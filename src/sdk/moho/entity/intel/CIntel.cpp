@@ -16,6 +16,35 @@
 
 namespace
 {
+  struct CIntelSerializerHelperRuntime
+  {
+    void* mVtable;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+
+  static_assert(
+    offsetof(CIntelSerializerHelperRuntime, mHelperNext) == 0x04,
+    "CIntelSerializerHelperRuntime::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CIntelSerializerHelperRuntime, mHelperPrev) == 0x08,
+    "CIntelSerializerHelperRuntime::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CIntelSerializerHelperRuntime, mLoadCallback) == 0x0C,
+    "CIntelSerializerHelperRuntime::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CIntelSerializerHelperRuntime, mSaveCallback) == 0x10,
+    "CIntelSerializerHelperRuntime::mSaveCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CIntelSerializerHelperRuntime) == 0x14, "CIntelSerializerHelperRuntime size must be 0x14");
+
+  CIntelSerializerHelperRuntime gCIntelSerializerHelper{};
+
   [[nodiscard]] gpg::RType* CachedCIntelPosHandleType()
   {
     static gpg::RType* cached = nullptr;
@@ -80,12 +109,46 @@ namespace
   {
     return handle.mLastPos.x != position.x || handle.mLastPos.y != position.y || handle.mLastPos.z != position.z;
   }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
+  int DeserializeCIntelFromArchiveBridge(const int archivePtr, const int objectPtr)
+  {
+    gpg::ReadArchive* const archive = reinterpret_cast<gpg::ReadArchive*>(archivePtr);
+    auto* const intel = reinterpret_cast<moho::CIntel*>(objectPtr);
+    if (archive == nullptr || intel == nullptr) {
+      return 0;
+    }
+
+    const gpg::RRef nullOwner{};
+    intel->ReadArchive(*archive, nullOwner);
+    return 0;
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* CIntel::sType = nullptr;
 
+  /**
+   * Address: 0x00683170 (FUN_00683170)
+   *
+   * What it does:
+   * Returns cached reflected type metadata for `CIntel`, resolving it
+   * through RTTI lookup on first use.
+   */
   gpg::RType* CIntel::StaticGetClass()
   {
     if (!sType) {
@@ -279,6 +342,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076E6B0 (FUN_0076E6B0)
+   *
+   * What it does:
+   * Serializer-load thunk lane that forwards directly into
+   * `CIntel::ReadArchive` using a null-owner reflection reference.
+   */
+  [[maybe_unused]] void DeserializeCIntelFromArchiveThunk(gpg::ReadArchive* const archive, CIntel* const intel)
+  {
+    if (archive == nullptr || intel == nullptr) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    intel->ReadArchive(*archive, nullOwner);
+  }
+
+  /**
    * Address: 0x0076E9E0 (FUN_0076E9E0, thunk to 0x0076EA60)
    *
    * What it does:
@@ -310,6 +390,23 @@ namespace moho
 
     auto* const intel = reinterpret_cast<CIntel*>(static_cast<std::uintptr_t>(objectPtr));
     intel->WriteArchive(*archive, *ownerRef);
+  }
+
+  /**
+   * Address: 0x0076E6D0 (FUN_0076E6D0)
+   *
+   * What it does:
+   * Initializes startup CIntel serializer-helper links and binds recovered
+   * load/save callback lanes.
+   */
+  [[nodiscard]] gpg::SerHelperBase* InitializeCIntelSerializerHelper()
+  {
+    InitializeHelperNode(gCIntelSerializerHelper);
+    gCIntelSerializerHelper.mLoadCallback = reinterpret_cast<gpg::RType::load_func_t>(
+      &DeserializeCIntelFromArchiveBridge
+    );
+    gCIntelSerializerHelper.mSaveCallback = reinterpret_cast<gpg::RType::save_func_t>(&CIntel::SerializeSave);
+    return HelperSelfNode(gCIntelSerializerHelper);
   }
 
   /**
@@ -408,3 +505,16 @@ namespace moho
     return mJamming.present != 0u && mJamming.enabled != 0u;
   }
 } // namespace moho
+
+namespace
+{
+  struct CIntelSerializerHelperBootstrap
+  {
+    CIntelSerializerHelperBootstrap()
+    {
+      (void)moho::InitializeCIntelSerializerHelper();
+    }
+  };
+
+  [[maybe_unused]] CIntelSerializerHelperBootstrap gCIntelSerializerHelperBootstrap;
+} // namespace

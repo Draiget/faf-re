@@ -27,6 +27,30 @@ namespace
   gpg::RType* gBeamBlueprintType = nullptr;
   moho::RBeamBlueprintConstruct gBeamBlueprintConstruct;
 
+  /**
+   * Address: 0x005102E0 (FUN_005102E0)
+   *
+   * What it does:
+   * Unlinks the global `RBeamBlueprintConstruct` helper node from the
+   * intrusive serializer-helper list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintConstruct);
+  }
+
+  /**
+   * Address: 0x00510310 (FUN_00510310)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `RBeamBlueprintConstruct` helper-node
+   * cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintConstructHelperNodeSecondary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintConstruct);
+  }
+
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -46,7 +70,7 @@ namespace
 
   void CleanupBeamBlueprintConstructAtexit()
   {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintConstruct);
+    (void)CleanupBeamBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 

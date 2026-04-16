@@ -1,9 +1,21 @@
-﻿#include "moho/ui/EScrollTypeTypeInfo.h"
+#include "moho/ui/EScrollTypeTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 namespace moho
 {
+  /**
+   * Address: 0x007771B0 (FUN_007771B0, Moho::EScrollTypeTypeInfo::ctor)
+   *
+   * What it does:
+   * Preregisters the reflected `EScrollType` enum metadata.
+   */
+  EScrollTypeTypeInfo::EScrollTypeTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(EScrollType), this);
+  }
+
   /**
    * Address: 0x00777240 (FUN_00777240, Moho::EScrollTypeTypeInfo::dtr)
    */

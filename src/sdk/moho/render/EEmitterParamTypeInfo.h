@@ -8,6 +8,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00770790 (FUN_00770790)
+     *
+     * What it does:
+     * Preregisters the reflected `EEmitterParam` enum metadata.
+     */
+    EEmitterParamTypeInfo();
+
+    /**
      * Address: 0x00770820 (FUN_00770820, scalar deleting thunk)
      */
     ~EEmitterParamTypeInfo() override;

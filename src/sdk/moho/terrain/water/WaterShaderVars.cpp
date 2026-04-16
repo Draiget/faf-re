@@ -1,4 +1,5 @@
 #include "moho/terrain/water/WaterShaderVars.h"
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 
 namespace
 {
@@ -47,6 +48,23 @@ namespace moho
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunColorShaderVar, "SunColor")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunGlowShaderVar, "SunGlow")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2TerrainScaleShaderVar, "TerrainScale")
+
+  /**
+   * Address: 0x008111E0 (FUN_008111E0)
+   *
+   * What it does:
+   * Writes one 16-byte raw payload into `water2/TerrainScale` when that
+   * shader variable exists, then returns the variable lane.
+   */
+  ShaderVar* SetWater2TerrainScaleShaderVarData(const void* const terrainScaleData) noexcept
+  {
+    ShaderVar& shaderVar = GetWater2TerrainScaleShaderVar();
+    if (shaderVar.Exists()) {
+      shaderVar.mEffectVariable->SetPtr(terrainScaleData, 16U);
+    }
+    return &shaderVar;
+  }
+
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WorldToViewShorelineShaderVar, "WorldToView")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2ProjectionShorelineShaderVar, "Projection")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterElevationTShorelineShaderVar, "WaterElevation")

@@ -51,6 +51,30 @@ namespace moho
      */
     bool ManipulatorUpdate() override;
 
+    /**
+     * Address: 0x00647620 (FUN_00647620)
+     *
+     * What it does:
+     * Stores clamped acceleration scalar as runtime rate (`max(0,value) * 0.1`).
+     */
+    CSlideManipulator* SetAccelerationRateFromScript(float value) noexcept;
+
+    /**
+     * Address: 0x00647640 (FUN_00647640)
+     *
+     * What it does:
+     * Stores clamped deceleration scalar as runtime rate (`max(0,value) * 0.1`).
+     */
+    CSlideManipulator* SetDecelerationRateFromScript(float value) noexcept;
+
+    /**
+     * Address: 0x00647520 (FUN_00647520)
+     *
+     * What it does:
+     * Sets world-units flag lane used by goal/move conversion logic.
+     */
+    void SetWorldUnits(bool enabled) noexcept;
+
     static gpg::RType* sType;
 
     Wm3::Vector3f mCurrentPosition{}; // +0x80

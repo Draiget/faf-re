@@ -75,6 +75,15 @@ namespace moho
   };
 
   /**
+   * Address: 0x005108A0 (FUN_005108A0)
+   *
+   * What it does:
+   * Destroys all `REmitterCurveKey` entries in one storage lane, frees the
+   * backing allocation, and clears begin/end/capacity pointers.
+   */
+  void ResetEmitterCurveKeyStorageRuntime(REmitterCurveKeyListStorage* storage);
+
+  /**
    * Address: 0x00515460 (FUN_00515460)
    *
    * What it does:
@@ -87,6 +96,14 @@ namespace moho
     float XRange{0.0f};               // +0x04
     REmitterCurveKeyListStorage Keys; // +0x08
     static gpg::RType* sType;
+
+    /**
+     * Address: 0x0050E530 (FUN_0050E530, ??0REmitterBlueprintCurve@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Installs the curve vftable and zero-initializes range/key-storage lanes.
+     */
+    REmitterBlueprintCurve();
 
     /**
      * Address: 0x0050E4F0 (FUN_0050E4F0)

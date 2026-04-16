@@ -5,6 +5,15 @@
 namespace moho
 {
   /**
+   * Address: 0x007179B0 (FUN_007179B0, Moho::SThreatTypeInfo::SThreatTypeInfo)
+   */
+  SThreatTypeInfo::SThreatTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(SThreat), this);
+  }
+
+  /**
    * Address: 0x00717A40 (FUN_00717A40, Moho::SThreatTypeInfo::dtr)
    */
   SThreatTypeInfo::~SThreatTypeInfo() = default;

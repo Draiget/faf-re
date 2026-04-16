@@ -55,6 +55,26 @@ namespace
     moho::CFireWeaponTask::MemberSerialize(archive, task, version, ownerRef);
   }
 
+  /**
+   * Address: 0x006DD3B0 (FUN_006DD3B0)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CFireWeaponTask::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CFireWeaponTaskMemberDeserializeThunk(
+    moho::CFireWeaponTask* const task,
+    gpg::ReadArchive* const archive,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || task == nullptr) {
+      return;
+    }
+
+    moho::CFireWeaponTask::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
@@ -74,10 +94,17 @@ namespace
     return type;
   }
 
-  void cleanup_CFireWeaponTaskSerializer_00BFE710_Impl()
+  [[nodiscard]] gpg::SerHelperBase* cleanup_CFireWeaponTaskSerializer_00BFE710_Impl()
   {
-    gCFireWeaponTaskSerializer.mHelperNext = SerializerSelfNode(gCFireWeaponTaskSerializer);
-    gCFireWeaponTaskSerializer.mHelperPrev = SerializerSelfNode(gCFireWeaponTaskSerializer);
+    if (gCFireWeaponTaskSerializer.mHelperNext != nullptr && gCFireWeaponTaskSerializer.mHelperPrev != nullptr) {
+      gCFireWeaponTaskSerializer.mHelperNext->mPrev = gCFireWeaponTaskSerializer.mHelperPrev;
+      gCFireWeaponTaskSerializer.mHelperPrev->mNext = gCFireWeaponTaskSerializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCFireWeaponTaskSerializer);
+    gCFireWeaponTaskSerializer.mHelperNext = self;
+    gCFireWeaponTaskSerializer.mHelperPrev = self;
+    return self;
   }
 
 } // namespace
@@ -132,7 +159,31 @@ namespace moho
    */
   void cleanup_CFireWeaponTaskSerializer()
   {
-    cleanup_CFireWeaponTaskSerializer_00BFE710_Impl();
+    (void)cleanup_CFireWeaponTaskSerializer_00BFE710_Impl();
+  }
+
+  /**
+   * Address: 0x006D3F50 (FUN_006D3F50)
+   *
+   * What it does:
+   * Duplicated teardown lane that unlinks `CFireWeaponTaskSerializer` helper
+   * links and rewires the node as a self-linked singleton.
+   */
+  gpg::SerHelperBase* cleanup_CFireWeaponTaskSerializer_variant_primary()
+  {
+    return cleanup_CFireWeaponTaskSerializer_00BFE710_Impl();
+  }
+
+  /**
+   * Address: 0x006D3F80 (FUN_006D3F80)
+   *
+   * What it does:
+   * Secondary duplicated teardown lane for `CFireWeaponTaskSerializer` helper
+   * link unlink + self-link reset.
+   */
+  gpg::SerHelperBase* cleanup_CFireWeaponTaskSerializer_variant_secondary()
+  {
+    return cleanup_CFireWeaponTaskSerializer_00BFE710_Impl();
   }
 
   /**
@@ -143,7 +194,6 @@ namespace moho
     InitializeSerializerNode(gCFireWeaponTaskSerializer);
     gCFireWeaponTaskSerializer.mDeserialize = &CFireWeaponTaskSerializer::Deserialize;
     gCFireWeaponTaskSerializer.mSerialize = &CFireWeaponTaskSerializer::Serialize;
-    gCFireWeaponTaskSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_CFireWeaponTaskSerializer);
   }
 } // namespace moho

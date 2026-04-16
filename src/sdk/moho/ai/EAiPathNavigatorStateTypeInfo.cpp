@@ -126,6 +126,33 @@ namespace
     return UnlinkSerializerNode(*AcquireEAiPathNavigatorStatePrimitiveSerializer());
   }
 
+  /**
+   * Address: 0x005AD310 (FUN_005AD310)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the recovered
+   * `EAiPathNavigatorState` primitive serializer helper node and restores
+   * self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  cleanup_EAiPathNavigatorStatePrimitiveSerializerStartupThunkA()
+  {
+    return cleanup_EAiPathNavigatorStatePrimitiveSerializer();
+  }
+
+  /**
+   * Address: 0x005AD340 (FUN_005AD340)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same
+   * `EAiPathNavigatorState` primitive serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  cleanup_EAiPathNavigatorStatePrimitiveSerializerStartupThunkB()
+  {
+    return cleanup_EAiPathNavigatorStatePrimitiveSerializer();
+  }
+
   void cleanup_EAiPathNavigatorStatePrimitiveSerializer_atexit()
   {
     (void)cleanup_EAiPathNavigatorStatePrimitiveSerializer();
@@ -205,13 +232,19 @@ void EAiPathNavigatorStatePrimitiveSerializer::Serialize(
   archive->WriteInt(static_cast<int>(*value));
 }
 
+/**
+ * Address: 0x005B0050 (FUN_005B0050)
+ *
+ * What it does:
+ * Binds reflected load/save callbacks for `EAiPathNavigatorState`.
+ */
 void EAiPathNavigatorStatePrimitiveSerializer::RegisterSerializeFunctions()
 {
   gpg::RType* const type = CachedEAiPathNavigatorStateType();
   GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
+  GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mLoadCallback;
+  GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
 
@@ -241,7 +274,6 @@ int moho::register_EAiPathNavigatorStatePrimitiveSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &EAiPathNavigatorStatePrimitiveSerializer::Deserialize;
   serializer->mSaveCallback = &EAiPathNavigatorStatePrimitiveSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_EAiPathNavigatorStatePrimitiveSerializer_atexit);
 }
 

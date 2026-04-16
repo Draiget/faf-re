@@ -14,7 +14,10 @@
  * Parses the incoming null-terminated string using the recovered CRT `atof`
  * lane and returns the parsed value.
  */
-extern "C" double __cdecl RuntimeAtofForward(const char* text);
+extern "C" double __cdecl RuntimeAtofForward(const char* text)
+{
+  return std::atof(text != nullptr ? text : "0");
+}
 
 // ---------------------------------------------------------------------------
 // RFloatType

@@ -38,14 +38,14 @@ namespace
   }
 
   template <typename TConstruct>
-  void UnlinkConstructNode(TConstruct& construct) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkConstructNode(TConstruct& construct) noexcept
   {
-    if (construct.mHelperNext != nullptr && construct.mHelperPrev != nullptr) {
-      construct.mHelperNext->mPrev = construct.mHelperPrev;
-      construct.mHelperPrev->mNext = construct.mHelperNext;
-    }
-
-    InitializeConstructNode(construct);
+    construct.mHelperNext->mPrev = construct.mHelperPrev;
+    construct.mHelperPrev->mNext = construct.mHelperNext;
+    gpg::SerHelperBase* const self = ConstructSelfNode(construct);
+    construct.mHelperPrev = self;
+    construct.mHelperNext = self;
+    return self;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiSiloBuildImplType()
@@ -59,22 +59,49 @@ namespace
   }
 
   /**
+   * Address: 0x005CF7E0 (FUN_005CF7E0, CAiSiloBuildImplConstruct cleanup helper variant)
+   *
+   * What it does:
+   * Unlinks `CAiSiloBuildImplConstruct` from the intrusive helper list,
+   * resets self-links, and returns the helper node.
+   */
+  [[maybe_unused, nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplConstruct_primary()
+  {
+    CAiSiloBuildImplConstruct* const construct =
+      reinterpret_cast<CAiSiloBuildImplConstruct*>(gCAiSiloBuildImplConstructStorage);
+    return UnlinkConstructNode(*construct);
+  }
+
+  /**
+   * Address: 0x005CF810 (FUN_005CF810, CAiSiloBuildImplConstruct cleanup helper variant)
+   *
+   * What it does:
+   * Secondary cleanup variant that unlinks
+   * `CAiSiloBuildImplConstruct` from the intrusive helper list, resets
+   * self-links, and returns the helper node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplConstruct_secondary()
+  {
+    CAiSiloBuildImplConstruct* const construct =
+      reinterpret_cast<CAiSiloBuildImplConstruct*>(gCAiSiloBuildImplConstructStorage);
+    return UnlinkConstructNode(*construct);
+  }
+
+  /**
    * Address: 0x00BF7F30 (FUN_00BF7F30, cleanup_CAiSiloBuildImplConstruct)
    *
    * What it does:
-   * Unlinks the static construct helper node from reflection helper lists and
-   * tears down local storage.
+   * Startup teardown hook that performs the construct helper unlink/reset and
+   * returns the helper node.
    */
-  void cleanup_CAiSiloBuildImplConstruct()
+  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplConstruct()
   {
-    if (!gCAiSiloBuildImplConstructConstructed) {
-      return;
-    }
+    return cleanup_CAiSiloBuildImplConstruct_secondary();
+  }
 
-    CAiSiloBuildImplConstruct* const construct = AcquireCAiSiloBuildImplConstruct();
-    UnlinkConstructNode(*construct);
-    construct->~CAiSiloBuildImplConstruct();
-    gCAiSiloBuildImplConstructConstructed = false;
+  void cleanup_CAiSiloBuildImplConstruct_atexit()
+  {
+    (void)cleanup_CAiSiloBuildImplConstruct();
   }
 } // namespace
 
@@ -112,7 +139,7 @@ int moho::register_CAiSiloBuildImplConstruct()
   construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiSiloBuildImplConstruct::Construct);
   construct->mDeleteCallback = &CAiSiloBuildImplConstruct::Deconstruct;
   construct->RegisterConstructFunction();
-  return std::atexit(&cleanup_CAiSiloBuildImplConstruct);
+  return std::atexit(&cleanup_CAiSiloBuildImplConstruct_atexit);
 }
 
 /**

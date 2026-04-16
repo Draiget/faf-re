@@ -24,6 +24,16 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005D1F00 (FUN_005D1F00, ??0IAiSteering@Moho@@QAE@XZ)
+     * Address: 0x005D2750 (FUN_005D2750)
+     *
+     * What it does:
+     * Initializes the IAiSteering interface base lane for derived steering
+     * implementations; the second constructor lane is an equivalent alias.
+     */
+    IAiSteering();
+
+    /**
      * Address: 0x005D1F10 (FUN_005D1F10, scalar deleting thunk)
      *
      * VFTable SLOT: 0

@@ -45,20 +45,4 @@ namespace moho
 
   static_assert(sizeof(SBlackListInfoTypeInfo) == 0x64, "SBlackListInfoTypeInfo size must be 0x64");
 
-  /**
-   * Address: 0x00BFE620 (FUN_00BFE620, sub_BFE620)
-   *
-   * What it does:
-   * Releases `SBlackListInfoTypeInfo` dynamic field/base arrays and resets the
-   * type object to base `RObject` lane semantics.
-   */
-  void cleanup_SBlackListInfoTypeInfo();
-
-  /**
-   * Address: 0x00BD8810 (FUN_00BD8810, sub_BD8810)
-   *
-   * What it does:
-   * Forces `SBlackListInfoTypeInfo` registration and schedules exit cleanup.
-   */
-  int register_SBlackListInfoTypeInfo();
 } // namespace moho

@@ -76,6 +76,136 @@ namespace
   moho::StatItem* gEngineStatSoundPendingDestroy = nullptr;
 
   /**
+   * Address: 0x008AA210 (FUN_008AA210)
+   *
+   * What it does:
+   * Returns one resolved sound-variable state lane.
+   */
+  [[nodiscard]] std::uint16_t ReadSndVarState(const moho::CSndVar& value) noexcept
+  {
+    return value.mState;
+  }
+
+  /**
+   * Address: 0x008AA220 (FUN_008AA220)
+   *
+   * What it does:
+   * Returns one resolved bank id from a sound-parameter descriptor.
+   */
+  [[nodiscard]] std::uint16_t ReadSndParamsBankId(const moho::CSndParams& params) noexcept
+  {
+    return params.mBankId;
+  }
+
+  /**
+   * Address: 0x008AA230 (FUN_008AA230)
+   *
+   * What it does:
+   * Returns one resolved cue id from a sound-parameter descriptor.
+   */
+  [[nodiscard]] std::uint16_t ReadSndParamsCueId(const moho::CSndParams& params) noexcept
+  {
+    return params.mCueId;
+  }
+
+  /**
+   * Address: 0x008AA260 (FUN_008AA260)
+   *
+   * What it does:
+   * Returns one script-loop owner context pointer from a script sound handle.
+   */
+  [[nodiscard]] moho::CSndParams* ReadSoundLoopOwnerContext(moho::HSound& sound) noexcept
+  {
+    return sound.mLoopOwnerContext;
+  }
+
+  /**
+   * Address: 0x008AA270 (FUN_008AA270)
+   *
+   * What it does:
+   * Writes one loop-cue pointer into a script sound handle and returns the
+   * same handle.
+   */
+  [[nodiscard]] moho::HSound* WriteSoundLoopCue(moho::HSound* const sound, moho::IXACTCue* const cue) noexcept
+  {
+    sound->mLoopCue = cue;
+    return sound;
+  }
+
+  /**
+   * Address: 0x008AA280 (FUN_008AA280)
+   *
+   * What it does:
+   * Returns one loop-cue pointer from a script sound handle.
+   */
+  [[nodiscard]] moho::IXACTCue* ReadSoundLoopCue(moho::HSound& sound) noexcept
+  {
+    return sound.mLoopCue;
+  }
+
+  /**
+   * Address: 0x008AA2A0 (FUN_008AA2A0)
+   *
+   * What it does:
+   * Returns one ducking-flag byte from a script sound handle.
+   */
+  [[nodiscard]] std::uint8_t ReadSoundAffectsDuckingFlag(const moho::HSound& sound) noexcept
+  {
+    return sound.mAffectsDucking;
+  }
+
+  /**
+   * Address: 0x008AA300 (FUN_008AA300)
+   *
+   * What it does:
+   * Returns one RPC-loop variable pointer from a sound-parameter descriptor.
+   */
+  [[nodiscard]] moho::CSndVar* ReadSndParamsRpcLoopVariable(moho::CSndParams& params) noexcept
+  {
+    return params.mRpcLoopVariable;
+  }
+
+  /**
+   * Address: 0x008AB1F0 (FUN_008AB1F0)
+   *
+   * What it does:
+   * Packs one `(bankId, cueId)` pair into a 32-bit lookup key.
+   */
+  [[nodiscard]] std::uint32_t PackSndBankCueKey(const std::uint16_t bankId, const std::uint16_t cueId) noexcept
+  {
+    return static_cast<std::uint32_t>(cueId) | (static_cast<std::uint32_t>(bankId) << 16u);
+  }
+
+  /**
+   * Address: 0x008AB440 (FUN_008AB440)
+   *
+   * What it does:
+   * Destroys one loop cue attached to a script sound handle when present and
+   * returns that cue pointer.
+   */
+  [[nodiscard]] moho::IXACTCue* DestroySoundLoopCueIfPresent(moho::HSound& sound)
+  {
+    moho::IXACTCue* const cue = ReadSoundLoopCue(sound);
+    if (cue != nullptr) {
+      cue->Destroy();
+    }
+    return cue;
+  }
+
+  /**
+   * Address: 0x008AE440 (FUN_008AE440)
+   *
+   * What it does:
+   * Clears the process-global user-sound-manager singleton storage and
+   * returns the address of that singleton slot.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CUserSoundManager** ResetUserSoundManagerSingletonStorageLane() noexcept
+  {
+    gUserSoundManager = nullptr;
+    return &gUserSoundManager;
+  }
+
+  /**
    * Address: 0x008AB400 (FUN_008AB400, IXACTCUE::GetState)
    *
    * What it does:
@@ -86,7 +216,7 @@ namespace
   [[nodiscard]] bool SoundHandleCueIsPrepared(moho::HSound* const sound)
   {
     std::int32_t cueState = 0;
-    moho::IXACTCue* const cue = (sound != nullptr) ? sound->mLoopCue : nullptr;
+    moho::IXACTCue* const cue = (sound != nullptr) ? ReadSoundLoopCue(*sound) : nullptr;
     if (cue == nullptr) {
       return true;
     }
@@ -132,6 +262,62 @@ namespace
   };
   static_assert(offsetof(EntityLoopTreeNode, mEntityId) == 0x0C, "EntityLoopTreeNode::mEntityId offset must be 0x0C");
   static_assert(offsetof(EntityLoopTreeNode, mIsSentinel) == 0x11, "EntityLoopTreeNode::mIsSentinel offset must be 0x11");
+
+  struct SelfLinkedDwordNode12
+  {
+    SelfLinkedDwordNode12* mNext; // +0x00
+    SelfLinkedDwordNode12* mPrev; // +0x04
+    std::uint32_t mLane08;        // +0x08
+  };
+  static_assert(sizeof(SelfLinkedDwordNode12) == 0x0C, "SelfLinkedDwordNode12 size must be 0x0C");
+
+  /**
+   * Address: 0x008AF3A0 (FUN_008AF3A0, sub_8AF3A0)
+   *
+   * What it does:
+   * Allocates one 12-byte intrusive-list sentinel lane and self-links the
+   * first two pointer lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] SelfLinkedDwordNode12* CreateSelfLinkedDwordNode12()
+  {
+    auto* const node = static_cast<SelfLinkedDwordNode12*>(::operator new(sizeof(SelfLinkedDwordNode12)));
+    if (node != nullptr) {
+      node->mNext = node;
+      node->mPrev = node;
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x008AF620 (FUN_008AF620, sub_8AF620)
+   *
+   * What it does:
+   * Allocates one compact 20-byte tree node and seeds parent/child links plus
+   * payload and node-color lanes for red-black insert staging.
+   */
+  [[maybe_unused]] [[nodiscard]] EntityLoopTreeNode* CreateEntityLoopTreeNodeFromLinks(
+    EntityLoopTreeNode* const left,
+    EntityLoopTreeNode* const parent,
+    EntityLoopTreeNode* const right,
+    const std::int32_t* const payloadEntityId,
+    const std::uint8_t color
+  )
+  {
+    auto* const node = static_cast<EntityLoopTreeNode*>(::operator new(sizeof(EntityLoopTreeNode)));
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    node->mLeft = left;
+    node->mParent = parent;
+    node->mRight = right;
+    node->mEntityId = payloadEntityId != nullptr ? *payloadEntityId : 0;
+    node->mColor = color;
+    node->mIsSentinel = 0u;
+    node->pad_12[0] = 0u;
+    node->pad_12[1] = 0u;
+    return node;
+  }
 
   [[nodiscard]] moho::SoundHandleRecord*& OwnerLoopHeadRef(moho::HSndEntityLoop& ownerHandle) noexcept
   {
@@ -221,6 +407,13 @@ namespace
   static_assert(sizeof(UserSessionEntityMapView) == 0x0C, "UserSessionEntityMapView size must be 0x0C");
   static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
 
+  /**
+   * Address: 0x008AEEC0 (FUN_008AEEC0)
+   *
+   * What it does:
+   * Recursively destroys one entity-loop RB-tree branch and releases each
+   * node payload, stopping on the sentinel/head lane.
+   */
   void DestroyEntityLoopTree(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
   {
     if (node == nullptr || node == head || node->mIsSentinel != 0u) {
@@ -232,6 +425,13 @@ namespace
     operator delete(node);
   }
 
+  /**
+   * Address: 0x008AF130 (FUN_008AF130, sub_8AF130)
+   *
+   * What it does:
+   * Descends one entity-loop tree through left-child links and returns the
+   * minimum node reachable from the input lane.
+   */
   [[nodiscard]] EntityLoopTreeNode* EntityLoopTreeMinimum(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
   {
     if (node == nullptr || node == head) {
@@ -243,6 +443,13 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x008AF110 (FUN_008AF110, sub_8AF110)
+   *
+   * What it does:
+   * Descends one entity-loop tree through right-child links and returns the
+   * maximum node reachable from the input lane.
+   */
   [[nodiscard]] EntityLoopTreeNode* EntityLoopTreeMaximum(EntityLoopTreeNode* node, EntityLoopTreeNode* const head)
   {
     if (node == nullptr || node == head) {
@@ -559,6 +766,13 @@ namespace
     RebuildSoundHandleOwnerChains(manager);
   }
 
+  /**
+   * Address: 0x008AA7C0 (FUN_008AA7C0)
+   *
+   * What it does:
+   * Returns one reusable loop-handle id from the free-id bitset, or allocates
+   * the next monotonic id when the free-id set is empty.
+   */
   [[nodiscard]] std::uint32_t AcquireSoundHandleIndex(moho::SoundHandleIdPool* const idPool)
   {
     if (idPool == nullptr) {
@@ -622,7 +836,7 @@ namespace
   bool IsSndVarReady(const moho::CSndVar& value)
   {
     if (value.mResolved != 0u) {
-      return value.mState != 0xFFFFu;
+      return ReadSndVarState(value) != 0xFFFFu;
     }
     return value.DoResolve();
   }
@@ -670,6 +884,13 @@ namespace
     hook.mNext = nullptr;
   }
 
+  /**
+   * Address: 0x008AEC20 (FUN_008AEC20, sub_8AEC20)
+   *
+   * What it does:
+   * Rebinds one listener-army intrusive hook to a new owner anchor and keeps
+   * the single-linked owner chain consistent across unlink/relink transitions.
+   */
   void RelinkArmyHook(ListenerArmyHook& hook, moho::UserArmy* army)
   {
     auto* const newOwnerAnchor = army == nullptr
@@ -869,6 +1090,18 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x008AA7A0 (FUN_008AA7A0)
+   *
+   * What it does:
+   * Initializes the free-id bitset runtime lanes and resets next-id to zero.
+   */
+  SoundHandleIdPool::SoundHandleIdPool()
+    : mFreeIds()
+    , mNextId(0u)
+  {
+  }
+
+  /**
    * Address: 0x008AA800 (FUN_008AA800, ??0CUserSoundManager@Moho@@QAE@XZ)
    *
    * What it does:
@@ -900,7 +1133,6 @@ namespace moho
     , mActiveDuckingSounds(0)
     , mReserved2A34(0u)
   {
-    mLoopHandleIdPool.mNextId = 0u;
     mSoundHandles.Resize(0x100u, SoundHandleRecord{});
     const std::size_t handleCount = mSoundHandles.Size();
     for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
@@ -947,6 +1179,42 @@ namespace moho
     }
 
     return gUserSoundManager;
+  }
+
+  /**
+   * Address: 0x008AE460 (FUN_008AE460, user-sound singleton getter lane)
+   *
+   * What it does:
+   * Returns the process-global user-sound-manager singleton pointer without
+   * creating a replacement instance.
+   */
+  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRaw() noexcept
+  {
+    return gUserSoundManager;
+  }
+
+  /**
+   * Address: 0x008AE470 (FUN_008AE470, user-sound singleton getter lane)
+   *
+   * What it does:
+   * Alias entry that returns the same process-global user-sound-manager
+   * singleton pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRawAliasA() noexcept
+  {
+    return USER_GetSoundManagerSingletonRaw();
+  }
+
+  /**
+   * Address: 0x008AED80 (FUN_008AED80, user-sound singleton getter lane)
+   *
+   * What it does:
+   * Alias entry that returns the same process-global user-sound-manager
+   * singleton pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRawAliasB() noexcept
+  {
+    return USER_GetSoundManagerSingletonRaw();
   }
 
   /**
@@ -1046,6 +1314,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x008AA600 (FUN_008AA600)
+   *
+   * What it does:
+   * Destroys one entity-loop record when its cue is in stopped state, or
+   * updates per-record playing-seconds when the cue remains in playing state.
+   */
+  [[maybe_unused]] int UpdateEntityLoopPlayingSecondsOrDestroy(
+    SoundHandleRecord* const record,
+    AudioEngine* const voiceEngine,
+    const float frameSeconds
+  )
+  {
+    if (record == nullptr || voiceEngine == nullptr || record->mCue == nullptr) {
+      return 0;
+    }
+
+    if (voiceEngine->IsStopped(record->mCue)) {
+      SND_DestroyEntityLoop(record);
+      return 0;
+    }
+
+    std::int32_t cueState = 0;
+    const int getStateResult = record->mCue->GetState(&cueState);
+    if (cueState == kCueStatePlaying) {
+      record->mPlayingSeconds += frameSeconds;
+    }
+
+    return getStateResult;
+  }
+
+  /**
    * Address: 0x008AC0B0 (FUN_008AC0B0)
    *
    * gpg::fastvector<Moho::SAudioRequest> const&
@@ -1103,7 +1402,7 @@ namespace moho
         HSound* const sound = request.sound;
         CSndParams* params = request.params;
         if (params == nullptr && sound != nullptr) {
-          params = static_cast<CSndParams*>(sound->mLoopOwnerContext);
+          params = ReadSoundLoopOwnerContext(*sound);
         }
 
         if (sound == nullptr || params == nullptr || voiceEngine == nullptr) {
@@ -1114,8 +1413,11 @@ namespace moho
         }
 
         IXACTCue* cue = nullptr;
-        if (AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) >= 0 && cue != nullptr) {
-          sound->mLoopCue = cue;
+        if (
+          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) >= 0
+          && cue != nullptr
+        ) {
+          (void)WriteSoundLoopCue(sound, cue);
           AudioEngine::Calculate3D(&request.position, voiceEngine, cue);
         }
         break;
@@ -1123,7 +1425,7 @@ namespace moho
 
       case EAudioRequestType::StopLoop: {
         HSound* const sound = request.sound;
-        IXACTCue* const cue = sound != nullptr ? sound->mLoopCue : nullptr;
+        IXACTCue* const cue = sound != nullptr ? ReadSoundLoopCue(*sound) : nullptr;
         if (cue == nullptr) {
           gpg::Warnf("SND: No cue for stop loop request.");
           break;
@@ -1146,8 +1448,7 @@ namespace moho
           break;
         }
 
-        const std::uint32_t cueKey =
-          static_cast<std::uint32_t>(params->mCueId) | (static_cast<std::uint32_t>(params->mBankId) << 16u);
+        const std::uint32_t cueKey = PackSndBankCueKey(ReadSndParamsBankId(*params), ReadSndParamsCueId(*params));
 
         bool seenCueKey = false;
         const std::size_t recentKeyCount = mRecentOneShotKeys.Size();
@@ -1168,7 +1469,10 @@ namespace moho
         }
 
         IXACTCue* cue = nullptr;
-        if (AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) < 0 || cue == nullptr) {
+        if (
+          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0
+          || cue == nullptr
+        ) {
           break;
         }
 
@@ -1200,7 +1504,7 @@ namespace moho
   bool CUserSoundManager::StopRPCEntityLoop(SoundHandleRecord* const record)
   {
     const float trackedCountMinusOne = static_cast<float>(static_cast<std::int32_t>(record->mTrackedEntityCount) - 1);
-    SND_SetGlobalFloat(record->mParams->mRpcLoopVariable->mState, trackedCountMinusOne);
+    SND_SetGlobalFloat(ReadSndParamsRpcLoopVariable(*record->mParams)->mState, trackedCountMinusOne);
     if (record->mTrackedEntityCount != 1u) {
       return false;
     }
@@ -1245,7 +1549,7 @@ namespace moho
     }
 
     IXACTCue* cue = nullptr;
-    if (AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) < 0) {
+    if (AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0) {
       EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
       if (gEngineStatSoundLimitedLoop != nullptr) {
         (void)::InterlockedExchangeAdd(
@@ -1292,17 +1596,24 @@ namespace moho
    */
   void CUserSoundManager::StartRPCEntityLoop(const std::int32_t& entityId, HSndEntityLoop* const loopHandle)
   {
-    if (loopHandle == nullptr || loopHandle->mParams == nullptr || loopHandle->mParams->mRpcLoopVariable == nullptr) {
+    if (
+      loopHandle == nullptr
+      || loopHandle->mParams == nullptr
+      || ReadSndParamsRpcLoopVariable(*loopHandle->mParams) == nullptr
+    ) {
       return;
     }
 
     CSndParams* const params = loopHandle->mParams;
-    const std::uint16_t rpcLoopVariable = params->mRpcLoopVariable->mState;
+    const std::uint16_t rpcLoopVariable = ReadSndParamsRpcLoopVariable(*params)->mState;
 
     if (loopHandle->mLoopIndex == -1) {
       IXACTCue* cue = nullptr;
       AudioEngine* const voiceEngine = mVoiceEngine.get();
-      if (voiceEngine == nullptr || AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) < 0) {
+      if (
+        voiceEngine == nullptr
+        || AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0
+      ) {
         return;
       }
 
@@ -1407,7 +1718,8 @@ namespace moho
         continue;
       }
 
-      const CSndVar* const rpcLoopVariable = record.mParams != nullptr ? record.mParams->mRpcLoopVariable : nullptr;
+      const CSndVar* const rpcLoopVariable = record.mParams != nullptr ? ReadSndParamsRpcLoopVariable(*record.mParams)
+                                                                       : nullptr;
       if (rpcLoopVariable == nullptr || rpcLoopVariable->mState == 0xFFFFu) {
         UpdateEntityLoopSpatialization(&record, mVoiceEngine.get(), simDeltaSeconds);
       }
@@ -1430,11 +1742,7 @@ namespace moho
         continue;
       }
 
-      cueState = 0;
-      record.mCue->GetState(&cueState);
-      if (cueState == kCueStatePlaying) {
-        record.mPlayingSeconds += frameSeconds;
-      }
+      (void)UpdateEntityLoopPlayingSecondsOrDestroy(&record, mVoiceEngine.get(), frameSeconds);
     }
 
     const int pendingDestroyCount = DrainFinishedPendingCues(mPendingDestroyCues, mVoiceEngine.get());
@@ -1466,8 +1774,10 @@ namespace moho
       gpg::Debugf("SND: Play    [Cue: %s] [Bank: %s] %i", params.mCue.c_str(), params.mBank.c_str(), snd_index);
     }
 
-    const int xactResult = AudioEngine::Play(params.mBankId, nullptr, mVoiceEngine.get(), params.mCueId, 0);
-    WarnCuePlayFailure(xactResult, params.mCueId, params.mBankId, params.mBank);
+    const std::uint16_t bankId = ReadSndParamsBankId(params);
+    const std::uint16_t cueId = ReadSndParamsCueId(params);
+    const int xactResult = AudioEngine::Play(bankId, nullptr, mVoiceEngine.get(), cueId, 0);
+    WarnCuePlayFailure(xactResult, cueId, bankId, params.mBank);
   }
 
   /**
@@ -1491,8 +1801,10 @@ namespace moho
       gpg::Debugf("SND: Play2D  [Cue: %s] [Bank: %s] %i", params.mCue.c_str(), params.mBank.c_str(), snd_index);
     }
 
-    const int xactResult = AudioEngine::Play(params.mBankId, nullptr, mVoiceEngine.get(), params.mCueId, 0);
-    WarnCuePlayFailure(xactResult, params.mCueId, params.mBankId, params.mBank);
+    const std::uint16_t bankId = ReadSndParamsBankId(params);
+    const std::uint16_t cueId = ReadSndParamsCueId(params);
+    const int xactResult = AudioEngine::Play(bankId, nullptr, mVoiceEngine.get(), cueId, 0);
+    WarnCuePlayFailure(xactResult, cueId, bankId, params.mBank);
   }
 
   /**
@@ -1611,13 +1923,17 @@ namespace moho
       gpg::Debugf("SND: Play2D  [Cue: %s] [Bank: %s] %i", params->mCue.c_str(), params->mBank.c_str(), snd_index);
     }
 
-    if (AudioEngine::Play(params->mBankId, &cue, engine, params->mCueId, preloadOnly ? 1 : 0) < 0 || cue == nullptr) {
+    if (
+      AudioEngine::Play(ReadSndParamsBankId(*params), &cue, engine, ReadSndParamsCueId(*params), preloadOnly ? 1 : 0)
+        < 0
+      || cue == nullptr
+    ) {
       return nullptr;
     }
 
     HSound* const sound = new HSound(params);
     (void)AppendSoundToList(sound, reinterpret_cast<LoopNode*>(&mActiveLoops));
-    sound->mLoopCue = cue;
+    (void)WriteSoundLoopCue(sound, cue);
     return sound;
   }
 
@@ -1634,7 +1950,7 @@ namespace moho
       return;
     }
 
-    IXACTCue* const cue = sound->mLoopCue;
+    IXACTCue* const cue = ReadSoundLoopCue(*sound);
     if (cue != nullptr) {
       if (!immediate) {
         cue->Stop(0);
@@ -1642,9 +1958,9 @@ namespace moho
       }
 
       cue->Stop(1);
-      cue->Destroy();
-      const bool hadDuck = sound->mAffectsDucking != 0u;
-      sound->mLoopCue = nullptr;
+      (void)DestroySoundLoopCueIfPresent(*sound);
+      const bool hadDuck = ReadSoundAffectsDuckingFlag(*sound) != 0u;
+      (void)WriteSoundLoopCue(sound, nullptr);
       if (hadDuck) {
         PopDuck(false);
       }
@@ -1676,11 +1992,11 @@ namespace moho
     auto* const sentinel = reinterpret_cast<LoopNode*>(&mActiveLoops);
     while (mActiveLoops.mNext != sentinel) {
       HSound* const sound = LoopOwnerFromNode(mActiveLoops.mNext);
-      if (sound->mLoopCue != nullptr) {
-        StopAndDestroyCue(sound->mLoopCue);
-        sound->mLoopCue = nullptr;
+      if (ReadSoundLoopCue(*sound) != nullptr) {
+        StopAndDestroyCue(ReadSoundLoopCue(*sound));
+        (void)WriteSoundLoopCue(sound, nullptr);
 
-        if (sound->mAffectsDucking != 0u && mActiveDuckingSounds > 0) {
+        if (ReadSoundAffectsDuckingFlag(*sound) != 0u && mActiveDuckingSounds > 0) {
           --mActiveDuckingSounds;
           if (mActiveDuckingSounds == 0 && IsSndVarReady(mDuckLengthVar)) {
             mDuckElapsedSeconds = 0.0f;
@@ -2150,8 +2466,8 @@ namespace moho
       const LuaPlus::LuaObject soundObject(LuaPlus::LuaStackObject(state, 1));
       if (HSound* const sound = SCR_FromLua_HSoundOpt(soundObject, state); sound != nullptr) {
         (void)USER_GetSound();
-        if (sound->mLoopCue != nullptr) {
-          sound->mLoopCue->Play();
+        if (ReadSoundLoopCue(*sound) != nullptr) {
+          ReadSoundLoopCue(*sound)->Play();
         }
       }
     }

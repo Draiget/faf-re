@@ -100,6 +100,16 @@ namespace moho
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x0052BB50 (FUN_0052BB50, Moho::EntityCategory::Add)
+     *
+     * What it does:
+     * Iterates every set bit in `source` as a rules-ordinal lane, remaps that
+     * ordinal through `GetBlueprintFromOrdinal()->mBlueprintOrdinal`, and sets
+     * the remapped bit in `out`.
+     */
+    static EntityCategorySet* Add(EntityCategorySet* out, const EntityCategorySet* source);
+
+    /**
      * Address: 0x0056A9D0 (FUN_0056A9D0, Moho::EntityCategory::HasBlueprint)
      *
      * What it does:
@@ -191,6 +201,15 @@ namespace moho
     gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(sizeof(EntityCategoryHelperSerializer) == 0x14, "EntityCategoryHelperSerializer size must be 0x14");
+
+  /**
+   * Address: 0x0052C8D8 (FUN_0052C8D8)
+   *
+   * What it does:
+   * Returns the startup singleton serializer helper for
+   * `EntityCategoryHelper`.
+   */
+  [[nodiscard]] EntityCategoryHelperSerializer* GetEntityCategoryHelperSerializer() noexcept;
 
   /**
    * Address: 0x00BC8F10 (FUN_00BC8F10, register_EntityCategoryHelperTypeInfoStartup)

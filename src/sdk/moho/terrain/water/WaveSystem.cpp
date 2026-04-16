@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <new>
 
 #include "gpg/core/streams/BinaryReader.h"
@@ -52,6 +53,54 @@ namespace
     for (moho::WaveGenerator* const* it = begin; it != end; ++it) {
       delete *it;
     }
+  }
+
+  /**
+   * Address: 0x00887BB0 (FUN_00887BB0)
+   *
+   * What it does:
+   * Runs one deleting-destructor thunk for `WaveGenerator`, forwarding through
+   * non-deleting `WaveGenerator::~WaveGenerator` and optional storage release.
+   */
+  [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
+    moho::WaveGenerator* const generator,
+    const unsigned char deleteFlag
+  )
+  {
+    generator->~WaveGenerator();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(generator));
+    }
+    return generator;
+  }
+
+  [[nodiscard]] moho::WaveGenerator*** CompactWaveGeneratorPointerRangeWithoutTarget(
+    moho::WaveGenerator*** const outEnd,
+    moho::WaveGenerator** begin,
+    moho::WaveGenerator** const end,
+    moho::WaveGenerator* const target
+  ) noexcept
+  {
+    moho::WaveGenerator** cursor = begin;
+    while (cursor != end && *cursor != target) {
+      ++cursor;
+    }
+
+    if (cursor == end) {
+      *outEnd = cursor;
+      return outEnd;
+    }
+
+    moho::WaveGenerator** write = cursor;
+    for (moho::WaveGenerator** read = cursor + 1; read != end; ++read) {
+      if (*read != target) {
+        *write = *read;
+        ++write;
+      }
+    }
+
+    *outEnd = write;
+    return outEnd;
   }
 } // namespace
 
@@ -437,6 +486,43 @@ namespace moho
 
     // Binary path appends even on allocation failure (stores nullptr).
     mWaveGenerators.push_back(generator);
+    return generator;
+  }
+
+  /**
+   * Address: 0x00888F20 (FUN_00888F20, sub_888F20)
+   *
+   * What it does:
+   * Removes all cached references to `generator` from active wave-generator
+   * storage and runs one deleting-destructor lane for that generator.
+   */
+  WaveGenerator* WaveSystem::RemoveAndDeleteGenerator(WaveGenerator* const generator)
+  {
+    WaveGenerator** const previousEnd = mWaveGenerators.end_;
+    WaveGenerator** compactedEnd = previousEnd;
+
+    // Inlined block from FUN_0088ACB0 (`sub_88ACB0`).
+    (void)CompactWaveGeneratorPointerRangeWithoutTarget(
+      &compactedEnd,
+      mWaveGenerators.start_,
+      previousEnd,
+      generator
+    );
+
+    if (compactedEnd != previousEnd) {
+      const std::ptrdiff_t trailingCount = static_cast<std::ptrdiff_t>(mWaveGenerators.end_ - previousEnd);
+      WaveGenerator** updatedEnd = compactedEnd + trailingCount;
+      if (trailingCount > 0) {
+        std::memmove(
+          compactedEnd,
+          previousEnd,
+          static_cast<std::size_t>(trailingCount) * sizeof(WaveGenerator*)
+        );
+      }
+      mWaveGenerators.end_ = updatedEnd;
+    }
+
+    delete generator;
     return generator;
   }
 } // namespace moho

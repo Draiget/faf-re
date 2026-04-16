@@ -36,6 +36,12 @@ namespace
     return *reinterpret_cast<moho::MotorSinkAwayTypeInfo*>(gMotorSinkAwayTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x00696390 (FUN_00696390)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `MotorSinkAway` lane.
+   */
   [[nodiscard]] gpg::RType* CachedMotorSinkAwayType()
   {
     if (!moho::MotorSinkAway::sType) {
@@ -44,6 +50,17 @@ namespace
 
     GPG_ASSERT(moho::MotorSinkAway::sType != nullptr);
     return moho::MotorSinkAway::sType;
+  }
+
+  /**
+   * Address: 0x00696C10 (FUN_00696C10)
+   *
+   * What it does:
+   * Secondary duplicated RTTI-resolve lane for `MotorSinkAway`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedMotorSinkAwayTypeVariantB()
+  {
+    return CachedMotorSinkAwayType();
   }
 
   [[nodiscard]] gpg::RType* CachedMotorType()
@@ -64,6 +81,62 @@ namespace
 
     GPG_ASSERT(moho::CScriptObject::sType != nullptr);
     return moho::CScriptObject::sType;
+  }
+
+  /**
+   * Address: 0x006962A0 (FUN_006962A0)
+   *
+   * What it does:
+   * Deserializes one `Motor` object lane through archive owner context and
+   * returns the archive instance.
+   */
+  gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  {
+    archive->Read(CachedMotorType(), object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006962E0 (FUN_006962E0)
+   *
+   * What it does:
+   * Serializes one `Motor` object lane through archive owner context and
+   * returns the archive instance.
+   */
+  gpg::WriteArchive* WriteMotorArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(CachedMotorType(), objectSlot, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00696320 (FUN_00696320)
+   *
+   * What it does:
+   * Deserializes one `Motor` object lane through archive owner context.
+   */
+  void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  {
+    archive->Read(CachedMotorType(), object, *ownerRef);
+  }
+
+  /**
+   * Address: 0x00696350 (FUN_00696350)
+   *
+   * What it does:
+   * Serializes one `Motor` object lane through archive owner context.
+   */
+  void WriteMotorArchiveObjectLane1(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(CachedMotorType(), objectSlot, *ownerRef);
   }
 
   /**
@@ -92,6 +165,24 @@ namespace
     ref.mObj = object;
     ref.mType = CachedMotorSinkAwayType();
     return ref;
+  }
+
+  /**
+   * Address: 0x00696F80 (FUN_00696F80)
+   *
+   * What it does:
+   * Builds one temporary `RRef_MotorSinkAway` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackRRef_MotorSinkAway(
+    gpg::RRef* const out,
+    moho::MotorSinkAway* const value
+  )
+  {
+    const gpg::RRef ref = MakeMotorSinkAwayRef(value);
+    out->mObj = ref.mObj;
+    out->mType = ref.mType;
+    return out;
   }
 
   template <typename THelper>
@@ -124,6 +215,7 @@ namespace
 
   /**
    * Address: 0x006967F0 (FUN_006967F0, construct helper body)
+   * Address: 0x00696F70 (FUN_00696F70, construct helper thunk)
    */
   void Construct_MotorSinkAway_Object(gpg::SerConstructResult* const result)
   {
@@ -137,7 +229,7 @@ namespace
   }
 
   /**
-   * Address: 0x006967E0 (FUN_006967E0, construct callback thunk)
+    * Alias of FUN_006967E0 (non-canonical helper lane).
    */
   void Construct_MotorSinkAway_Callback(
     gpg::ReadArchive*, const int, const int, gpg::SerConstructResult* const result
@@ -152,6 +244,46 @@ namespace
   void DeleteConstructedMotorSinkAway(void* const objectPtr)
   {
     delete static_cast<moho::MotorSinkAway*>(objectPtr);
+  }
+
+  /**
+   * Address: 0x00696C30 (FUN_00696C30)
+   *
+   * What it does:
+   * Initializes the generic construct-helper lane for `MotorSinkAway`.
+   */
+  [[nodiscard]] moho::MotorSinkAwayConstruct* InitializeMotorSinkAwayConstructGenericHelperLane()
+  {
+    InitializeHelperNode(gMotorSinkAwayConstruct);
+    gMotorSinkAwayConstruct.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_MotorSinkAway_Callback);
+    gMotorSinkAwayConstruct.mDeleteCallback = &DeleteConstructedMotorSinkAway;
+    return &gMotorSinkAwayConstruct;
+  }
+
+  /**
+   * Address: 0x00696750 (FUN_00696750)
+   *
+   * What it does:
+   * Initializes the custom construct-helper lane for `MotorSinkAway`.
+   */
+  [[nodiscard]] moho::MotorSinkAwayConstruct* InitializeMotorSinkAwayConstructCustomHelperLane()
+  {
+    return InitializeMotorSinkAwayConstructGenericHelperLane();
+  }
+
+  /**
+   * Address: 0x00696CB0 (FUN_00696CB0)
+   *
+   * What it does:
+   * Initializes the save/load serializer helper lane for `MotorSinkAway`.
+   */
+  [[nodiscard]] moho::MotorSinkAwaySerializer* InitializeMotorSinkAwaySerializerHelperLane()
+  {
+    InitializeHelperNode(gMotorSinkAwaySerializer);
+    gMotorSinkAwaySerializer.mDeserialize = &moho::MotorSinkAwaySerializer::Deserialize;
+    gMotorSinkAwaySerializer.mSerialize = &moho::MotorSinkAwaySerializer::Serialize;
+    return &gMotorSinkAwaySerializer;
   }
 
   /**
@@ -198,6 +330,7 @@ namespace
 
   /**
    * Address: 0x00696FC0 (FUN_00696FC0, serializer save thunk alias)
+   * Address: 0x00672550 (FUN_00672550)
    *
    * What it does:
    * Tail-forwards the MotorSinkAway serialize thunk alias to the recovered
@@ -251,6 +384,20 @@ namespace moho
   CScrLuaMetatableFactory<MotorSinkAway>& CScrLuaMetatableFactory<MotorSinkAway>::Instance()
   {
     return sInstance;
+  }
+
+  /**
+   * Address: 0x006971D0 (FUN_006971D0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<MotorSinkAway>` and returns that singleton.
+   */
+  CScrLuaMetatableFactory<MotorSinkAway>* startup_CScrLuaMetatableFactory_MotorSinkAway_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<MotorSinkAway>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
   }
 
   /**
@@ -327,12 +474,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00696700 (FUN_00696700, MotorSinkAwayTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `MotorSinkAwayTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x006966A0 (FUN_006966A0, Moho::MotorSinkAwayTypeInfo::dtr)
    */
   MotorSinkAwayTypeInfo::~MotorSinkAwayTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyMotorSinkAwayTypeInfoBody(this);
   }
 
   /**
@@ -360,6 +523,7 @@ namespace moho
 
   /**
    * Address: 0x00696EF0 (FUN_00696EF0, Moho::MotorSinkAwayTypeInfo::AddBase_Motor)
+   * Address: 0x00696740 (FUN_00696740, add-base thunk lane)
    */
   void MotorSinkAwayTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
@@ -414,13 +578,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x006967E0 (FUN_006967E0, construct registration lane)
+   * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::RegisterConstructFunction)
+   *
+   * What it does:
+   * Binds construct/delete callbacks into reflected RTTI for `MotorSinkAway`.
    */
   void MotorSinkAwayConstruct::RegisterConstructFunction()
   {
     gpg::RType* const type = CachedMotorSinkAwayType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
+    GPG_ASSERT(type->serConstructFunc_ == nullptr);
     type->serConstructFunc_ = mConstructCallback;
     type->deleteFunc_ = mDeleteCallback;
   }
@@ -473,10 +639,7 @@ namespace moho
    */
   int register_MotorSinkAwayConstruct()
   {
-    InitializeHelperNode(gMotorSinkAwayConstruct);
-    gMotorSinkAwayConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_MotorSinkAway_Callback);
-    gMotorSinkAwayConstruct.mDeleteCallback = &DeleteConstructedMotorSinkAway;
+    (void)InitializeMotorSinkAwayConstructCustomHelperLane();
     gMotorSinkAwayConstruct.RegisterConstructFunction();
     return std::atexit(&cleanup_MotorSinkAwayConstruct_atexit);
   }
@@ -486,10 +649,7 @@ namespace moho
    */
   int register_MotorSinkAwaySerializer()
   {
-    InitializeHelperNode(gMotorSinkAwaySerializer);
-    gMotorSinkAwaySerializer.mDeserialize = &MotorSinkAwaySerializer::Deserialize;
-    gMotorSinkAwaySerializer.mSerialize = &MotorSinkAwaySerializer::Serialize;
-    gMotorSinkAwaySerializer.RegisterSerializeFunctions();
+    (void)InitializeMotorSinkAwaySerializerHelperLane();
     return std::atexit(&cleanup_MotorSinkAwaySerializer_atexit);
   }
 
@@ -504,6 +664,40 @@ namespace moho
     return index;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Address: 0x00696BD0 (FUN_00696BD0)
+   *
+   * What it does:
+   * Increments the `MotorSinkAway` instance-counter lane and returns the
+   * caller-provided passthrough value.
+   */
+  [[maybe_unused]] void* IncrementMotorSinkAwayInstanceCounterPassThrough(void* const value) noexcept
+  {
+    AddInstanceCounterDelta(moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem(), 1);
+    return value;
+  }
+
+  /**
+   * Address: 0x00696BF0 (FUN_00696BF0)
+   *
+   * What it does:
+   * Decrements the `MotorSinkAway` instance-counter lane and returns the
+   * address of that counter slot.
+   */
+  [[maybe_unused]] volatile std::int32_t* DecrementMotorSinkAwayInstanceCounterAndReturnLane() noexcept
+  {
+    moho::StatItem* const statItem = moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem();
+    if (!statItem) {
+      return nullptr;
+    }
+
+    AddInstanceCounterDelta(statItem, -1);
+    return &statItem->mPrimaryValueBits;
+  }
+} // namespace
 
 /**
  * Address: 0x00696D90 (FUN_00696D90, Moho::InstanceCounter<Moho::MotorSinkAway>::GetStatItem)

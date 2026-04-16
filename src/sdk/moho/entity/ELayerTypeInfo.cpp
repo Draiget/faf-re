@@ -64,6 +64,40 @@ namespace
   }
 
   /**
+   * Address: 0x0050C660 (FUN_0050C660)
+   *
+   * What it does:
+   * Initializes callback lanes for startup-owned `ELayer` primitive serializer
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ELayerPrimitiveSerializer*
+  InitializeELayerPrimitiveSerializerStartupThunkPrimary()
+  {
+    auto* const serializer = AcquireELayerPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::ELayerPrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::ELayerPrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050CA60 (FUN_0050CA60)
+   *
+   * What it does:
+   * Secondary startup-init entry for the `ELayer` primitive serializer helper
+   * storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ELayerPrimitiveSerializer*
+  InitializeELayerPrimitiveSerializerStartupThunkSecondary()
+  {
+    auto* const serializer = AcquireELayerPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::ELayerPrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::ELayerPrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
    * Address: 0x0050CA90 (FUN_0050CA90, resolve_ELayerType)
    */
   [[nodiscard]] gpg::RType* ResolveELayerType()
@@ -222,11 +256,7 @@ namespace moho
    */
   int register_ELayerPrimitiveSerializer()
   {
-    auto* const serializer = AcquireELayerPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &ELayerPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &ELayerPrimitiveSerializer::Serialize;
-
+    (void)InitializeELayerPrimitiveSerializerStartupThunkPrimary();
     return std::atexit(&cleanup_ELayerPrimitiveSerializer);
   }
 } // namespace moho

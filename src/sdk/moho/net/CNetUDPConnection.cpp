@@ -1601,7 +1601,7 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
 }
 
 /**
- * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+  * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Inserts DATA packet into future-queue sorted by sequence and rejects duplicates.
@@ -1630,7 +1630,7 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
 }
 
 /**
- * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+  * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Pops the oldest packet from the early/future queue.
@@ -1647,7 +1647,7 @@ SNetPacket* CNetUDPConnection::EarlyPopFront()
 }
 
 /**
- * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+  * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Recomputes ACK early-mask bits from queued future packet sequences.
@@ -1664,7 +1664,7 @@ void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& m
 }
 
 /**
- * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+  * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Consumes one in-order DATA packet payload into input pipeline and advances
@@ -1731,7 +1731,7 @@ void CNetUDPConnection::UnlinkFromConnectorList() noexcept
 }
 
 /**
- * Address: 0x00488D80 (inlined helper inside FUN_00488D80)
+  * Alias of FUN_00488D80 (non-canonical helper lane).
  *
  * What it does:
  * Inserts outbound DATA packet into resend queue ordered by scheduled send time.

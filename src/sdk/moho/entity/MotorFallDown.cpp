@@ -55,6 +55,12 @@ namespace
     return *reinterpret_cast<moho::MotorFallDownTypeInfo*>(gMotorFallDownTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x00694B70 (FUN_00694B70)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `MotorFallDown` lane.
+   */
   [[nodiscard]] gpg::RType* CachedMotorFallDownType()
   {
     if (!moho::MotorFallDown::sType) {
@@ -63,6 +69,17 @@ namespace
 
     GPG_ASSERT(moho::MotorFallDown::sType != nullptr);
     return moho::MotorFallDown::sType;
+  }
+
+  /**
+   * Address: 0x006959F0 (FUN_006959F0)
+   *
+   * What it does:
+   * Secondary duplicated RTTI-resolve lane for `MotorFallDown`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedMotorFallDownTypeVariantB()
+  {
+    return CachedMotorFallDownType();
   }
 
   [[nodiscard]] gpg::RType* CachedMotorType()
@@ -212,7 +229,32 @@ namespace
   }
 
   /**
+   * Address: 0x006950E0 (FUN_006950E0)
+   *
+   * What it does:
+   * Unlinks global `MotorFallDownSerializer` helper links and resets the node
+   * to the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkMotorFallDownSerializerHelperNodePrimary() noexcept
+  {
+    return UnlinkHelperNode(gMotorFallDownSerializer);
+  }
+
+  /**
+   * Address: 0x00695110 (FUN_00695110)
+   *
+   * What it does:
+   * Secondary unlink/reset entry for the global
+   * `MotorFallDownSerializer` helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkMotorFallDownSerializerHelperNodeSecondary() noexcept
+  {
+    return UnlinkHelperNode(gMotorFallDownSerializer);
+  }
+
+  /**
    * Address: 0x00694FF0 (FUN_00694FF0, construct helper body)
+   * Address: 0x00695DA0 (FUN_00695DA0, construct helper thunk)
    */
   void ConstructMotorFallDownObject(gpg::SerConstructResult* const result)
   {
@@ -223,6 +265,24 @@ namespace
 
     const gpg::RRef objectRef = MakeMotorFallDownRef(object);
     result->SetUnowned(objectRef, 0u);
+  }
+
+  /**
+   * Address: 0x00695DB0 (FUN_00695DB0)
+   *
+   * What it does:
+   * Builds one temporary `RRef_MotorFallDown` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackRRef_MotorFallDown(
+    gpg::RRef* const out,
+    moho::MotorFallDown* const value
+  )
+  {
+    const gpg::RRef ref = MakeMotorFallDownRef(value);
+    out->mObj = ref.mObj;
+    out->mType = ref.mType;
+    return out;
   }
 
   /**
@@ -291,6 +351,7 @@ namespace
 
   /**
    * Address: 0x00695DF0 (FUN_00695DF0, serializer save thunk alias)
+   * Address: 0x005191D0 (FUN_005191D0)
    *
    * What it does:
    * Tail-forwards the MotorFallDown serialize thunk alias to the recovered
@@ -323,6 +384,23 @@ namespace
   void SerializeMotorFallDownThunkVariantB(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
   {
     SerializeMotorFallDownBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006960D0 (FUN_006960D0)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `MotorFallDown` object storage
+   * using the cached motor-fall-down RTTI descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastMotorFallDownRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedMotorFallDownType());
+    return upcast.mObj;
   }
 
   /**
@@ -508,12 +586,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00694F00 (FUN_00694F00, MotorFallDownTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `MotorFallDownTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x00694EA0 (FUN_00694EA0, Moho::MotorFallDownTypeInfo::dtr)
    */
   MotorFallDownTypeInfo::~MotorFallDownTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyMotorFallDownTypeInfoBody(this);
   }
 
   /**
@@ -541,6 +635,7 @@ namespace moho
 
   /**
    * Address: 0x00695D20 (FUN_00695D20, Moho::MotorFallDownTypeInfo::AddBase_Motor)
+   * Address: 0x00694F40 (FUN_00694F40, add-base thunk lane)
    */
   void MotorFallDownTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
@@ -633,7 +728,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_MotorFallDownSerializer()
   {
-    return UnlinkHelperNode(gMotorFallDownSerializer);
+    return UnlinkMotorFallDownSerializerHelperNodePrimary();
   }
 
   /**
@@ -670,7 +765,6 @@ namespace moho
     InitializeHelperNode(gMotorFallDownSerializer);
     gMotorFallDownSerializer.mDeserialize = &MotorFallDownSerializer::Deserialize;
     gMotorFallDownSerializer.mSerialize = &MotorFallDownSerializer::Serialize;
-    gMotorFallDownSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_MotorFallDownSerializer_atexit);
   }
 
@@ -705,6 +799,30 @@ namespace moho
         LuaPlus::LuaStackObject::TypeError(&arg, "number");
       }
       return static_cast<float>(lua_tonumber(state->m_state, stackIndex));
+    }
+
+    /**
+     * Address: 0x00695140 (FUN_00695140)
+     *
+     * What it does:
+     * Applies one whack impulse lane to `MotorFallDown`: initializes
+     * `mFallDirectionRadians`/`mBreakOnWhack` from the first XZ normal pair and
+     * accumulates force into `mFallDepth`.
+     */
+    [[maybe_unused]] bool ApplyMotorFallDownWhackImpulse(
+      const float* const normalXYZ,
+      MotorFallDown* const motor,
+      const float force,
+      const bool doBreak
+    )
+    {
+      if (!motor->mBreakOnWhack) {
+        motor->mFallDirectionRadians = std::atan2(normalXYZ[0], normalXYZ[2]);
+        motor->mBreakOnWhack = doBreak;
+      }
+
+      motor->mFallDepth += force;
+      return doBreak;
     }
   } // namespace
 
@@ -761,19 +879,15 @@ namespace moho
     LuaPlus::LuaStackObject dobreakArg(state, 6);
     const bool dobreak = LuaPlus::LuaStackObject::GetBoolean(&dobreakArg);
 
-    if (!motor->mBreakOnWhack) {
-      motor->mFallDirectionRadians = std::atan2(normalX, normalZ);
-      motor->mBreakOnWhack = dobreak;
-    }
-
-    motor->mFallDepth += force;
+    const float hitNormal[3]{normalX, 0.0f, normalZ};
+    (void)ApplyMotorFallDownWhackImpulse(hitNormal, motor, force, dobreak);
 
     lua_settop(rawState, 1);
     return 1;
   }
 
   /**
-   * Address: 0x00695740 (FUN_00695740, func_MotorFallDownWhack_LuaFuncDef)
+    * Alias of FUN_00695740 (non-canonical helper lane).
    *
    * What it does:
    * Publishes `MotorFallDown:Whack()` into the sim Lua init set.
@@ -791,6 +905,40 @@ namespace moho
     return &binder;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Address: 0x006959B0 (FUN_006959B0)
+   *
+   * What it does:
+   * Increments the `MotorFallDown` instance-counter lane and returns the
+   * caller-provided passthrough value.
+   */
+  [[maybe_unused]] void* IncrementMotorFallDownInstanceCounterPassThrough(void* const value) noexcept
+  {
+    AddInstanceCounterDelta(moho::InstanceCounter<moho::MotorFallDown>::GetStatItem(), 1);
+    return value;
+  }
+
+  /**
+   * Address: 0x006959D0 (FUN_006959D0)
+   *
+   * What it does:
+   * Decrements the `MotorFallDown` instance-counter lane and returns the
+   * address of that counter slot.
+   */
+  [[maybe_unused]] volatile std::int32_t* DecrementMotorFallDownInstanceCounterAndReturnLane() noexcept
+  {
+    moho::StatItem* const statItem = moho::InstanceCounter<moho::MotorFallDown>::GetStatItem();
+    if (!statItem) {
+      return nullptr;
+    }
+
+    AddInstanceCounterDelta(statItem, -1);
+    return &statItem->mPrimaryValueBits;
+  }
+} // namespace
 
 /**
  * Address: 0x00695BC0 (FUN_00695BC0, Moho::InstanceCounter<Moho::MotorFallDown>::GetStatItem)

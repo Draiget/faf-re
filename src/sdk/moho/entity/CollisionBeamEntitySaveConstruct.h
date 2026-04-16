@@ -19,7 +19,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)
+      * Alias of FUN_00674EE0 (non-canonical helper lane).
      *
      * What it does:
      * Resolves `CollisionBeamEntity` RTTI and binds one save-construct-args

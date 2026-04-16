@@ -22,7 +22,13 @@ namespace moho
     static gpg::RType* sType;
 
   protected:
-    ISimResources() = default;
+    /**
+     * Address: 0x00546E70 (FUN_00546E70)
+     *
+     * What it does:
+     * Initializes one `ISimResources` interface subobject vtable lane.
+     */
+    ISimResources();
     ~ISimResources() override = default;
   };
 

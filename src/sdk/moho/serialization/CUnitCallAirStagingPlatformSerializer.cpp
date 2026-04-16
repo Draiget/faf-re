@@ -163,3 +163,29 @@ namespace
   CUnitCallAirStagingPlatformSerializerBootstrap gCUnitCallAirStagingPlatformSerializerBootstrap;
 } // namespace
 
+namespace
+{
+  /**
+   * Address: 0x00601C80 (FUN_00601C80)
+   *
+   * What it does:
+   * Unlinks `CUnitCallAirStagingPlatformSerializer` helper node from the
+   * intrusive serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallAirStagingPlatformSerializerNodePrimary()
+  {
+    return UnlinkSerializerNode(gCUnitCallAirStagingPlatformSerializer);
+  }
+
+  /**
+   * Address: 0x00601CB0 (FUN_00601CB0)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCallAirStagingPlatformSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallAirStagingPlatformSerializerNodeSecondary()
+  {
+    return UnlinkSerializerNode(gCUnitCallAirStagingPlatformSerializer);
+  }
+} // namespace

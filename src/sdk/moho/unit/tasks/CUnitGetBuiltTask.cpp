@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitGetBuiltTask.h"
 
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/unit/core/Unit.h"
 
@@ -66,3 +67,32 @@ namespace moho
    */
   CUnitGetBuiltTask::~CUnitGetBuiltTask() = default;
 } // namespace moho
+
+namespace
+{
+  gpg::SerSaveLoadHelperListRuntime gCUnitGetBuiltTaskSerializer{};
+
+  /**
+   * Address: 0x0060A7B0 (FUN_0060A7B0)
+   *
+   * What it does:
+   * Unlinks `CUnitGetBuiltTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGetBuiltTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer);
+  }
+
+  /**
+   * Address: 0x0060A7E0 (FUN_0060A7E0)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitGetBuiltTaskSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGetBuiltTaskSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer);
+  }
+} // namespace

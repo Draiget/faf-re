@@ -18,6 +18,21 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00760C80 (FUN_00760C80)
+     *
+     * Sim* ownerSim
+     *
+     * IDA signature:
+     * Moho::ISimSoundManager_vtbl **__usercall sub_760C80@<eax>(Moho::ISimSoundManager_vtbl **result@<eax>,
+     * Moho::ISimSoundManager_vtbl *a2@<ecx>);
+     *
+     * What it does:
+     * Initializes one `CSimSoundManager` runtime object with owner-sim pointer,
+     * inline request-vector lanes, and self-linked active-loop sentinel.
+     */
+    explicit CSimSoundManager(Sim* ownerSim);
+
+    /**
      * Address: 0x00760CC0 (FUN_00760CC0)
      * Slot: 0
      *

@@ -55,12 +55,28 @@ namespace gpg::gal
         void DestroyState();
 
         /**
+         * Address: 0x0094B370 (FUN_0094B370)
+         *
+         * What it does:
+         * Validates and returns the retained depth-stencil-texture lane.
+         */
+        void* GetDepthStencilTextureOrThrow();
+
+        /**
          * Address: 0x0094B420 (FUN_0094B420)
          *
          * What it does:
          * Validates and returns the retained depth-stencil-view lane.
          */
         void* GetDepthStencilViewOrThrow();
+
+        /**
+         * Address: 0x0094B4D0 (FUN_0094B4D0)
+         *
+         * What it does:
+         * Validates and returns the retained shader-resource-view lane.
+         */
+        void* GetShaderResourceViewOrThrow();
 
     public:
         DepthStencilTargetContext context_{}; // +0x04

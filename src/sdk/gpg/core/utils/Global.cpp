@@ -85,6 +85,19 @@ namespace
     };
     static_assert(sizeof(AllocatorLockToken) == 0x01, "AllocatorLockToken size must be 0x01");
 
+    /**
+     * Address: 0x00957CA0 (FUN_00957CA0)
+     *
+     * What it does:
+     * Returns the allocator lock-state byte from one lock token.
+     */
+    [[maybe_unused]] [[nodiscard]] std::uint8_t ReadAllocatorLockStateLane(
+      const AllocatorLockToken* const token
+    ) noexcept
+    {
+      return token->hasLock;
+    }
+
     struct SmallBlockRequestLane
     {
         SmallBlockNode* head;
@@ -92,6 +105,20 @@ namespace
         std::int32_t lowWatermark;
     };
     static_assert(sizeof(SmallBlockRequestLane) == 0x0C, "SmallBlockRequestLane size must be 0x0C");
+
+    /**
+     * Address: 0x00957CF0 (FUN_00957CF0)
+     *
+     * What it does:
+     * Resets one request lane to an empty state.
+     */
+    [[nodiscard]] SmallBlockRequestLane* ResetSmallBlockRequestLane(SmallBlockRequestLane* const lane) noexcept
+    {
+      lane->head = nullptr;
+      lane->count = 0;
+      lane->lowWatermark = 0;
+      return lane;
+    }
 
     constexpr std::array<std::uint32_t, kSmallBlockClassCount> kSmallBlockSizes = {
       4u,
@@ -220,6 +247,12 @@ namespace
         record->next = nullptr;
     }
 
+    /**
+     * Address: 0x00957F00 (FUN_00957F00)
+     *
+     * What it does:
+     * Inserts `record` at list head and repairs intrusive back-links.
+     */
     void LinkRecordHead(HeapRecord*& head, HeapRecord* const record)
     {
         record->previous = head;
@@ -230,6 +263,13 @@ namespace
         head = record;
     }
 
+    /**
+     * Address: 0x00957D00 (FUN_00957D00)
+     *
+     * What it does:
+     * Pops one node from a thread-cache lane, updates count, and tracks the
+     * low-watermark.
+     */
     [[nodiscard]] SmallBlockNode* PopLaneNode(ThreadSmallBlockLane& lane)
     {
         SmallBlockNode* const node = lane.head;
@@ -245,6 +285,12 @@ namespace
         return node;
     }
 
+    /**
+     * Address: 0x00957D20 (FUN_00957D20)
+     *
+     * What it does:
+     * Pushes one node to the lane head and increments lane count.
+     */
     void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
     {
         node->next = lane.head;
@@ -286,13 +332,37 @@ namespace
     void FlushCurrentThreadHeapCache();
 
     [[nodiscard]] bool AllocateNewBlock(std::uint32_t kindPages);
-    [[nodiscard]] HeapRecord* AllocateFreeRegion(std::uint32_t pages);
+    [[nodiscard]] HeapRecord* AllocateFreeRegion(std::uint32_t pages, bool canGrow);
     [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(std::uint32_t pages);
     [[nodiscard]] void* AllocateLargeRegion(std::uint32_t bytes);
 
-    void AllocateSmallBlocksAmount(SmallBlockRequestLane* request, std::uint32_t kind, std::int32_t count);
+    void AllocateSmallBlocksAmount(SmallBlockRequestLane* request, std::uint32_t kind, std::int32_t count, bool canGrow);
 
-    [[nodiscard]] SmallBlockNode* AllocateInSmallBlock(std::uint32_t sizeBytes);
+    /**
+     * Address: 0x00957DE0 (FUN_00957DE0)
+     *
+     * What it does:
+     * Pushes `count` strided nodes into one request lane and returns the next
+     * cursor after the copied range.
+     */
+    [[nodiscard]] SmallBlockNode* PushStridedNodesToRequestLane(
+      SmallBlockNode* node,
+      std::int32_t count,
+      SmallBlockRequestLane* const request,
+      const std::uint32_t strideBytes
+    ) noexcept
+    {
+      while (count > 0) {
+        node->next = request->head;
+        ++request->count;
+        request->head = node;
+        node = reinterpret_cast<SmallBlockNode*>(reinterpret_cast<std::uint8_t*>(node) + strideBytes);
+        --count;
+      }
+      return node;
+    }
+
+    [[nodiscard]] SmallBlockNode* AllocateInSmallBlock(std::uint32_t sizeBytes, bool canGrow);
 
     [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* token, bool shouldLock);
     void LeaveAllocatorLock(AllocatorLockToken* token);
@@ -445,7 +515,7 @@ namespace
         gHeapUsed = 0;
         gHeapReserved = kPrimaryHeapReserveBytes;
 
-        gNextAvailableHeapRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes));
+        gNextAvailableHeapRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes, true));
         return reinterpret_cast<SmallBlockNode*>(gNextAvailableHeapRecord);
     }
 
@@ -502,7 +572,7 @@ namespace
      */
     void LeaveAllocatorLock(AllocatorLockToken* const token)
     {
-        if (token->hasLock != 0) {
+        if (ReadAllocatorLockStateLane(token) != 0) {
             ::LeaveCriticalSection(&gAllocatorSentinel);
             token->hasLock = 0;
         }
@@ -558,7 +628,7 @@ namespace
         }
 
         const std::uint32_t tailPages = record->sizePages - requestedPages;
-        HeapRecord* tailRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes));
+        HeapRecord* tailRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes, false));
         if (tailRecord == nullptr) {
             tailRecord = gNextAvailableHeapRecord;
             gNextAvailableHeapRecord = nullptr;
@@ -578,7 +648,7 @@ namespace
 
         record->sizePages = requestedPages;
         if (gNextAvailableHeapRecord == nullptr) {
-            gNextAvailableHeapRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes));
+            gNextAvailableHeapRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes, true));
         }
     }
 
@@ -752,7 +822,7 @@ namespace
             totalPages = 0x2000u;
         }
 
-        HeapRecord* metadataRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes));
+        HeapRecord* metadataRecord = reinterpret_cast<HeapRecord*>(AllocateInSmallBlock(kHeapRecordSizeBytes, false));
 
         std::uint32_t requiredPages = kindPages;
         if (metadataRecord == nullptr) {
@@ -880,10 +950,10 @@ namespace
      * What it does:
      * Finds or grows a committed free-region record for the requested page count.
      */
-    [[nodiscard]] HeapRecord* AllocateFreeRegion(const std::uint32_t pages)
+    [[nodiscard]] HeapRecord* AllocateFreeRegion(const std::uint32_t pages, const bool canGrow)
     {
         std::uint32_t bucket = ClampSizeMinusOneToBucket(pages);
-        bool canGrowAllocator = true;
+        bool canGrowAllocator = canGrow;
 
         while (true) {
             std::uint32_t lookupBucket = bucket;
@@ -932,7 +1002,7 @@ namespace
      */
     [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
     {
-        HeapRecord* const block = AllocateFreeRegion(pages);
+        HeapRecord* const block = AllocateFreeRegion(pages, true);
         if (block != nullptr) {
             SplitHeapRecord(pages, block);
         }
@@ -948,7 +1018,7 @@ namespace
     [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
     {
         const std::uint32_t pages = BytesToPages(bytes);
-        HeapRecord* const block = AllocateFreeRegion(pages);
+        HeapRecord* const block = AllocateFreeRegion(pages, true);
         if (block == nullptr) {
             return nullptr;
         }
@@ -971,7 +1041,8 @@ namespace
     void AllocateSmallBlocksAmount(
       SmallBlockRequestLane* const request,
       const std::uint32_t kind,
-      std::int32_t count
+      std::int32_t count,
+      const bool canGrow
     )
     {
         if (count <= 0) {
@@ -1010,7 +1081,7 @@ namespace
             }
 
             const std::uint32_t pages = BytesToPages(32u * blockSize);
-            prototype = AllocateFreeRegion(pages);
+            prototype = AllocateFreeRegion(pages, canGrow);
             if (prototype == nullptr) {
                 return;
             }
@@ -1031,12 +1102,7 @@ namespace
             gHeapInUse += static_cast<std::uint32_t>(blocksToRequest) * blockSize;
             gHeapInSmallBlocks -= static_cast<std::uint32_t>(blocksToRequest) * blockSize;
 
-            for (std::int32_t i = 0; i < blocksToRequest; ++i) {
-                node->next = request->head;
-                ++request->count;
-                request->head = node;
-                node = reinterpret_cast<SmallBlockNode*>(reinterpret_cast<std::uint8_t*>(node) + blockSize);
-            }
+            node = PushStridedNodesToRequestLane(node, blocksToRequest, request, blockSize);
 
             const std::int32_t remaining = totalBlocks - blocksToRequest;
             for (std::int32_t i = 0; i < remaining; ++i) {
@@ -1059,11 +1125,12 @@ namespace
      * What it does:
      * Allocates one object from the small-block allocator by byte size.
      */
-    [[nodiscard]] SmallBlockNode* AllocateInSmallBlock(const std::uint32_t sizeBytes)
+    [[nodiscard]] SmallBlockNode* AllocateInSmallBlock(const std::uint32_t sizeBytes, const bool canGrow)
     {
         SmallBlockRequestLane request{};
+        (void)ResetSmallBlockRequestLane(&request);
         const std::uint32_t kind = GetSmallBlockIndex(sizeBytes);
-        AllocateSmallBlocksAmount(&request, kind, 1);
+        AllocateSmallBlocksAmount(&request, kind, 1, canGrow);
         return request.head;
     }
 
@@ -1088,8 +1155,9 @@ namespace
         }
 
         SmallBlockRequestLane request{};
+        (void)ResetSmallBlockRequestLane(&request);
         const std::uint32_t kind = GetSmallBlockIndex(kThreadCacheSizeBytes);
-        AllocateSmallBlocksAmount(&request, kind, 1);
+        AllocateSmallBlocksAmount(&request, kind, 1, true);
 
         if (request.head != nullptr) {
             gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
@@ -1198,8 +1266,9 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
     if (size <= 0x4000u) {
         if (threadCache == kThreadCacheDisabled || threadCache == nullptr) {
             SmallBlockRequestLane request{};
+            (void)ResetSmallBlockRequestLane(&request);
             const std::uint32_t kind = GetSmallBlockIndex(size);
-            AllocateSmallBlocksAmount(&request, kind, 1);
+            AllocateSmallBlocksAmount(&request, kind, 1, true);
             allocation = request.head;
         } else {
             const std::uint32_t kind = GetSmallBlockIndex(size);
@@ -1207,7 +1276,7 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 
             if (lane.count == 0) {
                 ::EnterCriticalSection(&gAllocatorSentinel);
-                AllocateSmallBlocksAmount(reinterpret_cast<SmallBlockRequestLane*>(&lane), kind, 16);
+                AllocateSmallBlocksAmount(reinterpret_cast<SmallBlockRequestLane*>(&lane), kind, 16, true);
 
                 threadCache->cachedBytes += static_cast<std::int32_t>(16u * GetBlockSize(kind));
                 if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {

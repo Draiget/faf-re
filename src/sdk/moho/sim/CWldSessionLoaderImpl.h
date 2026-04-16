@@ -70,7 +70,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x008855B0 init path (FUN_008855B0, func_GetWldSessionLoader)
+       * Address: 0x008855B0 (FUN_008855B0)
      */
     CWldSessionLoaderImpl();
 
@@ -155,7 +155,7 @@ namespace moho
   );
 
   /**
-   * Address: 0x008855B0 (FUN_008855B0, func_GetWldSessionLoader)
+    * Alias of FUN_008855B0 (non-canonical helper lane).
    */
   CWldSessionLoaderImpl* GetWldSessionLoader();
 } // namespace moho

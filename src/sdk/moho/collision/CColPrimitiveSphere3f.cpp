@@ -149,7 +149,6 @@ namespace moho
     gSphere3fSerializer.mHelperPrev = self;
     gSphere3fSerializer.mLoadCallback = &Sphere3fSerializer::Deserialize;
     gSphere3fSerializer.mSaveCallback = &Sphere3fSerializer::Serialize;
-    gSphere3fSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupSphere3fSerializer);
   }
 
@@ -207,7 +206,6 @@ namespace
   template <typename THelper>
   void InitializeHelperNode(THelper& helper) noexcept
   {
-    new (HelperSelfNode(helper)) gpg::SerHelperBase();
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
     helper.mHelperNext = self;
     helper.mHelperPrev = self;
@@ -224,6 +222,43 @@ namespace
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
     helper.mHelperPrev = self;
     helper.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x004FEF90 (FUN_004FEF90, DColPrimSphereSerializer helper unlink/reset)
+   *
+   * What it does:
+   * Unlinks the global `DColPrimSphereSerializer` helper node from its current
+   * intrusive lane, rewires it to a self-linked singleton node, and returns
+   * that self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimSphereSerializerHelperPrimary() noexcept
+  {
+    gDColPrimSphereSerializer.mHelperNext->mPrev = gDColPrimSphereSerializer.mHelperPrev;
+    gDColPrimSphereSerializer.mHelperPrev->mNext = gDColPrimSphereSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimSphereSerializer);
+    gDColPrimSphereSerializer.mHelperPrev = self;
+    gDColPrimSphereSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x004FEFC0 (FUN_004FEFC0, DColPrimSphereSerializer helper unlink/reset variant)
+   *
+   * What it does:
+   * Executes the duplicate serializer-helper unlink/reset lane and returns the
+   * self-linked helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimSphereSerializerHelperSecondary() noexcept
+  {
+    gDColPrimSphereSerializer.mHelperNext->mPrev = gDColPrimSphereSerializer.mHelperPrev;
+    gDColPrimSphereSerializer.mHelperPrev->mNext = gDColPrimSphereSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimSphereSerializer);
+    gDColPrimSphereSerializer.mHelperPrev = self;
+    gDColPrimSphereSerializer.mHelperNext = self;
     return self;
   }
 
@@ -301,7 +336,7 @@ namespace
 
   void CleanupDColPrimSphereSerializerAtExit()
   {
-    (void)UnlinkHelperNode(gDColPrimSphereSerializer);
+    (void)UnlinkDColPrimSphereSerializerHelperPrimary();
   }
 
   void CleanupDColPrimSphereConstructAtExit()
@@ -343,23 +378,40 @@ namespace
   }
 
   /**
+   * Address: 0x004FECF0 (FUN_004FECF0)
+   *
+   * What it does:
+   * Serializes one sphere primitive's shape payload and local-center payload
+   * through the primitive virtual accessors used by save-construct lanes.
+   */
+  void SaveSpherePrimitiveConstructArgs(
+    moho::SphereCollisionPrimitive* const primitive,
+    gpg::WriteArchive* const archive,
+    gpg::SerSaveConstructArgsResult* const result
+  )
+  {
+    Wm3::Vec3f center{};
+    gpg::RRef shapeOwnerRef{};
+    archive->Write(CachedDColPrimSphereShapeType(), primitive->GetSphere(), shapeOwnerRef);
+
+    gpg::RRef centerOwnerRef{};
+    archive->Write(CachedDColPrimSphereVector3fType(), primitive->GetCenter(&center), centerOwnerRef);
+    result->SetUnowned(0u);
+  }
+
+  /**
    * Address: 0x004FEC50 (FUN_004FEC50)
    *
    * What it does:
-   * Saves one sphere collision primitive's shape and local-center construct
-   * arguments in binary archive order.
+   * Tail-forwards save-construct-args dispatch into the shared sphere
+   * primitive serialization helper.
    */
   void SaveConstructArgsDColPrimSphere(
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const primitive = reinterpret_cast<moho::SphereCollisionPrimitive*>(objectPtr);
-    Wm3::Vec3f center{};
-    const gpg::RRef ownerRef{};
-
-    archive->Write(CachedDColPrimSphereShapeType(), primitive->GetSphere(), ownerRef);
-    archive->Write(CachedDColPrimSphereVector3fType(), primitive->GetCenter(&center), ownerRef);
-    result->SetUnowned(0u);
+    SaveSpherePrimitiveConstructArgs(primitive, archive, result);
   }
 
   /**
@@ -477,6 +529,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x004FE640 (FUN_004FE640, preregister_DColPrimSphereTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup-owned `DColPrimSphereTypeInfo`
+   * instance for `typeid(CColPrimitive<Wm3::Sphere3f>)`.
+   */
+  [[nodiscard]] gpg::RType* preregister_DColPrimSphereTypeInfo()
+  {
+    if (!gDColPrimSphereTypeInfoConstructed) {
+      new (gDColPrimSphereTypeInfoStorage) DColPrimSphereTypeInfo();
+      gDColPrimSphereTypeInfoConstructed = true;
+    }
+
+    auto* const type = reinterpret_cast<gpg::RType*>(gDColPrimSphereTypeInfoStorage);
+    gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Sphere3f>), type);
+    return type;
+  }
+
+  /**
    * Address: 0x00BC7550 (FUN_00BC7550, register_DColPrimSphereTypeInfo)
    *
    * What it does:
@@ -485,12 +556,7 @@ namespace moho
    */
   int register_DColPrimSphereTypeInfo()
   {
-    if (!gDColPrimSphereTypeInfoConstructed) {
-      new (gDColPrimSphereTypeInfoStorage) DColPrimSphereTypeInfo();
-      gDColPrimSphereTypeInfoConstructed = true;
-      gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Sphere3f>), reinterpret_cast<gpg::RType*>(gDColPrimSphereTypeInfoStorage));
-    }
-
+    (void)preregister_DColPrimSphereTypeInfo();
     return std::atexit(&cleanup_DColPrimSphereTypeInfo_atexit);
   }
 

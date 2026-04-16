@@ -14,6 +14,9 @@ namespace moho
   class CUnitCarrierLaunchTypeInfo final : public gpg::RType
   {
   public:
+    [[nodiscard]] const char* GetName() const override;
+    void Init() override;
+
     /**
      * Address: 0x00607D00 (FUN_00607D00, Moho::CUnitCarrierLaunchTypeInfo::NewRef)
      *
@@ -31,6 +34,15 @@ namespace moho
      */
     static gpg::RRef CtrRef(void* objectStorage);
   };
+
+  /**
+   * Address: 0x00607470 (FUN_00607470, preregister_CUnitCarrierLaunchTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CUnitCarrierLaunchTypeInfo`
+   * reflection lane.
+   */
+  [[nodiscard]] gpg::RType* preregister_CUnitCarrierLaunchTypeInfo();
 
   static_assert(sizeof(CUnitCarrierLaunchTypeInfo) == 0x64, "CUnitCarrierLaunchTypeInfo size must be 0x64");
 } // namespace moho

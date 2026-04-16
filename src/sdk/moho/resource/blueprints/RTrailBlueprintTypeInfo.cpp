@@ -36,11 +36,18 @@ namespace
     gRTrailBlueprintTypeInfoConstructed = false;
   }
 
+  /**
+   * Address: 0x005104B0 (FUN_005104B0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `RTrailBlueprint`.
+   */
   gpg::RType* CachedTrailBlueprintType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = moho::RTrailBlueprint::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::RTrailBlueprint));
+      moho::RTrailBlueprint::sType = cached;
     }
     return cached;
   }
@@ -155,6 +162,22 @@ namespace
     static_cast<moho::RTrailBlueprint*>(objectMemory)->~RTrailBlueprint();
   }
 
+  /**
+   * Address: 0x005104F0 (FUN_005104F0)
+   *
+   * What it does:
+   * Binds the callback lanes used by `RTrailBlueprintTypeInfo` for object
+   * allocation, placement construction, deletion, and destruction.
+   */
+  [[nodiscard]] TypeInfo* BindTrailBlueprintTypeInfoHookLanes(TypeInfo* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewTrailBlueprintRef;
+    typeInfo->ctorRefFunc_ = &ConstructTrailBlueprintRef;
+    typeInfo->deleteFunc_ = &DeleteTrailBlueprintObject;
+    typeInfo->dtrFunc_ = &DestroyTrailBlueprintObject;
+    return typeInfo;
+  }
+
   struct RTrailBlueprintTypeInfoBootstrap
   {
     RTrailBlueprintTypeInfoBootstrap()
@@ -200,10 +223,7 @@ namespace moho
   void RTrailBlueprintTypeInfo::Init()
   {
     size_ = sizeof(RTrailBlueprint);
-    newRefFunc_ = &NewTrailBlueprintRef;
-    deleteFunc_ = &DeleteTrailBlueprintObject;
-    ctorRefFunc_ = &ConstructTrailBlueprintRef;
-    dtrFunc_ = &DestroyTrailBlueprintObject;
+    (void)BindTrailBlueprintTypeInfoHookLanes(this);
     AddEffectBase(this);
     gpg::RType::Init();
     AddFields(this);

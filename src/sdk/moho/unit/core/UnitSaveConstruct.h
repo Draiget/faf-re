@@ -25,6 +25,8 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006AE920 (FUN_006AE920, Moho::UnitSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
      * Binds the `moho::Unit` save-construct-args callback into RTTI using
      * `typeid(moho::Unit)`.
      */

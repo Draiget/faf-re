@@ -109,6 +109,7 @@ namespace moho
   public:
     /**
      * Address: 0x004094E0 (FUN_004094E0, Moho::CTaskThreadConstruct::Construct)
+     * Address: 0x00724910 (FUN_00724910)
      *
      * What it does:
      * Forwards serializer construct callback into CTaskThread allocation/init path.
@@ -143,7 +144,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x004095F0 (FUN_004095F0, Moho::CTaskThreadSerializer::Deserialize)
+      * Alias of FUN_004095F0 (non-canonical helper lane).
      *
      * What it does:
      * Loads stage pointer, pending-frame counter, staged flag, and task stack.
@@ -151,7 +152,7 @@ namespace moho
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00409610 (FUN_00409610, Moho::CTaskThreadSerializer::Serialize)
+      * Alias of FUN_00409610 (non-canonical helper lane).
      *
      * What it does:
      * Saves stage pointer, pending-frame counter, staged flag, and task stack.

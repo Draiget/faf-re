@@ -9,9 +9,10 @@ namespace
 {
   gpg::RType* CachedDefaultSkelType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = moho::CAniDefaultSkel::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::CAniDefaultSkel));
+      moho::CAniDefaultSkel::sType = cached;
     }
     return cached;
   }

@@ -37,6 +37,38 @@ namespace
   }
 
   /**
+   * Address: 0x00651F20 (FUN_00651F20)
+   *
+   * What it does:
+   * Resets the global debug-overlay intrusive head so prev/next point to
+   * itself and returns that head lane.
+   */
+  [[nodiscard]] moho::TDatListItem<moho::RDebugOverlayClass, void>* ResetDbgOverlayHeadLinks()
+  {
+    auto& overlays = GlobalDebugOverlayClassList();
+    overlays.mPrev = &overlays;
+    overlays.mNext = &overlays;
+    return &overlays;
+  }
+
+  /**
+   * Address: 0x006517A0 (FUN_006517A0, sDBGOverlays intrusive unlink/reset helper)
+   *
+   * What it does:
+   * Unlinks the global debug-overlay intrusive head from its current lane and
+   * restores self-linked singleton list state.
+   */
+  [[nodiscard]] moho::TDatListItem<moho::RDebugOverlayClass, void>* UnlinkAndResetDbgOverlaysPrimary()
+  {
+    auto& overlays = GlobalDebugOverlayClassList();
+    overlays.mPrev->mNext = overlays.mNext;
+    overlays.mNext->mPrev = overlays.mPrev;
+    overlays.mNext = &overlays;
+    overlays.mPrev = &overlays;
+    return &overlays;
+  }
+
+  /**
    * Address: 0x00BFB730 (??1sDBGOverlays@Moho@@QAE@@Z, cleanup_sDBGOverlays)
    *
    * What it does:
@@ -45,8 +77,7 @@ namespace
    */
   void cleanup_sDBGOverlays()
   {
-    moho::TDatList<moho::RDebugOverlayClass, void>& overlays = GlobalDebugOverlayClassList();
-    overlays.ListUnlink();
+    (void)UnlinkAndResetDbgOverlaysPrimary();
   }
 
   moho::RDebugGridTypeInfo* gRDebugGridTypeInfo = nullptr;
@@ -126,6 +157,17 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x0064C3C0 (FUN_0064C3C0, Moho::RDebugOverlayClass::RDebugOverlayClass)
+   */
+  RDebugOverlayClass::RDebugOverlayClass()
+    : gpg::RType()
+    , mOverlayClassPad0064(0)
+    , mOverlayClassLink()
+    , mOverlayToken()
+    , mOverlayDescription()
+  {}
+
+  /**
    * Address: 0x0064C170 (FUN_0064C170, ?GetClass@RDebugOverlayClass@Moho@@UBEPAVRType@gpg@@XZ)
    */
   gpg::RType* RDebugOverlayClass::GetClass() const
@@ -145,9 +187,78 @@ namespace moho
   }
 
   /**
-   * Address: 0x0064C4D0 (FUN_0064C4D0, scalar deleting body)
+   * Address: 0x0064C400 (FUN_0064C400, non-deleting destructor body)
+   * Thunk entry: 0x0064C4D0 (FUN_0064C4D0, scalar deleting destructor)
    */
-  RDebugOverlayClass::~RDebugOverlayClass() = default;
+  RDebugOverlayClass::~RDebugOverlayClass()
+  {
+    mOverlayDescription.assign_owned("");
+    mOverlayToken.assign_owned("");
+    mOverlayClassLink.ListUnlink();
+    mOverlayClassLink.ListResetLinks();
+    fields_ = {};
+    bases_ = {};
+  }
+
+  /**
+   * Address: 0x0064C4C0 (FUN_0064C4C0)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one overlay-class destroy lane into the
+   * canonical non-deleting destructor body.
+   */
+  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkA(RDebugOverlayClass* const overlayClass)
+  {
+    overlayClass->~RDebugOverlayClass();
+  }
+
+  /**
+   * Address: 0x0064D170 (FUN_0064D170)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one overlay-class destroy lane into the
+   * canonical non-deleting destructor body.
+   */
+  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkB(RDebugOverlayClass* const overlayClass)
+  {
+    overlayClass->~RDebugOverlayClass();
+  }
+
+  /**
+   * Address: 0x0064D9D0 (FUN_0064D9D0)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one overlay-class destroy lane into the
+   * canonical non-deleting destructor body.
+   */
+  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkC(RDebugOverlayClass* const overlayClass)
+  {
+    overlayClass->~RDebugOverlayClass();
+  }
+
+  /**
+   * Address: 0x00650670 (FUN_00650670)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one overlay-class destroy lane into the
+   * canonical non-deleting destructor body.
+   */
+  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkD(RDebugOverlayClass* const overlayClass)
+  {
+    overlayClass->~RDebugOverlayClass();
+  }
+
+  /**
+   * Address: 0x00650880 (FUN_00650880)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one overlay-class destroy lane into the
+   * canonical non-deleting destructor body.
+   */
+  [[maybe_unused]] void DestroyRDebugOverlayClassViaTypeInfoThunkE(RDebugOverlayClass* const overlayClass)
+  {
+    overlayClass->~RDebugOverlayClass();
+  }
 
   /**
    * Address: 0x00651920 (FUN_00651920)
@@ -176,7 +287,7 @@ namespace moho
     static bool sInitialized = false;
     if (!sInitialized) {
       sInitialized = true;
-      GlobalDebugOverlayClassList().ListResetLinks();
+      (void)ResetDbgOverlayHeadLinks();
       (void)std::atexit(&cleanup_sDBGOverlays);
     }
     return &GlobalDebugOverlayClassList();

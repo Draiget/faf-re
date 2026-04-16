@@ -239,7 +239,7 @@ namespace
   }
 
   /**
-   * Address: 0x004C9CA0 (FUN_004C9CA0, CLuaTask serializer cleanup alias A)
+    * Alias of FUN_004C9CA0 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasA()
   {
@@ -247,7 +247,7 @@ namespace
   }
 
   /**
-   * Address: 0x004C9CD0 (FUN_004C9CD0, CLuaTask serializer cleanup alias B)
+    * Alias of FUN_004C9CD0 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasB()
   {

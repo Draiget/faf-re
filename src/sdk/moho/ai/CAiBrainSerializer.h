@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00579D90 (FUN_00579D90, Moho::CAiBrainSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiBrain::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00579DA0 (FUN_00579DA0, Moho::CAiBrainSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiBrain::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0057E460 (FUN_0057E460)
      *
      * What it does:
@@ -40,4 +56,13 @@ namespace moho
   static_assert(offsetof(CAiBrainSerializer, mLoadCallback) == 0x0C, "CAiBrainSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(CAiBrainSerializer, mSaveCallback) == 0x10, "CAiBrainSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(CAiBrainSerializer) == 0x14, "CAiBrainSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCB430 (FUN_00BCB430, register_CAiBrainSerializer)
+   *
+   * What it does:
+   * Initializes the global CAiBrain serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CAiBrainSerializer();
 } // namespace moho

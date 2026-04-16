@@ -72,6 +72,44 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0059CEB0 (FUN_0059CEB0)
+   *
+   * What it does:
+   * Binds one `fastvector` runtime-view header to caller-provided inline
+   * pointer storage with inline capacity for 10 pointer elements.
+   */
+  [[nodiscard]] gpg::fastvector_runtime_view<CAiFormationInstance*>* BindFormationInstanceInlineRuntimeView(
+    gpg::fastvector_runtime_view<CAiFormationInstance*>* const result,
+    CAiFormationInstance** const inlineOrigin
+  ) noexcept
+  {
+    result->begin = inlineOrigin;
+    result->end = inlineOrigin;
+    result->capacityEnd = inlineOrigin + 10;
+    result->metadata = inlineOrigin;
+    return result;
+  }
+
+  /**
+   * Address: 0x0059C890 (FUN_0059C890)
+   *
+   * What it does:
+   * Initializes `fastvector_n<CAiFormationInstance*,10>` header lanes so begin,
+   * end, and metadata point at inline storage, with capacity at `+0x28`.
+   */
+  [[nodiscard]] gpg::fastvector_n<CAiFormationInstance*, 10>* InitializeFormationInstanceInlineStorage(
+    gpg::fastvector_n<CAiFormationInstance*, 10>* const result
+  ) noexcept
+  {
+    auto& view = gpg::AsFastVectorRuntimeView<CAiFormationInstance*>(result);
+    auto* const inlineOrigin = reinterpret_cast<CAiFormationInstance**>(
+      reinterpret_cast<std::uint8_t*>(result) + 0x10u
+    );
+    (void)BindFormationInstanceInlineRuntimeView(&view, inlineOrigin);
+    return result;
+  }
+
   void InitializeCAiFormationDBImpl(CAiFormationDBImpl* const object) noexcept
   {
     if (!object) {
@@ -79,7 +117,7 @@ namespace
     }
 
     object->mSim = nullptr;
-    object->mFormInstances.ResetStorageToInline();
+    (void)InitializeFormationInstanceInlineStorage(&object->mFormInstances);
   }
 
   [[nodiscard]] IFormationInstanceFastVectorTypeInfo* AcquireFastVectorIFormationInstanceType()
@@ -399,10 +437,7 @@ const char* CAiFormationDBImplTypeInfo::GetName() const
 void CAiFormationDBImplTypeInfo::Init()
 {
   size_ = sizeof(CAiFormationDBImpl);
-  newRefFunc_ = &CAiFormationDBImplTypeInfo::NewRef;
-  ctorRefFunc_ = &CAiFormationDBImplTypeInfo::CtrRef;
-  deleteFunc_ = &CAiFormationDBImplTypeInfo::Delete;
-  dtrFunc_ = &CAiFormationDBImplTypeInfo::Destruct;
+  (void)InitializeAllocationCallbacks(this);
   gpg::RType::Init();
 
   static gpg::RType* sCachedIAiFormationDBType = nullptr;
@@ -422,6 +457,22 @@ void CAiFormationDBImplTypeInfo::Init()
   }
 
   Finish();
+}
+
+/**
+ * Address: 0x0059CB50 (FUN_0059CB50)
+ *
+ * What it does:
+ * Wires `newRef/ctorRef/delete/dtr` callback lanes for
+ * `CAiFormationDBImpl` reflection ownership.
+ */
+gpg::RType* CAiFormationDBImplTypeInfo::InitializeAllocationCallbacks(gpg::RType* const typeInfo)
+{
+  typeInfo->newRefFunc_ = &CAiFormationDBImplTypeInfo::NewRef;
+  typeInfo->ctorRefFunc_ = &CAiFormationDBImplTypeInfo::CtrRef;
+  typeInfo->deleteFunc_ = &CAiFormationDBImplTypeInfo::Delete;
+  typeInfo->dtrFunc_ = &CAiFormationDBImplTypeInfo::Destruct;
+  return typeInfo;
 }
 
 /**

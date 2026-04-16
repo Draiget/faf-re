@@ -114,15 +114,6 @@ namespace moho
   static_assert(sizeof(EAlliancePrimitiveSerializer) == 0x14, "EAlliancePrimitiveSerializer size must be 0x14");
 
   /**
-   * Address: 0x00509D60 (FUN_00509D60, preregister_EAllianceTypeInfo)
-   *
-   * What it does:
-   * Constructs/preregisters startup-owned RTTI descriptor storage for
-   * `EAlliance`.
-   */
-  [[nodiscard]] gpg::REnumType* preregister_EAllianceTypeInfo();
-
-  /**
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
    *
    * What it does:

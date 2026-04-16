@@ -19,6 +19,17 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyStats.h"
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+
+  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(gpg::WriteArchive* archive, int ownerToken);
+} // namespace gpg
+
 namespace
 {
   constexpr const char kReflectSharedPtrHeaderPath[] =
@@ -178,15 +189,28 @@ namespace
     }
 
     /**
+     * Address: 0x0070E9A0 (FUN_0070E9A0)
+     *
+     * What it does:
+     * Installs `STrigger` allocation/construct/delete/destruct callback slots
+     * on one reflected type descriptor.
+     */
+    static gpg::RType* AssignSTriggerLifecycleCallbacks(gpg::RType* const typeInfo)
+    {
+      typeInfo->newRefFunc_ = &STriggerTypeInfo::NewRef;
+      typeInfo->ctorRefFunc_ = &STriggerTypeInfo::CtrRef;
+      typeInfo->deleteFunc_ = &STriggerTypeInfo::Delete;
+      typeInfo->dtrFunc_ = &STriggerTypeInfo::Destruct;
+      return typeInfo;
+    }
+
+    /**
      * Address: 0x0070B280 (FUN_0070B280, Moho::STriggerTypeInfo::Init)
      */
     void Init() override
     {
       size_ = sizeof(moho::STrigger);
-      newRefFunc_ = &STriggerTypeInfo::NewRef;
-      ctorRefFunc_ = &STriggerTypeInfo::CtrRef;
-      deleteFunc_ = &STriggerTypeInfo::Delete;
-      dtrFunc_ = &STriggerTypeInfo::Destruct;
+      (void)AssignSTriggerLifecycleCallbacks(this);
       gpg::RType::Init();
       Finish();
     }
@@ -383,6 +407,13 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x0070FA50 (FUN_0070FA50)
+     *
+     * What it does:
+     * Serializes one `fastvector<SCondition>` lane by writing element count and
+     * then each `SCondition` payload through reflected write callbacks.
+     */
     static void Serialize(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
       const auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(reinterpret_cast<void*>(objectPtr));
@@ -431,6 +462,13 @@ namespace
       return view.Data() ? view.Size() : 0u;
     }
 
+    /**
+     * Address: 0x0070E7A0 (FUN_0070E7A0, gpg::RFastVectorType_SCondition::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<SCondition>` lane and value-initializes
+     * appended elements.
+     */
     void SetCount(void* const obj, const int count) const override
     {
       if (!obj || count < 0) {
@@ -631,6 +669,13 @@ namespace
   class RListSharedPtrSTriggerTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00712F40 (FUN_00712F40, gpg::RListType_shared_ptr_STrigger::RListType_shared_ptr_STrigger)
+     *
+     * What it does:
+     * Preregisters `std::list<boost::shared_ptr<moho::STrigger>>` reflection
+     * metadata at startup.
+     */
     RListSharedPtrSTriggerTypeInfo()
       : gpg::RType()
     {
@@ -819,6 +864,202 @@ namespace
     gStatsCArmyStatItemTypeNameInitGuard = 0u;
   }
 
+  /**
+   * Address: 0x0070FE00 (FUN_0070FE00, gpg::RMapType_RUnitBlueprintP_float::SerLoad)
+   *
+   * What it does:
+   * Clears destination storage, then reads `count` serialized
+   * `RUnitBlueprint* -> float` lanes from the archive.
+   */
+  void DeserializeUnitBlueprintWeightMap(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    auto* const destination = reinterpret_cast<UnitBlueprintWeightMap*>(objectPtr);
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+    destination->clear();
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int index = 0u; index < count; ++index) {
+      moho::RUnitBlueprint* blueprint = nullptr;
+      float value = 0.0f;
+      archive->ReadPointer_RUnitBlueprint(&blueprint, &owner);
+      archive->ReadFloat(&value);
+      (*destination)[blueprint] = value;
+    }
+  }
+
+  /**
+   * Address: 0x0070FEB0 (FUN_0070FEB0, gpg::RMapType_RUnitBlueprintP_float::SerSave)
+   *
+   * What it does:
+   * Writes map size followed by each `RUnitBlueprint* -> float` pair in
+   * map-order.
+   */
+  void SerializeUnitBlueprintWeightMap(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const auto* const source = reinterpret_cast<const UnitBlueprintWeightMap*>(objectPtr);
+    const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
+    archive->WriteUInt(count);
+    if (source == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (const auto& entry : *source) {
+      gpg::RRef pointerRef{};
+      gpg::RRef_RUnitBlueprint(&pointerRef, const_cast<moho::RUnitBlueprint*>(entry.first));
+      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, owner);
+      archive->WriteFloat(entry.second);
+    }
+  }
+
+  /**
+   * Alias of FUN_00710460 (serializer load helper lane).
+   *
+   * What it does:
+   * Clears destination storage, then reads `count` serialized
+   * `string -> CArmyStatItem*` lanes from the archive.
+   */
+  void DeserializeStringArmyStatItemMap(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    auto* const destination = reinterpret_cast<StringToArmyStatItemMap*>(objectPtr);
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+    destination->clear();
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int index = 0u; index < count; ++index) {
+      msvc8::string key{};
+      moho::CArmyStatItem* value = nullptr;
+      archive->ReadString(&key);
+      archive->ReadPointer_CArmyStatItem(&value, &owner);
+      (*destination)[key.c_str()] = value;
+    }
+  }
+
+  /**
+   * Address: 0x007105A0 (FUN_007105A0, gpg::RMapType_string_CArmyStateItemP::SerSave)
+   *
+   * What it does:
+   * Writes map size followed by each `string -> CArmyStatItem*` pair in
+   * map-order.
+   */
+  void SerializeStringArmyStatItemMap(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const auto* const source = reinterpret_cast<const StringToArmyStatItemMap*>(objectPtr);
+    const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
+    archive->WriteUInt(count);
+    if (source == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (const auto& entry : *source) {
+      msvc8::string key(entry.first.c_str());
+      archive->WriteString(&key);
+
+      gpg::RRef pointerRef{};
+      gpg::RRef_CArmyStatItem(&pointerRef, entry.second);
+      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, owner);
+    }
+  }
+
+  /**
+   * Address: 0x007102B0 (FUN_007102B0)
+   *
+   * What it does:
+   * Locks one `Stats<CArmyStatItem>` lane, reads an owned root pointer from
+   * archive, swaps it into `mItem`, and deletes the previous root.
+   */
+  void DeserializeStatsCArmyStatItemOwnedRootLane(gpg::ReadArchive* const archive, const int ownerToken)
+  {
+    auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(ownerToken))
+    );
+    if (archive == nullptr || stats == nullptr) {
+      return;
+    }
+
+    boost::mutex::scoped_lock lock(*stats->mLock);
+    moho::CArmyStatItem* loadedRoot = nullptr;
+    const gpg::RRef owner{};
+    archive->ReadPointerOwned_CArmyStatItem(&loadedRoot, &owner);
+
+    moho::CArmyStatItem* const previousRoot = stats->mItem;
+    stats->mItem = loadedRoot;
+    delete previousRoot;
+  }
+
+  /**
+   * Address: 0x007103D0 (FUN_007103D0)
+   *
+   * What it does:
+   * Allocates one `Stats<CArmyStatItem>`, wraps it in typed `RRef`, and
+   * publishes it as an unowned serializer construct result.
+   */
+  void ConstructStatsCArmyStatItemForSerializer(
+    const int, const int, const int, gpg::SerConstructResult* const constructResult
+  )
+  {
+    auto* const stats = new (std::nothrow) moho::Stats<moho::CArmyStatItem>();
+    if (constructResult == nullptr) {
+      delete stats;
+      return;
+    }
+
+    gpg::RRef statsRef{};
+    gpg::RRef_Stats_CArmyStatItem(&statsRef, stats);
+    constructResult->SetUnowned(statsRef, 0u);
+  }
+
+  /**
+   * Address: 0x00712780 (FUN_00712780)
+   *
+   * What it does:
+   * Destroys one `Stats<CArmyStatItem>` object and releases its storage when
+   * the pointer is non-null.
+   */
+  void DeleteStatsCArmyStatItemOwnedObject(void* const object)
+  {
+    delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object);
+  }
+
   class RMapUnitBlueprintFloatTypeInfo final : public gpg::RType
   {
   public:
@@ -882,6 +1123,8 @@ namespace
     {
       size_ = sizeof(UnitBlueprintWeightMap);
       version_ = 1;
+      serLoadFunc_ = &DeserializeUnitBlueprintWeightMap;
+      serSaveFunc_ = &SerializeUnitBlueprintWeightMap;
     }
   };
 
@@ -921,11 +1164,22 @@ namespace
       return gStatsCArmyStatItemTypeName.c_str();
     }
 
+    /**
+     * Address: 0x0070F1D0 (FUN_0070F1D0, Moho::StatsRType_CArmyStatItem::Init)
+     *
+     * What it does:
+     * Sets reflected Stats<CArmyStatItem> size/version lanes and installs
+     * save/construct/load/delete callback helpers in original binary order.
+     */
     void Init() override
     {
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
-      gpg::RType::Init();
-      Finish();
+      version_ = 1;
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(&DeserializeStatsCArmyStatItemOwnedRootLane);
+      serSaveFunc_ =
+        reinterpret_cast<gpg::RType::save_func_t>(&gpg::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1);
+      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructStatsCArmyStatItemForSerializer);
+      deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }
   };
 
@@ -992,6 +1246,8 @@ namespace
     {
       size_ = sizeof(StringToArmyStatItemMap);
       version_ = 1;
+      serLoadFunc_ = &DeserializeStringArmyStatItemMap;
+      serSaveFunc_ = &SerializeStringArmyStatItemMap;
     }
   };
 
@@ -1183,7 +1439,6 @@ namespace moho
     gSConditionSerializer.mHelperPrev = self;
     gSConditionSerializer.mLoadCallback = &SConditionSerializer::Deserialize;
     gSConditionSerializer.mSaveCallback = &SConditionSerializer::Serialize;
-    gSConditionSerializer.RegisterSerializeFunctions();
   }
 
   /**
@@ -1204,7 +1459,6 @@ namespace moho
     gSTriggerSerializer.mHelperPrev = self;
     gSTriggerSerializer.mLoadCallback = &STriggerSerializer::Deserialize;
     gSTriggerSerializer.mSaveCallback = &STriggerSerializer::Serialize;
-    gSTriggerSerializer.RegisterSerializeFunctions();
   }
 
   /**

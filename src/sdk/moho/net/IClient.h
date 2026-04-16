@@ -111,16 +111,22 @@ namespace moho
     IClient(const char* name, int index, int32_t ownerId);
 
     /**
-     * Address: <synthetic host-build helper>
+     * Address: 0x0053B5C0 (FUN_0053B5C0)
      *
      * What it does:
-     * Exposes the per-owner id lane tracked by this client record.
+     * Returns the client index lane stored in this record.
      */
     [[nodiscard]]
-    int32_t GetOwnerId() const
-    {
-      return mOwnerId;
-    }
+    int GetIndex() const;
+
+    /**
+     * Address: 0x0053B5D0 (FUN_0053B5D0)
+     *
+     * What it does:
+     * Returns the owner-id lane stored in this record.
+     */
+    [[nodiscard]]
+    int32_t GetOwnerId() const;
 
     /**
      * Address: <synthetic host-build helper>

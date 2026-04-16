@@ -50,6 +50,35 @@ namespace
     InitializeSerializerNode(serializer);
   }
 
+  /**
+   * Address: 0x005E46C0 (FUN_005E46C0)
+   *
+   * What it does:
+   * Splices this serializer helper node out of its intrusive lane when linked,
+   * then resets helper links to self and returns the self node pointer.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSTransportPickUpInfoSerializerHelperNodeVariantA(
+    STransportPickUpInfoSerializer& serializer
+  ) noexcept
+  {
+    UnlinkSerializerNode(serializer);
+    return SerializerSelfNode(serializer);
+  }
+
+  /**
+   * Address: 0x005E46F0 (FUN_005E46F0)
+   *
+   * What it does:
+   * Secondary helper-node unlink/reset variant that preserves the same
+   * intrusive unlink semantics and returns the helper self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSTransportPickUpInfoSerializerHelperNodeVariantB(
+    STransportPickUpInfoSerializer& serializer
+  ) noexcept
+  {
+    return UnlinkSTransportPickUpInfoSerializerHelperNodeVariantA(serializer);
+  }
+
   [[nodiscard]] gpg::RType* CachedSTransportPickUpInfoType()
   {
     static gpg::RType* cached = nullptr;
@@ -102,7 +131,7 @@ namespace
     }
 
     STransportPickUpInfoSerializer* const serializer = AcquireSTransportPickUpInfoSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkSTransportPickUpInfoSerializerHelperNodeVariantA(*serializer);
     serializer->~STransportPickUpInfoSerializer();
     gSTransportPickUpInfoSerializerConstructed = false;
   }
@@ -205,7 +234,5 @@ int moho::register_STransportPickUpInfoSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &STransportPickUpInfoSerializer::Deserialize;
   serializer->mSaveCallback = &STransportPickUpInfoSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_STransportPickUpInfoSerializer);
 }
-

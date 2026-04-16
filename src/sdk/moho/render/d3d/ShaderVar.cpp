@@ -160,6 +160,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x007E9040 (FUN_007E9040, func_register_ShaderVar_5)
+   *
+   * What it does:
+   * Adapts the caller order `(effectFileName, variableName, shaderVar)` to the
+   * canonical shader-var registration lane and returns the same shader-var slot.
+   */
+  ShaderVar* RegisterShaderVarFromEffectFileFirst(
+    const char* const effectFileName,
+    const char* const variableName,
+    ShaderVar* const shaderVar
+  )
+  {
+    RegisterShaderVar(variableName, shaderVar, effectFileName);
+    return shaderVar;
+  }
+
+  /**
    * Address: 0x00437ED0 (FUN_00437ED0, struct_ShaderVar::Exists)
    *
    * What it does:

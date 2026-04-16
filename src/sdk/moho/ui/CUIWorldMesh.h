@@ -49,6 +49,32 @@ namespace moho
      */
     ~CUIWorldMesh() override;
 
+    /**
+     * Address: 0x0086AE00 (FUN_0086AE00)
+     *
+     * What it does:
+     * Builds one stance transform from position/orientation components and
+     * applies it to the owned mesh instance as both start and end stance.
+     */
+    void SetStanceFromComponents(
+      float positionX,
+      float positionY,
+      float positionZ,
+      float orientationX,
+      float orientationY,
+      float orientationZ,
+      float orientationW
+    );
+
+    /**
+     * Address: 0x0086B2C0 (FUN_0086B2C0, Moho::CUIWorldMesh::SetMesh)
+     *
+     * What it does:
+     * Resolves one world-mesh descriptor table and updates the owned mesh
+     * instance from either direct model/material lanes or unit blueprint data.
+     */
+    void SetMesh(const LuaPlus::LuaObject& meshDescriptor);
+
   public:
     MeshInstance* mMeshInstance = nullptr; // +0x34
   };

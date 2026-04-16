@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+
 using namespace moho;
 
 namespace
@@ -14,26 +16,71 @@ namespace
    */
   void VisionDbPoolNoOpListCallback(void* /*self*/) {}
 
-  template <class Entry>
-  void ClearRingAndDeleteHead(Entry*& head, std::uint32_t& count) noexcept
+  struct VisionDbIntrusiveListNodeRuntime
   {
-    if (!head) {
-      return;
+    VisionDbIntrusiveListNodeRuntime* next; // +0x00
+    VisionDbIntrusiveListNodeRuntime* prev; // +0x04
+  };
+
+  struct VisionDbIntrusiveListStateRuntime
+  {
+    std::uint32_t listCookie;              // +0x00
+    VisionDbIntrusiveListNodeRuntime* head; // +0x04
+    std::uint32_t size;                    // +0x08
+  };
+
+  static_assert(
+    sizeof(VisionDbIntrusiveListStateRuntime) == 0x0C,
+    "VisionDbIntrusiveListStateRuntime size must be 0x0C"
+  );
+
+  /**
+   * Address: 0x0081B9C0 (FUN_0081B9C0)
+   *
+   * What it does:
+   * Clears one intrusive list while preserving its sentinel node.
+   */
+  VisionDbIntrusiveListNodeRuntime* VisionDbClearListNodesKeepingSentinel(
+    VisionDbIntrusiveListStateRuntime* const listState
+  ) noexcept
+  {
+    if (listState == nullptr || listState->head == nullptr) {
+      return nullptr;
     }
 
-    Entry* node = static_cast<Entry*>(head->mNext);
-    head->mNext = head;
-    head->mPrev = head;
-    count = 0;
+    VisionDbIntrusiveListNodeRuntime* const head = listState->head;
+    VisionDbIntrusiveListNodeRuntime* node = head->next;
+    head->next = head;
+    head->prev = head;
+    listState->size = 0;
 
     while (node != head) {
-      Entry* next = static_cast<Entry*>(node->mNext);
+      VisionDbIntrusiveListNodeRuntime* const next = node->next;
       ::operator delete(node);
       node = next;
     }
 
-    ::operator delete(head);
-    head = nullptr;
+    return head;
+  }
+
+  /**
+   * Address: 0x0081B790 (FUN_0081B790)
+   *
+   * What it does:
+   * Allocates one 12-byte intrusive-list sentinel lane and self-links its
+   * `prev/next` pointers.
+   */
+  [[maybe_unused]] [[nodiscard]] VisionDbIntrusiveListNodeRuntime* VisionDbAllocateSelfLinkedListSentinel12()
+  {
+    auto* const rawNode = static_cast<std::uint8_t*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    if (rawNode == nullptr) {
+      return nullptr;
+    }
+
+    auto* const node = reinterpret_cast<VisionDbIntrusiveListNodeRuntime*>(rawNode);
+    node->next = node;
+    node->prev = node;
+    return node;
   }
 
   void ResetVisionEntry(
@@ -194,10 +241,16 @@ namespace
  */
 VisionDB::Pool::Pool()
 {
-  mEntriesHead = new ZoneBlockEntry();
+  mEntriesHead = reinterpret_cast<ZoneBlockEntry*>(VisionDbAllocateSelfLinkedListSentinel12());
+  if (mEntriesHead != nullptr) {
+    mEntriesHead->blockBase = nullptr;
+  }
   mEntriesSize = 0;
 
-  mEntryPoolHead = new FreeNodeEntry();
+  mEntryPoolHead = reinterpret_cast<FreeNodeEntry*>(VisionDbAllocateSelfLinkedListSentinel12());
+  if (mEntryPoolHead != nullptr) {
+    mEntryPoolHead->node = nullptr;
+  }
   mEntryPoolSize = 0;
 }
 
@@ -213,8 +266,19 @@ void VisionDB::Pool::Clear()
   VisionDbPoolNoOpListCallback(this);
   FreeZoneBlocks(mEntriesHead);
 
-  ClearRingAndDeleteHead(mEntryPoolHead, mEntryPoolSize);
-  ClearRingAndDeleteHead(mEntriesHead, mEntriesSize);
+  if (mEntryPoolHead != nullptr) {
+    auto* const entryPoolState = reinterpret_cast<VisionDbIntrusiveListStateRuntime*>(&mEntryPoolListState);
+    (void)VisionDbClearListNodesKeepingSentinel(entryPoolState);
+    ::operator delete(mEntryPoolHead);
+    mEntryPoolHead = nullptr;
+  }
+
+  if (mEntriesHead != nullptr) {
+    auto* const entriesState = reinterpret_cast<VisionDbIntrusiveListStateRuntime*>(&mEntriesListState);
+    (void)VisionDbClearListNodesKeepingSentinel(entriesState);
+    ::operator delete(mEntriesHead);
+    mEntriesHead = nullptr;
+  }
 }
 
 /**
@@ -413,6 +477,23 @@ void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* n
 }
 
 /**
+ * Address: 0x0081AE60 (FUN_0081AE60)
+ *
+ * What it does:
+ * Runs the non-deleting handle teardown lane shared by the deleting-dtor
+ * wrapper: unlink the pooled node from the owner chain and return it to the
+ * owning VisionDB pool.
+ */
+void VisionDB::Handle::ReleasePooledNodeToOwnerPool()
+{
+  auto* const owner = reinterpret_cast<VisionDB*>(mDB);
+  auto* const pooledNode = reinterpret_cast<Pool::PooledNode*>(mNode);
+  auto* const ownerChain = static_cast<OwnerChainView*>(pooledNode->mParent);
+  UnlinkFromOwnerTree(ownerChain, pooledNode);
+  ReturnNodeToFreeList(&owner->pool_, pooledNode);
+}
+
+/**
  * Address: 0x0081AE20 (FUN_0081AE20)
  * Address: 0x103E3DA0
  *
@@ -421,18 +502,16 @@ void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* n
  */
 VisionDB::Handle::~Handle()
 {
-  auto* const pooledNode = reinterpret_cast<Pool::PooledNode*>(mNode);
-  auto* const owner = reinterpret_cast<VisionDB*>(mDB);
-  if (pooledNode && owner) {
-    auto* const ownerChain = static_cast<OwnerChainView*>(pooledNode->mParent);
-    UnlinkFromOwnerTree(ownerChain, pooledNode);
-    ReturnNodeToFreeList(&owner->pool_, pooledNode);
-  }
-
-  mDB = 0;
-  mNode = 0;
+  ReleasePooledNodeToOwnerPool();
 }
 
+/**
+ * Address: 0x0081AE90 (FUN_0081AE90, sub_81AE90)
+ *
+ * What it does:
+ * Initializes one vision DB instance by constructing its pool lane and
+ * clearing the root-node pointer.
+ */
 VisionDB::VisionDB()
   : pool_()
   , rootNode_(nullptr)

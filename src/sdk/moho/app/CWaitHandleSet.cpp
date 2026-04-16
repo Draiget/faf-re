@@ -311,7 +311,7 @@ void CWaitHandleSet::MsgWaitEx(const DWORD timeoutMs)
 }
 
 /**
- * Address: 0x004145E0
+  * Alias of FUN_004145E0 (non-canonical helper lane).
  *
  * Compatibility wrapper retained while callsites migrate to MsgWaitEx naming.
  */

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +20,14 @@ namespace moho
   class EScrollTypeTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x007771B0 (FUN_007771B0, Moho::EScrollTypeTypeInfo::ctor)
+     *
+     * What it does:
+     * Preregisters the reflected `EScrollType` enum metadata.
+     */
+    EScrollTypeTypeInfo();
+
     /**
      * Address: 0x00777240 (FUN_00777240, Moho::EScrollTypeTypeInfo::dtr)
      */

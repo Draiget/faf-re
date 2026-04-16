@@ -1,6 +1,7 @@
 #include "CWldSessionLoaderImpl.h"
 
 #include <cstring>
+#include <new>
 
 #include "boost/thread.h"
 #include "gpg/core/containers/String.h"
@@ -44,6 +45,24 @@ namespace moho
         return;
       }
     }
+
+    /**
+     * Address: 0x00885640 (FUN_00885640, sub_885640)
+     *
+     * What it does:
+     * Unlinks one intrusive list-item lane from its current neighbors and
+     * re-initializes it as a self-linked sentinel node.
+     */
+    [[nodiscard]] TDatListItem<SWldScenarioInfo, void>* ResetScenarioListHead(
+      TDatListItem<SWldScenarioInfo, void>& listItem
+    ) noexcept
+    {
+      listItem.mNext->mPrev = listItem.mPrev;
+      listItem.mPrev->mNext = listItem.mNext;
+      listItem.mPrev = &listItem;
+      listItem.mNext = &listItem;
+      return &listItem;
+    }
   } // namespace
 
   /**
@@ -65,7 +84,7 @@ namespace moho
   CWldSessionLoaderImpl::~CWldSessionLoaderImpl()
   {
     Finalize();
-    mScenarioHead.ListUnlink();
+    (void)ResetScenarioListHead(mScenarioHead);
   }
 
   /**
@@ -391,11 +410,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x008855B0 (FUN_008855B0, func_GetWldSessionLoader)
+    * Alias of FUN_008855B0 (non-canonical helper lane).
    */
   CWldSessionLoaderImpl* GetWldSessionLoader()
   {
     static CWldSessionLoaderImpl sWldSessionLoader{};
     return &sWldSessionLoader;
+  }
+
+  /**
+   * Address: 0x00885630 (FUN_00885630, sub_885630)
+   *
+   * What it does:
+   * Rebinds the loader singleton storage to base `IWldSessionLoader` vtable
+   * lane and returns the same singleton-address as interface pointer.
+   */
+  [[maybe_unused]] IWldSessionLoader* ResetWldSessionLoaderSingletonToInterfaceVtable() noexcept
+  {
+    IWldSessionLoader* const loader = static_cast<IWldSessionLoader*>(GetWldSessionLoader());
+    return ::new (loader) IWldSessionLoader();
   }
 } // namespace moho

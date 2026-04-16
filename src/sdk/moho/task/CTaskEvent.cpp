@@ -172,7 +172,7 @@ namespace
   }
 
   /**
-   * Address: 0x004081E0 (FUN_004081E0, gpg::ReadArchive::ReadPointer_STaskEventLinkage)
+    * Alias of FUN_004081E0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane and upcasts it to `STaskEventLinkage`
@@ -204,7 +204,7 @@ namespace
   }
 
   /**
-   * Address: 0x00407A50 (FUN_00407A50, gpg::ReadArchive::ReadPointerOwned_STaskEventLinkage)
+    * Alias of FUN_00407A50 (non-canonical helper lane).
    *
    * What it does:
    * Reads one pointer lane, enforces owned-pointer transition
@@ -336,7 +336,6 @@ namespace
     ResetHelperIntrusiveLinks(&gCTaskEventSerializer);
     gCTaskEventSerializer.mSerLoadFunc = &DeserializeCTaskEvent;
     gCTaskEventSerializer.mSerSaveFunc = &SerializeCTaskEvent;
-    gCTaskEventSerializer.RegisterSerializeFunctions();
   }
 
   /**
@@ -641,6 +640,7 @@ void WeakPtr_STaskEventLinkage::Write(
 
 /**
  * Address: 0x004078B0 (FUN_004078B0, Moho::WeakPtr_STaskEventLinkage::SetObject)
+ * Address: 0x00873690 (FUN_00873690)
  *
  * What it does:
  * Atomically rebinds an intrusive `WeakPtr<STaskEventLinkage>` slot to a new

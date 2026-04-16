@@ -94,6 +94,12 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x00689740 (FUN_00689740)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `EntitySetBase` lane.
+   */
   [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
   {
     gpg::RType* type = moho::EntitySetBase::sType;
@@ -118,6 +124,12 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x006940F0 (FUN_006940F0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `WeakEntitySetTemplate<Entity>` lane.
+   */
   [[nodiscard]] gpg::RType* ResolveWeakEntitySetType()
   {
     gpg::RType* type = WeakEntitySet::sType;
@@ -130,6 +142,12 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x006947C0 (FUN_006947C0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `fastvector<Entity*>` lane.
+   */
   [[nodiscard]] gpg::RType* ResolveFastVectorEntityPointerType()
   {
     static gpg::RType* type = nullptr;
@@ -144,12 +162,294 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x006947E0 (FUN_006947E0)
+   *
+   * What it does:
+   * Secondary duplicated RTTI-resolve lane for `fastvector<Entity*>`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveFastVectorEntityPointerTypeVariantB()
+  {
+    return ResolveFastVectorEntityPointerType();
+  }
+
   [[nodiscard]] gpg::RRef MakeEntitySetBaseRef(moho::EntitySetBase* object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
     ref.mType = ResolveEntitySetBaseType();
     return ref;
+  }
+
+  /**
+   * Address: 0x006942C0 (FUN_006942C0)
+   *
+   * What it does:
+   * Deserializes one `EntitySetTemplate<Entity>` object lane using one local
+   * null-owner reference.
+   */
+  void ReadEntitySetArchiveObjectWithNullOwner(gpg::ReadArchive* const archive, void* const object)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(ResolveEntitySetType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x00694300 (FUN_00694300)
+   *
+   * What it does:
+   * Serializes one `EntitySetTemplate<Entity>` object lane using one local
+   * null-owner reference.
+   */
+  void WriteEntitySetArchiveObjectWithNullOwner(gpg::WriteArchive* const archive, void** const objectSlot)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(ResolveEntitySetType(), objectSlot, ownerRef);
+  }
+
+  /**
+   * Address: 0x006944B0 (FUN_006944B0)
+   *
+   * What it does:
+   * Deserializes one `EntitySetBase` object lane through archive owner context
+   * and returns the archive instance.
+   */
+  gpg::ReadArchive* ReadEntitySetBaseArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006944F0 (FUN_006944F0)
+   *
+   * What it does:
+   * Serializes one `EntitySetBase` object lane through archive owner context
+   * and returns the archive instance.
+   */
+  gpg::WriteArchive* WriteEntitySetBaseArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00694530 (FUN_00694530)
+   *
+   * What it does:
+   * Deserializes one `EntitySetBase` object lane through archive owner context.
+   */
+  void ReadEntitySetBaseArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  {
+    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+  }
+
+  /**
+   * Address: 0x00694560 (FUN_00694560)
+   *
+   * What it does:
+   * Serializes one `EntitySetBase` object lane through archive owner context.
+   */
+  void WriteEntitySetBaseArchiveObjectLane1(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+  }
+
+  /**
+   * Address: 0x006946E0 (FUN_006946E0)
+   *
+   * What it does:
+   * Deserializes one `fastvector<Entity*>` object lane through archive owner
+   * context and returns the archive instance.
+   */
+  gpg::ReadArchive* ReadFastVectorEntityPointerArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    archive->Read(ResolveFastVectorEntityPointerType(), object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00694720 (FUN_00694720)
+   *
+   * What it does:
+   * Serializes one `fastvector<Entity*>` object lane through archive owner
+   * context and returns the archive instance.
+   */
+  gpg::WriteArchive* WriteFastVectorEntityPointerArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(ResolveFastVectorEntityPointerType(), objectSlot, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00694760 (FUN_00694760)
+   *
+   * What it does:
+   * Deserializes one `fastvector<Entity*>` object lane through archive owner
+   * context.
+   */
+  void ReadFastVectorEntityPointerArchiveObjectLane1(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    archive->Read(ResolveFastVectorEntityPointerType(), object, *ownerRef);
+  }
+
+  /**
+   * Address: 0x00694790 (FUN_00694790)
+   *
+   * What it does:
+   * Serializes one `fastvector<Entity*>` object lane through archive owner
+   * context.
+   */
+  void WriteFastVectorEntityPointerArchiveObjectLane1(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    archive->Write(ResolveFastVectorEntityPointerType(), objectSlot, *ownerRef);
+  }
+
+  /**
+   * Address: 0x006945D0 (FUN_006945D0)
+   *
+   * What it does:
+   * Tracks one `EntitySetBase` pointer lane and deserializes the embedded
+   * `fastvector<Entity*>` payload from archive storage.
+   */
+  void DeserializeEntitySetBaseSerializerBody(moho::EntitySetBase* const object, gpg::ReadArchive* const archive)
+  {
+    if (!archive || !object) {
+      return;
+    }
+
+    const gpg::RRef selfRef = MakeEntitySetBaseRef(object);
+    archive->TrackPointer(selfRef);
+
+    const gpg::RRef owner{};
+    archive->Read(ResolveFastVectorEntityPointerType(), &object->mVec, owner);
+  }
+
+  /**
+   * Address: 0x00694160 (FUN_00694160)
+   *
+   * What it does:
+   * Bridge thunk that forwards one `EntitySetBase` deserialize lane to the
+   * canonical serializer body.
+   */
+  [[maybe_unused]] void DeserializeEntitySetBaseSerializerBodyThunkA(
+    moho::EntitySetBase* const object,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeEntitySetBaseSerializerBody(object, archive);
+  }
+
+  /**
+   * Address: 0x00694490 (FUN_00694490)
+   *
+   * What it does:
+   * Mirrored bridge thunk that forwards one `EntitySetBase` deserialize lane
+   * to the canonical serializer body.
+   */
+  [[maybe_unused]] void DeserializeEntitySetBaseSerializerBodyThunkB(
+    moho::EntitySetBase* const object,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeEntitySetBaseSerializerBody(object, archive);
+  }
+
+  /**
+   * Address: 0x00694640 (FUN_00694640)
+   *
+   * What it does:
+   * Marks one pre-created `EntitySetBase` pointer lane and serializes the
+   * embedded `fastvector<Entity*>` payload to archive storage.
+   */
+  void SerializeEntitySetBaseSerializerBody(const moho::EntitySetBase* const object, gpg::WriteArchive* const archive)
+  {
+    if (!archive || !object) {
+      return;
+    }
+
+    gpg::RRef selfRef = MakeEntitySetBaseRef(const_cast<moho::EntitySetBase*>(object));
+    archive->PreCreatedPtr(selfRef);
+
+    const gpg::RRef owner{};
+    archive->Write(ResolveFastVectorEntityPointerType(), &object->mVec, owner);
+  }
+
+  /**
+   * Address: 0x00694170 (FUN_00694170)
+   *
+   * What it does:
+   * Register-shape serializer thunk forwarding to the canonical
+   * `EntitySetBase` save body.
+   */
+  [[maybe_unused]] void SerializeEntitySetBaseSerializerBodyThunkA(
+    const moho::EntitySetBase* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeEntitySetBaseSerializerBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006944A0 (FUN_006944A0)
+   *
+   * What it does:
+   * Secondary register-shape serializer thunk forwarding to the canonical
+   * `EntitySetBase` save body.
+   */
+  [[maybe_unused]] void SerializeEntitySetBaseSerializerBodyThunkB(
+    const moho::EntitySetBase* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeEntitySetBaseSerializerBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006946B0 (FUN_006946B0)
+   *
+   * What it does:
+   * Builds one temporary `RRef_EntitySetBase` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackRRef_EntitySetBase(
+    gpg::RRef* const out,
+    moho::EntitySetBase* const value
+  )
+  {
+    gpg::RRef tmp{};
+    (void)gpg::RRef_EntitySetBase(&tmp, value);
+    out->mObj = tmp.mObj;
+    out->mType = tmp.mType;
+    return out;
   }
 
   /**
@@ -408,13 +708,8 @@ namespace moho
     if (!archive || objectPtr == 0) {
       return;
     }
-
     auto* const object = reinterpret_cast<EntitySetBase*>(objectPtr);
-    const gpg::RRef selfRef = MakeEntitySetBaseRef(object);
-    archive->TrackPointer(selfRef);
-
-    const gpg::RRef nullOwner{};
-    archive->Read(ResolveFastVectorEntityPointerType(), &object->mVec, nullOwner);
+    DeserializeEntitySetBaseSerializerBody(object, archive);
   }
 
   /**
@@ -427,13 +722,8 @@ namespace moho
     if (!archive || objectPtr == 0) {
       return;
     }
-
     auto* const object = reinterpret_cast<EntitySetBase*>(objectPtr);
-    const gpg::RRef selfRef = MakeEntitySetBaseRef(object);
-    archive->PreCreatedPtr(selfRef);
-
-    const gpg::RRef nullOwner{};
-    archive->Write(ResolveFastVectorEntityPointerType(), &object->mVec, nullOwner);
+    SerializeEntitySetBaseSerializerBody(object, archive);
   }
 
   /**
@@ -523,14 +813,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00693570 (FUN_00693570, sub_693570)
-   */
-  gpg::RType* construct_EntitySetBaseTypeInfo()
-  {
-    return &AcquireEntitySetBaseTypeInfo();
-  }
-
-  /**
    * Address: 0x00BFCCC0 (FUN_00BFCCC0, sub_BFCCC0)
    *
    * What it does:
@@ -551,7 +833,7 @@ namespace moho
    */
   int register_EntitySetBaseTypeInfo()
   {
-    (void)construct_EntitySetBaseTypeInfo();
+    (void)AcquireEntitySetBaseTypeInfo();
     return std::atexit(&cleanup_EntitySetBaseTypeInfo);
   }
 
@@ -567,6 +849,18 @@ namespace moho
     gEntitySetBaseSerializer.mDeserialize = &EntitySetBaseSerializer::Deserialize;
     gEntitySetBaseSerializer.mSerialize = &EntitySetBaseSerializer::Serialize;
     return SerializerSelfNode(gEntitySetBaseSerializer);
+  }
+
+  /**
+   * Address: 0x00693DB0 (FUN_00693DB0)
+   *
+   * What it does:
+   * Startup leaf that initializes global `EntitySetBaseSerializer` callback
+   * lanes and returns its serializer helper pointer.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_EntitySetBaseSerializer_StartupLeaf()
+  {
+    return construct_EntitySetBaseSerializer();
   }
 
   /**
@@ -612,14 +906,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00693760 (FUN_00693760, sub_693760)
-   */
-  gpg::RType* construct_EntitySetTypeInfo()
-  {
-    return &AcquireEntitySetTypeInfo();
-  }
-
-  /**
    * Address: 0x00BFCD50 (FUN_00BFCD50, sub_BFCD50)
    *
    * What it does:
@@ -640,7 +926,7 @@ namespace moho
    */
   int register_EntitySetTypeInfo()
   {
-    (void)construct_EntitySetTypeInfo();
+    (void)AcquireEntitySetTypeInfo();
     return std::atexit(&cleanup_EntitySetTypeInfo);
   }
 
@@ -656,6 +942,18 @@ namespace moho
     gEntitySetSerializer.mDeserialize = &EntitySetSerializer::Deserialize;
     gEntitySetSerializer.mSerialize = &EntitySetSerializer::Serialize;
     return SerializerSelfNode(gEntitySetSerializer);
+  }
+
+  /**
+   * Address: 0x00693E50 (FUN_00693E50)
+   *
+   * What it does:
+   * Startup leaf that initializes global `EntitySetSerializer` callback lanes
+   * and returns its serializer helper pointer.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_EntitySetSerializer_StartupLeaf()
+  {
+    return construct_EntitySetSerializer();
   }
 
   /**
@@ -701,14 +999,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006939B0 (FUN_006939B0, sub_6939B0)
-   */
-  gpg::RType* construct_WeakEntitySetTypeInfo()
-  {
-    return &AcquireWeakEntitySetTypeInfo();
-  }
-
-  /**
    * Address: 0x00BFCDE0 (FUN_00BFCDE0, sub_BFCDE0)
    *
    * What it does:
@@ -729,7 +1019,7 @@ namespace moho
    */
   int register_WeakEntitySetTypeInfo()
   {
-    (void)construct_WeakEntitySetTypeInfo();
+    (void)AcquireWeakEntitySetTypeInfo();
     return std::atexit(&cleanup_WeakEntitySetTypeInfo);
   }
 
@@ -745,6 +1035,18 @@ namespace moho
     gWeakEntitySetSerializer.mDeserialize = &WeakEntitySetSerializer::Deserialize;
     gWeakEntitySetSerializer.mSerialize = &WeakEntitySetSerializer::Serialize;
     return SerializerSelfNode(gWeakEntitySetSerializer);
+  }
+
+  /**
+   * Address: 0x00693EF0 (FUN_00693EF0)
+   *
+   * What it does:
+   * Startup leaf that initializes global `WeakEntitySetSerializer` callback
+   * lanes and returns its serializer helper pointer.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_WeakEntitySetSerializer_StartupLeaf()
+  {
+    return construct_WeakEntitySetSerializer();
   }
 
   /**

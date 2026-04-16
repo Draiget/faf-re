@@ -1,5 +1,7 @@
 #include "moho/effects/rendering/IEffectManagerTypeInfo.h"
 
+#include <typeinfo>
+
 #include "moho/effects/rendering/IEffectManager.h"
 
 namespace moho
@@ -34,5 +36,18 @@ namespace moho
     size_ = sizeof(IEffectManager);
     gpg::RType::Init();
     Finish();
+  }
+
+  /**
+   * Address: 0x00770F50 (FUN_00770F50, preregister_IEffectManagerTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::IEffectManager`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IEffectManagerTypeInfo()
+  {
+    static IEffectManagerTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(IEffectManager), &typeInfo);
+    return &typeInfo;
   }
 } // namespace moho

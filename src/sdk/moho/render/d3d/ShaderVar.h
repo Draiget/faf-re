@@ -97,6 +97,20 @@ namespace moho
   ShaderVar* RegisterShaderVar(const char* variableName, ShaderVar* shaderVar, const char* effectFileName);
 
   /**
+   * Address: 0x007E9040 (FUN_007E9040, func_register_ShaderVar_5)
+   *
+   * What it does:
+   * Forwards one `(effectFileName, variableName, shaderVar)` call-shape to
+   * `RegisterShaderVar(variableName, shaderVar, effectFileName)` and returns
+   * the shader-var slot.
+   */
+  ShaderVar* RegisterShaderVarFromEffectFileFirst(
+    const char* effectFileName,
+    const char* variableName,
+    ShaderVar* shaderVar
+  );
+
+  /**
    * Address: 0x00BC3FF0 (FUN_00BC3FF0, register_ShaderVarPrimBatcherCompositeMatrix)
    *
    * What it does:

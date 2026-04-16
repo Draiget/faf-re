@@ -63,6 +63,15 @@ namespace moho
   class IMessageReceiver : public TDatListItem<IMessageReceiver, void>
   {
   public:
+    /**
+     * Address: 0x0053BC60 (FUN_0053BC60)
+     *
+     * What it does:
+     * Initializes the intrusive receiver link node and installs the interface
+     * vtable lane.
+     */
+    IMessageReceiver();
+
     virtual void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) = 0;
 
     /**
@@ -90,8 +99,8 @@ namespace moho
     SMsgReceiverLinkage(unsigned int lower, unsigned int upper, IMessageReceiver* rec, CMessageDispatcher* dispatcher);
 
     /**
-     * Address: 0x0047C320 (FUN_0047C320, non-deleting destructor lane)
-     * Address: 0x0047C2E0 (FUN_0047C2E0, deleting-destructor thunk)
+       * Address: 0x0047C320 (FUN_0047C320)
+       * Address: 0x0047C2E0 (FUN_0047C2E0)
      *
      * What it does:
      * Unlinks linkage from both intrusive-list lanes before destruction.

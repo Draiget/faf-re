@@ -42,6 +42,30 @@ namespace
   {
     (void)moho::cleanup_CIntelPosHandleSerializer();
   }
+
+  /**
+   * Address: 0x0076F430 (FUN_0076F430)
+   *
+   * What it does:
+   * Unlinks startup `CIntelPosHandleSerializer` helper links and rewires the
+   * node into one self-linked sentinel lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelPosHandleSerializerNodeVariantA() noexcept
+  {
+    return UnlinkSerializerNode(gCIntelPosHandleSerializer);
+  }
+
+  /**
+   * Address: 0x0076F460 (FUN_0076F460)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for startup `CIntelPosHandleSerializer`
+   * helper links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelPosHandleSerializerNodeVariantB() noexcept
+  {
+    return UnlinkSerializerNode(gCIntelPosHandleSerializer);
+  }
 } // namespace
 
 namespace moho
@@ -128,4 +152,3 @@ namespace
 
   [[maybe_unused]] CIntelPosHandleSerializerBootstrap gCIntelPosHandleSerializerBootstrap;
 } // namespace
-

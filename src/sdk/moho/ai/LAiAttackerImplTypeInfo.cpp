@@ -49,6 +49,24 @@ namespace
     AcquireLAiAttackerImplTypeInfo()->~LAiAttackerImplTypeInfo();
     gLAiAttackerImplTypeInfoConstructed = false;
   }
+
+  /**
+   * Address: 0x005DBF30 (FUN_005DBF30)
+   *
+   * What it does:
+   * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
+   * `Destruct`) on one `LAiAttackerImplTypeInfo` descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::LAiAttackerImplTypeInfo* AssignLAiAttackerImplLifecycleCallbacks(
+    moho::LAiAttackerImplTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->newRefFunc_ = &moho::LAiAttackerImplTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &moho::LAiAttackerImplTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &moho::LAiAttackerImplTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &moho::LAiAttackerImplTypeInfo::Destruct;
+    return typeInfo;
+  }
 } // namespace
 
 /**
@@ -82,10 +100,7 @@ const char* LAiAttackerImplTypeInfo::GetName() const
 void LAiAttackerImplTypeInfo::Init()
 {
   size_ = sizeof(LAiAttackerImpl);
-  newRefFunc_ = &LAiAttackerImplTypeInfo::NewRef;
-  ctorRefFunc_ = &LAiAttackerImplTypeInfo::CtrRef;
-  deleteFunc_ = &LAiAttackerImplTypeInfo::Delete;
-  dtrFunc_ = &LAiAttackerImplTypeInfo::Destruct;
+  (void)AssignLAiAttackerImplLifecycleCallbacks(this);
   gpg::RType::Init();
   AddBase_CTask(this);
   Finish();

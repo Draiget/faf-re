@@ -43,6 +43,8 @@ constexpr std::size_t kOffFlags             = 0x6C;   // png_uint_32 flags
 constexpr std::size_t kOffTransformations   = 0x70;   // png_uint_32 transformations
 constexpr std::size_t kOffZbuf              = 0xAC;   // png_bytep   zbuf
 constexpr std::size_t kOffZbufSize          = 0xB0;   // png_size_t  zbuf_size
+constexpr std::size_t kOffZlibMethod        = 0xB8;   // int         zlib_method
+constexpr std::size_t kOffZlibWindowBits    = 0xBC;   // int         zlib_window_bits
 constexpr std::size_t kOffZstream           = 0x74;   // z_stream    zstream
 constexpr std::size_t kOffZstreamNextOut    = 0x80;   // z_stream.next_out
 constexpr std::size_t kOffZstreamAvailOut   = 0x84;   // z_stream.avail_out
@@ -89,6 +91,8 @@ template <typename T>
 [[nodiscard]] inline std::uint32_t& Mode(png_structp p) noexcept            { return Field<std::uint32_t>(p, kOffMode); }
 [[nodiscard]] inline std::uint32_t& Flags(png_structp p) noexcept           { return Field<std::uint32_t>(p, kOffFlags); }
 [[nodiscard]] inline std::uint32_t& Transformations(png_structp p) noexcept { return Field<std::uint32_t>(p, kOffTransformations); }
+[[nodiscard]] inline int& ZlibMethod(png_structp p) noexcept                { return Field<int>(p, kOffZlibMethod); }
+[[nodiscard]] inline int& ZlibWindowBits(png_structp p) noexcept            { return Field<int>(p, kOffZlibWindowBits); }
 
 [[nodiscard]] inline std::uint8_t&  BitDepth(png_structp p) noexcept    { return *(RawBase(p) + kOffBitDepth); }
 [[nodiscard]] inline std::uint8_t&  ColorType(png_structp p) noexcept   { return *(RawBase(p) + kOffColorType); }
@@ -113,6 +117,8 @@ constexpr std::uint32_t kPngSwapAlpha      = 0x20000;
 constexpr std::uint32_t kPngInvertAlpha    = 0x80000;
 constexpr std::uint32_t kPngInvertMono     = 0x0020;
 constexpr std::uint32_t kPngSwapBytes      = 0x0010;
+constexpr std::uint32_t kPngFlagZlibCustomWindowBits = 0x0008;
+constexpr std::uint32_t kPngFlagZlibCustomMethod = 0x0010;
 
 // png_set_filler "flags" extra bit (PNG_FILLER_BEFORE flag stored at offset 0x6C+0x80 in
 // the binary's flag word; recovered binary uses bit 0x80 in field at offset 108 (0x6C)).

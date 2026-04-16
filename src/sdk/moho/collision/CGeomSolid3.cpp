@@ -147,6 +147,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x0073B090 (FUN_0073B090)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one copy-assignment lane into
+   * `CGeomSolid3::operator=` and returns destination storage.
+   */
+  [[maybe_unused]] [[nodiscard]] CGeomSolid3* CopyAssignGeomSolidRegisterAdapter(
+    CGeomSolid3* const destination,
+    const CGeomSolid3* const source
+  )
+  {
+    if (destination != nullptr && source != nullptr) {
+      *destination = *source;
+    }
+    return destination;
+  }
+
+  /**
    * Address: 0x00471950 (FUN_00471950)
    *
    * unsigned int, Wm3::Plane3<float> const&

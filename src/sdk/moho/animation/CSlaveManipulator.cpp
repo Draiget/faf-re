@@ -8,6 +8,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "lua/LuaObject.h"
@@ -31,6 +32,39 @@ namespace
     "which come before the slave manipulator will be copied.";
   constexpr float kDegreesPerSecondToRadians = 0.0017453292f;
 
+  /**
+   * Address: 0x00645AD0 (FUN_00645AD0)
+   *
+   * What it does:
+   * Computes one row-major 3x3 matrix product (`out = lhs * rhs`) used by the
+   * slave-manipulator motion pipeline.
+   */
+  [[maybe_unused]] float* MultiplyMatrix3x3RowMajor(
+    float* const out,
+    const float* const lhs,
+    const float* const rhs
+  ) noexcept
+  {
+    const float row2col0 = (lhs[6] * rhs[0]) + (lhs[7] * rhs[1]) + (lhs[8] * rhs[2]);
+    const float row2col1 = (lhs[6] * rhs[3]) + (lhs[7] * rhs[4]) + (lhs[8] * rhs[5]);
+    const float row2col2 = (lhs[6] * rhs[6]) + (lhs[7] * rhs[7]) + (lhs[8] * rhs[8]);
+
+    const float row1col0 = (lhs[3] * rhs[0]) + (lhs[4] * rhs[1]) + (lhs[5] * rhs[2]);
+    const float row1col1 = (lhs[3] * rhs[3]) + (lhs[4] * rhs[4]) + (lhs[5] * rhs[5]);
+    const float row1col2 = (lhs[3] * rhs[6]) + (lhs[4] * rhs[7]) + (lhs[5] * rhs[8]);
+
+    out[0] = (lhs[0] * rhs[0]) + (lhs[1] * rhs[1]) + (lhs[2] * rhs[2]);
+    out[1] = (lhs[0] * rhs[3]) + (lhs[1] * rhs[4]) + (lhs[2] * rhs[5]);
+    out[2] = (lhs[0] * rhs[6]) + (lhs[1] * rhs[7]) + (lhs[2] * rhs[8]);
+    out[3] = row1col0;
+    out[4] = row1col1;
+    out[5] = row1col2;
+    out[6] = row2col0;
+    out[7] = row2col1;
+    out[8] = row2col2;
+    return out;
+  }
+
   [[nodiscard]] gpg::RType* CachedCSlaveManipulatorType()
   {
     gpg::RType* type = moho::CSlaveManipulator::sType;
@@ -39,6 +73,202 @@ namespace
       moho::CSlaveManipulator::sType = type;
     }
     return type;
+  }
+
+  /**
+   * Address: 0x00646A50 (FUN_00646A50)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CSlaveManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlaveManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCSlaveManipulatorType());
+    return upcast.mObj;
+  }
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
+  {
+    gpg::RType* type = moho::IAniManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::IAniManipulator));
+      moho::IAniManipulator::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedQuaternionfType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Quaternionf));
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00646C40 (FUN_00646C40)
+   *
+   * What it does:
+   * Deserializes one `CSlaveManipulator` lane by loading IAniManipulator base
+   * state then source-bone, current quaternion, and max-rate fields.
+   */
+  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerBody(
+    moho::CSlaveManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
+    archive->ReadInt(&manipulator->mSourceBoneIndex);
+    archive->Read(CachedQuaternionfType(), &manipulator->mCurrentRotation, owner);
+    archive->ReadFloat(&manipulator->mMaxRate);
+  }
+
+  /**
+   * Address: 0x00646CE0 (FUN_00646CE0)
+   *
+   * What it does:
+   * Serializes one `CSlaveManipulator` lane by saving IAniManipulator base
+   * state then source-bone, current quaternion, and max-rate fields.
+   */
+  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerBody(
+    const moho::CSlaveManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(CachedIAniManipulatorType(), manipulator, owner);
+    archive->WriteInt(manipulator->mSourceBoneIndex);
+    archive->Write(CachedQuaternionfType(), &manipulator->mCurrentRotation, owner);
+    archive->WriteFloat(manipulator->mMaxRate);
+  }
+
+  /**
+   * Address: 0x006468C0 (FUN_006468C0)
+   *
+   * What it does:
+   * First tail-thunk alias that forwards slave manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerThunkAliasA(
+    moho::CSlaveManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCSlaveManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x006468D0 (FUN_006468D0)
+   *
+   * What it does:
+   * First tail-thunk alias that forwards slave manipulator serialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerThunkAliasA(
+    const moho::CSlaveManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSlaveManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00646A30 (FUN_00646A30)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards slave manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerThunkAliasB(
+    moho::CSlaveManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCSlaveManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00646A40 (FUN_00646A40)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards slave manipulator serialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerThunkAliasB(
+    const moho::CSlaveManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSlaveManipulatorSerializerBody(manipulator, archive);
+  }
+
+  struct CSlaveManipulatorSerializerHelperNode
+  {
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(sizeof(CSlaveManipulatorSerializerHelperNode) == 0x10, "CSlaveManipulatorSerializerHelperNode size must be 0x10");
+
+  CSlaveManipulatorSerializerHelperNode gCSlaveManipulatorSerializer;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
+  {
+    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
+      helper.mNext->mPrev = helper.mPrev;
+      helper.mPrev->mNext = helper.mNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00645F20 (FUN_00645F20)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CSlaveManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
+  }
+
+  /**
+   * Address: 0x00645F50 (FUN_00645F50)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CSlaveManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
   }
 
   template <class TObject>
@@ -198,7 +428,7 @@ namespace moho
 } // namespace moho
 
 /**
- * Address: 0x10015880 (constructor shape)
+  * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.

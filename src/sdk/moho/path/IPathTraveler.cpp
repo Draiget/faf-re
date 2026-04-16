@@ -3,6 +3,14 @@
 namespace moho
 {
   /**
+   * Address: 0x005A9F80 (FUN_005A9F80)
+   */
+  IPathTraveler::IPathTraveler()
+  {
+    mPathQueueNode.ListUnlinkSelf();
+  }
+
+  /**
    * Address: 0x005A9C60 (FUN_005A9C60, ?Func7@IPathTraveler@Moho@@UAEXABUNavPath@2@@Z)
    *
    * SNavPath const &

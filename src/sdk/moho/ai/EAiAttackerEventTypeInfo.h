@@ -12,6 +12,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005D59A0 (FUN_005D59A0, Moho::EAiAttackerEventTypeInfo::EAiAttackerEventTypeInfo)
+     *
+     * What it does:
+     * Preregisters `EAiAttackerEvent` enum metadata with the reflection runtime.
+     */
+    EAiAttackerEventTypeInfo();
+
+    /**
      * Address: 0x005D5A30 (FUN_005D5A30, scalar deleting thunk)
      */
     ~EAiAttackerEventTypeInfo() override;

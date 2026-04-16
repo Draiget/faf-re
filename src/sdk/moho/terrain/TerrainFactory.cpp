@@ -12,6 +12,47 @@ namespace moho
 {
   namespace
   {
+    struct IRenTerrainRuntimeView
+    {
+      void* mVtable = nullptr;
+    };
+    static_assert(sizeof(IRenTerrainRuntimeView) == 0x04, "IRenTerrainRuntimeView size must be 0x04");
+
+    class IRenTerrainVTableProbe
+    {
+    public:
+      virtual ~IRenTerrainVTableProbe() = default;
+    };
+
+    [[nodiscard]] void* RecoveredIRenTerrainVTable() noexcept
+    {
+      static IRenTerrainVTableProbe probe;
+      return *reinterpret_cast<void**>(&probe);
+    }
+
+    void WriteIRenTerrainVTable(IRenTerrainRuntimeView* const object) noexcept
+    {
+      object->mVtable = RecoveredIRenTerrainVTable();
+    }
+
+    /**
+     * Address: 0x007FF7D0 (FUN_007FF7D0)
+     *
+     * IDA signature:
+     * _DWORD *__usercall sub_7FF7D0@<eax>(_DWORD *result@<eax>)
+     *
+     * What it does:
+     * Writes the `IRenTerrain` base-interface vtable lane and returns the same
+     * object pointer.
+     */
+    [[maybe_unused]] IRenTerrainRuntimeView* InitializeIRenTerrainVTableReturnLane(
+      IRenTerrainRuntimeView* const object
+    ) noexcept
+    {
+      WriteIRenTerrainVTable(object);
+      return object;
+    }
+
     template <typename T>
     [[nodiscard]] TerrainCommon* AllocateTerrainNoThrow()
     {

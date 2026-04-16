@@ -1,9 +1,13 @@
 #include "moho/unit/tasks/CUnitFormAndMoveTask.h"
 
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -63,6 +67,86 @@ namespace
     }
 
     return reinterpret_cast<moho::Broadcaster*>(&navigator->mListenerNode);
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCUnitFormAndMoveTaskType()
+  {
+    gpg::RType* type = moho::CUnitFormAndMoveTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitFormAndMoveTask));
+      moho::CUnitFormAndMoveTask::sType = type;
+    }
+    return type;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
+
+  /**
+   * Address: 0x006199D0 (FUN_006199D0)
+   *
+   * What it does:
+   * Forwards one form-move serializer load thunk lane to
+   * `CUnitFormAndMoveTask::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CUnitFormAndMoveTaskMemberDeserializeThunk(
+    gpg::ReadArchive* const archive,
+    moho::CUnitFormAndMoveTask* const task
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006199E0 (FUN_006199E0)
+   *
+   * What it does:
+   * Forwards one form-move serializer save thunk lane to
+   * `CUnitFormAndMoveTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitFormAndMoveTaskMemberSerializeThunk(
+    gpg::WriteArchive* const archive,
+    const moho::CUnitFormAndMoveTask* const task
+  )
+  {
+    task->MemberSerialize(archive);
   }
 } // namespace
 
@@ -235,6 +319,87 @@ namespace moho
   }
 
   /**
+   * Address: 0x0061A9C0 (FUN_0061A9C0)
+   *
+   * What it does:
+   * Deserializes base command-task state, weak formation pointer lane, and
+   * the arrival-satisfied flag for one form-move task.
+   */
+  void CUnitFormAndMoveTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
+
+    IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
+    archive->ReadPointer_IFormationInstance(&formationBase, &owner);
+    mFormation = static_cast<CAiFormationInstance*>(formationBase);
+
+    bool arrivalSatisfied = (mFormationArrivalSatisfied != 0u);
+    archive->ReadBool(&arrivalSatisfied);
+    mFormationArrivalSatisfied = arrivalSatisfied ? 1u : 0u;
+  }
+
+  /**
+   * Address: 0x0061AA30 (FUN_0061AA30)
+   *
+   * What it does:
+   * Serializes base command-task state, weak formation pointer lane, and the
+   * arrival-satisfied flag for one form-move task.
+   */
+  void CUnitFormAndMoveTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(CachedCCommandTaskType(), const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this)), owner);
+
+    gpg::RRef formationRef{};
+    gpg::RRef_IFormationInstance(&formationRef, mFormation);
+    gpg::WriteRawPointer(archive, formationRef, gpg::TrackedPointerState::Unowned, owner);
+
+    archive->WriteBool(mFormationArrivalSatisfied != 0u);
+  }
+
+  /**
+   * Address: 0x0061A340 (FUN_0061A340)
+   * Address: 0x00610640 (FUN_00610640)
+   *
+   * What it does:
+   * Thin alias lane that forwards one `(task, archive)` pair into
+   * `CUnitFormAndMoveTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitFormAndMoveTaskMemberSerializeAliasThunk(
+    const CUnitFormAndMoveTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (task != nullptr) {
+      task->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0061A3E0 (FUN_0061A3E0)
+   *
+   * What it does:
+   * Thin alias lane that forwards one `(task, archive)` pair into
+   * `CUnitFormAndMoveTask::MemberSerialize`.
+   */
+  void CUnitFormAndMoveTaskMemberSerializeAlias(
+    const CUnitFormAndMoveTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    task->MemberSerialize(archive);
+  }
+
+  /**
    * Address: 0x00619680 (FUN_00619680, listener callback lane)
    *
    * What it does:
@@ -322,3 +487,45 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0061A5A0 (FUN_0061A5A0, gpg::RRef_CUnitFormAndMoveTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for
+   * `moho::CUnitFormAndMoveTask*`, preserving dynamic-derived ownership and
+   * base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitFormAndMoveTask(gpg::RRef* const outRef, moho::CUnitFormAndMoveTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeDerivedRef(value, CachedCUnitFormAndMoveTaskType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x0061A380 (FUN_0061A380)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary
+   * `RRef_CUnitFormAndMoveTask` and copies object/type fields into the
+   * destination reference record.
+   */
+  gpg::RRef* AssignCUnitFormAndMoveTaskRef(gpg::RRef* const outRef, moho::CUnitFormAndMoveTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef temporaryRef{};
+    (void)RRef_CUnitFormAndMoveTask(&temporaryRef, value);
+    outRef->mObj = temporaryRef.mObj;
+    outRef->mType = temporaryRef.mType;
+    return outRef;
+  }
+} // namespace gpg

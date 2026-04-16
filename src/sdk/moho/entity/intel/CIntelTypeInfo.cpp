@@ -100,10 +100,13 @@ namespace moho
   void CIntelTypeInfo::Init()
   {
     size_ = sizeof(CIntel);
-    newRefFunc_ = &CIntelTypeInfo::NewRef;
-    ctorRefFunc_ = &CIntelTypeInfo::CtrRef;
-    deleteFunc_ = &CIntelTypeInfo::Delete;
-    dtrFunc_ = &CIntelTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CIntelTypeInfo::NewRef,
+      &CIntelTypeInfo::CtrRef,
+      &CIntelTypeInfo::Delete,
+      &CIntelTypeInfo::Destruct
+    );
     gpg::RType::Init();
     Finish();
   }

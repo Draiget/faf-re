@@ -1,11 +1,23 @@
 #include "moho/ui/EMauiEventTypeTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
 {
+  /**
+   * Address: 0x00795A10 (FUN_00795A10, Moho::EMauiEventTypeTypeInfo::ctor)
+   *
+   * What it does:
+   * Preregisters the reflected `EMauiEventType` enum metadata.
+   */
+  EMauiEventTypeTypeInfo::EMauiEventTypeTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(EMauiEventType), this);
+  }
+
   /**
    * Address: 0x00795AA0 (FUN_00795AA0, Moho::EMauiEventTypeTypeInfo::dtr)
    */

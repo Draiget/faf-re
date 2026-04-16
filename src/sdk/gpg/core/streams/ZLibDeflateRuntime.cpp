@@ -1,5 +1,11 @@
 #include "gpg/core/streams/ZLibDeflateRuntime.h"
 
+#include <array>
+#include <cstddef>
+#include <cstring>
+
+#include <zlib.h>
+
 namespace
 {
   constexpr std::uint32_t kDeflateMinMatch = 3u;
@@ -11,6 +17,350 @@ namespace
   constexpr int kRepeat3To6Code = 16;
   constexpr int kRepeatZero3To10Code = 17;
   constexpr int kRepeatZero11To138Code = 18;
+  constexpr int kDeflateLiteralCount = 256;
+
+  constexpr std::array<int, 29> kExtraLengthBits{
+    0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+    1, 1, 2, 2, 2, 2, 3, 3, 3, 3,
+    4, 4, 4, 4, 5, 5, 5, 5, 0
+  };
+
+  constexpr std::array<int, 30> kExtraDistanceBits{
+    0, 0, 0, 0, 1, 1, 2, 2, 3, 3,
+    4, 4, 5, 5, 6, 6, 7, 7, 8, 8,
+    9, 9, 10, 10, 11, 11, 12, 12, 13, 13
+  };
+
+  [[nodiscard]] constexpr std::array<std::uint8_t, 256> BuildLengthCodeTable() noexcept
+  {
+    std::array<std::uint8_t, 256> table{};
+    std::size_t length = 0;
+    int code = 0;
+    for (; code < 28; ++code) {
+      const std::size_t span = std::size_t{1} << static_cast<std::size_t>(kExtraLengthBits[code]);
+      for (std::size_t n = 0; n < span; ++n) {
+        table[length++] = static_cast<std::uint8_t>(code);
+      }
+    }
+
+    table[length - 1] = static_cast<std::uint8_t>(code);
+    return table;
+  }
+
+  [[nodiscard]] constexpr std::array<std::uint8_t, 512> BuildDistanceCodeTable() noexcept
+  {
+    std::array<std::uint8_t, 512> table{};
+    std::size_t dist = 0;
+    int code = 0;
+    for (; code < 16; ++code) {
+      const std::size_t span = std::size_t{1} << static_cast<std::size_t>(kExtraDistanceBits[code]);
+      for (std::size_t n = 0; n < span; ++n) {
+        table[dist++] = static_cast<std::uint8_t>(code);
+      }
+    }
+
+    dist >>= 7u;
+    for (; code < 30; ++code) {
+      const std::size_t span = std::size_t{1} << static_cast<std::size_t>(kExtraDistanceBits[code] - 7);
+      for (std::size_t n = 0; n < span; ++n) {
+        table[256u + dist++] = static_cast<std::uint8_t>(code);
+      }
+    }
+
+    return table;
+  }
+
+  constexpr std::array<std::uint8_t, 256> kLengthCode = BuildLengthCodeTable();
+  constexpr std::array<std::uint8_t, 512> kDistanceCode = BuildDistanceCodeTable();
+
+  struct DeflateConfigurationRuntimeEntry
+  {
+    std::uint16_t goodLength = 0;
+    std::uint16_t maxLazy = 0;
+    std::uint16_t niceLength = 0;
+    std::uint16_t maxChain = 0;
+  };
+  static_assert(sizeof(DeflateConfigurationRuntimeEntry) == 0x08, "DeflateConfigurationRuntimeEntry size must be 0x08");
+
+  // Mirrors zlib 1.2.3 deflate configuration_table good/max_lazy/nice/max_chain lanes.
+  constexpr std::array<DeflateConfigurationRuntimeEntry, 10> kDeflateConfigurationTable{
+    DeflateConfigurationRuntimeEntry{0, 0, 0, 0},
+    DeflateConfigurationRuntimeEntry{4, 4, 8, 4},
+    DeflateConfigurationRuntimeEntry{4, 5, 16, 8},
+    DeflateConfigurationRuntimeEntry{4, 6, 32, 32},
+    DeflateConfigurationRuntimeEntry{4, 4, 16, 16},
+    DeflateConfigurationRuntimeEntry{8, 16, 32, 32},
+    DeflateConfigurationRuntimeEntry{8, 16, 128, 128},
+    DeflateConfigurationRuntimeEntry{8, 32, 128, 256},
+    DeflateConfigurationRuntimeEntry{32, 128, 258, 1024},
+    DeflateConfigurationRuntimeEntry{32, 258, 258, 4096}
+  };
+
+  struct DeflateLmInitStateRuntimeView
+  {
+    std::uint8_t reserved00_2B[0x2C]{};
+    std::uint32_t windowWordSize = 0;         // +0x2C
+    std::uint8_t reserved30_3B[0x0C]{};
+    std::uint32_t windowSize = 0;             // +0x3C
+    std::uint8_t reserved40_43[0x04]{};
+    std::uint16_t* hashHead = nullptr;        // +0x44
+    std::uint32_t insertHash = 0;             // +0x48
+    std::uint32_t hashSize = 0;               // +0x4C
+    std::uint8_t reserved50_5B[0x0C]{};
+    std::int32_t blockStart = 0;              // +0x5C
+    std::uint32_t matchLength = 0;            // +0x60
+    std::uint8_t reserved64_67[0x04]{};
+    std::uint32_t matchAvailable = 0;         // +0x68
+    std::uint32_t stringStart = 0;            // +0x6C
+    std::uint8_t reserved70_73[0x04]{};
+    std::uint32_t lookahead = 0;              // +0x74
+    std::uint32_t previousLength = 0;         // +0x78
+    std::uint32_t maxChainLength = 0;         // +0x7C
+    std::uint32_t maxLazyMatch = 0;           // +0x80
+    std::int32_t compressionLevel = 0;        // +0x84
+    std::uint8_t reserved88_8B[0x04]{};
+    std::uint32_t goodMatch = 0;              // +0x8C
+    std::uint32_t niceMatch = 0;              // +0x90
+  };
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, windowWordSize) == 0x2C,
+    "DeflateLmInitStateRuntimeView::windowWordSize offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, windowSize) == 0x3C,
+    "DeflateLmInitStateRuntimeView::windowSize offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, hashHead) == 0x44,
+    "DeflateLmInitStateRuntimeView::hashHead offset must be 0x44"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, insertHash) == 0x48,
+    "DeflateLmInitStateRuntimeView::insertHash offset must be 0x48"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, hashSize) == 0x4C,
+    "DeflateLmInitStateRuntimeView::hashSize offset must be 0x4C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, blockStart) == 0x5C,
+    "DeflateLmInitStateRuntimeView::blockStart offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, matchLength) == 0x60,
+    "DeflateLmInitStateRuntimeView::matchLength offset must be 0x60"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, matchAvailable) == 0x68,
+    "DeflateLmInitStateRuntimeView::matchAvailable offset must be 0x68"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, stringStart) == 0x6C,
+    "DeflateLmInitStateRuntimeView::stringStart offset must be 0x6C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, lookahead) == 0x74,
+    "DeflateLmInitStateRuntimeView::lookahead offset must be 0x74"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, previousLength) == 0x78,
+    "DeflateLmInitStateRuntimeView::previousLength offset must be 0x78"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, maxChainLength) == 0x7C,
+    "DeflateLmInitStateRuntimeView::maxChainLength offset must be 0x7C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, maxLazyMatch) == 0x80,
+    "DeflateLmInitStateRuntimeView::maxLazyMatch offset must be 0x80"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, compressionLevel) == 0x84,
+    "DeflateLmInitStateRuntimeView::compressionLevel offset must be 0x84"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, goodMatch) == 0x8C,
+    "DeflateLmInitStateRuntimeView::goodMatch offset must be 0x8C"
+  );
+  static_assert(
+    offsetof(DeflateLmInitStateRuntimeView, niceMatch) == 0x90,
+    "DeflateLmInitStateRuntimeView::niceMatch offset must be 0x90"
+  );
+
+  struct InflateSyncStateRuntimeView
+  {
+    std::int32_t mode = 0;                    // +0x00
+    std::uint8_t reserved04_37[0x34]{};       // +0x04
+    std::uint32_t bitBuffer = 0;              // +0x38
+    std::uint32_t bitCount = 0;               // +0x3C
+    std::uint8_t reserved40_67[0x28]{};       // +0x40
+    std::uint32_t markerState = 0;            // +0x68
+  };
+  static_assert(offsetof(InflateSyncStateRuntimeView, mode) == 0x00, "InflateSyncStateRuntimeView::mode offset must be 0x00");
+  static_assert(
+    offsetof(InflateSyncStateRuntimeView, bitBuffer) == 0x38,
+    "InflateSyncStateRuntimeView::bitBuffer offset must be 0x38"
+  );
+  static_assert(
+    offsetof(InflateSyncStateRuntimeView, bitCount) == 0x3C,
+    "InflateSyncStateRuntimeView::bitCount offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(InflateSyncStateRuntimeView, markerState) == 0x68,
+    "InflateSyncStateRuntimeView::markerState offset must be 0x68"
+  );
+
+  struct DeflateSetDictionaryStateRuntimeView
+  {
+    void* streamLane = nullptr;               // +0x00
+    std::int32_t methodOrWrap = 0;            // +0x04
+    std::uint8_t reserved08_17[0x10]{};       // +0x08
+    std::int32_t status = 0;                  // +0x18
+    std::uint8_t reserved1C_2B[0x10]{};       // +0x1C
+    std::uint32_t windowSize = 0;             // +0x2C
+    std::uint8_t reserved30_33[0x04]{};       // +0x30
+    std::uint32_t windowMask = 0;             // +0x34
+    std::uint8_t* window = nullptr;           // +0x38
+    std::uint8_t reserved3C_3F[0x04]{};       // +0x3C
+    std::uint16_t* previous = nullptr;        // +0x40
+    std::uint16_t* head = nullptr;            // +0x44
+    std::uint32_t insertHash = 0;             // +0x48
+    std::uint32_t hashSize = 0;               // +0x4C
+    std::uint8_t reserved50_53[0x04]{};       // +0x50
+    std::uint32_t hashMask = 0;               // +0x54
+    std::uint32_t hashShift = 0;              // +0x58
+    std::uint32_t blockStart = 0;             // +0x5C
+    std::uint8_t reserved60_6B[0x0C]{};       // +0x60
+    std::uint32_t stringStart = 0;            // +0x6C
+  };
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, status) == 0x18,
+    "DeflateSetDictionaryStateRuntimeView::status offset must be 0x18"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, windowSize) == 0x2C,
+    "DeflateSetDictionaryStateRuntimeView::windowSize offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, window) == 0x38,
+    "DeflateSetDictionaryStateRuntimeView::window offset must be 0x38"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, previous) == 0x40,
+    "DeflateSetDictionaryStateRuntimeView::previous offset must be 0x40"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, head) == 0x44,
+    "DeflateSetDictionaryStateRuntimeView::head offset must be 0x44"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, insertHash) == 0x48,
+    "DeflateSetDictionaryStateRuntimeView::insertHash offset must be 0x48"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, hashMask) == 0x54,
+    "DeflateSetDictionaryStateRuntimeView::hashMask offset must be 0x54"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, hashShift) == 0x58,
+    "DeflateSetDictionaryStateRuntimeView::hashShift offset must be 0x58"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, blockStart) == 0x5C,
+    "DeflateSetDictionaryStateRuntimeView::blockStart offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(DeflateSetDictionaryStateRuntimeView, stringStart) == 0x6C,
+    "DeflateSetDictionaryStateRuntimeView::stringStart offset must be 0x6C"
+  );
+
+  struct DeflateCopyStateRuntimeView
+  {
+    z_stream* stream = nullptr;               // +0x00
+    std::uint8_t reserved04_07[0x04]{};       // +0x04
+    std::uint8_t* pendingBuffer = nullptr;    // +0x08
+    std::uint32_t pendingBufferSize = 0;      // +0x0C
+    std::uint8_t* pendingOut = nullptr;       // +0x10
+    std::uint32_t pending = 0;                // +0x14
+    std::uint8_t reserved18_2B[0x14]{};       // +0x18
+    std::uint32_t windowSize = 0;             // +0x2C
+    std::uint8_t reserved30_33[0x04]{};       // +0x30
+    std::uint32_t windowMask = 0;             // +0x34
+    std::uint8_t* window = nullptr;           // +0x38
+    std::uint8_t reserved3C_3F[0x04]{};       // +0x3C
+    std::uint16_t* previous = nullptr;        // +0x40
+    std::uint16_t* head = nullptr;            // +0x44
+    std::uint8_t reserved48_4B[0x04]{};       // +0x48
+    std::uint32_t hashSize = 0;               // +0x4C
+    std::uint8_t reserved50_B17[0xAC8]{};     // +0x50
+    DeflateCtDataRuntime* lDescDynTree = nullptr;  // +0xB18
+    std::uint8_t reservedB1C_B23[0x08]{};     // +0xB1C
+    DeflateCtDataRuntime* dDescDynTree = nullptr;  // +0xB24
+    std::uint8_t reservedB28_B2F[0x08]{};     // +0xB28
+    DeflateCtDataRuntime* blDescDynTree = nullptr; // +0xB30
+    std::uint8_t reservedB34_1697[0xB64]{};   // +0xB34
+    std::uint8_t* literalBuffer = nullptr;    // +0x1698
+    std::uint32_t litBufSize = 0;             // +0x169C
+    std::uint8_t reserved16A0_16A3[0x04]{};   // +0x16A0
+    std::uint8_t* distanceBuffer = nullptr;   // +0x16A4
+  };
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, pendingBuffer) == 0x08,
+    "DeflateCopyStateRuntimeView::pendingBuffer offset must be 0x08"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, pendingBufferSize) == 0x0C,
+    "DeflateCopyStateRuntimeView::pendingBufferSize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, pendingOut) == 0x10,
+    "DeflateCopyStateRuntimeView::pendingOut offset must be 0x10"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, windowSize) == 0x2C,
+    "DeflateCopyStateRuntimeView::windowSize offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, window) == 0x38,
+    "DeflateCopyStateRuntimeView::window offset must be 0x38"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, previous) == 0x40,
+    "DeflateCopyStateRuntimeView::previous offset must be 0x40"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, head) == 0x44,
+    "DeflateCopyStateRuntimeView::head offset must be 0x44"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, hashSize) == 0x4C,
+    "DeflateCopyStateRuntimeView::hashSize offset must be 0x4C"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, lDescDynTree) == 0xB18,
+    "DeflateCopyStateRuntimeView::lDescDynTree offset must be 0xB18"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, dDescDynTree) == 0xB24,
+    "DeflateCopyStateRuntimeView::dDescDynTree offset must be 0xB24"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, blDescDynTree) == 0xB30,
+    "DeflateCopyStateRuntimeView::blDescDynTree offset must be 0xB30"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, literalBuffer) == 0x1698,
+    "DeflateCopyStateRuntimeView::literalBuffer offset must be 0x1698"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, litBufSize) == 0x169C,
+    "DeflateCopyStateRuntimeView::litBufSize offset must be 0x169C"
+  );
+  static_assert(
+    offsetof(DeflateCopyStateRuntimeView, distanceBuffer) == 0x16A4,
+    "DeflateCopyStateRuntimeView::distanceBuffer offset must be 0x16A4"
+  );
+  static_assert(sizeof(DeflateCopyStateRuntimeView) == 0x16A8, "DeflateCopyStateRuntimeView size must be 0x16A8");
 
   void SendBits(
     DeflateStateRuntimePrefix* const state,
@@ -52,6 +402,397 @@ namespace
     return leftFrequency < rightFrequency || (leftFrequency == rightFrequency && depth[leftNode] <= depth[rightNode]);
   }
 } // namespace
+
+/**
+ * Address: 0x0095A7D0 (FUN_0095A7D0)
+ *
+ * What it does:
+ * Consumes up to `inputLength` bytes while updating the inflate sync marker
+ * state lane (`0..4`) and returns the number of consumed bytes.
+ */
+[[maybe_unused]] unsigned int InflateSyncMarkerScan(
+  std::uint32_t* const markerState,
+  const std::uint8_t* const inputBytes,
+  const unsigned int inputLength
+) noexcept
+{
+  std::uint32_t state = *markerState;
+  unsigned int consumed = 0;
+  while (consumed < inputLength) {
+    if (state >= 4u) {
+      break;
+    }
+
+    const std::uint8_t value = inputBytes[consumed];
+    const std::uint8_t expected = (state < 2u) ? 0u : 0xFFu;
+    if (value == expected) {
+      ++state;
+    } else if (value != 0u) {
+      state = 0u;
+    } else {
+      state = 4u - state;
+    }
+
+    ++consumed;
+  }
+
+  *markerState = state;
+  return consumed;
+}
+
+/**
+ * Address: 0x0095A830 (FUN_0095A830)
+ *
+ * What it does:
+ * Scans the input stream for the inflate sync marker sequence and transitions
+ * back to block decoding when the marker is found.
+ */
+extern "C" int __cdecl inflateSync(
+  z_stream* const stream
+)
+{
+  if (stream == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  auto* const state = reinterpret_cast<InflateSyncStateRuntimeView*>(stream->state);
+  if (state == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  if (stream->avail_in == 0u && state->bitCount < 8u) {
+    return Z_BUF_ERROR;
+  }
+
+  if (state->mode != 0x1D) {
+    const std::uint32_t remainderBits = state->bitCount & 0x7u;
+    state->bitBuffer <<= remainderBits;
+    state->bitCount -= remainderBits;
+    state->mode = 0x1D;
+
+    std::array<std::uint8_t, 4> bufferedBytes{};
+    unsigned int bufferedCount = 0u;
+    while (state->bitCount >= 8u) {
+      bufferedBytes[bufferedCount++] = static_cast<std::uint8_t>(state->bitBuffer & 0xFFu);
+      state->bitBuffer >>= 8u;
+      state->bitCount -= 8u;
+    }
+
+    state->markerState = 0u;
+    (void)InflateSyncMarkerScan(&state->markerState, bufferedBytes.data(), bufferedCount);
+  }
+
+  const unsigned int consumed = InflateSyncMarkerScan(&state->markerState, stream->next_in, stream->avail_in);
+  stream->total_in += consumed;
+  stream->avail_in -= consumed;
+  stream->next_in += consumed;
+
+  if (state->markerState != 4u) {
+    return Z_DATA_ERROR;
+  }
+
+  const uLong preservedTotalIn = stream->total_in;
+  const uLong preservedTotalOut = stream->total_out;
+  (void)inflateReset(stream);
+  stream->total_in = preservedTotalIn;
+  stream->total_out = preservedTotalOut;
+  state->mode = 0x0B;
+  return Z_OK;
+}
+
+/**
+ * Address: 0x0095AA90 (FUN_0095AA90)
+ *
+ * What it does:
+ * Seeds the deflate history window with one preset dictionary and rebuilds
+ * the hash chains used by the match finder.
+ */
+extern "C" int __cdecl deflateSetDictionary(
+  z_stream* const stream,
+  const std::uint8_t* const dictionary,
+  const unsigned int dictionaryLength
+)
+{
+  if (stream == nullptr || dictionary == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  auto* const state = reinterpret_cast<DeflateSetDictionaryStateRuntimeView*>(stream->state);
+  if (state == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  const int status = state->status;
+  if (status == 2 || (status == 1 && state->methodOrWrap != 42)) {
+    return Z_STREAM_ERROR;
+  }
+
+  if (status != 0) {
+    stream->adler = adler32(stream->adler, dictionary, dictionaryLength);
+  }
+
+  if (dictionaryLength >= 3u) {
+    unsigned int copyLength = dictionaryLength;
+    const std::uint8_t* dictionaryTail = dictionary;
+    const unsigned int maxDictionaryBytes = state->windowSize - 262u;
+    if (dictionaryLength > maxDictionaryBytes) {
+      copyLength = maxDictionaryBytes;
+      dictionaryTail = dictionary + (dictionaryLength - maxDictionaryBytes);
+    }
+
+    std::memcpy(state->window, dictionaryTail, copyLength);
+    state->stringStart = copyLength;
+    state->blockStart = copyLength;
+
+    state->insertHash = state->window[0];
+    state->insertHash = ((state->insertHash << state->hashShift) ^ state->window[1]) & state->hashMask;
+
+    const unsigned int lastInsertIndex = copyLength - 3u;
+    for (unsigned int index = 0u; index <= lastInsertIndex; ++index) {
+      state->insertHash = ((state->insertHash << state->hashShift) ^ state->window[index + 2u]) & state->hashMask;
+      state->previous[index & state->windowMask] = state->head[state->insertHash];
+      state->head[state->insertHash] = static_cast<std::uint16_t>(index);
+    }
+  }
+
+  return Z_OK;
+}
+
+/**
+ * Address: 0x0095B5C0 (FUN_0095B5C0)
+ *
+ * What it does:
+ * Clones one active deflate stream state, including hash/window/pending
+ * buffers, so compression can continue from an identical state.
+ */
+extern "C" int __cdecl deflateCopy(
+  z_stream* const destination,
+  z_stream* const source
+)
+{
+  if (destination == nullptr || source == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  auto* const sourceState = reinterpret_cast<DeflateCopyStateRuntimeView*>(source->state);
+  if (sourceState == nullptr) {
+    return Z_STREAM_ERROR;
+  }
+
+  std::memcpy(destination, source, sizeof(z_stream));
+  auto* const copiedState = static_cast<DeflateCopyStateRuntimeView*>(
+    destination->zalloc(destination->opaque, 1u, static_cast<uInt>(sizeof(DeflateStateRuntime)))
+  );
+  if (copiedState == nullptr) {
+    return Z_MEM_ERROR;
+  }
+
+  destination->state = reinterpret_cast<internal_state*>(copiedState);
+  std::memcpy(copiedState, sourceState, sizeof(DeflateStateRuntime));
+  copiedState->stream = destination;
+
+  copiedState->window = static_cast<std::uint8_t*>(destination->zalloc(destination->opaque, sourceState->windowSize, 2u));
+  copiedState->previous = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->windowSize, 2u));
+  copiedState->head = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->hashSize, 2u));
+  copiedState->pendingBuffer = static_cast<std::uint8_t*>(
+    destination->zalloc(destination->opaque, sourceState->litBufSize, 4u)
+  );
+
+  if (
+    copiedState->window == nullptr || copiedState->previous == nullptr || copiedState->head == nullptr ||
+    copiedState->pendingBuffer == nullptr
+  ) {
+    (void)deflateEnd(destination);
+    return Z_MEM_ERROR;
+  }
+
+  std::memcpy(copiedState->window, sourceState->window, 2u * static_cast<std::size_t>(sourceState->windowSize));
+  std::memcpy(copiedState->previous, sourceState->previous, 2u * static_cast<std::size_t>(sourceState->windowSize));
+  std::memcpy(copiedState->head, sourceState->head, 2u * static_cast<std::size_t>(sourceState->hashSize));
+  std::memcpy(copiedState->pendingBuffer, sourceState->pendingBuffer, sourceState->pendingBufferSize);
+
+  copiedState->pendingOut = copiedState->pendingBuffer + (sourceState->pendingOut - sourceState->pendingBuffer);
+  copiedState->distanceBuffer = copiedState->pendingBuffer + 2u * (sourceState->litBufSize >> 1u);
+  copiedState->literalBuffer = copiedState->pendingBuffer + sourceState->litBufSize + 2u * sourceState->litBufSize;
+  copiedState->dDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0x988u);
+  copiedState->lDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0x94u);
+  copiedState->blDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0xA7Cu);
+  return Z_OK;
+}
+
+/**
+ * Address: 0x0095C990 (FUN_0095C990)
+ *
+ * What it does:
+ * Returns the embedded zlib version literal for runtime compatibility checks.
+ */
+extern "C" const char* __cdecl zlibVersion()
+{
+  return "1.2.3";
+}
+
+/**
+ * Address: 0x0095D630 (FUN_0095D630)
+ *
+ * What it does:
+ * Combines two packed Adler lanes using the runtime modulo path
+ * (`base = 65521`) and returns the merged packed state.
+ */
+[[maybe_unused]] std::uint32_t Adler32CombinePackedLaneRuntime(
+  const std::uint32_t adlerA,
+  const std::uint32_t adlerB,
+  const std::uint32_t lengthLane
+) noexcept
+{
+  constexpr std::uint32_t kAdlerBase = 65521u;
+
+  const std::uint32_t s1A = static_cast<std::uint16_t>(adlerA);
+  const std::uint32_t s2A = adlerA >> 16u;
+  const std::uint32_t s1B = static_cast<std::uint16_t>(adlerB);
+  const std::uint32_t s2B = adlerB >> 16u;
+  const std::uint32_t lengthModBase = lengthLane % kAdlerBase;
+
+  const std::uint32_t productLane = lengthModBase * s1A;
+  std::uint32_t sumS1 = s1A + s1B + 65520u;
+  const std::uint32_t laneS2 = s2B + s2A - kAdlerBase * (productLane / kAdlerBase) - lengthModBase;
+  std::uint32_t sumS2 = productLane + laneS2 + kAdlerBase;
+
+  if (sumS1 > kAdlerBase) {
+    sumS1 = s1A + s1B - 1u;
+    if (sumS1 > kAdlerBase) {
+      sumS1 = s1A + s1B - 65522u;
+    }
+  }
+
+  if (sumS2 > 0x1FFE2u) {
+    sumS2 = productLane + laneS2 - kAdlerBase;
+  }
+  if (sumS2 > kAdlerBase) {
+    sumS2 -= kAdlerBase;
+  }
+
+  return sumS1 | (sumS2 << 16u);
+}
+
+/**
+ * Address: 0x0095D6D0 (FUN_0095D6D0)
+ *
+ * What it does:
+ * Returns the zlib CRC lookup-table base lane.
+ */
+[[maybe_unused]] const uLongf* RuntimeGetZlibCrcTable() noexcept
+{
+  return get_crc_table();
+}
+
+/**
+ * Address: 0x0095DC90 (FUN_0095DC90)
+ *
+ * What it does:
+ * Squares one CRC GF(2) matrix lane (`32` rows) into `destinationMatrix`.
+ */
+[[maybe_unused]] unsigned int Crc32Gf2MatrixSquare(
+  std::uint32_t* const destinationMatrix,
+  const std::uint32_t* const sourceMatrix
+) noexcept
+{
+  for (int row = 0; row < 32; ++row) {
+    std::uint32_t vector = sourceMatrix[row];
+    std::uint32_t sum = 0u;
+    const std::uint32_t* column = sourceMatrix;
+    while (vector != 0u) {
+      if ((vector & 1u) != 0u) {
+        sum ^= *column;
+      }
+      vector >>= 1u;
+      ++column;
+    }
+    destinationMatrix[row] = sum;
+  }
+
+  return 0u;
+}
+
+namespace
+{
+  /**
+   * Address: 0x0095DC70 (FUN_0095DC70)
+   *
+   * What it does:
+   * Multiplies one CRC GF(2) matrix lane by a bit-vector lane and returns the
+   * folded XOR sum.
+   */
+  [[nodiscard]] std::uint32_t Crc32Gf2MatrixTimes(
+    const std::uint32_t* matrix,
+    std::uint32_t vector
+  ) noexcept
+  {
+    std::uint32_t sum = 0u;
+    while (vector != 0u) {
+      if ((vector & 1u) != 0u) {
+        sum ^= *matrix;
+      }
+      vector >>= 1u;
+      ++matrix;
+    }
+    return sum;
+  }
+}
+
+/**
+ * Address: 0x0095DCD0 (FUN_0095DCD0)
+ *
+ * What it does:
+ * Combines one CRC lane (`crc1`) with a second CRC lane (`crc2`) that follows
+ * `length` bytes later in the stream, using zlib's GF(2) matrix stepping
+ * method.
+ */
+[[maybe_unused]] std::uint32_t Crc32CombineByLength(
+  const std::uint32_t crc1,
+  const std::uint32_t crc2,
+  std::uint32_t length
+) noexcept
+{
+  if (length == 0u) {
+    return crc1;
+  }
+
+  std::uint32_t odd[32]{};
+  std::uint32_t even[32]{};
+
+  odd[0] = 0xEDB88320u;
+  std::uint32_t row = 1u;
+  for (int index = 1; index < 32; ++index) {
+    odd[index] = row;
+    row <<= 1u;
+  }
+
+  (void)Crc32Gf2MatrixSquare(even, odd);
+  (void)Crc32Gf2MatrixSquare(odd, even);
+
+  std::uint32_t combined = crc1;
+  while (true) {
+    (void)Crc32Gf2MatrixSquare(even, odd);
+    if ((length & 1u) != 0u) {
+      combined = Crc32Gf2MatrixTimes(even, combined);
+    }
+    length >>= 1u;
+    if (length == 0u) {
+      break;
+    }
+
+    (void)Crc32Gf2MatrixSquare(odd, even);
+    if ((length & 1u) != 0u) {
+      combined = Crc32Gf2MatrixTimes(odd, combined);
+    }
+    length >>= 1u;
+    if (length == 0u) {
+      break;
+    }
+  }
+
+  return crc2 ^ combined;
+}
 
 /**
  * Address: 0x0095F140 (FUN_0095F140, bi_windup)
@@ -129,6 +870,71 @@ extern "C" DeflateStateRuntimePrefix* __cdecl putShortMSB(
   state->pending_buf[state->pending++] = static_cast<std::uint8_t>((word >> 8u) & 0xFFu);
   state->pending_buf[state->pending++] = static_cast<std::uint8_t>(word & 0xFFu);
   return state;
+}
+
+/**
+ * Address: 0x0095ACB0 (FUN_0095ACB0, flush_pending)
+ *
+ * What it does:
+ * Copies one bounded pending-buffer span into `stream->next_out`, updates
+ * pending/output counters, and rewinds `pendingOut` to `pendingBuffer` when
+ * all pending bytes are drained.
+ */
+[[maybe_unused]] DeflateCopyStateRuntimeView* DeflateFlushPendingToOutput(
+  z_stream* const stream
+) noexcept
+{
+  auto* const state = reinterpret_cast<DeflateCopyStateRuntimeView*>(stream->state);
+  unsigned int pendingBytes = state->pending;
+  if (pendingBytes > stream->avail_out) {
+    pendingBytes = stream->avail_out;
+  }
+
+  if (pendingBytes != 0u) {
+    std::memcpy(stream->next_out, state->pendingOut, pendingBytes);
+    stream->next_out += pendingBytes;
+    state->pendingOut += pendingBytes;
+    stream->total_out += pendingBytes;
+    stream->avail_out -= pendingBytes;
+    state->pending -= pendingBytes;
+    if (state->pending == 0u) {
+      state->pendingOut = state->pendingBuffer;
+    }
+  }
+
+  return state;
+}
+
+/**
+ * Address: 0x0095B7D0 (FUN_0095B7D0, lm_init)
+ *
+ * What it does:
+ * Initializes deflate match-finder lanes by clearing hash heads, selecting
+ * level-tuned configuration parameters, and resetting start/lookahead state.
+ */
+[[maybe_unused]] void DeflateInitializeMatchFinderState(
+  DeflateLmInitStateRuntimeView* const state
+) noexcept
+{
+  state->windowSize = state->windowWordSize * 2u;
+
+  state->hashHead[state->hashSize - 1u] = 0u;
+  std::memset(state->hashHead, 0, state->hashSize * 2u - 2u);
+
+  const DeflateConfigurationRuntimeEntry& configuration =
+    kDeflateConfigurationTable[static_cast<std::size_t>(state->compressionLevel)];
+
+  state->maxLazyMatch = configuration.maxLazy;
+  state->goodMatch = configuration.goodLength;
+  state->niceMatch = configuration.niceLength;
+  state->stringStart = 0u;
+  state->blockStart = 0;
+  state->lookahead = 0u;
+  state->matchAvailable = 0u;
+  state->insertHash = 0u;
+  state->maxChainLength = configuration.maxChain;
+  state->previousLength = 2u;
+  state->matchLength = 2u;
 }
 
 /**
@@ -288,6 +1094,67 @@ extern "C" int __cdecl longest_match_fast(
     return static_cast<int>(state->lookahead);
   }
   return matchLength;
+}
+
+/**
+ * Address: 0x0095DE50 (FUN_0095DE50)
+ *
+ * What it does:
+ * Compresses one in-memory source span into a caller-provided destination
+ * span using one temporary z_stream lane and returns zlib-style status codes.
+ */
+[[maybe_unused]] int DeflateCompressBufferWithRuntimeLevel(
+  std::uint8_t* const destinationBuffer,
+  unsigned int* const inOutDestinationLength,
+  std::uint8_t* const sourceBuffer,
+  const unsigned int sourceLength,
+  const int compressionLevel
+)
+{
+  z_stream stream;
+  stream.next_in = sourceBuffer;
+  stream.avail_in = sourceLength;
+  stream.next_out = destinationBuffer;
+  stream.avail_out = *inOutDestinationLength;
+  std::memset(&stream.zalloc, 0, 12u);
+
+  int result = ::deflateInit2_(
+    &stream,
+    compressionLevel,
+    Z_DEFLATED,
+    15,
+    8,
+    0,
+    "1.2.3",
+    56
+  );
+  if (result == Z_OK) {
+    const int flushStatus = ::deflate(&stream, Z_FINISH);
+    if (flushStatus == Z_STREAM_END) {
+      *inOutDestinationLength = static_cast<unsigned int>(stream.total_out);
+      return ::deflateEnd(&stream);
+    }
+
+    (void)::deflateEnd(&stream);
+    result = Z_BUF_ERROR;
+    if (flushStatus != Z_OK) {
+      return flushStatus;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Address: 0x0095DF20 (FUN_0095DF20, compressBound)
+ *
+ * What it does:
+ * Returns zlib's legacy upper bound for compressed output bytes from one
+ * source byte count.
+ */
+[[maybe_unused]] unsigned int compressBoundRuntime(const unsigned int sourceLength)
+{
+  return sourceLength + (sourceLength >> 12u) + (sourceLength >> 14u) + 11u;
 }
 
 /**
@@ -600,6 +1467,42 @@ extern "C" void __cdecl send_tree(
       minCount = 4;
     }
   }
+}
+
+/**
+ * Address: 0x0095EB20 (FUN_0095EB20, _tr_tally)
+ *
+ * What it does:
+ * Appends one literal/match token into `l_buf`/`d_buf`, updates dynamic
+ * Huffman frequency lanes, and returns true when the literal buffer reaches
+ * its last writable slot.
+ */
+extern "C" int __cdecl _tr_tally(
+  DeflateStateRuntime* const state,
+  const int distance,
+  const int literalOrLengthCode
+)
+{
+  const std::uint32_t literalIndex = state->last_lit;
+  state->d_buf[literalIndex] = static_cast<std::uint16_t>(distance);
+  state->l_buf[literalIndex] = static_cast<std::uint8_t>(literalOrLengthCode);
+  ++state->last_lit;
+
+  if (distance != 0) {
+    ++state->matches;
+    const std::uint32_t lengthCode = kLengthCode[static_cast<std::uint8_t>(literalOrLengthCode)];
+    ++state->dyn_ltree[lengthCode + kDeflateLiteralCount + 1].fc.freq;
+
+    const std::uint32_t distanceMinusOne = static_cast<std::uint32_t>(distance - 1);
+    const std::uint32_t distanceCode = distanceMinusOne < 256u
+      ? kDistanceCode[distanceMinusOne]
+      : kDistanceCode[(distanceMinusOne >> 7u) + 256u];
+    ++state->dyn_dtree[distanceCode].fc.freq;
+  } else {
+    ++state->dyn_ltree[static_cast<std::uint8_t>(literalOrLengthCode)].fc.freq;
+  }
+
+  return state->last_lit == (state->lit_bufsize - 1u) ? 1 : 0;
 }
 
 /**

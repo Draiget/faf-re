@@ -1,4 +1,5 @@
 #include "CubeRenderTargetContext.hpp"
+#include "DepthStencilTarget.hpp"
 #include "DepthStencilTargetContext.hpp"
 #include "DeviceContext.hpp"
 #include "DrawContext.hpp"
@@ -10,6 +11,7 @@
 #include "TextureContext.hpp"
 #include "VertexBuffer.hpp"
 #include "VertexBufferContext.hpp"
+#include "StringUtils.h"
 
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -28,6 +30,40 @@ namespace gpg::gal
             EffectMacro* last = nullptr;  // +0x08
             EffectMacro* end = nullptr;   // +0x0C
         };
+
+        struct DepthStencilTargetOwnerRuntimeView final
+        {
+            void* vftable = nullptr;                      // +0x00
+            std::uint32_t lane04 = 0u;                   // +0x04
+            std::uint32_t width = 0u;                    // +0x08
+            std::uint32_t height = 0u;                   // +0x0C
+            std::uint32_t format = 0u;                   // +0x10
+            bool flag = false;                           // +0x14
+            std::uint8_t pad15_17[3]{};                  // +0x15
+            boost::detail::sp_counted_base* handle = nullptr; // +0x18
+        };
+        static_assert(
+            offsetof(DepthStencilTargetOwnerRuntimeView, width) == 0x08,
+            "DepthStencilTargetOwnerRuntimeView::width offset must be 0x08"
+        );
+        static_assert(
+            offsetof(DepthStencilTargetOwnerRuntimeView, handle) == 0x18,
+            "DepthStencilTargetOwnerRuntimeView::handle offset must be 0x18"
+        );
+        static_assert(sizeof(DepthStencilTargetOwnerRuntimeView) == 0x1C, "DepthStencilTargetOwnerRuntimeView size must be 0x1C");
+
+        struct IndexBufferOwnerRuntimeView final
+        {
+            void* vftable = nullptr;                      // +0x00
+            std::uint32_t lane04 = 0u;                   // +0x04
+            std::uint32_t format = 0u;                   // +0x08
+            std::uint32_t size = 0u;                     // +0x0C
+            std::uint32_t type = 0u;                     // +0x10
+            boost::detail::sp_counted_base* handle = nullptr; // +0x14
+        };
+        static_assert(offsetof(IndexBufferOwnerRuntimeView, format) == 0x08, "IndexBufferOwnerRuntimeView::format offset must be 0x08");
+        static_assert(offsetof(IndexBufferOwnerRuntimeView, handle) == 0x14, "IndexBufferOwnerRuntimeView::handle offset must be 0x14");
+        static_assert(sizeof(IndexBufferOwnerRuntimeView) == 0x18, "IndexBufferOwnerRuntimeView size must be 0x18");
 
         struct EffectContextRuntimeView final
         {
@@ -77,6 +113,96 @@ namespace gpg::gal
             runtime.proxy = nullptr;
         }
 
+        /**
+         * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
+         *
+         * What it does:
+         * Scans one contiguous `[first,last)` effect-macro range and returns
+         * the first entry whose key text exactly matches `needle->keyText_`;
+         * returns `last` when no exact key match exists.
+         */
+        [[maybe_unused]] EffectMacro** FindEffectMacroByKeyInRange(
+            EffectMacro** const outPosition,
+            EffectMacro* first,
+            EffectMacro* last,
+            const EffectMacro* const needle
+        ) noexcept
+        {
+            EffectMacro* cursor = first;
+            if (first != last && needle != nullptr)
+            {
+                const char* const needleText = needle->keyText_.raw_data_unsafe();
+                const std::size_t needleLength = needle->keyText_.size();
+
+                while (cursor != last)
+                {
+                    const char* const candidateText = cursor->keyText_.raw_data_unsafe();
+                    const std::size_t candidateLength = cursor->keyText_.size();
+                    const std::size_t compareLength = candidateLength < needleLength ? candidateLength : needleLength;
+                    const int compareResult = STR_Compare(candidateText, needleText, compareLength);
+                    if (compareResult == 0 && candidateLength == needleLength)
+                    {
+                        break;
+                    }
+
+                    ++cursor;
+                }
+            }
+
+            if (outPosition != nullptr)
+            {
+                *outPosition = cursor;
+            }
+            return outPosition;
+        }
+
+        /**
+         * Address: 0x0093F7C0 (FUN_0093F7C0, effect-macro backward assign lane)
+         *
+         * What it does:
+         * Assigns one already-constructed macro range backward
+         * (`[first,last) -> ending at outLast`) while preserving the original
+         * `msvc8::string::assign` per-field behavior.
+         */
+        [[maybe_unused]] EffectMacro* AssignEffectMacroRangeBackward(
+            EffectMacro* const first,
+            EffectMacro* last,
+            EffectMacro* outLast
+        ) noexcept
+        {
+            if (first == last)
+            {
+                return outLast;
+            }
+
+            EffectMacro* source = last;
+            EffectMacro* destination = outLast;
+            do
+            {
+                --source;
+                --destination;
+                destination->keyText_.assign(source->keyText_, 0U, msvc8::string::npos);
+                destination->valueText_.assign(source->valueText_, 0U, msvc8::string::npos);
+            } while (source != first);
+            return destination;
+        }
+
+        /**
+         * Address: 0x0093FB00 (FUN_0093FB00)
+         *
+         * What it does:
+         * Dispatch adapter lane into the backward effect-macro range assign
+         * helper.
+         */
+        [[maybe_unused]] EffectMacro* AssignEffectMacroRangeBackwardDispatchA(
+            EffectMacro* const first,
+            EffectMacro* const last,
+            EffectMacro* const outLast
+        ) noexcept
+        {
+            return AssignEffectMacroRangeBackward(first, last, outLast);
+        }
+
         void AssignSharedCount(
             boost::detail::sp_counted_base*& target,
             boost::detail::sp_counted_base* const source
@@ -93,6 +219,104 @@ namespace gpg::gal
             }
 
             target = source;
+        }
+
+        /**
+         * Address: 0x008E7F80 (FUN_008E7F80)
+         *
+         * What it does:
+         * Releases one retained depth-stencil shared-control lane and resets
+         * the embedded depth-stencil context payload to default values.
+         */
+        [[maybe_unused]] void ResetDepthStencilTargetOwnerRuntime(
+            DepthStencilTargetOwnerRuntimeView* const owner
+        ) noexcept
+        {
+            if (owner == nullptr) {
+                return;
+            }
+
+            if (owner->handle != nullptr) {
+                owner->handle->release();
+            }
+            owner->handle = nullptr;
+
+            const DepthStencilTargetContext resetContext{};
+            owner->width = resetContext.width_;
+            owner->height = resetContext.height_;
+            owner->format = resetContext.format_;
+            owner->flag = resetContext.field0x10_;
+        }
+
+        /**
+         * Address: 0x008F4C30 (FUN_008F4C30)
+         *
+         * What it does:
+         * Releases one retained index-buffer shared-control lane and resets
+         * the embedded index-buffer context payload to default values.
+         */
+        [[maybe_unused]] void ResetIndexBufferOwnerRuntime(
+            IndexBufferOwnerRuntimeView* const owner
+        ) noexcept
+        {
+            if (owner == nullptr) {
+                return;
+            }
+
+            if (owner->handle != nullptr) {
+                owner->handle->release();
+            }
+            owner->handle = nullptr;
+
+            const IndexBufferContext resetContext{};
+            owner->format = resetContext.format_;
+            owner->size = resetContext.size_;
+            owner->type = resetContext.type_;
+        }
+
+        /**
+         * Address: 0x008E7B00 (FUN_008E7B00)
+         *
+         * What it does:
+         * Initializes one texture-context payload from a render-target context
+         * and remaps legacy render-target format tokens to texture-format lanes.
+         */
+        [[maybe_unused]] TextureContext* InitializeTextureContextFromRenderTargetContext(
+            TextureContext* const outContext,
+            const RenderTargetContext* const sourceContext
+        ) noexcept
+        {
+            if (outContext == nullptr || sourceContext == nullptr) {
+                return outContext;
+            }
+
+            ::new (static_cast<void*>(outContext)) TextureContext();
+            outContext->width_ = sourceContext->width_;
+            outContext->height_ = sourceContext->height_;
+
+            switch (sourceContext->format_)
+            {
+            case 0:
+                outContext->format_ = 0;
+                break;
+            case 2:
+                outContext->format_ = 2;
+                break;
+            case 3:
+                outContext->format_ = 3;
+                break;
+            case 6:
+                outContext->format_ = 4;
+                break;
+            case 7:
+                outContext->format_ = 14;
+                break;
+            default:
+                outContext->format_ = 20;
+                break;
+            }
+
+            return outContext;
         }
     }
 
@@ -133,6 +357,20 @@ namespace gpg::gal
           size_(size),
           type_(type)
     {
+    }
+
+    /**
+     * Address: 0x008F4BF0 (FUN_008F4BF0)
+     *
+     * What it does:
+     * Copies index-buffer metadata payload lanes from another context.
+     */
+    IndexBufferContext& IndexBufferContext::AssignFrom(const IndexBufferContext& other)
+    {
+        format_ = other.format_;
+        size_ = other.size_;
+        type_ = other.type_;
+        return *this;
     }
 
     /**
@@ -241,6 +479,46 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E7DF0 (FUN_008E7DF0)
+     *
+     * What it does:
+     * Initializes archive-backed texture source metadata from one location
+     * string, one retained shared data buffer view, and explicit
+     * format/dimension payload lanes.
+     */
+    TextureContext::TextureContext(
+        const char* const location,
+        const gpg::MemBuffer<const char>& data,
+        const std::uint32_t format,
+        const std::uint32_t width,
+        const std::uint32_t height
+    )
+        : source_(1U),
+          location_(
+            (location != nullptr) ? location : "",
+            static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
+          ),
+          dataArray_(nullptr),
+          dataCount_(nullptr),
+          dataBegin_(0U),
+          dataEnd_(0U),
+          type_(0U),
+          usage_(1U),
+          format_(format),
+          mipmapLevels_(0U),
+          reserved0x44_(0U),
+          width_(width),
+          height_(height),
+          reserved0x50_(0U)
+    {
+        const boost::SharedPtrRaw<const char> retainedData = boost::SharedPtrRawFromSharedRetained(data.mData);
+        dataArray_ = const_cast<char*>(retainedData.px);
+        dataCount_ = retainedData.pi;
+        dataBegin_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mBegin));
+        dataEnd_ = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(data.mEnd));
+    }
+
+    /**
      * Address: 0x008E7A40 (FUN_008E7A40, gpg::gal::TextureContext::Copy)
      *
      * What it does:
@@ -268,6 +546,16 @@ namespace gpg::gal
             dataCount_->add_ref_copy();
         }
     }
+
+    /**
+     * Address: 0x008E7E90 (FUN_008E7E90)
+     * Address: 0x008E7EA0 (FUN_008E7EA0)
+     *
+     * What it does:
+     * Initializes one abstract depth-stencil target base lane and applies
+     * the base vftable ownership used by derived constructors.
+     */
+    DepthStencilTarget::DepthStencilTarget() = default;
 
     /**
      * Address: 0x00903B60 (FUN_00903B60)
@@ -318,6 +606,19 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x00941250 (FUN_00941250)
+     *
+     * What it does:
+     * Copies cube render-target dimension/format lanes from another context.
+     */
+    CubeRenderTargetContext& CubeRenderTargetContext::AssignFrom(const CubeRenderTargetContext& other)
+    {
+        dimension_ = other.dimension_;
+        format_ = other.format_;
+        return *this;
+    }
+
+    /**
      * Address: 0x0093EF90 (FUN_0093EF90)
      *
      * What it does:
@@ -364,6 +665,24 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E79E0 (FUN_008E79E0)
+     *
+     * What it does:
+     * Initializes render-target context with explicit width, height, and
+     * format lanes.
+     */
+    RenderTargetContext::RenderTargetContext(
+        const std::uint32_t width,
+        const std::uint32_t height,
+        const std::uint32_t format
+    )
+        : width_(width),
+          height_(height),
+          format_(format)
+    {
+    }
+
+    /**
      * Address: 0x00442050 (FUN_00442050, sub_442050)
      *
      * What it does:
@@ -377,10 +696,13 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008E65A0 (FUN_008E65A0)
+     * Address: 0x008E6590 (FUN_008E6590)
+     * Address: 0x008E65A0 (FUN_008E65A0, scalar deleting destructor thunk)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for cube render-target context handles.
+     * Non-deleting destructor body resets vtable ownership for the
+     * cube-render-target context base lane. Scalar-delete thunk reuses this
+     * body then releases storage when requested.
      */
     CubeRenderTargetContext::~CubeRenderTargetContext() = default;
 
@@ -396,10 +718,12 @@ namespace gpg::gal
     DepthStencilTargetContext::~DepthStencilTargetContext() = default;
 
     /**
-     * Address: 0x00430570 (FUN_00430570)
+     * Address: 0x008E69B0 (FUN_008E69B0, gpg::gal::DeviceContext::~DeviceContext)
+     * Address: 0x00430570 (FUN_00430570, scalar deleting destructor thunk)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for device-context interface instances.
+     * Tears down one device-context base lane; deleting-thunk dispatch uses
+     * the same canonical destructor body.
      */
     DeviceContext::~DeviceContext() = default;
 

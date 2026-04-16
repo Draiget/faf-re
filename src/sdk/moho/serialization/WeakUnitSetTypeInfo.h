@@ -12,7 +12,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006D2B10 (FUN_006D2B10, sub_6D2B10)
+       * Address: 0x006D2B10 (FUN_006D2B10)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `WeakEntitySetTemplate<Unit>`.
@@ -48,14 +48,6 @@ namespace moho
   };
 
   static_assert(sizeof(WeakUnitSetTypeInfo) == 0x64, "WeakUnitSetTypeInfo size must be 0x64");
-
-  /**
-   * Address: 0x006D2B10 (FUN_006D2B10, sub_6D2B10)
-   *
-   * What it does:
-   * Ensures global `WeakUnitSetTypeInfo` construction and returns it as `gpg::RType*`.
-   */
-  [[nodiscard]] gpg::RType* construct_WeakUnitSetTypeInfo();
 
   /**
    * Address: 0x00BFE480 (FUN_00BFE480, sub_BFE480)

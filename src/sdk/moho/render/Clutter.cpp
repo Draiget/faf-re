@@ -13,6 +13,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/STIMap.h"
 
+#include <algorithm>
 #include <boost/mutex.h>
 #include <cmath>
 #include <cstring>
@@ -37,6 +38,11 @@ namespace
     virtual ~DestroyInstanceVtableTag() = default;
   };
 
+  struct UpdateInstanceVtableTag
+  {
+    virtual ~UpdateInstanceVtableTag() = default;
+  };
+
   struct SurfaceVtableResetTag
   {
     virtual ~SurfaceVtableResetTag() = default;
@@ -53,6 +59,12 @@ namespace
     moho::MeshRenderer* instance;
   };
 
+  struct UpdateInstanceRuntimeLane
+  {
+    void* vtable;
+    std::int32_t ownerToken;
+  };
+
   struct CWldTerrainResRuntimeView
   {
     void* vtable;
@@ -65,6 +77,7 @@ namespace
   RegionKeyVtableResetTag gRegionKeyVtableResetTag{};
   RegionRuntimeVtableResetTag gRegionRuntimeVtableResetTag{};
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
+  UpdateInstanceVtableTag gUpdateInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
 
@@ -81,6 +94,169 @@ namespace
   [[nodiscard]] void* DestroyInstanceVtableToken()
   {
     return *reinterpret_cast<void**>(&gDestroyInstanceVtableTag);
+  }
+
+  [[nodiscard]] void* UpdateInstanceVtableToken()
+  {
+    return *reinterpret_cast<void**>(&gUpdateInstanceVtableTag);
+  }
+
+  /**
+   * Address: 0x007D5C90 (FUN_007D5C90)
+   *
+   * What it does:
+   * Initializes one region-key runtime lane from explicit `(x,z)` coordinates.
+   */
+  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromCoordinates(
+    moho::ClutterRegionKey* const outKey,
+    const std::int32_t x,
+    const std::int32_t z
+  ) noexcept
+  {
+    if (outKey == nullptr) {
+      return nullptr;
+    }
+
+    outKey->vtable = RegionKeyVtableResetToken();
+    outKey->mX = x;
+    outKey->mZ = z;
+    return outKey;
+  }
+
+  /**
+   * Address: 0x007D5CA0 (FUN_007D5CA0)
+   *
+   * What it does:
+   * Initializes one region-key runtime lane by copying `(x,z)` from one
+   * clutter-region lane.
+   */
+  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromRegion(
+    moho::ClutterRegionKey* const outKey,
+    const moho::ClutterRegion* const region
+  ) noexcept
+  {
+    if (outKey == nullptr) {
+      return nullptr;
+    }
+
+    outKey->vtable = RegionKeyVtableResetToken();
+    outKey->mX = region != nullptr ? region->mX : 0;
+    outKey->mZ = region != nullptr ? region->mZ : 0;
+    return outKey;
+  }
+
+  /**
+   * Address: 0x007D92A0 (FUN_007D92A0)
+   *
+   * What it does:
+   * Initializes one region-key runtime lane by copying coordinates from one
+   * source region-key lane.
+   */
+  [[maybe_unused]] moho::ClutterRegionKey* InitializeRegionKeyFromSourceKey(
+    moho::ClutterRegionKey* const outKey,
+    const moho::ClutterRegionKey* const sourceKey
+  ) noexcept
+  {
+    if (outKey == nullptr) {
+      return nullptr;
+    }
+
+    outKey->vtable = RegionKeyVtableResetToken();
+    outKey->mX = sourceKey != nullptr ? sourceKey->mX : 0;
+    outKey->mZ = sourceKey != nullptr ? sourceKey->mZ : 0;
+    return outKey;
+  }
+
+  /**
+   * Address: 0x007D5E30 (FUN_007D5E30)
+   *
+   * What it does:
+   * Initializes one update-instance helper lane with owner token payload.
+   */
+  [[maybe_unused]] UpdateInstanceRuntimeLane* InitializeUpdateInstanceLane(
+    UpdateInstanceRuntimeLane* const outLane,
+    const std::int32_t ownerToken
+  ) noexcept
+  {
+    if (outLane == nullptr) {
+      return nullptr;
+    }
+
+    outLane->vtable = UpdateInstanceVtableToken();
+    outLane->ownerToken = ownerToken;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x007D5E40 (FUN_007D5E40)
+   *
+   * What it does:
+   * Resets one update-instance helper lane to the `UpdateInstance` vtable.
+   */
+  [[maybe_unused]] void ResetUpdateInstanceLaneVtable(UpdateInstanceRuntimeLane* const lane) noexcept
+  {
+    if (lane == nullptr) {
+      return;
+    }
+
+    lane->vtable = UpdateInstanceVtableToken();
+  }
+
+  /**
+   * Address: 0x007D9820 (FUN_007D9820)
+   *
+   * What it does:
+   * Initializes one destroy-instance lane from another lane's payload while
+   * restoring the destroy-instance vtable token.
+   */
+  [[maybe_unused]] DestroyInstanceRuntimeLane* InitializeDestroyInstanceLaneFromSource(
+    DestroyInstanceRuntimeLane* const outLane,
+    const DestroyInstanceRuntimeLane* const sourceLane
+  ) noexcept
+  {
+    if (outLane == nullptr) {
+      return nullptr;
+    }
+
+    outLane->vtable = DestroyInstanceVtableToken();
+    outLane->instance = sourceLane != nullptr ? sourceLane->instance : nullptr;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x007D9830 (FUN_007D9830)
+   *
+   * What it does:
+   * Initializes one update-instance lane from another lane's owner-token
+   * payload while restoring the update-instance vtable token.
+   */
+  [[maybe_unused]] UpdateInstanceRuntimeLane* InitializeUpdateInstanceLaneFromSource(
+    UpdateInstanceRuntimeLane* const outLane,
+    const UpdateInstanceRuntimeLane* const sourceLane
+  ) noexcept
+  {
+    if (outLane == nullptr) {
+      return nullptr;
+    }
+
+    outLane->vtable = UpdateInstanceVtableToken();
+    outLane->ownerToken = sourceLane != nullptr ? sourceLane->ownerToken : 0;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x007D5EA0 (FUN_007D5EA0)
+   *
+   * What it does:
+   * Resets one destroy-instance helper lane to the `DestroyInstance` vtable.
+   */
+  void ResetDestroyInstanceLaneVtable(DestroyInstanceRuntimeLane* const lane) noexcept
+  {
+    if (lane == nullptr) {
+      return;
+    }
+
+    lane->vtable = DestroyInstanceVtableToken();
   }
 
   [[nodiscard]] void* SurfaceVtableResetToken()
@@ -148,6 +324,82 @@ namespace
   )
   {
     return (lhs.mX < rhs.mX) || (lhs.mX == rhs.mX && lhs.mZ < rhs.mZ);
+  }
+
+  [[nodiscard]] int AlignDownToEven(const int value) noexcept
+  {
+    return (value % 2 != 0) ? (value - 1) : value;
+  }
+
+  [[nodiscard]] int AlignUpToEven(const int value) noexcept
+  {
+    return (value % 2 != 0) ? (value + 1) : value;
+  }
+
+  [[nodiscard]] float SampleHeightWordAsWorldUnits(
+    const moho::CHeightField& heightField,
+    const int x,
+    const int z
+  ) noexcept
+  {
+    if (heightField.data == nullptr || heightField.width <= 0 || heightField.height <= 0) {
+      return 0.0f;
+    }
+
+    const int clampedX = std::clamp(x, 0, heightField.width - 1);
+    const int clampedZ = std::clamp(z, 0, heightField.height - 1);
+    const std::size_t sampleIndex =
+      static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(heightField.width)
+      + static_cast<std::size_t>(clampedX);
+
+    constexpr float kHeightWordScale = 0.0078125f;
+    return static_cast<float>(heightField.data[sampleIndex]) * kHeightWordScale;
+  }
+
+  [[nodiscard]] Wm3::AxisAlignedBox3f BuildRegionBoundsFromHeightField(
+    const moho::CHeightField& heightField,
+    const int x,
+    const int z
+  )
+  {
+    const float h00 = SampleHeightWordAsWorldUnits(heightField, x, z);
+    const float h01 = SampleHeightWordAsWorldUnits(heightField, x, z + 2);
+    const float h10 = SampleHeightWordAsWorldUnits(heightField, x + 2, z);
+    const float h11 = SampleHeightWordAsWorldUnits(heightField, x + 2, z + 2);
+
+    const float minHeight = std::min(std::min(h00, h01), std::min(h10, h11));
+    const float maxHeight = std::max(std::max(h00, h01), std::max(h10, h11));
+
+    Wm3::AxisAlignedBox3f regionBounds{};
+    regionBounds.Min.x = static_cast<float>(x);
+    regionBounds.Min.y = minHeight;
+    regionBounds.Min.z = static_cast<float>(z);
+    regionBounds.Max.x = static_cast<float>(x + 2);
+    regionBounds.Max.y = maxHeight;
+    regionBounds.Max.z = static_cast<float>(z + 2);
+    return regionBounds;
+  }
+
+  [[nodiscard]] std::uint8_t GetTerrainTypeAtOrDefault(
+    const moho::STIMap& map,
+    const int x,
+    const int z
+  ) noexcept
+  {
+    if (map.mTerrainType.data == nullptr || map.mTerrainType.width <= 1 || map.mTerrainType.height <= 1) {
+      return 1u;
+    }
+
+    const int maxSampleX = map.mTerrainType.width - 1;
+    const int maxSampleZ = map.mTerrainType.height - 1;
+    if (x < 0 || z < 0 || x >= maxSampleX || z >= maxSampleZ) {
+      return 1u;
+    }
+
+    const std::size_t terrainIndex =
+      static_cast<std::size_t>(z) * static_cast<std::size_t>(map.mTerrainType.width)
+      + static_cast<std::size_t>(x);
+    return map.mTerrainType.data[terrainIndex];
   }
 
   [[nodiscard]] moho::ClutterRegionKeyNode* TreeMinimum(
@@ -388,6 +640,32 @@ namespace
   }
 
   /**
+   * Address: 0x007D7C20 (FUN_007D7C20)
+   *
+   * What it does:
+   * Finds one exact region-key match and stores either that node or the tree
+   * head sentinel (miss) into `outNode`.
+   */
+  moho::ClutterRegionKeyNode** FindRegionKeyExactOrHead(
+    moho::ClutterRegionKeyNode** const outNode,
+    moho::ClutterRegionKeyTreeState* const tree,
+    const moho::ClutterRegionKey& key
+  )
+  {
+    if (outNode == nullptr || tree == nullptr || tree->head == nullptr) {
+      return outNode;
+    }
+
+    moho::ClutterRegionKeyNode* const candidate = FindLowerBound(tree, key);
+    if (candidate == tree->head || RegionKeyLess(key, candidate->key)) {
+      *outNode = tree->head;
+    } else {
+      *outNode = candidate;
+    }
+    return outNode;
+  }
+
+  /**
    * Address: 0x007D9100 (FUN_007D9100)
    */
   [[nodiscard]] moho::ClutterRegionKeyNode* FindUpperBound(
@@ -526,6 +804,23 @@ namespace
   }
 
   /**
+   * Address: 0x007D7A80 (FUN_007D7A80)
+   *
+   * What it does:
+   * Erases all region-key nodes, releases the tree head sentinel lane, and
+   * resets the owner state to an empty/null tree.
+   */
+  std::int32_t ClearRegionKeyTreeStorageLaneA(moho::ClutterRegionKeyTreeState* const tree)
+  {
+    moho::ClutterRegionKeyNode* outNext = nullptr;
+    (void)EraseRegionKeyNodeRange(tree, &outNext, tree->head->left, tree->head);
+    ::operator delete(tree->head);
+    tree->head = nullptr;
+    tree->size = 0;
+    return 0;
+  }
+
+  /**
    * Address: 0x007D7A10 (FUN_007D7A10)
    */
   void ClearIntrusiveListNodes(moho::ClutterIntrusiveListState* const list)
@@ -592,7 +887,52 @@ namespace
     }
 
     destroyLane.instance = instance;
-    destroyLane.vtable = DestroyInstanceVtableToken();
+    ResetDestroyInstanceLaneVtable(&destroyLane);
+  }
+
+  /**
+   * Address: 0x007D9440 (FUN_007D9440)
+   *
+   * What it does:
+   * Rebinds each region-map mesh instance to the provided clutter owner and
+   * refreshes one update-instance helper lane to the update vtable token.
+   */
+  UpdateInstanceRuntimeLane* BindRegionMeshInstancesToOwner(
+    UpdateInstanceRuntimeLane* const lane,
+    moho::ClutterListNode* begin,
+    moho::ClutterListNode* const endSentinel,
+    const std::int32_t ownerToken
+  ) noexcept
+  {
+    if (lane == nullptr) {
+      return nullptr;
+    }
+
+    for (moho::ClutterListNode* node = begin; node != endSentinel; node = node->next) {
+      auto* const meshInstance = static_cast<moho::MeshInstance*>(node->payload);
+      meshInstance->unk24 = ownerToken;
+    }
+
+    lane->ownerToken = ownerToken;
+    lane->vtable = UpdateInstanceVtableToken();
+    return lane;
+  }
+
+  [[nodiscard]] void* AllocatePointerListStorageChecked(std::uint32_t count);
+
+  /**
+   * Address: 0x007D7D00 (FUN_007D7D00)
+   *
+   * What it does:
+   * Allocates one 12-byte intrusive-list sentinel node and self-links its
+   * `next/prev` lanes.
+   */
+  [[nodiscard]] moho::ClutterListNode* AllocateRegionMapSentinelNode()
+  {
+    auto* const node = static_cast<moho::ClutterListNode*>(AllocatePointerListStorageChecked(1u));
+    node->next = node;
+    node->prev = node;
+    return node;
   }
 
   /**
@@ -628,6 +968,164 @@ namespace
   }
 
   /**
+   * Address: 0x007D8EC0 (FUN_007D8EC0)
+   *
+   * What it does:
+   * Allocates one region-key RB-tree node and initializes parent/child links,
+   * key payload, and red/non-nil color flags.
+   */
+  [[nodiscard]] moho::ClutterRegionKeyNode* AllocateRegionKeyTreeNode(
+    moho::ClutterRegionKeyNode* const left,
+    moho::ClutterRegionKeyNode* const parent,
+    moho::ClutterRegionKeyNode* const right,
+    const moho::ClutterRegionKey& key
+  )
+  {
+    moho::ClutterRegionKeyNode* const node = AllocateRegionKeyNode();
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    node->left = left;
+    node->parent = parent;
+    node->right = right;
+    node->key.vtable = RegionKeyVtableResetToken();
+    node->key.mX = key.mX;
+    node->key.mZ = key.mZ;
+    node->color = 0;
+    node->isNil = 0;
+    return node;
+  }
+
+  [[nodiscard]] bool InsertRegionKeyIntoTree(
+    moho::ClutterRegionKeyTreeState* const tree,
+    const moho::ClutterRegionKey& key
+  )
+  {
+    if (tree == nullptr || tree->head == nullptr) {
+      return false;
+    }
+
+    constexpr std::uint32_t kMaxRegionKeyCount = 0x15555554u;
+    if (tree->size >= kMaxRegionKeyCount) {
+      throw std::length_error("map/set<T> too long");
+    }
+
+    moho::ClutterRegionKeyNode* parent = tree->head;
+    moho::ClutterRegionKeyNode* probe = tree->head->parent;
+    bool insertOnLeft = true;
+
+    while (!IsTreeNil(tree, probe)) {
+      parent = probe;
+      if (RegionKeyLess(key, probe->key)) {
+        probe = probe->left;
+        insertOnLeft = true;
+      } else if (RegionKeyLess(probe->key, key)) {
+        probe = probe->right;
+        insertOnLeft = false;
+      } else {
+        return false;
+      }
+    }
+
+    moho::ClutterRegionKeyNode* inserted =
+      AllocateRegionKeyTreeNode(tree->head, parent, tree->head, key);
+    if (inserted == nullptr) {
+      return false;
+    }
+
+    if (parent == tree->head) {
+      tree->head->parent = inserted;
+      tree->head->left = inserted;
+      tree->head->right = inserted;
+    } else if (insertOnLeft) {
+      parent->left = inserted;
+    } else {
+      parent->right = inserted;
+    }
+
+    ++tree->size;
+
+    while (inserted != tree->head->parent && !IsTreeBlack(tree, inserted->parent)) {
+      moho::ClutterRegionKeyNode* parentNode = inserted->parent;
+      moho::ClutterRegionKeyNode* grandParent = parentNode->parent;
+
+      if (parentNode == grandParent->left) {
+        moho::ClutterRegionKeyNode* const uncle = grandParent->right;
+        if (!IsTreeBlack(tree, uncle)) {
+          parentNode->color = 1;
+          uncle->color = 1;
+          grandParent->color = 0;
+          inserted = grandParent;
+        } else {
+          if (inserted == parentNode->right) {
+            inserted = parentNode;
+            RotateTreeLeft(tree, inserted);
+            parentNode = inserted->parent;
+            grandParent = parentNode->parent;
+          }
+
+          parentNode->color = 1;
+          grandParent->color = 0;
+          RotateTreeRight(tree, grandParent);
+        }
+      } else {
+        moho::ClutterRegionKeyNode* const uncle = grandParent->left;
+        if (!IsTreeBlack(tree, uncle)) {
+          parentNode->color = 1;
+          uncle->color = 1;
+          grandParent->color = 0;
+          inserted = grandParent;
+        } else {
+          if (inserted == parentNode->left) {
+            inserted = parentNode;
+            RotateTreeRight(tree, inserted);
+            parentNode = inserted->parent;
+            grandParent = parentNode->parent;
+          }
+
+          parentNode->color = 1;
+          grandParent->color = 0;
+          RotateTreeLeft(tree, grandParent);
+        }
+      }
+    }
+
+    tree->head->parent->color = 1;
+    RefreshTreeEndpoints(tree);
+    return true;
+  }
+
+  [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
+  {
+    constexpr std::uint32_t kRegionPoolCount = 128u;
+
+    auto* const rawStorage = static_cast<std::uint8_t*>(
+      ::operator new(sizeof(std::uint32_t) + sizeof(moho::ClutterRegion) * kRegionPoolCount)
+    );
+    *reinterpret_cast<std::uint32_t*>(rawStorage) = kRegionPoolCount;
+
+    auto* const regionBase =
+      reinterpret_cast<moho::ClutterRegion*>(rawStorage + sizeof(std::uint32_t));
+    std::uint32_t constructedCount = 0u;
+
+    try {
+      for (; constructedCount < kRegionPoolCount; ++constructedCount) {
+        ::new (static_cast<void*>(regionBase + constructedCount)) moho::ClutterRegion();
+      }
+    } catch (...) {
+      while (constructedCount > 0u) {
+        --constructedCount;
+        regionBase[constructedCount].~ClutterRegion();
+      }
+      ::operator delete(rawStorage);
+      throw;
+    }
+
+    return regionBase;
+  }
+
+  /**
    * Address: 0x007D9530 (FUN_007D9530)
    */
   [[nodiscard]] void* AllocatePointerListStorageChecked(const std::uint32_t count)
@@ -636,6 +1134,18 @@ namespace
       throw std::bad_alloc();
     }
     return ::operator new(sizeof(moho::ClutterListNode) * count);
+  }
+
+  /**
+   * Address: 0x007D85C0 (FUN_007D85C0)
+   *
+   * What it does:
+   * Jump-adapter lane that allocates exactly one clutter list node storage
+   * record through the checked allocator.
+   */
+  [[maybe_unused]] [[nodiscard]] void* AllocateSinglePointerListStorageCheckedAdapter()
+  {
+    return AllocatePointerListStorageChecked(1u);
   }
 
   /**
@@ -747,6 +1257,42 @@ namespace
   }
 
   /**
+   * Address: 0x007D94F0 (FUN_007D94F0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one clutter-seed range copy into the
+   * canonical count-based copy lane.
+   */
+  [[maybe_unused]] moho::ClutterSurfaceElement* CopyClutterSeedRangeAdapterA(
+    moho::ClutterSurfaceElement* const destination,
+    const moho::ClutterSurfaceElement* const source,
+    const std::uint32_t count
+  )
+  {
+    return CopyClutterSeedRange(destination, source, static_cast<int>(count));
+  }
+
+  /**
+   * Address: 0x007D7F00 (FUN_007D7F00)
+   *
+   * What it does:
+   * Copies `count` repeated `ClutterSurfaceElement` values from one seed value
+   * lane and returns one-past-end destination.
+   */
+  [[maybe_unused]] moho::ClutterSurfaceElement* CopyClutterSeedValueRange(
+    moho::ClutterSurfaceElement* const destination,
+    const moho::ClutterSurfaceElement& seedValue,
+    const std::int32_t count
+  )
+  {
+    if (count <= 0) {
+      return destination;
+    }
+
+    return CopyClutterSeedRange(destination, &seedValue, count);
+  }
+
+  /**
    * Address: 0x007D78B0 (FUN_007D78B0)
    */
   std::uint32_t AppendSurfaceSeed(
@@ -841,7 +1387,7 @@ namespace moho
     mX = -1;
     mZ = -1;
     mMap.lane00 = nullptr;
-    mMap.head = AllocateListSentinelNode();
+    mMap.head = AllocateRegionMapSentinelNode();
     mMap.size = 0;
   }
 
@@ -939,6 +1485,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D6380 (FUN_007D6380, ?Update@Clutter@Moho@@QAEXPBVGeomCamera3@2@@Z)
+   *
+   * What it does:
+   * Runs one clutter update frame by culling stale regions first, then
+   * generating new visible region clutter from terrain data.
+   */
+  void Clutter::Update(const GeomCamera3* const camera)
+  {
+    UpdateCurrent(camera);
+    GenerateNew(camera);
+  }
+
+  /**
    * Address: 0x007D6410 (FUN_007D6410, ?IsVisible@Clutter@Moho@@AAE_NPBVGeomCamera3@2@ABV?$AxisAlignedBox3@M@Wm3@@@Z)
    *
    * What it does:
@@ -963,6 +1522,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D64C0 (FUN_007D64C0, ?IsVisible@Clutter@Moho@@AAE_NPBVGeomCamera3@2@PBVRegion@12@@Z)
+   *
+   * What it does:
+   * Returns visibility state for one clutter region by delegating to AABB
+   * visibility test using the region's box lane.
+   */
+  bool Clutter::IsVisible(const GeomCamera3* const camera, const ClutterRegion* const region)
+  {
+    return region != nullptr && IsVisible(camera, region->mBox);
+  }
+
+  /**
    * Address: 0x007D6510 (FUN_007D6510, ?UpdateCurrent@Clutter@Moho@@AAEXPBVGeomCamera3@2@@Z)
    *
    * What it does:
@@ -974,12 +1545,135 @@ namespace moho
     ClutterRegion* currentRegion = mCurRegion;
     while (currentRegion != nullptr) {
       ClutterRegion* const previousRegion = currentRegion->mPrev;
-      if (!IsVisible(camera, currentRegion->mBox)) {
+      if (!IsVisible(camera, currentRegion)) {
         DestroyRegion(currentRegion);
       }
 
       currentRegion = previousRegion;
     }
+  }
+
+  /**
+   * Address: 0x007D6640 (FUN_007D6640, ?GenerateNew@Clutter@Moho@@AAEXPBVGeomCamera3@2@@Z)
+   *
+   * What it does:
+   * Scans 2x2 terrain tiles around the camera clutter radius, creates missing
+   * visible regions, and populates each region from four sampled terrain types.
+   */
+  void Clutter::GenerateNew(const GeomCamera3* const camera)
+  {
+    (void)MeshRenderer::GetInstance();
+
+    if (GetActiveRules() == nullptr) {
+      return;
+    }
+
+    STIMap* const terrainMap = GetTerrainTypeMap();
+    if (terrainMap == nullptr) {
+      return;
+    }
+
+    CHeightField* const heightField = terrainMap->GetHeightField();
+    if (heightField == nullptr) {
+      return;
+    }
+
+    const float radius = ren_ClutterRadius;
+    const float originX = camera->inverseView.r[3].x;
+    const float originZ = camera->inverseView.r[3].z;
+
+    const float probeX0 = originX - radius * camera->view.r[0].z;
+    const float probeX1 = originX + radius * camera->view.r[0].x;
+    const float probeX2 = originX - radius * camera->view.r[0].x;
+
+    const float probeZ0 = originZ - radius * camera->view.r[2].z;
+    const float probeZ1 = originZ + radius * camera->view.r[2].x;
+    const float probeZ2 = originZ - radius * camera->view.r[2].x;
+
+    const int xBegin = AlignDownToEven(static_cast<int>(std::min(std::min(probeX0, probeX1), probeX2)));
+    const int xEnd = AlignUpToEven(static_cast<int>(std::max(std::max(probeX0, probeX1), probeX2)));
+    const int zBegin = AlignDownToEven(static_cast<int>(std::min(std::min(probeZ0, probeZ1), probeZ2)));
+    const int zEnd = AlignUpToEven(static_cast<int>(std::max(std::max(probeZ0, probeZ1), probeZ2)));
+
+    for (int x = xBegin; x < xEnd; x += 2) {
+      for (int z = zBegin; z < zEnd; z += 2) {
+        if (IsCluttered(x, z)) {
+          continue;
+        }
+
+        const Wm3::AxisAlignedBox3f regionBounds = BuildRegionBoundsFromHeightField(*heightField, x, z);
+        if (!IsVisible(camera, regionBounds)) {
+          continue;
+        }
+
+        ClutterRegion* const region = CreateRegion(x, z, regionBounds);
+        if (region == nullptr) {
+          continue;
+        }
+
+        const std::uint8_t terrain00 = GetTerrainTypeAtOrDefault(*terrainMap, x, z);
+        const std::uint8_t terrain01 = GetTerrainTypeAtOrDefault(*terrainMap, x, z + 1);
+        const std::uint8_t terrain10 = GetTerrainTypeAtOrDefault(*terrainMap, x + 1, z);
+        const std::uint8_t terrain11 = GetTerrainTypeAtOrDefault(*terrainMap, x + 1, z + 1);
+
+        const float density00 = static_cast<float>(
+                                  (terrain00 == terrain01) + (terrain00 == terrain10) + (terrain00 == terrain11) + 1
+                                )
+                              * 0.25f;
+        const float density01 = static_cast<float>(
+                                  (terrain01 == terrain00) + (terrain01 == terrain10) + (terrain01 == terrain11) + 1
+                                )
+                              * 0.25f;
+        const float density10 = static_cast<float>(
+                                  (terrain10 == terrain00) + (terrain10 == terrain01) + (terrain10 == terrain11) + 1
+                                )
+                              * 0.25f;
+        const float density11 = static_cast<float>(
+                                  (terrain11 == terrain00) + (terrain11 == terrain01) + (terrain11 == terrain10) + 1
+                                )
+                              * 0.25f;
+
+        PopulateRegionClutter(camera, *heightField, region, density00, GetSurface(terrain00));
+        PopulateRegionClutter(camera, *heightField, region, density01, GetSurface(terrain01));
+        PopulateRegionClutter(camera, *heightField, region, density10, GetSurface(terrain10));
+        PopulateRegionClutter(camera, *heightField, region, density11, GetSurface(terrain11));
+      }
+    }
+  }
+
+  /**
+   * Address: 0x007D7050 (FUN_007D7050, ?UpdateRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@PAVRegion@12@@Z)
+   *
+   * What it does:
+   * Rebinds each mesh-instance payload in one region map to this clutter
+   * owner lane.
+   */
+  void Clutter::UpdateRegion(const GeomCamera3* const camera, ClutterRegion* const region)
+  {
+    (void)camera;
+
+    ClutterListNode* const head = region->mMap.head;
+    UpdateInstanceRuntimeLane updateLane{};
+    const auto ownerToken = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(this));
+    (void)BindRegionMeshInstancesToOwner(&updateLane, head->next, head, ownerToken);
+  }
+
+  /**
+   * Address: 0x007D64D0 (FUN_007D64D0, ?IsCluttered@Clutter@Moho@@AAE_NHH@Z)
+   *
+   * What it does:
+   * Probes the region-key RB-tree for one exact `(x,z)` key match.
+   */
+  bool Clutter::IsCluttered(const int x, const int z)
+  {
+    ClutterRegionKey lookupKey{};
+    lookupKey.vtable = RegionKeyVtableResetToken();
+    lookupKey.mX = x;
+    lookupKey.mZ = z;
+
+    ClutterRegionKeyNode* candidate = mKeys.head;
+    (void)FindRegionKeyExactOrHead(&candidate, &mKeys, lookupKey);
+    return candidate != nullptr && candidate != mKeys.head;
   }
 
   /**
@@ -1090,7 +1784,7 @@ namespace moho
     region->mX = -1;
 
     DestroyInstanceRuntimeLane destroyLane{};
-    destroyLane.vtable = DestroyInstanceVtableToken();
+    ResetDestroyInstanceLaneVtable(&destroyLane);
     destroyLane.instance = nullptr;
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
@@ -1143,6 +1837,26 @@ namespace moho
   std::uint32_t IncrementListSizeChecked(ClutterRegionListState* const listState)
   {
     return IncrementPointerListSizeChecked(reinterpret_cast<ClutterIntrusiveListState*>(listState));
+  }
+
+  /**
+   * Address: 0x007D7F70 (FUN_007D7F70)
+   *
+   * What it does:
+   * Allocates one region-list node at the tail sentinel position, increments
+   * list size with VC8 overflow semantics, and links the new tail node.
+   */
+  std::uint32_t __stdcall AppendRegionListTailLaneA(
+    ClutterRegion* const* const valueRef,
+    ClutterRegionListState* const sizeState,
+    ClutterRegionListState* const linkState
+  )
+  {
+    ClutterRegionListNode* const node = AllocateRegionListNode(linkState->head, linkState->head->prev, valueRef);
+    const std::uint32_t nextSize = IncrementListSizeChecked(sizeState);
+    linkState->head->prev = node;
+    node->prev->next = node;
+    return nextSize;
   }
 
   /**
@@ -1270,6 +1984,85 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D6E10 (FUN_007D6E10, ?UnlinkRegion@Clutter@Moho@@AAEXPAVRegion@12@@Z)
+   *
+   * What it does:
+   * Detaches one region node from the active doubly-linked chain and updates
+   * `mCurRegion` when it points at the removed node.
+   */
+  void Clutter::UnlinkRegion(ClutterRegion* const region)
+  {
+    if (mCurRegion == region) {
+      mCurRegion = region->mNext;
+    }
+
+    if (region->mPrev != nullptr) {
+      region->mPrev->mNext = region->mNext;
+    }
+
+    if (region->mNext != nullptr) {
+      region->mNext->mPrev = region->mPrev;
+    }
+  }
+
+  /**
+   * Address: 0x007D6E40
+   * (FUN_007D6E40, ?CreateRegion@Clutter@Moho@@AAEPAVRegion@12@HHABV?$AxisAlignedBox3@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Expands the recycle pool in 128-region blocks when needed, takes one
+   * recycled region, links it as current, writes coordinates/bounds, and
+   * inserts the corresponding key into the region-key tree.
+   */
+  ClutterRegion* Clutter::CreateRegion(const int x, const int z, const Wm3::AxisAlignedBox3f& box)
+  {
+    constexpr std::uint32_t kRegionPoolCount = 128u;
+
+    if (mList2.size == 0u) {
+      ClutterRegion* const regionPool = AllocateRegionPoolBlock();
+      (void)AppendPointerListTail(reinterpret_cast<void* const*>(&regionPool), &mList1, mList1.head);
+
+      for (std::uint32_t index = 0; index < kRegionPoolCount; ++index) {
+        ClutterRegion* regionValue = regionPool + index;
+        (void)AppendRegionListTailLaneA(&regionValue, &mList2, &mList2);
+      }
+    }
+
+    ClutterRegionListNode* const recycleHead = mList2.head;
+    ClutterRegionListNode* const recycleNode = recycleHead->next;
+    if (recycleNode == recycleHead) {
+      return nullptr;
+    }
+
+    ClutterRegion* const region = recycleNode->value;
+    recycleNode->prev->next = recycleNode->next;
+    recycleNode->next->prev = recycleNode->prev;
+    ::operator delete(recycleNode);
+    if (mList2.size != 0u) {
+      --mList2.size;
+    }
+
+    region->mNext = nullptr;
+    region->mPrev = mCurRegion;
+    if (mCurRegion != nullptr) {
+      mCurRegion->mNext = region;
+    }
+    mCurRegion = region;
+
+    region->mX = x;
+    region->mZ = z;
+    region->mBox = box;
+
+    ClutterRegionKey regionKey{};
+    regionKey.vtable = RegionKeyVtableResetToken();
+    regionKey.mX = x;
+    regionKey.mZ = z;
+    (void)InsertRegionKeyIntoTree(&mKeys, regionKey);
+
+    return region;
+  }
+
+  /**
    * Address: 0x007D7080 (FUN_007D7080, ?DestroyRegion@Clutter@Moho@@AAEXPAVRegion@12@@Z)
    */
   void Clutter::DestroyRegion(ClutterRegion* const region)
@@ -1280,16 +2073,7 @@ namespace moho
     regionKey.mZ = region->mZ;
     (void)EraseRegionKeyRange(&regionKey, &mKeys);
 
-    if (mCurRegion == region) {
-      mCurRegion = region->mPrev;
-    }
-
-    if (region->mNext) {
-      region->mNext->mPrev = region->mPrev;
-    }
-    if (region->mPrev) {
-      region->mPrev->mNext = region->mNext;
-    }
+    UnlinkRegion(region);
 
     (void)ResetRegionRuntimeState(region);
 
@@ -1323,6 +2107,17 @@ namespace moho
     mKeys.size = 0;
     mKeys.head->left = mKeys.head;
     mKeys.head->right = mKeys.head;
+  }
+
+  /**
+   * Address: 0x007D62B0 (FUN_007D62B0, ?Initialize@Clutter@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Forwards to `Shutdown()` (thunk lane in the original binary).
+   */
+  void Clutter::Initialize()
+  {
+    Shutdown();
   }
 
   /**

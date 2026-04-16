@@ -50,6 +50,65 @@ namespace
   }
 
   /**
+   * Address: 0x005A7C20 (FUN_005A7C20)
+   *
+   * What it does:
+   * Adds the reflected `IAiNavigator` base entry to the navigator impl RTTI
+   * node.
+   */
+  void AddIAiNavigatorBase(gpg::RType& typeInfo)
+  {
+    gpg::RType* const baseType = CachedIAiNavigatorType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo.AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x005A7C80 (FUN_005A7C80)
+   *
+   * What it does:
+   * Adds the reflected `CTask` base entry to the navigator impl RTTI node.
+   */
+  void AddCTaskBase(gpg::RType& typeInfo)
+  {
+    gpg::RType* const baseType = CachedCTaskType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0x10;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo.AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x005A7CE0 (FUN_005A7CE0)
+   *
+   * What it does:
+   * Adds the reflected `CScriptObject` base entry to the navigator impl RTTI
+   * node.
+   */
+  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  {
+    gpg::RType* const baseType = CachedCScriptObjectType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0x28;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo.AddBase(baseField);
+  }
+
+  /**
    * Address: 0x00BF6D50 (FUN_00BF6D50)
    *
    * What it does:
@@ -99,28 +158,9 @@ void CAiNavigatorImplTypeInfo::Init()
   Version(1);
   gpg::RType::Init();
 
-  gpg::RField baseField{};
-
-  baseField.mName = CachedIAiNavigatorType()->GetName();
-  baseField.mType = CachedIAiNavigatorType();
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
-
-  baseField.mName = CachedCTaskType()->GetName();
-  baseField.mType = CachedCTaskType();
-  baseField.mOffset = 0x10;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
-
-  baseField.mName = CachedCScriptObjectType()->GetName();
-  baseField.mType = CachedCScriptObjectType();
-  baseField.mOffset = 0x28;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
+  AddIAiNavigatorBase(*this);
+  AddCTaskBase(*this);
+  AddCScriptObjectBase(*this);
 
   Finish();
 }

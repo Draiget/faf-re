@@ -33,6 +33,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0089C8A0 (FUN_0089C8A0, Moho::CWldTerrainDecalTYPETypeInfo::ctor)
+     *
+     * What it does:
+     * Preregisters the reflected `EWldTerrainDecalType` enum metadata.
+     */
+    CWldTerrainDecalTYPETypeInfo();
+
+    /**
      * Address: 0x0089C930 (FUN_0089C930, Moho::CWldTerrainDecalTYPETypeInfo::dtr)
      *
      * What it does:

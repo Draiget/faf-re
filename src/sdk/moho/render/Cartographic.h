@@ -13,9 +13,54 @@ namespace gpg
 
 namespace moho
 {
+  struct GeomCamera3;
+
+  /**
+   * VFTABLE: 0x00E3F710
+   * COL:     0x00E97F88
+   */
+  class CartographicDecal
+  {
+  public:
+    /**
+     * Address: 0x007D4A00 (FUN_007D4A00, sub_7D4A00)
+     *
+     * What it does:
+     * Initializes one cartographic decal payload object and installs the
+     * decal runtime vtable lane.
+     */
+    CartographicDecal();
+    virtual ~CartographicDecal() = default;
+
+  public:
+    std::uint8_t mSerializedPayload[0x24]{}; // +0x04
+  };
+
+  static_assert(sizeof(CartographicDecal) == 0x28, "CartographicDecal size must be 0x28");
+
   class CartographicDecalBatch
   {
   public:
+    /**
+     * Address: 0x007D4C80 (FUN_007D4C80, ??1CartographicDecalBatch@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Tears down one cartographic decal-batch lane by clearing active decal
+     * nodes, releasing retained resource handles, and restoring inline string
+     * lanes to empty state.
+     */
+    virtual ~CartographicDecalBatch();
+
+    /**
+     * Address: 0x007D4E60 (FUN_007D4E60, ?Shutdown@CartographicDecalBatch@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Clears one cartographic decal-batch payload in place, releasing
+     * retained handles and intrusive decal nodes without freeing the batch
+     * storage itself.
+     */
+    void Shutdown();
+
     /**
      * Address: 0x007D5650 (FUN_007D5650, ?Write@CartographicDecalBatch@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
      *
@@ -25,7 +70,7 @@ namespace moho
     void Write(gpg::BinaryWriter& writer);
 
   private:
-    std::uint8_t mOpaqueStorage[0x74]; // +0x00
+    std::uint8_t mOpaqueStorage[0x70]; // +0x04
   };
 
   static_assert(sizeof(CartographicDecalBatch) == 0x74, "CartographicDecalBatch size must be 0x74");
@@ -55,6 +100,14 @@ namespace moho
     virtual ~Cartographic() = default;
 
     /**
+     * Address: 0x007D1700 (FUN_007D1700, ?IsInitialized@Cartographic@Moho@@QBE_NXZ)
+     *
+     * What it does:
+     * Returns whether the cartographic runtime lane has been initialized.
+     */
+    [[nodiscard]] bool IsInitialized() const;
+
+    /**
      * Address: 0x007D1DF0 (FUN_007D1DF0, ?WriteDecals@Cartographic@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
      * Mangled: ?WriteDecals@Cartographic@Moho@@QAEXAAVBinaryWriter@gpg@@@Z
      *
@@ -72,6 +125,17 @@ namespace moho
      * and returns the backing GAL effect handle.
      */
     [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetEffect();
+
+  private:
+    /**
+     * Address: 0x007D2E40 (FUN_007D2E40, ?RenderParticles@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z)
+     * Mangled: ?RenderParticles@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z
+     *
+     * What it does:
+     * Forwards one cartographic particle-render pass into the global world
+     * particle renderer with fixed water/suppress flags.
+     */
+    void RenderParticles(std::int32_t tick, float frameAlpha, const GeomCamera3& camera);
 
   public:
     bool mInitialized;                            // +0x04
@@ -95,4 +159,22 @@ namespace moho
   static_assert(offsetof(Cartographic, mListSentinel) == 0x5C, "Cartographic::mListSentinel offset must be 0x5C");
   static_assert(offsetof(Cartographic, mRuntimeHandles) == 0x64, "Cartographic::mRuntimeHandles offset must be 0x64");
   static_assert(sizeof(Cartographic) == 0xA4, "Cartographic size must be 0xA4");
+
+  /**
+   * Address: 0x007D1710 (FUN_007D1710)
+   *
+   * What it does:
+   * Copy-inserts one decal-batch node after the cartographic list sentinel and
+   * increments the owning batch count with VC8 list-overflow protection.
+   */
+  std::int32_t InsertCartographicDecalBatchCopy(const CartographicDecalBatch& sourceBatch, Cartographic& owner);
+
+  /**
+   * Address: 0x007D1740 (FUN_007D1740)
+   *
+   * What it does:
+   * Unlinks and destroys one decal-batch node (when not sentinel), decrements
+   * count, and returns the predecessor node.
+   */
+  CartographicListNode* EraseCartographicDecalBatchNode(Cartographic& owner, CartographicListNode* node);
 } // namespace moho

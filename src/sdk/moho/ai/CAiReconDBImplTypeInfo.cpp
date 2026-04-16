@@ -565,6 +565,44 @@ namespace
     return InsertNodeWithFixup(storage, parent, insertLeft, key, value);
   }
 
+  class DeleteWithFlagSlot0Runtime
+  {
+  public:
+    virtual void* DeleteWithFlag(int deleteFlag) = 0;
+
+  protected:
+    ~DeleteWithFlagSlot0Runtime() = default;
+  };
+
+  /**
+   * Address: 0x005C7EE0 (FUN_005C7EE0)
+   *
+   * What it does:
+   * Invokes slot-0 delete-with-flag semantics with flag `1` when the runtime
+   * object pointer is non-null.
+   */
+  void DeleteSlot0RuntimeWithFlagOne(void* const object)
+  {
+    auto* const runtime = static_cast<DeleteWithFlagSlot0Runtime*>(object);
+    if (!runtime) {
+      return;
+    }
+
+    (void)runtime->DeleteWithFlag(1);
+  }
+
+  /**
+   * Address: 0x005C7F70 (FUN_005C7F70)
+   *
+   * What it does:
+   * Invokes slot-0 delete-with-flag semantics with flag `0` (non-deleting
+   * destructor path).
+   */
+  void DestroySlot0RuntimeWithFlagZero(void* const object)
+  {
+    (void)static_cast<DeleteWithFlagSlot0Runtime*>(object)->DeleteWithFlag(0);
+  }
+
   /**
    * Address: 0x005C7E60 (FUN_005C7E60, Moho::CAiReconDBImpl::operator new)
    *
@@ -577,21 +615,32 @@ namespace
     return MakeTypedRef(new CAiReconDBImpl(nullptr, false), CachedCAiReconDBImplType());
   }
 
-  void DeleteAiReconDbOwned(void* object)
+  [[maybe_unused]] void DeleteAiReconDbOwned(void* object)
   {
     delete static_cast<CAiReconDBImpl*>(object);
   }
 
+  /**
+   * Address: 0x005C7F00 (FUN_005C7F00)
+   *
+   * What it does:
+   * Runs one in-place `CAiReconDBImpl` default construction lane and wraps the
+   * resulting storage pointer as one reflected `RRef_CAiReconDBImpl` payload.
+   */
   [[nodiscard]] gpg::RRef ConstructAiReconDbRefInPlace(void* objectStorage)
   {
     auto* const recon = static_cast<CAiReconDBImpl*>(objectStorage);
-    if (recon) {
-      new (recon) CAiReconDBImpl(nullptr, false);
+    CAiReconDBImpl* constructed = nullptr;
+    if (recon != nullptr) {
+      constructed = new (recon) CAiReconDBImpl();
     }
-    return MakeTypedRef(recon, CachedCAiReconDBImplType());
+
+    gpg::RRef out{};
+    gpg::RRef_CAiReconDBImpl(&out, constructed);
+    return out;
   }
 
-  void DestroyAiReconDbInPlace(void* object)
+  [[maybe_unused]] void DestroyAiReconDbInPlace(void* object)
   {
     auto* const recon = static_cast<CAiReconDBImpl*>(object);
     if (recon) {
@@ -635,7 +684,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BF7CC0 (FUN_00BF7CC0, cleanup_RVectorType_ReconBlipPtr)
+    * Alias of FUN_00BF7CC0 (non-canonical helper lane).
    *
    * What it does:
    * Tears down startup-owned `vector<ReconBlip*>` reflection storage.
@@ -651,7 +700,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BF7C60 (FUN_00BF7C60, cleanup_RMultiMapType_SReconKey_ReconBlipPtr)
+    * Alias of FUN_00BF7C60 (non-canonical helper lane).
    *
    * What it does:
    * Tears down startup-owned recon-blip map reflection storage.
@@ -935,13 +984,25 @@ const char* CAiReconDBImplTypeInfo::GetName() const
 void CAiReconDBImplTypeInfo::Init()
 {
   size_ = sizeof(CAiReconDBImpl);
-  newRefFunc_ = &CreateAiReconDbRefOwned;
-  ctorRefFunc_ = &ConstructAiReconDbRefInPlace;
-  deleteFunc_ = &DeleteAiReconDbOwned;
-  dtrFunc_ = &DestroyAiReconDbInPlace;
+  BindFactoryCallbacks();
   gpg::RType::Init();
   AddIAiReconDBBase(this);
   Finish();
+}
+
+/**
+ * Address: 0x005C4D30 (FUN_005C4D30)
+ *
+ * What it does:
+ * Binds the reflection allocation/construction/destruction callback lanes for
+ * `CAiReconDBImpl`.
+ */
+void CAiReconDBImplTypeInfo::BindFactoryCallbacks() noexcept
+{
+  newRefFunc_ = &CreateAiReconDbRefOwned;
+  ctorRefFunc_ = &ConstructAiReconDbRefInPlace;
+  deleteFunc_ = &DeleteSlot0RuntimeWithFlagOne;
+  dtrFunc_ = &DestroySlot0RuntimeWithFlagZero;
 }
 
 /**

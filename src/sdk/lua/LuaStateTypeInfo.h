@@ -15,6 +15,15 @@ namespace LuaPlus
 	{
 	public:
 		/**
+		 * Address: 0x0090C210 (FUN_0090C210, LuaPlus::LuaStateTypeInfo::LuaStateTypeInfo)
+		 *
+		 * What it does:
+		 * Constructs the LuaState runtime type descriptor and preregisters it
+		 * with reflection registry using `typeid(LuaState)`.
+		 */
+		LuaStateTypeInfo();
+
+		/**
 		 * Address: 0x0090C2E0
 		 * Slot: 2
 		 * Demangled: LuaPlus::LuaStateTypeInfo scalar deleting destructor

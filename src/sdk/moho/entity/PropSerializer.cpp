@@ -122,6 +122,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x006F9C70 (FUN_006F9C70)
+   *
+   * What it does:
+   * Duplicated teardown lane for `SPropPriorityInfoSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_SPropPriorityInfoSerializer_variant_primary()
+  {
+    return UnlinkSerializerNode(gSPropPriorityInfoSerializer);
+  }
+
+  /**
+   * Address: 0x006F9CA0 (FUN_006F9CA0)
+   *
+   * What it does:
+   * Secondary duplicated teardown lane for
+   * `SPropPriorityInfoSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_SPropPriorityInfoSerializer_variant_secondary()
+  {
+    return UnlinkSerializerNode(gSPropPriorityInfoSerializer);
+  }
+
+  /**
    * Address: 0x00BD9840 (FUN_00BD9840, register_SPropPriorityInfoSerializer)
    */
   void register_SPropPriorityInfoSerializer()
@@ -129,7 +152,6 @@ namespace moho
     InitializeSerializerNode(gSPropPriorityInfoSerializer);
     gSPropPriorityInfoSerializer.mDeserialize = &SPropPriorityInfoSerializer::Deserialize;
     gSPropPriorityInfoSerializer.mSerialize = &SPropPriorityInfoSerializer::Serialize;
-    gSPropPriorityInfoSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupSPropPriorityInfoSerializerAtexit);
   }
 
@@ -180,6 +202,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x006FA7D0 (FUN_006FA7D0)
+   *
+   * What it does:
+   * Duplicated teardown lane for `PropSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_PropSerializer_variant_primary()
+  {
+    return UnlinkSerializerNode(gPropSerializer);
+  }
+
+  /**
+   * Address: 0x006FA800 (FUN_006FA800)
+   *
+   * What it does:
+   * Secondary duplicated teardown lane for `PropSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_PropSerializer_variant_secondary()
+  {
+    return UnlinkSerializerNode(gPropSerializer);
+  }
+
+  /**
    * Address: 0x00BD9910 (FUN_00BD9910, register_PropSerializer)
    */
   void register_PropSerializer()
@@ -187,9 +231,7 @@ namespace moho
     InitializeSerializerNode(gPropSerializer);
     gPropSerializer.mDeserialize = &PropSerializer::Deserialize;
     gPropSerializer.mSerialize = &PropSerializer::Serialize;
-    gPropSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupPropSerializerAtexit);
   }
 } // namespace moho
-
 

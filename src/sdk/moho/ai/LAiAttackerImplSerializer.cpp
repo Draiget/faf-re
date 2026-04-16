@@ -37,6 +37,34 @@ namespace
     return reinterpret_cast<LAiAttackerImplSerializer*>(gLAiAttackerImplSerializerStorage);
   }
 
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  template <typename TSerializer>
+  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+    return self;
+  }
+
   template <typename T>
   [[nodiscard]] gpg::RRef MakeDerivedRef(T* object, gpg::RType* staticType)
   {
@@ -87,6 +115,30 @@ namespace
   }
 
   /**
+   * Address: 0x005D6240 (FUN_005D6240)
+   *
+   * What it does:
+   * Unlinks the global `LAiAttackerImplSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_LAiAttackerImplSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(*AcquireLAiAttackerImplSerializer());
+  }
+
+  /**
+   * Address: 0x005D6270 (FUN_005D6270)
+   *
+   * What it does:
+   * Secondary unlink/reset thunk for the global
+   * `LAiAttackerImplSerializer` helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_LAiAttackerImplSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(*AcquireLAiAttackerImplSerializer());
+  }
+
+  /**
    * Address: 0x00BF83D0 (FUN_00BF83D0, sub_BF83D0)
    *
    * What it does:
@@ -99,12 +151,7 @@ namespace
     }
 
     LAiAttackerImplSerializer* const serializer = AcquireLAiAttackerImplSerializer();
-    if (serializer->mHelperNext != nullptr && serializer->mHelperPrev != nullptr) {
-      serializer->mHelperNext->mPrev = serializer->mHelperPrev;
-      serializer->mHelperPrev->mNext = serializer->mHelperNext;
-    }
-    serializer->mHelperNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-    serializer->mHelperPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
+    (void)cleanup_LAiAttackerImplSerializerStartupThunkA();
     serializer->~LAiAttackerImplSerializer();
     gLAiAttackerImplSerializerConstructed = false;
   }
@@ -202,10 +249,8 @@ void LAiAttackerImplSerializer::RegisterSerializeFunctions()
 void moho::register_LAiAttackerImplSerializer()
 {
   LAiAttackerImplSerializer* const serializer = AcquireLAiAttackerImplSerializer();
-  serializer->mHelperNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mHelperPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
+  InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &LAiAttackerImplSerializer::Deserialize;
   serializer->mSaveCallback = &LAiAttackerImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_LAiAttackerImplSerializer);
 }

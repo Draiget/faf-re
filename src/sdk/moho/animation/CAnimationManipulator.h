@@ -118,8 +118,29 @@ namespace moho
     [[nodiscard]] float GetAnimationFraction() const;
     [[nodiscard]] float GetAnimationTime() const noexcept;
     [[nodiscard]] float GetAnimationDuration() const;
+
+    /**
+     * Address: 0x0063EF80 (FUN_0063EF80)
+     *
+     * What it does:
+     * Sets overwrite-mode flag lane controlling pose overwrite behavior.
+     */
     void SetOverwriteMode(bool enabled) noexcept;
+
+    /**
+     * Address: 0x0063EF90 (FUN_0063EF90)
+     *
+     * What it does:
+     * Sets disable-on-signal behavior flag lane.
+     */
     void SetDisableOnSignal(bool enabled) noexcept;
+
+    /**
+     * Address: 0x0063EFA0 (FUN_0063EFA0)
+     *
+     * What it does:
+     * Sets directional-animation playback flag lane.
+     */
     void SetDirectionalAnim(bool enabled) noexcept;
 
     void InitializeBoneMask(std::uint32_t boneCount);

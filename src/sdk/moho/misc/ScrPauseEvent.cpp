@@ -100,7 +100,7 @@ void* moho::ScrPauseEvent::GetClassInfo() const
 }
 
 /**
- * Address: 0x004B4450 (FUN_004B4450, deleting-dtor lane)
+  * Alias of FUN_004B4450 (non-canonical helper lane).
  *
  * What it does:
  * Deletes this payload object.

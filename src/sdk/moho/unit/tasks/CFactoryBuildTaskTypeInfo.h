@@ -14,6 +14,9 @@ namespace moho
   class CFactoryBuildTaskTypeInfo final : public gpg::RType
   {
   public:
+    [[nodiscard]] const char* GetName() const override;
+    void Init() override;
+
     /**
      * Address: 0x005FC480 (FUN_005FC480, Moho::CFactoryBuildTaskTypeInfo::NewRef)
      *
@@ -31,6 +34,15 @@ namespace moho
      */
     static gpg::RRef CtrRef(void* objectStorage);
   };
+
+  /**
+   * Address: 0x005FA130 (FUN_005FA130, preregister_CFactoryBuildTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CFactoryBuildTaskTypeInfo`
+   * reflection lane.
+   */
+  [[nodiscard]] gpg::RType* preregister_CFactoryBuildTaskTypeInfo();
 
   static_assert(sizeof(CFactoryBuildTaskTypeInfo) == 0x64, "CFactoryBuildTaskTypeInfo size must be 0x64");
 } // namespace moho

@@ -78,6 +78,12 @@ namespace
   constexpr const char* kChatMessageTooLongMessage = "Message too long.";
   constexpr const char* kInternalSaveGameHelpText = "InternalSaveGame";
   constexpr const char* kSessionGetCommandSourceNamesHelpText = "Return a table of  command sources.";
+  constexpr const char* kLoadSavedGameHelpText = "bool LoadSavedGame(filename)";
+  constexpr const char* kPrefetchSessionHelpText =
+    "PrefetchSession(mapname, mods, hipri) -- start a background load with the given map and mods. If hipri is true, "
+    "this will interrupt any previous loads in progress.";
+  constexpr const char* kGetSessionClientsHelpText =
+    "GetSessionClients() -- return a table of the various clients in the current session.";
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
   {
@@ -113,6 +119,46 @@ namespace
     out.mObj = saveData;
     out.mType = CachedSessionSaveDataType();
     return out;
+  }
+
+  /**
+   * Address: 0x00883380 (FUN_00883380)
+   *
+   * What it does:
+   * Reads one reflected `SSavedGameHeader` payload from a read archive lane
+   * using the provided owner ref (or null-owner fallback).
+   */
+  [[nodiscard]] gpg::ReadArchive* ReadSavedGameHeaderPayload(
+    gpg::ReadArchive* const archive,
+    moho::SSavedGameHeader* const header,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || header == nullptr) {
+      return archive;
+    }
+
+    const gpg::RRef& effectiveOwner = ownerRef != nullptr ? *ownerRef : NullOwnerRef();
+    archive->Read(moho::SSavedGameHeader::StaticGetClass(), header, effectiveOwner);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00882040 (FUN_00882040, sub_882040)
+   *
+   * What it does:
+   * Replaces one owned read-archive lane and destroys the previous instance
+   * when the incoming pointer differs.
+   */
+  [[nodiscard]] gpg::ReadArchive* ReplaceReadArchiveLane(
+    gpg::ReadArchive*& current, gpg::ReadArchive* const replacement
+  )
+  {
+    if (current != replacement && current != nullptr) {
+      delete current;
+    }
+    current = replacement;
+    return current;
   }
 
   /**
@@ -769,6 +815,63 @@ namespace moho
   }
 
   /**
+   * Address: 0x00880C60 (FUN_00880C60, func_LoadSavedGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LoadSavedGame`.
+   */
+  CScrLuaInitForm* func_LoadSavedGame_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "LoadSavedGame",
+      &moho::cfunc_LoadSavedGame,
+      nullptr,
+      "<global>",
+      kLoadSavedGameHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00886370 (FUN_00886370, func_PrefetchSession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `PrefetchSession`.
+   */
+  CScrLuaInitForm* func_PrefetchSession_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "PrefetchSession",
+      &moho::cfunc_PrefetchSession,
+      nullptr,
+      "<global>",
+      kPrefetchSessionHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0088D4E0 (FUN_0088D4E0, func_GetSessionClients_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetSessionClients`.
+   */
+  CScrLuaInitForm* func_GetSessionClients_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "GetSessionClients",
+      &moho::cfunc_GetSessionClients,
+      nullptr,
+      "<global>",
+      kGetSessionClientsHelpText
+    );
+    return &binder;
+  }
+
+  /**
    * Address: 0x00881AB0 (FUN_00881AB0, cfunc_InternalSaveGame)
    *
    * What it does:
@@ -887,8 +990,8 @@ namespace moho
       throw std::runtime_error("InvalidFormat");
     }
 
-    mReader = gpg::CreateBinaryReadArchive(file);
-    mReader->Read(SSavedGameHeader::StaticGetClass(), &mHeader, NullOwnerRef());
+    (void)ReplaceReadArchiveLane(mReader, gpg::CreateBinaryReadArchive(file));
+    (void)ReadSavedGameHeaderPayload(mReader, &mHeader, nullptr);
     mReader->EndSection(false);
     if (mHeader.mVersion != 20) {
       throw std::runtime_error("WrongVersion");

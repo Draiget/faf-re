@@ -171,6 +171,15 @@ struct Proto
 	 * debug name/source pointer lanes under the owning thread archive context.
 	 */
 	static void MemberSerialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00922B20 (FUN_00922B20, Proto::MemberDeserialize)
+	 *
+	 * What it does:
+	 * Deserializes proto scalar metadata, constants/code/nested-proto lanes,
+	 * and debug name/source pointer lanes, then validates bytecode consistency.
+	 */
+	static void MemberDeserialize(gpg::ReadArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
 };
 
 struct UpVal
@@ -338,6 +347,20 @@ struct __declspec(align(8)) lua_State
 		lua_State* state,
 		int version,
 		const gpg::RRef* ownerRef
+	);
+
+	/**
+	 * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
+	 *
+	 * What it does:
+	 * Restores one Lua thread stack/callframe/global/upvalue lane set from a
+	 * serialized archive payload.
+	 */
+	static void MemberDeserialize(
+		gpg::ReadArchive* archive,
+		lua_State* state,
+		int version,
+		gpg::RRef* ownerRef
 	);
 
 	// Stock LuaPlus_1081 ends at +0x44. Remaining slots are kept for the

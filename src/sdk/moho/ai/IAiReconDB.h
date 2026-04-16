@@ -55,6 +55,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005C2320 (FUN_005C2320)
+     *
+     * What it does:
+     * Initializes one IAiReconDB interface subobject vtable lane.
+     */
+    IAiReconDB();
+
+    /**
      * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
      * Address: 0x005BE020 (FUN_005BE020, scalar deleting thunk)
      *

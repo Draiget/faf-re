@@ -70,6 +70,51 @@ namespace
   }
 
   /**
+   * Address: 0x005D5C50 (FUN_005D5C50)
+   *
+   * What it does:
+   * Forwards one IAiAttacker load-callback lane to
+   * `IAiAttackerSerializer::Deserialize`.
+   */
+  void IAiAttackerDeserializeThunk(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    IAiAttackerSerializer::Deserialize(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x005D5C60 (FUN_005D5C60)
+   *
+   * What it does:
+   * Forwards one IAiAttacker save-callback lane to
+   * `IAiAttackerSerializer::Serialize`.
+   */
+  void IAiAttackerSerializeThunk(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    IAiAttackerSerializer::Serialize(archive, objectPtr, version, ownerRef);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkIAiAttackerSerializerHelperNode()
+  {
+    if (!gIAiAttackerSerializerConstructed) {
+      return nullptr;
+    }
+
+    IAiAttackerSerializer* const serializer = AcquireIAiAttackerSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
+  /**
    * Address: 0x00BF82E0 (FUN_00BF82E0, sub_BF82E0)
    *
    * What it does:
@@ -82,9 +127,32 @@ namespace
       return;
     }
 
-    IAiAttackerSerializer* const serializer = AcquireIAiAttackerSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkIAiAttackerSerializerHelperNode();
     gIAiAttackerSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x005D5CA0 (FUN_005D5CA0)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks recovered `IAiAttackerSerializer`
+   * helper links and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiAttackerSerializerStartupThunkA()
+  {
+    return UnlinkIAiAttackerSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005D5CD0 (FUN_005D5CD0)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `IAiAttackerSerializer`
+   * helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_IAiAttackerSerializerStartupThunkB()
+  {
+    return UnlinkIAiAttackerSerializerHelperNode();
   }
 } // namespace
 
@@ -150,8 +218,7 @@ int moho::register_IAiAttackerSerializer()
 {
   IAiAttackerSerializer* const serializer = AcquireIAiAttackerSerializer();
   InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &IAiAttackerSerializer::Deserialize;
-  serializer->mSaveCallback = &IAiAttackerSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
+  serializer->mLoadCallback = &IAiAttackerDeserializeThunk;
+  serializer->mSaveCallback = &IAiAttackerSerializeThunk;
   return std::atexit(&cleanup_IAiAttackerSerializer);
 }

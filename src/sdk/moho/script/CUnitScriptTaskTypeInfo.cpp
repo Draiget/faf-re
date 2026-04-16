@@ -154,10 +154,13 @@ const char* CUnitScriptTaskTypeInfo::GetName() const
 void CUnitScriptTaskTypeInfo::Init()
 {
   size_ = sizeof(CUnitScriptTask);
-  newRefFunc_ = &CreateCUnitScriptTaskRefOwned;
-  ctorRefFunc_ = &ConstructCUnitScriptTaskRefInPlace;
-  deleteFunc_ = &DeleteCUnitScriptTaskOwned;
-  dtrFunc_ = &DestroyCUnitScriptTaskInPlace;
+  (void)gpg::BindRTypeLifecycleCallbacks(
+    this,
+    &CreateCUnitScriptTaskRefOwned,
+    &ConstructCUnitScriptTaskRefInPlace,
+    &DeleteCUnitScriptTaskOwned,
+    &DestroyCUnitScriptTaskInPlace
+  );
 
   gpg::RType::Init();
   version_ = 1;

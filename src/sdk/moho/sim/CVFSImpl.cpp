@@ -171,9 +171,9 @@ namespace
   }
 
   /**
-   * Address: 0x0046AE90 (FUN_0046AE90, sub_46AE90)
-   * Address: 0x0046B4B0 (FUN_0046B4B0, sub_46B4B0)
-   * Address: 0x0046BA60 (FUN_0046BA60, sub_46BA60)
+    * Alias of FUN_0046AE90 (non-canonical helper lane).
+    * Alias of FUN_0046B4B0 (non-canonical helper lane).
+    * Alias of FUN_0046BA60 (non-canonical helper lane).
    *
    * What it does:
    * Compares search-path candidate string lanes using reverse path-component

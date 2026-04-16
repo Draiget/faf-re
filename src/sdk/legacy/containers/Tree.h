@@ -182,12 +182,7 @@ namespace msvc8
     Node* head_;
   };
 
-  template <
-    class Node,
-    Node* Node::* ParentMember,
-    Node* Node::* LeftMember,
-    Node* Node::* RightMember,
-    auto Node::* SentinelMember>
+  template <class Node, auto ParentMember, auto LeftMember, auto RightMember, auto SentinelMember>
   struct MemberSentinelTreeTraits
   {
     [[nodiscard]] static Node* parent(Node* node) noexcept
@@ -208,21 +203,16 @@ namespace msvc8
     }
   };
 
-  template <
-    class Node,
-    Node* Node::* ParentMember,
-    Node* Node::* LeftMember,
-    Node* Node::* RightMember,
-    auto Node::* SentinelMember>
+  template <class Node, auto ParentMember, auto LeftMember, auto RightMember, auto SentinelMember>
   using MemberSentinelTreeView =
     SentinelTreeView<Node, MemberSentinelTreeTraits<Node, ParentMember, LeftMember, RightMember, SentinelMember>>;
 
   template <
     class Node,
-    Node* Node::* ParentMember,
-    Node* Node::* LeftMember,
-    Node* Node::* RightMember,
-    auto Node::* SentinelMember,
+    auto ParentMember,
+    auto LeftMember,
+    auto RightMember,
+    auto SentinelMember,
     class Key,
     class NodeLessThanKey>
   [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
@@ -234,10 +224,10 @@ namespace msvc8
 
   template <
     class Node,
-    Node* Node::* ParentMember,
-    Node* Node::* LeftMember,
-    Node* Node::* RightMember,
-    auto Node::* SentinelMember,
+    auto ParentMember,
+    auto LeftMember,
+    auto RightMember,
+    auto SentinelMember,
     class Key,
     class NodeLessThanKey>
   [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
@@ -249,10 +239,7 @@ namespace msvc8
   template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
   [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    constexpr auto kParent = static_cast<Node* Node::*>(&msvc8::Tree<Node>::parent);
-    constexpr auto kLeft = static_cast<Node* Node::*>(&msvc8::Tree<Node>::left);
-    constexpr auto kRight = static_cast<Node* Node::*>(&msvc8::Tree<Node>::right);
-    return MemberSentinelTreeView<Node, kParent, kLeft, kRight, SentinelMember>{head}.lower_bound(
+    return MemberSentinelTreeView<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.lower_bound(
       key,
       nodeLessThanKey
     );
@@ -261,10 +248,7 @@ namespace msvc8
   template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
   [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    constexpr auto kParent = static_cast<Node* Node::*>(&msvc8::Tree<Node>::parent);
-    constexpr auto kLeft = static_cast<Node* Node::*>(&msvc8::Tree<Node>::left);
-    constexpr auto kRight = static_cast<Node* Node::*>(&msvc8::Tree<Node>::right);
-    return MemberSentinelTreeView<Node, kParent, kLeft, kRight, SentinelMember>{head}.find_equal_or_head(
+    return MemberSentinelTreeView<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.find_equal_or_head(
       key,
       nodeLessThanKey
     );

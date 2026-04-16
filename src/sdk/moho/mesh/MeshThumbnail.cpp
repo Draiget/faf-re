@@ -4,16 +4,34 @@
 
 namespace moho
 {
+  /**
+   * Address: 0x007EA700 (FUN_007EA700, ??0MeshThumbnail@Moho@@QAE@XZ)
+   * Mangled: ??0MeshThumbnail@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Initializes one empty thumbnail request with default camera state,
+   * identity-forward orientation lane, magenta tint sentinel, and normalized
+   * output rectangle `[0,0,1,1]`.
+   */
   MeshThumbnail::MeshThumbnail()
     : requestId(0)
     , mPad0C_0F{}
     , camera()
     , meshInstance(nullptr)
     , orientation()
-    , color(0)
+    , color(0xFFFF00FFu)
     , outputRect{}
     , outputSheet()
-  {}
+  {
+    orientation.x = 1.0f;
+    orientation.y = 0.0f;
+    orientation.z = 0.0f;
+    orientation.w = 0.0f;
+    outputRect.x0 = 0.0f;
+    outputRect.z0 = 0.0f;
+    outputRect.x1 = 1.0f;
+    outputRect.z1 = 1.0f;
+  }
 
   /**
    * Address: 0x007EAF90 (FUN_007EAF90, ??0MeshThumbnail@Moho@@QAE@@Z)

@@ -5,6 +5,22 @@
 
 namespace moho
 {
+  namespace
+  {
+    /**
+     * Address: 0x007FF7C0 (FUN_007FF7C0, IRenTerrain base-vtable reset lane)
+     *
+     * What it does:
+     * Represents the compiler-emitted base-vtable reset lane executed before
+     * terrain-base member initialization.
+     */
+    void ResetIRenTerrainBaseVtable(TerrainCommon* const object)
+    {
+      // Recovered C++ constructor prologues already perform this vtable install.
+      (void)object;
+    }
+  } // namespace
+
   /**
    * Address: 0x007FF840 (FUN_007FF840, ??0TerrainCommon@Moho@@QAE@@Z)
    *
@@ -14,6 +30,8 @@ namespace moho
    */
   TerrainCommon::TerrainCommon()
   {
+    ResetIRenTerrainBaseVtable(this);
+
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     resources->GetTexture(mDecalMask, "/textures/engine/decalMask.dds", 0, true);
   }

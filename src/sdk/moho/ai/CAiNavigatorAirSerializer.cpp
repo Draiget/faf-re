@@ -50,6 +50,7 @@ namespace
 
   /**
    * Address: 0x005A8950 (FUN_005A8950, j_Moho::CAiNavigatorAir::MemberDeserialize_0)
+   * Address: 0x0084B3E0 (FUN_0084B3E0)
    *
    * What it does:
    * Secondary forwarding thunk to `CAiNavigatorAir::MemberDeserialize`.
@@ -131,13 +132,61 @@ namespace
   }
 
   /**
-   * Address: 0x00BF6F40 (FUN_00BF6F40, cleanup_CAiNavigatorAirSerializer)
+    * Alias of FUN_00BF6F40 (non-canonical helper lane).
    *
    * What it does:
    * Unlinks recovered CAiNavigatorAir serializer helper node from intrusive
    * serializer chain.
    */
   [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializer()
+  {
+    if (!gCAiNavigatorAirSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireCAiNavigatorAirSerializer());
+  }
+
+  /**
+   * Address: 0x005A5700 (FUN_005A5700)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAiNavigatorAirSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiNavigatorAirSerializer* InitializeCAiNavigatorAirSerializerStartupThunk()
+  {
+    CAiNavigatorAirSerializer* const serializer = AcquireCAiNavigatorAirSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mLoadCallback = &CAiNavigatorAirSerializer::Deserialize;
+    serializer->mSaveCallback = &CAiNavigatorAirSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x005A5730 (FUN_005A5730)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CAiNavigatorAir serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializerStartupThunkA()
+  {
+    if (!gCAiNavigatorAirSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireCAiNavigatorAirSerializer());
+  }
+
+  /**
+   * Address: 0x005A5760 (FUN_005A5760)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CAiNavigatorAir serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorAirSerializerStartupThunkB()
   {
     if (!gCAiNavigatorAirSerializerConstructed) {
       return nullptr;
@@ -219,7 +268,6 @@ void moho::register_CAiNavigatorAirSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiNavigatorAirSerializer::Deserialize;
   serializer->mSaveCallback = &CAiNavigatorAirSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiNavigatorAirSerializer_atexit);
 }
 

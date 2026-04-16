@@ -87,6 +87,7 @@ namespace moho
 
   /**
    * Address: 0x005FD580 (FUN_005FD580, Moho::WeakPtr_CUnitCommand::cpy_range_0)
+   * Address: 0x006EB7F0 (FUN_006EB7F0)
    *
    * What it does:
    * Adapts the source-first argument order used by one vector-copy lane and
@@ -109,6 +110,15 @@ namespace moho
     const msvc8::vector<WeakPtr<CUnitCommand>>& source,
     msvc8::vector<WeakPtr<CUnitCommand>>& destination
   );
+
+  /**
+   * Address: 0x005A07A0 (FUN_005A07A0, std::vector_WeakPtr_CUnitCommand::reset_storage)
+   *
+   * What it does:
+   * Destroys one `vector<WeakPtr<CUnitCommand>>` payload, releases the backing
+   * heap block, and clears the vector storage lanes to empty.
+   */
+  void ResetWeakPtrCUnitCommandVectorStorage(msvc8::vector<WeakPtr<CUnitCommand>>& storage);
 
   /**
    * Address: 0x005A2270 (FUN_005A2270, Moho::WeakPtr_CUnitCommand::destruct_range)

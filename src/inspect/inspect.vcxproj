@@ -107,8 +107,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\boost_1_34_1\stage\faf-required-md\lib;$(SolutionDir)output\sdk\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sdk.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\boost_1_34_1\stage\faf-required-md\lib;$(SolutionDir)output\main\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>main.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -126,8 +126,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\boost_1_34_1\stage\faf-required-md\lib;$(SolutionDir)output\sdk\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sdk.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\boost_1_34_1\stage\faf-required-md\lib;$(SolutionDir)output\main\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>main.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -143,8 +143,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)output\sdk\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sdk.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)output\main\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>main.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -162,11 +162,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)output\sdk\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sdk.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)output\main\$(Platform)\$(Configuration)\;$(SolutionDir)output\LuaPlus_Build1081\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>main.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="utils\discovery_tracer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="utils\memory\asm_utils.cpp" />
     <ClCompile Include="utils\memory\detours.cpp" />
@@ -175,6 +176,7 @@
     <ClCompile Include="utils\rtti_dump.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="utils\discovery_tracer.h" />
     <ClInclude Include="utils\debug.h" />
     <ClInclude Include="utils\memory\asm_utils.h" />
     <ClInclude Include="utils\memory\detours.h" />
@@ -184,7 +186,7 @@
     <ClInclude Include="utils\signatures.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\sdk\sdk.vcxproj">
+    <ProjectReference Include="..\sdk\main.vcxproj">
       <Project>{A6F8502F-3D49-4578-AC83-D434981AD676}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

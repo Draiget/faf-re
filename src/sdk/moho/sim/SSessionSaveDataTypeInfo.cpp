@@ -20,6 +20,23 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x008991D0 (FUN_008991D0)
+   *
+   * What it does:
+   * Installs one `SSessionSaveDataTypeInfo` lifecycle callback set into one reflected type record.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallSSessionSaveDataTypeInfoLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  )
+  {
+    typeInfo->newRefFunc_ = &SSessionSaveDataTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &SSessionSaveDataTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &SSessionSaveDataTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &SSessionSaveDataTypeInfo::Destruct;
+    return typeInfo;
+  }
+
   [[nodiscard]] SSessionSaveDataTypeInfo& AcquireSSessionSaveDataTypeInfo()
   {
     if (!gSSessionSaveDataTypeInfoConstructed) {
@@ -73,10 +90,13 @@ void SSessionSaveDataTypeInfo::Init()
 {
   size_ = 0x0C;
   gpg::RType::Init();
-  newRefFunc_ = &SSessionSaveDataTypeInfo::NewRef;
-  ctorRefFunc_ = &SSessionSaveDataTypeInfo::CtrRef;
-  deleteFunc_ = &SSessionSaveDataTypeInfo::Delete;
-  dtrFunc_ = &SSessionSaveDataTypeInfo::Destruct;
+  (void)gpg::BindRTypeLifecycleCallbacks(
+    this,
+    &SSessionSaveDataTypeInfo::NewRef,
+    &SSessionSaveDataTypeInfo::CtrRef,
+    &SSessionSaveDataTypeInfo::Delete,
+    &SSessionSaveDataTypeInfo::Destruct
+  );
   Finish();
 }
 

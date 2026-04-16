@@ -40,7 +40,7 @@ namespace moho
     const char* GetName() const override;
 
     /**
-     * Address: 0x0052B640 (FUN_0052B640, Moho::RRuleGameRulesImplTypeInfo::Init)
+       * Address: 0x0052B640 (FUN_0052B640)
      *
      * What it does:
      * Sets RRuleGameRulesImpl size metadata, registers the RRuleGameRules base,
@@ -50,7 +50,7 @@ namespace moho
 
   private:
     /**
-     * Address: 0x0052B640 setup tail (base registration)
+      * Alias of FUN_0052B640 (non-canonical helper lane).
      *
      * What it does:
      * Registers RRuleGameRules as reflected base at subobject offset +0x00.

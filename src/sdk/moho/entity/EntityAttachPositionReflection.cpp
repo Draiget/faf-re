@@ -1,11 +1,14 @@
 #include "moho/entity/Entity.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/BadRefCast.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/render/camera/VTransform.h"
@@ -357,6 +360,191 @@ namespace
     return ResolveCachedType<moho::VTransform>(gVTransformType);
   }
 
+  struct ScaledDirectionLaneView
+  {
+    Wm3::Vector3f base;      // +0x00
+    Wm3::Vector3f direction; // +0x0C
+    float scale;             // +0x18
+  };
+
+  static_assert(sizeof(ScaledDirectionLaneView) == 0x1C, "ScaledDirectionLaneView size must be 0x1C");
+  static_assert(
+    offsetof(ScaledDirectionLaneView, direction) == 0x0C, "ScaledDirectionLaneView::direction offset must be 0x0C"
+  );
+  static_assert(offsetof(ScaledDirectionLaneView, scale) == 0x18, "ScaledDirectionLaneView::scale offset must be 0x18");
+
+  /**
+   * Address: 0x00675300 (FUN_00675300)
+   *
+   * What it does:
+   * Computes `out = base + direction * scale` from one packed lane payload.
+   */
+  [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ComposeScaledDirectionOffsetAdd(
+    Wm3::Vector3f* const out,
+    const ScaledDirectionLaneView* const lane
+  ) noexcept
+  {
+    GPG_ASSERT(out != nullptr);
+    GPG_ASSERT(lane != nullptr);
+    if (!out || !lane) {
+      return out;
+    }
+
+    const float scale = lane->scale;
+    out->x = lane->base.x + (lane->direction.x * scale);
+    out->y = lane->base.y + (lane->direction.y * scale);
+    out->z = lane->base.z + (lane->direction.z * scale);
+    return out;
+  }
+
+  /**
+   * Address: 0x00675350 (FUN_00675350)
+   *
+   * What it does:
+   * Computes `out = base - direction * scale` from one packed lane payload.
+   */
+  [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ComposeScaledDirectionOffsetSub(
+    Wm3::Vector3f* const out,
+    const ScaledDirectionLaneView* const lane
+  ) noexcept
+  {
+    GPG_ASSERT(out != nullptr);
+    GPG_ASSERT(lane != nullptr);
+    if (!out || !lane) {
+      return out;
+    }
+
+    const float scale = lane->scale;
+    out->x = lane->base.x - (lane->direction.x * scale);
+    out->y = lane->base.y - (lane->direction.y * scale);
+    out->z = lane->base.z - (lane->direction.z * scale);
+    return out;
+  }
+
+  struct ByteLaneFlagAt18View
+  {
+    std::uint8_t pad_00_18[0x18];
+    std::uint8_t flagValue; // +0x18
+  };
+
+  static_assert(offsetof(ByteLaneFlagAt18View, flagValue) == 0x18, "ByteLaneFlagAt18View::flagValue offset must be 0x18");
+
+  /**
+   * Address: 0x006767F0 (FUN_006767F0)
+   *
+   * What it does:
+   * Returns one raw flag byte from lane `+0x18`.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadFlagByteAtOffset18(const ByteLaneFlagAt18View* const view) noexcept
+  {
+    GPG_ASSERT(view != nullptr);
+    if (!view) {
+      return 0u;
+    }
+
+    return view->flagValue;
+  }
+
+  struct PackedHistoryIndexWordView
+  {
+    std::uint32_t packedWord;
+  };
+
+  static_assert(
+    offsetof(PackedHistoryIndexWordView, packedWord) == 0x00,
+    "PackedHistoryIndexWordView::packedWord offset must be 0x00"
+  );
+
+  inline constexpr std::uint32_t kPackedHistoryIndexShift = 20u;
+  inline constexpr std::uint32_t kPackedHistoryIndexMask = 0xFFu;
+  inline constexpr std::uint32_t kPackedHistoryIndexInvalid = 0xFFu;
+
+  /**
+   * Address: 0x00676AB0 (FUN_00676AB0)
+   *
+   * What it does:
+   * Decodes packed table index bits (`[27:20]`) from one 32-bit lane.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t DecodePackedHistoryIndexByte(const PackedHistoryIndexWordView* const packedWord
+  ) noexcept
+  {
+    GPG_ASSERT(packedWord != nullptr);
+    if (!packedWord) {
+      return 0u;
+    }
+
+    return (packedWord->packedWord >> kPackedHistoryIndexShift) & kPackedHistoryIndexMask;
+  }
+
+  struct PackedHistoryLookupOwnerView
+  {
+    std::uint8_t pad_0000_0910[0x910];
+    const std::uint32_t* tableBegin; // +0x910
+    const std::uint32_t* tableEnd;   // +0x914
+  };
+
+  static_assert(
+    offsetof(PackedHistoryLookupOwnerView, tableBegin) == 0x910,
+    "PackedHistoryLookupOwnerView::tableBegin offset must be 0x910"
+  );
+  static_assert(
+    offsetof(PackedHistoryLookupOwnerView, tableEnd) == 0x914,
+    "PackedHistoryLookupOwnerView::tableEnd offset must be 0x914"
+  );
+
+  /**
+   * Address: 0x00676AE0 (FUN_00676AE0)
+   *
+   * What it does:
+   * Decodes one packed index (`[27:20]`) and returns the matching dword table
+   * element from lanes `+0x910/+0x914`, with null/range/sentinel guards.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LookupPackedHistoryTableValue(
+    const PackedHistoryLookupOwnerView* const ownerView,
+    const std::uint32_t packedValue
+  ) noexcept
+  {
+    GPG_ASSERT(ownerView != nullptr);
+    if (!ownerView) {
+      return 0u;
+    }
+
+    const PackedHistoryIndexWordView packedWord{packedValue};
+    const std::uint32_t decodedIndex = DecodePackedHistoryIndexByte(&packedWord);
+    if (decodedIndex == kPackedHistoryIndexInvalid) {
+      return 0u;
+    }
+
+    const std::uint32_t* const begin = ownerView->tableBegin;
+    const std::uint32_t* const end = ownerView->tableEnd;
+    if (begin == nullptr || end <= begin) {
+      return 0u;
+    }
+
+    const std::size_t entryCount = static_cast<std::size_t>(end - begin);
+    if (decodedIndex >= entryCount) {
+      return 0u;
+    }
+
+    return begin[decodedIndex];
+  }
+
+  /**
+   * Address: 0x00676CC0 (FUN_00676CC0)
+   *
+   * What it does:
+   * Returns entity lane `mLastTickProcessed` (`+0x174`).
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadEntityLastTickProcessed(const moho::Entity* const entity) noexcept
+  {
+    GPG_ASSERT(entity != nullptr);
+    if (!entity) {
+      return 0u;
+    }
+
+    return entity->mLastTickProcessed;
+  }
+
   /**
    * Address: 0x0067F000 (FUN_0067F000, gpg::RType::AddField_VTransform_0x150PendingCoords)
    *
@@ -434,24 +622,171 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x00676EE0 (FUN_00676EE0)
+   *
+   * What it does:
+   * Unlinks global `SEntAttachInfoSerializer` helper links and resets the
+   * node into the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSEntAttachInfoSerializerHelperNodePrimary() noexcept
+  {
+    gSEntAttachInfoSerializer.mHelperNext->mPrev = gSEntAttachInfoSerializer.mHelperPrev;
+    gSEntAttachInfoSerializer.mHelperPrev->mNext = gSEntAttachInfoSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gSEntAttachInfoSerializer);
+    gSEntAttachInfoSerializer.mHelperPrev = self;
+    gSEntAttachInfoSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00676F10 (FUN_00676F10)
+   *
+   * What it does:
+   * Provides the second binary cleanup entry for the same
+   * `SEntAttachInfoSerializer` intrusive helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkSEntAttachInfoSerializerHelperNodeSecondary() noexcept
+  {
+    gSEntAttachInfoSerializer.mHelperNext->mPrev = gSEntAttachInfoSerializer.mHelperPrev;
+    gSEntAttachInfoSerializer.mHelperPrev->mNext = gSEntAttachInfoSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gSEntAttachInfoSerializer);
+    gSEntAttachInfoSerializer.mHelperPrev = self;
+    gSEntAttachInfoSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00677190 (FUN_00677190)
+   *
+   * What it does:
+   * Unlinks global `PositionHistorySerializer` helper links and resets the
+   * node into the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkPositionHistorySerializerHelperNodePrimary() noexcept
+  {
+    gPositionHistorySerializer.mHelperNext->mPrev = gPositionHistorySerializer.mHelperPrev;
+    gPositionHistorySerializer.mHelperPrev->mNext = gPositionHistorySerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gPositionHistorySerializer);
+    gPositionHistorySerializer.mHelperPrev = self;
+    gPositionHistorySerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x006771C0 (FUN_006771C0)
+   *
+   * What it does:
+   * Provides the second binary cleanup entry for the same
+   * `PositionHistorySerializer` intrusive helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkPositionHistorySerializerHelperNodeSecondary() noexcept
+  {
+    gPositionHistorySerializer.mHelperNext->mPrev = gPositionHistorySerializer.mHelperPrev;
+    gPositionHistorySerializer.mHelperPrev->mNext = gPositionHistorySerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gPositionHistorySerializer);
+    gPositionHistorySerializer.mHelperPrev = self;
+    gPositionHistorySerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0067B400 (FUN_0067B400)
+   *
+   * What it does:
+   * Unlinks global `EntitySaveConstruct` helper links and resets the
+   * node into the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEntitySaveConstructHelperNodePrimary() noexcept
+  {
+    gEntitySaveConstruct.mHelperNext->mPrev = gEntitySaveConstruct.mHelperPrev;
+    gEntitySaveConstruct.mHelperPrev->mNext = gEntitySaveConstruct.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gEntitySaveConstruct);
+    gEntitySaveConstruct.mHelperPrev = self;
+    gEntitySaveConstruct.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0067B430 (FUN_0067B430)
+   *
+   * What it does:
+   * Provides the second binary cleanup entry for the same
+   * `EntitySaveConstruct` intrusive helper node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEntitySaveConstructHelperNodeSecondary() noexcept
+  {
+    gEntitySaveConstruct.mHelperNext->mPrev = gEntitySaveConstruct.mHelperPrev;
+    gEntitySaveConstruct.mHelperPrev->mNext = gEntitySaveConstruct.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gEntitySaveConstruct);
+    gEntitySaveConstruct.mHelperPrev = self;
+    gEntitySaveConstruct.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0067B4C0 (FUN_0067B4C0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `EntityConstruct` helper storage and
+   * returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EntityConstruct* InitializeEntityConstructStartupThunk() noexcept
+  {
+    InitializeHelperNode(gEntityConstruct);
+    gEntityConstruct.mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&moho::EntityConstruct::Construct);
+    gEntityConstruct.mDeconstructCallback = &moho::EntityConstruct::Deconstruct;
+    return &gEntityConstruct;
+  }
+
+  /**
+   * Address: 0x0067B4F0 (FUN_0067B4F0)
+   *
+   * What it does:
+   * Unlinks global `EntityConstruct` helper links and resets the
+   * node into the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEntityConstructHelperNode() noexcept
+  {
+    return UnlinkHelperNode(gEntityConstruct);
+  }
+
+  /**
+   * Address: 0x0067B520 (FUN_0067B520)
+   *
+   * What it does:
+   * Provides the second binary cleanup entry for the same
+   * `EntityConstruct` intrusive helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkEntityConstructHelperNodeSecondary() noexcept
+  {
+    return UnlinkHelperNode(gEntityConstruct);
+  }
+
   void cleanup_SEntAttachInfoSerializer_Atexit()
   {
-    (void)UnlinkHelperNode(gSEntAttachInfoSerializer);
+    (void)UnlinkSEntAttachInfoSerializerHelperNodePrimary();
   }
 
   void cleanup_PositionHistorySerializer_Atexit()
   {
-    (void)UnlinkHelperNode(gPositionHistorySerializer);
+    (void)UnlinkPositionHistorySerializerHelperNodePrimary();
   }
 
   void cleanup_EntitySaveConstruct_Atexit()
   {
-    (void)UnlinkHelperNode(gEntitySaveConstruct);
+    (void)UnlinkEntitySaveConstructHelperNodeSecondary();
   }
 
   void cleanup_EntityConstruct_Atexit()
   {
-    (void)UnlinkHelperNode(gEntityConstruct);
+    (void)UnlinkEntityConstructHelperNode();
   }
 
   /**
@@ -461,6 +796,143 @@ namespace
    * Preserves one legacy no-op callback lane installed by PositionHistory RTTI init.
    */
   void PositionHistoryTypeInfoNoOpCallback(void* /*self*/) {}
+
+  /**
+   * Address: 0x0067E020 (FUN_0067E020)
+   *
+   * What it does:
+   * Initializes one `PositionHistory` payload in caller-owned storage and
+   * returns typed reflection reference lanes for that storage.
+   */
+  [[nodiscard]] gpg::RRef ConstructPositionHistoryRefInPlace(void* const objectStorage)
+  {
+    auto* const history = static_cast<moho::PositionHistory*>(objectStorage);
+    if (history != nullptr) {
+      moho::InitializePositionHistory(*history);
+    }
+
+    gpg::RRef out{};
+    (void)gpg::RRef_PositionHistory(&out, history);
+    return out;
+  }
+
+  [[nodiscard]] moho::PositionHistory* UpcastPositionHistoryOrThrow(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolvePositionHistoryType());
+    auto* const history = static_cast<moho::PositionHistory*>(upcast.mObj);
+    if (history == nullptr) {
+      throw gpg::BadRefCast("type error");
+    }
+    return history;
+  }
+
+  [[nodiscard]] gpg::RRef NewPositionHistoryRef()
+  {
+    moho::PositionHistory* const history = new (std::nothrow) moho::PositionHistory();
+    if (history != nullptr) {
+      moho::InitializePositionHistory(*history);
+    }
+
+    gpg::RRef out{};
+    (void)gpg::RRef_PositionHistory(&out, history);
+    return out;
+  }
+
+  [[nodiscard]] gpg::RRef CopyPositionHistoryRef(gpg::RRef* const sourceRef)
+  {
+    GPG_ASSERT(sourceRef != nullptr);
+    if (sourceRef == nullptr) {
+      gpg::RRef out{};
+      (void)gpg::RRef_PositionHistory(&out, nullptr);
+      return out;
+    }
+
+    const moho::PositionHistory* const sourceHistory = UpcastPositionHistoryOrThrow(*sourceRef);
+    auto* const copiedHistory = new (std::nothrow) moho::PositionHistory(*sourceHistory);
+
+    gpg::RRef out{};
+    (void)gpg::RRef_PositionHistory(&out, copiedHistory);
+    return out;
+  }
+
+  [[nodiscard]] gpg::RRef ConstructPositionHistoryRefFromSource(
+    void* const objectStorage,
+    gpg::RRef* const sourceRef
+  )
+  {
+    auto* history = static_cast<moho::PositionHistory*>(objectStorage);
+    if (history != nullptr) {
+      if (sourceRef == nullptr) {
+        moho::InitializePositionHistory(*history);
+      } else {
+        const moho::PositionHistory* const sourceHistory = UpcastPositionHistoryOrThrow(*sourceRef);
+        history = new (history) moho::PositionHistory(*sourceHistory);
+      }
+    }
+
+    gpg::RRef out{};
+    (void)gpg::RRef_PositionHistory(&out, history);
+    return out;
+  }
+
+  void DeletePositionHistoryStorage(void* const objectStorage)
+  {
+    ::operator delete(objectStorage);
+  }
+
+  /**
+   * Address: 0x0067C340 (FUN_0067C340)
+   *
+   * What it does:
+   * Binds the `new/construct/delete/destruct` callback lanes for
+   * `PositionHistory` reflection storage.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryNewCtorDeleteDtr(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    if (typeInfo == nullptr) {
+      return nullptr;
+    }
+
+    typeInfo->newRefFunc_ = &NewPositionHistoryRef;
+    typeInfo->ctorRefFunc_ = &ConstructPositionHistoryRefInPlace;
+    typeInfo->deleteFunc_ = &DeletePositionHistoryStorage;
+    typeInfo->dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x0067C360 (FUN_0067C360)
+   *
+   * What it does:
+   * Binds the `copy/move/delete/destruct` callback lanes for
+   * `PositionHistory` reflection storage.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryCopyMoveDeleteDtr(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    if (typeInfo == nullptr) {
+      return nullptr;
+    }
+
+    typeInfo->cpyRefFunc_ = &CopyPositionHistoryRef;
+    typeInfo->movRefFunc_ = &ConstructPositionHistoryRefFromSource;
+    typeInfo->deleteFunc_ = &DeletePositionHistoryStorage;
+    typeInfo->dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x006770A0 (FUN_006770A0)
+   *
+   * What it does:
+   * Binds all lifecycle callback lanes for `PositionHistory` reflection:
+   * `new/copy/delete/construct/move/destruct`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryLifecycleCallbacks(gpg::RType* const typeInfo)
+  {
+    return BindPositionHistoryCopyMoveDeleteDtr(BindPositionHistoryNewCtorDeleteDtr(typeInfo));
+  }
 } // namespace
 
 namespace moho
@@ -628,12 +1100,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00677060 (FUN_00677060, PositionHistoryTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected field/base vector lanes and restores base `RObject`
+   * teardown state for one `PositionHistoryTypeInfo` instance.
+   */
+  [[maybe_unused]] void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x00677000 (FUN_00677000, Moho::PositionHistoryTypeInfo::dtr)
    */
   PositionHistoryTypeInfo::~PositionHistoryTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyPositionHistoryTypeInfoBody(this);
   }
 
   /**
@@ -650,6 +1138,7 @@ namespace moho
   void PositionHistoryTypeInfo::Init()
   {
     size_ = sizeof(PositionHistory);
+    ctorRefFunc_ = &ConstructPositionHistoryRefInPlace;
     dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
     gpg::RType::Init();
     Finish();
@@ -886,7 +1375,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_EntitySaveConstruct()
   {
-    return UnlinkHelperNode(gEntitySaveConstruct);
+    return UnlinkEntitySaveConstructHelperNodePrimary();
   }
 
   /**
@@ -897,7 +1386,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_EntityConstruct()
   {
-    return UnlinkHelperNode(gEntityConstruct);
+    return UnlinkEntityConstructHelperNode();
   }
 
   /**
@@ -923,7 +1412,6 @@ namespace moho
     InitializeHelperNode(gSEntAttachInfoSerializer);
     gSEntAttachInfoSerializer.mDeserialize = &SEntAttachInfoSerializer::Deserialize;
     gSEntAttachInfoSerializer.mSerialize = &SEntAttachInfoSerializer::Serialize;
-    gSEntAttachInfoSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SEntAttachInfoSerializer_Atexit);
   }
 
@@ -950,7 +1438,6 @@ namespace moho
     InitializeHelperNode(gPositionHistorySerializer);
     gPositionHistorySerializer.mDeserialize = &PositionHistorySerializer::Deserialize;
     gPositionHistorySerializer.mSerialize = &PositionHistorySerializer::Serialize;
-    gPositionHistorySerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_PositionHistorySerializer_Atexit);
   }
 

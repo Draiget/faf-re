@@ -7,6 +7,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class WriteArchive;
 } // namespace gpg
 
@@ -36,6 +37,18 @@ namespace moho
     SEconPair mLastUseRequested;
     SEconPair mLastUseActual;
     SEconStoragePair mMaxStorage;
+
+    /**
+     * Address: 0x005641F0 (FUN_005641F0, Moho::SEconTotals::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::SEconTotals::MemberDeserialize(ReadArchive *a1@<esi>, Moho::SEconTotals *a2@<eax>);
+     *
+     * What it does:
+     * Reads the five `SEconPair` lanes via reflected `SEconValue` type data,
+     * then reads max-storage `ENERGY`/`MASS` u64 lanes through `ReadUInt64`.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00564320 (FUN_00564320, Moho::SEconTotals::MemberSerialize)

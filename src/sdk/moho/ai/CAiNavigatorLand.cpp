@@ -68,6 +68,13 @@ namespace
     return goal;
   }
 
+  /**
+   * Address: 0x0051E380 (FUN_0051E380)
+   *
+   * What it does:
+   * Converts one world-space center position into the lower-left goal-cell
+   * coordinate for the provided footprint dimensions.
+   */
   [[nodiscard]] SOCellPos TargetWorldToCell(const Wm3::Vector3f& worldPos, const SFootprint& footprint) noexcept
   {
     SOCellPos cell{};

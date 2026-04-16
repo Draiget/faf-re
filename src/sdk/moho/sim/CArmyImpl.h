@@ -394,4 +394,12 @@ namespace moho
   );
   static_assert(offsetof(CArmyImpl, IgnoreUnitCapFlag) == 0x274, "CArmyImpl::IgnoreUnitCapFlag offset must be 0x274");
   static_assert(sizeof(CArmyImpl) == 0x288, "CArmyImpl size must be 0x288");
+
+  /**
+   * Address: 0x005A2C20 (FUN_005A2C20, Moho::AI_Tick)
+   *
+   * What it does:
+   * Advances one AI brain tick for an army across its three task-thread stages.
+   */
+  void AI_Tick(CArmyImpl* army);
 } // namespace moho

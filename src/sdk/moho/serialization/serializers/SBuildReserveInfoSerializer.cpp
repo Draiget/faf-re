@@ -126,6 +126,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00579AC0 (FUN_00579AC0)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * SBuildReserveInfo serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializerStartupThunkA()
+  {
+    return cleanup_SBuildReserveInfoSerializer();
+  }
+
+  /**
+   * Address: 0x00579AF0 (FUN_00579AF0)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * SBuildReserveInfo serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SBuildReserveInfoSerializerStartupThunkB()
+  {
+    return cleanup_SBuildReserveInfoSerializer();
+  }
+
+  /**
    * Address: 0x00BCB390 (FUN_00BCB390, register_SBuildReserveInfoSerializer)
    *
    * What it does:

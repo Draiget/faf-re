@@ -17,6 +17,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0064C850 (FUN_0064C850)
+     *
+     * What it does:
+     * Initializes the collision-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugCollision();
+
+    /**
      * Address: 0x0064C270 (FUN_0064C270, ?GetClass@RDebugCollision@Moho@@UBEPAVRType@gpg@@XZ)
      * Slot: 0
      *

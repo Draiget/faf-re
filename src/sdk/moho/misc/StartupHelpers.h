@@ -14,6 +14,7 @@
 
 struct lua_State;
 struct IDirectSoundBuffer;
+struct _GUID;
 
 namespace gpg::gal
 {
@@ -93,6 +94,48 @@ namespace moho
   static_assert(sizeof(ResolutionTriple) == 0xC, "ResolutionTriple size must be 0xC");
 
   /**
+   * Legacy startup adapter-mode entry with virtual ownership lane.
+   */
+  class Resolution
+  {
+  public:
+    /**
+     * Address: 0x008CD4E0 (FUN_008CD4E0, Resolution default ctor lane)
+     *
+     * What it does:
+     * Initializes one adapter-mode entry virtual ownership lane only.
+     */
+    Resolution();
+
+    /**
+     * Address: 0x008CD4A0 (FUN_008CD4A0, Resolution ctor lane)
+     *
+     * What it does:
+     * Initializes one adapter-mode entry from explicit width/height/refresh
+     * integer lanes.
+     */
+    Resolution(std::int32_t width, std::int32_t height, std::int32_t framesPerSecond);
+
+    /**
+     * Address: 0x008D6AB0 (FUN_008D6AB0, Resolution copy ctor lane)
+     *
+     * What it does:
+     * Copy-constructs one adapter-mode entry from another `Resolution`.
+     */
+    Resolution(const Resolution& other);
+
+    virtual ~Resolution() = default;
+
+    std::int32_t width;
+    std::int32_t height;
+    std::int32_t framesPerSecond;
+  };
+  static_assert(sizeof(Resolution) == 0x10, "Resolution size must be 0x10");
+  static_assert(offsetof(Resolution, width) == 0x04, "Resolution::width offset must be 0x04");
+  static_assert(offsetof(Resolution, height) == 0x08, "Resolution::height offset must be 0x08");
+  static_assert(offsetof(Resolution, framesPerSecond) == 0x0C, "Resolution::framesPerSecond offset must be 0x0C");
+
+  /**
    * Address: 0x008CD6C0 (Resolution::Resolution parser body)
    *
    * What it does:
@@ -115,6 +158,23 @@ namespace moho
   class IUserPrefs
   {
   public:
+    /**
+     * Address: 0x008C7400 (FUN_008C7400, ??0IUserPrefs@Moho@@QAE@XZ)
+     * Address: 0x008C73F0 (FUN_008C73F0, IUserPrefs ctor lane)
+     *
+     * What it does:
+     * Initializes one user-preferences base interface object.
+     */
+    IUserPrefs();
+
+    /**
+     * Address: 0x008C74A0 (FUN_008C74A0, ??1IUserPrefs@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Tears down one user-preferences base interface object.
+     */
+    virtual ~IUserPrefs();
+
     virtual msvc8::string* GetStr1() = 0;
     virtual msvc8::string* GetStr2() = 0;
     virtual void RefreshCurrentProfile() = 0;
@@ -294,6 +354,24 @@ namespace moho
   void SetupBasicMovieManager();
 
   /**
+   * Address: 0x00874CA0 (FUN_00874CA0, sub_874CA0)
+   *
+   * What it does:
+   * Destroys the current movie-manager singleton when present and clears the
+   * global owner lane.
+   */
+  CMovieManager* DestroyMovieManagerSingleton();
+
+  /**
+   * Address: 0x00875250 (FUN_00875250, sub_875250)
+   *
+   * What it does:
+   * Replaces the global movie-manager singleton, destroying any existing
+   * different instance before rebinding.
+   */
+  CMovieManager* ReplaceMovieManagerSingleton(CMovieManager* manager);
+
+  /**
    * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
    *
    * What it does:
@@ -334,6 +412,7 @@ namespace moho
     void Destroy();
 
     /**
+     * Address: 0x00874F20 (FUN_00874F20, sub_874F20)
      * Address context:
      * - `cfunc_SetMovieVolumeL` (`0x00875020`) writes this transformed value.
      *
@@ -352,6 +431,15 @@ namespace moho
     [[nodiscard]] float GetVolumeForLua() const;
 
   private:
+    /**
+     * Address: 0x00874B90 (FUN_00874B90)
+     *
+     * What it does:
+     * Shuts down Sofdec runtime lanes and releases owned DirectSound resources
+     * without deleting the owning `CMovieManager` object.
+     */
+    void ShutdownMovieRuntimeNoDelete();
+
     /**
      * Address: 0x00874990 (FUN_00874990, `func_CreateDirectSound`)
      *
@@ -409,6 +497,70 @@ namespace moho
    */
   void APP_InitializeIdentity();
 
+  /**
+   * Address: 0x008C8640 (FUN_008C8640, USER_SetCompanyName)
+   * Mangled: ?USER_SetCompanyName@Moho@@YAXVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Replaces the startup company-name lane.
+   */
+  void USER_SetCompanyName(gpg::StrArg companyName);
+
+  /**
+   * Address: 0x008C8670 (FUN_008C8670, USER_SetAppName)
+   * Mangled: ?USER_SetAppName@Moho@@YAXVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Replaces the startup app/product-name lane.
+   */
+  void USER_SetAppName(gpg::StrArg appName);
+
+  /**
+   * Address: 0x008C86A0 (FUN_008C86A0, USER_SetAppExtensionPrefix)
+   * Mangled: ?USER_SetAppExtensionPrefix@Moho@@YAXVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Replaces the startup app-extension/prefs-prefix lane.
+   */
+  void USER_SetAppExtensionPrefix(gpg::StrArg extensionPrefix);
+
+  /**
+   * Address: 0x008C86D0 (FUN_008C86D0, USER_SetGameId)
+   *
+   * What it does:
+   * Writes the fixed 4-word game-id tuple used by save/profile identity logic.
+   */
+  void USER_SetGameId();
+
+  /**
+   * Address: 0x008C8760 (FUN_008C8760, USER_SetCurrentProfile)
+   * Mangled:
+   * ?USER_SetCurrentProfile@Moho@@YAXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+   *
+   * What it does:
+   * Selects one profile by name in `profile.profiles`, updates that profile's
+   * `NetName`, and writes `profile.current`; if missing, invokes
+   * `/lua/user/prefs.lua:CreateProfile(profileName)`.
+   */
+  void USER_SetCurrentProfile(const msvc8::string& profileName);
+
+  /**
+   * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
+   * Mangled: ?USER_GetGameId@Moho@@YAABU_GUID@@XZ
+   *
+   * What it does:
+   * Returns the process-global 128-bit game-id lane.
+   */
+  [[nodiscard]] _GUID& USER_GetGameId();
+
+  /**
+   * Address: 0x008C6730 (FUN_008C6730, USER_LuaFrame)
+   *
+   * What it does:
+   * Runs one user-task stage frame through the process-global user stage lane.
+   */
+  void USER_LuaFrame();
+
   [[nodiscard]] const msvc8::string& APP_GetCompanyName();
   [[nodiscard]] const msvc8::string& APP_GetProductName();
   [[nodiscard]] const msvc8::string& APP_GetPreferencePrefix();
@@ -445,6 +597,32 @@ namespace moho
    * its following positional arguments.
    */
   bool CFG_GetArgOption(gpg::StrArg option, std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* outArgs);
+
+  /**
+   * Address: 0x00500A90 (FUN_00500A90, Moho::P4_Info)
+   * Mangled: ?P4_Info@Moho@@YAXXZ
+   *
+   * What it does:
+   * Legacy Perforce info hook lane retained as an explicit no-op.
+   */
+  void P4_Info();
+
+  /**
+   * Address: 0x00500AA0 (FUN_00500AA0, Moho::P4_Edit)
+   * Mangled: ?P4_Edit@Moho@@YAXPBD@Z
+   *
+   * What it does:
+   * Legacy Perforce edit hook lane retained as an explicit no-op.
+   */
+  void P4_Edit(const char* filePath);
+
+  /**
+   * Address: 0x00500AC0 (FUN_00500AC0, Moho::P4_DoPrompt)
+   *
+   * What it does:
+   * Returns whether Perforce prompt UI should be shown (`/p4yes` disables it).
+   */
+  [[nodiscard]] bool P4_DoPrompt();
 
   /**
    * Address: 0x0041B690 (FUN_0041B690)
@@ -1136,6 +1314,16 @@ namespace moho
    * Returns startup preference toggle `debug.enable_debug_facilities`.
    */
   [[nodiscard]] bool USER_DebugFacilitiesEnabled();
+
+  /**
+   * Address: 0x008C89D0 (FUN_008C89D0, USER_LoadPreferences)
+   *
+   * What it does:
+   * Builds per-user preference-file paths, loads persisted Lua preferences
+   * (or fallback `Installed.Prefs` defaults), and installs the process-global
+   * `IUserPrefs` singleton.
+   */
+  void USER_LoadPreferences(const msvc8::string& preferenceFileName);
 
   /**
    * Address: 0x008C91A0 (FUN_008C91A0, USER_SavePreferences)

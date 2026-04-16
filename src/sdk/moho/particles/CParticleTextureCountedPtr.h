@@ -35,7 +35,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::RCountedPtrType)
+       * Address: 0x0065AAD0 (FUN_0065AAD0)
      */
     RCountedPtrType();
     /**
@@ -44,7 +44,7 @@ namespace moho
     ~RCountedPtrType() override;
 
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::GetName)
+      * Alias of FUN_0065AAD0 (non-canonical helper lane).
      */
     [[nodiscard]] const char* GetName() const override;
     /**
@@ -115,7 +115,7 @@ namespace moho
   ) noexcept;
 
   /**
-   * Address: 0x0065AAD0 (FUN_0065AAD0, preregister_CountedPtrCParticleTextureType)
+    * Alias of FUN_0065AAD0 (non-canonical helper lane).
    */
   gpg::RType* preregister_CountedPtrCParticleTextureType();
 

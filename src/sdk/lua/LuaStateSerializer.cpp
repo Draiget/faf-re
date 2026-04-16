@@ -7,6 +7,33 @@
 
 using namespace LuaPlus;
 
+namespace
+{
+/**
+ * Address: 0x0090BC90 (FUN_0090BC90)
+ *
+ * What it does:
+ * Reads serialized root/active Lua-state pointer lanes and rebinds the target
+ * `LuaState` wrapper to the restored active lane.
+ */
+void DeserializeLuaStatePointerPair(
+	gpg::ReadArchive* const archive,
+	LuaState* const state,
+	const gpg::RRef* const ownerRef
+)
+{
+	LuaState* rootState = nullptr;
+	(void)archive->ReadPointer_LuaState(&rootState, ownerRef);
+
+	gpg::RRef rootStateRef{};
+	(void)gpg::RRef_lua_State(&rootStateRef, rootState->m_state);
+
+	lua_State* activeState = nullptr;
+	(void)archive->ReadPointer_lua_State(&activeState, &rootStateRef);
+	state->SetState(activeState);
+}
+} // namespace
+
 /**
  * Address: 0x0090B6F0
  */
@@ -34,14 +61,5 @@ void LuaStateSerializer::Deserialize(
 )
 {
 	(void)version;
-
-	LuaState* rootState = nullptr;
-	(void)archive->ReadPointer_LuaState(&rootState, ownerRef);
-
-	gpg::RRef rootStateRef{};
-	(void)gpg::RRef_lua_State(&rootStateRef, rootState->m_state);
-
-	lua_State* activeState = nullptr;
-	(void)archive->ReadPointer_lua_State(&activeState, &rootStateRef);
-	state->SetState(activeState);
+	DeserializeLuaStatePointerPair(archive, state, ownerRef);
 }

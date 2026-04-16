@@ -10,6 +10,22 @@ namespace moho
   class RWeakPtrType;
 
   /**
+   * Address: 0x00541400 (FUN_00541400, preregister_IUnitTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `IUnit`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IUnitTypeInfoStartup();
+
+  /**
+   * Address: 0x00541B40 (FUN_00541B40, preregister_WeakPtrIUnitTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `WeakPtr<IUnit>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_WeakPtrIUnitTypeStartup();
+
+  /**
    * Address family:
    * - 0x00541600 / 0x005416C0 / 0x00541850 / 0x00541860 / 0x005416A0 (FA)
    * - 0x1012EFC0 / 0x1012F080 / 0x1012F1D0 / 0x1012F1E0 / 0x1012F060 (MohoEngine)
@@ -142,4 +158,13 @@ namespace gpg
     sizeof(RFastVectorType<moho::WeakPtr<moho::IUnit>>) == 0x68,
     "RFastVectorType<WeakPtr<IUnit>> size must be 0x68"
   );
+
+  /**
+   * Address: 0x00571B90 (FUN_00571B90, preregister_FastVectorWeakPtrIUnitTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `gpg::fastvector<moho::WeakPtr<moho::IUnit>>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_FastVectorWeakPtrIUnitTypeStartup();
 } // namespace gpg

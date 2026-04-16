@@ -63,10 +63,13 @@ namespace moho
   void CEfxBeamTypeInfo::Init()
   {
     size_ = sizeof(CEfxBeam);
-    newRefFunc_ = &CEfxBeamTypeInfo::NewRef;
-    ctorRefFunc_ = &CEfxBeamTypeInfo::CtrRef;
-    deleteFunc_ = &CEfxBeamTypeInfo::Delete;
-    dtrFunc_ = &CEfxBeamTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CEfxBeamTypeInfo::NewRef,
+      &CEfxBeamTypeInfo::CtrRef,
+      &CEfxBeamTypeInfo::Delete,
+      &CEfxBeamTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CEffectImpl(this);
     Finish();

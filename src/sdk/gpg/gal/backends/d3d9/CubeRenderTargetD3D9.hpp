@@ -14,6 +14,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x009411E0 (FUN_009411E0)
+         *
+         * What it does:
+         * Initializes one empty D3D9 cube-render-target wrapper with default
+         * context and cleared texture/face-surface lanes.
+         */
+        CubeRenderTargetD3D9();
+
+        /**
          * Address: 0x00941450 (FUN_00941450, gpg::gal::CubeRenderTargetD3D9::CubeRenderTargetD3D9)
          *
          * What it does:

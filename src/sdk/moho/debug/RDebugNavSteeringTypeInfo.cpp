@@ -3,12 +3,40 @@
 #include "moho/debug/RDebugNavSteering.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
+namespace
+{
+  /**
+   * Address: 0x00650A90 (FUN_00650A90)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for navigator-steering
+   * rendering.
+   */
+  void RegisterRDebugNavSteeringOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display the navigator steering", "NavSteering");
+  }
+} // namespace
+
 namespace moho
 {
   /**
    * Address: 0x00650A60 (FUN_00650A60, Moho::RDebugNavSteeringTypeInfo::dtr)
    */
   RDebugNavSteeringTypeInfo::~RDebugNavSteeringTypeInfo() = default;
+
+  /**
+   * Address: 0x00650A80 (FUN_00650A80)
+   *
+   * What it does:
+   * Deleting-destructor thunk lane that forwards into
+   * `RDebugOverlayClass` non-deleting destructor body.
+   */
+  [[maybe_unused]] RDebugOverlayClass* DestroyRDebugNavSteeringTypeInfoThunk(RDebugOverlayClass* const object)
+  {
+    object->~RDebugOverlayClass();
+    return object;
+  }
 
   /**
    * Address: 0x00650A50 (FUN_00650A50, Moho::RDebugNavSteeringTypeInfo::GetName)
@@ -27,13 +55,16 @@ namespace moho
   void RDebugNavSteeringTypeInfo::Init()
   {
     size_ = sizeof(RDebugNavSteering);
-    newRefFunc_ = &RDebugNavSteeringTypeInfo::NewRef;
-    ctorRefFunc_ = &RDebugNavSteeringTypeInfo::CtrRef;
-    deleteFunc_ = &RDebugNavSteeringTypeInfo::Delete;
-    dtrFunc_ = &RDebugNavSteeringTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &RDebugNavSteeringTypeInfo::NewRef,
+      &RDebugNavSteeringTypeInfo::CtrRef,
+      &RDebugNavSteeringTypeInfo::Delete,
+      &RDebugNavSteeringTypeInfo::Destruct
+    );
     AddBase_RDebugOverlay(this);
     gpg::RType::Init();
-    RegisterOverlayClass("Display the navigator steering", "NavSteering");
+    RegisterRDebugNavSteeringOverlayClass(this);
     Finish();
   }
 

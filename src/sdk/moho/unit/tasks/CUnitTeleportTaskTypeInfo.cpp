@@ -16,6 +16,35 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
+  struct CUnitTeleportTaskTypeInfoStartupHelperLinks
+  {
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+  };
+
+  CUnitTeleportTaskTypeInfoStartupHelperLinks gCUnitTeleportTaskTypeInfoStartupHelperLinks{};
+
+  [[nodiscard]] gpg::SerHelperBase* CUnitTeleportTaskTypeInfoStartupSelfNode() noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitTeleportTaskTypeInfoStartupHelperNode() noexcept
+  {
+    if (
+      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext != nullptr
+      && gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev != nullptr
+    ) {
+      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext->mPrev = gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev;
+      gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev->mNext = gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext;
+    }
+
+    gpg::SerHelperBase* const self = CUnitTeleportTaskTypeInfoStartupSelfNode();
+    gCUnitTeleportTaskTypeInfoStartupHelperLinks.mPrev = self;
+    gCUnitTeleportTaskTypeInfoStartupHelperLinks.mNext = self;
+    return self;
+  }
+
   struct CUnitTeleportTaskRuntimeView final : moho::CCommandTask
   {
     moho::EAiTargetType mTargetType = static_cast<moho::EAiTargetType>(0); // +0x30
@@ -74,6 +103,18 @@ namespace
     gTypeInfoConstructed = false;
   }
 
+  /**
+   * Address: 0x0060AA60 (FUN_0060AA60)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks one static helper-link node used by
+   * `CUnitTeleportTaskTypeInfo` bootstrap storage and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CUnitTeleportTaskTypeInfoStartupThunkA() noexcept
+  {
+    return UnlinkCUnitTeleportTaskTypeInfoStartupHelperNode();
+  }
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -129,10 +170,13 @@ namespace moho
   void CUnitTeleportTaskTypeInfo::Init()
   {
     size_ = sizeof(CUnitTeleportTask);
-    newRefFunc_ = &CUnitTeleportTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitTeleportTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitTeleportTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitTeleportTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitTeleportTaskTypeInfo::NewRef,
+      &CUnitTeleportTaskTypeInfo::CtrRef,
+      &CUnitTeleportTaskTypeInfo::Delete,
+      &CUnitTeleportTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();
@@ -206,4 +250,3 @@ namespace moho
     return std::atexit(&cleanup);
   }
 } // namespace moho
-

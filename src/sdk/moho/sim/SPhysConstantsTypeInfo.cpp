@@ -25,11 +25,57 @@ namespace
     return *reinterpret_cast<TypeInfo*>(gSPhysConstantsTypeInfoStorage);
   }
 
+  gpg::RType* gSPhysConstantsPrimaryType = nullptr;
+  gpg::RType* gSPhysConstantsSecondaryType = nullptr;
+
+  /**
+   * Address: 0x00698A40 (FUN_00698A40)
+   *
+   * What it does:
+   * Resolves and caches the primary RTTI lane for `SPhysConstants`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveSPhysConstantsPrimaryType()
+  {
+    gpg::RType* type = gSPhysConstantsPrimaryType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SPhysConstants));
+      gSPhysConstantsPrimaryType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00698F20 (FUN_00698F20)
+   *
+   * What it does:
+   * Resolves and caches the secondary RTTI lane for `SPhysConstants`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveSPhysConstantsSecondaryType()
+  {
+    gpg::RType* type = gSPhysConstantsSecondaryType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SPhysConstants));
+      gSPhysConstantsSecondaryType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedSPhysConstantsType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::SPhysConstants));
+    }
+
+    GPG_ASSERT(cached != nullptr);
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
     }
 
     GPG_ASSERT(cached != nullptr);
@@ -43,10 +89,99 @@ namespace
     ref.mType = CachedSPhysConstantsType();
     return ref;
   }
+
+  /**
+   * Address: 0x0069A020 (FUN_0069A020)
+   *
+   * What it does:
+   * Deserializes one `Vector3f` object lane using one local null-owner
+   * reference.
+   */
+  void ReadVector3fArchiveObjectWithNullOwnerVariantA(gpg::ReadArchive* const archive, void* const object)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(CachedVector3fType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x0069A060 (FUN_0069A060)
+   *
+   * What it does:
+   * Serializes one `Vector3f` object lane using one local null-owner
+   * reference.
+   */
+  void WriteVector3fArchiveObjectWithNullOwnerVariantA(gpg::WriteArchive* const archive, void** const objectSlot)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+  }
+
+  /**
+   * Address: 0x0069A0D0 (FUN_0069A0D0)
+   *
+   * What it does:
+   * Secondary deserialization lane for one `Vector3f` object using one local
+   * null-owner reference.
+   */
+  void ReadVector3fArchiveObjectWithNullOwnerVariantB(gpg::ReadArchive* const archive, void* const object)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(CachedVector3fType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x0069A110 (FUN_0069A110)
+   *
+   * What it does:
+   * Secondary serialization lane for one `Vector3f` object using one local
+   * null-owner reference.
+   */
+  void WriteVector3fArchiveObjectWithNullOwnerVariantB(gpg::WriteArchive* const archive, void** const objectSlot)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+  }
+
+  /**
+   * Address: 0x0069A150 (FUN_0069A150)
+   *
+   * What it does:
+   * Stdcall bridge that deserializes one `Vector3f` object lane using one
+   * local null-owner reference.
+   */
+  void ReadVector3fArchiveObjectWithNullOwnerStdCall(void* const object, gpg::ReadArchive* const archive)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(CachedVector3fType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x0069A190 (FUN_0069A190)
+   *
+   * What it does:
+   * Stdcall bridge that serializes one `Vector3f` object lane using one local
+   * null-owner reference.
+   */
+  void WriteVector3fArchiveObjectWithNullOwnerStdCall(void** const objectSlot, gpg::WriteArchive* const archive)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00699A90 (FUN_00699A90, Moho::SPhysConstants::SPhysConstants)
+   *
+   * What it does:
+   * Initializes gravity constants to `(0.0f, -4.9f, 0.0f)`.
+   */
+  SPhysConstants::SPhysConstants() noexcept
+    : mGravity(0.0f, -4.9f, 0.0f)
+  {
+  }
+
   /**
    * Address: 0x00699AB0 (FUN_00699AB0, Moho::SPhysConstantsTypeInfo::SPhysConstantsTypeInfo)
    */
@@ -57,12 +192,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00699BC0 (FUN_00699BC0, SPhysConstantsTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `SPhysConstantsTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroySPhysConstantsTypeInfoBody(SPhysConstantsTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x00699B60 (FUN_00699B60, Moho::SPhysConstantsTypeInfo::dtr)
    */
   SPhysConstantsTypeInfo::~SPhysConstantsTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroySPhysConstantsTypeInfoBody(this);
   }
 
   /**
@@ -79,10 +230,13 @@ namespace moho
   void SPhysConstantsTypeInfo::Init()
   {
     size_ = sizeof(SPhysConstants);
-    newRefFunc_ = &SPhysConstantsTypeInfo::NewRef;
-    ctorRefFunc_ = &SPhysConstantsTypeInfo::CtrRef;
-    deleteFunc_ = &SPhysConstantsTypeInfo::Delete;
-    dtrFunc_ = &SPhysConstantsTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &SPhysConstantsTypeInfo::NewRef,
+      &SPhysConstantsTypeInfo::CtrRef,
+      &SPhysConstantsTypeInfo::Delete,
+      &SPhysConstantsTypeInfo::Destruct
+    );
     gpg::RType::Init();
     Finish();
   }
@@ -92,13 +246,7 @@ namespace moho
    */
   gpg::RRef SPhysConstantsTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) SPhysConstants;
-    if (object) {
-      object->mGravity.x = 0.0f;
-      object->mGravity.y = -4.9f;
-      object->mGravity.z = 0.0f;
-    }
-
+    auto* const object = new (std::nothrow) SPhysConstants();
     return MakeSPhysConstantsRef(object);
   }
 
@@ -109,9 +257,7 @@ namespace moho
   {
     auto* const object = static_cast<SPhysConstants*>(objectPtr);
     if (object) {
-      object->mGravity.x = 0.0f;
-      object->mGravity.y = -4.9f;
-      object->mGravity.z = 0.0f;
+      ::new (object) SPhysConstants();
     }
 
     return MakeSPhysConstantsRef(object);

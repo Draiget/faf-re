@@ -23,6 +23,15 @@ namespace moho
   {
     static gpg::RType* sType;
 
+    /**
+     * Address: 0x00676B50 (FUN_00676B50, Moho::SScroller::SScroller defaults lane)
+     *
+     * What it does:
+     * Seeds one scroller payload with mode `None`, zero timing/scroll lanes,
+     * and unit scale factors for both UV channels.
+     */
+    void InitializeDefaults() noexcept;
+
     std::int32_t mType; // +0x00
     float mFloat04;     // +0x04
     float mFloat08;     // +0x08
@@ -37,6 +46,17 @@ namespace moho
   class CTextureScroller
   {
   public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x00683190 (FUN_00683190)
+     *
+     * What it does:
+     * Returns cached reflected type metadata for `CTextureScroller`,
+     * resolving it through RTTI lookup on first use.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00676BA0 (FUN_00676BA0, ??0CTextureScroller@Moho@@QAE@@Z)
      *

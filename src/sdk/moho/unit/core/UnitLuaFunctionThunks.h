@@ -247,7 +247,21 @@ namespace moho
    * Publishes the `Unit:GetCommandQueue()` Lua binder definition.
    */
   CScrLuaInitForm* func_UnitGetCommandQueue_LuaFuncDef();
+
+  /**
+   * Address: 0x006CDEF0 (FUN_006CDEF0, func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:MeleeWarpAdjacentToTarget(target)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x006CDCB0 (FUN_006CDCB0, func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:HasMeleeSpaceAroundTarget(target)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetCustomName_LuaFuncDef();
 

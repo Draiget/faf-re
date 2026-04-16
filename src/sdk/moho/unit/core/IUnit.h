@@ -10,6 +10,11 @@
 #include "moho/misc/WeakObject.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   /**
@@ -85,6 +90,17 @@ namespace moho
   class IUnit : public WeakObject
   {
   public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x006A5340 (FUN_006A5340, ??0IUnit@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes the `IUnit` base object by setting the weak-link head lane to
+     * null and installing the `IUnit` vtable.
+     */
+    IUnit() noexcept;
+
     /**
      * Address: 0x006A48C0
      * Slot: 0

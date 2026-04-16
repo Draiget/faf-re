@@ -30,7 +30,6 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
-#include "moho/unit/tasks/CFireWeaponTask.h"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
@@ -41,6 +40,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <new>
 
 using namespace moho;
 
@@ -757,45 +757,20 @@ UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlue
   CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
   const int weaponIndex = static_cast<int>(view->mWeapons.size());
 
-  UnitWeapon* weapon = new UnitWeapon();
+  UnitWeapon* weapon = static_cast<UnitWeapon*>(::operator new(sizeof(UnitWeapon), std::nothrow));
   if (weapon != nullptr) {
-    Unit* const ownerUnit = view->mUnit;
-    weapon->mSim = (ownerUnit != nullptr) ? ownerUnit->SimulationRef : nullptr;
-    weapon->mWeaponBlueprint = weaponBlueprint;
-    weapon->mProjectileBlueprint = nullptr;
-    weapon->mAttacker = AsAiAttackerBase(this);
-    weapon->mAttributes = CWeaponAttributes(weaponBlueprint);
-    weapon->mUnit = ownerUnit;
-    weapon->mWeaponIndex = weaponIndex;
-    weapon->mBone = -1;
-    weapon->mEnabled = 1u;
-    weapon->mCanFire = 1u;
-    weapon->mLabel = "Default";
-    weapon->mTarget = BuildClearedTarget();
-    weapon->mFiringRandomness = (weaponBlueprint != nullptr) ? weaponBlueprint->FiringRandomness : 0.0f;
-
-    if (weapon->mSim != nullptr && weapon->mSim->mRules != nullptr && weaponBlueprint != nullptr
-        && !weaponBlueprint->ProjectileId.name.empty()) {
-      weapon->mProjectileBlueprint = weapon->mSim->mRules->GetProjectileBlueprint(weaponBlueprint->ProjectileId);
-    }
-
-    weapon->mFireWeaponTask = new CFireWeaponTask(weapon);
-    AttachTaskToStage(weapon->mFireWeaponTask, &view->mStage, false);
-
-    (void)weapon->RunScript("OnCreate");
+    weapon = new (weapon) UnitWeapon(this, weaponBlueprint, weaponIndex);
   }
 
   view->mWeapons.push_back(weapon);
 
-  if (weaponBlueprint != nullptr && weaponBlueprint->ManualFire == 0u) {
+  if (weaponBlueprint->ManualFire == 0u) {
     CAcquireTargetTask* const task = new CAcquireTargetTask(weapon, this);
     AttachTaskToStage(task, &view->mStage, false);
     view->mTasks.push_back(task);
   }
 
-  if (view->mUnit != nullptr) {
-    view->mUnit->NeedSyncGameData = true;
-  }
+  view->mUnit->NeedSyncGameData = true;
 
   return weapon;
 }
@@ -854,7 +829,7 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
     weapon->mTarget = clearedTarget;
 
     if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->NeedPrep != 0u && hasDesiredTarget) {
-      (void)weapon->RunScript("OnGotTarget");
+      weapon->NotifyOnGotTarget();
     }
   }
 

@@ -34,6 +34,8 @@ namespace
 
   /**
    * Address: 0x005A21F0 (FUN_005A21F0, j_Moho::CAiBuilderImpl::MemberSerialize_0)
+   * Address: 0x00635370 (FUN_00635370)
+   * Address: 0x004E7070 (FUN_004E7070)
    *
    * What it does:
    * Secondary forwarding thunk to `CAiBuilderImpl::MemberSerialize`.
@@ -113,6 +115,30 @@ namespace
     return UnlinkSerializerNode(*AcquireCAiBuilderImplSerializer());
   }
 
+  /**
+   * Address: 0x0059FE70 (FUN_0059FE70)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * CAiBuilderImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiBuilderImplSerializerStartupThunkA()
+  {
+    return cleanup_CAiBuilderImplSerializer();
+  }
+
+  /**
+   * Address: 0x0059FEA0 (FUN_0059FEA0)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * CAiBuilderImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiBuilderImplSerializerStartupThunkB()
+  {
+    return cleanup_CAiBuilderImplSerializer();
+  }
+
   void cleanup_CAiBuilderImplSerializer_atexit()
   {
     (void)cleanup_CAiBuilderImplSerializer();
@@ -189,7 +215,6 @@ void moho::register_CAiBuilderImplSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiBuilderImplSerializer::Deserialize;
   serializer->mSaveCallback = &CAiBuilderImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiBuilderImplSerializer_atexit);
 }
 

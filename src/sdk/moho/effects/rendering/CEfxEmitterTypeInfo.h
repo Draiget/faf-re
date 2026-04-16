@@ -16,7 +16,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0065DFE0 (FUN_0065DFE0)
+       * Address: 0x0065DFE0 (FUN_0065DFE0)
      * Mangled: ??0CEfxEmitterTypeInfo@Moho@@QAE@@Z
      *
      * What it does:
@@ -73,7 +73,7 @@ namespace moho
   static_assert(sizeof(CEfxEmitterTypeInfo) == 0x64, "CEfxEmitterTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x0065DFE0 (FUN_0065DFE0)
+    * Alias of FUN_0065DFE0 (non-canonical helper lane).
    *
    * What it does:
    * Constructs and preregisters startup RTTI metadata for `moho::CEfxEmitter`.

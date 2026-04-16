@@ -31,4 +31,28 @@ namespace moho
   };
 
   static_assert(sizeof(CAniDefaultSkelTypeInfo) == 0x64, "CAniDefaultSkelTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x0054A930 (FUN_0054A930, preregister_CAniDefaultSkelTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI metadata for `CAniDefaultSkel`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CAniDefaultSkelTypeInfo();
+
+  /**
+   * Address: 0x00BF44E0 (FUN_00BF44E0, cleanup_CAniDefaultSkelTypeInfo)
+   *
+   * What it does:
+   * Releases startup-owned `CAniDefaultSkelTypeInfo` field/base metadata storage.
+   */
+  void cleanup_CAniDefaultSkelTypeInfo();
+
+  /**
+   * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfoAtexit)
+   *
+   * What it does:
+   * Preregisters `CAniDefaultSkel` RTTI and installs process-exit cleanup.
+   */
+  int register_CAniDefaultSkelTypeInfoAtexit();
 } // namespace moho

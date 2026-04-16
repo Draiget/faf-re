@@ -15,6 +15,15 @@ namespace
   class MemBufferCharTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0094E700 (FUN_0094E700, MemBufferCharTypeInfo::MemBufferCharTypeInfo)
+     *
+     * What it does:
+     * Constructs the `gpg::MemBuffer<char>` runtime type descriptor and
+     * preregisters it with reflection registry.
+     */
+    MemBufferCharTypeInfo();
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
@@ -30,6 +39,15 @@ namespace
   class MemBufferCharConstTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0094E7D0 (FUN_0094E7D0, MemBufferCharConstTypeInfo::MemBufferCharConstTypeInfo)
+     *
+     * What it does:
+     * Constructs the `gpg::MemBuffer<const char>` runtime type descriptor and
+     * preregisters it with reflection registry.
+     */
+    MemBufferCharConstTypeInfo();
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
@@ -59,7 +77,42 @@ namespace
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\MemBufferStream.cpp";
 
   constexpr std::uint64_t kMaxStreamPosition = 0x7FFFFFFFULL;
+
+  using SharedByteDeleter = void(__cdecl*)(void*);
+
+  /**
+   * Address: 0x0094E2F0 (FUN_0094E2F0, boost::shared_ptr_char_P_void_P::shared_ptr_char_P_void_P)
+   *
+   * What it does:
+   * Constructs one `boost::shared_ptr<char>` from raw pointer + deleter,
+   * preserving `sp_enable_shared_from_this` setup done by Boost internals.
+   */
+  boost::shared_ptr<char>* ConstructSharedByteOwnerWithDeleter(
+    boost::shared_ptr<char>* const outOwner,
+    char* const pointer,
+    const SharedByteDeleter deleter
+  )
+  {
+    if (outOwner == nullptr) {
+      return nullptr;
+    }
+
+    *outOwner = boost::shared_ptr<char>(pointer, deleter);
+    return outOwner;
+  }
 } // namespace
+
+/**
+ * Address: 0x0094E700 (FUN_0094E700, MemBufferCharTypeInfo::MemBufferCharTypeInfo)
+ *
+ * What it does:
+ * Constructs the `gpg::MemBuffer<char>` runtime type descriptor and
+ * preregisters it with reflection registry.
+ */
+MemBufferCharTypeInfo::MemBufferCharTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(MemBuffer<char>), this);
+}
 
 const char* MemBufferCharTypeInfo::GetName() const
 {
@@ -78,6 +131,18 @@ void MemBufferCharTypeInfo::Init()
   size_ = 0x10;
   gpg::RType::Init();
   Finish();
+}
+
+/**
+ * Address: 0x0094E7D0 (FUN_0094E7D0, MemBufferCharConstTypeInfo::MemBufferCharConstTypeInfo)
+ *
+ * What it does:
+ * Constructs the `gpg::MemBuffer<const char>` runtime type descriptor and
+ * preregisters it with reflection registry.
+ */
+MemBufferCharConstTypeInfo::MemBufferCharConstTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(MemBuffer<const char>), this);
 }
 
 const char* MemBufferCharConstTypeInfo::GetName() const
@@ -100,6 +165,44 @@ void MemBufferCharConstTypeInfo::Init()
 }
 
 /**
+ * Address: 0x0094E8A0 (FUN_0094E8A0, MemBufferCharTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `MemBufferCharTypeInfo` descriptor via `gpg::RType` base
+ * teardown and conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyMemBufferCharTypeInfoDeleting(
+  MemBufferCharTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x0094E900 (FUN_0094E900, MemBufferCharConstTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `MemBufferCharConstTypeInfo` descriptor via `gpg::RType` base
+ * teardown and conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyMemBufferCharConstTypeInfoDeleting(
+  MemBufferCharConstTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
  * Address: 0x0094E320 (FUN_0094E320)
  *
  * What it does:
@@ -114,7 +217,8 @@ MemBuffer<char> gpg::AllocMemBuffer(
     std::memset(buff, 0, size);
   }
 
-  boost::shared_ptr<char> ptr(buff, std::free);
+  boost::shared_ptr<char> ptr;
+  (void)ConstructSharedByteOwnerWithDeleter(&ptr, buff, static_cast<SharedByteDeleter>(&std::free));
   char* const end = (buff == nullptr) ? nullptr : (buff + size);
   return MemBuffer<char>(ptr, buff, end);
 }

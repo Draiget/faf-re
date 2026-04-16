@@ -16,6 +16,8 @@ extern "C"
     const moho::VMatrix4* source
   );
 
+  moho::VMatrix4* WINAPI D3DXMatrixTranslation(moho::VMatrix4* outMatrix, float x, float y, float z);
+  moho::VMatrix4* WINAPI D3DXMatrixScaling(moho::VMatrix4* outMatrix, float x, float y, float z);
   moho::VMatrix4* WINAPI D3DXMatrixRotationX(moho::VMatrix4* outMatrix, float angle);
   moho::VMatrix4* WINAPI D3DXMatrixRotationY(moho::VMatrix4* outMatrix, float angle);
   moho::VMatrix4* WINAPI D3DXMatrixRotationZ(moho::VMatrix4* outMatrix, float angle);
@@ -58,6 +60,31 @@ namespace gpg::gal::Math
   }
 
   /**
+   * Address: 0x00940770 (FUN_00940770, sub_940770)
+   *
+   * What it does:
+   * Builds one translation matrix through the D3DX lane and returns
+   * `outMatrix`.
+   */
+  Matrix* translation(Matrix* const outMatrix, const float x, const float y, const float z)
+  {
+    D3DXMatrixTranslation(outMatrix, x, y, z);
+    return outMatrix;
+  }
+
+  /**
+   * Address: 0x009407A0 (FUN_009407A0, sub_9407A0)
+   *
+   * What it does:
+   * Builds one scale matrix through the D3DX lane and returns `outMatrix`.
+   */
+  Matrix* scaling(Matrix* const outMatrix, const float x, const float y, const float z)
+  {
+    D3DXMatrixScaling(outMatrix, x, y, z);
+    return outMatrix;
+  }
+
+  /**
    * Address: 0x009406D0 (FUN_009406D0, ?rotationAxisX@Math@gal@gpg@@YAPBUMatrix@23@PAU423@M@Z)
    *
    * What it does:
@@ -93,6 +120,45 @@ namespace gpg::gal::Math
   Matrix* rotationAxisZ(Matrix* const outMatrix, const float angle)
   {
     D3DXMatrixRotationZ(outMatrix, angle);
+    return outMatrix;
+  }
+
+  /**
+   * Address: 0x0089C830 (FUN_0089C830)
+   *
+   * What it does:
+   * Register-shape wrapper that forwards to `rotationAxisX` and returns
+   * `outMatrix`.
+   */
+  [[maybe_unused]] Matrix* RotationAxisXRegisterAdapter(Matrix* const outMatrix, const float angle)
+  {
+    (void)rotationAxisX(outMatrix, angle);
+    return outMatrix;
+  }
+
+  /**
+   * Address: 0x0089C850 (FUN_0089C850)
+   *
+   * What it does:
+   * Register-shape wrapper that forwards to `rotationAxisY` and returns
+   * `outMatrix`.
+   */
+  [[maybe_unused]] Matrix* RotationAxisYRegisterAdapter(Matrix* const outMatrix, const float angle)
+  {
+    (void)rotationAxisY(outMatrix, angle);
+    return outMatrix;
+  }
+
+  /**
+   * Address: 0x0089C870 (FUN_0089C870)
+   *
+   * What it does:
+   * Register-shape wrapper that forwards to `rotationAxisZ` and returns
+   * `outMatrix`.
+   */
+  [[maybe_unused]] Matrix* RotationAxisZRegisterAdapter(Matrix* const outMatrix, const float angle)
+  {
+    (void)rotationAxisZ(outMatrix, angle);
     return outMatrix;
   }
 

@@ -1,7 +1,9 @@
 #include "moho/entity/EntityCategoryReflection.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -13,6 +15,8 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace
 {
@@ -70,6 +74,34 @@ namespace
   };
   static_assert(sizeof(EntityCategoryLuaMetatableFactory) == 0x8, "EntityCategoryLuaMetatableFactory size must be 0x8");
 
+  /**
+   * Address: 0x00537070 (FUN_00537070)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for the entity-category
+   * Lua metatable factory singleton and returns that singleton.
+   */
+  [[maybe_unused]] EntityCategoryLuaMetatableFactory* startup_EntityCategoryLuaMetatableFactory_Index()
+  {
+    auto& instance = EntityCategoryLuaMetatableFactory::Instance();
+    instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
+  }
+
+  /**
+   * Address: 0x00BC8F70 (FUN_00BC8F70, register_EntityCategoryLuaMetatableFactoryIndexStartup)
+   *
+   * What it does:
+   * Allocates the startup factory-object index used by entity-category Lua
+   * metatable objects and stores it on the singleton factory.
+   */
+  int register_EntityCategoryLuaMetatableFactoryIndexStartup()
+  {
+    const int index = moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    EntityCategoryLuaMetatableFactory::Instance().SetFactoryObjectIndexForRecovery(index);
+    return index;
+  }
+
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -98,6 +130,46 @@ namespace
       moho::EntityCategorySet::sType = gpg::LookupRType(typeid(moho::EntityCategorySet));
     }
     return moho::EntityCategorySet::sType;
+  }
+
+  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveCategoryRules(const moho::EntityCategorySet& categorySet) noexcept
+  {
+    return reinterpret_cast<moho::RRuleGameRulesImpl*>(
+      static_cast<std::uintptr_t>(categorySet.mUniverse.mWordUniverseHandle)
+    );
+  }
+
+  /**
+   * Address: 0x00533310 (FUN_00533310, sub_533310)
+   *
+   * What it does:
+   * Walks source category ordinals in `[position, endOrdinalExclusive)`,
+   * remaps each ordinal via `GetBlueprintFromOrdinal()->mBlueprintOrdinal`,
+   * then sets the mapped bit in `out`.
+   */
+  void AddMappedBlueprintOrdinalBits(
+    moho::EntityCategorySet* const out,
+    moho::RRuleGameRulesImpl* const rules,
+    const moho::BVIntSet& sourceBits,
+    unsigned int position,
+    const unsigned int endOrdinalExclusive
+  )
+  {
+    if (position == endOrdinalExclusive) {
+      return;
+    }
+
+    moho::BVIntSet& outBits = out->mBits;
+    do {
+      moho::RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(static_cast<int>(position));
+      const auto mappedOrdinal = static_cast<unsigned int>(blueprint->mBlueprintOrdinal);
+
+      outBits.EnsureBounds(mappedOrdinal, mappedOrdinal + 1u);
+      const unsigned int relativeWord = (mappedOrdinal >> 5u) - outBits.mFirstWordIndex;
+      outBits.mWords.start_[relativeWord] |= (1u << (mappedOrdinal & 0x1Fu));
+
+      position = sourceBits.GetNext(position);
+    } while (position != endOrdinalExclusive);
   }
 
   /**
@@ -177,6 +249,40 @@ namespace
     return self;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* ResetEntityCategoryHelperSerializerLinks() noexcept
+  {
+    gEntityCategoryHelperSerializer.mNext->mPrev = gEntityCategoryHelperSerializer.mPrev;
+    gEntityCategoryHelperSerializer.mPrev->mNext = gEntityCategoryHelperSerializer.mNext;
+    gpg::SerHelperBase* const self = HelperSelfNode(gEntityCategoryHelperSerializer);
+    gEntityCategoryHelperSerializer.mPrev = self;
+    gEntityCategoryHelperSerializer.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0052B900 (FUN_0052B900)
+   *
+   * What it does:
+   * Unlinks `EntityCategoryHelperSerializer` from the global helper intrusive
+   * list and restores self-sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEntityCategoryHelperSerializerPrimary() noexcept
+  {
+    return ResetEntityCategoryHelperSerializerLinks();
+  }
+
+  /**
+   * Address: 0x0052B930 (FUN_0052B930)
+   *
+   * What it does:
+   * Secondary entrypoint for `EntityCategoryHelperSerializer` helper-list
+   * unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEntityCategoryHelperSerializerSecondary() noexcept
+  {
+    return ResetEntityCategoryHelperSerializerLinks();
+  }
+
   void cleanup_EntityCategoryHelperSerializerAtexit()
   {
     gEntityCategoryHelperSerializer.~EntityCategoryHelperSerializer();
@@ -186,6 +292,7 @@ namespace
   {
     EntityCategoryHelperRegistration()
     {
+      (void)register_EntityCategoryLuaMetatableFactoryIndexStartup();
       (void)moho::register_EntityCategoryHelperTypeInfoStartup();
       moho::register_EntityCategoryHelperSerializer();
     }
@@ -194,10 +301,16 @@ namespace
   EntityCategoryHelperRegistration gEntityCategoryHelperRegistration;
 } // namespace
 
-namespace moho
+  namespace moho
 {
   gpg::RType* EntityCategoryHelper::sType = nullptr;
 
+  /**
+   * Address: 0x0052D8D0 (FUN_0052D8D0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `EntityCategoryHelper`.
+   */
   gpg::RType* EntityCategoryHelper::StaticGetClass()
   {
     if (!sType) {
@@ -275,6 +388,22 @@ namespace moho
     BVIntSet unionBits{};
     (void)lhs->mBits.Union(&unionBits, &rhs->mBits);
     out->mBits = unionBits;
+    return out;
+  }
+
+  /**
+   * Address: 0x0052BB50 (FUN_0052BB50, Moho::EntityCategory::Add)
+   *
+   * What it does:
+   * Iterates each source category ordinal and ORs the corresponding
+   * `RBlueprint::mBlueprintOrdinal` bit into `out`.
+   */
+  EntityCategorySet* EntityCategory::Add(EntityCategorySet* const out, const EntityCategorySet* const source)
+  {
+    const unsigned int endOrdinalExclusive = source->mBits.Max();
+    const unsigned int firstOrdinal = source->mBits.GetNext(std::numeric_limits<unsigned int>::max());
+
+    AddMappedBlueprintOrdinalBits(out, ResolveCategoryRules(*source), source->mBits, firstOrdinal, endOrdinalExclusive);
     return out;
   }
 
@@ -683,7 +812,15 @@ namespace moho
    */
   EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer()
   {
-    (void)UnlinkHelperNode(gEntityCategoryHelperSerializer);
+    (void)::CleanupEntityCategoryHelperSerializerPrimary();
+  }
+
+  /**
+   * Address: 0x0052C8D8 (FUN_0052C8D8)
+   */
+  EntityCategoryHelperSerializer* GetEntityCategoryHelperSerializer() noexcept
+  {
+    return &gEntityCategoryHelperSerializer;
   }
 
   /**
@@ -715,7 +852,6 @@ namespace moho
     InitializeHelperNode(gEntityCategoryHelperSerializer);
     gEntityCategoryHelperSerializer.mSerLoadFunc = &EntityCategory::SerLoad;
     gEntityCategoryHelperSerializer.mSerSaveFunc = &EntityCategory::SerSave;
-    gEntityCategoryHelperSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_EntityCategoryHelperSerializerAtexit);
   }
 } // namespace moho

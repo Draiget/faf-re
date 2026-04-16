@@ -6,11 +6,22 @@ float sTimerCycleToSeconds; // 0x00F8ED60
 volatile LONGLONG cycle; // 0x00F8ED68
 time::Timer systemTimer; // 0x00F8ED78, first set at 0x00BEAB90
 
-// inline
+/**
+ * Address: 0x00955480 (FUN_00955480)
+ *
+ * What it does:
+ * Caches QueryPerformanceFrequency and precomputes cycle-to-seconds scale.
+ */
+[[maybe_unused]] BOOL InitializePerformanceFrequencyCache()
+{
+    const BOOL result = QueryPerformanceFrequency(&sPerformanceFrequency);
+    sTimerCycleToSeconds = 1.0f / static_cast<float>(sPerformanceFrequency.QuadPart);
+    return result;
+}
+
 inline void EnsurePerformanceFrequencyInitialized() {
     if (!sPerformanceFrequency.QuadPart) {
-        QueryPerformanceFrequency(&sPerformanceFrequency);
-        sTimerCycleToSeconds = 1.0f / static_cast<float>(sPerformanceFrequency.QuadPart);
+        (void)InitializePerformanceFrequencyCache();
     }
 }
 

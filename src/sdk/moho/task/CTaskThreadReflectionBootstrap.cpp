@@ -204,7 +204,7 @@ namespace
    */
   void RegisterCTaskThreadSerializerBootstrap()
   {
-    InitializeCTaskThreadSerializerHelper(&gCTaskThreadSerializerHelper)->RegisterSerializeFunctions();
+    (void)InitializeCTaskThreadSerializerHelper(&gCTaskThreadSerializerHelper);
   }
 
   struct CTaskThreadSerializerRegistration
@@ -218,7 +218,6 @@ namespace
 
       gCTaskThreadConstructHelper.RegisterConstructFunction();
       RegisterCTaskThreadSerializerBootstrap();
-      gCTaskStageSerializerHelper.RegisterSerializeFunctions();
     }
   };
 
@@ -338,6 +337,8 @@ namespace moho
 
 /**
  * Address: 0x004094E0 (FUN_004094E0, Moho::CTaskThreadConstruct::Construct)
+ * Address: 0x0061AD00 (FUN_0061AD00)
+ * Address: 0x00724910 (FUN_00724910)
  *
  * What it does:
  * Wraps serializer construct callback and forwards to CTaskThread allocator path.

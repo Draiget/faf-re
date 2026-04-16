@@ -22,6 +22,18 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005CE850 (FUN_005CE850, ??0IAiSiloBuild@Moho@@QAE@XZ)
+     * Address: 0x005CF660 (FUN_005CF660)
+     *
+     * VFTable SLOT: construction lane
+     *
+     * What it does:
+     * Initializes one silo-build interface base object; the second constructor
+     * lane is an equivalent alias.
+     */
+    IAiSiloBuild();
+
+    /**
      * Address: 0x005CE860 (FUN_005CE860, scalar deleting thunk)
      *
      * VFTable SLOT: 0

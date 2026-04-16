@@ -3,6 +3,7 @@
 namespace moho
 {
   /**
+   * Address: 0x005BD5E0 (FUN_005BD5E0, ??0CScrLuaBaseClassSpec@Moho@@QAE@AAVCScrLuaInitFormSet@1@PAVCScrLuaObjectFactory@1@1PBD2@Z)
    * Address: 0x10015A90 (FUN_10015A90)
    *
    * What it does:

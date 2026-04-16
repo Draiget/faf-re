@@ -1,6 +1,7 @@
 #include "MeshBatchKey.h"
 
 #include <algorithm>
+#include <cstring>
 #include <new>
 #include <stdexcept>
 
@@ -51,6 +52,68 @@ namespace moho
       cloned.last = allocated + count;
       cloned.end = allocated + count;
       return cloned;
+    }
+
+    /**
+     * Address: 0x007E2A30 (FUN_007E2A30)
+     *
+     * What it does:
+     * Clears one mesh-batch instance-pointer vector by resetting `last` to
+     * `first` while preserving allocated storage.
+     */
+    [[maybe_unused]] void ClearMeshBatchInstanceVectorRange(MeshBatchInstanceVector& vector) noexcept
+    {
+      if (vector.first != vector.last) {
+        vector.last = vector.first;
+      }
+    }
+
+    /**
+     * Address: 0x007DA100 (FUN_007DA100)
+     *
+     * What it does:
+     * Relocates one suffix pointer range from `source` into `destination`,
+     * updates the vector `last` lane, and writes the destination iterator to
+     * caller output storage.
+     */
+    [[maybe_unused]] MeshInstance*** RelocateMeshBatchInstancePointerRangeAndStoreIterator(
+      MeshBatchInstanceVector& vector,
+      MeshInstance*** const outIterator,
+      MeshInstance** const destination,
+      MeshInstance** const source
+    ) noexcept
+    {
+      if (destination != source) {
+        const std::ptrdiff_t elementCount = vector.last - source;
+        MeshInstance** const destinationEnd = destination + elementCount;
+        if (elementCount > 0) {
+          std::memmove(
+            destination,
+            source,
+            static_cast<std::size_t>(elementCount) * sizeof(MeshInstance*)
+          );
+        }
+        vector.last = destinationEnd;
+      }
+
+      *outIterator = destination;
+      return outIterator;
+    }
+
+    /**
+     * Address: 0x007E3110 (FUN_007E3110)
+     *
+     * What it does:
+     * Register-shape adapter for mesh-batch instance-pointer range relocation.
+     */
+    [[maybe_unused]] MeshInstance*** RelocateMeshBatchInstancePointerRangeAndStoreIteratorAdapter(
+      MeshBatchInstanceVector& vector,
+      MeshInstance*** const outIterator,
+      MeshInstance** const destination,
+      MeshInstance** const source
+    ) noexcept
+    {
+      return RelocateMeshBatchInstancePointerRangeAndStoreIterator(vector, outIterator, destination, source);
     }
 
     /**
@@ -244,6 +307,23 @@ namespace moho
    */
   MeshBatchKey::~MeshBatchKey() = default;
 
+  MeshBatchBucket::MeshBatchBucket()
+    : key()
+    , instances{nullptr, nullptr, nullptr, nullptr}
+  {}
+
+  /**
+   * Address: 0x007E36C0 (FUN_007E36C0, ??0MeshBatchBucket@Moho@@QAE@ABU01@@Z)
+   *
+   * What it does:
+   * Copy-constructs one mesh-batch bucket key and clones the owned
+   * instance-pointer vector payload.
+   */
+  MeshBatchBucket::MeshBatchBucket(const MeshBatchBucket& other)
+    : key(other.key)
+    , instances(CloneMeshBatchInstanceVector(other.instances))
+  {}
+
   /**
    * Address: 0x007E35B0 (FUN_007E35B0)
    *
@@ -303,6 +383,55 @@ namespace moho
     }
 
     return candidate;
+  }
+
+  /**
+   * Address: 0x007E4FA0 (FUN_007E4FA0)
+   *
+   * What it does:
+   * Moves one mesh-bucket RB-tree iterator lane backward.
+   */
+  [[maybe_unused]] MeshBatchBucketNode* RetreatMeshBatchBucketIterator(
+    const std::uint32_t /*unused*/,
+    MeshBatchBucketNode** const iteratorLane
+  )
+  {
+    if (iteratorLane == nullptr || *iteratorLane == nullptr) {
+      return nullptr;
+    }
+
+    MeshBatchBucketNode* const node = *iteratorLane;
+    if (IsSentinelNode(node)) {
+      MeshBatchBucketNode* const right = node->right;
+      *iteratorLane = right;
+      return right;
+    }
+
+    MeshBatchBucketNode* left = node->left;
+    if (IsSentinelNode(left)) {
+      MeshBatchBucketNode* parent = node->parent;
+      while (!IsSentinelNode(parent)) {
+        if (*iteratorLane != parent->left) {
+          break;
+        }
+        *iteratorLane = parent;
+        parent = parent->parent;
+      }
+
+      if (!IsSentinelNode(*iteratorLane)) {
+        *iteratorLane = parent;
+      }
+      return parent;
+    }
+
+    MeshBatchBucketNode* right = left->right;
+    while (!IsSentinelNode(right)) {
+      left = right;
+      right = right->right;
+    }
+
+    *iteratorLane = left;
+    return right;
   }
 
   /**

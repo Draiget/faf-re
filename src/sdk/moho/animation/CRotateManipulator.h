@@ -63,6 +63,22 @@ namespace moho
      */
     bool SetCurrentAngle(float angleRadians);
 
+    /**
+     * Address: 0x00643400 (FUN_00643400)
+     *
+     * What it does:
+     * Sets spin-down mode flag lane.
+     */
+    void SetSpinDownEnabled(bool enabled) noexcept;
+
+    /**
+     * Address: 0x00643CD0 (FUN_00643CD0)
+     *
+     * What it does:
+     * Updates follow-bone index and marks goal state dirty for next tick.
+     */
+    void SetFollowBoneTarget(int followBoneIndex) noexcept;
+
     static gpg::RType* sType;
 
     std::uint8_t mHasGoal = 0;      // +0x80
@@ -226,21 +242,97 @@ namespace moho
    */
   int cfunc_CRotateManipulatorSetAccel(lua_State* luaContext);
 
+  /**
+   * Address: 0x00644280 (FUN_00644280, cfunc_CRotateManipulatorSetSpinDown)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CRotateManipulatorSetSpinDownL`.
+   */
   int cfunc_CRotateManipulatorSetSpinDown(lua_State* luaContext);
+  /**
+   * Address: 0x00644470 (FUN_00644470, cfunc_CRotateManipulatorSetGoalL)
+   *
+   * What it does:
+   * Reads `(rotator, goalDegrees)`, validates numeric input, converts to
+   * radians, stores goal angle, and updates triggered state.
+   */
   int cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00644300 (FUN_00644300, cfunc_CRotateManipulatorSetSpinDownL)
+   *
+   * What it does:
+   * Reads `(rotator, enabled)`, validates the rotator object, sets spin-down
+   * mode, and returns the rotator Lua object.
+   */
   int cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorSetSpeed(lua_State* luaContext);
+
+  /**
+   * Address: 0x00644790 (FUN_00644790, cfunc_CRotateManipulatorSetSpeedL)
+   *
+   * What it does:
+   * Reads `(rotator, speedDegPerSec)`, validates numeric input, converts to
+   * radians/sec, and stores runtime speed lane.
+   */
   int cfunc_CRotateManipulatorSetSpeedL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorSetTargetSpeed(lua_State* luaContext);
+  /**
+   * Address: 0x00644930 (FUN_00644930, cfunc_CRotateManipulatorSetTargetSpeedL)
+   *
+   * What it does:
+   * Reads `(rotator, targetSpeedDegPerSec)`, validates numeric input, converts
+   * to radians/sec, stores target speed, and updates triggered state.
+   */
   int cfunc_CRotateManipulatorSetTargetSpeedL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00644B00 (FUN_00644B00, cfunc_CRotateManipulatorSetAccelL)
+   *
+   * What it does:
+   * Reads `(rotator, accelDegPerSecSq)`, validates numeric input, converts to
+   * radians/sec^2, and stores runtime acceleration lane.
+   */
   int cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorClearFollowBone(lua_State* luaContext);
+
+  /**
+   * Address: 0x00644CA0 (FUN_00644CA0, cfunc_CRotateManipulatorClearFollowBoneL)
+   *
+   * What it does:
+   * Reads `(rotator)`, clears follow-bone target (`-1`) and marks goal state
+   * dirty, then returns the rotator Lua object.
+   */
   int cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorSetFollowBone(lua_State* luaContext);
+
+  /**
+   * Address: 0x00644E10 (FUN_00644E10, cfunc_CRotateManipulatorSetFollowBoneL)
+   *
+   * What it does:
+   * Reads `(rotator, bone)`, resolves bone index through owner actor, assigns
+   * follow-bone target, and returns the rotator Lua object.
+   */
   int cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorGetCurrentAngle(lua_State* luaContext);
+
+  /**
+   * Address: 0x00644FB0 (FUN_00644FB0, cfunc_CRotateManipulatorGetCurrentAngleL)
+   *
+   * What it does:
+   * Reads `(rotator)`, pushes current angle in degrees, and returns one Lua
+   * number.
+   */
   int cfunc_CRotateManipulatorGetCurrentAngleL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorSetCurrentAngle(lua_State* luaContext);
+  /**
+   * Address: 0x00645120 (FUN_00645120, cfunc_CRotateManipulatorSetCurrentAngleL)
+   *
+   * What it does:
+   * Reads `(rotator, angleDegrees)`, validates numeric input, converts to
+   * radians, applies current-angle lane, and raises Lua error on failure.
+   */
   int cfunc_CRotateManipulatorSetCurrentAngleL(LuaPlus::LuaState* state);
 } // namespace moho
 
@@ -255,4 +347,3 @@ namespace gpg
    */
   gpg::RRef* RRef_CRotateManipulator(gpg::RRef* outRef, moho::CRotateManipulator* value);
 } // namespace gpg
-

@@ -8,6 +8,7 @@
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/IEffectManager.h"
+#include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/CollisionBeamStartupRegistrations.h"
 #include "moho/misc/InstanceCounter.h"
@@ -147,6 +148,24 @@ namespace moho
   gpg::RType* CollisionBeamEntity::sType = nullptr;
 
   /**
+   * Address: 0x006746F0 (FUN_006746F0)
+   *
+   * What it does:
+   * Returns cached reflected type metadata for `CollisionBeamEntity`,
+   * resolving it through RTTI lookup on first use.
+   */
+  gpg::RType* CollisionBeamEntity::StaticGetClass()
+  {
+    gpg::RType* type = sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CollisionBeamEntity));
+      sType = type;
+    }
+
+    return type;
+  }
+
+  /**
    * Address: 0x005DC340 (FUN_005DC340, Moho::ManyToOneBroadcaster_ECollisionBeamEvent::BroadcastEvent)
    *
    * What it does:
@@ -277,7 +296,7 @@ namespace moho
    */
   void CollisionBeamEntity::SetEfxBeam(IEffect* const beamEmitter, const bool checkCollision)
   {
-    mEffect.ResetFromObject(beamEmitter);
+    (void)RelinkWeakPtrIEffect(&mEffect, beamEmitter);
 
     if (mLauncher.GetObjectPtr() != nullptr && checkCollision) {
       CheckCollision();
@@ -309,6 +328,29 @@ namespace moho
   CollisionBeamEntity* CollisionBeamEntity::IsCollisionBeam()
   {
     return this;
+  }
+
+  /**
+   * Address: 0x00672C70 (FUN_00672C70, Moho::CollisionBeamEntity::GetLauncher)
+   * Mangled: ?GetLauncher@CollisionBeamEntity@Moho@@QBEPAVEntity@2@XZ
+   *
+   * What it does:
+   * Resolves launcher weak-link ownership and returns launcher unit as its
+   * `Entity` base pointer when available.
+   */
+  Entity* CollisionBeamEntity::GetLauncher() const
+  {
+    UnitWeapon* const launcherWeapon = mLauncher.GetObjectPtr();
+    if (launcherWeapon == nullptr) {
+      return nullptr;
+    }
+
+    Unit* const launcherUnit = launcherWeapon->mUnit;
+    if (launcherUnit == nullptr) {
+      return nullptr;
+    }
+
+    return static_cast<Entity*>(launcherUnit);
   }
 
   /**
@@ -408,6 +450,17 @@ namespace moho
 
     attacker->TransmitBeamImpactEvent(launcherWeapon, this);
     mCollisionListenerBound = 1u;
+  }
+
+  /**
+   * Address: 0x006732C0 (FUN_006732C0, ?IsEnabled@CollisionBeamEntity@Moho@@QBE_NXZ)
+   *
+   * What it does:
+   * Returns whether collision-check processing is currently enabled.
+   */
+  bool CollisionBeamEntity::IsEnabled() const
+  {
+    return mEnabled != 0u;
   }
 
   /**

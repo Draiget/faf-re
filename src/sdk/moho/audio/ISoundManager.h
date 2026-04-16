@@ -65,6 +65,22 @@ namespace moho
     virtual ISoundManager* Destroy(std::uint8_t flags);
   };
 
+  /**
+   * Address: 0x00760A60 (FUN_00760A60)
+   *
+   * What it does:
+   * Restores one base `ISoundManager` vtable lane in place.
+   */
+  [[nodiscard]] ISoundManager* InitializeSoundManagerVtable(ISoundManager* soundManager) noexcept;
+
+  /**
+   * Address: 0x00760F10 (FUN_00760F10)
+   *
+   * What it does:
+   * Alias entry that restores the same base `ISoundManager` vtable lane.
+   */
+  [[nodiscard]] ISoundManager* InitializeSoundManagerVtableAlias(ISoundManager* soundManager) noexcept;
+
   static_assert(sizeof(ISoundManager) == 0x4, "ISoundManager size must be 0x4");
   static_assert(std::is_polymorphic<ISoundManager>::value, "ISoundManager must remain polymorphic");
 } // namespace moho

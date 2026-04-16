@@ -48,6 +48,12 @@ namespace
     return reinterpret_cast<moho::EImpactTypeTypeInfo*>(gEImpactTypeTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x0050AB70 (FUN_0050AB70)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `EImpactType`.
+   */
   [[nodiscard]] gpg::RType* ResolveEImpactType()
   {
     static gpg::RType* cached = nullptr;
@@ -82,6 +88,40 @@ namespace
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
     serializer.mHelperPrev = self;
+  }
+
+  /**
+   * Address: 0x0050A6A0 (FUN_0050A6A0)
+   *
+   * What it does:
+   * Initializes callback lanes for startup-owned `EImpactType` primitive
+   * serializer helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EImpactTypePrimitiveSerializer*
+  InitializeEImpactTypePrimitiveSerializerStartupThunkPrimary()
+  {
+    auto* const serializer = AcquireEImpactTypePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EImpactTypePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EImpactTypePrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050A9D0 (FUN_0050A9D0)
+   *
+   * What it does:
+   * Secondary startup-init entry for the `EImpactType` primitive serializer
+   * helper storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EImpactTypePrimitiveSerializer*
+  InitializeEImpactTypePrimitiveSerializerStartupThunkSecondary()
+  {
+    auto* const serializer = AcquireEImpactTypePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EImpactTypePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EImpactTypePrimitiveSerializer::Serialize;
+    return serializer;
   }
 
   /**
@@ -127,14 +167,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00509ED0 (FUN_00509ED0, preregister_EImpactTypeTypeInfo)
-   */
-  gpg::REnumType* preregister_EImpactTypeTypeInfo()
-  {
-    return ConstructEImpactTypeTypeInfoInternal();
-  }
-
   /**
    * Address: 0x0067B240 (FUN_0067B240, Moho::ENT_GetImpactType)
    */
@@ -275,7 +307,7 @@ namespace moho
    */
   int register_EImpactTypeTypeInfo()
   {
-    (void)preregister_EImpactTypeTypeInfo();
+    (void)ConstructEImpactTypeTypeInfoInternal();
     return std::atexit(&cleanup_EImpactTypeTypeInfo);
   }
 
@@ -333,11 +365,7 @@ namespace moho
    */
   int register_EImpactTypePrimitiveSerializer()
   {
-    auto* const serializer = AcquireEImpactTypePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &EImpactTypePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &EImpactTypePrimitiveSerializer::Serialize;
-
+    (void)InitializeEImpactTypePrimitiveSerializerStartupThunkPrimary();
     return std::atexit(&cleanup_EImpactTypePrimitiveSerializer);
   }
 } // namespace moho

@@ -2139,6 +2139,7 @@ namespace
 
   /**
    * Address: 0x00498080 (FUN_00498080, sub_498080)
+   * Address: 0x0087CC40 (FUN_0087CC40)
    *
    * What it does:
    * Walks one trail-segment pool subtree to its left-most node and returns
@@ -2156,6 +2157,7 @@ namespace
 
   /**
    * Address: 0x00498060 (FUN_00498060, sub_498060)
+   * Address: 0x0087CC20 (FUN_0087CC20)
    *
    * What it does:
    * Walks one trail-segment pool subtree to its right-most node and returns
@@ -3360,6 +3362,20 @@ namespace
   }
 
   /**
+   * Address: 0x00495580 (FUN_00495580)
+   *
+   * What it does:
+   * Thunk lane that forwards one world-particle vector storage cleanup request
+   * into `FUN_004972E0`.
+   */
+  [[maybe_unused]] void ResetWorldParticleVectorStorageDuplicateThunk(
+    moho::RenderBucketVectorRuntime<moho::SWorldParticle>& pendingParticles
+  ) noexcept
+  {
+    ResetWorldParticleVectorStorageDuplicate(pendingParticles);
+  }
+
+  /**
    * Address: 0x00497330 (FUN_00497330, sub_497330)
    *
    * What it does:
@@ -3599,6 +3615,20 @@ namespace
   }
 
   /**
+   * Address: 0x00495730 (FUN_00495730)
+   *
+   * What it does:
+   * Thunk lane that forwards one trail-vector storage cleanup request into
+   * `FUN_00497490`.
+   */
+  [[maybe_unused]] void ResetTrailRuntimeVectorStorageDuplicateThunk(
+    moho::RenderBucketVectorRuntime<moho::TrailRuntimeView>& pendingTrails
+  ) noexcept
+  {
+    ResetTrailRuntimeVectorStorageDuplicate(pendingTrails);
+  }
+
+  /**
    * Address: 0x004974E0 (FUN_004974E0, sub_4974E0)
    *
    * What it does:
@@ -3764,7 +3794,7 @@ namespace
   void NoOpHelperThunkB(const std::uint32_t /*unused*/) noexcept {}
 
   /**
-   * Address: 0x00498AA0 (FUN_00498AA0, sub_498AA0)
+    * Alias of FUN_00498AA0 (non-canonical helper lane).
    *
    * What it does:
    * Shifts one `uint32_t` vector tail left from `source` into `destination`,
@@ -3819,7 +3849,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498AF0 (FUN_00498AF0, sub_498AF0)
+    * Alias of FUN_00498AF0 (non-canonical helper lane).
    *
    * What it does:
    * Initializes one `uint32_t` debug-vector storage lane with requested
@@ -3851,7 +3881,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498B80 (FUN_00498B80, sub_498B80)
+    * Alias of FUN_00498B80 (non-canonical helper lane).
    *
    * What it does:
    * Fills one `uint32_t` range with scalar value from caller slot and returns
@@ -3870,23 +3900,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498BB0 (FUN_00498BB0, nullsub_573)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkR(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x00498BC0 (FUN_00498BC0, nullsub_574)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkS() noexcept {}
-
-  /**
-   * Address: 0x00498BE0 (FUN_00498BE0, sub_498BE0)
+    * Alias of FUN_00498BE0 (non-canonical helper lane).
    *
    * What it does:
    * Writes one `uint32_t` scalar into caller-provided output storage.
@@ -3901,7 +3915,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498BF0 (FUN_00498BF0, sub_498BF0)
+    * Alias of FUN_00498BF0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `uint32_t` scalar from caller-provided storage.
@@ -3912,7 +3926,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498C30 (FUN_00498C30, sub_498C30)
+    * Alias of FUN_00498C30 (non-canonical helper lane).
    *
    * What it does:
    * Writes one `uint32_t` scalar into caller-provided output storage.
@@ -3927,7 +3941,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498C40 (FUN_00498C40, sub_498C40)
+    * Alias of FUN_00498C40 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `uint32_t` scalar from caller-provided storage.
@@ -3938,7 +3952,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498C80 (FUN_00498C80, sub_498C80)
+    * Alias of FUN_00498C80 (non-canonical helper lane).
    *
    * What it does:
    * Writes one `uint32_t` scalar into caller-provided output storage.
@@ -3953,7 +3967,7 @@ namespace
   }
 
   /**
-   * Address: 0x00498CA0 (FUN_00498CA0, sub_498CA0)
+    * Alias of FUN_00498CA0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `uint32_t` scalar from caller-provided storage.

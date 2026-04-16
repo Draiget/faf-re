@@ -271,6 +271,93 @@ namespace
       && ((kLuaOpcodeModes[opcode] & 0x80u) != 0u);
   }
 
+  /**
+   * Address: 0x009100A0 (FUN_009100A0, getjumpcontrol)
+   *
+   * What it does:
+   * Returns the instruction lane that controls jump semantics for `pc`,
+   * stepping back one slot when the prior opcode is a test-with-following-jump.
+   */
+  [[nodiscard]] Instruction* LuaResolveControllingInstruction(FuncState* const fs, const std::int32_t pc) noexcept
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    Instruction* controllingInstruction = &fsView->f->code[pc];
+    if (pc >= 1 && LuaOpcodeNeedsFollowingJump(*(controllingInstruction - 1))) {
+      --controllingInstruction;
+    }
+    return controllingInstruction;
+  }
+
+  /**
+   * Address: 0x00910150 (FUN_00910150, patchtestreg)
+   *
+   * What it does:
+   * Patches one Lua test-instruction A-register lane; when `registerIndex`
+   * equals `NO_REG` (`0xFF`), keeps the existing encoded register value.
+   */
+  [[maybe_unused]] [[nodiscard]] std::int32_t
+  LuaPatchTestRegisterField(std::int32_t registerIndex, Instruction* const instructionSlot) noexcept
+  {
+    if (registerIndex == NO_REG) {
+      registerIndex = static_cast<std::int32_t>((*instructionSlot >> 15) & 0x1FFu);
+    }
+
+    const std::int32_t patchedAField = registerIndex << 24;
+    *instructionSlot = static_cast<Instruction>(
+      (static_cast<std::uint32_t>(*instructionSlot) & 0x00FFFFFFu) | static_cast<std::uint32_t>(patchedAField)
+    );
+    return patchedAField;
+  }
+
+  /**
+   * Address: 0x00912F00 (FUN_00912F00, isinstack)
+   *
+   * What it does:
+   * Returns `1` when `stackValue` is within one call frame stack window
+   * `[base, top)`; returns `0` otherwise.
+   */
+  [[nodiscard]] std::int32_t isinstack(CallInfo* const callInfo, LuaPlus::TObject* const stackValue)
+  {
+    LuaPlus::StkId cursor = callInfo->base;
+    const LuaPlus::StkId top = callInfo->top;
+    while (cursor < top) {
+      if (cursor == stackValue) {
+        return 1;
+      }
+      ++cursor;
+    }
+    return 0;
+  }
+
+  /**
+   * Address: 0x009103C0 (FUN_009103C0, freereg)
+   *
+   * What it does:
+   * Releases one register lane when it is outside the active-local range and
+   * below the Lua max stack sentinel.
+   */
+  void freereg(FuncState* const fs, const std::int32_t registerIndex)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    if (registerIndex >= fsView->nactvar && registerIndex < MAXSTACK) {
+      --fsView->freereg;
+    }
+  }
+
+  /**
+   * Address: 0x009103E0 (FUN_009103E0, freeexp)
+   *
+   * What it does:
+   * Releases one expression register lane when expression kind is
+   * non-relocatable.
+   */
+  void freeexp(expdesc* const expression, FuncState* const fs)
+  {
+    if (expression->k == VNONRELOC) {
+      freereg(fs, expression->info);
+    }
+  }
+
   void singlevaraux(FuncState* fs, TString* name, expdesc* outVariable, int base);
 
   extern "C"
@@ -311,6 +398,7 @@ namespace
     std::int32_t luaX_lex(LexState* ls, SemInfo* seminfo);
     std::int32_t indexupvalue(FuncState* fs, expdesc* value, TString* name);
     TString* str_checkname(LexState* ls);
+    void luaX_syntaxerror(LexState* ls, const char* msg);
     void luaY_field(LexState* ls, expdesc* outExpression);
     void luaK_storevar(FuncState* fs, expdesc* outVariableExpression, expdesc* valueExpression);
     void luaK_fixline(FuncState* fs, int line);
@@ -322,6 +410,9 @@ namespace
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
     void LuaUndumpLoadChunkHeader(LuaUndumpLoadStateRuntimeView* loadState);
     Proto* LuaUndumpLoadTopLevelProto(LuaUndumpLoadStateRuntimeView* loadState, int parentProtoIndex);
+    void luaG_runerror(lua_State* L, const char* format, ...);
+    int luaK_exp2anyreg(FuncState* fs, expdesc* e);
+    void luaK_indexed(FuncState* fs, expdesc* t, expdesc* k);
   }
 
   /**
@@ -543,6 +634,69 @@ namespace
   }
 
   /**
+   * Address: 0x0091B090 (FUN_0091B090, singlevar)
+   *
+   * What it does:
+   * Reads one identifier token and resolves it as local/upvalue/global
+   * expression metadata through `singlevaraux`.
+   */
+  TString* singlevar(LexState* const lexState, expdesc* const outVariable, const int base)
+  {
+    TString* const name = str_checkname(lexState);
+    singlevaraux(lexState->fs, name, outVariable, base);
+    return name;
+  }
+
+  /**
+   * Address: 0x0091AC60 (lparser.c::str_checkname, file-local in original Lua)
+   *
+   * What it does:
+   * Asserts the current lexer token is `TK_NAME` (`0x104`), captures the
+   * semantic-info `TString*`, advances to the next token, and returns the
+   * captured identifier. Recovered as a free function here because callers
+   * (e.g., `singlevar`) live in our recovered LuaParser.cpp.
+   */
+  extern "C" TString* str_checkname(LexState* const ls)
+  {
+    constexpr std::int32_t kTkName = 0x104;
+    if (ls->t.token != kTkName) {
+      luaX_syntaxerror(ls, "<name> expected");
+    }
+
+    TString* const ts = ls->t.seminfo.ts;
+    next(ls);
+    return ts;
+  }
+
+  /**
+   * Address: 0x0091B470 (lparser.c::luaY_field, file-local in original Lua)
+   *
+   * What it does:
+   * Parses one `.NAME` / `:NAME` field access: emits the receiver expression
+   * to any register, advances past the dot/colon, builds a `VK` constant key
+   * for the field name, and forms an indexed access through `luaK_indexed`.
+   * Recovered here so `funcname` can resolve the call. The inline-codestring
+   * sequence (NO_JUMP `t`/`f`, `VK` kind, `luaK_stringK` index) replaces the
+   * original file-local `checkname` helper which is unreachable from the lib.
+   */
+  extern "C" void luaY_field(LexState* const ls, expdesc* const v)
+  {
+    FuncState* const fs = ls->fs;
+    luaK_exp2anyreg(fs, v);
+    next(ls);
+
+    TString* const name = str_checkname(ls);
+
+    expdesc key{};
+    key.t = -1;
+    key.f = -1;
+    key.k = VK;
+    key.info = luaK_stringK(fs, name);
+
+    luaK_indexed(fs, v, &key);
+  }
+
+  /**
    * Address: 0x0091D850 (FUN_0091D850, funcname)
    *
    * What it does:
@@ -551,8 +705,7 @@ namespace
    */
   extern "C" std::int32_t funcname(expdesc* const outExpression, LexState* const lexState)
   {
-    TString* const rootName = str_checkname(lexState);
-    singlevaraux(lexState->fs, rootName, outExpression, 1);
+    (void)singlevar(lexState, outExpression, 1);
 
     while (lexState->t.token == '.') {
       luaY_field(lexState, outExpression);
@@ -728,6 +881,23 @@ namespace
   }
 
   /**
+   * Address: 0x00910940 (FUN_00910940, code_label)
+   *
+   * What it does:
+   * Marks the current bytecode slot as the newest label target and emits one
+   * `OP_LOADBOOL` lane with packed `A/B/C` fields.
+   */
+  extern "C" std::int32_t
+  code_label(const int a, FuncState* const fs, const int b, const int c)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    fsView->lasttarget = fsView->pc;
+    const Instruction instruction = static_cast<Instruction>((((c | ((b | (a << 9)) << 9)) << 6) | 2));
+    return luaK_code(fs, instruction, lexState->lastline);
+  }
+
+  /**
    * Address: 0x00911380 (FUN_00911380, codebinop)
    *
    * What it does:
@@ -786,14 +956,7 @@ namespace
    */
   void invertjump(FuncState* const fs, expdesc* const expression)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    const std::int32_t pc = expression->info;
-    Instruction* instructionSlot = &fsView->f->code[pc];
-
-    if (pc >= 1 && LuaOpcodeNeedsFollowingJump(*(instructionSlot - 1))) {
-      --instructionSlot;
-    }
-
+    Instruction* const instructionSlot = LuaResolveControllingInstruction(fs, expression->info);
     const Instruction instruction = *instructionSlot;
     const Instruction invertedCondition = ((instruction & 0xFF000000u) == 0u) ? 0x01000000u : 0u;
     *instructionSlot = (instruction & 0x00FFFFFFu) | invertedCondition;
@@ -819,9 +982,7 @@ namespace
     }
 
     discharge2anyreg(fs, expression);
-    if (expression->k == VNONRELOC && expression->info >= fsView->nactvar && expression->info < MAXSTACK) {
-      --fsView->freereg;
-    }
+    freeexp(expression, fs);
     return luaK_condjump(NO_REG, fs, 28, expression->info, cond);
   }
 
@@ -844,10 +1005,7 @@ namespace
 
     while (true) {
       Instruction* const jumpInstruction = &code[list];
-      Instruction* controllingInstruction = jumpInstruction;
-      if (list >= 1 && LuaOpcodeNeedsFollowingJump(*(jumpInstruction - 1))) {
-        controllingInstruction = jumpInstruction - 1;
-      }
+      Instruction* const controllingInstruction = LuaResolveControllingInstruction(fs, list);
 
       const Instruction testInstruction = *controllingInstruction;
       const std::int32_t opcode = static_cast<std::int32_t>(testInstruction & 0x3Fu);
@@ -929,12 +1087,7 @@ namespace
     case VRELOCABLE:
     case VNONRELOC:
       discharge2anyreg(fs, expression);
-      if (expression->k == VNONRELOC) {
-        auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-        if (expression->info >= fsView->activeVariableCount && expression->info < MAXSTACK) {
-          --fsView->freeRegisterIndex;
-        }
-      }
+      freeexp(expression, fs);
       expression->info = luaK_codeABC(fs, OP_NOT, 0, expression->info, 0);
       expression->k = VRELOCABLE;
       break;
@@ -1023,6 +1176,24 @@ namespace
       primaryexp(outExpression, ls);
       return;
     }
+  }
+
+  /**
+   * Address: 0x0091CE70 (FUN_0091CE70)
+   *
+   * What it does:
+   * Parses one expression, emits it into the next free register, and returns
+   * the original expression-kind lane.
+   */
+  [[maybe_unused]] std::int32_t ParseExpressionToNextRegisterAndReturnKind(
+    LexState* const ls
+  )
+  {
+    expdesc expression{};
+    subexpr(ls, &expression, -1);
+    const std::int32_t kind = expression.k;
+    luaK_exp2nextreg(ls->fs, &expression);
+    return kind;
   }
 
   /**
@@ -1359,6 +1530,38 @@ namespace
 
 extern "C"
 {
+  /**
+   * Address: 0x00928ED0 (FUN_00928ED0, LoadChunk)
+   *
+   * What it does:
+   * Reads and validates the binary chunk header (signature byte, version,
+   * format word, endianness/size flags) from the load stream. The full
+   * binary-bytecode loader is not yet recovered (FUN_00928ED0 is 512 bytes
+   * of bit-twiddling); this stub raises a runtime error so callers see a
+   * clear failure if pre-compiled bytecode is ever loaded. Lua source
+   * loading goes through `luaY_parser`, not this path.
+   */
+  void LuaUndumpLoadChunkHeader(LuaUndumpLoadStateRuntimeView* const loadState)
+  {
+    luaG_runerror(loadState->state, "binary chunk loading not implemented in %s", loadState->sourceName);
+  }
+
+  /**
+   * Address: 0x00928C10 (FUN_00928C10, LoadFunction)
+   *
+   * What it does:
+   * Recursively reads one `Proto` (line numbers, locals, upvalues, code,
+   * constants, nested protos) from the binary chunk stream. Not yet recovered
+   * (FUN_00928C10 is 447 bytes); raises a runtime error if reached. Compiled
+   * Lua source goes through `luaY_parser` instead, so this path is dormant
+   * unless a `.luac` chunk is fed to `lua_load`.
+   */
+  Proto* LuaUndumpLoadTopLevelProto(LuaUndumpLoadStateRuntimeView* const loadState, int)
+  {
+    luaG_runerror(loadState->state, "binary chunk loading not implemented in %s", loadState->sourceName);
+    return nullptr;
+  }
+
   /**
    * Address: 0x009290F0 (FUN_009290F0, luaU_undump)
    *

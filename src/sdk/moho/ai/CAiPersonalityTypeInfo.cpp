@@ -46,6 +46,29 @@ namespace
   }
 
   /**
+   * Address: 0x005B9520 (FUN_005B9520)
+   *
+   * What it does:
+   * Registers `CScriptObject` as one reflected base lane for
+   * `CAiPersonality` at offset `+0x00`.
+   */
+  void AddCScriptObjectBaseToCAiPersonalityType(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedCScriptObjectType();
+    if (!baseType) {
+      return;
+    }
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
    * Address: 0x00BF76B0 (FUN_00BF76B0, cleanup_CAiPersonalityTypeInfo)
    *
    * What it does:
@@ -82,15 +105,7 @@ void CAiPersonalityTypeInfo::Init()
 {
   size_ = sizeof(CAiPersonality);
   gpg::RType::Init();
-
-  gpg::RField baseField{};
-  baseField.mName = CachedCScriptObjectType()->GetName();
-  baseField.mType = CachedCScriptObjectType();
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
-
+  AddCScriptObjectBaseToCAiPersonalityType(this);
   Finish();
 }
 

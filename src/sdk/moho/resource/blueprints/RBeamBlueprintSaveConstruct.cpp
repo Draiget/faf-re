@@ -24,9 +24,21 @@ namespace
   gpg::RType* gBeamBlueprintType = nullptr;
   moho::RBeamBlueprintSaveConstruct gBeamBlueprintSaveConstruct;
 
+  /**
+   * Address: 0x00510230 (FUN_00510230)
+   *
+   * What it does:
+   * Unlinks the global `RBeamBlueprintSaveConstruct` helper node from the
+   * intrusive serializer-helper list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintSaveConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintSaveConstruct);
+  }
+
   void CleanupBeamBlueprintSaveConstructAtexit()
   {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintSaveConstruct);
+    (void)CleanupBeamBlueprintSaveConstructHelperNodePrimary();
   }
 } // namespace
 

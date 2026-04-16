@@ -40,6 +40,15 @@ namespace moho
      * Address: 0x006F8C50 (FUN_006F8C50, Moho::CUnitCommandQueueTypeInfo::AddBase_Broadcaster_EUnitCommandQueueStatus)
      */
     static void AddBase_Broadcaster_EUnitCommandQueueStatus(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x006EDBD0 (FUN_006EDBD0)
+     *
+     * What it does:
+     * Wrapper lane that forwards one base-registration dispatch to
+     * `AddBase_Broadcaster_EUnitCommandQueueStatus`.
+     */
+    [[maybe_unused]] static void AddBase_Broadcaster_EUnitCommandQueueStatusAdapter(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(CUnitCommandQueueTypeInfo) == 0x64, "CUnitCommandQueueTypeInfo size must be 0x64");
@@ -55,7 +64,7 @@ namespace moho
     );
 
     /**
-     * Address: 0x006EE970 (FUN_006EE970, helper Init)
+     * Address: 0x006F8420 (FUN_006F8420, Moho::CUnitCommandQueueSaveConstruct::RegisterSaveConstructArgsFunction)
      */
     virtual void RegisterSaveConstructArgsFunction();
 
@@ -93,7 +102,7 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x006EEA40 (FUN_006EEA40, helper Init)
+     * Address: 0x006F84A0 (FUN_006F84A0, Moho::CUnitCommandQueueConstruct::RegisterConstructFunction)
      */
     virtual void RegisterConstructFunction();
 
@@ -185,4 +194,3 @@ namespace moho
    */
   void register_CUnitCommandQueueSerializer();
 } // namespace moho
-

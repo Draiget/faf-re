@@ -8,6 +8,12 @@
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/task/CCommandTask.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class CUnitCommand;
@@ -75,6 +81,24 @@ namespace moho
      * command toward the unload goal.
      */
     int Execute() override;
+
+    /**
+     * Address: 0x00629880 (FUN_00629880, Moho::CUnitUnloadUnits::MemberDeserialize)
+     *
+     * What it does:
+     * Reads base command-task state, unload-goal payload, task-state booleans,
+     * and loaded-unit entity-set lanes from archive storage.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00629950 (FUN_00629950, Moho::CUnitUnloadUnits::MemberSerialize)
+     *
+     * What it does:
+     * Writes base command-task state, unload-goal payload, task-state booleans,
+     * and loaded-unit entity-set lanes into archive storage.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     SNavGoal mUnloadGoal;                     // 0x30

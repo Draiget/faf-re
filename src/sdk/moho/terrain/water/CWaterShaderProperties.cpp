@@ -1,6 +1,7 @@
 #include "moho/terrain/water/CWaterShaderProperties.h"
 
 #include <cmath>
+#include <new>
 #include <boost/detail/sp_counted_base.hpp>
 
 #include "gpg/core/streams/BinaryReader.h"
@@ -294,6 +295,25 @@ CWaterShaderProperties::~CWaterShaderProperties()
   for (auto& s : mShaderNames) {
     s.tidy();
   }
+}
+
+/**
+ * Address: 0x0089F8B0 (FUN_0089F8B0)
+ *
+ * What it does:
+ * Runs one deleting-destructor thunk for `CWaterShaderProperties`, forwarding
+ * through non-deleting teardown and optional storage release.
+ */
+[[nodiscard]] CWaterShaderProperties* DestroyWaterShaderPropertiesDeleting(
+  CWaterShaderProperties* const properties,
+  const unsigned char deleteFlag
+)
+{
+  properties->~CWaterShaderProperties();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(properties));
+  }
+  return properties;
 }
 
 /**

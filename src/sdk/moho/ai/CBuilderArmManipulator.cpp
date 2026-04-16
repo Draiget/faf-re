@@ -1,7 +1,10 @@
 #include "moho/ai/CBuilderArmManipulator.h"
 
+#include <cstddef>
 #include <cmath>
+#include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
@@ -25,6 +28,205 @@ namespace
   constexpr std::uint8_t kTrackingModeWorldSpace = 0x04;
   constexpr std::uint8_t kTrackingResultOutsideTolerance = 0x01;
   constexpr std::uint8_t kTrackingResultHeadingMotion = 0x02;
+
+  struct CBuilderArmManipulatorSerializerStartupNode
+  {
+    void* mVtable = nullptr;                    // +0x00
+    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
+    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
+    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
+    gpg::RType::save_func_t mSave = nullptr;   // +0x10
+  };
+
+  static_assert(
+    offsetof(CBuilderArmManipulatorSerializerStartupNode, mHelperNext) == 0x04,
+    "CBuilderArmManipulatorSerializerStartupNode::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CBuilderArmManipulatorSerializerStartupNode, mHelperPrev) == 0x08,
+    "CBuilderArmManipulatorSerializerStartupNode::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CBuilderArmManipulatorSerializerStartupNode) == 0x14,
+    "CBuilderArmManipulatorSerializerStartupNode size must be 0x14"
+  );
+
+  CBuilderArmManipulatorSerializerStartupNode gCBuilderArmManipulatorSerializerStartupNode{};
+
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CBuilderArmManipulatorSerializerStartupNode& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CBuilderArmManipulatorSerializerStartupNode& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
+  {
+    gpg::RType* type = moho::IAniManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::IAniManipulator));
+      moho::IAniManipulator::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+      moho::WeakPtr<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00637510 (FUN_00637510)
+   *
+   * What it does:
+   * Deserializes one `CBuilderArmManipulator` lane by loading
+   * `IAniManipulator` base state, goal weak-pointer lane, and all builder-arm
+   * tracking parameters.
+   */
+  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBody(
+    moho::CBuilderArmManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
+    archive->Read(CachedWeakPtrUnitType(), &manipulator->mGoalUnit, owner);
+
+    archive->ReadFloat(&manipulator->mHeading);
+    archive->ReadFloat(&manipulator->mPitch);
+    archive->ReadInt(&manipulator->mReferenceBoneIdx);
+    archive->ReadBool(&manipulator->mTrackingScriptActive);
+    archive->ReadFloat(&manipulator->mHeadingCenter);
+    archive->ReadFloat(&manipulator->mHeadingHalfArc);
+    archive->ReadFloat(&manipulator->mHeadingMaxSlew);
+    archive->ReadFloat(&manipulator->mPitchCenter);
+    archive->ReadFloat(&manipulator->mPitchHalfArc);
+    archive->ReadFloat(&manipulator->mPitchMaxSlew);
+    archive->ReadBool(&manipulator->mOnTarget);
+  }
+
+  /**
+   * Address: 0x00637190 (FUN_00637190)
+   * Address: 0x00617AF0 (FUN_00617AF0)
+   * Address: 0x0064B360 (FUN_0064B360)
+   *
+   * What it does:
+   * Bridge thunk that forwards one builder-arm serializer deserialize lane to
+   * the canonical deserialize body.
+   */
+  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBodyThunkA(
+    moho::CBuilderArmManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCBuilderArmManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00637300 (FUN_00637300)
+   * Address: 0x006354C0 (FUN_006354C0)
+   * Address: 0x0064B4D0 (FUN_0064B4D0)
+   *
+   * What it does:
+   * Mirrored bridge thunk that forwards one builder-arm serializer deserialize
+   * lane to the canonical deserialize body.
+   */
+  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBodyThunkB(
+    moho::CBuilderArmManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCBuilderArmManipulatorSerializerBody(manipulator, archive);
+  }
+
+  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBody(
+    const moho::CBuilderArmManipulator* manipulator,
+    gpg::WriteArchive* archive
+  );
+
+  /**
+   * Address: 0x006371A0 (FUN_006371A0)
+   *
+   * What it does:
+   * Jump-thunk adapter that forwards one builder-arm serializer save lane to
+   * `FUN_00637640`.
+   */
+  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBodyThunkA(
+    const moho::CBuilderArmManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCBuilderArmManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00637310 (FUN_00637310)
+   * Address: 0x00617B40 (FUN_00617B40)
+   *
+   * What it does:
+   * Mirrored jump-thunk adapter that forwards one builder-arm serializer save
+   * lane to `FUN_00637640`.
+   */
+  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBodyThunkB(
+    const moho::CBuilderArmManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCBuilderArmManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00637640 (FUN_00637640)
+   *
+   * What it does:
+   * Serializes one `CBuilderArmManipulator` lane by saving IAniManipulator
+   * base state, goal weak-pointer lane, and all builder-arm tracking fields.
+   */
+  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBody(
+    const moho::CBuilderArmManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(CachedIAniManipulatorType(), manipulator, owner);
+    archive->Write(CachedWeakPtrUnitType(), &manipulator->mGoalUnit, owner);
+
+    archive->WriteFloat(manipulator->mHeading);
+    archive->WriteFloat(manipulator->mPitch);
+    archive->WriteInt(manipulator->mReferenceBoneIdx);
+    archive->WriteBool(manipulator->mTrackingScriptActive);
+    archive->WriteFloat(manipulator->mHeadingCenter);
+    archive->WriteFloat(manipulator->mHeadingHalfArc);
+    archive->WriteFloat(manipulator->mHeadingMaxSlew);
+    archive->WriteFloat(manipulator->mPitchCenter);
+    archive->WriteFloat(manipulator->mPitchHalfArc);
+    archive->WriteFloat(manipulator->mPitchMaxSlew);
+    archive->WriteBool(manipulator->mOnTarget);
+  }
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const ownerActor, const std::int32_t boneIndex) noexcept
   {
@@ -79,6 +281,51 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00635B20 (FUN_00635B20)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CBuilderArmManipulator` serializer
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] void* InitializeCBuilderArmManipulatorSerializerStartupThunk()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCBuilderArmManipulatorSerializerStartupNode);
+    gCBuilderArmManipulatorSerializerStartupNode.mHelperPrev = self;
+    gCBuilderArmManipulatorSerializerStartupNode.mHelperNext = self;
+    gCBuilderArmManipulatorSerializerStartupNode.mLoad = reinterpret_cast<gpg::RType::load_func_t>(
+      &DeserializeCBuilderArmManipulatorSerializerBody
+    );
+    gCBuilderArmManipulatorSerializerStartupNode.mSave = reinterpret_cast<gpg::RType::save_func_t>(
+      &SerializeCBuilderArmManipulatorSerializerBody
+    );
+    return &gCBuilderArmManipulatorSerializerStartupNode;
+  }
+
+  /**
+   * Address: 0x00635B50 (FUN_00635B50, cleanup_CBuilderArmManipulatorSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the `CBuilderArmManipulator`
+   * serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CBuilderArmManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCBuilderArmManipulatorSerializerStartupNode);
+  }
+
+  /**
+   * Address: 0x00635B80 (FUN_00635B80, cleanup_CBuilderArmManipulatorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the
+   * `CBuilderArmManipulator` serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CBuilderArmManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCBuilderArmManipulatorSerializerStartupNode);
+  }
+
+  /**
    * Address: 0x00635BB0 (FUN_00635BB0, ??0CBuilderArmManipulator@Moho@@QAE@@Z)
    *
    * What it does:
@@ -101,6 +348,15 @@ namespace moho
   {
     // Binary constructor leaves the 0x90 lane untouched.
   }
+
+  /**
+   * Address: 0x00635FA0 (FUN_00635FA0, ??1CBuilderArmManipulator@Moho@@UAE@XZ)
+   *
+   * What it does:
+   * Runs weak-target lane teardown and forwards destruction into
+   * `IAniManipulator`.
+   */
+  CBuilderArmManipulator::~CBuilderArmManipulator() = default;
 
   /**
    * Address: 0x00636490 (FUN_00636490, Moho::CBuilderArmManipulator::SetAimingArc)

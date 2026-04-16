@@ -40,6 +40,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050EFD0 (FUN_0050EFD0, Moho::RBeamBlueprint::dtr core)
+   *
+   * What it does:
+   * Releases beam texture string storage and resets base resource-id storage.
+   */
+  RBeamBlueprint::~RBeamBlueprint()
+  {
+    TextureName.tidy(true, 0U);
+    BlueprintId.name.tidy(true, 0U);
+  }
+
+  /**
    * Address: 0x0050EEB0 (FUN_0050EEB0)
    * Mangled: ?GetClass@RBeamBlueprint@Moho@@UBEPAVRType@gpg@@XZ
    *

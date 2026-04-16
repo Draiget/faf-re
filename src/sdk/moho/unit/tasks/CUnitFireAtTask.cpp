@@ -1,7 +1,9 @@
 #include "moho/unit/tasks/CUnitFireAtTask.h"
 
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -31,10 +33,52 @@ namespace
 
     return false;
   }
+
+  [[nodiscard]] gpg::RType* CachedCUnitFireAtTaskType()
+  {
+    gpg::RType* type = moho::CUnitFireAtTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitFireAtTask));
+      moho::CUnitFireAtTask::sType = type;
+    }
+    return type;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
 } // namespace
 
 namespace moho
 {
+  gpg::RType* CUnitFireAtTask::sType = nullptr;
+
   /**
    * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
    * Mangled: ??1CUnitFireAtTask@Moho@@QAE@@Z
@@ -135,3 +179,43 @@ namespace moho
     return -1;
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0060CE10 (FUN_0060CE10, gpg::RRef_CUnitFireAtTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitFireAtTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeDerivedRef(value, CachedCUnitFireAtTaskType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x0060C800 (FUN_0060C800)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CUnitFireAtTask` and
+   * copies object/type fields into the destination reference record.
+   */
+  gpg::RRef* AssignCUnitFireAtTaskRef(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef temporaryRef{};
+    (void)RRef_CUnitFireAtTask(&temporaryRef, value);
+    outRef->mObj = temporaryRef.mObj;
+    outRef->mType = temporaryRef.mType;
+    return outRef;
+  }
+} // namespace gpg

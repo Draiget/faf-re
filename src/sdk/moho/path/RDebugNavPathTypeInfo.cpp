@@ -27,6 +27,17 @@ namespace
     }
     return sType;
   }
+
+  /**
+   * Address: 0x00650680 (FUN_00650680)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for navigator-path rendering.
+   */
+  void RegisterRDebugNavPathOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display the navigator paths", "NavPath");
+  }
 } // namespace
 
 namespace moho
@@ -53,14 +64,16 @@ namespace moho
   void RDebugNavPathTypeInfo::Init()
   {
     size_ = sizeof(RDebugNavPath);
-    newRefFunc_ = &RDebugNavPathTypeInfo::NewRef;
-    ctorRefFunc_ = &RDebugNavPathTypeInfo::CtrRef;
-    deleteFunc_ = &RDebugNavPathTypeInfo::Delete;
-    dtrFunc_ = &RDebugNavPathTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &RDebugNavPathTypeInfo::NewRef,
+      &RDebugNavPathTypeInfo::CtrRef,
+      &RDebugNavPathTypeInfo::Delete,
+      &RDebugNavPathTypeInfo::Destruct
+    );
     AddBase_RDebugOverlay(this);
     gpg::RType::Init();
-
-    RegisterOverlayClass("Display the navigator paths", "NavPath");
+    RegisterRDebugNavPathOverlayClass(this);
     Finish();
   }
 

@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "Wm3Vector3.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
 
 struct lua_State;
@@ -12,7 +14,9 @@ struct lua_State;
 namespace moho
 {
   class CAniActor;
+  class Entity;
   class Sim;
+  class Unit;
 
   struct SAniManipBinding
   {
@@ -102,7 +106,7 @@ namespace moho
      *
      * VFTable SLOT: 1 (primary CTaskEvent/CScriptEvent view)
      */
-    virtual bool ManipulatorUpdate() = 0;
+    virtual bool ManipulatorUpdate();
 
     /**
      * Address: 0x0063B6D0 (FUN_0063B6D0, ?AddWatchBone@IAniManipulator@Moho@@QAEHH@Z)
@@ -128,6 +132,90 @@ namespace moho
     std::uint32_t mUnknown5C;                            // +0x5C
     SAniManipBindingStorage mWatchBones;                 // +0x60
   };
+
+  class CFootPlantManipulator : public IAniManipulator
+  {
+  public:
+    /**
+     * Address: 0x006392E0 (FUN_006392E0, ??0CFootPlantManipulator@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Builds `IAniManipulator` base lanes then initializes foot-plant weak-link
+     * and bone/stance tuning lanes to zero defaults.
+     */
+    CFootPlantManipulator();
+
+    bool ManipulatorUpdate() override;
+
+    WeakPtr<Unit> mGoalUnit;         // +0x80
+    std::int32_t mFootBoneIndex;     // +0x88
+    std::int32_t mKneeBoneIndex;     // +0x8C
+    std::int32_t mHipBoneIndex;      // +0x90
+    bool mStraightLegs;              // +0x94
+    std::uint8_t mPad95_97[0x3]{};   // +0x95
+    float mMaxFootFall;              // +0x98
+    float mHalfLegSpan;              // +0x9C
+  };
+  static_assert(offsetof(CFootPlantManipulator, mGoalUnit) == 0x80, "CFootPlantManipulator::mGoalUnit offset must be 0x80");
+  static_assert(
+    offsetof(CFootPlantManipulator, mFootBoneIndex) == 0x88,
+    "CFootPlantManipulator::mFootBoneIndex offset must be 0x88"
+  );
+  static_assert(
+    offsetof(CFootPlantManipulator, mStraightLegs) == 0x94,
+    "CFootPlantManipulator::mStraightLegs offset must be 0x94"
+  );
+  static_assert(
+    offsetof(CFootPlantManipulator, mMaxFootFall) == 0x98,
+    "CFootPlantManipulator::mMaxFootFall offset must be 0x98"
+  );
+  static_assert(sizeof(CFootPlantManipulator) == 0xA0, "CFootPlantManipulator size must be 0xA0");
+
+  class CBoneEntityManipulator : public IAniManipulator
+  {
+  public:
+    /**
+     * Address: 0x00634400 (FUN_00634400, ??0CBoneEntityManipulator@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Builds `IAniManipulator` base lanes then clears goal/target weak links,
+     * resets reference-bone index, and zeroes pivot coordinates.
+     */
+    CBoneEntityManipulator();
+
+    /**
+     * Address: 0x00634630 (FUN_00634630, ??1CBoneEntityManipulator@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks both goal/target weak-link lanes from owner chains, clears link
+     * state, then forwards to `IAniManipulator` teardown.
+     */
+    ~CBoneEntityManipulator() override;
+
+    bool ManipulatorUpdate() override;
+
+    WeakPtr<Unit> mGoalUnit;           // +0x80
+    WeakPtr<Entity> mTargetEntity;     // +0x88
+    std::int32_t mReferenceBoneIndex;  // +0x90
+    Wm3::Vector3f mPivot;              // +0x94
+  };
+  static_assert(
+    offsetof(CBoneEntityManipulator, mGoalUnit) == 0x80,
+    "CBoneEntityManipulator::mGoalUnit offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulator, mTargetEntity) == 0x88,
+    "CBoneEntityManipulator::mTargetEntity offset must be 0x88"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulator, mReferenceBoneIndex) == 0x90,
+    "CBoneEntityManipulator::mReferenceBoneIndex offset must be 0x90"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulator, mPivot) == 0x94,
+    "CBoneEntityManipulator::mPivot offset must be 0x94"
+  );
+  static_assert(sizeof(CBoneEntityManipulator) == 0xA0, "CBoneEntityManipulator size must be 0xA0");
 
   using IAniManipulatorSetPrecedence_LuaFuncDef = ::moho::CScrLuaBinder;
   using IAniManipulatorEnable_LuaFuncDef = ::moho::CScrLuaBinder;

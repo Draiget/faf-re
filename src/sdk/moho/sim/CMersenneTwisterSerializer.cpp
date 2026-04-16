@@ -103,7 +103,6 @@ namespace
     gCMersenneTwisterSerializer.mHelperPrev = nullptr;
     gCMersenneTwisterSerializer.mLoadCallback = &LoadCMersenneTwister;
     gCMersenneTwisterSerializer.mSaveCallback = &SaveCMersenneTwister;
-    gCMersenneTwisterSerializer.RegisterSerializeFunctions();
   }
 
   struct CMersenneTwisterReflectionRegistration

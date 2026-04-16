@@ -62,6 +62,17 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E3C50 (FUN_005E3C50)
+     * Address: 0x005E82A0 (FUN_005E82A0)
+     *
+     * What it does:
+     * Initializes the transport interface vtable lane and resets broadcaster
+     * links to a self-linked sentinel state; the second constructor lane is
+     * an equivalent alias.
+     */
+    IAiTransport();
+
+    /**
      * Address: 0x005E3C70 (FUN_005E3C70, scalar deleting thunk)
      *
      * What it does:

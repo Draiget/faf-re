@@ -685,7 +685,7 @@
   }
 
   /**
-   * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
+    * Alias of FUN_00AEDB70 (non-canonical helper lane).
    *
    * What it does:
    * Builds one ARGB8888 alpha ramp table for 3110 mode:
@@ -745,7 +745,7 @@
   }
 
   /**
-   * Address: 0x00AEDD50 (FUN_00AEDD50, _CFT_MakeArgb8888Alp3211Tbl)
+    * Alias of FUN_00AEDD50 (non-canonical helper lane).
    *
    * What it does:
    * Builds one ARGB8888 alpha ramp table for 3211 mode:
@@ -1051,6 +1051,45 @@
     timerSummary->maxTicksLow = 0;
     timerSummary->maxTicksHigh = 0;
     timerSummary->sampleCount = 0;
+    return timerSummary;
+  }
+
+  /**
+   * Address: 0x00AE6FE0 (FUN_00AE6FE0, _UTY_AddTsum)
+   *
+   * What it does:
+   * Accumulates one signed 64-bit timer sample into the summary sum lane,
+   * updates min/max sample lanes, and increments summary sample count.
+   */
+  moho::SfplyTimerSummary* UTY_AddTsum(moho::SfplyTimerSummary* const timerSummary, const std::int64_t sampleTicks)
+  {
+    const std::uint32_t sampleLow = static_cast<std::uint32_t>(sampleTicks);
+    const std::int32_t sampleHigh = static_cast<std::int32_t>(static_cast<std::uint64_t>(sampleTicks) >> 32u);
+
+    const std::uint32_t previousAccumLow = static_cast<std::uint32_t>(timerSummary->accumulatedTicksLow);
+    const std::uint32_t nextAccumLow = previousAccumLow + sampleLow;
+    const std::uint32_t carry = (nextAccumLow < previousAccumLow) ? 1u : 0u;
+    timerSummary->accumulatedTicksLow = static_cast<std::int32_t>(nextAccumLow);
+    timerSummary->accumulatedTicksHigh =
+      timerSummary->accumulatedTicksHigh + sampleHigh + static_cast<std::int32_t>(carry);
+
+    const auto packSigned64 = [](const std::int32_t highWord, const std::int32_t lowWord) -> std::int64_t {
+      return (static_cast<std::int64_t>(highWord) << 32u) | static_cast<std::uint32_t>(lowWord);
+    };
+
+    const std::int64_t currentMin = packSigned64(timerSummary->minTicksHigh, timerSummary->minTicksLow);
+    if (sampleTicks < currentMin) {
+      timerSummary->minTicksLow = static_cast<std::int32_t>(sampleTicks);
+      timerSummary->minTicksHigh = sampleHigh;
+    }
+
+    const std::int64_t currentMax = packSigned64(timerSummary->maxTicksHigh, timerSummary->maxTicksLow);
+    if (sampleTicks > currentMax) {
+      timerSummary->maxTicksLow = static_cast<std::int32_t>(sampleTicks);
+      timerSummary->maxTicksHigh = sampleHigh;
+    }
+
+    ++timerSummary->sampleCount;
     return timerSummary;
   }
 
@@ -1482,9 +1521,218 @@
 
       return cftbgra256x3.data();
     }
+
+    [[nodiscard]] inline std::uint32_t PackYuyvLane(
+      const std::uint8_t y0,
+      const std::uint8_t cb,
+      const std::uint8_t y1,
+      const std::uint8_t cr
+    ) noexcept
+    {
+      return
+        static_cast<std::uint32_t>(y0) |
+        (static_cast<std::uint32_t>(cb) << 8) |
+        (static_cast<std::uint32_t>(y1) << 16) |
+        (static_cast<std::uint32_t>(cr) << 24);
+    }
+
+    [[nodiscard]] inline std::uint8_t BlendChromaLane(
+      const std::uint8_t lhs,
+      const std::uint8_t rhs,
+      const std::uint32_t lhsWeight,
+      const std::uint32_t rhsWeight
+    ) noexcept
+    {
+      const std::uint32_t weighted =
+        lhsWeight * static_cast<std::uint32_t>(lhs) +
+        rhsWeight * static_cast<std::uint32_t>(rhs) +
+        4u;
+      return static_cast<std::uint8_t>(weighted >> 3);
+    }
+
+    [[nodiscard]] std::uint8_t* ConvertYcc420PlanarToYcc422pix2Int2smp(
+      const CftYcc420PlanarInputLanes* const inputLanes,
+      const CftPixelSurfaceLanes* const outputSurface
+    )
+    {
+      std::int32_t processedRows = 0;
+      std::uint8_t* yRow0 = inputLanes->yPlane;
+      std::uint8_t* cbLeadRow = inputLanes->cbPlane;
+      std::uint8_t* crLeadRow = inputLanes->crPlane;
+      auto* outputRow0 = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase);
+
+      const std::int32_t oddWidthFlag = outputSurface->widthPixels & 1;
+      const std::uint32_t roundedWidthPixels =
+        static_cast<std::uint32_t>(outputSurface->widthPixels + oddWidthFlag);
+      const std::uint32_t chromaPairsPerRow = roundedWidthPixels >> 1;
+
+      const std::int32_t yTailAdvance = inputLanes->yStrideBytes - static_cast<std::int32_t>(roundedWidthPixels);
+      const std::int32_t chromaTailAdvance = inputLanes->cbStrideBytes - static_cast<std::int32_t>(chromaPairsPerRow);
+      const std::int32_t outputTailAdvanceWords =
+        (outputSurface->strideBytes - (2 * static_cast<std::int32_t>(roundedWidthPixels))) / 4;
+
+      const std::int32_t yGroupAdvance = (4 * inputLanes->yStrideBytes) - static_cast<std::int32_t>(roundedWidthPixels);
+      const std::int32_t chromaGroupAdvance = (2 * inputLanes->cbStrideBytes) - static_cast<std::int32_t>(chromaPairsPerRow);
+      const std::int32_t outputGroupAdvanceWords =
+        (4 * outputSurface->strideBytes - (2 * static_cast<std::int32_t>(roundedWidthPixels))) / 4;
+      const std::int32_t outputStrideWords = outputSurface->strideBytes / 4;
+
+      const std::int32_t leadingRows = (outputSurface->heightPixels > 2) ? 2 : outputSurface->heightPixels;
+      while (processedRows < leadingRows) {
+        if (chromaPairsPerRow != 0) {
+          std::uint32_t pairCount = chromaPairsPerRow;
+          do {
+            const std::uint8_t y0 = *yRow0++;
+            const std::uint8_t y1 = *yRow0++;
+            const std::uint8_t cb = *cbLeadRow++;
+            const std::uint8_t cr = *crLeadRow++;
+            *outputRow0++ = PackYuyvLane(y0, cb, y1, cr);
+          } while (--pairCount != 0);
+        }
+
+        if (oddWidthFlag != 0) {
+          auto* const outputBytes = reinterpret_cast<std::uint8_t*>(outputRow0);
+          outputBytes[-2] = outputBytes[-4];
+        }
+
+        yRow0 += yTailAdvance;
+        cbLeadRow += chromaTailAdvance;
+        crLeadRow += chromaTailAdvance;
+        outputRow0 += outputTailAdvanceWords;
+        ++processedRows;
+      }
+
+      auto* outputRow1 = outputRow0 + outputStrideWords;
+      auto* outputRow2 = outputRow0 + (2 * outputStrideWords);
+      auto* outputRow3 = outputRow0 + (3 * outputStrideWords);
+
+      std::uint8_t* yRow1 = yRow0 + inputLanes->yStrideBytes;
+      std::uint8_t* yRow2 = yRow0 + (2 * inputLanes->yStrideBytes);
+      std::uint8_t* yRow3 = yRow0 + (3 * inputLanes->yStrideBytes);
+
+      std::uint8_t* cbRow0 = inputLanes->cbPlane;
+      std::uint8_t* cbRow1 = cbRow0 + inputLanes->cbStrideBytes;
+      std::uint8_t* cbRow2 = cbRow0 + (2 * inputLanes->cbStrideBytes);
+      std::uint8_t* cbRow3 = cbRow0 + (3 * inputLanes->cbStrideBytes);
+
+      std::uint8_t* crRow0 = inputLanes->crPlane;
+      std::uint8_t* crRow1 = crRow0 + inputLanes->crStrideBytes;
+      std::uint8_t* crRow2 = crRow0 + (2 * inputLanes->crStrideBytes);
+      std::uint8_t* crRow3 = crRow0 + (3 * inputLanes->crStrideBytes);
+
+      while (processedRows + 3 < outputSurface->heightPixels) {
+        if (chromaPairsPerRow != 0) {
+          std::uint32_t pairCount = chromaPairsPerRow;
+          do {
+            const std::uint8_t y00 = *yRow0++;
+            const std::uint8_t y01 = *yRow0++;
+            const std::uint8_t y10 = *yRow1++;
+            const std::uint8_t y11 = *yRow1++;
+            const std::uint8_t y20 = *yRow2++;
+            const std::uint8_t y21 = *yRow2++;
+            const std::uint8_t y30 = *yRow3++;
+            const std::uint8_t y31 = *yRow3++;
+
+            *outputRow0++ = PackYuyvLane(
+              y00,
+              BlendChromaLane(*cbRow0, *cbRow2, 5u, 3u),
+              y01,
+              BlendChromaLane(*crRow0, *crRow2, 5u, 3u)
+            );
+            *outputRow1++ = PackYuyvLane(
+              y10,
+              BlendChromaLane(*cbRow1, *cbRow3, 7u, 1u),
+              y11,
+              BlendChromaLane(*crRow1, *crRow3, 7u, 1u)
+            );
+            *outputRow2++ = PackYuyvLane(
+              y20,
+              BlendChromaLane(*cbRow2, *cbRow0, 7u, 1u),
+              y21,
+              BlendChromaLane(*crRow2, *crRow0, 7u, 1u)
+            );
+            *outputRow3++ = PackYuyvLane(
+              y30,
+              BlendChromaLane(*cbRow1, *cbRow3, 3u, 5u),
+              y31,
+              BlendChromaLane(*crRow1, *crRow3, 3u, 5u)
+            );
+
+            ++cbRow0;
+            ++cbRow1;
+            ++cbRow2;
+            ++cbRow3;
+            ++crRow0;
+            ++crRow1;
+            ++crRow2;
+            ++crRow3;
+          } while (--pairCount != 0);
+        }
+
+        if (oddWidthFlag != 0) {
+          auto* const outputBytes0 = reinterpret_cast<std::uint8_t*>(outputRow0);
+          auto* const outputBytes1 = reinterpret_cast<std::uint8_t*>(outputRow1);
+          auto* const outputBytes2 = reinterpret_cast<std::uint8_t*>(outputRow2);
+          auto* const outputBytes3 = reinterpret_cast<std::uint8_t*>(outputRow3);
+          outputBytes0[-2] = outputBytes0[-4];
+          outputBytes1[-2] = outputBytes1[-4];
+          outputBytes2[-2] = outputBytes2[-4];
+          outputBytes3[-2] = outputBytes3[-4];
+        }
+
+        yRow0 += yGroupAdvance;
+        yRow1 += yGroupAdvance;
+        yRow2 += yGroupAdvance;
+        yRow3 += yGroupAdvance;
+        cbRow0 += chromaGroupAdvance;
+        cbRow1 += chromaGroupAdvance;
+        cbRow2 += chromaGroupAdvance;
+        cbRow3 += chromaGroupAdvance;
+        crRow0 += chromaGroupAdvance;
+        crRow1 += chromaGroupAdvance;
+        crRow2 += chromaGroupAdvance;
+        crRow3 += chromaGroupAdvance;
+        outputRow0 += outputGroupAdvanceWords;
+        outputRow1 += outputGroupAdvanceWords;
+        outputRow2 += outputGroupAdvanceWords;
+        outputRow3 += outputGroupAdvanceWords;
+        processedRows += 4;
+      }
+
+      while (processedRows < outputSurface->heightPixels) {
+        if (chromaPairsPerRow != 0) {
+          std::uint32_t pairCount = chromaPairsPerRow;
+          do {
+            const std::uint8_t y0 = *yRow0++;
+            const std::uint8_t y1 = *yRow0++;
+            const std::uint8_t cb = *cbRow0++;
+            const std::uint8_t cr = *crRow0++;
+            *outputRow0++ = PackYuyvLane(y0, cb, y1, cr);
+          } while (--pairCount != 0);
+        }
+
+        if (oddWidthFlag != 0) {
+          auto* const outputBytes = reinterpret_cast<std::uint8_t*>(outputRow0);
+          outputBytes[-2] = outputBytes[-4];
+        }
+
+        yRow0 += yTailAdvance;
+        cbRow0 += chromaTailAdvance;
+        crRow0 += chromaTailAdvance;
+        outputRow0 += outputTailAdvanceWords;
+        ++processedRows;
+      }
+
+      return cbRow0;
+    }
   } // namespace
 
   std::int32_t cft_Ycc420plnToArgb8888UserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable
+  );
+  std::int32_t cft_Ycc420plnToArgb8888SplitUserTable(
     const CftYcc420PlanarInputLanes* const inputLanes,
     const CftPixelSurfaceLanes* const outputSurface,
     const void* const colorTable
@@ -1523,6 +1771,45 @@
     outputSurface.reserved = 0;
 
     return cft_Ycc420plnToArgb8888UserTable(
+      reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes),
+      reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface),
+      ResolveArgb8888UserTable(userTableAddress)
+    );
+  }
+
+  /**
+   * Address: 0x00AF2A90 (FUN_00AF2A90, _CFT_Ycc420plnToArgb8888Split)
+   *
+   * What it does:
+   * Repackages packed YCC420/input-surface lanes into split-frame converter
+   * views and dispatches conversion through either the caller-provided table
+   * pointer or the default ARGB table.
+   */
+  std::int32_t CFT_Ycc420plnToArgb8888Split(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords,
+    const std::int32_t* const userTableAddress
+  )
+  {
+    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
+    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
+
+    CftYcc420PlanarInputLanesView inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
+    inputLanes.yStrideBytes = inputView->yStrideBytes;
+    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
+    inputLanes.crStrideBytes = inputView->crStrideBytes;
+
+    CftPixelSurfaceLanesView outputSurface{};
+    outputSurface.pixelBase = outputView->pixelBase;
+    outputSurface.widthPixels = outputView->widthPixels;
+    outputSurface.heightPixels = outputView->heightPixels;
+    outputSurface.strideBytes = outputView->strideBytes;
+    outputSurface.reserved = 0;
+
+    return cft_Ycc420plnToArgb8888SplitUserTable(
       reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes),
       reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface),
       ResolveArgb8888UserTable(userTableAddress)
@@ -1629,6 +1916,47 @@
   }
 
   /**
+   * Address: 0x00AF1B60 (FUN_00AF1B60, _cft_c_Ycc420plnToYcc422pix2Int2smp)
+   *
+   * What it does:
+   * Runs scalar two-sample YCC420 planar -> YCC422 pixel2/int conversion with
+   * weighted vertical chroma blending on 4-line groups.
+   */
+  std::uint8_t* cft_c_Ycc420plnToYcc422pix2Int2smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToYcc422pix2Int2smp");
+    return ConvertYcc420PlanarToYcc422pix2Int2smp(inputLanes, outputSurface);
+  }
+
+  /**
+   * Address: 0x00B03600 (FUN_00B03600, _cft_sse_Ycc420plnToYcc422pix2Int2smp)
+   *
+   * What it does:
+   * Publishes SSE lane identity, aligns caller scratch workspace, and executes
+   * the two-sample YCC420 planar -> YCC422 pixel2/int conversion pipeline.
+   */
+  std::int32_t cft_sse_Ycc420plnToYcc422pix2Int2smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const std::uintptr_t scratchBufferAddress,
+    const std::int32_t scratchBufferSizeBytes
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_sse_Ycc420plnToYcc422pix2Int2smp");
+    const std::uintptr_t alignedScratchBufferAddress =
+      (scratchBufferAddress + 31u) & ~static_cast<std::uintptr_t>(31u);
+    (void)alignedScratchBufferAddress;
+    (void)scratchBufferSizeBytes;
+
+    return static_cast<std::int32_t>(
+      reinterpret_cast<std::intptr_t>(ConvertYcc420PlanarToYcc422pix2Int2smp(inputLanes, outputSurface))
+    );
+  }
+
+  /**
    * Address: 0x00B03EA0 (FUN_00B03EA0, _CFT_Ycc420plnToYcc422pix2Int1smp)
    *
    * What it does:
@@ -1672,6 +2000,80 @@
     }
 
     return cft_sse_Ycc420plnToYcc422pix2Int1smp(inputLanes, outputSurface);
+  }
+
+  /**
+   * Address: 0x00AEED20 (FUN_00AEED20, _CFT_Ycc420plnToYcc422pix2Int)
+   *
+   * What it does:
+   * Repackages packed conversion lanes and dispatches either the 1-sample
+   * fast lane or the two-sample scalar/SSE lane based on optimize mode and
+   * alignment/stride preconditions.
+   */
+  std::int32_t CFT_Ycc420plnToYcc422pix2Int(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords,
+    const std::int32_t* const scratchBufferWords
+  )
+  {
+    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
+    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
+
+    CftYcc420PlanarInputLanesView inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
+    inputLanes.yStrideBytes = inputView->yStrideBytes;
+    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
+    inputLanes.crStrideBytes = inputView->crStrideBytes;
+
+    CftPixelSurfaceLanesView outputSurface{};
+    outputSurface.pixelBase = outputView->pixelBase;
+    outputSurface.widthPixels = outputView->widthPixels;
+    outputSurface.heightPixels = outputView->heightPixels;
+    outputSurface.strideBytes = outputView->strideBytes;
+    outputSurface.reserved = 0;
+
+    if (CFTCOM_GetOptimizeSpeed() != 0) {
+      return CFT_Ycc420plnToYcc422pix2Int1smp(
+        reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes),
+        reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface)
+      );
+    }
+
+    const auto* const inputLanesPtr =
+      reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
+    const auto* const outputSurfacePtr =
+      reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
+
+    const std::uintptr_t alignmentMask =
+      reinterpret_cast<std::uintptr_t>(inputLanes.yPlane) |
+      reinterpret_cast<std::uintptr_t>(inputLanes.cbPlane) |
+      reinterpret_cast<std::uintptr_t>(inputLanes.crPlane) |
+      reinterpret_cast<std::uintptr_t>(outputSurface.pixelBase);
+    const std::int32_t alignedWidthPixels = (outputSurface.widthPixels + 15) & ~15;
+    if (
+      UTY_SupportSse() == 0 ||
+      (alignmentMask & 0x0Fu) != 0u ||
+      (outputSurface.heightPixels & 3) != 0 ||
+      (outputSurface.widthPixels & 0x0F) != 0 ||
+      std::abs(outputSurface.strideBytes) < (2 * alignedWidthPixels)
+    ) {
+      return static_cast<std::int32_t>(
+        reinterpret_cast<std::intptr_t>(cft_c_Ycc420plnToYcc422pix2Int2smp(inputLanesPtr, outputSurfacePtr))
+      );
+    }
+
+    const std::uintptr_t scratchBufferAddress = static_cast<std::uintptr_t>(
+      static_cast<std::uint32_t>(scratchBufferWords[0])
+    );
+    const std::int32_t scratchBufferSizeBytes = scratchBufferWords[1];
+    return cft_sse_Ycc420plnToYcc422pix2Int2smp(
+      inputLanesPtr,
+      outputSurfacePtr,
+      scratchBufferAddress,
+      scratchBufferSizeBytes
+    );
   }
 
   /**
@@ -2823,7 +3225,7 @@
   }
 
   /**
-   * Address: 0x00ADE1C0 (FUN_00ADE1C0, _SFXA_Init)
+    * Alias of FUN_00ADE1C0 (non-canonical helper lane).
    *
    * What it does:
    * SFXA init thunk that forwards to `sfxalp_InitLibWork`.
@@ -3053,7 +3455,7 @@
   }
 
   /**
-   * Address: 0x00ADE3E0 (FUN_00ADE3E0, _SFXSUD_Init)
+    * Alias of FUN_00ADE3E0 (non-canonical helper lane).
    */
   void SFXSUD_Init()
   {
@@ -3167,6 +3569,44 @@
     laneView->laneParam3C = 0;
     laneView->sourceBufferBytes = sourceBufferBytes;
     return sourceBufferBytes;
+  }
+
+  /**
+   * Address: 0x00ADE840 (FUN_00ADE840, _SFBUF_FixAringBuf)
+   *
+   * What it does:
+   * Rebinds one audio-ring lane from the lane source buffer, derives secondary
+   * sample base and sample capacity from transfer/sample parameters, and
+   * stores the updated aring descriptor lanes.
+   */
+  std::int32_t SFBUF_FixAringBuf(
+    const std::int32_t sfbufHandleAddress,
+    const std::int32_t laneIndex,
+    const std::int32_t sampleMode,
+    const std::int32_t transferParam2,
+    const std::int32_t transferParam0
+  )
+  {
+    auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufSupplyLaneView* const laneView = &runtimeView->lanes[laneIndex];
+
+    const std::int32_t primarySampleBaseAddress = laneView->sourceBufferAddress;
+    std::int32_t sampleWindowBytes = laneView->sourceBufferBytes;
+    if (transferParam2 > 1) {
+      sampleWindowBytes /= transferParam2;
+    }
+
+    auto* const aringState = reinterpret_cast<SfbufAringLaneStateView*>(&laneView->laneParam18);
+    aringState->transferParam0 = transferParam0;
+    aringState->sampleMode = sampleMode;
+    aringState->transferParam2 = transferParam2;
+    aringState->primarySampleBaseAddress = primarySampleBaseAddress;
+    aringState->secondarySampleBaseAddress = primarySampleBaseAddress + sampleWindowBytes;
+
+    const std::int32_t bytesPerSample = (sampleMode + 7) / 8;
+    const std::int32_t ringCapacitySamples = sampleWindowBytes / bytesPerSample;
+    aringState->ringCapacitySamples = ringCapacitySamples;
+    return ringCapacitySamples;
   }
 
   /**
@@ -3373,6 +3813,24 @@
   }
 
   /**
+   * Address: 0x00AE5A90 (FUN_00AE5A90)
+   *
+   * What it does:
+   * Clears one 5-word supply-lane tail payload and returns the same base lane.
+   */
+  std::int32_t* sfbuf_ClearSupplyTailFiveWords(std::int32_t* const tailWords) noexcept
+  {
+    if (tailWords == nullptr) {
+      return nullptr;
+    }
+
+    for (std::int32_t laneWord = 0; laneWord < 5; ++laneWord) {
+      tailWords[laneWord] = 0;
+    }
+    return tailWords;
+  }
+
+  /**
    * Address: 0x00ADEA60 (FUN_00ADEA60, _sfbuf_SetSupSj)
    */
   void sfbuf_SetSupSj(
@@ -3392,9 +3850,7 @@
     (void)sfbuf_InitConti(supplyLaneWords + 6);
     supplyLaneWords[8] = 0;
     supplyLaneWords[9] = 0;
-    for (std::int32_t laneWord = 0; laneWord < 5; ++laneWord) {
-      supplyLaneWords[10 + laneWord] = 0;
-    }
+    (void)sfbuf_ClearSupplyTailFiveWords(supplyLaneWords + 10);
 
     SFLIB_UnlockCs();
   }

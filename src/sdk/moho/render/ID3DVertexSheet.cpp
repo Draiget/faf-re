@@ -2,8 +2,24 @@
 
 #include "boost/shared_ptr.h"
 
+#include <new>
+
 namespace moho
 {
+  /**
+   * Address: 0x00813D90 (FUN_00813D90, boost::shared_ptr_ID3DVertexSheet::shared_ptr_ID3DVertexSheet)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<ID3DVertexSheet>` from one raw vertex-sheet pointer lane.
+   */
+  boost::shared_ptr<ID3DVertexSheet>* ConstructSharedVertexSheetFromRaw(
+    boost::shared_ptr<ID3DVertexSheet>* const outVertexSheet,
+    ID3DVertexSheet* const vertexSheet
+  )
+  {
+    return ::new (outVertexSheet) boost::shared_ptr<ID3DVertexSheet>(vertexSheet);
+  }
+
   /**
    * Address: 0x00814940 (FUN_00814940, boost::shared_ptr_ID3DVertexSheet::operator=)
    *

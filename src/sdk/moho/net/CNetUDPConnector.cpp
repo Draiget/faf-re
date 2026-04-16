@@ -377,7 +377,7 @@ void CNetUDPConnector::Pull()
 }
 
 /**
- * Address: 0x0048B7F0 (FUN_0048B7F0)
+  * Alias of FUN_0048B7F0 (non-canonical helper lane).
  * Address: 0x100851A0 (sub_100851A0)
  *
  * What it does:
@@ -954,7 +954,7 @@ void CNetUDPConnector::Entry()
 }
 
 /**
- * Address: 0x0048AC40 (FUN_0048AC40)
+  * Alias of FUN_0048AC40 (non-canonical helper lane).
  *
  * What it does:
  * Flushes connector outbound packet queue, then computes next wake timeout

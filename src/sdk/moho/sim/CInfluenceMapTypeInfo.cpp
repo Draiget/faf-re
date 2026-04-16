@@ -71,6 +71,15 @@ namespace moho
   }
 
   /**
+   * Address: 0x007154D0 (FUN_007154D0, Moho::EThreatTypeTypeInfo::EThreatTypeTypeInfo)
+   */
+  EThreatTypeTypeInfo::EThreatTypeTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EThreatType), this);
+  }
+
+  /**
    * Address: 0x00715580 (FUN_00715580, j_??1REnumType@gpg@@QAE@@Z_48)
    */
   EThreatTypeTypeInfo::~EThreatTypeTypeInfo() = default;

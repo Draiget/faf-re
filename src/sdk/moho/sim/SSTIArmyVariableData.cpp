@@ -1,6 +1,7 @@
 #include "SSTIArmyVariableData.h"
 
 #include <cstdlib>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
@@ -122,9 +123,64 @@ namespace
     return self;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* ResetSSTIArmyVariableDataSerializerHelperLinks() noexcept
+  {
+    gSSTIArmyVariableDataSerializer.mHelperNext->mPrev = gSSTIArmyVariableDataSerializer.mHelperPrev;
+    gSSTIArmyVariableDataSerializer.mHelperPrev->mNext = gSSTIArmyVariableDataSerializer.mHelperNext;
+    gpg::SerHelperBase* const self = HelperSelfNode(gSSTIArmyVariableDataSerializer);
+    gSSTIArmyVariableDataSerializer.mHelperPrev = self;
+    gSSTIArmyVariableDataSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00550A60 (FUN_00550A60)
+   *
+   * What it does:
+   * Unlinks `SSTIArmyVariableDataSerializer` helper node from the intrusive
+   * helper list and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyVariableDataSerializerHelperNodePrimary() noexcept
+  {
+    return ResetSSTIArmyVariableDataSerializerHelperLinks();
+  }
+
+  /**
+   * Address: 0x00550A90 (FUN_00550A90)
+   *
+   * What it does:
+   * Secondary entrypoint for `SSTIArmyVariableDataSerializer` helper-node
+   * unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTIArmyVariableDataSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetSSTIArmyVariableDataSerializerHelperLinks();
+  }
+
   void CleanupSSTIArmyVariableDataSerializerAtexit()
   {
-    (void)UnlinkHelperNode(gSSTIArmyVariableDataSerializer);
+    (void)CleanupSSTIArmyVariableDataSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x00704250 (FUN_00704250)
+   *
+   * What it does:
+   * Copies one contiguous 32-bit range `[sourceBegin, sourceEnd)` into
+   * destination storage and returns one-past the last written slot.
+   */
+  [[maybe_unused]] std::uint32_t* CopyWordRangeForward(
+    std::uint32_t* destination,
+    const std::uint32_t* sourceBegin,
+    const std::uint32_t* const sourceEnd
+  ) noexcept
+  {
+    while (sourceBegin != sourceEnd) {
+      *destination = *sourceBegin;
+      ++destination;
+      ++sourceBegin;
+    }
+    return destination;
   }
 
   /**
@@ -193,6 +249,480 @@ namespace
     }
 
     data->SerializeSaveBody(archive, nullptr);
+  }
+
+  /**
+   * Address: 0x00700280 (FUN_00700280)
+   *
+   * What it does:
+   * Assigns one `SSTIArmyVariableData` payload from `source` into
+   * `destination` and returns the destination pointer.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* AssignSSTIArmyVariableData(
+    const moho::SSTIArmyVariableData* const source,
+    moho::SSTIArmyVariableData* const destination
+  )
+  {
+    *destination = *source;
+    return destination;
+  }
+
+  struct SSTIArmyVariableDataOwnerSlotRuntime
+  {
+    std::uint8_t reserved00_7F[0x80]{};
+    moho::SSTIArmyVariableData variableData;
+  };
+  static_assert(
+    offsetof(SSTIArmyVariableDataOwnerSlotRuntime, variableData) == 0x80,
+    "SSTIArmyVariableDataOwnerSlotRuntime::variableData offset must be 0x80"
+  );
+
+  /**
+   * Address: 0x008B17D0 (FUN_008B17D0)
+   *
+   * What it does:
+   * Copies one source `SSTIArmyVariableData` payload into an owning object's
+   * embedded variable-data slot at offset `+0x80`.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* AssignSSTIArmyVariableDataIntoEmbeddedOwnerSlot(
+    const moho::SSTIArmyVariableData* const source,
+    SSTIArmyVariableDataOwnerSlotRuntime* const owner
+  )
+  {
+    return AssignSSTIArmyVariableData(source, &owner->variableData);
+  }
+
+  /**
+   * Address: 0x007519A0 (FUN_007519A0)
+   *
+   * What it does:
+   * Copies one contiguous `SSTIArmyVariableData` assignment range
+   * `[sourceBegin, sourceEnd)` into `destinationBegin` and returns the end of
+   * the destination range.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeForwardAssign(
+    const moho::SSTIArmyVariableData* sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd,
+    moho::SSTIArmyVariableData* destinationBegin
+  )
+  {
+    moho::SSTIArmyVariableData* destinationCursor = destinationBegin;
+    for (const moho::SSTIArmyVariableData* sourceCursor = sourceBegin;
+         sourceCursor != sourceEnd;
+         ++sourceCursor, ++destinationCursor) {
+      (void)AssignSSTIArmyVariableData(sourceCursor, destinationCursor);
+    }
+
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x00753C80 (FUN_00753C80)
+   *
+   * What it does:
+   * Alternate call-convention lane that forwards one contiguous
+   * `SSTIArmyVariableData` assignment copy from `[sourceBegin, sourceEnd)` into
+   * destination storage and returns destination end.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeForwardAssignThunkA(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    return CopySSTIArmyVariableDataRangeForwardAssign(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00751A00 (FUN_00751A00)
+   *
+   * What it does:
+   * Assign-fills one destination range `[destinationBegin, destinationEnd)`
+   * from a single source payload and returns the last written destination slot
+   * (or `destinationBegin` when the range is empty).
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* FillSSTIArmyVariableDataRangeAssignReturnLastWritten(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    moho::SSTIArmyVariableData* const destinationEnd,
+    const moho::SSTIArmyVariableData* const source
+  )
+  {
+    moho::SSTIArmyVariableData* lastWritten = destinationBegin;
+    for (moho::SSTIArmyVariableData* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
+      lastWritten = AssignSSTIArmyVariableData(source, cursor);
+    }
+
+    return lastWritten;
+  }
+
+  /**
+   * Address: 0x00753CE0 (FUN_00753CE0)
+   *
+   * What it does:
+   * Alternate lane that assign-fills one destination range
+   * `[destinationBegin, destinationEnd)` from one source payload and returns
+   * the last written destination slot.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* FillSSTIArmyVariableDataRangeAssignReturnLastWrittenThunkA(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const source,
+    moho::SSTIArmyVariableData* const destinationEnd
+  )
+  {
+    return FillSSTIArmyVariableDataRangeAssignReturnLastWritten(destinationBegin, destinationEnd, source);
+  }
+
+  /**
+   * Address: 0x00751A20 (FUN_00751A20)
+   *
+   * What it does:
+   * Copies one contiguous `SSTIArmyVariableData` assignment range backward from
+   * `[sourceBegin, sourceEnd)` into destination storage ending at
+   * `destinationEnd`, and returns the begin of the written destination range.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeBackwardAssign(
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* sourceEnd,
+    moho::SSTIArmyVariableData* destinationEnd
+  )
+  {
+    moho::SSTIArmyVariableData* destinationCursor = destinationEnd;
+    while (sourceBegin != sourceEnd) {
+      --sourceEnd;
+      --destinationCursor;
+      (void)AssignSSTIArmyVariableData(sourceEnd, destinationCursor);
+    }
+
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x00753D00 (FUN_00753D00)
+   *
+   * What it does:
+   * Alternate call-convention lane that backward-copies
+   * `[sourceBegin, sourceEnd)` into destination storage ending at
+   * `destinationEnd`.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeBackwardAssignThunkA(
+    const moho::SSTIArmyVariableData* const sourceEnd,
+    moho::SSTIArmyVariableData* const destinationEnd,
+    const moho::SSTIArmyVariableData* const sourceBegin
+  )
+  {
+    return CopySSTIArmyVariableDataRangeBackwardAssign(sourceBegin, sourceEnd, destinationEnd);
+  }
+
+  /**
+   * Address: 0x00755920 (FUN_00755920)
+   *
+   * What it does:
+   * Secondary backward-copy lane for `SSTIArmyVariableData` assignment ranges.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeBackwardAssignThunkB(
+    moho::SSTIArmyVariableData* const destinationEnd,
+    const moho::SSTIArmyVariableData* const sourceEnd,
+    const moho::SSTIArmyVariableData* const sourceBegin
+  )
+  {
+    return CopySSTIArmyVariableDataRangeBackwardAssign(sourceBegin, sourceEnd, destinationEnd);
+  }
+
+  /**
+   * Address: 0x005632D0 (FUN_005632D0, copy_SSTIArmyVariableData_range_with_rollback)
+   *
+   * What it does:
+   * Copy-constructs one contiguous `SSTIArmyVariableData` range into
+   * destination storage and destroys already-constructed elements before
+   * rethrowing if a construction step throws.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeWithRollback(
+    const moho::SSTIArmyVariableData* sourceBegin,
+    const moho::SSTIArmyVariableData* sourceEnd,
+    moho::SSTIArmyVariableData* destinationBegin
+  )
+  {
+    moho::SSTIArmyVariableData* destinationCursor = destinationBegin;
+    try {
+      for (const moho::SSTIArmyVariableData* sourceCursor = sourceBegin;
+           sourceCursor != sourceEnd;
+           ++sourceCursor, ++destinationCursor) {
+        if (destinationCursor != nullptr) {
+          ::new (destinationCursor) moho::SSTIArmyVariableData(*sourceCursor);
+        }
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (moho::SSTIArmyVariableData* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->~SSTIArmyVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x00562620 (FUN_00562620)
+   *
+   * What it does:
+   * Register-shape adapter for guarded contiguous
+   * `SSTIArmyVariableData` copy-construction.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeWithRollbackRegisterAdapter(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    return CopySSTIArmyVariableDataRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00562B10 (FUN_00562B10)
+   *
+   * What it does:
+   * Primary adapter lane that forwards one contiguous
+   * `SSTIArmyVariableData` range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIArmyVariableDataRangeWithRollbackAdapterLaneA(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    (void)CopySSTIArmyVariableDataRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00562FF0 (FUN_00562FF0)
+   *
+   * What it does:
+   * Secondary adapter lane that forwards one contiguous
+   * `SSTIArmyVariableData` range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIArmyVariableDataRangeWithRollbackAdapterLaneB(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    (void)CopySSTIArmyVariableDataRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005631F0 (FUN_005631F0)
+   *
+   * What it does:
+   * Tertiary adapter lane that forwards one contiguous
+   * `SSTIArmyVariableData` range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIArmyVariableDataRangeWithRollbackAdapterLaneC(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    (void)CopySSTIArmyVariableDataRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x007566F0 (FUN_007566F0)
+   * Address: 0x00757430 (FUN_00757430, copy_SSTIArmyVariableData_range_with_rollback_alt)
+   *
+   * What it does:
+   * Alternate call-convention lane for the same guarded contiguous
+   * `SSTIArmyVariableData` copy-construction routine.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeWithRollbackAlt(
+    const moho::SSTIArmyVariableData* sourceBegin,
+    const moho::SSTIArmyVariableData* sourceEnd,
+    moho::SSTIArmyVariableData* destinationBegin
+  )
+  {
+    return CopySSTIArmyVariableDataRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00753CB0 (FUN_00753CB0)
+   *
+   * What it does:
+   * Register-lane adapter that forwards one guarded
+   * `SSTIArmyVariableData` contiguous copy-construction range into the
+   * alternate rollback lane.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeWithRollbackAltRegisterAdapterA(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    return CopySSTIArmyVariableDataRangeWithRollbackAlt(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x007558F0 (FUN_007558F0)
+   *
+   * What it does:
+   * Secondary register-lane adapter for guarded
+   * `SSTIArmyVariableData` contiguous copy-construction into destination
+   * storage through the alternate rollback lane.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* CopySSTIArmyVariableDataRangeWithRollbackAltRegisterAdapterB(
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    const moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    return CopySSTIArmyVariableDataRangeWithRollbackAlt(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x007519D0 (FUN_007519D0)
+   *
+   * What it does:
+   * Copies one contiguous range `[sourceBegin, sourceEnd)` into destination
+   * storage starting at `sourceEnd`.
+   */
+  [[maybe_unused]] void CopySSTIArmyVariableDataTailRangeWithRollbackAdapter(
+    const moho::SSTIArmyVariableData* const sourceBegin,
+    moho::SSTIArmyVariableData* const sourceEnd
+  )
+  {
+    (void)CopySSTIArmyVariableDataRangeWithRollbackAlt(sourceBegin, sourceEnd, sourceEnd);
+  }
+
+  struct LegacyWordVectorRuntimeView
+  {
+    void* mAllocProxy;           // +0x00
+    std::uint32_t* mBegin;       // +0x04
+    std::uint32_t* mEnd;         // +0x08
+    std::uint32_t* mCapacityEnd; // +0x0C
+  };
+
+  static_assert(sizeof(LegacyWordVectorRuntimeView) == 0x10, "LegacyWordVectorRuntimeView size must be 0x10");
+
+  /**
+   * Address: 0x0055FE70 (FUN_0055FE70)
+   *
+   * What it does:
+   * Releases one legacy word-vector backing allocation and clears the
+   * begin/end/capacity lanes to the empty-state shape.
+   */
+  void ResetLegacyWordVectorStorage(LegacyWordVectorRuntimeView* const vectorRuntime)
+  {
+    if (vectorRuntime->mBegin != nullptr) {
+      ::operator delete(vectorRuntime->mBegin);
+    }
+    vectorRuntime->mBegin = nullptr;
+    vectorRuntime->mEnd = nullptr;
+    vectorRuntime->mCapacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x00754200 (FUN_00754200, fill_SSTIArmyVariableData_count_with_rollback)
+   *
+   * What it does:
+   * Copy-constructs `count` contiguous `SSTIArmyVariableData` objects from one
+   * source payload into destination storage and destroys already-constructed
+   * elements before rethrowing if construction fails.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* FillSSTIArmyVariableDataCountWithRollback(
+    const unsigned int count,
+    moho::SSTIArmyVariableData* destinationBegin,
+    const moho::SSTIArmyVariableData* source
+  )
+  {
+    moho::SSTIArmyVariableData* destinationCursor = destinationBegin;
+    try {
+      for (unsigned int i = 0; i < count; ++i, ++destinationCursor) {
+        if (destinationCursor != nullptr) {
+          ::new (destinationCursor) moho::SSTIArmyVariableData(*source);
+        }
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (moho::SSTIArmyVariableData* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->~SSTIArmyVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x007507A0 (FUN_007507A0)
+   *
+   * What it does:
+   * Alternate register-lane adapter that forwards one counted
+   * `SSTIArmyVariableData` fill-copy request to the canonical rollback helper.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* FillSSTIArmyVariableDataCountWithRollbackAdapterLaneB(
+    const moho::SSTIArmyVariableData* const source,
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const unsigned int count
+  )
+  {
+    return FillSSTIArmyVariableDataCountWithRollback(count, destinationBegin, source);
+  }
+
+  /**
+   * Address: 0x00751EC0 (FUN_00751EC0)
+   *
+   * What it does:
+   * Alternate counted-fill adapter lane that forwards
+   * `SSTIArmyVariableData` rollback construction into the canonical helper.
+   */
+  [[maybe_unused]] moho::SSTIArmyVariableData* FillSSTIArmyVariableDataCountWithRollbackAdapterLaneC(
+    const moho::SSTIArmyVariableData* const source,
+    moho::SSTIArmyVariableData* const destinationBegin,
+    const unsigned int count
+  )
+  {
+    return FillSSTIArmyVariableDataCountWithRollback(count, destinationBegin, source);
+  }
+
+  [[nodiscard]] moho::SSTIArmyVariableData* CopyConstructSSTIArmyVariableDataIfPresent(
+    moho::SSTIArmyVariableData* const destination,
+    const moho::SSTIArmyVariableData* const source
+  )
+  {
+    if (source == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (destination) moho::SSTIArmyVariableData(*source);
+  }
+
+  /**
+   * Address: 0x00563590 (FUN_00563590)
+   *
+   * What it does:
+   * Primary adapter lane for nullable `SSTIArmyVariableData`
+   * copy-construction into caller-provided storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTIArmyVariableData* CopyConstructSSTIArmyVariableDataIfPresentPrimary(
+    moho::SSTIArmyVariableData* const destination,
+    const moho::SSTIArmyVariableData* const source
+  )
+  {
+    return CopyConstructSSTIArmyVariableDataIfPresent(destination, source);
+  }
+
+  /**
+   * Address: 0x00563790 (FUN_00563790)
+   *
+   * What it does:
+   * Secondary adapter lane for nullable `SSTIArmyVariableData`
+   * copy-construction into caller-provided storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTIArmyVariableData* CopyConstructSSTIArmyVariableDataIfPresentSecondary(
+    moho::SSTIArmyVariableData* const destination,
+    const moho::SSTIArmyVariableData* const source
+  )
+  {
+    return CopyConstructSSTIArmyVariableDataIfPresent(destination, source);
   }
 } // namespace
 
@@ -277,6 +807,24 @@ namespace moho
   SSTIArmyVariableData::~SSTIArmyVariableData() = default;
 
   /**
+   * Address: 0x00561590 (FUN_00561590)
+   *
+   * What it does:
+   * Destroys one contiguous `SSTIArmyVariableData` range `[begin, end)` by
+   * invoking the element destructor in forward order.
+   */
+  [[maybe_unused]] void DestroySSTIArmyVariableDataRange(
+    SSTIArmyVariableData* begin,
+    SSTIArmyVariableData* const end
+  )
+  {
+    while (begin != end) {
+      begin->~SSTIArmyVariableData();
+      ++begin;
+    }
+  }
+
+  /**
    * Address: 0x007011C0 (FUN_007011C0)
    */
   void SArmyVectorWithMeta::CopyWordPayloadFrom(const SArmyVectorWithMeta& source)
@@ -285,7 +833,8 @@ namespace moho
       return;
     }
 
-    mWords.assign(source.mWords.data(), source.mWords.size());
+    mWords.resize(source.mWords.size());
+    (void)CopyWordRangeForward(mWords.data(), source.mWords.data(), source.mWords.data() + source.mWords.size());
   }
 
   /**
@@ -464,7 +1013,6 @@ namespace moho
     InitializeHelperNode(gSSTIArmyVariableDataSerializer);
     gSSTIArmyVariableDataSerializer.mSerLoadFunc = &SSTIArmyVariableDataSerializer::Deserialize;
     gSSTIArmyVariableDataSerializer.mSerSaveFunc = &SSTIArmyVariableDataSerializer::Serialize;
-    gSSTIArmyVariableDataSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupSSTIArmyVariableDataSerializerAtexit);
   }
 

@@ -17,6 +17,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00651AE0 (FUN_00651AE0)
+     *
+     * What it does:
+     * Initializes the debug-overlay base lane and seeds intrusive links as a
+     * singleton ring.
+     */
+    RDebugOverlay();
+
+    /**
      * Address: 0x0064C1E0 (FUN_0064C1E0, scalar deleting body)
      * Slot: 2
      *

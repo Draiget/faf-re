@@ -30,6 +30,15 @@ namespace moho
     std::uint8_t pad_0027{0};     // +0x27
 
     /**
+     * Address: 0x0050E5F0 (FUN_0050E5F0, Moho::REffectBlueprint::REffectBlueprint)
+     *
+     * What it does:
+     * Initializes the base effect-blueprint lane with null owner, empty
+     * resource id, and all fidelity flags enabled.
+     */
+    REffectBlueprint();
+
+    /**
      * Address: 0x00A82547 (`_purecall`)
      * Slot: 0
      */

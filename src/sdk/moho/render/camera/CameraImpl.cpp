@@ -476,6 +476,110 @@ namespace
     return gpg::time::GetSystemTimer().ElapsedSeconds();
   }
 
+  class RecoveredITimeSourceVtableProbe final : public CameraTimeSourceRuntime
+  {
+  public:
+    float Time() override
+    {
+      return 0.0f;
+    }
+  };
+
+  [[nodiscard]] void* RecoveredITimeSourceVtable() noexcept
+  {
+    static RecoveredITimeSourceVtableProbe probe;
+    return *reinterpret_cast<void**>(&probe);
+  }
+
+  [[nodiscard]] void* RecoveredSystemTimeSourceVtable() noexcept
+  {
+    static SystemTimeSource probe;
+    return *reinterpret_cast<void**>(&probe);
+  }
+
+  [[nodiscard]] void* RecoveredGameTimeSourceVtable() noexcept
+  {
+    static GameTimeSource probe;
+    return *reinterpret_cast<void**>(&probe);
+  }
+
+  /**
+   * Address: 0x007A6500 (FUN_007A6500)
+   *
+   * What it does:
+   * Restores one base `ITimeSource` vtable lane in place.
+   */
+  [[nodiscard]] CameraTimeSourceRuntime* InitializeCameraTimeSourceVtable(
+    CameraTimeSourceRuntime* const timeSource
+  ) noexcept
+  {
+    *reinterpret_cast<void**>(timeSource) = RecoveredITimeSourceVtable();
+    return timeSource;
+  }
+
+  /**
+   * Address: 0x007A7E00 (FUN_007A7E00)
+   *
+   * What it does:
+   * Restores one `SystemTimeSource` vtable lane in place.
+   */
+  [[nodiscard]] SystemTimeSource* InitializeSystemTimeSourceVtable(SystemTimeSource* const timeSource) noexcept
+  {
+    *reinterpret_cast<void**>(timeSource) = RecoveredSystemTimeSourceVtable();
+    return timeSource;
+  }
+
+  /**
+   * Address: 0x007A7E10 (FUN_007A7E10)
+   *
+   * What it does:
+   * Restores one `GameTimeSource` vtable lane in place.
+   */
+  [[nodiscard]] GameTimeSource* InitializeGameTimeSourceVtable(GameTimeSource* const timeSource) noexcept
+  {
+    *reinterpret_cast<void**>(timeSource) = RecoveredGameTimeSourceVtable();
+    return timeSource;
+  }
+
+  /**
+   * Address: 0x007A7E90 (FUN_007A7E90)
+   *
+   * What it does:
+   * Alias entry that restores the same base `ITimeSource` vtable lane.
+   */
+  [[nodiscard]] CameraTimeSourceRuntime* InitializeCameraTimeSourceVtableAlias0(
+    CameraTimeSourceRuntime* const timeSource
+  ) noexcept
+  {
+    return InitializeCameraTimeSourceVtable(timeSource);
+  }
+
+  /**
+   * Address: 0x007A7EE0 (FUN_007A7EE0)
+   *
+   * What it does:
+   * Alias entry that restores the same base `ITimeSource` vtable lane.
+   */
+  [[nodiscard]] CameraTimeSourceRuntime* InitializeCameraTimeSourceVtableAlias1(
+    CameraTimeSourceRuntime* const timeSource
+  ) noexcept
+  {
+    return InitializeCameraTimeSourceVtable(timeSource);
+  }
+
+  /**
+   * Address: 0x007A7EF0 (FUN_007A7EF0)
+   *
+   * What it does:
+   * Alias entry that restores the same base `ITimeSource` vtable lane.
+   */
+  [[nodiscard]] CameraTimeSourceRuntime* InitializeCameraTimeSourceVtableAlias2(
+    CameraTimeSourceRuntime* const timeSource
+  ) noexcept
+  {
+    return InitializeCameraTimeSourceVtable(timeSource);
+  }
+
   struct CameraTransitionFlagView
   {
     std::uint8_t mUnknown000To00F[0x10]{};
@@ -509,6 +613,21 @@ namespace
   [[nodiscard]] RuntimeCameraBaseView* AsRuntimeCameraBaseView(moho::CameraImpl* const camera) noexcept
   {
     return reinterpret_cast<RuntimeCameraBaseView*>(camera);
+  }
+
+  /**
+   * Address: 0x007A7DE0 (FUN_007A7DE0)
+   *
+   * What it does:
+   * Restores one runtime camera-base node to the self-linked broadcaster
+   * sentinel state after construction.
+   */
+  [[nodiscard]] RuntimeCameraBaseView* InitializeRuntimeCameraBaseLane(RuntimeCameraBaseView* const cameraBase) noexcept
+  {
+    moho::Broadcaster& broadcaster = cameraBase->mBroadcaster;
+    broadcaster.mNext = &broadcaster;
+    broadcaster.mPrev = &broadcaster;
+    return cameraBase;
   }
 
   struct CameraTrackingEvent
@@ -664,6 +783,20 @@ namespace
 
     weakRef.mOwnerLinkSlot = nullptr;
     weakRef.mNextOwner = nullptr;
+  }
+
+  void LinkSelectionWeakOwnerRef(moho::UserEntity* const entity, moho::SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    weakRef.mOwnerLinkSlot = nullptr;
+    weakRef.mNextOwner = nullptr;
+    if (entity == nullptr) {
+      return;
+    }
+
+    auto** const ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+    weakRef.mOwnerLinkSlot = ownerLinkSlot;
+    weakRef.mNextOwner = *ownerLinkSlot;
+    *ownerLinkSlot = &weakRef;
   }
 
   [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateSelectionSetHead()
@@ -859,7 +992,16 @@ namespace
     list.mSize = 0;
   }
 
-  void CameraTargetListAppendWeakRef(CameraTargetEntityList& list, const moho::SSelectionWeakRefUserEntity& weakRef)
+  /**
+   * Address: 0x007AE4E0 (FUN_007AE4E0, helper lane behind CameraImpl::CameraFollow)
+   *
+   * What it does:
+   * Appends one target weak-ref node into the camera's target list and returns
+   * the newly appended node so follow state can keep a typed active cursor.
+   */
+  [[nodiscard]] CameraTargetEntityNode* CameraTargetListAppendWeakRef(
+    CameraTargetEntityList& list, const moho::SSelectionWeakRefUserEntity& weakRef
+  )
   {
     EnsureCameraTargetListInitialized(list);
     auto* const node = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
@@ -878,6 +1020,7 @@ namespace
     CameraTargetListIncrementSize(list);
     list.mHead->mPrev = node;
     node->mPrev->mNext = node;
+    return node;
   }
 
   void CameraTargetListClear(CameraTargetEntityList& list)
@@ -920,7 +1063,7 @@ namespace
     moho::SSelectionNodeUserEntity* node =
       moho::SSelectionSetUserEntity::find(const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), sourceSet.mHead->mLeft, &cursor);
     while (node != sourceSet.mHead) {
-      CameraTargetListAppendWeakRef(outList, node->mEnt);
+      (void)CameraTargetListAppendWeakRef(outList, node->mEnt);
       moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
       node = moho::SSelectionSetUserEntity::find(
         const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), cursor, &cursor
@@ -1357,6 +1500,42 @@ void moho::CameraImpl::CameraReset()
 }
 
 /**
+ * Address: 0x007A71B0 (FUN_007A71B0, Moho::CameraImpl::CameraFollow)
+ * Mangled: ?CameraFollow@CameraImpl@Moho@@UAEXABUSCamFollowParams@2@@Z
+ *
+ * What it does:
+ * Promotes one follow target into the active camera target list when the
+ * current entity-id gate still matches.
+ */
+void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  UserEntity* const currentTarget = GetTargetEntity();
+  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != followParams.mCurrentEntityId) {
+    return;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  UserEntity* const nextTarget = FindSessionEntityById(session, followParams.mTargetEntityId);
+  if (nextTarget == nullptr) {
+    return;
+  }
+
+  moho::SSelectionWeakRefUserEntity weakRef{};
+  LinkSelectionWeakOwnerRef(nextTarget, weakRef);
+  CameraTargetEntityNode* const nextNode = CameraTargetListAppendWeakRef(runtime->mTargetEntities, weakRef);
+  if (nextNode != nullptr) {
+    runtime->mActiveTargetEntityNode = nextNode;
+  }
+
+  runtime->mTargetTimeLeft = followParams.mTargetTimeLeft;
+}
+
+/**
  * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
  *
  * What it does:
@@ -1432,6 +1611,18 @@ void moho::CameraImpl::CameraSetViewport(const Wm3::Vector2f& viewportOrigin, co
 void moho::CameraImpl::CameraSetOrtho(const bool enabled)
 {
   AsRuntimeView(this)->mIsOrtho = static_cast<std::uint8_t>(enabled ? 1 : 0);
+}
+
+/**
+ * Address: 0x007A6A30 (FUN_007A6A30, Moho::CameraImpl::SetTimeSource)
+ * Mangled: ?SetTimeSource@CameraImpl@Moho@@QAEXW4ECamTimeSource@2@@Z
+ *
+ * What it does:
+ * Stores the active runtime time-source selector in the camera runtime view.
+ */
+void moho::CameraImpl::SetTimeSource(const ECamTimeSource timeSource)
+{
+  AsRuntimeView(this)->mTimeSource = static_cast<std::int32_t>(timeSource);
 }
 
 /**
@@ -1984,7 +2175,7 @@ void moho::CameraImpl::CalculateFOV()
 }
 
 /**
- * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
+  * Alias of FUN_007A6BF0 (non-canonical helper lane).
  * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
  *
  * What it does:
@@ -2267,6 +2458,21 @@ void moho::CameraImpl::TargetManual(
     runtime->mTargetType = kCameraTargetTypeHermite;
     SetupHermite();
   }
+}
+
+/**
+ * Address: 0x007A8E90 (FUN_007A8E90, Moho::CameraImpl::SetZoom)
+ * Mangled: ?SetZoom@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * What it does:
+ * Re-applies manual targeting at the current target position while keeping
+ * the active heading and far-pitch lanes and substituting a new zoom/seconds
+ * pair.
+ */
+void moho::CameraImpl::SetZoom(const float zoom, const float seconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  TargetManual(runtime->mTargetLocation, runtime->mHeading, runtime->mFarPitch, zoom, seconds);
 }
 
 /**
@@ -2595,8 +2801,7 @@ int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
   }
   const float targetZoom = static_cast<float>(lua_tonumber(rawState, 2));
 
-  CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
-  camera->TargetManual(runtime->mTargetLocation, runtime->mHeading, runtime->mFarPitch, targetZoom, transitionSeconds);
+  camera->SetZoom(targetZoom, transitionSeconds);
   return 0;
 }
 
@@ -3695,7 +3900,7 @@ int moho::cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
-  AsRuntimeView(camera)->mTimeSource = kCameraTimeSourceGame;
+  camera->SetTimeSource(static_cast<ECamTimeSource>(kCameraTimeSourceGame));
   return 0;
 }
 
@@ -3747,7 +3952,7 @@ int moho::cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
   CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
-  AsRuntimeView(camera)->mTimeSource = kCameraTimeSourceSystem;
+  camera->SetTimeSource(static_cast<ECamTimeSource>(kCameraTimeSourceSystem));
   return 0;
 }
 

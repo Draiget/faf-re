@@ -1,4 +1,5 @@
 #include "Effect.hpp"
+#include "EffectVariable.hpp"
 
 #include "gpg/gal/Device.hpp"
 
@@ -24,6 +25,22 @@ namespace gpg::gal
             ) = 0;
         };
     }
+
+    /**
+     * Address: 0x009415A0 (FUN_009415A0)
+     *
+     * What it does:
+     * Initializes one base `Effect` lane and installs the class vtable.
+     */
+    Effect::Effect() = default;
+
+    /**
+     * Address: 0x00942F70 (FUN_00942F70)
+     *
+     * What it does:
+     * Initializes one base `EffectVariable` lane and installs the class vtable.
+     */
+    EffectVariable::EffectVariable() = default;
 
     /**
      * Address: 0x0093F5B0 (FUN_0093F5B0)

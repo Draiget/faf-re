@@ -6,6 +6,25 @@ using namespace gpg;
 
 namespace
 {
+  /**
+   * Address: 0x008DD220 (FUN_008DD220)
+   *
+   * What it does:
+   * Builds one `std::runtime_error` payload from
+   * `prefix_or_default("type error: ") + detail`.
+   */
+  [[maybe_unused]] std::runtime_error* BuildRuntimeTypeErrorWithPrefix(
+    std::runtime_error* const outError,
+    const char* const prefix,
+    const char* const detail
+  )
+  {
+    const char* const resolvedPrefix = prefix ? prefix : "type error: ";
+    std::string message(resolvedPrefix);
+    message += (detail != nullptr) ? detail : "";
+    return new (outError) std::runtime_error(message);
+  }
+
   [[nodiscard]] std::string BuildBadRefCastMessage(
     const char* const prefix, const char* const fromType, const char* const toType
   )

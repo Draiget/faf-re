@@ -9,6 +9,15 @@
 
 using namespace moho;
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
   alignas(CAiAttackerImplConstruct) unsigned char gCAiAttackerImplConstructStorage[sizeof(CAiAttackerImplConstruct)];
@@ -33,6 +42,49 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RRef MakeCAiAttackerImplRef(CAiAttackerImpl* const object)
+  {
+    gpg::RRef ref{};
+    gpg::RRef_CAiAttackerImpl(&ref, object);
+    return ref;
+  }
+
+  /**
+   * Address: 0x005D83A0 (FUN_005D83A0)
+   *
+   * What it does:
+   * Allocates one `CAiAttackerImpl`, wraps it in a typed reflected reference,
+   * and publishes that payload through `SerConstructResult::SetUnowned`.
+   */
+  void ConstructCAiAttackerImplForResult(gpg::SerConstructResult* const result)
+  {
+    CAiAttackerImpl* object = nullptr;
+    void* const storage = ::operator new(sizeof(CAiAttackerImpl), std::nothrow);
+    if (storage) {
+      object = new (storage) CAiAttackerImpl();
+    }
+
+    result->SetUnowned(MakeCAiAttackerImplRef(object), 0u);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiAttackerImplConstructHelperNode()
+  {
+    if (!gCAiAttackerImplConstructConstructed) {
+      return nullptr;
+    }
+
+    CAiAttackerImplConstruct* const construct = AcquireCAiAttackerImplConstruct();
+    if (construct->mHelperNext && construct->mHelperPrev) {
+      construct->mHelperNext->mPrev = construct->mHelperPrev;
+      construct->mHelperPrev->mNext = construct->mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&construct->mHelperNext);
+    construct->mHelperNext = self;
+    construct->mHelperPrev = self;
+    return self;
+  }
+
   /**
    * Address: 0x00BF8400 (FUN_00BF8400, sub_BF8400)
    *
@@ -46,13 +98,33 @@ namespace
     }
 
     CAiAttackerImplConstruct* const construct = AcquireCAiAttackerImplConstruct();
-    if (construct->mHelperNext && construct->mHelperPrev) {
-      construct->mHelperNext->mPrev = construct->mHelperPrev;
-      construct->mHelperPrev->mNext = construct->mHelperNext;
-    }
-
+    (void)UnlinkCAiAttackerImplConstructHelperNode();
     construct->~CAiAttackerImplConstruct();
     gCAiAttackerImplConstructConstructed = false;
+  }
+
+  /**
+   * Address: 0x005D8330 (FUN_005D8330)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks recovered
+   * `CAiAttackerImplConstruct` helper links and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplConstructStartupThunkA()
+  {
+    return UnlinkCAiAttackerImplConstructHelperNode();
+  }
+
+  /**
+   * Address: 0x005D8360 (FUN_005D8360)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same
+   * `CAiAttackerImplConstruct` helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplConstructStartupThunkB()
+  {
+    return UnlinkCAiAttackerImplConstructHelperNode();
   }
 } // namespace
 
@@ -61,10 +133,18 @@ namespace
  *
  * What it does:
  * Construct-callback lane used by recovered `CAiAttackerImpl` reflection
- * helper registration.
+ * helper registration. Forwards into the canonical helper body recovered at
+ * `0x005D83A0`.
  */
-void CAiAttackerImplConstruct::Construct(gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const)
-{}
+void CAiAttackerImplConstruct::Construct(
+  gpg::ReadArchive* const,
+  const int,
+  const int,
+  gpg::SerConstructResult* const result
+)
+{
+  ConstructCAiAttackerImplForResult(result);
+}
 
 /**
  * Address: 0x005DEB50 (FUN_005DEB50)

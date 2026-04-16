@@ -63,6 +63,8 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x005B0050 (FUN_005B0050)
+     *
      * What it does:
      * Binds load/save callbacks into `EAiPathNavigatorState` reflected
      * metadata.

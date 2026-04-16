@@ -48,6 +48,62 @@ namespace moho
      */
     void Set(const Wm3::Quaternionf& quat, const Wm3::Vector3f& vec);
 
+    /**
+     * Address: 0x004EEC10 (FUN_004EEC10, ?LoadInverse@VMatrix4@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Replaces this matrix with its full inverse.
+     */
+    void LoadInverse();
+
+    /**
+     * Address: 0x004EEC40 (FUN_004EEC40, ?LoadInverse4x3@VMatrix4@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Replaces this matrix with the inverse lane used by 4x3 call sites.
+     */
+    void LoadInverse4x3();
+
+    /**
+     * Address: 0x004EEC70 (FUN_004EEC70, ?LoadInverseRigid@VMatrix4@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Replaces this matrix with the inverse lane used by rigid-transform paths.
+     */
+    void LoadInverseRigid();
+
+    /**
+     * Address: 0x004EECA0 (FUN_004EECA0, ?LoadTranslate@VMatrix4@Moho@@QAEXMMM@Z)
+     *
+     * What it does:
+     * Overwrites this matrix with one translation matrix.
+     */
+    void LoadTranslate(float x, float y, float z);
+
+    /**
+     * Address: 0x004EECD0 (FUN_004EECD0, ?LoadScale@VMatrix4@Moho@@QAEXMMM@Z)
+     *
+     * What it does:
+     * Overwrites this matrix with one non-uniform scale matrix.
+     */
+    void LoadScale(float x, float y, float z);
+
+    /**
+     * Address: 0x004EED60 (FUN_004EED60, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Vector3@M@Wm3@@M@Z)
+     *
+     * What it does:
+     * Overwrites this matrix with one axis-angle rotation matrix.
+     */
+    void LoadRotate(const Wm3::Vector3f& axis, float angleRadians);
+
+    /**
+     * Address: 0x004EEDA0 (FUN_004EEDA0, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Quaternion@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Overwrites this matrix with one quaternion rotation matrix.
+     */
+    void LoadRotate(const Wm3::Quaternionf& rotation);
+
     /** Identity. */
     static VMatrix4 Identity()
     {
@@ -211,4 +267,21 @@ namespace moho
 
   static_assert(sizeof(VMatrix4) == 0x40, "VMatrix4 size must be 0x40");
   static_assert(alignof(VMatrix4) == 0x4, "VMatrix4 alignment must be 4");
+
+  /**
+   * Address: 0x004EE6E0 (FUN_004EE6E0, ?VEC_Mul@Moho@@YA?AUVMatrix4@1@ABU21@0@Z)
+   *
+   * What it does:
+   * Returns one matrix product using the binary's argument order lane.
+   */
+  [[nodiscard]] VMatrix4 VEC_Mul(const VMatrix4& lhs, const VMatrix4& rhs);
+
+  /**
+   * Address: 0x004EE710 (FUN_004EE710, ?VEC_Mul4x3@Moho@@YAXAAUVMatrix4@1@ABU21@1@Z)
+   *
+   * What it does:
+   * Computes one affine 4x3 matrix composition lane (`rhs * lhs`) and writes
+   * x/y/z components of all four rows into `out`.
+   */
+  void VEC_Mul4x3(const VMatrix4& lhs, VMatrix4& out, const VMatrix4& rhs);
 } // namespace moho

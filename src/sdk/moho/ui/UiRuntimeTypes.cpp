@@ -1,15 +1,21 @@
-﻿#include "moho/ui/UiRuntimeTypes.h"
+#include "moho/ui/UiRuntimeTypes.h"
 
 #include <Windows.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <exception>
 #include <limits>
+#include <memory>
+#include <map>
 #include <new>
 #include <string>
 #include <stdexcept>
+#include <type_traits>
 #include <typeinfo>
 #include <vector>
 
@@ -21,14 +27,21 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/ScrDebugHooks.h"
 #include "moho/app/WinApp.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/resource/RResId.h"
+#include "moho/resource/ResourceManager.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -44,18 +57,32 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/task/CTask.h"
+#include "moho/task/CTaskThread.h"
+#include "moho/task/ScrDiskWatcherTask.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/ui/CUIWorldMesh.h"
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/ui/EMauiScrollAxisTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/unit/core/UserUnit.h"
 
 namespace moho
 {
   bool WIN_CopyToClipboard(const wchar_t* text);
 }
+
+/**
+ * Address: 0x0086A350 (FUN_0086A350, ??0IWldUIProvider@Moho@@QAE@XZ)
+ * Address: 0x0086A5C0 (FUN_0086A5C0, IWldUIProvider ctor lane)
+ *
+ * What it does:
+ * Initializes one world-UI-provider base interface object.
+ */
+moho::IWldUIProvider::IWldUIProvider() = default;
 
 /**
  * Address: 0x0096B5B0 (FUN_0096B5B0, func_GetCursorPos)
@@ -79,6 +106,12 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   int modifiers,
   moho::CWldSession* wldSession
 );
+
+namespace moho
+{
+  int cfunc_IN_ClearKeyMap(lua_State* luaContext);
+  int func_FlushEvents(lua_State* luaContext);
+}
 
 /**
  * Address: 0x0096AFC0 (FUN_0096AFC0, wxCharCodeWXToMSW)
@@ -779,6 +812,14 @@ namespace moho
   int cfunc_CUIWorldMeshGetInterpolatedOrientedBoxL(LuaPlus::LuaState* state);
   int cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* state);
   int cfunc_CUIWorldViewGetScreenPosL(LuaPlus::LuaState* state);
+  /**
+   * Address: 0x00857BE0 (FUN_00857BE0, cfunc_AddCommandFeedbackBlipL)
+   *
+   * What it does:
+   * Reads one blip descriptor table + duration and appends one temporary mesh
+   * marker into the command-feedback runtime list.
+   */
+  int cfunc_AddCommandFeedbackBlipL(LuaPlus::LuaState* state);
 
   int cfunc_CMauiBitmapInternalSetSolidColorL(LuaPlus::LuaState* state);
   int cfunc_CMauiBitMapGetNumFramesL(LuaPlus::LuaState* state);
@@ -800,6 +841,11 @@ namespace moho
   int cfunc_CMauiCursorResetToDefaultL(LuaPlus::LuaState* state);
   int cfunc_CMauiCursorHideL(LuaPlus::LuaState* state);
   int cfunc_CMauiCursorShowL(LuaPlus::LuaState* state);
+  int register_CScrLuaMetatableFactory_CMauiHistogram_Index();
+  int register_CScrLuaMetatableFactory_CMauiScrollbar_Index();
+  int register_CScrLuaMetatableFactory_CLuaWldUIProvider_Index();
+  int register_CScrLuaMetatableFactory_CUIWorldMesh_Index();
+  int register_CScrLuaMetatableFactory_CUIWorldView_Index();
   int cfunc_CMauiEditSetNewForegroundColorL(LuaPlus::LuaState* state);
   int cfunc_CMauiEditGetForegroundColorL(LuaPlus::LuaState* state);
   int cfunc_CMauiEditSetNewBackgroundColorL(LuaPlus::LuaState* state);
@@ -862,8 +908,17 @@ namespace
 {
   using moho::CD3DFont;
   using moho::CMauiControlExtendedRuntimeView;
+  using moho::CMauiCursorRuntimeView;
+  using moho::CMauiCursorTextureRuntimeView;
   using moho::CMauiEditRuntimeView;
   using moho::CScriptLazyVar_float;
+
+  moho::CMauiBitmapRuntimeView* SetBitmapAlphaHitTestEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
+  moho::CMauiBitmapRuntimeView* SetBitmapTiledEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
+  moho::CMauiBitmapRuntimeView* SetBitmapLoopEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
+  std::int32_t ReadBitmapCurrentFrame(const moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
+  std::int32_t CountBitmapFramePatternEntries(const moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
+  std::uint32_t EnableBitmapAnimationIfMultipleTextures(moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
 
   static_assert(
     sizeof(moho::CScriptLazyVar_float) >= sizeof(LuaPlus::LuaObject),
@@ -888,6 +943,61 @@ namespace
   constexpr moho::EMauiScrollAxis kVerticalScrollAxis = static_cast<moho::EMauiScrollAxis>(0);
 
   LuaPlus::LuaState* gUserLuaState = nullptr;
+  std::uint8_t gUserLuaStateInitGuard = 0;
+  std::aligned_storage_t<sizeof(LuaPlus::LuaState), alignof(LuaPlus::LuaState)> gUserLuaStateStorage{};
+  std::aligned_storage_t<sizeof(moho::CTaskStage), alignof(moho::CTaskStage)> gUserStageStorage{};
+
+  [[nodiscard]] LuaPlus::LuaState* GetUserLuaStateStorageObject() noexcept
+  {
+    return reinterpret_cast<LuaPlus::LuaState*>(&gUserLuaStateStorage);
+  }
+
+  [[nodiscard]] moho::CTaskStage* GetUserStageStorageObject() noexcept
+  {
+    return reinterpret_cast<moho::CTaskStage*>(&gUserStageStorage);
+  }
+
+  void CleanupUserLuaStateStorageAtExit()
+  {
+    std::destroy_at(GetUserLuaStateStorageObject());
+    gUserLuaState = nullptr;
+  }
+
+  void CleanupUserStageStorageAtExit()
+  {
+    moho::sUserStage = nullptr;
+  }
+
+  void AttachTaskToStage(moho::CTask* const task, moho::CTaskStage* const stage, const bool owning)
+  {
+    if (task == nullptr || stage == nullptr || task->mOwnerThread != nullptr) {
+      return;
+    }
+
+    moho::CTaskThread* const thread = new moho::CTaskThread(stage);
+    if (thread == nullptr) {
+      return;
+    }
+
+    task->mAutoDelete = owning;
+    task->mOwnerThread = thread;
+    task->mSubtask = thread->mTaskTop;
+    thread->mTaskTop = task;
+  }
+
+  void RunLuaInitFormSetIfPresent(const char* const setName, LuaPlus::LuaState* const state)
+  {
+    moho::CScrLuaInitFormSet* const initSet = moho::SCR_FindLuaInitFormSet(setName);
+    if (initSet == nullptr) {
+      return;
+    }
+
+    initSet->mRegistered = 1;
+    for (moho::CScrLuaInitForm* form = initSet->mForms; form != nullptr; form = form->mNextInSet) {
+      form->Run(state);
+    }
+  }
+
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kCursorSetDefaultTextureHelpText = "Cursor:SetDefaultTexture(filename, hotspotX, hotspotY)";
@@ -991,6 +1101,10 @@ namespace
     "InternalCreateMovie(luaobj,parent) -- for internal use by CreateMovie()";
   constexpr const char* kInternalCreateTextHelpText = "InternalCreateText(luaobj,parent)";
   constexpr const char* kInternalCreateMapPreviewHelpText = "InternalCreateMapPreview(luaobj,parent)";
+  constexpr const char* kInternalCreateWldUIProviderHelpText =
+    "InternalCreateWldUIProvider(luaobj) - create the C++ script object";
+  constexpr const char* kInternalCreateWorldMeshHelpText =
+    "InternalCreateWorldMesh(luaobj) -- for internal use by WorldMesh()";
   constexpr const char* kCMauiItemListSetNewFontHelpText =
     "ItemList:SetNewFont(family, pointsize) -- set the font to use in this ItemList control";
   constexpr const char* kCMauiItemListAddItemHelpText =
@@ -1112,6 +1226,138 @@ namespace
   constexpr const char* kSetUIControlsAlphaHelpText =
     "SetUIControlsAlpha(float alpha) -- set the alpha multiplier for 2d UI controls";
   constexpr const char* kGetUIControlsAlphaHelpText = "float GetUIControlsAlpha() -- get the alpha multiplier for 2d UI controls";
+  constexpr const char* kFlushEventsHelpText = "FlushEvents() -- flush mouse/keyboard events";
+  constexpr const char* kClearCurrentFactoryForQueueDisplayHelpText = "ClearCurrentFactoryForQueueDisplay()";
+  constexpr const char* kINAddKeyMapTableHelpText = "IN_AddKeyMapTable(keyMapTable) - add a set of key mappings";
+  constexpr const char* kINRemoveKeyMapTableHelpText =
+    "IN_RemoveKeyMapTable(keyMapTable) - removes the keys from the key map";
+  constexpr const char* kINClearKeyMapHelpText = "IN_ClearKeyMap() - clears all key mappings";
+
+  [[nodiscard]] std::map<int, std::string>& UiKeyActionMap() noexcept
+  {
+    static std::map<int, std::string> keyActionMap{};
+    return keyActionMap;
+  }
+
+  [[nodiscard]] std::map<int, bool>& UiKeyRepeatMap() noexcept
+  {
+    static std::map<int, bool> keyRepeatMap{};
+    return keyRepeatMap;
+  }
+
+  /**
+   * Address: 0x0083A4F0 (FUN_0083A4F0, sub_83A4F0)
+   *
+   * What it does:
+   * Returns mutable action-string storage lane for one parsed key mask,
+   * creating the lane when it is not present.
+   */
+  [[nodiscard]] std::string* EnsureUiKeyActionEntry(const int keyMask) noexcept
+  {
+    return &UiKeyActionMap()[keyMask];
+  }
+
+  /**
+   * Address: 0x0083A640 (FUN_0083A640, sub_83A640)
+   *
+   * What it does:
+   * Erases one parsed key mask from action-string storage.
+   */
+  void RemoveUiKeyActionEntry(const int keyMask) noexcept
+  {
+    UiKeyActionMap().erase(keyMask);
+  }
+
+  /**
+   * Address: 0x0083A9D0 (FUN_0083A9D0, sub_83A9D0)
+   *
+   * What it does:
+   * Returns mutable key-repeat storage lane for one parsed key mask, creating
+   * the lane when it is not present.
+   */
+  [[nodiscard]] bool* EnsureUiKeyRepeatEntry(const int keyMask) noexcept
+  {
+    return &UiKeyRepeatMap()[keyMask];
+  }
+
+  /**
+   * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70)
+   *
+   * What it does:
+   * Erases one parsed key mask from key-repeat storage.
+   */
+  void RemoveUiKeyRepeatEntry(const int keyMask) noexcept
+  {
+    UiKeyRepeatMap().erase(keyMask);
+  }
+
+  /**
+   * Address: 0x00838FD0 (FUN_00838FD0, Moho::CUIKeyHandler::AddKeyMapTable)
+   *
+   * What it does:
+   * Iterates one Lua key-map table, parses each key token to packed key-mask
+   * form, stores the bound action string, and records optional key-repeat lanes.
+   */
+  void AddUiKeyMapEntries(const LuaPlus::LuaObject& keyMapTable)
+  {
+    if (!keyMapTable.IsTable()) {
+      gpg::Warnf("CUIKeyHandler::AddKeyMapTable requires a table");
+      return;
+    }
+
+    for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
+      const char* const keyBindingSpecText = iter.m_keyObj.GetString();
+      const std::string keyBindingSpec = keyBindingSpecText != nullptr ? keyBindingSpecText : "";
+      const int keyMask = moho::IN_ParseKeyModifiers(keyBindingSpec);
+
+      const LuaPlus::LuaObject actionObject = iter.m_valueObj["action"];
+      const char* const actionText = actionObject.GetString();
+      *EnsureUiKeyActionEntry(keyMask) = actionText != nullptr ? actionText : "";
+
+      const LuaPlus::LuaObject keyRepeatObject = iter.m_valueObj["keyRepeat"];
+      if (!keyRepeatObject.IsNil() && keyRepeatObject.GetBoolean()) {
+        *EnsureUiKeyRepeatEntry(keyMask) = true;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00839270 (FUN_00839270, Moho::CUIKeyHandler::RemoveKeyMapTable)
+   *
+   * What it does:
+   * Iterates one Lua key-map table, parses each key token, and erases matching
+   * action/repeat entries from runtime key-map stores.
+   */
+  void RemoveUiKeyMapEntries(const LuaPlus::LuaObject& keyMapTable)
+  {
+    if (!keyMapTable.IsTable()) {
+      gpg::Warnf("CUIKeyHandler::RemoveKeyMapTable requires a table");
+      return;
+    }
+
+    for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
+      const char* const keyBindingSpecText = iter.m_keyObj.GetString();
+      const std::string keyBindingSpec = keyBindingSpecText != nullptr ? keyBindingSpecText : "";
+      const int keyMask = moho::IN_ParseKeyModifiers(keyBindingSpec);
+      RemoveUiKeyActionEntry(keyMask);
+      RemoveUiKeyRepeatEntry(keyMask);
+    }
+  }
+
+  /**
+   * Address: 0x00839440 (FUN_00839440, sub_839440)
+   *
+   * What it does:
+   * Clears both runtime key-map stores and returns one success lane.
+   */
+  int ClearUiKeyMaps() noexcept
+  {
+    UiKeyActionMap().clear();
+    UiKeyRepeatMap().clear();
+    return 0;
+  }
+  constexpr const char* kAddBlinkyBoxHelpText = "AddBlinkyBox(entityId, onTime, offTime, totalTime)";
+  constexpr const char* kAddCommandFeedbackBlipHelpText = "AddCommandFeedbackBlip(meshInfoTable, duration)";
   constexpr const char* kCUIWorldViewCameraResetHelpText = "moho.UIWorldView:Reset()";
   constexpr const char* kCUIWorldViewGetsGlobalCameraCommandsHelpText =
     "moho.UIWorldView:GetsGlobalCameraCommands(bool getsCommands)";
@@ -1343,26 +1589,73 @@ namespace
     return ControlFromParentListNode(siblingNode);
   }
 
+    /**
+   * Address: 0x007863B0 (FUN_007863B0)
+   *
+   * What it does:
+   * Resolves one control's `Depth` lazy-var lane into the cached depth scalar
+   * and reports whether the cached value changed.
+   */
+  [[nodiscard]] bool RefreshDepthLaneForControl(moho::CMauiControl* const control) noexcept
+  {
+    if (control == nullptr) {
+      return false;
+    }
+
+    CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(control);
+    const float resolvedDepth = moho::CScriptLazyVar_float::GetValue(&controlView->mDepthLV);
+    if (controlView->mDepth == resolvedDepth) {
+      return false;
+    }
+
+    controlView->mDepth = resolvedDepth;
+    return true;
+  }
+
+  struct CMauiDepthTraversalCursor
+  {
+    moho::CMauiControl* mSubtreeRoot = nullptr;
+    moho::CMauiControl* mCurrent = nullptr;
+  };
+
+  /**
+   * Address: 0x007864C0 (FUN_007864C0)
+   *
+   * What it does:
+   * Advances one `(subtreeRoot,current)` depth-first traversal cursor lane to
+   * the next control and returns the updated cursor.
+   */
+  [[maybe_unused]] CMauiDepthTraversalCursor* AdvanceDepthTraversalCursor(
+    CMauiDepthTraversalCursor* const cursor
+  ) noexcept
+  {
+    if (cursor != nullptr && cursor->mCurrent != nullptr) {
+      cursor->mCurrent = cursor->mCurrent->DepthFirstSuccessor(cursor->mSubtreeRoot);
+    }
+    return cursor;
+  }
+
   [[nodiscard]] bool RefreshDepthLaneForSubtree(moho::CMauiControl* const subtreeRoot) noexcept
   {
     bool depthChanged = false;
-    for (moho::CMauiControl* controlCursor = subtreeRoot; controlCursor != nullptr;
-         controlCursor = controlCursor->DepthFirstSuccessor(subtreeRoot)) {
+    CMauiDepthTraversalCursor traversalCursor{ subtreeRoot, subtreeRoot };
+
+    while (traversalCursor.mCurrent != nullptr) {
+      moho::CMauiControl* const controlCursor = traversalCursor.mCurrent;
       if (controlCursor->IsHidden()) {
+        (void)AdvanceDepthTraversalCursor(&traversalCursor);
         continue;
       }
 
-      CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(controlCursor);
-      const float resolvedDepth = moho::CScriptLazyVar_float::GetValue(&controlView->mDepthLV);
-      if (controlView->mDepth != resolvedDepth) {
-        controlView->mDepth = resolvedDepth;
+      if (RefreshDepthLaneForControl(controlCursor)) {
         depthChanged = true;
       }
+
+      (void)AdvanceDepthTraversalCursor(&traversalCursor);
     }
 
     return depthChanged;
   }
-
   void RebuildRenderedChildrenLane(moho::CMauiControl* const subtreeRoot)
   {
     CMauiControlExtendedRuntimeView* const rootView = CMauiControlExtendedRuntimeView::FromControl(subtreeRoot);
@@ -1378,6 +1671,12 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0078C7E0 (FUN_0078C7E0)
+   *
+   * What it does:
+   * Stable-sorts the rendered-child lane by each control's resolved depth.
+   */
   void SortRenderedChildrenByDepth(msvc8::vector<moho::CMauiControl*>& renderedChildren)
   {
     moho::CMauiControl** const begin = renderedChildren.begin();
@@ -1399,6 +1698,203 @@ namespace
         return lhsView->mDepth < rhsView->mDepth;
       }
     );
+  }
+
+  /**
+   * Address: 0x0078C730 (FUN_0078C730)
+   *
+   * What it does:
+   * Backward-copies one dword range `[sourceBegin, sourceEnd)` into destination
+   * ending at `destinationEnd` and stores resulting begin pointer to output.
+   */
+  [[maybe_unused]] std::uint32_t** CopyDwordRangeBackwardToEnd(
+    std::uint32_t** const outBeginSlot,
+    const std::uint32_t* sourceEnd,
+    const std::uint32_t* const sourceBegin,
+    std::uint32_t* destinationEnd
+  ) noexcept
+  {
+    if (sourceEnd != sourceBegin) {
+      do {
+        --sourceEnd;
+        --destinationEnd;
+        *destinationEnd = *sourceEnd;
+      } while (sourceEnd != sourceBegin);
+    }
+
+    *outBeginSlot = destinationEnd;
+    return outBeginSlot;
+  }
+
+  /**
+   * Address: 0x0078C760 (FUN_0078C760)
+   *
+   * What it does:
+   * Secondary entrypoint for backward dword-range copy into destination tail.
+   */
+  [[maybe_unused]] std::uint32_t** CopyDwordRangeBackwardToEndAlias(
+    std::uint32_t** const outBeginSlot,
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* sourceEnd,
+    std::uint32_t* destinationEnd
+  ) noexcept
+  {
+    return CopyDwordRangeBackwardToEnd(outBeginSlot, sourceEnd, sourceBegin, destinationEnd);
+  }
+
+  /**
+   * Address: 0x0078C790 (FUN_0078C790)
+   *
+   * What it does:
+   * Forward-copies one dword range `[sourceBegin, sourceEnd)` and stores
+   * one-past-end destination pointer in output.
+   */
+  [[maybe_unused]] std::uint32_t** CopyDwordRangeForwardToEnd(
+    std::uint32_t** const outEndSlot,
+    const std::uint32_t* sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* destinationBegin
+  ) noexcept
+  {
+    while (sourceBegin != sourceEnd) {
+      *destinationBegin = *sourceBegin;
+      ++sourceBegin;
+      ++destinationBegin;
+    }
+
+    *outEndSlot = destinationBegin;
+    return outEndSlot;
+  }
+
+  /**
+   * Address: 0x0078C7C0 (FUN_0078C7C0)
+   *
+   * What it does:
+   * Conditionally stores one source dword into destination when destination
+   * storage is present.
+   */
+  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresent(
+    std::uint32_t* const destination,
+    const std::uint32_t* const source
+  ) noexcept
+  {
+    if (destination != nullptr) {
+      *destination = *source;
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x0078C8F0 (FUN_0078C8F0)
+   *
+   * What it does:
+   * Advances one packed byte-address lane by `4 * dwordCount`.
+   */
+  [[maybe_unused]] std::uint32_t* AdvancePackedAddressByDwordCount(
+    std::uint32_t* const packedAddressLane,
+    const std::int32_t dwordCount
+  ) noexcept
+  {
+    *packedAddressLane += static_cast<std::uint32_t>(4 * dwordCount);
+    return packedAddressLane;
+  }
+
+  /**
+   * Address: 0x0078C9E0 (FUN_0078C9E0)
+   *
+   * What it does:
+   * Stores active cursor hotspot `(x,y)` lanes.
+   */
+  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorHotspotXY(
+    CMauiCursorTextureRuntimeView* const cursorView,
+    const std::int32_t hotspotX,
+    const std::int32_t hotspotY
+  ) noexcept
+  {
+    cursorView->mHotspotX = hotspotX;
+    cursorView->mHotspotY = hotspotY;
+    return cursorView;
+  }
+
+  /**
+   * Address: 0x0078C9F0 (FUN_0078C9F0)
+   *
+   * What it does:
+   * Stores default cursor hotspot `(x,y)` lanes.
+   */
+  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorDefaultHotspotXY(
+    CMauiCursorTextureRuntimeView* const cursorView,
+    const std::int32_t hotspotX,
+    const std::int32_t hotspotY
+  ) noexcept
+  {
+    cursorView->mDefaultHotspotX = hotspotX;
+    cursorView->mDefaultHotspotY = hotspotY;
+    return cursorView;
+  }
+
+  /**
+   * Address: 0x0078CFA0 (FUN_0078CFA0)
+   *
+   * What it does:
+   * Updates cursor-showing lane and marks cursor state dirty when value changes.
+   */
+  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorShowingAndMarkDirty(
+    CMauiCursorTextureRuntimeView* const cursorView,
+    const bool isShowing
+  ) noexcept
+  {
+    if (cursorView->mIsShowing != isShowing) {
+      cursorView->mIsShowing = isShowing;
+      cursorView->mIsDefaultTexture = true;
+    }
+    return cursorView;
+  }
+
+  /**
+   * Address: 0x00782F80 (FUN_00782F80)
+   *
+   * What it does:
+   * Appends one texture batch entry to the bitmap's legacy vector lane.
+   */
+  void AppendBitmapTextureBatch(
+    msvc8::vector<boost::shared_ptr<moho::CD3DBatchTexture>>& textureBatches,
+    const boost::shared_ptr<moho::CD3DBatchTexture>& texture
+  )
+  {
+    textureBatches.push_back(texture);
+  }
+
+  /**
+   * Address: 0x0079C8A0 (FUN_0079C8A0)
+   *
+   * What it does:
+   * Removes one item-list entry, compacts the tail left by one slot, and keeps
+   * the selection lane consistent with the post-delete vector size.
+   */
+  void RemoveItemListEntryAtIndex(moho::CMauiItemListRuntimeView* const itemListView, const std::int32_t index)
+  {
+    if (itemListView == nullptr || index < 0) {
+      return;
+    }
+    const std::size_t count = itemListView->mItems.size();
+    if (static_cast<std::size_t>(index) >= count) {
+      return;
+    }
+
+    for (std::size_t i = static_cast<std::size_t>(index) + 1u; i < count; ++i) {
+      itemListView->mItems[i - 1u] = itemListView->mItems[i];
+    }
+    itemListView->mItems.pop_back();
+
+    const std::int32_t currentSelection = itemListView->mCurSelection;
+    if (index >= currentSelection) {
+      if (currentSelection == GetItemListEntryCount(*itemListView)) {
+        itemListView->mCurSelection = -1;
+      }
+    } else {
+      itemListView->mCurSelection = currentSelection - 1;
+    }
   }
 
   class CMoviePlaybackInterface
@@ -1884,22 +2380,93 @@ namespace
   struct IMauiDraggerRuntimeView
   {
     std::uint32_t mVftable = 0;
-    DraggerLink mList{};
+    DraggerLink* mList = nullptr;
   };
 
   static_assert(offsetof(IMauiDraggerRuntimeView, mList) == 0x4, "IMauiDraggerRuntimeView::mList offset must be 0x4");
+  static_assert(sizeof(IMauiDraggerRuntimeView) == 0x8, "IMauiDraggerRuntimeView size must be 0x8");
+
+class MauiDraggerVtableProbe final : public moho::IMauiDragger
+{
+public:
+  void DragMove(const moho::SMauiEventData*) override
+  {
+  }
+
+  void DragRelease(const moho::SMauiEventData*) override
+  {
+  }
+
+  void OnCurrentDraggerReplaced() override
+  {
+  }
+};
+
+[[nodiscard]] static std::uint32_t ResolveMauiDraggerVtableLane() noexcept
+{
+  static MauiDraggerVtableProbe probe;
+  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(&probe)));
+}
+
+/**
+ * Address: 0x0078DEE0 (FUN_0078DEE0)
+ *
+ * What it does:
+ * Restores one dragger-base runtime lane with IMauiDragger vtable and clears
+ * the primary list-link pointer lane.
+ */
+[[maybe_unused]] static IMauiDraggerRuntimeView* func_InitMauiDraggerBase(
+  IMauiDraggerRuntimeView* const draggerView
+) noexcept
+{
+  draggerView->mList = nullptr;
+  draggerView->mVftable = ResolveMauiDraggerVtableLane();
+  return draggerView;
+}
 
   struct CMauiLuaDraggerEmbeddedRuntimeView
   {
     std::uint8_t mUnknown00To33[0x34]{};
     IMauiDraggerRuntimeView mDraggerBase{};
   };
-
   static_assert(
     offsetof(CMauiLuaDraggerEmbeddedRuntimeView, mDraggerBase) == 0x34,
     "CMauiLuaDraggerEmbeddedRuntimeView::mDraggerBase offset must be 0x34"
   );
+  static_assert(
+    sizeof(CMauiLuaDraggerEmbeddedRuntimeView) == 0x3C,
+    "CMauiLuaDraggerEmbeddedRuntimeView size must be 0x3C"
+  );
 
+} // namespace
+
+/**
+ * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
+ *
+ * What it does:
+ * Initializes one Lua dragger script-object base lane, resets the embedded
+ * dragger-base runtime fields, and binds the incoming Lua object payload.
+ */
+moho::CMauiLuaDragger* moho::func_CMauiLuaDraggerConstruct(
+  CMauiLuaDragger* const luaDragger,
+  const LuaPlus::LuaObject* const luaObject
+)
+{
+  auto* const draggerView = reinterpret_cast<CMauiLuaDraggerEmbeddedRuntimeView*>(luaDragger);
+  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(luaDragger);
+
+  static_cast<WeakObject*>(scriptObject)->weakLinkHead_ = 0u;
+  new (&scriptObject->cObject) LuaPlus::LuaObject();
+  new (&scriptObject->mLuaObj) LuaPlus::LuaObject();
+
+  IMauiDraggerRuntimeView* const draggerBaseView = &draggerView->mDraggerBase;
+  (void)func_InitMauiDraggerBase(draggerBaseView);
+  scriptObject->SetLuaObject(*luaObject);
+  return luaDragger;
+}
+
+namespace
+{
   using CameraDragDeltaFn = int(__thiscall*)(void*, Wm3::Vector2f*);
 
   struct CameraDraggerRuntimeView
@@ -2027,7 +2594,7 @@ namespace
     }
 
     auto* const draggerView = reinterpret_cast<IMauiDraggerRuntimeView*>(dragger);
-    return &draggerView->mList;
+    return reinterpret_cast<DraggerLink*>(&draggerView->mList);
   }
 
   [[nodiscard]] IMauiDragger* DraggerFromLink(DraggerLink* const link) noexcept
@@ -2054,6 +2621,26 @@ namespace
       node = head;
     }
     return node;
+  }
+
+  /**
+   * Address: 0x0078DEF0 (FUN_0078DEF0, Moho::CMauiLuaDragger::~CMauiLuaDragger)
+   *
+   * What it does:
+   * Restores the embedded dragger-base vtable lane, unlinks all dragger-list
+   * nodes rooted at that embedded lane, then runs `CScriptObject` base
+   * destructor behavior.
+   */
+  [[maybe_unused]] static moho::CScriptObject* func_CMauiLuaDraggerDestruct(
+    moho::CScriptObject* const scriptObject
+  ) noexcept
+  {
+    auto* const draggerView = reinterpret_cast<CMauiLuaDraggerEmbeddedRuntimeView*>(scriptObject);
+    IMauiDraggerRuntimeView* const draggerBaseView = &draggerView->mDraggerBase;
+    draggerBaseView->mVftable = ResolveMauiDraggerVtableLane();
+    (void)DetachDraggerList(draggerBaseView->mList);
+    scriptObject->moho::CScriptObject::~CScriptObject();
+    return scriptObject;
   }
 
   [[nodiscard]] IMauiDragger* ResolveEmbeddedLuaDragger(moho::CMauiLuaDragger* const luaDragger) noexcept
@@ -2094,15 +2681,189 @@ namespace
 
   msvc8::vector<moho::WeakPtr<moho::CMauiControl>> sInputCapture;
 
-  [[nodiscard]] std::size_t InputCaptureCount() noexcept
+/**
+ * Address: 0x007A59E0 (FUN_007A59E0)
+ *
+ * What it does:
+ * Returns the process-global input-capture vector storage, ignoring one
+ * stdcall argument lane.
+ */
+[[maybe_unused]] [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>*
+ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
+{
+  return &sInputCapture;
+}
+
+/**
+ * Address: 0x007A5DA0 (FUN_007A5DA0)
+ *
+ * What it does:
+ * Returns the process-global input-capture vector storage.
+ */
+[[maybe_unused]] [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
+{
+  return ResolveInputCaptureStorageWithArg(0);
+}
+
+  /**
+   * Address: 0x007A5680 (FUN_007A5680)
+   *
+   * What it does:
+   * Stores the current global input-capture begin lane into `outBegin`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** StoreInputCaptureBeginLane(
+    moho::WeakPtr<moho::CMauiControl>** const outBegin
+  ) noexcept
   {
     const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    *outBegin = view.begin;
+    return outBegin;
+  }
+
+  /**
+   * Address: 0x007A5690 (FUN_007A5690)
+   *
+   * What it does:
+   * Stores the current global input-capture end lane into `outEnd`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** StoreInputCaptureEndLane(
+    moho::WeakPtr<moho::CMauiControl>** const outEnd
+  ) noexcept
+  {
+    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    *outEnd = view.end;
+    return outEnd;
+  }
+
+  /**
+   * Address: 0x007A56F0 (FUN_007A56F0)
+   *
+   * What it does:
+   * Returns one indexed weak-control lane from the global input-capture
+   * vector storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* ResolveInputCaptureLaneAt(
+    const std::size_t index
+  ) noexcept
+  {
+    const auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    return view.begin + static_cast<std::ptrdiff_t>(index);
+  }
+
+  void UnlinkInputCaptureWeakPtrRange(
+    moho::WeakPtr<moho::CMauiControl>* begin,
+    moho::WeakPtr<moho::CMauiControl>* end
+  ) noexcept
+  {
+    while (begin != end) {
+      begin->UnlinkFromOwnerChain();
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x007A5970 (FUN_007A5970)
+   *
+   * What it does:
+   * Unlinks every weak-capture node from owner chains, frees the global
+   * input-capture backing storage lane, and clears begin/end/capacity lanes.
+   */
+  [[maybe_unused]] void CleanupInputCaptureAtExit() noexcept
+  {
+    auto& captureView = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    if (captureView.begin != nullptr) {
+      UnlinkInputCaptureWeakPtrRange(captureView.begin, captureView.end);
+      ::operator delete(static_cast<void*>(captureView.begin));
+    }
+    captureView.begin = nullptr;
+    captureView.end = nullptr;
+    captureView.capacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x00C032E0 (FUN_00C032E0)
+   *
+   * What it does:
+   * Thunk lane that forwards global input-capture cleanup-at-exit teardown
+   * into `FUN_007A5970`.
+   */
+  [[maybe_unused]] void CleanupInputCaptureAtExitAdapter() noexcept
+  {
+    CleanupInputCaptureAtExit();
+  }
+  /**
+   * Address: 0x007A56A0 (FUN_007A56A0)
+   *
+   * What it does:
+   * Returns the current number of weak-control entries in the global input
+   * capture stack.
+   */
+  [[nodiscard]] std::size_t InputCaptureCount() noexcept
+  {
+    const auto& captureVector = *ResolveInputCaptureStorage();
+    const auto& view = moho::AsWeakPtrVectorRuntimeView(captureVector);
     if (view.begin == nullptr || view.end == nullptr) {
       return 0;
     }
     return static_cast<std::size_t>(view.end - view.begin);
   }
 
+  /**
+   * Address: 0x007A5F60 (FUN_007A5F60)
+   *
+   * What it does:
+   * Copy-assigns one contiguous weak-control range while preserving intrusive
+   * weak-owner chain semantics for each destination lane.
+   */
+  [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* CopyInputCaptureWeakRangeAssign(
+    moho::WeakPtr<moho::CMauiControl>* destination,
+    const moho::WeakPtr<moho::CMauiControl>* sourceBegin,
+    const moho::WeakPtr<moho::CMauiControl>* sourceEnd
+  ) noexcept
+  {
+    const moho::WeakPtr<moho::CMauiControl>* source = sourceBegin;
+    while (source != sourceEnd) {
+      if (source->ownerLinkSlot != destination->ownerLinkSlot) {
+        if (destination->ownerLinkSlot != nullptr) {
+          auto** ownerCursor = reinterpret_cast<moho::WeakPtr<moho::CMauiControl>**>(destination->ownerLinkSlot);
+          while (*ownerCursor != destination) {
+            ownerCursor = &(*ownerCursor)->nextInOwner;
+          }
+          *ownerCursor = destination->nextInOwner;
+        }
+
+        destination->ownerLinkSlot = source->ownerLinkSlot;
+        if (source->ownerLinkSlot == nullptr) {
+          destination->nextInOwner = nullptr;
+        } else {
+          auto** const sourceHead = reinterpret_cast<moho::WeakPtr<moho::CMauiControl>**>(source->ownerLinkSlot);
+          destination->nextInOwner = *sourceHead;
+          *sourceHead = destination;
+        }
+      }
+
+      ++source;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x007A5E30 (FUN_007A5E30)
+   *
+   * What it does:
+   * Register-order adapter that forwards one input-capture weak-range
+   * copy-assign lane through CopyInputCaptureWeakRangeAssign.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* CopyInputCaptureWeakRangeAssignRegisterAdapter(
+    moho::WeakPtr<moho::CMauiControl>* const destination,
+    const moho::WeakPtr<moho::CMauiControl>* const sourceBegin,
+    const moho::WeakPtr<moho::CMauiControl>* const sourceEnd
+  ) noexcept
+  {
+    return CopyInputCaptureWeakRangeAssign(destination, sourceBegin, sourceEnd);
+  }
   void RemoveInputCaptureAt(const std::size_t index) noexcept
   {
     auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
@@ -2112,11 +2873,66 @@ namespace
     }
 
     view.begin[index].ResetFromObject(nullptr);
-    for (std::size_t i = index + 1; i < count; ++i) {
-      view.begin[i - 1].ResetFromOwnerLinkSlot(view.begin[i].ownerLinkSlot);
-      view.begin[i].ResetFromObject(nullptr);
+    moho::WeakPtr<moho::CMauiControl>* const oldEnd = view.end;
+    (void)CopyInputCaptureWeakRangeAssign(&view.begin[index], &view.begin[index + 1u], oldEnd);
+
+    moho::WeakPtr<moho::CMauiControl>* const newEnd = oldEnd - 1;
+    newEnd->ResetFromObject(nullptr);
+    view.end = newEnd;
+  }
+
+  /**
+   * Address: 0x007A5870 (FUN_007A5870)
+   *
+   * What it does:
+   * Inserts one weak-control capture lane at the requested position in the
+   * global `sInputCapture` vector and returns the rebased inserted iterator.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** InsertInputCaptureWithGrowth(
+    moho::WeakPtr<moho::CMauiControl>** const outIterator,
+    moho::WeakPtr<moho::CMauiControl>* const insertAt,
+    const moho::WeakPtr<moho::CMauiControl>* const value
+  )
+  {
+    using CaptureWeakPtr = moho::WeakPtr<moho::CMauiControl>;
+
+    const CaptureWeakPtr* const begin = sInputCapture.data();
+    const std::size_t count = sInputCapture.size();
+
+    std::size_t insertIndex = 0u;
+    if (begin != nullptr && count != 0u && insertAt != nullptr) {
+      const std::uintptr_t beginAddress = reinterpret_cast<std::uintptr_t>(begin);
+      const std::uintptr_t insertAddress = reinterpret_cast<std::uintptr_t>(insertAt);
+      if (insertAddress >= beginAddress) {
+        insertIndex = static_cast<std::size_t>((insertAddress - beginAddress) / sizeof(CaptureWeakPtr));
+      }
     }
-    view.end = view.begin + (count - 1u);
+    insertIndex = std::min(insertIndex, count);
+
+    CaptureWeakPtr captureValue{};
+    if (value != nullptr) {
+      captureValue = *value;
+    }
+
+    moho::EnsureWeakPtrVectorCapacity(sInputCapture, count + 1u);
+    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    for (std::size_t i = count; i > insertIndex; --i) {
+      view.begin[i].ResetFromOwnerLinkSlot(view.begin[i - 1u].ownerLinkSlot);
+      view.begin[i - 1u].ResetFromObject(nullptr);
+    }
+
+    if (value != nullptr) {
+      view.begin[insertIndex].ResetFromOwnerLinkSlot(captureValue.ownerLinkSlot);
+    } else {
+      view.begin[insertIndex].ResetFromObject(nullptr);
+    }
+    view.end = view.begin + count + 1u;
+
+    if (outIterator != nullptr) {
+      CaptureWeakPtr* const rebasedBegin = view.begin;
+      *outIterator = rebasedBegin != nullptr ? rebasedBegin + insertIndex : nullptr;
+    }
+    return outIterator;
   }
 
   /**
@@ -2165,17 +2981,47 @@ namespace
     return view.begin[count - 1u].GetObjectPtr();
   }
 
+  /**
+   * Address: 0x007A5710 (FUN_007A5710, sub_7A5710)
+   *
+   * What it does:
+   * Appends one weak-control entry to the global input-capture vector,
+   * growing capacity when needed.
+   */
+  [[maybe_unused]] static moho::WeakPtr<moho::CMauiControl>* AppendInputCaptureWeakReference(
+    const moho::WeakPtr<moho::CMauiControl>* const captureRef
+  )
+  {
+    if (captureRef == nullptr) {
+      return nullptr;
+    }
+
+    const std::size_t count = InputCaptureCount();
+    moho::EnsureWeakPtrVectorCapacity(sInputCapture, count + 1u);
+
+    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+    view.begin[count].ResetFromOwnerLinkSlot(captureRef->ownerLinkSlot);
+    view.end = view.begin + count + 1u;
+    return &view.begin[count];
+  }
+
+  /**
+   * Address: 0x007A4540 (FUN_007A4540, sub_7A4540)
+   *
+   * What it does:
+   * Wraps one control into one temporary weak-owner link and appends that
+   * weak reference to the global input-capture stack.
+   */
   void AddInputCaptureControl(moho::CMauiControl* const control)
   {
     if (control == nullptr) {
       return;
     }
 
-    const std::size_t count = InputCaptureCount();
-    moho::EnsureWeakPtrVectorCapacity(sInputCapture, count + 1u);
-    auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    view.begin[count].ResetFromObject(control);
-    view.end = view.begin + count + 1u;
+    moho::WeakPtr<moho::CMauiControl> captureRef{};
+    captureRef.ResetFromObject(control);
+    (void)AppendInputCaptureWeakReference(&captureRef);
+    captureRef.ResetFromObject(nullptr);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -2358,6 +3204,25 @@ namespace
     }
 
     return static_cast<moho::CMauiFrame*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00796E50 (FUN_00796E50, sub_796E50)
+   *
+   * What it does:
+   * Assigns one retained frame owner into one weak self-owner lane.
+   */
+  [[maybe_unused]] boost::weak_ptr<moho::CMauiFrame>* AssignFrameWeakSelfFromSharedOwner(
+    const boost::shared_ptr<moho::CMauiFrame>& owner,
+    boost::weak_ptr<moho::CMauiFrame>* const destination
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    *destination = owner;
+    return destination;
   }
 
   /**
@@ -2558,7 +3423,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040D820 (FUN_0040D820, func_round)
+    * Alias of FUN_0040D820 (non-canonical helper lane).
    *
    * What it does:
    * Applies x87-style nearby-int rounding and adjusts down by one when the
@@ -2662,6 +3527,349 @@ namespace
     if (destination) {
       ++destination->mRefCount;
     }
+  }
+
+  /**
+   * Address: 0x0078ECE0 (FUN_0078ECE0)
+   *
+   * What it does:
+   * Returns one text-advance measurement from the edit font lane and falls
+   * back to `0.0f` when no font is bound.
+   */
+  [[nodiscard]] float MeasureEditStringAdvanceOrZero(
+    CMauiEditRuntimeView* const editView,
+    const char* const text
+  )
+  {
+    CD3DFont* const font = editView->mFont;
+    if (font == nullptr) {
+      return 0.0f;
+    }
+    return font->GetAdvance(text, 0);
+  }
+  /**
+   * Address: 0x0078F310 (FUN_0078F310)
+   *
+   * What it does:
+   * Shows the edit caret and assigns keyboard focus when the edit is enabled.
+   */
+  void AcquireEditKeyboardFocusIfEnabled(moho::CMauiEdit* const edit)
+  {
+    CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
+    if (editView->mIsEnabled) {
+      editView->mCaretVisible = true;
+      moho::MAUI_SetKeyboardFocus(edit, true);
+    }
+  }
+  /**
+   * Address: 0x0078DC60 (FUN_0078DC60)
+   *
+   * What it does:
+   * Returns CMauiEdit background-visible lane.
+   */
+  [[maybe_unused]] bool ReadEditBackgroundVisibleLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mBackgroundVisible;
+  }
+
+  /**
+   * Address: 0x0078EBF0 (FUN_0078EBF0)
+   *
+   * What it does:
+   * Returns one font descent metric lane.
+   */
+  [[maybe_unused]] float ReadFontDescentLane(const CD3DFont* const font) noexcept
+  {
+    return font->mDescent;
+  }
+
+  /**
+   * Address: 0x0078ECC0 (FUN_0078ECC0)
+   *
+   * What it does:
+   * Stores edit drop-shadow enable lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditDropShadowLane(
+    CMauiEditRuntimeView* const editView,
+    const bool enabled
+  ) noexcept
+  {
+    editView->mDropShadow = enabled;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078ECD0 (FUN_0078ECD0)
+   *
+   * What it does:
+   * Returns edit max-char limit lane.
+   */
+  [[maybe_unused]] std::int32_t ReadEditMaxCharsLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mMaxChars;
+  }
+
+  /**
+   * Address: 0x0078ED10 (FUN_0078ED10)
+   *
+   * What it does:
+   * Reads edit-bound font height lane (`0.0f` when font is missing).
+   */
+  [[maybe_unused]] float ReadEditFontHeightLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    const CD3DFont* const font = editView->mFont;
+    return font != nullptr ? font->mHeight : 0.0f;
+  }
+
+  /**
+   * Address: 0x0078ED30 (FUN_0078ED30)
+   *
+   * What it does:
+   * Stores edit foreground color lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditForegroundColorLane(
+    CMauiEditRuntimeView* const editView,
+    const std::uint32_t color
+  ) noexcept
+  {
+    editView->mForegroundColor = color;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078ED40 (FUN_0078ED40)
+   *
+   * What it does:
+   * Returns edit foreground color lane.
+   */
+  [[maybe_unused]] std::uint32_t ReadEditForegroundColorLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mForegroundColor;
+  }
+
+  /**
+   * Address: 0x0078ED50 (FUN_0078ED50)
+   *
+   * What it does:
+   * Stores edit background-visible lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditBackgroundVisibleLane(
+    CMauiEditRuntimeView* const editView,
+    const bool visible
+  ) noexcept
+  {
+    editView->mBackgroundVisible = visible;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078ED60 (FUN_0078ED60)
+   *
+   * What it does:
+   * Returns edit background-visible lane.
+   */
+  [[maybe_unused]] bool ReadEditBackgroundVisibleLaneAlias(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mBackgroundVisible;
+  }
+
+  /**
+   * Address: 0x0078ED70 (FUN_0078ED70)
+   *
+   * What it does:
+   * Enables background rendering and stores edit background color lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* EnableEditBackgroundAndWriteColor(
+    CMauiEditRuntimeView* const editView,
+    const std::uint32_t color
+  ) noexcept
+  {
+    editView->mBackgroundVisible = true;
+    editView->mBackgroundColor = color;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078ED80 (FUN_0078ED80)
+   *
+   * What it does:
+   * Returns edit background color lane.
+   */
+  [[maybe_unused]] std::uint32_t ReadEditBackgroundColorLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mBackgroundColor;
+  }
+
+  /**
+   * Address: 0x0078ED90 (FUN_0078ED90)
+   *
+   * What it does:
+   * Stores edit highlight-foreground color lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditHighlightForegroundColorLane(
+    CMauiEditRuntimeView* const editView,
+    const std::uint32_t color
+  ) noexcept
+  {
+    editView->mHighlightForegroundColor = color;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078EDA0 (FUN_0078EDA0)
+   *
+   * What it does:
+   * Returns edit highlight-foreground color lane.
+   */
+  [[maybe_unused]] std::uint32_t ReadEditHighlightForegroundColorLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mHighlightForegroundColor;
+  }
+
+  /**
+   * Address: 0x0078EDB0 (FUN_0078EDB0)
+   *
+   * What it does:
+   * Stores edit highlight-background color lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditHighlightBackgroundColorLane(
+    CMauiEditRuntimeView* const editView,
+    const std::uint32_t color
+  ) noexcept
+  {
+    editView->mHighlightBackgroundColor = color;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078EDC0 (FUN_0078EDC0)
+   *
+   * What it does:
+   * Returns edit highlight-background color lane.
+   */
+  [[maybe_unused]] std::uint32_t ReadEditHighlightBackgroundColorLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mHighlightBackgroundColor;
+  }
+
+  /**
+   * Address: 0x0078EE00 (FUN_0078EE00)
+   *
+   * What it does:
+   * Returns edit caret-position lane.
+   */
+  [[maybe_unused]] std::int32_t ReadEditCaretPositionLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mCaretPosition;
+  }
+
+  /**
+   * Address: 0x0078EE10 (FUN_0078EE10)
+   *
+   * What it does:
+   * Stores edit caret-visible lane.
+   */
+  [[maybe_unused]] CMauiEditRuntimeView* WriteEditCaretVisibleLane(
+    CMauiEditRuntimeView* const editView,
+    const bool visible
+  ) noexcept
+  {
+    editView->mCaretVisible = visible;
+    return editView;
+  }
+
+  /**
+   * Address: 0x0078EE20 (FUN_0078EE20)
+   *
+   * What it does:
+   * Returns edit caret-visible lane.
+   */
+  [[maybe_unused]] bool ReadEditCaretVisibleLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mCaretVisible;
+  }
+
+  /**
+   * Address: 0x0078EE40 (FUN_0078EE40)
+   *
+   * What it does:
+   * Returns edit caret color lane.
+   */
+  [[maybe_unused]] std::uint32_t ReadEditCaretColorLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mCaretColor;
+  }
+
+  /**
+   * Address: 0x0078EE50 (FUN_0078EE50)
+   *
+   * What it does:
+   * Returns edit input-enabled lane.
+   */
+  [[maybe_unused]] bool ReadEditInputEnabledLane(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mIsEnabled;
+  }
+
+  /**
+   * Address: 0x0078EE70 (FUN_0078EE70)
+   *
+   * What it does:
+   * Returns whether selection start/end lanes differ.
+   */
+  [[maybe_unused]] bool HasEditSelectionRange(const CMauiEditRuntimeView* const editView) noexcept
+  {
+    return editView->mSelectionStart != editView->mSelectionEnd;
+  }
+
+  /**
+   * Address: 0x0078F360 (FUN_0078F360)
+   *
+   * What it does:
+   * Writes edit input/caret-enabled lanes; when disabling, also abandons
+   * keyboard focus through virtual dispatch path.
+   */
+  [[maybe_unused]] bool WriteEditInputEnabledAndCaretVisible(
+    moho::CMauiEdit* const edit,
+    const bool enabled
+  )
+  {
+    CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
+    editView->mIsEnabled = enabled;
+    editView->mCaretVisible = enabled;
+    if (!enabled) {
+      edit->AbandonKeyboardFocus();
+    }
+    return enabled;
+  }
+
+  /**
+   * Address: 0x00790580 (FUN_00790580)
+   *
+   * What it does:
+   * Forwards one key code into `CScriptObject::RunScriptOnCharPressed`.
+   */
+  [[nodiscard]] bool RunScriptOnCharPressedThunk(
+    moho::CScriptObject* const scriptObject,
+    const int keyCode
+  )
+  {
+    return scriptObject->RunScriptOnCharPressed(keyCode);
+  }
+  /**
+   * Address: 0x00794DB0 (FUN_00794DB0)
+   *
+   * What it does:
+   * Finds the first position at or after `startPos` where `text` contains any
+   * character from `characterSet`.
+   */
+  [[maybe_unused, nodiscard]] std::size_t FindFirstOfCharacterSet(
+    const msvc8::string& text,
+    const msvc8::string& characterSet,
+    const std::size_t startPos
+  ) noexcept
+  {
+    return text.view().find_first_of(characterSet.view(), startPos);
   }
 
   /**
@@ -2999,12 +4207,51 @@ namespace
 
     return false;
   }
+
+  /**
+   * Address: 0x0078A839 (FUN_0078A839)
+   *
+   * What it does:
+   * Logs one `OnHide` Lua callback exception into script-warning output.
+   */
+  void LogOnHideCallbackException(
+    moho::CScriptObject* const scriptObject,
+    const std::exception& exception
+  ) noexcept
+  {
+    if (scriptObject == nullptr) {
+      return;
+    }
+
+    const char* const message = exception.what() != nullptr ? exception.what() : "";
+    scriptObject->LogScriptWarning(scriptObject, "OnHide", message);
+  }
+
+  /**
+   * Address: 0x0078AB39 (FUN_0078AB39)
+   *
+   * What it does:
+   * Logs one `IsScrollable` Lua callback exception into script-warning output.
+   */
+  void LogIsScrollableCallbackException(
+    moho::CScriptObject* const scriptObject,
+    const std::exception& exception
+  ) noexcept
+  {
+    if (scriptObject == nullptr) {
+      return;
+    }
+
+    const char* const message = exception.what() != nullptr ? exception.what() : "";
+    scriptObject->LogScriptWarning(scriptObject, "IsScrollable", message);
+  }
 } // namespace
 
 moho::EUIState moho::sUIState = moho::UIS_none;
 bool moho::cam_Free = false;
 bool moho::ui_DisableCursorFixing = false;
-moho::CScriptObject* moho::sWldUIProvider = nullptr;
+bool moho::ui_WindowedAlwaysShowsCursor = false;
+moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
 moho::CMauiCurrentFocusControlRuntimeView moho::Maui_CurrentFocusControl{};
@@ -3174,6 +4421,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance()
 }
 
 /**
+ * Address: 0x00783EA0 (FUN_00783EA0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiControl>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiControl>*
+startup_CScrLuaMetatableFactory_CMauiControl_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
+
+/**
  * Address: 0x00783070 (FUN_00783070, Moho::CScrLuaMetatableFactory<Moho::CMauiControl>::Create)
  *
  * What it does:
@@ -3193,6 +4455,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiBorder>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiBorder>& moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance()
 {
   return sInstance;
+}
+
+/**
+ * Address: 0x007862E0 (FUN_007862E0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiBorder>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiBorder>*
+startup_CScrLuaMetatableFactory_CMauiBorder_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
 }
 
 /**
@@ -3218,6 +4495,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiBitmap>& moho::CScrLuaMetatableFactory<
 }
 
 /**
+ * Address: 0x00783E70 (FUN_00783E70)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiBitmap>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiBitmap>*
+startup_CScrLuaMetatableFactory_CMauiBitmap_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiBitmap>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
+
+/**
  * Address: 0x00783040 (FUN_00783040, Moho::CScrLuaMetatableFactory<Moho::CMauiBitmap>::Create)
  *
  * What it does:
@@ -3237,6 +4529,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiCursor>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiCursor>& moho::CScrLuaMetatableFactory<moho::CMauiCursor>::Instance()
 {
   return sInstance;
+}
+
+/**
+ * Address: 0x0078DAA0 (FUN_0078DAA0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiCursor>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiCursor>*
+startup_CScrLuaMetatableFactory_CMauiCursor_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiCursor>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
 }
 
 /**
@@ -3263,6 +4570,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>::Instance()
 }
 
 /**
+ * Address: 0x0078EAF0 (FUN_0078EAF0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiLuaDragger>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>*
+startup_CScrLuaMetatableFactory_CMauiLuaDragger_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
+
+/**
  * Address: 0x0078E660 (FUN_0078E660, Moho::CScrLuaMetatableFactory<Moho::CMauiLuaDragger>::Create)
  *
  * What it does:
@@ -3282,6 +4604,21 @@ moho::CScrLuaMetatableFactory<moho::CMauiEdit>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiEdit>& moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance()
 {
   return sInstance;
+}
+
+/**
+ * Address: 0x00795610 (FUN_00795610)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiEdit>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiEdit>*
+startup_CScrLuaMetatableFactory_CMauiEdit_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
 }
 
 /**
@@ -3342,17 +4679,115 @@ moho::CScrLuaMetatableFactory<moho::CMauiText>::Create(LuaPlus::LuaState* const 
 }
 
 /**
- * Address: 0x007A4280 (FUN_007A4280, sub_7A4280)
+ * Address: 0x00798BB0 (FUN_00798BB0, register_CScrLuaMetatableFactory_CMauiHistogram_Index)
  *
  * What it does:
- * Adds `CMauiControl` as one base descriptor on a `CMauiText` type-info owner.
+ * Allocates and stores the startup Lua metatable-factory index for
+ * CMauiHistogram.
  */
-[[maybe_unused]] static void AddCMauiControlBaseToCMauiTextType(gpg::RType* const typeInfo)
+int moho::register_CScrLuaMetatableFactory_CMauiHistogram_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiHistogram>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return 0;
+}
+
+/**
+ * Address: 0x007A2890 (FUN_007A2890, register_CScrLuaMetatableFactory_CMauiScrollbar_Index)
+ *
+ * What it does:
+ * Allocates and stores the startup Lua metatable-factory index for
+ * CMauiScrollbar.
+ */
+int moho::register_CScrLuaMetatableFactory_CMauiScrollbar_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiScrollbar>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return 0;
+}
+
+/**
+ * Address: 0x0086AD10 (FUN_0086AD10, register_CScrLuaMetatableFactory_CLuaWldUIProvider_Index)
+ *
+ * What it does:
+ * Allocates and stores the startup Lua metatable-factory index for
+ * CLuaWldUIProvider.
+ */
+int moho::register_CScrLuaMetatableFactory_CLuaWldUIProvider_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CLuaWldUIProvider>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return 0;
+}
+
+/**
+ * Address: 0x0086D9D0 (FUN_0086D9D0, register_CScrLuaMetatableFactory_CUIWorldMesh_Index)
+ *
+ * What it does:
+ * Allocates and stores the startup Lua metatable-factory index for
+ * CUIWorldMesh.
+ */
+int moho::register_CScrLuaMetatableFactory_CUIWorldMesh_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CUIWorldMesh>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return 0;
+}
+
+/**
+ * Address: 0x00873B50 (FUN_00873B50, register_CScrLuaMetatableFactory_CUIWorldView_Index)
+ *
+ * What it does:
+ * Allocates and stores the startup Lua metatable-factory index for
+ * CUIWorldView.
+ */
+int moho::register_CScrLuaMetatableFactory_CUIWorldView_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return 0;
+}
+
+namespace
+{
+  struct UiRuntimeTypesFactoryIndexBootstrap
+  {
+    UiRuntimeTypesFactoryIndexBootstrap()
+    {
+      (void)moho::register_CScrLuaMetatableFactory_CMauiHistogram_Index();
+      (void)moho::register_CScrLuaMetatableFactory_CMauiScrollbar_Index();
+      (void)moho::register_CScrLuaMetatableFactory_CLuaWldUIProvider_Index();
+      (void)moho::register_CScrLuaMetatableFactory_CUIWorldMesh_Index();
+      (void)moho::register_CScrLuaMetatableFactory_CUIWorldView_Index();
+    }
+  };
+
+  UiRuntimeTypesFactoryIndexBootstrap gUiRuntimeTypesFactoryIndexBootstrap;
+} // namespace
+/**
+ * Address: 0x00783B00 (FUN_00783B00, sub_783B00)
+ * Address: 0x007861B0 (FUN_007861B0, sub_7861B0)
+ * Address: 0x00794EC0 (FUN_00794EC0, sub_794EC0)
+ * Address: 0x00798950 (FUN_00798950, sub_798950)
+ * Address: 0x0079C940 (FUN_0079C940, sub_79C940)
+ * Address: 0x0079EAC0 (FUN_0079EAC0, sub_79EAC0)
+ * Address: 0x007A0140 (FUN_007A0140, sub_7A0140)
+ * Address: 0x007A2700 (FUN_007A2700, sub_7A2700)
+ * Address: 0x008513D0 (FUN_008513D0, sub_8513D0)
+ *
+ * What it does:
+ * Adds `CMauiControl` as one base descriptor on the target UI runtime type.
+ */
+[[maybe_unused]] static void AddCMauiControlBaseToUiRuntimeType(gpg::RType* const typeInfo)
 {
   gpg::RType* baseType = moho::CMauiControl::sType;
   if (baseType == nullptr) {
     baseType = gpg::LookupRType(typeid(moho::CMauiControl));
     moho::CMauiControl::sType = baseType;
+  }
+
+  if (typeInfo == nullptr || baseType == nullptr) {
+    return;
   }
 
   gpg::RField baseField{};
@@ -3365,6 +4800,46 @@ moho::CScrLuaMetatableFactory<moho::CMauiText>::Create(LuaPlus::LuaState* const 
 }
 
 /**
+ * Address: 0x0078A680 (FUN_0078A680, sub_78A680)
+ * Address: 0x0078D970 (FUN_0078D970, sub_78D970)
+ * Address: 0x0078E690 (FUN_0078E690, sub_78E690)
+ *
+ * What it does:
+ * Adds `CScriptObject` as one base descriptor on the target UI runtime type.
+ */
+[[maybe_unused]] static void AddCScriptObjectBaseToUiRuntimeType(gpg::RType* const typeInfo)
+{
+  gpg::RType* baseType = moho::CScriptObject::sType;
+  if (baseType == nullptr) {
+    baseType = gpg::LookupRType(typeid(moho::CScriptObject));
+    moho::CScriptObject::sType = baseType;
+  }
+
+  if (typeInfo == nullptr || baseType == nullptr) {
+    return;
+  }
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
+ * Address: 0x007A4280 (FUN_007A4280, sub_7A4280)
+ *
+ * What it does:
+ * Adds `CMauiControl` as one base descriptor on a `CMauiText` type-info owner.
+ */
+[[maybe_unused]] static void AddCMauiControlBaseToCMauiTextType(gpg::RType* const typeInfo)
+{
+  AddCMauiControlBaseToUiRuntimeType(typeInfo);
+}
+
+/**
  * Address: 0x007A43B0 (FUN_007A43B0, sub_7A43B0)
  *
  * What it does:
@@ -3374,6 +4849,36 @@ moho::CScrLuaMetatableFactory<moho::CMauiText>::Create(LuaPlus::LuaState* const 
 [[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiText>* RegisterCMauiTextMetatableFactoryInstance()
 {
   auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
+
+/**
+ * Address: 0x00796F00 (FUN_00796F00)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiFrame>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiFrame>*
+startup_CScrLuaMetatableFactory_CMauiFrame_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiFrame>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
+
+/**
+ * Address: 0x007975A0 (FUN_007975A0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CMauiGroup>` and returns that singleton.
+ */
+[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiGroup>*
+startup_CScrLuaMetatableFactory_CMauiGroup_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiGroup>::Instance();
   instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
   return &instance;
 }
@@ -3536,6 +5041,46 @@ void moho::CScriptLazyVar_float::SetValue(CScriptLazyVar_float* const value, con
   lua_settop(rawState, savedTop);
 }
 
+/**
+ * Address: 0x0077F670 (FUN_0077F670)
+ *
+ * What it does:
+ * Writes `0.0` into Lua table lane `1` for one lazy-var object lane.
+ */
+[[maybe_unused]] void ResetLazyVarObjectLaneToZero(LuaPlus::LuaObject* const lazyVarObject)
+{
+  if (lazyVarObject != nullptr) {
+    lazyVarObject->SetNumber(1, 0.0);
+  }
+}
+
+/**
+ * Address: 0x00782E60 (FUN_00782E60)
+ *
+ * What it does:
+ * Adapter lane that resolves and returns one `CScriptLazyVar_float` value.
+ */
+[[maybe_unused]] float EvaluateLazyVarFloatValueAdapter(const moho::CScriptLazyVar_float* const value) noexcept
+{
+  return moho::CScriptLazyVar_float::GetValue(value);
+}
+
+/**
+ * Address: 0x00782E70 (FUN_00782E70)
+ *
+ * What it does:
+ * Adapter lane that sets one `CScriptLazyVar_float` value and returns the
+ * same lazy-var lane pointer.
+ */
+[[maybe_unused]] moho::CScriptLazyVar_float* SetLazyVarFloatValueAdapter(
+  moho::CScriptLazyVar_float* const value,
+  const float next
+) noexcept
+{
+  moho::CScriptLazyVar_float::SetValue(value, next);
+  return value;
+}
+
 void moho::CMauiCursorLink::AssignCursor(CMauiCursor* const cursor) noexcept
 {
   CMauiCursorLink** const nextOwnerHead =
@@ -3614,6 +5159,21 @@ moho::CMauiCursor::CMauiCursor(LuaPlus::LuaObject* const luaObject)
   if (luaObject != nullptr) {
     scriptObject->SetLuaObject(*luaObject);
   }
+}
+
+/**
+ * Address: 0x0078CBF0 (FUN_0078CBF0, Moho::CMauiCursor::~CMauiCursor body)
+ *
+ * What it does:
+ * Releases active/default cursor texture weak-owner lanes and destroys the
+ * embedded script-object runtime base.
+ */
+moho::CMauiCursor::~CMauiCursor()
+{
+  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
+  cursorView->mTexture.reset();
+  cursorView->mDefaultTexture.reset();
+  reinterpret_cast<CScriptObject*>(this)->~CScriptObject();
 }
 
 /**
@@ -3746,8 +5306,7 @@ int moho::cfunc_CMauiCursorSetDefaultTextureL(LuaPlus::LuaState* const state)
   const int hotspotX = static_cast<int>(lua_tonumber(state->m_state, 3));
 
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  cursorView->mDefaultHotspotY = hotspotY;
-  cursorView->mDefaultHotspotX = hotspotX;
+  (void)SetCursorDefaultHotspotXY(cursorView, hotspotX, hotspotY);
   return 0;
 }
 
@@ -3820,8 +5379,7 @@ int moho::cfunc_CMauiCursorSetNewTextureL(LuaPlus::LuaState* const state)
   const int hotspotX = static_cast<int>(lua_tonumber(state->m_state, 3));
 
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  cursorView->mHotspotY = hotspotY;
-  cursorView->mHotspotX = hotspotX;
+  (void)SetCursorHotspotXY(cursorView, hotspotX, hotspotY);
   return 0;
 }
 
@@ -3923,8 +5481,7 @@ int moho::cfunc_CMauiCursorHideL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject cursorObject(LuaPlus::LuaStackObject(state, 1));
   CMauiCursor* const cursor = ResolveCursorFromLuaObjectOrError(cursorObject, state);
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  cursorView->mIsShowing = false;
-  cursorView->mIsDefaultTexture = true;
+  (void)SetCursorShowingAndMarkDirty(cursorView, false);
   return 0;
 }
 
@@ -3975,8 +5532,7 @@ int moho::cfunc_CMauiCursorShowL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject cursorObject(LuaPlus::LuaStackObject(state, 1));
   CMauiCursor* const cursor = ResolveCursorFromLuaObjectOrError(cursorObject, state);
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  cursorView->mIsShowing = true;
-  cursorView->mIsDefaultTexture = true;
+  (void)SetCursorShowingAndMarkDirty(cursorView, true);
   return 0;
 }
 
@@ -4189,6 +5745,38 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetUV_LuaFuncDef()
 }
 
 /**
+ * Address: 0x0077FE80 (FUN_0077FE80)
+ *
+ * What it does:
+ * Clamps one bitmap UV quad `(u0,v0,u1,v1)` to `[0,1]` and writes the
+ * runtime UV lanes.
+ */
+[[maybe_unused]] static moho::CMauiBitmapRuntimeView* func_SetBitmapUvClamped(
+  moho::CMauiBitmapRuntimeView* const bitmapView,
+  const float u0,
+  const float v0,
+  const float u1,
+  const float v1
+) noexcept
+{
+  const auto clamp01 = [](const float value) noexcept -> float {
+    if (value >= 1.0f) {
+      return 1.0f;
+    }
+    if (value < 0.0f) {
+      return 0.0f;
+    }
+    return value;
+  };
+
+  bitmapView->mU0 = clamp01(u0);
+  bitmapView->mV0 = clamp01(v0);
+  bitmapView->mU1 = clamp01(u1);
+  bitmapView->mV1 = clamp01(v1);
+  return bitmapView;
+}
+
+/**
  * Address: 0x00781710 (FUN_00781710, cfunc_CMauiBitmapSetUVL)
  *
  * What it does:
@@ -4229,21 +5817,8 @@ int moho::cfunc_CMauiBitmapSetUVL(LuaPlus::LuaState* const state)
   }
   float u0 = static_cast<float>(lua_tonumber(state->m_state, 2));
 
-  const auto clamp01 = [](const float value) noexcept -> float {
-    if (value >= 1.0f) {
-      return 1.0f;
-    }
-    if (value < 0.0f) {
-      return 0.0f;
-    }
-    return value;
-  };
-
   CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  bitmapView->mU0 = clamp01(u0);
-  bitmapView->mV0 = clamp01(v0);
-  bitmapView->mU1 = clamp01(u1);
-  bitmapView->mV1 = clamp01(v1);
+  (void)func_SetBitmapUvClamped(bitmapView, u0, v0, u1, v1);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4298,7 +5873,7 @@ int moho::cfunc_CMauiBitmapUseAlphaHitTestL(LuaPlus::LuaState* const state)
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject enabledArg(state, 2);
-  CMauiBitmapRuntimeView::FromBitmap(bitmap)->mUseAlphaHitTest = enabledArg.GetBoolean();
+  (void)SetBitmapAlphaHitTestEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), enabledArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4352,7 +5927,7 @@ int moho::cfunc_CMauiBitmapSetTiledL(LuaPlus::LuaState* const state)
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject tiledArg(state, 2);
-  CMauiBitmapRuntimeView::FromBitmap(bitmap)->mIsTiled = tiledArg.GetBoolean();
+  (void)SetBitmapTiledEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), tiledArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4405,7 +5980,7 @@ int moho::cfunc_CMauiBitmapLoopL(LuaPlus::LuaState* const state)
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject loopArg(state, 2);
-  CMauiBitmapRuntimeView::FromBitmap(bitmap)->mDoLoop = loopArg.GetBoolean();
+  (void)SetBitmapLoopEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), loopArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4457,15 +6032,7 @@ int moho::cfunc_CMauiBitmapPlayL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  const auto* const batchBegin = bitmapView->mTextureBatches.begin();
-  if (batchBegin != nullptr) {
-    const std::ptrdiff_t batchCount = bitmapView->mTextureBatches.end() - batchBegin;
-    if (batchCount > 1) {
-      bitmapView->mIsPlaying = true;
-      CMauiControlFrameUpdateRuntimeView::FromControl(bitmap)->mNeedsFrameUpdate = true;
-    }
-  }
+  (void)EnableBitmapAnimationIfMultipleTextures(CMauiBitmapRuntimeView::FromBitmap(bitmap));
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4518,16 +6085,7 @@ int moho::cfunc_CMauiBitmapStopL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  const auto* const batchBegin = bitmapView->mTextureBatches.begin();
-  if (batchBegin != nullptr) {
-    const std::ptrdiff_t batchCount = bitmapView->mTextureBatches.end() - batchBegin;
-    if (batchCount > 1) {
-      bitmapView->mIsPlaying = false;
-      CMauiControlFrameUpdateRuntimeView::FromControl(bitmap)->mNeedsFrameUpdate = false;
-      reinterpret_cast<CScriptObject*>(bitmap)->RunScript("OnAnimationStopped");
-    }
-  }
+  bitmap->StopAnimationPlayback();
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -4638,7 +6196,7 @@ int moho::cfunc_CMauiBitmapGetFrameL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
-  const int frameIndex = CMauiBitmapRuntimeView::FromBitmap(bitmap)->mCurrentFrame;
+  const int frameIndex = ReadBitmapCurrentFrame(CMauiBitmapRuntimeView::FromBitmap(bitmap));
 
   lua_pushnumber(state->m_state, static_cast<float>(frameIndex));
   (void)lua_gettop(state->m_state);
@@ -4691,10 +6249,7 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
-  const CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-
-  const std::int32_t* const frameStart = bitmapView->mFrames.begin();
-  const int frameCount = frameStart != nullptr ? static_cast<int>(bitmapView->mFrames.end() - frameStart) : 0;
+  const int frameCount = CountBitmapFramePatternEntries(CMauiBitmapRuntimeView::FromBitmap(bitmap));
   lua_pushnumber(state->m_state, static_cast<float>(frameCount));
   (void)lua_gettop(state->m_state);
   return 1;
@@ -4732,6 +6287,21 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetFrameRate_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00780250 (FUN_00780250)
+ *
+ * What it does:
+ * Updates one bitmap frame-duration lane from `frameRate` as `1.0f / fps`.
+ */
+[[maybe_unused]] static moho::CMauiBitmapRuntimeView* func_SetBitmapFrameRate(
+  moho::CMauiBitmapRuntimeView* const bitmapView,
+  const float frameRate
+) noexcept
+{
+  bitmapView->mFrameDurationSeconds = 1.0f / frameRate;
+  return bitmapView;
+}
+
+/**
  * Address: 0x007824A0 (FUN_007824A0, cfunc_CMauiBitmapSetFrameRateL)
  *
  * What it does:
@@ -4755,7 +6325,7 @@ int moho::cfunc_CMauiBitmapSetFrameRateL(LuaPlus::LuaState* const state)
 
   const float frameRate = static_cast<float>(lua_tonumber(state->m_state, 2));
   CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  bitmapView->mFrameDurationSeconds = 1.0f / frameRate;
+  (void)func_SetBitmapFrameRate(bitmapView, frameRate);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6883,6 +8453,87 @@ moho::UIBuildDragger::UIBuildDragger(
   }
 }
 
+struct BuildDragStepStateRuntimeView
+{
+  float mX;                // +0x00
+  float mZ;                // +0x04
+  float mXStep;            // +0x08
+  float mZStep;            // +0x0C
+  std::int32_t mStepCount; // +0x10
+};
+
+static_assert(sizeof(BuildDragStepStateRuntimeView) == 0x14, "BuildDragStepStateRuntimeView size must be 0x14");
+static_assert(
+  offsetof(BuildDragStepStateRuntimeView, mStepCount) == 0x10,
+  "BuildDragStepStateRuntimeView::mStepCount offset must be 0x10"
+);
+
+/**
+ * Address: 0x0040DAD0 (FUN_0040DAD0)
+ *
+ * What it does:
+ * Initializes one build-drag stepping lane from start/end world XZ
+ * coordinates, deriving normalized per-step deltas and integer step count.
+ */
+[[maybe_unused]] static void InitBuildDragStepState(
+  BuildDragStepStateRuntimeView* const state,
+  const float stepLength,
+  const float startX,
+  const float startZ,
+  const float endX,
+  const float endZ
+) noexcept
+{
+  const float deltaX = endX - startX;
+  const float deltaZ = endZ - startZ;
+
+  state->mX = startX;
+  state->mZ = startZ;
+
+  const float absDeltaZ = std::fabs(deltaZ);
+  const float absDeltaX = std::fabs(deltaX);
+  const float maxAxisDelta = (absDeltaZ <= absDeltaX) ? absDeltaX : absDeltaZ;
+
+  if (maxAxisDelta == 0.0f) {
+    state->mXStep = 0.0f;
+    state->mZStep = 0.0f;
+    state->mStepCount = 1;
+    return;
+  }
+
+  const float inverseMaxAxisDelta = 1.0f / maxAxisDelta;
+  state->mXStep = (inverseMaxAxisDelta * deltaX) * stepLength;
+  state->mZStep = (inverseMaxAxisDelta * deltaZ) * stepLength;
+
+  const float rawStepCount = maxAxisDelta / stepLength;
+  const float roundedStepCount = std::nearbyintf(rawStepCount);
+  std::int32_t carryAdjust = 0;
+  if (rawStepCount < roundedStepCount) {
+    carryAdjust = -1;
+  }
+
+  state->mStepCount = static_cast<std::int32_t>(roundedStepCount) + carryAdjust + 1;
+}
+
+/**
+ * Address: 0x00822F60 (FUN_00822F60)
+ *
+ * What it does:
+ * Thin forwarding lane that adapts drag-step initializer arguments and
+ * returns the same state pointer.
+ */
+[[maybe_unused]] static BuildDragStepStateRuntimeView* InitBuildDragStepStateAndReturnState(
+  BuildDragStepStateRuntimeView* const state,
+  const float stepLength,
+  const float startX,
+  const float startZ,
+  const float endX,
+  const float endZ
+) noexcept
+{
+  InitBuildDragStepState(state, stepLength, startX, startZ, endX, endZ);
+  return state;
+}
 /**
  * Address: 0x0078DDC0 (FUN_0078DDC0, sub_78DDC0)
  *
@@ -6999,10 +8650,7 @@ static IMauiDragger* func_GetCurrentDragger2()
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  if (cursorView->mIsShowing) {
-    cursorView->mIsShowing = false;
-    cursorView->mIsDefaultTexture = true;
-  }
+  (void)SetCursorShowingAndMarkDirty(cursorView, false);
 }
 
 /**
@@ -7023,11 +8671,7 @@ static IMauiDragger* func_GetCurrentDragger2()
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  const bool shouldShowCursor = !doStart;
-  if (cursorView->mIsShowing != shouldShowCursor) {
-    cursorView->mIsShowing = shouldShowCursor;
-    cursorView->mIsDefaultTexture = true;
-  }
+  (void)SetCursorShowingAndMarkDirty(cursorView, !doStart);
 
   if (!doStart) {
     ::SetCursorPos(sMouseMoveStart.x, sMouseMoveStart.y);
@@ -7501,6 +9145,71 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
   }
 }
 
+class UIBuildDraggerRuntimeConcrete final : public moho::UIBuildDragger
+{
+public:
+  UIBuildDraggerRuntimeConcrete(
+    moho::CWldSession* const session,
+    moho::CUIWorldViewBuildDragRuntimeView* const worldView,
+    moho::CameraImpl* const camera
+  )
+    : moho::UIBuildDragger(session, worldView, camera)
+  {
+  }
+
+  void DragMove(const moho::SMauiEventData* const /*eventData*/) override
+  {
+    if (mWldSession != nullptr) {
+      mEnd = mWldSession->CursorWorldPos;
+    }
+
+    if (mWldView != nullptr) {
+      mWldView->mEnd = mEnd;
+    }
+  }
+
+  void DragRelease(const moho::SMauiEventData* const /*eventData*/) override
+  {
+  }
+
+  void OnCurrentDraggerReplaced() override
+  {
+  }
+};
+
+static_assert(
+  sizeof(UIBuildDraggerRuntimeConcrete) == sizeof(moho::UIBuildDragger),
+  "UIBuildDraggerRuntimeConcrete size must match moho::UIBuildDragger"
+);
+
+/**
+ * Address: 0x00823CB0 (FUN_00823CB0, func_NewUIBuildDragger)
+ *
+ * What it does:
+ * Allocates one UIBuildDragger, runs its constructor with session/world-view/
+ * camera lanes, then posts the dragger; on allocation failure it posts a null
+ * dragger lane.
+ */
+[[maybe_unused]] static void func_NewUIBuildDragger(
+  moho::CMauiFrame* const originFrame,
+  moho::CWldSession* const session,
+  moho::SMauiEventData* const eventData,
+  moho::CameraImpl* const camera,
+  moho::CUIWorldViewBuildDragRuntimeView* const worldView
+)
+{
+  auto* const storage = static_cast<UIBuildDraggerRuntimeConcrete*>(
+    ::operator new(sizeof(UIBuildDraggerRuntimeConcrete), std::nothrow)
+  );
+  if (storage != nullptr) {
+    auto* const dragger = new (storage) UIBuildDraggerRuntimeConcrete(session, worldView, camera);
+    func_PostDragger(originFrame, dragger, eventData);
+    return;
+  }
+
+  func_PostDragger(originFrame, nullptr, eventData);
+}
+
 /**
  * Address: 0x0078E210 (FUN_0078E210, cfunc_PostDragger)
  *
@@ -7530,6 +9239,29 @@ moho::CScrLuaInitForm* moho::func_PostDragger_LuaFuncDef()
     kPostDraggerHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0078DC30 (FUN_0078DC30)
+ *
+ * What it does:
+ * Initializes one `SMauiEventData` lane to the default unknown-event state
+ * used by dragger posting paths.
+ */
+[[maybe_unused]] static moho::SMauiEventData* func_InitUnknownMauiEventData(
+  moho::SMauiEventData* const eventData
+) noexcept
+{
+  eventData->mEventType = moho::MET_Unknown;
+  eventData->mMousePos.x = -1.0f;
+  eventData->mMousePos.y = -1.0f;
+  eventData->mWheelRotation = 0;
+  eventData->mWheelData = 0;
+  eventData->mKeyCode = 0;
+  eventData->mRawKeyCode = 0;
+  eventData->mModifiers = moho::MEM_None;
+  eventData->mSource = nullptr;
+  return eventData;
 }
 
 /**
@@ -7585,15 +9317,8 @@ int moho::cfunc_PostDraggerL(LuaPlus::LuaState* const state)
   }
 
   SMauiEventData eventData{};
-  eventData.mEventType = MET_Unknown;
-  eventData.mMousePos.x = -1.0f;
-  eventData.mMousePos.y = -1.0f;
-  eventData.mWheelRotation = 0;
-  eventData.mWheelData = 0;
+  (void)func_InitUnknownMauiEventData(&eventData);
   eventData.mKeyCode = keyCode;
-  eventData.mRawKeyCode = 0;
-  eventData.mModifiers = MEM_None;
-  eventData.mSource = nullptr;
 
   func_PostDragger(originFrame, dragger, &eventData);
   return 0;
@@ -7774,7 +9499,7 @@ int moho::cfunc_CMauiEditSetNewForegroundColorL(LuaPlus::LuaState* const state)
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  CMauiEditRuntimeView::FromEdit(edit)->mForegroundColor = SCR_DecodeColor(state, colorObject);
+  (void)WriteEditForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject));
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -7827,7 +9552,7 @@ int moho::cfunc_CMauiEditGetForegroundColorL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, CMauiEditRuntimeView::FromEdit(edit)->mForegroundColor);
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
   colorObject.PushStack(state);
   return 1;
 }
@@ -7884,8 +9609,7 @@ int moho::cfunc_CMauiEditSetNewBackgroundColorL(LuaPlus::LuaState* const state)
   const std::uint32_t backgroundColor = SCR_DecodeColor(state, colorObject);
 
   CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  editView->mBackgroundVisible = true;
-  editView->mBackgroundColor = backgroundColor;
+  (void)EnableEditBackgroundAndWriteColor(editView, backgroundColor);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -7938,7 +9662,7 @@ int moho::cfunc_CMauiEditGetBackgroundColorL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, CMauiEditRuntimeView::FromEdit(edit)->mBackgroundColor);
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditBackgroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
   colorObject.PushStack(state);
   return 1;
 }
@@ -7992,7 +9716,7 @@ int moho::cfunc_CMauiEditShowBackgroundL(LuaPlus::LuaState* const state)
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject visibleArg(state, 2);
-  CMauiEditRuntimeView::FromEdit(edit)->mBackgroundVisible = visibleArg.GetBoolean();
+  (void)WriteEditBackgroundVisibleLane(CMauiEditRuntimeView::FromEdit(edit), visibleArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -8045,7 +9769,7 @@ int moho::cfunc_CMauiEditIsBackgroundVisibleL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushboolean(state->m_state, CMauiEditRuntimeView::FromEdit(edit)->mBackgroundVisible);
+  lua_pushboolean(state->m_state, ReadEditBackgroundVisibleLaneAlias(CMauiEditRuntimeView::FromEdit(edit)));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -8313,7 +10037,7 @@ int moho::cfunc_CMauiEditGetCaretPositionL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushnumber(state->m_state, static_cast<float>(CMauiEditRuntimeView::FromEdit(edit)->mCaretPosition));
+  lua_pushnumber(state->m_state, static_cast<float>(ReadEditCaretPositionLane(CMauiEditRuntimeView::FromEdit(edit))));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -8365,7 +10089,7 @@ int moho::cfunc_CMauiEditShowCaretL(LuaPlus::LuaState* const state)
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject visibleArg(state, 2);
-  CMauiEditRuntimeView::FromEdit(edit)->mCaretVisible = visibleArg.GetBoolean();
+  (void)WriteEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(edit), visibleArg.GetBoolean());
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -8415,7 +10139,7 @@ int moho::cfunc_CMauiEditIsCaretVisibleL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
-  lua_pushboolean(state->m_state, CMauiEditRuntimeView::FromEdit(edit)->mCaretVisible);
+  lua_pushboolean(state->m_state, ReadEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(edit)));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -8451,6 +10175,22 @@ moho::CScrLuaInitForm* moho::func_CMauiEditSetNewCaretColor_LuaFuncDef()
 }
 
 /**
+ * Address: 0x0078EE30 (FUN_0078EE30)
+ *
+ * What it does:
+ * Masks one caret color lane to RGB24 and stores it in edit runtime state.
+ */
+[[maybe_unused]] static std::uint32_t func_SetEditCaretColorRgb24(
+  moho::CMauiEditRuntimeView* const editView,
+  const std::uint32_t color
+) noexcept
+{
+  const std::uint32_t color24 = color & 0x00FFFFFFu;
+  editView->mCaretColor = color24;
+  return color24;
+}
+
+/**
  * Address: 0x00793910 (FUN_00793910, cfunc_CMauiEditSetNewCaretColorL)
  *
  * What it does:
@@ -8467,8 +10207,8 @@ int moho::cfunc_CMauiEditSetNewCaretColorL(LuaPlus::LuaState* const state)
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  const std::uint32_t caretColor = SCR_DecodeColor(state, colorObject) & 0x00FFFFFFu;
-  CMauiEditRuntimeView::FromEdit(edit)->mCaretColor = caretColor;
+  const std::uint32_t caretColor = SCR_DecodeColor(state, colorObject);
+  (void)func_SetEditCaretColorRgb24(CMauiEditRuntimeView::FromEdit(edit), caretColor);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -8519,7 +10259,7 @@ int moho::cfunc_CMauiEditGetCaretColorL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, CMauiEditRuntimeView::FromEdit(edit)->mCaretColor);
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditCaretColorLane(CMauiEditRuntimeView::FromEdit(edit)));
   colorObject.PushStack(state);
   return 1;
 }
@@ -8695,7 +10435,7 @@ int moho::cfunc_CMauiEditGetMaxCharsL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushnumber(state->m_state, static_cast<float>(CMauiEditRuntimeView::FromEdit(edit)->mMaxChars));
+  lua_pushnumber(state->m_state, static_cast<float>(ReadEditMaxCharsLane(CMauiEditRuntimeView::FromEdit(edit))));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -8745,7 +10485,7 @@ int moho::cfunc_CMauiEditIsEnabledL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
-  lua_pushboolean(state->m_state, CMauiEditRuntimeView::FromEdit(edit)->mIsEnabled);
+  lua_pushboolean(state->m_state, ReadEditInputEnabledLane(CMauiEditRuntimeView::FromEdit(edit)));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -8796,9 +10536,7 @@ int moho::cfunc_CMauiEditEnableInputL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  editView->mIsEnabled = true;
-  editView->mCaretVisible = true;
+  (void)WriteEditInputEnabledAndCaretVisible(edit, true);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -8849,10 +10587,7 @@ int moho::cfunc_CMauiEditDisableInputL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  editView->mIsEnabled = false;
-  editView->mCaretVisible = false;
-  edit->AbandonKeyboardFocus();
+  (void)WriteEditInputEnabledAndCaretVisible(edit, false);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -8906,7 +10641,7 @@ int moho::cfunc_CMauiEditSetNewHighlightForegroundColorL(LuaPlus::LuaState* cons
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  CMauiEditRuntimeView::FromEdit(edit)->mHighlightForegroundColor = SCR_DecodeColor(state, colorObject);
+  (void)WriteEditHighlightForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -8958,7 +10693,7 @@ int moho::cfunc_CMauiEditGetHighlightForegroundColorL(LuaPlus::LuaState* const s
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, CMauiEditRuntimeView::FromEdit(edit)->mHighlightForegroundColor);
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditHighlightForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
   colorObject.PushStack(state);
   return 1;
 }
@@ -9012,7 +10747,7 @@ int moho::cfunc_CMauiEditSetNewHighlightBackgroundColorL(LuaPlus::LuaState* cons
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  CMauiEditRuntimeView::FromEdit(edit)->mHighlightBackgroundColor = SCR_DecodeColor(state, colorObject);
+  (void)WriteEditHighlightBackgroundColorLane(CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -9064,7 +10799,7 @@ int moho::cfunc_CMauiEditGetHighlightBackgroundColorL(LuaPlus::LuaState* const s
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, CMauiEditRuntimeView::FromEdit(edit)->mHighlightBackgroundColor);
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditHighlightBackgroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
   colorObject.PushStack(state);
   return 1;
 }
@@ -9115,8 +10850,7 @@ int moho::cfunc_CMauiEditGetFontHeightL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  CD3DFont* const font = CMauiEditRuntimeView::FromEdit(edit)->mFont;
-  const float fontHeight = font != nullptr ? font->mHeight : 0.0f;
+  const float fontHeight = ReadEditFontHeightLane(CMauiEditRuntimeView::FromEdit(edit));
   lua_pushnumber(state->m_state, static_cast<float>(static_cast<int>(fontHeight)));
   (void)lua_gettop(state->m_state);
   return 1;
@@ -9170,11 +10904,7 @@ int moho::cfunc_CMauiEditAcquireFocusL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  if (editView->mIsEnabled) {
-    editView->mCaretVisible = true;
-    MAUI_SetKeyboardFocus(edit, true);
-  }
+  AcquireEditKeyboardFocusIfEnabled(edit);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -9281,7 +11011,7 @@ int moho::cfunc_CMauiEditSetDropShadowL(LuaPlus::LuaState* const state)
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject dropShadowArg(state, 2);
-  CMauiEditRuntimeView::FromEdit(edit)->mDropShadow = dropShadowArg.GetBoolean();
+  (void)WriteEditDropShadowLane(CMauiEditRuntimeView::FromEdit(edit), dropShadowArg.GetBoolean());
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -9340,9 +11070,7 @@ int moho::cfunc_CMauiEditGetStringAdvanceL(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&textArg, "string");
   }
 
-  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  CD3DFont* const font = editView->mFont;
-  const float advance = font != nullptr ? font->GetAdvance(text, 0) : 0.0f;
+  const float advance = MeasureEditStringAdvanceOrZero(CMauiEditRuntimeView::FromEdit(edit), text);
   lua_pushnumber(state->m_state, advance);
   (void)lua_gettop(state->m_state);
   return 1;
@@ -9810,9 +11538,7 @@ int moho::cfunc_InternalCreateGroupL(LuaPlus::LuaState* const state)
 }
 
 /**
- * Address context: constructor path in `cfunc_InternalCreateGroupL`
- * (`FUN_00797390`) allocates one `CMauiGroup` and initializes it through
- * `CMauiControl(luaObject, parent, "group")`.
+ * Address: 0x00797280 (FUN_00797280, ??0CMauiGroup@Moho@@QAE@@Z)
  *
  * What it does:
  * Constructs one group control from Lua object + parent lanes.
@@ -9997,6 +11723,19 @@ moho::CMauiMesh::CMauiMesh(LuaPlus::LuaObject* const luaObject, CMauiControl* co
   meshView->mOrientation = Wm3::Quaternionf::Identity();
   meshView->mUnknown13C = -1;
   CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+}
+
+/**
+ * Address: 0x0079DE70 (FUN_0079DE70, Moho::CMauiMesh::dtr)
+ *
+ * What it does:
+ * Releases the mesh preview texture shared-pointer lane and continues base
+ * control teardown.
+ */
+moho::CMauiMesh::~CMauiMesh()
+{
+  CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
+  meshView->mTexture.reset();
 }
 
 /**
@@ -10829,12 +12568,7 @@ int moho::cfunc_CMauiItemListShowItemL(LuaPlus::LuaState* const state)
   }
   const int index = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
   if (index >= 0) {
-    CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-    const int linesVisible = itemList->LinesVisible();
-    const int scrollPosition = itemListView->mScrollPosition;
-    if (index < scrollPosition || index >= linesVisible + scrollPosition) {
-      itemList->ScrollSetTop(kVerticalScrollAxis, static_cast<float>(index));
-    }
+    itemList->ShowItem(index);
   }
 
   return 0;
@@ -11054,6 +12788,20 @@ int moho::cfunc_CMauiItemListNeedsScrollBarL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x007994C0 (FUN_007994C0, sub_7994C0)
+ *
+ * What it does:
+ * Releases list-item string storage and one intrusive font reference, then
+ * continues base `CMauiControl` teardown.
+ */
+moho::CMauiItemList::~CMauiItemList()
+{
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  itemListView->mItems = msvc8::vector<msvc8::string>{};
+  ReleaseIntrusiveFont(itemListView->mFont);
+}
+
+/**
  * Address: 0x00799610 (FUN_00799610, Moho::CMauiItemList::SetFont)
  *
  * What it does:
@@ -11114,16 +12862,7 @@ void moho::CMauiItemList::DeleteItem(const std::int32_t index)
     return;
   }
 
-  itemListView->mItems.erase(itemListView->mItems.begin() + index);
-
-  const std::int32_t currentSelection = itemListView->mCurSelection;
-  if (index >= currentSelection) {
-    if (currentSelection == GetItemListEntryCount(*itemListView)) {
-      itemListView->mCurSelection = -1;
-    }
-  } else {
-    itemListView->mCurSelection = currentSelection - 1;
-  }
+  RemoveItemListEntryAtIndex(itemListView, index);
 }
 
 /**
@@ -11342,6 +13081,22 @@ void moho::CMauiItemList::ScrollToBottom()
   const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
   const int itemCount = GetItemListEntryCount(*itemListView);
   ScrollSetTop(kVerticalScrollAxis, static_cast<float>(itemCount));
+}
+
+/**
+ * Address: 0x0079A8C0 (FUN_0079A8C0, Moho::CMauiItemList::ShowItem)
+ *
+ * What it does:
+ * Scrolls the item list so index is visible inside the current viewport.
+ */
+void moho::CMauiItemList::ShowItem(const std::int32_t index)
+{
+  const std::int32_t visibleLineCount = LinesVisible();
+  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  const std::int32_t scrollPosition = itemListView->mScrollPosition;
+  if (index < scrollPosition || index >= (scrollPosition + visibleLineCount)) {
+    ScrollSetTop(kVerticalScrollAxis, static_cast<float>(index));
+  }
 }
 
 /**
@@ -11894,7 +13649,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMeshSetOrientation_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
+  * Alias of FUN_0079E930 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMesh` plus quaternion arg and stores mesh orientation.
@@ -12278,7 +14033,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMovieLoop_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079F8F0 (FUN_0079F8F0, cfunc_CMauiMovieLoopL)
+  * Alias of FUN_0079F8F0 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` plus bool and updates loop state.
@@ -12331,7 +14086,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMoviePlay_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079FA40 (FUN_0079FA40, cfunc_CMauiMoviePlayL)
+  * Alias of FUN_0079FA40 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` and starts playback.
@@ -12382,7 +14137,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMovieStop_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079FBA0 (FUN_0079FBA0, cfunc_CMauiMovieStopL)
+  * Alias of FUN_0079FBA0 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` and stops playback.
@@ -12433,7 +14188,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMovieIsLoaded_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079FCF0 (FUN_0079FCF0, cfunc_CMauiMovieIsLoadedL)
+  * Alias of FUN_0079FCF0 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` and returns whether it has loaded movie content.
@@ -12484,7 +14239,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMovieGetNumFrames_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079FE50 (FUN_0079FE50, cfunc_CMauiMovieGetNumFramesL)
+  * Alias of FUN_0079FE50 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` and returns frame-count numeric result.
@@ -12535,7 +14290,7 @@ moho::CScrLuaInitForm* moho::func_CMauiMovieGetFrameRate_LuaFuncDef()
 }
 
 /**
- * Address: 0x0079FFA0 (FUN_0079FFA0, cfunc_CMauiMovieGetFrameRateL)
+  * Alias of FUN_0079FFA0 (non-canonical helper lane).
  *
  * What it does:
  * Reads one `CMauiMovie` and returns frame-rate numeric result.
@@ -13017,7 +14772,7 @@ void moho::CMauiText::SetNewFont(CD3DFont* const font)
     const float advance = textView->mFont->GetAdvance(textView->mText.c_str(), 0);
     CScriptLazyVar_float::SetValue(&textView->mTextAdvanceLV, advance);
     CScriptLazyVar_float::SetValue(&textView->mFontAscentLV, textView->mFont->mAscent);
-    CScriptLazyVar_float::SetValue(&textView->mFontDescentLV, textView->mFont->mDescent);
+    CScriptLazyVar_float::SetValue(&textView->mFontDescentLV, ReadFontDescentLane(textView->mFont));
     CScriptLazyVar_float::SetValue(
       &textView->mFontExternalLeadingLV,
       textView->mFont->mExternalLeading
@@ -13840,6 +15595,33 @@ int moho::cfunc_GetUIControlsAlphaL(LuaPlus::LuaState* const state)
 
   lua_pushnumber(state->m_state, g_UIManager->GetUIControlsAlpha());
   return 1;
+}
+
+/**
+ * Address: 0x0084E140 (FUN_0084E140, func_FlushEvents_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `FlushEvents()` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_FlushEvents_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "FlushEvents",
+    &moho::func_FlushEvents,
+    nullptr,
+    "<global>",
+    kFlushEventsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE4EC0 (FUN_00BE4EC0, register_FlushEvents_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_FlushEvents_LuaFuncDef()
+{
+  return func_FlushEvents_LuaFuncDef();
 }
 
 /**
@@ -15198,6 +16980,113 @@ void moho::CLuaWldUIProvider::DestroyGameInterface()
 }
 
 /**
+ * Address: 0x0086A8D0 (FUN_0086A8D0, cfunc_InternalCreateWldUIProvider)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_InternalCreateWldUIProviderL`.
+ */
+int moho::cfunc_InternalCreateWldUIProvider(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateWldUIProviderL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0086A8F0 (FUN_0086A8F0, func_InternalCreateWldUIProvider_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateWldUIProvider(luaobj)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateWldUIProvider_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateWldUIProvider",
+    &moho::cfunc_InternalCreateWldUIProvider,
+    nullptr,
+    "<global>",
+    kInternalCreateWldUIProviderHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0086A950 (FUN_0086A950, cfunc_InternalCreateWldUIProviderL)
+ *
+ * What it does:
+ * Builds one `CLuaWldUIProvider` from one Lua object lane, pushes the
+ * script-object handle to Lua, and updates global world-ui-provider ownership.
+ */
+int moho::cfunc_InternalCreateWldUIProviderL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateWldUIProviderHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
+  CLuaWldUIProvider* const provider = new CLuaWldUIProvider(&luaObject);
+  CScriptObject* const providerScriptObject = static_cast<CScriptObject*>(provider);
+  providerScriptObject->mLuaObj.PushStack(state);
+
+  if (sWldUIProvider != provider && sWldUIProvider != nullptr) {
+    delete sWldUIProvider;
+  }
+  sWldUIProvider = provider;
+  return 1;
+}
+
+/**
+ * Address: 0x0086BB30 (FUN_0086BB30, cfunc_InternalCreateWorldMesh)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_InternalCreateWorldMeshL`.
+ */
+int moho::cfunc_InternalCreateWorldMesh(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateWorldMeshL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0086BB50 (FUN_0086BB50, func_InternalCreateWorldMesh_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateWorldMesh(luaobj)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateWorldMesh_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateWorldMesh",
+    &moho::cfunc_InternalCreateWorldMesh,
+    nullptr,
+    "<global>",
+    kInternalCreateWorldMeshHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0086BBB0 (FUN_0086BBB0, cfunc_InternalCreateWorldMeshL)
+ *
+ * What it does:
+ * Builds one `CUIWorldMesh` from one Lua object lane and pushes the
+ * script-object handle to Lua.
+ */
+int moho::cfunc_InternalCreateWorldMeshL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateWorldMeshHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldMesh* const worldMesh = new CUIWorldMesh(luaObject);
+  static_cast<CScriptObject*>(worldMesh)->mLuaObj.PushStack(state);
+  return 1;
+}
+/**
  * Address: 0x0086AA50 (FUN_0086AA50, cfunc_CLuaWldUIProviderDestroy)
  *
  * What it does:
@@ -15244,7 +17133,7 @@ int moho::cfunc_CLuaWldUIProviderDestroyL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject providerObject(LuaPlus::LuaStackObject(state, 1));
   CLuaWldUIProvider* const provider = ResolveCLuaWldUIProviderOptionalOrError(providerObject, state);
   if (provider != nullptr) {
-    delete reinterpret_cast<CScriptObject*>(provider);
+    delete static_cast<IWldUIProvider*>(provider);
     if (sWldUIProvider != nullptr) {
       delete sWldUIProvider;
       sWldUIProvider = nullptr;
@@ -15619,6 +17508,35 @@ int moho::cfunc_CUIWorldMeshDestroyL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0086BE40 (FUN_0086BE40, cfunc_CUIWorldMeshSetMeshL)
+ *
+ * What it does:
+ * Resolves one `CUIWorldMesh` plus descriptor-table argument and forwards the
+ * table into `CUIWorldMesh::SetMesh`.
+ */
+int moho::cfunc_CUIWorldMeshSetMeshL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCUIWorldMeshSetMeshHelpText, 2, argumentCount);
+  }
+
+  if (lua_type(state->m_state, 2) != LUA_TTABLE) {
+    gpg::Warnf("WorldMesh: Expected second parameter to be table");
+    return 0;
+  }
+
+  const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
+
+  const LuaPlus::LuaObject meshDescriptorObject(LuaPlus::LuaStackObject(state, 2));
+  if (worldMesh != nullptr) {
+    worldMesh->SetMesh(meshDescriptorObject);
+  }
+  return 0;
+}
+
+/**
  * Address: 0x0086BFD0 (FUN_0086BFD0, cfunc_CUIWorldMeshSetStanceL)
  *
  * What it does:
@@ -15642,7 +17560,7 @@ int moho::cfunc_CUIWorldMeshSetStanceL(LuaPlus::LuaState* const state)
   const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3f>(positionObject);
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
   MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
   if (meshInstance != nullptr) {
     VTransform stance{};
@@ -15667,7 +17585,7 @@ int moho::cfunc_CUIWorldMeshSetHiddenL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaStackObject hiddenArg(state, 2);
   const bool hidden = LuaPlus::LuaStackObject::GetBoolean(&hiddenArg);
@@ -15693,7 +17611,7 @@ int moho::cfunc_CUIWorldMeshIsHiddenL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   bool isHidden = false;
   MeshInstance* const meshInstance = CUIWorldMeshRuntimeView::FromWorldMesh(worldMesh)->mMeshInstance;
@@ -15720,7 +17638,7 @@ int moho::cfunc_CUIWorldMeshSetAuxiliaryParameterL(LuaPlus::LuaState* const stat
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaStackObject valueArg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -15749,7 +17667,7 @@ int moho::cfunc_CUIWorldMeshSetFractionCompleteParameterL(LuaPlus::LuaState* con
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaStackObject valueArg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -15778,7 +17696,7 @@ int moho::cfunc_CUIWorldMeshSetFractionHealthParameterL(LuaPlus::LuaState* const
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaStackObject valueArg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -15807,7 +17725,7 @@ int moho::cfunc_CUIWorldMeshSetLifetimeParameterL(LuaPlus::LuaState* const state
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaStackObject valueArg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -15837,7 +17755,7 @@ int moho::cfunc_CUIWorldMeshSetColorL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t color = SCR_DecodeColor(state, colorObject);
@@ -15863,7 +17781,7 @@ int moho::cfunc_CUIWorldMeshSetScaleL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   LuaPlus::LuaObject scaleObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f scale = SCR_FromLuaCopy<Wm3::Vector3f>(scaleObject);
@@ -15921,7 +17839,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedPositionL(LuaPlus::LuaState* const st
   }
 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   Wm3::Vector3f interpolatedPosition{};
   if (worldMesh != nullptr) {
@@ -15984,7 +17902,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedSphereL(LuaPlus::LuaState* const stat
   }
 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   Wm3::Vector3f center{};
   float radius = 0.0f;
@@ -16053,7 +17971,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedAlignedBoxL(LuaPlus::LuaState* const 
   }
 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   float xMin = 0.0f;
   float yMin = 0.0f;
@@ -16133,7 +18051,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedOrientedBoxL(LuaPlus::LuaState* const
   }
 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   Wm3::Box3f box{};
   if (worldMesh != nullptr) {
@@ -16218,7 +18136,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* const stat
   }
 
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
+  CUIWorldMesh* const worldMesh = SCR_FromLua_CUIWorldMesh(worldMeshObject, state);
 
   Wm3::Vector2f interpolatedScroll{};
   if (worldMesh != nullptr) {
@@ -16644,6 +18562,17 @@ float moho::CMauiControl::GetAlpha()
 }
 
 /**
+ * Address: 0x00786450 (FUN_00786450, Moho::CMauiControl::IsInvisible)
+ *
+ * What it does:
+ * Returns whether this control is currently marked invisible.
+ */
+bool moho::CMauiControl::IsInvisible()
+{
+  return CMauiControlExtendedRuntimeView::FromControl(this)->mInvisible;
+}
+
+/**
  * Address: 0x00786460 (FUN_00786460, Moho::CMauiControl::SetRenderPass)
  *
  * What it does:
@@ -16907,7 +18836,7 @@ void moho::CMauiControl::SetHidden(const bool hidden)
 bool moho::CMauiControl::OnHide(const bool& hidden)
 {
   CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-  WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<WeakObject*>(scriptObject));
+  ScriptCallbackWeakGuard weakGuard(scriptObject);
 
   LuaPlus::LuaObject callbackObject{};
   scriptObject->FindScript(&callbackObject, "OnHide");
@@ -16915,8 +18844,14 @@ bool moho::CMauiControl::OnHide(const bool& hidden)
     return false;
   }
 
-  LuaPlus::LuaFunction<bool> callback(callbackObject);
-  return callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, hidden);
+  try {
+    LuaPlus::LuaFunction<bool> callback(callbackObject);
+    return callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, hidden);
+  } catch (const std::exception& exception) {
+    LogOnHideCallbackException(weakGuard.ResolveObjectForWarning(), exception);
+  }
+
+  return false;
 }
 
 /**
@@ -16951,8 +18886,16 @@ bool moho::CMauiControl::GetIsScrollable(const char* const axisLexical)
     return false;
   }
 
-  LuaPlus::LuaFunction<bool> callback(callbackObject);
-  return callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, axisLexical != nullptr ? axisLexical : "");
+  try {
+    LuaPlus::LuaFunction<bool> callback(callbackObject);
+    return callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, axisLexical != nullptr ? axisLexical : "");
+  } catch (const std::exception& exception) {
+    LogIsScrollableCallbackException(scriptObject, exception);
+  } catch (...) {
+    scriptObject->LogScriptWarning(scriptObject, "IsScrollable", "unknown exception");
+  }
+
+  return false;
 }
 
 /**
@@ -17309,6 +19252,108 @@ namespace
     const boost::shared_ptr<moho::CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
     return textureStart != nullptr ? static_cast<std::int32_t>(bitmapView->mTextureBatches.end() - textureStart) : 0;
   }
+
+  /**
+   * Address: 0x0077F7F0 (FUN_0077F7F0)
+   *
+   * What it does:
+   * Stores one alpha-hit-test boolean lane into one bitmap runtime view.
+   */
+  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapAlphaHitTestEnabled(
+    moho::CMauiBitmapRuntimeView* const bitmapView,
+    const bool enabled
+  ) noexcept
+  {
+    bitmapView->mUseAlphaHitTest = enabled;
+    return bitmapView;
+  }
+
+  /**
+   * Address: 0x0077F7E0 (FUN_0077F7E0)
+   *
+   * What it does:
+   * Stores one tiled-render boolean lane into one bitmap runtime view.
+   */
+  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapTiledEnabled(
+    moho::CMauiBitmapRuntimeView* const bitmapView,
+    const bool enabled
+  ) noexcept
+  {
+    bitmapView->mIsTiled = enabled;
+    return bitmapView;
+  }
+
+  /**
+   * Address: 0x00780100 (FUN_00780100)
+   *
+   * What it does:
+   * Stores one loop-enabled boolean lane into one bitmap runtime view.
+   */
+  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapLoopEnabled(
+    moho::CMauiBitmapRuntimeView* const bitmapView,
+    const bool enabled
+  ) noexcept
+  {
+    bitmapView->mDoLoop = enabled;
+    return bitmapView;
+  }
+
+  /**
+   * Address: 0x00780220 (FUN_00780220)
+   *
+   * What it does:
+   * Reads one current-frame index lane from one bitmap runtime view.
+   */
+  [[maybe_unused]] std::int32_t ReadBitmapCurrentFrame(
+    const moho::CMauiBitmapRuntimeView* const bitmapView
+  ) noexcept
+  {
+    return bitmapView->mCurrentFrame;
+  }
+
+  /**
+   * Address: 0x00780230 (FUN_00780230)
+   *
+   * What it does:
+   * Returns frame count from one bitmap frame-pattern vector lane.
+   */
+  [[maybe_unused]] std::int32_t CountBitmapFramePatternEntries(
+    const moho::CMauiBitmapRuntimeView* const bitmapView
+  ) noexcept
+  {
+    const std::int32_t* const frameStart = bitmapView->mFrames.begin();
+    if (frameStart == nullptr) {
+      return 0;
+    }
+    return static_cast<std::int32_t>(bitmapView->mFrames.end() - frameStart);
+  }
+
+  /**
+   * Address: 0x00780090 (FUN_00780090)
+   *
+   * What it does:
+   * Enables bitmap animation/frame updates when there are at least two queued
+   * textures; returns remaining texture-slot count.
+   */
+  [[maybe_unused]] std::uint32_t EnableBitmapAnimationIfMultipleTextures(
+    moho::CMauiBitmapRuntimeView* const bitmapView
+  ) noexcept
+  {
+    const auto* const batchCursor = bitmapView->mTextureBatches.end();
+    if (batchCursor == nullptr) {
+      return 0u;
+    }
+
+    const std::uint32_t remainingSlots = static_cast<std::uint32_t>(
+      bitmapView->mTextureBatches.capacity() - bitmapView->mTextureBatches.size()
+    );
+    if (remainingSlots > 1u) {
+      bitmapView->mIsPlaying = true;
+      reinterpret_cast<moho::CMauiControlFrameUpdateRuntimeView*>(bitmapView)->mNeedsFrameUpdate = true;
+    }
+    return remainingSlots;
+  }
+
 }
 
 /**
@@ -17449,7 +19494,7 @@ void moho::CMauiBitmap::ShareTextures(CMauiBitmap* const sourceBitmap)
 void moho::CMauiBitmap::SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture)
 {
   CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mTextureBatches.push_back(texture);
+  AppendBitmapTextureBatch(bitmapView->mTextureBatches, texture);
 
   const boost::shared_ptr<CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
   if (textureStart != nullptr && (bitmapView->mTextureBatches.end() - textureStart) == 1) {
@@ -17599,6 +19644,31 @@ void moho::CMauiBitmap::SetLoopPingPongPattern()
   for (std::int32_t frameIndex = textureCount - 2; frameIndex > 0; --frameIndex) {
     bitmapView->mFrames.push_back(frameIndex);
   }
+}
+
+/**
+ * Address: 0x007800C0 (FUN_007800C0)
+ *
+ * What it does:
+ * Stops animated playback and dispatches `OnAnimationStopped` when active
+ * multi-frame texture state is present.
+ */
+void moho::CMauiBitmap::StopAnimationPlayback()
+{
+  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
+  const auto* const batchBegin = bitmapView->mTextureBatches.begin();
+  if (batchBegin == nullptr) {
+    return;
+  }
+
+  const std::ptrdiff_t batchCount = bitmapView->mTextureBatches.end() - batchBegin;
+  if (batchCount <= 1) {
+    return;
+  }
+
+  bitmapView->mIsPlaying = false;
+  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+  reinterpret_cast<CScriptObject*>(this)->RunScript("OnAnimationStopped");
 }
 
 /**
@@ -17790,10 +19860,23 @@ bool moho::CMauiEdit::HandleEvent(const SMauiEventData& eventData)
  */
 void moho::CMauiEdit::AbandonKeyboardFocus()
 {
-  CMauiEditRuntimeView::FromEdit(this)->mCaretVisible = false;
+  (void)WriteEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(this), false);
   if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
     MAUI_SetKeyboardFocus(nullptr, true);
   }
+}
+/**
+ * Address: 0x007915A0 (FUN_007915A0, Moho::CMauiEdit::LosingKeyboardFocus)
+ *
+ * What it does:
+ * Drops keyboard focus through the virtual abandon lane and emits
+ * OnLoseKeyboardFocus.
+ */
+void moho::CMauiEdit::LosingKeyboardFocus()
+{
+  CMauiControl* const control = this;
+  control->AbandonKeyboardFocus();
+  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnLoseKeyboardFocus");
 }
 
 /**
@@ -17809,7 +19892,7 @@ msvc8::string moho::CMauiEdit::GetSelection()
 
   const int selectionStart = editView->mSelectionStart;
   const int selectionEnd = editView->mSelectionEnd;
-  if (selectionStart != selectionEnd) {
+  if (HasEditSelectionRange(editView)) {
     selectionText = gpg::STR_Utf8SubString(editView->mText.c_str(), selectionStart, selectionEnd - selectionStart);
   }
 
@@ -18081,6 +20164,18 @@ void moho::CMauiEdit::MoveCaretLeft(int amount)
 }
 
 /**
+ * Address: 0x00791270 (FUN_00791270, Moho::CMauiEdit::MoveCaretRight)
+ *
+ * What it does:
+ * Moves caret right by `amount` UTF-8 characters through `SetCaretPosition`.
+ */
+void moho::CMauiEdit::MoveCaretRight(const int amount)
+{
+  const int caretPosition = CMauiEditRuntimeView::FromEdit(this)->mCaretPosition;
+  SetCaretPosition(caretPosition + amount);
+}
+
+/**
  * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
  *
  * What it does:
@@ -18231,7 +20326,7 @@ void moho::CMauiEdit::HandleKeyEvent(SMauiEventData* const eventData)
     }
 
     if (keyCode <= MKEY_START) {
-      if (!reinterpret_cast<CScriptObject*>(this)->RunScriptOnCharPressed(keyCode)) {
+      if (!RunScriptOnCharPressedThunk(reinterpret_cast<CScriptObject*>(this), keyCode)) {
         ClearSelection();
       }
       return;
@@ -18535,7 +20630,7 @@ void moho::CMauiBitmap::Dump()
 
   const int textureCount = static_cast<int>(bitmapView->mTextureBatches.size());
 
-  // The binary fetches height first then width on the FPU stack — preserve order.
+  // The binary fetches height first then width on the FPU stack � preserve order.
   const float bitmapHeight = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapHeightLV);
   const float bitmapWidth = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapWidthLV);
   gpg::Logf("Num Textures = %d Width = %.3f Height = %.3f", textureCount, bitmapWidth, bitmapHeight);
@@ -18568,7 +20663,7 @@ void moho::CMauiEdit::Dump()
   gpg::Logf("CMauiEdit");
 
   const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  const char* const showBackground = editView->mBackgroundVisible ? "true" : "false";
+  const char* const showBackground = ReadEditBackgroundVisibleLane(editView) ? "true" : "false";
   gpg::Logf(
     "FG Color = %#08X BG Color = %#08X HLFG Color = %#08X HLBG Color = %#08X Show BG = %s MaxChars = %d",
     editView->mForegroundColor,
@@ -18735,6 +20830,20 @@ float moho::CMauiFrame::GetTopmostDepth()
 }
 
 /**
+ * Address: 0x007966F0 (FUN_007966F0, ?DumpGraph@CMauiFrame@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Walks this frame subtree depth-first and invokes `Dump()` on each control.
+ */
+void moho::CMauiFrame::DumpGraph()
+{
+  for (CMauiControl* controlCursor = this; controlCursor != nullptr;
+       controlCursor = controlCursor->DepthFirstSuccessor(this)) {
+    controlCursor->Dump();
+  }
+}
+
+/**
  * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
  *
  * What it does:
@@ -18802,7 +20911,7 @@ boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(LuaPlus::LuaState* 
   if (frame != nullptr) {
     outFrame = boost::shared_ptr<CMauiFrame>(frame);
     CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame);
-    frameView->mSelfWeak = outFrame;
+    (void)AssignFrameWeakSelfFromSharedOwner(outFrame, &frameView->mSelfWeak);
   }
 
   lua_settop(rawState, savedTop);
@@ -19092,19 +21201,133 @@ LuaPlus::LuaObject* moho::CreateLuaEventObject(
   return outEvent;
 }
 
+/**
+ * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
+ *
+ * What it does:
+ * Lazily initializes process-global user Lua state/runtime stage, installs
+ * debug hook wiring when the script debug window is active, attaches one
+ * `ScrDiskWatcherTask`, and runs core/user Lua init-form chains.
+ */
 LuaPlus::LuaState* moho::USER_GetLuaState()
 {
+  LuaPlus::LuaState* state = gUserLuaState;
+  if (state != nullptr) {
+    return state;
+  }
+
+  if ((gUserLuaStateInitGuard & 0x1u) == 0u) {
+    new (GetUserLuaStateStorageObject()) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+    gUserLuaStateInitGuard |= 0x1u;
+    (void)std::atexit(&CleanupUserLuaStateStorageAtExit);
+  }
+
+  if ((gUserLuaStateInitGuard & 0x2u) == 0u) {
+    new (GetUserStageStorageObject()) CTaskStage();
+    gUserLuaStateInitGuard |= 0x2u;
+    (void)std::atexit(&CleanupUserStageStorageAtExit);
+  }
+
+  sUserStage = GetUserStageStorageObject();
+  gUserLuaState = GetUserLuaStateStorageObject();
+
+  if (SCR_IsDebugWindowActive()) {
+    lua_sethook(gUserLuaState->m_state, &DebugLuaHook, 4, 0);
+  }
+
+  gUserLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(sUserStage);
+
+  ScrDiskWatcherTask* const diskWatcherTask = new (std::nothrow) ScrDiskWatcherTask(gUserLuaState);
+  AttachTaskToStage(diskWatcherTask, sUserStage, true);
+
+  RunLuaInitFormSetIfPresent("core", gUserLuaState);
+  RunLuaInitFormSetIfPresent("user", gUserLuaState);
+
   return gUserLuaState;
 }
 
+/**
+ * Address: 0x0083CD30 (FUN_0083CD30, Moho::MAUI_StartMainScript)
+ *
+ * What it does:
+ * Imports `/lua/ui/uimain.lua`, resolves `SetupUI`, and executes the entry
+ * callback against the active UI Lua state.
+ */
 bool moho::MAUI_StartMainScript()
 {
-  return true;
+  LuaPlus::LuaState* const state = ResolveUiManagerLuaState();
+  if (state == nullptr || state->m_state == nullptr) {
+    return false;
+  }
+
+  return InvokeUiLuaCallback(
+    state,
+    "/lua/ui/uimain.lua",
+    "SetupUI",
+    [](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(); }
+  );
 }
 
+/**
+ * Address: 0x0083D810 (FUN_0083D810, Moho::MAUI_ToggleConsole)
+ *
+ * What it does:
+ * Imports `/lua/ui/uimain.lua`, resolves `ToggleConsole`, and executes the
+ * callback against the active UI Lua state.
+ */
+void moho::MAUI_ToggleConsole()
+{
+  LuaPlus::LuaState* const state = ResolveUiManagerLuaState();
+  if (state == nullptr || state->m_state == nullptr) {
+    return;
+  }
+
+  (void)InvokeUiLuaCallback(
+    state,
+    "/lua/ui/uimain.lua",
+    "ToggleConsole",
+    [](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(); }
+  );
+}
+
+/**
+ * Address: 0x0078CEF0 (FUN_0078CEF0, sub_78CEF0)
+ *
+ * What it does:
+ * Commits pending cursor texture/visibility state to the active D3D device.
+ */
 void moho::MAUI_UpdateCursor(CMauiCursor* const cursor)
 {
-  (void)cursor;
+  if (cursor == nullptr) {
+    return;
+  }
+
+  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
+  if (!cursorView->mIsDefaultTexture) {
+    return;
+  }
+
+  CD3DDevice* const device = D3D_GetDevice();
+  if (device == nullptr) {
+    return;
+  }
+
+  cursorView->mIsDefaultTexture = false;
+
+  gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+  gpg::gal::DeviceContext* const deviceContext = galDevice != nullptr ? galDevice->GetDeviceContext() : nullptr;
+  const gpg::gal::Head* primaryHead = nullptr;
+  if (deviceContext != nullptr && deviceContext->GetHeadCount() > 0) {
+    primaryHead = &deviceContext->GetHead(0u);
+  }
+
+  if (cursorView->mTexture.get() != nullptr) {
+    (void)device->SetCursor(cursorView->mHotspotX, cursorView->mHotspotY, cursorView->mTexture);
+  }
+
+  const bool shouldShowCursor = cursorView->mIsShowing
+    || (primaryHead != nullptr && !primaryHead->mWindowed && ui_WindowedAlwaysShowsCursor);
+  (void)device->ShowCursor(shouldShowCursor);
 }
 
 void moho::MAUI_ReleaseCursor(CMauiCursor* const cursor)
@@ -19642,6 +21865,23 @@ namespace
   );
   static_assert(sizeof(FactoryCommandQueueItemRuntimeView) == 0x30, "FactoryCommandQueueItemRuntimeView size must be 0x30");
 
+  struct CurrentBuildFactoryRuntimeView
+  {
+    std::uintptr_t* start = nullptr;  // +0x00
+    std::uintptr_t* finish = nullptr; // +0x04
+  };
+  static_assert(sizeof(CurrentBuildFactoryRuntimeView) == 0x08, "CurrentBuildFactoryRuntimeView size must be 0x08");
+
+  struct CurrentBuildQueueRuntimeView
+  {
+    FactoryCommandQueueItemRuntimeView* start = nullptr; // +0x00
+    FactoryCommandQueueItemRuntimeView* end = nullptr;   // +0x04
+  };
+  static_assert(sizeof(CurrentBuildQueueRuntimeView) == 0x08, "CurrentBuildQueueRuntimeView size must be 0x08");
+
+  CurrentBuildFactoryRuntimeView sCurrentBuildFactory{};
+  CurrentBuildQueueRuntimeView sCurrentBuildQueue{};
+
   /**
    * Address: 0x00837AA0 (FUN_00837AA0, func_CpyBuildQueueItems)
    *
@@ -19665,6 +21905,22 @@ namespace
       ++destinationCursor;
     }
     return destinationCursor;
+  }
+
+  /**
+   * Address: 0x008378B0 (FUN_008378B0)
+   *
+   * What it does:
+   * Adapts one thiscall lane into `CopyBuildQueueItems(destination, begin,
+   * end)` and returns the advanced destination lane.
+   */
+  [[maybe_unused]] FactoryCommandQueueItemRuntimeView* CopyBuildQueueItemsThiscallAdapter(
+    FactoryCommandQueueItemRuntimeView* const sourceEnd,
+    FactoryCommandQueueItemRuntimeView* const sourceBegin,
+    FactoryCommandQueueItemRuntimeView* const destinationBegin
+  )
+  {
+    return CopyBuildQueueItems(destinationBegin, sourceBegin, sourceEnd);
   }
 
   /**
@@ -19698,6 +21954,46 @@ namespace
 
       ++begin;
     }
+  }
+
+  /**
+   * Address: 0x00837120 (FUN_00837120)
+   *
+   * What it does:
+   * Adapts one thiscall queue-range destroy lane into
+   * `DeleteRangeBuildQueueItems(begin, end)`.
+   */
+  [[maybe_unused]] void DeleteRangeBuildQueueItemsThiscallAdapter(
+    FactoryCommandQueueItemRuntimeView* const rangeEnd,
+    FactoryCommandQueueItemRuntimeView* const rangeBegin
+  )
+  {
+    DeleteRangeBuildQueueItems(rangeBegin, rangeEnd);
+  }
+
+  /**
+   * Address: 0x00837070 (FUN_00837070, sub_837070)
+   *
+   * What it does:
+   * Compacts one in-place factory queue window by moving the half-open tail
+   * `[sourceBegin, currentQueueEnd)` onto `destinationBegin`, destroys the
+   * vacated tail range, and updates the caller-provided queue-end lane.
+   */
+  [[maybe_unused]] FactoryCommandQueueItemRuntimeView** RebaseFactoryQueueRangeAndTrimTail(
+    FactoryCommandQueueItemRuntimeView** const outBegin,
+    FactoryCommandQueueItemRuntimeView* const destinationBegin,
+    FactoryCommandQueueItemRuntimeView* const sourceBegin
+  )
+  {
+    if (destinationBegin != sourceBegin) {
+      FactoryCommandQueueItemRuntimeView* const newEnd =
+        CopyBuildQueueItems(destinationBegin, sourceBegin, sCurrentBuildQueue.end);
+      DeleteRangeBuildQueueItems(newEnd, sCurrentBuildQueue.end);
+      sCurrentBuildQueue.end = newEnd;
+    }
+
+    *outBegin = destinationBegin;
+    return outBegin;
   }
 } // namespace
 
@@ -19738,13 +22034,212 @@ void moho::UI_StopCursorText()
   );
 }
 
+namespace moho
+{
+  SSelectionSetUserEntity sSelectionBrackets{};
+}
+
+namespace
+{
+  struct BlinkyBoxRuntimeView final : moho::TDatListItem<BlinkyBoxRuntimeView, void>
+  {
+    moho::SSelectionWeakRefUserEntity mUnit; // +0x08
+    std::uint8_t mIsOn;                      // +0x10
+    std::uint8_t pad_11_13[3]{};             // +0x11
+    float mCurDuration;                      // +0x14
+    float mCurCycleTime;                     // +0x18
+    float mOnTime;                           // +0x1C
+    float mOffTime;                          // +0x20
+    float mTotalTime;                        // +0x24
+  };
+
+  static_assert(sizeof(BlinkyBoxRuntimeView) == 0x28, "BlinkyBoxRuntimeView size must be 0x28");
+  static_assert(offsetof(BlinkyBoxRuntimeView, mUnit) == 0x08, "BlinkyBoxRuntimeView::mUnit offset must be 0x08");
+  static_assert(offsetof(BlinkyBoxRuntimeView, mIsOn) == 0x10, "BlinkyBoxRuntimeView::mIsOn offset must be 0x10");
+  static_assert(
+    offsetof(BlinkyBoxRuntimeView, mCurDuration) == 0x14, "BlinkyBoxRuntimeView::mCurDuration offset must be 0x14"
+  );
+  static_assert(
+    offsetof(BlinkyBoxRuntimeView, mCurCycleTime) == 0x18, "BlinkyBoxRuntimeView::mCurCycleTime offset must be 0x18"
+  );
+  static_assert(offsetof(BlinkyBoxRuntimeView, mOnTime) == 0x1C, "BlinkyBoxRuntimeView::mOnTime offset must be 0x1C");
+  static_assert(offsetof(BlinkyBoxRuntimeView, mOffTime) == 0x20, "BlinkyBoxRuntimeView::mOffTime offset must be 0x20");
+  static_assert(offsetof(BlinkyBoxRuntimeView, mTotalTime) == 0x24, "BlinkyBoxRuntimeView::mTotalTime offset must be 0x24");
+
+  moho::TDatListItem<BlinkyBoxRuntimeView, void> sBlinkyBoxes{};
+  /**
+   * Address: 0x007FC7F0 (FUN_007FC7F0)
+   *
+   * What it does:
+   * Unlinks the global blinky-box intrusive list sentinel from its neighbors,
+   * restores self-links, and returns the sentinel node.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TDatListItem<BlinkyBoxRuntimeView, void>*
+  ResetGlobalBlinkyBoxListSentinelRuntimeLaneAlpha() noexcept
+  {
+    sBlinkyBoxes.mPrev->mNext = sBlinkyBoxes.mNext;
+    sBlinkyBoxes.mNext->mPrev = sBlinkyBoxes.mPrev;
+    sBlinkyBoxes.mNext = &sBlinkyBoxes;
+    sBlinkyBoxes.mPrev = &sBlinkyBoxes;
+    return &sBlinkyBoxes;
+  }
+
+  void LinkBlinkyBoxUnitOwner(
+    moho::UserEntity* const entity,
+    moho::SSelectionWeakRefUserEntity& weakRef
+  ) noexcept
+  {
+    if (entity == nullptr) {
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+      return;
+    }
+
+    auto** const ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+    weakRef.mOwnerLinkSlot = ownerLinkSlot;
+    weakRef.mNextOwner = *ownerLinkSlot;
+    *ownerLinkSlot = &weakRef;
+  }
+}
+
+/**
+ * Address: 0x007FD9F0 (FUN_007FD9F0, func_PushBlinkyBox)
+ *
+ * What it does:
+ * Allocates one blinky-box runtime node, links its weak unit owner lane, and
+ * inserts it at the tail of the global blinky-box intrusive list.
+ */
+void moho::func_PushBlinkyBox(UserEntity* const entity, const float onTime, const float offTime, const float totalTime)
+{
+  auto* const blinkyBox = new BlinkyBoxRuntimeView{};
+
+  LinkBlinkyBoxUnitOwner(entity, blinkyBox->mUnit);
+  blinkyBox->mCurDuration = 0.0f;
+  blinkyBox->mCurCycleTime = 0.0f;
+  blinkyBox->mOnTime = onTime;
+  blinkyBox->mOffTime = offTime;
+  blinkyBox->mIsOn = 0u;
+  blinkyBox->mTotalTime = totalTime;
+
+  blinkyBox->ListLinkBefore(&sBlinkyBoxes);
+}
+
+/**
+ * Address: 0x007FDA90 (FUN_007FDA90)
+ *
+ * What it does:
+ * Adds one user-unit lane into the global selection-bracket weak-set and
+ * returns the raw register lane value from WeakSet_UserEntity::Add.
+ */
+std::int32_t moho::func_AddSelectionBracketUserUnit(UserUnit* const unit)
+{
+  SSelectionSetUserEntity::AddResult addResult;
+  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(
+    SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, reinterpret_cast<UserEntity*>(unit))
+  ));
+}
+
+/**
+ * Address: 0x007FDAB0 (FUN_007FDAB0)
+ *
+ * What it does:
+ * Drops all nodes from the global selection-bracket weak-set by taking the
+ * full-range erase path, then returns the head-sentinel lane value.
+ */
+std::int32_t moho::func_ClearSelectionBracketUserUnits()
+{
+  SSelectionNodeUserEntity* cursor = sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
+  (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sSelectionBrackets.mHead));
+}
+
+/**
+ * Address: 0x007FDAF0 (FUN_007FDAF0, cfunc_AddBlinkyBox)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_AddBlinkyBoxL`.
+ */
+int moho::cfunc_AddBlinkyBox(lua_State* const luaContext)
+{
+  return cfunc_AddBlinkyBoxL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007FDB10 (FUN_007FDB10, func_AddBlinkyBox_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `AddBlinkyBox(entityId, onTime, offTime, totalTime)` Lua
+ * binder metadata.
+ */
+moho::CScrLuaInitForm* moho::func_AddBlinkyBox_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AddBlinkyBox",
+    &moho::cfunc_AddBlinkyBox,
+    nullptr,
+    "<global>",
+    kAddBlinkyBoxHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007FDB70 (FUN_007FDB70, cfunc_AddBlinkyBoxL)
+ *
+ * What it does:
+ * Parses one entity-id plus three timing args and appends one blinky-box node
+ * for the resolved live user-entity.
+ */
+int moho::cfunc_AddBlinkyBoxL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAddBlinkyBoxHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject entityIdArg(state, 1);
+  if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
+    entityIdArg.TypeError("integer");
+  }
+
+  const EntId entityId = static_cast<EntId>(static_cast<std::int32_t>(lua_tonumber(state->m_state, 1)));
+  CWldSession* const session = WLD_GetActiveSession();
+  UserEntity* const entity = session != nullptr ? session->LookupEntityId(entityId) : nullptr;
+  if (entity == nullptr) {
+    LuaPlus::LuaState::Error(state, "Invalid entity id");
+    return 0;
+  }
+
+  const LuaPlus::LuaStackObject totalTimeArg(state, 4);
+  if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+    totalTimeArg.TypeError("number");
+  }
+  const float totalTime = static_cast<float>(lua_tonumber(state->m_state, 4));
+
+  const LuaPlus::LuaStackObject offTimeArg(state, 3);
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    offTimeArg.TypeError("number");
+  }
+  const float offTime = static_cast<float>(lua_tonumber(state->m_state, 3));
+
+  const LuaPlus::LuaStackObject onTimeArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    onTimeArg.TypeError("number");
+  }
+  const float onTime = static_cast<float>(lua_tonumber(state->m_state, 2));
+
+  func_PushBlinkyBox(entity, onTime, offTime, totalTime);
+  return 0;
+}
+
 namespace
 {
   struct CommandFeedbackBlipRuntimeView final
   {
-    moho::Mesh* mMesh; // +0x00
-    float mDuration;   // +0x04
-    float mCurTime;    // +0x08
+    moho::MeshInstance* mMeshInstance; // +0x00
+    float mDuration;                   // +0x04
+    float mCurTime;                    // +0x08
   };
 
   static_assert(
@@ -19759,14 +22254,195 @@ namespace
 
   msvc8::list<CommandFeedbackBlipRuntimeView> sCommandFeedbackBlips;
 
-  void DestroyCommandFeedbackBlipMesh(moho::Mesh*& mesh) noexcept
+  struct CommandFeedbackListNodeRuntimeView
   {
-    if (mesh == nullptr) {
+    CommandFeedbackListNodeRuntimeView* mNext; // +0x00
+    CommandFeedbackListNodeRuntimeView* mPrev; // +0x04
+    CommandFeedbackBlipRuntimeView mValue;     // +0x08
+  };
+  static_assert(sizeof(CommandFeedbackListNodeRuntimeView) == 0x14, "CommandFeedbackListNodeRuntimeView size must be 0x14");
+  static_assert(
+    offsetof(CommandFeedbackListNodeRuntimeView, mValue) == 0x08,
+    "CommandFeedbackListNodeRuntimeView::mValue offset must be 0x08"
+  );
+
+  struct CommandFeedbackListRuntimeView
+  {
+    msvc8::_Container_proxy* mProxy;              // +0x00
+    CommandFeedbackListNodeRuntimeView* mHead;    // +0x04
+    std::uint32_t mSize;                          // +0x08
+  };
+  static_assert(sizeof(CommandFeedbackListRuntimeView) == 0x0C, "CommandFeedbackListRuntimeView size must be 0x0C");
+
+  /**
+   * Address: 0x00858340 (FUN_00858340)
+   *
+   * What it does:
+   * Stores the first live command-feedback list node into `outNode`.
+   */
+  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView** StoreCommandFeedbackFirstNodeLane(
+    CommandFeedbackListNodeRuntimeView** const outNode
+  ) noexcept
+  {
+    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
+    *outNode = listView->mHead->mNext;
+    return outNode;
+  }
+
+  /**
+   * Address: 0x00858350 (FUN_00858350)
+   *
+   * What it does:
+   * Stores the command-feedback list sentinel node into `outNode`.
+   */
+  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView** StoreCommandFeedbackSentinelNodeLane(
+    CommandFeedbackListNodeRuntimeView** const outNode
+  ) noexcept
+  {
+    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
+    *outNode = listView->mHead;
+    return outNode;
+  }
+  /**
+   * Address: 0x008584F0 (FUN_008584F0)
+   *
+   * What it does:
+   * Allocates one command-feedback list node and seeds next/prev/value lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView* AllocateCommandFeedbackBlipNodeLane(
+    const CommandFeedbackBlipRuntimeView* const value,
+    CommandFeedbackListNodeRuntimeView* const next,
+    CommandFeedbackListNodeRuntimeView* const prev
+  )
+  {
+    auto* const inserted = static_cast<CommandFeedbackListNodeRuntimeView*>(
+      ::operator new(sizeof(CommandFeedbackListNodeRuntimeView))
+    );
+    if (inserted != nullptr) {
+      inserted->mNext = next;
+    }
+    if (inserted != nullptr) {
+      inserted->mPrev = prev;
+    }
+    if (inserted != nullptr) {
+      inserted->mValue = *value;
+    }
+    return inserted;
+  }
+
+  /**
+   * Address: 0x00858530 (FUN_00858530, sCommandFeedbackBlips::inc)
+   *
+   * What it does:
+   * Performs VC8-style list-size overflow guard and increments command-feedback
+   * list size.
+   */
+  void IncrementCommandFeedbackListSizeChecked()
+  {
+    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
+    if (listView->mSize == 0x15555555u) {
+      throw std::length_error("list<T> too long");
+    }
+    ++listView->mSize;
+  }
+
+  /**
+   * Address: 0x008583D0 (FUN_008583D0)
+   *
+   * What it does:
+   * Inserts one command-feedback blip node immediately before `position`,
+   * increments list size with VC8 overflow behavior, and relinks predecessor
+   * and successor lanes.
+   *
+   * Notes:
+   * Inlines allocation/size-check helpers from `FUN_008584F0` and
+   * `FUN_00858530`.
+   */
+  [[maybe_unused]] void InsertCommandFeedbackBlipBeforeNode(
+    const CommandFeedbackBlipRuntimeView* const value,
+    CommandFeedbackListNodeRuntimeView* const position
+  )
+  {
+    auto* const inserted = AllocateCommandFeedbackBlipNodeLane(value, position, position->mPrev);
+    IncrementCommandFeedbackListSizeChecked();
+    position->mPrev = inserted;
+    inserted->mPrev->mNext = inserted;
+  }
+
+  [[nodiscard]] const char* LuaStringOrEmpty(const LuaPlus::LuaObject& object) noexcept
+  {
+    const char* const value = object.GetString();
+    return value != nullptr ? value : "";
+  }
+
+  [[nodiscard]] boost::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelResource(const char* const modelPath)
+  {
+    if (moho::RScmResource::sType == nullptr) {
+      moho::RScmResource::sType = gpg::LookupRType(typeid(moho::RScmResource));
+    }
+
+    boost::weak_ptr<moho::RScmResource> weakResource{};
+    (void)moho::RES_GetResource(
+      &weakResource,
+      modelPath != nullptr ? modelPath : "",
+      nullptr,
+      moho::RScmResource::sType
+    );
+    return weakResource.lock();
+  }
+
+  [[nodiscard]] boost::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelFromDescriptor(
+    const LuaPlus::LuaObject& meshDescriptor,
+    moho::CWldSession* const worldSession,
+    float* const outUniformScale
+  )
+  {
+    const LuaPlus::LuaObject meshNameObject = meshDescriptor.GetByName("MeshName");
+    if (!meshNameObject.IsNil()) {
+      if (outUniformScale != nullptr) {
+        *outUniformScale = static_cast<float>(meshDescriptor.GetByName("UniformScale").GetNumber());
+      }
+      return ResolveCommandFeedbackModelResource(LuaStringOrEmpty(meshNameObject));
+    }
+
+    if (worldSession == nullptr || worldSession->mRules == nullptr) {
+      return {};
+    }
+
+    msvc8::string blueprintId(LuaStringOrEmpty(meshDescriptor.GetByName("BlueprintID")));
+    moho::RResId normalizedBlueprintId{};
+    gpg::STR_CopyFilename(&normalizedBlueprintId.name, &blueprintId);
+
+    moho::RUnitBlueprint* const unitBlueprint = worldSession->mRules->GetUnitBlueprint(normalizedBlueprintId);
+    if (unitBlueprint == nullptr) {
+      return {};
+    }
+
+    if (outUniformScale != nullptr) {
+      *outUniformScale = unitBlueprint->Display.UniformScale;
+    }
+
+    moho::RMeshBlueprint* const meshBlueprint = worldSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+    if (meshBlueprint == nullptr) {
+      return {};
+    }
+
+    const moho::RMeshBlueprintLOD* const lodBegin = meshBlueprint->mLods.begin();
+    if (lodBegin == nullptr || lodBegin == meshBlueprint->mLods.end()) {
+      return {};
+    }
+
+    return ResolveCommandFeedbackModelResource(lodBegin->mMeshName.c_str());
+  }
+
+  void DestroyCommandFeedbackBlipMeshInstance(moho::MeshInstance*& meshInstance) noexcept
+  {
+    if (meshInstance == nullptr) {
       return;
     }
 
-    delete mesh;
-    mesh = nullptr;
+    delete meshInstance;
+    meshInstance = nullptr;
   }
 } // namespace
 
@@ -19812,15 +22488,495 @@ void moho::UI_UpdateCommandFeedbackBlips(const float deltaSeconds)
     const float updatedTime = blip.mCurTime + deltaSeconds;
     blip.mCurTime = updatedTime;
     if (updatedTime >= blip.mDuration) {
-      DestroyCommandFeedbackBlipMesh(blip.mMesh);
+      DestroyCommandFeedbackBlipMeshInstance(blip.mMeshInstance);
     }
   }
 
   RemoveCommandFeedbackBlips(0);
 }
 
+/**
+ * Address: 0x00857BE0 (FUN_00857BE0, cfunc_AddCommandFeedbackBlipL)
+ *
+ * What it does:
+ * Reads one descriptor table `(MeshName|BlueprintID, Position, TextureName,
+ * ShaderName[, UniformScale])` plus duration, creates one transient mesh
+ * marker, and pushes it onto the command-feedback blip list.
+ */
+int moho::cfunc_AddCommandFeedbackBlipL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAddCommandFeedbackBlipHelpText, 2, argumentCount);
+  }
+
+  CWldSession* const worldSession = moho::WLD_GetSession();
+  if (worldSession == nullptr) {
+    gpg::Warnf("AddCommandFeedbackBlip: No user session, unable to add blip");
+    return 0;
+  }
+
+  if (lua_type(state->m_state, 1) != LUA_TTABLE) {
+    gpg::Warnf("AddCommandFeedbackBlip: Expecting lua table as argument");
+    return 0;
+  }
+
+  const LuaPlus::LuaObject meshDescriptor(LuaPlus::LuaStackObject(state, 1));
+
+  float uniformScale = 1.0f;
+  const boost::shared_ptr<RScmResource> modelResource =
+    ResolveCommandFeedbackModelFromDescriptor(meshDescriptor, worldSession, &uniformScale);
+  if (!modelResource) {
+    return 0;
+  }
+
+  const Wm3::Vector3f worldPosition = SCR_FromLuaCopy<Wm3::Vector3f>(meshDescriptor.GetByName("Position"));
+
+  const msvc8::string textureName(LuaStringOrEmpty(meshDescriptor.GetByName("TextureName")));
+  const msvc8::string shaderName(LuaStringOrEmpty(meshDescriptor.GetByName("ShaderName")));
+  const msvc8::string emptyTextureName{};
+
+  const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+    shaderName,
+    textureName,
+    emptyTextureName,
+    emptyTextureName,
+    emptyTextureName,
+    emptyTextureName,
+    nullptr
+  );
+
+  boost::shared_ptr<Mesh> mesh(new Mesh(modelResource, material));
+
+  MeshRenderer* const renderer = MeshRenderer::GetInstance();
+  const Wm3::Vector3f meshScale{uniformScale, uniformScale, uniformScale};
+  MeshInstance* const meshInstance =
+    renderer != nullptr ? renderer->CreateMeshInstance(worldSession->mGameTick, -1, meshScale, false, mesh) : nullptr;
+  if (meshInstance == nullptr) {
+    return 0;
+  }
+
+  CommandFeedbackBlipRuntimeView blip{};
+  blip.mMeshInstance = meshInstance;
+  blip.mDuration = static_cast<float>(lua_tonumber(state->m_state, 2));
+  blip.mCurTime = 0.0f;
+
+  auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
+  InsertCommandFeedbackBlipBeforeNode(&blip, listView->mHead);
+
+  meshInstance->lifetimeParameter = blip.mDuration * 10.0f;
+
+  VTransform transform{};
+  transform.orient_.x = 1.0f;
+  transform.orient_.y = 0.0f;
+  transform.orient_.z = 0.0f;
+  transform.orient_.w = 0.0f;
+  transform.pos_.x = worldPosition.x;
+  transform.pos_.y = worldPosition.y;
+  transform.pos_.z = worldPosition.z;
+  meshInstance->SetStance(transform, transform);
+
+  return 0;
+}
+
+/**
+ * Address: 0x00857B60 (FUN_00857B60, cfunc_AddCommandFeedbackBlip)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_AddCommandFeedbackBlipL`.
+ */
+int moho::cfunc_AddCommandFeedbackBlip(lua_State* const luaContext)
+{
+  return cfunc_AddCommandFeedbackBlipL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00857B80 (FUN_00857B80, func_AddCommandFeedbackBlip_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `AddCommandFeedbackBlip(meshInfoTable, duration)` Lua
+ * binder metadata.
+ */
+moho::CScrLuaInitForm* moho::func_AddCommandFeedbackBlip_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AddCommandFeedbackBlip",
+    &moho::cfunc_AddCommandFeedbackBlip,
+    nullptr,
+    "<global>",
+    kAddCommandFeedbackBlipHelpText
+  );
+  return &binder;
+}
 void moho::UI_DumpCurrentInputCapture()
 {
+}
+
+/**
+ * Address: 0x00838C60 (FUN_00838C60, sub_838C60)
+ *
+ * What it does:
+ * Runs one key-handler teardown lane and then executes base
+ * `wxEvtHandlerRuntime` destruction.
+ */
+moho::CUIKeyHandlerRuntime::~CUIKeyHandlerRuntime() = default;
+namespace
+{
+  [[nodiscard]] std::string ToUpperAscii(std::string token)
+  {
+    std::transform(
+      token.begin(),
+      token.end(),
+      token.begin(),
+      [](unsigned char value) { return static_cast<char>(std::toupper(value)); }
+    );
+    return token;
+  }
+
+  [[nodiscard]] int ParsePrimaryKeyToken(const std::string& primaryToken)
+  {
+    if (primaryToken.empty()) {
+      return 0;
+    }
+
+    const std::string key = ToUpperAscii(primaryToken);
+    if (key.size() == 1u) {
+      return static_cast<int>(key[0]);
+    }
+
+    if (key[0] == 'F' && key.size() <= 3u) {
+      const int functionIndex = std::atoi(key.c_str() + 1);
+      if (functionIndex >= 1 && functionIndex <= 24) {
+        return moho::MKEY_F1 + (functionIndex - 1);
+      }
+    }
+
+    if (key == "SPACE") {
+      return moho::MKEY_SPACE;
+    }
+    if (key == "TAB") {
+      return moho::MKEY_TAB;
+    }
+    if (key == "ENTER" || key == "RETURN") {
+      return moho::MKEY_RETURN;
+    }
+    if (key == "ESC" || key == "ESCAPE") {
+      return moho::MKEY_ESCAPE;
+    }
+    if (key == "LEFT") {
+      return moho::MKEY_LEFT;
+    }
+    if (key == "RIGHT") {
+      return moho::MKEY_RIGHT;
+    }
+    if (key == "UP") {
+      return moho::MKEY_UP;
+    }
+    if (key == "DOWN") {
+      return moho::MKEY_DOWN;
+    }
+    if (key == "HOME") {
+      return moho::MKEY_HOME;
+    }
+    if (key == "END") {
+      return moho::MKEY_END;
+    }
+    if (key == "PGUP" || key == "PAGEUP" || key == "PRIOR") {
+      return moho::MKEY_PRIOR;
+    }
+    if (key == "PGDN" || key == "PAGEDOWN" || key == "NEXT") {
+      return moho::MKEY_NEXT;
+    }
+
+    return 0;
+  }
+} // namespace
+
+/**
+ * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
+ *
+ * What it does:
+ * Parses one key-binding token string (key[-modifier[-modifier...]]) into
+ * one packed keycode/modifier mask lane.
+ */
+/**
+ * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
+ *
+ * What it does:
+ * Unwraps raw Lua callback state and forwards to
+ * `cfunc_ClearCurrentFactoryForQueueDisplayL`.
+ */
+int moho::cfunc_ClearCurrentFactoryForQueueDisplay(lua_State* const luaContext)
+{
+  return cfunc_ClearCurrentFactoryForQueueDisplayL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008365D0 (FUN_008365D0, func_ClearCurrentFactoryForQueueDisplay_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `ClearCurrentFactoryForQueueDisplay()` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_ClearCurrentFactoryForQueueDisplay_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ClearCurrentFactoryForQueueDisplay",
+    &moho::cfunc_ClearCurrentFactoryForQueueDisplay,
+    nullptr,
+    "<global>",
+    kClearCurrentFactoryForQueueDisplayHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00836630 (FUN_00836630, cfunc_ClearCurrentFactoryForQueueDisplayL)
+ *
+ * What it does:
+ * Validates zero-arg Lua call shape, unlinks current factory-owner lane from
+ * its intrusive owner chain, clears current-factory pointers, and compacts the
+ * current build-queue range.
+ */
+int moho::cfunc_ClearCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kClearCurrentFactoryForQueueDisplayHelpText, 0, argumentCount);
+  }
+
+  std::uintptr_t* cursor = sCurrentBuildFactory.start;
+  if (cursor != nullptr) {
+    if (*cursor != reinterpret_cast<std::uintptr_t>(&sCurrentBuildFactory)) {
+      do {
+        cursor = reinterpret_cast<std::uintptr_t*>(*cursor + 4u);
+      } while (*cursor != reinterpret_cast<std::uintptr_t>(&sCurrentBuildFactory));
+    }
+
+    *cursor = reinterpret_cast<std::uintptr_t>(sCurrentBuildFactory.finish);
+    sCurrentBuildFactory.start = nullptr;
+    sCurrentBuildFactory.finish = nullptr;
+  }
+
+  FactoryCommandQueueItemRuntimeView* rebasedBegin = nullptr;
+  RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, sCurrentBuildQueue.start, sCurrentBuildQueue.end);
+  return 0;
+}
+
+/**
+ * Address: 0x00BE4690 (FUN_00BE4690, register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef()
+{
+  return func_ClearCurrentFactoryForQueueDisplay_LuaFuncDef();
+}
+
+/**
+ * Address: 0x0083A190 (FUN_0083A190, cfunc_IN_AddKeyMapTable)
+ *
+ * What it does:
+ * Unwraps raw Lua callback state and forwards to `cfunc_IN_AddKeyMapTableL`.
+ */
+int moho::cfunc_IN_AddKeyMapTable(lua_State* const luaContext)
+{
+  return cfunc_IN_AddKeyMapTableL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083A210 (FUN_0083A210, cfunc_IN_AddKeyMapTableL)
+ *
+ * What it does:
+ * Validates one key-map table argument and merges action/repeat entries into
+ * the runtime key-map stores.
+ */
+int moho::cfunc_IN_AddKeyMapTableL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kINAddKeyMapTableHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject keyMapTable(LuaPlus::LuaStackObject(state, 1));
+  AddUiKeyMapEntries(keyMapTable);
+  return 0;
+}
+
+/**
+ * Address: 0x0083A1B0 (FUN_0083A1B0, func_IN_AddKeyMapTable_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `IN_AddKeyMapTable(keyMapTable)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_IN_AddKeyMapTable_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IN_AddKeyMapTable",
+    &moho::cfunc_IN_AddKeyMapTable,
+    nullptr,
+    "<global>",
+    kINAddKeyMapTableHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE4950 (FUN_00BE4950, register_IN_AddKeyMapTable_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_IN_AddKeyMapTable_LuaFuncDef()
+{
+  return func_IN_AddKeyMapTable_LuaFuncDef();
+}
+
+/**
+ * Address: 0x0083A2B0 (FUN_0083A2B0, cfunc_IN_RemoveKeyMapTable)
+ *
+ * What it does:
+ * Unwraps raw Lua callback state and forwards to `cfunc_IN_RemoveKeyMapTableL`.
+ */
+int moho::cfunc_IN_RemoveKeyMapTable(lua_State* const luaContext)
+{
+  return cfunc_IN_RemoveKeyMapTableL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083A330 (FUN_0083A330, cfunc_IN_RemoveKeyMapTableL)
+ *
+ * What it does:
+ * Validates one key-map table argument and removes each key binding from the
+ * runtime action/repeat key-map stores.
+ */
+int moho::cfunc_IN_RemoveKeyMapTableL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kINRemoveKeyMapTableHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject keyMapTable(LuaPlus::LuaStackObject(state, 1));
+  RemoveUiKeyMapEntries(keyMapTable);
+  return 0;
+}
+
+/**
+ * Address: 0x0083A2D0 (FUN_0083A2D0, func_IN_RemoveKeyMapTable_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `IN_RemoveKeyMapTable(keyMapTable)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_IN_RemoveKeyMapTable_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IN_RemoveKeyMapTable",
+    &moho::cfunc_IN_RemoveKeyMapTable,
+    nullptr,
+    "<global>",
+    kINRemoveKeyMapTableHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE4960 (FUN_00BE4960, register_IN_RemoveKeyMapTable_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_IN_RemoveKeyMapTable_LuaFuncDef()
+{
+  return func_IN_RemoveKeyMapTable_LuaFuncDef();
+}
+
+/**
+ * Address: 0x0083A3D0 (FUN_0083A3D0, cfunc_IN_ClearKeyMap)
+ *
+ * What it does:
+ * Validates the zero-argument lane and clears all runtime key-map bindings.
+ */
+int moho::cfunc_IN_ClearKeyMap(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kINClearKeyMapHelpText, 0, argumentCount);
+  }
+
+  ClearUiKeyMaps();
+  return 0;
+}
+
+/**
+ * Address: 0x0083A410 (FUN_0083A410, func_IN_ClearKeyMap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `IN_ClearKeyMap()` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_IN_ClearKeyMap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IN_ClearKeyMap",
+    &moho::cfunc_IN_ClearKeyMap,
+    nullptr,
+    "<global>",
+    kINClearKeyMapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE4970 (FUN_00BE4970, register_IN_ClearKeyMap_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_IN_ClearKeyMap_LuaFuncDef()
+{
+  return func_IN_ClearKeyMap_LuaFuncDef();
+}
+
+int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
+{
+  if (keyBindingSpec.empty()) {
+    return 0;
+  }
+
+  std::vector<std::string> tokens{};
+  std::size_t start = 0u;
+  while (start <= keyBindingSpec.size()) {
+    const std::size_t split = keyBindingSpec.find('-', start);
+    const std::size_t tokenLength =
+      (split == std::string::npos) ? (keyBindingSpec.size() - start) : (split - start);
+    if (tokenLength > 0u) {
+      tokens.emplace_back(keyBindingSpec.substr(start, tokenLength));
+    }
+    if (split == std::string::npos) {
+      break;
+    }
+    start = split + 1u;
+  }
+
+  if (tokens.empty()) {
+    return 0;
+  }
+
+  int keyMask = ParsePrimaryKeyToken(tokens.front());
+  for (std::size_t tokenIndex = 1u; tokenIndex < tokens.size(); ++tokenIndex) {
+    const std::string modifier = ToUpperAscii(tokens[tokenIndex]);
+    if (modifier == "ALT") {
+      keyMask |= static_cast<int>(0x80000000u);
+      continue;
+    }
+    if (modifier == "CTRL" || modifier == "CONTROL") {
+      keyMask |= static_cast<int>(0x40000000u);
+      continue;
+    }
+    if (modifier == "SHIFT") {
+      keyMask |= static_cast<int>(0x20000000u);
+      continue;
+    }
+
+    gpg::Warnf("Key map contains unrecognized modifier string: %s\n", tokens[tokenIndex].c_str());
+  }
+
+  return keyMask;
 }
 
 moho::wxEvtHandlerRuntime* moho::UI_CreateKeyHandler()
@@ -19921,4 +23077,61 @@ const moho::VMatrix4& moho::UI_IdentityMatrix()
   static const VMatrix4 kIdentity = VMatrix4::Identity();
   return kIdentity;
 }
+namespace
+{
+  /**
+   * Address: 0x00858440 (FUN_00858440)
+   *
+   * What it does:
+   * Returns the global command-feedback blip-list lane.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>*
+  GetCommandFeedbackBlipsLaneA(const int /*unused*/) noexcept
+  {
+    return &sCommandFeedbackBlips;
+  }
+
+  /**
+   * Address: 0x008585C0 (FUN_008585C0)
+   *
+   * What it does:
+   * Secondary entrypoint returning the command-feedback blip-list lane.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>*
+  GetCommandFeedbackBlipsLaneB(const int /*unused*/) noexcept
+  {
+    return &sCommandFeedbackBlips;
+  }
+
+  /**
+   * Address: 0x00858670 (FUN_00858670)
+   *
+   * What it does:
+   * Third entrypoint returning the command-feedback blip-list lane.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>*
+  GetCommandFeedbackBlipsLaneC(const int /*unused*/) noexcept
+  {
+    return &sCommandFeedbackBlips;
+  }
+
+  /**
+   * Address: 0x008587A0 (FUN_008587A0)
+   *
+   * What it does:
+   * Fourth entrypoint returning the command-feedback blip-list lane.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>* GetCommandFeedbackBlipsLaneD() noexcept
+  {
+    return &sCommandFeedbackBlips;
+  }
+} // namespace
+
+
+
+
+
+
+
+
 

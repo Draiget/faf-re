@@ -104,9 +104,11 @@ struct DeflateStateRuntime
   std::int32_t heap_len = 0;                   // +0x1450
   std::int32_t heap_max = 0;                   // +0x1454
   std::uint8_t depth[573]{};                   // +0x1458
-  std::uint8_t reserved1695_169F[0x0B]{};
+  std::uint8_t reserved1695_1697[0x03]{};
+  std::uint8_t* l_buf = nullptr;               // +0x1698
+  std::uint32_t lit_bufsize = 0;               // +0x169C
   std::uint32_t last_lit = 0;                  // +0x16A0
-  std::uint8_t reserved16A4_16A7[0x04]{};
+  std::uint16_t* d_buf = nullptr;              // +0x16A4
   std::uint32_t opt_len = 0;                   // +0x16A8
   std::uint32_t static_len = 0;                // +0x16AC
   std::uint32_t matches = 0;                   // +0x16B0
@@ -141,7 +143,10 @@ static_assert(offsetof(DeflateStateRuntime, heap) == 0xB5C, "DeflateStateRuntime
 static_assert(offsetof(DeflateStateRuntime, heap_len) == 0x1450, "DeflateStateRuntime::heap_len offset must be 0x1450");
 static_assert(offsetof(DeflateStateRuntime, heap_max) == 0x1454, "DeflateStateRuntime::heap_max offset must be 0x1454");
 static_assert(offsetof(DeflateStateRuntime, depth) == 0x1458, "DeflateStateRuntime::depth offset must be 0x1458");
+static_assert(offsetof(DeflateStateRuntime, l_buf) == 0x1698, "DeflateStateRuntime::l_buf offset must be 0x1698");
+static_assert(offsetof(DeflateStateRuntime, lit_bufsize) == 0x169C, "DeflateStateRuntime::lit_bufsize offset must be 0x169C");
 static_assert(offsetof(DeflateStateRuntime, last_lit) == 0x16A0, "DeflateStateRuntime::last_lit offset must be 0x16A0");
+static_assert(offsetof(DeflateStateRuntime, d_buf) == 0x16A4, "DeflateStateRuntime::d_buf offset must be 0x16A4");
 static_assert(offsetof(DeflateStateRuntime, opt_len) == 0x16A8, "DeflateStateRuntime::opt_len offset must be 0x16A8");
 static_assert(offsetof(DeflateStateRuntime, static_len) == 0x16AC, "DeflateStateRuntime::static_len offset must be 0x16AC");
 static_assert(offsetof(DeflateStateRuntime, matches) == 0x16B0, "DeflateStateRuntime::matches offset must be 0x16B0");
@@ -152,8 +157,59 @@ static_assert(offsetof(DeflateStateRuntime, bi_buf) == 0x16B8, "DeflateStateRunt
 static_assert(offsetof(DeflateStateRuntime, bi_valid) == 0x16BC, "DeflateStateRuntime::bi_valid offset must be 0x16BC");
 static_assert(sizeof(DeflateStateRuntime) == 0x16C0, "DeflateStateRuntime size must be 0x16C0");
 
+struct z_stream_s;
+using z_stream = z_stream_s;
+
 extern "C"
 {
+  /**
+   * Address: 0x0095A830 (FUN_0095A830)
+   *
+   * What it does:
+   * Scans the input stream for the inflate sync marker sequence and transitions
+   * back to block decoding when the marker is found.
+   */
+  int __cdecl inflateSync(z_stream* stream);
+
+  /**
+   * Address: 0x0095AA90 (FUN_0095AA90)
+   *
+   * What it does:
+   * Seeds the deflate history window with one preset dictionary and rebuilds
+   * the hash chains used by the match finder.
+   */
+  int __cdecl deflateSetDictionary(
+    z_stream* stream,
+    const std::uint8_t* dictionary,
+    unsigned int dictionaryLength
+  );
+
+  /**
+   * Address: 0x0095B5C0 (FUN_0095B5C0)
+   *
+   * What it does:
+   * Clones one active deflate stream state, including hash/window/pending
+   * buffers, so compression can continue from an identical state.
+   */
+  int __cdecl deflateCopy(z_stream* destination, z_stream* source);
+
+  /**
+   * Address: 0x0095C990 (FUN_0095C990)
+   *
+   * What it does:
+   * Returns the zlib build version literal used by runtime init entry points.
+   */
+  const char* __cdecl zlibVersion();
+
+  /**
+   * Address: 0x0095EB20 (FUN_0095EB20, _tr_tally)
+   *
+   * What it does:
+   * Appends one literal or match token into `l_buf`/`d_buf`, updates dynamic
+   * Huffman frequencies, and reports whether the literal buffer is full.
+   */
+  int __cdecl _tr_tally(DeflateStateRuntime* state, int distance, int literalOrLengthCode);
+
   /**
    * Address: 0x0095F140 (FUN_0095F140, bi_windup)
    *

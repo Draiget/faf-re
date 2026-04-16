@@ -1,5 +1,6 @@
 #include "CWldMap.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -8,6 +9,7 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gpg/core/containers/BitArray2D.h"
@@ -15,6 +17,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/streams/Stream.h"
+#include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
@@ -42,6 +45,41 @@
 namespace
 {
   constexpr float kQuaternionNormalizeEpsilon = 0.000001f;
+
+  struct Stride76RangeRuntimeView
+  {
+    std::uint32_t lane00 = 0;
+    const std::uint8_t* begin = nullptr; // +0x04
+    const std::uint8_t* end = nullptr;   // +0x08
+  };
+  static_assert(
+    offsetof(Stride76RangeRuntimeView, begin) == 0x04,
+    "Stride76RangeRuntimeView::begin offset must be 0x04"
+  );
+  static_assert(
+    offsetof(Stride76RangeRuntimeView, end) == 0x08,
+    "Stride76RangeRuntimeView::end offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x00889FE0 (FUN_00889FE0)
+   *
+   * What it does:
+   * Returns the number of 76-byte records currently stored in one raw
+   * begin/end range lane.
+   */
+  [[maybe_unused]] std::int32_t CountStride76RecordsRuntime(
+    const Stride76RangeRuntimeView* const range
+  ) noexcept
+  {
+    const std::uint8_t* const begin = range != nullptr ? range->begin : nullptr;
+    if (begin == nullptr) {
+      return 0;
+    }
+
+    const std::uint8_t* const end = range->end;
+    return static_cast<std::int32_t>((end - begin) / 76);
+  }
 
   struct QuaternionLanes
   {
@@ -451,6 +489,48 @@ namespace
     return reinterpret_cast<TerrainRuntimeView*>(terrainRes);
   }
 
+  /**
+   * Address: 0x0089E790 (FUN_0089E790)
+   *
+   * What it does:
+   * Builds one terrain tier AABB directly from heightfield min/max words and
+   * per-tier world-space step sizes.
+   */
+  [[nodiscard]] Wm3::AxisAlignedBox3f BuildTerrainTierBoundsFromHeightfield(
+    const moho::CHeightField& field,
+    const std::int32_t tier,
+    const std::int32_t tierX,
+    const std::int32_t tierZ
+  ) noexcept
+  {
+    const moho::SMinMax<std::uint16_t> minMax = field.GetTierBoundsUWord(tier, tierX, tierZ);
+    const float minY = static_cast<float>(minMax.min) * 0.0078125f;
+    const float maxY = static_cast<float>(minMax.max) * 0.0078125f;
+
+    const std::uint32_t safeTier = tier > 0 ? static_cast<std::uint32_t>(tier) : 0u;
+    const std::uint32_t tierStep = 1u << safeTier;
+
+    const std::uint32_t widthClamp =
+      field.width > 0 ? static_cast<std::uint32_t>(field.width - 1) : 0u;
+    const std::uint32_t heightClamp =
+      field.height > 0 ? static_cast<std::uint32_t>(field.height - 1) : 0u;
+
+    const std::uint32_t stepXWord = tierStep < widthClamp ? tierStep : widthClamp;
+    const std::uint32_t stepZWord = tierStep < heightClamp ? tierStep : heightClamp;
+
+    const float stepX = static_cast<float>(stepXWord);
+    const double stepZ = static_cast<double>(stepZWord);
+
+    Wm3::AxisAlignedBox3f out{};
+    out.Min.x = static_cast<float>(tierX) * stepX;
+    out.Max.x = static_cast<float>(tierX + 1) * stepX;
+    out.Min.z = static_cast<float>(static_cast<double>(tierZ) * stepZ);
+    out.Max.z = static_cast<float>(stepZ * static_cast<double>(tierZ + 1));
+    out.Min.y = minY;
+    out.Max.y = maxY;
+    return out;
+  }
+
   [[nodiscard]] bool IsTerrainEnvironmentLookupNil(const TerrainEnvironmentLookupNodeRuntimeView* const node) noexcept
   {
     return node == nullptr || node->mIsNil != 0;
@@ -468,6 +548,27 @@ namespace
   ) noexcept
   {
     return node.mKey.compare(0u, node.mKey.size(), query.c_str(), query.size());
+  }
+
+  /**
+   * Address: 0x008A98F0 (FUN_008A98F0, sub_8A98F0)
+   *
+   * What it does:
+   * Copy-constructs one environment lookup `(key,value)` pair from two
+   * temporary string lanes and returns the destination pair pointer.
+   */
+  [[maybe_unused]] moho::TerrainEnvironmentLookupPair* ConstructTerrainEnvironmentLookupPair(
+    moho::TerrainEnvironmentLookupPair* const destination,
+    msvc8::string key,
+    msvc8::string value
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    new (destination) moho::TerrainEnvironmentLookupPair(key, value);
+    return destination;
   }
 
   /**
@@ -533,6 +634,13 @@ namespace
     return FindTerrainEnvironmentNodeOrHead(map, key);
   }
 
+  /**
+   * Address: 0x008A87E0 (FUN_008A87E0, sub_8A87E0)
+   *
+   * What it does:
+   * Walks left links from one candidate node until the sentinel/nil lane and
+   * returns the leftmost concrete node (or head fallback).
+   */
   [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* TerrainEnvironmentTreeMin(
     TerrainEnvironmentLookupNodeRuntimeView* node, TerrainEnvironmentLookupNodeRuntimeView* head
   ) noexcept
@@ -543,6 +651,13 @@ namespace
     return node != nullptr ? node : head;
   }
 
+  /**
+   * Address: 0x008A87C0 (FUN_008A87C0, sub_8A87C0)
+   *
+   * What it does:
+   * Walks right links from one candidate node until the sentinel/nil lane and
+   * returns the rightmost concrete node (or head fallback).
+   */
   [[nodiscard]] TerrainEnvironmentLookupNodeRuntimeView* TerrainEnvironmentTreeMax(
     TerrainEnvironmentLookupNodeRuntimeView* node, TerrainEnvironmentLookupNodeRuntimeView* head
   ) noexcept
@@ -929,6 +1044,134 @@ namespace
     }
   }
 
+  void DestroyTerrainEnvironmentIteratorRange(
+    TerrainEnvironmentLookupNodeRuntimeView* node,
+    TerrainEnvironmentLookupNodeRuntimeView* const head
+  ) noexcept
+  {
+    while (!IsTerrainEnvironmentLookupNil(node)) {
+      TerrainEnvironmentLookupNodeRuntimeView* const eraseNode = node;
+      node = IncrementTerrainEnvironmentNode(node, head);
+      delete eraseNode;
+    }
+  }
+
+  /**
+   * Address: 0x008A7700 (FUN_008A7700, sub_8A7700)
+   *
+   * What it does:
+   * Destroys all terrain environment-lookup nodes from one sentinel map head,
+   * releases the sentinel storage, and clears map head/size lanes.
+   */
+  void DestroyTerrainEnvironmentLookupMapStorage(TerrainEnvironmentLookupMapRuntimeView& map) noexcept
+  {
+    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
+    if (head != nullptr) {
+      DestroyTerrainEnvironmentIteratorRange(head->left, head);
+      delete head;
+    }
+
+    map.mHead = nullptr;
+    map.mSize = 0u;
+  }
+
+  /**
+   * Address: 0x008A9DC0 (FUN_008A9DC0, sub_8A9DC0)
+   *
+   * What it does:
+   * Copies one half-open range of environment-lookup string pairs forward via
+   * member string `assign` lanes and returns one-past-last destination lane.
+   */
+  [[nodiscard]] moho::TerrainEnvironmentLookupPair* CopyTerrainEnvironmentLookupPairRangeForward(
+    moho::TerrainEnvironmentLookupPair* destinationBegin,
+    const moho::TerrainEnvironmentLookupPair* sourceBegin,
+    const moho::TerrainEnvironmentLookupPair* sourceEnd
+  )
+  {
+    moho::TerrainEnvironmentLookupPair* destination = destinationBegin;
+    const moho::TerrainEnvironmentLookupPair* source = sourceBegin;
+    while (source != sourceEnd) {
+      destination->first.assign(source->first, 0u, static_cast<std::size_t>(-1));
+      destination->second.assign(source->second, 0u, static_cast<std::size_t>(-1));
+      ++source;
+      ++destination;
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x008AA0B0 (FUN_008AA0B0, sub_8AA0B0)
+   *
+   * What it does:
+   * Copies one range of environment-lookup string pairs backward via member
+   * string `assign` lanes and returns the first written destination lane.
+   */
+  [[nodiscard]] moho::TerrainEnvironmentLookupPair* CopyTerrainEnvironmentLookupPairRangeBackward(
+    moho::TerrainEnvironmentLookupPair* destinationEnd,
+    const moho::TerrainEnvironmentLookupPair* sourceEnd,
+    const moho::TerrainEnvironmentLookupPair* sourceBegin
+  )
+  {
+    moho::TerrainEnvironmentLookupPair* destination = destinationEnd;
+    const moho::TerrainEnvironmentLookupPair* source = sourceEnd;
+    while (source != sourceBegin) {
+      --destination;
+      --source;
+      destination->first.assign(source->first, 0u, static_cast<std::size_t>(-1));
+      destination->second.assign(source->second, 0u, static_cast<std::size_t>(-1));
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x008A8B00 (FUN_008A8B00, sub_8A8B00)
+   *
+   * What it does:
+   * Erases one half-open pair range from a terrain environment-lookup vector
+   * by shifting tail values into the erase slot and destroying the old tail
+   * range, then stores the resulting iterator lane in `outResult`.
+   */
+  moho::TerrainEnvironmentLookupPair** EraseTerrainEnvironmentLookupPairRange(
+    moho::TerrainEnvironmentLookupPairs& pairs,
+    moho::TerrainEnvironmentLookupPair** const outResult,
+    moho::TerrainEnvironmentLookupPair* const eraseFirst,
+    moho::TerrainEnvironmentLookupPair* const eraseLast
+  )
+  {
+    auto& runtime = msvc8::AsVectorRuntimeView(pairs);
+    moho::TerrainEnvironmentLookupPair* const oldEnd = runtime.end;
+
+    if (eraseFirst != eraseLast) {
+      moho::TerrainEnvironmentLookupPair* const newEnd =
+        CopyTerrainEnvironmentLookupPairRangeForward(eraseFirst, eraseLast, oldEnd);
+
+      while (runtime.end != newEnd) {
+        --runtime.end;
+        std::destroy_at(runtime.end);
+      }
+    }
+
+    *outResult = eraseFirst;
+    return outResult;
+  }
+
+  /**
+   * Address: 0x008A83A0 (FUN_008A83A0, sub_8A83A0)
+   *
+   * What it does:
+   * Erases the full pair range from one terrain environment-lookup vector and
+   * returns the resulting iterator lane.
+   */
+  [[maybe_unused]] moho::TerrainEnvironmentLookupPair* EraseAllTerrainEnvironmentLookupPairs(
+    moho::TerrainEnvironmentLookupPairs& pairs
+  )
+  {
+    moho::TerrainEnvironmentLookupPair* result = nullptr;
+    auto& runtime = msvc8::AsVectorRuntimeView(pairs);
+    (void)EraseTerrainEnvironmentLookupPairRange(pairs, &result, runtime.begin, runtime.end);
+    return result;
+  }
+
   void SaveStratumLayer(gpg::BinaryWriter& writer, const moho::CStratumMaterial& layer)
   {
     writer.WriteString(layer.mPath);
@@ -1242,21 +1485,43 @@ namespace
     handles.mCapacityEnd = nullptr;
   }
 
-  void ResizeNormalMapHandleStorage(TerrainNormalMapHandleArray& handles, const std::size_t tileCount)
+  [[nodiscard]] std::size_t GetNormalMapHandleCount(const TerrainNormalMapHandleArray& handles) noexcept
   {
-    DestroyNormalMapHandleStorage(handles);
-    if (tileCount == 0u) {
+    if (handles.mBegin == nullptr || handles.mEnd == nullptr) {
+      return 0u;
+    }
+    return static_cast<std::size_t>(handles.mEnd - handles.mBegin);
+  }
+
+  [[nodiscard]] std::size_t GetNormalMapHandleCapacity(const TerrainNormalMapHandleArray& handles) noexcept
+  {
+    if (handles.mBegin == nullptr || handles.mCapacityEnd == nullptr) {
+      return 0u;
+    }
+    return static_cast<std::size_t>(handles.mCapacityEnd - handles.mBegin);
+  }
+
+  void ReserveNormalMapHandleStorage(TerrainNormalMapHandleArray& handles, const std::size_t requiredCount)
+  {
+    const std::size_t currentCapacity = GetNormalMapHandleCapacity(handles);
+    if (requiredCount <= currentCapacity) {
       return;
     }
 
+    const std::size_t currentCount = GetNormalMapHandleCount(handles);
+    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1u);
+    if (newCapacity < requiredCount) {
+      newCapacity = requiredCount;
+    }
+
     auto* const storage = static_cast<boost::shared_ptr<moho::CD3DDynamicTextureSheet>*>(
-      ::operator new(sizeof(boost::shared_ptr<moho::CD3DDynamicTextureSheet>) * tileCount)
+      ::operator new(sizeof(boost::shared_ptr<moho::CD3DDynamicTextureSheet>) * newCapacity)
     );
 
     auto* it = storage;
     try {
-      for (; it != storage + tileCount; ++it) {
-        new (it) boost::shared_ptr<moho::CD3DDynamicTextureSheet>();
+      for (auto* src = handles.mBegin; src != handles.mEnd; ++src, ++it) {
+        new (it) boost::shared_ptr<moho::CD3DDynamicTextureSheet>(*src);
       }
     } catch (...) {
       while (it != storage) {
@@ -1267,9 +1532,119 @@ namespace
       throw;
     }
 
+    DestroyNormalMapHandleStorage(handles);
     handles.mBegin = storage;
-    handles.mEnd = storage + tileCount;
-    handles.mCapacityEnd = storage + tileCount;
+    handles.mEnd = storage + currentCount;
+    handles.mCapacityEnd = storage + newCapacity;
+  }
+
+  /**
+   * Address: 0x008A9E90 (FUN_008A9E90)
+   *
+   * What it does:
+   * Copy-assigns one half-open normal-map handle range into destination
+   * storage, preserving shared-pointer reference-count semantics lane by lane.
+   */
+  [[maybe_unused]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>* CopyAssignNormalMapHandleRange(
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* destinationBegin,
+    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>* sourceBegin,
+    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>* sourceEnd
+  )
+  {
+    auto* destination = destinationBegin;
+    const auto* source = sourceBegin;
+    while (source != sourceEnd) {
+      *destination = *source;
+      ++destination;
+      ++source;
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x008A8BC0 (FUN_008A8BC0)
+   *
+   * What it does:
+   * Erases one half-open normal-map handle range, compacts trailing elements,
+   * destroys vacated shared-pointer lanes, updates vector end, and returns the
+   * legacy erase iterator result.
+   */
+  [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>** EraseNormalMapHandleRange(
+    TerrainNormalMapHandleArray& handles,
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet>** const outIterator,
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* const first,
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet>* const last
+  )
+  {
+    if (first != last) {
+      auto* const newEnd = CopyAssignNormalMapHandleRange(first, last, handles.mEnd);
+      for (auto* it = newEnd; it != handles.mEnd; ++it) {
+        std::destroy_at(it);
+      }
+      handles.mEnd = newEnd;
+    }
+
+    *outIterator = first;
+    return outIterator;
+  }
+
+  /**
+   * Address: 0x008A8430 (FUN_008A8430, sub_8A8430)
+   *
+   * What it does:
+   * Resizes normal-map texture-handle storage to one target element count
+   * while preserving existing handles and filling newly appended lanes with
+   * one caller-provided shared-pointer value.
+   */
+  void ResizeNormalMapHandleStorage(
+    TerrainNormalMapHandleArray& handles,
+    const std::size_t tileCount,
+    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& fillValue
+  )
+  {
+    constexpr std::size_t kMaxHandleCount = 0x1FFFFFFFu;
+    if (tileCount > kMaxHandleCount) {
+      throw std::length_error("CWldTerrainRes normal-map handle count exceeds legacy limit");
+    }
+
+    const std::size_t currentCount = GetNormalMapHandleCount(handles);
+    if (currentCount < tileCount) {
+      ReserveNormalMapHandleStorage(handles, tileCount);
+
+      auto* appendedEnd = handles.mEnd;
+      try {
+        for (std::size_t index = currentCount; index < tileCount; ++index, ++appendedEnd) {
+          new (appendedEnd) boost::shared_ptr<moho::CD3DDynamicTextureSheet>(fillValue);
+        }
+      } catch (...) {
+        while (appendedEnd != handles.mEnd) {
+          --appendedEnd;
+          std::destroy_at(appendedEnd);
+        }
+        throw;
+      }
+      handles.mEnd = appendedEnd;
+      return;
+    }
+
+    if (handles.mBegin != nullptr && tileCount < currentCount) {
+      auto* const newEnd = handles.mBegin + tileCount;
+      boost::shared_ptr<moho::CD3DDynamicTextureSheet>* eraseResult = nullptr;
+      (void)EraseNormalMapHandleRange(handles, &eraseResult, newEnd, handles.mEnd);
+    }
+  }
+
+  /**
+   * Address: 0x008A7C20 (FUN_008A7C20)
+   *
+   * What it does:
+   * Thin overload lane that zero-initializes one empty shared-pointer fill
+   * value and forwards resize work into the canonical 3-argument helper.
+   */
+  void ResizeNormalMapHandleStorage(TerrainNormalMapHandleArray& handles, const std::size_t tileCount)
+  {
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet> fillValue;
+    ResizeNormalMapHandleStorage(handles, tileCount, fillValue);
   }
 
   [[nodiscard]] std::uint8_t EncodeNormalLaneByte(const float lane) noexcept
@@ -1403,6 +1778,13 @@ namespace
     delete terrainRes;
   }
 
+  /**
+   * Address: 0x00891620 (FUN_00891620, sub_891620)
+   *
+   * What it does:
+   * Destroys one owned preview chunk pointer and frees its allocation when
+   * the pointer is non-null.
+   */
   void DestroyPreviewChunk(moho::RWldMapPreviewChunk* const chunk) noexcept
   {
     if (chunk == nullptr) {
@@ -1411,6 +1793,42 @@ namespace
 
     chunk->~RWldMapPreviewChunk();
     operator delete(chunk);
+  }
+
+  /**
+   * Address: 0x00891680 (FUN_00891680)
+   *
+   * What it does:
+   * Runs one `RWldMapPreviewChunk` teardown+free deleting path and returns the
+   * original pointer lane.
+   */
+  [[maybe_unused]] moho::RWldMapPreviewChunk* DeletePreviewChunkAndReturn(
+    moho::RWldMapPreviewChunk* const chunk
+  ) noexcept
+  {
+    chunk->~RWldMapPreviewChunk();
+    operator delete(chunk);
+    return chunk;
+  }
+
+  /**
+   * Address: 0x00891400 (FUN_00891400, sub_891400)
+   *
+   * What it does:
+   * Replaces one preview-chunk owner slot and destroys/frees the previous
+   * chunk when it exists.
+   */
+  void ReplaceOwnedPreviewChunk(
+    moho::RWldMapPreviewChunk** const slot,
+    moho::RWldMapPreviewChunk* const replacement
+  ) noexcept
+  {
+    moho::RWldMapPreviewChunk* const previous = *slot;
+    *slot = replacement;
+    if (previous != nullptr) {
+      previous->~RWldMapPreviewChunk();
+      operator delete(previous);
+    }
   }
 
   void DestroyPropsEntry(moho::CWldPropEntry& entry) noexcept
@@ -1431,6 +1849,34 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x008915A0 (FUN_008915A0)
+   *
+   * What it does:
+   * Register-order adapter lane for prop-entry range destruction.
+   */
+  [[maybe_unused]] void DestroyPropsEntriesRangeRegisterAdapterLaneA(
+    moho::CWldPropEntry* const end,
+    moho::CWldPropEntry* const begin
+  ) noexcept
+  {
+    DestroyPropsEntriesRange(begin, end);
+  }
+
+  /**
+   * Address: 0x00891660 (FUN_00891660)
+   *
+   * What it does:
+   * Secondary register-order adapter lane for prop-entry range destruction.
+   */
+  [[maybe_unused]] void DestroyPropsEntriesRangeRegisterAdapterLaneB(
+    moho::CWldPropEntry* const end,
+    moho::CWldPropEntry* const begin
+  ) noexcept
+  {
+    DestroyPropsEntriesRange(begin, end);
+  }
+
   void DestroyPropsEntries(moho::CWldPropEntry* const begin, moho::CWldPropEntry* const end) noexcept
   {
     if (begin == nullptr || end == nullptr || end < begin) {
@@ -1438,6 +1884,55 @@ namespace
     }
 
     DestroyPropsEntriesRange(begin, end);
+  }
+
+  void ClearOwnedWldPropsEntriesStorageCommon(moho::CWldProps* const props) noexcept
+  {
+    moho::CWldPropEntry* const begin = props->mEntriesBegin;
+    if (begin != nullptr) {
+      DestroyPropsEntriesRange(begin, props->mEntriesEnd);
+      operator delete(begin);
+    }
+
+    props->mEntriesBegin = nullptr;
+    props->mEntriesEnd = nullptr;
+    props->mEntriesCapacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x00890290 (FUN_00890290, sub_890290)
+   *
+   * What it does:
+   * Destroys and frees one CWldProps entry-storage block and clears all three
+   * entry pointer lanes.
+   */
+  void ClearOwnedWldPropsEntriesStorageLaneA(moho::CWldProps* const props) noexcept
+  {
+    ClearOwnedWldPropsEntriesStorageCommon(props);
+  }
+
+  /**
+   * Address: 0x008914F0 (FUN_008914F0, sub_8914F0)
+   *
+   * What it does:
+   * Duplicate cleanup lane that destroys/frees CWldProps entry storage and
+   * nulls begin/end/capacity pointers.
+   */
+  [[maybe_unused]] void ClearOwnedWldPropsEntriesStorageLaneB(moho::CWldProps* const props) noexcept
+  {
+    ClearOwnedWldPropsEntriesStorageCommon(props);
+  }
+
+  /**
+   * Address: 0x00891560 (FUN_00891560, sub_891560)
+   *
+   * What it does:
+   * Duplicate cleanup lane that destroys/frees CWldProps entry storage and
+   * nulls begin/end/capacity pointers.
+   */
+  [[maybe_unused]] void ClearOwnedWldPropsEntriesStorageLaneC(moho::CWldProps* const props) noexcept
+  {
+    ClearOwnedWldPropsEntriesStorageCommon(props);
   }
 
   /**
@@ -1449,14 +1944,7 @@ namespace
    */
   void DestroyWldPropsOwned(moho::CWldProps* const props) noexcept
   {
-    if (props->mEntriesBegin != nullptr) {
-      DestroyPropsEntriesRange(props->mEntriesBegin, props->mEntriesEnd);
-      operator delete(props->mEntriesBegin);
-    }
-
-    props->mEntriesBegin = nullptr;
-    props->mEntriesEnd = nullptr;
-    props->mEntriesCapacityEnd = nullptr;
+    ClearOwnedWldPropsEntriesStorageLaneA(props);
     operator delete(props);
   }
 
@@ -1468,44 +1956,301 @@ namespace
     DestroyWldPropsOwned(props);
   }
 
-  bool ResizeWldPropsEntries(moho::CWldProps& props, const std::uint32_t entryCount)
+  /**
+   * Address: 0x008914C0 (FUN_008914C0)
+   *
+   * What it does:
+   * Replaces one owned `CWldProps*` slot and destroys the previous object when
+   * non-null.
+   */
+  [[maybe_unused]] moho::CWldProps** ReplaceOwnedWldPropsSlot(
+    moho::CWldProps** const slot,
+    moho::CWldProps* const replacement
+  ) noexcept
   {
-    if (props.mEntriesBegin != nullptr) {
-      DestroyPropsEntries(props.mEntriesBegin, props.mEntriesEnd);
-      operator delete(props.mEntriesBegin);
+    moho::CWldProps* const previous = *slot;
+    *slot = replacement;
+    if (previous != nullptr) {
+      DestroyWldPropsOwned(previous);
+    }
+    return slot;
+  }
+
+  /**
+   * Address: 0x00891650 (FUN_00891650)
+   *
+   * What it does:
+   * Destroys one `CWldProps` owner lane when present and returns the original
+   * pointer value.
+   */
+  [[maybe_unused]] moho::CWldProps* DestroyWldPropsIfPresent(moho::CWldProps* const props) noexcept
+  {
+    if (props != nullptr) {
+      DestroyWldPropsOwned(props);
+    }
+    return props;
+  }
+
+  /**
+   * Address: 0x008915C0 (FUN_008915C0)
+   *
+   * What it does:
+   * Jump-only adapter lane that forwards directly to global `operator delete`.
+   */
+  [[maybe_unused]] void DeleteRawPointerLaneA(void* const pointer) noexcept
+  {
+    ::operator delete(pointer);
+  }
+
+  /**
+   * Address: 0x008915D0 (FUN_008915D0)
+   *
+   * What it does:
+   * Reads one little-endian signed 16-bit lane from a binary stream.
+   */
+  [[maybe_unused]] std::int16_t ReadSigned16Lane(gpg::BinaryReader* const reader)
+  {
+    std::int16_t value = 0;
+    reader->Read(reinterpret_cast<char*>(&value), sizeof(value));
+    return value;
+  }
+
+  /**
+   * Address: 0x00891770 (FUN_00891770)
+   *
+   * What it does:
+   * Clears one legacy string lane to empty state and returns zero.
+   */
+  [[maybe_unused]] int ClearLegacyStringAndReturnZero(msvc8::string* const value) noexcept
+  {
+    value->tidy(true, 0U);
+    return 0;
+  }
+
+  /**
+   * Address: 0x008917A0 (FUN_008917A0)
+   *
+   * What it does:
+   * Clears one legacy string lane to empty state and returns the same pointer.
+   */
+  [[maybe_unused]] msvc8::string* ClearLegacyStringAndReturnSelf(msvc8::string* const value) noexcept
+  {
+    value->tidy(true, 0U);
+    return value;
+  }
+
+  /**
+   * Address: 0x00891D10 (FUN_00891D10)
+   *
+   * What it does:
+   * Copy-assigns one world-prop entry lane (path string + packed transform).
+   */
+  [[maybe_unused]] moho::CWldPropEntry* CopyWldPropEntryLane(
+    moho::CWldPropEntry* const destination,
+    const moho::CWldPropEntry* const source
+  )
+  {
+    destination->mBlueprintPath.assign(source->mBlueprintPath, 0u, msvc8::string::npos);
+    for (std::size_t lane = 0; lane < 7u; ++lane) {
+      destination->mTransformData[lane] = source->mTransformData[lane];
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x008513A0 (FUN_008513A0)
+   *
+   * What it does:
+   * Runs `CWldMap` non-deleting destructor logic, then frees the heap storage
+   * block that owns that map instance.
+   */
+  [[maybe_unused]] moho::CWldMap* DestroyAndDeleteWldMap(moho::CWldMap* const map) noexcept
+  {
+    if (map != nullptr) {
+      map->~CWldMap();
+      ::operator delete(static_cast<void*>(map));
+    }
+    return map;
+  }
+
+  /**
+   * Address: 0x00886610 (FUN_00886610, sub_886610)
+   *
+   * What it does:
+   * Transfers one CWldMap ownership lane from source auto_ptr slot into target
+   * slot, deleting the previous target object when ownership changes.
+   */
+  [[maybe_unused]] moho::CWldMap** TransferAutoPtrCWldMapOwnership(
+    moho::CWldMap** const sourceSlot,
+    moho::CWldMap** const targetSlot
+  ) noexcept
+  {
+    moho::CWldMap* const transferred = *sourceSlot;
+    *sourceSlot = nullptr;
+
+    moho::CWldMap* const targetValue = *targetSlot;
+    if (transferred != targetValue && targetValue != nullptr) {
+      (void)DestroyAndDeleteWldMap(targetValue);
     }
 
-    props.mEntriesBegin = nullptr;
-    props.mEntriesEnd = nullptr;
-    props.mEntriesCapacityEnd = nullptr;
+    *targetSlot = transferred;
+    return targetSlot;
+  }
 
-    if (entryCount == 0) {
-      return true;
+  /**
+   * Address: 0x0088E720 (FUN_0088E720, sub_88E720)
+   *
+   * What it does:
+   * Transfers one STIMap ownership lane from source auto_ptr slot into target
+   * slot, deleting the previous target map when ownership changes.
+   */
+  [[maybe_unused]] moho::STIMap** TransferAutoPtrSTIMapOwnership(
+    moho::STIMap** const sourceSlot,
+    moho::STIMap** const targetSlot
+  ) noexcept
+  {
+    moho::STIMap* const transferred = *sourceSlot;
+    *sourceSlot = nullptr;
+
+    moho::STIMap* const targetValue = *targetSlot;
+    if (transferred != targetValue && targetValue != nullptr) {
+      targetValue->~STIMap();
+      operator delete(targetValue);
     }
 
-    auto* const storage = static_cast<moho::CWldPropEntry*>(
-      ::operator new(sizeof(moho::CWldPropEntry) * static_cast<std::size_t>(entryCount), std::nothrow)
-    );
-    if (storage == nullptr) {
-      return false;
+    *targetSlot = transferred;
+    return targetSlot;
+  }
+
+  /**
+   * Address: 0x00886500 (FUN_00886500, sub_886500)
+   *
+   * What it does:
+   * Transfers one LuaState ownership lane from source auto_ptr slot into
+   * target slot, deleting the previous target state when ownership changes.
+   */
+  [[maybe_unused]] LuaPlus::LuaState** TransferAutoPtrLuaStateOwnership(
+    LuaPlus::LuaState** const sourceSlot,
+    LuaPlus::LuaState** const targetSlot
+  ) noexcept
+  {
+    LuaPlus::LuaState* const transferred = *sourceSlot;
+    *sourceSlot = nullptr;
+
+    LuaPlus::LuaState* const targetValue = *targetSlot;
+    if (transferred != targetValue && targetValue != nullptr) {
+      targetValue->~LuaState();
+      operator delete(targetValue);
     }
 
+    *targetSlot = transferred;
+    return targetSlot;
+  }
+
+  [[nodiscard]] std::size_t GetWldPropEntryCount(const moho::CWldProps& props) noexcept
+  {
+    if (props.mEntriesBegin == nullptr || props.mEntriesEnd == nullptr) {
+      return 0u;
+    }
+    return static_cast<std::size_t>(props.mEntriesEnd - props.mEntriesBegin);
+  }
+
+  [[nodiscard]] std::size_t GetWldPropEntryCapacity(const moho::CWldProps& props) noexcept
+  {
+    if (props.mEntriesBegin == nullptr || props.mEntriesCapacityEnd == nullptr) {
+      return 0u;
+    }
+    return static_cast<std::size_t>(props.mEntriesCapacityEnd - props.mEntriesBegin);
+  }
+
+  void ReserveWldPropsEntries(moho::CWldProps& props, const std::size_t requiredCount)
+  {
+    const std::size_t currentCapacity = GetWldPropEntryCapacity(props);
+    if (requiredCount <= currentCapacity) {
+      return;
+    }
+
+    const std::size_t currentCount = GetWldPropEntryCount(props);
+    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1u);
+    if (newCapacity < requiredCount) {
+      newCapacity = requiredCount;
+    }
+
+    auto* const storage = static_cast<moho::CWldPropEntry*>(::operator new(sizeof(moho::CWldPropEntry) * newCapacity));
     moho::CWldPropEntry* it = storage;
     try {
-      for (; it != storage + entryCount; ++it) {
-        new (it) moho::CWldPropEntry{};
-        it->mBlueprintPath.tidy(false, 0U);
+      for (auto* src = props.mEntriesBegin; src != props.mEntriesEnd; ++src, ++it) {
+        new (it) moho::CWldPropEntry(*src);
       }
     } catch (...) {
-      DestroyPropsEntries(storage, it);
-      operator delete(storage);
+      while (it != storage) {
+        --it;
+        DestroyPropsEntry(*it);
+      }
+      ::operator delete(storage);
       throw;
     }
 
+    DestroyPropsEntries(props.mEntriesBegin, props.mEntriesEnd);
+    ::operator delete(props.mEntriesBegin);
     props.mEntriesBegin = storage;
-    props.mEntriesEnd = storage + entryCount;
-    props.mEntriesCapacityEnd = storage + entryCount;
-    return true;
+    props.mEntriesEnd = storage + currentCount;
+    props.mEntriesCapacityEnd = storage + newCapacity;
+  }
+
+  [[nodiscard]] moho::CWldPropEntry MakeDefaultWldPropEntry()
+  {
+    moho::CWldPropEntry defaultEntry{};
+    defaultEntry.mBlueprintPath.tidy(false, 0U);
+    defaultEntry.mTransformData[0] = 1.0f;
+    for (std::size_t lane = 1; lane < 7; ++lane) {
+      defaultEntry.mTransformData[lane] = 0.0f;
+    }
+    return defaultEntry;
+  }
+
+  /**
+   * Address: 0x008922F0 (FUN_008922F0, sub_8922F0)
+   *
+   * What it does:
+   * Resizes one `CWldProps` entry vector to a caller-requested count while
+   * preserving existing entries and using one caller-provided default record
+   * for appended lanes.
+   */
+  void ResizeWldPropsEntries(
+    moho::CWldProps& props,
+    const std::uint32_t entryCount,
+    const moho::CWldPropEntry& fillEntry
+  )
+  {
+    constexpr std::size_t kMaxEntryCount = 0x04924924u;
+    if (entryCount > kMaxEntryCount) {
+      throw std::length_error("CWldProps entry count exceeds legacy limit");
+    }
+
+    const std::size_t currentCount = GetWldPropEntryCount(props);
+    const std::size_t targetCount = static_cast<std::size_t>(entryCount);
+    if (currentCount < targetCount) {
+      ReserveWldPropsEntries(props, targetCount);
+
+      moho::CWldPropEntry* appendedEnd = props.mEntriesEnd;
+      try {
+        for (std::size_t index = currentCount; index < targetCount; ++index, ++appendedEnd) {
+          new (appendedEnd) moho::CWldPropEntry(fillEntry);
+        }
+      } catch (...) {
+        DestroyPropsEntriesRange(props.mEntriesEnd, appendedEnd);
+        throw;
+      }
+      props.mEntriesEnd = appendedEnd;
+      return;
+    }
+
+    if (props.mEntriesBegin != nullptr && targetCount < currentCount) {
+      moho::CWldPropEntry* const newEnd = props.mEntriesBegin + targetCount;
+      DestroyPropsEntriesRange(newEnd, props.mEntriesEnd);
+      props.mEntriesEnd = newEnd;
+    }
   }
 
   /**
@@ -1573,9 +2318,8 @@ namespace moho
     std::uint32_t entryCount = 0;
     reader.ReadExact(entryCount);
 
-    if (!ResizeWldPropsEntries(*this, entryCount)) {
-      return false;
-    }
+    const CWldPropEntry defaultEntry = MakeDefaultWldPropEntry();
+    ResizeWldPropsEntries(*this, entryCount, defaultEntry);
 
     for (std::uint32_t index = 0; index < entryCount; ++index) {
       msvc8::string blueprintPath;
@@ -2035,6 +2779,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A8310 (FUN_008A8310)
+   *
+   * What it does:
+   * Appends one `{key,name}` environment-lookup pair into the destination
+   * vector and returns the inserted slot.
+   */
+  [[nodiscard]] moho::TerrainEnvironmentLookupPair* AppendEnvironmentLookupPair(
+    moho::TerrainEnvironmentLookupPairs& outPairs,
+    const moho::TerrainEnvironmentLookupPair& pair
+  )
+  {
+    outPairs.push_back(pair);
+    return outPairs.empty() ? nullptr : &outPairs.back();
+  }
+
+  /**
    * Address: 0x008A1500
    * (FUN_008A1500, ?EnumerateEnvLookup@CWldTerrainRes@Moho@@UBEXAAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z)
    *
@@ -2044,13 +2804,23 @@ namespace moho
    */
   void IWldTerrainRes::EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const
   {
-    outPairs.clear();
+    auto& outPairsRuntime = msvc8::AsVectorRuntimeView(outPairs);
+    moho::TerrainEnvironmentLookupPair* eraseResult = nullptr;
+    (void)EraseTerrainEnvironmentLookupPairRange(
+      outPairs,
+      &eraseResult,
+      outPairsRuntime.begin,
+      outPairsRuntime.end
+    );
 
     TerrainEnvironmentLookupMapRuntimeView& map =
       const_cast<TerrainEnvironmentLookupMapRuntimeView&>(AsTerrainRuntimeView(this)->mEnvLookup);
     TerrainEnvironmentLookupNodeRuntimeView* node = map.mHead != nullptr ? map.mHead->left : nullptr;
     while (node != nullptr && node != map.mHead) {
-      outPairs.push_back(TerrainEnvironmentLookupPair{node->mKey, node->mValue.mEnvironmentName});
+      (void)AppendEnvironmentLookupPair(
+        outPairs,
+        moho::TerrainEnvironmentLookupPair{node->mKey, node->mValue.mEnvironmentName}
+      );
       node = IncrementTerrainEnvironmentNode(node, map.mHead);
     }
   }
@@ -2312,7 +3082,15 @@ namespace moho
   {
     const auto* const view = AsTerrainRuntimeView(this);
     const CHeightField* const field = view->mMap->mHeightField.get();
-    return field->GetBounds3D();
+    if (field == nullptr) {
+      return Wm3::AxisAlignedBox3f{};
+    }
+
+    const CHeightFieldTier* const firstTier = field->mGrids.begin();
+    const std::int32_t tierCount = firstTier != nullptr
+                                     ? static_cast<std::int32_t>(field->mGrids.end() - firstTier)
+                                     : 0;
+    return BuildTerrainTierBoundsFromHeightfield(*field, tierCount, 0, 0);
   }
 
   /**
@@ -2658,6 +3436,17 @@ namespace moho
     CloneTerrainDynamicTextureForEdit(normalView->mStratumMask1, true);
     CloneTerrainDynamicTextureForEdit(visualView->mWaterMapTexture, true);
   }
+
+  /**
+   * Address: 0x008A74D0 (FUN_008A74D0, IWldTerrainRes ctor lane)
+   *
+   * What it does:
+   * Initializes one terrain-resource interface base and clears playable-rect
+   * source ownership to null.
+   */
+  IWldTerrainRes::IWldTerrainRes()
+    : mPlayableRectSource(nullptr)
+  {}
 
   /**
    * Address: 0x008A7400 (FUN_008A7400, ?GetDecalManager@CWldTerrainRes@Moho@@EAEPAVIDecalManager@2@XZ)
@@ -3309,6 +4098,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A61B0 (FUN_008A61B0, ?SetWaterDefaults@CWldTerrainRes@Moho@@AAEXXZ)
+   *
+   * What it does:
+   * Reinitializes terrain water-shader parameters to their default property
+   * payload by constructing one default property block and replacing the
+   * currently owned instance.
+   */
+  void IWldTerrainRes::SetWaterDefaults()
+  {
+    CWaterShaderProperties defaults{};
+    SetWaterShaderProperties(defaults);
+  }
+
+  /**
    * Address: 0x008A49D0 (FUN_008A49D0, ?GetStratumMaterial@CWldTerrainRes@Moho@@UAEAAVStratumMaterial@2@XZ)
    *
    * What it does:
@@ -3465,9 +4268,7 @@ namespace moho
     }
 
     auto* const newPreviewChunk = new (std::nothrow) RWldMapPreviewChunk();
-    RWldMapPreviewChunk* const previousPreviewChunk = mMapPreviewChunk;
-    mMapPreviewChunk = newPreviewChunk;
-    DestroyPreviewChunk(previousPreviewChunk);
+    ReplaceOwnedPreviewChunk(&mMapPreviewChunk, newPreviewChunk);
     if (mMapPreviewChunk == nullptr || !mMapPreviewChunk->Load(reader, loadControl)) {
       return false;
     }
@@ -3511,8 +4312,6 @@ namespace moho
   )
   {
     auto* const newChunk = new (std::nothrow) RWldMapPreviewChunk(textureSheet, previewSize, previewName);
-    RWldMapPreviewChunk* const previousChunk = mMapPreviewChunk;
-    mMapPreviewChunk = newChunk;
-    DestroyPreviewChunk(previousChunk);
+    ReplaceOwnedPreviewChunk(&mMapPreviewChunk, newChunk);
   }
 } // namespace moho

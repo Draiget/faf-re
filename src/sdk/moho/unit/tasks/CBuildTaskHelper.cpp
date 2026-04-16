@@ -143,6 +143,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x005F5660 (FUN_005F5660)
+   *
+   * What it does:
+   * Stores the silo-mode flag lane and returns this helper for chained setup
+   * flow.
+   */
+  CBuildTaskHelper* CBuildTaskHelper::SetSiloMode(const bool isSilo) noexcept
+  {
+    mIsSilo = isSilo;
+    return this;
+  }
+
+  /**
    * Address: 0x005F5790 (FUN_005F5790, ??1CBuildTaskHelper@Moho@@QAE@@Z)
    */
   CBuildTaskHelper::~CBuildTaskHelper()

@@ -1,18 +1,22 @@
 #include "moho/audio/HSound.h"
 
 #include <cstdint>
+#include <typeinfo>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/CSndParams.h"
 
 namespace moho
 {
+  gpg::RType* HSound::sType = nullptr;
+
   CScrLuaMetatableFactory<HSound> CScrLuaMetatableFactory<HSound>::sInstance{};
 } // namespace moho
 
 /**
- * Address: 0x10015880 (constructor shape)
+  * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -75,6 +79,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x004E68F0 (FUN_004E68F0)
+   *
+   * What it does:
+   * Forwards one deleting-lane call from the `CScriptObject`-view vtable of
+   * `HSound` into the canonical `HSound::Destroy` implementation.
+   */
+  [[maybe_unused]] HSound* HSoundDestroyScriptObjectViewRuntime(HSound* const self, const std::uint8_t flags)
+  {
+    return self != nullptr ? self->Destroy(flags) : nullptr;
+  }
+
+  /**
    * Address: 0x004E1260 (FUN_004E1260, sub_4E1260)
    *
    * What it does:
@@ -123,7 +139,7 @@ namespace moho
    * Constructs Lua object lanes and binds this `HSound` instance into script
    * userdata/object state.
    */
-  void func_CreateLuaHSoundObject(LuaPlus::LuaState* const state, HSound* const sound)
+void func_CreateLuaHSoundObject(LuaPlus::LuaState* const state, HSound* const sound)
   {
     if (state == nullptr || sound == nullptr) {
       return;
@@ -135,5 +151,43 @@ namespace moho
     LuaPlus::LuaObject klass{};
     (void)func_CreateLuaHSound(&klass, state);
     sound->CreateLuaObject(klass, arg1, arg2, arg3);
+  }
+
+  /**
+   * Address: 0x004E6690 (FUN_004E6690)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `CSndParams` and returns the typed
+   * object pointer when the source is compatible.
+   */
+  [[nodiscard]] CSndParams* CastCSndParamsFromRRef(const gpg::RRef& source)
+  {
+    gpg::RType* type = CSndParams::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(CSndParams));
+      CSndParams::sType = type;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
+    return static_cast<CSndParams*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x004E66E0 (FUN_004E66E0)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `HSound` and returns the typed object
+   * pointer when the source is compatible.
+   */
+  [[nodiscard]] HSound* CastHSoundFromRRef(const gpg::RRef& source)
+  {
+    gpg::RType* type = HSound::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(HSound));
+      HSound::sType = type;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
+    return static_cast<HSound*>(upcast.mObj);
   }
 } // namespace moho

@@ -32,6 +32,15 @@ namespace moho
     CSimResources();
 
     /**
+     * Address: 0x00546E90 (FUN_00546E90, Moho::CSimResources::operator new)
+     *
+     * What it does:
+     * Allocates one `CSimResources` object and runs in-place construction,
+     * returning `nullptr` on allocation failure.
+     */
+    [[nodiscard]] static CSimResources* Create();
+
+    /**
      * Address: 0x00545E10 (FUN_00545E10, core dtor body)
      * Address: 0x00546A00 (Moho::CSimResources::dtr)
      *

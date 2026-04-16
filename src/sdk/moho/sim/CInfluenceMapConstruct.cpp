@@ -18,6 +18,20 @@ namespace
 {
   moho::CInfluenceMapConstruct gCInfluenceMapConstruct;
 
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
   /**
    * Address: 0x00717670 (FUN_00717670, sub_717670)
    */
@@ -49,6 +63,18 @@ namespace
   }
 
   /**
+   * Address: 0x0071CAC0 (FUN_0071CAC0)
+   *
+   * What it does:
+   * Register-lane adapter that forwards into the canonical
+   * `Construct_CInfluenceMapThunk` path.
+   */
+  [[maybe_unused]] int Construct_CInfluenceMapRegisterAdapter(gpg::SerConstructResult* const result)
+  {
+    return Construct_CInfluenceMapThunk(0, 0, 0, result);
+  }
+
+  /**
    * Address: 0x0071CAA0 (FUN_0071CAA0, sub_71CAA0)
    */
   void Delete_CInfluenceMap(void* const objectPtr)
@@ -60,6 +86,21 @@ namespace
 
     object->~CInfluenceMap();
     ::operator delete(object);
+  }
+
+  /**
+   * Address: 0x00718AB0 (FUN_00718AB0)
+   *
+   * What it does:
+   * Initializes startup `CInfluenceMap` construct-helper links and callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CInfluenceMapConstruct* InitializeCInfluenceMapConstructHelperStorage() noexcept
+  {
+    InitializeHelperNode(gCInfluenceMapConstruct);
+    gCInfluenceMapConstruct.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CInfluenceMapThunk);
+    gCInfluenceMapConstruct.mDeleteCallback = &Delete_CInfluenceMap;
+    return &gCInfluenceMapConstruct;
   }
 } // namespace
 
@@ -74,12 +115,8 @@ namespace moho
    */
   void register_CInfluenceMapConstruct()
   {
-    gCInfluenceMapConstruct.mHelperNext = nullptr;
-    gCInfluenceMapConstruct.mHelperPrev = nullptr;
-    gCInfluenceMapConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CInfluenceMapThunk);
-    gCInfluenceMapConstruct.mDeleteCallback = &Delete_CInfluenceMap;
-    gCInfluenceMapConstruct.RegisterConstructFunction();
+    CInfluenceMapConstruct* const helper = InitializeCInfluenceMapConstructHelperStorage();
+    helper->RegisterConstructFunction();
   }
 
   /**

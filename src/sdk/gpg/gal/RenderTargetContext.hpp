@@ -21,6 +21,15 @@ namespace gpg::gal
         RenderTargetContext();
 
         /**
+         * Address: 0x008E79E0 (FUN_008E79E0)
+         *
+         * What it does:
+         * Initializes render-target context with explicit width, height, and
+         * format lanes.
+         */
+        RenderTargetContext(std::uint32_t width, std::uint32_t height, std::uint32_t format);
+
+        /**
          * Address: 0x00442050 (FUN_00442050, sub_442050)
          *
          * What it does:

@@ -1,5 +1,7 @@
 #include "moho/terrain/LowFidelityTerrain.h"
 
+#include <cstdint>
+
 #include <boost/detail/sp_counted_base.hpp>
 
 #include "moho/misc/ID3DDeviceResources.h"
@@ -12,6 +14,9 @@
 
 namespace
 {
+  constexpr std::int32_t kSkirtMaxIndexCount = 199998;
+  constexpr std::int32_t kTriangleListPrimitiveType = 4;
+
   template <typename T>
   void DeleteOwned(T*& lane) noexcept
   {
@@ -30,10 +35,66 @@ namespace
       sharedCount = nullptr;
     }
   }
+
+  struct LowFidelityTriangleBatchRuntime
+  {
+    std::uint32_t pad00[5];         // +0x00
+    moho::CD3DVertexSheet* vtx;     // +0x14
+    moho::CD3DIndexSheet* idx;      // +0x18
+    std::uint32_t pad1C;            // +0x1C
+    std::int32_t indexCount;        // +0x20
+    std::int32_t endVertexInclusive; // +0x24
+  };
+  static_assert(offsetof(LowFidelityTriangleBatchRuntime, vtx) == 0x14, "LowFidelityTriangleBatchRuntime::vtx");
+  static_assert(offsetof(LowFidelityTriangleBatchRuntime, idx) == 0x18, "LowFidelityTriangleBatchRuntime::idx");
+  static_assert(
+    offsetof(LowFidelityTriangleBatchRuntime, indexCount) == 0x20,
+    "LowFidelityTriangleBatchRuntime::indexCount"
+  );
+  static_assert(
+    offsetof(LowFidelityTriangleBatchRuntime, endVertexInclusive) == 0x24,
+    "LowFidelityTriangleBatchRuntime::endVertexInclusive"
+  );
+
+  /**
+   * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
+   *
+   * What it does:
+   * Issues one triangle-list draw for one prebuilt low-fidelity terrain batch
+   * when the batch has a non-zero index count.
+   */
+  [[maybe_unused]] void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatchRuntime& batch)
+  {
+    if (batch.indexCount == 0 || batch.vtx == nullptr || batch.idx == nullptr) {
+      return;
+    }
+
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    if (device == nullptr) {
+      return;
+    }
+
+    moho::CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = batch.vtx;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = batch.endVertexInclusive;
+
+    moho::CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = batch.idx;
+    indexView.startIndex = 0;
+    indexView.indexCount = batch.indexCount;
+
+    std::int32_t primitiveType = 4;
+    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
 } // namespace
 
 namespace moho
 {
+  extern bool ren_Terrain;
+  extern bool ren_Skirt;
+
   boost::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
   WaterSurface* sTerrainWaterSurface = nullptr;
   CD3DTextureBatcher* texture_batcher = nullptr;
@@ -210,6 +271,44 @@ namespace moho
   void LowFidelityTerrain::DrawWaterLine(const std::int32_t /*arg0*/, const std::int32_t /*arg1*/)
   {
     (void)sTerrainWaterSurface->RenderWaterLayerAlphaMask(mCamera);
+  }
+
+  /**
+   * Address: 0x00809C80 (FUN_00809C80, Moho::LowFidelityTerrain::DrawTerrainSkirt)
+   *
+   * What it does:
+   * Selects the terrain-skirt technique and submits one indexed triangle-list
+   * draw from low-fidelity skirt lanes when terrain/skirt toggles and skirt
+   * range gating permit.
+   */
+  void LowFidelityTerrain::DrawTerrainSkirt()
+  {
+    if (!ren_Terrain || !ren_Skirt || mSkirtStartIndex == mSkirtEndIndex) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectTechnique("TTerrainSkirt");
+
+    std::int32_t indexCount = static_cast<std::int32_t>(mSkirtEndIndex - mSkirtStartIndex);
+    if (indexCount > kSkirtMaxIndexCount) {
+      indexCount = kSkirtMaxIndexCount;
+    }
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = static_cast<std::int32_t>(mSkirtStartIndex);
+    indexView.indexCount = indexCount;
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = mSkirtBaseVertex;
+    vertexView.endVertex = mSkirtEndVertex;
+
+    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
 
   /**

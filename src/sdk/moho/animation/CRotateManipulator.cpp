@@ -9,6 +9,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
@@ -210,6 +211,275 @@ namespace
     return moho::CRotateManipulator::sType;
   }
 
+  /**
+   * Address: 0x006456B0 (FUN_006456B0)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CRotateManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCRotateManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCRotateManipulatorType());
+    return upcast.mObj;
+  }
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
+  {
+    gpg::RType* type = moho::IAniManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::IAniManipulator));
+      moho::IAniManipulator::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x006458A0 (FUN_006458A0)
+   *
+   * What it does:
+   * Deserializes one `CRotateManipulator` lane from IAniManipulator base data
+   * plus rotate-state flags, axis, angular lanes, and follow-bone index.
+   */
+  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerBody(
+    moho::CRotateManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
+
+    bool hasGoal = manipulator->mHasGoal != 0;
+    archive->ReadBool(&hasGoal);
+    manipulator->mHasGoal = static_cast<std::uint8_t>(hasGoal ? 1 : 0);
+
+    bool spinDown = manipulator->mSpinDown != 0;
+    archive->ReadBool(&spinDown);
+    manipulator->mSpinDown = static_cast<std::uint8_t>(spinDown ? 1 : 0);
+
+    archive->Read(CachedVector3fType(), &manipulator->mAxis, owner);
+    archive->ReadFloat(&manipulator->mCurrentAngle);
+    archive->ReadFloat(&manipulator->mGoalAngle);
+    archive->ReadFloat(&manipulator->mSpeed);
+    archive->ReadFloat(&manipulator->mTargetSpeed);
+    archive->ReadFloat(&manipulator->mAccel);
+    archive->ReadInt(&manipulator->mFollowBone);
+  }
+
+  /**
+   * Address: 0x006459A0 (FUN_006459A0)
+   *
+   * What it does:
+   * Serializes one `CRotateManipulator` lane to IAniManipulator base data plus
+   * rotate-state flags, axis, angular lanes, and follow-bone index.
+   */
+  [[maybe_unused]] void SerializeCRotateManipulatorSerializerBody(
+    const moho::CRotateManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(CachedIAniManipulatorType(), manipulator, owner);
+    archive->WriteBool(manipulator->mHasGoal != 0);
+    archive->WriteBool(manipulator->mSpinDown != 0);
+    archive->Write(CachedVector3fType(), &manipulator->mAxis, owner);
+    archive->WriteFloat(manipulator->mCurrentAngle);
+    archive->WriteFloat(manipulator->mGoalAngle);
+    archive->WriteFloat(manipulator->mSpeed);
+    archive->WriteFloat(manipulator->mTargetSpeed);
+    archive->WriteFloat(manipulator->mAccel);
+    archive->WriteInt(manipulator->mFollowBone);
+  }
+
+  /**
+   * Address: 0x00645520 (FUN_00645520)
+   *
+   * What it does:
+   * First tail-thunk alias that forwards rotate manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerThunkAliasA(
+    moho::CRotateManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00645530 (FUN_00645530)
+   *
+   * What it does:
+   * First tail-thunk alias that forwards rotate manipulator serialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCRotateManipulatorSerializerThunkAliasA(
+    const moho::CRotateManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00645690 (FUN_00645690)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards rotate manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerThunkAliasB(
+    moho::CRotateManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x006456A0 (FUN_006456A0)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards rotate manipulator serialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCRotateManipulatorSerializerThunkAliasB(
+    const moho::CRotateManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  struct CRotateManipulatorSerializerHelperNode
+  {
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(sizeof(CRotateManipulatorSerializerHelperNode) == 0x10, "CRotateManipulatorSerializerHelperNode size must be 0x10");
+
+  CRotateManipulatorSerializerHelperNode gCRotateManipulatorSerializer;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
+  {
+    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
+      helper.mNext->mPrev = helper.mPrev;
+      helper.mPrev->mNext = helper.mNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  void DeserializeCRotateManipulatorSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const manipulator = reinterpret_cast<moho::CRotateManipulator*>(static_cast<std::uintptr_t>(objectPtr));
+    DeserializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  void SerializeCRotateManipulatorSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    const auto* const manipulator =
+      reinterpret_cast<const moho::CRotateManipulator*>(static_cast<std::uintptr_t>(objectPtr));
+    SerializeCRotateManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x006435A0 (FUN_006435A0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CRotateManipulator` serializer
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CRotateManipulatorSerializerHelperNode*
+  InitializeCRotateManipulatorSerializerStartupThunkPrimary()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCRotateManipulatorSerializer);
+    gCRotateManipulatorSerializer.mPrev = self;
+    gCRotateManipulatorSerializer.mNext = self;
+    gCRotateManipulatorSerializer.mSerLoadFunc = &DeserializeCRotateManipulatorSerializerCallback;
+    gCRotateManipulatorSerializer.mSerSaveFunc = &SerializeCRotateManipulatorSerializerCallback;
+    return &gCRotateManipulatorSerializer;
+  }
+
+  /**
+   * Address: 0x006452E0 (FUN_006452E0)
+   *
+   * What it does:
+   * Secondary startup-init entry for global `CRotateManipulator` serializer
+   * helper storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] CRotateManipulatorSerializerHelperNode*
+  InitializeCRotateManipulatorSerializerStartupThunkSecondary()
+  {
+    return InitializeCRotateManipulatorSerializerStartupThunkPrimary();
+  }
+
+  /**
+   * Address: 0x006435D0 (FUN_006435D0)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CRotateManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCRotateManipulatorSerializer);
+  }
+
+  /**
+   * Address: 0x00643600 (FUN_00643600)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CRotateManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCRotateManipulatorSerializer);
+  }
+
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
   {
@@ -369,6 +639,29 @@ bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
   watchedBone->Rotate(rotation);
   mCurrentAngle = angleRadians;
   return true;
+}
+
+/**
+ * Address: 0x00643400 (FUN_00643400)
+ *
+ * What it does:
+ * Sets spin-down mode flag lane.
+ */
+void moho::CRotateManipulator::SetSpinDownEnabled(const bool enabled) noexcept
+{
+  mSpinDown = enabled ? 1u : 0u;
+}
+
+/**
+ * Address: 0x00643CD0 (FUN_00643CD0)
+ *
+ * What it does:
+ * Updates follow-bone index and marks goal state dirty for next tick.
+ */
+void moho::CRotateManipulator::SetFollowBoneTarget(const int followBoneIndex) noexcept
+{
+  mFollowBone = followBoneIndex;
+  mHasGoal = 1u;
 }
 
 /**
@@ -543,11 +836,25 @@ int moho::cfunc_CreateRotatorL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+/**
+ * Address: 0x00644280 (FUN_00644280, cfunc_CRotateManipulatorSetSpinDown)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CRotateManipulatorSetSpinDownL`.
+ */
 int moho::cfunc_CRotateManipulatorSetSpinDown(lua_State* const luaContext)
 {
   return cfunc_CRotateManipulatorSetSpinDownL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644300 (FUN_00644300, cfunc_CRotateManipulatorSetSpinDownL)
+ *
+ * What it does:
+ * Reads `(rotator, enabled)`, validates the rotator object, sets spin-down
+ * mode, and returns the rotator Lua object.
+ */
 int moho::cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -558,7 +865,7 @@ int moho::cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidSpinDownError);
-  manipulator->mSpinDown = LuaPlus::LuaStackObject(state, 2).GetBoolean() ? 1u : 0u;
+  manipulator->SetSpinDownEnabled(LuaPlus::LuaStackObject(state, 2).GetBoolean());
 
   lua_settop(rawState, 1);
   return 1;
@@ -576,6 +883,13 @@ int moho::cfunc_CRotateManipulatorSetGoal(lua_State* const luaContext)
   return cfunc_CRotateManipulatorSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644470 (FUN_00644470, cfunc_CRotateManipulatorSetGoalL)
+ *
+ * What it does:
+ * Reads `(rotator, goalDegrees)`, validates numeric input, converts to
+ * radians, stores goal angle, and updates triggered state.
+ */
 int moho::cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -601,11 +915,25 @@ int moho::cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+/**
+ * Address: 0x00644710 (FUN_00644710, cfunc_CRotateManipulatorSetSpeed)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CRotateManipulatorSetSpeedL`.
+ */
 int moho::cfunc_CRotateManipulatorSetSpeed(lua_State* const luaContext)
 {
   return cfunc_CRotateManipulatorSetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644790 (FUN_00644790, cfunc_CRotateManipulatorSetSpeedL)
+ *
+ * What it does:
+ * Reads `(rotator, speedDegPerSec)`, validates numeric input, converts to
+ * radians/sec, and stores runtime speed lane.
+ */
 int moho::cfunc_CRotateManipulatorSetSpeedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -632,6 +960,13 @@ int moho::cfunc_CRotateManipulatorSetTargetSpeed(lua_State* const luaContext)
   return cfunc_CRotateManipulatorSetTargetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644930 (FUN_00644930, cfunc_CRotateManipulatorSetTargetSpeedL)
+ *
+ * What it does:
+ * Reads `(rotator, targetSpeedDegPerSec)`, validates numeric input, converts
+ * to radians/sec, stores target speed, and updates triggered state.
+ */
 int moho::cfunc_CRotateManipulatorSetTargetSpeedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -668,6 +1003,13 @@ int moho::cfunc_CRotateManipulatorSetAccel(lua_State* const luaContext)
   return cfunc_CRotateManipulatorSetAccelL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644B00 (FUN_00644B00, cfunc_CRotateManipulatorSetAccelL)
+ *
+ * What it does:
+ * Reads `(rotator, accelDegPerSecSq)`, validates numeric input, converts to
+ * radians/sec^2, and stores runtime acceleration lane.
+ */
 int moho::cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -689,11 +1031,25 @@ int moho::cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+/**
+ * Address: 0x00644C20 (FUN_00644C20, cfunc_CRotateManipulatorClearFollowBone)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CRotateManipulatorClearFollowBoneL`.
+ */
 int moho::cfunc_CRotateManipulatorClearFollowBone(lua_State* const luaContext)
 {
   return cfunc_CRotateManipulatorClearFollowBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644CA0 (FUN_00644CA0, cfunc_CRotateManipulatorClearFollowBoneL)
+ *
+ * What it does:
+ * Reads `(rotator)`, clears follow-bone target (`-1`) and marks goal state
+ * dirty, then returns the rotator Lua object.
+ */
 int moho::cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -704,18 +1060,31 @@ int moho::cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* const stat
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidClearFollowBoneError);
-  manipulator->mFollowBone = -1;
-  manipulator->mHasGoal = 1u;
+  manipulator->SetFollowBoneTarget(-1);
 
   lua_settop(rawState, 1);
   return 1;
 }
 
+/**
+ * Address: 0x00644D90 (FUN_00644D90, cfunc_CRotateManipulatorSetFollowBone)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CRotateManipulatorSetFollowBoneL`.
+ */
 int moho::cfunc_CRotateManipulatorSetFollowBone(lua_State* const luaContext)
 {
   return cfunc_CRotateManipulatorSetFollowBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644E10 (FUN_00644E10, cfunc_CRotateManipulatorSetFollowBoneL)
+ *
+ * What it does:
+ * Reads `(rotator, bone)`, resolves bone index through owner actor, assigns
+ * follow-bone target, and returns the rotator Lua object.
+ */
 int moho::cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -733,17 +1102,30 @@ int moho::cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, "A valid bone is required");
   }
 
-  manipulator->mFollowBone = followBone;
-  manipulator->mHasGoal = 1u;
+  manipulator->SetFollowBoneTarget(followBone);
   lua_settop(rawState, 1);
   return 1;
 }
 
+/**
+ * Address: 0x00644F30 (FUN_00644F30, cfunc_CRotateManipulatorGetCurrentAngle)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CRotateManipulatorGetCurrentAngleL`.
+ */
 int moho::cfunc_CRotateManipulatorGetCurrentAngle(lua_State* const luaContext)
 {
   return cfunc_CRotateManipulatorGetCurrentAngleL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00644FB0 (FUN_00644FB0, cfunc_CRotateManipulatorGetCurrentAngleL)
+ *
+ * What it does:
+ * Reads `(rotator)`, pushes current angle in degrees, and returns one Lua
+ * number.
+ */
 int moho::cfunc_CRotateManipulatorGetCurrentAngleL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -765,6 +1147,13 @@ int moho::cfunc_CRotateManipulatorSetCurrentAngle(lua_State* const luaContext)
   return cfunc_CRotateManipulatorSetCurrentAngleL(moho::SCR_ResolveBindingState(luaContext));
 }
 
+/**
+ * Address: 0x00645120 (FUN_00645120, cfunc_CRotateManipulatorSetCurrentAngleL)
+ *
+ * What it does:
+ * Reads `(rotator, angleDegrees)`, validates numeric input, converts to
+ * radians, applies current-angle lane, and raises Lua error on failure.
+ */
 int moho::cfunc_CRotateManipulatorSetCurrentAngleL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
@@ -928,7 +1317,7 @@ void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const
 }
 
 /**
- * Address: 0x006456F0 (FUN_006456F0, gpg::RRef_CRotateManipulator)
+  * Alias of FUN_006456F0 (non-canonical helper lane).
  *
  * What it does:
  * Builds one typed reflection reference for `moho::CRotateManipulator*`,

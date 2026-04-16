@@ -96,6 +96,16 @@ namespace moho
      */
     [[nodiscard]] bool GetInfo(SInfo& outInfo, bool useFineTime) const noexcept;
 
+    /**
+     * Address: 0x004E9D30 (FUN_004E9D30, ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z)
+     * Mangled: ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z
+     *
+     * What it does:
+     * Returns the signed second delta between this timestamp and another one
+     * using fine-time seconds + millisecond lanes.
+     */
+    [[nodiscard]] double GetDeltaSeconds(const CTimeStamp& other) const noexcept;
+
     std::int64_t time{0};  // +0x00
     std::int64_t ftime{0}; // +0x08
     std::uint16_t millis{0}; // +0x10
@@ -543,9 +553,9 @@ namespace moho
   /**
    * Unit stat-tree lookup helpers used by Unit::GetStat* wrappers.
    *
-   * Address: 0x0040C200 (FUN_0040C200, mode-based resolver)
-   * Address: 0x00417B60 (FUN_00417B60, float resolver)
-   * Address: 0x00417C50 (FUN_00417C50, string resolver)
+    * Alias of FUN_0040C200 (non-canonical helper lane).
+    * Alias of FUN_00417B60 (non-canonical helper lane).
+    * Alias of FUN_00417C50 (non-canonical helper lane).
    */
   [[nodiscard]] StatItem* ResolveStatByMode(void* statsRoot, gpg::StrArg name, int mode);
   [[nodiscard]] StatItem* ResolveStatFloat(void* statsRoot, gpg::StrArg name);

@@ -104,4 +104,12 @@ namespace moho
   static_assert(
     sizeof(SSTICommandConstantDataSerializer) == 0x14, "SSTICommandConstantDataSerializer size must be 0x14"
   );
+
+  /**
+   * Address: 0x00552630 (FUN_00552630, preregister_SSTICommandConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTICommandConstantData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTICommandConstantDataTypeInfo();
 } // namespace moho

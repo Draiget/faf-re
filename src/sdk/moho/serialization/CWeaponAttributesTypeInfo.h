@@ -48,19 +48,4 @@ namespace moho
 
   static_assert(sizeof(CWeaponAttributesTypeInfo) == 0x64, "CWeaponAttributesTypeInfo size must be 0x64");
 
-  /**
-   * Address: 0x00BFE590 (FUN_00BFE590, Moho::CWeaponAttributesTypeInfo::~CWeaponAttributesTypeInfo)
-   *
-   * What it does:
-   * Tears down the reflected `CWeaponAttributesTypeInfo` storage at process exit.
-   */
-  void cleanup_CWeaponAttributesTypeInfo();
-
-  /**
-   * Address: 0x00BD87B0 (FUN_00BD87B0, register_CWeaponAttributesTypeInfo)
-   *
-   * What it does:
-   * Forces `CWeaponAttributesTypeInfo` construction and schedules exit cleanup.
-   */
-  int register_CWeaponAttributesTypeInfo();
 } // namespace moho

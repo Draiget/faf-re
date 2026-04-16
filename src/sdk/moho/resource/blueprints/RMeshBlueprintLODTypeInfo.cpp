@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -161,6 +162,35 @@ namespace
     serSaveFunc_ = &VectorTypeInfo::SerSave;
   }
 
+  void AppendLoadedMeshBlueprintLod(
+    LODVector& storage,
+    const moho::RMeshBlueprintLOD& element
+  );
+
+  /**
+   * Address: 0x005198F0 (FUN_005198F0)
+   *
+   * What it does:
+   * Ensures one `vector<RMeshBlueprintLOD>` has capacity for at least
+   * `requestedCount` elements and returns previous capacity.
+   */
+  [[maybe_unused]] unsigned int EnsureMeshBlueprintLodVectorCapacity(
+    LODVector& storage,
+    const unsigned int requestedCount
+  )
+  {
+    constexpr unsigned int kLegacyMaxCount = 0x1414141u;
+    if (requestedCount > kLegacyMaxCount) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    const unsigned int previousCapacity = static_cast<unsigned int>(storage.capacity());
+    if (previousCapacity < requestedCount) {
+      storage.reserve(static_cast<std::size_t>(requestedCount));
+    }
+    return previousCapacity;
+  }
+
   /**
    * Address: 0x00519620 (FUN_00519620, gpg::RVectorType_RMeshBlueprintLOD::SerLoad)
    *
@@ -181,7 +211,7 @@ namespace
     archive->ReadUInt(&count);
 
     LODVector loaded{};
-    loaded.reserve(static_cast<std::size_t>(count));
+    (void)EnsureMeshBlueprintLodVectorCapacity(loaded, count);
 
     gpg::RType* const elementType = CachedRMeshBlueprintLODType();
     GPG_ASSERT(elementType != nullptr);
@@ -194,10 +224,25 @@ namespace
     for (unsigned int i = 0; i < count; ++i) {
       moho::RMeshBlueprintLOD element{};
       archive->Read(elementType, &element, emptyOwner);
-      loaded.push_back(element);
+      AppendLoadedMeshBlueprintLod(loaded, element);
     }
 
     *storage = loaded;
+  }
+
+  /**
+   * Address: 0x00519B10 (FUN_00519B10)
+   *
+   * What it does:
+   * Appends one deserialized `RMeshBlueprintLOD` element into the destination
+   * vector, preserving the legacy append-and-grow lane used by `SerLoad`.
+   */
+  void AppendLoadedMeshBlueprintLod(
+    LODVector& storage,
+    const moho::RMeshBlueprintLOD& element
+  )
+  {
+    storage.push_back(element);
   }
 
   /**
@@ -259,6 +304,35 @@ namespace
     return storage ? storage->size() : 0u;
   }
 
+  /**
+   * Address: 0x00519A10 (FUN_00519A10)
+   *
+   * What it does:
+   * Adjusts one `vector<RMeshBlueprintLOD>` length to `requestedCount` and
+   * uses one caller-provided fill lane for growth.
+   */
+  [[nodiscard]] std::size_t ResizeMeshBlueprintLodVectorWithFill(
+    LODVector& storage,
+    const std::size_t requestedCount,
+    const moho::RMeshBlueprintLOD& fillValue
+  )
+  {
+    const std::size_t currentCount = storage.size();
+    if (currentCount < requestedCount) {
+      storage.resize(requestedCount, fillValue);
+      return requestedCount;
+    }
+
+    if (requestedCount < currentCount) {
+      storage.resize(requestedCount);
+    }
+
+    return requestedCount;
+  }
+
+  /**
+   * Address: 0x005193D0 (FUN_005193D0, gpg::RVectorType_RMeshBlueprintLOD::SetCount)
+   */
   void VectorTypeInfo::SetCount(void* const obj, const int count) const
   {
     if (obj == nullptr || count < 0) {
@@ -266,7 +340,8 @@ namespace
     }
 
     auto* const storage = static_cast<LODVector*>(obj);
-    storage->resize(static_cast<std::size_t>(count));
+    const moho::RMeshBlueprintLOD fillValue{};
+    (void)ResizeMeshBlueprintLodVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
   }
 
   [[nodiscard]] TypeInfo& AcquireRMeshBlueprintLODTypeInfo()

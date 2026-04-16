@@ -60,22 +60,22 @@ namespace moho
     virtual void Delete(const char* statPath);
 
     /**
-     * Address: 0x0040C200 (FUN_0040C200, Moho::Stats_StatItem::GetItem)
+       * Address: 0x0040C200 (FUN_0040C200)
      */
     [[nodiscard]] StatItem* GetItem(gpg::StrArg statPath, bool allowCreate);
 
     /**
-     * Address: 0x00417B60 (FUN_00417B60, Moho::EngineStats::GetItem3)
+       * Address: 0x00417B60 (FUN_00417B60)
      */
     [[nodiscard]] StatItem* GetFloatItem(gpg::StrArg statPath);
 
     /**
-     * Address: 0x00417C50 (FUN_00417C50, Moho::EngineStats::GetItem_0)
+       * Address: 0x00417C50 (FUN_00417C50)
      */
     [[nodiscard]] StatItem* GetStringItem(gpg::StrArg statPath);
 
     /**
-     * Address: 0x00436290 (FUN_00436290, Moho::EngineStats::GetItem2)
+       * Address: 0x00436290 (FUN_00436290)
      */
     [[nodiscard]] StatItem* GetIntItem(gpg::StrArg statPath);
 
@@ -94,6 +94,7 @@ namespace moho
   static_assert(offsetof(Stats<StatItem>, mItem) == 0x04, "Stats<StatItem>::mItem offset must be 0x04");
   static_assert(offsetof(Stats<StatItem>, mLock) == 0x08, "Stats<StatItem>::mLock offset must be 0x08");
   static_assert(sizeof(Stats<StatItem>) == 0x10, "Stats<StatItem> size must be 0x10");
+  using Stats_StatItem = Stats<StatItem>;
 
   /**
    * Complete EngineStats object that extends `Stats<StatItem>` with logging state.
@@ -115,17 +116,17 @@ namespace moho
     ~EngineStats();
 
     /**
-     * Address: 0x00417B60 (FUN_00417B60, Moho::EngineStats::GetItem3)
+      * Alias of FUN_00417B60 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem3(gpg::StrArg statPath);
 
     /**
-     * Address: 0x00417C50 (FUN_00417C50, Moho::EngineStats::GetItem_0)
+      * Alias of FUN_00417C50 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem_0(gpg::StrArg statPath);
 
     /**
-     * Address: 0x00436290 (FUN_00436290, Moho::EngineStats::GetItem2)
+      * Alias of FUN_00436290 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem2(gpg::StrArg statPath);
 
@@ -344,6 +345,15 @@ namespace moho
      * Address: 0x00594400 (FUN_00594400, token traversal helper)
      */
     [[nodiscard]] CArmyStatItem* TraverseTables(gpg::StrArg statPath, bool allowCreate);
+
+    /**
+     * Address: 0x005944F0 (FUN_005944F0, func_TraverseTables2)
+     *
+     * What it does:
+     * Create-enabled wrapper lane over token traversal used by legacy
+     * CArmyStats helper callsites.
+     */
+    [[nodiscard]] CArmyStatItem* TraverseTablesCreate(gpg::StrArg statPath);
 
     /**
      * Address: 0x00706360 (FUN_00706360, sub_706360)

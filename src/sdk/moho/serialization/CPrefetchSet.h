@@ -70,7 +70,7 @@ namespace moho
 
   /**
    * Address: 0x004A7DD0 (FUN_004A7DD0, func_GetCObj_CPrefetchSet)
-   * Address: 0x004A8660 (FUN_004A8660, gpg::RRef::TryUpcast_CPrefetchSet)
+    * Alias of FUN_004A8660 (non-canonical helper lane).
    *
    * What it does:
    * Resolves native `CPrefetchSet*` from one Lua object or table `_c_object` lane.

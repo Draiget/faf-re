@@ -12,6 +12,15 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
+     * Address: 0x006FDAB0 (FUN_006FDAB0, Moho::SimArmy::SimArmy)
+     *
+     * What it does:
+     * Constructs the +0x08 `IArmy` base subobject and installs the
+     * `SimArmy` vtable on the complete object.
+     */
+    SimArmy();
+
+    /**
      * Address: 0x0074E550 (FUN_0074E550, Moho::SimArmy::GetPointerType)
      *
      * What it does:

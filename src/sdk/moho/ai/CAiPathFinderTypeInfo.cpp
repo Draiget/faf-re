@@ -36,6 +36,15 @@ namespace
   msvc8::string gRect2iListTypeName;
   bool gRect2iListTypeNameCleanupRegistered = false;
 
+  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointer(
+    gpg::RType** outType,
+    gpg::RType* value
+  ) noexcept;
+  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointerAlias(
+    gpg::RType** outType,
+    gpg::RType* value
+  ) noexcept;
+
   template <std::uintptr_t SlotAddress>
   struct StartupEngineStatsSlot
   {
@@ -50,7 +59,7 @@ namespace
     if (!gCAiPathFinderTypeInfoConstructed) {
       auto* const typeInfo = new (gCAiPathFinderTypeInfoStorage) CAiPathFinderTypeInfo();
       gpg::PreRegisterRType(typeid(CAiPathFinder), typeInfo);
-      CAiPathFinder::sType = typeInfo;
+      (void)StoreRuntimeTypePointerAlias(&CAiPathFinder::sType, typeInfo);
       gCAiPathFinderTypeInfoConstructed = true;
     }
 
@@ -82,6 +91,21 @@ namespace
   {
     gRect2iListTypeName.clear();
     gRect2iListTypeNameCleanupRegistered = false;
+  }
+
+  /**
+   * Address: 0x005AAF60 (FUN_005AAF60, sub_5AAF60)
+   *
+   * What it does:
+   * Clears one reflected `list<Rect2i>` storage lane and releases all list
+   * nodes, resetting the list into its empty sentinel state.
+   */
+  [[nodiscard]] std::list<gpg::Rect2i>* ClearRect2iListStorage(std::list<gpg::Rect2i>* const list)
+  {
+    if (list != nullptr) {
+      list->clear();
+    }
+    return list;
   }
 
   /**
@@ -155,7 +179,7 @@ namespace
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
-    list->clear();
+    (void)ClearRect2iListStorage(list);
 
     gpg::RType* const elementType = CachedRect2iType();
     if (elementType == nullptr) {
@@ -229,6 +253,59 @@ namespace
   }
 
   /**
+   * Address: 0x005AB1C0 (FUN_005AB1C0)
+   *
+   * What it does:
+   * Binds allocation/construction/destruction callback lanes for one
+   * `CAiPathFinderTypeInfo` descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiPathFinderTypeInfo* BindCAiPathFinderTypeInfoCallbacks(
+    CAiPathFinderTypeInfo* const typeInfo
+  ) noexcept
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    typeInfo->newRefFunc_ = &CAiPathFinderTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &CAiPathFinderTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &CAiPathFinderTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &CAiPathFinderTypeInfo::Destruct;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x005AB980 (FUN_005AB980)
+   *
+   * What it does:
+   * Stores one runtime `RType*` lane through an output pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointer(
+    gpg::RType** const outType,
+    gpg::RType* const value
+  ) noexcept
+  {
+    if (outType) {
+      *outType = value;
+    }
+    return outType;
+  }
+
+  /**
+   * Address: 0x005AB9B0 (FUN_005AB9B0)
+   *
+   * What it does:
+   * Alias lane for storing one runtime `RType*` pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointerAlias(
+    gpg::RType** const outType,
+    gpg::RType* const value
+  ) noexcept
+  {
+    return StoreRuntimeTypePointer(outType, value);
+  }
+
+  /**
    * Address: 0x005AAAA0 (FUN_005AAAA0, preregister_CAiPathFinderTypeInfo)
    *
    * What it does:
@@ -265,7 +342,7 @@ namespace
 
     AcquireCAiPathFinderTypeInfo()->~CAiPathFinderTypeInfo();
     gCAiPathFinderTypeInfoConstructed = false;
-    CAiPathFinder::sType = nullptr;
+    (void)StoreRuntimeTypePointer(&CAiPathFinder::sType, nullptr);
   }
 
   /**
@@ -384,10 +461,7 @@ void CAiPathFinderTypeInfo::Destruct(void* const objectStorage)
 void CAiPathFinderTypeInfo::Init()
 {
   size_ = sizeof(CAiPathFinder);
-  newRefFunc_ = &CAiPathFinderTypeInfo::NewRef;
-  ctorRefFunc_ = &CAiPathFinderTypeInfo::CtrRef;
-  deleteFunc_ = &CAiPathFinderTypeInfo::Delete;
-  dtrFunc_ = &CAiPathFinderTypeInfo::Destruct;
+  (void)BindCAiPathFinderTypeInfoCallbacks(this);
 
   gpg::RType::Init();
 

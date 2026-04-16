@@ -1,9 +1,11 @@
 #include "ReadArchive.h"
 
 #include <cstdint>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <istream>
+#include <new>
 #include <string>
 #include <string_view>
 
@@ -1205,6 +1207,15 @@ namespace
     }
 
     /**
+     * Address: 0x00904810 (FUN_00904810)
+     *
+     * What it does:
+     * Runs non-deleting teardown for one binary-read archive lane, releasing
+     * file shared-owner state before base `ReadArchive` destruction.
+     */
+    ~BinaryReadArchive() override = default;
+
+    /**
      * Address: 0x00904960 (FUN_00904960, gpg::BinaryReadArchive::ReadBytes)
      *
      * What it does:
@@ -1259,6 +1270,7 @@ namespace
 
     /**
      * Address: 0x009055F0 (FUN_009055F0, BinaryReadArchive::ReadFloat)
+     * Address: 0x0098FEC0 (FUN_0098FEC0)
      *
      * What it does:
      * Reads one 32-bit float lane from the binary archive stream.
@@ -1314,6 +1326,8 @@ namespace
 
     /**
      * Address: 0x009055A0 (FUN_009055A0, BinaryReadArchive::ReadUInt)
+     * Address: 0x00978C60 (FUN_00978C60)
+     * Address: 0x009C6860 (FUN_009C6860)
      *
      * What it does:
      * Thunk lane that forwards 32-bit primitive reads to `ReadInt2`.
@@ -1577,19 +1591,61 @@ namespace
     boost::shared_ptr<std::FILE> mFile;
   };
 
+  /**
+   * Address: 0x00904890 (FUN_00904890)
+   *
+   * What it does:
+   * Runs one deleting-destructor thunk for `BinaryReadArchive`, forwarding
+   * through non-deleting teardown and optional storage release.
+   */
+  [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
+    BinaryReadArchive* const archive,
+    const unsigned char deleteFlag
+  )
+  {
+    archive->~BinaryReadArchive();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(archive));
+    }
+    return archive;
+  }
+
   struct TextReadArchiveRuntimeView
   {
     std::uint8_t pad_0000_0040[0x40];
-    std::istream* stream; // +0x40
+    std::istream* stream;                    // +0x40
+    boost::detail::sp_counted_base* control; // +0x44
   };
   static_assert(
     offsetof(TextReadArchiveRuntimeView, stream) == 0x40,
     "TextReadArchiveRuntimeView::stream offset must be 0x40"
   );
+  static_assert(
+    offsetof(TextReadArchiveRuntimeView, control) == 0x44,
+    "TextReadArchiveRuntimeView::control offset must be 0x44"
+  );
 
   class TextReadArchive : public gpg::ReadArchive
   {
   public:
+    /**
+     * Address: 0x00939700 (FUN_00939700, ??1TextReadArchive@@QAE@@Z)
+     *
+     * What it does:
+     * Releases the stream shared-control lane and then runs
+     * `gpg::ReadArchive` base destruction.
+     */
+    ~TextReadArchive() override
+    {
+      auto* const runtime = reinterpret_cast<TextReadArchiveRuntimeView*>(this);
+      boost::detail::sp_counted_base* const control = runtime->control;
+      runtime->stream = nullptr;
+      runtime->control = nullptr;
+      if (control != nullptr) {
+        control->release();
+      }
+    }
+
     /**
      * Address: 0x0093E770 (FUN_0093E770, TextReadArchive::ReadDouble)
      *
@@ -1717,7 +1773,60 @@ namespace
       (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
     }
   };
+
+  /**
+   * Address: 0x009397E0 (FUN_009397E0, TextReadArchive::dtr)
+   *
+   * What it does:
+   * Runs one deleting-destructor thunk for `TextReadArchive`, forwarding
+   * through non-deleting teardown and optional storage release.
+   */
+  [[maybe_unused]] [[nodiscard]] TextReadArchive* DestroyTextReadArchiveDeleting(
+    TextReadArchive* const archive,
+    const unsigned char deleteFlag
+  )
+  {
+    archive->~TextReadArchive();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(archive));
+    }
+    return archive;
+  }
+
+  /**
+   * Address: 0x00952C90 (FUN_00952C90)
+   *
+   * What it does:
+   * Appends one reflected `TypeHandle` lane to the archive-local handle table,
+   * preserving the in-capacity fast path and vector-growth fallback behavior.
+   */
+  TypeHandle* AppendTypeHandle(msvc8::vector<TypeHandle>& typeHandles, const TypeHandle& handle)
+  {
+    const std::size_t insertIndex = typeHandles.size();
+    typeHandles.push_back(handle);
+    return &typeHandles[insertIndex];
+  }
 } // namespace
+
+/**
+ * Address: 0x00952B60 (FUN_00952B60, ??0ReadArchive@gpg@@QAE@XZ)
+ *
+ * What it does:
+ * Initializes read-archive type/pointer tracking lanes and refreshes global
+ * serializer helper registrations used by reflection load paths.
+ */
+ReadArchive::ReadArchive()
+  : mTypeHandles()
+  , mTrackedPtrs()
+  , mNullTrackedPointer{}
+{
+  mNullTrackedPointer.object = nullptr;
+  mNullTrackedPointer.type = nullptr;
+  mNullTrackedPointer.sharedObject = nullptr;
+  mNullTrackedPointer.sharedControl = nullptr;
+  mNullTrackedPointer.state = TrackedPointerState::Reserved;
+  SerHelperBase::InitNewHelpers();
+}
 
 /**
  * Address: 0x00952E40 (FUN_00952E40, ??1ReadArchive@gpg@@UAE@XZ)
@@ -1756,7 +1865,7 @@ TypeHandle ReadArchive::ReadTypeHandle()
     TypeHandle handle{};
     handle.type = type;
     handle.version = version;
-    mTypeHandles.push_back(handle);
+    static_cast<void>(AppendTypeHandle(mTypeHandles, handle));
     return handle;
   }
 
@@ -4984,6 +5093,37 @@ ReadArchive* ReadArchive::ReadPointer_Listener_NavPath(
 }
 
 /**
+ * Address: 0x007638D0 (FUN_007638D0)
+ *
+ * What it does:
+ * Repeatedly reads `Listener<const SNavPath&>` pointers from `archive` and
+ * relinks each non-null listener node into the intrusive ring immediately
+ * before `listHead`.
+ */
+moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
+  ReadArchive* const archive,
+  moho::Listener<const moho::SNavPath&>* const listHead,
+  const int version,
+  const gpg::RRef* const ownerRef
+)
+{
+  (void)version;
+
+  if (archive == nullptr || listHead == nullptr) {
+    return nullptr;
+  }
+
+  moho::Listener<const moho::SNavPath&>* listener = nullptr;
+  archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
+  while (listener != nullptr) {
+    listener->mListenerLink.ListLinkBefore(&listHead->mListenerLink);
+    archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
+  }
+
+  return listener;
+}
+
+/**
  * Address: 0x00771550 (FUN_00771550, gpg::ReadArchive::ReadPointer_IEffectManager)
  *
  * What it does:
@@ -7334,6 +7474,299 @@ ReadArchive& ReadArchive::TrackPointer(const RRef& objectRef)
   return *this;
 }
 
+namespace
+{
+  struct TrackedPointerCopyLaneRuntimeView
+  {
+    void* objectLane = nullptr;                         // +0x00
+    gpg::RType* typeLane = nullptr;                     // +0x04
+    std::uint32_t stateLane = 0;                        // +0x08
+    boost::detail::sp_counted_base* sharedControlLane = nullptr; // +0x0C
+    void* sharedObjectLane = nullptr;                   // +0x10
+  };
+  static_assert(
+    offsetof(TrackedPointerCopyLaneRuntimeView, sharedControlLane) == 0x0C,
+    "TrackedPointerCopyLaneRuntimeView::sharedControlLane offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(TrackedPointerCopyLaneRuntimeView, sharedObjectLane) == 0x10,
+    "TrackedPointerCopyLaneRuntimeView::sharedObjectLane offset must be 0x10"
+  );
+  static_assert(sizeof(TrackedPointerCopyLaneRuntimeView) == 0x14, "TrackedPointerCopyLaneRuntimeView size must be 0x14");
+
+  /**
+   * Address: 0x009506C0 (FUN_009506C0)
+   *
+   * What it does:
+   * Copies one `TypeHandle` lane from `sourceHandle` into each destination
+   * slot for `repeatCount` entries.
+   */
+  [[maybe_unused]] void CopyConstructTypeHandleCountFromSingleSource(
+    gpg::TypeHandle* const destinationBegin,
+    const std::int32_t repeatCount,
+    const gpg::TypeHandle* const sourceHandle
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
+    for (std::int32_t remaining = repeatCount; remaining > 0; --remaining) {
+      if (destinationAddress != 0u) {
+        auto* const destination = reinterpret_cast<gpg::TypeHandle*>(destinationAddress);
+        destination->type = sourceHandle->type;
+        destination->version = sourceHandle->version;
+      }
+      destinationAddress += sizeof(gpg::TypeHandle);
+    }
+  }
+
+  /**
+   * Address: 0x00950BC0 (FUN_00950BC0)
+   *
+   * What it does:
+   * Preserves one register-adapter lane for repeated type-handle copy
+   * construction from a single source lane.
+   */
+  [[maybe_unused]] void CopyConstructTypeHandleCountFromSingleSourceRegisterAdapterA(
+    gpg::TypeHandle* const destinationBegin,
+    const std::int32_t repeatCount,
+    const gpg::TypeHandle* const sourceHandle
+  ) noexcept
+  {
+    CopyConstructTypeHandleCountFromSingleSource(destinationBegin, repeatCount, sourceHandle);
+  }
+
+  /**
+   * Address: 0x00950EA0 (FUN_00950EA0)
+   *
+   * What it does:
+   * Copies one tracked-pointer lane from `sourceLane` into each destination
+   * slot for `repeatCount` entries and retains copied shared-control lanes.
+   */
+  [[maybe_unused]] void CopyConstructTrackedPointerCountFromSingleSource(
+    TrackedPointerCopyLaneRuntimeView* const destinationBegin,
+    const std::int32_t repeatCount,
+    const TrackedPointerCopyLaneRuntimeView* const sourceLane
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
+    for (std::int32_t remaining = repeatCount; remaining > 0; --remaining) {
+      if (destinationAddress != 0u) {
+        auto* const destination = reinterpret_cast<TrackedPointerCopyLaneRuntimeView*>(destinationAddress);
+        destination->objectLane = sourceLane->objectLane;
+        destination->typeLane = sourceLane->typeLane;
+        destination->stateLane = sourceLane->stateLane;
+        destination->sharedControlLane = sourceLane->sharedControlLane;
+        if (destination->sharedControlLane != nullptr) {
+          destination->sharedControlLane->add_ref_copy();
+        }
+        destination->sharedObjectLane = sourceLane->sharedObjectLane;
+      }
+      destinationAddress += sizeof(TrackedPointerCopyLaneRuntimeView);
+    }
+  }
+
+  /**
+   * Address: 0x00951010 (FUN_00951010)
+   *
+   * What it does:
+   * Preserves one register-adapter lane for repeated tracked-pointer copy
+   * construction from a single source lane.
+   */
+  [[maybe_unused]] void CopyConstructTrackedPointerCountFromSingleSourceRegisterAdapterA(
+    TrackedPointerCopyLaneRuntimeView* const destinationBegin,
+    const std::int32_t repeatCount,
+    const TrackedPointerCopyLaneRuntimeView* const sourceLane
+  ) noexcept
+  {
+    CopyConstructTrackedPointerCountFromSingleSource(destinationBegin, repeatCount, sourceLane);
+  }
+
+  struct TrackedPointerVectorRuntimeView
+  {
+    void* proxyLane = nullptr;                 // +0x00
+    gpg::TrackedPointerInfo* beginLane = nullptr;    // +0x04
+    gpg::TrackedPointerInfo* endLane = nullptr;      // +0x08
+    gpg::TrackedPointerInfo* capacityLane = nullptr; // +0x0C
+  };
+  static_assert(offsetof(TrackedPointerVectorRuntimeView, endLane) == 0x08, "TrackedPointerVectorRuntimeView::endLane offset must be 0x08");
+
+  /**
+   * Address: 0x009506F0 (FUN_009506F0)
+   *
+   * What it does:
+   * Copy-assigns tracked-pointer lanes from `[source, sourceEnd)` into
+   * `destination`, retaining incoming shared-control lanes and releasing
+   * replaced destination shared-control lanes.
+   */
+  [[nodiscard]] gpg::TrackedPointerInfo* MoveTrackedPointerRangeWithRetainedSharedOwners(
+    const gpg::TrackedPointerInfo* source,
+    const gpg::TrackedPointerInfo* const sourceEnd,
+    gpg::TrackedPointerInfo* destination
+  ) noexcept
+  {
+    while (source != sourceEnd) {
+      destination->object = source->object;
+      destination->type = source->type;
+      destination->state = source->state;
+
+      boost::detail::sp_counted_base* const incomingControl = source->sharedControl;
+      if (incomingControl != destination->sharedControl) {
+        if (incomingControl != nullptr) {
+          incomingControl->add_ref_copy();
+        }
+
+        if (destination->sharedControl != nullptr) {
+          destination->sharedControl->release();
+        }
+
+        destination->sharedControl = incomingControl;
+      }
+
+      destination->sharedObject = source->sharedObject;
+      ++source;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x00950790 (FUN_00950790)
+   *
+   * What it does:
+   * Copy-assigns one tracked-pointer source lane into each destination lane in
+   * `[destinationBegin, destinationEnd)`, retaining incoming shared-control
+   * lanes and releasing replaced destination shared-control lanes.
+   */
+  [[maybe_unused]] void CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwners(
+    gpg::TrackedPointerInfo* destinationBegin,
+    gpg::TrackedPointerInfo* const destinationEnd,
+    const gpg::TrackedPointerInfo* const sourceLane
+  ) noexcept
+  {
+    while (destinationBegin != destinationEnd) {
+      destinationBegin->object = sourceLane->object;
+      destinationBegin->type = sourceLane->type;
+      destinationBegin->state = sourceLane->state;
+
+      boost::detail::sp_counted_base* const incomingControl = sourceLane->sharedControl;
+      if (incomingControl != destinationBegin->sharedControl) {
+        if (incomingControl != nullptr) {
+          incomingControl->add_ref_copy();
+        }
+
+        if (destinationBegin->sharedControl != nullptr) {
+          destinationBegin->sharedControl->release();
+        }
+
+        destinationBegin->sharedControl = incomingControl;
+      }
+
+      destinationBegin->sharedObject = sourceLane->sharedObject;
+      ++destinationBegin;
+    }
+  }
+
+  /**
+   * Address: 0x00950BF0 (FUN_00950BF0)
+   *
+   * What it does:
+   * Preserves one register-adapter lane for forward tracked-pointer range copy
+   * while retaining/releasing shared-control ownership.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::TrackedPointerInfo* MoveTrackedPointerRangeWithRetainedSharedOwnersRegisterAdapterA(
+    const gpg::TrackedPointerInfo* const source,
+    const gpg::TrackedPointerInfo* const sourceEnd,
+    gpg::TrackedPointerInfo* const destination
+  ) noexcept
+  {
+    return MoveTrackedPointerRangeWithRetainedSharedOwners(source, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x00950C30 (FUN_00950C30)
+   *
+   * What it does:
+   * Preserves one jump-only adapter lane that forwards to `FUN_00950790`.
+   */
+  [[maybe_unused]] void CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwnersRegisterAdapterA(
+    gpg::TrackedPointerInfo* const destinationBegin,
+    gpg::TrackedPointerInfo* const destinationEnd,
+    const gpg::TrackedPointerInfo* const sourceLane
+  ) noexcept
+  {
+    CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwners(
+      destinationBegin,
+      destinationEnd,
+      sourceLane
+    );
+  }
+
+  /**
+   * Address: 0x00950F20 (FUN_00950F20, func_ReleaseRefsRange_TrackedPointerInfo)
+   * Address: 0x00951510 (FUN_00951510)
+   *
+   * What it does:
+   * Releases shared control blocks for one half-open tracked-pointer range and
+   * clears released shared-pointer lanes.
+   */
+  void ReleaseTrackedPointerInfoSharedRange(
+    gpg::TrackedPointerInfo* trackedBegin,
+    gpg::TrackedPointerInfo* const trackedEnd
+  ) noexcept
+  {
+    while (trackedBegin != trackedEnd) {
+      if (trackedBegin->sharedControl != nullptr) {
+        trackedBegin->sharedControl->release();
+        trackedBegin->sharedControl = nullptr;
+        trackedBegin->sharedObject = nullptr;
+      }
+      ++trackedBegin;
+    }
+  }
+
+  /**
+   * Address: 0x00951070 (FUN_00951070)
+   *
+   * What it does:
+   * Preserves one register-adapter lane for tracked-pointer shared-control
+   * release over a half-open range.
+   */
+  [[maybe_unused]] void ReleaseTrackedPointerInfoSharedRangeRegisterAdapterA(
+    gpg::TrackedPointerInfo* const trackedBegin,
+    gpg::TrackedPointerInfo* const trackedEnd
+  ) noexcept
+  {
+    ReleaseTrackedPointerInfoSharedRange(trackedBegin, trackedEnd);
+  }
+
+  /**
+   * Address: 0x00951E40 (FUN_00951E40)
+   *
+   * What it does:
+   * Erases one tracked-pointer range from vector storage by moving the tail
+   * lane down, releasing detached shared-control lanes, and storing the output
+   * cursor at the erase-begin position.
+   */
+  [[maybe_unused]] gpg::TrackedPointerInfo** EraseTrackedPointerRangeAndStoreCursorRuntime(
+    TrackedPointerVectorRuntimeView* const trackedVector,
+    gpg::TrackedPointerInfo** const outCursor,
+    gpg::TrackedPointerInfo* const eraseFirst,
+    gpg::TrackedPointerInfo* const eraseLast
+  ) noexcept
+  {
+    if (eraseFirst != eraseLast) {
+      gpg::TrackedPointerInfo* const oldEnd = trackedVector->endLane;
+      gpg::TrackedPointerInfo* const newEnd =
+        MoveTrackedPointerRangeWithRetainedSharedOwners(eraseLast, oldEnd, eraseFirst);
+      ReleaseTrackedPointerInfoSharedRange(newEnd, oldEnd);
+      trackedVector->endLane = newEnd;
+    }
+
+    *outCursor = eraseFirst;
+    return outCursor;
+  }
+} // namespace
+
 /**
  * Address: 0x00952BD0 (FUN_00952BD0)
  * Demangled: public: virtual void __thiscall gpg::ReadArchive::EndSection(bool)
@@ -7351,11 +7784,11 @@ void ReadArchive::EndSection(const bool)
       ref.mObj = tracked.object;
       ref.mType = tracked.type;
       ref.Delete();
-    } else if (tracked.state == TrackedPointerState::Shared && tracked.sharedControl) {
-      tracked.sharedControl->release();
-      tracked.sharedControl = nullptr;
-      tracked.sharedObject = nullptr;
     }
+  }
+
+  if (!mTrackedPtrs.empty()) {
+    ReleaseTrackedPointerInfoSharedRange(&mTrackedPtrs[0], &mTrackedPtrs[0] + mTrackedPtrs.size());
   }
 
   mTypeHandles.clear();

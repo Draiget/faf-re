@@ -95,6 +95,73 @@ namespace moho
     virtual void SetName(const msvc8::string& name, int slot);
 
     /**
+     * Address: 0x0089D310 (FUN_0089D310, ?SetHandle@CWldTerrainDecal@Moho@@QAEXH@Z)
+     * Mangled: ?SetHandle@CWldTerrainDecal@Moho@@QAEXH@Z
+     *
+     * What it does:
+     * Stores one runtime handle lane used by decal registration systems.
+     */
+    void SetHandle(int handle);
+
+    /**
+     * Address: 0x0089D320 (FUN_0089D320, ?SetScale@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     * Mangled: ?SetScale@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Updates world scale and immediately refreshes derived bounds/transforms.
+     */
+    void SetScale(const Wm3::Vec3f& scale);
+
+    /**
+     * Address: 0x0089D340 (FUN_0089D340, ?SetPosition@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     * Mangled: ?SetPosition@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Updates world position and immediately refreshes derived bounds/transforms.
+     */
+    void SetPosition(const Wm3::Vec3f& position);
+
+    /**
+     * Address: 0x0089D360 (FUN_0089D360, ?SetOrientation@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     * Mangled: ?SetOrientation@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Updates orientation euler lanes and immediately refreshes derived transforms.
+     */
+    void SetOrientation(const Wm3::Vec3f& orientation);
+
+    /**
+     * Address: 0x0089D380 (FUN_0089D380, ?SetParameters@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@00@Z)
+     * Mangled: ?SetParameters@CWldTerrainDecal@Moho@@QAEXABV?$Vector3@M@Wm3@@00@Z
+     *
+     * What it does:
+     * Stores orientation/position/scale lanes in one pass, then refreshes decal state.
+     */
+    void SetParameters(
+      const Wm3::Vec3f& orientation,
+      const Wm3::Vec3f& position,
+      const Wm3::Vec3f& scale
+    );
+
+    /**
+     * Address: 0x0089D3E0 (FUN_0089D3E0, ?SetNearCutoffLOD@CWldTerrainDecal@Moho@@QAEXM@Z)
+     * Mangled: ?SetNearCutoffLOD@CWldTerrainDecal@Moho@@QAEXM@Z
+     *
+     * What it does:
+     * Clears near-cutoff fade to zero (input argument is ignored by binary logic).
+     */
+    void SetNearCutoffLOD(float nearCutoffLod);
+
+    /**
+     * Address: 0x0089D3F0 (FUN_0089D3F0, ?SetRemoveTick@CWldTerrainDecal@Moho@@QAEXH@Z)
+     * Mangled: ?SetRemoveTick@CWldTerrainDecal@Moho@@QAEXH@Z
+     *
+     * What it does:
+     * Stores one absolute remove-tick lane used by lifetime scheduling.
+     */
+    void SetRemoveTick(int removeTick);
+
+    /**
      * Address: 0x0089DB50 (FUN_0089DB50, Moho::CWldTerrainDecal::GetTexture)
      *
      * What it does:
@@ -112,6 +179,16 @@ namespace moho
      * Projects one decal corner in world space.
      */
     virtual Wm3::Vec2f ComputeCorner(const Wm3::Vec2f& corner) const;
+
+    /**
+     * Address: 0x0089D490 (FUN_0089D490, ?IsInside@CWldTerrainDecal@Moho@@QBE_NABV?$Vector2@M@Wm3@@@Z)
+     * Mangled: ?IsInside@CWldTerrainDecal@Moho@@QBE_NABV?$Vector2@M@Wm3@@@Z
+     *
+     * What it does:
+     * Tests whether one world-space XZ point falls inside this decal's unit
+     * local `[0, 1)` footprint.
+     */
+    [[nodiscard]] bool IsInside(const Wm3::Vec2f& worldXZ) const;
 
     /**
      * Address: 0x0089C890 (Moho::CWldTerrainDecal::EnableFlatOptimization)
@@ -136,7 +213,6 @@ namespace moho
      * Computes the distance-based cutoff LOD for the decal.
      */
     virtual float ComputeCutoffLOD(float distance) const;
-
     /**
      * Address: 0x0089D400 (FUN_0089D400, Moho::CWldTerrainDecal::GetLODAlpha)
      *
@@ -145,6 +221,51 @@ namespace moho
      * lanes using `ren_DecalFadeFraction`.
      */
     [[nodiscard]] float GetLODAlpha(float distance) const;
+
+    /**
+     * Address: 0x0089DBB0 (FUN_0089DBB0, ?GetTextureMatrix@CWldTerrainDecal@Moho@@QBE?AUVMatrix4@2@HM@Z)
+     * Mangled: ?GetTextureMatrix@CWldTerrainDecal@Moho@@QBE?AUVMatrix4@2@HM@Z
+     *
+     * What it does:
+     * Returns the current texture matrix snapshot.
+     */
+    [[nodiscard]] VMatrix4 GetTextureMatrix(int slot, float lod) const;
+
+    /**
+     * Address: 0x0089DBD0 (FUN_0089DBD0, ?GetTangentMatrix@CWldTerrainDecal@Moho@@QBE?AUVMatrix4@2@HM@Z)
+     * Mangled: ?GetTangentMatrix@CWldTerrainDecal@Moho@@QBE?AUVMatrix4@2@HM@Z
+     *
+     * What it does:
+     * Returns the current tangent matrix snapshot.
+     */
+    [[nodiscard]] VMatrix4 GetTangentMatrix(int slot, float lod) const;
+
+    /**
+     * Address: 0x0089DBF0 (FUN_0089DBF0, ?GetExtents@CWldTerrainDecal@Moho@@QBEXHMPAV?$Vector2@M@Wm3@@0@Z)
+     * Mangled: ?GetExtents@CWldTerrainDecal@Moho@@QBEXHMPAV?$Vector2@M@Wm3@@0@Z
+     *
+     * What it does:
+     * Writes current projected XZ min/max extents to output vectors.
+     */
+    void GetExtents(int slot, float lod, Wm3::Vec2f* minOut, Wm3::Vec2f* maxOut) const;
+
+    /**
+     * Address: 0x0089DC20 (FUN_0089DC20, ?GetCurrentAlpha@CWldTerrainDecal@Moho@@QBEMHM@Z)
+     * Mangled: ?GetCurrentAlpha@CWldTerrainDecal@Moho@@QBEMHM@Z
+     *
+     * What it does:
+     * Returns the current decal alpha lane.
+     */
+    [[nodiscard]] float GetCurrentAlpha(int slot, float lod) const;
+
+    /**
+     * Address: 0x0089DC30 (FUN_0089DC30, ?AdjustAlpha@CWldTerrainDecal@Moho@@QAEMMM@Z)
+     * Mangled: ?AdjustAlpha@CWldTerrainDecal@Moho@@QAEMMM@Z
+     *
+     * What it does:
+     * Adjusts alpha by one signed delta and clamps against `[mCurrentAlpha-delta, 0]`.
+     */
+    float AdjustAlpha(float delta, float lod);
 
     /**
      * Address: 0x0089D3C0 (FUN_0089D3C0, Moho::CWldTerrainDecal::SetCutoffLOD)
@@ -265,3 +386,4 @@ namespace moho
   static_assert(sizeof(CountedPtr<CountedObject>) == 0x04, "CountedPtr<CountedObject> size must be 0x04");
   static_assert(sizeof(CWldTerrainDecal) == 0x170, "CWldTerrainDecal size must be 0x170");
 } // namespace moho
+

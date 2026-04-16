@@ -63,4 +63,47 @@ namespace moho
   static_assert(offsetof(SAiReservedTransportBone, attachBoneIndex) == 0x04, "SAiReservedTransportBone::attachBoneIndex offset must be 0x04");
   static_assert(offsetof(SAiReservedTransportBone, reservedUnit) == 0x08, "SAiReservedTransportBone::reservedUnit offset must be 0x08");
   static_assert(offsetof(SAiReservedTransportBone, reservedBones) == 0x10, "SAiReservedTransportBone::reservedBones offset must be 0x10");
+
+  /**
+   * Address: 0x005E8230 (FUN_005E8230, sub_5E8230)
+   *
+   * What it does:
+   * Releases one reserved-bones vector heap payload, clears the vector lanes,
+   * and unlinks the reserved-unit weak node from its owner chain.
+   */
+  [[nodiscard]] void* ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone);
+
+  /**
+   * Address: 0x005EE820 (FUN_005EE820, sub_5EE820)
+   *
+   * What it does:
+   * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
+   */
+  [[nodiscard]] void* ResetReservedTransportBoneEntryThunkA(SAiReservedTransportBone& bone);
+
+  /**
+   * Address: 0x005EF8B0 (FUN_005EF8B0, sub_5EF8B0)
+   *
+   * What it does:
+   * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
+   */
+  [[nodiscard]] void* ResetReservedTransportBoneEntryThunkB(SAiReservedTransportBone& bone);
+
+  /**
+   * Address: 0x005EA550 (FUN_005EA550, std::vector_SAiReservedTransportBone::reset_storage)
+   *
+   * What it does:
+   * Destroys one `vector<SAiReservedTransportBone>` payload, frees the backing
+   * heap block, and clears the vector storage lanes to empty.
+   */
+  void ResetReservedTransportBoneVectorStorage(msvc8::vector<SAiReservedTransportBone>& storage);
+
+  /**
+   * Address: 0x005EE360 (FUN_005EE360, destroy_SAiReservedTransportBone_range)
+   *
+   * What it does:
+   * Destroys one half-open SAiReservedTransportBone range by freeing each
+   * reserved-bone vector heap block and unlinking each weak-unit node.
+   */
+  [[nodiscard]] void* DestroyReservedTransportBoneRange(SAiReservedTransportBone* begin, SAiReservedTransportBone* end);
 } // namespace moho

@@ -2,12 +2,45 @@
 
 #include <algorithm>
 #include <limits>
+#include <new>
 
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/sim/CWldSession.h"
 
 namespace
 {
+  class ISelectionDraggerRuntimeLane
+  {
+  public:
+    ISelectionDraggerRuntimeLane() noexcept
+      : mSelectionListHead(nullptr)
+    {}
+
+    virtual ~ISelectionDraggerRuntimeLane() = default;
+
+  public:
+    moho::SelectionDraggerLink* mSelectionListHead; // +0x04
+  };
+  static_assert(sizeof(ISelectionDraggerRuntimeLane) == 0x08, "ISelectionDraggerRuntimeLane size must be 0x08");
+  static_assert(
+    offsetof(ISelectionDraggerRuntimeLane, mSelectionListHead) == 0x04,
+    "ISelectionDraggerRuntimeLane::mSelectionListHead offset must be 0x04"
+  );
+
+  /**
+   * Address: 0x00864040 (FUN_00864040)
+   *
+   * What it does:
+   * Constructs one selection-dragger interface base lane by clearing the
+   * intrusive list-head pointer and installing the interface vtable.
+   */
+  [[maybe_unused]] ISelectionDraggerRuntimeLane* InitializeISelectionDraggerRuntimeLane(
+    ISelectionDraggerRuntimeLane* const outLane
+  ) noexcept
+  {
+    return ::new (outLane) ISelectionDraggerRuntimeLane();
+  }
+
   [[nodiscard]] float InvalidSelectionScreenCoord() noexcept
   {
     static bool initialized = false;

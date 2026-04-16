@@ -47,6 +47,7 @@ namespace moho
 
     /**
      * Address: 0x100BEF20 (FUN_100BEF20)
+     * Address: 0x004CD460 (FUN_004CD460, Moho::CScrLuaClassBinder::Run)
      *
      * LuaState *
      *

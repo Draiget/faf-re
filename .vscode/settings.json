@@ -104,6 +104,8 @@
     "**/mcp/**": true,
     "**/skills/**": true,
     "**/scripts/**": true,
-    "**/.vscode/**": true
+    "**/.vscode/**": true,
+    "src/*/output/**": true,  
+    "src/*/buildstage/**": true
   }
 }

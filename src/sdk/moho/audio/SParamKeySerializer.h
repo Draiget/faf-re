@@ -29,7 +29,7 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
     /**
-     * Address: 0x00BF0E50 (FUN_00BF0E50, Moho::SParamKeySerializer::dtr)
+       * Address: 0x00BF0E50 (FUN_00BF0E50)
      */
     virtual ~SParamKeySerializer() noexcept;
 
@@ -41,7 +41,7 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF0E50 (FUN_00BF0E50, cleanup_SParamKeySerializer)
+    * Alias of FUN_00BF0E50 (non-canonical helper lane).
    */
   gpg::SerHelperBase* cleanup_SParamKeySerializer();
 

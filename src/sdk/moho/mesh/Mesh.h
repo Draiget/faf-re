@@ -30,6 +30,7 @@ namespace moho
   class MeshBatch;
   class Mesh;
   class MeshMaterial;
+  class MeshInstance;
   class CD3DDynamicTextureSheet;
   class ID3DRenderTarget;
   class ID3DDepthStencil;
@@ -38,8 +39,80 @@ namespace moho
   struct Vector4f;
   struct RMeshBlueprint;
   struct RMeshBlueprintLOD;
+  struct SpatialDB_MeshInstance;
   class RScmResource;
   struct GeomCamera3;
+
+  /**
+   * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<MeshMaterial>` from one raw material pointer
+   * lane.
+   */
+  boost::shared_ptr<MeshMaterial>* ConstructSharedMeshMaterialFromRaw(
+    boost::shared_ptr<MeshMaterial>* outMaterial,
+    MeshMaterial* material
+  );
+
+  /**
+   * Address: 0x007E5420 (FUN_007E5420, boost::shared_ptr_Mesh::shared_ptr_Mesh)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<Mesh>` from one raw mesh pointer lane.
+   */
+  boost::shared_ptr<Mesh>* ConstructSharedMeshFromRaw(
+    boost::shared_ptr<Mesh>* outMesh,
+    Mesh* mesh
+  );
+
+  /**
+   * Address: 0x007E6280 (FUN_007E6280, boost::shared_ptr_MeshBatch::shared_ptr_MeshBatch)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<MeshBatch>` from one raw batch pointer lane.
+   */
+  boost::shared_ptr<MeshBatch>* ConstructSharedMeshBatchFromRaw(
+    boost::shared_ptr<MeshBatch>* outBatch,
+    MeshBatch* batch
+  );
+
+  /**
+   * Address: 0x00832060 (FUN_00832060, boost::shared_ptr_MeshInstance::shared_ptr_MeshInstance)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<MeshInstance>` from one raw mesh-instance
+   * pointer lane.
+   */
+  boost::shared_ptr<MeshInstance>* ConstructSharedMeshInstanceFromRaw(
+    boost::shared_ptr<MeshInstance>* outMeshInstance,
+    MeshInstance* meshInstance
+  );
+
+  /**
+   * Address: 0x007E6CE0 (FUN_007E6CE0)
+   *
+   * What it does:
+   * Refreshes interpolation state and copies `MeshInstance::curPose` into
+   * `outPose`, retaining the shared control lane.
+   */
+  boost::shared_ptr<CAniPose>* CaptureMeshInstanceCurrentPose(
+    boost::shared_ptr<CAniPose>* outPose,
+    MeshInstance* meshInstance
+  );
+
+  /**
+   * Address: 0x0082BA50 (FUN_0082BA50)
+   *
+   * What it does:
+   * Register-order bridge that forwards one mesh-instance spatial collect lane
+   * into `SpatialDB_MeshInstance::Collect`.
+   */
+  std::int32_t CollectMeshInstanceRegisterAdapter(
+    SpatialDB_MeshInstance* instance,
+    EEntityType type,
+    gpg::fastvector<UserEntity*>& destination
+  );
 
   struct SpatialDB_MeshInstance
   {
@@ -47,7 +120,7 @@ namespace moho
     std::int32_t entry; // +0x04
 
     /**
-     * Address: 0x00501D80 (FUN_00501D80, Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance)
+       * Address: 0x00501D80 (FUN_00501D80)
      *
      * What it does:
      * Initializes one embedded spatial-db mesh-storage view in-place.
@@ -55,7 +128,7 @@ namespace moho
     void InitializeStorage();
 
     /**
-     * Address: 0x00501F50 (FUN_00501F50, Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance)
+      * Alias of FUN_00501F50 (non-canonical helper lane).
      *
      * What it does:
      * Rebuilds embedded top-level shard lanes for one map-size update.
@@ -63,7 +136,7 @@ namespace moho
     void ResizeStorageForMap(std::int32_t width, std::int32_t height);
 
     /**
-     * Address: 0x00501E50 (FUN_00501E50, Moho::SpatialDB_MeshInstance::~SpatialDB_MeshInstance)
+       * Address: 0x00501E50 (FUN_00501E50)
      *
      * What it does:
      * Tears down one embedded spatial-db mesh-storage view in-place.
@@ -162,6 +235,15 @@ namespace moho
   class MeshMaterial
   {
   public:
+    enum PARAM : std::int32_t
+    {
+      PARAM_GENERIC = 0,
+      PARAM_FRACTION_COMPLETE = 1,
+      PARAM_FRACTION_HEALTH = 2,
+      PARAM_LIFETIME = 3,
+      PARAM_AUXILIARY = 4,
+    };
+
     /**
      * Address: 0x007DBFC0 (FUN_007DBFC0, ??1MeshMaterial@Moho@@UAE@XZ)
      * Deleting thunk: 0x007DBFA0 (FUN_007DBFA0)
@@ -227,6 +309,16 @@ namespace moho
 
   class MeshLOD
   {
+  protected:
+    /**
+     * Address: 0x007DC7A0 (FUN_007DC7A0, ??0MeshLOD@Moho@@IAE@XZ)
+     *
+     * What it does:
+     * Initializes one empty runtime LOD lane with default cutoff/material state
+     * and null shared-resource handles.
+     */
+    MeshLOD();
+
   public:
     /**
      * Address: 0x007DC8C0 (FUN_007DC8C0,
@@ -286,6 +378,14 @@ namespace moho
      */
     void ResetBatches();
 
+    /**
+     * Address: 0x007DD5D0 (FUN_007DD5D0, ?SetCutoff@MeshLOD@Moho@@QAEXM@Z)
+     *
+     * What it does:
+     * Stores one LOD cutoff distance threshold.
+     */
+    void SetCutoff(float cutoffValue);
+
   public:
     std::uint8_t useDissolve; // +0x04
     std::uint8_t pad_05_07[0x03]{};
@@ -304,6 +404,15 @@ namespace moho
 
   class Mesh : public CResourceWatcher
   {
+  protected:
+    /**
+     * Address: 0x007DD5E0 (FUN_007DD5E0, ??0Mesh@Moho@@IAE@XZ)
+     *
+     * What it does:
+     * Initializes base mesh state lanes before resource/material loading.
+     */
+    Mesh();
+
   public:
     /**
      * Address: 0x007DD680 (FUN_007DD680,
@@ -360,6 +469,24 @@ namespace moho
     [[nodiscard]] const MeshLOD* ComputeLOD(float distance) const;
 
     /**
+     * Address: 0x007DDA20 (FUN_007DDA20, ?GetMaxCutoff@Mesh@Moho@@QBEMXZ)
+     *
+     * What it does:
+     * Returns the cutoff value from the last loaded mesh LOD, or zero when no
+     * LODs are available.
+     */
+    [[nodiscard]] float GetMaxCutoff() const;
+
+    /**
+     * Address: 0x007DD930 (FUN_007DD930, Moho::Mesh::GetSortOrder)
+     *
+     * What it does:
+     * Returns the blueprint sort-order lane when a blueprint is bound, else
+     * `0.0f`.
+     */
+    [[nodiscard]] float GetSortOrder() const;
+
+    /**
      * Address: 0x007DDC50 (FUN_007DDC50,
      * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@ABVRMeshBlueprintLOD@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
@@ -410,7 +537,7 @@ namespace moho
     [[nodiscard]] bool Equals(const MeshKey& rhs) const noexcept;
 
     /**
-     * Address chain: 0x007E5B20 / 0x007E5C00 comparator logic
+     * Address: 0x007E5B20 (FUN_007E5B20)
      *
      * What it does:
      * Orders keys lexicographically by (blueprint pointer, material object pointer).
@@ -457,6 +584,80 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<Mesh> GetMesh() const;
 
     /**
+     * Address: 0x007DE6A0 (FUN_007DE6A0, ?SetCurrentInterpolant@MeshInstance@Moho@@SAXM@Z)
+     *
+     * What it does:
+     * Advances the global mesh frame counter and snapshots the current render
+     * frame interpolation value.
+     */
+    static void SetCurrentInterpolant();
+
+    /**
+     * Address: 0x007DE6C0 (FUN_007DE6C0, ?Cull@MeshInstance@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Stores one per-instance hidden/cull visibility flag.
+     */
+    void Cull(bool hidden);
+
+    /**
+     * Address: 0x007DE6D0 (FUN_007DE6D0, ?Reflect@MeshInstance@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Clears one per-instance reflection-visibility flag.
+     */
+    void Reflect(bool reflected);
+
+    /**
+     * Address: 0x007DE880 (FUN_007DE880, ?SetParameter@MeshInstance@Moho@@QAEXW4PARAM@MeshMaterial@2@M@Z)
+     *
+     * What it does:
+     * Writes one shader parameter lane selected by `MeshMaterial::PARAM`.
+     */
+    void SetParameter(MeshMaterial::PARAM parameter, float value);
+
+    /**
+     * Address: 0x007DE850 (FUN_007DE850, ?SetInterpolantScale@MeshInstance@Moho@@QAEXM@Z)
+     *
+     * What it does:
+     * Stores one per-instance interpolation scale and invalidates cached
+     * interpolant lane for refresh.
+     */
+    void SetInterpolantScale(float interpolantScale);
+
+    /**
+     * Address: 0x007DE8C0 (FUN_007DE8C0, ?SetScale@MeshInstance@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Stores one per-instance render scale vector.
+     */
+    void SetScale(const Wm3::Vec3f& scale);
+
+    /**
+     * Address: 0x007DE8E0 (FUN_007DE8E0, ?SetColor@MeshInstance@Moho@@QAEXI@Z)
+     *
+     * What it does:
+     * Stores one packed per-instance color value.
+     */
+    void SetColor(std::uint32_t color);
+
+    /**
+     * Address: 0x007DE900 (FUN_007DE900, ?SetScroll@MeshInstance@Moho@@QAEXABV?$Vector2@M@Wm3@@0@Z)
+     *
+     * What it does:
+     * Stores two texture-scroll vector lanes for this mesh instance.
+     */
+    void SetScroll(const Wm3::Vec2f& scroll1, const Wm3::Vec2f& scroll2);
+
+    /**
+     * Address: 0x007DF140 (FUN_007DF140, ?ResetBatches@MeshInstance@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Resets mesh LOD batch handles for this instance when a mesh owner exists.
+     */
+    void ResetBatches();
+
+    /**
      * Address: 0x007DE890 (FUN_007DE890, ?SetDissolve@MeshInstance@Moho@@QAEXM@Z)
      *
      * What it does:
@@ -472,6 +673,15 @@ namespace moho
      * marks stance/bounds state dirty when transform data changed.
      */
     void SetStance(const VTransform& startTransform, const VTransform& endTransform);
+
+    /**
+     * Address: 0x007DE6E0 (FUN_007DE6E0, ?LockPose@MeshInstance@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Toggles static-pose lock state; when locking, snapshots `curPose` into
+     * `endPose`, and when unlocking, invalidates interpolation cache lanes.
+     */
+    void LockPose(bool lockPose);
 
     /**
      * Address: 0x007DEA30 (FUN_007DEA30,
@@ -653,6 +863,14 @@ namespace moho
     void Shutdown();
 
     /**
+     * Address: 0x007DF510 (FUN_007DF510, ?UpdateMapSize@MeshRenderer@Moho@@QAEXHH@Z)
+     *
+     * What it does:
+     * Resizes mesh spatial-db grid lanes to current map width/height.
+     */
+    void UpdateMapSize(std::int32_t width, std::int32_t height);
+
+    /**
      * Address: 0x007DF530 (FUN_007DF530,
      * ?CreateMeshInstance@MeshRenderer@Moho@@QAEPAVMeshInstance@2@HIPBVRMeshBlueprint@2@ABV?$Vector3@M@Wm3@@_NV?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
@@ -676,6 +894,37 @@ namespace moho
       bool isStaticPose,
       boost::shared_ptr<Mesh> mesh
     );
+
+    /**
+     * Address: 0x007E0380 (FUN_007E0380, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@@Z)
+     *
+     * What it does:
+     * Dispatches cartographic rendering through this renderer's owned batch
+     * tree.
+     */
+    void RenderCartographic(
+      float projectionScaleX,
+      float projectionScaleY,
+      float projectionScaleZ,
+      const GeomCamera3& camera
+    );
+
+    /**
+     * Address: 0x007E0820 (FUN_007E0820, ?RenderDepth@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@@Z)
+     *
+     * What it does:
+     * Dispatches one depth-only pass through this renderer's owned batch tree.
+     */
+    void RenderDepth(const GeomCamera3& camera);
+
+    /**
+     * Address: 0x007E11A0 (FUN_007E11A0, ?Render@MeshRenderer@Moho@@QAEXIABVGeomCamera3@2@PAVShadow@2@@Z)
+     *
+     * What it does:
+     * Dispatches one standard mesh render pass using the renderer-owned batch
+     * map (`meshes`) as the fourth argument.
+     */
+    void Render(std::int32_t meshFlags, const GeomCamera3& camera, Shadow* shadow);
 
     /**
      * Address: 0x007E11C0 (FUN_007E11C0,
@@ -718,6 +967,24 @@ namespace moho
      * wireframe bounds.
      */
     void RenderSkeleton(CD3DPrimBatcher* debugBatcher, CDebugCanvas* debugCanvas, MeshInstance* meshInstance, bool showBoneNames);
+
+    /**
+     * Address: 0x007DFF30 (FUN_007DFF30,
+     * ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@VMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@U?$less@VMeshBatchKey@Moho@@@4@V?$allocator@U?$pair@$$CBVMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@@std@@@4@@std@@@Z)
+     */
+    void RenderCartographic(
+      float projectionScaleX,
+      float projectionScaleY,
+      float projectionScaleZ,
+      const GeomCamera3& camera,
+      MeshBatchBucketTree& meshMap
+    );
+
+    /**
+     * Address: 0x007E03B0 (FUN_007E03B0,
+     * ?RenderDepth@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@AAV?$map@VMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@U?$less@VMeshBatchKey@Moho@@@4@V?$allocator@U?$pair@$$CBVMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@@std@@@4@@std@@@Z)
+     */
+    void RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap);
 
     /**
      * Address: 0x007E0C30 (FUN_007E0C30, Moho::MeshRenderer::Render)

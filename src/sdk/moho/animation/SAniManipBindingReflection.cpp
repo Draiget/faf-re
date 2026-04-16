@@ -208,6 +208,38 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  struct SAniManipBindingRuntimeInlineView
+  {
+    moho::SAniManipBinding* begin = nullptr;
+    moho::SAniManipBinding* end = nullptr;
+    moho::SAniManipBinding* capacityEnd = nullptr;
+    moho::SAniManipBinding* inlineStorage = nullptr;
+  };
+  static_assert(
+    sizeof(SAniManipBindingRuntimeInlineView) == 0x10,
+    "SAniManipBindingRuntimeInlineView size must be 0x10"
+  );
+
+  /**
+   * Address: 0x0063C780 (FUN_0063C780)
+   *
+   * What it does:
+   * Initializes one inline fastvector-style runtime view where `begin=end` at
+   * the inline storage base and capacity spans two `SAniManipBinding` lanes.
+   */
+  [[maybe_unused]] SAniManipBindingRuntimeInlineView*
+  InitializeSAniManipBindingRuntimeInlineView(
+    SAniManipBindingRuntimeInlineView* const outView,
+    moho::SAniManipBinding* const inlineStorageBase
+  ) noexcept
+  {
+    outView->begin = inlineStorageBase;
+    outView->end = inlineStorageBase;
+    outView->capacityEnd = inlineStorageBase + 2;
+    outView->inlineStorage = inlineStorageBase;
+    return outView;
+  }
+
   template <typename TSerializer>
   void UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
@@ -254,6 +286,13 @@ namespace
     binding->mFlags = static_cast<std::int32_t>(combined);
   }
 
+  /**
+   * Address: 0x0063CD00 (FUN_0063CD00)
+   *
+   * What it does:
+   * Serializes one `SAniManipBinding`, preserving the version-1 raw-pointer
+   * compatibility lane when older archive versions are requested.
+   */
   void SerializeSAniManipBindingFields(
     const moho::SAniManipBinding* const binding,
     gpg::WriteArchive* const archive,
@@ -273,6 +312,50 @@ namespace
   }
 
   /**
+   * Address: 0x0063C700 (FUN_0063C700, sub_63C700)
+   *
+   * What it does:
+   * Resizes one `fastvector<SAniManipBinding>` runtime view to `requestedCount`
+   * and fills appended lanes from `fillValue`.
+   */
+  [[maybe_unused]] unsigned int ResizeFastVectorSAniManipBindingFill(
+    const unsigned int requestedCount,
+    const moho::SAniManipBinding* const fillValue,
+    gpg::fastvector_runtime_view<moho::SAniManipBinding>& view
+  )
+  {
+    moho::SAniManipBinding* const begin = view.begin;
+    const unsigned int currentCount = begin ? static_cast<unsigned int>(view.end - begin) : 0u;
+    if (requestedCount < currentCount) {
+      moho::SAniManipBinding* const newEnd = begin + requestedCount;
+      if (newEnd != view.end) {
+        view.end = newEnd;
+      }
+      return currentCount;
+    }
+
+    if (requestedCount > currentCount) {
+      const unsigned int currentCapacity = begin ? static_cast<unsigned int>(view.capacityEnd - begin) : 0u;
+      const moho::SAniManipBinding fill = fillValue ? *fillValue : moho::SAniManipBinding{};
+      if (requestedCount > currentCapacity) {
+        gpg::FastVectorRuntimeResizeFill(&fill, requestedCount, view);
+        return requestedCount;
+      }
+
+      moho::SAniManipBinding* const targetEnd = view.begin + requestedCount;
+      while (view.end != targetEnd) {
+        moho::SAniManipBinding* const slot = view.end;
+        view.end = slot + 1;
+        if (slot) {
+          *slot = fill;
+        }
+      }
+    }
+
+    return requestedCount;
+  }
+
+  /**
    * Address: 0x0063C7A0 (FUN_0063C7A0, gpg::RFastVectorType_SAniManipBinding::SerLoad)
    *
    * What it does:
@@ -289,7 +372,7 @@ namespace
 
     auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(reinterpret_cast<void*>(objectPtr));
     moho::SAniManipBinding fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    ResizeFastVectorSAniManipBindingFill(count, &fill, view);
 
     gpg::RType* const elementType = CachedSAniManipBindingType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -432,6 +515,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063B420 (FUN_0063B420, cleanup_SAniManipBindingSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the recovered
+   * `SAniManipBindingSerializer` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SAniManipBindingSerializerStartupThunkA()
+  {
+    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
+  /**
+   * Address: 0x0063B450 (FUN_0063B450, cleanup_SAniManipBindingSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the recovered
+   * `SAniManipBindingSerializer` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SAniManipBindingSerializerStartupThunkB()
+  {
+    SAniManipBindingSerializer* const serializer = AcquireSAniManipBindingSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
+  /**
    * Address: 0x00BFAD90 (FUN_00BFAD90, cleanup_SAniManipBindingSerializer)
    */
   void cleanup_SAniManipBindingSerializer()
@@ -455,7 +566,6 @@ namespace moho
     InitializeSerializerNode(*serializer);
     serializer->mLoadCallback = &SAniManipBindingSerializer::Deserialize;
     serializer->mSaveCallback = &SAniManipBindingSerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SAniManipBindingSerializer);
   }
 } // namespace moho
@@ -549,7 +659,7 @@ namespace gpg
 
     auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(obj);
     moho::SAniManipBinding fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+    ResizeFastVectorSAniManipBindingFill(static_cast<unsigned int>(count), &fill, view);
   }
 } // namespace gpg
 

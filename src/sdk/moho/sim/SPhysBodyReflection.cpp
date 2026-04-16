@@ -153,7 +153,7 @@ namespace
   }
 
   /**
-   * Address: 0x006980D0 (FUN_006980D0)
+    * Alias of FUN_006980D0 (non-canonical helper lane).
    *
    * What it does:
    * Writes unowned `SPhysConstants*` save-construct argument and marks result as unowned.
@@ -175,7 +175,7 @@ namespace
   }
 
   /**
-   * Address: 0x00698040 (FUN_00698040)
+    * Alias of FUN_00698040 (non-canonical helper lane).
    *
    * What it does:
    * Save-construct-args thunk forwarding into `SaveConstructArgs_SPhysBodyVariant2`.
@@ -191,7 +191,7 @@ namespace
   }
 
   /**
-   * Address: 0x006981B0 (FUN_006981B0)
+    * Alias of FUN_006981B0 (non-canonical helper lane).
    *
    * What it does:
    * Constructs one `SPhysBody` with defaults seeded from referenced `SPhysConstants`
@@ -214,7 +214,7 @@ namespace
   }
 
   /**
-   * Address: 0x006982A0 (FUN_006982A0 helper body at 0x00698A60)
+    * Alias of FUN_006982A0 (non-canonical helper lane).
    */
   void DeserializeSPhysBody(moho::SPhysBody& object, gpg::ReadArchive& archive)
   {
@@ -230,7 +230,7 @@ namespace
   }
 
   /**
-   * Address: 0x006982B0 (FUN_006982B0 helper body at 0x00698BC0)
+    * Alias of FUN_006982B0 (non-canonical helper lane).
    */
   void SerializeSPhysBody(const moho::SPhysBody& object, gpg::WriteArchive& archive)
   {
@@ -346,7 +346,7 @@ namespace moho
   gpg::RType* SPhysBody::sType = nullptr;
 
   /**
-   * Address: 0x006973F0 (FUN_006973F0, Moho::SPhysBodyTypeInfo::SPhysBodyTypeInfo)
+    * Alias of FUN_006973F0 (non-canonical helper lane).
    */
   SPhysBodyTypeInfo::SPhysBodyTypeInfo()
     : gpg::RType()
@@ -355,7 +355,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00697480 (FUN_00697480, Moho::SPhysBodyTypeInfo::dtr)
+    * Alias of FUN_00697480 (non-canonical helper lane).
    */
   SPhysBodyTypeInfo::~SPhysBodyTypeInfo()
   {
@@ -364,7 +364,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00697470 (FUN_00697470, Moho::SPhysBodyTypeInfo::GetName)
+    * Alias of FUN_00697470 (non-canonical helper lane).
    */
   const char* SPhysBodyTypeInfo::GetName() const
   {
@@ -372,7 +372,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00697450 (FUN_00697450, Moho::SPhysBodyTypeInfo::Init)
+    * Alias of FUN_00697450 (non-canonical helper lane).
    */
   void SPhysBodyTypeInfo::Init()
   {
@@ -403,7 +403,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006982A0 (FUN_006982A0, Moho::SPhysBodySerializer::Deserialize)
+    * Alias of FUN_006982A0 (non-canonical helper lane).
    */
   void SPhysBodySerializer::Deserialize(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
   {
@@ -416,7 +416,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006982B0 (FUN_006982B0, Moho::SPhysBodySerializer::Serialize)
+    * Alias of FUN_006982B0 (non-canonical helper lane).
    */
   void SPhysBodySerializer::Serialize(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
   {
@@ -441,7 +441,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD2D0 (FUN_00BFD2D0)
+    * Alias of FUN_00BFD2D0 (non-canonical helper lane).
    */
   void cleanup_SPhysBodyTypeInfo()
   {
@@ -454,7 +454,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD330 (FUN_00BFD330)
+    * Alias of FUN_00BFD330 (non-canonical helper lane).
    */
   gpg::SerHelperBase* cleanup_SPhysBodySaveConstruct()
   {
@@ -462,7 +462,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD360 (FUN_00BFD360)
+    * Alias of FUN_00BFD360 (non-canonical helper lane).
    */
   gpg::SerHelperBase* cleanup_SPhysBodyConstruct()
   {
@@ -470,7 +470,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD390 (FUN_00BFD390, Moho::SPhysBodySerializer::dtr)
+    * Alias of FUN_00BFD390 (non-canonical helper lane).
    */
   void cleanup_SPhysBodySerializer()
   {
@@ -478,7 +478,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)
+    * Alias of FUN_00BD5E80 (non-canonical helper lane).
    */
   void register_SPhysBodyTypeInfo()
   {
@@ -487,7 +487,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5EA0 (FUN_00BD5EA0)
+    * Alias of FUN_00BD5EA0 (non-canonical helper lane).
    */
   int register_SPhysBodySaveConstruct()
   {
@@ -499,7 +499,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5ED0 (FUN_00BD5ED0)
+    * Alias of FUN_00BD5ED0 (non-canonical helper lane).
    */
   int register_SPhysBodyConstruct()
   {
@@ -511,14 +511,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5F10 (FUN_00BD5F10, register_SPhysBodySerializer)
+    * Alias of FUN_00BD5F10 (non-canonical helper lane).
    */
   void register_SPhysBodySerializer()
   {
     InitializeHelperNode(gSPhysBodySerializer);
     gSPhysBodySerializer.mDeserialize = &SPhysBodySerializer::Deserialize;
     gSPhysBodySerializer.mSerialize = &SPhysBodySerializer::Serialize;
-    gSPhysBodySerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SPhysBodySerializer_atexit);
   }
 } // namespace moho

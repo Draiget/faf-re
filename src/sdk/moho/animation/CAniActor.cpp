@@ -316,6 +316,13 @@ namespace
     return false;
   }
 
+  /**
+   * Address: 0x0063B990 (FUN_0063B990)
+   *
+   * What it does:
+   * Checks whether one manipulator has at least one watched bone whose
+   * skeleton bone name wildcard-matches `bonePattern`.
+   */
   [[nodiscard]] bool
   ManipulatorHasWatchBonePattern(const moho::IAniManipulator* const manipulator, const char* const bonePattern)
   {
@@ -442,7 +449,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
+    * Alias of FUN_00BFACD0 (non-canonical helper lane).
    *
    * What it does:
    * Unlinks `CAniActorConstruct` helper node from intrusive helper list.
@@ -461,6 +468,54 @@ namespace
   [[nodiscard]] gpg::SerHelperBase* cleanup_CAniActorSerializer_Impl()
   {
     return UnlinkHelperNode(gCAniActorSerializer);
+  }
+
+  /**
+   * Address: 0x0063AFC0 (FUN_0063AFC0, cleanup_CAniActorConstructStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the global `CAniActorConstruct` node
+   * and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorConstructStartupThunkA()
+  {
+    return cleanup_CAniActorConstruct_Impl();
+  }
+
+  /**
+   * Address: 0x0063AFF0 (FUN_0063AFF0, cleanup_CAniActorConstructStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the global
+   * `CAniActorConstruct` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorConstructStartupThunkB()
+  {
+    return cleanup_CAniActorConstruct_Impl();
+  }
+
+  /**
+   * Address: 0x0063B100 (FUN_0063B100, cleanup_CAniActorSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the global `CAniActorSerializer` node
+   * and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorSerializerStartupThunkA()
+  {
+    return cleanup_CAniActorSerializer_Impl();
+  }
+
+  /**
+   * Address: 0x0063B130 (FUN_0063B130, cleanup_CAniActorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the global
+   * `CAniActorSerializer` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAniActorSerializerStartupThunkB()
+  {
+    return cleanup_CAniActorSerializer_Impl();
   }
 
   void CleanupCAniActorTypeInfoAtexit()
@@ -953,7 +1008,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAC70 (FUN_00BFAC70, sub_BFAC70)
+    * Alias of FUN_00BFAC70 (non-canonical helper lane).
    *
    * What it does:
    * Releases startup-owned `CAniActorTypeInfo` storage.
@@ -975,7 +1030,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAD00 (FUN_00BFAD00, sub_BFAD00)
+    * Alias of FUN_00BFAD00 (non-canonical helper lane).
    *
    * What it does:
    * Unlinks global serializer helper node from intrusive helper list.
@@ -1018,8 +1073,7 @@ namespace moho
    */
   void register_CAniActorSerializer()
   {
-    CAniActorSerializer* const serializer = setup_CAniActorSerializerHelper();
-    serializer->RegisterSerializeFunctions();
+    (void)setup_CAniActorSerializerHelper();
     (void)std::atexit(&CleanupCAniActorSerializerAtexit);
   }
 } // namespace moho

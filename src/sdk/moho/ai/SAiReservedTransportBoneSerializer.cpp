@@ -41,7 +41,7 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
@@ -49,6 +49,31 @@ namespace
     }
 
     InitializeSerializerNode(serializer);
+    return SerializerSelfNode(serializer);
+  }
+
+  /**
+   * Address: 0x005E40F0 (FUN_005E40F0)
+   *
+   * What it does:
+   * Unlinks the global `SAiReservedTransportBoneSerializer` helper node from
+   * the intrusive serializer chain and restores it to a self-linked node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAiReservedTransportBoneSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(*AcquireSAiReservedTransportBoneSerializer());
+  }
+
+  /**
+   * Address: 0x005E4120 (FUN_005E4120)
+   *
+   * What it does:
+   * Secondary unlink/reset thunk for the global
+   * `SAiReservedTransportBoneSerializer` helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAiReservedTransportBoneSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(*AcquireSAiReservedTransportBoneSerializer());
   }
 
   [[nodiscard]] gpg::RType* CachedWeakUnitType()
@@ -87,11 +112,105 @@ namespace
     }
 
     SAiReservedTransportBoneSerializer* const serializer = AcquireSAiReservedTransportBoneSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)cleanup_SAiReservedTransportBoneSerializerStartupThunkA();
     serializer->~SAiReservedTransportBoneSerializer();
     gSAiReservedTransportBoneSerializerConstructed = false;
   }
+
 } // namespace
+
+/**
+ * Address: 0x005E8230 (FUN_005E8230, sub_5E8230)
+ *
+ * What it does:
+ * Releases one reserved-bones vector heap payload, clears the vector lanes,
+ * and unlinks the reserved-unit weak node from its owner chain.
+ */
+void* moho::ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone)
+{
+  auto& reservedBonesView = msvc8::AsVectorRuntimeView(bone.reservedBones);
+  if (reservedBonesView.begin != nullptr) {
+    ::operator delete(reservedBonesView.begin);
+  }
+
+  reservedBonesView.begin = nullptr;
+  reservedBonesView.end = nullptr;
+  reservedBonesView.capacityEnd = nullptr;
+
+  void* result = bone.reservedUnit.ownerLinkSlot;
+  if (result != nullptr) {
+    auto** linkSlot = reinterpret_cast<WeakPtr<Unit>**>(result);
+    WeakPtr<Unit>* const thisNode = &bone.reservedUnit;
+    if (*linkSlot != thisNode) {
+      do {
+        linkSlot = &(*linkSlot)->nextInOwner;
+      } while (*linkSlot != thisNode);
+    }
+    *linkSlot = thisNode->nextInOwner;
+    result = linkSlot;
+  }
+
+  return result;
+}
+
+/**
+ * Address: 0x005EE820 (FUN_005EE820, sub_5EE820)
+ *
+ * What it does:
+ * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
+ */
+void* moho::ResetReservedTransportBoneEntryThunkA(SAiReservedTransportBone& bone)
+{
+  return ResetReservedTransportBoneEntry(bone);
+}
+
+/**
+ * Address: 0x005EF8B0 (FUN_005EF8B0, sub_5EF8B0)
+ *
+ * What it does:
+ * Jump-only alias lane that forwards to `ResetReservedTransportBoneEntry`.
+ */
+void* moho::ResetReservedTransportBoneEntryThunkB(SAiReservedTransportBone& bone)
+{
+  return ResetReservedTransportBoneEntry(bone);
+}
+
+/**
+ * Address: 0x005EA550 (FUN_005EA550, std::vector_SAiReservedTransportBone::reset_storage)
+ *
+ * What it does:
+ * Destroys one `vector<SAiReservedTransportBone>` payload, releases the
+ * backing heap block, and clears the vector storage lanes to empty.
+ */
+void moho::ResetReservedTransportBoneVectorStorage(msvc8::vector<SAiReservedTransportBone>& storage)
+{
+  auto& view = msvc8::AsVectorRuntimeView(storage);
+  if (view.begin != nullptr) {
+    (void)DestroyReservedTransportBoneRange(view.begin, view.end);
+    ::operator delete(view.begin);
+  }
+
+  view.begin = nullptr;
+  view.end = nullptr;
+  view.capacityEnd = nullptr;
+}
+
+/**
+ * Address: 0x005EE360 (FUN_005EE360, destroy_SAiReservedTransportBone_range)
+ *
+ * What it does:
+ * Walks one half-open bone range, frees each reserved-bones heap lane, zeros
+ * vector pointers, and unlinks each reserved-unit weak node from owner chain.
+ */
+void* moho::DestroyReservedTransportBoneRange(SAiReservedTransportBone* begin, SAiReservedTransportBone* end)
+{
+  void* result = begin;
+  for (SAiReservedTransportBone* bone = begin; bone != end; ++bone) {
+    result = ResetReservedTransportBoneEntry(*bone);
+  }
+
+  return result;
+}
 
 /**
  * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
@@ -212,6 +331,5 @@ int moho::register_SAiReservedTransportBoneSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &SAiReservedTransportBoneSerializer::Deserialize;
   serializer->mSaveCallback = &SAiReservedTransportBoneSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_SAiReservedTransportBoneSerializer);
 }

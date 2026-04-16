@@ -13,7 +13,14 @@ namespace gpg::gal
     class RenderTargetD3D9
     {
     public:
-        RenderTargetD3D9() = default;
+        /**
+         * Address: 0x008F5260 (FUN_008F5260)
+         *
+         * What it does:
+         * Initializes one empty D3D9 render-target wrapper with default context
+         * and cleared retained texture/surface lanes.
+         */
+        RenderTargetD3D9();
 
         /**
          * Address: 0x008F5620 (FUN_008F5620)

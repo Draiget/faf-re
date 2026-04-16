@@ -21,6 +21,8 @@ namespace moho
 
   struct SPointVector
   {
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0050CF10 (FUN_0050CF10, Moho::SPointVector::MemberDeserialize)
      *

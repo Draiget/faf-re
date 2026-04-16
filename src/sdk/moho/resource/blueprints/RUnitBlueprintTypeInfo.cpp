@@ -7,6 +7,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprintWeaponVectorReflection.h"
 
 namespace
 {
@@ -116,11 +117,26 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x005263B0 (FUN_005263B0, preregister_VectorRUnitBlueprintWeaponTypeStartup)
+   *
+   * What it does:
+   * Constructs and preregisters startup reflection RTTI for
+   * `msvc8::vector<moho::RUnitBlueprintWeapon>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_VectorRUnitBlueprintWeaponTypeStartup()
+  {
+    return moho::preregister_VectorRUnitBlueprintWeaponType();
+  }
+
   gpg::RType* CachedWeaponVectorType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<moho::RUnitBlueprintWeapon>));
+      cached = preregister_VectorRUnitBlueprintWeaponTypeStartup();
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(msvc8::vector<moho::RUnitBlueprintWeapon>));
+      }
     }
     return cached;
   }
@@ -138,6 +154,7 @@ namespace
   {
     RUnitBlueprintTypeInfoBootstrap()
     {
+      (void)preregister_VectorRUnitBlueprintWeaponTypeStartup();
       moho::register_RUnitBlueprintTypeInfo();
     }
   };

@@ -9,6 +9,7 @@ namespace gpg
 {
   class ReadArchive;
   class RRef;
+  class RType;
   class SerConstructResult;
   class WriteArchive;
 } // namespace gpg
@@ -77,6 +78,8 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive);
 
   public:
+    static gpg::RType* sType;
+
     CEconomy* mEconomy; // +0x00
     SEconValue mAmt;    // +0x04
   };

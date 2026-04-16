@@ -941,6 +941,15 @@ extern "C"
   int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
 
   /**
+   * Address: 0x00AE78E0 (FUN_00AE78E0, _MPV_IsConformable)
+   *
+   * What it does:
+   * Checks whether one chunk is conformable for MPV-vs-M2V dispatch by
+   * probing sequence/user-data delimiter ordering.
+   */
+  int MPV_IsConformable(const std::uint8_t* bitstreamCursor, int scanLengthBytes);
+
+  /**
    * Address: 0x00AE9F10 (FUN_00AE9F10, _MPV_CheckDelim)
    *
    * What it does:

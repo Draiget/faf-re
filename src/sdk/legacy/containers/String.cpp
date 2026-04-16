@@ -115,6 +115,21 @@ void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
     bx.buf[newSize] = '\0';
 }
 
+/**
+ * Address: 0x006582E0 (FUN_006582E0)
+ *
+ * What it does:
+ * Resets each legacy string in `[begin, end)` to empty SSO state and releases
+ * heap-backed buffers when present.
+ */
+[[maybe_unused]] static void ResetStringRange(msvc8::string* begin, msvc8::string* end) noexcept
+{
+    while (begin != end) {
+        begin->tidy(true, 0U);
+        ++begin;
+    }
+}
+
 void msvc8::string::assign_owned(const std::string_view value) {
     tidy(true, 0U);
 

@@ -1,7 +1,21 @@
 #include "moho/sim/EGenericIconTypeTypeInfo.h"
 
+#include <typeinfo>
+
 namespace moho
 {
+  /**
+   * Address: 0x0085B120 (FUN_0085B120, Moho::EGenericIconTypeTypeInfo::EGenericIconTypeTypeInfo)
+   *
+   * What it does:
+   * Preregisters the enum type descriptor for `EGenericIconType` with the reflection registry.
+   */
+  EGenericIconTypeTypeInfo::EGenericIconTypeTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EGenericIconType), this);
+  }
+
   /**
    * Address: 0x0085B1B0 (FUN_0085B1B0, Moho::EGenericIconTypeTypeInfo::dtr)
    */

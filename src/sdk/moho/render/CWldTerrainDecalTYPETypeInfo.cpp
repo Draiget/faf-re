@@ -1,7 +1,20 @@
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 
+#include <typeinfo>
+
 namespace moho
 {
+  /**
+   * Address: 0x0089C8A0 (FUN_0089C8A0, Moho::CWldTerrainDecalTYPETypeInfo::ctor)
+   *
+   * What it does:
+   * Preregisters the reflected `EWldTerrainDecalType` enum metadata.
+   */
+  CWldTerrainDecalTYPETypeInfo::CWldTerrainDecalTYPETypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(EWldTerrainDecalType), this);
+  }
+
   /**
    * Address: 0x0089C930 (FUN_0089C930, Moho::CWldTerrainDecalTYPETypeInfo::dtr)
    */

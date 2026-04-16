@@ -1,6 +1,9 @@
 #include "moho/command/SSTICommandVariableData.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -8,12 +11,113 @@
 
 namespace
 {
+  class SSTICommandVariableDataTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SSTICommandVariableData";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTICommandVariableData);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
   moho::SSTICommandVariableDataSerializer gSSTICommandVariableDataSerializer{};
 
   gpg::RType* gEntIdVectorType = nullptr;
   gpg::RType* gUnitCommandType = nullptr;
   gpg::RType* gTargetType = nullptr;
   gpg::RType* gCellVectorType = nullptr;
+
+  struct SSTICommandVariableDataSlotRuntime
+  {
+    std::uint32_t mHeaderWord0 = 0;                  // +0x00
+    std::uint32_t mHeaderWord1 = 0;                  // +0x04
+    moho::SSTICommandVariableData mVariableData{};   // +0x08
+  };
+
+  static_assert(
+    offsetof(SSTICommandVariableDataSlotRuntime, mVariableData) == 0x08,
+    "SSTICommandVariableDataSlotRuntime::mVariableData offset must be 0x08"
+  );
+  static_assert(
+    sizeof(SSTICommandVariableDataSlotRuntime) >= (sizeof(moho::SSTICommandVariableData) + 0x08),
+    "SSTICommandVariableDataSlotRuntime must include 8-byte slot header plus variable payload"
+  );
+
+  struct RebindableInlineBufferLaneRuntime
+  {
+    std::uint32_t ownedStorage;  // +0x00
+    std::uint32_t beginStorage;  // +0x04
+    std::uint32_t endStorage;    // +0x08
+    std::uint32_t inlineStorage; // +0x0C
+  };
+
+  static_assert(
+    sizeof(RebindableInlineBufferLaneRuntime) == 0x10, "RebindableInlineBufferLaneRuntime size must be 0x10"
+  );
+
+  struct SSTICommandVariableDataRelocationSlotRuntime
+  {
+    std::uint32_t mHeaderWord0;                       // +0x00
+    std::uint32_t mHeaderWord1;                       // +0x04
+    RebindableInlineBufferLaneRuntime mEntIdsLane;    // +0x08
+    std::byte mMidLane[0x38];                         // +0x18
+    RebindableInlineBufferLaneRuntime mCellsLane;     // +0x50
+    std::byte mTailLane[0x18];                        // +0x60
+  };
+
+  static_assert(
+    offsetof(SSTICommandVariableDataRelocationSlotRuntime, mEntIdsLane) == 0x08,
+    "SSTICommandVariableDataRelocationSlotRuntime::mEntIdsLane offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SSTICommandVariableDataRelocationSlotRuntime, mCellsLane) == 0x50,
+    "SSTICommandVariableDataRelocationSlotRuntime::mCellsLane offset must be 0x50"
+  );
+  static_assert(
+    sizeof(SSTICommandVariableDataRelocationSlotRuntime) == 0x78,
+    "SSTICommandVariableDataRelocationSlotRuntime size must be 0x78"
+  );
+
+  void ResetRebindableInlineBufferLane(RebindableInlineBufferLaneRuntime& lane)
+  {
+    if (lane.ownedStorage != lane.inlineStorage) {
+      ::operator delete[](reinterpret_cast<void*>(static_cast<std::uintptr_t>(lane.ownedStorage)));
+      lane.ownedStorage = lane.inlineStorage;
+      lane.endStorage = *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(lane.ownedStorage));
+    }
+
+    lane.beginStorage = lane.ownedStorage;
+  }
+
+  /**
+   * Address: 0x00562C70 (FUN_00562C70, sub_562C70)
+   *
+   * What it does:
+   * Rebinds every `SSTICommandVariableData` relocation slot in `[first,last)`
+   * back to inline ent-id/cell storage lanes, releasing spilled heap blocks
+   * for both lanes in each 0x78-byte slot.
+   */
+  [[maybe_unused]] std::uint32_t RebindSSTICommandVariableDataSlotsToInlineStorage(
+    SSTICommandVariableDataRelocationSlotRuntime* first,
+    SSTICommandVariableDataRelocationSlotRuntime* const last
+  )
+  {
+    std::uint32_t resultLane = 0u;
+    while (first != last) {
+      ResetRebindableInlineBufferLane(first->mCellsLane);
+      ResetRebindableInlineBufferLane(first->mEntIdsLane);
+      resultLane = first->mEntIdsLane.ownedStorage;
+      ++first;
+    }
+    return resultLane;
+  }
 
   template <typename THelper>
   [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
@@ -41,6 +145,40 @@ namespace
     helper.mHelperNext = self;
     helper.mHelperPrev = self;
     return self;
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* ResetSSTICommandVariableDataSerializerHelperLinks() noexcept
+  {
+    gSSTICommandVariableDataSerializer.mHelperNext->mPrev = gSSTICommandVariableDataSerializer.mHelperPrev;
+    gSSTICommandVariableDataSerializer.mHelperPrev->mNext = gSSTICommandVariableDataSerializer.mHelperNext;
+    gpg::SerHelperBase* const self = HelperSelfNode(gSSTICommandVariableDataSerializer);
+    gSSTICommandVariableDataSerializer.mHelperNext = self;
+    gSSTICommandVariableDataSerializer.mHelperPrev = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00552B80 (FUN_00552B80)
+   *
+   * What it does:
+   * Unlinks `SSTICommandVariableDataSerializer` helper node from the intrusive
+   * helper list and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandVariableDataSerializerHelperNodePrimary() noexcept
+  {
+    return ResetSSTICommandVariableDataSerializerHelperLinks();
+  }
+
+  /**
+   * Address: 0x00552BB0 (FUN_00552BB0)
+   *
+   * What it does:
+   * Secondary entrypoint for `SSTICommandVariableDataSerializer` helper-node
+   * unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSSTICommandVariableDataSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetSSTICommandVariableDataSerializerHelperLinks();
   }
 
   [[nodiscard]] gpg::RType* ResolveEntIdVectorType()
@@ -77,7 +215,279 @@ namespace
 
   void cleanup_SSTICommandVariableDataSerializer_Atexit()
   {
-    (void)UnlinkHelperNode(gSSTICommandVariableDataSerializer);
+    (void)CleanupSSTICommandVariableDataSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x006EC8E0 (FUN_006EC8E0)
+   * Address: 0x006EBBD0 (FUN_006EBBD0)
+   *
+   * What it does:
+   * Fills one uninitialized slot range with repeated copy-constructed
+   * `SSTICommandVariableData` payload lanes taken from `fillValue`.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* FillUninitializedSSTICommandVariableDataSlots(
+    SSTICommandVariableDataSlotRuntime* destinationBegin,
+    SSTICommandVariableDataSlotRuntime* destinationEnd,
+    const SSTICommandVariableDataSlotRuntime& fillValue
+  )
+  {
+    for (SSTICommandVariableDataSlotRuntime* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
+      cursor->mHeaderWord0 = fillValue.mHeaderWord0;
+      ::new (&cursor->mVariableData) moho::SSTICommandVariableData(fillValue.mVariableData);
+    }
+    return destinationEnd;
+  }
+
+  /**
+   * Address: 0x006ED220 (FUN_006ED220)
+   * Address: 0x006EC920 (FUN_006EC920)
+   *
+   * What it does:
+   * Backward-copy constructs one slot range into uninitialized destination
+   * storage and returns the new destination begin iterator.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopyBackwardSSTICommandVariableDataSlots(
+    SSTICommandVariableDataSlotRuntime* sourceCurrent,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    SSTICommandVariableDataSlotRuntime* destinationCurrent
+  )
+  {
+    while (sourceCurrent != sourceBegin) {
+      --sourceCurrent;
+      --destinationCurrent;
+      destinationCurrent->mHeaderWord0 = sourceCurrent->mHeaderWord0;
+      ::new (&destinationCurrent->mVariableData) moho::SSTICommandVariableData(sourceCurrent->mVariableData);
+    }
+
+    return destinationCurrent;
+  }
+
+  /**
+   * Address: 0x006EBBE0 (FUN_006EBBE0)
+   *
+   * What it does:
+   * Adapts one legacy call-convention lane into the canonical backward slot
+   * copy helper for `SSTICommandVariableData`.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopyBackwardSSTICommandVariableDataSlotsAdapter(
+    SSTICommandVariableDataSlotRuntime* sourceCurrent,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    SSTICommandVariableDataSlotRuntime* destinationCurrent
+  ) noexcept
+  {
+    return CopyBackwardSSTICommandVariableDataSlots(sourceCurrent, sourceBegin, destinationCurrent);
+  }
+
+  [[nodiscard]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotRangeWithRollback(
+    const SSTICommandVariableDataSlotRuntime* sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* sourceEnd,
+    SSTICommandVariableDataSlotRuntime* destinationBegin
+  )
+  {
+    SSTICommandVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (const SSTICommandVariableDataSlotRuntime* sourceCursor = sourceBegin;
+           sourceCursor != sourceEnd;
+           ++sourceCursor, ++destinationCursor) {
+        if (destinationCursor != nullptr) {
+          destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+          ::new (&destinationCursor->mVariableData) moho::SSTICommandVariableData(sourceCursor->mVariableData);
+        }
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTICommandVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTICommandVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x005634F0 (FUN_005634F0, copy_SSTICommandVariableData_slot_range_with_rollback)
+   *
+   * What it does:
+   * Copy-constructs one contiguous slot range (`header + SSTICommandVariableData`)
+   * into destination storage and destroys already-constructed payload lanes
+   * before rethrowing if a construction step throws.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(
+    const SSTICommandVariableDataSlotRuntime* sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* sourceEnd,
+    SSTICommandVariableDataSlotRuntime* destinationBegin
+  )
+  {
+    return CopySSTICommandVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005626B0 (FUN_005626B0)
+   *
+   * What it does:
+   * Legacy register-shape adapter lane that forwards contiguous
+   * `SSTICommandVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneLegacyEntry(
+    [[maybe_unused]] const void* const unusedContext,
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00562BA0 (FUN_00562BA0)
+   *
+   * What it does:
+   * Primary adapter lane that forwards contiguous
+   * `SSTICommandVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneA(
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005630B0 (FUN_005630B0)
+   *
+   * What it does:
+   * Secondary adapter lane that forwards contiguous
+   * `SSTICommandVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneB(
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00563280 (FUN_00563280)
+   *
+   * What it does:
+   * Tertiary adapter lane that forwards contiguous
+   * `SSTICommandVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneC(
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x006ED830 (FUN_006ED830, copy_SSTICommandVariableData_slot_range_with_rollback_alt)
+   * Address: 0x006EBBA0 (FUN_006EBBA0)
+   * Address: 0x006EC8B0 (FUN_006EC8B0)
+   * Address: 0x006ED1F0 (FUN_006ED1F0)
+   * Address: 0x006ED560 (FUN_006ED560)
+   *
+   * What it does:
+   * Alternate call-convention lane for the same guarded slot-range copy helper.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotRangeWithRollbackLegacyAlt(
+    const SSTICommandVariableDataSlotRuntime* sourceBegin,
+    const SSTICommandVariableDataSlotRuntime* sourceEnd,
+    SSTICommandVariableDataSlotRuntime* destinationBegin
+  )
+  {
+    return CopySSTICommandVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x006EC460 (FUN_006EC460, copy_SSTICommandVariableData_slot_range_with_rollback_counted)
+   * Address: 0x006EB7D0 (FUN_006EB7D0)
+   *
+   * What it does:
+   * Copy-constructs one counted slot range (`header + SSTICommandVariableData`)
+   * into destination storage and destroys already-constructed payload lanes
+   * before rethrowing if a copy step throws.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotRangeWithRollbackCounted(
+    const std::uint32_t count,
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin
+  )
+  {
+    if (count == 0u) {
+      return destinationBegin;
+    }
+
+    if (destinationBegin == nullptr || sourceBegin == nullptr) {
+      return destinationBegin;
+    }
+
+    SSTICommandVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (std::uint32_t i = 0; i < count; ++i, ++destinationCursor) {
+        const SSTICommandVariableDataSlotRuntime* const sourceCursor = sourceBegin + i;
+        destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+        ::new (&destinationCursor->mVariableData) moho::SSTICommandVariableData(sourceCursor->mVariableData);
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTICommandVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTICommandVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x006EA2D0 (FUN_006EA2D0)
+   *
+   * What it does:
+   * Adapts one counted slot-copy lane into
+   * `CopySSTICommandVariableDataSlotRangeWithRollbackCounted` and returns the
+   * destination end pointer.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotRangeCountedAdapter(
+    const SSTICommandVariableDataSlotRuntime* const sourceBegin,
+    SSTICommandVariableDataSlotRuntime* const destinationBegin,
+    const std::uint32_t count
+  )
+  {
+    return CopySSTICommandVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  /**
+   * Address: 0x006ECA60 (FUN_006ECA60)
+   *
+   * What it does:
+   * Copies one slot header lane and copy-constructs one embedded
+   * `SSTICommandVariableData` payload into destination storage.
+   */
+  [[maybe_unused]] SSTICommandVariableDataSlotRuntime* CopySSTICommandVariableDataSlotLane(
+    SSTICommandVariableDataSlotRuntime* const destination,
+    const SSTICommandVariableDataSlotRuntime* const source
+  )
+  {
+    if (destination == nullptr || source == nullptr) {
+      return destination;
+    }
+
+    destination->mHeaderWord0 = source->mHeaderWord0;
+    ::new (&destination->mVariableData) moho::SSTICommandVariableData(source->mVariableData);
+    return destination;
   }
 
   void register_SSTICommandVariableDataSerializer()
@@ -85,7 +495,6 @@ namespace
     InitializeHelperNode(gSSTICommandVariableDataSerializer);
     gSSTICommandVariableDataSerializer.mSerLoadFunc = &moho::SSTICommandVariableDataSerializer::Serialize;
     gSSTICommandVariableDataSerializer.mSerSaveFunc = &moho::SSTICommandVariableDataSerializer::Deserialize;
-    gSSTICommandVariableDataSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SSTICommandVariableDataSerializer_Atexit);
   }
 } // namespace
@@ -93,6 +502,19 @@ namespace
 namespace moho
 {
   gpg::RType* SSTICommandVariableData::sType = nullptr;
+
+  /**
+   * Address: 0x005528C0 (FUN_005528C0, preregister_SSTICommandVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTICommandVariableData`.
+   */
+  gpg::RType* preregister_SSTICommandVariableDataTypeInfo()
+  {
+    static SSTICommandVariableDataTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTICommandVariableData), &typeInfo);
+    return &typeInfo;
+  }
 
   /**
    * Address: 0x00552A00 (FUN_00552A00, Moho::SSTICommandVariableData::SSTICommandVariableData)
@@ -287,7 +709,7 @@ namespace moho
   {
     gpg::RType* type = SSTICommandVariableData::sType;
     if (type == nullptr) {
-      type = gpg::LookupRType(typeid(SSTICommandVariableData));
+      type = preregister_SSTICommandVariableDataTypeInfo();
       SSTICommandVariableData::sType = type;
     }
 
@@ -305,6 +727,7 @@ namespace
   {
     SSTICommandVariableDataSerializerBootstrap()
     {
+      (void)moho::preregister_SSTICommandVariableDataTypeInfo();
       register_SSTICommandVariableDataSerializer();
     }
   };

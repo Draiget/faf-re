@@ -10,6 +10,15 @@
 
 namespace
 {
+  alignas(moho::CUnitCaptureTaskTypeInfo)
+    unsigned char gCUnitCaptureTaskTypeInfoStorage[sizeof(moho::CUnitCaptureTaskTypeInfo)];
+  bool gCUnitCaptureTaskTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CUnitCaptureTaskTypeInfo& CUnitCaptureTaskTypeInfoStorageRef() noexcept
+  {
+    return *reinterpret_cast<moho::CUnitCaptureTaskTypeInfo*>(gCUnitCaptureTaskTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -42,6 +51,29 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00604140 (FUN_00604140, preregister_CUnitCaptureTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CUnitCaptureTaskTypeInfo`
+   * reflection lane.
+   */
+  gpg::RType* preregister_CUnitCaptureTaskTypeInfo()
+  {
+    if (!gCUnitCaptureTaskTypeInfoConstructed) {
+      new (gCUnitCaptureTaskTypeInfoStorage) CUnitCaptureTaskTypeInfo();
+      gCUnitCaptureTaskTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CUnitCaptureTask), &CUnitCaptureTaskTypeInfoStorageRef());
+    return &CUnitCaptureTaskTypeInfoStorageRef();
+  }
+
+  const char* CUnitCaptureTaskTypeInfo::GetName() const
+  {
+    return "CUnitCaptureTask";
+  }
+
+  /**
    * Address: 0x006041A0 (FUN_006041A0, Moho::CUnitCaptureTaskTypeInfo::Init)
    *
    * What it does:
@@ -51,10 +83,13 @@ namespace moho
   void CUnitCaptureTaskTypeInfo::Init()
   {
     size_ = 0x64;
-    newRefFunc_ = &CUnitCaptureTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitCaptureTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitCaptureTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitCaptureTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitCaptureTaskTypeInfo::NewRef,
+      &CUnitCaptureTaskTypeInfo::CtrRef,
+      &CUnitCaptureTaskTypeInfo::Delete,
+      &CUnitCaptureTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_ECommandEvent(this);

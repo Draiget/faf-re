@@ -8,6 +8,20 @@
 
 namespace
 {
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -24,6 +38,7 @@ namespace
 
   /**
    * Address: 0x0071F330 (FUN_0071F330, sub_71F330)
+   * Address: 0x0071E2F0 (FUN_0071E2F0)
    */
   void Deserialize_CInfluenceMap(
     gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
@@ -62,6 +77,7 @@ namespace
 
   /**
    * Address: 0x0071F400 (FUN_0071F400, sub_71F400)
+   * Address: 0x0071E300 (FUN_0071E300)
    */
   void Serialize_CInfluenceMap(
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
@@ -93,6 +109,34 @@ namespace
   }
 
   /**
+   * Address: 0x0071CB00 (FUN_0071CB00)
+   *
+   * What it does:
+   * Register-lane alias that forwards into `Deserialize_CInfluenceMap`.
+   */
+  [[maybe_unused]] void Deserialize_CInfluenceMapRegisterAlias(
+    gpg::ReadArchive* const archive,
+    const int objectPtr
+  )
+  {
+    Deserialize_CInfluenceMap(archive, objectPtr, 0, nullptr);
+  }
+
+  /**
+   * Address: 0x0071CB10 (FUN_0071CB10)
+   *
+   * What it does:
+   * Register-lane alias that forwards into `Serialize_CInfluenceMap`.
+   */
+  [[maybe_unused]] void Serialize_CInfluenceMapRegisterAlias(
+    const int objectPtr,
+    gpg::WriteArchive* const archive
+  )
+  {
+    Serialize_CInfluenceMap(archive, objectPtr, 0, nullptr);
+  }
+
+  /**
    * Address: 0x00717700 (FUN_00717700, sub_717700)
    */
   int Deserialize_CInfluenceMapThunk(const int archivePtr, const int objectPtr)
@@ -109,6 +153,22 @@ namespace
     Serialize_CInfluenceMap(reinterpret_cast<gpg::WriteArchive*>(archivePtr), objectPtr, 0, nullptr);
     return 0;
   }
+
+  /**
+   * Address: 0x00718B30 (FUN_00718B30)
+   *
+   * What it does:
+   * Initializes startup `CInfluenceMap` save/load helper links and callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CInfluenceMapSerializer* InitializeCInfluenceMapSerializerHelperStorage() noexcept
+  {
+    InitializeHelperNode(gCInfluenceMapSerializer);
+    gCInfluenceMapSerializer.mLoadCallback =
+      reinterpret_cast<gpg::RType::load_func_t>(&Deserialize_CInfluenceMapThunk);
+    gCInfluenceMapSerializer.mSaveCallback =
+      reinterpret_cast<gpg::RType::save_func_t>(&Serialize_CInfluenceMapThunk);
+    return &gCInfluenceMapSerializer;
+  }
 } // namespace
 
 namespace moho
@@ -122,13 +182,7 @@ namespace moho
    */
   void register_CInfluenceMapSerializer()
   {
-    gCInfluenceMapSerializer.mHelperNext = nullptr;
-    gCInfluenceMapSerializer.mHelperPrev = nullptr;
-    gCInfluenceMapSerializer.mLoadCallback =
-      reinterpret_cast<gpg::RType::load_func_t>(&Deserialize_CInfluenceMapThunk);
-    gCInfluenceMapSerializer.mSaveCallback =
-      reinterpret_cast<gpg::RType::save_func_t>(&Serialize_CInfluenceMapThunk);
-    gCInfluenceMapSerializer.RegisterSerializeFunctions();
+    (void)InitializeCInfluenceMapSerializerHelperStorage();
   }
 
   /**

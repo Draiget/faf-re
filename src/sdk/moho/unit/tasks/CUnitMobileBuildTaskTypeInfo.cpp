@@ -101,10 +101,13 @@ namespace moho
   void CUnitMobileBuildTaskTypeInfo::Init()
   {
     size_ = 0xE8;
-    newRefFunc_ = &CUnitMobileBuildTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitMobileBuildTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitMobileBuildTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitMobileBuildTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitMobileBuildTaskTypeInfo::NewRef,
+      &CUnitMobileBuildTaskTypeInfo::CtrRef,
+      &CUnitMobileBuildTaskTypeInfo::Delete,
+      &CUnitMobileBuildTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_ECommandEvent(this);

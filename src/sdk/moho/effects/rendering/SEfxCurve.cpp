@@ -266,6 +266,13 @@ namespace moho
 {
   namespace
   {
+    /**
+     * Address: 0x00514FF0 (FUN_00514FF0, SEfxCurve y-bounds recompute lane)
+     *
+     * What it does:
+     * Recomputes Y min/max bounds from the current key vector by scanning
+     * every `(x,y,z)` key lane.
+     */
     void RecomputeEmitterCurveYBounds(SEfxCurve& curve)
     {
       curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
@@ -342,6 +349,30 @@ namespace moho
     const float yCenter = previousKey.y + (currentKey.y - previousKey.y) * interpolation;
     const float zSpread = previousKey.z + (currentKey.z - previousKey.z) * interpolation;
     return RandomizedValue(yCenter, zSpread);
+  }
+
+  /**
+   * Address: 0x00515090 (FUN_00515090, rescale_emitter_curve_x_range)
+   *
+   * What it does:
+   * Rescales the curve key X lanes to a new X range, updates stored X bounds,
+   * then recomputes Y min/max bounds from all retained keys.
+   */
+  SEfxCurve* RescaleEmitterCurveXRange(SEfxCurve* const curve, const float minX, const float maxX)
+  {
+    if (curve == nullptr) {
+      return nullptr;
+    }
+
+    const float scale = (maxX - minX) / (curve->mBoundsMax.x - curve->mBoundsMin.x);
+    for (Wm3::Vector3f* key = curve->mKeys.begin(); key != curve->mKeys.end(); ++key) {
+      key->x = key->x * scale;
+    }
+
+    curve->mBoundsMax.x = maxX;
+    curve->mBoundsMin.x = minX;
+    RecomputeEmitterCurveYBounds(*curve);
+    return curve;
   }
 
   /**

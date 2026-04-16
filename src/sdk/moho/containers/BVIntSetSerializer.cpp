@@ -201,7 +201,6 @@ namespace
     {
       moho::register_BVIntSetTypeInfo();
       moho::register_BVIntSetSerializer();
-      InitializeBVIntSetSerializer()->RegisterSerializeFunctions();
     }
   };
 

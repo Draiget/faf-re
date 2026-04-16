@@ -9,6 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/entity/Entity.h"
@@ -193,6 +194,21 @@ namespace
     return list.mHead != nullptr && list.mHead->mNext != list.mHead && list.mSize > 0;
   }
 
+  /**
+   * Address: 0x005D01E0 (FUN_005D01E0, silo-list sentinel allocator)
+   *
+   * What it does:
+   * Allocates one `SSiloTypeListNode` head sentinel and self-links its
+   * `{next,prev}` lanes for empty-list state.
+   */
+  [[nodiscard]] SSiloTypeListNode* AllocateSelfLinkedSiloTypeSentinel()
+  {
+    auto* const node = static_cast<SSiloTypeListNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+  }
+
   [[nodiscard]] ESiloType FrontSiloType(const SSiloTypeList& list) noexcept
   {
     return list.mHead->mNext->mValue;
@@ -210,7 +226,8 @@ namespace
   void InitializeSiloTypeList(SSiloTypeList& list)
   {
     list.mProxyOrUnused = nullptr;
-    list.mHead = AllocateSiloTypeNode(SILOTYPE_Tactical);
+    list.mHead = AllocateSelfLinkedSiloTypeSentinel();
+    list.mHead->mValue = SILOTYPE_Tactical;
     list.mSize = 0;
   }
 
@@ -295,7 +312,7 @@ namespace
   }
 
   /**
-   * Address: 0x005CFA20 (sub_5CFA20 equivalent used by CAiSiloBuildImpl paths)
+    * Alias of FUN_005CFA20 (non-canonical helper lane).
    */
   void DestroyEconomyRequestPointer(CEconRequest*& request)
   {
@@ -517,6 +534,40 @@ void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   GPG_ASSERT(econValueType != nullptr);
   archive->Write(econValueType, &mSegmentCost, owner);
   archive->Write(econValueType, &mSegmentSpent, owner);
+}
+
+/**
+ * Address: 0x005D08E0 (FUN_005D08E0)
+ *
+ * What it does:
+ * Thin serializer-save thunk lane forwarding one silo-build object/archive
+ * pair into `CAiSiloBuildImpl::MemberSerialize`.
+ */
+[[maybe_unused]] void CAiSiloBuildImplMemberSerializeThunkA(
+  const CAiSiloBuildImpl* const object,
+  gpg::WriteArchive* const archive
+)
+{
+  if (object != nullptr) {
+    object->MemberSerialize(archive);
+  }
+}
+
+/**
+ * Address: 0x005D1030 (FUN_005D1030)
+ *
+ * What it does:
+ * Secondary serializer-save thunk lane forwarding one silo-build
+ * object/archive pair into `CAiSiloBuildImpl::MemberSerialize`.
+ */
+[[maybe_unused]] void CAiSiloBuildImplMemberSerializeThunkB(
+  const CAiSiloBuildImpl* const object,
+  gpg::WriteArchive* const archive
+)
+{
+  if (object != nullptr) {
+    object->MemberSerialize(archive);
+  }
 }
 
 /**

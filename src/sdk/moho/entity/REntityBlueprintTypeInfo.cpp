@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 #include <type_traits>
 
@@ -214,6 +215,13 @@ namespace
 
     [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     [[nodiscard]] size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x00512DC0 (FUN_00512DC0, gpg::RVectorType_string::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected string-vector lane to a requested count using a
+     * default-constructed fill string.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -221,6 +229,8 @@ namespace
 
   msvc8::string gRStringVectorTypeName{};
   std::uint32_t gRStringVectorTypeNameInitGuard = 0u;
+  using StringVector = msvc8::vector<msvc8::string>;
+  constexpr std::size_t kStringVectorMaxElements = 0x9249249u;
 
   /**
    * Address: 0x00BF2760 (FUN_00BF2760, sub_BF2760)
@@ -267,6 +277,66 @@ namespace
     serSaveFunc_ = &RStringVectorTypeInfo::SerSave;
   }
 
+  /**
+   * Address: 0x00512FC0 (FUN_00512FC0, gpg::RVectorType_string::Reserve)
+   *
+   * What it does:
+   * Ensures a reflected string vector has enough capacity for a pending load
+   * or append sequence and preserves any pre-existing elements.
+   */
+  [[nodiscard]] std::size_t EnsureStringVectorCapacity(StringVector& value, const std::size_t requestedCount)
+  {
+    if (requestedCount > kStringVectorMaxElements) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    const std::size_t currentCount = value.size();
+    if (currentCount < requestedCount) {
+      value.reserve(requestedCount);
+    }
+
+    return currentCount;
+  }
+
+  /**
+   * Address: 0x005130E0 (FUN_005130E0, gpg::RVectorType_string::Resize)
+   *
+   * What it does:
+   * Resizes a reflected string vector to the requested count and default-fills
+   * new lanes from the supplied string template.
+   */
+  void ResizeStringVector(StringVector& value, const std::size_t count, msvc8::string fill)
+  {
+    value.resize(count, fill);
+  }
+
+  /**
+   * Address: 0x00512E30 (FUN_00512E30)
+   *
+   * What it does:
+   * Adapts one register-lane call shape into the canonical reflected
+   * `vector<string>` resize path using a default-constructed fill string.
+   */
+  [[maybe_unused]] void ResizeStringVectorWithDefaultFillLane(
+    StringVector* const storage,
+    const unsigned int requestedCount
+  )
+  {
+    if (storage == nullptr) {
+      return;
+    }
+
+    msvc8::string fill{};
+    ResizeStringVector(*storage, static_cast<std::size_t>(requestedCount), fill);
+  }
+
+  /**
+   * Address: 0x00512E60 (FUN_00512E60, gpg::RVectorType_string::SerLoad)
+   *
+   * What it does:
+   * Reads one serialized string-vector lane (count + string elements) and
+   * replaces destination storage.
+   */
   void RStringVectorTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
     const int objectPtr,
@@ -278,12 +348,12 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<msvc8::vector<msvc8::string>*>(objectPtr);
+    auto* const storage = reinterpret_cast<StringVector*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
-    msvc8::vector<msvc8::string> loaded{};
-    loaded.reserve(static_cast<std::size_t>(count));
+    StringVector loaded{};
+    (void)EnsureStringVectorCapacity(loaded, static_cast<std::size_t>(count));
 
     for (unsigned int index = 0; index < count; ++index) {
       msvc8::string value{};
@@ -305,7 +375,7 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<msvc8::vector<msvc8::string>*>(objectPtr);
+    auto* const storage = reinterpret_cast<StringVector*>(objectPtr);
     const unsigned int count = storage != nullptr ? static_cast<unsigned int>(storage->size()) : 0u;
     archive->WriteUInt(count);
 
@@ -323,7 +393,7 @@ namespace
     gpg::RRef out{};
     out.mType = CachedStringType();
 
-    auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
+    auto* const storage = static_cast<StringVector*>(obj);
     if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
       return out;
     }
@@ -334,18 +404,26 @@ namespace
 
   size_t RStringVectorTypeInfo::GetCount(void* const obj) const
   {
-    const auto* const storage = static_cast<const msvc8::vector<msvc8::string>*>(obj);
+    const auto* const storage = static_cast<const StringVector*>(obj);
     return storage ? storage->size() : 0u;
   }
 
+  /**
+   * Address: 0x00512DC0 (FUN_00512DC0, gpg::RVectorType_string::SetCount)
+   *
+   * What it does:
+   * Resizes one reflected string-vector lane to a requested count using a
+   * default-constructed fill string.
+   */
   void RStringVectorTypeInfo::SetCount(void* const obj, const int count) const
   {
-    auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
+    auto* const storage = static_cast<StringVector*>(obj);
     if (!storage || count < 0) {
       return;
     }
 
-    storage->resize(static_cast<std::size_t>(count));
+    msvc8::string fill{};
+    ResizeStringVector(*storage, static_cast<std::size_t>(count), fill);
   }
 
   alignas(EFootprintFlagsTypeInfo) unsigned char gEFootprintFlagsTypeInfoStorage[sizeof(EFootprintFlagsTypeInfo)];
@@ -807,4 +885,20 @@ gpg::RRef* gpg::RRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlue
     moho::REntityBlueprint::sType,
     gREntityBlueprintRRefCache
   );
+}
+
+/**
+ * Address: 0x0060C290 (FUN_0060C290, func_RRRefREntityBlueprint)
+ *
+ * What it does:
+ * Builds one temporary `RRef_REntityBlueprint` and copies `(mObj,mType)` into
+ * caller-owned output storage.
+ */
+gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlueprint* const value)
+{
+  gpg::RRef temp{};
+  (void)RRef_REntityBlueprint(&temp, value);
+  outRef->mObj = temp.mObj;
+  outRef->mType = temp.mType;
+  return outRef;
 }

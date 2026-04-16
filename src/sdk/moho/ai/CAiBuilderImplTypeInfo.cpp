@@ -1,5 +1,6 @@
 #include "moho/ai/CAiBuilderImplTypeInfo.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <map>
@@ -35,6 +36,177 @@ namespace
   alignas(CAiBuilderRebuildMapTypeInfo)
   unsigned char gCAiBuilderRebuildMapTypeInfoStorage[sizeof(CAiBuilderRebuildMapTypeInfo)] = {};
   bool gCAiBuilderRebuildMapTypeInfoConstructed = false;
+
+  struct RebuildMapIteratorRuntimeLane final
+  {
+    SBuilderRebuildNode* node = nullptr; // +0x00
+  };
+
+  struct RebuildMapInsertResultRuntimeLane final
+  {
+    SBuilderRebuildNode* node = nullptr; // +0x00
+    std::uint8_t inserted = 0U;          // +0x04
+    std::uint8_t pad05[3]{};             // +0x05
+  };
+
+  struct RebuildMapKeyValueRuntimeLane final
+  {
+    std::uint32_t key = 0U;                // +0x00
+    const RUnitBlueprint* blueprint = nullptr; // +0x04
+  };
+
+  static_assert(
+    offsetof(RebuildMapIteratorRuntimeLane, node) == 0x00,
+    "RebuildMapIteratorRuntimeLane::node offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RebuildMapInsertResultRuntimeLane, node) == 0x00,
+    "RebuildMapInsertResultRuntimeLane::node offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RebuildMapInsertResultRuntimeLane, inserted) == 0x04,
+    "RebuildMapInsertResultRuntimeLane::inserted offset must be 0x04"
+  );
+  static_assert(offsetof(RebuildMapKeyValueRuntimeLane, key) == 0x00, "RebuildMapKeyValueRuntimeLane::key offset must be 0x00");
+  static_assert(
+    offsetof(RebuildMapKeyValueRuntimeLane, blueprint) == 0x04,
+    "RebuildMapKeyValueRuntimeLane::blueprint offset must be 0x04"
+  );
+  static_assert(sizeof(RebuildMapIteratorRuntimeLane) == 0x04, "RebuildMapIteratorRuntimeLane size must be 0x04");
+  static_assert(sizeof(RebuildMapInsertResultRuntimeLane) == 0x08, "RebuildMapInsertResultRuntimeLane size must be 0x08");
+  static_assert(sizeof(RebuildMapKeyValueRuntimeLane) == 0x08, "RebuildMapKeyValueRuntimeLane size must be 0x08");
+
+  [[nodiscard]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLane(
+    RebuildMapIteratorRuntimeLane* const outLane,
+    SBuilderRebuildNode* const node
+  ) noexcept
+  {
+    outLane->node = node;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x005A0BB0 (FUN_005A0BB0)
+   *
+   * What it does:
+   * Adapter lane that stores one rebuild-map node pointer into iterator output.
+   */
+  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterA(
+    RebuildMapIteratorRuntimeLane* const outLane,
+    SBuilderRebuildNode* const node
+  ) noexcept
+  {
+    return StoreRebuildIteratorNodeLane(outLane, node);
+  }
+
+  /**
+   * Address: 0x005A0C00 (FUN_005A0C00)
+   *
+   * What it does:
+   * Secondary adapter lane that stores one rebuild-map node pointer into
+   * iterator output.
+   */
+  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterB(
+    RebuildMapIteratorRuntimeLane* const outLane,
+    SBuilderRebuildNode* const node
+  ) noexcept
+  {
+    return StoreRebuildIteratorNodeLane(outLane, node);
+  }
+
+  /**
+   * Address: 0x005A0C50 (FUN_005A0C50)
+   *
+   * What it does:
+   * Builds one `(key, blueprint)` value lane from split key/value source
+   * pointers.
+   */
+  [[maybe_unused]] RebuildMapKeyValueRuntimeLane* BuildRebuildMapKeyValueLane(
+    RebuildMapKeyValueRuntimeLane* const outLane,
+    const std::uint32_t* const keySource,
+    const RUnitBlueprint* const* const blueprintSource
+  ) noexcept
+  {
+    outLane->key = *keySource;
+    outLane->blueprint = *blueprintSource;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x005A1280 (FUN_005A1280)
+   *
+   * What it does:
+   * Tertiary adapter lane that stores one rebuild-map node pointer into
+   * iterator output.
+   */
+  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterC(
+    RebuildMapIteratorRuntimeLane* const outLane,
+    SBuilderRebuildNode* const node
+  ) noexcept
+  {
+    return StoreRebuildIteratorNodeLane(outLane, node);
+  }
+
+  /**
+   * Address: 0x005A1290 (FUN_005A1290)
+   *
+   * What it does:
+   * Clears one rebuild-map iterator node lane to null.
+   */
+  [[maybe_unused]] RebuildMapIteratorRuntimeLane* ClearRebuildIteratorNodeLane(
+    RebuildMapIteratorRuntimeLane* const outLane
+  ) noexcept
+  {
+    outLane->node = nullptr;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x005A12B0 (FUN_005A12B0)
+   *
+   * What it does:
+   * Quaternary adapter lane that stores one rebuild-map node pointer into
+   * iterator output.
+   */
+  [[maybe_unused]] RebuildMapIteratorRuntimeLane* StoreRebuildIteratorNodeLaneAdapterD(
+    RebuildMapIteratorRuntimeLane* const outLane,
+    SBuilderRebuildNode* const node
+  ) noexcept
+  {
+    return StoreRebuildIteratorNodeLane(outLane, node);
+  }
+
+  /**
+   * Address: 0x005A14C0 (FUN_005A14C0)
+   *
+   * What it does:
+   * Clears one rebuild-map insert-result node lane to null.
+   */
+  [[maybe_unused]] RebuildMapInsertResultRuntimeLane* ClearRebuildInsertResultNodeLane(
+    RebuildMapInsertResultRuntimeLane* const outLane
+  ) noexcept
+  {
+    outLane->node = nullptr;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x005A14E0 (FUN_005A14E0)
+   *
+   * What it does:
+   * Builds one `(node, inserted)` insert-result lane from split source
+   * pointers.
+   */
+  [[maybe_unused]] RebuildMapInsertResultRuntimeLane* BuildRebuildInsertResultLane(
+    RebuildMapInsertResultRuntimeLane* const outLane,
+    SBuilderRebuildNode* const* const nodeSource,
+    const std::uint8_t* const insertedSource
+  ) noexcept
+  {
+    outLane->node = *nodeSource;
+    outLane->inserted = *insertedSource;
+    return outLane;
+  }
 
   msvc8::string gCAiBuilderRebuildMapTypeName;
   bool gCAiBuilderRebuildMapTypeNameInitialized = false;
@@ -93,6 +265,29 @@ namespace
       IAiBuilder::sType = gpg::LookupRType(typeid(IAiBuilder));
     }
     return IAiBuilder::sType;
+  }
+
+  /**
+   * Address: 0x005A1C20 (FUN_005A1C20)
+   *
+   * What it does:
+   * Registers `IAiBuilder` as one reflected base lane for `CAiBuilderImpl` at
+   * offset `+0x00`.
+   */
+  void AddIAiBuilderBaseToCAiBuilderImplType(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedIAiBuilderType();
+    if (!baseType) {
+      return;
+    }
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
   }
 
   [[nodiscard]] gpg::RType* CachedUnsignedIntType()
@@ -457,15 +652,7 @@ void CAiBuilderImplTypeInfo::Init()
 {
   size_ = sizeof(CAiBuilderImpl);
   gpg::RType::Init();
-
-  gpg::RField baseField{};
-  baseField.mName = CachedIAiBuilderType()->GetName();
-  baseField.mType = CachedIAiBuilderType();
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
-
+  AddIAiBuilderBaseToCAiBuilderImplType(this);
   Finish();
 }
 

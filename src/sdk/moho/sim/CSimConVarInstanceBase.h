@@ -126,6 +126,26 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00579720 (FUN_00579720, sub_579720)
+     *
+     * What it does:
+     * Initializes one base sim-convar instance object with a bound command
+     * name lane.
+     */
+    explicit CSimConVarInstanceBase(const char* name);
+
+    /**
+     * Address: 0x00579730 (FUN_00579730, sub_579730)
+     * Address: 0x005D4260 (FUN_005D4260)
+     *
+     * What it does:
+     * Initializes one base sim-convar instance object and installs the
+     * `CSimConVarInstanceBase` vtable lane; the second constructor lane is an
+     * equivalent alias.
+     */
+    CSimConVarInstanceBase();
+
+    /**
      * Address: 0x00579740 (FUN_00579740, sub_579740)
      *
      * IDA signature:
@@ -207,6 +227,46 @@ namespace moho
   };
 
   /**
+   * Address: 0x0057FCC0 (FUN_0057FCC0, Moho::TSimConVarInstance_int::OnCall)
+   *
+   * What it does:
+   * Handles int sim-convar command arguments via the shared int parser helper;
+   * prints current value when fewer than two tokens are provided.
+   */
+  template <>
+  int TSimConVarInstance<int>::HandleConsoleCommand(void* commandArgs);
+
+  /**
+   * Address: 0x0057FC50 (FUN_0057FC50, Moho::TSimConVarInstance_bool::OnCall)
+   *
+   * What it does:
+   * Handles bool sim-convar command arguments using legacy bool parsing
+   * semantics (`=`, on/off/true/false/show/tog, numeric fallback).
+   */
+  template <>
+  int TSimConVarInstance<bool>::HandleConsoleCommand(void* commandArgs);
+
+  /**
+   * Address: 0x00735990 (FUN_00735990, Moho::TSimConVarInstance_uint8::OnCall)
+   *
+   * What it does:
+   * Handles uint8 sim-convar command arguments via the shared uint8 parser
+   * helper; prints current value when fewer than two tokens are provided.
+   */
+  template <>
+  int TSimConVarInstance<std::uint8_t>::HandleConsoleCommand(void* commandArgs);
+
+  /**
+   * Address: 0x00735AB0 (FUN_00735AB0, Moho::TSimConVarInstance_string::OnCall)
+   *
+   * What it does:
+   * Handles string sim-convar command arguments (`= value` or direct
+   * assignment); prints current value when fewer than two tokens are provided.
+   */
+  template <>
+  int TSimConVarInstance<msvc8::string>::HandleConsoleCommand(void* commandArgs);
+
+  /**
    * Address: 0x005D4180 (FUN_005D4180, Moho::TSimConVarInstance_float::OnCall)
    *
    * What it does:
@@ -227,6 +287,24 @@ namespace moho
   void* TSimConVarInstance<float>::GetValueStorage();
 
   /**
+   * Address: 0x0057FC70 (FUN_0057FC70, Moho::TSimConVarInstance_bool::GetPtr)
+   *
+   * What it does:
+   * Returns pointer to the bool value lane stored at offset +0x08.
+   */
+  template <>
+  void* TSimConVarInstance<bool>::GetValueStorage();
+
+  /**
+   * Address: 0x0057FD20 (FUN_0057FD20, Moho::TSimConVarInstance_int::GetPtr)
+   *
+   * What it does:
+   * Returns pointer to the int value lane stored at offset +0x08.
+   */
+  template <>
+  void* TSimConVarInstance<int>::GetValueStorage();
+
+  /**
    * Address: 0x0057FC80 (FUN_0057FC80, Moho::TSimConVarInstance_bool::GetRRef)
    *
    * What it does:
@@ -235,6 +313,36 @@ namespace moho
    */
   template <>
   gpg::RRef* TSimConVarInstance<bool>::GetValueRef(gpg::RRef* outRef);
+
+  /**
+   * Address: 0x0057FD30 (FUN_0057FD30, Moho::TSimConVarInstance_int::GetRRef)
+   *
+   * What it does:
+   * Builds one reflected int reference for this convar value and copies it
+   * into `outRef`.
+   */
+  template <>
+  gpg::RRef* TSimConVarInstance<int>::GetValueRef(gpg::RRef* outRef);
+
+  /**
+   * Address: 0x00735A00 (FUN_00735A00, Moho::TSimConVarInstance_uint8::GetRRef)
+   *
+   * What it does:
+   * Builds one reflected uint8 reference for this convar value and copies it
+   * into `outRef`.
+   */
+  template <>
+  gpg::RRef* TSimConVarInstance<std::uint8_t>::GetValueRef(gpg::RRef* outRef);
+
+  /**
+   * Address: 0x00735AE0 (FUN_00735AE0, Moho::TSimConVarInstance_string::GetRRef)
+   *
+   * What it does:
+   * Builds one reflected string reference for this convar value and copies it
+   * into `outRef`.
+   */
+  template <>
+  gpg::RRef* TSimConVarInstance<msvc8::string>::GetValueRef(gpg::RRef* outRef);
 
   /**
    * Address: 0x005D41F0 (FUN_005D41F0, Moho::TSimConVarInstance_float::GetRRef)

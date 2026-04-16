@@ -36,12 +36,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x006D2C00 (FUN_006D2C00, WeakUnitSetTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `WeakUnitSetTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyWeakUnitSetTypeInfoBody(WeakUnitSetTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x006D2BA0 (FUN_006D2BA0, sub_6D2BA0)
    */
   WeakUnitSetTypeInfo::~WeakUnitSetTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyWeakUnitSetTypeInfoBody(this);
   }
 
   /**
@@ -94,14 +110,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D2B10 (FUN_006D2B10, sub_6D2B10)
-   */
-  gpg::RType* construct_WeakUnitSetTypeInfo()
-  {
-    return &AcquireWeakUnitSetTypeInfo();
-  }
-
-  /**
    * Address: 0x00BFE480 (FUN_00BFE480, sub_BFE480)
    */
   void cleanup_WeakUnitSetTypeInfo()
@@ -119,7 +127,7 @@ namespace moho
    */
   int register_WeakUnitSetTypeInfo()
   {
-    (void)construct_WeakUnitSetTypeInfo();
+    (void)AcquireWeakUnitSetTypeInfo();
     return std::atexit(&cleanup_WeakUnitSetTypeInfo);
   }
 } // namespace moho

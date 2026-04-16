@@ -4,9 +4,59 @@
 
 // Forward declaration of QuatCrossAdd (defined in Sim.cpp at global scope)
 Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
 
 namespace moho
 {
+  namespace
+  {
+    /**
+     * Address: 0x00A3AD70 (FUN_00A3AD70)
+     *
+     * What it does:
+     * Converts one quaternion lane set in binary order `(x, y, z, w)` into a
+     * 3x3 rotation matrix lane buffer.
+     */
+    [[maybe_unused]] double* QuaternionToRotationMatrix3x3(
+      const double* const quaternionLanes,
+      double* const outMatrixLanes
+    ) noexcept
+    {
+      const double x = quaternionLanes[0];
+      const double y = quaternionLanes[1];
+      const double z = quaternionLanes[2];
+      const double w = quaternionLanes[3];
+
+      const double twoY = y * 2.0;
+      const double twoZ = z * 2.0;
+      const double twoW = w * 2.0;
+
+      const double twoXY = x * twoY;
+      const double twoXZ = x * twoZ;
+      const double twoXW = x * twoW;
+      const double twoYY = y * twoY;
+      const double twoYZ = y * twoZ;
+      const double twoYW = y * twoW;
+      const double twoZZ = z * twoZ;
+      const double twoZW = z * twoW;
+      const double twoWW = w * twoW;
+
+      outMatrixLanes[0] = 1.0 - (twoWW + twoZZ);
+      outMatrixLanes[1] = twoYZ - twoXW;
+      outMatrixLanes[2] = twoYW + twoXZ;
+      outMatrixLanes[3] = twoXW + twoYZ;
+      outMatrixLanes[4] = 1.0 - (twoWW + twoYY);
+      outMatrixLanes[5] = twoZW - twoXY;
+      outMatrixLanes[6] = twoYW - twoXZ;
+      outMatrixLanes[7] = twoZW + twoXY;
+      outMatrixLanes[8] = 1.0 - (twoYY + twoZZ);
+      return outMatrixLanes;
+    }
+  } // namespace
+
   /**
    * Address: 0x0062FB50 (FUN_0062FB50, func_NormalizeAngle)
    *
@@ -26,6 +76,50 @@ namespace moho
       return wrapped - kTwoPi;
     }
     return wrapped;
+  }
+
+  /**
+   * Address: 0x0062FBA0 (FUN_0062FBA0)
+   *
+   * What it does:
+   * Rotates one vector by the conjugate of one raw quaternion lane set.
+   */
+  [[maybe_unused]] Wm3::Vector3f* RotateVectorByConjugateQuaternionLanes(
+    const float* const quaternionLanes,
+    Wm3::Vector3f* const outVector,
+    const Wm3::Vector3f* const sourceVector
+  )
+  {
+    Wm3::Quaternionf conjugate{};
+    conjugate.x = quaternionLanes[0];
+    conjugate.y = -quaternionLanes[1];
+    conjugate.z = -quaternionLanes[2];
+    conjugate.w = -quaternionLanes[3];
+    moho::MultQuadVec(outVector, sourceVector, &conjugate);
+    return outVector;
+  }
+
+  /**
+   * Address: 0x00694AF0 (FUN_00694AF0)
+   *
+   * What it does:
+   * Extracts the quaternion-derived Y-axis matrix column
+   * `(m01, m11, m21)` into `outAxis` for one `(w,x,y,z)` quaternion lane.
+   */
+  [[maybe_unused]] Wm3::Vector3f* QuaternionExtractYAxisColumn(
+    Wm3::Vector3f* const outAxis,
+    const Wm3::Quaternionf* const quaternion
+  ) noexcept
+  {
+    const float x = quaternion->x;
+    const float y = quaternion->y;
+    const float z = quaternion->z;
+    const float w = quaternion->w;
+
+    outAxis->x = ((y * x) - (w * z)) * 2.0f;
+    outAxis->y = 1.0f - ((z * z) + (x * x)) * 2.0f;
+    outAxis->z = ((z * y) + (w * x)) * 2.0f;
+    return outAxis;
   }
 
   /**
@@ -197,6 +291,19 @@ namespace moho
     out->y = vectorComponents[1];
     out->z = vectorComponents[2];
     return out;
+  }
+
+  /**
+   * Address: 0x006D1E20 (FUN_006D1E20)
+   *
+   * What it does:
+   * Thin thunk alias that forwards one row-major 3x3 matrix conversion request
+   * to the canonical matrix-to-quaternion path.
+   */
+  [[maybe_unused]] Wm3::Quaternionf*
+  MatrixRowsToQuatCanonicalThunk(const Wm3::Vector3f* const matrixRows, Wm3::Quaternionf* const out) noexcept
+  {
+    return MatrixRowsToQuatCanonical(matrixRows, out);
   }
 
   /**
@@ -462,6 +569,50 @@ namespace moho
     quat->x = (dw * ox) + (dx * ow) + (dy * oz) - (dz * oy);
     quat->y = (dw * oy) - (dx * oz) + (dy * ow) + (dz * ox);
     quat->z = (dw * oz) + (dx * oy) - (dy * ox) + (dz * ow);
+  }
+
+  /**
+   * Address: 0x006C1070 (FUN_006C1070)
+   *
+   * What it does:
+   * Extracts one axis-angle representation from a quaternion, returning the
+   * normalized axis in `axisOut` and angle (radians) in `angleRadiansOut`.
+   */
+  void QuatToAxisAndAngle(
+    const Wm3::Quaternionf& quaternion,
+    Wm3::Vector3f* const axisOut,
+    float* const angleRadiansOut
+  ) noexcept
+  {
+    if (axisOut == nullptr || angleRadiansOut == nullptr) {
+      return;
+    }
+
+    constexpr float kAxisEpsilon = 1.0e-6f;
+    constexpr float kPi = 3.1415927f;
+    const float axisLengthSquared =
+      (quaternion.x * quaternion.x) + (quaternion.y * quaternion.y) + (quaternion.z * quaternion.z);
+
+    if (axisLengthSquared <= kAxisEpsilon) {
+      axisOut->x = 1.0f;
+      axisOut->y = 0.0f;
+      axisOut->z = 0.0f;
+      *angleRadiansOut = 0.0f;
+      return;
+    }
+
+    float halfAngle = 0.0f;
+    if (quaternion.w <= -1.0f) {
+      halfAngle = kPi;
+    } else if (quaternion.w < 1.0f) {
+      halfAngle = static_cast<float>(std::acos(static_cast<double>(quaternion.w)));
+    }
+
+    *angleRadiansOut = halfAngle * 2.0f;
+    const float inverseAxisLength = 1.0f / std::sqrt(axisLengthSquared);
+    axisOut->x = quaternion.x * inverseAxisLength;
+    axisOut->y = quaternion.y * inverseAxisLength;
+    axisOut->z = quaternion.z * inverseAxisLength;
   }
 
   /**

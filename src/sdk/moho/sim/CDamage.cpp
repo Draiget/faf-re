@@ -7,8 +7,12 @@
 #include <string>
 #include <typeinfo>
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/entity/Shield.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/sim/CDamageEMethodTypeInfo.h"
@@ -59,6 +63,48 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x00739B00 (FUN_00739B00)
+   *
+   * What it does:
+   * Atomically increments the `CDamage` instance stat lane and returns the
+   * original caller payload pointer unchanged.
+   */
+  [[maybe_unused]] [[nodiscard]] void* IncrementCDamageInstanceCounterAndReturnPayload(void* const payload) noexcept
+  {
+#if defined(_WIN32)
+    (void)::InterlockedExchangeAdd(
+      reinterpret_cast<volatile long*>(&moho::InstanceCounter<moho::CDamage>::GetStatItem()->mPrimaryValueBits),
+      1L
+    );
+#else
+    ++moho::InstanceCounter<moho::CDamage>::GetStatItem()->mPrimaryValueBits;
+#endif
+    return payload;
+  }
+
+  /**
+   * Address: 0x00739B30 (FUN_00739B30)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `CDamage`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCDamageTypeBridge()
+  {
+    gpg::RType* type = moho::CDamage::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CDamage));
+      moho::CDamage::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x0073AAC0 (FUN_0073AAC0)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `CDamageMethod`.
+   */
   [[nodiscard]] gpg::RType* CachedDamageMethodType()
   {
     static gpg::RType* cached = nullptr;
@@ -69,6 +115,12 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x0073AAE0 (FUN_0073AAE0)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `SMinMax<float>`.
+   */
   [[nodiscard]] gpg::RType* CachedSMinMaxFloatType()
   {
     static gpg::RType* cached = nullptr;
@@ -96,6 +148,139 @@ namespace
     LuaPlus::LuaObject scriptFactory{};
     moho::func_CreateLuaCDamage(&scriptFactory, sim->mLuaState);
     return scriptFactory;
+  }
+
+  /**
+   * Address: 0x00736DB0 (FUN_00736DB0)
+   *
+   * What it does:
+   * Returns true when one shield owns a collision primitive and that
+   * primitive contains the target entity world-position lane.
+   */
+  [[maybe_unused]] bool ShieldContainsEntityPosition(moho::Shield* const shield, moho::Entity* const entity)
+  {
+    if (shield != nullptr) {
+      moho::EntityCollisionUpdater* const collisionShape = shield->CollisionExtents;
+      if (collisionShape != nullptr) {
+        return collisionShape->PointInShape(&entity->Position);
+      }
+    }
+
+    gpg::Logf("invalid shield or missing collision primitive!");
+    return false;
+  }
+
+  /**
+   * Address: 0x00736DE0 (FUN_00736DE0, sub_736DE0)
+   *
+   * What it does:
+   * Returns true when `entity` lies inside at least one active shield
+   * collision primitive in `sim`.
+   */
+  [[maybe_unused]] bool EntityOverlapsAnyShield(moho::Sim* const sim, moho::Entity* const entity)
+  {
+    if (sim == nullptr || entity == nullptr) {
+      return false;
+    }
+
+    for (moho::Shield* const shield : sim->mShields) {
+      if (ShieldContainsEntityPosition(shield, entity)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Address: 0x00739BB0 (FUN_00739BB0)
+   *
+   * What it does:
+   * Removes one shield entry from the active damage-iteration list and returns
+   * the next iterator lane.
+   */
+  [[maybe_unused]] msvc8::list<moho::Shield*>::iterator RemoveDamageShieldEntry(
+    msvc8::list<moho::Shield*>& shields,
+    const msvc8::list<moho::Shield*>::iterator current
+  )
+  {
+    return shields.erase(current);
+  }
+
+  /**
+   * Address: 0x00739DD0 (FUN_00739DD0)
+   *
+   * What it does:
+   * Clears the temporary shield-iteration list used by the damage path and
+   * releases its owned entries.
+   */
+  [[maybe_unused]] void ResetDamageShieldIterationList(msvc8::list<moho::Shield*>& shields)
+  {
+    shields.clear();
+  }
+
+  struct DamageShieldListSentinelRuntimeNode
+  {
+    DamageShieldListSentinelRuntimeNode* next;
+    DamageShieldListSentinelRuntimeNode* prev;
+    std::uint32_t valueLane;
+  };
+  static_assert(
+    sizeof(DamageShieldListSentinelRuntimeNode) == 0x0C,
+    "DamageShieldListSentinelRuntimeNode size must be 0x0C"
+  );
+
+  /**
+   * Address: 0x00739DB0 (FUN_00739DB0, SIM shield-list sentinel allocator)
+   *
+   * What it does:
+   * Allocates one 12-byte shield-list sentinel lane and self-links its
+   * `{next,prev}` pointers.
+   */
+  [[maybe_unused]] [[nodiscard]] DamageShieldListSentinelRuntimeNode* AllocateSelfLinkedDamageShieldSentinel()
+  {
+    auto* const node =
+      static_cast<DamageShieldListSentinelRuntimeNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    node->next = node;
+    node->prev = node;
+    return node;
+  }
+
+  struct DamagePairSeed
+  {
+    std::uint32_t first;
+    std::uint32_t second;
+  };
+  static_assert(sizeof(DamagePairSeed) == 0x08, "DamagePairSeed size must be 0x08");
+
+  struct DamageLinkedPairNodeRuntime
+  {
+    DamageLinkedPairNodeRuntime* next;
+    DamageLinkedPairNodeRuntime* prev;
+    std::uint32_t payload0;
+    std::uint32_t payload1;
+  };
+  static_assert(sizeof(DamageLinkedPairNodeRuntime) == 0x10, "DamageLinkedPairNodeRuntime size must be 0x10");
+
+  /**
+   * Address: 0x0073A120 (FUN_0073A120, SIM damage linked-pair node allocator)
+   *
+   * What it does:
+   * Allocates one 16-byte linked node, seeds `{next,prev}` from caller lanes,
+   * and copies one 8-byte payload pair into the node tail.
+   */
+  [[maybe_unused]] [[nodiscard]] DamageLinkedPairNodeRuntime* AllocateLinkedDamagePairNode(
+    const DamagePairSeed& seed,
+    DamageLinkedPairNodeRuntime* const next,
+    DamageLinkedPairNodeRuntime* const prev
+  )
+  {
+    auto* const node = static_cast<DamageLinkedPairNodeRuntime*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
+    node->next = next;
+    node->prev = prev;
+    node->payload0 = seed.first;
+    node->payload1 = seed.second;
+    return node;
   }
 } // namespace
 

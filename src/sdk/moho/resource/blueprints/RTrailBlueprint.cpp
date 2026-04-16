@@ -30,6 +30,19 @@ namespace moho
   {}
 
   /**
+   * Address: 0x0050EE20 (FUN_0050EE20, Moho::RTrailBlueprint::dtr core)
+   *
+   * What it does:
+   * Releases trail texture string storage and resets base resource-id storage.
+   */
+  RTrailBlueprint::~RTrailBlueprint()
+  {
+    RampTexture.tidy(true, 0U);
+    RepeatTexture.tidy(true, 0U);
+    BlueprintId.name.tidy(true, 0U);
+  }
+
+  /**
    * Address: 0x0050ED40 (FUN_0050ED40)
    * Mangled: ?GetClass@RTrailBlueprint@Moho@@UBEPAVRType@gpg@@XZ
    *

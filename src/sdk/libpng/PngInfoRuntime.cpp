@@ -9,6 +9,25 @@
 #include "libpng/PngSetRuntime.h"   // png_info_struct field layout
 #include "libpng/PngStructRuntime.h"
 
+namespace {
+
+struct PngInfoRowLayoutRuntimeView
+{
+  std::uint8_t pad00_5F[0x60]{};
+  std::uint32_t rowbytes = 0;  // +0x60
+  std::uint8_t channels = 0;   // +0x64
+  std::uint8_t pixelDepth = 0; // +0x65
+};
+
+static_assert(offsetof(PngInfoRowLayoutRuntimeView, rowbytes) == 0x60,
+              "PngInfoRowLayoutRuntimeView::rowbytes offset must be 0x60");
+static_assert(offsetof(PngInfoRowLayoutRuntimeView, channels) == 0x64,
+              "PngInfoRowLayoutRuntimeView::channels offset must be 0x64");
+static_assert(offsetof(PngInfoRowLayoutRuntimeView, pixelDepth) == 0x65,
+              "PngInfoRowLayoutRuntimeView::pixelDepth offset must be 0x65");
+
+} // namespace
+
 /**
  * Address: 0x009E0567 (FUN_009E0567)
  *
@@ -83,4 +102,40 @@ extern "C" std::uint32_t png_get_valid(png_structp png_ptr, png_infop info_ptr, 
   }
   // info_ptr->valid is a uint32_t at +0x08 (see PngSetRuntime.h layout view).
   return flag & info_ptr->valid;
+}
+
+/**
+ * Address: 0x009E25C1 (FUN_009E25C1)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E25C1(int a1, int a2, char a3, char a4);
+ *
+ * What it does:
+ * Stores rowbytes/channels/pixel-depth lanes in one png_info payload.
+ */
+extern "C" void png_info_set_row_layout_runtime(
+  png_infop const info_ptr,
+  const std::uint32_t rowbytes,
+  const std::uint8_t channels,
+  const std::uint8_t pixel_depth)
+{
+  auto* const info = reinterpret_cast<PngInfoRowLayoutRuntimeView*>(info_ptr);
+  info->rowbytes = rowbytes;
+  info->channels = channels;
+  info->pixelDepth = pixel_depth;
+}
+
+/**
+ * Address: 0x009E25DB (FUN_009E25DB)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E25DB(int a1);
+ *
+ * What it does:
+ * Returns one png_info rowbytes lane (`+0x60`).
+ */
+extern "C" std::uint32_t png_info_get_rowbytes_runtime(png_infop info_ptr)
+{
+  const auto* const info = reinterpret_cast<const PngInfoRowLayoutRuntimeView*>(info_ptr);
+  return info->rowbytes;
 }

@@ -95,6 +95,20 @@ CHostManager::~CHostManager()
 }
 
 /**
+ * Address: 0x00BEF9F0 (FUN_00BEF9F0, ??1sHostManager@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Thunk lane that forwards one host-manager teardown request into
+ * `FUN_0047FA40`.
+ */
+[[maybe_unused]] void DestroyHostManagerRuntimeAdapter(CHostManager* const manager) noexcept
+{
+  if (manager != nullptr) {
+    manager->~CHostManager();
+  }
+}
+
+/**
  * Address: 0x0047FF10 (FUN_0047FF10)
  * Mangled: ?NET_GetAddrInfo@Moho@@YA_NVStrArg@gpg@@G_NAAIAAG@Z
  *

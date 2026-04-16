@@ -49,7 +49,7 @@ namespace
 
   void DestroySTriggerState(moho::STrigger* const trigger)
   {
-    // Address: 0x00711A90 (FUN_00711A90, sub_711A90).
+    // Alias of FUN_00711A90 (non-canonical helper lane).
     if (!trigger) {
       return;
     }
@@ -64,6 +64,96 @@ namespace
     }
     trigger->mConditions.end = trigger->mConditions.begin;
     trigger->mName.tidy(true, 0U);
+  }
+
+  /**
+   * Address: 0x00714850 (FUN_00714850)
+   *
+   * What it does:
+   * Deleting-dtor thunk lane for `STrigger`: runs the canonical destructor
+   * body and frees object storage when the pointer is non-null.
+   */
+  [[maybe_unused]] void DestroySTriggerAndFreeThunk(moho::STrigger* const trigger)
+  {
+    if (trigger == nullptr) {
+      return;
+    }
+
+    trigger->~STrigger();
+    ::operator delete(trigger);
+  }
+
+  /**
+   * Address: 0x00713950 (FUN_00713950)
+   *
+   * What it does:
+   * Backward-copies one `SCondition` range into potentially overlapping
+   * destination storage and returns the new destination begin iterator.
+   */
+  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRange(
+    moho::SCondition* sourceCurrent,
+    const moho::SCondition* const sourceBegin,
+    moho::SCondition* destinationCurrent
+  )
+  {
+    while (sourceCurrent != sourceBegin) {
+      --sourceCurrent;
+      --destinationCurrent;
+
+      destinationCurrent->mItem = sourceCurrent->mItem;
+      destinationCurrent->mOp = sourceCurrent->mOp;
+      destinationCurrent->mCat = sourceCurrent->mCat;
+      destinationCurrent->mVal = sourceCurrent->mVal;
+      std::memcpy(destinationCurrent->mPad34, sourceCurrent->mPad34, sizeof(destinationCurrent->mPad34));
+    }
+
+    return destinationCurrent;
+  }
+
+  /**
+   * Address: 0x007138C0 (FUN_007138C0)
+   *
+   * What it does:
+   * Secondary lane for backward-copying one `SCondition` range into
+   * potentially overlapping destination storage.
+   */
+  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeLaneA(
+    moho::SCondition* sourceCurrent,
+    const moho::SCondition* const sourceBegin,
+    moho::SCondition* destinationCurrent
+  )
+  {
+    return CopyBackwardSConditionRange(sourceCurrent, sourceBegin, destinationCurrent);
+  }
+
+  /**
+   * Address: 0x00712840 (FUN_00712840)
+   *
+   * What it does:
+   * Thin jump-thunk alias to the `FUN_007138C0` backward-copy lane.
+   */
+  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeThunkA(
+    moho::SCondition* sourceCurrent,
+    const moho::SCondition* const sourceBegin,
+    moho::SCondition* destinationCurrent
+  )
+  {
+    return CopyBackwardSConditionRangeLaneA(sourceCurrent, sourceBegin, destinationCurrent);
+  }
+
+  /**
+   * Address: 0x00712870 (FUN_00712870)
+   *
+   * What it does:
+   * Thin jump-thunk alias to the `FUN_00713950` backward-copy lane.
+   */
+  [[maybe_unused]] moho::SCondition* CopyBackwardSConditionRangeThunkB(
+    moho::SCondition* sourceCurrent,
+    const moho::SCondition* const sourceBegin,
+    moho::SCondition* destinationCurrent
+  )
+  {
+    return CopyBackwardSConditionRange(sourceCurrent, sourceBegin, destinationCurrent);
   }
 } // namespace
 

@@ -15,7 +15,7 @@ using namespace moho;
 namespace moho
 {
   /**
-   * Address: 0x00484660 (FUN_00484660)
+    * Alias of FUN_00484660 (non-canonical helper lane).
    *
    * What it does:
    * Tracks an accepted socket until first TCP connect payload is decoded.
@@ -33,7 +33,7 @@ namespace moho
     std::uint32_t mPad0xB4;
 
     /**
-     * Address: 0x00484660 (FUN_00484660)
+     * Address: 0x00484660 (FUN_00484660, Moho::SPartialConnection::SPartialConnection)
      */
     STcpPartialConnection(CNetTCPConnector* connector, const SOCKET socket, const u_long address, const u_short port)
       : TDatListItem<STcpPartialConnection, void>()
@@ -170,7 +170,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00485810 (FUN_00485810, helper inside connector pull flow)
+    * Alias of FUN_00485810 (non-canonical helper lane).
    *
    * What it does:
    * Unlinks an in-flight frame from connector work-chain if still active.

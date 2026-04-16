@@ -1,14 +1,178 @@
 #include "moho/effects/rendering/IEffect.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
+#include "moho/sim/Sim.h"
 
 namespace moho
 {
   gpg::RType* IEffect::sType = nullptr;
+
+  namespace
+  {
+    [[nodiscard]] LuaPlus::LuaObject BuildEffectLuaFactoryObject(CEffectManagerImpl* const manager)
+    {
+      LuaPlus::LuaObject factory{};
+      if (manager == nullptr) {
+        return factory;
+      }
+
+      Sim* const sim = manager->GetSim();
+      LuaPlus::LuaState* const luaState = sim != nullptr ? sim->GetLuaState() : nullptr;
+      (void)func_CreateLuaIEffect(&factory, luaState);
+      return factory;
+    }
+
+    void InitializeEffectManagerNodeAndStats(IEffect& effect)
+    {
+      effect.mManagerListNode.mNext = &effect.mManagerListNode;
+      effect.mManagerListNode.mPrev = &effect.mManagerListNode;
+
+      if (StatItem* const statItem = InstanceCounter<IEffect>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+        (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
+#else
+        statItem->mPrimaryValueBits += 1;
+#endif
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00658F00 (FUN_00658F00, Moho::IEffect::IEffect)
+   */
+  IEffect::IEffect()
+    : CScriptObject()
+  {
+    InitializeEffectManagerNodeAndStats(*this);
+
+    mUnknown3C = 0;
+    mUnknown40 = 0xFFFFFFFFu;
+  }
+
+  /**
+   * Address: 0x00658F70 (FUN_00658F70, Moho::IEffect::IEffect)
+   *
+   * What it does:
+   * Builds manager-bound script metadata from the owning sim Lua state and
+   * initializes one effect runtime lane with manager and script token fields.
+   */
+  IEffect::IEffect(CEffectManagerImpl* const manager, const int scriptObjectToken)
+    : CScriptObject(BuildEffectLuaFactoryObject(manager), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
+  {
+    InitializeEffectManagerNodeAndStats(*this);
+
+    const std::uintptr_t rawManager = reinterpret_cast<std::uintptr_t>(manager);
+    mUnknown3C = static_cast<std::uint32_t>(rawManager);
+    mUnknown40 = static_cast<std::uint32_t>(scriptObjectToken);
+  }
+
+  /**
+   * Address: 0x00659960 (FUN_00659960)
+   *
+   * What it does:
+   * Atomically increments the `IEffect` instance counter stat and returns one
+   * caller-passthrough value unchanged.
+   */
+  [[maybe_unused]] int IncrementIEffectInstanceCounterAndReturnPassthrough(const int passthrough)
+  {
+    if (StatItem* const statItem = InstanceCounter<IEffect>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+      (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
+#else
+      statItem->mPrimaryValueBits += 1;
+#endif
+    }
+
+    return passthrough;
+  }
+
+  /**
+   * Address: 0x00659950 (FUN_00659950)
+   *
+   * What it does:
+   * Initializes one effect-manager intrusive node to singleton self-links.
+   */
+  [[maybe_unused]] IEffect::ManagerListNode* InitializeIEffectManagerNodeSelfLinks(
+    IEffect::ManagerListNode* const node
+  ) noexcept
+  {
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x00657BF0 (FUN_00657BF0)
+   *
+   * What it does:
+   * Unlinks one effect-manager intrusive node from its current ring and
+   * restores singleton self-links.
+   */
+  [[maybe_unused]] IEffect::ManagerListNode* UnlinkIEffectManagerNodeAndSelfLink(
+    IEffect::ManagerListNode* const node
+  ) noexcept
+  {
+    node->mPrev->mNext = node->mNext;
+    node->mNext->mPrev = node->mPrev;
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x00654260 (FUN_00654260)
+   *
+   * What it does:
+   * Reads one opaque manager-owner lane at `IEffect+0x3C`.
+   */
+  [[maybe_unused]] std::uint32_t ReadIEffectManagerOwnerLane(const IEffect* const effect) noexcept
+  {
+    return effect->mUnknown3C;
+  }
+
+  struct RefCountedRuntimeView
+  {
+    void** vtable = nullptr; // +0x00
+    volatile long refCount = 0; // +0x04
+  };
+  static_assert(sizeof(RefCountedRuntimeView) == 0x08, "RefCountedRuntimeView size must be 0x08");
+  static_assert(offsetof(RefCountedRuntimeView, refCount) == 0x04, "RefCountedRuntimeView::refCount offset must be 0x04");
+
+  /**
+   * Address: 0x00658440 (FUN_00658440)
+   *
+   * What it does:
+   * Releases one ref-counted object pointer lane and nulls the caller slot.
+   */
+  [[maybe_unused]] RefCountedRuntimeView** ReleaseRefCountedPointerAndClearSlot(
+    RefCountedRuntimeView** const objectSlot
+  ) noexcept
+  {
+    RefCountedRuntimeView* const object = *objectSlot;
+    if (object != nullptr) {
+#if defined(_WIN32)
+      if (::InterlockedExchangeAdd(&object->refCount, -1L) == 1L)
+#else
+      if (--object->refCount == 0L)
+#endif
+      {
+        using DeleteWithFlagFn = void(__thiscall*)(RefCountedRuntimeView*, int);
+        const auto destroy = reinterpret_cast<DeleteWithFlagFn>(object->vtable[0]);
+        destroy(object, 1);
+      }
+    }
+
+    *objectSlot = nullptr;
+    return objectSlot;
+  }
 
   /**
    * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
@@ -22,7 +186,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
+    * Alias of FUN_00654220 (non-canonical helper lane).
    */
   gpg::RType* IEffect::GetClass() const
   {
@@ -146,7 +310,7 @@ namespace moho
   {}
 
   /**
-   * Address: 0x006543C0 (FUN_006543C0, Moho::IEffect::OnTick)
+    * Alias of FUN_006543C0 (non-canonical helper lane).
    */
   void IEffect::OnTick()
   {}

@@ -5,6 +5,7 @@
 #include "moho/sim/CWldSession.h"
 #include "utils/signatures.h"
 #include "utils/memory/detours.h"
+#include "utils/discovery_tracer.h"
 #include "utils/debug.h"
 #include "utils/rtti_dump.h"
 #include "moho/sim/Sim.h"
@@ -24,6 +25,7 @@ std::unique_ptr<detours::Detour<EntityCreateUnitFn>> g_Entity_CreateUnit;
 std::unique_ptr<detours::Detour<SessionBeginFn>> g_Session_Begin;
 
 static moho::CWldSession** g_Session;
+static HMODULE g_InspectModule = nullptr;
 
 bool InstallDetours();
 void UninstallDetours();
@@ -48,6 +50,7 @@ static DWORD EntryThread_Impl(LPVOID) {
 	// DumpAllRtti("G:\\projects\\faf-main\\rtti_dump_all.hpp", opts);
 
     InstallDetours();
+    inspect::discovery::Start(g_InspectModule);
 
     OutputDebugStringW(L"[inspect] init done\n");
     return 0;
@@ -65,6 +68,7 @@ static DWORD WINAPI EntryThread(LPVOID param) {
 
 BOOL APIENTRY DllMain(HMODULE h, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
+        g_InspectModule = h;
         DisableThreadLibraryCalls(h);
         const HANDLE th = CreateThread(nullptr, 0, EntryThread, nullptr, 0, nullptr);
         if (th) {
@@ -170,14 +174,20 @@ bool InstallDetours() {
 
 void UninstallDetours() {
     g_Sim_CreateArmy.reset();
+    g_Entity_CreateUnit.reset();
+    g_Session_Begin.reset();
+    inspect::discovery::Stop();
 }
 
 extern "C" __declspec(dllexport) DWORD WINAPI Inspect_Reinit(LPVOID) {
-	/* re-hook, DebugBreak, etc. */
+    if (!g_Sim_CreateArmy || !g_Entity_CreateUnit || !g_Session_Begin) {
+        InstallDetours();
+    }
+    inspect::discovery::Start(g_InspectModule);
 	return 0;
 }
 
 extern "C" __declspec(dllexport) DWORD WINAPI Inspect_Cleanup(LPVOID) {
-	/* unhook */
+    UninstallDetours();
 	return 0;
 }

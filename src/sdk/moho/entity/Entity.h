@@ -23,6 +23,7 @@
 #include "Wm3Box3.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Sphere3.h"
+#include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
 struct lua_State;
@@ -61,10 +62,12 @@ namespace moho
   class CSndParams;
   class STIMap;
   struct CollisionPairResult;
+  struct CollisionLineResult;
   enum EVisibilityMode : std::int32_t;
   struct PositionHistory;
   struct SCoordsVec2;
   struct SOCellPos;
+  struct SScroller;
   struct SFootprint;
   struct SSyncData;
 
@@ -97,6 +100,8 @@ namespace moho
    */
   struct EntityAttributes : SSTIIntelAttributes
   {
+    inline static gpg::RType* sType = nullptr;
+
     /**
      * Address: 0x005BD530 (FUN_005BD530, Moho::EntityAttributes::GetRange)
      *
@@ -123,6 +128,15 @@ namespace moho
      * jammer/spoof lanes always report disabled.
      */
     [[nodiscard]] bool IsEnabled(EEntityAttribute attribute) const noexcept;
+
+    /**
+     * Address: 0x00689DC0 (FUN_00689DC0, Moho::EntityAttributes::SetEnabled)
+     *
+     * What it does:
+     * Writes the sign-bit enable flag for one intel-bearing lane while
+     * preserving the stored radius payload.
+     */
+    void SetEnabled(EEntityAttribute attribute, bool enabled) noexcept;
 
     /**
      * Address: 0x00559350 (FUN_00559350, Moho::EntityAttributes::MemberDeserialize)
@@ -294,6 +308,16 @@ namespace moho
   [[nodiscard]] Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept;
 
   /**
+   * Address: 0x0050B620 (FUN_0050B620, ?COORDS_ForwardVector@Moho@@YA?AV?$Vector3@M@Wm3@@MM@Z)
+   *
+   * What it does:
+   * Converts heading/pitch radians into one unit forward vector using the
+   * engine's original sign convention (`+x = sin(heading)`, `+z = cos(heading)`,
+   * `+y` inverted for positive pitch).
+   */
+  [[nodiscard]] Wm3::Vector3f COORDS_ForwardVector(float heading, float pitch) noexcept;
+
+  /**
    * Address: 0x0050B710 (FUN_0050B710, ?COORDS_Pitch@Moho@@YAMABV?$Vector3@M@Wm3@@@Z)
    *
    * What it does:
@@ -331,6 +355,15 @@ namespace moho
   [[nodiscard]] ELayer COORDS_StringToLayer(const char* layerName) noexcept;
 
   /**
+   * Address: 0x0050AF80 (FUN_0050AF80, ?COORDS_ToRect@Moho@@YA?AV?$Rect2@H@gpg@@ABUSOCellPos@1@ABUSFootprint@1@@Z)
+   *
+   * What it does:
+   * Converts one footprint-origin cell position plus footprint dimensions into
+   * one half-open grid rectangle (`x0/z0` inclusive, `x1/z1` exclusive).
+   */
+  [[nodiscard]] gpg::Rect2i COORDS_ToRect(const SOCellPos& cellPos, const SFootprint& footprint) noexcept;
+
+  /**
    * Address: 0x0050AFA0 (FUN_0050AFA0, Moho::COORDS_ToGridRect)
    *
    * What it does:
@@ -340,6 +373,15 @@ namespace moho
    * match the binary's `WORD` cast.
    */
   gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* result, const SCoordsVec2& centerXZ, int sizeX, int sizeZ);
+
+  /**
+   * Address: 0x0050B090 (FUN_0050B090, ?COORDS_Elevation@Moho@@YAMPBVSTIMap@1@MME@Z)
+   *
+   * What it does:
+   * Samples terrain elevation and optionally clamps it to water elevation when
+   * the requested layer is not seabed-capable.
+   */
+  [[nodiscard]] float COORDS_Elevation(const STIMap* map, float x, float z, ELayer layer) noexcept;
 
   /**
    * Address: 0x0050B010 (FUN_0050B010, Moho::COORDS_ToGridRect)
@@ -369,6 +411,16 @@ namespace moho
    */
   [[nodiscard]] Wm3::Vector3f
   COORDS_ToWorldPos(const STIMap* map, const SOCellPos& cellPos, const SFootprint& footprint) noexcept;
+
+  /**
+   * Address: 0x0050B1D0 (FUN_0050B1D0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@@Z)
+   *
+   * What it does:
+   * Builds one world-space vector from raw XZ coordinates and samples
+   * elevation using footprint occupancy and water rules.
+   */
+  [[nodiscard]] Wm3::Vector3f
+  COORDS_ToWorldPos(const STIMap* map, const SCoordsVec2& worldPos, const SFootprint& footprint) noexcept;
 
   /**
    * Address: 0x0050B260 (FUN_0050B260, ?COORDS_GridSnap@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@W4ELayer@1@@Z)
@@ -623,6 +675,8 @@ namespace moho
   {
     // Primary vftable (38 entries)
   public:
+    inline static gpg::RType* sType = nullptr;
+
     /**
      * Address: 0x00676C40
      * VFTable SLOT: 0
@@ -646,8 +700,13 @@ namespace moho
     [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
-     * Address: 0x00677C60
+     * Address: 0x006785D0 (FUN_006785D0, ??1Entity@Moho@@MAE@XZ)
+     * Deleting thunk: 0x00677C60 (FUN_00677C60)
      * VFTable SLOT: 2
+     *
+     * What it does:
+     * Releases runtime-owned entity resources, unlinks attach/shooter state,
+     * and then falls through to base/member teardown.
      */
     virtual ~Entity() = 0;
 
@@ -661,6 +720,15 @@ namespace moho
      * from `Sim` and collision-bucket flags without blueprint script binding.
      */
     Entity(Sim* sim, std::uint32_t collisionBucketFlags);
+
+    /**
+     * Address: 0x00678160 (FUN_00678160, ??0Entity@Moho@@IAE@PAVSim@1@VEntId@1@H@Z)
+     *
+     * What it does:
+     * Initializes base entity storage from `(sim, entityId, bucketFlags)` and
+     * then dispatches `StandardInit`.
+     */
+    Entity(Sim* sim, EntId entityId, std::uint32_t collisionBucketFlags);
 
     /**
      * Address: 0x00677C90 (FUN_00677C90)
@@ -723,7 +791,7 @@ namespace moho
     int TaskTick();
 
     /**
-     * Address: 0x00679F70
+       * Address: 0x00679F70 (FUN_00679F70)
      * (CTask secondary vtable Execute slot forwards to TaskTick path.)
      */
     int Execute() override;
@@ -843,6 +911,57 @@ namespace moho
     virtual void SetMesh(const RResId&, struct RMeshBlueprint*, bool);
 
     /**
+     * Address: 0x0067A8B0 (FUN_0067A8B0, ?ChangeScroller@Entity@Moho@@QAEXABUSScroller@2@@Z)
+     *
+     * What it does:
+     * Ensures one runtime texture-scroller instance exists, then applies a new
+     * `SScroller` definition payload.
+     */
+    void ChangeScroller(const SScroller& definition);
+
+    /**
+     * Address: 0x0067A900 (FUN_0067A900, ?UpdateScrollPos@Entity@Moho@@QAEXQAM@Z)
+     *
+     * What it does:
+     * Seeds both texture-scroll lanes from one incoming UV coordinate pair.
+     */
+    void UpdateScrollPos(const Wm3::Vec2f& scrollPosition);
+
+    /**
+     * Address: 0x0067A930 (FUN_0067A930, ?UpdateScroll@Entity@Moho@@QAEXQAM@Z)
+     *
+     * What it does:
+     * Copies current scroll lane to previous and advances current lane by one
+     * delta vector.
+     */
+    void UpdateScroll(const Wm3::Vec2f& scrollDelta);
+
+    /**
+     * Address: 0x0067A980 (FUN_0067A980, ?StopScroll@Entity@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Collapses scroll motion by snapping current lane to previous lane.
+     */
+    void StopScroll();
+
+    /**
+     * Address: 0x00678D80 (FUN_00678D80, ?SetAnimScoll@Entity@Moho@@QAEXMM@Z)
+     *
+     * What it does:
+     * Shifts the current texture-scroll lane into the previous lane and stores
+     * one new animation scroll lane pair.
+     */
+    void SetAnimScroll(float scrollX, float scrollY);
+
+    /**
+     * Address: 0x0067A9A0 (FUN_0067A9A0, ?SetAmbientSound@Entity@Moho@@QAEXPAVCSndParams@2@0@Z)
+     *
+     * What it does:
+     * Stores ambient detail and rumble sound parameter lanes.
+     */
+    void SetAmbientSound(CSndParams* detailSound, CSndParams* rumbleSound);
+
+    /**
      * Address: 0x005BDBD0
      * VFTable SLOT: 14
      */
@@ -910,6 +1029,23 @@ namespace moho
     void AddShooter(Entity* shooter);
 
     /**
+     * Address: 0x0067A160 (FUN_0067A160, ?RemoveShooter@Entity@Moho@@QAEXPAV12@@Z)
+     * Mangled: ?RemoveShooter@Entity@Moho@@QAEXPAV12@@Z
+     *
+     * What it does:
+     * Removes this entity from `target->mShooters` when `target` is non-null.
+     */
+    void RemoveShooter(Entity* target);
+
+    /**
+     * Address: 0x0067A180 (FUN_0067A180, Moho::Entity::GetNumShooters)
+     *
+     * What it does:
+     * Returns the current number of shooter entities tracked in `mShooters`.
+     */
+    [[nodiscard]] int GetNumShooters() const;
+
+    /**
      * Address: 0x00679290 (FUN_00679290, ?GetPhysBody@Entity@Moho@@QAEPAUSPhysBody@2@_N@Z)
      *
      * What it does:
@@ -918,13 +1054,33 @@ namespace moho
      */
     [[nodiscard]] SPhysBody* GetPhysBody(bool unusedFlag = false);
 
+    /**
+     * Address: 0x006793D0 (FUN_006793D0, ?AddWorldImpulse@Entity@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z)
+     * Mangled: ?AddWorldImpulse@Entity@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z
+     *
+     * What it does:
+     * Applies one world-space impulse at one world-space application point to
+     * this entity's cached physics-body state when present.
+     */
+    void AddWorldImpulse(const Wm3::Vec3f& impulse, const Wm3::Vec3f& worldPoint);
+
+    /**
+     * Address: 0x006794D0 (FUN_006794D0, ?AddLocalImpulse@Entity@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z)
+     * Mangled: ?AddLocalImpulse@Entity@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z
+     *
+     * What it does:
+     * Applies one local impulse payload to this entity's physics body when
+     * the body lane exists.
+     */
+    void AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint);
+
     /** Address: 0x00679CE0, VFTable SLOT: 18 */
     virtual VTransform GetBoneWorldTransform(int) const;
 
     /** Address: 0x00679E20, VFTable SLOT: 19 */
     virtual VTransform GetBoneLocalTransform(int) const;
 
-    /** Address: 0x00679F70, VFTable SLOT: 20 */
+    /** Alias of FUN_00679F70 (non-canonical helper lane). */
     virtual int MotionTick();
 
     /**
@@ -942,7 +1098,7 @@ namespace moho
     virtual msvc8::vector<Entity*>& GetAttachedEntities();
 
     /**
-     * Address: 0x00679550 (FUN_00679550)
+      * Alias of FUN_00679550 (non-canonical helper lane).
      * VFTable SLOT: 23
      *
      * What it does:
@@ -985,7 +1141,7 @@ namespace moho
     virtual void Kill(Entity*, gpg::StrArg, float);
 
     /**
-     * Address: 0x00679B80 (FUN_00679B80)
+      * Alias of FUN_00679B80 (non-canonical helper lane).
      * VFTable SLOT: 32
      *
      * What it does:
@@ -1032,7 +1188,26 @@ namespace moho
     [[nodiscard]] bool Intersects(const Wm3::Box3f& box, CollisionPairResult* outResult);
 
     /**
-     * Address: 0x0067AC40 (FUN_0067AC40)
+     * Address: 0x0067A9B0 (FUN_0067A9B0, ?Intersects@Entity@Moho@@QAE_NABV?$Sphere3@M@Wm3@@PAUCollisionResult@2@@Z)
+     *
+     * What it does:
+     * Tests one world sphere against this entity's collision primitive and, on
+     * hit, stamps this entity as the source lane in `outResult`.
+     */
+    [[nodiscard]] bool Intersects(const Wm3::Sphere3f& sphere, CollisionPairResult* outResult);
+
+    /**
+     * Address: 0x0067A9F0 (FUN_0067A9F0, ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
+     *
+     * What it does:
+     * Tests one world line segment against this entity's collision primitive
+     * and, on hit, stamps this entity as the source lane in `outResult`.
+     */
+    [[nodiscard]] bool
+    Intersects(const Wm3::Vec3f& lineStart, const Wm3::Vec3f& lineEnd, CollisionLineResult* outResult);
+
+    /**
+      * Alias of FUN_0067AC40 (non-canonical helper lane).
      *
      * What it does:
      * Installs a box collision primitive, applies current transform, relinks
@@ -1041,7 +1216,7 @@ namespace moho
     void SetCollisionBoxShape(const Wm3::Box3f& localBox);
 
     /**
-     * Address: 0x0067AD30 (FUN_0067AD30)
+      * Alias of FUN_0067AD30 (non-canonical helper lane).
      *
      * What it does:
      * Installs a sphere collision primitive, applies current transform,
@@ -1060,7 +1235,7 @@ namespace moho
     void GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const;
 
     /**
-     * Address: 0x0067AE00 (FUN_0067AE00)
+      * Alias of FUN_0067AE00 (non-canonical helper lane).
      *
      * What it does:
      * Deletes active collision primitive and clears collision-cell span.
@@ -1075,7 +1250,13 @@ namespace moho
      */
     void RefreshCollisionShapeFromBlueprint();
 
-    /** Address: 0x0067A220, VFTable SLOT: 34 */
+    /**
+     * Address: 0x0067A220 (FUN_0067A220, ?CreateInterface@Entity@Moho@@MAEXPAUSSyncData@2@@Z)
+     *
+     * What it does:
+     * Queues the entity's create snapshot into the sync payload and marks the
+     * interface lane as created.
+     */
     virtual void CreateInterface(SSyncData*);
 
     /** Address: 0x0067A260, VFTable SLOT: 35 */
@@ -1171,6 +1352,14 @@ namespace moho
      * path and re-queueing this entity in the coord update list.
      */
     void SetStrategicUnderlay(const RResId& underlayId);
+
+    /**
+     * Address: 0x005BDC60 (FUN_005BDC60)
+     *
+     * What it does:
+     * Returns the cached intel manager pointer lane.
+     */
+    [[nodiscard]] CIntel* GetIntelManager() const noexcept;
 
     /**
      * Address: 0x005BDC70 (FUN_005BDC70, ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
@@ -2514,6 +2703,16 @@ namespace moho
    * nil lane) into one validated entity bone index.
    */
   int ENTSCR_ResolveBoneIndex(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
+
+  /**
+   * Address: 0x006926C0 (FUN_006926C0, Moho::ENTSCR_GetBonePosition)
+   * Mangled: ?ENTSCR_GetBonePosition@Moho@@YA?AV?$Vector3@M@Wm3@@PAVEntity@1@AAVLuaStackObject@LuaPlus@@_N@Z
+   *
+   * What it does:
+   * Resolves one Lua bone identifier and returns that bone's world position.
+   */
+  [[nodiscard]] Wm3::Vector3f
+  ENTSCR_GetBonePosition(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
   static_assert(offsetof(Entity, mCollisionCellSpan) == 0x4C, "Entity::mCollisionCellSpan offset must be 0x4C");

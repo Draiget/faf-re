@@ -1,5 +1,7 @@
 #include "moho/entity/intel/CIntelCounterHandleTypeInfo.h"
 
+#include <typeinfo>
+
 #include "moho/entity/intel/CIntelCounterHandle.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
 
@@ -27,6 +29,19 @@ namespace moho
     gpg::RType::Init();
     AddBase_CIntelPosHandle(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x0076F490 (FUN_0076F490, preregister_CIntelCounterHandleTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::CIntelCounterHandle`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CIntelCounterHandleTypeInfo()
+  {
+    static CIntelCounterHandleTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(CIntelCounterHandle), &typeInfo);
+    return &typeInfo;
   }
 
   /**

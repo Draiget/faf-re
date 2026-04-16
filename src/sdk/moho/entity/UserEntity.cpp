@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
@@ -12,6 +13,8 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/math/MathReflection.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RScmResource.h"
@@ -47,6 +50,21 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x008C6520 (FUN_008C6520)
+   *
+   * What it does:
+   * Lazily resolves and caches one reflection type lane for `moho::UserEntity`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveUserEntityTypeCacheLane()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::UserEntity));
+    }
+    return cached;
+  }
+
   void InitializeSpatialDbEntry(
     moho::UserEntitySpatialDbEntry& entry,
     void* const sessionSpatialDbStorage,
@@ -57,6 +75,25 @@ namespace
     // Address: 0x00501A80 (sub_501A80)
     auto* const meshEntry = reinterpret_cast<moho::SpatialDB_MeshInstance*>(&entry);
     meshEntry->Register(sessionSpatialDbStorage, owner, spatialDbMask);
+  }
+
+  /**
+   * Address: 0x0089E520 (FUN_0089E520)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one spatial DB entry construction
+   * request into the canonical `InitializeSpatialDbEntry` helper and returns
+   * the destination entry pointer.
+   */
+  [[maybe_unused]] moho::UserEntitySpatialDbEntry* InitializeSpatialDbEntryAdapterLane(
+    moho::UserEntitySpatialDbEntry* const destinationEntry,
+    void* const sessionSpatialDbStorage,
+    void* const owner,
+    const std::int32_t spatialDbMask
+  )
+  {
+    InitializeSpatialDbEntry(*destinationEntry, sessionSpatialDbStorage, owner, spatialDbMask);
+    return destinationEntry;
   }
 
   // 0x00416F60
@@ -651,6 +688,32 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B8E40 (FUN_008B8E40, UserEntity interpolated scroll lane)
+   *
+   * What it does:
+   * Computes one interpolated `(u,v)` texture-scroll pair by blending the two
+   * variable-data scroll lanes using clamped impact-weighted alpha.
+   */
+  UserEntity* UserEntity::GetInterpolatedScroll(
+    float* const outScrollV,
+    float* const outScrollU,
+    const float interpolationAlpha
+  )
+  {
+    const float clampedAlpha = ClampUnitInterval(mVariableData.mCurImpactValue * interpolationAlpha);
+
+    if (outScrollU != nullptr) {
+      *outScrollU = mVariableData.mScroll0U + ((mVariableData.mScroll1U - mVariableData.mScroll0U) * clampedAlpha);
+    }
+
+    if (outScrollV != nullptr) {
+      *outScrollV = mVariableData.mScroll0V + ((mVariableData.mScroll1V - mVariableData.mScroll0V) * clampedAlpha);
+    }
+
+    return this;
+  }
+
+  /**
    * Address: 0x007EC2F0 (FUN_007EC2F0, ?GetInterpolatedPosition@UserEntity@Moho@@QBE?AV?$Vector3@M@Wm3@@M@Z)
    *
    * What it does:
@@ -661,6 +724,25 @@ namespace moho
   {
     const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
     return interpolated.pos_;
+  }
+
+  /**
+   * Address: 0x008B9740 (FUN_008B9740, ?GetRenderSphere@UserEntity@Moho@@QBE?AV?$Sphere3@M@Wm3@@M@Z)
+   *
+   * What it does:
+   * Returns current render-oriented bounds from mesh interpolation state when
+   * mesh data exists, otherwise synthesizes a transform-aligned half-unit box.
+   */
+  Wm3::Box3f UserEntity::GetRenderSphere(const float interpolationAlpha) const
+  {
+    if (mMeshInstance != nullptr) {
+      mMeshInstance->UpdateInterpolatedFields();
+      return mMeshInstance->box;
+    }
+
+    const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
+    const moho::VAxes3 axes(interpolated.orient_);
+    return Wm3::Box3f(interpolated.pos_, axes.vX, axes.vY, axes.vZ, 0.5f, 0.5f, 0.5f);
   }
 
   /**
@@ -742,6 +824,17 @@ namespace moho
     mMeshInstance = nullptr;
     mPosePrimary.reset();
     mPoseSecondary.reset();
+  }
+
+  /**
+   * Address: 0x008B8BB0 (FUN_008B8BB0, ?GetMeshInstance@UserEntity@Moho@@QBEPAVMeshInstance@2@XZ)
+   *
+   * What it does:
+   * Returns the current mesh-instance pointer lane.
+   */
+  MeshInstance* UserEntity::GetMeshInstance() const
+  {
+    return mMeshInstance;
   }
 
   /**

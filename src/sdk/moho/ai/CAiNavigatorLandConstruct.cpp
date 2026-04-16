@@ -47,11 +47,24 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x005A7E20 (FUN_005A7E20)
+   *
+   * What it does:
+   * Populates one reflected `RRef` payload for a `CAiNavigatorLand` object.
+   */
+  [[nodiscard]] gpg::RRef* PopulateCAiNavigatorLandRef(gpg::RRef* const out, CAiNavigatorLand* const object)
+  {
+    gpg::RRef temp{};
+    gpg::RRef_CAiNavigatorLand(&temp, object);
+    *out = temp;
+    return out;
+  }
+
   [[nodiscard]] gpg::RRef MakeCAiNavigatorLandRef(CAiNavigatorLand* const object)
   {
     gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = CachedCAiNavigatorLandType();
+    (void)PopulateCAiNavigatorLandRef(&ref, object);
     return ref;
   }
 

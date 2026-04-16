@@ -19,7 +19,14 @@ namespace gpg
    */
   int STR_Utf8ByteOffset(StrArg str, int pos);
   int STR_Utf8Len(char const*);                                         // 0x00938070
-  const char* STR_NextUtf8Char(const char* str);                        // 0x00938040
+  /**
+   * Address: 0x00938040 (FUN_00938040, gpg::STR_NextUtf8Char)
+   *
+   * What it does:
+   * Advances to the next UTF-8 codepoint boundary (or keeps `str` at the
+   * NUL terminator when already at string end).
+   */
+  const char* STR_NextUtf8Char(const char* str);
   /**
    * Address: 0x00938020 (FUN_00938020, gpg::STR_PreviousUtf8Char)
    *
@@ -79,7 +86,14 @@ namespace gpg
    * after the next whitespace separator; returns UTF-8 length when none exists.
    */
   int STR_GetNextWordStartIndex(msvc8::string& str, int pos);
-  bool STR_EndsWith(StrArg str, StrArg end);                                            // 0x00938190
+  /**
+   * Address: 0x00938190 (FUN_00938190, gpg::STR_EndsWith)
+   *
+   * What it does:
+   * Returns whether `str` ends with `end` when `str` is strictly longer than
+   * `end`, matching the original binary comparison lane.
+   */
+  bool STR_EndsWith(StrArg str, StrArg end);
   /**
    * Address: 0x00938210 (FUN_00938210, gpg::STR_StartsWith)
    *

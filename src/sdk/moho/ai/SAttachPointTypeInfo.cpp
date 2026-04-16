@@ -12,16 +12,33 @@ namespace
 {
   alignas(SAttachPointTypeInfo) unsigned char gSAttachPointTypeInfoStorage[sizeof(SAttachPointTypeInfo)];
   bool gSAttachPointTypeInfoConstructed = false;
+  bool gSAttachPointTypeInfoPreregistered = false;
 
   [[nodiscard]] SAttachPointTypeInfo* AcquireSAttachPointTypeInfo()
   {
     if (!gSAttachPointTypeInfoConstructed) {
-      auto* const type = new (gSAttachPointTypeInfoStorage) SAttachPointTypeInfo();
-      gpg::PreRegisterRType(typeid(SAttachPoint), type);
+      new (gSAttachPointTypeInfoStorage) SAttachPointTypeInfo();
       gSAttachPointTypeInfoConstructed = true;
     }
 
     return reinterpret_cast<SAttachPointTypeInfo*>(gSAttachPointTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x005E41A0 (FUN_005E41A0)
+   *
+   * What it does:
+   * Initializes the startup-owned `SAttachPointTypeInfo` instance and
+   * preregisters RTTI for `SAttachPoint`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SAttachPointTypeInfoStartup()
+  {
+    auto* const typeInfo = AcquireSAttachPointTypeInfo();
+    if (!gSAttachPointTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(SAttachPoint), typeInfo);
+      gSAttachPointTypeInfoPreregistered = true;
+    }
+    return typeInfo;
   }
 
   void cleanup_SAttachPointTypeInfo()
@@ -32,6 +49,7 @@ namespace
 
     AcquireSAttachPointTypeInfo()->~SAttachPointTypeInfo();
     gSAttachPointTypeInfoConstructed = false;
+    gSAttachPointTypeInfoPreregistered = false;
   }
 } // namespace
 
@@ -66,7 +84,6 @@ void SAttachPointTypeInfo::Init()
  */
 int moho::register_SAttachPointTypeInfo()
 {
-  (void)AcquireSAttachPointTypeInfo();
+  (void)preregister_SAttachPointTypeInfoStartup();
   return std::atexit(&cleanup_SAttachPointTypeInfo);
 }
-

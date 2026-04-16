@@ -28,6 +28,14 @@ namespace moho
 
   struct SEjectRequest
   {
+    /**
+     * Address: 0x0053B8D0 (FUN_0053B8D0)
+     *
+     * What it does:
+     * Initializes one eject-request record from requester and beat fields.
+     */
+    SEjectRequest(const CClientBase* requester, int afterBeat);
+
     const CClientBase* mRequester{nullptr};
     int mAfterBeat{0};
   };
@@ -61,6 +69,33 @@ namespace moho
      * Slot: 0
      */
     BVIntSet* GetValidCommandSources() override;
+
+    /**
+     * Address: 0x0053B8E0 (FUN_0053B8E0)
+     *
+     * What it does:
+     * Returns the owning client-manager pointer lane.
+     */
+    [[nodiscard]]
+    CClientManagerImpl* GetManager() const;
+
+    /**
+     * Address: 0x0053B900 (FUN_0053B900)
+     *
+     * What it does:
+     * Returns the readiness bit lane for this client.
+     */
+    [[nodiscard]]
+    bool IsReady() const;
+
+    /**
+     * Address: 0x0053B920 (FUN_0053B920)
+     *
+     * What it does:
+     * Returns the raw sim-rate lane tracked by this client.
+     */
+    [[nodiscard]]
+    int32_t GetSimRateRaw() const;
 
     /**
      * Address: 0x0053C960 (FUN_0053C960)

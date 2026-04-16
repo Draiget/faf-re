@@ -8,6 +8,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00770DD0 (FUN_00770DD0)
+     *
+     * What it does:
+     * Preregisters the reflected `ETrailParam` enum metadata.
+     */
+    ETrailParamTypeInfo();
+
+    /**
      * Address: 0x00770E60 (FUN_00770E60, scalar deleting thunk)
      */
     ~ETrailParamTypeInfo() override;

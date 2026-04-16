@@ -117,6 +117,30 @@ namespace
     return UnlinkSerializerNode(gEAiResultPrimitiveSerializer);
   }
 
+  /**
+   * Address: 0x00608C40 (FUN_00608C40)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks static `EAiResult` primitive
+   * serializer helper links and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiResultPrimitiveSerializerStartupThunkA()
+  {
+    return cleanup_EAiResultPrimitiveSerializer();
+  }
+
+  /**
+   * Address: 0x00608C70 (FUN_00608C70)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `EAiResult` primitive
+   * serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiResultPrimitiveSerializerStartupThunkB()
+  {
+    return cleanup_EAiResultPrimitiveSerializer();
+  }
+
   void cleanup_EAiResultPrimitiveSerializer_atexit()
   {
     (void)cleanup_EAiResultPrimitiveSerializer();
@@ -224,7 +248,6 @@ namespace moho
     InitializeSerializerNode(gEAiResultPrimitiveSerializer);
     gEAiResultPrimitiveSerializer.mDeserialize = &Deserialize_EAiResult;
     gEAiResultPrimitiveSerializer.mSerialize = &Serialize_EAiResult;
-    gEAiResultPrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_EAiResultPrimitiveSerializer_atexit);
   }
 } // namespace moho

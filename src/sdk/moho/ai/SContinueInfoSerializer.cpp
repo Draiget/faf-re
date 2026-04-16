@@ -77,6 +77,38 @@ namespace
     return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
   }
 
+  /**
+   * Address: 0x005B22E0 (FUN_005B22E0)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * SContinueInfo serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SContinueInfoSerializerStartupThunkA()
+  {
+    if (!gSContinueInfoSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
+  }
+
+  /**
+   * Address: 0x005B2310 (FUN_005B2310)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * SContinueInfo serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SContinueInfoSerializerStartupThunkB()
+  {
+    if (!gSContinueInfoSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireSContinueInfoSerializer());
+  }
+
   void cleanup_SContinueInfoSerializer_atexit()
   {
     (void)cleanup_SContinueInfoSerializer();

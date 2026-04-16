@@ -33,6 +33,16 @@ namespace moho
     CEffectImpl();
 
     /**
+     * Address: 0x00659190 (FUN_00659190, Moho::CEffectImpl::CEffectImpl)
+     *
+     * What it does:
+     * Initializes one manager-bound effect lane using `IEffect` manager/script
+     * constructor flow, then seeds the same inline-vector and attachment
+     * defaults as the no-arg constructor.
+     */
+    CEffectImpl(CEffectManagerImpl* manager, int scriptObjectToken);
+
+    /**
      * Address: 0x00659170 (FUN_00659170, Moho::CEffectImpl::dtr thunk)
      * Address: 0x00655BA0 (FUN_00655BA0, Moho::CEffectImpl::~CEffectImpl body)
      */

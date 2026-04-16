@@ -3,14 +3,22 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "Wm3Vector3.h"
+#include "moho/animation/IAniManipulator.h"
 #include "lua/LuaObject.h"
+#include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CBuilderArmManipulator.h"
 #include "moho/animation/CRotateManipulator.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 
@@ -18,12 +26,19 @@ struct lua_State;
 
 namespace moho
 {
+  class CAimManipulator;
   class CBoneEntityManipulator;
   class CBuilderArmManipulator;
+  class CFootPlantManipulator;
   class CRotateManipulator;
   class CThrustManipulator;
   class Entity;
+  class Unit;
 
+  int cfunc_CreateAimController(lua_State* luaContext);
+  int cfunc_CreateBuilderArmController(lua_State* luaContext);
+  int cfunc_CreateFootPlantController(lua_State* luaContext);
+  int cfunc_CreateThrustController(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
   int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* luaContext);
@@ -44,6 +59,7 @@ namespace moho
   int cfunc_CRotateManipulatorGetCurrentAngle(lua_State* luaContext);
   int cfunc_CRotateManipulatorSetCurrentAngle(lua_State* luaContext);
   int cfunc_CThrustManipulatorSetThrustingParam(lua_State* luaContext);
+  int cfunc_CThrustManipulatorSetThrustingParamL(LuaPlus::LuaState* state);
 
   template <>
   class CScrLuaMetatableFactory<CBoneEntityManipulator> final : public CScrLuaObjectFactory
@@ -61,6 +77,20 @@ namespace moho
 
   template <>
   class CScrLuaMetatableFactory<CBuilderArmManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  template <>
+  class CScrLuaMetatableFactory<CFootPlantManipulator> final : public CScrLuaObjectFactory
   {
   public:
     static CScrLuaMetatableFactory& Instance();
@@ -123,6 +153,10 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CBuilderArmManipulator>) == 0x08,
     "CScrLuaMetatableFactory<CBuilderArmManipulator> size must be 0x8"
   );
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CFootPlantManipulator>) == 0x08,
+    "CScrLuaMetatableFactory<CFootPlantManipulator> size must be 0x8"
+  );
   static_assert(sizeof(CScrLuaMetatableFactory<Entity>) == 0x08, "CScrLuaMetatableFactory<Entity> size must be 0x8");
   static_assert(
     sizeof(CScrLuaMetatableFactory<CRotateManipulator>) == 0x08,
@@ -135,9 +169,223 @@ namespace moho
 
   CScrLuaMetatableFactory<CBoneEntityManipulator> CScrLuaMetatableFactory<CBoneEntityManipulator>::sInstance{};
   CScrLuaMetatableFactory<CBuilderArmManipulator> CScrLuaMetatableFactory<CBuilderArmManipulator>::sInstance{};
+  CScrLuaMetatableFactory<CFootPlantManipulator> CScrLuaMetatableFactory<CFootPlantManipulator>::sInstance{};
   CScrLuaMetatableFactory<Entity> CScrLuaMetatableFactory<Entity>::sInstance{};
   CScrLuaMetatableFactory<CRotateManipulator> CScrLuaMetatableFactory<CRotateManipulator>::sInstance{};
   CScrLuaMetatableFactory<CThrustManipulator> CScrLuaMetatableFactory<CThrustManipulator>::sInstance{};
+
+  struct CBoneEntityManipulatorSerializerStartupNode
+  {
+    void* mVtable = nullptr;                    // +0x00
+    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
+    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
+    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
+    gpg::RType::save_func_t mSave = nullptr;   // +0x10
+  };
+
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerStartupNode, mHelperNext) == 0x04,
+    "CBoneEntityManipulatorSerializerStartupNode::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerStartupNode, mHelperPrev) == 0x08,
+    "CBoneEntityManipulatorSerializerStartupNode::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CBoneEntityManipulatorSerializerStartupNode) == 0x14,
+    "CBoneEntityManipulatorSerializerStartupNode size must be 0x14"
+  );
+
+  CBoneEntityManipulatorSerializerStartupNode gCBoneEntityManipulatorSerializerStartupNode{};
+
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CBoneEntityManipulatorSerializerStartupNode& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CBoneEntityManipulatorSerializerStartupNode& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
+  {
+    gpg::RType* type = moho::IAniManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::IAniManipulator));
+      moho::IAniManipulator::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+      moho::WeakPtr<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Entity>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
+      moho::WeakPtr<moho::Entity>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
+  struct CBoneEntityManipulatorSerializerRuntimeView : moho::IAniManipulator
+  {
+    moho::WeakPtr<moho::Unit> mGoalUnit;        // +0x80
+    moho::WeakPtr<moho::Entity> mTargetEntity; // +0x88
+    std::int32_t mReferenceBoneIndex;           // +0x90
+    Wm3::Vector3f mPivot;                       // +0x94
+  };
+
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerRuntimeView, mGoalUnit) == 0x80,
+    "CBoneEntityManipulatorSerializerRuntimeView::mGoalUnit offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerRuntimeView, mTargetEntity) == 0x88,
+    "CBoneEntityManipulatorSerializerRuntimeView::mTargetEntity offset must be 0x88"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerRuntimeView, mReferenceBoneIndex) == 0x90,
+    "CBoneEntityManipulatorSerializerRuntimeView::mReferenceBoneIndex offset must be 0x90"
+  );
+  static_assert(
+    offsetof(CBoneEntityManipulatorSerializerRuntimeView, mPivot) == 0x94,
+    "CBoneEntityManipulatorSerializerRuntimeView::mPivot offset must be 0x94"
+  );
+  static_assert(
+    sizeof(CBoneEntityManipulatorSerializerRuntimeView) == 0xA0,
+    "CBoneEntityManipulatorSerializerRuntimeView size must be 0xA0"
+  );
+
+  /**
+   * Address: 0x006356D0 (FUN_006356D0, CBoneEntityManipulator serializer load body)
+   *
+   * What it does:
+   * Deserializes one `CBoneEntityManipulator` lane by loading
+   * `IAniManipulator` base state, goal/target weak-pointer lanes,
+   * reference-bone index, and pivot vector.
+   */
+  [[maybe_unused]] void DeserializeCBoneEntityManipulatorSerializerBody(
+    CBoneEntityManipulatorSerializerRuntimeView* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
+    archive->Read(CachedWeakPtrUnitType(), &manipulator->mGoalUnit, owner);
+    archive->Read(CachedWeakPtrEntityType(), &manipulator->mTargetEntity, owner);
+    archive->ReadInt(&manipulator->mReferenceBoneIndex);
+    archive->Read(CachedVector3fType(), &manipulator->mPivot, owner);
+  }
+
+  /**
+   * Address: 0x006357D0 (FUN_006357D0, CBoneEntityManipulator serializer save body)
+   *
+   * What it does:
+   * Serializes one `CBoneEntityManipulator` lane by saving `IAniManipulator`
+   * base state, goal/target weak-pointer lanes, reference-bone index,
+   * and pivot vector.
+   */
+  [[maybe_unused]] void SerializeCBoneEntityManipulatorSerializerBody(
+    const CBoneEntityManipulatorSerializerRuntimeView* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(CachedIAniManipulatorType(), static_cast<const moho::IAniManipulator*>(manipulator), owner);
+    archive->Write(CachedWeakPtrUnitType(), &manipulator->mGoalUnit, owner);
+    archive->Write(CachedWeakPtrEntityType(), &manipulator->mTargetEntity, owner);
+    archive->WriteInt(manipulator->mReferenceBoneIndex);
+    archive->Write(CachedVector3fType(), &manipulator->mPivot, owner);
+  }
+
+  /**
+   * Address: 0x00634BC0 (FUN_00634BC0, Moho::CBoneEntityManipulatorSerializer::Deserialize)
+   *
+   * What it does:
+   * Load-callback thunk that forwards one serializer lane into the canonical
+   * CBone deserialization body (`FUN_006356D0`).
+   */
+  [[maybe_unused]] void DeserializeCBoneEntityManipulatorSerializerThunk(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const manipulator =
+      reinterpret_cast<CBoneEntityManipulatorSerializerRuntimeView*>(static_cast<std::uintptr_t>(objectPtr));
+    DeserializeCBoneEntityManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00634BD0 (FUN_00634BD0, Moho::CBoneEntityManipulatorSerializer::Serialize)
+   *
+   * What it does:
+   * Save-callback thunk that forwards one serializer lane into the canonical
+   * CBone serialization body (`FUN_006357D0`).
+   */
+  [[maybe_unused]] void SerializeCBoneEntityManipulatorSerializerThunk(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    const auto* const manipulator =
+      reinterpret_cast<const CBoneEntityManipulatorSerializerRuntimeView*>(static_cast<std::uintptr_t>(objectPtr));
+    SerializeCBoneEntityManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00635380 (FUN_00635380)
+   *
+   * What it does:
+   * Tail-forward thunk that aliases the canonical CBoneEntityManipulator
+   * serializer-save body (`FUN_006357D0`).
+   */
+  [[maybe_unused]] void SerializeCBoneEntityManipulatorSerializerBodyThunk(
+    const CBoneEntityManipulatorSerializerRuntimeView* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCBoneEntityManipulatorSerializerBody(manipulator, archive);
+  }
 
   CScrLuaMetatableFactory<CBoneEntityManipulator>::CScrLuaMetatableFactory()
     : CScrLuaObjectFactory(CScrLuaObjectFactory::AllocateFactoryObjectIndex())
@@ -146,6 +394,22 @@ namespace moho
   CScrLuaMetatableFactory<CBoneEntityManipulator>& CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance()
   {
     return sInstance;
+  }
+
+  /**
+   * Address: 0x00635490 (FUN_00635490)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CBoneEntityManipulator>` and returns that
+   * singleton.
+   */
+  [[maybe_unused]] CScrLuaMetatableFactory<CBoneEntityManipulator>*
+  startup_CScrLuaMetatableFactory_CBoneEntityManipulator_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
   }
 
   LuaPlus::LuaObject CScrLuaMetatableFactory<CBoneEntityManipulator>::Create(LuaPlus::LuaState* const state)
@@ -163,6 +427,20 @@ namespace moho
   }
 
   LuaPlus::LuaObject CScrLuaMetatableFactory<CBuilderArmManipulator>::Create(LuaPlus::LuaState* const state)
+  {
+    return SCR_CreateSimpleMetatable(state);
+  }
+
+  CScrLuaMetatableFactory<CFootPlantManipulator>::CScrLuaMetatableFactory()
+    : CScrLuaObjectFactory(CScrLuaObjectFactory::AllocateFactoryObjectIndex())
+  {}
+
+  CScrLuaMetatableFactory<CFootPlantManipulator>& CScrLuaMetatableFactory<CFootPlantManipulator>::Instance()
+  {
+    return sInstance;
+  }
+
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CFootPlantManipulator>::Create(LuaPlus::LuaState* const state)
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -228,6 +506,47 @@ namespace moho
   }
 
   /**
+   * Address: 0x00633050 (FUN_00633050, func_CreateLuaAimManipulatorObject)
+   *
+   * What it does:
+   * Writes the `CAimManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject* func_CreateLuaAimManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CAimManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x006352F0 (FUN_006352F0, func_CreateLuaBoneEntityManipulatorObject)
+   *
+   * What it does:
+   * Writes the `CBoneEntityManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject*
+  func_CreateLuaBoneEntityManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x0063A1D0 (FUN_0063A1D0, func_CreateLuaFootPlantManipulatorObject)
+   *
+   * What it does:
+   * Writes the `CFootPlantManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject*
+  func_CreateLuaFootPlantManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CFootPlantManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
    * Address: 0x00645540 (FUN_00645540, func_CreateCRotateManipulatorObject)
    *
    * What it does:
@@ -257,6 +576,19 @@ namespace moho
 
 namespace
 {
+  constexpr const char* kGlobalLuaFactoryClassName = "<global>";
+  constexpr const char* kCreateAimControllerName = "CreateAimController";
+  constexpr const char* kCreateAimControllerHelpText =
+    "CreateAimController(weapon, label, turretBone, [barrelBone], [muzzleBone])";
+  constexpr const char* kCreateBuilderArmControllerName = "CreateBuilderArmController";
+  constexpr const char* kCreateBuilderArmControllerHelpText =
+    "CreateBuilderArmController(unit,turretBone, [barrelBone], [aimBone])";
+  constexpr const char* kCreateFootPlantControllerName = "CreateFootPlantController";
+  constexpr const char* kCreateFootPlantControllerHelpText =
+    "CreateFootPlantController(unit, footBone, kneeBone, hipBone, [straightLegs], [maxFootFall])";
+  constexpr const char* kCreateThrustControllerName = "CreateThrustController";
+  constexpr const char* kCreateThrustControllerHelpText = "CreateThrustController(unit, label, thrustBone)";
+
   constexpr const char* kCBoneEntityManipulatorSetPivotName = "SetPivot";
   constexpr const char* kCBoneEntityManipulatorSetPivotClassName = "CBoneEntityManipulator";
   constexpr const char* kCBoneEntityManipulatorSetPivotHelpText =
@@ -422,6 +754,30 @@ namespace
   {
     return Target();
   }
+
+  struct ThrustCapVector3f
+  {
+    float x;
+    float y;
+    float z;
+  };
+
+  struct CThrustManipulatorLuaRuntimeView
+  {
+    std::byte preCapStorage[0xAC];
+    ThrustCapVector3f mCapMin;
+    ThrustCapVector3f mCapMax;
+    float mTurnForceMult;
+    float mTurnSpeed;
+  };
+
+  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mCapMin) == 0xAC, "mCapMin offset must be 0xAC");
+  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mCapMax) == 0xB8, "mCapMax offset must be 0xB8");
+  static_assert(
+    offsetof(CThrustManipulatorLuaRuntimeView, mTurnForceMult) == 0xC4,
+    "mTurnForceMult offset must be 0xC4"
+  );
+  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mTurnSpeed) == 0xC8, "mTurnSpeed offset must be 0xC8");
 
   struct ManipulatorLuaFunctionThunksBootstrap
   {
@@ -651,6 +1007,149 @@ namespace moho
   }
 
   /**
+   * Address: 0x0064AD10 (FUN_0064AD10, cfunc_CThrustManipulatorSetThrustingParam)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_CThrustManipulatorSetThrustingParamL`.
+   */
+  int cfunc_CThrustManipulatorSetThrustingParam(lua_State* const luaContext)
+  {
+    return cfunc_CThrustManipulatorSetThrustingParamL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0064AD90 (FUN_0064AD90, cfunc_CThrustManipulatorSetThrustingParamL)
+   *
+   * What it does:
+   * Validates and reads `SetThrustingParam(...)` numeric arguments from Lua
+   * then updates cap ranges plus turn force/speed on one thrust manipulator.
+   */
+  int cfunc_CThrustManipulatorSetThrustingParamL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 9) {
+      LuaPlus::LuaState::Error(
+        state,
+        kLuaExpectedArgsWarning,
+        kCThrustManipulatorSetThrustingParamHelpText,
+        9,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CThrustManipulator* const manipulator = moho::SCR_FromLua_CThrustManipulator(manipulatorObject, state);
+
+    const float turnSpeed = ReadRequiredLuaNumber(state, 9);
+    const float turnForceMult = ReadRequiredLuaNumber(state, 8);
+    const float zCapMax = ReadRequiredLuaNumber(state, 7);
+    const float yCapMax = ReadRequiredLuaNumber(state, 5);
+    const float xCapMax = ReadRequiredLuaNumber(state, 3);
+    const float zCapMin = ReadRequiredLuaNumber(state, 6);
+    const float yCapMin = ReadRequiredLuaNumber(state, 4);
+    const float xCapMin = ReadRequiredLuaNumber(state, 2);
+
+    CThrustManipulatorLuaRuntimeView* const runtimeView =
+      reinterpret_cast<CThrustManipulatorLuaRuntimeView*>(manipulator);
+    runtimeView->mCapMin.x = xCapMin;
+    runtimeView->mCapMin.y = yCapMin;
+    runtimeView->mCapMin.z = zCapMin;
+    runtimeView->mCapMax.x = xCapMax;
+    runtimeView->mCapMax.y = yCapMax;
+    runtimeView->mCapMax.z = zCapMax;
+    runtimeView->mTurnForceMult = turnForceMult;
+    runtimeView->mTurnSpeed = turnSpeed;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00634BE0 (FUN_00634BE0, startup_CBoneEntityManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes one `CBoneEntityManipulator` serializer helper node by
+   * rewiring intrusive links, binding load/save callbacks, and publishing one
+   * startup vtable lane tag.
+   */
+  [[maybe_unused]] CBoneEntityManipulatorSerializerStartupNode* startup_CBoneEntityManipulatorSerializer()
+  {
+    auto* const self =
+      reinterpret_cast<gpg::SerHelperBase*>(&gCBoneEntityManipulatorSerializerStartupNode.mHelperNext);
+    gCBoneEntityManipulatorSerializerStartupNode.mHelperNext = self;
+    gCBoneEntityManipulatorSerializerStartupNode.mHelperPrev = self;
+    gCBoneEntityManipulatorSerializerStartupNode.mLoad = &DeserializeCBoneEntityManipulatorSerializerThunk;
+    gCBoneEntityManipulatorSerializerStartupNode.mSave = &SerializeCBoneEntityManipulatorSerializerThunk;
+
+    static std::uint8_t sCBoneEntityManipulatorSerializerRuntimeVTableTag = 0;
+    gCBoneEntityManipulatorSerializerStartupNode.mVtable = &sCBoneEntityManipulatorSerializerRuntimeVTableTag;
+    return &gCBoneEntityManipulatorSerializerStartupNode;
+  }
+
+  /**
+   * Address: 0x00635110 (FUN_00635110, startup_CBoneEntityManipulatorSerializerSerSaveLoadHelperLane)
+   *
+   * What it does:
+   * Initializes the same global CBone serializer helper node but rebinds the
+   * startup vtable lane to the SerSaveLoadHelper variant before wiring
+   * deserialize/serialize callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] CBoneEntityManipulatorSerializerStartupNode*
+  startup_CBoneEntityManipulatorSerializerSerSaveLoadHelperLane()
+  {
+    auto* const self =
+      reinterpret_cast<gpg::SerHelperBase*>(&gCBoneEntityManipulatorSerializerStartupNode.mHelperNext);
+    gCBoneEntityManipulatorSerializerStartupNode.mHelperNext = self;
+    gCBoneEntityManipulatorSerializerStartupNode.mHelperPrev = self;
+
+    static std::uint8_t sCBoneEntityManipulatorSerializerSerSaveLoadHelperVTableTag = 0;
+    gCBoneEntityManipulatorSerializerStartupNode.mVtable =
+      &sCBoneEntityManipulatorSerializerSerSaveLoadHelperVTableTag;
+    gCBoneEntityManipulatorSerializerStartupNode.mLoad = &DeserializeCBoneEntityManipulatorSerializerThunk;
+    gCBoneEntityManipulatorSerializerStartupNode.mSave = &SerializeCBoneEntityManipulatorSerializerThunk;
+    return &gCBoneEntityManipulatorSerializerStartupNode;
+  }
+
+  /**
+   * Address: 0x00634B70 (FUN_00634B70, CBoneEntityManipulatorTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Executes one non-deleting cleanup lane for the CBone manipulator type-info
+   * descriptor by running the `gpg::RType` base teardown.
+   */
+  [[maybe_unused]] void DestroyCBoneEntityManipulatorTypeInfoBody(gpg::RType* const typeInfo) noexcept
+  {
+    if (!typeInfo) {
+      return;
+    }
+
+    typeInfo->~RType();
+  }
+
+  /**
+   * Address: 0x00634C10 (FUN_00634C10, cleanup_CBoneEntityManipulatorSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the `CBoneEntityManipulator` serializer
+   * helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CBoneEntityManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCBoneEntityManipulatorSerializerStartupNode);
+  }
+
+  /**
+   * Address: 0x00634C40 (FUN_00634C40, cleanup_CBoneEntityManipulatorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the
+   * `CBoneEntityManipulator` serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CBoneEntityManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCBoneEntityManipulatorSerializerStartupNode);
+  }
+
+  /**
    * Address: 0x00634C90 (FUN_00634C90, func_CBoneEntityManipulatorSetPivot_LuaFuncDef)
    *
    * What it does:
@@ -742,6 +1241,63 @@ namespace moho
       &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
       kCBuilderArmManipulatorClassName,
       kCBuilderArmManipulatorSetHeadingPitchHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00631F40 (FUN_00631F40, func_CreateAimController_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateAimController(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateAimController_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateAimControllerName,
+      &cfunc_CreateAimController,
+      nullptr,
+      kGlobalLuaFactoryClassName,
+      kCreateAimControllerHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00636820 (FUN_00636820, func_CreateBuilderArmController_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateBuilderArmController(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateBuilderArmController_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateBuilderArmControllerName,
+      &cfunc_CreateBuilderArmController,
+      nullptr,
+      kGlobalLuaFactoryClassName,
+      kCreateBuilderArmControllerHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00639CA0 (FUN_00639CA0, func_CreateFootPlantController_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateFootPlantController(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateFootPlantController_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateFootPlantControllerName,
+      &cfunc_CreateFootPlantController,
+      nullptr,
+      kGlobalLuaFactoryClassName,
+      kCreateFootPlantControllerHelpText
     );
     return &binder;
   }
@@ -951,6 +1507,25 @@ namespace moho
       &CScrLuaMetatableFactory<CThrustManipulator>::Instance(),
       kCThrustManipulatorClassName,
       kCThrustManipulatorSetThrustingParamHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0064AB60 (FUN_0064AB60, func_CreateThrustController_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateThrustController(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateThrustController_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateThrustControllerName,
+      &cfunc_CreateThrustController,
+      nullptr,
+      kGlobalLuaFactoryClassName,
+      kCreateThrustControllerHelpText
     );
     return &binder;
   }

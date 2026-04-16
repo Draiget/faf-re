@@ -93,6 +93,29 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00655FC0 (FUN_00655FC0)
+   *
+   * What it does:
+   * Unlinks the global CEfxBeam serializer helper node and restores
+   * self-links on the serializer node.
+   */
+  gpg::SerHelperBase* UnlinkCEfxBeamSerializerNodeVariantA()
+  {
+    return UnlinkSerializerNode(gCEfxBeamSerializer);
+  }
+
+  /**
+   * Address: 0x00655FF0 (FUN_00655FF0)
+   *
+   * What it does:
+   * Runs the duplicate CEfxBeam serializer helper-node unlink/reset lane.
+   */
+  gpg::SerHelperBase* UnlinkCEfxBeamSerializerNodeVariantB()
+  {
+    return UnlinkSerializerNode(gCEfxBeamSerializer);
+  }
+
+  /**
    * Address: 0x00657B80 (FUN_00657B80, gpg::SerSaveLoadHelper_CEfxBeam::Init)
    */
   void CEfxBeamSerializer::RegisterSerializeFunctions()

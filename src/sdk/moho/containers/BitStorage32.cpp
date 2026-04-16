@@ -121,7 +121,7 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x00440030/FUN_00440030 and 0x0063F8D0/FUN_0063F8D0 equivalent
+    * Alias of FUN_00440030 (non-canonical helper lane).
    *
    * What it does:
    * Releases word storage and clears all metadata lanes.

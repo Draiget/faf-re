@@ -1,6 +1,7 @@
 #include "ResourceDeposit.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <new>
@@ -68,6 +69,121 @@ namespace
   alignas(moho::ResourceDepositTypeInfo) unsigned char
     gResourceDepositTypeInfoStorage[sizeof(moho::ResourceDepositTypeInfo)]{};
   bool gResourceDepositTypeInfoConstructed = false;
+
+  struct ResourceDepositSerializerHelper
+  {
+    void* mVTable;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+  static_assert(
+    offsetof(ResourceDepositSerializerHelper, mHelperNext) == 0x04,
+    "ResourceDepositSerializerHelper::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(ResourceDepositSerializerHelper, mHelperPrev) == 0x08,
+    "ResourceDepositSerializerHelper::mHelperPrev offset must be 0x08"
+  );
+  static_assert(sizeof(ResourceDepositSerializerHelper) == 0x14, "ResourceDepositSerializerHelper size must be 0x14");
+
+  ResourceDepositSerializerHelper gResourceDepositSerializer{};
+
+  [[nodiscard]] gpg::SerHelperBase* ResourceDepositSerializerSelfNode() noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&gResourceDepositSerializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* ResetResourceDepositSerializerHelperLinks() noexcept
+  {
+    gResourceDepositSerializer.mHelperNext->mPrev = gResourceDepositSerializer.mHelperPrev;
+    gResourceDepositSerializer.mHelperPrev->mNext = gResourceDepositSerializer.mHelperNext;
+    gpg::SerHelperBase* const self = ResourceDepositSerializerSelfNode();
+    gResourceDepositSerializer.mHelperPrev = self;
+    gResourceDepositSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00545CC0 (FUN_00545CC0)
+   *
+   * What it does:
+   * Executes one non-deleting `gpg::RType` base-teardown lane for
+   * `ResourceDepositTypeInfo`.
+   */
+  [[maybe_unused]] void cleanup_ResourceDepositTypeInfoRTypeBase(moho::ResourceDepositTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
+    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+  }
+
+  void DeserializeResourceDepositSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
+    moho::ResourceDeposit::MemberDeserialize(object, archive);
+  }
+
+  void SerializeResourceDepositSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::ResourceDeposit*>(static_cast<std::uintptr_t>(objectPtr));
+    moho::ResourceDeposit::MemberSerialize(object, archive);
+  }
+
+  /**
+   * Address: 0x00545D30 (FUN_00545D30)
+   *
+   * What it does:
+   * Initializes callback lanes for global `ResourceDepositSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] ResourceDepositSerializerHelper* InitializeResourceDepositSerializerStartupThunk() noexcept
+  {
+    gpg::SerHelperBase* const self = ResourceDepositSerializerSelfNode();
+    gResourceDepositSerializer.mHelperPrev = self;
+    gResourceDepositSerializer.mHelperNext = self;
+    gResourceDepositSerializer.mLoadCallback = &DeserializeResourceDepositSerializerCallback;
+    gResourceDepositSerializer.mSaveCallback = &SerializeResourceDepositSerializerCallback;
+    return &gResourceDepositSerializer;
+  }
+
+  /**
+   * Address: 0x00545D60 (FUN_00545D60)
+   *
+   * What it does:
+   * Unlinks `ResourceDepositSerializer` helper node from the intrusive helper
+   * list and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodePrimary() noexcept
+  {
+    return ResetResourceDepositSerializerHelperLinks();
+  }
+
+  /**
+   * Address: 0x00545D90 (FUN_00545D90)
+   *
+   * What it does:
+   * Secondary entrypoint for `ResourceDepositSerializer` helper-node
+   * unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetResourceDepositSerializerHelperLinks();
+  }
 
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
   {

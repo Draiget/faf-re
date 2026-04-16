@@ -38,6 +38,16 @@ namespace moho
     };
 
     /**
+     * Address: 0x00438310 (FUN_00438310, ??0CD3DPrimBatcher@Moho@@QAE@PAVCD3DTextureBatcher@1@@Z)
+     *
+     * What it does:
+     * Initializes one prim-batcher runtime lane, allocates three dynamic
+     * vertex sheets and one dynamic index sheet from device resources, and
+     * seeds identity view/projection/composite matrices.
+     */
+    explicit CD3DPrimBatcher(CD3DTextureBatcher* textureBatcher);
+
+    /**
      * Address: 0x00438460 (FUN_00438460, Moho::CD3DPrimBatcher::~CD3DPrimBatcher)
      *
      * What it does:

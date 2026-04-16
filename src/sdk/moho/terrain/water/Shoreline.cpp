@@ -19,6 +19,17 @@ namespace
 {
   using ShoreCellRef = boost::shared_ptr<moho::ShoreCell>;
 
+  /**
+   * Address: 0x00813DB0 (FUN_00813DB0, boost::shared_ptr_ShoreCell::shared_ptr_ShoreCell)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
+   */
+  ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
+  {
+    return ::new (outShoreCell) ShoreCellRef(shoreCell);
+  }
+
   struct ShoreCorner3
   {
     float x;
@@ -585,6 +596,18 @@ namespace
   }
 
   /**
+   * Address: 0x008135A0 (FUN_008135A0, sub_8135A0)
+   *
+   * What it does:
+   * Appends one shoreline-cell shared pointer at vector tail, using the
+   * in-place lane when capacity is available and growing storage otherwise.
+   */
+  void AppendShoreCellRef(msvc8::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
+  {
+    shorelineCells.push_back(cell);
+  }
+
+  /**
    * Address: 0x00813300 (FUN_00813300, func_CreateShoreCell)
    *
    * What it does:
@@ -627,7 +650,7 @@ namespace
     }
 
     InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDbEntry, terrainResource);
-    shoreline.mCells.push_back(cell);
+    AppendShoreCellRef(shoreline.mCells, cell);
   }
 
   /**
@@ -650,6 +673,22 @@ namespace
       ++write;
     }
     return write;
+  }
+
+  /**
+   * Address: 0x00813DD0 (FUN_00813DD0)
+   *
+   * What it does:
+   * Argument-order adapter that forwards one shoreline-cell shared-pointer
+   * range copy into `CopyShoreCellRefRange`.
+   */
+  [[maybe_unused]] ShoreCellRef* CopyShoreCellRefRangeArgumentOrderAdapter(
+    ShoreCellRef* sourceBegin,
+    ShoreCellRef* const sourceEnd,
+    ShoreCellRef* const destination
+  )
+  {
+    return CopyShoreCellRefRange(destination, sourceBegin, sourceEnd);
   }
 
   /**
@@ -697,6 +736,54 @@ namespace moho
 {
   bool ren_Shoreline = false;
   float ren_ShorelineCutoff = 0.0f;
+
+  /**
+   * Address: 0x008126E0 (FUN_008126E0, ??0ShoreCell@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Initializes one shoreline-cell object by setting `mType` to zero,
+   * clearing the embedded spatial-db entry lanes, and zeroing all five
+   * shoreline point pairs.
+   */
+  ShoreCell::ShoreCell()
+  {
+    mType = 0;
+
+    mSpatialDbEntry.db = nullptr;
+    mSpatialDbEntry.entry = 0;
+
+    for (ShoreCellPoint2& point : mPoints) {
+      point.x = 0.0f;
+      point.z = 0.0f;
+    }
+  }
+
+  /**
+   * Address: 0x00812760 (FUN_00812760)
+   *
+   * What it does:
+   * Runs one null-guard adapter lane that only destroys one
+   * `SpatialDB_MeshInstance` when its `db` lane is non-null.
+   */
+  [[maybe_unused]] SpatialDB_MeshInstance* DestroySpatialDbMeshInstanceIfBoundAdapter(
+    SpatialDB_MeshInstance* const entry
+  )
+  {
+    if (entry->db != nullptr) {
+      entry->~SpatialDB_MeshInstance();
+    }
+
+    return entry;
+  }
+
+  /**
+   * Address: 0x00812770 (FUN_00812770, sub_812770)
+   *
+   * What it does:
+   * Runs one shoreline-cell teardown lane; the embedded `SpatialDB_MeshInstance`
+   * member handles conditional unbind/release during default destruction.
+   */
+  ShoreCell::~ShoreCell() = default;
 
   /**
    * Address: 0x00812840 (FUN_00812840, Moho::Shoreline::Shoreline)

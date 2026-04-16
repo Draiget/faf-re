@@ -6,14 +6,20 @@
 #include <new>
 #include <string>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
@@ -23,6 +29,7 @@
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiPersonality.h"
+#include "moho/ai/IAiTransport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CSquad.h"
@@ -36,6 +43,15 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitCommand.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 namespace moho
 {
@@ -61,7 +77,9 @@ namespace
 {
   using moho::ESquadClass;
   using moho::EUnitState;
+  using moho::CSquad;
   using moho::SEntitySetTemplateUnit;
+  using moho::EntityCategorySet;
   using moho::Unit;
 
   constexpr ESquadClass kAllSquadsClass = static_cast<ESquadClass>(6);
@@ -123,6 +141,378 @@ namespace
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
+
+  struct SerializerConstructHelperRuntime
+  {
+    void* mVtable;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+
+  static_assert(
+    offsetof(SerializerConstructHelperRuntime, mHelperNext) == 0x04,
+    "SerializerConstructHelperRuntime::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SerializerConstructHelperRuntime, mHelperPrev) == 0x08,
+    "SerializerConstructHelperRuntime::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SerializerConstructHelperRuntime, mConstructCallback) == 0x0C,
+    "SerializerConstructHelperRuntime::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerializerConstructHelperRuntime, mDeleteCallback) == 0x10,
+    "SerializerConstructHelperRuntime::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SerializerConstructHelperRuntime) == 0x14,
+    "SerializerConstructHelperRuntime size must be 0x14"
+  );
+
+  struct SerializerSaveLoadHelperRuntime
+  {
+    void* mVtable;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+
+  static_assert(
+    offsetof(SerializerSaveLoadHelperRuntime, mHelperNext) == 0x04,
+    "SerializerSaveLoadHelperRuntime::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SerializerSaveLoadHelperRuntime, mHelperPrev) == 0x08,
+    "SerializerSaveLoadHelperRuntime::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SerializerSaveLoadHelperRuntime, mLoadCallback) == 0x0C,
+    "SerializerSaveLoadHelperRuntime::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerializerSaveLoadHelperRuntime, mSaveCallback) == 0x10,
+    "SerializerSaveLoadHelperRuntime::mSaveCallback offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SerializerSaveLoadHelperRuntime) == 0x14,
+    "SerializerSaveLoadHelperRuntime size must be 0x14"
+  );
+
+  SerializerConstructHelperRuntime gCSquadConstructHelper{};
+  SerializerConstructHelperRuntime gCPlatoonConstructHelper{};
+  SerializerSaveLoadHelperRuntime gCSquadSerializerHelper{};
+  SerializerSaveLoadHelperRuntime gCPlatoonSerializerHelper{};
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
+  /**
+   * Address: 0x0072AA20 (FUN_0072AA20)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `CSquad`.
+   */
+  [[nodiscard]] gpg::RType* CachedCSquadType()
+  {
+    if (moho::CSquad::sType == nullptr) {
+      moho::CSquad::sType = gpg::LookupRType(typeid(moho::CSquad));
+    }
+    return moho::CSquad::sType;
+  }
+
+  /**
+   * Address: 0x00723AA0 (FUN_00723AA0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `CPlatoon` lane.
+   */
+  [[nodiscard]] gpg::RType* CachedCPlatoonType()
+  {
+    if (moho::CPlatoon::sType == nullptr) {
+      moho::CPlatoon::sType = gpg::LookupRType(typeid(moho::CPlatoon));
+    }
+    return moho::CPlatoon::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCScriptObjectTypeForCPlatoonSerializer()
+  {
+    if (moho::CScriptObject::sType == nullptr) {
+      moho::CScriptObject::sType = gpg::LookupRType(typeid(moho::CScriptObject));
+    }
+    return moho::CScriptObject::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitSetTypeForCSquadSerializer()
+  {
+    static gpg::RType* sUnitSetType = nullptr;
+    if (sUnitSetType == nullptr) {
+      sUnitSetType = gpg::LookupRType(typeid(moho::SEntitySetTemplateUnit));
+    }
+    return sUnitSetType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedESquadClassTypeForCSquadSerializer()
+  {
+    static gpg::RType* sSquadClassType = nullptr;
+    if (sSquadClassType == nullptr) {
+      sSquadClassType = gpg::LookupRType(typeid(moho::ESquadClass));
+    }
+    return sSquadClassType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedEntityCategorySetVectorTypeForCSquadSerializer()
+  {
+    static gpg::RType* sCategoryVectorType = nullptr;
+    if (sCategoryVectorType == nullptr) {
+      sCategoryVectorType = gpg::LookupRType(typeid(msvc8::vector<moho::EntityCategorySet>));
+    }
+    return sCategoryVectorType;
+  }
+
+  /**
+   * Address: 0x0072ABD0 (FUN_0072ABD0)
+   *
+   * What it does:
+   * Registers `CScriptObject` as reflected base at zero offset for the
+   * platoon runtime type descriptor lane.
+   */
+  [[maybe_unused]] void AddBase_CSCcriptObject(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedCScriptObjectTypeForCPlatoonSerializer();
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x00724B90 (FUN_00724B90)
+   *
+   * What it does:
+   * Thin thunk lane that forwards to `AddBase_CSCcriptObject`.
+   */
+  [[maybe_unused]] void AddBase_CSCcriptObjectThunk(gpg::RType* const typeInfo)
+  {
+    AddBase_CSCcriptObject(typeInfo);
+  }
+
+  void RegisterConstructCallbacks(
+    gpg::RType* const type,
+    const gpg::RType::construct_func_t constructCallback,
+    const gpg::RType::delete_func_t deleteCallback
+  )
+  {
+    GPG_ASSERT(type != nullptr);
+    if (type == nullptr) {
+      return;
+    }
+
+    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == constructCallback);
+    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == deleteCallback);
+    type->serConstructFunc_ = constructCallback;
+    type->deleteFunc_ = deleteCallback;
+  }
+
+  struct PlatoonPriorityEntry
+  {
+    std::int32_t payload = 0; // +0x00
+    float priority = 0.0f; // +0x04
+  };
+  static_assert(sizeof(PlatoonPriorityEntry) == 0x8, "PlatoonPriorityEntry size must be 0x8");
+
+  struct PlatoonUnitSearchEntry
+  {
+    moho::Unit* unit = nullptr; // +0x00
+    float distanceSq = 0.0f; // +0x04
+  };
+  static_assert(sizeof(PlatoonUnitSearchEntry) == 0x8, "PlatoonUnitSearchEntry size must be 0x8");
+
+  /**
+   * Address: 0x00733AB0 (FUN_00733AB0)
+   *
+   * What it does:
+   * Fills one `[destinationBegin, destinationEnd)` range with a repeated
+   * platoon-priority entry.
+   */
+  [[maybe_unused]] PlatoonPriorityEntry* FillPlatoonPriorityEntryRange(
+    PlatoonPriorityEntry* destinationBegin,
+    PlatoonPriorityEntry* const destinationEnd,
+    const PlatoonPriorityEntry& value
+  ) noexcept
+  {
+    while (destinationBegin != destinationEnd) {
+      *destinationBegin = value;
+      ++destinationBegin;
+    }
+    return destinationBegin;
+  }
+
+  /**
+   * Address: 0x00733AD0 (FUN_00733AD0)
+   *
+   * What it does:
+   * Copies one platoon-priority range backward into destination storage.
+   */
+  [[maybe_unused]] PlatoonPriorityEntry* CopyPlatoonPriorityEntryRangeBackward(
+    PlatoonPriorityEntry* destinationEnd,
+    const PlatoonPriorityEntry* const sourceBegin,
+    const PlatoonPriorityEntry* sourceEnd
+  ) noexcept
+  {
+    while (sourceEnd != sourceBegin) {
+      --sourceEnd;
+      --destinationEnd;
+      *destinationEnd = *sourceEnd;
+    }
+    return destinationEnd;
+  }
+
+  struct PlatoonTreeNodeFlag45Runtime
+  {
+    PlatoonTreeNodeFlag45Runtime* left; // +0x00
+    PlatoonTreeNodeFlag45Runtime* parent; // +0x04
+    PlatoonTreeNodeFlag45Runtime* right; // +0x08
+    std::uint8_t reserved0C_0F[0x04]; // +0x0C
+    std::uint8_t payload_10_2B[0x1C]; // +0x10
+    std::uint8_t sentinel44; // +0x2C
+    std::uint8_t isNil45; // +0x2D
+  };
+  static_assert(offsetof(PlatoonTreeNodeFlag45Runtime, isNil45) == 0x2D, "PlatoonTreeNodeFlag45Runtime::isNil45 offset");
+
+  /**
+   * Address: 0x00736450 (FUN_00736450)
+   *
+   * What it does:
+   * Returns the rightmost node reachable from a flag-45 RB-tree head.
+   */
+  [[maybe_unused]] PlatoonTreeNodeFlag45Runtime* FindPlatoonTreeRightmostNode(
+    PlatoonTreeNodeFlag45Runtime* head
+  ) noexcept
+  {
+    PlatoonTreeNodeFlag45Runtime* cursor = head->right;
+    while (cursor->isNil45 == 0u) {
+      head = cursor;
+      cursor = head->right;
+    }
+    return head;
+  }
+
+  /**
+   * Address: 0x00736470 (FUN_00736470)
+   *
+   * What it does:
+   * Returns the leftmost node reachable from a flag-45 RB-tree head.
+   */
+  [[maybe_unused]] PlatoonTreeNodeFlag45Runtime* FindPlatoonTreeLeftmostNode(
+    PlatoonTreeNodeFlag45Runtime* head
+  ) noexcept
+  {
+    PlatoonTreeNodeFlag45Runtime* cursor = head->left;
+    if (cursor->isNil45 != 0u) {
+      return head;
+    }
+
+    do {
+      head = cursor;
+      cursor = head->left;
+    } while (cursor->isNil45 == 0u);
+    return head;
+  }
+
+  /**
+   * Address: 0x00734460 (FUN_00734460)
+   *
+   * What it does:
+   * Inserts one `{payload, priority}` heap entry by promoting parents while
+   * preserving max-heap ordering within the bounded lane.
+   */
+  [[nodiscard]] std::int32_t InsertPlatoonPriorityEntryByPromotingParents(
+    PlatoonPriorityEntry* const heap,
+    int insertionIndex,
+    const int lowerBoundIndex,
+    const std::int32_t payload,
+    const float priority
+  ) noexcept
+  {
+    int parentIndex = (insertionIndex - 1) / 2;
+    while (lowerBoundIndex < insertionIndex) {
+      if (priority <= heap[parentIndex].priority) {
+        break;
+      }
+
+      heap[insertionIndex] = heap[parentIndex];
+      insertionIndex = parentIndex;
+      parentIndex = (parentIndex - 1) / 2;
+    }
+
+    heap[insertionIndex].payload = payload;
+    heap[insertionIndex].priority = priority;
+    return payload;
+  }
+
+  /**
+   * Address: 0x00734350 (FUN_00734350)
+   *
+   * What it does:
+   * Sifts one heap gap down through max-priority children, then reinserts the
+   * pending `{payload, priority}` pair via parent-promotion into the bounded
+   * lane used by platoon target-priority sorting.
+   */
+  [[maybe_unused]] [[nodiscard]] std::int32_t SiftDownPlatoonPriorityEntryAndReinsert(
+    int startIndex,
+    const int heapSize,
+    PlatoonPriorityEntry* const heap,
+    const std::int32_t payload,
+    const float priority
+  ) noexcept
+  {
+    const int originalIndex = startIndex;
+    int childIndex = (startIndex * 2) + 2;
+    bool childEqualsHeapBoundary = (childIndex == heapSize);
+
+    while (childIndex < heapSize) {
+      const int leftChildIndex = childIndex - 1;
+      if (heap[leftChildIndex].priority > heap[childIndex].priority) {
+        childIndex = leftChildIndex;
+      }
+
+      heap[startIndex] = heap[childIndex];
+      startIndex = childIndex;
+      childIndex = (childIndex * 2) + 2;
+      childEqualsHeapBoundary = (childIndex == heapSize);
+    }
+
+    if (childEqualsHeapBoundary) {
+      heap[startIndex] = heap[heapSize - 1];
+      startIndex = heapSize - 1;
+    }
+
+    return InsertPlatoonPriorityEntryByPromotingParents(
+      heap,
+      startIndex,
+      originalIndex,
+      payload,
+      priority
+    );
+  }
 
   struct CSquadRuntimeView
   {
@@ -281,6 +671,97 @@ namespace
         (void)outSet.AddUnit(DecodeSquadUnit(*unitSlot));
       }
     }
+  }
+
+  /**
+   * Address: 0x0072A210 (FUN_0072A210, sub_72A210)
+   *
+   * What it does:
+   * Reads the platoon's owned squad pointers from the archive and appends each
+   * recovered squad into the platoon's squad storage until the archive returns
+   * a null pointer lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadPlatoonSquadsFromArchive(
+    gpg::ReadArchive* const archive,
+    moho::CPlatoon* const platoon
+  )
+  {
+    if (archive == nullptr || platoon == nullptr) {
+      return archive;
+    }
+
+    moho::Entity* loadedEntity = nullptr;
+    gpg::RRef ownerRef{};
+    archive->ReadPointerOwned_Entity(&loadedEntity, &ownerRef);
+    while (loadedEntity != nullptr) {
+      platoon->mSquadList.PushBack(reinterpret_cast<moho::CSquad*>(loadedEntity));
+
+      loadedEntity = nullptr;
+      ownerRef = {};
+      archive->ReadPointerOwned_Entity(&loadedEntity, &ownerRef);
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x0072A290 (FUN_0072A290)
+   *
+   * What it does:
+   * Writes each squad pointer lane as `owned`, then emits a null-squad
+   * `unowned` terminator lane for platoon squad-list serialization.
+   */
+  [[maybe_unused]] void WritePlatoonSquadPointersToArchive(
+    gpg::WriteArchive* const archive,
+    moho::CPlatoon* const platoon
+  )
+  {
+    const gpg::RRef ownerRef{};
+
+    for (moho::CSquad** squadIt = platoon->mSquadList.begin(); squadIt != platoon->mSquadList.end(); ++squadIt) {
+      gpg::RRef squadRef{};
+      squadRef.mObj = *squadIt;
+      squadRef.mType = CachedCSquadType();
+      gpg::WriteRawPointer(archive, squadRef, gpg::TrackedPointerState::Owned, ownerRef);
+    }
+
+    gpg::RRef terminatorRef{};
+    terminatorRef.mObj = nullptr;
+    terminatorRef.mType = CachedCSquadType();
+    gpg::WriteRawPointer(archive, terminatorRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
+  /**
+   * Address: 0x00733480 (FUN_00733480, sub_733480)
+   *
+   * What it does:
+   * Appends one platoon unit-search entry to the bounded result lane used by
+   * `FormPlatoon()` candidate filtering.
+   */
+  [[maybe_unused]] void AppendPlatoonUnitSearchEntry(
+    std::vector<PlatoonUnitSearchEntry>& entries,
+    moho::Unit* const unit,
+    const float distanceSq
+  )
+  {
+    entries.push_back(PlatoonUnitSearchEntry{unit, distanceSq});
+  }
+
+  /**
+   * Address: 0x00723A50 (FUN_00723A50, copy_CSquadUnits_into_EntitySet)
+   *
+   * What it does:
+   * Copy-constructs destination `SEntitySetTemplateUnit` from one squad's
+   * `mUnits` lane and returns destination.
+   */
+  [[nodiscard]] SEntitySetTemplateUnit*
+  CopyCSquadUnitsIntoEntitySet(SEntitySetTemplateUnit* const destination, const CSquad* const squad)
+  {
+    if (destination == nullptr || squad == nullptr) {
+      return destination;
+    }
+
+    return ::new (destination) SEntitySetTemplateUnit(squad->mUnits);
   }
 
   enum class PlatoonThreatType : std::int32_t
@@ -449,6 +930,80 @@ namespace
     squad->mUnitSlotEnd = end - 1;
   }
 
+  /**
+   * Address: 0x007241C0 (FUN_007241C0)
+   *
+   * What it does:
+   * Removes every entity referenced by `units` from `squad` using
+   * `RemoveUnitFromSquad` one-by-one.
+   */
+  [[maybe_unused]] void RemoveUnitSetMembersFromSquad(
+    CSquadRuntimeView& squad,
+    const SEntitySetTemplateUnit& units
+  )
+  {
+    for (moho::Entity* const* unitIt = units.mVec.begin(); unitIt != units.mVec.end(); ++unitIt) {
+      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitIt);
+      RemoveUnitFromSquad(&squad, unit != nullptr ? static_cast<const moho::Entity*>(unit) : nullptr);
+    }
+  }
+
+  /**
+   * Address: 0x007241F0 (FUN_007241F0)
+   *
+   * What it does:
+   * Appends the source unit range into destination set and invalidates the
+   * platoon's cached Lua unit-list flag.
+   */
+  [[maybe_unused]] void AppendUnitSetRangeAndInvalidateLuaCache(
+    const SEntitySetTemplateUnit& sourceUnits,
+    SEntitySetTemplateUnit& destinationUnits,
+    CPlatoonRuntimeView& platoonRuntime
+  )
+  {
+    destinationUnits.AddRange(sourceUnits.mVec.begin(), sourceUnits.mVec.end());
+    platoonRuntime.mHasLuaList = 0u;
+  }
+
+  /**
+   * Address: 0x00724810 (FUN_00724810)
+   *
+   * What it does:
+   * Replaces one squad's prioritized target-category list with `categories`.
+   */
+  [[maybe_unused]] msvc8::vector<EntityCategorySet>* SetSquadPrioritizedTargetCategories(
+    CSquadRuntimeView& squadRuntime,
+    const msvc8::vector<EntityCategorySet>& categories
+  )
+  {
+    auto& squad = *reinterpret_cast<CSquad*>(&squadRuntime);
+    squad.mCats = categories;
+    return &squad.mCats;
+  }
+
+  /**
+   * Address: 0x00725990 (FUN_00725990)
+   *
+   * What it does:
+   * Finds the first squad in `platoonRuntime` matching `squadClass` and
+   * replaces that squad's prioritized target-category list.
+   */
+  [[maybe_unused]] msvc8::vector<EntityCategorySet>* SetPlatoonSquadPrioritizedTargetCategories(
+    CPlatoonRuntimeView& platoonRuntime,
+    const ESquadClass squadClass,
+    const msvc8::vector<EntityCategorySet>& categories
+  )
+  {
+    for (CSquadRuntimeView** squadLane = platoonRuntime.mSquadStart; squadLane != platoonRuntime.mSquadEnd; ++squadLane) {
+      CSquadRuntimeView* const squadRuntime = *squadLane;
+      if (squadRuntime == nullptr || squadRuntime->mSquadClass != squadClass) {
+        continue;
+      }
+      return SetSquadPrioritizedTargetCategories(*squadRuntime, categories);
+    }
+    return nullptr;
+  }
+
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
@@ -577,7 +1132,6 @@ namespace moho
   int cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState* state);
-  int cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonFindHighestValueUnitL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonStopL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonMoveToLocationL(LuaPlus::LuaState* state);
@@ -629,9 +1183,62 @@ namespace moho
     return sStatItem;
   }
 
+  /**
+   * Address: 0x0072A370 (FUN_0072A370)
+   *
+   * What it does:
+   * Increments the global `CPlatoon` instance-counter stat and returns the
+   * input platoon pointer unchanged.
+   */
+  [[maybe_unused]] CPlatoon* MarkCPlatoonInstanceConstructed(CPlatoon* const platoon)
+  {
+    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
+#else
+      statItem->mPrimaryValueBits += 1;
+#endif
+    }
+    return platoon;
+  }
+
   CScrLuaMetatableFactory<CPlatoon>& CScrLuaMetatableFactory<CPlatoon>::Instance()
   {
     return sInstance;
+  }
+
+  /**
+   * Address: 0x0072AC30 (FUN_0072AC30)
+   *
+   * What it does:
+   * Returns cached `CPlatoon` metatable object from Lua object-factory
+   * storage.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* func_GetCPlatoonFactory(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<CPlatoon>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x0072B1D0 (FUN_0072B1D0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CPlatoon>` and returns that singleton.
+   */
+  [[maybe_unused]] CScrLuaMetatableFactory<CPlatoon>* startup_CScrLuaMetatableFactory_CPlatoon_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<CPlatoon>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
   }
 
   LuaPlus::LuaObject CScrLuaMetatableFactory<CPlatoon>::Create(LuaPlus::LuaState* const state)
@@ -672,6 +1279,38 @@ namespace moho
   )
   {
     return new (std::nothrow) CPlatoon(sim, army, platoonName, aiPlan);
+  }
+
+  /**
+   * Address: 0x00724BA0 (FUN_00724BA0, Moho::CPlatoon::CPlatoon)
+   */
+  CPlatoon::CPlatoon()
+    : CScriptObject()
+    , mSim(nullptr)
+    , mArmy(nullptr)
+    , mUnknown_0x03C(0u)
+    , mSquadList()
+    , mName()
+    , mPlan()
+    , mUniqueName()
+    , mFormation()
+    , mDisbandOnIdle(0u)
+    , mPad_0x0E1{0u, 0u, 0u}
+    , mLifetimeStat1(0)
+    , mLifetimeStat2(0)
+    , mLifetimeStat3(0.0f)
+    , mLifetimeStat4(0.0f)
+    , mLuaUnitList()
+    , mHasLuaList(0u)
+    , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
+  {
+    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
+#else
+      statItem->mPrimaryValueBits += 1;
+#endif
+    }
   }
 
   /**
@@ -720,6 +1359,570 @@ namespace moho
 
     const char* planArg = mPlan.c_str();
     CallbackStr("OnCreate", &planArg);
+  }
+
+  /**
+   * Address: 0x0072A0C0 (FUN_0072A0C0)
+   *
+   * What it does:
+   * Forwards one platoon serializer construct thunk lane to
+   * `CPlatoon::ConstructForSerializer`.
+   */
+  [[maybe_unused]] void ConstructCPlatoonForSerializerThunk(
+    gpg::ReadArchive* const,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    CPlatoon::ConstructForSerializer(result);
+  }
+
+  /**
+   * Address: 0x0072A0D0 (FUN_0072A0D0, sub_72A0D0)
+   */
+  void CPlatoon::ConstructForSerializer(gpg::SerConstructResult* const result)
+  {
+    auto* const object = new (std::nothrow) CPlatoon();
+    gpg::RRef objectRef{};
+    gpg::RRef_CPlatoon(&objectRef, object);
+    result->SetUnowned(objectRef, 0u);
+  }
+
+  void ConstructCSquadForSerializer(
+    gpg::ReadArchive* const,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    void* const storage = ::operator new(sizeof(CSquad), std::nothrow);
+    CSquad* squad = nullptr;
+    if (storage != nullptr) {
+      squad = static_cast<CSquad*>(storage);
+      squad->mSim = nullptr;
+      ::new (&squad->mUnits) SEntitySetTemplateUnit();
+      squad->mSquadClass = ESquadClass::Unassigned;
+      ::new (&squad->mName) msvc8::string();
+      ::new (&squad->mCats) msvc8::vector<EntityCategorySet>();
+      squad->mPad_0x5C = 0u;
+    }
+
+    if (result == nullptr) {
+      return;
+    }
+
+    gpg::RRef objectRef{};
+    objectRef.mObj = squad;
+    objectRef.mType = CachedCSquadType();
+    result->SetUnowned(objectRef, 0u);
+  }
+
+  int ConstructCSquadForSerializerThunk(const int, const int, const int, gpg::SerConstructResult* const result)
+  {
+    ConstructCSquadForSerializer(nullptr, 0, 0, result);
+    return 0;
+  }
+
+  /**
+   * Address: 0x0072AB70 (FUN_0072AB70)
+   *
+   * What it does:
+   * Serializer construct adapter that forwards to the CSquad construct helper.
+   */
+  [[maybe_unused]] int ConstructCSquadForSerializerAlias(gpg::SerConstructResult* const result)
+  {
+    ConstructCSquadForSerializer(nullptr, 0, 0, result);
+    return 0;
+  }
+
+  /**
+   * Address: 0x0072AB80 (FUN_0072AB80)
+   *
+   * What it does:
+   * Builds one reflected `RRef` for `squad` and copies it into `outRef`.
+   */
+  [[maybe_unused]] gpg::RRef* AssignCSquadRef(gpg::RRef& outRef, CSquad* const squad)
+  {
+    outRef.mObj = squad;
+    outRef.mType = CachedCSquadType();
+    return &outRef;
+  }
+
+  /**
+   * Address: 0x0072AC70 (FUN_0072AC70)
+   *
+   * What it does:
+   * Serializer construct adapter that forwards to
+   * `CPlatoon::ConstructForSerializer`.
+   */
+  [[maybe_unused]] int ConstructCPlatoonForSerializerAlias(gpg::SerConstructResult* const result)
+  {
+    CPlatoon::ConstructForSerializer(result);
+    return 0;
+  }
+
+  /**
+   * Address: 0x0072B200 (FUN_0072B200)
+   *
+   * What it does:
+   * Deserializes one `CSquad` payload lane in binary order:
+   * `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats`.
+   */
+  [[maybe_unused]] void DeserializeCSquadSerializerPayload(
+    gpg::ReadArchive* const archive,
+    CSquad* const squad
+  )
+  {
+    gpg::RRef ownerRef{};
+    archive->ReadPointer_Sim(&squad->mSim, &ownerRef);
+    archive->Read(CachedUnitSetTypeForCSquadSerializer(), &squad->mUnits, ownerRef);
+
+    ownerRef = {};
+    archive->Read(CachedESquadClassTypeForCSquadSerializer(), &squad->mSquadClass, ownerRef);
+    archive->ReadString(&squad->mName);
+
+    ownerRef = {};
+    archive->Read(CachedEntityCategorySetVectorTypeForCSquadSerializer(), &squad->mCats, ownerRef);
+  }
+
+  /**
+   * Address: 0x0072ABB0 (FUN_0072ABB0)
+   *
+   * What it does:
+   * Thunk lane that forwards to `DeserializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCSquadSerializerPayloadThunkA(
+    gpg::ReadArchive* const archive,
+    CSquad* const squad
+  )
+  {
+    DeserializeCSquadSerializerPayload(archive, squad);
+  }
+
+  /**
+   * Address: 0x0072B0A0 (FUN_0072B0A0)
+   * Address: 0x007CFB00 (FUN_007CFB00)
+   *
+   * What it does:
+   * Duplicate thunk lane forwarding to `DeserializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCSquadSerializerPayloadThunkB(
+    gpg::ReadArchive* const archive,
+    CSquad* const squad
+  )
+  {
+    DeserializeCSquadSerializerPayload(archive, squad);
+  }
+
+  /**
+   * Address: 0x0072B2E0 (FUN_0072B2E0)
+   *
+   * What it does:
+   * Serializes one `CSquad` payload lane in binary order:
+   * `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats`.
+   */
+  [[maybe_unused]] void SerializeCSquadSerializerPayload(
+    CSquad* const squad,
+    gpg::WriteArchive* const archive
+  )
+  {
+    gpg::RRef ownerRef{};
+    gpg::RRef simRef{};
+    gpg::AssignSimRef(&simRef, squad->mSim);
+    gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    ownerRef = {};
+    archive->Write(CachedUnitSetTypeForCSquadSerializer(), &squad->mUnits, ownerRef);
+
+    ownerRef = {};
+    archive->Write(CachedESquadClassTypeForCSquadSerializer(), &squad->mSquadClass, ownerRef);
+    archive->WriteString(&squad->mName);
+
+    ownerRef = {};
+    archive->Write(CachedEntityCategorySetVectorTypeForCSquadSerializer(), &squad->mCats, ownerRef);
+  }
+
+  /**
+   * Address: 0x0072ABC0 (FUN_0072ABC0)
+   *
+   * What it does:
+   * Thunk lane that forwards to `SerializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCSquadSerializerPayloadThunkA(
+    CSquad* const squad,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSquadSerializerPayload(squad, archive);
+  }
+
+  /**
+   * Address: 0x0072B0B0 (FUN_0072B0B0)
+   *
+   * What it does:
+   * Duplicate thunk lane forwarding to `SerializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCSquadSerializerPayloadThunkB(
+    CSquad* const squad,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSquadSerializerPayload(squad, archive);
+  }
+
+  /**
+   * Address: 0x0072B3C0 (FUN_0072B3C0)
+   *
+   * What it does:
+   * Deserializes one `CPlatoon` payload lane in binary order:
+   * CScriptObject base, sim/army pointers, squad list, strings, and stat lanes.
+   */
+  [[maybe_unused]] void DeserializeCPlatoonSerializerPayload(
+    CPlatoon* const platoon,
+    gpg::ReadArchive* const archive
+  )
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(CachedCScriptObjectTypeForCPlatoonSerializer(), platoon, ownerRef);
+
+    ownerRef = {};
+    archive->ReadPointer_Sim(&platoon->mSim, &ownerRef);
+
+    ownerRef = {};
+    SimArmy* army = nullptr;
+    archive->ReadPointer_SimArmy(&army, &ownerRef);
+    platoon->mArmy = reinterpret_cast<IArmy*>(army);
+
+    (void)ReadPlatoonSquadsFromArchive(archive, platoon);
+    archive->ReadString(&platoon->mName);
+    archive->ReadString(&platoon->mPlan);
+    archive->ReadString(&platoon->mUniqueName);
+    archive->ReadString(&platoon->mFormation);
+
+    bool disbandOnIdle = false;
+    archive->ReadBool(&disbandOnIdle);
+    platoon->mDisbandOnIdle = disbandOnIdle ? 1u : 0u;
+    archive->ReadInt(&platoon->mLifetimeStat1);
+    archive->ReadInt(&platoon->mLifetimeStat2);
+    archive->ReadFloat(&platoon->mLifetimeStat3);
+    archive->ReadFloat(&platoon->mLifetimeStat4);
+  }
+
+  /**
+   * Address: 0x0072B0C0 (FUN_0072B0C0)
+   *
+   * What it does:
+   * Thunk lane that forwards to `DeserializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCPlatoonSerializerPayloadThunk(
+    CPlatoon* const platoon,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCPlatoonSerializerPayload(platoon, archive);
+  }
+
+  /**
+   * Address: 0x0072ACB0 (FUN_0072ACB0)
+   *
+   * What it does:
+   * Secondary thunk lane that forwards to `DeserializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCPlatoonSerializerPayloadThunkB(
+    CPlatoon* const platoon,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCPlatoonSerializerPayload(platoon, archive);
+  }
+
+  /**
+   * Address: 0x0072B4D0 (FUN_0072B4D0)
+   *
+   * What it does:
+   * Serializes one `CPlatoon` payload lane in binary order:
+   * CScriptObject base, sim/army pointers, squad list, strings, and stat lanes.
+   */
+  [[maybe_unused]] void SerializeCPlatoonSerializerPayload(
+    CPlatoon* const platoon,
+    gpg::WriteArchive* const archive
+  )
+  {
+    gpg::RRef ownerRef{};
+    archive->Write(CachedCScriptObjectTypeForCPlatoonSerializer(), platoon, ownerRef);
+
+    ownerRef = {};
+    gpg::RRef simRef{};
+    gpg::AssignSimRef(&simRef, platoon->mSim);
+    gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    ownerRef = {};
+    gpg::RRef armyRef{};
+    gpg::RRef_SimArmy(&armyRef, reinterpret_cast<SimArmy*>(platoon->mArmy));
+    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    WritePlatoonSquadPointersToArchive(archive, platoon);
+
+    archive->WriteString(&platoon->mName);
+    archive->WriteString(&platoon->mPlan);
+    archive->WriteString(&platoon->mUniqueName);
+    archive->WriteString(&platoon->mFormation);
+    archive->WriteBool(platoon->mDisbandOnIdle != 0u);
+    archive->WriteInt(platoon->mLifetimeStat1);
+    archive->WriteInt(platoon->mLifetimeStat2);
+    archive->WriteFloat(platoon->mLifetimeStat3);
+    archive->WriteFloat(platoon->mLifetimeStat4);
+  }
+
+  /**
+   * Address: 0x0072B0D0 (FUN_0072B0D0)
+   *
+   * What it does:
+   * Tail-jump thunk lane that forwards directly to
+   * `SerializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCPlatoonSerializerPayloadThunkB(
+    CPlatoon* const platoon,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCPlatoonSerializerPayload(platoon, archive);
+  }
+
+  /**
+   * Address: 0x0072ACC0 (FUN_0072ACC0)
+   *
+   * What it does:
+   * Thunk lane that forwards to `SerializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCPlatoonSerializerPayloadThunk(
+    CPlatoon* const platoon,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCPlatoonSerializerPayload(platoon, archive);
+  }
+
+  /**
+   * Address: 0x007249B0 (FUN_007249B0, Moho::CSquadSerializer::Deserialize)
+   *
+   * What it does:
+   * Forwards one CSquad serializer-load callback lane to
+   * `DeserializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCSquadSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    DeserializeCSquadSerializerPayload(archive, reinterpret_cast<CSquad*>(static_cast<std::uintptr_t>(objectPtr)));
+  }
+
+  /**
+   * Address: 0x007249C0 (FUN_007249C0, Moho::CSquadSerializer::Serialize)
+   *
+   * What it does:
+   * Forwards one CSquad serializer-save callback lane to
+   * `SerializeCSquadSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCSquadSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    SerializeCSquadSerializerPayload(
+      reinterpret_cast<CSquad*>(static_cast<std::uintptr_t>(objectPtr)),
+      archive
+    );
+  }
+
+  /**
+   * Address: 0x0072A160 (FUN_0072A160, Moho::CPlatoonSerializer::Deserialize)
+   *
+   * What it does:
+   * Forwards one CPlatoon serializer-load callback lane to
+   * `DeserializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void DeserializeCPlatoonSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    DeserializeCPlatoonSerializerPayload(
+      reinterpret_cast<CPlatoon*>(static_cast<std::uintptr_t>(objectPtr)),
+      archive
+    );
+  }
+
+  /**
+   * Address: 0x0072A170 (FUN_0072A170, Moho::CPlatoonSerializer::Serialize)
+   *
+   * What it does:
+   * Forwards one CPlatoon serializer-save callback lane to
+   * `SerializeCPlatoonSerializerPayload`.
+   */
+  [[maybe_unused]] void SerializeCPlatoonSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    SerializeCPlatoonSerializerPayload(
+      reinterpret_cast<CPlatoon*>(static_cast<std::uintptr_t>(objectPtr)),
+      archive
+    );
+  }
+
+  void DeleteConstructedCSquadForSerializer(void* const objectPtr)
+  {
+    auto* const squad = static_cast<CSquad*>(objectPtr);
+    if (squad == nullptr) {
+      return;
+    }
+
+    squad->~CSquad();
+    ::operator delete(squad);
+  }
+
+  void DeleteConstructedCPlatoonForSerializer(void* const objectPtr)
+  {
+    if (objectPtr == nullptr) {
+      return;
+    }
+
+    delete static_cast<CPlatoon*>(objectPtr);
+  }
+
+  /**
+   * Address: 0x00724880 (FUN_00724880)
+   *
+   * What it does:
+   * Initializes startup CSquad construct-helper links and binds construct/delete
+   * callbacks for serializer-owned squad objects.
+   */
+  [[nodiscard]] SerializerConstructHelperRuntime* InitializeCSquadConstructHelper()
+  {
+    InitializeHelperNode(gCSquadConstructHelper);
+    gCSquadConstructHelper.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCSquadForSerializerThunk);
+    gCSquadConstructHelper.mDeleteCallback = &DeleteConstructedCSquadForSerializer;
+    RegisterConstructCallbacks(
+      CachedCSquadType(),
+      gCSquadConstructHelper.mConstructCallback,
+      gCSquadConstructHelper.mDeleteCallback
+    );
+    return &gCSquadConstructHelper;
+  }
+
+  /**
+   * Address: 0x0072A540 (FUN_0072A540)
+   *
+   * What it does:
+   * Reinitializes the CSquad generic construct-helper lane with the same
+   * construct/delete callback pair.
+   */
+  [[nodiscard]] SerializerConstructHelperRuntime* InitializeCSquadGenericConstructHelper()
+  {
+    return InitializeCSquadConstructHelper();
+  }
+
+  /**
+   * Address: 0x0072A030 (FUN_0072A030)
+   *
+   * What it does:
+   * Initializes startup CPlatoon construct-helper links and binds
+   * serializer construct/delete callbacks.
+   */
+  [[nodiscard]] SerializerConstructHelperRuntime* InitializeCPlatoonConstructHelper()
+  {
+    InitializeHelperNode(gCPlatoonConstructHelper);
+    gCPlatoonConstructHelper.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCPlatoonForSerializerThunk);
+    gCPlatoonConstructHelper.mDeleteCallback = &DeleteConstructedCPlatoonForSerializer;
+    RegisterConstructCallbacks(
+      CachedCPlatoonType(),
+      gCPlatoonConstructHelper.mConstructCallback,
+      gCPlatoonConstructHelper.mDeleteCallback
+    );
+    return &gCPlatoonConstructHelper;
+  }
+
+  /**
+   * Address: 0x0072A660 (FUN_0072A660)
+   *
+   * What it does:
+   * Reinitializes the CPlatoon generic construct-helper lane with the same
+   * construct/delete callback pair.
+   */
+  [[nodiscard]] SerializerConstructHelperRuntime* InitializeCPlatoonGenericConstructHelper()
+  {
+    return InitializeCPlatoonConstructHelper();
+  }
+
+  /**
+   * Address: 0x007249D0 (FUN_007249D0)
+   *
+   * What it does:
+   * Initializes startup CSquad save/load-helper links and binds serializer
+   * callback lanes.
+   */
+  [[nodiscard]] SerializerSaveLoadHelperRuntime* InitializeCSquadSerializerHelperStoragePrimary()
+  {
+    InitializeHelperNode(gCSquadSerializerHelper);
+    gCSquadSerializerHelper.mLoadCallback = &DeserializeCSquadSerializerCallback;
+    gCSquadSerializerHelper.mSaveCallback = &SerializeCSquadSerializerCallback;
+    return &gCSquadSerializerHelper;
+  }
+
+  /**
+   * Address: 0x0072A5C0 (FUN_0072A5C0)
+   *
+   * What it does:
+   * Reinitializes CSquad save/load-helper links and callback lanes.
+   */
+  [[nodiscard]] SerializerSaveLoadHelperRuntime* InitializeCSquadSerializerHelperStorageSecondary()
+  {
+    InitializeHelperNode(gCSquadSerializerHelper);
+    gCSquadSerializerHelper.mLoadCallback = &DeserializeCSquadSerializerCallback;
+    gCSquadSerializerHelper.mSaveCallback = &SerializeCSquadSerializerCallback;
+    return &gCSquadSerializerHelper;
+  }
+
+  /**
+   * Address: 0x0072A180 (FUN_0072A180)
+   *
+   * What it does:
+   * Initializes startup CPlatoon save/load-helper links and binds serializer
+   * callback lanes.
+   */
+  [[nodiscard]] SerializerSaveLoadHelperRuntime* InitializeCPlatoonSerializerHelperStoragePrimary()
+  {
+    InitializeHelperNode(gCPlatoonSerializerHelper);
+    gCPlatoonSerializerHelper.mLoadCallback = &DeserializeCPlatoonSerializerCallback;
+    gCPlatoonSerializerHelper.mSaveCallback = &SerializeCPlatoonSerializerCallback;
+    return &gCPlatoonSerializerHelper;
+  }
+
+  /**
+   * Address: 0x0072A6E0 (FUN_0072A6E0)
+   *
+   * What it does:
+   * Reinitializes CPlatoon save/load-helper links and callback lanes.
+   */
+  [[nodiscard]] SerializerSaveLoadHelperRuntime* InitializeCPlatoonSerializerHelperStorageSecondary()
+  {
+    InitializeHelperNode(gCPlatoonSerializerHelper);
+    gCPlatoonSerializerHelper.mLoadCallback = &DeserializeCPlatoonSerializerCallback;
+    gCPlatoonSerializerHelper.mSaveCallback = &SerializeCPlatoonSerializerCallback;
+    return &gCPlatoonSerializerHelper;
   }
 
   /**
@@ -834,6 +2037,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725840 (FUN_00725840, sub_725840)
+   */
+  int CPlatoon::CountAllSquadUnitSlots() const
+  {
+    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    int unitSlotCount = 0;
+    for (CSquadRuntimeView* const* squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
+      const CSquadRuntimeView* const squad = *squadLane;
+      unitSlotCount += static_cast<int>(squad->mUnitSlotEnd - squad->mUnitSlotBegin);
+    }
+    return unitSlotCount;
+  }
+
+  /**
    * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
    *
    * What it does:
@@ -909,6 +2126,45 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725280 (FUN_00725280, sub_725280)
+   *
+   * What it does:
+   * Finds the first squad lane matching `squadClass`, appends every entry in
+   * `units` into that squad's entity set, and clears the Lua unit-list cache
+   * validity flag on this platoon.
+   */
+  void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const SEntitySetTemplateUnit& units)
+  {
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
+      CSquadRuntimeView* const squadView = *squadLane;
+      if (squadView == nullptr || squadView->mSquadClass != squadClass) {
+        continue;
+      }
+
+      reinterpret_cast<CSquad*>(squadView)->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
+      break;
+    }
+
+    runtimeView.mHasLuaList = 0u;
+  }
+
+  /**
+   * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
+   *
+   * What it does:
+   * Builds a one-unit temporary set around `unit`, forwards into
+   * `AppendUnitsToSquad`, and preserves the Lua unit-list cache invalidation
+   * side effect for this platoon.
+   */
+  void CPlatoon::AppendUnitToSquad(const ESquadClass squadClass, Unit* const unit)
+  {
+    SEntitySetTemplateUnit singleUnitSet{};
+    (void)singleUnitSet.AddUnit(unit);
+    AppendUnitsToSquad(squadClass, singleUnitSet);
+  }
+
+  /**
    * Address: 0x00729F90 (FUN_00729F90, Moho::CPlatoon::SquadHasState)
    *
    * What it does:
@@ -966,6 +2222,112 @@ namespace moho
       StopSquad(squadView);
       return;
     }
+  }
+
+  /**
+   * Address: 0x00728A70 (FUN_00728A70, Moho::CPlatoon::LoadUnits)
+   *
+   * What it does:
+   * Scans assigned squads for payload/transport candidates, reserves load slots
+   * per transport, issues `UNITCOMMAND_TransportLoadUnits`, and returns issued
+   * command weak-links.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::LoadUnits(const EntityCategorySet* const categorySet)
+  {
+    constexpr const char* kTransportationCategoryName = "TRANSPORTATION";
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    SEntitySetTemplateUnit transportUnits{};
+    SEntitySetTemplateUnit unitsToLoad{};
+
+    for (int squadClassValue = 1; squadClassValue < static_cast<int>(kAllSquadsClass); ++squadClassValue) {
+      CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassValue));
+      if (squad == nullptr) {
+        continue;
+      }
+
+      const SEntitySetTemplateUnit squadUnits(squad->mUnits);
+
+      for (Entity* const* unitEntry = squadUnits.mVec.begin(); unitEntry != squadUnits.mVec.end(); ++unitEntry) {
+        Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
+          continue;
+        }
+
+        if (!unit->IsInCategory(kTransportationCategoryName)
+            && EntityCategory::HasBlueprint(unit->GetBlueprint(), categorySet)) {
+          (void)unitsToLoad.AddUnit(unit);
+        }
+      }
+
+      for (Entity* const* unitEntry = squadUnits.mVec.begin(); unitEntry != squadUnits.mVec.end(); ++unitEntry) {
+        Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
+          continue;
+        }
+
+        if (unit->IsInCategory(kTransportationCategoryName)) {
+          (void)transportUnits.AddUnit(unit);
+        }
+      }
+    }
+
+    if (transportUnits.Empty() || unitsToLoad.Empty()) {
+      gpg::Logf(
+        "Cannot perform load operation. Attempted to load %d units onto %d transports",
+        static_cast<int>(unitsToLoad.Size()),
+        static_cast<int>(transportUnits.Size())
+      );
+      return issuedCommands;
+    }
+
+    SEntitySetTemplateUnit assignedUnits{};
+    for (Entity* const* transportEntry = transportUnits.mVec.begin(); transportEntry != transportUnits.mVec.end();
+         ++transportEntry) {
+      Unit* const transportUnit = SEntitySetTemplateUnit::UnitFromEntry(*transportEntry);
+      if (transportUnit == nullptr) {
+        continue;
+      }
+
+      IAiTransport* const aiTransport = transportUnit->AiTransport;
+      if (aiTransport == nullptr) {
+        continue;
+      }
+
+      SEntitySetTemplateUnit commandUnits{};
+      for (Entity* const* unitEntry = unitsToLoad.mVec.begin(); unitEntry != unitsToLoad.mVec.end(); ++unitEntry) {
+        Unit* const loadUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        if (loadUnit == nullptr || assignedUnits.ContainsUnit(loadUnit)) {
+          continue;
+        }
+
+        if (aiTransport->TransportAssignSlot(loadUnit, -1)) {
+          (void)commandUnits.AddUnit(loadUnit);
+          (void)assignedUnits.AddUnit(loadUnit);
+        }
+      }
+
+      for (Entity* const* unitEntry = commandUnits.mVec.begin(); unitEntry != commandUnits.mVec.end(); ++unitEntry) {
+        Unit* const reservedUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        aiTransport->TransportRemoveUnitReservation(reservedUnit);
+      }
+
+      (void)commandUnits.AddUnit(transportUnit);
+
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(transportUnit->GetEntityId());
+      commandIssueData.mTarget.mPos.x = 0.0f;
+      commandIssueData.mTarget.mPos.y = 0.0f;
+      commandIssueData.mTarget.mPos.z = 0.0f;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, commandUnits, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
   }
 
   /**
@@ -1054,6 +2416,90 @@ namespace moho
 
     const char* callbackArg = normalizedPlan;
     scriptObject->CallbackStr("OnCreate", &callbackArg);
+  }
+
+  /**
+   * Address: 0x0072B720 (FUN_0072B720, Moho::CPlatoon::GetArmy)
+   *
+   * What it does:
+   * Returns this platoon's owning army lane.
+   */
+  IArmy* CPlatoon::GetArmy() const
+  {
+    return mArmy;
+  }
+
+  /**
+   * Address: 0x0072B7A0 (FUN_0072B7A0, Moho::CPlatoon::GetLifetimeStat1)
+   *
+   * What it does:
+   * Returns the first integer lifetime-stat lane.
+   */
+  std::int32_t CPlatoon::GetLifetimeStat1() const
+  {
+    return mLifetimeStat1;
+  }
+
+  /**
+   * Address: 0x0072B7B0 (FUN_0072B7B0, Moho::CPlatoon::GetLifetimeStat2)
+   *
+   * What it does:
+   * Returns the second integer lifetime-stat lane.
+   */
+  std::int32_t CPlatoon::GetLifetimeStat2() const
+  {
+    return mLifetimeStat2;
+  }
+
+  /**
+   * Address: 0x0072B790 (FUN_0072B790, sub_72B790)
+   */
+  CPlatoon* CPlatoon::MarkDisbandOnIdle()
+  {
+    mDisbandOnIdle = 1u;
+    return this;
+  }
+
+  /**
+   * Address: 0x0072B7C0 (FUN_0072B7C0, sub_72B7C0)
+   */
+  float CPlatoon::GetLifetimeStat3() const
+  {
+    return mLifetimeStat3;
+  }
+
+  /**
+   * Address: 0x0072B7D0 (FUN_0072B7D0, sub_72B7D0)
+   */
+  float CPlatoon::GetLifetimeStat4() const
+  {
+    return mLifetimeStat4;
+  }
+
+  /**
+   * Address: 0x0072B7F0 (FUN_0072B7F0, sub_72B7F0)
+   */
+  bool CPlatoon::HasLuaUnitList() const
+  {
+    return mHasLuaList != 0u;
+  }
+
+  /**
+   * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
+   */
+  CPlatoon* CPlatoon::AddLifetimeStat3(const float delta)
+  {
+    mLifetimeStat3 += delta;
+    return this;
+  }
+
+  /**
+   * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
+   */
+  CPlatoon* CPlatoon::AddLifetimeStat4(const float delta)
+  {
+    mLifetimeStat4 += delta;
+    return this;
   }
 
   /**
@@ -1879,9 +3325,7 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
-    runtimeView.mDisbandOnIdle = 1;
+    platoon->MarkDisbandOnIdle();
     return 0;
   }
 
@@ -2384,6 +3828,59 @@ namespace moho
       kFormPlatoonHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x0072E940 (FUN_0072E940, cfunc_CPlatoonSetPrioritizedTargetListL)
+   *
+   * What it does:
+   * Resolves `(platoon, squadClass, categoryTable)` from Lua, copies category
+   * entries into a temporary prioritized-category vector, then replaces the
+   * matching squad's prioritized target list.
+   */
+  int cfunc_CPlatoonSetPrioritizedTargetListL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected %d args, but got %d",
+        kSetPrioritizedTargetListHelpText,
+        3,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef enumRef{};
+    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, enumRef);
+
+    msvc8::vector<EntityCategorySet> prioritizedCategories{};
+    const LuaPlus::LuaObject categoryTable(LuaPlus::LuaStackObject(state, 3));
+    if (categoryTable.IsTable()) {
+      const int categoryCount = categoryTable.GetCount();
+      for (int categoryIndex = 1; categoryIndex <= categoryCount; ++categoryIndex) {
+        const LuaPlus::LuaObject categoryObject = categoryTable[categoryIndex];
+        if (EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); categorySet != nullptr) {
+          prioritizedCategories.push_back(*categorySet);
+        }
+      }
+
+      auto& runtime = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+      (void)SetPlatoonSquadPrioritizedTargetCategories(runtime, squadClass, prioritizedCategories);
+    }
+
+    return 0;
   }
 
   /**
@@ -2897,6 +4394,51 @@ namespace moho
   }
 
   /**
+   * Address: 0x00730970 (FUN_00730970, cfunc_CPlatoonLoadUnitsL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Resolves `(platoon, category)`, issues platoon transport-load commands,
+   * builds a Lua array of resulting command objects, and unlinks temporary
+   * weak-command lanes before returning.
+   */
+  int cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLoadUnitsHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+    EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->LoadUnits(categorySet);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00730B10 (FUN_00730B10, cfunc_CPlatoonUnloadUnitsAtLocation)
    *
    * What it does:
@@ -3238,14 +4780,13 @@ namespace moho
       return 1;
     }
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
-    lua_pushnumber(state->m_state, static_cast<float>(runtimeView.mLifetimeStat1));
+    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetLifetimeStat1()));
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, static_cast<float>(runtimeView.mLifetimeStat2));
+    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetLifetimeStat2()));
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, runtimeView.mLifetimeStat3);
+    lua_pushnumber(state->m_state, platoon->GetLifetimeStat3());
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, runtimeView.mLifetimeStat4);
+    lua_pushnumber(state->m_state, platoon->GetLifetimeStat4());
     (void)lua_gettop(state->m_state);
     return 4;
   }
@@ -3629,6 +5170,14 @@ namespace
   {
     CPlatoonLuaBindingBootstrap()
     {
+      (void)moho::InitializeCSquadSerializerHelperStoragePrimary();
+      (void)moho::InitializeCSquadSerializerHelperStorageSecondary();
+      (void)moho::InitializeCPlatoonSerializerHelperStoragePrimary();
+      (void)moho::InitializeCPlatoonSerializerHelperStorageSecondary();
+      (void)moho::InitializeCSquadConstructHelper();
+      (void)moho::InitializeCSquadGenericConstructHelper();
+      (void)moho::InitializeCPlatoonConstructHelper();
+      (void)moho::InitializeCPlatoonGenericConstructHelper();
       (void)moho::register_CPlatoonCanConsiderFormingPlatoon_LuaFuncDef();
       (void)moho::func_CPlatoonGetPlatoonUnits_LuaFuncDef();
       (void)moho::func_CPlatoonCanFormPlatoon_LuaFuncDef();

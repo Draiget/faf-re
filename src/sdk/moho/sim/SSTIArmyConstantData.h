@@ -38,6 +38,15 @@ namespace moho
     SSTIArmyConstantData();
 
     /**
+     * Address: 0x00742FA0 (FUN_00742FA0, Moho::SSTIArmyConstantData::SSTIArmyConstantData copy-ctor)
+     *
+     * What it does:
+     * Clones fixed identity/string lanes and all eight tracked shared
+     * `CIntelGrid` pointer lanes from one source payload.
+     */
+    SSTIArmyConstantData(const SSTIArmyConstantData& other);
+
+    /**
      * Address: 0x006FD570 (FUN_006FD570, Moho::SSTIArmyConstantData::~SSTIArmyConstantData)
      *
      * What it does:

@@ -243,7 +243,7 @@ namespace
   }
 
   /**
-   * Address: 0x0041A3D0 (FUN_0041A3D0, gpg::ReadArchive::ReadPointerOwned_StatItem)
+    * Alias of FUN_0041A3D0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane, enforces `Unowned -> Owned` transition, and
@@ -1004,6 +1004,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x004E9D30 (FUN_004E9D30, ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z)
+   * Mangled: ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z
+   *
+   * What it does:
+   * Returns the signed second delta between this timestamp and another one
+   * using fine-time seconds + millisecond lanes.
+   */
+  double CTimeStamp::GetDeltaSeconds(const CTimeStamp& other) const noexcept
+  {
+    constexpr double kMillisToSeconds = 0.001;
+    const double otherFineSeconds =
+      static_cast<double>(other.ftime) + (static_cast<double>(other.millis) * kMillisToSeconds);
+    const double thisFineSeconds =
+      static_cast<double>(ftime) + (static_cast<double>(millis) * kMillisToSeconds);
+    return otherFineSeconds - thisFineSeconds;
+  }
+
+  /**
    * Address: 0x0040AB20 (FUN_0040AB20, sub_40AB20)
    *
    * What it does:
@@ -1217,7 +1235,7 @@ namespace moho
   EngineStats::~EngineStats() = default;
 
   /**
-   * Address: 0x00417B60 (FUN_00417B60, Moho::EngineStats::GetItem3)
+    * Alias of FUN_00417B60 (non-canonical helper lane).
    */
   StatItem* EngineStats::GetItem3(const gpg::StrArg statPath)
   {
@@ -1225,7 +1243,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00417C50 (FUN_00417C50, Moho::EngineStats::GetItem_0)
+    * Alias of FUN_00417C50 (non-canonical helper lane).
    */
   StatItem* EngineStats::GetItem_0(const gpg::StrArg statPath)
   {
@@ -1241,7 +1259,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00436290 (FUN_00436290, Moho::EngineStats::GetItem2)
+    * Alias of FUN_00436290 (non-canonical helper lane).
    */
   StatItem* EngineStats::GetItem2(const gpg::StrArg statPath)
   {
@@ -2558,7 +2576,6 @@ namespace moho
       reinterpret_cast<gpg::RType::load_func_t>(&DeserializeEStatType);
     gEStatTypePrimitiveSerializer.mSerSaveFunc =
       reinterpret_cast<gpg::RType::save_func_t>(&SerializeEStatType);
-    gEStatTypePrimitiveSerializer.RegisterSerializeFunctions();
   }
 
   /**
@@ -2576,7 +2593,6 @@ namespace moho
       reinterpret_cast<gpg::RType::load_func_t>(&DeserializeEPulseMode);
     gEPulseModePrimitiveSerializer.mSerSaveFunc =
       reinterpret_cast<gpg::RType::save_func_t>(&SerializeEPulseMode);
-    gEPulseModePrimitiveSerializer.RegisterSerializeFunctions();
   }
 
   void register_StatItemSerializer()
@@ -2585,7 +2601,6 @@ namespace moho
     gStatItemSerializer.mPrev = nullptr;
     gStatItemSerializer.mSerLoadFunc = &DeserializeStatItem;
     gStatItemSerializer.mSerSaveFunc = &SerializeStatItem;
-    gStatItemSerializer.RegisterSerializeFunctions();
   }
 
   /**
@@ -2656,7 +2671,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0040C200 (FUN_0040C200, mode-based resolver)
+    * Alias of FUN_0040C200 (non-canonical helper lane).
    */
   StatItem* ResolveStatByMode(void* statsRoot, const gpg::StrArg name, const int mode)
   {
@@ -2668,7 +2683,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00417B60 (FUN_00417B60, float resolver)
+    * Alias of FUN_00417B60 (non-canonical helper lane).
    */
   StatItem* ResolveStatFloat(void* statsRoot, const gpg::StrArg name)
   {
@@ -2680,7 +2695,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00417C50 (FUN_00417C50, string resolver)
+    * Alias of FUN_00417C50 (non-canonical helper lane).
    */
   StatItem* ResolveStatString(void* statsRoot, const gpg::StrArg name)
   {

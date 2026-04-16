@@ -14,6 +14,8 @@ namespace moho
   class CUnitMoveTaskTypeInfo final : public gpg::RType
   {
   public:
+    [[nodiscard]] const char* GetName() const override;
+
     /**
      * Address: 0x00618EC0 (FUN_00618EC0, Moho::CUnitMoveTaskTypeInfo::Init)
      *
@@ -68,6 +70,15 @@ namespace moho
      */
     static void AssignDtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo);
   };
+
+  /**
+   * Address: 0x00618E60 (FUN_00618E60, preregister_CUnitMoveTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CUnitMoveTaskTypeInfo` reflection
+   * lane.
+   */
+  [[nodiscard]] gpg::RType* preregister_CUnitMoveTaskTypeInfo();
 
   static_assert(sizeof(CUnitMoveTaskTypeInfo) == 0x64, "CUnitMoveTaskTypeInfo size must be 0x64");
 } // namespace moho

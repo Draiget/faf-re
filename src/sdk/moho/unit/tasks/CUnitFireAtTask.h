@@ -6,6 +6,12 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/task/CCommandTask.h"
 
+namespace gpg
+{
+  class RRef;
+  class RType;
+}
+
 namespace moho
 {
   class IAiCommandDispatchImpl;
@@ -14,6 +20,8 @@ namespace moho
   class CUnitFireAtTask : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
      * Mangled: ??1CUnitFireAtTask@Moho@@QAE@@Z
@@ -72,3 +80,24 @@ namespace moho
   );
   static_assert(sizeof(CUnitFireAtTask) == 0x5C, "CUnitFireAtTask size must be 0x5C");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0060CE10 (FUN_0060CE10, gpg::RRef_CUnitFireAtTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitFireAtTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* outRef, moho::CUnitFireAtTask* value);
+
+  /**
+   * Address: 0x0060C800 (FUN_0060C800)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CUnitFireAtTask` and
+   * copies object/type fields into the destination reference record.
+   */
+  gpg::RRef* AssignCUnitFireAtTaskRef(gpg::RRef* outRef, moho::CUnitFireAtTask* value);
+} // namespace gpg

@@ -1944,6 +1944,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x007FA100 (FUN_007FA100)
+   *
+   * What it does:
+   * Jump-only adapter lane that forwards directly into `REN_Init()`.
+   */
+  [[maybe_unused]] void REN_InitAdapterA()
+  {
+    REN_Init();
+  }
+
+  /**
    * Address: 0x00430900 (FUN_00430900, ?D3D_Init@Moho@@YA_NXZ)
    *
    * What it does:

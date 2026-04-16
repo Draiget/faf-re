@@ -23,6 +23,7 @@ namespace moho
   class Sim;
   class Unit;
   struct CEntityDbIdPoolNode;
+  struct CEntityDbBoundedPropQueueNode;
 
   struct CEntityDbListHead
   {
@@ -65,9 +66,9 @@ namespace moho
   struct CEntityDbBoundedPropQueueRuntime
   {
     std::uint32_t queueProxy; // +0x00
-    std::uint32_t start;      // +0x04
-    std::uint32_t end;        // +0x08
-    std::uint32_t capacity;   // +0x0C
+    CEntityDbBoundedPropQueueNode* start; // +0x04
+    CEntityDbBoundedPropQueueNode* end;   // +0x08
+    CEntityDbBoundedPropQueueNode* capacity; // +0x0C
     std::uint32_t vectorProxy; // +0x10
     void* storageBegin;       // +0x14
     void* storageCurrent;     // +0x18
@@ -102,6 +103,14 @@ namespace moho
      * current decoded unit payload.
      */
     explicit CUnitIterAllArmies(Sim* sim);
+
+    /**
+     * Address: 0x005C87A0 (FUN_005C87A0, Moho::CUnitIterAllArmies::Next)
+     *
+     * What it does:
+     * Advances to the next all-units tree node and refreshes `mCur`.
+     */
+    void Next() noexcept;
 
   public:
     CEntityDbAllUnitsNode* mItr; // +0x00
@@ -156,6 +165,16 @@ namespace moho
     [[nodiscard]] std::int32_t AddBoundedProp(Prop* prop);
 
     /**
+     * Address: 0x00684CE0 (FUN_00684CE0, ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z)
+     * Mangled: ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
+     *
+     * What it does:
+     * Removes one bounded-prop queue lane by handle when the handle resolves
+     * to a live entry.
+     */
+    void RemoveBoundedProp(std::int32_t handle);
+
+    /**
      * Address: 0x00684480 (FUN_00684480, ?DoReserveId@EntityDB@Moho@@AAE?AVEntId@2@I@Z)
      *
      * What it does:
@@ -195,7 +214,7 @@ namespace moho
     [[nodiscard]] CEntityDbAllUnitsNode* AllUnitsEnd() const;
 
     /**
-     * Address: 0x005C87A0 (FUN_005C87A0, Moho::CUnitIterAllArmies::Next)
+      * Alias of FUN_005C87A0 (non-canonical helper lane).
      *
      * What it does:
      * Advances one all-units tree iterator node to its in-order successor.
@@ -204,7 +223,7 @@ namespace moho
     static CEntityDbAllUnitsNode* NextAllUnitsNode(CEntityDbAllUnitsNode* node) noexcept;
 
     /**
-     * Address: 0x005C87A0 callsite shape (Moho::CUnitIterAllArmies payload)
+      * Alias of FUN_005C87A0 (non-canonical helper lane).
      *
      * What it does:
      * Converts one all-units tree node payload into the owning `Unit*`.

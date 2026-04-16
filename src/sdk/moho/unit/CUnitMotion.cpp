@@ -150,6 +150,52 @@ namespace moho
     }
 
     /**
+     * Address: 0x00699600 (FUN_00699600, sub_699600)
+     *
+     * What it does:
+     * Builds one vector opposite to `direction`, scales that length by
+     * normalized distance and forward-projection attenuation, and applies the
+     * result in-place to `outVector`.
+     */
+    [[maybe_unused]] Wm3::Vector3f* ComputeScaledOpposingVectorWithDirectionalAttenuation(
+      Wm3::Vector3f* const outVector,
+      Wm3::Vector3f direction,
+      const float projectionAxisX,
+      const float projectionAxisY,
+      const float projectionAxisZ,
+      const float referenceLength,
+      const float outputLengthScale
+    ) noexcept
+    {
+      outVector->x = -direction.x;
+      outVector->y = -direction.y;
+      outVector->z = -direction.z;
+
+      const float directionLength = std::sqrt(
+        (direction.x * direction.x) + (direction.y * direction.y) + (direction.z * direction.z)
+      );
+      float normalizedScale = directionLength / referenceLength;
+      if (normalizedScale > 8.0f) {
+        normalizedScale = 8.0f;
+      }
+      if (normalizedScale < 1.0f) {
+        normalizedScale = 1.0f;
+      }
+
+      (void)Wm3::Vector3f::Normalize(&direction);
+      float directionalProjection =
+        (projectionAxisX * direction.x) + (projectionAxisY * direction.y) + (projectionAxisZ * direction.z);
+      if (directionalProjection < 0.0f) {
+        directionalProjection = 0.0f;
+      }
+
+      const float scaledLength =
+        ((1.0f - directionalProjection) * normalizedScale) * outputLengthScale;
+      (void)VecSetLength(outVector, scaledLength);
+      return outVector;
+    }
+
+    /**
      * Address: 0x0069A2A0 (FUN_0069A2A0, func_VecSetLength)
      *
      * What it does:
@@ -180,6 +226,65 @@ namespace moho
       out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
       out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
       return out;
+    }
+
+    /**
+     * Address: 0x006B6FE0 (FUN_006B6FE0, sub_6B6FE0)
+     *
+     * What it does:
+     * Applies one world-space impulse into body linear velocity using inverse
+     * mass scaling; zero-mass lanes use `FLT_MAX` scaling to match binary.
+     */
+    void ApplyImpulseToBodyVelocity(SPhysBody& body, const Wm3::Vector3f& impulse) noexcept
+    {
+      const float inverseMass =
+        (body.mMass == 0.0f) ? std::numeric_limits<float>::max() : (1.0f / body.mMass);
+
+      body.mVelocity.x += impulse.x * inverseMass;
+      body.mVelocity.y += impulse.y * inverseMass;
+      body.mVelocity.z += impulse.z * inverseMass;
+    }
+
+    [[nodiscard]] float ClampBallisticAngularRange(const float inverseInertiaAxis) noexcept
+    {
+      constexpr float kBallisticAngularRangeScale = 0.2f;
+      constexpr float kBallisticAngularRangeMax = 2.0f;
+      const float range = inverseInertiaAxis * kBallisticAngularRangeScale;
+      return (range <= kBallisticAngularRangeMax) ? range : kBallisticAngularRangeMax;
+    }
+
+    /**
+     * Address: 0x005BE040 (FUN_005BE040, Moho::ScaleRandomUInt32ToRange)
+     *
+     * What it does:
+     * Samples one 32-bit MT lane and returns the high half of
+     * `range * random`, preserving VC8 multiply-high range scaling behavior.
+     */
+    [[nodiscard]] std::uint32_t ScaleRandomUInt32ToRange(
+      const std::uint32_t range,
+      CRandomStream& randomStream
+    ) noexcept
+    {
+      const std::uint32_t randomValue = randomStream.twister.NextUInt32();
+      return static_cast<std::uint32_t>((static_cast<std::uint64_t>(range) * randomValue) >> 32u);
+    }
+
+    /**
+     * Address: 0x005BE060 (FUN_005BE060, Moho::CUnitMotion::RandomUniformIntRange)
+     *
+     * What it does:
+     * Samples one 32-bit MT value and scales it into the half-open integer
+     * range `[minValue, maxValue)` using the binary's high-half multiply
+     * trick.
+     */
+    [[nodiscard]] int RandomUniformIntRange(
+      const int minValue,
+      const int maxValue,
+      CRandomStream& randomStream
+    ) noexcept
+    {
+      const std::uint64_t range = static_cast<std::uint32_t>(maxValue - minValue);
+      return minValue + static_cast<int>(ScaleRandomUInt32ToRange(static_cast<std::uint32_t>(range), randomStream));
     }
 
     [[nodiscard]] const char* UnitMotionStateToScriptString(const EUnitMotionState state) noexcept
@@ -278,6 +383,26 @@ namespace moho
       }
 
       return sampledElevation;
+    }
+
+    /**
+     * Address: 0x0062B1C0 (FUN_0062B1C0)
+     *
+     * What it does:
+     * Samples terrain elevation from one height-field lane and adds occupied
+     * rectangle distance when an owning unit is provided.
+     */
+    [[maybe_unused]] [[nodiscard]] float SampleElevationWithOccupiedRectOffset(
+      const CHeightField* const heightField,
+      Unit* const unit,
+      const Wm3::Vector3f& samplePoint
+    ) noexcept
+    {
+      const float elevation = heightField ? heightField->GetElevation(samplePoint.x, samplePoint.z) : samplePoint.y;
+      if (unit != nullptr) {
+        return elevation + unit->DistanceToOccupiedRect(&samplePoint);
+      }
+      return elevation;
     }
 
     [[nodiscard]] gpg::RRef MakeCUnitMotionRef(CUnitMotion* const value) noexcept
@@ -1092,6 +1217,95 @@ namespace moho
   }
 
   /**
+   * Address: 0x006B8AC0 (FUN_006B8AC0, ?AddImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@_N@Z)
+   * Mangled: ?AddImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@_N@Z
+   *
+   * What it does:
+   * Applies one impulse into owner motion lanes; airborne units update body
+   * velocity directly, while non-air units blend steering state and can force
+   * one ballistic transition with randomized angular impulse.
+   */
+  void CUnitMotion::AddImpulse(const Wm3::Vector3f& impulse, const bool transitionToBallistic)
+  {
+    Unit* const unit = mUnit;
+    if (unit->IsDead() || unit->IsBeingBuilt()) {
+      return;
+    }
+
+    SPhysBody* const body = static_cast<Entity*>(unit)->GetPhysBody(false);
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    if (blueprint->Physics.MotionType == RULEUMT_Air) {
+      ApplyImpulseToBodyVelocity(*body, impulse);
+      return;
+    }
+
+    if (IsMoving()) {
+      mInStateTransition = true;
+    }
+
+    mVelocity.x = impulse.x + (mVelocity.x * 0.5f);
+    mVelocity.y = impulse.y + (mVelocity.y * 0.5f);
+    mVelocity.z = impulse.z + (mVelocity.z * 0.5f);
+
+    mVector44.x = impulse.x + (mVector44.x * 0.5f);
+    mVector44.y = impulse.y + (mVector44.y * 0.5f);
+    mVector44.z = impulse.z + (mVector44.z * 0.5f);
+
+    if (transitionToBallistic) {
+      CRandomStream* const random = unit->SimulationRef->mRngState;
+      body->SetTransform(unit->GetTransform());
+
+      const float xRange = ClampBallisticAngularRange(body->mInvInertiaTensor.x);
+      const float yRange = ClampBallisticAngularRange(body->mInvInertiaTensor.y);
+      const float zRange = ClampBallisticAngularRange(body->mInvInertiaTensor.z);
+
+      const Wm3::Vector3f localAngularImpulse{
+        random->FRand(-xRange, xRange) / body->mInvInertiaTensor.x,
+        random->FRand(-yRange, yRange) / body->mInvInertiaTensor.y,
+        random->FRand(-zRange, zRange) / body->mInvInertiaTensor.z,
+      };
+
+      Wm3::MultiplyQuaternionVector(&mVector108, localAngularImpulse, body->mOrientation);
+
+      unit->SetCurrentLayer(LAYER_Air);
+      SetMotionState(kUnitMotionStateBallistic);
+
+      ApplyImpulseToBodyVelocity(*body, impulse);
+
+      VTransform pendingTransform(unit->GetTransform());
+      const Wm3::Vector3f& currentPosition = unit->GetPosition();
+      constexpr float kPendingTransformVelocityScale = 0.1f;
+
+      pendingTransform.pos_.x = currentPosition.x + (mVelocity.x * kPendingTransformVelocityScale);
+      pendingTransform.pos_.y = currentPosition.y + (mVelocity.y * kPendingTransformVelocityScale);
+      pendingTransform.pos_.z = currentPosition.z + (mVelocity.z * kPendingTransformVelocityScale);
+
+      unit->SetPendingTransform(pendingTransform, 1.0f);
+      unit->AdvanceCoords();
+
+      mProcessSurfaceCollision = false;
+      mIsBeingPushed = true;
+      return;
+    }
+
+    constexpr float kSurfaceImpulseSpeedScale = 0.2f;
+    const float maxSurfaceSpeed = unit->mInfoCache.mFormationTopSpeed * kSurfaceImpulseSpeedScale;
+
+    const float speed = std::sqrt(
+      (mVelocity.x * mVelocity.x) +
+      (mVelocity.y * mVelocity.y) +
+      (mVelocity.z * mVelocity.z)
+    );
+    if (speed > maxSurfaceSpeed) {
+      (void)VecSetLength(&mVelocity, maxSurfaceSpeed);
+      mVector44 = mVelocity;
+    }
+
+    mProcessSurfaceCollision = true;
+    mIsBeingPushed = true;
+  }
+
+  /**
    * Address: 0x006B8F30 (FUN_006B8F30)
    * Mangled: ?SetMotionHorzEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionHorzEvent@2@@Z
    *
@@ -1328,6 +1542,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x006A4C40 (FUN_006A4C40)
+   *
+   * What it does:
+   * Copies current velocity into caller-provided output storage.
+   */
+  Wm3::Vector3f* CUnitMotion::GetVelocity(Wm3::Vector3f* const outVelocity) const
+  {
+    if (outVelocity == nullptr) {
+      return nullptr;
+    }
+
+    *outVelocity = mVelocity;
+    return outVelocity;
+  }
+
+  /**
    * Address: 0x006B98C0 (FUN_006B98C0, ?IsOnValidLayer@CUnitMotion@Moho@@QBE_NXZ)
    * Mangled: ?IsOnValidLayer@CUnitMotion@Moho@@QBE_NXZ
    *
@@ -1431,6 +1661,76 @@ namespace moho
 
     const EntitySetTemplate<Unit> loadedUnits = transport->TransportGetLoadedUnits(false);
     return loadedUnits.begin() != loadedUnits.end();
+  }
+
+  /**
+   * Address: 0x006C3180 (FUN_006C3180, ?CalcMoveLand@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
+   * Mangled: ?CalcMoveLand@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z
+   *
+   * What it does:
+   * Runs one land move step via `CalcMoveCommon`, applies forced or deferred
+   * ground snap/raised-platform resolution, and updates common motion events.
+   */
+  void CUnitMotion::CalcMoveLand(
+    VTransform& transform,
+    float* const outMoveDistance
+  )
+  {
+    bool moveSucceeded = false;
+    bool forceGroundResolution = false;
+
+    if (!mUnit->IsDead()) {
+      moveSucceeded = CalcMoveCommon(transform, outMoveDistance);
+      if (moveSucceeded && !mUnit->IsUnitState(UNITSTATE_Teleporting)) {
+        forceGroundResolution = true;
+      }
+    }
+
+    if (forceGroundResolution || mProcessSurfaceCollision) {
+      FindIntersectingRaisedPlatform();
+      transform = SnapToGround(transform);
+      mProcessSurfaceCollision = false;
+    }
+
+    ProcessCommonMotionState(moveSucceeded);
+  }
+
+  /**
+   * Address: 0x006C3480 (FUN_006C3480, ?CalcMoveWater@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+   * Mangled: ?CalcMoveWater@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z
+   *
+   * What it does:
+   * Runs one water move step through `CalcMoveCommon`, applies dive/surface
+   * transitions and water snap, and updates common horizontal motion events.
+   */
+  void CUnitMotion::CalcMoveWater(VTransform& transform)
+  {
+    bool moveSucceeded = false;
+    if (!mUnit->IsDead()) {
+      moveSucceeded = CalcMoveCommon(transform, nullptr);
+    }
+
+    const bool transitionUpdated = HandleDivingAndSurfacing();
+    if (moveSucceeded) {
+      Unit* const previousPlatform = mRaisedPlatformUnit.GetObjectPtr();
+      FindIntersectingRaisedPlatform();
+
+      if (previousPlatform != nullptr && mRaisedPlatformUnit.GetObjectPtr() == nullptr) {
+        const char* newLayerName = Entity::LayerToString(LAYER_Water);
+        const char* oldLayerName = Entity::LayerToString(LAYER_Land);
+        mUnit->CallbackStr("OnLayerChange", &newLayerName, &oldLayerName);
+      }
+    }
+
+    const float speedSq =
+      (mVelocity.x * mVelocity.x) +
+      (mVelocity.y * mVelocity.y) +
+      (mVelocity.z * mVelocity.z);
+    if (moveSucceeded || transitionUpdated || speedSq > 0.000001f) {
+      transform = SnapToWater(transform);
+    }
+
+    ProcessCommonMotionState(moveSucceeded);
   }
 
   /**

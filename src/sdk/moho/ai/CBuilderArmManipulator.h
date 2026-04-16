@@ -22,6 +22,8 @@ namespace moho
   class CBuilderArmManipulator : public IAniManipulator
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00635BB0 (FUN_00635BB0, ??0CBuilderArmManipulator@Moho@@QAE@@Z)
      *
@@ -30,6 +32,15 @@ namespace moho
      * tracking parameters and cleared weak-target state.
      */
     CBuilderArmManipulator();
+
+    /**
+     * Address: 0x00635FA0 (FUN_00635FA0, ??1CBuilderArmManipulator@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Tears down builder-arm specific weak-target state, then runs
+     * `IAniManipulator` base destruction.
+     */
+    ~CBuilderArmManipulator() override;
 
     /**
      * Address: 0x00636490 (FUN_00636490, Moho::CBuilderArmManipulator::SetAimingArc)

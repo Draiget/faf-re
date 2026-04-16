@@ -14,6 +14,7 @@
 
 #include <Windows.h>
 
+#include "gpg/gal/Matrix.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
@@ -125,6 +126,19 @@ namespace
     InitializeHelperNode(serializer);
   }
 
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkAndResetSerializerStartupHelperNode() noexcept
+  {
+    TSerializer& serializer = AccessSerializerStartupSlot<TSerializer>();
+    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+    serializer.mHelperPrev->mNext = serializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
   [[nodiscard]] gpg::RType* ResolveIntType()
   {
     static gpg::RType* cached = nullptr;
@@ -157,6 +171,43 @@ namespace
     GPG_ASSERT(!typeInfo->initFinished_);
     typeInfo->fields_.push_back(gpg::RField{name, ResolveVector3fType(), offset});
     return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x004EABF0 (FUN_004EABF0)
+   *
+   * What it does:
+   * Appends one canonical `"x"/"y"/"z"` float-field trio to the current
+   * reflection type at offsets `0/4/8` and returns the `z` field handle.
+   */
+  [[maybe_unused]] gpg::RField* RegisterXyzFloatReflectionFields(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    if (typeInfo == nullptr) {
+      return nullptr;
+    }
+
+    typeInfo->AddFieldFloat("x", 0);
+    typeInfo->AddFieldFloat("y", 4);
+    return typeInfo->AddFieldFloat("z", 8);
+  }
+
+  /**
+   * Address: 0x004EA910 (FUN_004EA910)
+   *
+   * What it does:
+   * Appends one canonical `"x"/"y"` float-field pair to the current
+   * reflection type at offsets `0/4` and returns the `y` field handle.
+   */
+  [[maybe_unused]] gpg::RField* RegisterXyFloatReflectionFields(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    if (typeInfo == nullptr) {
+      return nullptr;
+    }
+
+    typeInfo->AddFieldFloat("x", 0);
+    return typeInfo->AddFieldFloat("y", 4);
   }
 
   template <typename TTypeInfo>
@@ -461,6 +512,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x004E9FA0 (FUN_004E9FA0)
+   *
+   * What it does:
+   * Stores one 32-bit lane into caller output storage.
+   */
+  [[maybe_unused]] std::uint32_t* WriteDwordLane9FA0(
+    std::uint32_t* const outLane,
+    const std::uint32_t value
+  ) noexcept
+  {
+    *outLane = value;
+    return outLane;
+  }
+
+  /**
    * Address: 0x004E9FB0 (FUN_004E9FB0, Moho::AxisAlignedBox3fTypeInfo::AxisAlignedBox3fTypeInfo)
    */
   AxisAlignedBox3fTypeInfo::AxisAlignedBox3fTypeInfo()
@@ -507,6 +573,30 @@ namespace moho
   void AxisAlignedBox3fSerializer::Serialize(gpg::WriteArchive* const archive, Wm3::AxisAlignedBox3f* const box)
   {
     AxisAlignedBox3fMemberSerialize(box, archive);
+  }
+
+  /**
+   * Address: 0x004EA1A0 (FUN_004EA1A0)
+   *
+   * What it does:
+   * Unlinks the `AxisAlignedBox3fSerializer` startup helper node from its
+   * intrusive list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_AxisAlignedBox3fSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<AxisAlignedBox3fSerializer>();
+  }
+
+  /**
+   * Address: 0x004EA1D0 (FUN_004EA1D0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `AxisAlignedBox3fSerializer` that performs the
+   * same helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_AxisAlignedBox3fSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<AxisAlignedBox3fSerializer>();
   }
 
   /**
@@ -579,6 +669,30 @@ namespace moho
 
     archive->WriteInt(vector->x);
     archive->WriteInt(vector->y);
+  }
+
+  /**
+   * Address: 0x004EA400 (FUN_004EA400)
+   *
+   * What it does:
+   * Unlinks the `Vector2iSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector2iSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector2iSerializer>();
+  }
+
+  /**
+   * Address: 0x004EA430 (FUN_004EA430)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `Vector2iSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector2iSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector2iSerializer>();
   }
 
   /**
@@ -657,6 +771,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EA700 (FUN_004EA700)
+   *
+   * What it does:
+   * Unlinks the `Vector3iSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector3iSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector3iSerializer>();
+  }
+
+  /**
+   * Address: 0x004EA730 (FUN_004EA730)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `Vector3iSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector3iSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector3iSerializer>();
+  }
+
+  /**
    * Address: 0x00BF1350 (FUN_00BF1350, cleanup_Vector3iSerializer)
    */
   Vector3iSerializer::~Vector3iSerializer() noexcept
@@ -693,8 +831,7 @@ namespace moho
   {
     size_ = sizeof(Vector2f);
     gpg::RType::Init();
-    AddFieldFloat("x", offsetof(Vector2f, x));
-    AddFieldFloat("y", offsetof(Vector2f, y));
+    (void)RegisterXyFloatReflectionFields(this);
     Finish();
   }
 
@@ -726,6 +863,30 @@ namespace moho
 
     archive->WriteFloat(vector->x);
     archive->WriteFloat(vector->y);
+  }
+
+  /**
+   * Address: 0x004EA9C0 (FUN_004EA9C0)
+   *
+   * What it does:
+   * Unlinks the `Vector2fSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector2fSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector2fSerializer>();
+  }
+
+  /**
+   * Address: 0x004EA9F0 (FUN_004EA9F0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `Vector2fSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector2fSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector2fSerializer>();
   }
 
   /**
@@ -765,9 +926,7 @@ namespace moho
   {
     size_ = sizeof(Vector3f);
     gpg::RType::Init();
-    AddFieldFloat("x", offsetof(Vector3f, x));
-    AddFieldFloat("y", offsetof(Vector3f, y));
-    AddFieldFloat("z", offsetof(Vector3f, z));
+    RegisterXyzFloatReflectionFields(this);
     Finish();
   }
 
@@ -801,6 +960,30 @@ namespace moho
     archive->WriteFloat(vector->x);
     archive->WriteFloat(vector->y);
     archive->WriteFloat(vector->z);
+  }
+
+  /**
+   * Address: 0x004EACD0 (FUN_004EACD0)
+   *
+   * What it does:
+   * Unlinks the `Vector3fSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector3fSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector3fSerializer>();
+  }
+
+  /**
+   * Address: 0x004EAD00 (FUN_004EAD00)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `Vector3fSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector3fSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector3fSerializer>();
   }
 
   /**
@@ -882,6 +1065,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EB030 (FUN_004EB030)
+   *
+   * What it does:
+   * Unlinks the `Vector4fSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector4fSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector4fSerializer>();
+  }
+
+  /**
+   * Address: 0x004EB060 (FUN_004EB060)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `Vector4fSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_Vector4fSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<Vector4fSerializer>();
+  }
+
+  /**
    * Address: 0x00BF1500 (FUN_00BF1500, cleanup_Vector4fSerializer)
    */
   Vector4fSerializer::~Vector4fSerializer() noexcept
@@ -957,6 +1164,30 @@ namespace moho
     archive->WriteFloat(quaternion->z);
     archive->WriteFloat(quaternion->w);
     archive->WriteFloat(quaternion->x);
+  }
+
+  /**
+   * Address: 0x004EB390 (FUN_004EB390)
+   *
+   * What it does:
+   * Unlinks the `QuaternionfSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_QuaternionfSerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<QuaternionfSerializer>();
+  }
+
+  /**
+   * Address: 0x004EB3C0 (FUN_004EB3C0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `QuaternionfSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_QuaternionfSerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<QuaternionfSerializer>();
   }
 
   /**
@@ -1044,6 +1275,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EC1B0 (FUN_004EC1B0)
+   *
+   * What it does:
+   * Unlinks the `VEulers3Serializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_VEulers3SerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VEulers3Serializer>();
+  }
+
+  /**
+   * Address: 0x004EC1E0 (FUN_004EC1E0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `VEulers3Serializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_VEulers3SerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VEulers3Serializer>();
+  }
+
+  /**
    * Address: 0x00BF1620 (FUN_00BF1620, cleanup_VEulers3Serializer)
    */
   VEulers3Serializer::~VEulers3Serializer() noexcept
@@ -1121,6 +1376,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EC530 (FUN_004EC530)
+   *
+   * What it does:
+   * Unlinks the `VAxes3Serializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_VAxes3SerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VAxes3Serializer>();
+  }
+
+  /**
+   * Address: 0x004EC560 (FUN_004EC560)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `VAxes3Serializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_VAxes3SerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VAxes3Serializer>();
+  }
+
+  /**
    * Address: 0x00BF16B0 (FUN_00BF16B0, cleanup_VAxes3Serializer)
    */
   VAxes3Serializer::~VAxes3Serializer() noexcept
@@ -1186,6 +1465,47 @@ namespace moho
     axes->vZ.x = forwardX;
     axes->vZ.y = forwardY;
     axes->vZ.z = forwardZ;
+  }
+
+  /**
+   * Address: 0x0050B650 (FUN_0050B650, ?COORDS_LookAt@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
+   *
+   * What it does:
+   * Builds look-at axes using world-up `(0,1,0)` and the supplied forward
+   * direction.
+   */
+  void COORDS_LookAt(const Wm3::Vector3f& forward, VAxes3* const axes)
+  {
+    const Wm3::Vector3f worldUp{0.0f, 1.0f, 0.0f};
+    VEC_LookAt(worldUp, forward, axes);
+  }
+
+  /**
+   * Address: 0x0050B680 (FUN_0050B680, ?COORDS_LookAtXZ@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
+   *
+   * What it does:
+   * Builds an XZ-plane-aligned basis from one direction vector without
+   * normalizing the projected axes.
+   */
+  VAxes3* COORDS_LookAtXZ(VAxes3* const outAxes, const Wm3::Vector3f& direction)
+  {
+    const float lengthSq = (direction.x * direction.x) + (direction.y * direction.y) + (direction.z * direction.z);
+    if (lengthSq <= 0.0f) {
+      return outAxes;
+    }
+
+    outAxes->vX.x = direction.z;
+    outAxes->vX.y = 0.0f;
+    outAxes->vX.z = -direction.x;
+
+    outAxes->vY.x = 0.0f;
+    outAxes->vY.y = 1.0f;
+    outAxes->vY.z = 0.0f;
+
+    outAxes->vZ.x = direction.x;
+    outAxes->vZ.y = 0.0f;
+    outAxes->vZ.z = direction.z;
+    return outAxes;
   }
 
   /**
@@ -1279,6 +1599,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x004F0270 (FUN_004F0270)
+   *
+   * What it does:
+   * Unlinks the `VMatrix4Serializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_VMatrix4SerializerVariant1()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VMatrix4Serializer>();
+  }
+
+  /**
+   * Address: 0x004F02A0 (FUN_004F02A0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `VMatrix4Serializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_VMatrix4SerializerVariant2()
+  {
+    return UnlinkAndResetSerializerStartupHelperNode<VMatrix4Serializer>();
+  }
+
+  /**
    * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::RegisterSerializeFunctions)
    */
   void VMatrix4Serializer::RegisterSerializeFunctions()
@@ -1341,6 +1685,83 @@ namespace moho
   }
 
   /**
+   * Address: 0x004ED8B0 (FUN_004ED8B0)
+   *
+   * What it does:
+   * Initializes one 3-float vector lane from three scalar source lanes.
+   */
+  [[maybe_unused]] Wm3::Vector3f* InitializeVector3fFromScalarLanes(
+    Wm3::Vector3f* const outVector,
+    const float* const xLane,
+    const float* const yLane,
+    const float* const zLane
+  ) noexcept
+  {
+    outVector->x = *xLane;
+    outVector->y = *yLane;
+    outVector->z = *zLane;
+    return outVector;
+  }
+
+  /**
+   * Address: 0x004ED930 (FUN_004ED930)
+   *
+   * What it does:
+   * Returns one float-lane pointer offset by `index`.
+   */
+  [[maybe_unused]] float* OffsetFloatLanePointer(
+    float* const baseLane,
+    const std::int32_t index
+  ) noexcept
+  {
+    return baseLane + index;
+  }
+
+  /**
+   * Address: 0x004EE300 (FUN_004EE300)
+   *
+   * What it does:
+   * Builds one 4x4 matrix from four row lanes in register-order mapping
+   * (`row0=edi`, `row1=esi`, `row2=edx`, `row3=ecx`).
+   */
+  [[maybe_unused]] VMatrix4* BuildVMatrix4FromRegisterRowLanesA(
+    const Vector4f* const laneEdxRow2,
+    const Vector4f* const laneEcxRow3,
+    const Vector4f* const laneEdiRow0,
+    const Vector4f* const laneEsiRow1,
+    VMatrix4* const outMatrix
+  ) noexcept
+  {
+    outMatrix->r[0] = *laneEdiRow0;
+    outMatrix->r[1] = *laneEsiRow1;
+    outMatrix->r[2] = *laneEdxRow2;
+    outMatrix->r[3] = *laneEcxRow3;
+    return outMatrix;
+  }
+
+  /**
+   * Address: 0x004EE4D0 (FUN_004EE4D0)
+   *
+   * What it does:
+   * Duplicate lane for building one 4x4 matrix from four row lanes in the
+   * same register-order mapping as `FUN_004EE300`.
+   */
+  [[maybe_unused]] VMatrix4* BuildVMatrix4FromRegisterRowLanesB(
+    const Vector4f* const laneEdxRow2,
+    const Vector4f* const laneEcxRow3,
+    const Vector4f* const laneEdiRow0,
+    const Vector4f* const laneEsiRow1,
+    VMatrix4* const outMatrix
+  ) noexcept
+  {
+    outMatrix->r[0] = *laneEdiRow0;
+    outMatrix->r[1] = *laneEsiRow1;
+    outMatrix->r[2] = *laneEdxRow2;
+    outMatrix->r[3] = *laneEcxRow3;
+    return outMatrix;
+  }
+
+  /**
    * Address: 0x004EE980 (FUN_004EE980, Moho::VMatrix4::Set)
    *
    * What it does:
@@ -1380,6 +1801,186 @@ namespace moho
     r[3].y = vec.y;
     r[3].z = vec.z;
     r[3].w = 1.0f;
+  }
+
+  /**
+   * Address: 0x00658EE0 (FUN_00658EE0)
+   *
+   * What it does:
+   * Copies the canonical identity matrix lane into `out` and returns it.
+   */
+  [[maybe_unused]] VMatrix4* CopyVMatrix4IdentityLane(VMatrix4* const out)
+  {
+    if (out == nullptr) {
+      return nullptr;
+    }
+
+    static const VMatrix4 kIdentity = VMatrix4::Identity();
+    *out = kIdentity;
+    return out;
+  }
+
+  /**
+   * Address: 0x004EE6B0 (FUN_004EE6B0)
+   *
+   * What it does:
+   * Lazily snapshots `VMatrix4::NaN` into one process-global matrix lane and
+   * returns that cached lane.
+   */
+  [[maybe_unused]] VMatrix4* AccessVMatrix4NaNCache()
+  {
+    static bool sInitialized = false;
+    static VMatrix4 sNaNCache{};
+
+    if (!sInitialized) {
+      sInitialized = true;
+      sNaNCache = VMatrix4::NaN;
+    }
+
+    return &sNaNCache;
+  }
+
+  /**
+   * Address: 0x004EE6E0 (FUN_004EE6E0, ?VEC_Mul@Moho@@YA?AUVMatrix4@1@ABU21@0@Z)
+   *
+   * What it does:
+   * Returns one matrix product using the binary's `rhs * lhs` call order.
+   */
+  VMatrix4 VEC_Mul(const VMatrix4& lhs, const VMatrix4& rhs)
+  {
+    VMatrix4 result{};
+    (void)gpg::gal::Math::mul(&result, &rhs, &lhs);
+    return result;
+  }
+
+  /**
+   * Address: 0x004EE710 (FUN_004EE710, ?VEC_Mul4x3@Moho@@YAXAAUVMatrix4@1@ABU21@1@Z)
+   *
+   * What it does:
+   * Computes one affine 4x3 matrix composition (`rhs * lhs`) and writes x/y/z
+   * lanes for all rows into `out`.
+   */
+  void VEC_Mul4x3(const VMatrix4& lhs, VMatrix4& out, const VMatrix4& rhs)
+  {
+    const float lhs00 = lhs.r[0].x;
+    const float lhs01 = lhs.r[0].y;
+    const float lhs02 = lhs.r[0].z;
+    const float lhs10 = lhs.r[1].x;
+    const float lhs11 = lhs.r[1].y;
+    const float lhs12 = lhs.r[1].z;
+    const float lhs20 = lhs.r[2].x;
+    const float lhs21 = lhs.r[2].y;
+    const float lhs22 = lhs.r[2].z;
+    const float lhs30 = lhs.r[3].x;
+    const float lhs31 = lhs.r[3].y;
+    const float lhs32 = lhs.r[3].z;
+
+    out.r[0].x = (rhs.r[0].z * lhs20) + (rhs.r[0].y * lhs10) + (rhs.r[0].x * lhs00);
+    out.r[0].y = (rhs.r[0].z * lhs21) + (rhs.r[0].y * lhs11) + (rhs.r[0].x * lhs01);
+    out.r[0].z = (rhs.r[0].z * lhs22) + (rhs.r[0].y * lhs12) + (rhs.r[0].x * lhs02);
+
+    out.r[1].x = (rhs.r[1].z * lhs20) + (rhs.r[1].y * lhs10) + (rhs.r[1].x * lhs00);
+    out.r[1].y = (rhs.r[1].z * lhs21) + (rhs.r[1].y * lhs11) + (rhs.r[1].x * lhs01);
+    out.r[1].z = (rhs.r[1].z * lhs22) + (rhs.r[1].y * lhs12) + (rhs.r[1].x * lhs02);
+
+    out.r[2].x = (rhs.r[2].z * lhs20) + (rhs.r[2].y * lhs10) + (rhs.r[2].x * lhs00);
+    out.r[2].y = (rhs.r[2].z * lhs21) + (rhs.r[2].y * lhs11) + (rhs.r[2].x * lhs01);
+    out.r[2].z = (rhs.r[2].z * lhs22) + (rhs.r[2].y * lhs12) + (rhs.r[2].x * lhs02);
+
+    out.r[3].x = ((rhs.r[3].z * lhs20) + (rhs.r[3].y * lhs10) + (rhs.r[3].x * lhs00)) + lhs30;
+    out.r[3].y = ((rhs.r[3].z * lhs21) + (rhs.r[3].y * lhs11) + (rhs.r[3].x * lhs01)) + lhs31;
+    out.r[3].z = ((rhs.r[3].z * lhs22) + (rhs.r[3].y * lhs12) + (rhs.r[3].x * lhs02)) + lhs32;
+  }
+
+  /**
+   * Address: 0x004EEC10 (FUN_004EEC10, ?LoadInverse@VMatrix4@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Replaces this matrix with its full inverse.
+   */
+  void VMatrix4::LoadInverse()
+  {
+    VMatrix4 inverse{};
+    (void)gpg::gal::Math::invert(&inverse, this);
+    *this = inverse;
+  }
+
+  /**
+   * Address: 0x004EEC40 (FUN_004EEC40, ?LoadInverse4x3@VMatrix4@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Replaces this matrix with the inverse lane used by 4x3 call sites.
+   */
+  void VMatrix4::LoadInverse4x3()
+  {
+    VMatrix4 inverse{};
+    (void)gpg::gal::Math::invert(&inverse, this);
+    *this = inverse;
+  }
+
+  /**
+   * Address: 0x004EEC70 (FUN_004EEC70, ?LoadInverseRigid@VMatrix4@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Replaces this matrix with the inverse lane used by rigid-transform paths.
+   */
+  void VMatrix4::LoadInverseRigid()
+  {
+    VMatrix4 inverse{};
+    (void)gpg::gal::Math::invert(&inverse, this);
+    *this = inverse;
+  }
+
+  /**
+   * Address: 0x004EECA0 (FUN_004EECA0, ?LoadTranslate@VMatrix4@Moho@@QAEXMMM@Z)
+   *
+   * What it does:
+   * Overwrites this matrix with one translation matrix.
+   */
+  void VMatrix4::LoadTranslate(const float x, const float y, const float z)
+  {
+    (void)gpg::gal::Math::translation(this, x, y, z);
+  }
+
+  /**
+   * Address: 0x004EECD0 (FUN_004EECD0, ?LoadScale@VMatrix4@Moho@@QAEXMMM@Z)
+   *
+   * What it does:
+   * Overwrites this matrix with one non-uniform scale matrix.
+   */
+  void VMatrix4::LoadScale(const float x, const float y, const float z)
+  {
+    (void)gpg::gal::Math::scaling(this, x, y, z);
+  }
+
+  /**
+   * Address: 0x004EED60 (FUN_004EED60, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Vector3@M@Wm3@@M@Z)
+   *
+   * What it does:
+   * Overwrites this matrix with one axis-angle rotation matrix.
+   */
+  void VMatrix4::LoadRotate(const Wm3::Vector3f& axis, const float angleRadians)
+  {
+    // Preserve the binary's by-value axis staging before calling the D3DX lane.
+    const Wm3::Vector3f axisCopy{axis.x, axis.y, axis.z};
+    (void)gpg::gal::Math::rotationAxis(this, &axisCopy, angleRadians);
+  }
+
+  /**
+   * Address: 0x004EEDA0 (FUN_004EEDA0, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Quaternion@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Overwrites this matrix with one quaternion rotation matrix.
+   */
+  void VMatrix4::LoadRotate(const Wm3::Quaternionf& rotation)
+  {
+    // Wm3 lane is `w,x,y,z`; D3DX lane expects contiguous `x,y,z,w`.
+    Wm3::Quaternionf d3dRotation{};
+    d3dRotation.w = rotation.x;
+    d3dRotation.x = rotation.y;
+    d3dRotation.y = rotation.z;
+    d3dRotation.z = rotation.w;
+    (void)gpg::gal::Math::rotationQuaternion(this, &d3dRotation);
   }
 
   /**

@@ -6,15 +6,36 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace
 {
+  class UnitAttributesTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "UnitAttributes";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::UnitAttributes);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
   [[nodiscard]] gpg::RType* CachedUnitAttributesType()
   {
     gpg::RType* type = moho::UnitAttributes::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(moho::UnitAttributes));
+      if (!type) {
+        type = moho::preregister_UnitAttributesTypeInfo();
+      }
       moho::UnitAttributes::sType = type;
     }
 
@@ -50,11 +71,114 @@ namespace
 
     return type;
   }
+
+  /**
+   * Address: 0x006A47F0 (FUN_006A47F0)
+   *
+   * What it does:
+   * Restores unit spawn-elevation lane from blueprint physics elevation.
+   */
+  [[maybe_unused]] moho::UnitAttributes* RestoreSpawnElevationFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  {
+    attributes->spawnElevationOffset = attributes->blueprint->Physics.Elevation;
+    return attributes;
+  }
+
+  /**
+   * Address: 0x006A4830 (FUN_006A4830)
+   *
+   * What it does:
+   * Restores unit regen-rate lane from blueprint defense data.
+   */
+  [[maybe_unused]] moho::UnitAttributes* RestoreRegenRateFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  {
+    attributes->regenRate = attributes->blueprint->Defense.RegenRate;
+    return attributes;
+  }
+
+  /**
+   * Address: 0x006A4840 (FUN_006A4840)
+   *
+   * What it does:
+   * Restores unit build-rate lane from blueprint economy data.
+   */
+  [[maybe_unused]] moho::UnitAttributes* RestoreBuildRateFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  {
+    attributes->buildRate = attributes->blueprint->Economy.BuildRate;
+    return attributes;
+  }
+
+  /**
+   * Address: 0x006A4850 (FUN_006A4850)
+   *
+   * What it does:
+   * Restores unit command-capability mask from blueprint general data.
+   */
+  [[maybe_unused]] moho::UnitAttributes* RestoreCommandCapsFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  {
+    attributes->commandCapsMask = static_cast<std::uint32_t>(attributes->blueprint->General.CommandCaps);
+    return attributes;
+  }
+
+  /**
+   * Address: 0x006A4860 (FUN_006A4860)
+   *
+   * What it does:
+   * Restores unit toggle-capability mask from blueprint general data.
+   */
+  [[maybe_unused]] moho::UnitAttributes* RestoreToggleCapsFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  {
+    attributes->toggleCapsMask = static_cast<std::uint32_t>(attributes->blueprint->General.ToggleCaps);
+    return attributes;
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* UnitAttributes::sType = nullptr;
+
+  /**
+   * Address: 0x006A4760 (FUN_006A4760, Moho::UnitAttributes::UnitAttributes)
+   *
+   * What it does:
+   * Copies rule-empty category universe lanes, clears category bit words back
+   * to inline-empty storage, then restores blueprint-driven elevation/rates/caps.
+   */
+  UnitAttributes::UnitAttributes(const RUnitBlueprint* const unitBlueprint, const RRuleGameRulesImpl* const rules)
+  {
+    blueprint = unitBlueprint;
+
+    const CategoryWordRangeView* const emptyCategory = rules->GetEntityCategory("");
+    restrictionCategory.mUniverse = emptyCategory->mUniverse;
+    restrictionCategory.mBits.mFirstWordIndex = emptyCategory->mBits.mFirstWordIndex;
+    restrictionCategory.mBits.mWords.start_ = emptyCategory->mBits.mWords.start_;
+    restrictionCategory.mBits.mWords.end_ = emptyCategory->mBits.mWords.end_;
+    restrictionCategory.mBits.mWords.capacity_ = emptyCategory->mBits.mWords.capacity_;
+
+    (void)RestoreSpawnElevationFromBlueprint(this);
+
+    restrictionCategory.mBits.mFirstWordIndex = 0u;
+    restrictionCategory.mBits.mWords.ResetStorageToInline();
+
+    (void)RestoreRegenRateFromBlueprint(this);
+    (void)RestoreBuildRateFromBlueprint(this);
+    (void)RestoreCommandCapsFromBlueprint(this);
+    (void)RestoreToggleCapsFromBlueprint(this);
+  }
+
+  /**
+   * Address: 0x0055C210 (FUN_0055C210, preregister_UnitAttributesTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `UnitAttributes`.
+   */
+  gpg::RType* preregister_UnitAttributesTypeInfo()
+  {
+    static UnitAttributesTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(UnitAttributes), &typeInfo);
+    UnitAttributes::sType = &typeInfo;
+    return &typeInfo;
+  }
 
   /**
    * Address: 0x0055C2D0 (FUN_0055C2D0, Moho::UnitAttributes::StaticGetClass)
@@ -147,3 +271,16 @@ namespace moho
     archive->WriteBool(attributes->mCapturable);
   }
 } // namespace moho
+
+namespace
+{
+  struct UnitAttributesTypeInfoBootstrap
+  {
+    UnitAttributesTypeInfoBootstrap()
+    {
+      (void)moho::preregister_UnitAttributesTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] UnitAttributesTypeInfoBootstrap gUnitAttributesTypeInfoBootstrap;
+} // namespace

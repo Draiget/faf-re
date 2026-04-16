@@ -84,6 +84,17 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEAiTargetTypePrimitiveSerializerHelperNode()
+  {
+    if (!gEAiTargetTypePrimitiveSerializerConstructed) {
+      return nullptr;
+    }
+
+    EAiTargetTypePrimitiveSerializer* const serializer = AcquireEAiTargetTypePrimitiveSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
   /**
    * Address: 0x00BF8870 (FUN_00BF8870, sub_BF8870)
    *
@@ -113,9 +124,32 @@ namespace
       return;
     }
 
-    EAiTargetTypePrimitiveSerializer* const serializer = AcquireEAiTargetTypePrimitiveSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkEAiTargetTypePrimitiveSerializerHelperNode();
     gEAiTargetTypePrimitiveSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x005E2480 (FUN_005E2480)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks recovered `EAiTargetType` primitive
+   * serializer helper links and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiTargetTypePrimitiveSerializerStartupThunkA()
+  {
+    return UnlinkEAiTargetTypePrimitiveSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005E24B0 (FUN_005E24B0)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `EAiTargetType` primitive
+   * serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiTargetTypePrimitiveSerializerStartupThunkB()
+  {
+    return UnlinkEAiTargetTypePrimitiveSerializerHelperNode();
   }
 } // namespace
 
@@ -241,7 +275,6 @@ int moho::register_EAiTargetTypePrimitiveSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &EAiTargetTypePrimitiveSerializer::Deserialize;
   serializer->mSaveCallback = &EAiTargetTypePrimitiveSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_EAiTargetTypePrimitiveSerializer);
 }
 

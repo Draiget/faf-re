@@ -3,6 +3,21 @@
 #include "moho/debug/RDebugNavWaypoints.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
+namespace
+{
+  /**
+   * Address: 0x00650890 (FUN_00650890)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for navigator-waypoint
+   * rendering.
+   */
+  void RegisterRDebugNavWaypointsOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display the navigator waypoints", "NavWaypoints");
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -27,13 +42,16 @@ namespace moho
   void RDebugNavWaypointsTypeInfo::Init()
   {
     size_ = sizeof(RDebugNavWaypoints);
-    newRefFunc_ = &RDebugNavWaypointsTypeInfo::NewRef;
-    ctorRefFunc_ = &RDebugNavWaypointsTypeInfo::CtrRef;
-    deleteFunc_ = &RDebugNavWaypointsTypeInfo::Delete;
-    dtrFunc_ = &RDebugNavWaypointsTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &RDebugNavWaypointsTypeInfo::NewRef,
+      &RDebugNavWaypointsTypeInfo::CtrRef,
+      &RDebugNavWaypointsTypeInfo::Delete,
+      &RDebugNavWaypointsTypeInfo::Destruct
+    );
     AddBase_RDebugOverlay(this);
     gpg::RType::Init();
-    RegisterOverlayClass("Display the navigator waypoints", "NavWaypoints");
+    RegisterRDebugNavWaypointsOverlayClass(this);
     Finish();
   }
 

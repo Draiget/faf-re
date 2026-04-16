@@ -94,8 +94,10 @@ namespace LuaPlus
 
 		/**
 		 * Address: 0x009075D0 (FUN_009075D0, LuaPlus::LuaObject::~LuaObject)
-		 * Address: 0x005D0A90 (FUN_005D0A90, LuaObject::j_Dtr_6 thunk)
-		 * Address: 0x00624120 (FUN_00624120, LuaObject::j_Dtr_7 thunk)
+		   * Address: 0x005790D0 (FUN_005790D0)
+		   * Address: 0x005791A0 (FUN_005791A0)
+		   * Address: 0x005D0A90 (FUN_005D0A90)
+		   * Address: 0x00624120 (FUN_00624120)
 		 * Address: 0x00BA2E8B (FUN_00BA2E8B, LuaObject::j_Dtr_9 thunk)
 		 *
 		 * What it does:
@@ -185,6 +187,24 @@ namespace LuaPlus
 		explicit operator bool() const noexcept;
 
 		/**
+		 * Address: 0x0090BF00 (FUN_0090BF00)
+		 *
+		 * What it does:
+		 * Performs Lua semantic equality on this value and `other` after matching
+		 * type tags.
+		 */
+		[[nodiscard]] bool operator==(const LuaObject& other) const;
+
+		/**
+		 * Address: 0x0090BF40 (FUN_0090BF40)
+		 *
+		 * What it does:
+		 * Performs Lua semantic less-than comparison between this value and
+		 * `other`.
+		 */
+		[[nodiscard]] bool operator<(const LuaObject& other) const;
+
+		/**
 		 * Address: 0x009074B0
 		 *
 		 * @param key 
@@ -192,6 +212,24 @@ namespace LuaPlus
 		 */
 		void SetTableHelper(const char* key, TObject* obj);
 		void SetTableHelper(int32_t index, TObject* obj);
+
+		/**
+		 * Address: 0x00907510 (FUN_00907510)
+		 *
+		 * What it does:
+		 * Writes one table entry by integer key directly through `luaV_settable`
+		 * using a caller-provided value slot.
+		 */
+		void SetTableHelperRaw(int32_t index, StkId valueSlot);
+
+		/**
+		 * Address: 0x00907550 (FUN_00907550)
+		 *
+		 * What it does:
+		 * Writes one table entry by Lua-object key through `luaV_settable` using
+		 * a caller-provided value slot.
+		 */
+		void SetTableHelperRaw(const LuaObject& key, StkId valueSlot);
 
 		/**
 		 * Address: 0x00907ED0 (FUN_00907ED0, LuaPlus::LuaObject::SetN)
@@ -286,6 +324,19 @@ namespace LuaPlus
 		void AssignThread(LuaState* state);
 
 		/**
+		 * Address: 0x00909900 (FUN_00909900, LuaPlus::LuaObject::AssignObject)
+		 *
+		 * What it does:
+		 * Copies one source `LuaObject` payload into this object after validating
+		 * shared root-state ownership.
+		 *
+		 * Notes:
+		 * The binary keeps the `state` argument lane for ABI compatibility but
+		 * does not read it in this implementation.
+		 */
+		void AssignObject(LuaState* state, const LuaObject& value);
+
+		/**
 		 * Address: 0x009084E0 (FUN_009084E0, LuaPlus::LuaObject::SetString)
 		 *
 		 * What it does:
@@ -300,6 +351,15 @@ namespace LuaPlus
 		 * Writes one table entry by string key using a string-or-nil payload.
 		 */
 		void SetString(const char* key, const char* value);
+
+		/**
+		 * Address: 0x00908590 (FUN_00908590, LuaPlus::LuaObject::SetString)
+		 *
+		 * What it does:
+		 * Writes one table entry by LuaObject key using a string-or-nil payload
+		 * after validating shared-state ownership with `key`.
+		 */
+		void SetString(const LuaObject& key, const char* value);
 
 		/**
 		 * Address: 0x00907FF0 (FUN_00907FF0, LuaPlus::LuaObject::SetNil)
@@ -318,6 +378,15 @@ namespace LuaPlus
 		void SetNil(int32_t index);
 
 		/**
+		 * Address: 0x00908060 (FUN_00908060, LuaPlus::LuaObject::SetNil)
+		 *
+		 * What it does:
+		 * Writes one nil payload to a table field addressed by LuaObject key
+		 * after validating shared-state ownership with `key`.
+		 */
+		void SetNil(const LuaObject& key);
+
+		/**
 		 * Address: 0x00908370 (FUN_00908370, LuaPlus::LuaObject::SetNumber)
 		 *
 		 * What it does:
@@ -332,6 +401,15 @@ namespace LuaPlus
 		 * Writes one table entry by string key using a numeric payload.
 		 */
 		void SetNumber(const char* key, float value);
+
+		/**
+		 * Address: 0x009083E0 (FUN_009083E0, LuaPlus::LuaObject::SetNumber)
+		 *
+		 * What it does:
+		 * Writes one table entry by LuaObject key using a numeric payload after
+		 * validating shared-state ownership with `key`.
+		 */
+		void SetNumber(const LuaObject& key, float value);
 
 		/**
 		 * Address: 0x00908240 (FUN_00908240, ?SetInteger@LuaObject@LuaPlus@@QBEXHH@Z)
@@ -350,12 +428,63 @@ namespace LuaPlus
 		void SetInteger(const char* key, int32_t value);
 
 		/**
+		 * Address: 0x009082B0 (FUN_009082B0, LuaPlus::LuaObject::SetInteger)
+		 *
+		 * What it does:
+		 * Writes one table entry by LuaObject key using an integer payload lane
+		 * after validating shared-state ownership with `key`.
+		 */
+		void SetInteger(const LuaObject& key, int32_t value);
+
+		/**
 		 * Address: 0x009080C0 (FUN_009080C0, LuaPlus::LuaObject::SetBoolean)
 		 *
 		 * What it does:
 		 * Writes one boolean payload into this table by string key.
 		 */
 		void SetBoolean(const char* key, bool value);
+
+		/**
+		 * Address: 0x00908110 (FUN_00908110, LuaPlus::LuaObject::SetBoolean)
+		 *
+		 * What it does:
+		 * Writes one boolean payload into this table by numeric index.
+		 */
+		void SetBoolean(int32_t index, bool value);
+
+		/**
+		 * Address: 0x00908180 (FUN_00908180, LuaPlus::LuaObject::SetBoolean)
+		 *
+		 * What it does:
+		 * Writes one boolean payload into this table by LuaObject key after
+		 * validating shared-state ownership with `key`.
+		 */
+		void SetBoolean(const LuaObject& key, bool value);
+
+		/**
+		 * Address: 0x00908680 (FUN_00908680, LuaPlus::LuaObject::SetLightUserData)
+		 *
+		 * What it does:
+		 * Writes one light-userdata payload into this table by numeric index.
+		 */
+		void SetLightUserData(int32_t index, void* value);
+
+		/**
+		 * Address: 0x00908630 (FUN_00908630, LuaPlus::LuaObject::SetLightUserData)
+		 *
+		 * What it does:
+		 * Writes one light-userdata payload into this table by string key.
+		 */
+		void SetLightUserData(const char* key, void* value);
+
+		/**
+		 * Address: 0x009086F0 (FUN_009086F0, LuaPlus::LuaObject::SetLightUserData)
+		 *
+		 * What it does:
+		 * Writes one light-userdata payload into this table by LuaObject key after
+		 * validating shared-state ownership with `key`.
+		 */
+		void SetLightUserData(const LuaObject& key, void* value);
 
 		/**
 		 * Address: 0x00908760 (FUN_00908760, LuaPlus::LuaObject::SetObject)
@@ -418,6 +547,14 @@ namespace LuaPlus
 		[[nodiscard]] LuaObject CreateTable(int32_t index, int32_t narray, int32_t lnhash);
 
 		/**
+		 * Address: 0x00908D50 (FUN_00908D50, LuaPlus::LuaObject::CreateTable)
+		 *
+		 * What it does:
+		 * Creates one new Lua table and stores it under LuaObject key `key`.
+		 */
+		[[nodiscard]] LuaObject CreateTable(const LuaObject& key, int32_t narray, int32_t lnhash);
+
+		/**
 		 * Address: 0x00909CE0 (FUN_00909CE0, LuaPlus::LuaObject::Insert)
 		 *
 		 * What it does:
@@ -425,6 +562,24 @@ namespace LuaPlus
 		 * restores the caller's original Lua stack top.
 		 */
 		void Insert(int32_t key, const LuaObject& obj) const;
+
+		/**
+		 * Address: 0x00909EB0 (FUN_00909EB0, LuaPlus::LuaObject::Remove)
+		 *
+		 * What it does:
+		 * Calls Lua `table.remove(this, index)` using the active state and
+		 * restores the caller's original Lua stack top.
+		 */
+		void Remove(int32_t index) const;
+
+		/**
+		 * Address: 0x0090A020 (FUN_0090A020, LuaPlus::LuaObject::Sort)
+		 *
+		 * What it does:
+		 * Calls Lua `table.sort(this)` using the active state and restores the
+		 * caller's original Lua stack top.
+		 */
+		void Sort() const;
 
 		/**
 		 * Address: 0x10007360 (?GetByIndex@LuaObject@LuaPlus@@QBE?AV12@H@Z)
@@ -443,6 +598,15 @@ namespace LuaPlus
 		 */
 		[[nodiscard]] LuaObject GetByObject(const LuaObject& key) const;
 
+		/**
+		 * Address: 0x00908EE0 (FUN_00908EE0, LuaPlus::LuaObject::GetByObject)
+		 *
+		 * What it does:
+		 * Looks up this table with one Lua stack key lane and returns the raw
+		 * value as a bound LuaObject.
+		 */
+		[[nodiscard]] LuaObject GetByObject(const LuaStackObject& obj) const;
+
 		[[nodiscard]]
 		LuaObject GetByName(const char* name) const;
 
@@ -457,6 +621,16 @@ namespace LuaPlus
 		LuaObject operator[](const char* name) const;
 
 		/**
+		 * Address: 0x00909280 (FUN_00909280, LuaPlus::LuaObject::operator[])
+		 *
+		 * What it does:
+		 * Validates object-state compatibility for table indexing with one
+		 * LuaObject key and returns the raw table slot value.
+		 */
+		[[nodiscard]]
+		LuaObject operator[](const LuaObject& key) const;
+
+		/**
 		 * Address: 0x009091E0 (FUN_009091E0, LuaPlus::LuaObject::operator[])
 		 *
 		 * What it does:
@@ -465,6 +639,16 @@ namespace LuaPlus
 		 */
 		[[nodiscard]]
 		LuaObject operator[](int32_t index) const;
+
+		/**
+		 * Address: 0x00909310 (FUN_00909310, LuaPlus::LuaObject::operator[])
+		 *
+		 * What it does:
+		 * Validates root-state compatibility for table indexing with one
+		 * LuaStackObject key and returns the raw table slot value.
+		 */
+		[[nodiscard]]
+		LuaObject operator[](const LuaStackObject& key) const;
 
 		/**
 		 * Address: 0x009093B0 (FUN_009093B0, LuaPlus::LuaObject::Lookup)
@@ -575,6 +759,15 @@ namespace LuaPlus
 		[[nodiscard]] bool IsNil() const noexcept;
 
 		/**
+		 * Address: 0x00907850 (FUN_00907850, LuaPlus::LuaObject::IsNone)
+		 *
+		 * What it does:
+		 * Asserts state binding and returns whether this object carries the
+		 * `LUA_TNONE` sentinel tag.
+		 */
+		[[nodiscard]] bool IsNone() const;
+
+		/**
 		 * Address: 0x009078D0 (FUN_009078D0, LuaPlus::LuaObject::IsBoolean)
 		 *
 		 * What it does:
@@ -599,6 +792,15 @@ namespace LuaPlus
 		[[nodiscard]] bool IsString() const noexcept;
 
 		/**
+		 * Address: 0x00907890 (FUN_00907890, LuaPlus::LuaObject::IsLightUserData)
+		 *
+		 * What it does:
+		 * Asserts state binding and returns whether this value carries a light-
+		 * userdata tag.
+		 */
+		[[nodiscard]] bool IsLightUserData() const;
+
+		/**
 		 * Address: 0x00907310 (FUN_00907310, LuaPlus::LuaObject::IsTable)
 		 *
 		 * What it does:
@@ -614,6 +816,24 @@ namespace LuaPlus
 		 * and Lua closure tags via `(tt | 1) == LUA_TFUNCTION`.
 		 */
 		[[nodiscard]] bool IsFunction() const;
+
+		/**
+		 * Address: 0x00907700 (FUN_00907700, LuaPlus::LuaObject::IsConvertibleToInteger)
+		 *
+		 * What it does:
+		 * Returns true when this value is already numeric or can be coerced to a
+		 * numeric lane via `luaV_tonumber`.
+		 */
+		[[nodiscard]] bool IsConvertibleToInteger() const;
+
+		/**
+		 * Address: 0x00907760 (FUN_00907760, LuaPlus::LuaObject::IsConvertibleToNumber)
+		 *
+		 * What it does:
+		 * Returns true when this value is already numeric or can be coerced to a
+		 * numeric lane via `luaV_tonumber`.
+		 */
+		[[nodiscard]] bool IsConvertibleToNumber() const;
 
 		/**
 		 * Address: 0x009077C0 (FUN_009077C0, LuaPlus::LuaObject::IsConvertibleToString)
@@ -685,6 +905,15 @@ namespace LuaPlus
 		 * numeric coercion and returns `0` on conversion failure.
 		 */
 		[[nodiscard]] double ToNumber() const;
+
+		/**
+		 * Address: 0x00907380 (FUN_00907380)
+		 *
+		 * What it does:
+		 * Returns one integer truncation of this value when numeric/coercible,
+		 * otherwise returns `0`.
+		 */
+		[[nodiscard]] int32_t ToInteger() const;
 
 	public:
 		LuaObject* m_next; // Intrusive list node next (managed by LuaState root).
@@ -897,6 +1126,39 @@ namespace LuaPlus
 		 * Raises a Lua argument error when stack slot `index` is missing.
 		 */
 		void CheckAny(int32_t index);
+
+		/**
+		 * Address: 0x0090BF90 (FUN_0090BF90)
+		 *
+		 * What it does:
+		 * Raises one Lua argument error for argument lane `narg`.
+		 */
+		int ArgError(int narg, char* extraMessage);
+
+		/**
+		 * Address: 0x0090BFD0 (FUN_0090BFD0)
+		 *
+		 * What it does:
+		 * Returns optional string argument `narg` or `defaultValue`, and writes
+		 * string byte length when `lengthOut` is non-null.
+		 */
+		[[nodiscard]] const char* OptString(int narg, char* defaultValue, size_t* lengthOut);
+
+		/**
+		 * Address: 0x0090BFF0 (FUN_0090BFF0)
+		 *
+		 * What it does:
+		 * Validates numeric argument `index` and returns its number lane.
+		 */
+		[[nodiscard]] lua_Number CheckNumber(int index);
+
+		/**
+		 * Address: 0x0090C010 (FUN_0090C010)
+		 *
+		 * What it does:
+		 * Returns optional numeric argument `index` or `defaultValue`.
+		 */
+		[[nodiscard]] lua_Number OptNumber(int index, lua_Number defaultValue);
 
 		int32_t GetTop() const;
 		bool IsRootState() const;

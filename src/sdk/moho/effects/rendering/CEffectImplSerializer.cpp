@@ -185,6 +185,29 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x006598F0 (FUN_006598F0)
+   *
+   * What it does:
+   * Unlinks the global CEffectImpl serializer helper node and restores
+   * self-links on the serializer node.
+   */
+  gpg::SerHelperBase* UnlinkCEffectImplSerializerNodeVariantA()
+  {
+    return UnlinkHelperNode(gCEffectImplSerializer);
+  }
+
+  /**
+   * Address: 0x00659920 (FUN_00659920)
+   *
+   * What it does:
+   * Runs the duplicate CEffectImpl serializer helper-node unlink/reset lane.
+   */
+  gpg::SerHelperBase* UnlinkCEffectImplSerializerNodeVariantB()
+  {
+    return UnlinkHelperNode(gCEffectImplSerializer);
+  }
+
+  /**
    * Address: 0x006598A0 (FUN_006598A0, Moho::CEffectImplSerializer::Deserialize)
    */
   void CEffectImplSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
@@ -237,7 +260,6 @@ namespace moho
     InitializeHelperNode(gCEffectImplSerializer);
     gCEffectImplSerializer.mLoadCallback = &CEffectImplSerializer::Deserialize;
     gCEffectImplSerializer.mSaveCallback = &CEffectImplSerializer::Serialize;
-    gCEffectImplSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_CEffectImplSerializer_atexit);
   }
 } // namespace moho

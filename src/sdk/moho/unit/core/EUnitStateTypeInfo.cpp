@@ -1,5 +1,6 @@
 #include "moho/unit/core/EUnitStateTypeInfo.h"
 
+#include <cstdint>
 #include <new>
 #include <typeinfo>
 
@@ -122,5 +123,42 @@ namespace moho
     AddEnum(StripPrefix("UNITSTATE_HoldingPattern"), UNITSTATE_HoldingPattern);
     AddEnum(StripPrefix("UNITSTATE_SiloBuildingAmmo"), UNITSTATE_SiloBuildingAmmo);
   }
-} // namespace moho
 
+  /**
+   * Address: 0x0055D450 (FUN_0055D450, PrimitiveSerHelper<EUnitState>::Deserialize)
+   */
+  void EUnitStatePrimitiveSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    int value = 0;
+    archive->ReadInt(&value);
+    *reinterpret_cast<EUnitState*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EUnitState>(value);
+  }
+
+  /**
+   * Address: 0x0055D470 (FUN_0055D470, PrimitiveSerHelper<EUnitState>::Serialize)
+   */
+  void EUnitStatePrimitiveSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    const auto value = *reinterpret_cast<const EUnitState*>(static_cast<std::uintptr_t>(objectPtr));
+    archive->WriteInt(static_cast<int>(value));
+  }
+
+  void EUnitStatePrimitiveSerializer::RegisterSerializeFunctions()
+  {
+    gpg::RType* const type = gpg::LookupRType(typeid(EUnitState));
+    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    type->serLoadFunc_ = mDeserialize;
+    type->serSaveFunc_ = mSerialize;
+  }
+} // namespace moho

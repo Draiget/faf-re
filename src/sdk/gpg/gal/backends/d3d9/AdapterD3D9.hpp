@@ -16,7 +16,15 @@ namespace gpg::gal
   class AdapterD3D9
   {
   public:
-    AdapterD3D9() = default;
+    /**
+     * Address: 0x00941040 (FUN_00941040, gpg::gal::AdapterD3D9::AdapterD3D9)
+     * Mangled: ??0AdapterD3D9@gal@gpg@@QAE@@Z
+     *
+     * What it does:
+     * Initializes one empty adapter descriptor with default string/vector lanes
+     * and zeroed numeric identifiers.
+     */
+    AdapterD3D9();
 
     /**
      * Address: 0x009410A0 (FUN_009410A0, gpg::gal::AdapterD3D9::AdapterD3D9)
@@ -33,6 +41,15 @@ namespace gpg::gal
       const msvc8::string& device,
       const msvc8::string& desc
     );
+
+    /**
+     * Address: 0x008EFF80 (FUN_008EFF80, gpg::gal::AdapterD3D9::AdapterD3D9 copy)
+     *
+     * What it does:
+     * Copy-constructs one adapter descriptor by cloning identifier lanes,
+     * string lanes, and the adapter-mode vector payload.
+     */
+    AdapterD3D9(const AdapterD3D9& other);
 
     /**
      * Address: 0x00940C90 (FUN_00940C90)

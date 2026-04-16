@@ -42,6 +42,40 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x0065B7F0 (FUN_0065B7F0, ??0SParticle@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes one world-particle payload with default resistance, size,
+   * blend/z modes, texture lanes, and army-index sentinel.
+   */
+  SWorldParticle::SWorldParticle()
+    : mEnabled(false)
+    , mPadding01{}
+    , mResistance(0.07f)
+    , mPos{0.0f, 0.0f, 0.0f}
+    , mDir{0.0f, 0.0f, 0.0f}
+    , mAccel{0.0f, 0.0f, 0.0f}
+    , mInterop(0.0f)
+    , mLifetime(0.0f)
+    , mFramerate(0.0f)
+    , mValue1(0.0f)
+    , mTextureSelection(0.0f)
+    , mValue3(0.0f)
+    , mRampSelection(0.0f)
+    , mBeginSize(1.0f)
+    , mEndSize(1.0f)
+    , mAngle(0.0f)
+    , mRotationCurve(0.0f)
+    , mReserved54(0.0f)
+    , mTexture{}
+    , mRampTexture{}
+    , mTypeTag()
+    , mArmyIndex(-1)
+    , mBlendMode(BlendMode::Mode3)
+    , mZMode(ZMode::Mode0)
+  {}
+
+  /**
    * Address: 0x00490570 (FUN_00490570, Moho::SWorldParticle::MemberDeserialize)
    */
   void SWorldParticle::MemberDeserialize(gpg::ReadArchive* const archive)

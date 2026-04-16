@@ -1,7 +1,13 @@
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
 
+#include <cstdint>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityId.h"
@@ -31,10 +37,127 @@ namespace
     void* const valueStorage = instance ? instance->GetValueStorage() : nullptr;
     return valueStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(valueStorage) != 0u);
   }
+
+  template <class T>
+  [[nodiscard]] gpg::RType* ResolveCachedType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(T));
+    }
+    return sType;
+  }
+
+  struct CUnitUpgradeTaskSerializerStartupNode
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mLoad = nullptr;
+    gpg::RType::save_func_t mSave = nullptr;
+  };
+  static_assert(sizeof(CUnitUpgradeTaskSerializerStartupNode) == 0x14, "CUnitUpgradeTaskSerializerStartupNode size must be 0x14");
+
+  CUnitUpgradeTaskSerializerStartupNode gCUnitUpgradeTaskSerializer{};
+
+  void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
+    task->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitUpgradeTaskSerializerCallback(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    const auto* const task = reinterpret_cast<const moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005F8800 (FUN_005F8800)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CUnitUpgradeTaskSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CUnitUpgradeTaskSerializerStartupNode* InitializeCUnitUpgradeTaskSerializerStartupThunk()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitUpgradeTaskSerializer.mNext);
+    gCUnitUpgradeTaskSerializer.mPrev = self;
+    gCUnitUpgradeTaskSerializer.mNext = self;
+    gCUnitUpgradeTaskSerializer.mLoad = &DeserializeCUnitUpgradeTaskSerializerCallback;
+    gCUnitUpgradeTaskSerializer.mSave = &SerializeCUnitUpgradeTaskSerializerCallback;
+    return &gCUnitUpgradeTaskSerializer;
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005FEBC0 (FUN_005FEBC0)
+   *
+   * What it does:
+   * Deserializes upgrade-task runtime state (base command-task lane, target
+   * blueprint pointer, build-helper lane, and upgraded-unit weak pointer).
+   */
+  void CUnitUpgradeTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    if (gpg::RType* const commandTaskType = ResolveCachedType<CCommandTask>()) {
+      archive->Read(commandTaskType, this, ownerRef);
+    }
+
+    gpg::RRef blueprintRef{};
+    RUnitBlueprint* toBlueprint = const_cast<RUnitBlueprint*>(mToBlueprint);
+    archive->ReadPointer_RUnitBlueprint(&toBlueprint, &blueprintRef);
+    mToBlueprint = toBlueprint;
+
+    if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {
+      const gpg::RRef buildHelperRef{};
+      archive->Read(buildHelperType, &mBuildHelper, buildHelperRef);
+    }
+
+    if (gpg::RType* const weakUnitType = ResolveCachedType<WeakPtr<Unit>>()) {
+      const gpg::RRef upgradedUnitRef{};
+      archive->Read(weakUnitType, &mUpgradedUnit, upgradedUnitRef);
+    }
+  }
+
+  /**
+   * Address: 0x005FEC90 (FUN_005FEC90)
+   *
+   * What it does:
+   * Serializes upgrade-task runtime state (base command-task lane, target
+   * blueprint pointer, build-helper lane, and upgraded-unit weak pointer).
+   */
+  void CUnitUpgradeTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    if (gpg::RType* const commandTaskType = ResolveCachedType<CCommandTask>()) {
+      archive->Write(commandTaskType, this, ownerRef);
+    }
+
+    gpg::RRef blueprintRef{};
+    gpg::RRef_RUnitBlueprint(&blueprintRef, const_cast<RUnitBlueprint*>(mToBlueprint));
+    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {
+      archive->Write(buildHelperType, &mBuildHelper, ownerRef);
+    }
+
+    if (gpg::RType* const weakUnitType = ResolveCachedType<WeakPtr<Unit>>()) {
+      archive->Write(weakUnitType, &mUpgradedUnit, ownerRef);
+    }
+  }
+
   /**
    * Address: 0x005F83D0 (FUN_005F83D0, ??0CUnitUpgradeTask@Moho@@QAE@@Z)
    */
@@ -233,5 +356,33 @@ int CUnitUpgradeTask::TaskTick()
   int CUnitUpgradeTask::Execute()
   {
     return TaskTick();
+  }
+
+  /**
+   * Address: 0x005FD1B0 (FUN_005FD1B0)
+   *
+   * What it does:
+   * Preserves one serializer-save thunk lane for `CUnitUpgradeTask`.
+   */
+  [[maybe_unused]] void CUnitUpgradeTaskMemberSerializeAdapterLaneA(
+    const CUnitUpgradeTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005FDB60 (FUN_005FDB60)
+   *
+   * What it does:
+   * Alternate serializer-save thunk lane for `CUnitUpgradeTask`.
+   */
+  [[maybe_unused]] void CUnitUpgradeTaskMemberSerializeAdapterLaneB(
+    const CUnitUpgradeTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    task->MemberSerialize(archive);
   }
 } // namespace moho

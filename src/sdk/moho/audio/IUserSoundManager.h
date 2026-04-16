@@ -21,6 +21,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x008AB120 (FUN_008AB120, IUserSoundManager ctor lane)
+     *
+     * What it does:
+     * Initializes one user-sound-manager base interface object.
+     */
+    IUserSoundManager();
+
+    /**
      * Address: 0x00A82547 (_purecall)
      * Slot: 0
      */

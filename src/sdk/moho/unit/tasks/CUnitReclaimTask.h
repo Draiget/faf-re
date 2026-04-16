@@ -69,6 +69,24 @@ namespace moho
     void OnEvent(ECommandEvent event) override;
 
     /**
+     * Address: 0x0061F000 (FUN_0061F000, Moho::CUnitReclaimTask::TaskTick)
+     *
+     * What it does:
+     * Runs reclaim task state transitions: validates target lanes, handles
+     * approach/setup, evaluates reclaim costs, applies per-tick reclaim
+     * materialization, and credits reclaimed resources to army economy totals.
+     */
+    [[nodiscard]] int TaskTick();
+
+    /**
+     * Alias of FUN_0061F000.
+     *
+     * What it does:
+     * Dispatches the command-task execute slot into `TaskTick`.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x00620C60 (FUN_00620C60, Moho::CUnitReclaimTask::MemberDeserialize)
      *
      * What it does:

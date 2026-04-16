@@ -26,10 +26,11 @@ namespace moho
     CEfxBeam();
 
     /**
-     * Address: 0x00655B80 (FUN_00655B80, Moho::CEfxBeam::dtr)
+     * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)
+     * Thunk entry: 0x00655B80 (FUN_00655B80, Moho::CEfxBeam::dtr)
      *
      * What it does:
-     * Releases CEfxBeam-owned intrusive and reflected member state.
+     * Releases beam texture lanes and detaches endpoint weak-link ownership.
      */
     ~CEfxBeam() override;
 
@@ -75,6 +76,20 @@ namespace moho
      * handles detach/destroy paths for invalid source attachments.
      */
     [[nodiscard]] bool Update();
+
+    /**
+     * Address: 0x00655B50 (FUN_00655B50, Moho::CEfxBeam::AttachEntityToEntity)
+     *
+     * What it does:
+     * Binds source attachment lanes through `SetBone`, stores end weak-target
+     * ownership, and clamps negative end-bone indices to zero.
+     */
+    void AttachEntityToEntity(
+      Entity* sourceEntity,
+      std::int32_t sourceBoneIndex,
+      Entity* targetEntity,
+      std::int32_t targetBoneIndex
+    );
 
     /**
      * What it does:

@@ -32,6 +32,40 @@ namespace
     AcquireTypeInfo().~CAcquireTargetTaskTypeInfo();
     gCAcquireTargetTaskTypeInfoConstructed = false;
   }
+
+  /**
+   * Address: 0x005D8820 (FUN_005D8820)
+   *
+   * What it does:
+   * Runs the in-place default construction path for one
+   * `CAcquireTargetTask` instance used by type-info `NewRef`/`CtrRef`.
+   */
+  [[nodiscard]] moho::CAcquireTargetTask* ConstructAcquireTargetTaskInPlace(void* const objectStorage)
+  {
+    if (objectStorage == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (objectStorage) moho::CAcquireTargetTask(nullptr, nullptr);
+  }
+
+  /**
+   * Address: 0x005DC140 (FUN_005DC140)
+   *
+   * What it does:
+   * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
+   * `Destruct`) on one `CAcquireTargetTaskTypeInfo` descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAcquireTargetTaskTypeInfo* AssignAcquireTargetTaskLifecycleCallbacks(
+    moho::CAcquireTargetTaskTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->newRefFunc_ = &moho::CAcquireTargetTaskTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &moho::CAcquireTargetTaskTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &moho::CAcquireTargetTaskTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &moho::CAcquireTargetTaskTypeInfo::Destruct;
+    return typeInfo;
+  }
 } // namespace
 
 namespace moho
@@ -64,10 +98,7 @@ namespace moho
   void CAcquireTargetTaskTypeInfo::Init()
   {
     size_ = sizeof(CAcquireTargetTask);
-    newRefFunc_ = &CAcquireTargetTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CAcquireTargetTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CAcquireTargetTaskTypeInfo::Delete;
-    dtrFunc_ = &CAcquireTargetTaskTypeInfo::Destruct;
+    (void)AssignAcquireTargetTaskLifecycleCallbacks(this);
     gpg::RType::Init();
     AddBase_CTask(this);
     AddBase_ManyToOneListener_EProjectileImpactEvent(this);
@@ -140,7 +171,8 @@ namespace moho
    */
   gpg::RRef CAcquireTargetTaskTypeInfo::NewRef()
   {
-    auto* const task = new (std::nothrow) CAcquireTargetTask(nullptr, nullptr);
+    void* const storage = ::operator new(sizeof(CAcquireTargetTask), std::nothrow);
+    auto* const task = ConstructAcquireTargetTaskInPlace(storage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CAcquireTargetTask))};
   }
 
@@ -149,10 +181,7 @@ namespace moho
    */
   gpg::RRef CAcquireTargetTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CAcquireTargetTask*>(objectStorage);
-    if (task) {
-      new (task) CAcquireTargetTask(nullptr, nullptr);
-    }
+    auto* const task = ConstructAcquireTargetTaskInPlace(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CAcquireTargetTask))};
   }
 

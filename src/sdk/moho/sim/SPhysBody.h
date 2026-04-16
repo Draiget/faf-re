@@ -53,6 +53,15 @@ namespace moho
     SPhysBody() = default;
 
     /**
+     * Address: 0x006831B0 (FUN_006831B0)
+     *
+     * What it does:
+     * Returns cached reflected type metadata for `SPhysBody`, resolving it
+     * through RTTI lookup on first use.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
      * Address: 0x006975B0 (FUN_006975B0, Moho::SPhysBody::SPhysBody)
      *
      * What it does:
@@ -201,7 +210,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006981B0 (FUN_006981B0, construct registration lane)
+      * Alias of FUN_006981B0 (non-canonical helper lane).
      */
     virtual void RegisterConstructFunction();
 

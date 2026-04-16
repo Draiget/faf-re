@@ -77,6 +77,15 @@ namespace moho
     int Execute() override;
 
     /**
+     * Address: 0x00605BA0 (FUN_00605BA0, Moho::CUnitCaptureTask::MemberSerialize)
+     *
+     * What it does:
+     * Saves base command-task state plus capture-task command/target/economy
+     * ownership lanes and capture progress/rate values.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x00604FC0 (FUN_00604FC0, Moho::CUnitCaptureTask::Receive)
      *
      * What it does:

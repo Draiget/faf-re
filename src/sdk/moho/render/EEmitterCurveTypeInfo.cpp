@@ -1,10 +1,22 @@
 #include "moho/render/EEmitterCurveTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/render/EEmitterCurve.h"
 
 using namespace moho;
+
+/**
+ * Address: 0x007704E0 (FUN_007704E0)
+ *
+ * What it does:
+ * Preregisters the reflected `EEmitterCurve` enum metadata.
+ */
+EEmitterCurveTypeInfo::EEmitterCurveTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(EEmitterCurve), this);
+}
 
 /**
  * Address: 0x00770570 (FUN_00770570, scalar deleting thunk)

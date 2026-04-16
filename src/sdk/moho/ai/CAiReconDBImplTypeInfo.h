@@ -53,6 +53,16 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+  private:
+    /**
+     * Address: 0x005C4D30 (FUN_005C4D30)
+     *
+     * What it does:
+     * Binds the reflection allocation/construction/destruction callback lanes
+     * for `CAiReconDBImpl`.
+     */
+    void BindFactoryCallbacks() noexcept;
   };
 
   static_assert(sizeof(CAiReconDBImplTypeInfo) == 0x64, "CAiReconDBImplTypeInfo size must be 0x64");
@@ -76,7 +86,7 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_RVectorType_ReconBlipPtr();
 
   /**
-   * Address: 0x00BF7CC0 (FUN_00BF7CC0, sub_BF7CC0)
+     * Address: 0x00BF7CC0 (FUN_00BF7CC0)
    *
    * What it does:
    * Tears down startup-owned `vector<ReconBlip*>` reflection storage.
@@ -101,7 +111,7 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_RMultiMapType_SReconKey_ReconBlipPtr();
 
   /**
-   * Address: 0x00BF7C60 (FUN_00BF7C60, sub_BF7C60)
+     * Address: 0x00BF7C60 (FUN_00BF7C60)
    *
    * What it does:
    * Tears down startup-owned recon-blip map reflection storage.

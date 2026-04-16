@@ -74,7 +74,7 @@ namespace
   {
     SBlackListInfoTypeInfoBootstrap()
     {
-      (void)moho::register_SBlackListInfoTypeInfo();
+      (void)register_SBlackListInfoTypeInfo_00BD8810_Impl();
     }
   };
 
@@ -115,19 +115,4 @@ namespace moho
     Finish();
   }
 
-  /**
-   * Address: 0x00BFE620 (FUN_00BFE620, sub_BFE620)
-   */
-  void cleanup_SBlackListInfoTypeInfo()
-  {
-    cleanup_SBlackListInfoTypeInfo_00BFE620_Impl();
-  }
-
-  /**
-   * Address: 0x00BD8810 (FUN_00BD8810, sub_BD8810)
-   */
-  int register_SBlackListInfoTypeInfo()
-  {
-    return register_SBlackListInfoTypeInfo_00BD8810_Impl();
-  }
 } // namespace moho

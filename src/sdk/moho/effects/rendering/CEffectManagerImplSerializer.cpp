@@ -135,6 +135,51 @@ namespace
   }
 
   /**
+   * Address: 0x0066C2E0 (FUN_0066C2E0)
+   *
+   * What it does:
+   * Thunk lane that forwards into
+   * `SerializeActiveEffectsList_CEffectManagerImpl`.
+   */
+  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkA(
+    const moho::CEffectManagerImpl* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
+  }
+
+  /**
+   * Address: 0x0066C640 (FUN_0066C640)
+   *
+   * What it does:
+   * Duplicate thunk lane that forwards into
+   * `SerializeActiveEffectsList_CEffectManagerImpl`.
+   */
+  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkB(
+    const moho::CEffectManagerImpl* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
+  }
+
+  /**
+   * Address: 0x0066D090 (FUN_0066D090)
+   *
+   * What it does:
+   * Duplicate thunk lane that forwards into
+   * `SerializeActiveEffectsList_CEffectManagerImpl`.
+   */
+  [[maybe_unused]] void SerializeActiveEffectsList_CEffectManagerImplThunkC(
+    const moho::CEffectManagerImpl* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
+  }
+
+  /**
    * Address: 0x0066BBD0 (FUN_0066BBD0, Deserialize_CEffectManagerImpl)
    *
    * What it does:
@@ -209,7 +254,6 @@ namespace moho
     InitializeHelperNode(gCEffectManagerImplSerializer);
     gCEffectManagerImplSerializer.mLoadCallback = &Deserialize_CEffectManagerImpl;
     gCEffectManagerImplSerializer.mSaveCallback = &Serialize_CEffectManagerImpl;
-    gCEffectManagerImplSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_CEffectManagerImplSerializer_atexit);
   }
 } // namespace moho

@@ -21,6 +21,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0055B990 (FUN_0055B990, Moho::EFireStateTypeInfo::EFireStateTypeInfo)
+     *
+     * What it does:
+     * Preregisters the enum type descriptor for `EFireState` with the reflection registry.
+     */
+    EFireStateTypeInfo();
+
+    /**
      * Address: 0x0055BA20 (FUN_0055BA20, Moho::EFireStateTypeInfo::dtr)
      */
     ~EFireStateTypeInfo() override;
@@ -41,6 +49,56 @@ namespace moho
      */
     void AddEnums();
   };
+
+  class EFireStatePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x0055D3E0 (FUN_0055D3E0, PrimitiveSerHelper<EFireState>::Deserialize)
+     *
+     * What it does:
+     * Deserializes one `EFireState` lane from archive storage.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0055D400 (FUN_0055D400, PrimitiveSerHelper<EFireState>::Serialize)
+     *
+     * What it does:
+     * Serializes one `EFireState` lane into archive storage.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `EFireState`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mDeserialize;
+    gpg::RType::save_func_t mSerialize;
+  };
+
+  static_assert(
+    offsetof(EFireStatePrimitiveSerializer, mHelperNext) == 0x04,
+    "EFireStatePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EFireStatePrimitiveSerializer, mHelperPrev) == 0x08,
+    "EFireStatePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EFireStatePrimitiveSerializer, mDeserialize) == 0x0C,
+    "EFireStatePrimitiveSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EFireStatePrimitiveSerializer, mSerialize) == 0x10,
+    "EFireStatePrimitiveSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(EFireStatePrimitiveSerializer) == 0x14, "EFireStatePrimitiveSerializer size must be 0x14");
 
   static_assert(sizeof(EFireStateTypeInfo) == 0x78, "EFireStateTypeInfo size must be 0x78");
 } // namespace moho

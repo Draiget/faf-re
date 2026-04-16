@@ -45,14 +45,57 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkHelperNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(TSerializer& serializer) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
       serializer.mHelperPrev->mNext = serializer.mHelperNext;
     }
 
-    InitializeHelperNode(serializer);
+    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0050C1C0 (FUN_0050C1C0)
+   *
+   * What it does:
+   * Unlinks the `SNavGoalSerializer` helper node and resets both links to the
+   * serializer self-node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupSNavGoalSerializerVariant1() noexcept
+  {
+    return UnlinkHelperNode(SNavGoalSerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050C1F0 (FUN_0050C1F0)
+   *
+   * What it does:
+   * Duplicate lane of `SNavGoalSerializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSNavGoalSerializerVariant2() noexcept
+  {
+    return UnlinkHelperNode(SNavGoalSerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050C120 (FUN_0050C120)
+   *
+   * What it does:
+   * Executes one non-deleting `gpg::RType` base-teardown lane for
+   * `SNavGoalTypeInfo`.
+   */
+  [[maybe_unused]] void cleanup_SNavGoalTypeInfoRTypeBase(moho::SNavGoalTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
+    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
   [[nodiscard]] gpg::RType* CachedRect2iType()
@@ -74,6 +117,12 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x0050CAF0 (FUN_0050CAF0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `SNavGoal`.
+   */
   [[nodiscard]] gpg::RType* CachedSNavGoalType()
   {
     gpg::RType* cached = moho::SNavGoal::sType;
@@ -101,7 +150,7 @@ namespace
     }
 
     moho::SNavGoalSerializer& serializer = SNavGoalSerializerStorageRef();
-    UnlinkHelperNode(serializer);
+    (void)CleanupSNavGoalSerializerVariant1();
     serializer.~SNavGoalSerializer();
     gSNavGoalSerializerConstructed = false;
   }
@@ -231,6 +280,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050C190 (FUN_0050C190)
+   *
+   * What it does:
+   * Initializes `SNavGoalSerializer` helper links and callback lanes.
+   */
+  [[nodiscard]] SNavGoalSerializer* initialize_SNavGoalSerializerVariant1()
+  {
+    if (!gSNavGoalSerializerConstructed) {
+      new (gSNavGoalSerializerStorage) SNavGoalSerializer();
+      gSNavGoalSerializerConstructed = true;
+    }
+
+    InitializeHelperNode(SNavGoalSerializerStorageRef());
+    SNavGoalSerializerStorageRef().mDeserialize =
+      reinterpret_cast<gpg::RType::load_func_t>(&SNavGoalSerializer::Deserialize);
+    SNavGoalSerializerStorageRef().mSerialize =
+      reinterpret_cast<gpg::RType::save_func_t>(&SNavGoalSerializer::Serialize);
+    return &SNavGoalSerializerStorageRef();
+  }
+
+  /**
+   * Address: 0x0050C840 (FUN_0050C840)
+   *
+   * What it does:
+   * Duplicate lane of `SNavGoalSerializer` callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] SNavGoalSerializer* initialize_SNavGoalSerializerVariant2()
+  {
+    return initialize_SNavGoalSerializerVariant1();
+  }
+
+  /**
    * Address: 0x0050C870 (FUN_0050C870, Moho::SNavGoalSerializer::RegisterSerializeFunctions)
    *
    * What it does:
@@ -271,17 +352,7 @@ namespace moho
    */
   void register_SNavGoalSerializer()
   {
-    if (!gSNavGoalSerializerConstructed) {
-      new (gSNavGoalSerializerStorage) SNavGoalSerializer();
-      gSNavGoalSerializerConstructed = true;
-    }
-
-    InitializeHelperNode(SNavGoalSerializerStorageRef());
-    SNavGoalSerializerStorageRef().mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&SNavGoalSerializer::Deserialize);
-    SNavGoalSerializerStorageRef().mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SNavGoalSerializer::Serialize);
-    SNavGoalSerializerStorageRef().RegisterSerializeFunctions();
+    (void)initialize_SNavGoalSerializerVariant1();
     (void)std::atexit(&CleanupSNavGoalSerializerAtExit);
   }
 

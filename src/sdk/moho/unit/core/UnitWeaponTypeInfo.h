@@ -51,19 +51,4 @@ namespace moho
 
   static_assert(sizeof(UnitWeaponTypeInfo) == 0x64, "UnitWeaponTypeInfo size must be 0x64");
 
-  /**
-   * Address: 0x00BFE740 (FUN_00BFE740, sub_BFE740)
-   *
-   * What it does:
-   * Tears down `UnitWeaponTypeInfo` reflected vectors and restores base RTTI lane.
-   */
-  void cleanup_UnitWeaponTypeInfo();
-
-  /**
-   * Address: 0x00BD88D0 (FUN_00BD88D0, register_UnitWeaponTypeInfo)
-   *
-   * What it does:
-   * Forces `UnitWeaponTypeInfo` registration and schedules exit cleanup.
-   */
-  void register_UnitWeaponTypeInfo();
 } // namespace moho

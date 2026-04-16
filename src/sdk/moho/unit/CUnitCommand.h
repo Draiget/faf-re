@@ -27,6 +27,7 @@ namespace moho
 {
   class Entity;
   class Unit;
+  class CCommandDb;
   class CAiFormationInstance;
   class Sim;
   struct SOCellPos;
@@ -58,7 +59,9 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x006E7D10 (FUN_006E7D10, Moho::CUnitCommand::GetDerivedObjectRef)
@@ -69,7 +72,7 @@ namespace moho
     gpg::RRef GetDerivedObjectRef();
 
     /**
-     * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
+       * Address: 0x006E81B0 (FUN_006E81B0)
      *
      * What it does:
      * Initializes one command from issue payload lanes, updates sim command
@@ -78,7 +81,7 @@ namespace moho
     CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData);
 
     /**
-     * Address: 0x006E81B0 (FUN_006E81B0, command-id override lane)
+       * Address: 0x006E81B0 (FUN_006E81B0)
      *
      * What it does:
      * Initializes one command from issue payload lanes while forcing the
@@ -105,6 +108,7 @@ namespace moho
 
     /**
      * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
+     * Address: 0x006EC1B0 (FUN_006EC1B0)
      *
      * What it does:
      * Loads the serialized command payload lanes into this command instance.
@@ -113,6 +117,8 @@ namespace moho
 
     /**
      * Address: 0x006ECE20 (FUN_006ECE20, Moho::CUnitCommand::MemberSerialize)
+     * Address: 0x006EB750 (FUN_006EB750)
+     * Address: 0x006EC1C0 (FUN_006EC1C0)
      *
      * What it does:
      * Saves the serialized command payload lanes from this command instance.
@@ -127,6 +133,15 @@ namespace moho
      * into `queue` at `index` (negative index means append-relative insertion).
      */
     void AddUnit(Unit* unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue, int index);
+
+    /**
+     * Address: 0x006E8CC0 (FUN_006E8CC0)
+     *
+     * What it does:
+     * Adds one live unit into this command's unit-set and formation lanes
+     * without touching external command-queue links.
+     */
+    void AddUnit(Unit* unit);
 
     /**
      * Address: 0x006E8C20 (FUN_006E8C20)
@@ -234,7 +249,7 @@ namespace moho
     void SetTarget(const CAiTarget& target);
 
     /**
-     * Address: 0x005BF810 (FUN_005BF810)
+      * Alias of FUN_005BF810 (non-canonical helper lane).
      *
      * What it does:
      * Refreshes cached command blip/transform state for the current frame.
@@ -260,6 +275,7 @@ namespace moho
     CUnitCommand();
 
     friend class CUnitCommandConstruct;
+    friend class CCommandDb;
 
     /**
      * Address: 0x006E8500 (FUN_006E8500)

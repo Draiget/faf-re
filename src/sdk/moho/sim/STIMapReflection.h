@@ -5,6 +5,14 @@
 namespace moho
 {
   class STIMap;
+
+  /**
+   * Address: 0x00577750 (FUN_00577750, preregister_STIMapTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `STIMap`.
+   */
+  [[nodiscard]] gpg::RType* preregister_STIMapTypeInfo();
 }
 
 namespace gpg
@@ -18,7 +26,7 @@ namespace gpg
   gpg::RRef* RRef_STIMap(gpg::RRef* outRef, moho::STIMap* value);
 
   /**
-   * Address: 0x005096E0 (FUN_005096E0, gpg::ReadArchive::ReadPointer_STIMap)
+    * Alias of FUN_005096E0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked-pointer lane, upcasts it to `STIMap`, and raises

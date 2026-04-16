@@ -12,6 +12,61 @@ namespace moho
 
   namespace
   {
+    struct ITesselatorRuntimeView
+    {
+      void* mVtable = nullptr;
+    };
+    static_assert(sizeof(ITesselatorRuntimeView) == 0x04, "ITesselatorRuntimeView size must be 0x04");
+
+    class ITesselatorVTableProbe
+    {
+    public:
+      virtual ~ITesselatorVTableProbe() = default;
+    };
+
+    [[nodiscard]] void* RecoveredITesselatorVTable() noexcept
+    {
+      static ITesselatorVTableProbe probe;
+      return *reinterpret_cast<void**>(&probe);
+    }
+
+    void WriteITesselatorVTable(ITesselatorRuntimeView* const object) noexcept
+    {
+      object->mVtable = RecoveredITesselatorVTable();
+    }
+
+    /**
+     * Address: 0x0080B9A0 (FUN_0080B9A0)
+     *
+     * IDA signature:
+     * void __thiscall sub_80B9A0(_DWORD *this)
+     *
+     * What it does:
+     * Writes the `ITesselator` base-interface vtable lane in-place.
+     */
+    [[maybe_unused]] void InitializeITesselatorVTableThiscall(ITesselatorRuntimeView* const object) noexcept
+    {
+      WriteITesselatorVTable(object);
+    }
+
+    /**
+     * Address: 0x0080EBA0 (FUN_0080EBA0)
+     *
+     * IDA signature:
+     * _DWORD *__usercall sub_80EBA0@<eax>(_DWORD *result@<eax>)
+     *
+     * What it does:
+     * Alias lane that writes the same `ITesselator` base-interface vtable and
+     * returns the same object pointer.
+     */
+    [[maybe_unused]] ITesselatorRuntimeView* InitializeITesselatorVTableReturnLane(
+      ITesselatorRuntimeView* const object
+    ) noexcept
+    {
+      WriteITesselatorVTable(object);
+      return object;
+    }
+
     enum IntersectionResult : int
     {
       kSplit = 1,

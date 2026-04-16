@@ -68,10 +68,13 @@ namespace moho
   void CFireWeaponTaskTypeInfo::Init()
   {
     size_ = sizeof(CFireWeaponTask);
-    newRefFunc_ = &CFireWeaponTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CFireWeaponTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CFireWeaponTaskTypeInfo::Delete;
-    dtrFunc_ = &CFireWeaponTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CFireWeaponTaskTypeInfo::NewRef,
+      &CFireWeaponTaskTypeInfo::CtrRef,
+      &CFireWeaponTaskTypeInfo::Delete,
+      &CFireWeaponTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CTask(this);
     Finish();
@@ -151,9 +154,9 @@ namespace moho
   /**
    * Address: 0x00BD8870 (FUN_00BD8870, register_CFireWeaponTaskTypeInfo)
    */
-  int register_CFireWeaponTaskTypeInfo()
+  void register_CFireWeaponTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CFireWeaponTaskTypeInfo);
+    (void)std::atexit(&cleanup_CFireWeaponTaskTypeInfo);
   }
 } // namespace moho

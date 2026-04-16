@@ -3525,6 +3525,24 @@ SFD_SetVideoPts(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t ptsQ
 std::int32_t SFD_SetConcatPlay(void* sfdHandle);
 
 /**
+ * Address: 0x00ACF050 (FUN_00ACF050, _SFD_SetVideoPid)
+ *
+ * What it does:
+ * Forwards one video PID handle lane into SFD condition `81` for a non-null
+ * work-control handle.
+ */
+std::int32_t SFD_SetVideoPid(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, void* videoPidHandle);
+
+/**
+ * Address: 0x00ACF070 (FUN_00ACF070, _SFD_SetAudioPid)
+ *
+ * What it does:
+ * Forwards one audio PID handle lane into SFD condition `82` for a non-null
+ * work-control handle.
+ */
+std::int32_t SFD_SetAudioPid(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, void* audioPidHandle);
+
+/**
  * Address: 0x00ACFB00 (FUN_00ACFB00, _SFD_SetOutVol)
  *
  * What it does:
@@ -3647,7 +3665,7 @@ std::int32_t
 CFT_MakeArgb8888AlpLumiTbl(std::int32_t luminancePivot, std::int32_t luminanceMin, std::int32_t luminanceMax, std::int32_t tableAddress);
 
 /**
- * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
+  * Alias of FUN_00AEDB70 (non-canonical helper lane).
  *
  * What it does:
  * Builds one ARGB8888 alpha table pack for 3110 blend mode.
@@ -3656,7 +3674,7 @@ std::int32_t
 CFT_MakeArgb8888Alp3110Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
 
 /**
- * Address: 0x00AEDD50 (FUN_00AEDD50, _CFT_MakeArgb8888Alp3211Tbl)
+  * Alias of FUN_00AEDD50 (non-canonical helper lane).
  *
  * What it does:
  * Builds one ARGB8888 alpha table pack for 3211 blend mode.

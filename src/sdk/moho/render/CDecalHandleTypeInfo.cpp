@@ -52,6 +52,24 @@ namespace
       object->~CDecalHandle();
     }
   }
+
+  /**
+   * Address: 0x0077AB70 (FUN_0077AB70)
+   *
+   * What it does:
+   * Binds `CDecalHandle` new/construct/delete/destruct callback lanes into
+   * the reflected type callback slots.
+   */
+  [[maybe_unused]] moho::CDecalHandleTypeInfo* BindDecalHandleTypeCallbackSlots(
+    moho::CDecalHandleTypeInfo* const typeInfo
+  )
+  {
+    typeInfo->newRefFunc_ = &NewRef_CDecalHandle;
+    typeInfo->ctorRefFunc_ = &CtrRef_CDecalHandle;
+    typeInfo->deleteFunc_ = &Delete_CDecalHandle;
+    typeInfo->dtrFunc_ = &Dtr_CDecalHandle;
+    return typeInfo;
+  }
 } // namespace
 
 namespace moho
@@ -84,10 +102,7 @@ namespace moho
   void CDecalHandleTypeInfo::Init()
   {
     size_ = sizeof(CDecalHandle);
-    newRefFunc_ = &NewRef_CDecalHandle;
-    ctorRefFunc_ = &CtrRef_CDecalHandle;
-    deleteFunc_ = &Delete_CDecalHandle;
-    dtrFunc_ = &Dtr_CDecalHandle;
+    (void)BindDecalHandleTypeCallbackSlots(this);
     AddBase_CScriptObject(this);
     gpg::RType::Init();
     Finish();

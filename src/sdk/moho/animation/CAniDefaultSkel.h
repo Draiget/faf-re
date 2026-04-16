@@ -7,6 +7,8 @@ namespace moho
   class CAniDefaultSkel : public CAniSkel
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0054A390 (FUN_0054A390, Moho::CAniDefaultSkel::CAniDefaultSkel)
      * Mangled: ??0CAniDefaultSkel@Moho@@IAE@XZ

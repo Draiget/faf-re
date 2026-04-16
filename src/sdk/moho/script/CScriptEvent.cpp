@@ -324,6 +324,18 @@ namespace
     return CAnimationManipulator::sType;
   }
 
+  gpg::RType* CachedCRotateManipulatorType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("CRotateManipulator");
+    }
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("Moho::CRotateManipulator");
+    }
+    return cached;
+  }
+
   gpg::RType* CachedCSlaveManipulatorType()
   {
     static gpg::RType* cached = nullptr;
@@ -528,6 +540,18 @@ namespace
     }
     if (!cached) {
       cached = gpg::REF_FindTypeNamed("Moho::CUIWorldView");
+    }
+    return cached;
+  }
+
+  gpg::RType* CachedCUIWorldMeshType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("CUIWorldMesh");
+    }
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("Moho::CUIWorldMesh");
     }
     return cached;
   }
@@ -1486,6 +1510,41 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
 }
 
 /**
+ * Address: 0x00645560 (FUN_00645560, Moho::SCR_FromLua_CRotateManipulator)
+ *
+ * What it does:
+ * Converts one Lua `_c_object` payload to `CRotateManipulator*` and raises
+ * Lua errors for missing, destroyed, or type-mismatched game objects.
+ */
+CRotateManipulator* moho::SCR_FromLua_CRotateManipulator(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
+{
+  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  if (!scriptObjectSlot) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
+    return nullptr;
+  }
+
+  CScriptObject* const scriptObject = *scriptObjectSlot;
+  if (!scriptObject) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kDestroyedGameObjectError);
+    return nullptr;
+  }
+
+  const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
+  const gpg::RType* const rotateType = CachedCRotateManipulatorType();
+  const gpg::RRef upcast = rotateType ? gpg::REF_UpcastPtr(sourceRef, rotateType) : gpg::RRef{};
+  if (!upcast.mObj) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
+    return nullptr;
+  }
+
+  return reinterpret_cast<CRotateManipulator*>(upcast.mObj);
+}
+
+/**
  * Address: 0x00646900 (FUN_00646900, Moho::SCR_FromLua_CSlaveManipulator)
  *
  * What it does:
@@ -2312,6 +2371,38 @@ CUIWorldView* moho::SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, L
 }
 
 /**
+ * Address: 0x0086D900 (FUN_0086D900, Moho::SCR_FromLua_CUIWorldMesh)
+ *
+ * What it does:
+ * Converts one Lua `_c_object` payload to `CUIWorldMesh*` and raises Lua
+ * errors for missing, destroyed, or type-mismatched game objects.
+ */
+CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+{
+  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  if (!scriptObjectSlot) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
+    return nullptr;
+  }
+
+  CScriptObject* const scriptObject = *scriptObjectSlot;
+  if (!scriptObject) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kDestroyedGameObjectError);
+    return nullptr;
+  }
+
+  const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
+  const gpg::RType* const worldMeshType = CachedCUIWorldMeshType();
+  const gpg::RRef upcast = worldMeshType ? gpg::REF_UpcastPtr(sourceRef, worldMeshType) : gpg::RRef{};
+  if (!upcast.mObj) {
+    luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
+    return nullptr;
+  }
+
+  return reinterpret_cast<CUIWorldMesh*>(upcast.mObj);
+}
+
+/**
  * Address: 0x007989B0 (FUN_007989B0, Moho::SCR_FromLua_CMauiHistogram)
  *
  * What it does:
@@ -2930,7 +3021,7 @@ Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState
 }
 
 /**
- * Address: 0x004C9030 (FUN_004C9030, func_RRefCScriptObject)
+  * Alias of FUN_004C9030 (non-canonical helper lane).
  */
 gpg::RRef moho::SCR_MakeScriptObjectRef(CScriptObject* object)
 {

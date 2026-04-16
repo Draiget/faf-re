@@ -16,11 +16,13 @@ namespace moho
   class StatItem;
   template <class T>
   class Stats;
+  class Sim;
   class CAniSkel;
   class CAniPose;
   class CIntelGrid;
   class ISimResources;
   class LaunchInfoBase;
+  class RScaResource;
   class RScmResource;
   struct STrigger;
   struct SSessionSaveData;
@@ -177,6 +179,17 @@ namespace gpg
   ReadPointerShared_CIntelGrid2(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
 
   /**
+   * Address: 0x00642F60 (FUN_00642F60, gpg::ReadArchive::ReadPointerShared_RScaResource)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<RScaResource>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void ReadPointerShared_RScaResource(
+    boost::SharedPtrRaw<moho::RScaResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
+  );
+
+  /**
    * Address: 0x0055A5D0 (FUN_0055A5D0)
    *
    * What it does:
@@ -212,4 +225,13 @@ namespace gpg
    * Wraps an ArchiveToken object in reflection reference form.
    */
   RRef RRef_ArchiveToken(ArchiveToken* token);
+
+  /**
+   * Address: 0x00756130 (FUN_00756130, sub_756130)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_Sim` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignSimRef(RRef* outRef, moho::Sim* value);
 } // namespace gpg

@@ -2,6 +2,47 @@
 
 #include "moho/resource/RScmResource.h"
 
+#include <cstring>
+
+namespace
+{
+  /**
+   * Address: 0x007E8F70 (FUN_007E8F70)
+   *
+   * What it does:
+   * Scans one C-string pointer range and stores the first cursor whose text
+   * exactly matches the probe string; otherwise stores `end`.
+   */
+  const char*** MeshBatchFindMatchingNameCursor(
+    const msvc8::string* const probeName,
+    const char*** const outCursor,
+    const char** begin,
+    const char** const end
+  ) noexcept
+  {
+    if (probeName == nullptr || outCursor == nullptr) {
+      return nullptr;
+    }
+
+    const char** cursor = begin;
+    while (cursor != end) {
+      const char* const candidateText = *cursor;
+      const std::size_t candidateLength = (candidateText != nullptr) ? std::strlen(candidateText) : 0u;
+
+      const int compareResult =
+        probeName->compare(0u, probeName->size(), candidateText != nullptr ? candidateText : "", candidateLength);
+      if (compareResult == 0) {
+        break;
+      }
+
+      ++cursor;
+    }
+
+    *outCursor = cursor;
+    return outCursor;
+  }
+} // namespace
+
 namespace moho
 {
   /**

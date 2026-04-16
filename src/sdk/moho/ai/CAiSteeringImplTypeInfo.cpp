@@ -24,6 +24,12 @@ namespace
     return reinterpret_cast<CAiSteeringImplTypeInfo*>(gCAiSteeringImplTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x005D4220 (FUN_005D4220)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `CAiSteeringImpl`.
+   */
   [[nodiscard]] gpg::RType* CachedCAiSteeringImplType()
   {
     if (!CAiSteeringImpl::sType) {
@@ -104,6 +110,24 @@ namespace
     if (steering) {
       steering->~CAiSteeringImpl();
     }
+  }
+
+  /**
+   * Address: 0x005D3DC0 (FUN_005D3DC0)
+   *
+   * What it does:
+   * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
+   * `Destruct`) on one `CAiSteeringImplTypeInfo` descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiSteeringImplTypeInfo* AssignCAiSteeringImplLifecycleCallbacks(
+    CAiSteeringImplTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->newRefFunc_ = &CreateAiSteeringImplRefOwned;
+    typeInfo->ctorRefFunc_ = &CAiSteeringImplTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &DeleteAiSteeringImplOwned;
+    typeInfo->dtrFunc_ = &DestroyAiSteeringImplInPlace;
+    return typeInfo;
   }
 
   void AddIAiSteeringBase(gpg::RType* typeInfo)
@@ -188,10 +212,7 @@ const char* CAiSteeringImplTypeInfo::GetName() const
 void CAiSteeringImplTypeInfo::Init()
 {
   size_ = sizeof(CAiSteeringImpl);
-  newRefFunc_ = &CreateAiSteeringImplRefOwned;
-  ctorRefFunc_ = &CAiSteeringImplTypeInfo::CtrRef;
-  deleteFunc_ = &DeleteAiSteeringImplOwned;
-  dtrFunc_ = &DestroyAiSteeringImplInPlace;
+  (void)AssignCAiSteeringImplLifecycleCallbacks(this);
   gpg::RType::Init();
   AddIAiSteeringBase(this);
   AddCTaskBase(this);

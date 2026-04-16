@@ -56,13 +56,22 @@ namespace moho
   void CArmyImplTypeInfo::Init()
   {
     size_ = sizeof(CArmyImpl);
-    newRefFunc_ = &CArmyImplTypeInfo::NewRef;
-    ctorRefFunc_ = &CArmyImplTypeInfo::CtrRef;
-    deleteFunc_ = &CArmyImplTypeInfo::Delete;
-    dtrFunc_ = &CArmyImplTypeInfo::Destruct;
+    AssignFactoryCallbacks(this);
     gpg::RType::Init();
     AddBase_SimArmy(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x00701D00 (FUN_00701D00, sub_701D00)
+   */
+  CArmyImplTypeInfo* CArmyImplTypeInfo::AssignFactoryCallbacks(CArmyImplTypeInfo* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &CArmyImplTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &CArmyImplTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &CArmyImplTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &CArmyImplTypeInfo::Destruct;
+    return typeInfo;
   }
 
   /**

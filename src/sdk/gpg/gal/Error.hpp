@@ -17,6 +17,17 @@ namespace gpg
      * diagnostic text, returning `"n/a"` for unknown values.
      */
     const char* __stdcall D3DErrorToString(long code);
+
+    /**
+     * Address: 0x00B542F1 (FUN_00B542F1)
+     *
+     * HRESULT
+     *
+     * What it does:
+     * Maps a large set of DirectX/COM HRESULT values to stable engine-facing
+     * wide diagnostic text, returning `L"n/a"` for unknown values.
+     */
+    const wchar_t* __stdcall D3DErrorToWideString(long code);
 }
 
 namespace gpg::gal

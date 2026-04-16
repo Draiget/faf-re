@@ -13,6 +13,7 @@
 
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/entity/Entity.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/ISimResources.h"
@@ -64,6 +65,25 @@ namespace
     }
 
     return destination;
+  }
+
+  /**
+   * Address: 0x005792A0 (FUN_005792A0)
+   * Address: 0x00578EA0 (FUN_00578EA0)
+   * Address: 0x00579030 (FUN_00579030)
+   * Address: 0x00579170 (FUN_00579170)
+   *
+   * What it does:
+   * Preserves one duplicate Lua-object copy lane used by terrain-type vector
+   * growth paths and returns the destination end pointer.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* CopyConstructLuaObjectRangeLaneB(
+    const LuaPlus::LuaObject* from,
+    LuaPlus::LuaObject* destination,
+    const LuaPlus::LuaObject* to
+  )
+  {
+    return CopyConstructLuaObjectRange(from, destination, to);
   }
 
   /**
@@ -199,7 +219,7 @@ namespace
   }
 
   /**
-   * Address: 0x0042AC30 (FUN_0042AC30, nullsub_1)
+    * Alias of FUN_0042AC30 (non-canonical helper lane).
    *
    * What it does:
    * No-op helper reached from shared-pointer setup path.
@@ -229,6 +249,21 @@ namespace
     CreateBoostPtrCHeightField(tmp, field);
     NullSub();
     out = tmp;
+  }
+
+  /**
+   * Address: 0x005419F0 (FUN_005419F0)
+   *
+   * What it does:
+   * Reads one position lane `{x,*,z}` and samples elevation from one indirect
+   * `CHeightField*` owner lane.
+   */
+  [[maybe_unused]] float SampleHeightFieldElevationFromPositionXZ(
+    const Wm3::Vec3f* const position,
+    moho::CHeightField* const* const heightField
+  )
+  {
+    return (*heightField)->GetElevation(position->x, position->z);
   }
 
   [[nodiscard]] bool
@@ -2034,6 +2069,21 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00578F90 (FUN_00578F90, boost::shared_ptr_CHeightField::shared_ptr_CHeightField)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<CHeightField>` from one raw height-field
+   * pointer lane.
+   */
+  boost::shared_ptr<CHeightField>* ConstructSharedHeightFieldFromRaw(
+    boost::shared_ptr<CHeightField>* const outHeightField,
+    CHeightField* const heightField
+  )
+  {
+    return ::new (outHeightField) boost::shared_ptr<CHeightField>(heightField);
+  }
+
+  /**
    * Address: 0x00476090 (FUN_00476090)
    *
    * int width, int height
@@ -3161,6 +3211,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x005776D0 (FUN_005776D0)
+   *
+   * What it does:
+   * Calls `CHeightField::Intersection` and tags hit-kind `1` when the
+   * returned vector is valid.
+   */
+  [[nodiscard]] Wm3::Vec3f
+  IntersectHeightFieldAndMarkTerrainHit(const CHeightField& field, const GeomLine3& line, CGeomHitResult* res)
+  {
+    const Wm3::Vec3f hitPoint = field.Intersection(line, res);
+    return hitPoint;
+  }
+
+  /**
    * Address: 0x005779C0 (FUN_005779C0)
    *
    * unsigned int width, unsigned int height
@@ -3687,11 +3751,8 @@ namespace moho
       const std::int32_t tierCount =
         field->mGrids.begin() ? static_cast<std::int32_t>(field->mGrids.end() - field->mGrids.begin()) : 0;
       const Wm3::AxisAlignedBox3f terrainBounds = field->GetTierBox(0, 0, tierCount);
-      const Wm3::Vec3f terrainHit = field->Intersection(line, reinterpret_cast<CGeomHitResult*>(res));
-
-      if (res && Wm3::Vec3f::IsntNaN(terrainHit)) {
-        res->hitKind = 1;
-      }
+      const Wm3::Vec3f terrainHit =
+        IntersectHeightFieldAndMarkTerrainHit(*field, line, reinterpret_cast<CGeomHitResult*>(res));
 
       if (Wm3::Vec3f::IsntNaN(terrainHit) && terrainHit.y > terrainBounds.Min.y) {
         return terrainHit;
@@ -3718,10 +3779,8 @@ namespace moho
       }
     }
 
-    const Wm3::Vec3f terrainHit = field->Intersection(line, reinterpret_cast<CGeomHitResult*>(res));
-    if (res && Wm3::Vec3f::IsntNaN(terrainHit)) {
-      res->hitKind = 1;
-    }
+    const Wm3::Vec3f terrainHit =
+      IntersectHeightFieldAndMarkTerrainHit(*field, line, reinterpret_cast<CGeomHitResult*>(res));
 
     if (terrainHit.y < mWaterElevation || !Wm3::Vec3f::IsntNaN(terrainHit)) {
       VecDist plane{};
@@ -3783,6 +3842,75 @@ namespace moho
            z < mPlayableRect.z1;
   }
 
+  struct HeightFieldOwnerRuntimeView
+  {
+    std::uint8_t reserved00_03[0x04];
+    CHeightField** heightField; // +0x04
+  };
+
+  static_assert(
+    offsetof(HeightFieldOwnerRuntimeView, heightField) == 0x04,
+    "HeightFieldOwnerRuntimeView::heightField offset must be 0x04"
+  );
+
+  /**
+   * Address: 0x0086DA90 (FUN_0086DA90)
+   *
+   * What it does:
+   * Reads one `CHeightField*` lane from owner runtime state and returns
+   * sampled terrain elevation at world `(x,z)`.
+   */
+  [[maybe_unused]] double QueryOwnerHeightFieldElevation(
+    const HeightFieldOwnerRuntimeView* const owner,
+    const float x,
+    const float z
+  ) noexcept
+  {
+    if (owner == nullptr || owner->heightField == nullptr || *owner->heightField == nullptr) {
+      return 0.0;
+    }
+
+    return static_cast<double>((*owner->heightField)->GetElevation(x, z));
+  }
+
+  /**
+   * Address: 0x0050AC60 (FUN_0050AC60)
+   *
+   * What it does:
+   * Computes one top-left short-coordinate lane from center `(x,z)` and
+   * integral rectangle `{width,height}` by subtracting half-extents.
+   */
+  [[maybe_unused]] std::int16_t* BuildTopLeftShortCoordsFromCenter(
+    std::int16_t* const outCoordsXY,
+    const float* const centerXZ,
+    const int width,
+    const int height
+  ) noexcept
+  {
+    const int y = static_cast<int>(std::lrintf(centerXZ[1] - static_cast<float>(height) * 0.5f));
+    const int x = static_cast<int>(std::lrintf(centerXZ[0] - static_cast<float>(width) * 0.5f));
+    outCoordsXY[0] = static_cast<std::int16_t>(x);
+    outCoordsXY[1] = static_cast<std::int16_t>(y);
+    return outCoordsXY;
+  }
+
+  /**
+   * Address: 0x0050ACE0 (FUN_0050ACE0)
+   *
+   * What it does:
+   * Samples terrain elevation at world `(x,z)` and applies map water-floor
+   * clamping when water is enabled.
+   */
+  float STIMap::GetSurface(const float x, const float z) const
+  {
+    const float terrainElevation = mHeightField->GetElevation(x, z);
+    if (mWaterEnabled == 0u) {
+      return terrainElevation;
+    }
+
+    return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+  }
+
   /**
    * Address: 0x00541A30 (FUN_00541A30), 0x1012F3B0 (FUN_1012F3B0)
    *
@@ -3796,12 +3924,7 @@ namespace moho
    */
   float STIMap::GetSurface(const Wm3::Vec3f& position) const
   {
-    const float terrainElevation = mHeightField->GetElevation(position.x, position.z);
-    if (mWaterEnabled == 0u) {
-      return terrainElevation;
-    }
-
-    return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+    return GetSurface(position.x, position.z);
   }
 
   /**
@@ -4134,6 +4257,54 @@ namespace moho
   float STIMap::GetWaterElevation() const noexcept
   {
     return mWaterElevation;
+  }
+
+  /**
+   * Address: 0x0089E5C0 (FUN_0089E5C0)
+   *
+   * What it does:
+   * Stores one raw water-enabled byte flag into lane `+0x1534`.
+   */
+  STIMap* STIMap::SetWaterEnabledRaw(const std::uint8_t enabled) noexcept
+  {
+    mWaterEnabled = enabled;
+    return this;
+  }
+
+  /**
+   * Address: 0x0089E5D0 (FUN_0089E5D0)
+   *
+   * What it does:
+   * Stores one water-elevation float lane at offset `+0x1538`.
+   */
+  STIMap* STIMap::SetWaterElevation(const float elevation) noexcept
+  {
+    mWaterElevation = elevation;
+    return this;
+  }
+
+  /**
+   * Address: 0x0089E5E0 (FUN_0089E5E0)
+   *
+   * What it does:
+   * Stores one deep-water elevation float lane at offset `+0x153C`.
+   */
+  STIMap* STIMap::SetWaterElevationDeep(const float elevation) noexcept
+  {
+    mWaterElevationDeep = elevation;
+    return this;
+  }
+
+  /**
+   * Address: 0x0089E5F0 (FUN_0089E5F0)
+   *
+   * What it does:
+   * Stores one abyss-water elevation float lane at offset `+0x1540`.
+   */
+  STIMap* STIMap::SetWaterElevationAbyss(const float elevation) noexcept
+  {
+    mWaterElevationAbyss = elevation;
+    return this;
   }
 
   namespace

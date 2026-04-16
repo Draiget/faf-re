@@ -35,6 +35,30 @@ namespace moho
       destination->z = sampleSymmetricOffset(blueprint->Physics.DirectionZRange) + blueprint->Physics.DirectionZ;
       return destination;
     }
+
+    [[nodiscard]] float SampleSymmetricRange(CRandomStream* const randomStream, const float range)
+    {
+      const float minValue = -range;
+      const float maxValue = range;
+      const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
+      return minValue + ((maxValue - minValue) * unit);
+    }
+
+    /**
+     * Address: 0x0051CC40 (FUN_0051CC40)
+     *
+     * What it does:
+     * Lazily resolves and caches RTTI metadata for `RProjectileBlueprint`.
+     */
+    [[nodiscard]] gpg::RType* ResolveRProjectileBlueprintType()
+    {
+      gpg::RType* type = RProjectileBlueprint::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(RProjectileBlueprint));
+        RProjectileBlueprint::sType = type;
+      }
+      return type;
+    }
   } // namespace
 
   gpg::RType* RProjectileBlueprint::sType = nullptr;
@@ -55,6 +79,15 @@ namespace moho
   {
     mCollisionShape = COLSHAPE_None;
   }
+
+  /**
+   * Address: 0x0051B840 (FUN_0051B840, Moho::RProjectileBlueprint::dtr)
+   *
+   * What it does:
+   * Runs non-deleting teardown for projectile-specific string lanes, then
+   * delegates to `REntityBlueprint` destruction.
+   */
+  RProjectileBlueprint::~RProjectileBlueprint() = default;
 
   /**
    * Address: 0x0051B650 (FUN_0051B650)
@@ -118,10 +151,7 @@ namespace moho
    */
   gpg::RType* RProjectileBlueprint::GetClass() const
   {
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(RProjectileBlueprint));
-    }
-    return sType;
+    return ResolveRProjectileBlueprintType();
   }
 
   /**
@@ -196,10 +226,78 @@ namespace moho
    */
   float RProjectileBlueprint::GetRandomInitialSpeed(CRandomStream* const randomStream) const
   {
-    const float range = Physics.InitialSpeedRange;
-    const float minSpeed = -range;
-    const float maxSpeed = range;
-    const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
-    return minSpeed + ((maxSpeed - minSpeed) * unit) + Physics.InitialSpeed;
+    return SampleSymmetricRange(randomStream, Physics.InitialSpeedRange) + Physics.InitialSpeed;
+  }
+
+  /**
+   * Address: 0x0051C620 (FUN_0051C620)
+   *
+   * What it does:
+   * Samples a symmetric lifetime offset around `Physics.Lifetime` using
+   * `Physics.LifetimeRange`.
+   */
+  float RProjectileBlueprint::GetRandomLifetime(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Physics.LifetimeRange) + Physics.Lifetime;
+  }
+
+  /**
+   * Address: 0x0051C6E0 (FUN_0051C6E0)
+   *
+   * What it does:
+   * Samples a symmetric max-speed offset around `Physics.MaxSpeed` using
+   * `Physics.MaxSpeedRange`.
+   */
+  float RProjectileBlueprint::GetRandomMaxSpeed(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Physics.MaxSpeedRange) + Physics.MaxSpeed;
+  }
+
+  /**
+   * Address: 0x0051C740 (FUN_0051C740)
+   *
+   * What it does:
+   * Samples a symmetric acceleration offset around `Physics.Acceleration`
+   * using `Physics.AccelerationRange`.
+   */
+  float RProjectileBlueprint::GetRandomAcceleration(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Physics.AccelerationRange) + Physics.Acceleration;
+  }
+
+  /**
+   * Address: 0x0051C7A0 (FUN_0051C7A0)
+   *
+   * What it does:
+   * Samples a symmetric turn-rate offset around `Physics.TurnRate` using
+   * `Physics.TurnRateRange`.
+   */
+  float RProjectileBlueprint::GetRandomTurnRate(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Physics.TurnRateRange) + Physics.TurnRate;
+  }
+
+  /**
+   * Address: 0x0051C800 (FUN_0051C800)
+   *
+   * What it does:
+   * Samples a symmetric mesh-scale offset around `Display.UniformScale`
+   * using `Display.MeshScaleRange`.
+   */
+  float RProjectileBlueprint::GetRandomMeshScale(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Display.MeshScaleRange) + Display.UniformScale;
+  }
+
+  /**
+   * Address: 0x0051C860 (FUN_0051C860)
+   *
+   * What it does:
+   * Samples a symmetric mesh-scale-velocity offset around
+   * `Display.MeshScaleVelocity` using `Display.MeshScaleVelocityRange`.
+   */
+  float RProjectileBlueprint::GetRandomMeshScaleVelocity(CRandomStream* const randomStream) const
+  {
+    return SampleSymmetricRange(randomStream, Display.MeshScaleVelocityRange) + Display.MeshScaleVelocity;
   }
 } // namespace moho

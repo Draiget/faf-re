@@ -73,6 +73,16 @@ namespace moho
     VTransform& operator=(const VTransform& rhs) noexcept;
 
     /**
+     * Address: 0x004F04D0 (FUN_004F04D0, ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ)
+     * Mangled: ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ
+     *
+     * What it does:
+     * Converts this transform to one matrix by forwarding
+     * `(orient_, pos_)` into `VMatrix4::Set`.
+     */
+    [[nodiscard]] operator VMatrix4() const;
+
+    /**
      * Address: 0x00549DC0 (FUN_00549DC0)
      *
      * What it does:

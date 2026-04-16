@@ -107,7 +107,35 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF0E50 (FUN_00BF0E50, cleanup_SParamKeySerializer)
+   * Address: 0x004DF080 (FUN_004DF080)
+   *
+   * What it does:
+   * Unlinks the global `SParamKeySerializer` helper node and rewires it as a
+   * self-linked singleton.
+   */
+  gpg::SerHelperBase* cleanup_SParamKeySerializer_alias0()
+  {
+    if (!gSParamKeySerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(GetSParamKeySerializer());
+  }
+
+  /**
+   * Address: 0x004DF0B0 (FUN_004DF0B0)
+   *
+   * What it does:
+   * Alias lane of `cleanup_SParamKeySerializer_alias0` with identical
+   * unlink-and-self-link behavior.
+   */
+  gpg::SerHelperBase* cleanup_SParamKeySerializer_alias1()
+  {
+    return cleanup_SParamKeySerializer_alias0();
+  }
+
+  /**
+    * Alias of FUN_00BF0E50 (non-canonical helper lane).
    */
   gpg::SerHelperBase* cleanup_SParamKeySerializer()
   {

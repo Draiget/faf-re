@@ -14,6 +14,7 @@ namespace moho
   class CBoneEntityManipulator;
   class CBuilderArmManipulator;
   class CAnimationManipulator;
+  class CRotateManipulator;
   class CAiAttackerImpl;
   class CAiBrain;
   class CAiNavigatorImpl;
@@ -46,6 +47,7 @@ namespace moho
   class MotorFallDown;
   class ScriptedDecal;
   class CUIMapPreview;
+  class CUIWorldMesh;
   class CUIWorldView;
   class CameraImpl;
   class CMauiItemList;
@@ -239,7 +241,7 @@ namespace moho
   Unit* SCR_FromLua_Unit(const LuaPlus::LuaObject& object);
 
   /**
-   * Address: 0x00593970 (FUN_00593970, func_GetUnitOpt)
+    * Alias of FUN_00593970 (non-canonical helper lane).
    *
    * What it does:
    * Converts one Lua object to `Unit*` without throwing conversion errors:
@@ -385,6 +387,16 @@ namespace moho
    */
   [[nodiscard]]
   CAnimationManipulator* SCR_FromLua_CAnimationManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00645560 (FUN_00645560, Moho::SCR_FromLua_CRotateManipulator)
+   *
+   * What it does:
+   * Converts one Lua `_c_object` payload to `CRotateManipulator*` and raises
+   * Lua errors for missing, destroyed, or type-mismatched game objects.
+   */
+  [[nodiscard]]
+  CRotateManipulator* SCR_FromLua_CRotateManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00646900 (FUN_00646900, Moho::SCR_FromLua_CSlaveManipulator)
@@ -655,6 +667,16 @@ namespace moho
   CUIWorldView* SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x0086D900 (FUN_0086D900, Moho::SCR_FromLua_CUIWorldMesh)
+   *
+   * What it does:
+   * Converts one Lua `_c_object` payload to `CUIWorldMesh*` and raises Lua
+   * errors when payload is missing, destroyed, or of the wrong runtime type.
+   */
+  [[nodiscard]]
+  CUIWorldMesh* SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x007989B0 (FUN_007989B0, Moho::SCR_FromLua_CMauiHistogram)
    *
    * What it does:
@@ -857,7 +879,7 @@ namespace moho
   Prop* SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
-   * Address: 0x004C9030 (FUN_004C9030, func_RRefCScriptObject)
+    * Alias of FUN_004C9030 (non-canonical helper lane).
    *
    * What it does:
    * Builds an RTTI-aware `gpg::RRef` for a CScriptObject pointer.

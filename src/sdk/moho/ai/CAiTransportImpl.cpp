@@ -318,6 +318,7 @@ namespace
   }
 
   /**
+   * Address: 0x005EF610 (FUN_005EF610, std::vector_SAttachPoint::copy_helper)
    * Address: 0x005EF660 (FUN_005EF660, func_SAttachPointPtr::memcpy)
    *
    * What it does:
@@ -345,6 +346,250 @@ namespace
     }
 
     return destination;
+  }
+
+  /**
+   * Address: 0x005EC4B0 (FUN_005EC4B0)
+   * Address: 0x005EE0C0 (FUN_005EE0C0)
+   *
+   * What it does:
+   * Adapter lane that forwards contiguous `SAttachPoint` range copy requests
+   * into the canonical vector copy helper.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeVectorCopyHelperAdapter(
+    const SAttachPoint* sourceBegin,
+    const SAttachPoint* sourceEnd,
+    SAttachPoint* destination
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005F04B0 (FUN_005F04B0)
+   *
+   * What it does:
+   * Copies one contiguous 32-bit lane range `[sourceBegin, sourceEnd)` into
+   * destination storage and returns one-past the copied destination cursor.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullable(
+    std::uint32_t* destination,
+    const std::uint32_t* sourceBegin,
+    const std::uint32_t* sourceEnd
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+    for (const std::uint32_t* source = sourceBegin; source != sourceEnd; ++source) {
+      if (destinationAddress != 0u) {
+        *reinterpret_cast<std::uint32_t*>(destinationAddress) = *source;
+      }
+      destinationAddress += sizeof(std::uint32_t);
+    }
+
+    return reinterpret_cast<std::uint32_t*>(destinationAddress);
+  }
+
+  /**
+   * Address: 0x005EC8E0 (FUN_005EC8E0)
+   * Address: 0x005EE4A0 (FUN_005EE4A0)
+   *
+   * What it does:
+   * Adapter lane that forwards contiguous dword range copy requests into the
+   * canonical nullable dword-range helper.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableAdapter(
+    const std::uint32_t* sourceBegin,
+    const std::uint32_t* sourceEnd,
+    std::uint32_t* destination
+  ) noexcept
+  {
+    return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EF720 (FUN_005EF720)
+   *
+   * What it does:
+   * Source-first adapter lane for one nullable contiguous dword-range copy
+   * dispatch.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableSourceFirstAdapter(
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* const destination
+  ) noexcept
+  {
+    return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005F0590 (FUN_005F0590)
+   *
+   * What it does:
+   * Alternate lane for contiguous `SAttachPoint` range copy used by transport
+   * attach-point vector helpers.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullableAlt(
+    SAttachPoint* destination,
+    const SAttachPoint* sourceBegin,
+    const SAttachPoint* sourceEnd
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EC9B0 (FUN_005EC9B0)
+   * Address: 0x005EE590 (FUN_005EE590)
+   *
+   * What it does:
+   * Adapter lane that forwards contiguous attach-point range copy requests into
+   * the alternate nullable attach-point helper.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullableAltAdapter(
+    const SAttachPoint* sourceBegin,
+    const SAttachPoint* sourceEnd,
+    SAttachPoint* destination
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullableAlt(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EF780 (FUN_005EF780)
+   * Address: 0x005EFEA0 (FUN_005EFEA0)
+   *
+   * What it does:
+   * Source-first adapter lane for contiguous nullable `SAttachPoint` range
+   * copy dispatch into the alternate helper.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullableAltSourceFirstAdapter(
+    const SAttachPoint* const sourceBegin,
+    const SAttachPoint* const sourceEnd,
+    SAttachPoint* const destination
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullableAlt(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EF7B0 (FUN_005EF7B0)
+   *
+   * What it does:
+   * Register-shape adapter lane that forwards one contiguous nullable
+   * `SAttachPoint` range copy dispatch into `func_SAttachPointPtr::memcpy`.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullableRegisterAdapter(
+    SAttachPoint* const destination,
+    const SAttachPoint* const sourceBegin,
+    const SAttachPoint* const sourceEnd
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EE150 (FUN_005EE150)
+   * Address: 0x005EE5C0 (FUN_005EE5C0)
+   *
+   * What it does:
+   * Adapter lane that forwards contiguous attach-point range copy requests into
+   * the canonical nullable attach-point helper.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullableAdapter(
+    const SAttachPoint* sourceBegin,
+    const SAttachPoint* sourceEnd,
+    SAttachPoint* destination
+  ) noexcept
+  {
+    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EC4E0 (FUN_005EC4E0)
+   * Address: 0x005EC9E0 (FUN_005EC9E0)
+   *
+   * What it does:
+   * Adapts one `(sourceEnd, sourceBegin, destination)` lane into the canonical
+   * attach-point contiguous copy helper.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* CopyAttachPointRangeAdapterReversed(
+    SAttachPoint* const sourceEnd,
+    SAttachPoint* const sourceBegin,
+    SAttachPoint* const destination
+  ) noexcept
+  {
+    return CopyAttachPointRange(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005E9A90 (FUN_005E9A90)
+   *
+   * What it does:
+   * Resets one `vector<SAttachPoint>` logical size to zero while preserving
+   * allocated storage.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint* ResetAttachPointVectorUsedRange(msvc8::vector<SAttachPoint>& storage) noexcept
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (view.begin != view.end) {
+      view.end = CopyAttachPointRange(view.begin, view.end, view.end);
+    }
+
+    return view.end;
+  }
+
+  /**
+   * Address: 0x005EA930 (FUN_005EA930)
+   *
+   * What it does:
+   * Compacts one erased attach-point range by copying `[eraseEnd, end)` into
+   * `eraseBegin`, updates vector end, and returns `outCursor`.
+   */
+  [[maybe_unused]] [[nodiscard]] SAttachPoint** EraseAttachPointRangeAndReturnCursor(
+    SAttachPoint** const outCursor,
+    msvc8::vector<SAttachPoint>& storage,
+    SAttachPoint* const eraseBegin,
+    SAttachPoint* const eraseEnd
+  ) noexcept
+  {
+    if (eraseBegin != eraseEnd) {
+      auto& view = msvc8::AsVectorRuntimeView(storage);
+      view.end = CopyAttachPointRange(eraseBegin, eraseEnd, view.end);
+    }
+
+    *outCursor = eraseBegin;
+    return outCursor;
+  }
+
+  /**
+   * Address: 0x005E9CF0 (FUN_005E9CF0)
+   *
+   * What it does:
+   * Removes one `int` lane at `erasePos` from contiguous vector storage,
+   * compacts the tail with `memmove_s`, updates the active end lane, and
+   * returns the erased-position cursor.
+   */
+  [[maybe_unused]] [[nodiscard]] int* EraseIntVectorElementAndReturnCursor(
+    msvc8::vector<int>& storage,
+    int* const erasePos
+  ) noexcept
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    int* const activeEnd = view.end;
+
+    if (erasePos != activeEnd) {
+      int* const moveSource = erasePos + 1;
+      const std::ptrdiff_t remaining = activeEnd - moveSource;
+      if (remaining > 0) {
+        const std::size_t bytes = static_cast<std::size_t>(remaining) * sizeof(int);
+        (void)memmove_s(erasePos, bytes, moveSource, bytes);
+      }
+
+      view.end = erasePos + remaining;
+    }
+
+    return erasePos;
   }
 
   /**
@@ -415,6 +660,84 @@ namespace
   }
 
   /**
+   * Address: 0x005F0810 (FUN_005F0810, sub_5F0810)
+   *
+   * What it does:
+   * Copies the current heap-root attach-point into `poppedOut`, then restores
+   * heap ordering by sifting `inserted` down across `[begin, end)`.
+   */
+  [[maybe_unused]] void PopAttachPointHeapRootAndInsert(
+    SAttachPoint* const begin,
+    SAttachPoint* const end,
+    SAttachPoint* const poppedOut,
+    const SAttachPoint& inserted
+  ) noexcept
+  {
+    if (begin == nullptr || end == nullptr || poppedOut == nullptr || begin == end) {
+      return;
+    }
+
+    *poppedOut = *begin;
+    SiftDownAttachPointHeapAndInsert(0, static_cast<int>(end - begin), begin, inserted);
+  }
+
+  /**
+   * Address: 0x005F0680 (FUN_005F0680)
+   *
+   * What it does:
+   * Adapts one heap pop lane by using the last element (`end - 1`) as both
+   * output slot and inserted replacement payload for
+   * `PopAttachPointHeapRootAndInsert`.
+   */
+  [[maybe_unused]] void PopAttachPointHeapRootIntoTailSlotAdapter(
+    SAttachPoint* const begin,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    SAttachPoint* const tailSlot = end - 1;
+    const SAttachPoint inserted = *tailSlot;
+    PopAttachPointHeapRootAndInsert(begin, tailSlot, tailSlot, inserted);
+  }
+
+  /**
+   * Address: 0x005EFB50 (FUN_005EFB50, sub_5EFB50)
+   *
+   * What it does:
+   * Repeatedly pops the heap root into the shrinking tail lane of one
+   * contiguous attach-point heap window until at most one element remains.
+   */
+  [[maybe_unused]] int PopAttachPointHeapRootsIntoSortedTail(
+    SAttachPoint* const begin,
+    SAttachPoint* end
+  ) noexcept
+  {
+    int remaining = static_cast<int>(end - begin);
+    while (remaining > 1) {
+      SAttachPoint* const tailSlot = end - 1;
+      const SAttachPoint inserted = *tailSlot;
+      PopAttachPointHeapRootAndInsert(begin, tailSlot, tailSlot, inserted);
+      end = tailSlot;
+      remaining = static_cast<int>(end - begin);
+    }
+    return remaining;
+  }
+
+  /**
+   * Address: 0x005EED90 (FUN_005EED90, sub_5EED90)
+   *
+   * What it does:
+   * Tail-forwards one attach-point heap-sort thunk lane into
+   * `PopAttachPointHeapRootsIntoSortedTail`.
+   */
+  [[maybe_unused]] int PopAttachPointHeapRootsIntoSortedTailThunk(
+    SAttachPoint* const begin,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    return PopAttachPointHeapRootsIntoSortedTail(begin, end);
+  }
+
+  /**
    * Address: 0x005EEDA0 (FUN_005EEDA0, func_CombSortAttachData_Small)
    *
    * What it does:
@@ -455,6 +778,23 @@ namespace
       --parentIndex;
       const SAttachPoint node = start[parentIndex];
       SiftDownAttachPointHeapAndInsert(parentIndex, upper, start, node);
+    }
+  }
+
+  /**
+   * Address: 0x005EED50 (FUN_005EED50)
+   *
+   * What it does:
+   * Calls the attach-point heap-build helper only when the source span holds
+   * at least two elements.
+   */
+  [[maybe_unused]] void BuildAttachPointMaxHeapIfMultiElement(
+    SAttachPoint* const start,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    if ((end - start) > 1) {
+      BuildAttachPointMaxHeap(start, end);
     }
   }
 
@@ -506,6 +846,42 @@ namespace
 
       *current = carried;
     }
+  }
+
+  /**
+   * Address: 0x005F0480 (FUN_005F0480)
+   *
+   * What it does:
+   * Adapter lane that forwards one attach-point rotate dispatch into the
+   * canonical gcd-cycle rotator.
+   */
+  [[maybe_unused]] void RotateAttachPointRangeByGcdCyclesAdapter(
+    SAttachPoint* const start,
+    SAttachPoint* const tooth,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    RotateAttachPointRangeByGcdCycles(start, tooth, end);
+  }
+
+  /**
+   * Address: 0x005EFBE0 (FUN_005EFBE0)
+   *
+   * What it does:
+   * Guarded adapter lane for attach-point rotate dispatch; executes only when
+   * `start != tooth` and `tooth != end`.
+   */
+  [[maybe_unused]] void RotateAttachPointRangeByGcdCyclesGuardedAdapter(
+    SAttachPoint* const start,
+    SAttachPoint* const tooth,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    if (start == tooth || tooth == end) {
+      return;
+    }
+
+    RotateAttachPointRangeByGcdCycles(start, tooth, end);
   }
 
   /**
@@ -650,6 +1026,29 @@ namespace
     const char* const boneName = bone->mBoneName;
     LuaPlus::LuaObject* const payloadObj = payloadUnit ? &payloadUnit->mLuaObj : nullptr;
     transportUnit->LuaPCall(callbackName, &boneName, payloadObj);
+  }
+
+  /**
+   * Address: 0x005E3ED0 (FUN_005E3ED0, sub_5E3ED0)
+   *
+   * What it does:
+   * Initializes one reserved-transport-bone payload from transport/attach
+   * indices, links the weak-unit lane, copies one reserved-bone vector payload,
+   * and returns the destination entry pointer.
+   */
+  [[maybe_unused]] SAiReservedTransportBone* InitReservedTransportBoneEntry(
+    const unsigned int transportBoneIndex,
+    const unsigned int attachBoneIndex,
+    SAiReservedTransportBone* const destination,
+    Unit* const reservedUnit,
+    msvc8::vector<int> reservedBones
+  )
+  {
+    destination->transportBoneIndex = transportBoneIndex;
+    destination->attachBoneIndex = attachBoneIndex;
+    destination->reservedUnit.ResetFromObject(reservedUnit);
+    destination->reservedBones = reservedBones;
+    return destination;
   }
 
 } // namespace
@@ -990,6 +1389,24 @@ void CAiTransportImpl::TransportRemovePickupUnit(Unit* const unit, const bool cl
   }
 }
 
+namespace
+{
+  /**
+   * Address: 0x005E9670 (FUN_005E9670)
+   *
+   * What it does:
+   * Erases one reservation slot from `mReservedBones` and returns the next
+   * iterator lane for erase-while-iterating loops.
+   */
+  [[nodiscard]] SAiReservedTransportBone* EraseReservedTransportBoneAndAdvance(
+    msvc8::vector<SAiReservedTransportBone>& reservations,
+    SAiReservedTransportBone* const it
+  )
+  {
+    return reservations.erase(it);
+  }
+} // namespace
+
 /**
  * Address: 0x005E64D0 (FUN_005E64D0)
  */
@@ -998,7 +1415,7 @@ void CAiTransportImpl::TransportRemoveUnitReservation(Unit* const unit)
   for (SAiReservedTransportBone* it = mReservedBones.begin(); it != mReservedBones.end();) {
     Unit* const reserved = it->reservedUnit.GetObjectPtr();
     if (!reserved || reserved == unit) {
-      it = mReservedBones.erase(it);
+      it = EraseReservedTransportBoneAndAdvance(mReservedBones, it);
     } else {
       ++it;
     }
@@ -1013,13 +1430,13 @@ void CAiTransportImpl::TransportUnreserveUnattachedSpots()
   for (SAiReservedTransportBone* it = mReservedBones.begin(); it != mReservedBones.end();) {
     Unit* const reserved = it->reservedUnit.GetObjectPtr();
     if (!reserved) {
-      it = mReservedBones.erase(it);
+      it = EraseReservedTransportBoneAndAdvance(mReservedBones, it);
       continue;
     }
 
     Unit* const transportedBy = reserved->TransportedByRef.ResolveObjectPtr<Unit>();
     if (transportedBy != mUnit) {
-      it = mReservedBones.erase(it);
+      it = EraseReservedTransportBoneAndAdvance(mReservedBones, it);
       continue;
     }
 
@@ -1538,10 +1955,13 @@ void CAiTransportImpl::ReserveBone(
   }
 
   SAiReservedTransportBone reservation{};
-  reservation.transportBoneIndex = transportBoneIndex;
-  reservation.attachBoneIndex = bestAttachBoneIndex;
-  reservation.reservedUnit.ResetFromObject(unit);
-  reservation.reservedBones = boneIndices;
+  (void)InitReservedTransportBoneEntry(
+    transportBoneIndex,
+    bestAttachBoneIndex,
+    &reservation,
+    unit,
+    boneIndices
+  );
   mReservedBones.push_back(reservation);
 }
 

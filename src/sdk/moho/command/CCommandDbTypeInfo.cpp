@@ -21,6 +21,24 @@ namespace
     return *reinterpret_cast<moho::CCommandDBTypeInfo*>(gCCommandDBTypeInfoStorage);
   }
 
+  gpg::RType* gLegacyCCommandDbType = nullptr;
+
+  /**
+   * Address: 0x006E2290 (FUN_006E2290)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `CCommandDB` lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyCCommandDbType()
+  {
+    gpg::RType* type = gLegacyCCommandDbType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandDb));
+      gLegacyCCommandDbType = type;
+    }
+    return type;
+  }
+
   /**
    * Address: 0x00BFE940 (FUN_00BFE940, sub_BFE940)
    *
@@ -51,9 +69,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x006E0970 (FUN_006E0970, CCommandDBTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `CCommandDBTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(CCommandDBTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x006E0910 (FUN_006E0910, Moho::CCommandDBTypeInfo::dtr)
    */
-  CCommandDBTypeInfo::~CCommandDBTypeInfo() = default;
+  CCommandDBTypeInfo::~CCommandDBTypeInfo()
+  {
+    DestroyCCommandDbTypeInfoBody(this);
+  }
 
   /**
    * Address: 0x006E0900 (FUN_006E0900, Moho::CCommandDBTypeInfo::GetName)

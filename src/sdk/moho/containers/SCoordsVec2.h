@@ -8,6 +8,8 @@ namespace moho
 {
   struct SCoordsVec2
   {
+    static gpg::RType* sType;
+
     float x;
     float z;
   };

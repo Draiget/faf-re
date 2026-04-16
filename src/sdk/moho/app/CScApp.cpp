@@ -233,7 +233,7 @@ namespace
   }
 
   /**
-   * Address: 0x008D1470 (FUN_008D1470) - heap stat publish prelude.
+    * Alias of FUN_008D1470 (non-canonical helper lane).
    *
    * What it does:
    * Pulls allocator counters and publishes the six heap stat strings used by UI stats.
@@ -272,17 +272,6 @@ namespace
       sAddressSpaceMonitorTimer.Reset();
       QueryHeapAddressSpace();
     }
-  }
-
-  void PushFrameDelta(CScApp::RollingFrameRates& history, const float deltaSeconds)
-  {
-    const int next = (history.end + 1) % 10;
-    if (next == history.start) {
-      history.start = (history.start + 1) % 10;
-    }
-
-    history.vals[history.end] = deltaSeconds;
-    history.end = next;
   }
 
   [[nodiscard]] float TryReadFixedFrameDeltaSeconds()
@@ -714,10 +703,29 @@ namespace
     (void)::AppendMenuW(systemMenu, MF_STRING, 1u, L"New Item");
     return ::AppendMenuW(systemMenu, MF_STRING, 2u, L"Open Lua Debugger");
   }
+
+  /**
+   * Address: 0x008D0340 (FUN_008D0340)
+   *
+   * What it does:
+   * Executes one startup graphics-options setup chain:
+   * primary/secondary adapter settings, fidelity presets/settings, shadow
+   * quality, and anti-aliasing.
+   */
+  void ConfigureStartupGraphicsOptionGroups(const bool secondarySetupMode)
+  {
+    moho::SetupPrimaryAdapterSettings();
+    moho::SetupSecondaryAdapterSettings(secondarySetupMode);
+    moho::CreateFidelityPresets();
+    moho::SetupFidelitySettings();
+    moho::SetupShadowQualitySettings();
+    moho::SetupAntiAliasingSettings();
+  }
 } // namespace
 
 /**
  * Address: 0x008D5280 (FUN_008D5280, sub_8D5280)
+ * Address: 0x008D4B90 (FUN_008D4B90)
  *
  * What it does:
  * Flushes the ring and resets start/end indexes to zero.
@@ -732,6 +740,44 @@ void CScApp::RollingFrameRates::Reset()
 
   start = 0;
   end = 0;
+}
+
+/**
+ * Address: 0x008D4AE0 (FUN_008D4AE0)
+ *
+ * What it does:
+ * Writes one frame-time sample to the ring, advances start when full,
+ * advances end, and returns the div carry from old_end+1.
+ */
+std::int32_t CScApp::RollingFrameRates::Push(const float deltaSeconds)
+{
+  const std::int32_t oldEnd = end;
+  const std::int32_t next = (oldEnd + 1) % 10;
+
+  vals[oldEnd] = deltaSeconds;
+  if (next == start) {
+    start = (start + 1) % 10;
+  }
+
+  end = next;
+  return (oldEnd + 1) / 10;
+}
+
+/**
+ * Address: 0x008D1CF0 (FUN_008D1CF0)
+ *
+ * What it does:
+ * Thin thunk lane that forwards one rolling-frame-rate object into the
+ * canonical reset routine.
+ */
+[[maybe_unused]] CScApp::RollingFrameRates* CScAppRollingFrameRatesResetThunk(
+  CScApp::RollingFrameRates* const history
+) noexcept
+{
+  if (history != nullptr) {
+    history->Reset();
+  }
+  return history;
 }
 
 /**
@@ -826,6 +872,13 @@ bool CScApp::Init()
     return false;
   }
 
+  msvc8::vector<msvc8::string> preferenceArgs;
+  if (moho::CFG_GetArgOption("/prefs", 1, &preferenceArgs) && !preferenceArgs.empty()) {
+    moho::USER_LoadPreferences(preferenceArgs[0]);
+  } else {
+    moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
+  }
+
   moho::USER_EnsureDocumentDirectories();
   moho::UI_Init();
   if (!CreateDevice()) {
@@ -897,7 +950,7 @@ void CScApp::Main()
     curTime.Reset();
   }
 
-  PushFrameDelta(framerates, frameSeconds);
+  (void)framerates.Push(frameSeconds);
   moho::SND_Frame();
   moho::DISK_UpdateWatcher();
 
@@ -1169,12 +1222,7 @@ bool CScApp::CreateDevice()
   }
 
   (void)gpg::gal::Device::GetInstance();
-  moho::SetupPrimaryAdapterSettings();
-  moho::SetupSecondaryAdapterSettings(secondarySetupMode);
-  moho::CreateFidelityPresets();
-  moho::SetupFidelitySettings();
-  moho::SetupShadowQualitySettings();
-  moho::SetupAntiAliasingSettings();
+  ConfigureStartupGraphicsOptionGroups(secondarySetupMode);
   moho::SetupBasicMovieManager();
   moho::OPTIONS_Apply();
 

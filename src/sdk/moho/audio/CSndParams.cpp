@@ -197,6 +197,29 @@ namespace
   }
 
   /**
+   * Address: 0x004DED40 (FUN_004DED40)
+   *
+   * What it does:
+   * Copies the four `SParamKey` string lanes (`Cue`, `Bank`, `LodCutoff`,
+   * `RpcLoopVar`) from `sourceKey` into `outKey`.
+   */
+  [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
+    const moho::SParamKey* const sourceKey,
+    moho::SParamKey* const outKey
+  )
+  {
+    if (sourceKey == nullptr || outKey == nullptr) {
+      return outKey;
+    }
+
+    outKey->mCueName = sourceKey->mCueName;
+    outKey->mBankName = sourceKey->mBankName;
+    outKey->mLodCutoffVariableName = sourceKey->mLodCutoffVariableName;
+    outKey->mRpcLoopVariableName = sourceKey->mRpcLoopVariableName;
+    return outKey;
+  }
+
+  /**
    * Address: 0x004DEDF0 (FUN_004DEDF0)
    *
    * What it does:
@@ -223,6 +246,28 @@ namespace
     temp.mLodCutoff.tidy(true, 0U);
     temp.mBank.tidy(true, 0U);
     temp.mCue1.tidy(true, 0U);
+  }
+
+  /**
+   * Address: 0x004DEB60 (FUN_004DEB60)
+   *
+   * What it does:
+   * Initializes one `HSndEntityLoop` lane as `{head=nullptr, index=-1,
+   * params=<input>}`.
+   */
+  [[nodiscard]] moho::HSndEntityLoop* InitializeSndEntityLoopHandle(
+    moho::HSndEntityLoop* const outHandle,
+    moho::CSndParams* const params
+  ) noexcept
+  {
+    if (outHandle == nullptr) {
+      return outHandle;
+    }
+
+    outHandle->mListLinkHead = nullptr;
+    outHandle->mLoopIndex = -1;
+    outHandle->mParams = params;
+    return outHandle;
   }
 
   [[nodiscard]] moho::CSndParams* FindCachedSndParamsByHashLocked(const moho::SParamKey& key, const std::uint32_t hash)
@@ -253,6 +298,341 @@ namespace
   void InsertSndParamsCacheEntryLocked(const std::uint32_t hash, moho::CSndParams* const params)
   {
     gSndParamsHashCache.emplace(hash, params);
+  }
+
+  struct TwoWordRuntimeState
+  {
+    std::uint32_t mFirst;  // +0x00
+    std::uint32_t mSecond; // +0x04
+  };
+
+  static_assert(sizeof(TwoWordRuntimeState) == 0x8, "TwoWordRuntimeState size must be 0x8");
+
+  /**
+   * Address: 0x004E14B0 (FUN_004E14B0)
+   *
+   * What it does:
+   * Clears one two-word runtime state pair to zero.
+   */
+  [[nodiscard]] TwoWordRuntimeState* ClearTwoWordRuntimeState(TwoWordRuntimeState* const state) noexcept
+  {
+    if (state == nullptr) {
+      return state;
+    }
+
+    state->mFirst = 0u;
+    state->mSecond = 0u;
+    return state;
+  }
+
+  struct IntrusiveLinkNode
+  {
+    IntrusiveLinkNode* mNext; // +0x00
+    IntrusiveLinkNode* mPrev; // +0x04
+  };
+
+  static_assert(sizeof(IntrusiveLinkNode) == 0x8, "IntrusiveLinkNode size must be 0x8");
+
+  /**
+   * Address: 0x004E1BD0 (FUN_004E1BD0)
+   *
+   * What it does:
+   * Advances one intrusive cursor slot to its current node's `next` link.
+   */
+  [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
+  {
+    if (cursorSlot != nullptr && *cursorSlot != nullptr) {
+      *cursorSlot = (*cursorSlot)->mNext;
+    }
+    return cursorSlot;
+  }
+
+  struct PairHeadTailView
+  {
+    std::uint32_t mHeadValue; // +0x00
+    std::uint32_t mTailValue; // +0x04
+  };
+
+  static_assert(sizeof(PairHeadTailView) == 0x8, "PairHeadTailView size must be 0x8");
+
+  [[nodiscard]] PairHeadTailView* CopyPairHeadTail(
+    PairHeadTailView* const outPair,
+    const std::uint32_t* const headValueSlot,
+    const std::uint32_t* const tailValueSlot
+  ) noexcept
+  {
+    if (outPair == nullptr || headValueSlot == nullptr || tailValueSlot == nullptr) {
+      return outPair;
+    }
+
+    outPair->mHeadValue = *headValueSlot;
+    outPair->mTailValue = *tailValueSlot;
+    return outPair;
+  }
+
+  /**
+   * Address: 0x004E1BF0 (FUN_004E1BF0)
+   *
+   * What it does:
+   * Writes one `(head,tail)` pair from two source value slots.
+   */
+  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_A(
+    PairHeadTailView* const outPair,
+    const std::uint32_t* const headValueSlot,
+    const std::uint32_t* const tailValueSlot
+  ) noexcept
+  {
+    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
+  }
+
+  /**
+   * Address: 0x004E1C30 (FUN_004E1C30)
+   *
+   * What it does:
+   * Writes one `(head,tail)` pair from two source value slots.
+   */
+  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_B(
+    PairHeadTailView* const outPair,
+    const std::uint32_t* const headValueSlot,
+    const std::uint32_t* const tailValueSlot
+  ) noexcept
+  {
+    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
+  }
+
+  /**
+   * Address: 0x004E1C70 (FUN_004E1C70)
+   *
+   * What it does:
+   * Writes one `(head,tail)` pair from two source value slots.
+   */
+  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_C(
+    PairHeadTailView* const outPair,
+    const std::uint32_t* const headValueSlot,
+    const std::uint32_t* const tailValueSlot
+  ) noexcept
+  {
+    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
+  }
+
+  struct SndLoopTreeNodeRuntimeView
+  {
+    SndLoopTreeNodeRuntimeView* mLeft;   // +0x00
+    SndLoopTreeNodeRuntimeView* mParent; // +0x04
+    SndLoopTreeNodeRuntimeView* mRight;  // +0x08
+    std::uintptr_t mParamsKeyWord = 0;   // +0x0C
+    moho::HSndEntityLoop* mLoop = nullptr; // +0x10
+    std::uint8_t mColor = 0;             // +0x14
+    std::uint8_t mIsNil = 0;             // +0x15
+    std::uint8_t mReserved16[0x2]{};     // +0x16
+  };
+  static_assert(
+    offsetof(SndLoopTreeNodeRuntimeView, mParamsKeyWord) == 0x0C,
+    "SndLoopTreeNodeRuntimeView::mParamsKeyWord offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SndLoopTreeNodeRuntimeView, mLoop) == 0x10,
+    "SndLoopTreeNodeRuntimeView::mLoop offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SndLoopTreeNodeRuntimeView, mIsNil) == 0x15,
+    "SndLoopTreeNodeRuntimeView::mIsNil offset must be 0x15"
+  );
+  static_assert(sizeof(SndLoopTreeNodeRuntimeView) == 0x18, "SndLoopTreeNodeRuntimeView size must be 0x18");
+
+  struct SndLoopTreeOwnerRuntimeView
+  {
+    std::uint32_t mReserved00 = 0;          // +0x00
+    SndLoopTreeNodeRuntimeView* mHeader = nullptr; // +0x04
+  };
+  static_assert(
+    offsetof(SndLoopTreeOwnerRuntimeView, mHeader) == 0x04,
+    "SndLoopTreeOwnerRuntimeView::mHeader offset must be 0x04"
+  );
+  static_assert(sizeof(SndLoopTreeOwnerRuntimeView) == 0x8, "SndLoopTreeOwnerRuntimeView size must be 0x8");
+
+  struct SndLoopTreeFindResultRuntimeView
+  {
+    SndLoopTreeNodeRuntimeView* mNode = nullptr; // +0x00
+  };
+  static_assert(sizeof(SndLoopTreeFindResultRuntimeView) == 0x4, "SndLoopTreeFindResultRuntimeView size must be 0x4");
+
+  /**
+   * Address: 0x004E1950 (FUN_004E1950)
+   *
+   * What it does:
+   * Performs a lower-bound walk in the legacy shared-loop RB-tree and writes
+   * either the exact key node or the end sentinel.
+   */
+  [[maybe_unused]] [[nodiscard]] SndLoopTreeFindResultRuntimeView* FindSndLoopNodeByParams(
+    SndLoopTreeFindResultRuntimeView* const outResult,
+    const SndLoopTreeOwnerRuntimeView* const treeOwner,
+    const moho::CSndParams* const* const paramsSlot
+  ) noexcept
+  {
+    SndLoopTreeNodeRuntimeView* candidate = treeOwner->mHeader;
+    SndLoopTreeNodeRuntimeView* cursor = candidate->mParent;
+    const std::uintptr_t keyWord = reinterpret_cast<std::uintptr_t>(*paramsSlot);
+
+    while (cursor->mIsNil == 0u) {
+      if (cursor->mParamsKeyWord >= keyWord) {
+        candidate = cursor;
+        cursor = cursor->mLeft;
+      } else {
+        cursor = cursor->mRight;
+      }
+    }
+
+    SndLoopTreeNodeRuntimeView* const endNode = treeOwner->mHeader;
+    if (candidate == endNode || keyWord < candidate->mParamsKeyWord) {
+      outResult->mNode = endNode;
+    } else {
+      outResult->mNode = candidate;
+    }
+    return outResult;
+  }
+
+  struct HeaderPointerOwnerView
+  {
+    std::uint32_t mReserved00;   // +0x00
+    std::uint32_t* mHeaderSlot;  // +0x04
+  };
+
+  static_assert(sizeof(HeaderPointerOwnerView) == 0x8, "HeaderPointerOwnerView size must be 0x8");
+
+  [[nodiscard]] std::uint32_t* ReadHeaderRootWord(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    if (outWord == nullptr || owner == nullptr || owner->mHeaderSlot == nullptr) {
+      return outWord;
+    }
+
+    *outWord = *owner->mHeaderSlot;
+    return outWord;
+  }
+
+  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    if (outWord == nullptr || owner == nullptr) {
+      return outWord;
+    }
+
+    *outWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owner->mHeaderSlot));
+    return outWord;
+  }
+
+  /**
+   * Address: 0x004E19F0 (FUN_004E19F0)
+   *
+   * What it does:
+   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderRootWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E1A00 (FUN_004E1A00)
+   *
+   * What it does:
+   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderPointerWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E1B00 (FUN_004E1B00)
+   *
+   * What it does:
+   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderRootWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E1B10 (FUN_004E1B10)
+   *
+   * What it does:
+   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderPointerWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E2590 (FUN_004E2590)
+   *
+   * What it does:
+   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderRootWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E25A0 (FUN_004E25A0)
+   *
+   * What it does:
+   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
+   */
+  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
+    std::uint32_t* const outWord,
+    const HeaderPointerOwnerView* const owner
+  ) noexcept
+  {
+    return ReadHeaderPointerWord(outWord, owner);
+  }
+
+  /**
+   * Address: 0x004E1F70 (FUN_004E1F70)
+   *
+   * What it does:
+   * Unlinks one intrusive node from its current list and resets it to a
+   * self-linked singleton node.
+   */
+  [[nodiscard]] IntrusiveLinkNode* ResetIntrusiveNodeLinks(IntrusiveLinkNode* const node) noexcept
+  {
+    if (node == nullptr) {
+      return node;
+    }
+
+    if (node->mNext != nullptr) {
+      node->mNext->mPrev = node->mPrev;
+    }
+    if (node->mPrev != nullptr) {
+      node->mPrev->mNext = node->mNext;
+    }
+
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
   }
 
   /**
@@ -448,6 +828,20 @@ namespace
     {}
   };
   static_assert(sizeof(CSndParamsPointerMetatableFactory) == 0x8, "CSndParamsPointerMetatableFactory size must be 0x8");
+
+  /**
+   * Address: 0x004E5A30 (FUN_004E5A30)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CSndParams*>` and returns that singleton.
+   */
+  [[maybe_unused]] CSndParamsPointerMetatableFactory* startup_CScrLuaMetatableFactory_CSndParamsPointer_Index()
+  {
+    auto& instance = CSndParamsPointerMetatableFactory::Instance();
+    instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
+  }
 
   /**
    * Address: 0x004E5510 (FUN_004E5510, gpg::RRef::TryUpcast_CSndParams_P)

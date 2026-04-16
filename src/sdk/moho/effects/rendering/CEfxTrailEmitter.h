@@ -4,9 +4,16 @@
 #include <cstdint>
 
 #include "moho/effects/rendering/CEffectImpl.h"
+#include "Wm3Vector3.h"
+
+namespace gpg
+{
+  class WriteArchive;
+}
 
 namespace moho
 {
+  struct GeomCamera3;
   struct RTrailBlueprint;
 
   /**
@@ -39,15 +46,33 @@ namespace moho
      */
     [[nodiscard]] bool ProcessLifetime();
 
+    /**
+     * Address: 0x00672820 (FUN_00672820, sub_672820)
+     *
+     * What it does:
+     * Serializes base effect state, trail blueprint pointer, trail timing
+     * lanes, one Vector3 payload lane, and visibility/update flags.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00671550 (FUN_00671550, Moho::CEfxTrailEmitter::CanSeeCam)
+     *
+     * What it does:
+     * Applies trail LOD/frustum checks and focused-army recon visibility probe
+     * for one camera.
+     */
+    [[nodiscard]] bool CanSeeCam(const GeomCamera3* camera);
+
   public:
     RTrailBlueprint* mTrailBlueprint;      // +0x190
     std::int32_t mTrailLength;             // +0x194
     float mTotalTicks;                     // +0x198
     float mLife;                           // +0x19C
     float mLength;                         // +0x1A0
-    std::uint8_t mUnknown1A4_1AF[0x0C];    // +0x1A4
+    Wm3::Vector3f mSerializedTrailPosition; // +0x1A4
     bool mCreated;                         // +0x1B0
-    bool mUnknown1B1;                      // +0x1B1
+    bool mVisible;                         // +0x1B1
     std::uint8_t mPad1B2[0x02];            // +0x1B2
     std::uint32_t mLastUpdate;             // +0x1B4
   };
@@ -73,8 +98,16 @@ namespace moho
     "CEfxTrailEmitter::mLength offset must be 0x1A0"
   );
   static_assert(
+    offsetof(CEfxTrailEmitter, mSerializedTrailPosition) == 0x1A4,
+    "CEfxTrailEmitter::mSerializedTrailPosition offset must be 0x1A4"
+  );
+  static_assert(
     offsetof(CEfxTrailEmitter, mCreated) == 0x1B0,
     "CEfxTrailEmitter::mCreated offset must be 0x1B0"
+  );
+  static_assert(
+    offsetof(CEfxTrailEmitter, mVisible) == 0x1B1,
+    "CEfxTrailEmitter::mVisible offset must be 0x1B1"
   );
   static_assert(
     offsetof(CEfxTrailEmitter, mLastUpdate) == 0x1B4,

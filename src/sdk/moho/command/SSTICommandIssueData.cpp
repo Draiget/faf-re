@@ -25,6 +25,54 @@ namespace
     (void)gpg::FastVectorN2RebindAndCopy(&destination, &source);
     return destination;
   }
+
+  /**
+   * Address: 0x00579370 (FUN_00579370)
+   *
+   * What it does:
+   * Initializes one ground-position target lane from world coordinates, setting
+   * target kind to `AITARGET_Ground` and entity-id sentinel to `0xF0000000`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTITarget* InitializeGroundTargetFromWorldPos(
+    moho::SSTITarget* const outTarget,
+    const Wm3::Vec3f* const worldPos
+  ) noexcept
+  {
+    outTarget->mType = moho::EAiTargetType::AITARGET_Ground;
+    outTarget->mEntityId = 0xF0000000u;
+    outTarget->mPos = *worldPos;
+    return outTarget;
+  }
+
+  /**
+   * Address: 0x00579390 (FUN_00579390)
+   *
+   * What it does:
+   * Stores one source target lane into `SSTICommandIssueData::mTarget2`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTICommandIssueData* AssignSecondaryTargetLane(
+    moho::SSTICommandIssueData* const outIssueData,
+    const moho::SSTITarget* const sourceTarget
+  ) noexcept
+  {
+    outIssueData->mTarget2 = *sourceTarget;
+    return outIssueData;
+  }
+
+  /**
+   * Address: 0x005793D0 (FUN_005793D0)
+   *
+   * What it does:
+   * Stores one blueprint pointer lane into `SSTICommandIssueData::mBlueprint`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTICommandIssueData* AssignBlueprintLane(
+    moho::SSTICommandIssueData* const outIssueData,
+    moho::RUnitBlueprint* const blueprint
+  ) noexcept
+  {
+    outIssueData->mBlueprint = blueprint;
+    return outIssueData;
+  }
 } // namespace
 
 namespace moho
@@ -53,8 +101,8 @@ namespace moho
     , unk04(-1)
     , mIndex(-1)
     , mCommandType(commandType)
-    , mTarget{AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
-    , mTarget2{AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
+    , mTarget{EAiTargetType::AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
+    , mTarget2{EAiTargetType::AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
     , unk38(-1)
     , mOri(1.0f, 0.0f, 0.0f, 0.0f)
     , unk4C(1.0f)

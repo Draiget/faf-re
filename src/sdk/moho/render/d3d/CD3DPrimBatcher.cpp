@@ -22,6 +22,7 @@
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/sim/STIMap.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -232,6 +233,24 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x007FC1C0 (FUN_007FC1C0)
+   *
+   * What it does:
+   * Disposes one `sp_counted_impl_p<CD3DPrimBatcher>` payload by running
+   * non-deleting `CD3DPrimBatcher` teardown and releasing owned storage.
+   */
+  void DisposeCountedPrimBatcherStorage(
+    boost::SpCountedImplStorage<moho::CD3DPrimBatcher>* const countedStorage
+  )
+  {
+    moho::CD3DPrimBatcher* const ownedBatcher = countedStorage->px;
+    if (ownedBatcher != nullptr) {
+      ownedBatcher->~CD3DPrimBatcher();
+      ::operator delete(static_cast<void*>(ownedBatcher));
+    }
+  }
+
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex BuildTransformedVertex(
     const moho::CD3DPrimBatcherRuntimeView& runtime,
     const moho::CD3DPrimBatcher::Vertex& source
@@ -308,6 +327,63 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00438310 (FUN_00438310, ??0CD3DPrimBatcher@Moho@@QAE@PAVCD3DTextureBatcher@1@@Z)
+   *
+   * What it does:
+   * Initializes one prim-batcher runtime lane, allocates three dynamic vertex
+   * sheets and one dynamic index sheet from device resources, and seeds
+   * identity view/projection/composite matrices.
+   */
+  CD3DPrimBatcher::CD3DPrimBatcher(CD3DTextureBatcher* const textureBatcher)
+  {
+    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+
+    runtime->mTextureBatcher = textureBatcher;
+    runtime->mCurVertexSheet = 0;
+    runtime->mIndexSheet = nullptr;
+
+    runtime->mVertices.mFirst = nullptr;
+    runtime->mVertices.mLast = nullptr;
+    runtime->mVertices.mEnd = nullptr;
+
+    runtime->mUnknown028 = 0u;
+
+    runtime->mPrimitives.mFirst = nullptr;
+    runtime->mPrimitives.mLast = nullptr;
+    runtime->mPrimitives.mEnd = nullptr;
+
+    runtime->mMode = 0u;
+    runtime->mDynamicTexSheet.px = nullptr;
+    runtime->mDynamicTexSheet.pi = nullptr;
+    runtime->mTexture.px = nullptr;
+    runtime->mTexture.pi = nullptr;
+
+    runtime->mP2x = 0.0f;
+    runtime->mP2y = 0.0f;
+    runtime->mP1x = 1.0f;
+    runtime->mP1y = 1.0f;
+
+    const VMatrix4 identity = VMatrix4::Identity();
+    std::memcpy(&runtime->mViewMatrix, &identity, sizeof(runtime->mViewMatrix));
+    std::memcpy(&runtime->mProjectionMatrix, &identity, sizeof(runtime->mProjectionMatrix));
+    std::memcpy(&runtime->mComposite, &identity, sizeof(runtime->mComposite));
+
+    runtime->mResetComposite = 0u;
+    runtime->mRebuildComposite = 0u;
+    runtime->mUnknown11ETo11F[0] = 0u;
+    runtime->mUnknown11ETo11F[1] = 0u;
+    runtime->mAlphaMultiplier = 1.0f;
+
+    ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+    for (CD3DVertexSheet*& sheet : runtime->mVertexSheets) {
+      CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(6);
+      sheet = resources->NewVertexSheet(1u, 0x8000, vertexFormat);
+    }
+
+    runtime->mIndexSheet = resources->CreateIndexSheet(true, 0x8000);
+  }
+
   /**
    * Address: 0x00438460 (FUN_00438460, Moho::CD3DPrimBatcher::~CD3DPrimBatcher)
    *

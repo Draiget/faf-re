@@ -27,6 +27,23 @@ namespace gpg::gal
     Matrix* invert(Matrix* outMatrix, const Matrix* sourceMatrix);
 
     /**
+     * Address: 0x00940770 (FUN_00940770, sub_940770)
+     *
+     * What it does:
+     * Builds one translation matrix through the D3DX lane and returns
+     * `outMatrix`.
+     */
+    Matrix* translation(Matrix* outMatrix, float x, float y, float z);
+
+    /**
+     * Address: 0x009407A0 (FUN_009407A0, sub_9407A0)
+     *
+     * What it does:
+     * Builds one scale matrix through the D3DX lane and returns `outMatrix`.
+     */
+    Matrix* scaling(Matrix* outMatrix, float x, float y, float z);
+
+    /**
      * Address: 0x009406D0 (FUN_009406D0, ?rotationAxisX@Math@gal@gpg@@YAPBUMatrix@23@PAU423@M@Z)
      *
      * What it does:

@@ -182,6 +182,15 @@ namespace moho
   };
 
   /**
+   * Address: 0x0053AA40 (FUN_0053AA40)
+   *
+   * What it does:
+   * Ensures the resource-manager singleton, attaches process-lifetime SCA
+   * factory registration, and returns the attached factory object.
+   */
+  CScaResourceFactory* construct_CScaResourceFactoryPreload();
+
+  /**
    * Address: 0x0053B100 (FUN_0053B100)
    *
    * IDA signature:

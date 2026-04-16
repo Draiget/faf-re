@@ -57,9 +57,15 @@ namespace
    * What it does:
    * Unlinks global `COGridSerializer` intrusive helper node from registration list.
    */
-  void cleanup_COGridSerializer()
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCOGridSerializerNode()
   {
     SerializerNode(&gCOGridSerializer)->ListUnlink();
+    return reinterpret_cast<gpg::SerHelperBase*>(SerializerNode(&gCOGridSerializer));
+  }
+
+  void cleanup_COGridSerializer()
+  {
+    (void)UnlinkCOGridSerializerNode();
   }
 
   struct COGridSerializerBootstrap
@@ -67,7 +73,6 @@ namespace
     COGridSerializerBootstrap()
     {
       moho::register_COGridSerializer();
-      gCOGridSerializer.RegisterSerializeFunctions();
     }
   };
 
@@ -76,6 +81,95 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00723590 (FUN_00723590)
+   *
+   * What it does:
+   * Builds one reflected `COGrid` reference and tracks it as a pre-created
+   * pointer in the read-archive lane.
+   */
+  [[maybe_unused]] gpg::ReadArchive* TrackCOGridReadPointerLaneA(COGrid* const grid, gpg::ReadArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->TrackPointer(selfRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x007235D0 (FUN_007235D0)
+   *
+   * What it does:
+   * Builds one reflected `COGrid` reference and marks it as pre-created in the
+   * write-archive lane.
+   */
+  [[maybe_unused]] gpg::WriteArchive* TrackCOGridWritePointerLaneA(COGrid* const grid, gpg::WriteArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->PreCreatedPtr(selfRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x007236D0 (FUN_007236D0)
+   *
+   * What it does:
+   * Duplicate read-archive lane that tracks one reflected `COGrid` pointer.
+   */
+  [[maybe_unused]] gpg::ReadArchive* TrackCOGridReadPointerLaneB(COGrid* const grid, gpg::ReadArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->TrackPointer(selfRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00723710 (FUN_00723710)
+   *
+   * What it does:
+   * Duplicate write-archive lane that marks one reflected `COGrid` pointer as
+   * pre-created.
+   */
+  [[maybe_unused]] gpg::WriteArchive* TrackCOGridWritePointerLaneB(COGrid* const grid, gpg::WriteArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->PreCreatedPtr(selfRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00723990 (FUN_00723990)
+   *
+   * What it does:
+   * Secondary duplicate read-archive lane for reflected `COGrid` pointer
+   * tracking.
+   */
+  [[maybe_unused]] gpg::ReadArchive* TrackCOGridReadPointerLaneC(COGrid* const grid, gpg::ReadArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->TrackPointer(selfRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x007239D0 (FUN_007239D0)
+   *
+   * What it does:
+   * Secondary duplicate write-archive lane for reflected `COGrid` pre-created
+   * pointer publication.
+   */
+  [[maybe_unused]] gpg::WriteArchive* TrackCOGridWritePointerLaneC(COGrid* const grid, gpg::WriteArchive* const archive)
+  {
+    gpg::RRef selfRef{};
+    gpg::RRef_COGrid(&selfRef, grid);
+    archive->PreCreatedPtr(selfRef);
+    return archive;
+  }
+
   /**
    * Address: 0x00722CC0 (FUN_00722CC0, Moho::COGridSerializer::Deserialize)
    */
@@ -99,16 +193,43 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDAAB0 (FUN_00BDAAB0, register_COGridSerializer)
+   * Address: 0x00722D40 (FUN_00722D40)
+   *
+   * What it does:
+   * Initializes startup `COGridSerializer` helper links and callback lanes.
    */
-  void register_COGridSerializer()
+  [[maybe_unused]] [[nodiscard]] COGridSerializer* InitializeCOGridSerializerHelperStoragePrimary()
   {
     SerHelperNode* const self = SerializerNode(&gCOGridSerializer);
     self->prev = self;
     self->next = self;
-
     gCOGridSerializer.mLoadCallback = &COGridSerializer::Deserialize;
     gCOGridSerializer.mSaveCallback = &COGridSerializer::Serialize;
+    return &gCOGridSerializer;
+  }
+
+  /**
+   * Address: 0x00722F60 (FUN_00722F60)
+   *
+   * What it does:
+   * Secondary startup `COGridSerializer` helper initialization variant.
+   */
+  [[maybe_unused]] [[nodiscard]] COGridSerializer* InitializeCOGridSerializerHelperStorageSecondary()
+  {
+    SerHelperNode* const self = SerializerNode(&gCOGridSerializer);
+    self->prev = self;
+    self->next = self;
+    gCOGridSerializer.mLoadCallback = &COGridSerializer::Deserialize;
+    gCOGridSerializer.mSaveCallback = &COGridSerializer::Serialize;
+    return &gCOGridSerializer;
+  }
+
+  /**
+   * Address: 0x00BDAAB0 (FUN_00BDAAB0, register_COGridSerializer)
+   */
+  void register_COGridSerializer()
+  {
+    (void)InitializeCOGridSerializerHelperStoragePrimary();
     (void)std::atexit(&cleanup_COGridSerializer);
   }
 
@@ -122,5 +243,27 @@ namespace moho
     type->serLoadFunc_ = mLoadCallback;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSaveCallback;
+  }
+
+  /**
+   * Address: 0x00722D70 (FUN_00722D70)
+   *
+   * What it does:
+   * Duplicated teardown lane for `COGridSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_COGridSerializer_variant_primary()
+  {
+    return UnlinkCOGridSerializerNode();
+  }
+
+  /**
+   * Address: 0x00722DA0 (FUN_00722DA0)
+   *
+   * What it does:
+   * Secondary duplicated teardown lane for `COGridSerializer` helper links.
+   */
+  gpg::SerHelperBase* cleanup_COGridSerializer_variant_secondary()
+  {
+    return UnlinkCOGridSerializerNode();
   }
 } // namespace moho

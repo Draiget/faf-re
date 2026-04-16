@@ -65,11 +65,138 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x00507260 (FUN_00507260, CIntelGridSaveConstruct helper unlink/reset)
+   *
+   * What it does:
+   * Unlinks the global `CIntelGridSaveConstruct` helper node from its current
+   * intrusive lane, rewires it to a self-linked singleton node, and returns
+   * that self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridSaveConstructHelperPrimary() noexcept
+  {
+    gCIntelGridSaveConstruct.mNext->mPrev = gCIntelGridSaveConstruct.mPrev;
+    gCIntelGridSaveConstruct.mPrev->mNext = gCIntelGridSaveConstruct.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridSaveConstruct);
+    gCIntelGridSaveConstruct.mPrev = self;
+    gCIntelGridSaveConstruct.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00507290 (FUN_00507290, CIntelGridSaveConstruct helper unlink/reset variant)
+   *
+   * What it does:
+   * Executes the duplicate save-construct helper unlink/reset lane and returns
+   * the self-linked helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridSaveConstructHelperSecondary() noexcept
+  {
+    gCIntelGridSaveConstruct.mNext->mPrev = gCIntelGridSaveConstruct.mPrev;
+    gCIntelGridSaveConstruct.mPrev->mNext = gCIntelGridSaveConstruct.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridSaveConstruct);
+    gCIntelGridSaveConstruct.mPrev = self;
+    gCIntelGridSaveConstruct.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00507360 (FUN_00507360, CIntelGridConstruct helper unlink/reset)
+   *
+   * What it does:
+   * Unlinks the global `CIntelGridConstruct` helper node from its current
+   * intrusive lane, rewires it to a self-linked singleton node, and returns
+   * that self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridConstructHelperPrimary() noexcept
+  {
+    gCIntelGridConstruct.mNext->mPrev = gCIntelGridConstruct.mPrev;
+    gCIntelGridConstruct.mPrev->mNext = gCIntelGridConstruct.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridConstruct);
+    gCIntelGridConstruct.mPrev = self;
+    gCIntelGridConstruct.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00507390 (FUN_00507390, CIntelGridConstruct helper unlink/reset variant)
+   *
+   * What it does:
+   * Executes the duplicate construct-helper unlink/reset lane and returns the
+   * self-linked helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridConstructHelperSecondary() noexcept
+  {
+    gCIntelGridConstruct.mNext->mPrev = gCIntelGridConstruct.mPrev;
+    gCIntelGridConstruct.mPrev->mNext = gCIntelGridConstruct.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridConstruct);
+    gCIntelGridConstruct.mPrev = self;
+    gCIntelGridConstruct.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x005074E0 (FUN_005074E0, CIntelGridSerializer helper unlink/reset)
+   *
+   * What it does:
+   * Unlinks the global `CIntelGridSerializer` helper node from its current
+   * intrusive lane, rewires it to a self-linked singleton node, and returns
+   * that self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridSerializerHelperPrimary() noexcept
+  {
+    gCIntelGridSerializer.mNext->mPrev = gCIntelGridSerializer.mPrev;
+    gCIntelGridSerializer.mPrev->mNext = gCIntelGridSerializer.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridSerializer);
+    gCIntelGridSerializer.mPrev = self;
+    gCIntelGridSerializer.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00507510 (FUN_00507510, CIntelGridSerializer helper unlink/reset variant)
+   *
+   * What it does:
+   * Executes the duplicate serializer-helper unlink/reset lane and returns the
+   * self-linked helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelGridSerializerHelperSecondary() noexcept
+  {
+    gCIntelGridSerializer.mNext->mPrev = gCIntelGridSerializer.mPrev;
+    gCIntelGridSerializer.mPrev->mNext = gCIntelGridSerializer.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCIntelGridSerializer);
+    gCIntelGridSerializer.mPrev = self;
+    gCIntelGridSerializer.mNext = self;
+    return self;
+  }
+
   template <class TTypeInfo>
   void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
   {
     typeInfo.fields_ = msvc8::vector<gpg::RField>{};
     typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+  }
+
+  /**
+   * Address: 0x005071C0 (FUN_005071C0)
+   *
+   * What it does:
+   * Executes one non-deleting `gpg::RType` base-teardown lane for
+   * `CIntelGridTypeInfo`.
+   */
+  [[maybe_unused]] void cleanup_CIntelGridTypeInfoRTypeBase(moho::CIntelGridTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    ResetTypeInfoVectors(*typeInfo);
   }
 
   gpg::RType* CachedIntelGridType()
@@ -169,6 +296,23 @@ namespace
   }
 
   /**
+   * Address: 0x005072C0 (FUN_005072C0, CIntelGrid save-construct forwarding lane)
+   *
+   * What it does:
+   * Forwards save-construct argument serialization with default
+   * `version=0` and a null owner-reference lane.
+   */
+  [[maybe_unused]] void ForwardCIntelGridMemberSaveConstructArgs_DefaultOwner(
+    gpg::SerSaveConstructArgsResult* const result,
+    moho::CIntelGrid* const intelGrid,
+    gpg::WriteArchive* const archive
+  )
+  {
+    const gpg::RRef nullOwner{};
+    ForwardCIntelGridMemberSaveConstructArgs(result, intelGrid, archive, 0, nullOwner);
+  }
+
+  /**
    * Address: 0x005089C0 (FUN_005089C0, STIMap unowned pointer write helper)
    */
   [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
@@ -212,7 +356,7 @@ namespace
   }
 
   /**
-   * Address: 0x00508D80 (FUN_00508D80, CIntelGrid storage-release helper)
+    * Alias of FUN_00508D80 (non-canonical helper lane).
    */
   [[maybe_unused]] void DestroyCIntelGridInPlace(moho::CIntelGrid* const intelGrid)
   {
@@ -285,6 +429,21 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x005CAFB0 (FUN_005CAFB0, boost::shared_ptr_CIntelGrid::shared_ptr_CIntelGrid)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<CIntelGrid>` from one raw intel-grid pointer
+   * lane.
+   */
+  boost::shared_ptr<CIntelGrid>* ConstructSharedIntelGridFromRaw(
+    boost::shared_ptr<CIntelGrid>* const outIntelGrid,
+    CIntelGrid* const intelGrid
+  )
+  {
+    return ::new (outIntelGrid) boost::shared_ptr<CIntelGrid>(intelGrid);
+  }
+
+  /**
    * Address: 0x00507720 (FUN_00507720, ??0CIntelGrid@Moho@@QAE@PBVSTIMap@1@H@Z)
    *
    * What it does:
@@ -338,6 +497,19 @@ namespace moho
     }
 
     return mGrid[uz * mWidth + ux] != 0;
+  }
+
+  /**
+   * Address: 0x005BE180 (FUN_005BE180, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector2@H@Wm3@@@Z)
+   *
+   * What it does:
+   * Checks one integer grid cell directly against bounds and visibility storage.
+   */
+  bool CIntelGrid::IsVisible(const Wm3::Vector2i& gridCell) const
+  {
+    const std::uint32_t x = static_cast<std::uint32_t>(gridCell.x);
+    const std::uint32_t z = static_cast<std::uint32_t>(gridCell.y);
+    return x < mWidth && z < mHeight && mGrid[z * mWidth + x] != 0;
   }
 
   /**
@@ -733,7 +905,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CIntelGridSaveConstruct()
   {
-    return UnlinkHelperNode(gCIntelGridSaveConstruct);
+    return UnlinkCIntelGridSaveConstructHelperPrimary();
   }
 
   /**
@@ -741,7 +913,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CIntelGridConstruct()
   {
-    return UnlinkHelperNode(gCIntelGridConstruct);
+    return UnlinkCIntelGridConstructHelperPrimary();
   }
 
   /**
@@ -749,7 +921,85 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CIntelGridSerializer()
   {
-    return UnlinkHelperNode(gCIntelGridSerializer);
+    return UnlinkCIntelGridSerializerHelperPrimary();
+  }
+
+  /**
+   * Address: 0x00507210 (FUN_00507210, CIntelGridSaveConstruct startup helper init)
+   *
+   * What it does:
+   * Initializes the global `CIntelGridSaveConstruct` helper node links and
+   * binds the save-construct callback lane.
+   */
+  [[nodiscard]] CIntelGridSaveConstruct* initialize_CIntelGridSaveConstructCallbacksVariant1()
+  {
+    InitializeHelperNode(gCIntelGridSaveConstruct);
+    gCIntelGridSaveConstruct.mSerSaveConstructArgsFunc =
+      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CIntelGridSaveConstruct::SaveConstruct);
+    return &gCIntelGridSaveConstruct;
+  }
+
+  /**
+   * Address: 0x00507D30 (FUN_00507D30, CIntelGridSaveConstruct startup helper init duplicate)
+   *
+   * What it does:
+   * Duplicate lane of `CIntelGridSaveConstruct` helper callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] CIntelGridSaveConstruct* initialize_CIntelGridSaveConstructCallbacksVariant2()
+  {
+    return initialize_CIntelGridSaveConstructCallbacksVariant1();
+  }
+
+  /**
+   * Address: 0x00507330 (FUN_00507330)
+   *
+   * What it does:
+   * Initializes the global `CIntelGridConstruct` helper callback lanes and
+   * returns that helper object.
+   */
+  [[nodiscard]] CIntelGridConstruct* initialize_CIntelGridConstructCallbacksVariant1()
+  {
+    InitializeHelperNode(gCIntelGridConstruct);
+    gCIntelGridConstruct.mSerConstructFunc = reinterpret_cast<gpg::RType::construct_func_t>(&CIntelGridConstruct::Construct);
+    gCIntelGridConstruct.mDeleteFunc = &CIntelGridConstruct::Deconstruct;
+    return &gCIntelGridConstruct;
+  }
+
+  /**
+   * Address: 0x005074B0 (FUN_005074B0)
+   *
+   * What it does:
+   * Initializes the global `CIntelGridSerializer` helper callback lanes and
+   * returns that helper object.
+   */
+  [[nodiscard]] CIntelGridSerializer* initialize_CIntelGridSerializerCallbacksVariant1()
+  {
+    InitializeHelperNode(gCIntelGridSerializer);
+    gCIntelGridSerializer.mSerLoadFunc = reinterpret_cast<gpg::RType::load_func_t>(&CIntelGridSerializer::Deserialize);
+    gCIntelGridSerializer.mSerSaveFunc = reinterpret_cast<gpg::RType::save_func_t>(&CIntelGridSerializer::Serialize);
+    return &gCIntelGridSerializer;
+  }
+
+  /**
+   * Address: 0x00507DB0 (FUN_00507DB0)
+   *
+   * What it does:
+   * Duplicate lane of `CIntelGridConstruct` helper callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] CIntelGridConstruct* initialize_CIntelGridConstructCallbacksVariant2()
+  {
+    return initialize_CIntelGridConstructCallbacksVariant1();
+  }
+
+  /**
+   * Address: 0x00507E30 (FUN_00507E30)
+   *
+   * What it does:
+   * Duplicate lane of `CIntelGridSerializer` helper callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] CIntelGridSerializer* initialize_CIntelGridSerializerCallbacksVariant2()
+  {
+    return initialize_CIntelGridSerializerCallbacksVariant1();
   }
 
   /**
@@ -766,9 +1016,7 @@ namespace moho
    */
   void register_CIntelGridSaveConstruct()
   {
-    InitializeHelperNode(gCIntelGridSaveConstruct);
-    gCIntelGridSaveConstruct.mSerSaveConstructArgsFunc =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CIntelGridSaveConstruct::SaveConstruct);
+    (void)initialize_CIntelGridSaveConstructCallbacksVariant1();
     gCIntelGridSaveConstruct.RegisterSaveConstructArgsFunction();
     (void)std::atexit(&CleanupSaveConstructAtexit);
   }
@@ -778,9 +1026,7 @@ namespace moho
    */
   void register_CIntelGridConstruct()
   {
-    InitializeHelperNode(gCIntelGridConstruct);
-    gCIntelGridConstruct.mSerConstructFunc = reinterpret_cast<gpg::RType::construct_func_t>(&CIntelGridConstruct::Construct);
-    gCIntelGridConstruct.mDeleteFunc = &CIntelGridConstruct::Deconstruct;
+    (void)initialize_CIntelGridConstructCallbacksVariant1();
     gCIntelGridConstruct.RegisterConstructFunction();
     (void)std::atexit(&CleanupConstructAtexit);
   }
@@ -790,10 +1036,7 @@ namespace moho
    */
   void register_CIntelGridSerializer()
   {
-    InitializeHelperNode(gCIntelGridSerializer);
-    gCIntelGridSerializer.mSerLoadFunc = reinterpret_cast<gpg::RType::load_func_t>(&CIntelGridSerializer::Deserialize);
-    gCIntelGridSerializer.mSerSaveFunc = reinterpret_cast<gpg::RType::save_func_t>(&CIntelGridSerializer::Serialize);
-    gCIntelGridSerializer.RegisterSerializeFunctions();
+    (void)initialize_CIntelGridSerializerCallbacksVariant1();
     (void)std::atexit(&CleanupSerializerAtexit);
   }
 } // namespace moho

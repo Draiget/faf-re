@@ -15,17 +15,35 @@ namespace
   alignas(SAiReservedTransportBoneTypeInfo)
     unsigned char gSAiReservedTransportBoneTypeInfoStorage[sizeof(SAiReservedTransportBoneTypeInfo)];
   bool gSAiReservedTransportBoneTypeInfoConstructed = false;
+  bool gSAiReservedTransportBoneTypeInfoPreregistered = false;
 
   [[nodiscard]] SAiReservedTransportBoneTypeInfo* AcquireSAiReservedTransportBoneTypeInfo()
   {
     if (!gSAiReservedTransportBoneTypeInfoConstructed) {
-      auto* const type = new (gSAiReservedTransportBoneTypeInfoStorage) SAiReservedTransportBoneTypeInfo();
-      gpg::PreRegisterRType(typeid(SAiReservedTransportBone), type);
-      SAiReservedTransportBone::sType = type;
+      new (gSAiReservedTransportBoneTypeInfoStorage) SAiReservedTransportBoneTypeInfo();
       gSAiReservedTransportBoneTypeInfoConstructed = true;
     }
 
     return reinterpret_cast<SAiReservedTransportBoneTypeInfo*>(gSAiReservedTransportBoneTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x005E3F60 (FUN_005E3F60)
+   *
+   * What it does:
+   * Initializes the startup-owned `SAiReservedTransportBoneTypeInfo` instance
+   * and preregisters RTTI for `SAiReservedTransportBone`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SAiReservedTransportBoneTypeInfoStartup()
+  {
+    auto* const typeInfo = AcquireSAiReservedTransportBoneTypeInfo();
+    if (!gSAiReservedTransportBoneTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(SAiReservedTransportBone), typeInfo);
+      gSAiReservedTransportBoneTypeInfoPreregistered = true;
+    }
+
+    SAiReservedTransportBone::sType = typeInfo;
+    return typeInfo;
   }
 
   void cleanup_SAiReservedTransportBoneTypeInfo()
@@ -37,6 +55,7 @@ namespace
     AcquireSAiReservedTransportBoneTypeInfo()->~SAiReservedTransportBoneTypeInfo();
     SAiReservedTransportBone::sType = nullptr;
     gSAiReservedTransportBoneTypeInfoConstructed = false;
+    gSAiReservedTransportBoneTypeInfoPreregistered = false;
   }
 } // namespace
 
@@ -72,6 +91,6 @@ void SAiReservedTransportBoneTypeInfo::Init()
  */
 int moho::register_SAiReservedTransportBoneTypeInfo()
 {
-  (void)AcquireSAiReservedTransportBoneTypeInfo();
+  (void)preregister_SAiReservedTransportBoneTypeInfoStartup();
   return std::atexit(&cleanup_SAiReservedTransportBoneTypeInfo);
 }

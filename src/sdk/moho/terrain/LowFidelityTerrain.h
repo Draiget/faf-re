@@ -84,6 +84,15 @@ namespace moho
     void DrawWaterLine(std::int32_t arg0, std::int32_t arg1);
 
     /**
+     * Address: 0x00809C80 (FUN_00809C80, Moho::LowFidelityTerrain::DrawTerrainSkirt)
+     *
+     * What it does:
+     * Issues one terrain-skirt indexed draw for the low-fidelity terrain path
+     * when terrain/skirt flags are enabled and skirt index lanes are valid.
+     */
+    virtual void DrawTerrainSkirt();
+
+    /**
      * Address: 0x00809B20 (FUN_00809B20, Moho::LowFidelityTerrain::DrawTerrainNormal)
      *
      * What it does:
@@ -128,11 +137,11 @@ namespace moho
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;                 // +0x14
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;                   // +0x18
     GeomCamera3* mCamera = nullptr;                                 // +0x1C
-    void* mUnknown20 = nullptr;                                     // +0x20
-    void* mUnknown24 = nullptr;                                     // +0x24
-    void* mUnknown28 = nullptr;                                     // +0x28
-    void* mUnknown2C = nullptr;                                     // +0x2C
-    void* mUnknown30 = nullptr;                                     // +0x30
+    std::uint32_t mSkirtStartIndex = 0u;                            // +0x20
+    std::uint32_t mUnknown24 = 0u;                                  // +0x24
+    std::uint32_t mSkirtEndIndex = 0u;                              // +0x28
+    std::int32_t mSkirtEndVertex = 0;                               // +0x2C
+    std::int32_t mSkirtBaseVertex = 0;                              // +0x30
     float mTerrainScale = 1.0F;                                     // +0x34
     float mUnknown38 = 0.0F;                                        // +0x38
     float mUnknown3C = 0.0F;                                        // +0x3C
@@ -148,6 +157,22 @@ namespace moho
 
   static_assert(offsetof(LowFidelityTerrain, mTerrainResource) == 0x0C, "LowFidelityTerrain::mTerrainResource offset must be 0x0C");
   static_assert(offsetof(LowFidelityTerrain, mTesselator) == 0x10, "LowFidelityTerrain::mTesselator offset must be 0x10");
+  static_assert(
+    offsetof(LowFidelityTerrain, mSkirtStartIndex) == 0x20,
+    "LowFidelityTerrain::mSkirtStartIndex offset must be 0x20"
+  );
+  static_assert(
+    offsetof(LowFidelityTerrain, mSkirtEndIndex) == 0x28,
+    "LowFidelityTerrain::mSkirtEndIndex offset must be 0x28"
+  );
+  static_assert(
+    offsetof(LowFidelityTerrain, mSkirtEndVertex) == 0x2C,
+    "LowFidelityTerrain::mSkirtEndVertex offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(LowFidelityTerrain, mSkirtBaseVertex) == 0x30,
+    "LowFidelityTerrain::mSkirtBaseVertex offset must be 0x30"
+  );
   static_assert(
     offsetof(LowFidelityTerrain, mPrimaryPatchData) == 0x50,
     "LowFidelityTerrain::mPrimaryPatchData offset must be 0x50"

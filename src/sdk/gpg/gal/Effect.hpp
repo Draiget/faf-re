@@ -15,6 +15,14 @@ namespace gal {
     class Effect {
     public:
       /**
+       * Address: 0x009415A0 (FUN_009415A0)
+       *
+       * What it does:
+       * Initializes one base `Effect` lane and installs the class vtable.
+       */
+      Effect();
+
+      /**
        * Address: 0x0093F5B0 (FUN_0093F5B0)
        * Mangled: ?Create@Effect@gal@gpg@@SA?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@ABVEffectContext@23@@Z
        *

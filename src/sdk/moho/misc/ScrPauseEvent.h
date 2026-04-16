@@ -37,7 +37,7 @@ namespace moho
     ScrPauseEvent(const ScrPauseEvent& other);
 
     /**
-     * Address: 0x004B4450 (FUN_004B4450, sub_4B4450)
+       * Address: 0x004B4450 (FUN_004B4450)
      *
      * What it does:
      * Releases payload string lanes and wxEvent ref-data state.
@@ -53,7 +53,7 @@ namespace moho
     [[nodiscard]] void* GetClassInfo() const override;
 
     /**
-     * Address: 0x004B4450 (FUN_004B4450, deleting-dtor lane)
+      * Alias of FUN_004B4450 (non-canonical helper lane).
      *
      * What it does:
      * Deletes this payload object.

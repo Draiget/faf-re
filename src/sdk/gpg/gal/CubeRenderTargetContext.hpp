@@ -29,10 +29,21 @@ namespace gpg::gal
         CubeRenderTargetContext(std::uint32_t dimension, std::uint32_t format);
 
         /**
-         * Address: 0x008E65A0 (FUN_008E65A0)
+         * Address: 0x00941250 (FUN_00941250)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for cube render-target context handles.
+         * Copies cube render-target dimension and format lanes from another
+         * context instance.
+         */
+        CubeRenderTargetContext& AssignFrom(const CubeRenderTargetContext& other);
+
+        /**
+         * Address: 0x008E6590 (FUN_008E6590)
+         * Address: 0x008E65A0 (FUN_008E65A0, scalar deleting destructor thunk)
+         *
+         * What it does:
+         * Resets base vftable ownership for cube render-target context teardown.
+         * The scalar-deleting thunk reuses this destructor body.
          */
         virtual ~CubeRenderTargetContext();
 

@@ -82,6 +82,62 @@ namespace moho
     [[nodiscard]] bool IsEnemy(std::uint32_t armyIndex) const;
 
     /**
+     * Address: 0x00707C40 (FUN_00707C40)
+     *
+     * What it does:
+     * Writes one player-color BGRA value into the variable-data payload.
+     */
+    void SetPlayerColorBgra(std::uint32_t playerColorBgra);
+
+    /**
+     * Address: 0x00707C50 (FUN_00707C50)
+     *
+     * What it does:
+     * Writes one army-color BGRA value into the variable-data payload.
+     */
+    void SetArmyColorBgra(std::uint32_t armyColorBgra);
+
+    /**
+     * Address: 0x00707C60 (FUN_00707C60)
+     *
+     * What it does:
+     * Writes one faction index into the variable-data payload.
+     */
+    void SetFactionIndex(std::int32_t factionIndex);
+
+    /**
+     * Address: 0x00707C90 (FUN_00707C90)
+     *
+     * What it does:
+     * Sets the variable-data show-score flag.
+     */
+    void SetShowScoreFlag(bool enabled);
+
+    /**
+     * Address: 0x00707CA0 (FUN_00707CA0)
+     *
+     * What it does:
+     * Returns the constant-data civilian flag.
+     */
+    [[nodiscard]] bool IsCivilian() const;
+
+    /**
+     * Address: 0x00707CB0 (FUN_00707CB0)
+     *
+     * What it does:
+     * Returns the variable-data out-of-game flag.
+     */
+    [[nodiscard]] bool IsOutOfGame() const;
+
+    /**
+     * Address: 0x00707CD0 (FUN_00707CD0)
+     *
+     * What it does:
+     * Returns handicap scalar when handicap is enabled, otherwise `0.0f`.
+     */
+    [[nodiscard]] float GetHandicap() const;
+
+    /**
      * Binary evidence summary:
      * - Address: 0x00550B20 (FUN_00550B20): IArmy typeinfo size is 0x1E0.
      * - Address: 0x00703E40 (FUN_00703E40): SimArmy registers IArmy as base at offset +0x08.

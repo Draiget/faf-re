@@ -54,6 +54,122 @@ namespace
   };
 
   RUnitBlueprintWeaponVectorReflectionBootstrap gRUnitBlueprintWeaponVectorReflectionBootstrap;
+
+  /**
+   * Address: 0x00524380 (FUN_00524380)
+   *
+   * What it does:
+   * Ensures one `vector<RUnitBlueprintWeapon>` has capacity for `count`
+   * elements before deserialization fills it.
+   */
+  void EnsureWeaponVectorCapacity(WeaponVector& storage, const std::size_t count)
+  {
+    if (count <= storage.capacity()) {
+      return;
+    }
+
+    storage.reserve(count);
+  }
+
+  /**
+   * Address: 0x00526170 (FUN_00526170)
+   *
+   * What it does:
+   * Copy-assigns one contiguous `RUnitBlueprintWeapon` destination range from
+   * source lanes and returns the advanced source cursor.
+   */
+  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
+    moho::RUnitBlueprintWeapon* destinationBegin,
+    moho::RUnitBlueprintWeapon* destinationEnd,
+    const moho::RUnitBlueprintWeapon* sourceBegin
+  )
+  {
+    moho::RUnitBlueprintWeapon* destinationCursor = destinationBegin;
+    const moho::RUnitBlueprintWeapon* sourceCursor = sourceBegin;
+
+    while (destinationCursor != destinationEnd) {
+      *destinationCursor = *sourceCursor;
+      ++destinationCursor;
+      ++sourceCursor;
+    }
+
+    return sourceCursor;
+  }
+
+  /**
+   * Address: 0x00524620 (FUN_00524620)
+   *
+   * What it does:
+   * Destroys one contiguous half-open range `[first,last)` of
+   * `RUnitBlueprintWeapon` elements.
+   */
+  void DestroyUnitBlueprintWeaponRange(
+    moho::RUnitBlueprintWeapon* const first,
+    moho::RUnitBlueprintWeapon* const last
+  )
+  {
+    for (moho::RUnitBlueprintWeapon* cursor = first; cursor != last; ++cursor) {
+      cursor->~RUnitBlueprintWeapon();
+    }
+  }
+
+  /**
+   * Address: 0x00524A80 (FUN_00524A80)
+   *
+   * What it does:
+   * Destroys one half-open tail range in `vector<RUnitBlueprintWeapon>`,
+   * updates the runtime `end` lane, and returns the erased begin iterator.
+   */
+  [[nodiscard]] moho::RUnitBlueprintWeapon** DestroyUnitBlueprintWeaponTailAndReturnIterator(
+    WeaponVector& storage,
+    moho::RUnitBlueprintWeapon** const outIterator,
+    moho::RUnitBlueprintWeapon* const eraseBegin,
+    moho::RUnitBlueprintWeapon* const eraseEnd
+  )
+  {
+    if (eraseBegin != eraseEnd) {
+      DestroyUnitBlueprintWeaponRange(eraseBegin, eraseEnd);
+
+      auto& view = msvc8::AsVectorRuntimeView(storage);
+      view.end = eraseBegin;
+    }
+
+    if (outIterator) {
+      *outIterator = eraseBegin;
+    }
+    return outIterator;
+  }
+
+  /**
+   * Address: 0x005244A0 (FUN_005244A0)
+   *
+   * What it does:
+   * Adjusts one `vector<RUnitBlueprintWeapon>` length to `requestedCount` and
+   * uses one caller-provided fill lane for growth.
+   */
+  [[nodiscard]] std::size_t ResizeUnitBlueprintWeaponVectorWithFill(
+    WeaponVector& storage,
+    const std::size_t requestedCount,
+    const moho::RUnitBlueprintWeapon& fillValue
+  )
+  {
+    const std::size_t currentCount = storage.size();
+    if (currentCount < requestedCount) {
+      storage.resize(requestedCount, fillValue);
+      return requestedCount;
+    }
+
+    if (requestedCount < currentCount) {
+      auto& view = msvc8::AsVectorRuntimeView(storage);
+      if (view.begin && view.end) {
+        moho::RUnitBlueprintWeapon* const eraseBegin = view.begin + requestedCount;
+        moho::RUnitBlueprintWeapon* outIterator = nullptr;
+        (void)DestroyUnitBlueprintWeaponTailAndReturnIterator(storage, &outIterator, eraseBegin, view.end);
+      }
+    }
+
+    return requestedCount;
+  }
 } // namespace
 
 /**
@@ -132,7 +248,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
   archive->ReadUInt(&count);
 
   WeaponVector loaded{};
-  loaded.reserve(static_cast<std::size_t>(count));
+  EnsureWeaponVectorCapacity(loaded, static_cast<std::size_t>(count));
 
   gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
   if (!elementType) {
@@ -225,7 +341,8 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SetCount(void* const obj, const int 
   }
 
   auto* const storage = static_cast<WeaponVector*>(obj);
-  storage->resize(static_cast<std::size_t>(count));
+  const moho::RUnitBlueprintWeapon fillValue{};
+  (void)ResizeUnitBlueprintWeaponVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
 }
 
 gpg::RType* moho::preregister_VectorRUnitBlueprintWeaponType()
@@ -235,6 +352,13 @@ gpg::RType* moho::preregister_VectorRUnitBlueprintWeaponType()
   return typeInfo;
 }
 
+/**
+ * Address: 0x00BC8D30 (FUN_00BC8D30, register_VectorRUnitBlueprintWeaponTypeAtexit)
+ *
+ * What it does:
+ * Startup lane that preregisters `vector<RUnitBlueprintWeapon>` reflection
+ * metadata and installs teardown callback.
+ */
 int moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
 {
   (void)preregister_VectorRUnitBlueprintWeaponType();

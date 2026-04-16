@@ -9,7 +9,7 @@ namespace
 {
   struct PauseListenerRuntimeView final
   {
-    std::uint32_t mUnknown0x04;
+    void* mPauseEventListenerVftable;
     moho::Broadcaster mSessionListenerLink;
   };
 
@@ -19,11 +19,34 @@ namespace
   );
   static_assert(sizeof(PauseListenerRuntimeView) == 0x0C, "PauseListenerRuntimeView size must be 0x0C");
 
+  PauseListenerRuntimeView gPauseListenerStartupAnchor{};
+  void* gPauseEventListenerVftable = nullptr;
+
   [[nodiscard]] moho::Broadcaster& PauseListenerLink(moho::PauseListener& listener) noexcept
   {
     auto* const base = reinterpret_cast<std::uint8_t*>(&listener);
     auto* const view = reinterpret_cast<PauseListenerRuntimeView*>(base + 0x04);
     return view->mSessionListenerLink;
+  }
+
+  /**
+   * Address: 0x008697C0 (FUN_008697C0, pause-listener startup anchor cleanup)
+   *
+   * What it does:
+   * Restores the pause-event listener-vtable lane on the startup anchor,
+   * unlinks its session-listener link from the current ring, and rewires that
+   * link back to a self-linked singleton node.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::Broadcaster* cleanup_PauseListenerStartupAnchor()
+  {
+    gPauseListenerStartupAnchor.mPauseEventListenerVftable = gPauseEventListenerVftable;
+
+    moho::Broadcaster& pauseLink = gPauseListenerStartupAnchor.mSessionListenerLink;
+    pauseLink.mPrev->mNext = pauseLink.mNext;
+    pauseLink.mNext->mPrev = pauseLink.mPrev;
+    pauseLink.mPrev = &pauseLink;
+    pauseLink.mNext = &pauseLink;
+    return &pauseLink;
   }
 } // namespace
 

@@ -13,11 +13,37 @@
 namespace
 {
   constexpr std::uint32_t kSteeringLineColor = 0xFF0000FFu;
+
+  /**
+   * Address: 0x00651020 (FUN_00651020, Moho::RDebugNavSteering non-deleting dtor body)
+   *
+   * What it does:
+   * Runs the typed debug-overlay intrusive unlink lane for one
+   * `RDebugNavSteering` instance and restores singleton link state.
+   */
+  [[maybe_unused]] void DestroyRDebugNavSteeringNonDeletingBody(moho::RDebugNavSteering* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
+    node->ListUnlinkSelf();
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* RDebugNavSteering::sType = nullptr;
+
+  /**
+   * Address: 0x00650EF0 (FUN_00650EF0)
+   *
+   * What it does:
+   * Initializes the steering-overlay vtable lane and inherited intrusive
+   * debug-overlay links.
+   */
+  RDebugNavSteering::RDebugNavSteering() = default;
 
   /**
    * Address: 0x00650930 (FUN_00650930, Moho::RDebugNavSteering::GetClass)

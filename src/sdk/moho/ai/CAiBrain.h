@@ -954,6 +954,30 @@ namespace moho
   int cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x005898B0 (FUN_005898B0, func_CAiBrainCreateUnitNearSpot_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `brain:CreateUnitNearSpot(unitName, posX, posY)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainCreateUnitNearSpot_LuaFuncDef();
+
+  /**
+   * Address: 0x00589DD0 (FUN_00589DD0, func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `brain:CreateResourceBuildingNearest(structureName, posX, posY)` Lua binder.
+   */
+  void func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef();
+
+  /**
+   * Address: 0x0058A460 (FUN_0058A460, func_CAiBrainFindPlaceToBuild_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `brain:FindPlaceToBuild(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainFindPlaceToBuild_LuaFuncDef();
+
+  /**
    * Address: 0x0058ED60 (FUN_0058ED60, cfunc_CAiBrainGetAttackVectors)
    *
    * What it does:

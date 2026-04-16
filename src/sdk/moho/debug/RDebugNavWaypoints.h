@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x00650EE0 (FUN_00650EE0)
+     *
+     * What it does:
+     * Initializes the waypoint-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugNavWaypoints();
+
+    /**
      * Address: 0x00650730 (FUN_00650730, Moho::RDebugNavWaypoints::GetClass)
      * Slot: 0
      *

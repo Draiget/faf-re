@@ -2,6 +2,8 @@
 
 namespace moho
 {
+  gpg::RType* CAniDefaultSkel::sType = nullptr;
+
   /**
    * Address: 0x0054A390 (FUN_0054A390, Moho::CAniDefaultSkel::CAniDefaultSkel)
    * Mangled: ??0CAniDefaultSkel@Moho@@IAE@XZ

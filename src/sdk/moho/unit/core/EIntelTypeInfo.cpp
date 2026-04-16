@@ -53,6 +53,21 @@ namespace
     return reinterpret_cast<moho::EIntelPrimitiveSerializer*>(gEIntelPrimitiveSerializerStorage);
   }
 
+  /**
+   * Address: 0x0050ABD0 (FUN_0050ABD0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `EIntel`.
+   */
+  [[nodiscard]] gpg::RType* ResolveEIntelType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EIntel));
+    }
+    return cached;
+  }
+
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
   {
@@ -78,6 +93,40 @@ namespace
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
     serializer.mHelperPrev = self;
+  }
+
+  /**
+   * Address: 0x0050A880 (FUN_0050A880)
+   *
+   * What it does:
+   * Initializes callback lanes for startup-owned `EIntel` primitive serializer
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EIntelPrimitiveSerializer*
+  InitializeEIntelPrimitiveSerializerStartupThunkPrimary()
+  {
+    auto* const serializer = AcquireEIntelPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EIntelPrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EIntelPrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050AB20 (FUN_0050AB20)
+   *
+   * What it does:
+   * Secondary startup-init entry for the `EIntel` primitive serializer helper
+   * storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EIntelPrimitiveSerializer*
+  InitializeEIntelPrimitiveSerializerStartupThunkSecondary()
+  {
+    auto* const serializer = AcquireEIntelPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EIntelPrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EIntelPrimitiveSerializer::Serialize;
+    return serializer;
   }
 
   /**
@@ -197,7 +246,7 @@ namespace moho
    */
   void EIntelPrimitiveSerializer::RegisterSerializeFunctions()
   {
-    gpg::RType* const type = gpg::LookupRType(typeid(EIntel));
+    gpg::RType* const type = ResolveEIntelType();
     GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
     GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
     type->serLoadFunc_ = mDeserialize;
@@ -218,10 +267,7 @@ namespace moho
    */
   int register_EIntelPrimitiveSerializer()
   {
-    auto* const serializer = AcquireEIntelPrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &EIntelPrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &EIntelPrimitiveSerializer::Serialize;
+    (void)InitializeEIntelPrimitiveSerializerStartupThunkPrimary();
     return std::atexit(&cleanup_EIntelPrimitiveSerializer);
   }
 } // namespace moho

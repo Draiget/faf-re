@@ -18,6 +18,15 @@ namespace gal {
     class VertexBufferD3D10 {
     public:
       /**
+       * Address: 0x0094D990 (FUN_0094D990)
+       *
+       * What it does:
+       * Initializes one empty D3D10 vertex-buffer wrapper with default context
+       * and cleared native/staging/lock tracking lanes.
+       */
+      VertexBufferD3D10();
+
+      /**
        * Address: 0x0094DB50 (FUN_0094DB50)
        *
        * VertexBufferContext const *,void *,void *,void *

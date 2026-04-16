@@ -11,6 +11,15 @@ namespace gal {
     class RenderTarget {
     public:
       /**
+       * Address: 0x008F5250 (FUN_008F5250)
+       *
+       * What it does:
+       * Initializes one abstract render-target base lane by installing the
+       * class vtable.
+       */
+      RenderTarget();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

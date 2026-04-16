@@ -36,6 +36,13 @@ namespace
     return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
   }
 
+  [[nodiscard]] gpg::RRef MakeCAiBrainRef(CAiBrain* const object)
+  {
+    gpg::RRef ref{};
+    gpg::RRef_CAiBrain(&ref, object);
+    return ref;
+  }
+
   void InitializeHelperNode(CAiBrainConstruct& helper) noexcept
   {
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
@@ -56,17 +63,39 @@ namespace
     return self;
   }
 
-  void ConstructCAiBrainForSerializer(gpg::ReadArchive*, int, int, gpg::SerConstructResult* const result)
+  /**
+   * Address: 0x00579D00 (FUN_00579D00)
+   *
+   * What it does:
+   * Allocates one `CAiBrain`, wraps it in a reflected `RRef`, and publishes
+   * that reference through `SerConstructResult::SetUnowned`.
+   */
+  void ConstructCAiBrainForResult(gpg::ReadArchive*, int, int, gpg::SerConstructResult* const result)
   {
-    if (!result) {
-      return;
+    CAiBrain* object = nullptr;
+    void* const storage = ::operator new(sizeof(CAiBrain), std::nothrow);
+    if (storage) {
+      object = new (storage) CAiBrain();
     }
 
-    CAiBrain* const object = new (std::nothrow) CAiBrain();
-    gpg::RRef objectRef{};
-    objectRef.mObj = object;
-    objectRef.mType = object ? object->GetClass() : nullptr;
-    result->SetUnowned(objectRef, 0u);
+    result->SetUnowned(MakeCAiBrainRef(object), 0u);
+  }
+
+  /**
+   * Address: 0x00579CF0 (FUN_00579CF0)
+   *
+   * What it does:
+   * Forwards one serializer construct callback lane to
+   * `ConstructCAiBrainForResult`.
+   */
+  void ConstructCAiBrainForResultThunk(
+    gpg::ReadArchive* const archive,
+    const int objectLane,
+    const int version,
+    gpg::SerConstructResult* const result
+  )
+  {
+    ConstructCAiBrainForResult(archive, objectLane, version, result);
   }
 
   void DeleteConstructedCAiBrain(void* const objectPtr)
@@ -126,7 +155,7 @@ int moho::register_CAiBrainConstructStartup()
 {
   InitializeHelperNode(gCAiBrainConstructStartupHelper);
   gCAiBrainConstructStartupHelper.mConstructCallback =
-    reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCAiBrainForSerializer);
+    reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCAiBrainForResultThunk);
   gCAiBrainConstructStartupHelper.mDeleteCallback = &DeleteConstructedCAiBrain;
   gCAiBrainConstructStartupHelper.RegisterConstructFunction();
   return std::atexit(&cleanup_CAiBrainConstructStartupAtExit);

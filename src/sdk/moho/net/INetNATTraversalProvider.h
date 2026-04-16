@@ -19,6 +19,14 @@ namespace moho
   class INetNATTraversalProvider
   {
   public:
+    /**
+     * Address: 0x007B64F0 (FUN_007B64F0, ??0INetNATTraversalProvider@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one NAT traversal provider base interface object.
+     */
+    INetNATTraversalProvider();
+
     static gpg::RType* sType;
 
     [[nodiscard]] static gpg::RType* StaticGetClass();

@@ -41,7 +41,7 @@ namespace moho
 
   public:
     /**
-     * Address: 0x00779170 (FUN_00779170)
+       * Address: 0x00779170 (FUN_00779170)
      *
      * What it does:
      * Initializes decal runtime storage (id pool, handle list, start-tick buckets).
@@ -49,7 +49,7 @@ namespace moho
     CDecalBuffer();
 
     /**
-     * Address: 0x00779170 (FUN_00779170)
+       * Address: 0x00779170 (FUN_00779170)
      *
      * What it does:
      * Initializes decal runtime storage bound to a Sim owner.

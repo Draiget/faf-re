@@ -77,6 +77,11 @@ namespace moho
     ~CLobby() override;
 
     /**
+     * Task-execution bridge for legacy `CTask` ABI.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x004C70A0
      */
     msvc8::string GetErrorDescription() override;
@@ -141,7 +146,19 @@ namespace moho
     void OnConnectionMade(const CMessage* message, INetConnection* connection);
 
     /**
-     * Address: 0x007C5ED0
+     * Address: 0x007C5ED0 (FUN_007C5ED0)
+     *
+     * What it does:
+     * Handles connection-loss state transitions and reconnect/eject behavior.
+     */
+    void Reconnect(INetConnection* connection);
+
+    /**
+     * Address: 0x007C62E0 (FUN_007C62E0)
+     *
+     * What it does:
+     * Message-dispatch adapter that forwards one lost-link callback into
+     * `Reconnect`.
      */
     void OnConnectionLost(CMessage* message, INetConnection* connection);
 
@@ -383,6 +400,63 @@ namespace moho
   };
 
   static_assert(sizeof(CScrLuaMetatableFactory<CLobby>) == 0x08, "CScrLuaMetatableFactory<CLobby> size must be 0x08");
+
+  /**
+   * Address: 0x007C0060 (FUN_007C0060, cfunc_InternalCreateDiscoveryService)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_InternalCreateDiscoveryServiceL`.
+   */
+  int cfunc_InternalCreateDiscoveryService(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C0080 (FUN_007C0080, func_InternalCreateDiscoveryService_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateDiscoveryService(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateDiscoveryService_LuaFuncDef();
+
+  /**
+   * Address: 0x007C00E0 (FUN_007C00E0, cfunc_InternalCreateDiscoveryServiceL)
+   */
+  int cfunc_InternalCreateDiscoveryServiceL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C0CC0 (FUN_007C0CC0, cfunc_InternalCreateLobby)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to `cfunc_InternalCreateLobbyL`.
+   */
+  int cfunc_InternalCreateLobby(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C0CE0 (FUN_007C0CE0, func_InternalCreateLobby_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateLobby(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateLobby_LuaFuncDef();
+
+  /**
+   * Address: 0x007C0D40 (FUN_007C0D40, cfunc_InternalCreateLobbyL)
+   *
+   * What it does:
+   * Validates and decodes one `InternalCreateLobby(...)` Lua call, resolves
+   * connector/NAT lanes, constructs `CLobby`, and pushes the lobby Lua object.
+   */
+  int cfunc_InternalCreateLobbyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00BDFDD0 (FUN_00BDFDD0, register_InternalCreateDiscoveryService_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_InternalCreateDiscoveryService_LuaFuncDef();
+
+  /**
+   * Address: 0x00BDFE50 (FUN_00BDFE50, register_InternalCreateLobby_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_InternalCreateLobby_LuaFuncDef();
 
   /**
    * Address: 0x007C13E0 (FUN_007C13E0, cfunc_CLobbyDestroy)

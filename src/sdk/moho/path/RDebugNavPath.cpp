@@ -77,11 +77,37 @@ namespace
       hasPrevious = true;
     }
   }
+
+  /**
+   * Address: 0x00650FC0 (FUN_00650FC0, Moho::RDebugNavPath non-deleting dtor body)
+   *
+   * What it does:
+   * Runs the typed debug-overlay intrusive unlink lane for one
+   * `RDebugNavPath` instance and restores singleton link state.
+   */
+  [[maybe_unused]] void DestroyRDebugNavPathNonDeletingBody(moho::RDebugNavPath* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
+    node->ListUnlinkSelf();
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* RDebugNavPath::sType = nullptr;
+
+  /**
+   * Address: 0x00650ED0 (FUN_00650ED0)
+   *
+   * What it does:
+   * Initializes the nav-path overlay vtable lane and inherited intrusive
+   * debug-overlay links.
+   */
+  RDebugNavPath::RDebugNavPath() = default;
 
   /**
    * Address: 0x00650520 (FUN_00650520, ?GetClass@RDebugNavPath@Moho@@UBEPAVRType@gpg@@XZ)

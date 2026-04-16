@@ -68,13 +68,22 @@ namespace moho
   void CArmyStatItemTypeInfo::Init()
   {
     size_ = sizeof(CArmyStatItem);
-    newRefFunc_ = &CArmyStatItemTypeInfo::NewRef;
-    ctorRefFunc_ = &CArmyStatItemTypeInfo::CtrRef;
-    deleteFunc_ = &CArmyStatItemTypeInfo::Delete;
-    dtrFunc_ = &CArmyStatItemTypeInfo::Destruct;
+    (void)AssignLifecycleCallbacks(this);
     gpg::RType::Init();
     AddBase_StatItem(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x0070EE90 (FUN_0070EE90)
+   */
+  gpg::RType* CArmyStatItemTypeInfo::AssignLifecycleCallbacks(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &CArmyStatItemTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &CArmyStatItemTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &CArmyStatItemTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &CArmyStatItemTypeInfo::Destruct;
+    return typeInfo;
   }
 
   /**
@@ -184,6 +193,28 @@ namespace gpg
     outRef->mType = dynamicType;
     outRef->mObj =
       reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    return outRef;
+  }
+
+  /**
+   * Address: 0x007129E0 (FUN_007129E0)
+   *
+   * What it does:
+   * Packs one `RRef_CArmyStatItem` result into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackRRef_CArmyStatItem(
+    gpg::RRef* const outRef,
+    moho::CArmyStatItem* const value
+  )
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef tmp{};
+    (void)RRef_CArmyStatItem(&tmp, value);
+    outRef->mObj = tmp.mObj;
+    outRef->mType = tmp.mType;
     return outRef;
   }
 } // namespace gpg

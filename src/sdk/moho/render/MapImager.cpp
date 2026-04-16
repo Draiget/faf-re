@@ -19,6 +19,8 @@
 
 namespace
 {
+  constexpr const char* kMapBorderAddName = "MapBorderAdd";
+  constexpr const char* kMapBorderAddHelpText = "MapBorderAdd(blueprintid)";
   constexpr const char* kMapBorderClearName = "MapBorderClear";
   constexpr const char* kMapBorderClearHelpText = "MapBorderClear()";
   constexpr const char* kGlobalLuaClassName = "<global>";
@@ -170,7 +172,7 @@ void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
 }
 
 /**
- * Address: 0x007F6530 (FUN_007F6530, Moho::REN_ShowSkeletons)
+  * Alias of FUN_007F6530 (non-canonical helper lane).
  *
  * What it does:
  * Toggles global skeleton-debug rendering and mirrors that bool lane into the
@@ -184,6 +186,30 @@ void REN_ShowSkeletons()
   if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
     activeDriver->SetSyncFilterOptionFlag(showSkeletons);
   }
+}
+
+/**
+ * Address: 0x007FA1E0 (FUN_007FA1E0, sub_7FA1E0)
+ *
+ * What it does:
+ * Adds one map-border blueprint to the active viewport map-imager lane when
+ * a render viewport is present.
+ */
+void REN_AddBorderToActiveViewport(const msvc8::string& meshBlueprintPath)
+{
+  if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
+    mapImager->AddBorder(meshBlueprintPath);
+  }
+}
+
+/**
+ * Address: 0x007FA720 (FUN_007FA720, Moho::REN_RenderShadowDebugOverlay)
+ *
+ * What it does:
+ * No-op shadow debug overlay callback lane retained for binary parity.
+ */
+void REN_RenderShadowDebugOverlay()
+{
 }
 
 /**
@@ -218,6 +244,64 @@ void REN_MapBorderClear(void* const commandArgs)
 {
   (void)commandArgs;
   ClearActiveViewportMapBorder();
+}
+
+/**
+ * Address: 0x00848260 (FUN_00848260, cfunc_MapBorderAdd)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_MapBorderAddL`.
+ */
+int cfunc_MapBorderAdd(lua_State* const luaContext)
+{
+  return cfunc_MapBorderAddL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00848280 (FUN_00848280, func_MapBorderAdd_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `MapBorderAdd(blueprintid)` Lua binder metadata into the
+ * user init set.
+ */
+CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kMapBorderAddName,
+    &moho::cfunc_MapBorderAdd,
+    nullptr,
+    kGlobalLuaClassName,
+    kMapBorderAddHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008482E0 (FUN_008482E0, cfunc_MapBorderAddL)
+ *
+ * What it does:
+ * Validates one string argument and asks the active viewport map-imager to
+ * add the requested border mesh blueprint.
+ */
+int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
+{
+  const int argCount = lua_gettop(state->m_state);
+  if (argCount != 1) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMapBorderAddHelpText, 1, argCount);
+  }
+
+  LuaPlus::LuaStackObject blueprintArg(state, 1);
+  const char* const blueprintId = lua_tostring(state->m_state, 1);
+  if (blueprintId == nullptr) {
+    blueprintArg.TypeError("string");
+  }
+
+  if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
+    mapImager->AddBorder(msvc8::string(blueprintId));
+  }
+
+  return 0;
 }
 
 /**

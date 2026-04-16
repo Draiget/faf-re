@@ -26,7 +26,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678800 (FUN_00678800, Moho::Entity::InitPositionHistory dependency)
+    * Alias of FUN_00678800 (non-canonical helper lane).
    *
    * What it does:
    * Initializes all position-history samples and resets cursor to `0`.
@@ -40,7 +40,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678E90 (FUN_00678E90), 0x00678F10 (FUN_00678F10)
+    * Alias of FUN_00678E90 (non-canonical helper lane).
    *
    * What it does:
    * Reads packed transform lanes from entity orientation/position storage.
@@ -59,7 +59,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678E90 (FUN_00678E90), 0x00678F10 (FUN_00678F10)
+    * Alias of FUN_00678E90 (non-canonical helper lane).
    *
    * What it does:
    * Writes packed transform lanes back to entity orientation/position storage.
@@ -78,7 +78,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679210 (FUN_00679210)
+    * Alias of FUN_00679210 (non-canonical helper lane).
    *
    * What it does:
    * Builds packed payload from a typed `VTransform`.
@@ -98,7 +98,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679CE0 (FUN_00679CE0)
+    * Alias of FUN_00679CE0 (non-canonical helper lane).
    *
    * What it does:
    * Rebuilds a typed `VTransform` from packed payload lanes.
@@ -139,7 +139,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678F10 (FUN_00678F10)
+    * Alias of FUN_00678F10 (non-canonical helper lane).
    *
    * What it does:
    * Appends previous/current transform snapshots into the rolling history ring.

@@ -19,7 +19,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006D3780 (FUN_006D3780, Moho::CWeaponAttributesSerializer::Deserialize)
+      * Alias of FUN_006D3780 (non-canonical helper lane).
      *
      * What it does:
      * Loads the reflected pointer/string/float lanes for `CWeaponAttributes`.
@@ -27,7 +27,7 @@ namespace moho
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x006D3790 (FUN_006D3790, Moho::CWeaponAttributesSerializer::Serialize)
+      * Alias of FUN_006D3790 (non-canonical helper lane).
      *
      * What it does:
      * Saves the reflected pointer/string/float lanes for `CWeaponAttributes`.
@@ -64,7 +64,7 @@ namespace moho
   static_assert(sizeof(CWeaponAttributesSerializer) == 0x14, "CWeaponAttributesSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, sub_BFE5F0)
+   * Address: 0x00BFE5F0 (FUN_00BFE5F0, serializer helper unlink cleanup)
    *
    * What it does:
    * Unlinks `CWeaponAttributesSerializer` helper-node links and rewires self-links.
@@ -72,7 +72,7 @@ namespace moho
   gpg::SerHelperBase* cleanup_CWeaponAttributesSerializer();
 
   /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, register_CWeaponAttributesSerializer)
+   * Address: 0x00BD87D0 (FUN_00BD87D0, startup registration + atexit cleanup)
    *
    * What it does:
    * Initializes and registers `CWeaponAttributes` serializer callbacks.

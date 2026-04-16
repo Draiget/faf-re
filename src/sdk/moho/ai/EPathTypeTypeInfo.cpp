@@ -111,6 +111,30 @@ namespace
     return UnlinkSerializerNode(*AcquireEPathTypePrimitiveSerializer());
   }
 
+  /**
+   * Address: 0x005B20F0 (FUN_005B20F0)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the recovered `EPathType` primitive
+   * serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EPathTypePrimitiveSerializerStartupThunkA()
+  {
+    return cleanup_EPathTypePrimitiveSerializer();
+  }
+
+  /**
+   * Address: 0x005B2120 (FUN_005B2120)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `EPathType` primitive
+   * serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EPathTypePrimitiveSerializerStartupThunkB()
+  {
+    return cleanup_EPathTypePrimitiveSerializer();
+  }
+
   void cleanup_EPathTypePrimitiveSerializer_atexit()
   {
     (void)cleanup_EPathTypePrimitiveSerializer();

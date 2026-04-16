@@ -11,6 +11,15 @@ namespace gal {
     class IndexBuffer {
     public:
       /**
+       * Address: 0x008F4B80 (FUN_008F4B80)
+       *
+       * What it does:
+       * Initializes one abstract index-buffer base lane by installing the
+       * class vtable.
+       */
+      IndexBuffer();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

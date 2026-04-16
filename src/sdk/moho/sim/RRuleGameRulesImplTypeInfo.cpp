@@ -90,7 +90,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0052B640 setup tail (base registration)
+    * Alias of FUN_0052B640 (non-canonical helper lane).
    */
   void RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules(gpg::RType* const typeInfo)
   {

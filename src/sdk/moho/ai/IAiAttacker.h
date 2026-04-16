@@ -32,6 +32,17 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005D56D0 (FUN_005D56D0)
+     * Address: 0x005D6A80 (FUN_005D6A80)
+     *
+     * What it does:
+     * Initializes the attacker interface vtable lane and resets the embedded
+     * broadcaster links to a self-linked sentinel state; the second
+     * constructor lane is an equivalent alias.
+     */
+    IAiAttacker();
+
+    /**
      * Address: 0x005D5780 (FUN_005D5780)
      *
      * What it does:
@@ -80,6 +91,14 @@ namespace moho
   static_assert(sizeof(IAiAttacker) == 0x0C, "IAiAttacker size must be 0x0C");
 
   /**
+   * Address: 0x005DF860 (FUN_005DF860, preregister_RBroadcasterRType_EAiAttackerEvent)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `Broadcaster<EAiAttackerEvent>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RBroadcasterRType_EAiAttackerEvent();
+
+  /**
    * Address: 0x00BCEAA0 (FUN_00BCEAA0, sub_BCEAA0)
    *
    * What it does:
@@ -96,6 +115,24 @@ namespace moho
    * process-exit cleanup.
    */
   int register_RListenerRType_EAiAttackerEvent();
+
+  /**
+   * Address: 0x005DF920 (FUN_005DF920, preregister_RVectorType_UnitWeaponPtr)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `msvc8::vector<moho::UnitWeapon*>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RVectorType_UnitWeaponPtr();
+
+  /**
+   * Address: 0x005DF990 (FUN_005DF990, preregister_RVectorType_CAcquireTargetTaskPtr)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `msvc8::vector<moho::CAcquireTargetTask*>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RVectorType_CAcquireTargetTaskPtr();
 
   /**
    * Address: 0x00BCEAE0 (FUN_00BCEAE0, sub_BCEAE0)

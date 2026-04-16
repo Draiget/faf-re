@@ -93,6 +93,30 @@ namespace
     return UnlinkSerializerNode(*AcquireEAiNavigatorStatusPrimitiveSerializer());
   }
 
+  /**
+   * Address: 0x005A2FC0 (FUN_005A2FC0)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * EAiNavigatorStatus primitive serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_EAiNavigatorStatusPrimitiveSerializerStartupThunkA()
+  {
+    return cleanup_EAiNavigatorStatusPrimitiveSerializer();
+  }
+
+  /**
+   * Address: 0x005A2FF0 (FUN_005A2FF0)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * EAiNavigatorStatus primitive serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_EAiNavigatorStatusPrimitiveSerializerStartupThunkB()
+  {
+    return cleanup_EAiNavigatorStatusPrimitiveSerializer();
+  }
+
   void cleanup_EAiNavigatorStatusPrimitiveSerializer_atexit()
   {
     (void)cleanup_EAiNavigatorStatusPrimitiveSerializer();

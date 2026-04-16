@@ -329,6 +329,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00723610 (FUN_00723610)
+   *
+   * What it does:
+   * Register/stack adapter that forwards one backward range copy request to
+   * `CopyCollisionResultsBackwardAlt`.
+   */
+  [[maybe_unused]] CollisionResult* CopyCollisionResultsBackwardAltAdapter(
+    CollisionResult* const sourceBegin,
+    CollisionResult* const sourceEnd,
+    CollisionResult* const destinationEnd
+  ) noexcept
+  {
+    return CopyCollisionResultsBackwardAlt(destinationEnd, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00723640 (FUN_00723640)
+   *
+   * What it does:
+   * Register/stack adapter that forwards one backward range copy request to
+   * `CopyCollisionResultsBackward`.
+   */
+  [[maybe_unused]] CollisionResult* CopyCollisionResultsBackwardAdapter(
+    CollisionResult* const sourceBegin,
+    CollisionResult* const sourceEnd,
+    CollisionResult* const destinationEnd
+  ) noexcept
+  {
+    return CopyCollisionResultsBackward(destinationEnd, sourceEnd, sourceBegin);
+  }
+
+  /**
    * Address: 0x00723410 (FUN_00723410, func_CopyCollisionResultArr1)
    *
    * What it does:
@@ -356,6 +388,47 @@ namespace moho
 
     return reinterpret_cast<CollisionResult*>(destinationAddress);
   }
+
+  /**
+   * Address: 0x00723090 (FUN_00723090, sub_723090)
+   *
+   * What it does:
+   * Inserts one `CollisionResult` range `[sourceBegin, sourceEnd)` before
+   * `insertBefore` in the active `fastvector_n` lane, growing storage when
+   * required, and returns the rebased insertion pointer.
+   */
+  CollisionResult* InsertCollisionResultRange(
+    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
+    CollisionResult* insertBefore,
+    const CollisionResult* const sourceBegin,
+    const CollisionResult* const sourceEnd
+  ) noexcept
+  {
+    if (sourceBegin == sourceEnd) {
+      return insertBefore;
+    }
+
+    CollisionResult* const begin = outCollisions.start_;
+    CollisionResult* const end = outCollisions.end_;
+
+    if (insertBefore == nullptr || insertBefore < begin) {
+      insertBefore = begin;
+    } else if (insertBefore > end) {
+      insertBefore = end;
+    }
+
+    const std::size_t insertionOffset = static_cast<std::size_t>(insertBefore - begin);
+    outCollisions.InsertAt(insertBefore, sourceBegin, sourceEnd);
+    return outCollisions.start_ + insertionOffset;
+  }
+
+  /**
+   * Address: 0x004FFDE0 (FUN_004FFDE0, Moho::CColPrimitiveBase::CColPrimitiveBase)
+   *
+   * What it does:
+   * Initializes one collision-primitive base runtime lane.
+   */
+  EntityCollisionUpdater::EntityCollisionUpdater() = default;
 
   /**
    * Address: 0x0067AC40 (FUN_0067AC40, inlined construction payload)

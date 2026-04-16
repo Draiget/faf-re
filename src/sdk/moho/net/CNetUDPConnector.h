@@ -166,7 +166,7 @@ namespace moho
     void Pull() override;
 
     /**
-     * Address: 0x0048B7F0
+      * Alias of FUN_0048B7F0 (non-canonical helper lane).
      * Address: 0x100851A0 (sub_100851A0)
      * Slot: 9
      * Demangled: Moho::CNetUDPConnector::Push
@@ -303,7 +303,7 @@ namespace moho
     void Entry();
 
     /**
-     * Address: 0x0048AC40
+      * Alias of FUN_0048AC40 (non-canonical helper lane).
      */
     int32_t SendData();
 

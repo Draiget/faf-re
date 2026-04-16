@@ -79,10 +79,13 @@ namespace moho
   void CUnitUpgradeTaskTypeInfo::Init()
   {
     size_ = sizeof(CUnitUpgradeTask);
-    newRefFunc_ = &CUnitUpgradeTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitUpgradeTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitUpgradeTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitUpgradeTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitUpgradeTaskTypeInfo::NewRef,
+      &CUnitUpgradeTaskTypeInfo::CtrRef,
+      &CUnitUpgradeTaskTypeInfo::Delete,
+      &CUnitUpgradeTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

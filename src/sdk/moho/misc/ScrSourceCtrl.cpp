@@ -10,6 +10,39 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x004C6750 (FUN_004C6750)
+ *
+ * ScrSourcePageRuntimeLane ***,ScrSourcePageRuntimeLane **,ScrSourcePageRuntimeLane **,std::string
+ *
+ * What it does:
+ * Scans one source-page pointer range and returns the iterator slot of the
+ * first page whose mounted source path exactly matches the provided key.
+ */
+moho::ScrSourcePageRuntimeLane*** moho::ScrSourceCtrl::FindPageIteratorByMountedSourcePath(
+  ScrSourcePageRuntimeLane*** const outIterator,
+  ScrSourcePageRuntimeLane** begin,
+  ScrSourcePageRuntimeLane** const end,
+  msvc8::string mountedSourcePath
+)
+{
+  ScrSourcePageRuntimeLane** it = begin;
+  while (it != end) {
+    ScrFileCtrl* const page = AsScrFileCtrl(*it);
+    if (page != nullptr
+        && mountedSourcePath.compare(
+             0U, mountedSourcePath.size(), page->mSourcePath.c_str(), page->mSourcePath.size()
+           )
+             == 0) {
+      break;
+    }
+    ++it;
+  }
+
+  *outIterator = it;
+  return outIterator;
+}
+
 void moho::ScrSourceCtrl::InitializeNotebookBaseRuntime(
   ScrSourceCtrl& object,
   wxWindowBase* const parentWindow

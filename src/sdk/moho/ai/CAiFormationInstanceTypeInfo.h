@@ -44,6 +44,15 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x0059C7D0 (FUN_0059C7D0)
+     *
+     * What it does:
+     * Wires `newRef/ctorRef/delete/dtr` callback lanes for
+     * `CAiFormationInstance` reflection ownership.
+     */
+    static gpg::RType* InitializeAllocationCallbacks(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x0059D0F0 (FUN_0059D0F0, ??2CAiFormationInstance@Moho@@QAE@@Z_0)
      *
      * What it does:

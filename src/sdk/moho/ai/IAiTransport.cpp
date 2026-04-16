@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -287,6 +288,94 @@ namespace
   using IntVector = msvc8::vector<int>;
   using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
   using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
+
+  /**
+   * Address: 0x005EACC0 (FUN_005EACC0)
+   *
+   * What it does:
+   * Ensures one `vector<int>` has at least `targetCapacity` storage lanes,
+   * preserving existing contents and returning resulting capacity.
+   */
+  [[nodiscard]] unsigned int EnsureIntVectorCapacity(
+    IntVector& storage,
+    const unsigned int targetCapacity
+  )
+  {
+    if (targetCapacity > 0x3FFFFFFFu) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    const unsigned int currentCapacity = static_cast<unsigned int>(storage.capacity());
+    if (currentCapacity < targetCapacity) {
+      storage.reserve(static_cast<std::size_t>(targetCapacity));
+      return targetCapacity;
+    }
+
+    return currentCapacity;
+  }
+
+  /**
+   * Address: 0x005EB150 (FUN_005EB150)
+   *
+   * What it does:
+   * Ensures one `vector<SAttachPoint>` has at least `targetCapacity` storage
+   * lanes, preserving existing contents and returning resulting storage base.
+   */
+  [[nodiscard]] unsigned int EnsureAttachPointVectorCapacity(
+    AttachPointVector& storage,
+    const unsigned int targetCapacity
+  )
+  {
+    if (targetCapacity > 0x0CCCCCCCu) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    const unsigned int currentCapacity = static_cast<unsigned int>(storage.capacity());
+    if (currentCapacity < targetCapacity) {
+      storage.reserve(static_cast<std::size_t>(targetCapacity));
+      return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(storage.data()));
+    }
+
+    return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(storage.data()));
+  }
+
+  /**
+   * Address: 0x005EB260 (FUN_005EB260)
+   *
+   * What it does:
+   * Resizes one `vector<SAttachPoint>` payload to `targetCount`, preserving
+   * prefix elements and default-constructing growth lanes.
+   */
+  [[nodiscard]] unsigned int ResizeAttachPointVectorToCount(
+    AttachPointVector& storage,
+    const unsigned int targetCount
+  )
+  {
+    const std::size_t targetSize = static_cast<std::size_t>(targetCount);
+    if (storage.size() < targetSize) {
+      storage.resize(targetSize, moho::SAttachPoint{});
+    } else if (targetSize < storage.size()) {
+      storage.resize(targetSize);
+    }
+
+    return static_cast<unsigned int>(storage.size());
+  }
+
+  /**
+   * Address: 0x005EA890 (FUN_005EA890)
+   *
+   * What it does:
+   * Resize-wrapper lane that materializes one zero-initialized
+   * `moho::SAttachPoint` default element and forwards to the canonical
+   * attach-point vector resize helper.
+   */
+  [[maybe_unused]] [[nodiscard]] unsigned int ResizeAttachPointVectorWithDefaultLane(
+    AttachPointVector& storage,
+    const unsigned int targetCount
+  )
+  {
+    return ResizeAttachPointVectorToCount(storage, targetCount);
+  }
 
   alignas(BroadcasterTransportType) unsigned char gBroadcasterTransportTypeStorage[sizeof(BroadcasterTransportType)];
   bool gBroadcasterTransportTypeConstructed = false;
@@ -759,7 +848,7 @@ void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const int ob
   archive->ReadUInt(&count);
 
   IntVector loaded{};
-  loaded.reserve(static_cast<std::size_t>(count));
+  (void)EnsureIntVectorCapacity(loaded, count);
   for (unsigned int i = 0; i < count; ++i) {
     int value = 0;
     archive->ReadInt(&value);
@@ -1077,7 +1166,7 @@ void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, con
   archive->ReadUInt(&count);
 
   AttachPointVector loaded{};
-  loaded.reserve(static_cast<std::size_t>(count));
+  (void)EnsureAttachPointVectorCapacity(loaded, count);
 
   gpg::RType* const elementType = ResolveAttachPointType();
   GPG_ASSERT(elementType != nullptr);
@@ -1159,7 +1248,7 @@ void gpg::RVectorType_SAttachPoint::SetCount(void* const obj, const int count) c
     return;
   }
 
-  storage->resize(static_cast<std::size_t>(count));
+  (void)ResizeAttachPointVectorToCount(*storage, static_cast<unsigned int>(count));
 }
 
 gpg::RType* IAiTransport::sType = nullptr;
@@ -1176,6 +1265,22 @@ const IAiTransportEventListener* IAiTransportEventListener::FromListenerLink(con
   return Broadcaster::owner_from_member<IAiTransportEventListener, Broadcaster, &IAiTransportEventListener::mListenerLink>(
     link
   );
+}
+
+/**
+ * Address: 0x005E3C50 (FUN_005E3C50)
+ * Address: 0x005E82A0 (FUN_005E82A0)
+ *
+ * What it does:
+ * Initializes IAiTransport base lanes and re-seeds broadcaster links to a
+ * self-linked sentinel chain; the second constructor lane is an equivalent
+ * alias.
+ */
+IAiTransport::IAiTransport()
+  : Broadcaster()
+{
+  mNext = this;
+  mPrev = this;
 }
 
 /**

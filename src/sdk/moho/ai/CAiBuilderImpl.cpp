@@ -190,6 +190,149 @@ namespace
     return cellPos;
   }
 
+  struct BuilderFieldCopyRuntime final
+  {
+    std::uint32_t lane00 = 0U; // +0x00
+    std::uint32_t lane04 = 0U; // +0x04
+    std::uint32_t lane08 = 0U; // +0x08
+  };
+
+  struct BuilderPointerFieldCopyRuntime final
+  {
+    std::uint32_t lane00 = 0U;              // +0x00
+    const std::uint32_t* lane04 = nullptr;  // +0x04
+  };
+
+  static_assert(offsetof(BuilderFieldCopyRuntime, lane00) == 0x00, "BuilderFieldCopyRuntime::lane00 offset must be 0x00");
+  static_assert(offsetof(BuilderFieldCopyRuntime, lane04) == 0x04, "BuilderFieldCopyRuntime::lane04 offset must be 0x04");
+  static_assert(offsetof(BuilderFieldCopyRuntime, lane08) == 0x08, "BuilderFieldCopyRuntime::lane08 offset must be 0x08");
+  static_assert(sizeof(BuilderFieldCopyRuntime) == 0x0C, "BuilderFieldCopyRuntime size must be 0x0C");
+
+  static_assert(
+    offsetof(BuilderPointerFieldCopyRuntime, lane00) == 0x00,
+    "BuilderPointerFieldCopyRuntime::lane00 offset must be 0x00"
+  );
+  static_assert(
+    offsetof(BuilderPointerFieldCopyRuntime, lane04) == 0x04,
+    "BuilderPointerFieldCopyRuntime::lane04 offset must be 0x04"
+  );
+  static_assert(sizeof(BuilderPointerFieldCopyRuntime) == 0x08, "BuilderPointerFieldCopyRuntime size must be 0x08");
+
+  [[nodiscard]] std::uint32_t* CopyBuilderLane04ToOut(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime& runtime
+  ) noexcept
+  {
+    *outValue = runtime.lane04;
+    return outValue;
+  }
+
+  [[nodiscard]] std::uint32_t* CopyBuilderLane08ToOut(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime& runtime
+  ) noexcept
+  {
+    *outValue = runtime.lane08;
+    return outValue;
+  }
+
+  [[nodiscard]] std::uint32_t* CopyDereferencedBuilderLane04ToOut(
+    std::uint32_t* const outValue,
+    const BuilderPointerFieldCopyRuntime& runtime
+  ) noexcept
+  {
+    *outValue = *runtime.lane04;
+    return outValue;
+  }
+
+  /**
+   * Address: 0x0059FF80 (FUN_0059FF80)
+   *
+   * What it does:
+   * Adapter lane that copies one 32-bit field at `+0x04` into caller output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterA(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyBuilderLane04ToOut(outValue, *runtime);
+  }
+
+  /**
+   * Address: 0x0059FF90 (FUN_0059FF90)
+   *
+   * What it does:
+   * Adapter lane that copies one 32-bit field at `+0x08` into caller output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyBuilderLane08ToOutAdapter(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyBuilderLane08ToOut(outValue, *runtime);
+  }
+
+  /**
+   * Address: 0x005A00E0 (FUN_005A00E0)
+   *
+   * What it does:
+   * Adapter lane that dereferences one pointer field at `+0x04` and copies the
+   * 32-bit pointee value into caller output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyDereferencedBuilderLane04ToOutAdapterA(
+    std::uint32_t* const outValue,
+    const BuilderPointerFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyDereferencedBuilderLane04ToOut(outValue, *runtime);
+  }
+
+  /**
+   * Address: 0x005A00F0 (FUN_005A00F0)
+   *
+   * What it does:
+   * Secondary adapter lane that copies one 32-bit field at `+0x04` into caller
+   * output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterB(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyBuilderLane04ToOut(outValue, *runtime);
+  }
+
+  /**
+   * Address: 0x005A0E80 (FUN_005A0E80)
+   *
+   * What it does:
+   * Secondary adapter lane that dereferences one pointer field at `+0x04` and
+   * copies the 32-bit pointee value into caller output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyDereferencedBuilderLane04ToOutAdapterB(
+    std::uint32_t* const outValue,
+    const BuilderPointerFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyDereferencedBuilderLane04ToOut(outValue, *runtime);
+  }
+
+  /**
+   * Address: 0x005A0E90 (FUN_005A0E90)
+   *
+   * What it does:
+   * Tertiary adapter lane that copies one 32-bit field at `+0x04` into caller
+   * output.
+   */
+  [[maybe_unused]] std::uint32_t* CopyBuilderLane04ToOutAdapterC(
+    std::uint32_t* const outValue,
+    const BuilderFieldCopyRuntime* const runtime
+  ) noexcept
+  {
+    return CopyBuilderLane04ToOut(outValue, *runtime);
+  }
+
   /**
    * Address: 0x005A1410 (FUN_005A1410, func_NewMapNodeRUnitBlueprint)
    *
@@ -231,6 +374,13 @@ namespace
     map.mSize = 0;
   }
 
+  /**
+   * Address: 0x005A0A00 (FUN_005A0A00)
+   *
+   * What it does:
+   * Recursively releases one rebuild-structure RB-tree branch rooted at
+   * `node`, stopping on sentinel/head lanes.
+   */
   void DestroyRebuildTree(SBuilderRebuildNode* node, SBuilderRebuildNode* head)
   {
     if (!node || node == head || node->isNil != 0) {
@@ -256,6 +406,72 @@ namespace
     map.mSize = 0;
   }
 
+  void RemoveRebuildNode(SBuilderRebuildMap& map, SBuilderRebuildNode* node);
+
+  /**
+   * Address: 0x005A0F60 (FUN_005A0F60, rebuild-map erase-range helper)
+   *
+   * What it does:
+   * Erases one half-open iterator range from the rebuild-structure RB tree
+   * and returns/stores the successor iterator after the erased range.
+   */
+  SBuilderRebuildNode* EraseRebuildMapNodeRange(
+    SBuilderRebuildMap& map,
+    SBuilderRebuildNode*& outIterator,
+    SBuilderRebuildNode* first,
+    SBuilderRebuildNode* last
+  )
+  {
+    SBuilderRebuildNode* const head = map.mHead;
+    SBuilderRebuildNode* cursor = first;
+
+    if (cursor == head->left && last == head) {
+      ClearRebuildMapNodes(map);
+      outIterator = head->left;
+      return outIterator;
+    }
+
+    while (cursor != last) {
+      SBuilderRebuildNode* const current = cursor;
+      if (current == nullptr || current == head) {
+        cursor = last;
+        break;
+      }
+
+      if (current->isNil == 0u) {
+        SBuilderRebuildNode* next = current->right;
+        if (next->isNil != 0u) {
+          SBuilderRebuildNode* parent = current->parent;
+          while (parent->isNil == 0u) {
+            if (cursor != parent->right) {
+              break;
+            }
+            cursor = parent;
+            parent = parent->parent;
+          }
+          cursor = parent;
+        } else {
+          cursor = next;
+          while (cursor->left->isNil == 0u) {
+            cursor = cursor->left;
+          }
+        }
+      }
+
+      RemoveRebuildNode(map, current);
+    }
+
+    outIterator = cursor;
+    return outIterator;
+  }
+
+  /**
+   * Address: 0x0059FB80 (FUN_0059FB80)
+   *
+   * What it does:
+   * Clears all rebuild-map nodes, frees header storage, and resets map header
+   * lanes to the empty state.
+   */
   void DestroyRebuildMap(SBuilderRebuildMap& map)
   {
     if (!map.mHead) {
@@ -263,7 +479,8 @@ namespace
       return;
     }
 
-    ClearRebuildMapNodes(map);
+    SBuilderRebuildNode* eraseResult = map.mHead;
+    (void)EraseRebuildMapNodeRange(map, eraseResult, map.mHead->left, map.mHead);
     ::operator delete(map.mHead);
     map.mHead = nullptr;
     map.mSize = 0;
@@ -284,6 +501,40 @@ namespace
     }
 
     return nullptr;
+  }
+
+  /**
+   * Address: 0x005A0400 (FUN_005A0400)
+   *
+   * What it does:
+   * Performs one lower-bound walk in the rebuild-map RB tree and returns the
+   * exact-key node when present, otherwise the map head sentinel.
+   */
+  [[nodiscard]] SBuilderRebuildNode* FindRebuildNodeForEraseOrHead(
+    const SBuilderRebuildMap& map, const std::uint32_t key
+  )
+  {
+    SBuilderRebuildNode* const head = map.mHead;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    SBuilderRebuildNode* candidate = head;
+    SBuilderRebuildNode* cursor = head->parent;
+    while (cursor && cursor != head && cursor->isNil == 0) {
+      if (cursor->key >= key) {
+        candidate = cursor;
+        cursor = cursor->left;
+      } else {
+        cursor = cursor->right;
+      }
+    }
+
+    if (candidate == head || key < candidate->key) {
+      return head;
+    }
+
+    return candidate;
   }
 
   void RefreshRebuildMapExtremes(SBuilderRebuildMap& map)
@@ -566,6 +817,40 @@ void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   mFactoryQueueDirty = 1u;
+}
+
+/**
+ * Address: 0x005A1CE0 (FUN_005A1CE0)
+ *
+ * What it does:
+ * Tail-thunk alias that forwards one builder serializer-load lane into
+ * `CAiBuilderImpl::MemberDeserialize`.
+ */
+[[maybe_unused]] void DeserializeCAiBuilderImplMemberThunkA(
+  CAiBuilderImpl* const object,
+  gpg::ReadArchive* const archive
+)
+{
+  if (object != nullptr) {
+    object->MemberDeserialize(archive);
+  }
+}
+
+/**
+ * Address: 0x005A21E0 (FUN_005A21E0)
+ *
+ * What it does:
+ * Secondary tail-thunk alias that forwards one builder serializer-load lane
+ * into `CAiBuilderImpl::MemberDeserialize`.
+ */
+[[maybe_unused]] void DeserializeCAiBuilderImplMemberThunkB(
+  CAiBuilderImpl* const object,
+  gpg::ReadArchive* const archive
+)
+{
+  if (object != nullptr) {
+    object->MemberDeserialize(archive);
+  }
 }
 
 /**
@@ -878,7 +1163,11 @@ void CAiBuilderImpl::BuilderAddRebuildStructure(const SOCellPos& cellPos, const 
 void CAiBuilderImpl::BuilderRemoveRebuildStructure(const SOCellPos& cellPos)
 {
   const std::uint32_t key = EncodeRebuildKey(cellPos);
-  SBuilderRebuildNode* const node = FindRebuildNode(mRebuildStructures, key);
+  SBuilderRebuildNode* const node = FindRebuildNodeForEraseOrHead(mRebuildStructures, key);
+  if (node == mRebuildStructures.mHead) {
+    return;
+  }
+
   RemoveRebuildNode(mRebuildStructures, node);
 }
 

@@ -22,7 +22,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00529510 (RRuleGameRulesImpl dtr)
+     * Alias of FUN_00529510 (RRuleGameRulesImpl deleting destructor wrapper)
      * VTable slot: 0
      */
     virtual ~EntityCategoryLookupResolver() = default;

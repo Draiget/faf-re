@@ -6,7 +6,9 @@
 
 namespace gpg
 {
+  class ReadArchive;
   struct SerHelperBase;
+  class SerConstructResult;
 } // namespace gpg
 
 namespace moho
@@ -18,6 +20,16 @@ namespace moho
   class CIntelPosHandleConstruct
   {
   public:
+    /**
+     * Address: 0x0076F350 (FUN_0076F350, Moho::CIntelPosHandleConstruct::Construct)
+     *
+     * What it does:
+     * Allocates one `CIntelPosHandle` runtime object, zero-initializes its
+     * fields through constructor semantics, and returns it as an unowned
+     * construct-result payload.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
     /**
      * Address: 0x0076FA80 (FUN_0076FA80, gpg::SerConstructHelper_CIntelPosHandle::Init)
      *

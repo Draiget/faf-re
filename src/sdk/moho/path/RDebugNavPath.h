@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x00650ED0 (FUN_00650ED0)
+     *
+     * What it does:
+     * Initializes the nav-path overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugNavPath();
+
+    /**
      * Address: 0x00650520 (FUN_00650520, ?GetClass@RDebugNavPath@Moho@@UBEPAVRType@gpg@@XZ)
      * Slot: 0
      *

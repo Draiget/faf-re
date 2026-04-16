@@ -5,6 +5,11 @@ using namespace moho;
 gpg::RType* IAiReconDB::sType = nullptr;
 
 /**
+ * Address: 0x005C2320 (FUN_005C2320)
+ */
+IAiReconDB::IAiReconDB() = default;
+
+/**
  * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
  * Address: 0x005BE020 (FUN_005BE020, scalar deleting thunk)
  *
@@ -16,7 +21,7 @@ gpg::RType* IAiReconDB::sType = nullptr;
 IAiReconDB::~IAiReconDB() = default;
 
 /**
- * Address: 0x005C29C0 (FUN_005C29C0, nullsub_1553)
+  * Alias of FUN_005C29C0 (non-canonical helper lane).
  *
  * What it does:
  * No-op checksum update hook in the base recon DB interface lane.

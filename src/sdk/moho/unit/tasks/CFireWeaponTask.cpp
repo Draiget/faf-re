@@ -1,6 +1,5 @@
 #include "CFireWeaponTask.h"
 
-#include <cmath>
 #include <cstdlib>
 #include <new>
 #include <string>
@@ -12,7 +11,6 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
-#include "moho/entity/Entity.h"
 #include "moho/misc/StatItem.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
@@ -118,22 +116,6 @@ namespace
     throw std::runtime_error(msg.c_str());
   }
 
-  [[nodiscard]] const Wm3::Vector3f& WeaponTargetPosition(const UnitWeapon* const weapon) noexcept
-  {
-    if (!weapon) {
-      static const Wm3::Vector3f kZeroVector{};
-      return kZeroVector;
-    }
-
-    if (weapon->mTarget.targetType == EAiTargetType::AITARGET_Entity) {
-      if (Entity* const entity = weapon->mTarget.targetEntity.GetObjectPtr()) {
-        return entity->GetPositionWm3();
-      }
-    }
-
-    return weapon->mTarget.position;
-  }
-
   [[nodiscard]] bool WeaponHasTarget(const UnitWeapon* const weapon) noexcept
   {
     return weapon != nullptr && weapon->mTarget.targetType != EAiTargetType::AITARGET_None;
@@ -157,25 +139,13 @@ namespace
     return const_cast<UnitWeapon*>(weapon)->CheckSilo();
   }
 
-  [[nodiscard]] bool WeaponTargetIsTooClose(const UnitWeapon* const weapon) noexcept
+  [[nodiscard]] bool WeaponTargetIsTooClose(UnitWeapon* const weapon) noexcept
   {
-    if (!weapon || !weapon->mUnit || !weapon->mWeaponBlueprint) {
+    if (!weapon) {
       return false;
     }
 
-    const float minRadius = weapon->mAttributes.mMinRadius >= 0.0f ? weapon->mAttributes.mMinRadius
-                                                                   : weapon->mWeaponBlueprint->MinRadius;
-    if (minRadius <= 0.0f) {
-      return false;
-    }
-
-    const Wm3::Vector3f& unitPos = weapon->mUnit->GetPosition();
-    const Wm3::Vector3f& targetPos = WeaponTargetPosition(weapon);
-    const float dx = targetPos.x - unitPos.x;
-    const float dy = targetPos.y - unitPos.y;
-    const float dz = targetPos.z - unitPos.z;
-    const float distSq = (dx * dx) + (dy * dy) + (dz * dz);
-    return distSq < (minRadius * minRadius);
+    return weapon->TargetIsTooClose(&weapon->mTarget) != ESolutionStatus::TRS_Available;
   }
 
   void FireWeapon(UnitWeapon* const weapon)
@@ -238,6 +208,14 @@ CFireWeaponTask::CFireWeaponTask(UnitWeapon* const weapon)
 CFireWeaponTask::~CFireWeaponTask()
 {
   AddStatCounter(InstanceCounter<CFireWeaponTask>::GetStatItem(), -1);
+}
+
+/**
+ * Address: 0x006D3AE0 (FUN_006D3AE0)
+ */
+std::int32_t CFireWeaponTask::GetFireClock() const
+{
+  return mFireClock;
 }
 
 /**

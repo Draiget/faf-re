@@ -56,6 +56,34 @@ namespace
     static constexpr long kHashModulus = 0x7FFFFFFFL;
 
     /**
+     * Address: 0x008D5D00 (FUN_008D5D00, sub_8D5D00)
+     *
+     * What it does:
+     * Compacts one pointer-vector tail by shifting `[eraseEnd, finish)` onto
+     * `eraseBegin` and updating vector logical end to the new tail.
+     */
+    [[nodiscard]] static SymbolAddressNode** CompactBucketVectorTail(
+      std::vector<SymbolAddressNode*>& bucketHeads,
+      SymbolAddressNode** const eraseBegin,
+      SymbolAddressNode** const eraseEnd
+    )
+    {
+      if (eraseBegin != eraseEnd) {
+        SymbolAddressNode** writeCursor = eraseBegin;
+        SymbolAddressNode** readCursor = eraseEnd;
+        SymbolAddressNode** const finish =
+          bucketHeads.data() + static_cast<std::ptrdiff_t>(bucketHeads.size());
+        while (readCursor != finish) {
+          *writeCursor = *readCursor;
+          ++writeCursor;
+          ++readCursor;
+        }
+        bucketHeads.resize(static_cast<std::size_t>(writeCursor - bucketHeads.data()));
+      }
+      return eraseBegin;
+    }
+
+    /**
      * Address: 0x008D5580 (FUN_008D5580, sub_8D5580)
      *
      * What it does:
@@ -68,7 +96,11 @@ namespace
       if (bucketHeads.size() < size) {
         bucketHeads.insert(bucketHeads.end(), size - bucketHeads.size(), fillValue);
       } else if (bucketHeads.size() > size) {
-        bucketHeads.erase(bucketHeads.begin() + static_cast<std::ptrdiff_t>(size), bucketHeads.end());
+        SymbolAddressNode** const eraseBegin =
+          bucketHeads.data() + static_cast<std::ptrdiff_t>(size);
+        SymbolAddressNode** const eraseEnd =
+          bucketHeads.data() + static_cast<std::ptrdiff_t>(bucketHeads.size());
+        (void)CompactBucketVectorTail(bucketHeads, eraseBegin, eraseEnd);
       }
     }
 
@@ -528,7 +560,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
       CScApp app;
       moho::WIN_AppExecute(&app);
-      exitCode = app.exitValue;
+      exitCode = app.GetExitValue();
       app.framerates.Reset();
     }
 

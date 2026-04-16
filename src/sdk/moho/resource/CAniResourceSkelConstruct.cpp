@@ -16,8 +16,70 @@ namespace gpg
   };
 } // namespace gpg
 
+namespace
+{
+  moho::CAniResourceSkelConstruct gCAniResourceSkelConstruct{};
+
+  [[nodiscard]] gpg::SerHelperBase* ResetCAniResourceSkelConstructHelperLinks() noexcept
+  {
+    gCAniResourceSkelConstruct.mHelperNext->mPrev = gCAniResourceSkelConstruct.mHelperPrev;
+    gCAniResourceSkelConstruct.mHelperPrev->mNext = gCAniResourceSkelConstruct.mHelperNext;
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCAniResourceSkelConstruct.mHelperNext);
+    gCAniResourceSkelConstruct.mHelperPrev = self;
+    gCAniResourceSkelConstruct.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00538860 (FUN_00538860)
+   *
+   * What it does:
+   * Unlinks `CAniResourceSkelConstruct` helper node from the intrusive helper
+   * list and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelConstructHelperNodePrimary() noexcept
+  {
+    return ResetCAniResourceSkelConstructHelperLinks();
+  }
+
+  /**
+   * Address: 0x00538890 (FUN_00538890)
+   *
+   * What it does:
+   * Secondary entrypoint for `CAniResourceSkelConstruct` helper-node
+   * unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelConstructHelperNodeSecondary() noexcept
+  {
+    return ResetCAniResourceSkelConstructHelperLinks();
+  }
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x00539C80 (FUN_00539C80)
+   *
+   * What it does:
+   * Packages one shared `CAniSkel` lane into the construct-result shared
+   * payload with resolved `CAniSkel` runtime type metadata.
+   */
+  void SetConstructResultSharedAniSkel(
+    gpg::SerConstructResult* const result,
+    const boost::shared_ptr<const CAniSkel>& skeleton
+  )
+  {
+    gpg::RType* skelType = CAniSkel::sType;
+    if (skelType == nullptr) {
+      skelType = gpg::LookupRType(typeid(CAniSkel));
+      CAniSkel::sType = skelType;
+    }
+
+    const boost::shared_ptr<void>& sharedAny =
+      reinterpret_cast<const boost::shared_ptr<void>&>(skeleton);
+    result->SetShared(sharedAny, skelType, 1U);
+  }
+
   /**
    * Address: 0x005388C0 (FUN_005388C0, Moho::CAniResourceSkelConstruct::Construct)
    *
@@ -47,15 +109,7 @@ namespace moho
       skeleton = modelResource->GetSkeleton();
     }
 
-    gpg::RType* skelType = CAniSkel::sType;
-    if (skelType == nullptr) {
-      skelType = gpg::LookupRType(typeid(CAniSkel));
-      CAniSkel::sType = skelType;
-    }
-
-    const boost::shared_ptr<void>& sharedAny =
-      reinterpret_cast<const boost::shared_ptr<void>&>(skeleton);
-    result->SetShared(sharedAny, skelType, 1U);
+    SetConstructResultSharedAniSkel(result, skeleton);
   }
 
   /**

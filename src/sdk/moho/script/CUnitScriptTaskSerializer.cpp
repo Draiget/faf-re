@@ -127,6 +127,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00622F10 (FUN_00622F10, cleanup_CUnitScriptTaskSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the global `CUnitScriptTaskSerializer`
+   * node and restores its self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitScriptTaskSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCUnitScriptTaskSerializer);
+  }
+
+  /**
+   * Address: 0x00622F40 (FUN_00622F40, cleanup_CUnitScriptTaskSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the global
+   * `CUnitScriptTaskSerializer` node and restores its self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitScriptTaskSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCUnitScriptTaskSerializer);
+  }
+
+  /**
    * Address: 0x00BD19A0 (FUN_00BD19A0)
    */
   void register_CUnitScriptTaskSerializer()

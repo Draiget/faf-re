@@ -11,6 +11,15 @@ namespace gal {
     class PipelineState {
     public:
       /**
+       * Address: 0x00902230 (FUN_00902230)
+       *
+       * What it does:
+       * Initializes one base `PipelineState` lane by installing the class
+       * vtable.
+       */
+      PipelineState();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

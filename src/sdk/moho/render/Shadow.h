@@ -7,6 +7,18 @@
 
 namespace moho
 {
+  struct ShadowRuntimeSharedRef;
+
+  struct ShadowRuntimeLane
+  {
+    std::int32_t mState;               // +0x00
+    ShadowRuntimeSharedRef* mResource; // +0x04
+  };
+
+  static_assert(sizeof(ShadowRuntimeLane) == 0x08, "ShadowRuntimeLane size must be 0x8");
+  static_assert(offsetof(ShadowRuntimeLane, mState) == 0x00, "ShadowRuntimeLane::mState offset must be 0x0");
+  static_assert(offsetof(ShadowRuntimeLane, mResource) == 0x04, "ShadowRuntimeLane::mResource offset must be 0x4");
+
   class Shadow
   {
   public:
@@ -19,7 +31,13 @@ namespace moho
      */
     Shadow();
 
-    virtual ~Shadow() = default;
+    /**
+     * Address: 0x007FE200 (FUN_007FE200, ??1Shadow@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Runs non-deleting teardown for one shadow runtime object.
+     */
+    virtual ~Shadow();
 
   public:
     std::int32_t mUninitializedLane04;   // +0x04
@@ -30,7 +48,7 @@ namespace moho
     bool mUnknown14;                     // +0x14
     std::uint8_t mPadding15_17[0x03];    // +0x15
     GeomCamera3 mCamera;                 // +0x18
-    std::int32_t mRuntimeLanes[14];      // +0x2E0
+    ShadowRuntimeLane mRuntimeLanes[7];  // +0x2E0
   };
 
   static_assert(offsetof(Shadow, mShadowFidelity) == 0x08, "Shadow::mShadowFidelity offset must be 0x08");

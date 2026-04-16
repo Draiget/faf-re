@@ -15,6 +15,7 @@ namespace gpg
 namespace moho
 {
   struct RUnitBlueprint;
+  class RRuleGameRulesImpl;
 
   /**
    * Recovered `UnitAttributes` layout.
@@ -55,6 +56,17 @@ namespace moho
     std::uint32_t unknown_006C;    // +0x6C
 
     static gpg::RType* sType;
+    UnitAttributes() = default;
+
+    /**
+     * Address: 0x006A4760 (FUN_006A4760, Moho::UnitAttributes::UnitAttributes)
+     *
+     * What it does:
+     * Seeds runtime attribute lanes from blueprint defaults, initializes the
+     * category universe from rules empty-category lookup, and restores command/
+     * toggle capability masks.
+     */
+    UnitAttributes(const RUnitBlueprint* blueprint, const RRuleGameRulesImpl* rules);
 
     /**
      * Address: 0x0055C2D0 (FUN_0055C2D0, Moho::UnitAttributes::StaticGetClass)
@@ -140,4 +152,12 @@ namespace moho
   static_assert(offsetof(UnitAttributes, unknown_006B) == 0x6B, "UnitAttributes::unknown_006B offset must be 0x6B");
   static_assert(offsetof(UnitAttributes, unknown_006C) == 0x6C, "UnitAttributes::unknown_006C offset must be 0x6C");
   static_assert(sizeof(UnitAttributes) == 0x70, "UnitAttributes size must be 0x70");
+
+  /**
+   * Address: 0x0055C210 (FUN_0055C210, preregister_UnitAttributesTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `UnitAttributes`.
+   */
+  [[nodiscard]] gpg::RType* preregister_UnitAttributesTypeInfo();
 } // namespace moho

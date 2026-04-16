@@ -17,6 +17,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005989F0 (FUN_005989F0, ??0IAiCommandDispatch@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one AI-command-dispatch base object with interface vtable
+     * ownership.
+     */
+    IAiCommandDispatch();
+
+    /**
      * Address: 0x00598A00 (FUN_00598A00, scalar deleting thunk)
      *
      * VFTable SLOT: 0

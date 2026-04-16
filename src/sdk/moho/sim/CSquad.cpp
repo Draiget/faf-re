@@ -93,6 +93,20 @@ namespace moho
   CSquad::~CSquad() = default;
 
   /**
+   * Address: 0x00725040 (FUN_00725040)
+   *
+   * What it does:
+   * Runs one `CSquad` destructor lane and then releases the object storage with
+   * scalar `operator delete`, returning the same pointer.
+   */
+  [[maybe_unused]] CSquad* DestroySquadAndDeleteStorage(CSquad* const squad)
+  {
+    squad->~CSquad();
+    ::operator delete(squad);
+    return squad;
+  }
+
+  /**
    * Address: 0x00725580 (FUN_00725580, Moho::CSquad::operator new)
    *
    * IDA signature:

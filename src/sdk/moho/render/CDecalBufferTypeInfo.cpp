@@ -1,6 +1,7 @@
 #include "moho/render/CDecalBufferTypeInfo.h"
 
 #include <new>
+#include <typeinfo>
 
 #include "moho/render/CDecalBuffer.h"
 
@@ -55,6 +56,38 @@ namespace
       object->~CDecalBuffer();
     }
   }
+
+  /**
+   * Address: 0x00779020 (FUN_00779020)
+   *
+   * What it does:
+   * Binds `CDecalBuffer` new/construct/delete/destruct callback lanes into
+   * the reflected type callback slots.
+   */
+  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsPrimary(
+    moho::CDecalBufferTypeInfo* const typeInfo
+  )
+  {
+    typeInfo->newRefFunc_ = &NewRef_CDecalBuffer;
+    typeInfo->ctorRefFunc_ = &CtrRef_CDecalBuffer;
+    typeInfo->deleteFunc_ = &Delete_CDecalBuffer;
+    typeInfo->dtrFunc_ = &Dtr_CDecalBuffer;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x0077A740 (FUN_0077A740)
+   *
+   * What it does:
+   * Secondary callback-slot binder for `CDecalBuffer` reflected type
+   * lifecycle lanes.
+   */
+  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsSecondary(
+    moho::CDecalBufferTypeInfo* const typeInfo
+  )
+  {
+    return BindDecalBufferTypeCallbackSlotsPrimary(typeInfo);
+  }
 } // namespace
 
 namespace moho
@@ -82,10 +115,20 @@ namespace moho
   {
     size_ = sizeof(CDecalBuffer);
     gpg::RType::Init();
-    newRefFunc_ = &NewRef_CDecalBuffer;
-    ctorRefFunc_ = &CtrRef_CDecalBuffer;
-    deleteFunc_ = &Delete_CDecalBuffer;
-    dtrFunc_ = &Dtr_CDecalBuffer;
+    (void)BindDecalBufferTypeCallbackSlotsPrimary(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x00778ED0 (FUN_00778ED0, preregister_CDecalBufferTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::CDecalBuffer`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CDecalBufferTypeInfo()
+  {
+    static CDecalBufferTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(CDecalBuffer), &typeInfo);
+    return &typeInfo;
   }
 } // namespace moho

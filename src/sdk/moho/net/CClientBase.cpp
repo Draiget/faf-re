@@ -44,7 +44,32 @@ namespace
     outPipe->Write(message.mBuff.start_, message.mBuff.Size());
     *lastEmittedSource = sourceId;
   }
+
+  /**
+   * Address: 0x00540A70 (FUN_00540A70)
+   *
+   * What it does:
+   * Reads one 32-bit integer value from a `BinaryReader` lane and returns it
+   * by value.
+   */
+  [[maybe_unused]] int ReadClientMessageInt32Raw(gpg::BinaryReader* const reader)
+  {
+    int value = 0;
+    reader->Read(reinterpret_cast<char*>(&value), sizeof(value));
+    return value;
+  }
 } // namespace
+
+/**
+ * Address: 0x0053B8D0 (FUN_0053B8D0)
+ *
+ * What it does:
+ * Initializes one eject-request record from requester and beat fields.
+ */
+SEjectRequest::SEjectRequest(const CClientBase* const requester, const int afterBeat)
+  : mRequester(requester)
+  , mAfterBeat(afterBeat)
+{}
 
 /**
  * Address: 0x0053B930 (FUN_0053B930)
@@ -52,6 +77,39 @@ namespace
 BVIntSet* CClientBase::GetValidCommandSources()
 {
   return &mValidCommandSources;
+}
+
+/**
+ * Address: 0x0053B8E0 (FUN_0053B8E0)
+ *
+ * What it does:
+ * Returns the owning client-manager pointer lane.
+ */
+CClientManagerImpl* CClientBase::GetManager() const
+{
+  return mManager;
+}
+
+/**
+ * Address: 0x0053B900 (FUN_0053B900)
+ *
+ * What it does:
+ * Returns the readiness bit lane for this client.
+ */
+bool CClientBase::IsReady() const
+{
+  return mReady;
+}
+
+/**
+ * Address: 0x0053B920 (FUN_0053B920)
+ *
+ * What it does:
+ * Returns the raw sim-rate lane tracked by this client.
+ */
+int32_t CClientBase::GetSimRateRaw() const
+{
+  return mSimRate;
 }
 
 /**
@@ -561,7 +619,7 @@ void CClientBase::AddOrUpdateEjectRequest(const CClientBase* requester, const in
     }
   }
 
-  mEjectRequests.push_back(SEjectRequest{requester, afterBeat});
+  mEjectRequests.push_back(SEjectRequest(requester, afterBeat));
 }
 
 /**

@@ -6,12 +6,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <new>
 #include <stdexcept>
-#include <vector>
 #include <typeinfo>
+#include <vector>
 
 #include "CClientManagerImpl.h"
+#include "CDiscoveryService.h"
 #include "CMessageStream.h"
+#include "CNetNullConnector.h"
 #include "CNetUDPConnection.h"
 #include "ELobbyMsg.h"
 #include "gpg/core/containers/String.h"
@@ -19,6 +22,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
 #include "INetDatagramSocket.h"
+#include "INetNATTraversalProviderWeakPtrReflection.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
@@ -32,7 +37,6 @@
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
-#include "lua/LuaTableIterator.h"
 using namespace moho;
 
 namespace moho
@@ -52,11 +56,23 @@ namespace moho
    * Console command definition that exposes `lob_IgnoreNames` for runtime tuning.
    */
   TConVar<msvc8::string> ConVar_lob_IgnoreNames{
-    "lob_IgnoreNames", "Comma seperated list of player names to ignore.", &lob_IgnoreNames
+    "lob_IgnoreNames",
+    "Comma seperated list of player names to ignore.",
+    &lob_IgnoreNames
   };
 
   int cfunc_CLobbySendDataL(LuaPlus::LuaState* state);
   int cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* state);
+  int cfunc_InternalCreateDiscoveryServiceL(LuaPlus::LuaState* state);
+  /**
+   * Address: 0x007CB690 (FUN_007CB690, func_GetCObj_NatTraversalProvider)
+   *
+   * What it does:
+   * Unwraps Lua boxed userdata payload and returns the typed
+   * `boost::weak_ptr<INetNATTraversalProvider>` slot.
+   */
+  [[nodiscard]] boost::weak_ptr<INetNATTraversalProvider>* func_GetCObj_NatTraversalProvider(LuaPlus::LuaObject valueObject);
+  int cfunc_InternalCreateLobbyL(LuaPlus::LuaState* state);
   int cfunc_CLobbyHostGameL(LuaPlus::LuaState* state);
   int cfunc_CLobbyJoinGameL(LuaPlus::LuaState* state);
   int cfunc_CLobbyBroadcastDataL(LuaPlus::LuaState* state);
@@ -78,6 +94,10 @@ namespace moho
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+  constexpr const char* kInternalCreateDiscoveryServiceHelp = "InternalCreateDiscoveryService(class)";
+  constexpr const char* kInternalCreateLobbyHelp =
+    "InternalCreateLobby(class, string protocol, int localPort, int maxConnections, string playerName, string playerUID, "
+    "Boxed<weak_ptr<INetNATTraversalProvider> > natTraversalProvider)";
   constexpr const char* kCLobbyDestroyHelp = "CLobby.Destroy(self)";
   constexpr const char* kCLobbyMakeValidGameNameHelp = "string CLobby.MakeValidGameName(self,origName)";
   constexpr const char* kCLobbyMakeValidPlayerNameHelp = "string CLobby.MakeValidPlayerName(self,uid,origName)";
@@ -99,11 +119,177 @@ namespace
   constexpr const char* kCLobbyDisconnectFromPeerHelp = "void CLobby.DisconnectFromPeer(self,uid";
   constexpr const char* kValidateIPAddressHelp = "str = ValidateIPAddress(ipaddr)";
 
+  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
+  {
+    gpg::RRef out{};
+    if (!userDataObject.IsUserData()) {
+      return out;
+    }
+
+    lua_State* const rawState = userDataObject.GetActiveCState();
+    if (rawState == nullptr) {
+      return out;
+    }
+
+    const int stackTop = lua_gettop(rawState);
+    const_cast<LuaPlus::LuaObject&>(userDataObject).PushStack(rawState);
+    void* const rawUserData = lua_touserdata(rawState, -1);
+    if (rawUserData != nullptr) {
+      out = *static_cast<gpg::RRef*>(rawUserData);
+    }
+    lua_settop(rawState, stackTop);
+    return out;
+  }
+
+  /**
+   * Address: 0x007C8D70 (FUN_007C8D70)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `CLobby`.
+   */
+  [[nodiscard]] gpg::RType* CachedCLobbyRuntimeTypeBridge()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::CLobby));
+    }
+    return cached;
+  }
+
   struct LaunchPlayerOptionEntry
   {
     int32_t mSlotIndex{-1};
     LuaPlus::LuaObject mOptions;
   };
+  static_assert(sizeof(LaunchPlayerOptionEntry) == 0x18, "LaunchPlayerOptionEntry size must be 0x18");
+
+  /**
+   * Address: 0x007CED70 (FUN_007CED70)
+   *
+   * What it does:
+   * Copy-constructs one half-open launch-player-option range into destination
+   * storage and returns the destination end pointer.
+   */
+  [[maybe_unused]] LaunchPlayerOptionEntry* CopyConstructLaunchPlayerOptionEntryRange(
+    const LaunchPlayerOptionEntry* sourceBegin,
+    LaunchPlayerOptionEntry* destinationBegin,
+    const LaunchPlayerOptionEntry* sourceEnd
+  )
+  {
+    while (sourceBegin != sourceEnd) {
+      if (destinationBegin != nullptr) {
+        destinationBegin->mSlotIndex = sourceBegin->mSlotIndex;
+        ::new (static_cast<void*>(&destinationBegin->mOptions)) LuaPlus::LuaObject(sourceBegin->mOptions);
+      }
+      ++sourceBegin;
+      ++destinationBegin;
+    }
+
+    return destinationBegin;
+  }
+
+  /**
+   * Address: 0x007CD090 (FUN_007CD090)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one launch-player-option
+   * copy-construction range into the canonical lane.
+   */
+  [[maybe_unused]] LaunchPlayerOptionEntry* CopyConstructLaunchPlayerOptionEntryRangeAdapterA(
+    const LaunchPlayerOptionEntry* const sourceBegin,
+    LaunchPlayerOptionEntry* const destinationBegin,
+    const LaunchPlayerOptionEntry* const sourceEnd
+  )
+  {
+    return CopyConstructLaunchPlayerOptionEntryRange(sourceBegin, destinationBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x007CDD50 (FUN_007CDD50)
+   *
+   * What it does:
+   * Secondary register-shape adapter for launch-player-option range
+   * copy-construction.
+   */
+  [[maybe_unused]] LaunchPlayerOptionEntry* CopyConstructLaunchPlayerOptionEntryRangeAdapterB(
+    const LaunchPlayerOptionEntry* const sourceBegin,
+    LaunchPlayerOptionEntry* const destinationBegin,
+    const LaunchPlayerOptionEntry* const sourceEnd
+  )
+  {
+    return CopyConstructLaunchPlayerOptionEntryRange(sourceBegin, destinationBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x007CE890 (FUN_007CE890)
+   *
+   * What it does:
+   * Third adapter lane for launch-player-option half-open range
+   * copy-construction.
+   */
+  [[maybe_unused]] LaunchPlayerOptionEntry* CopyConstructLaunchPlayerOptionEntryRangeAdapterC(
+    const LaunchPlayerOptionEntry* const sourceBegin,
+    LaunchPlayerOptionEntry* const destinationBegin,
+    const LaunchPlayerOptionEntry* const sourceEnd
+  )
+  {
+    return CopyConstructLaunchPlayerOptionEntryRange(sourceBegin, destinationBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x007CC0E0 (FUN_007CC0E0)
+   *
+   * What it does:
+   * Copy-assigns one half-open launch-player-option range from one prototype
+   * record and returns the Lua-object lane pointer from the final assignment.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* CopyAssignLaunchPlayerOptionEntryRange(
+    LaunchPlayerOptionEntry* destinationBegin,
+    LaunchPlayerOptionEntry* destinationEnd,
+    const LaunchPlayerOptionEntry& source
+  )
+  {
+    LuaPlus::LuaObject* assignmentResult = reinterpret_cast<LuaPlus::LuaObject*>(destinationBegin);
+    for (LaunchPlayerOptionEntry* destination = destinationBegin; destination != destinationEnd; ++destination) {
+      destination->mSlotIndex = source.mSlotIndex;
+      assignmentResult = &(destination->mOptions = source.mOptions);
+    }
+    return assignmentResult;
+  }
+
+  /**
+   * Address: 0x007CD0B0 (FUN_007CD0B0)
+   *
+   * What it does:
+   * Copies one launch-player-option prototype record from pointer form across
+   * destination range and returns the final LuaObject assignment lane.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* CopyAssignLaunchPlayerOptionEntryRangeFromPointer(
+    LaunchPlayerOptionEntry* const destinationBegin,
+    const LaunchPlayerOptionEntry* const source,
+    LaunchPlayerOptionEntry* const destinationEnd
+  )
+  {
+    return CopyAssignLaunchPlayerOptionEntryRange(destinationBegin, destinationEnd, *source);
+  }
+
+  /**
+   * Address: 0x007C0CA0 (FUN_007C0CA0)
+   *
+   * What it does:
+   * Unlinks one intrusive peer-list head node from its current ring and
+   * restores self-linked sentinel lanes.
+   */
+  [[maybe_unused]] moho::TDatListItem<moho::SPeer, void>* UnlinkPeerListHead(
+    moho::TDatListItem<moho::SPeer, void>* const head
+  ) noexcept
+  {
+    head->mPrev->mNext = head->mNext;
+    head->mNext->mPrev = head->mPrev;
+    head->mPrev = head;
+    head->mNext = head;
+    return head;
+  }
 
   bool sLobbyIgnoreNamesConVarRegistered = false;
 
@@ -139,8 +325,10 @@ namespace
     auto* const head = static_cast<LinkNode*>(&dispatcher);
     for (LinkNode* node = head->mNext; node != head; node = node->mNext) {
       auto* const linkage = static_cast<SMsgReceiverLinkage*>(node);
-      if (linkage->mLower == lower && linkage->mUpper == upper &&
-          linkage->mReceiver == const_cast<IMessageReceiver*>(receiver)) {
+      if (
+        linkage->mLower == lower && linkage->mUpper == upper &&
+        linkage->mReceiver == const_cast<IMessageReceiver*>(receiver)
+      ) {
         dispatcher.RemoveLinkage(linkage);
         return true;
       }
@@ -148,7 +336,10 @@ namespace
     return false;
   }
 
-  void DetachLobbyReceiverRanges(INetConnection* const connection, const IMessageReceiver* const receiver)
+  void DetachLobbyReceiverRanges(
+    INetConnection* const connection,
+    const IMessageReceiver* const receiver
+  )
   {
     GPG_ASSERT(connection != nullptr);
     auto& dispatcher = *static_cast<CMessageDispatcher*>(connection);
@@ -165,7 +356,9 @@ namespace
     }
   }
 
-  [[nodiscard]] int32_t ParseOwnerId(const LuaPlus::LuaObject& ownerIdObject)
+  [[nodiscard]] int32_t ParseOwnerId(
+    const LuaPlus::LuaObject& ownerIdObject
+  )
   {
     const char* const ownerIdStr = ownerIdObject.GetString();
     return std::atoi(ownerIdStr ? ownerIdStr : "");
@@ -262,7 +455,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CLobby>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CLobby>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -276,11 +471,7 @@ namespace moho
  */
 gpg::RType* CLobby::GetClass() const
 {
-  static gpg::RType* sLobbyType = nullptr;
-  if (sLobbyType == nullptr) {
-    sLobbyType = gpg::LookupRType(typeid(CLobby));
-  }
-  return sLobbyType;
+  return CachedCLobbyRuntimeTypeBridge();
 }
 
 /**
@@ -336,6 +527,7 @@ CLobby::CLobby(
 
   this->connector->SelectEvent(event);
   WIN_GetWaitHandleSet()->AddHandle(event);
+  (void)UnlinkPeerListHead(&peers);
 }
 
 /**
@@ -373,6 +565,7 @@ CLobby::~CLobby()
     delete static_cast<SPeer*>(peers.mNext);
   }
 
+  (void)UnlinkPeerListHead(&peers);
   mSocket.reset();
 }
 
@@ -381,7 +574,9 @@ msvc8::string CLobby::GetErrorDescription()
   return CScriptObject::GetErrorDescription();
 }
 
-SPeer* CLobby::FindPeerByConnection(const INetConnection* connection)
+SPeer* CLobby::FindPeerByConnection(
+  const INetConnection* connection
+)
 {
   for (SPeer* peer : peers.owners()) {
     if (peer->peerConnection == connection) {
@@ -391,7 +586,9 @@ SPeer* CLobby::FindPeerByConnection(const INetConnection* connection)
   return nullptr;
 }
 
-SPeer* CLobby::FindPeerByUid(const int32_t uid)
+SPeer* CLobby::FindPeerByUid(
+  const int32_t uid
+)
 {
   for (SPeer* peer : peers.owners()) {
     if (peer->uid == uid) {
@@ -406,7 +603,10 @@ SPeer* CLobby::FindPeerByUid(const int32_t uid)
  *
  * Callsite: 0x00487885
  */
-void CLobby::ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher)
+void CLobby::ReceiveMessage(
+  CMessage* message,
+  CMessageDispatcher* dispatcher
+)
 {
   // CNetUDPConnection is caller, which have INetConnection `[dispatcher - 4].mReceivers[255]`.
   const auto connection = static_cast<INetConnection*>(dispatcher);
@@ -459,7 +659,12 @@ void CLobby::ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher)
  * What it does:
  * Handles incoming lobby datagrams and replies to discovery requests.
  */
-void CLobby::OnDatagram(CMessage* msg, INetDatagramSocket* sock, const u_long address, const u_short port)
+void CLobby::OnDatagram(
+  CMessage* msg,
+  INetDatagramSocket* sock,
+  const u_long address,
+  const u_short port
+)
 {
   if (!msg || !sock) {
     return;
@@ -509,7 +714,10 @@ void CLobby::OnDatagram(CMessage* msg, INetDatagramSocket* sock, const u_long ad
 /**
  * Address: 0x007C64C0 (FUN_007C64C0)
  */
-void CLobby::OnJoin(CMessage* message, INetConnection* connection)
+void CLobby::OnJoin(
+  CMessage* message,
+  INetConnection* connection
+)
 {
   CMessageStream stream{message};
   const gpg::BinaryReader br{&stream};
@@ -603,7 +811,10 @@ void CLobby::OnJoin(CMessage* message, INetConnection* connection)
 /**
  * Address: 0x007C6AD0 (FUN_007C6AD0)
  */
-void CLobby::OnRejected(CMessage* message, [[maybe_unused]] INetConnection* connection)
+void CLobby::OnRejected(
+  CMessage* message,
+  [[maybe_unused]] INetConnection* connection
+)
 {
   CMessageStream s(message, CMessageStream::Access::kReadOnly);
   const gpg::BinaryReader br{&s};
@@ -617,7 +828,10 @@ void CLobby::OnRejected(CMessage* message, [[maybe_unused]] INetConnection* conn
 /**
  * Address: 0x007C6BD0 (FUN_007C6BD0)
  */
-void CLobby::OnWelcome(CMessage* message, const INetConnection* connection)
+void CLobby::OnWelcome(
+  CMessage* message,
+  const INetConnection* connection
+)
 {
   SPeer* peer = FindPeerByConnection(connection);
 
@@ -690,7 +904,10 @@ void CLobby::OnWelcome(CMessage* message, const INetConnection* connection)
 /**
  * Address: 0x007C7010 (FUN_007C7010)
  */
-void CLobby::OnNewPeer(CMessage* message, INetConnection* connection)
+void CLobby::OnNewPeer(
+  CMessage* message,
+  INetConnection* connection
+)
 {
   if (connection != peerConnection) {
     // If this is not a host.
@@ -718,7 +935,10 @@ void CLobby::OnNewPeer(CMessage* message, INetConnection* connection)
 /**
  * Address: 0x007C76A0 (FUN_007C76A0)
  */
-void CLobby::OnDeletePeer(CMessage* message, INetConnection* connection)
+void CLobby::OnDeletePeer(
+  CMessage* message,
+  INetConnection* connection
+)
 {
   if (connection != peerConnection) {
     // If this is not a host.
@@ -739,7 +959,10 @@ void CLobby::OnDeletePeer(CMessage* message, INetConnection* connection)
 /**
  * Address: 0x007C7C10 (FUN_007C7C10)
  */
-void CLobby::OnEstablishedPeers(CMessage* message, INetConnection* connection)
+void CLobby::OnEstablishedPeers(
+  CMessage* message,
+  INetConnection* connection
+)
 {
   SPeer* peer = FindPeerByConnection(connection);
 
@@ -793,7 +1016,10 @@ void CLobby::OnEstablishedPeers(CMessage* message, INetConnection* connection)
 /**
  * Address: 0x007C6EE0 (FUN_007C6EE0)
  */
-void CLobby::OnScriptData(CMessage* message, INetConnection* connection)
+void CLobby::OnScriptData(
+  CMessage* message,
+  INetConnection* connection
+)
 {
   CMessageStream s(message, CMessageStream::Access::kReadOnly);
   const gpg::BinaryReader br{&s};
@@ -822,7 +1048,10 @@ void CLobby::OnScriptData(CMessage* message, INetConnection* connection)
 /**
  * Address: 0x007C5B60 (FUN_007C5B60)
  */
-void CLobby::OnConnectionFailed([[maybe_unused]] CMessage* message, INetConnection* connection)
+void CLobby::OnConnectionFailed(
+  [[maybe_unused]] CMessage* message,
+  INetConnection* connection
+)
 {
   if (connection == peerConnection) {
     // If this is not a host.
@@ -849,7 +1078,10 @@ void CLobby::OnConnectionFailed([[maybe_unused]] CMessage* message, INetConnecti
 /**
  * Address: 0x007C5CA0 (FUN_007C5CA0)
  */
-void CLobby::OnConnectionMade([[maybe_unused]] const CMessage* message, INetConnection* connection)
+void CLobby::OnConnectionMade(
+  [[maybe_unused]] const CMessage* message,
+  INetConnection* connection
+)
 {
   SPeer* peer = FindPeerByConnection(connection);
 
@@ -885,7 +1117,7 @@ void CLobby::OnConnectionMade([[maybe_unused]] const CMessage* message, INetConn
  * What it does:
  * Handles connection-loss state transitions and reconnect/eject behavior.
  */
-void CLobby::OnConnectionLost(CMessage* message, INetConnection* connection)
+void CLobby::Reconnect(INetConnection* connection)
 {
   if (connection == peerConnection) {
     // If this is not a host.
@@ -965,9 +1197,25 @@ void CLobby::OnConnectionLost(CMessage* message, INetConnection* connection)
 }
 
 /**
+ * Address: 0x007C62E0 (FUN_007C62E0)
+ *
+ * What it does:
+ * Adapts one message-receiver callback lane into `CLobby::Reconnect`.
+ */
+void CLobby::OnConnectionLost(
+  [[maybe_unused]] CMessage* message,
+  INetConnection* connection
+)
+{
+  Reconnect(connection);
+}
+
+/**
  * Address: 0x007C77F0 (FUN_007C77F0)
  */
-void CLobby::PeerDisconnected(SPeer* peer)
+void CLobby::PeerDisconnected(
+  SPeer* peer
+)
 {
   peer->peerConnection->ScheduleDestroy();
   peer->ListUnlink();
@@ -998,7 +1246,9 @@ void CLobby::PeerDisconnected(SPeer* peer)
 /**
  * Address: 0x007C8040 (FUN_007C8040)
  */
-void CLobby::BroadcastStream(const CMessageStream& s)
+void CLobby::BroadcastStream(
+  const CMessageStream& s
+)
 {
   for (SPeer* it : peers.owners()) {
     if (it->state == ENetworkPlayerState::kEstablished) {
@@ -1010,7 +1260,10 @@ void CLobby::BroadcastStream(const CMessageStream& s)
 /**
  * Address: 0x007C1720 (FUN_007C1720)
  */
-msvc8::string CLobby::MakeValidPlayerName(msvc8::string joiningName, const int32_t uid)
+msvc8::string CLobby::MakeValidPlayerName(
+  msvc8::string joiningName,
+  const int32_t uid
+)
 {
   static constexpr std::size_t maxLen = 24;
 
@@ -1058,13 +1311,223 @@ msvc8::string CLobby::MakeValidPlayerName(msvc8::string joiningName, const int32
 }
 
 /**
+ * Address: 0x007C0060 (FUN_007C0060, cfunc_InternalCreateDiscoveryService)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_InternalCreateDiscoveryServiceL`.
+ */
+int moho::cfunc_InternalCreateDiscoveryService(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateDiscoveryServiceL(luaContext ? luaContext->stateUserData : nullptr);
+}
+
+/**
+ * Address: 0x007C00E0 (FUN_007C00E0, cfunc_InternalCreateDiscoveryServiceL)
+ *
+ * What it does:
+ * Validates one class argument, constructs one `CDiscoveryService`, and pushes
+ * its script object back to Lua.
+ */
+int moho::cfunc_InternalCreateDiscoveryServiceL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateDiscoveryServiceHelp, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject classObject(LuaPlus::LuaStackObject(state, 1));
+  CDiscoveryService* const discoveryService = new CDiscoveryService(classObject);
+  discoveryService->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x007C0080 (FUN_007C0080, func_InternalCreateDiscoveryService_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateDiscoveryService(...)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateDiscoveryService_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateDiscoveryService",
+    &moho::cfunc_InternalCreateDiscoveryService,
+    nullptr,
+    "<global>",
+    kInternalCreateDiscoveryServiceHelp
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007C0CC0 (FUN_007C0CC0, cfunc_InternalCreateLobby)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_InternalCreateLobbyL`.
+ */
+int moho::cfunc_InternalCreateLobby(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateLobbyL(luaContext ? luaContext->stateUserData : nullptr);
+}
+
+/**
+ * Address: 0x007CB690 (FUN_007CB690, func_GetCObj_NatTraversalProvider)
+ *
+ * What it does:
+ * Unwraps Lua boxed userdata payload and returns the typed
+ * `boost::weak_ptr<INetNATTraversalProvider>` slot.
+ */
+boost::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversalProvider(
+  LuaPlus::LuaObject valueObject
+)
+{
+  if (valueObject.IsTable()) {
+    valueObject = valueObject.GetByName("_c_object");
+  }
+
+  const gpg::RRef userDataRef = ExtractLuaUserDataRef(valueObject);
+  const gpg::RRef upcastRef = gpg::REF_UpcastPtr(userDataRef, gpg::ResolveWeakPtrINetNATTraversalProviderType());
+  auto* const providerSlot = static_cast<boost::weak_ptr<INetNATTraversalProvider>*>(upcastRef.mObj);
+  if (providerSlot == nullptr) {
+    throw std::bad_cast{};
+  }
+  return providerSlot;
+}
+
+/**
+ * Address: 0x007C0D40 (FUN_007C0D40, cfunc_InternalCreateLobbyL)
+ *
+ * What it does:
+ * Validates and decodes one `InternalCreateLobby(...)` Lua call, resolves
+ * connector/NAT lanes, constructs `CLobby`, and pushes the lobby Lua object.
+ */
+int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 7) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateLobbyHelp, 7, argumentCount);
+  }
+
+  const LuaPlus::LuaObject clazz(LuaPlus::LuaStackObject(state, 1));
+
+  LuaPlus::LuaStackObject protocolArg(state, 2);
+  const char* const protocolText = lua_tostring(state->m_state, 2);
+  if (protocolText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&protocolArg, "string");
+  }
+  const ENetProtocolType protocol = NET_ProtocolFromString(protocolText ? protocolText : "");
+
+  LuaPlus::LuaStackObject localPortArg(state, 3);
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&localPortArg, "integer");
+  }
+  const int localPort = static_cast<int>(lua_tonumber(state->m_state, 3));
+
+  LuaPlus::LuaStackObject maxConnectionsArg(state, 4);
+  if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&maxConnectionsArg, "integer");
+  }
+  const int maxConnections = static_cast<int>(lua_tonumber(state->m_state, 4));
+
+  LuaPlus::LuaStackObject playerNameArg(state, 5);
+  const char* const playerName = lua_tostring(state->m_state, 5);
+  if (playerName == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&playerNameArg, "string");
+  }
+
+  int uid = -1;
+  if (lua_type(state->m_state, 6) != LUA_TNIL) {
+    LuaPlus::LuaStackObject uidArg(state, 6);
+    const char* const uidText = lua_tostring(state->m_state, 6);
+    if (uidText == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&uidArg, "string");
+    }
+    uid = std::atoi(uidText ? uidText : "");
+  }
+
+  boost::weak_ptr<INetNATTraversalProvider> natTraversalProvider{};
+  if (lua_type(state->m_state, 7) != LUA_TNIL) {
+    const LuaPlus::LuaObject natTraversalProviderObject(LuaPlus::LuaStackObject(state, 7));
+    natTraversalProvider = *func_GetCObj_NatTraversalProvider(natTraversalProviderObject);
+  }
+
+  boost::weak_ptr<INetNATTraversalProvider> liveNatTraversalProvider{};
+  if (!natTraversalProvider.expired()) {
+    liveNatTraversalProvider = natTraversalProvider;
+  }
+  const bool noNatTraversalProvider = (liveNatTraversalProvider.use_count() == 0);
+
+  INetConnector* connector = nullptr;
+  if (protocol == ENetProtocolType::kTcp) {
+    connector = NET_MakeTCPConnector(static_cast<u_short>(localPort));
+  } else if (protocol == ENetProtocolType::kUdp) {
+    connector = NET_MakeUDPConnector(static_cast<u_short>(localPort), liveNatTraversalProvider);
+  } else {
+    connector = new (std::nothrow) CNetNullConnector();
+  }
+
+  if (connector == nullptr) {
+    lua_pushnil(state->m_state);
+    (void)lua_gettop(state->m_state);
+    return 1;
+  }
+
+  const msvc8::string protocolName = NET_GetProtocolName(protocol);
+  const u_short gamePort = connector->GetLocalPort();
+  gpg::Logf("LOBBY: Game port %d[%s] opened.", gamePort, protocolName.c_str());
+
+  CLobby* const lobby = new CLobby(clazz, connector, maxConnections, noNatTraversalProvider, playerName, uid);
+  lobby->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x007C0CE0 (FUN_007C0CE0, func_InternalCreateLobby_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateLobby(...)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateLobby_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateLobby",
+    &moho::cfunc_InternalCreateLobby,
+    nullptr,
+    "<global>",
+    kInternalCreateLobbyHelp
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BDFDD0 (FUN_00BDFDD0, register_InternalCreateDiscoveryService_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_InternalCreateDiscoveryService_LuaFuncDef()
+{
+  return func_InternalCreateDiscoveryService_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BDFE50 (FUN_00BDFE50, register_InternalCreateLobby_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_InternalCreateLobby_LuaFuncDef()
+{
+  return func_InternalCreateLobby_LuaFuncDef();
+}
+
+/**
  * Address: 0x007C13E0 (FUN_007C13E0, cfunc_CLobbyDestroy)
  *
  * What it does:
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyDestroyL`.
  */
-int moho::cfunc_CLobbyDestroy(lua_State* const luaContext)
+int moho::cfunc_CLobbyDestroy(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyDestroyL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1095,7 +1558,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyDestroy_LuaFuncDef()
  * Validates one Lua `self` arg, resolves optional `CLobby*`, and deletes it
  * when present.
  */
-int moho::cfunc_CLobbyDestroyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyDestroyL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1121,7 +1586,9 @@ int moho::cfunc_CLobbyDestroyL(LuaPlus::LuaState* const state)
  * What it does:
  * Returns one copy of `sourceName` truncated to at most 32 bytes.
  */
-[[nodiscard]] msvc8::string MakeValidGameName(const msvc8::string& sourceName)
+[[nodiscard]] msvc8::string MakeValidGameName(
+  const msvc8::string& sourceName
+)
 {
   return sourceName.substr(0, 32u);
 }
@@ -1133,7 +1600,9 @@ int moho::cfunc_CLobbyDestroyL(LuaPlus::LuaState* const state)
  * Validates `(self, origName)` Lua args, normalizes game name length to 32
  * bytes, and pushes the sanitized result.
  */
-int moho::cfunc_CLobbyMakeValidGameNameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyMakeValidGameNameL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1141,7 +1610,9 @@ int moho::cfunc_CLobbyMakeValidGameNameL(LuaPlus::LuaState* const state)
 
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCLobbyMakeValidGameNameHelp, 2, argumentCount);
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kCLobbyMakeValidGameNameHelp, 2, argumentCount
+    );
   }
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
@@ -1165,7 +1636,9 @@ int moho::cfunc_CLobbyMakeValidGameNameL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyMakeValidGameNameL`.
  */
-int moho::cfunc_CLobbyMakeValidGameName(lua_State* const luaContext)
+int moho::cfunc_CLobbyMakeValidGameName(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyMakeValidGameNameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1196,7 +1669,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyMakeValidGameName_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyMakeValidPlayerNameL`.
  */
-int moho::cfunc_CLobbyMakeValidPlayerName(lua_State* const luaContext)
+int moho::cfunc_CLobbyMakeValidPlayerName(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyMakeValidPlayerNameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1208,16 +1683,14 @@ int moho::cfunc_CLobbyMakeValidPlayerName(lua_State* const luaContext)
  * Validates `(self, uid, name)` Lua args, normalizes the requested name via
  * `CLobby::MakeValidPlayerName`, and pushes the sanitized result.
  */
-int moho::cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyMakeValidPlayerNameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 3) {
     LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected %d args, but got %d",
-      kCLobbyMakeValidPlayerNameHelp,
-      3,
-      argumentCount
+      state, "%s\n  expected %d args, but got %d", kCLobbyMakeValidPlayerNameHelp, 3, argumentCount
     );
   }
 
@@ -1269,7 +1742,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyMakeValidPlayerName_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyHostGameL`.
  */
-int moho::cfunc_CLobbyHostGame(lua_State* const luaContext)
+int moho::cfunc_CLobbyHostGame(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyHostGameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1280,7 +1755,9 @@ int moho::cfunc_CLobbyHostGame(lua_State* const luaContext)
  * What it does:
  * Validates one Lua `self` arg and dispatches `CLobby::HostGame`.
  */
-int moho::cfunc_CLobbyHostGameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyHostGameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1319,7 +1796,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyHostGame_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyJoinGameL`.
  */
-int moho::cfunc_CLobbyJoinGame(lua_State* const luaContext)
+int moho::cfunc_CLobbyJoinGame(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyJoinGameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1331,7 +1810,9 @@ int moho::cfunc_CLobbyJoinGame(lua_State* const luaContext)
  * Validates `(self,address,nameOrNil,uidOrNil)`, resolves host endpoint,
  * and dispatches `CLobby::JoinGame`.
  */
-int moho::cfunc_CLobbyJoinGameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyJoinGameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 4) {
@@ -1402,7 +1883,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyJoinGame_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyBroadcastDataL`.
  */
-int moho::cfunc_CLobbyBroadcastData(lua_State* const luaContext)
+int moho::cfunc_CLobbyBroadcastData(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyBroadcastDataL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1413,7 +1896,9 @@ int moho::cfunc_CLobbyBroadcastData(lua_State* const luaContext)
  * What it does:
  * Validates `(self,table)` and dispatches `CLobby::BroadcastScriptData`.
  */
-int moho::cfunc_CLobbyBroadcastDataL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyBroadcastDataL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -1457,7 +1942,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyBroadcastData_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbySendDataL`.
  */
-int moho::cfunc_CLobbySendData(lua_State* const luaContext)
+int moho::cfunc_CLobbySendData(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbySendDataL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1469,7 +1956,9 @@ int moho::cfunc_CLobbySendData(lua_State* const luaContext)
  * Validates `(self, targetId, table)` Lua args and dispatches one direct lobby
  * script-data message.
  */
-int moho::cfunc_CLobbySendDataL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbySendDataL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 3) {
@@ -1541,7 +2030,9 @@ moho::CScrLuaInitForm* moho::func_CLobbySendData_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyGetPeersL`.
  */
-int moho::cfunc_CLobbyGetPeers(lua_State* const luaContext)
+int moho::cfunc_CLobbyGetPeers(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyGetPeersL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1571,7 +2062,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyGetPeers_LuaFuncDef()
  * What it does:
  * Validates one Lua `self` arg and returns one table containing all peers.
  */
-int moho::cfunc_CLobbyGetPeersL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyGetPeersL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1593,7 +2086,9 @@ int moho::cfunc_CLobbyGetPeersL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyGetPeerL`.
  */
-int moho::cfunc_CLobbyGetPeer(lua_State* const luaContext)
+int moho::cfunc_CLobbyGetPeer(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyGetPeerL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1623,7 +2118,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyGetPeer_LuaFuncDef()
  * What it does:
  * Validates `(self, uid)` and returns one peer table or `nil`.
  */
-int moho::cfunc_CLobbyGetPeerL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyGetPeerL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -1652,7 +2149,9 @@ int moho::cfunc_CLobbyGetPeerL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyGetLocalPlayerNameL`.
  */
-int moho::cfunc_CLobbyGetLocalPlayerName(lua_State* const luaContext)
+int moho::cfunc_CLobbyGetLocalPlayerName(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyGetLocalPlayerNameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1682,7 +2181,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPlayerName_LuaFuncDef()
  * What it does:
  * Validates one Lua `self` arg and returns local player name text.
  */
-int moho::cfunc_CLobbyGetLocalPlayerNameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyGetLocalPlayerNameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1703,7 +2204,9 @@ int moho::cfunc_CLobbyGetLocalPlayerNameL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyGetLocalPlayerIDL`.
  */
-int moho::cfunc_CLobbyGetLocalPlayerID(lua_State* const luaContext)
+int moho::cfunc_CLobbyGetLocalPlayerID(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyGetLocalPlayerIDL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1733,7 +2236,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPlayerID_LuaFuncDef()
  * What it does:
  * Validates one Lua `self` arg and returns local uid as text.
  */
-int moho::cfunc_CLobbyGetLocalPlayerIDL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyGetLocalPlayerIDL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1758,7 +2263,9 @@ int moho::cfunc_CLobbyGetLocalPlayerIDL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyIsHostL`.
  */
-int moho::cfunc_CLobbyIsHost(lua_State* const luaContext)
+int moho::cfunc_CLobbyIsHost(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyIsHostL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1788,7 +2295,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyIsHost_LuaFuncDef()
  * What it does:
  * Validates one Lua `self` arg and returns whether no host connection is bound.
  */
-int moho::cfunc_CLobbyIsHostL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyIsHostL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1809,7 +2318,9 @@ int moho::cfunc_CLobbyIsHostL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyGetLocalPortL`.
  */
-int moho::cfunc_CLobbyGetLocalPort(lua_State* const luaContext)
+int moho::cfunc_CLobbyGetLocalPort(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyGetLocalPortL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1839,7 +2350,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyGetLocalPort_LuaFuncDef()
  * What it does:
  * Validates one Lua `self` arg and returns local connector port or `nil`.
  */
-int moho::cfunc_CLobbyGetLocalPortL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyGetLocalPortL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -1873,7 +2386,9 @@ int moho::cfunc_CLobbyGetLocalPortL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyEjectPeerL`.
  */
-int moho::cfunc_CLobbyEjectPeer(lua_State* const luaContext)
+int moho::cfunc_CLobbyEjectPeer(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyEjectPeerL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1884,7 +2399,9 @@ int moho::cfunc_CLobbyEjectPeer(lua_State* const luaContext)
  * What it does:
  * Validates `(self, targetId, reason)` Lua args and ejects one peer by uid.
  */
-int moho::cfunc_CLobbyEjectPeerL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyEjectPeerL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 3) {
@@ -1937,7 +2454,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyEjectPeer_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyConnectToPeerL`.
  */
-int moho::cfunc_CLobbyConnectToPeer(lua_State* const luaContext)
+int moho::cfunc_CLobbyConnectToPeer(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyConnectToPeerL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -1968,7 +2487,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyConnectToPeer_LuaFuncDef()
  * Validates `(self,address,name,uid)`, resolves endpoint, and dispatches
  * `CLobby::ConnectToPeer`.
  */
-int moho::cfunc_CLobbyConnectToPeerL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyConnectToPeerL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 4) {
@@ -2014,7 +2535,9 @@ int moho::cfunc_CLobbyConnectToPeerL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyDisconnectFromPeerL`.
  */
-int moho::cfunc_CLobbyDisconnectFromPeer(lua_State* const luaContext)
+int moho::cfunc_CLobbyDisconnectFromPeer(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyDisconnectFromPeerL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -2025,7 +2548,9 @@ int moho::cfunc_CLobbyDisconnectFromPeer(lua_State* const luaContext)
  * What it does:
  * Validates `(self, uid)` Lua args and disconnects one peer by uid.
  */
-int moho::cfunc_CLobbyDisconnectFromPeerL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyDisconnectFromPeerL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -2072,7 +2597,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyDisconnectFromPeer_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyLaunchGameL`.
  */
-int moho::cfunc_CLobbyLaunchGame(lua_State* const luaContext)
+int moho::cfunc_CLobbyLaunchGame(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyLaunchGameL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -2083,7 +2610,9 @@ int moho::cfunc_CLobbyLaunchGame(lua_State* const luaContext)
  * What it does:
  * Validates `(self,gameConfig)` and dispatches one launch-game request.
  */
-int moho::cfunc_CLobbyLaunchGameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyLaunchGameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -2124,7 +2653,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyLaunchGame_LuaFuncDef()
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards to
  * `cfunc_CLobbyDebugDumpL`.
  */
-int moho::cfunc_CLobbyDebugDump(lua_State* const luaContext)
+int moho::cfunc_CLobbyDebugDump(
+  lua_State* const luaContext
+)
 {
   return cfunc_CLobbyDebugDumpL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -2135,7 +2666,9 @@ int moho::cfunc_CLobbyDebugDump(lua_State* const luaContext)
  * What it does:
  * Validates one Lua `self` arg and dispatches `CLobby::DebugDump`.
  */
-int moho::cfunc_CLobbyDebugDumpL(LuaPlus::LuaState* const state)
+int moho::cfunc_CLobbyDebugDumpL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -2174,7 +2707,9 @@ moho::CScrLuaInitForm* moho::func_CLobbyDebugDump_LuaFuncDef()
  * Validates one Lua `ipaddr` string, resolves host:port through `NET_GetAddrInfo`,
  * and returns either `"A.B.C.D:port"` or `nil`.
  */
-int moho::cfunc_ValidateIPAddressL(LuaPlus::LuaState* const state)
+int moho::cfunc_ValidateIPAddressL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -2209,7 +2744,9 @@ int moho::cfunc_ValidateIPAddressL(LuaPlus::LuaState* const state)
  * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards
  * to `cfunc_ValidateIPAddressL`.
  */
-int moho::cfunc_ValidateIPAddress(lua_State* const luaContext)
+int moho::cfunc_ValidateIPAddress(
+  lua_State* const luaContext
+)
 {
   return cfunc_ValidateIPAddressL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -2223,12 +2760,7 @@ int moho::cfunc_ValidateIPAddress(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ValidateIPAddress_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "ValidateIPAddress",
-    &moho::cfunc_ValidateIPAddress,
-    nullptr,
-    "<global>",
-    kValidateIPAddressHelp
+    UserLuaInitSet(), "ValidateIPAddress", &moho::cfunc_ValidateIPAddress, nullptr, "<global>", kValidateIPAddressHelp
   );
   return &binder;
 }
@@ -2236,7 +2768,9 @@ moho::CScrLuaInitForm* moho::func_ValidateIPAddress_LuaFuncDef()
 /**
  * Address: 0x007C7FA0 (FUN_007C7FA0)
  */
-void CLobby::Msg(gpg::StrArg msg)
+void CLobby::Msg(
+  gpg::StrArg msg
+)
 {
   CallbackStr("SystemMessage", &msg);
 }
@@ -2244,7 +2778,10 @@ void CLobby::Msg(gpg::StrArg msg)
 /**
  * Address: 0x007C7FC0 (FUN_007C7FC0)
  */
-void CLobby::Msgf(const char* fmt, ...)
+void CLobby::Msgf(
+  const char* fmt,
+  ...
+)
 {
   va_list va;
   va_start(va, fmt);
@@ -2259,7 +2796,9 @@ void CLobby::Msgf(const char* fmt, ...)
  * Address: 0x007CBAD0 (FUN_007CBAD0)
  */
 void CLobby::ProcessConnectionToHostEstablished(
-  const char** localPeerUidBuf, const char** newLocalNameBuf, const char** hostPeerUidBuf
+  const char** localPeerUidBuf,
+  const char** newLocalNameBuf,
+  const char** hostPeerUidBuf
 )
 {
   LuaPlus::LuaObject dest;
@@ -2293,7 +2832,12 @@ void CLobby::ProcessEjected()
 /**
  * Address: 0x007C7190 (FUN_007C7190)
  */
-void CLobby::ConnectToPeer(const u_long address, const u_short port, const msvc8::string& name, const int32_t uid)
+void CLobby::ConnectToPeer(
+  const u_long address,
+  const u_short port,
+  const msvc8::string& name,
+  const int32_t uid
+)
 {
   for (SPeer* it : peers.owners()) {
     if (it->uid == uid) {
@@ -2339,7 +2883,9 @@ void CLobby::ConnectToPeer(const u_long address, const u_short port, const msvc8
 /**
  * Address: 0x007C7790 (FUN_007C7790)
  */
-void CLobby::DisconnectFromPeer(const int32_t uid)
+void CLobby::DisconnectFromPeer(
+  const int32_t uid
+)
 {
   if (localUid == uid) {
     gpg::Logf("LOBBY: we've been ejected.");
@@ -2363,7 +2909,10 @@ void CLobby::DisconnectFromPeer(const int32_t uid)
  * Enforces host-only eject preconditions, scans the intrusive peer list for
  * one target uid, then dispatches `KickPeer`.
  */
-void CLobby::EjectPeer(const int32_t id, const char* const reason)
+void CLobby::EjectPeer(
+  const int32_t id,
+  const char* const reason
+)
 {
   if (peerConnection != nullptr) {
     throw std::runtime_error("Only the host can eject players.");
@@ -2389,7 +2938,10 @@ void CLobby::EjectPeer(const int32_t id, const char* const reason)
 /**
  * Address: 0x007C7AC0 (FUN_007C7AC0)
  */
-void CLobby::KickPeer(SPeer* peer, const char* reason)
+void CLobby::KickPeer(
+  SPeer* peer,
+  const char* reason
+)
 {
   if (peerConnection != nullptr) {
     throw std::runtime_error("Only the host can eject players.");
@@ -2440,6 +2992,13 @@ void CLobby::PushTask()
   }
 
   connector->Pull();
+}
+
+int CLobby::Execute()
+{
+  PushTask();
+  PullTask();
+  return 1;
 }
 
 /**
@@ -2528,7 +3087,12 @@ void CLobby::HostGame()
  * What it does:
  * Connects to host endpoint and seeds host peer state.
  */
-void CLobby::JoinGame(const u_long address, const u_short port, const char* remPlayerName, int remPlayerUid)
+void CLobby::JoinGame(
+  const u_long address,
+  const u_short port,
+  const char* remPlayerName,
+  int remPlayerUid
+)
 {
   if (joinedLobby) {
     throw std::runtime_error("Attempting to host or join after already having done so.");
@@ -2557,7 +3121,9 @@ void CLobby::JoinGame(const u_long address, const u_short port, const char* remP
 /**
  * Address: 0x007C2210 (FUN_007C2210)
  */
-void CLobby::BroadcastScriptData(LuaPlus::LuaObject& dat)
+void CLobby::BroadcastScriptData(
+  LuaPlus::LuaObject& dat
+)
 {
   CMessage msg(ELobbyMsg::LOBMSG_BroadcastScriptData);
   CMessageStream s(msg, CMessageStream::Access::kReadWrite);
@@ -2574,7 +3140,10 @@ void CLobby::BroadcastScriptData(LuaPlus::LuaObject& dat)
  * What it does:
  * Sends a Lua script payload to a specific established peer uid.
  */
-void CLobby::SendScriptData(int32_t id, LuaPlus::LuaObject& dat)
+void CLobby::SendScriptData(
+  int32_t id,
+  LuaPlus::LuaObject& dat
+)
 {
   CMessage msg(ELobbyMsg::LOBMSG_DirectScriptData);
   CMessageStream s(msg, CMessageStream::Access::kReadWrite);
@@ -2595,7 +3164,9 @@ void CLobby::SendScriptData(int32_t id, LuaPlus::LuaObject& dat)
 /**
  * Address: 0x007C27E0 (FUN_007C27E0)
  */
-LuaPlus::LuaObject CLobby::GetPeers(LuaPlus::LuaState* state)
+LuaPlus::LuaObject CLobby::GetPeers(
+  LuaPlus::LuaState* state
+)
 {
   LuaPlus::LuaObject ret;
   ret.AssignNewTable(state, 0, 0);
@@ -2610,7 +3181,9 @@ LuaPlus::LuaObject CLobby::GetPeers(LuaPlus::LuaState* state)
 /**
  * Address: 0x007C38C0 (FUN_007C38C0)
  */
-void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
+void CLobby::LaunchGame(
+  const LuaPlus::LuaObject& dat
+)
 {
   LuaPlus::LuaObject gameOptions = dat["GameOptions"];
 
@@ -2697,9 +3270,13 @@ void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
   }
 
   if (!playerOptions.empty()) {
-    std::sort(playerOptions.begin(), playerOptions.end(), [](const LaunchPlayerOptionEntry& lhs, const LaunchPlayerOptionEntry& rhs) {
+    std::sort(
+      playerOptions.begin(),
+      playerOptions.end(),
+      [](const LaunchPlayerOptionEntry& lhs, const LaunchPlayerOptionEntry& rhs) {
       return lhs.mSlotIndex < rhs.mSlotIndex;
-    });
+    }
+    );
   }
 
   auto sessionInfo = msvc8::auto_ptr<SWldSessionInfo>(new SWldSessionInfo());
@@ -2773,7 +3350,8 @@ void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
       const char* const optionPlayerName = playerNameObject.GetString();
       AssignClientIndex(clientIndex, ownerId, optionPlayerName ? optionPlayerName : "", localClientIndex);
 
-      const uint32_t sourceId = AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
+      const uint32_t sourceId =
+        AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
       if (sourceId != 0xFFu) {
         (void)commandSourceSet.Add(sourceId);
       }
@@ -2818,7 +3396,9 @@ void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
     CLIENT_CreateClientManager(static_cast<std::size_t>(clientIndex), connector, gameSpeed, adjustableGameSpeed);
   connector = nullptr;
 
-  sessionInfo->mClientManager->CreateLocalClient(playerName.c_str(), localClientIndex, localUid, sessionInfo->mSourceId);
+  sessionInfo->mClientManager->CreateLocalClient(
+    playerName.c_str(), localClientIndex, localUid, sessionInfo->mSourceId
+  );
 
   for (SPeer* peer : peers.owners()) {
     if (peer->mClientInd == -1) {
@@ -2828,15 +3408,13 @@ void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
     if (peer->state == ENetworkPlayerState::kEstablished) {
       DetachLobbyReceiverRanges(peer->peerConnection, this);
       sessionInfo->mClientManager->CreateNetClient(
-        peer->playerName.c_str(),
-        peer->mClientInd,
-        peer->uid,
-        peer->mCmdSource,
-        peer->peerConnection
+        peer->playerName.c_str(), peer->mClientInd, peer->uid, peer->mCmdSource, peer->peerConnection
       );
       peer->peerConnection = nullptr;
     } else {
-      sessionInfo->mClientManager->CreateNullClient(peer->playerName.c_str(), peer->mClientInd, peer->uid, peer->mCmdSource);
+      sessionInfo->mClientManager->CreateNullClient(
+        peer->playerName.c_str(), peer->mClientInd, peer->uid, peer->mCmdSource
+      );
     }
   }
 
@@ -2890,7 +3468,12 @@ void CLobby::DebugDump()
  * What it does:
  * Resolves/creates a peer owner record and assigns a stable per-owner client index.
  */
-void CLobby::AssignClientIndex(int32_t& clientIndex, const int32_t ownerId, const char* plyName, int32_t& tmpUid)
+void CLobby::AssignClientIndex(
+  int32_t& clientIndex,
+  const int32_t ownerId,
+  const char* plyName,
+  int32_t& tmpUid
+)
 {
   if (ownerId == localUid) {
     if (tmpUid == -1) {
@@ -2916,7 +3499,10 @@ void CLobby::AssignClientIndex(int32_t& clientIndex, const int32_t ownerId, cons
  * Returns an owner-specific command-source id, creating source entries lazily.
  */
 uint32_t CLobby::AssignCommandSource(
-  int timeouts, int32_t ownerId, msvc8::vector<SSTICommandSource>& commandSources, uint32_t& sourceId
+  int timeouts,
+  int32_t ownerId,
+  msvc8::vector<SSTICommandSource>& commandSources,
+  uint32_t& sourceId
 )
 {
   static constexpr uint32_t kInvalidCommandSourceId = 0xFF;

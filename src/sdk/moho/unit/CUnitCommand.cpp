@@ -19,7 +19,9 @@
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/CountedObject.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -32,6 +34,21 @@
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
+
+/**
+ * Address: 0x006EC9E0 (FUN_006EC9E0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CUnitCommand>` and returns that singleton.
+ */
+[[maybe_unused]] moho::CScrLuaMetatableFactory<moho::CUnitCommand>*
+startup_CScrLuaMetatableFactory_CUnitCommand_Index()
+{
+  auto& instance = moho::CScrLuaMetatableFactory<moho::CUnitCommand>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
+}
 
 namespace gpg
 {
@@ -47,6 +64,18 @@ namespace
   using CommandOwnerSlotNode = WeakPtr<CUnitCommand>;
   using BroadcasterOwnerSlotNode = WeakPtr<Broadcaster>;
   using EntityOwnerSlotNode = WeakPtr<Entity>;
+
+  /**
+   * Address: 0x006EB6C0 (FUN_006EB6C0)
+   *
+   * What it does:
+   * Returns cached `CUnitCommand` metatable object from Lua object-factory
+   * storage.
+   */
+  [[maybe_unused]] [[nodiscard]] LuaPlus::LuaObject GetUnitCommandFactory(LuaPlus::LuaState* const state)
+  {
+    return CScrLuaMetatableFactory<CUnitCommand>::Instance().Get(state);
+  }
 
   [[nodiscard]] bool IsUsableCommandUnitEntry(const CScriptObject* const entry) noexcept
   {
@@ -100,6 +129,21 @@ namespace
       }
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x006EBFA0 (FUN_006EBFA0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `Broadcaster<ECommandEvent>` lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyBroadcasterCommandEventType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(BroadcasterEventTag<ECommandEvent>));
+    }
+    return type;
   }
 
   [[nodiscard]] gpg::RType* ResolveWeakPtrCUnitCommandVectorType()
@@ -156,6 +200,206 @@ namespace
       CountedPtr<IFormationInstance>::sType = sType;
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x006ED340 (FUN_006ED340)
+   *
+   * What it does:
+   * Loads one reflected `Broadcaster<ECommandEvent>` payload through cached
+   * RTTI lookup and returns the archive pointer for chaining.
+   */
+  gpg::ReadArchive* ReadBroadcasterCommandEventArchiveAndReturnArchive(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveBroadcasterCommandEventType()) {
+        archive->Read(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED380 (FUN_006ED380)
+   *
+   * What it does:
+   * Loads one reflected `SSTICommandConstantData` payload through cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+        archive->Read(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED3C0 (FUN_006ED3C0)
+   *
+   * What it does:
+   * Loads one reflected `SSTICommandVariableData` payload through cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+        archive->Read(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED400 (FUN_006ED400)
+   *
+   * What it does:
+   * Loads one reflected `CountedPtr<IFormationInstance>` payload through
+   * cached RTTI lookup and returns the archive pointer for chaining.
+   */
+  gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCountedPtrIFormationInstanceType()) {
+        archive->Read(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED440 (FUN_006ED440)
+   *
+   * What it does:
+   * Saves one reflected `Broadcaster<ECommandEvent>` payload through cached
+   * RTTI lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveBroadcasterCommandEventType()) {
+        archive->Write(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED480 (FUN_006ED480)
+   *
+   * What it does:
+   * Saves one reflected `SSTICommandConstantData` payload through cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+        archive->Write(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED4C0 (FUN_006ED4C0)
+   *
+   * What it does:
+   * Saves one reflected `SSTICommandVariableData` payload through cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+        archive->Write(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED500 (FUN_006ED500)
+   *
+   * What it does:
+   * Saves one reflected `CountedPtr<IFormationInstance>` payload through
+   * cached RTTI lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive != nullptr) {
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      if (gpg::RType* const type = ResolveCountedPtrIFormationInstanceType()) {
+        archive->Write(type, objectPtr, owner);
+      }
+    }
+
+    return archive;
+  }
+
+  /**
+   * Address: 0x006ED5B0 (FUN_006ED5B0)
+   *
+   * What it does:
+   * Read-callback bridge that loads one reflected `Broadcaster<ECommandEvent>`
+   * payload through cached RTTI lookup.
+   */
+  void ReadBroadcasterCommandEventArchiveCallback(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    (void)ReadBroadcasterCommandEventArchiveAndReturnArchive(archive, objectPtr, ownerRef);
   }
 
   template <class TObject>
@@ -236,6 +480,218 @@ namespace
     }
   }
 
+  struct CUnitCommandByteAt110RuntimeView
+  {
+    std::byte pad0000_010F[0x110];
+    std::uint8_t lane110;
+  };
+  static_assert(offsetof(CUnitCommandByteAt110RuntimeView, lane110) == 0x110, "CUnitCommandByteAt110RuntimeView::lane110");
+
+  struct CUnitCommandByteAt154RuntimeView
+  {
+    std::byte pad0000_0153[0x154];
+    std::uint8_t lane154;
+  };
+  static_assert(offsetof(CUnitCommandByteAt154RuntimeView, lane154) == 0x154, "CUnitCommandByteAt154RuntimeView::lane154");
+
+  struct CUnitCommandWordAtA0RuntimeView
+  {
+    std::byte pad0000_009F[0xA0];
+    std::uint32_t laneA0;
+  };
+  static_assert(offsetof(CUnitCommandWordAtA0RuntimeView, laneA0) == 0xA0, "CUnitCommandWordAtA0RuntimeView::laneA0");
+
+  struct CUnitCommandWordAt13CRuntimeView
+  {
+    std::byte pad0000_013B[0x13C];
+    std::uint32_t lane13C;
+  };
+  static_assert(offsetof(CUnitCommandWordAt13CRuntimeView, lane13C) == 0x13C, "CUnitCommandWordAt13CRuntimeView::lane13C");
+
+  struct SelfLinkPairRuntimeView
+  {
+    SelfLinkPairRuntimeView* prev;
+    SelfLinkPairRuntimeView* next;
+  };
+  static_assert(sizeof(SelfLinkPairRuntimeView) == 0x08, "SelfLinkPairRuntimeView size");
+  static_assert(offsetof(SelfLinkPairRuntimeView, prev) == 0x00, "SelfLinkPairRuntimeView::prev");
+  static_assert(offsetof(SelfLinkPairRuntimeView, next) == 0x04, "SelfLinkPairRuntimeView::next");
+
+  /**
+   * Address: 0x006E7CC0 (FUN_006E7CC0)
+   *
+   * What it does:
+   * Reads one command-runtime byte lane at offset `+0x110`.
+   */
+  [[maybe_unused]] std::uint8_t ReadCommandRuntimeByte110(const CUnitCommandByteAt110RuntimeView* const command) noexcept
+  {
+    return command->lane110;
+  }
+
+  /**
+   * Address: 0x006E7D30 (FUN_006E7D30)
+   *
+   * What it does:
+   * Reads one command-runtime byte lane at offset `+0x154`.
+   */
+  [[maybe_unused]] std::uint8_t ReadCommandRuntimeByte154(const CUnitCommandByteAt154RuntimeView* const command) noexcept
+  {
+    return command->lane154;
+  }
+
+  /**
+   * Address: 0x006E8160 (FUN_006E8160)
+   *
+   * What it does:
+   * Initializes one two-link intrusive header to singleton self-links.
+   */
+  [[maybe_unused]] SelfLinkPairRuntimeView* InitializeSelfLinkPairPrimary(SelfLinkPairRuntimeView* const links) noexcept
+  {
+    links->next = links;
+    links->prev = links;
+    return links;
+  }
+
+  /**
+   * Address: 0x006E8AF0 (FUN_006E8AF0)
+   *
+   * What it does:
+   * Returns true for patrol/form-patrol command types and, for attack commands,
+   * optionally requires ground-target form.
+   */
+  [[maybe_unused]] bool IsAttackOrPatrolWithOptionalGroundTarget(
+    const CUnitCommand* const command,
+    const bool requireGroundTargetForAttack
+  ) noexcept
+  {
+    const EUnitCommandType commandType = command->mVarDat.mCmdType;
+    if (commandType == EUnitCommandType::UNITCOMMAND_Attack) {
+      if (requireGroundTargetForAttack) {
+        return command->mTarget.targetType == EAiTargetType::AITARGET_Ground;
+      }
+    } else if (
+      commandType == EUnitCommandType::UNITCOMMAND_Patrol
+      || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Address: 0x006E8B30 (FUN_006E8B30)
+   *
+   * What it does:
+   * Returns whether command type equals `UNITCOMMAND_BuildFactory`.
+   */
+  [[maybe_unused]] bool IsBuildFactoryCommand(const CUnitCommand* const command) noexcept
+  {
+    return command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory;
+  }
+
+  /**
+   * Address: 0x006E9320 (FUN_006E9320)
+   *
+   * What it does:
+   * Returns true when one intrusive two-link header is self-linked.
+   */
+  [[maybe_unused]] bool IsSelfLinkedPair(const SelfLinkPairRuntimeView* const links) noexcept
+  {
+    return links->prev == links->next;
+  }
+
+  /**
+   * Address: 0x006E95A0 (FUN_006E95A0)
+   *
+   * What it does:
+   * Alias lane for initializing one two-link intrusive header to singleton
+   * self-links.
+   */
+  [[maybe_unused]] SelfLinkPairRuntimeView* InitializeSelfLinkPairSecondary(SelfLinkPairRuntimeView* const links) noexcept
+  {
+    links->next = links;
+    links->prev = links;
+    return links;
+  }
+
+  /**
+   * Address: 0x006E95F0 (FUN_006E95F0)
+   *
+   * What it does:
+   * Clears one scalar dword output lane to zero.
+   */
+  [[maybe_unused]] std::uint32_t* ClearScalarDwordLane(std::uint32_t* const outValue) noexcept
+  {
+    *outValue = 0u;
+    return outValue;
+  }
+
+  /**
+   * Address: 0x006EC9D0 (FUN_006EC9D0)
+   *
+   * What it does:
+   * Swaps one scalar dword lane between two storage slots.
+   */
+  [[maybe_unused]] std::uint32_t* SwapScalarDwordLane(
+    std::uint32_t* const left,
+    std::uint32_t* const right
+  ) noexcept
+  {
+    const std::uint32_t value = *right;
+    *right = *left;
+    *left = value;
+    return left;
+  }
+
+  /**
+   * Address: 0x006ED980 (FUN_006ED980)
+   *
+   * What it does:
+   * Copies one runtime dword lane at offset `+0xA0` into output storage.
+   */
+  [[maybe_unused]] std::uint32_t* CopyRuntimeWordA0(
+    std::uint32_t* const outValue,
+    const CUnitCommandWordAtA0RuntimeView* const source
+  ) noexcept
+  {
+    *outValue = source->laneA0;
+    return outValue;
+  }
+
+  /**
+   * Address: 0x006ED990 (FUN_006ED990)
+   *
+   * What it does:
+   * Reads one runtime dword lane at offset `+0x13C`.
+   */
+  [[maybe_unused]] std::uint32_t ReadRuntimeWord13C(const CUnitCommandWordAt13CRuntimeView* const source) noexcept
+  {
+    return source->lane13C;
+  }
+
+  /**
+   * Address: 0x005527C0 (FUN_005527C0, struct_CommandIssueDataHelper::struct_CommandIssueDataHelper)
+   *
+   * What it does:
+   * Initializes one published-command descriptor from issue-data lanes
+   * (`nextCommandId`, orientation/aux scalars, blueprint, and Lua-object
+   * lexical payload).
+   */
+  [[maybe_unused]] SSTICommandConstantData* InitializePublishedCommandDescriptorFromIssueData(
+    SSTICommandConstantData* const destination,
+    const SSTICommandIssueData* const issueData
+  )
+  {
+    destination->cmd = issueData->nextCommandId;
+    destination->unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(issueData->unk38));
+    destination->origin = issueData->mOri;
+    destination->unk1 = issueData->unk4C;
+    destination->blueprint = static_cast<REntityBlueprint*>(issueData->mBlueprint);
+    destination->unk2 = SCR_ToString(issueData->mObject);
+    return destination;
+  }
+
   /**
    * Address: 0x006E7BD0 (FUN_006E7BD0, struct_CommandIssueDataHelper::cpy)
    *
@@ -254,6 +710,38 @@ namespace
     destination.unk1 = source.unk1;
     destination.blueprint = source.blueprint;
     destination.unk2 = source.unk2;
+  }
+
+  /**
+   * Address: 0x006E7BC0 (FUN_006E7BC0)
+   *
+   * What it does:
+   * Adapter that copies one published-command descriptor lane and returns the
+   * destination pointer.
+   */
+  [[maybe_unused]] SSTICommandConstantData* CopyPublishedCommandDescriptorAdapterPrimary(
+    SSTICommandConstantData* const destination,
+    const SSTICommandConstantData* const source
+  )
+  {
+    CopyPublishedCommandDescriptor(*destination, *source);
+    return destination;
+  }
+
+  /**
+   * Address: 0x006EB470 (FUN_006EB470)
+   *
+   * What it does:
+   * Secondary adapter that copies one published-command descriptor lane and
+   * returns the destination pointer.
+   */
+  [[maybe_unused]] SSTICommandConstantData* CopyPublishedCommandDescriptorAdapterSecondary(
+    SSTICommandConstantData* const destination,
+    const SSTICommandConstantData* const source
+  )
+  {
+    CopyPublishedCommandDescriptor(*destination, *source);
+    return destination;
   }
 
   /**
@@ -431,6 +919,20 @@ moho::StatItem* moho::InstanceCounter<moho::CUnitCommand>::GetStatItem()
   return sStatItem;
 }
 
+/**
+ * Address: 0x006E95B0 (FUN_006E95B0)
+ *
+ * What it does:
+ * Increments the `CUnitCommand` instance-counter stat lane and returns the
+ * pass-through value unchanged.
+ */
+[[maybe_unused]] int IncrementCUnitCommandInstanceStatAndReturn(const int passthrough)
+{
+  moho::StatItem* const statItem = moho::InstanceCounter<moho::CUnitCommand>::GetStatItem();
+  (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
+  return passthrough;
+}
+
 CScriptObject* SCommandUnitSet::EntryFromUnit(Unit* const unit) noexcept
 {
   if (!unit) {
@@ -598,7 +1100,7 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
 }
 
 /**
- * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
+    * Alias of FUN_006E81B0 (non-canonical helper lane).
  *
  * What it does:
  * Initializes one command from issue payload lanes, updates sim command
@@ -628,12 +1130,8 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   mPrev = this;
   mNext = this;
 
+  (void)InitializePublishedCommandDescriptorFromIssueData(&mConstDat, &issueData);
   mConstDat.cmd = resolvedCommandId;
-  mConstDat.unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(issueData.unk38));
-  mConstDat.origin = issueData.mOri;
-  mConstDat.unk1 = issueData.unk4C;
-  mConstDat.blueprint = static_cast<REntityBlueprint*>(issueData.mBlueprint);
-  mConstDat.unk2 = SCR_ToString(issueData.mObject);
 
   CopyIssueDataToVariablePayload(issueData, mVarDat);
   mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
@@ -728,6 +1226,7 @@ void CUnitCommand::MemberConstruct(gpg::SerConstructResult* const result)
 
 /**
  * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
+ * Address: 0x006EC1B0 (FUN_006EC1B0)
  *
  * What it does:
  * Loads reflected base/object lanes and command payload fields, then maps the
@@ -802,6 +1301,8 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitComma
 
 /**
  * Address: 0x006ECE20 (FUN_006ECE20, Moho::CUnitCommand::MemberSerialize)
+ * Address: 0x006EB750 (FUN_006EB750)
+ * Address: 0x006EC1C0 (FUN_006EC1C0)
  *
  * What it does:
  * Saves reflected base/object lanes and command payload fields, serializing
@@ -893,6 +1394,30 @@ void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>
 
   mNeedsUpdate = true;
   InsertWeakPtrVectorObjectAt(queue, this, NormalizeWeakPtrVectorInsertIndex(queue, index));
+
+  if (mFormationInstance) {
+    mFormationInstance->AddUnit(unit);
+  }
+}
+
+/**
+ * Address: 0x006E8CC0 (FUN_006E8CC0)
+ *
+ * What it does:
+ * Adds one live unit into this command's unit-set and formation lanes without
+ * mutating any external command queue.
+ */
+void CUnitCommand::AddUnit(Unit* const unit)
+{
+  if (!unit || unit->IsDead() || unit->DestroyQueued()) {
+    return;
+  }
+
+  if (!mUnitSet.InsertUnitSorted(unit)) {
+    return;
+  }
+
+  mNeedsUpdate = true;
 
   if (mFormationInstance) {
     mFormationInstance->AddUnit(unit);
@@ -1213,7 +1738,7 @@ void CUnitCommand::SetTarget(const CAiTarget& target)
 }
 
 /**
- * Address: 0x005BF810 (FUN_005BF810)
+  * Alias of FUN_005BF810 (non-canonical helper lane).
  *
  * What it does:
  * Compatibility forwarder for legacy callsites that still dispatch the recon

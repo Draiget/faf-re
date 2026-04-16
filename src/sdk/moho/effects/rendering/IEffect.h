@@ -12,6 +12,7 @@
 namespace moho
 {
   class CParticleTexture;
+  class CEffectManagerImpl;
   class Entity;
 
   class IEffect : public CScriptObject
@@ -20,7 +21,7 @@ namespace moho
     static gpg::RType* sType;
 
     /**
-     * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
+      * Alias of FUN_00654220 (non-canonical helper lane).
      *
      * What it does:
      * Returns cached reflection descriptor for `IEffect`.
@@ -29,11 +30,31 @@ namespace moho
     static gpg::RType* StaticGetClass();
 
     /**
-     * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
+      * Alias of FUN_00654220 (non-canonical helper lane).
      * Slot: 0
      */
     [[nodiscard]]
     gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00658F00 (FUN_00658F00, Moho::IEffect::IEffect)
+     *
+     * What it does:
+     * Initializes one effect runtime lane from `CScriptObject`, self-links the
+     * manager-node list entry, increments effect instance stats, and clears the
+     * manager/Lua sentinel lanes.
+     */
+    IEffect();
+
+    /**
+     * Address: 0x00658F70 (FUN_00658F70, Moho::IEffect::IEffect)
+     *
+     * What it does:
+     * Initializes one effect runtime lane using manager-owned Lua state
+     * metadata, self-links the manager list node, increments instance stats,
+     * and stores manager/script token ownership fields.
+     */
+    IEffect(CEffectManagerImpl* manager, int scriptObjectToken);
 
     /**
      * Address: 0x00654240 (FUN_00654240, Moho::IEffect::GetDerivedObjectRef)

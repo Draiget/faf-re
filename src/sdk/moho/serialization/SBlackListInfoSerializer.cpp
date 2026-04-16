@@ -94,13 +94,7 @@ namespace
     archive->WriteInt(info->mValue);
   }
 
-  /**
-   * Address: 0x00BFE680 (FUN_00BFE680, serializer helper unlink cleanup)
-   *
-   * What it does:
-   * Unlinks the `SBlackListInfoSerializer` helper node and rewires it as a self-linked singleton.
-   */
-  gpg::SerHelperBase* cleanup_SBlackListInfoSerializer_00BFE680_Impl()
+  [[nodiscard]] gpg::SerHelperBase* CleanupSBlackListInfoSerializerNode()
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(gSBlackListInfoSerializer);
     if (gSBlackListInfoSerializer.mHelperNext == nullptr || gSBlackListInfoSerializer.mHelperPrev == nullptr) {
@@ -116,23 +110,28 @@ namespace
     return self;
   }
 
-  void cleanup_SBlackListInfoSerializer_00BFE680_AtExit()
-  {
-    (void)cleanup_SBlackListInfoSerializer_00BFE680_Impl();
-  }
-
   /**
-   * Address: 0x00BD8830 (FUN_00BD8830, register serializer + atexit cleanup)
+   * Address: 0x006D3A10 (FUN_006D3A10)
    *
    * What it does:
-   * Installs `SBlackListInfo` serializer callbacks and schedules helper cleanup.
+   * Splices `SBlackListInfoSerializer` out of its intrusive helper lane when
+   * linked, then rewires helper links to the serializer self node.
    */
-  int register_SBlackListInfoSerializer_00BD8830_Impl()
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSBlackListInfoSerializerHelperNodeVariantA() noexcept
+  {
+    return CleanupSBlackListInfoSerializerNode();
+  }
+
+  void cleanup_SBlackListInfoSerializer_00BFE680_AtExit()
+  {
+    (void)moho::cleanup_SBlackListInfoSerializer();
+  }
+
+  int RegisterSBlackListInfoSerializerStartup()
   {
     InitializeSerializerNode(gSBlackListInfoSerializer);
     gSBlackListInfoSerializer.mDeserialize = &moho::SBlackListInfoSerializer::Deserialize;
     gSBlackListInfoSerializer.mSerialize = &moho::SBlackListInfoSerializer::Serialize;
-    gSBlackListInfoSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_SBlackListInfoSerializer_00BFE680_AtExit);
   }
 
@@ -194,19 +193,19 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE680 (FUN_00BFE680, sub_BFE680)
+   * Address: 0x00BFE680 (FUN_00BFE680, serializer helper unlink cleanup)
    */
   gpg::SerHelperBase* cleanup_SBlackListInfoSerializer()
   {
-    return cleanup_SBlackListInfoSerializer_00BFE680_Impl();
+    return UnlinkSBlackListInfoSerializerHelperNodeVariantA();
   }
 
   /**
-   * Address: 0x00BD8830 (FUN_00BD8830, register_SBlackListInfoSerializer)
+   * Address: 0x00BD8830 (FUN_00BD8830, register serializer + atexit cleanup)
    */
   int register_SBlackListInfoSerializer()
   {
-    return register_SBlackListInfoSerializer_00BD8830_Impl();
+    return RegisterSBlackListInfoSerializerStartup();
   }
 
   /**
@@ -214,7 +213,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_SBlackListInfoSerializer_00()
   {
-    return cleanup_SBlackListInfoSerializer_00BFE680_Impl();
+    return cleanup_SBlackListInfoSerializer();
   }
 
   /**

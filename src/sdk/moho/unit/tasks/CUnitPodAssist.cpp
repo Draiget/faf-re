@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitPodAssist.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <new>
@@ -46,6 +47,48 @@ namespace
     sizeof(CUnitRepairTaskDispatchView) == sizeof(moho::CUnitRepairTask),
     "CUnitRepairTaskDispatchView size must match CUnitRepairTask"
   );
+
+  struct CUnitPodAssistSerializerStartupNode
+  {
+    void* mVtable = nullptr;                    // +0x00
+    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
+    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
+    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
+    gpg::RType::save_func_t mSave = nullptr;   // +0x10
+  };
+
+  static_assert(
+    offsetof(CUnitPodAssistSerializerStartupNode, mHelperNext) == 0x04,
+    "CUnitPodAssistSerializerStartupNode::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitPodAssistSerializerStartupNode, mHelperPrev) == 0x08,
+    "CUnitPodAssistSerializerStartupNode::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CUnitPodAssistSerializerStartupNode) == 0x14,
+    "CUnitPodAssistSerializerStartupNode size must be 0x14"
+  );
+
+  CUnitPodAssistSerializerStartupNode gCUnitPodAssistSerializerStartupNode{};
+
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CUnitPodAssistSerializerStartupNode& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CUnitPodAssistSerializerStartupNode& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
 
   [[nodiscard]] gpg::RType* CachedCUnitPodAssistType()
   {
@@ -261,6 +304,30 @@ namespace moho
     }
 
     mTaskState = TASKSTATE_Waiting;
+  }
+
+  /**
+   * Address: 0x0061D770 (FUN_0061D770, cleanup_CUnitPodAssistSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the `CUnitPodAssist` serializer helper
+   * node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitPodAssistSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCUnitPodAssistSerializerStartupNode);
+  }
+
+  /**
+   * Address: 0x0061D7A0 (FUN_0061D7A0, cleanup_CUnitPodAssistSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the `CUnitPodAssist`
+   * serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitPodAssistSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCUnitPodAssistSerializerStartupNode);
   }
 
   /**
@@ -505,6 +572,24 @@ namespace moho
 
 namespace gpg
 {
+  /**
+   * Address: 0x0061E770 (FUN_0061E770, reflection pair-pack thunk alias)
+   *
+   * What it does:
+   * Builds one `CUnitPodAssist` reflection reference then writes the pair into
+   * caller-provided `RRef` storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackCUnitPodAssistRefPair(
+    moho::CUnitPodAssist* const value,
+    gpg::RRef* const outPair
+  )
+  {
+    gpg::RRef typedRef{};
+    (void)gpg::RRef_CUnitPodAssist(&typedRef, value);
+    *outPair = typedRef;
+    return outPair;
+  }
+
   /**
    * Address: 0x0061E7C0 (FUN_0061E7C0, gpg::RRef_CUnitPodAssist)
    *

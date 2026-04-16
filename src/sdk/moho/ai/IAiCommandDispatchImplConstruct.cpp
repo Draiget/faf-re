@@ -77,6 +77,30 @@ namespace
     return UnlinkConstructNode(*AcquireIAiCommandDispatchImplConstruct());
   }
 
+  /**
+   * Address: 0x005992C0 (FUN_005992C0)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * IAiCommandDispatchImpl construct-helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplConstructStartupThunkA()
+  {
+    return cleanup_IAiCommandDispatchImplConstruct();
+  }
+
+  /**
+   * Address: 0x005992F0 (FUN_005992F0)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * IAiCommandDispatchImpl construct-helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplConstructStartupThunkB()
+  {
+    return cleanup_IAiCommandDispatchImplConstruct();
+  }
+
   void cleanup_IAiCommandDispatchImplConstruct_atexit()
   {
     (void)cleanup_IAiCommandDispatchImplConstruct();

@@ -142,6 +142,33 @@ SteeringParams::SteeringParams(
 }
 
 /**
+ * Address: 0x006990B0 (FUN_006990B0)
+ *
+ * What it does:
+ * Register-shape adapter that placement-constructs one `SteeringParams`
+ * object with dynamic limits enabled.
+ */
+[[maybe_unused]] SteeringParams* ConstructSteeringParamsAdapter(
+  const Wm3::Vector3f* const sourcePosition,
+  const Wm3::Vector3f* const destinationPosition,
+  const Wm3::Vector3f* const forwardVector,
+  SteeringParams* const outParams,
+  Unit* const unit,
+  const float speedLimit
+) noexcept
+{
+  ::new (outParams) SteeringParams(
+    unit,
+    *sourcePosition,
+    *destinationPosition,
+    *forwardVector,
+    speedLimit,
+    false
+  );
+  return outParams;
+}
+
+/**
  * Address: 0x00698FF0 (FUN_00698FF0)
  */
 SteeringParams BuildSteeringParamsFromTransform(
@@ -162,6 +189,117 @@ SteeringParams BuildSteeringParamsFromTransform(
   source.z = transform.pos_.z;
 
   return SteeringParams(unit, source, destination, forward, 0.0f, true);
+}
+
+/**
+ * Address: 0x00698F40 (FUN_00698F40)
+ *
+ * What it does:
+ * Normalizes one input 2D direction lane into caller-owned output storage.
+ */
+[[maybe_unused]] Wm3::Vector2f* NormalizeDirection2DUnchecked(
+  Wm3::Vector2f* const outDirection,
+  const Wm3::Vector2f* const inputDirection
+) noexcept
+{
+  const float x = inputDirection->x;
+  const float y = inputDirection->y;
+  const float invLength = 1.0f / std::sqrt((x * x) + (y * y));
+  outDirection->x = x * invLength;
+  outDirection->y = y * invLength;
+  return outDirection;
+}
+
+/**
+ * Address: 0x00699500 (FUN_00699500)
+ *
+ * What it does:
+ * Applies one steering blend/clamp lane to a 3D direction vector, preserving
+ * orientation while enforcing a maximum magnitude cap.
+ */
+[[maybe_unused]] void BlendAndClampDirection3D(
+  const Wm3::Vector3f* const blendDirection,
+  Wm3::Vector3f* const inOutDirection,
+  const float maxMagnitude
+) noexcept
+{
+  const float lengthSq =
+    (inOutDirection->x * inOutDirection->x) +
+    (inOutDirection->y * inOutDirection->y) +
+    (inOutDirection->z * inOutDirection->z);
+
+  if (lengthSq <= (maxMagnitude * maxMagnitude)) {
+    return;
+  }
+
+  const float deltaLength = std::sqrt(lengthSq) - maxMagnitude;
+  inOutDirection->x = ((blendDirection->x * deltaLength) + maxMagnitude) * inOutDirection->x;
+  inOutDirection->y = ((blendDirection->y * deltaLength) + maxMagnitude) * inOutDirection->y;
+  inOutDirection->z = ((blendDirection->z * deltaLength) + maxMagnitude) * inOutDirection->z;
+
+  const float adjustedLengthSq =
+    (inOutDirection->x * inOutDirection->x) +
+    (inOutDirection->y * inOutDirection->y) +
+    (inOutDirection->z * inOutDirection->z);
+  const float normalizeScale = maxMagnitude / std::sqrt(adjustedLengthSq);
+
+  inOutDirection->x *= normalizeScale;
+  inOutDirection->y *= normalizeScale;
+  inOutDirection->z *= normalizeScale;
+}
+
+/**
+ * Address: 0x00699760 (FUN_00699760)
+ *
+ * What it does:
+ * Computes one steering speed cap from `SteeringParams` by combining
+ * rotate-on-spot gating, heading-alignment tests, and turn-radius limits.
+ */
+[[maybe_unused]] float ComputeSteeringSpeedCapFromParams(
+  const SteeringParams* const params,
+  const float distanceGate
+) noexcept
+{
+  constexpr float kHeadingAlignmentThreshold = 0.98000002f;
+  constexpr float kHalfScale = 0.5f;
+
+  if (params->mRotateOnSpot != 0u && params->mRotateOnSpotThreshold > distanceGate) {
+    const float deltaX = params->mDeltaX;
+    const float deltaZ = params->mDeltaZ;
+    const float inverseLength = 1.0f / std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+
+    const float headingAlignment =
+      (params->mForwardXZ.y * (deltaZ * inverseLength)) +
+      (params->mForwardXZ.x * (deltaX * inverseLength));
+    if (headingAlignment < kHeadingAlignmentThreshold) {
+      return 0.0f;
+    }
+
+    return params->mMaxSpeed;
+  }
+
+  const float crossLane =
+    (params->mDeltaZ * params->mForwardXZ.x) -
+    (params->mForwardXZ.y * params->mDeltaX);
+  const float turnScale = (crossLane == 0.0f)
+    ? 0.0f
+    : (params->mDistanceSq * kHalfScale) / crossLane;
+
+  const float radiusLimit = params->mInvTurnRadius;
+  const float absTurnScale = std::fabs(turnScale);
+  if (absTurnScale < radiusLimit) {
+    if (absTurnScale == 0.0f) {
+      return params->mMaxSpeed;
+    }
+
+    return (params->mTurnRate * absTurnScale) * kHalfScale;
+  }
+
+  if (radiusLimit < 0.0f) {
+    return 0.0f;
+  }
+
+  return radiusLimit;
 }
 
 /**
@@ -469,12 +607,23 @@ namespace
     return gSCollisionInfoType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveECollisionTypeType()
+  /**
+   * Address: 0x00598470 (FUN_00598470)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `ECollisionType`.
+   */
+  [[nodiscard]] gpg::RType* ResolveECollisionTypeTypePrimary()
   {
     if (gECollisionTypeType == nullptr) {
       gECollisionTypeType = gpg::LookupRType(typeid(moho::ECollisionType));
     }
     return gECollisionTypeType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveECollisionTypeType()
+  {
+    return ResolveECollisionTypeTypePrimary();
   }
 
   [[nodiscard]] gpg::RType* ResolveEPathPointStateType()
@@ -716,12 +865,64 @@ namespace
   }
 
   /**
+   * Address: 0x0062F7B0 (FUN_0062F7B0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CPathPointSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CPathPointSerializer* InitializeCPathPointSerializerStartupThunkPrimary()
+  {
+    moho::CPathPointSerializer* const serializer = &gCPathPointSerializer;
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::CPathPointSerializer::Deserialize;
+    serializer->mSerialize = &moho::CPathPointSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0062F8E0 (FUN_0062F8E0)
+   *
+   * What it does:
+   * Secondary startup-init entry for global `CPathPointSerializer` helper
+   * storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CPathPointSerializer* InitializeCPathPointSerializerStartupThunkSecondary()
+  {
+    return InitializeCPathPointSerializerStartupThunkPrimary();
+  }
+
+  /**
    * Address: 0x00BFA880 (FUN_00BFA880, cleanup_CPathPointSerializer)
    *
    * What it does:
    * Unlinks the recovered `CPathPointSerializer` helper node.
    */
   gpg::SerHelperBase* cleanup_CPathPointSerializer()
+  {
+    return UnlinkSerializerNode(gCPathPointSerializer);
+  }
+
+  /**
+   * Address: 0x0062F7E0 (FUN_0062F7E0, cleanup_CPathPointSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the global `CPathPointSerializer`
+   * helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CPathPointSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCPathPointSerializer);
+  }
+
+  /**
+   * Address: 0x0062F810 (FUN_0062F810, cleanup_CPathPointSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the global
+   * `CPathPointSerializer` helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CPathPointSerializerStartupThunkB()
   {
     return UnlinkSerializerNode(gCPathPointSerializer);
   }
@@ -762,6 +963,30 @@ namespace
     return UnlinkSerializerNode(*AcquireECollisionTypePrimitiveSerializer());
   }
 
+  /**
+   * Address: 0x005966D0 (FUN_005966D0)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * `ECollisionType` primitive serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_PrimitiveSerHelper_ECollisionTypeStartupThunkA()
+  {
+    return cleanup_PrimitiveSerHelper_ECollisionType_int();
+  }
+
+  /**
+   * Address: 0x00596700 (FUN_00596700)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * `ECollisionType` primitive serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_PrimitiveSerHelper_ECollisionTypeStartupThunkB()
+  {
+    return cleanup_PrimitiveSerHelper_ECollisionType_int();
+  }
+
   void cleanup_PrimitiveSerHelper_ECollisionType_int_atexit()
   {
     (void)cleanup_PrimitiveSerHelper_ECollisionType_int();
@@ -796,6 +1021,30 @@ namespace
       return nullptr;
     }
     return UnlinkSerializerNode(*AcquireSCollisionInfoSerializer());
+  }
+
+  /**
+   * Address: 0x005968D0 (FUN_005968D0)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * SCollisionInfo serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SCollisionInfoSerializerStartupThunkA()
+  {
+    return cleanup_SCollisionInfoSerializer();
+  }
+
+  /**
+   * Address: 0x00596900 (FUN_00596900)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * SCollisionInfo serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SCollisionInfoSerializerStartupThunkB()
+  {
+    return cleanup_SCollisionInfoSerializer();
   }
 
   void cleanup_SCollisionInfoSerializer_atexit()
@@ -881,6 +1130,46 @@ namespace
 
     const auto* const value = reinterpret_cast<const moho::EPathPointState*>(static_cast<std::uintptr_t>(objectPtr));
     archive->WriteInt(static_cast<int>(*value));
+  }
+
+  /**
+   * Address: 0x0062F840 (FUN_0062F840)
+   *
+   * What it does:
+   * Reinitializes startup helper storage for one primitive-serializer lane of
+   * `EPathPointState` and binds enum load/save callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EPathPointStatePrimitiveSerializer*
+  InitializeEPathPointStatePrimitiveSerializerPrimitiveLane()
+  {
+    InitializeSerializerNode(gEPathPointStatePrimitiveSerializer);
+    gEPathPointStatePrimitiveSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(
+      &Deserialize_EPathPointState
+    );
+    gEPathPointStatePrimitiveSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(
+      &Serialize_EPathPointState
+    );
+    return &gEPathPointStatePrimitiveSerializer;
+  }
+
+  /**
+   * Address: 0x0062F9C0 (FUN_0062F9C0)
+   *
+   * What it does:
+   * Reinitializes startup helper storage for one save/load-helper lane of
+   * `EPathPointState` and binds enum load/save callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EPathPointStatePrimitiveSerializer*
+  InitializeEPathPointStatePrimitiveSerializerSaveLoadLane()
+  {
+    InitializeSerializerNode(gEPathPointStatePrimitiveSerializer);
+    gEPathPointStatePrimitiveSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(
+      &Deserialize_EPathPointState
+    );
+    gEPathPointStatePrimitiveSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(
+      &Serialize_EPathPointState
+    );
+    return &gEPathPointStatePrimitiveSerializer;
   }
 } // namespace
 
@@ -1005,7 +1294,7 @@ CAiPathSpline::~CAiPathSpline()
 }
 
 /**
- * Address: 0x005B2550 (FUN_005B2550)
+  * Alias of FUN_005B2550 (non-canonical helper lane).
  */
 void CAiPathSpline::ResetNodesToInline()
 {
@@ -1024,7 +1313,7 @@ CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index)
 }
 
 /**
- * Address: 0x005965E0 (FUN_005965E0, sub_5965E0)
+    * Alias of FUN_005965E0 (non-canonical helper lane).
  */
 const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
 {
@@ -1259,6 +1548,17 @@ void ECollisionTypeTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x0062F740 (FUN_0062F740, CPathPointTypeInfo non-deleting cleanup body)
+ *
+ * What it does:
+ * Executes one non-deleting destruction lane for `CPathPointTypeInfo`.
+ */
+[[maybe_unused]] void DestroyCPathPointTypeInfoBody(CPathPointTypeInfo* const typeInfo) noexcept
+{
+  typeInfo->~CPathPointTypeInfo();
+}
+
 CPathPointTypeInfo::~CPathPointTypeInfo() = default;
 
 const char* CPathPointTypeInfo::GetName() const
@@ -1485,6 +1785,39 @@ void SCollisionInfoSerializer::RegisterSerializeFunctions()
 }
 
 /**
+ * Address: 0x0062F9F0 (FUN_0062F9F0, Moho::CPathPoint::MemberDeserialize)
+ *
+ * What it does:
+ * Loads path-point position/direction vectors and state enum lanes from a
+ * read archive payload.
+ */
+void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (archive == nullptr) {
+    return;
+  }
+
+  gpg::RRef positionOwner{};
+  gpg::RType* const vectorType = ResolveVector3fType();
+  GPG_ASSERT(vectorType != nullptr);
+  if (vectorType == nullptr) {
+    return;
+  }
+  archive->Read(vectorType, &mPosition, positionOwner);
+
+  gpg::RRef directionOwner{};
+  archive->Read(vectorType, &mDirection, directionOwner);
+
+  gpg::RRef stateOwner{};
+  gpg::RType* const stateType = ResolveEPathPointStateType();
+  GPG_ASSERT(stateType != nullptr);
+  if (stateType == nullptr) {
+    return;
+  }
+  archive->Read(stateType, &mState, stateOwner);
+}
+
+/**
  * Address: 0x0062F790 (FUN_0062F790, CPathPointSerializer::Deserialize)
  *
  * What it does:
@@ -1502,19 +1835,38 @@ void CPathPointSerializer::Deserialize(
   }
 
   auto* const point = reinterpret_cast<CPathPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  gpg::RRef valueRef{};
-  gpg::RRef directionRef{};
-  gpg::RRef stateRef{};
-
-  gpg::RType* const vectorType = ResolveVector3fType();
-  GPG_ASSERT(vectorType != nullptr);
-  archive->Read(vectorType, &point->mPosition, valueRef);
-  archive->Read(vectorType, &point->mDirection, directionRef);
-
-  gpg::RType* const stateType = ResolveEPathPointStateType();
-  GPG_ASSERT(stateType != nullptr);
-  archive->Read(stateType, &point->mState, stateRef);
+  point->MemberDeserialize(archive);
 }
+
+namespace
+{
+  /**
+   * Address: 0x0062FAA0 (FUN_0062FAA0)
+   *
+   * What it does:
+   * Writes `CPathPoint` position/direction vectors and path-state enum lanes
+   * into archive storage using reflected runtime types.
+   */
+  void SerializePathPointSerializerBody(const moho::CPathPoint& point, gpg::WriteArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    gpg::RRef positionOwner{};
+    gpg::RRef directionOwner{};
+    gpg::RRef stateOwner{};
+
+    gpg::RType* const vectorType = ResolveVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    archive->Write(vectorType, &point.mPosition, positionOwner);
+    archive->Write(vectorType, &point.mDirection, directionOwner);
+
+    gpg::RType* const stateType = ResolveEPathPointStateType();
+    GPG_ASSERT(stateType != nullptr);
+    archive->Write(stateType, &point.mState, stateOwner);
+  }
+} // namespace
 
 /**
  * Address: 0x0062F7A0 (FUN_0062F7A0, CPathPointSerializer::Serialize)
@@ -1534,18 +1886,7 @@ void CPathPointSerializer::Serialize(
   }
 
   auto* const point = reinterpret_cast<CPathPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  gpg::RRef valueRef{};
-  gpg::RRef directionRef{};
-  gpg::RRef stateRef{};
-
-  gpg::RType* const vectorType = ResolveVector3fType();
-  GPG_ASSERT(vectorType != nullptr);
-  archive->Write(vectorType, &point->mPosition, valueRef);
-  archive->Write(vectorType, &point->mDirection, directionRef);
-
-  gpg::RType* const stateType = ResolveEPathPointStateType();
-  GPG_ASSERT(stateType != nullptr);
-  archive->Write(stateType, &point->mState, stateRef);
+  SerializePathPointSerializerBody(*point, archive);
 }
 
 void CPathPointSerializer::RegisterSerializeFunctions()
@@ -1613,7 +1954,6 @@ void moho::register_SCollisionInfoSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mDeserialize = &SCollisionInfoSerializer::Deserialize;
   serializer->mSerialize = &SCollisionInfoSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_SCollisionInfoSerializer_atexit);
 }
 
@@ -1637,14 +1977,7 @@ int moho::register_EPathPointStateTypeInfo()
  */
 int moho::register_EPathPointStatePrimitiveSerializer()
 {
-  InitializeSerializerNode(gEPathPointStatePrimitiveSerializer);
-  gEPathPointStatePrimitiveSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(
-    &Deserialize_EPathPointState
-  );
-  gEPathPointStatePrimitiveSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(
-    &Serialize_EPathPointState
-  );
-  gEPathPointStatePrimitiveSerializer.RegisterSerializeFunctions();
+  (void)InitializeEPathPointStatePrimitiveSerializerSaveLoadLane();
   return std::atexit(&cleanup_EPathPointStatePrimitiveSerializer_atexit);
 }
 
@@ -1671,7 +2004,6 @@ void moho::register_CPathPointSerializer()
   InitializeSerializerNode(gCPathPointSerializer);
   gCPathPointSerializer.mDeserialize = &CPathPointSerializer::Deserialize;
   gCPathPointSerializer.mSerialize = &CPathPointSerializer::Serialize;
-  gCPathPointSerializer.RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CPathPointSerializer_atexit);
 }
 

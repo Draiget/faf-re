@@ -64,12 +64,17 @@ namespace moho
     static gpg::RType* sType;
 
     /**
-     * Address: 0x0051D250 (FUN_0051D250, ??0RPropBlueprint@Moho@@QAE@@Z)
-     * Mangled: ??0RPropBlueprint@Moho@@QAE@@Z
+     * Address: 0x0051D250 (FUN_0051D250)
+     * Mangled: ??0RPropBlueprint@Moho@@QAE@PAVRRuleGameRules@1@ABVRResId@1@@Z
      *
      * What it does:
-     * Runs base entity-blueprint construction and seeds prop display/defense/
-     * economy defaults.
+     * Runs base entity-blueprint construction with `(owner, resId)` and seeds
+     * prop display/defense/economy defaults.
+     */
+    RPropBlueprint(RRuleGameRules* owner, const RResId& resId);
+
+    /**
+     * Local source-compat convenience constructor for scratch/default lanes.
      */
     RPropBlueprint();
 

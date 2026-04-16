@@ -61,7 +61,7 @@ namespace
   }
 
   /**
-   * Address: 0x006738A0 (FUN_006738A0, save-construct callback lane)
+    * Alias of FUN_006738A0 (non-canonical helper lane).
    *
    * What it does:
    * Writes one unowned `Sim*` owner pointer for a collision-beam object into
@@ -90,7 +90,7 @@ namespace
   }
 
   /**
-   * Address: 0x00674EB0 (FUN_00674EB0, startup helper initializer lane)
+    * Alias of FUN_00674EB0 (non-canonical helper lane).
    *
    * What it does:
    * Initializes global save-construct helper links as a self-linked intrusive
@@ -123,7 +123,7 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)
+    * Alias of FUN_00674EE0 (non-canonical helper lane).
    */
   gpg::RType* CollisionBeamEntitySaveConstruct::Init()
   {
@@ -139,7 +139,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC340 (FUN_00BFC340, cleanup_CollisionBeamEntitySaveConstruct)
+    * Alias of FUN_00BFC340 (non-canonical helper lane).
    */
   gpg::SerHelperBase* cleanup_CollisionBeamEntitySaveConstruct()
   {
@@ -147,7 +147,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4C60 (FUN_00BD4C60, register_CollisionBeamEntitySaveConstruct)
+    * Alias of FUN_00BD4C60 (non-canonical helper lane).
    */
   int register_CollisionBeamEntitySaveConstruct()
   {

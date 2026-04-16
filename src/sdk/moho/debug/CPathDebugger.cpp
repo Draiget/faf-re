@@ -1,5 +1,7 @@
 #include "moho/debug/CPathDebugger.h"
 
+#include <typeinfo>
+
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
@@ -12,6 +14,35 @@ namespace
   constexpr const char* kCPathDebuggerLuaClassName = "CPathDebugger";
   constexpr const char* kCPathDebuggerDestroyName = "Destroy";
   constexpr const char* kCPathDebuggerDestroyHelpText = "Destroy the path debugger";
+
+  /**
+   * Address: 0x007B5C30 (FUN_007B5C30)
+   *
+   * What it does:
+   * Returns the lazily cached reflection descriptor for `CPathDebugger`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPathDebuggerTypePrimary()
+  {
+    if (!moho::CPathDebugger::sType) {
+      moho::CPathDebugger::sType = gpg::LookupRType(typeid(moho::CPathDebugger));
+    }
+    return moho::CPathDebugger::sType;
+  }
+
+  /**
+   * Address: 0x007B6210 (FUN_007B6210)
+   *
+   * What it does:
+   * Secondary cache accessor returning the reflection descriptor for
+   * `CPathDebugger`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPathDebuggerTypeSecondary()
+  {
+    if (!moho::CPathDebugger::sType) {
+      moho::CPathDebugger::sType = gpg::LookupRType(typeid(moho::CPathDebugger));
+    }
+    return moho::CPathDebugger::sType;
+  }
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
@@ -43,6 +74,33 @@ namespace moho
   {
     return SCR_CreateSimpleMetatable(state);
   }
+
+  /**
+   * Address: 0x007B6390 (FUN_007B6390, register_CScrLuaMetatableFactory_CPathDebugger_Index)
+   *
+   * What it does:
+   * Allocates and stores the startup Lua metatable-factory index for
+   * `CPathDebugger`.
+   */
+  int register_CScrLuaMetatableFactory_CPathDebugger_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<CPathDebugger>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return 0;
+  }
+
+  namespace
+  {
+    struct CPathDebuggerFactoryIndexBootstrap
+    {
+      CPathDebuggerFactoryIndexBootstrap()
+      {
+        (void)moho::register_CScrLuaMetatableFactory_CPathDebugger_Index();
+      }
+    };
+
+    CPathDebuggerFactoryIndexBootstrap gCPathDebuggerFactoryIndexBootstrap;
+  } // namespace
 
   /**
    * Address: 0x007B5C90 (FUN_007B5C90)

@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00760BD0 (FUN_00760BD0, Moho::ISoundManagerSerializer::Deserialize)
+     *
+     * What it does:
+     * Placeholder deserialize lane for `ISoundManager` (no payload fields).
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00760BE0 (FUN_00760BE0, Moho::ISoundManagerSerializer::Serialize)
+     *
+     * What it does:
+     * Placeholder serialize lane for `ISoundManager` (no payload fields).
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00761BE0 (FUN_00761BE0, gpg::SerSaveLoadHelper_ISoundManager::Init)
      *
      * What it does:
@@ -49,4 +65,3 @@ namespace moho
   );
   static_assert(sizeof(ISoundManagerSerializer) == 0x14, "ISoundManagerSerializer size must be 0x14");
 } // namespace moho
-

@@ -6,6 +6,12 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CBuildTaskHelper.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   struct RUnitBlueprint;
@@ -13,6 +19,24 @@ namespace moho
   class CUnitUpgradeTask : public CCommandTask
   {
   public:
+    /**
+     * Address: 0x005FEBC0 (FUN_005FEBC0)
+     *
+     * What it does:
+     * Deserializes upgrade-task runtime state (base command-task lane, target
+     * blueprint pointer, build-helper lane, and upgraded-unit weak pointer).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005FEC90 (FUN_005FEC90)
+     *
+     * What it does:
+     * Serializes upgrade-task runtime state (base command-task lane, target
+     * blueprint pointer, build-helper lane, and upgraded-unit weak pointer).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     /**
      * Address: 0x005F83D0 (FUN_005F83D0, ??0CUnitUpgradeTask@Moho@@QAE@@Z)
      *

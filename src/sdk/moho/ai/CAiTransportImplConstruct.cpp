@@ -48,6 +48,35 @@ namespace
     InitializeConstructNode(construct);
   }
 
+  /**
+   * Address: 0x005E8490 (FUN_005E8490)
+   *
+   * What it does:
+   * Splices this construct helper node out of its intrusive lane when linked,
+   * then resets helper links to self and returns the self node pointer.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplConstructHelperNodeVariantA(
+    CAiTransportImplConstruct& construct
+  ) noexcept
+  {
+    UnlinkConstructNode(construct);
+    return ConstructSelfNode(construct);
+  }
+
+  /**
+   * Address: 0x005E84C0 (FUN_005E84C0)
+   *
+   * What it does:
+   * Secondary helper-node unlink/reset variant that preserves the same
+   * intrusive unlink semantics and returns the helper self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplConstructHelperNodeVariantB(
+    CAiTransportImplConstruct& construct
+  ) noexcept
+  {
+    return UnlinkCAiTransportImplConstructHelperNodeVariantA(construct);
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiTransportImplType()
   {
     gpg::RType* type = CAiTransportImpl::sType;
@@ -58,6 +87,22 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x005E9B80 (FUN_005E9B80)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAiTransportImplConstruct` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiTransportImplConstruct* InitializeCAiTransportImplConstructStartupThunk()
+  {
+    CAiTransportImplConstruct* const construct = AcquireCAiTransportImplConstruct();
+    InitializeConstructNode(*construct);
+    construct->mConstructCallback = reinterpret_cast<gpg::RType::construct_func_t>(&CAiTransportImplConstruct::Construct);
+    construct->mDeleteCallback = &CAiTransportImplConstruct::Deconstruct;
+    return construct;
+  }
+
   void cleanup_CAiTransportImplConstruct()
   {
     if (!gCAiTransportImplConstructConstructed) {
@@ -65,7 +110,7 @@ namespace
     }
 
     CAiTransportImplConstruct* const construct = AcquireCAiTransportImplConstruct();
-    UnlinkConstructNode(*construct);
+    (void)UnlinkCAiTransportImplConstructHelperNodeVariantA(*construct);
     construct->~CAiTransportImplConstruct();
     gCAiTransportImplConstructConstructed = false;
   }

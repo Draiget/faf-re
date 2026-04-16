@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #include "moho/entity/Entity.h"
 #include "moho/unit/core/Unit.h"
@@ -125,6 +126,96 @@ namespace moho
     CopyEntityInlineVector(other.mVec, mVec);
   }
 
+  [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresent(
+    SEntitySetTemplateUnit* const destination,
+    const SEntitySetTemplateUnit* const source
+  )
+  {
+    if (source == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (destination) SEntitySetTemplateUnit(*source);
+  }
+
+  /**
+   * Address: 0x00705AE0 (FUN_00705AE0)
+   *
+   * What it does:
+   * Primary register-lane adapter for nullable `SEntitySetTemplateUnit`
+   * copy-construction into caller-provided storage.
+   */
+  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresentPrimary(
+    SEntitySetTemplateUnit* const destination,
+    const SEntitySetTemplateUnit* const source
+  )
+  {
+    return CopyConstructEntitySetTemplateUnitIfPresent(destination, source);
+  }
+
+  /**
+   * Address: 0x00706230 (FUN_00706230)
+   *
+   * What it does:
+   * Secondary register-lane adapter for nullable `SEntitySetTemplateUnit`
+   * copy-construction into caller-provided storage.
+   */
+  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresentSecondary(
+    SEntitySetTemplateUnit* const destination,
+    const SEntitySetTemplateUnit* const source
+  )
+  {
+    return CopyConstructEntitySetTemplateUnitIfPresent(destination, source);
+  }
+
+  /**
+   * Address: 0x00706D70 (FUN_00706D70)
+   *
+   * What it does:
+   * Copy-constructs one contiguous `[sourceBegin, sourceEnd)` range of
+   * `SEntitySetTemplateUnit` records into uninitialized destination storage;
+   * on exception, resets already-constructed destination entries and rethrows.
+   */
+  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitRangeWithRollback(
+    const SEntitySetTemplateUnit* sourceBegin,
+    const SEntitySetTemplateUnit* const sourceEnd,
+    SEntitySetTemplateUnit* destinationBegin
+  )
+  {
+    std::uintptr_t sourceCursorWord = reinterpret_cast<std::uintptr_t>(sourceBegin);
+    const std::uintptr_t sourceEndWord = reinterpret_cast<std::uintptr_t>(sourceEnd);
+    std::uintptr_t destinationCursorWord = reinterpret_cast<std::uintptr_t>(destinationBegin);
+    const std::uintptr_t destinationBeginWord = destinationCursorWord;
+
+    try {
+      while (sourceCursorWord != sourceEndWord) {
+        const auto* const source = reinterpret_cast<const SEntitySetTemplateUnit*>(sourceCursorWord);
+        auto* const destination = reinterpret_cast<SEntitySetTemplateUnit*>(destinationCursorWord);
+
+        if (destination != nullptr) {
+          destination->ListResetLinks();
+          destination->mVec.ResetStorageToInline();
+          destination->mVec.AddAll(&source->mVec);
+        }
+
+        sourceCursorWord += sizeof(SEntitySetTemplateUnit);
+        destinationCursorWord += sizeof(SEntitySetTemplateUnit);
+      }
+
+      return reinterpret_cast<SEntitySetTemplateUnit*>(destinationCursorWord);
+    } catch (...) {
+      for (
+        std::uintptr_t rollbackCursorWord = destinationBeginWord;
+        rollbackCursorWord != destinationCursorWord;
+        rollbackCursorWord += sizeof(SEntitySetTemplateUnit)
+      ) {
+        auto* const rollback = reinterpret_cast<SEntitySetTemplateUnit*>(rollbackCursorWord);
+        rollback->~SEntitySetTemplateUnit();
+      }
+      throw;
+    }
+  }
+
   Unit* SEntitySetTemplateUnit::UnitFromEntry(Entity* const entity) noexcept
   {
     if (IsInvalidEntitySetEntry(entity)) {
@@ -188,6 +279,13 @@ namespace moho
     mVec.PushBack(entity);
   }
 
+  /**
+   * Address: 0x005E89E0 (FUN_005E89E0)
+   *
+   * What it does:
+   * Binary-searches one candidate by unit/entity id and returns true only on
+   * exact pointer match.
+   */
   bool SEntitySetTemplateUnit::ContainsUnit(const Unit* const unit) const noexcept
   {
     if (!unit) {

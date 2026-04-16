@@ -6,11 +6,14 @@
 #include "legacy/containers/Vector.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/SEfxCurve.h"
+#include "moho/particles/SWorldParticle.h"
+#include "moho/render/EmitterType.h"
 #include "Wm3Vector3.h"
 
 namespace moho
 {
   struct GeomCamera3;
+  struct REmitterBlueprint;
   struct CEfxCurveVectorRuntime
   {
     SEfxCurve* mFirst; // +0x00
@@ -111,6 +114,25 @@ namespace moho
     [[nodiscard]] bool IsVisible();
 
     /**
+     * Address: 0x006593E0 (FUN_006593E0, Moho::CEfxEmitter::InterpolatePosition)
+     *
+     * What it does:
+     * Resolves entity transform history for one effect attachment lane, blends
+     * orientation/position at `tick` + `interp`, and writes the resulting
+     * world matrix (optionally composed with one parent-bone local transform).
+     */
+    [[nodiscard]] static bool InterpolatePosition(const CEffectImpl* effect, VMatrix4* outMatrix, int tick, float interp);
+
+    /**
+     * Address: 0x0065C1A0 (FUN_0065C1A0, Moho::CEfxEmitter::Interpolate)
+     *
+     * What it does:
+     * Interpolates emitter attachment transform at `(tick=0, interp=0.0)` and
+     * projects the first start-vector lane through that matrix into `mPos`.
+     */
+    void Interpolate();
+
+    /**
      * Address: 0x0065C700 (FUN_0065C700, Moho::CEfxEmitter::ProcessLifetime)
      *
      * What it does:
@@ -119,18 +141,30 @@ namespace moho
      */
     [[nodiscard]] bool ProcessLifetime();
 
+    /**
+     * Address: 0x00660280 (FUN_00660280, Moho::CEfxEmitter::MemberSerialize)
+     *
+     * What it does:
+     * Serializes base effect lanes, emitter metadata, blueprint pointer,
+     * particle payload, and visibility/lifetime state.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   private:
     friend struct CEfxEmitterLayoutVerifier;
 
-    std::uint8_t mUnresolved190_197[0x08];  // +0x190
+    EmitterType mEmitterType;               // +0x190
+    std::uint8_t mPad194[0x04];             // +0x194
     CEfxCurveVectorRuntime mCurves;         // +0x198
-    std::uint8_t mUnresolved1A4_647[0x4A4]; // +0x1A4
+    std::uint8_t mUnresolved1A4_63F[0x49C]; // +0x1A4
+    REmitterBlueprint* mBlueprint;          // +0x640
+    float mTotalEmissions;                  // +0x644
     std::uint32_t mLife;                    // +0x648
-    std::uint8_t mUnresolved64C_6D7[0x8C];  // +0x64C
+    SWorldParticle mParticle;               // +0x64C
     bool mValid;                            // +0x6D8
     std::uint8_t mPad6D9[0x03];             // +0x6D9
     std::uint32_t mZCurveMask;              // +0x6DC
-    std::uint8_t mUnresolved6E0_6E3[0x04];  // +0x6E0
+    std::int32_t mMaxLifetime;              // +0x6E0
     bool mVisible;                          // +0x6E4
     std::uint8_t mPad6E5[0x03];             // +0x6E5
     std::uint32_t mLastUpdate;              // +0x6E8
@@ -139,10 +173,15 @@ namespace moho
 
   struct CEfxEmitterLayoutVerifier
   {
+    static_assert(offsetof(CEfxEmitter, mEmitterType) == 0x190, "CEfxEmitter::mEmitterType offset must be 0x190");
     static_assert(offsetof(CEfxEmitter, mCurves) == 0x198, "CEfxEmitter::mCurves offset must be 0x198");
+    static_assert(offsetof(CEfxEmitter, mBlueprint) == 0x640, "CEfxEmitter::mBlueprint offset must be 0x640");
+    static_assert(offsetof(CEfxEmitter, mTotalEmissions) == 0x644, "CEfxEmitter::mTotalEmissions offset must be 0x644");
     static_assert(offsetof(CEfxEmitter, mLife) == 0x648, "CEfxEmitter::mLife offset must be 0x648");
+    static_assert(offsetof(CEfxEmitter, mParticle) == 0x64C, "CEfxEmitter::mParticle offset must be 0x64C");
     static_assert(offsetof(CEfxEmitter, mValid) == 0x6D8, "CEfxEmitter::mValid offset must be 0x6D8");
     static_assert(offsetof(CEfxEmitter, mZCurveMask) == 0x6DC, "CEfxEmitter::mZCurveMask offset must be 0x6DC");
+    static_assert(offsetof(CEfxEmitter, mMaxLifetime) == 0x6E0, "CEfxEmitter::mMaxLifetime offset must be 0x6E0");
     static_assert(offsetof(CEfxEmitter, mVisible) == 0x6E4, "CEfxEmitter::mVisible offset must be 0x6E4");
     static_assert(offsetof(CEfxEmitter, mLastUpdate) == 0x6E8, "CEfxEmitter::mLastUpdate offset must be 0x6E8");
     static_assert(offsetof(CEfxEmitter, mPos) == 0x6EC, "CEfxEmitter::mPos offset must be 0x6EC");

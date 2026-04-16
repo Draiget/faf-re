@@ -15,6 +15,58 @@ namespace
   bool gCAiPathNavigatorTypeInfoConstructed = false;
   gpg::RType* gListenerNavPathType = nullptr;
 
+  /**
+   * Address: 0x005B0380 (FUN_005B0380)
+   *
+   * What it does:
+   * Wires the allocation callbacks used by `CAiPathNavigatorTypeInfo`.
+   */
+  [[maybe_unused]] void BindCAiPathNavigatorTypeInfoConstructionCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
+  {
+    typeInfo.newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
+    typeInfo.ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
+  }
+
+  /**
+   * Address: 0x005B0390 (FUN_005B0390)
+   *
+   * What it does:
+   * Wires the destruction callbacks used by `CAiPathNavigatorTypeInfo`.
+   */
+  [[maybe_unused]] void BindCAiPathNavigatorTypeInfoDestructionCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
+  {
+    typeInfo.deleteFunc_ = &CAiPathNavigatorTypeInfo::Delete;
+    typeInfo.dtrFunc_ = &CAiPathNavigatorTypeInfo::Destruct;
+  }
+
+  /**
+   * Address: 0x005B00E0 (FUN_005B00E0)
+   *
+   * What it does:
+   * Wires the full callback set used by `CAiPathNavigatorTypeInfo`.
+   */
+  void BindCAiPathNavigatorTypeInfoCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
+  {
+    typeInfo.newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
+    typeInfo.ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
+    typeInfo.deleteFunc_ = &CAiPathNavigatorTypeInfo::Delete;
+    typeInfo.dtrFunc_ = &CAiPathNavigatorTypeInfo::Destruct;
+  }
+
+  /**
+   * Address: 0x005B0AE0 (FUN_005B0AE0)
+   *
+   * What it does:
+   * Builds a reflected `RRef` for one `CAiPathNavigator` into caller storage.
+   */
+  gpg::RRef* PopulateCAiPathNavigatorRef(gpg::RRef* const out, CAiPathNavigator* const value)
+  {
+    gpg::RRef temp{};
+    gpg::RRef_CAiPathNavigator(&temp, value);
+    *out = temp;
+    return out;
+  }
+
   [[nodiscard]] CAiPathNavigatorTypeInfo* AcquireCAiPathNavigatorTypeInfo()
   {
     if (!gCAiPathNavigatorTypeInfoConstructed) {
@@ -81,10 +133,7 @@ const char* CAiPathNavigatorTypeInfo::GetName() const
 void CAiPathNavigatorTypeInfo::Init()
 {
   size_ = sizeof(CAiPathNavigator);
-  newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
-  ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
-  deleteFunc_ = &CAiPathNavigatorTypeInfo::Delete;
-  dtrFunc_ = &CAiPathNavigatorTypeInfo::Destruct;
+  BindCAiPathNavigatorTypeInfoCallbacks(*this);
   gpg::RType::Init();
   AddBase_Listener_NavPath(this);
   Version(1);
@@ -118,7 +167,7 @@ gpg::RRef CAiPathNavigatorTypeInfo::NewRef()
 {
   auto* const navigator = new (std::nothrow) CAiPathNavigator();
   gpg::RRef out{};
-  gpg::RRef_CAiPathNavigator(&out, navigator);
+  PopulateCAiPathNavigatorRef(&out, navigator);
   return out;
 }
 
@@ -137,7 +186,7 @@ gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
   }
 
   gpg::RRef out{};
-  gpg::RRef_CAiPathNavigator(&out, navigator);
+  PopulateCAiPathNavigatorRef(&out, navigator);
   return out;
 }
 

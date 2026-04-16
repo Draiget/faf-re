@@ -24,6 +24,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CAiAttackerImpl;
   class CFireWeaponTask;
   class Entity;
   class IAiAttacker;
@@ -54,6 +55,15 @@ namespace moho
 
   using WeaponCollisionEntryVec = gpg::fastvector_n<WeaponCollisionEntry, 10>;
 
+  enum class ESolutionStatus : std::int32_t
+  {
+    TRS_Available = 0,
+    TRS_InsideMinRange = 1,
+    TRS_NoSolution = 2,
+    TRS_OutsideMaxRange = 3,
+  };
+  static_assert(sizeof(ESolutionStatus) == 0x04, "ESolutionStatus size must be 0x04");
+
   class UnitWeapon : public CScriptEvent
   {
   public:
@@ -68,6 +78,16 @@ namespace moho
      * state for weapon task dispatch.
      */
     UnitWeapon();
+
+    /**
+     * Address: 0x006D4310 (FUN_006D4310, Moho::UnitWeapon::UnitWeapon)
+     *
+     * What it does:
+     * Binds this weapon to one attacker/blueprint lane, allocates its fire
+     * task thread, creates Lua script instance state, and applies parsed
+     * target-restriction category filters.
+     */
+    UnitWeapon(CAiAttackerImpl* attackerImpl, RUnitBlueprintWeapon* weaponBlueprint, int weaponIndex);
 
     /**
      * Address: 0x006D4A90 (FUN_006D4A90, Moho::UnitWeapon::~UnitWeapon)
@@ -103,7 +123,15 @@ namespace moho
     EntityCategorySet* GetCat2(EntityCategorySet* outCategory) const;
 
     /**
-     * Address family: 0x006DB9E0 / 0x006DB960 callsites
+     * Address: 0x006A4C60 (FUN_006A4C60, Moho::UnitWeapon::GetBone)
+     *
+     * What it does:
+     * Returns the configured muzzle/bone index lane.
+     */
+    [[nodiscard]] std::int32_t GetBone() const;
+
+    /**
+     * Address: 0x006D34B0 (FUN_006D34B0)
      *
      * What it does:
      * Lazily resolves and caches reflected RTTI for `UnitWeapon`.
@@ -117,6 +145,30 @@ namespace moho
      * Lazily resolves and caches reflected RTTI for `UnitWeapon*`.
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
+
+    /**
+     * Address: 0x006D3540 (FUN_006D3540)
+     *
+     * What it does:
+     * Sets weapon firing-randomness lane.
+     */
+    UnitWeapon* SetFiringRandomness(float value);
+
+    /**
+     * Address: 0x006D3550 (FUN_006D3550)
+     *
+     * What it does:
+     * Returns current firing-randomness lane.
+     */
+    [[nodiscard]] float GetFiringRandomness() const;
+
+    /**
+     * Address: 0x006D3560 (FUN_006D3560)
+     *
+     * What it does:
+     * Sets fire-target-layer caps and marks owner unit sync-data lane dirty.
+     */
+    UnitWeapon* SetFireTargetLayerCaps(ELayer layerMask);
 
     /**
      * Address: 0x006DF3A0 (FUN_006DF3A0, Moho::UnitWeapon::MemberDeserialize)
@@ -153,6 +205,15 @@ namespace moho
     Projectile* CreateProjectile(std::int32_t muzzleBoneIndex);
 
     /**
+     * Address: 0x006D4740 (FUN_006D4740, Moho::UnitWeapon::CreateInstance)
+     *
+     * What it does:
+     * Resolves weapon script class from blueprint label/index and binds one Lua
+     * script instance for this weapon object.
+     */
+    void CreateInstance();
+
+    /**
      * Address: 0x006D53C0 (FUN_006D53C0, Moho::UnitWeapon::ChangeProjectileBlueprint)
      *
      * What it does:
@@ -160,6 +221,14 @@ namespace moho
      * resource and updates this weapon's silo-dependent projectile lane.
      */
     void ChangeProjectileBlueprint(const msvc8::string& blueprint);
+
+    /**
+     * Address: 0x006D61E0 (FUN_006D61E0)
+     *
+     * What it does:
+     * Dispatches the weapon script callback lane `OnGotTarget`.
+     */
+    void NotifyOnGotTarget();
 
     /**
      * Address: 0x006D5330 (FUN_006D5330, Moho::UnitWeapon::GetTransform)
@@ -180,12 +249,57 @@ namespace moho
     [[nodiscard]] static bool CanAttackTarget(CAiTarget* target, UnitWeapon* weapon);
 
     /**
+     * Address: 0x006D4C80 (FUN_006D4C80, Moho::UnitWeapon::CanFire)
+     *
+     * What it does:
+     * Evaluates one weapon-owner fire gate lane (state, movement, water level,
+     * bomb-drop release timing, and heading constraints) for one target payload.
+     */
+    [[nodiscard]] static bool CanFire(UnitWeapon* weapon, CAiTarget* targetData);
+
+    /**
      * Address: 0x006D5500 (FUN_006D5500, Moho::UnitWeapon::CheckSilo)
      *
      * What it does:
      * Validates counted-projectile silo storage availability for this weapon.
      */
     [[nodiscard]] bool CheckSilo();
+
+    /**
+     * Address: 0x006D5810 (FUN_006D5810, Moho::UnitWeapon::TargetIsTooCloseMelee)
+     *
+     * What it does:
+     * Evaluates melee-only collision/footprint reachability against one target
+     * entity and returns one target-solution status lane.
+     */
+    [[nodiscard]] ESolutionStatus TargetIsTooCloseMelee(Entity* targetEntity);
+
+    /**
+     * Address: 0x006D5B40 (FUN_006D5B40, Moho::UnitWeapon::TargetSolutionStatusGun)
+     *
+     * What it does:
+     * Evaluates one gun-target point against radius/height/heading constraints
+     * and returns one target-solution status lane.
+     */
+    [[nodiscard]] ESolutionStatus TargetSolutionStatusGun(const Wm3::Vector3f* targetPosition, float* inOutDistanceSq);
+
+    /**
+     * Address: 0x006D5D40 (FUN_006D5D40, Moho::UnitWeapon::GetSolutionStatus)
+     *
+     * What it does:
+     * Resolves one target entity into melee/gun solution-status logic for this
+     * weapon.
+     */
+    [[nodiscard]] ESolutionStatus GetSolutionStatus(Entity* targetEntity);
+
+    /**
+     * Address: 0x006D5D80 (FUN_006D5D80, Moho::UnitWeapon::TargetIsTooClose)
+     *
+     * What it does:
+     * Returns the current target-solution status for one AI target payload,
+     * dispatching to melee or gun status lanes.
+     */
+    [[nodiscard]] ESolutionStatus TargetIsTooClose(CAiTarget* targetData);
 
     /**
      * Address: 0x006D6A00 (FUN_006D6A00, Moho::UnitWeapon::GetClosestCollision)

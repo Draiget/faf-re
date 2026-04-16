@@ -23,6 +23,15 @@ namespace gpg::gal
 		HardwareVertexFormatterD3D9();
 
 		/**
+		 * Address: 0x009451D0 (FUN_009451D0)
+		 *
+		 * What it does:
+		 * Runs the non-deleting destructor body and restores the base
+		 * `MeshFormatter` vtable lane.
+		 */
+		~HardwareVertexFormatterD3D9();
+
+		/**
 		 * Address: 0x00945600 (FUN_00945600, scalar deleting destructor thunk)
 		 * Slot: 0
 		 */

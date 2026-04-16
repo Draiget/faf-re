@@ -81,7 +81,6 @@ namespace moho
     gCArmyImplSerializer.mHelperPrev = nullptr;
     gCArmyImplSerializer.mLoadCallback = &CArmyImplSerializer::Deserialize;
     gCArmyImplSerializer.mSaveCallback = &CArmyImplSerializer::Serialize;
-    gCArmyImplSerializer.RegisterSerializeFunctions();
   }
 
   /**

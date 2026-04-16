@@ -13,6 +13,7 @@ namespace moho
     {
       constexpr std::uintptr_t kPathBackgroundUpdateConVarEa = 0x010BA530u;
       constexpr std::uintptr_t kPathBackgroundBudgetConVarEa = 0x010BA404u;
+      constexpr std::uintptr_t kPathTimeoutPreviewConVarEa = 0x010BB0ACu;
       constexpr std::uintptr_t kChecksumPeriodConVarEa = 0x010BA5E0u;
       constexpr std::uintptr_t kSteeringAirToleranceConVarEa = 0x010AFE14u;
 
@@ -30,6 +31,11 @@ namespace moho
     CSimConVarBase* SimPathBackgroundBudgetConVar()
     {
       return reinterpret_cast<CSimConVarBase*>(kPathBackgroundBudgetConVarEa);
+    }
+
+    CSimConVarBase* SimPathTimeoutPreviewConVar()
+    {
+      return reinterpret_cast<CSimConVarBase*>(kPathTimeoutPreviewConVarEa);
     }
 
     CSimConVarBase* SimChecksumPeriodConVar()

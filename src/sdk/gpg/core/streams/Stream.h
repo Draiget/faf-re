@@ -23,6 +23,24 @@ namespace gpg
        * Constructs the standard "unsupported stream operation" logic_error payload.
        */
       UnsupportedOperation();
+
+      /**
+       * Address: 0x00956F70 (FUN_00956F70)
+       *
+       * What it does:
+       * Copy-constructs the unsupported-operation logic_error payload.
+       */
+      UnsupportedOperation(const UnsupportedOperation& other);
+
+      /**
+       * Address: 0x00956EC0 (FUN_00956EC0, non-deleting dtor lane)
+       * Address: 0x00956F00 (FUN_00956F00, deleting dtor lane)
+       *
+       * What it does:
+       * Tears down `UnsupportedOperation` logic-error payload storage and
+       * supports scalar-delete dispatch.
+       */
+      ~UnsupportedOperation() override;
     };
 
     enum Mode
@@ -338,11 +356,13 @@ namespace gpg
     }
 
     /**
-     * NOTE: helper method (no stable standalone symbol mapping yet).
+     * Address: 0x004CCBD0 (FUN_004CCBD0)
      *
-     * Returns one byte from read window or virtual read fallback; returns -1 on EOF.
+     * What it does:
+     * Returns one byte from the read window or virtual read fallback; returns
+     * `-1` when no byte can be read.
      */
-    int8_t GetByte();
+    int GetByte();
   };
   static_assert(sizeof(Stream) == 0x1C, "gpg::Stream size must be 0x1C");
 
@@ -381,6 +401,15 @@ namespace gpg
     void WriteChar(char value);
 
     /**
+     * Address: 0x009571E0 (FUN_009571E0)
+     *
+     * What it does:
+     * Writes `length` bytes from `value` by forwarding each byte through
+     * `WriteChar` normalization semantics.
+     */
+    void WriteChars(const char* value, int length);
+
+    /**
      * Address: 0x009571B0 (FUN_009571B0)
      *
      * What it does:
@@ -405,7 +434,14 @@ namespace gpg
     void Printf(const char* format, ...);
 
   private:
-    void WriteByte(char value);
+    /**
+     * Address: 0x00957010 (FUN_00957010)
+     *
+     * What it does:
+     * Writes one byte through inline write-buffer fast path; when the buffer is
+     * full it falls back to virtual slot `VirtWrite(&value, 1)`.
+     */
+    char* WriteByte(char value);
 
     Stream* mStream{};
     int mMode{};

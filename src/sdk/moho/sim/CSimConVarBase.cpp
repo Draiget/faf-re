@@ -9,11 +9,29 @@ using namespace moho;
 namespace
 {
   std::uint32_t gSimConVarIndexCounter = 0u;
+
+  /**
+   * Address: 0x00743210 (FUN_00743210)
+   *
+   * What it does:
+   * Returns the current process-global sim-convar index counter lane.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t GetSimConVarIndexCounterValue() noexcept
+  {
+    return gSimConVarIndexCounter;
+  }
 }
 
+/**
+ * Address: 0x00579760 (FUN_00579760, Moho::CSimConVarBase::CSimConVarBase)
+ *
+ * What it does:
+ * Initializes one convar definition lane, assigns a unique global convar
+ * index, and binds the `CSimConVarBase` vftable.
+ */
 CSimConVarBase::CSimConVarBase(const bool requiresCheat, const char* const name)
   : CSimConCommand(requiresCheat, name)
-  , mIndex(0u)
+  , mIndex(AllocateSimConVarIndex())
 {
 }
 
@@ -68,6 +86,20 @@ CSimConVarInstanceBase* moho::TSimConVar<bool>::CreateInstance()
   instance->mName = mName;
   instance->mValue = mDefaultValue;
   return instance;
+}
+
+/**
+ * Address: 0x0057DEA0 (FUN_0057DEA0, Moho::TSimConVar_bool::TSimConVar_bool)
+ *
+ * What it does:
+ * Initializes one bool convar definition, assigning convar index and default
+ * bool payload lane.
+ */
+template <>
+moho::TSimConVar<bool>::TSimConVar(const bool requiresCheat, const char* const name, const bool& defaultValue)
+  : CSimConVarBase(requiresCheat, name)
+  , mDefaultValue(defaultValue)
+{
 }
 
 /**

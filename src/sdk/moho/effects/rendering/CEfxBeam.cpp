@@ -33,21 +33,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* ResolveCEffectImplType()
-  {
-    return ResolveCachedType<moho::CEffectImpl>(moho::CEffectImpl::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSEntAttachInfoType()
-  {
-    return ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldBeamType()
-  {
-    return ResolveCachedType<moho::SWorldBeam>(moho::SWorldBeam::sType);
-  }
-
   [[nodiscard]] moho::IEffectManager* ResolveEffectManager(const moho::IEffect* const effect)
   {
     const std::uintptr_t raw = static_cast<std::uintptr_t>(effect->mUnknown3C);
@@ -152,11 +137,133 @@ namespace
     transform.pos_.y = 0.0f;
     transform.pos_.z = 0.0f;
   }
+
+  /**
+   * Address: 0x00658EC0 (FUN_00658EC0)
+   *
+   * What it does:
+   * Returns cached reflected type metadata for `SEntAttachInfo`, resolving it
+   * through RTTI lookup on first use.
+   */
+  [[nodiscard]] gpg::RType* CachedSEntAttachInfoType()
+  {
+    gpg::RType* type = moho::SEntAttachInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SEntAttachInfo));
+      moho::SEntAttachInfo::sType = type;
+    }
+
+    return type;
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* CEfxBeam::sType = nullptr;
+
+  /**
+   * Address: 0x00658DA0 (FUN_00658DA0)
+   *
+   * What it does:
+   * Reads one `CEffectImpl` base object through archive RTTI dispatch,
+   * resolving and caching the `CEffectImpl` reflection type on first use.
+   */
+  void ReadCEfxBeamBaseEffectImplAdapter(
+    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+  )
+  {
+    gpg::RType* type = CEffectImpl::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CEffectImpl));
+      CEffectImpl::sType = type;
+    }
+    archive->Read(type, object, owner);
+  }
+
+  /**
+   * Address: 0x00658DD0 (FUN_00658DD0)
+   *
+   * What it does:
+   * Writes one `CEffectImpl` base object through archive RTTI dispatch,
+   * resolving and caching the `CEffectImpl` reflection type on first use.
+   */
+  void WriteCEfxBeamBaseEffectImplAdapter(
+    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+  )
+  {
+    gpg::RType* type = CEffectImpl::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CEffectImpl));
+      CEffectImpl::sType = type;
+    }
+    archive->Write(type, object, owner);
+  }
+
+  /**
+   * Address: 0x00658E00 (FUN_00658E00)
+   *
+   * What it does:
+   * Reads one `SEntAttachInfo` payload through archive RTTI dispatch,
+   * resolving and caching the attach-info reflection type on first use.
+   */
+  void ReadCEfxBeamAttachInfoAdapter(
+    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+  )
+  {
+    archive->Read(CachedSEntAttachInfoType(), object, owner);
+  }
+
+  /**
+   * Address: 0x00658E30 (FUN_00658E30)
+   *
+   * What it does:
+   * Writes one `SEntAttachInfo` payload through archive RTTI dispatch,
+   * resolving and caching the attach-info reflection type on first use.
+   */
+  void WriteCEfxBeamAttachInfoAdapter(
+    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+  )
+  {
+    archive->Write(CachedSEntAttachInfoType(), object, owner);
+  }
+
+  /**
+   * Address: 0x00658E60 (FUN_00658E60)
+   *
+   * What it does:
+   * Reads one `SWorldBeam` payload through archive RTTI dispatch, resolving and
+   * caching the beam-payload reflection type on first use.
+   */
+  void ReadCEfxBeamWorldBeamAdapter(
+    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+  )
+  {
+    gpg::RType* type = SWorldBeam::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(SWorldBeam));
+      SWorldBeam::sType = type;
+    }
+    archive->Read(type, object, owner);
+  }
+
+  /**
+   * Address: 0x00658E90 (FUN_00658E90)
+   *
+   * What it does:
+   * Writes one `SWorldBeam` payload through archive RTTI dispatch, resolving and
+   * caching the beam-payload reflection type on first use.
+   */
+  void WriteCEfxBeamWorldBeamAdapter(
+    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+  )
+  {
+    gpg::RType* type = SWorldBeam::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(SWorldBeam));
+      SWorldBeam::sType = type;
+    }
+    archive->Write(type, object, owner);
+  }
 
   /**
    * Address: 0x006546F0 (FUN_006546F0, Moho::CEfxBeam::CEfxBeam)
@@ -174,10 +281,13 @@ namespace moho
   {}
 
   /**
-   * Address: 0x00655B80 (FUN_00655B80, Moho::CEfxBeam::dtr)
+   * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)
+   * Thunk entry: 0x00655B80 (FUN_00655B80, Moho::CEfxBeam::dtr)
    */
   CEfxBeam::~CEfxBeam()
   {
+    ResetCountedParticleTexturePtr(mBeam.mTexture1);
+    ResetCountedParticleTexturePtr(mBeam.mTexture2);
     mEnd.TargetWeakLink().UnlinkFromOwnerChain();
   }
 
@@ -191,12 +301,12 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(ResolveCEffectImplType(), static_cast<CEffectImpl*>(this), nullOwner);
+    ReadCEfxBeamBaseEffectImplAdapter(archive, static_cast<CEffectImpl*>(this), nullOwner);
     archive->ReadInt(&mBlendMode);
     archive->ReadBool(&mVisible);
     archive->ReadUInt(&mLastUpdate);
-    archive->Read(ResolveSEntAttachInfoType(), &mEnd, nullOwner);
-    archive->Read(ResolveSWorldBeamType(), &mBeam, nullOwner);
+    ReadCEfxBeamAttachInfoAdapter(archive, &mEnd, nullOwner);
+    ReadCEfxBeamWorldBeamAdapter(archive, &mBeam, nullOwner);
     archive->ReadBool(&mIsNew);
   }
 
@@ -210,12 +320,12 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(ResolveCEffectImplType(), static_cast<const CEffectImpl*>(this), nullOwner);
+    WriteCEfxBeamBaseEffectImplAdapter(archive, static_cast<const CEffectImpl*>(this), nullOwner);
     archive->WriteInt(mBlendMode);
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
-    archive->Write(ResolveSEntAttachInfoType(), &mEnd, nullOwner);
-    archive->Write(ResolveSWorldBeamType(), &mBeam, nullOwner);
+    WriteCEfxBeamAttachInfoAdapter(archive, &mEnd, nullOwner);
+    WriteCEfxBeamWorldBeamAdapter(archive, &mBeam, nullOwner);
     archive->WriteBool(mIsNew);
   }
 
@@ -403,6 +513,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x00655B50 (FUN_00655B50, Moho::CEfxBeam::AttachEntityToEntity)
+   *
+   * What it does:
+   * Sets source attachment lanes, stores one weak end-target entity pointer,
+   * and clamps negative target-bone indices to zero.
+   */
+  void CEfxBeam::AttachEntityToEntity(
+    Entity* const sourceEntity,
+    const std::int32_t sourceBoneIndex,
+    Entity* const targetEntity,
+    const std::int32_t targetBoneIndex
+  )
+  {
+    SetBone(sourceEntity, sourceBoneIndex);
+    mEnd.mAttachTargetWeak.ResetFromObject(targetEntity);
+    mEnd.mParentBoneIndex = targetBoneIndex < 0 ? 0 : targetBoneIndex;
+  }
+
+  /**
    * Address: 0x006585D0 (FUN_006585D0, serializer load thunk alias)
    *
    * What it does:
@@ -436,6 +565,7 @@ namespace moho
 
   /**
    * Address: 0x006585E0 (FUN_006585E0, serializer save thunk alias)
+   * Address: 0x0085ED60 (FUN_0085ED60)
    *
    * What it does:
    * Tail-forwards one CEfxBeam serialize thunk alias into

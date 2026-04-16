@@ -77,6 +77,38 @@ namespace
     return UnlinkSerializerNode(*AcquireCAiPathNavigatorSerializer());
   }
 
+  /**
+   * Address: 0x005AFC50 (FUN_005AFC50)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CAiPathNavigator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPathNavigatorSerializerStartupThunkA()
+  {
+    if (!gCAiPathNavigatorSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireCAiPathNavigatorSerializer());
+  }
+
+  /**
+   * Address: 0x005AFC80 (FUN_005AFC80)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CAiPathNavigator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPathNavigatorSerializerStartupThunkB()
+  {
+    if (!gCAiPathNavigatorSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireCAiPathNavigatorSerializer());
+  }
+
   void CleanupCAiPathNavigatorSerializerAtexit()
   {
     (void)cleanup_CAiPathNavigatorSerializer();

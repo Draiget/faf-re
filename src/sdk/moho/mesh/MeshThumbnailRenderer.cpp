@@ -2,12 +2,36 @@
 
 #include <cmath>
 #include <limits>
+#include <new>
 #include <stdexcept>
 
 #include "moho/mesh/Mesh.h"
 
+namespace moho
+{
+  struct WRenViewport;
+  extern WRenViewport* ren_Viewport;
+}
+
 namespace
 {
+  struct WRenViewportThumbnailRendererRuntime
+  {
+    std::uint8_t mUnknown000_33F[0x340];
+    moho::MeshThumbnailRenderer mThumbnailRenderer;
+  };
+
+  static_assert(
+    offsetof(WRenViewportThumbnailRendererRuntime, mThumbnailRenderer) == 0x340,
+    "WRenViewportThumbnailRendererRuntime::mThumbnailRenderer offset must be 0x340"
+  );
+
+  [[nodiscard]] moho::MeshThumbnailRenderer& GetViewportThumbnailRenderer(moho::WRenViewport* const viewport) noexcept
+  {
+    auto* const viewportRuntime = reinterpret_cast<WRenViewportThumbnailRendererRuntime*>(viewport);
+    return viewportRuntime->mThumbnailRenderer;
+  }
+
   [[nodiscard]] float VectorLengthSq(const Wm3::Vec3f& v) noexcept
   {
     return v.x * v.x + v.y * v.y + v.z * v.z;
@@ -24,9 +48,19 @@ namespace
       Finite(meshInstance.xMax) && Finite(meshInstance.yMax) && Finite(meshInstance.zMax);
   }
 
+  /**
+   * Address: 0x007EBC80 (FUN_007EBC80)
+   *
+   * What it does:
+   * Allocates one intrusive queue-head node and initializes the head as a
+   * self-linked sentinel.
+   */
   [[nodiscard]] moho::MeshThumbnailNode* CreateQueueHead()
   {
-    moho::MeshThumbnailNode* const head = new moho::MeshThumbnailNode{};
+    moho::MeshThumbnailNode* const head = new (std::nothrow) moho::MeshThumbnailNode{};
+    if (head == nullptr) {
+      return nullptr;
+    }
     head->next = head;
     head->prev = head;
     return head;
@@ -155,6 +189,28 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x007FA620 (FUN_007FA620, ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
+   * Mangled: ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
+   *
+   * What it does:
+   * Copies one texture-sheet shared-pointer lane and forwards the thumbnail
+   * request into the active global viewport thumbnail-renderer queue.
+   */
+  std::uint32_t REN_RequestThumbnail(
+    const RMeshBlueprint* const blueprint,
+    const Wm3::Quatf& orientation,
+    const std::uint32_t color,
+    const Wm3::Vec3f& viewOffsetHint,
+    boost::shared_ptr<ID3DTextureSheet> outputSheet,
+    const gpg::Rect2f& outputRect
+  )
+  {
+    boost::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
+    return GetViewportThumbnailRenderer(ren_Viewport)
+      .PushRequest(blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect);
+  }
+
   /**
    * Address: 0x007EA920 (FUN_007EA920)
    *

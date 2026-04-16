@@ -6,8 +6,12 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitCarrierLand.h"
+#include "Wm3Vector3.h"
 
 namespace
 {
@@ -74,6 +78,24 @@ namespace
     return type;
   }
 
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedCUnitCarrierLandType()
   {
     static gpg::RType* cached = nullptr;
@@ -119,10 +141,13 @@ namespace moho
   void CUnitCarrierLandTypeInfo::Init()
   {
     size_ = sizeof(CUnitCarrierLand);
-    newRefFunc_ = &CUnitCarrierLandTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitCarrierLandTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitCarrierLandTypeInfo::Delete;
-    dtrFunc_ = &CUnitCarrierLandTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitCarrierLandTypeInfo::NewRef,
+      &CUnitCarrierLandTypeInfo::CtrRef,
+      &CUnitCarrierLandTypeInfo::Delete,
+      &CUnitCarrierLandTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();
@@ -190,6 +215,69 @@ namespace moho
     object->~CUnitCarrierLandRuntimeView();
   }
 
+  /**
+   * Address: 0x006086C0 (FUN_006086C0, Moho::CUnitCarrierLand::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes base command-task state, target transport weak pointer, and
+   * carrier-landing reservation payload lanes.
+   */
+  void CUnitCarrierLand::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(CachedWeakPtrUnitType(), &mTargetCarrier, ownerRef);
+    archive->ReadBool(&mHasLoadedIntoCarrier);
+    archive->ReadInt(&mReservationResult);
+    archive->ReadFloat(&mCarrierHeight);
+    archive->Read(CachedVector3fType(), &mCarrierAttachPos, ownerRef);
+    archive->Read(CachedVector3fType(), &mCarrierAttachDir, ownerRef);
+    archive->Read(CachedVector3fType(), &mCarrierApproachPos, ownerRef);
+  }
+
+  /**
+   * Address: 0x00608800 (FUN_00608800, Moho::CUnitCarrierLand::MemberSerialize)
+   *
+   * What it does:
+   * Serializes base command-task state, target transport weak pointer, and
+   * carrier-landing reservation payload lanes.
+   */
+  void CUnitCarrierLand::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(CachedWeakPtrUnitType(), &mTargetCarrier, ownerRef);
+    archive->WriteBool(mHasLoadedIntoCarrier);
+    archive->WriteInt(mReservationResult);
+    archive->WriteFloat(mCarrierHeight);
+    archive->Write(CachedVector3fType(), &mCarrierAttachPos, ownerRef);
+    archive->Write(CachedVector3fType(), &mCarrierAttachDir, ownerRef);
+    archive->Write(CachedVector3fType(), &mCarrierApproachPos, ownerRef);
+  }
+
+  /**
+   * Address: 0x00608050 (FUN_00608050)
+   *
+   * What it does:
+   * Preserves one jump-thunk deserialize adapter lane that tail-forwards into
+   * `CUnitCarrierLand::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CUnitCarrierLandMemberDeserializeAdapterLaneB(
+    CUnitCarrierLand* const task,
+    gpg::ReadArchive* const archive
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
   int register_CUnitCarrierLandTypeInfo()
   {
     (void)AcquireTypeInfo();
@@ -197,3 +285,31 @@ namespace moho
   }
 } // namespace moho
 
+namespace
+{
+  gpg::SerSaveLoadHelperListRuntime gCUnitCarrierLandSerializer{};
+
+  /**
+   * Address: 0x00606D20 (FUN_00606D20)
+   *
+   * What it does:
+   * Unlinks `CUnitCarrierLandSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLandSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLandSerializer);
+  }
+
+  /**
+   * Address: 0x00606D50 (FUN_00606D50)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCarrierLandSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLandSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLandSerializer);
+  }
+} // namespace

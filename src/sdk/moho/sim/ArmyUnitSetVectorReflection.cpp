@@ -106,6 +106,15 @@ gpg::RType* gpg::ResolveEntitySetTemplateUnitVectorType()
   return moho::register_EntitySetTemplateUnitVectorType();
 }
 
+/**
+ * Address: 0x00704C60 (FUN_00704C60, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::dtr)
+ *
+ * What it does:
+ * Tears down one `RVectorType<SEntitySetTemplateUnit>` descriptor and
+ * releases inherited `gpg::RType` reflection storage lanes.
+ */
+gpg::RVectorType<moho::SEntitySetTemplateUnit>::~RVectorType() = default;
+
 const char* gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetName() const
 {
   static msvc8::string sName;

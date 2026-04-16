@@ -112,10 +112,13 @@ namespace moho
   void CUnitAttackTargetTaskTypeInfo::Init()
   {
     size_ = 0x90;
-    newRefFunc_ = &CUnitAttackTargetTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitAttackTargetTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitAttackTargetTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitAttackTargetTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitAttackTargetTaskTypeInfo::NewRef,
+      &CUnitAttackTargetTaskTypeInfo::CtrRef,
+      &CUnitAttackTargetTaskTypeInfo::Delete,
+      &CUnitAttackTargetTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_EAiAttackerEvent(this);

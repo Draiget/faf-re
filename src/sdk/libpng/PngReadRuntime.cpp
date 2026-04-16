@@ -29,6 +29,8 @@ extern "C" {
 
 void* png_create_struct_2(int type, void* (*malloc_fn)(png_structp, std::uint32_t), void* mem_ptr);
 void  png_destroy_struct_2(void* struct_ptr, void (*free_fn)(png_structp, void*), void* mem_ptr);
+void* png_create_struct(int type);
+void  png_destroy_struct(void* struct_ptr);
 void  png_set_mem_fn(png_structp png_ptr, void* mem_ptr,
                      void* (*malloc_fn)(png_structp, std::uint32_t),
                      void  (*free_fn)(png_structp, void*));
@@ -102,6 +104,60 @@ extern "C" void png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std
   read_data_fn(png_ptr, buf, length);
 }
 
+/**
+ * Address: 0x009E0A46 (FUN_009E0A46)
+ * Mangled: png_get_copyright
+ *
+ * What it does:
+ * Returns the embedded libpng copyright/version banner text.
+ */
+extern "C" const char* png_get_copyright(png_structp png_ptr)
+{
+  (void)png_ptr;
+  return "\n"
+         " libpng version 1.2.5rc3 - September 18, 2002\n"
+         "   Copyright (c) 1998-2002 Glenn Randers-Pehrson\n"
+         "   Copyright (c) 1996-1997 Andreas Dilger\n"
+         "   Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.\n";
+}
+
+/**
+ * Address: 0x009E0A4C (FUN_009E0A4C)
+ * Mangled: png_get_libpng_ver
+ *
+ * What it does:
+ * Returns the embedded libpng version token expected by callers.
+ */
+extern "C" const char* png_get_libpng_ver(png_structp png_ptr)
+{
+  (void)png_ptr;
+  return "1.2.5rc3";
+}
+
+/**
+ * Address: 0x009E0A52 (FUN_009E0A52)
+ * Mangled: png_get_header_ver
+ *
+ * What it does:
+ * Returns the embedded libpng header-version token.
+ */
+extern "C" const char* png_get_header_ver()
+{
+  return "1.2.5rc3";
+}
+
+/**
+ * Address: 0x009E0A58 (FUN_009E0A58)
+ * Mangled: png_get_header_version
+ *
+ * What it does:
+ * Returns the embedded libpng header-version banner string.
+ */
+extern "C" const char* png_get_header_version()
+{
+  return " libpng version 1.2.5rc3 - September 18, 2002 (header)\n";
+}
+
 namespace {
 
 using libpng_layout::Field;
@@ -127,6 +183,7 @@ constexpr std::uint32_t kPngHaveFileSig   = 0x1000;
 
 // Flag bits used by version handshake / read state.
 constexpr std::uint32_t kPngFlagLibraryMismatch = 0x20000;
+constexpr std::size_t kOffWarningFn = 0x44;
 
 [[nodiscard]] inline void*& MemPtrSlot(png_structp png_ptr)   { return Field<void*>(png_ptr, kOffMemPtr); }
 [[nodiscard]] inline png_malloc_ptr& MallocFnSlot(png_structp png_ptr) { return Field<png_malloc_ptr>(png_ptr, kOffMallocFn); }
@@ -142,6 +199,62 @@ constexpr int kPngStructPng  = 1;
 constexpr std::uint32_t kPngFreeAllRead = 0x4000;
 
 } // namespace
+
+/**
+ * Address: 0x009E0D7F (FUN_009E0D7F)
+ * Mangled: png_read_init_2
+ *
+ * What it does:
+ * Reinitializes one png read-state lane from legacy caller arguments while
+ * preserving the callback/jmp prefix and rebuilding zlib state.
+ */
+extern "C" void png_read_init_2(
+  png_structp* const png_ptr_ptr,
+  const char* const  user_png_ver,
+  const std::uint32_t png_struct_size)
+{
+  if (png_ptr_ptr == nullptr || *png_ptr_ptr == nullptr) {
+    return;
+  }
+
+  png_structp png_ptr = *png_ptr_ptr;
+  if (user_png_ver == nullptr || std::strcmp(user_png_ver, kPngLibraryVersion) != 0) {
+    Field<std::uint32_t>(png_ptr, kOffWarningFn) = 0u;
+    png_warning(png_ptr, "Application uses deprecated png_read_init() and should be recompiled.");
+  }
+
+  std::uint8_t preservedPrefix[0x40]{};
+  std::memcpy(preservedPrefix, png_ptr, sizeof(preservedPrefix));
+
+  if (png_struct_size < kPngStructSize) {
+    png_destroy_struct(png_ptr);
+    png_ptr = static_cast<png_structp>(png_create_struct(kPngStructPng));
+    *png_ptr_ptr = png_ptr;
+  }
+
+  std::memset(png_ptr, 0, kPngStructSize);
+  std::memcpy(png_ptr, preservedPrefix, sizeof(preservedPrefix));
+
+  Field<std::uint32_t>(png_ptr, kOffZbufSize) = 0x2000;
+  Field<void*>(png_ptr, kOffZbuf) = png_malloc(png_ptr, 0x2000);
+  Field<void*>(png_ptr, kOffZstreamZalloc) = reinterpret_cast<void*>(&png_zalloc);
+  Field<void*>(png_ptr, kOffZstreamZfree) = reinterpret_cast<void*>(&png_zfree);
+  Field<void*>(png_ptr, kOffZstreamOpaque) = png_ptr;
+
+  auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+  const int zret = inflateInit_(zstream, "1.1.4", 56);
+  if (zret == -6) {
+    png_error(png_ptr, "zlib version");
+  } else if (zret == -4 || zret == -2) {
+    png_error(png_ptr, "zlib memory");
+  } else if (zret != 0) {
+    png_error(png_ptr, "Unknown zlib error");
+  }
+
+  Field<void*>(png_ptr, kOffZstreamNextOut) = Field<void*>(png_ptr, kOffZbuf);
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+  png_set_read_fn(png_ptr, nullptr, nullptr);
+}
 
 /**
  * Address: 0x009E0AE9 (FUN_009E0AE9)
@@ -912,6 +1025,92 @@ extern "C" void png_destroy_read_struct(
 extern "C" void* png_get_io_ptr(png_structp png_ptr)
 {
   return libpng_detail::GetIoPtr(png_ptr);
+}
+
+/**
+ * Address: 0x009E09B2 (FUN_009E09B2)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E09B2(int a1, int a2);
+ *
+ * What it does:
+ * Writes one caller-provided IO state pointer into `png_struct::io_ptr`.
+ */
+extern "C" void png_set_io_ptr(png_structp png_ptr, void* io_ptr)
+{
+  // png_struct::io_ptr at +0x54 (same lane returned by png_get_io_ptr).
+  libpng_layout::Field<void*>(png_ptr, 0x54) = io_ptr;
+}
+
+/**
+ * Address: 0x009E09BE (FUN_009E09BE)
+ * Mangled: png_convert_to_rfc1123
+ *
+ * What it does:
+ * Allocates `png_ptr->time_buffer` on first use and formats one PNG `tIME`
+ * lane into RFC1123 UTC text.
+ */
+extern "C" char* png_convert_to_rfc1123(
+  png_structp const png_ptr,
+  const png_time* const ptime
+)
+{
+  constexpr std::size_t kOffTimeBuffer = 0x210;
+  static constexpr const char* kMonthNames[12] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+
+  char*& timeBuffer = libpng_layout::Field<char*>(png_ptr, kOffTimeBuffer);
+  if (timeBuffer == nullptr) {
+    timeBuffer = static_cast<char*>(png_malloc(png_ptr, 0x1Du));
+  }
+
+  int monthIndex = (static_cast<int>(ptime->month) - 1) % 12;
+  if (monthIndex < 0) {
+    monthIndex += 12;
+  }
+
+  std::sprintf(
+    timeBuffer,
+    "%d %s %d %02d:%02d:%02d +0000",
+    static_cast<int>(ptime->day & 0x1Fu),
+    kMonthNames[monthIndex],
+    static_cast<int>(ptime->year),
+    static_cast<int>(ptime->hour) % 24,
+    static_cast<int>(ptime->minute) % 60,
+    static_cast<int>(ptime->second) % 61
+  );
+  return timeBuffer;
+}
+
+/**
+ * Address: 0x009E7792 (FUN_009E7792)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E7792(int a1);
+ *
+ * What it does:
+ * Returns the opaque libpng error-context pointer lane (`png_struct::error_ptr`).
+ */
+extern "C" void* png_get_error_ptr(png_structp png_ptr)
+{
+  // png_struct::error_ptr at +0x48.
+  return libpng_layout::Field<void*>(png_ptr, 0x48);
+}
+
+/**
+ * Address: 0x009E1E86 (FUN_009E1E86)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E1E86(int a1, int a2);
+ *
+ * What it does:
+ * Stores one read-status callback pointer into `png_struct` lane `+0x198`.
+ */
+extern "C" void png_set_read_status_fn(png_structp png_ptr, void* read_status_fn)
+{
+  libpng_layout::Field<void*>(png_ptr, 0x198) = read_status_fn;
 }
 
 /**

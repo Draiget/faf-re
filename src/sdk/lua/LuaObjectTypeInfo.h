@@ -15,6 +15,15 @@ namespace LuaPlus
 	{
 	public:
 		/**
+		 * Address: 0x0090BB80 (FUN_0090BB80, LuaPlus::LuaObjectTypeInfo::LuaObjectTypeInfo)
+		 *
+		 * What it does:
+		 * Constructs the LuaObject runtime type descriptor and preregisters it
+		 * with reflection registry using `typeid(LuaObject)`.
+		 */
+		LuaObjectTypeInfo();
+
+		/**
 		 * Address: 0x0090BCE0
 		 * Slot: 2
 		 * Demangled: LuaPlus::LuaObjectTypeInfo scalar deleting destructor

@@ -67,6 +67,118 @@ namespace
     }
     return MakeBVIntSetIndex(&set, value);
   }
+
+  // Alias of FUN_00687AF0 ring-copy behavior for local IdPool map-lane cloning.
+  [[nodiscard]] moho::SimSubRes2* CopyIdPoolHistoryRingForMapLanes(
+    moho::SimSubRes2* const destination,
+    const moho::SimSubRes2* const source
+  )
+  {
+    if (destination == source) {
+      return destination;
+    }
+
+    destination->Reset();
+    for (int index = source->mStart; index != source->mEnd; index = (index + 1) % kHistoryCapacity) {
+      destination->PushSnapshot(AsBitSet(source->mData[index]));
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x00686DF0 (FUN_00686DF0, copy_IdPool_payload_for_map_lanes)
+   *
+   * What it does:
+   * Copies one `IdPool` payload into destination storage, including the
+   * released-id bitset and recycle-history ring snapshots.
+   */
+  [[maybe_unused]] moho::IdPool* CopyIdPoolPayloadForMapLanes(
+    const moho::IdPool* const source,
+    moho::IdPool* const destination
+  )
+  {
+    if (source == nullptr || destination == nullptr) {
+      return destination;
+    }
+
+    if (source == destination) {
+      return destination;
+    }
+
+    destination->mNextLowId = source->mNextLowId;
+    destination->mReleasedLows.mFirstWordIndex = source->mReleasedLows.mFirstWordIndex;
+    destination->mReleasedLows.mWords.ResetFrom(source->mReleasedLows.mWords);
+
+    destination->mSubRes2.mStart = 0;
+    destination->mSubRes2.mEnd = 0;
+    (void)CopyIdPoolHistoryRingForMapLanes(&destination->mSubRes2, &source->mSubRes2);
+
+    return destination;
+  }
+
+  struct IdPoolMapLaneCopyView
+  {
+    std::uint32_t mKey; // +0x00
+    std::uint32_t mReserved04;
+    moho::IdPool mPayload; // +0x08
+  };
+  static_assert(offsetof(IdPoolMapLaneCopyView, mKey) == 0x00, "IdPoolMapLaneCopyView::mKey offset must be 0x00");
+  static_assert(
+    offsetof(IdPoolMapLaneCopyView, mPayload) == 0x08, "IdPoolMapLaneCopyView::mPayload offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x00686D10 (FUN_00686D10)
+   *
+   * What it does:
+   * Copies one map-lane key dword and then clones the associated IdPool payload
+   * into destination storage.
+   */
+  [[maybe_unused]] IdPoolMapLaneCopyView* CopyIdPoolMapLaneEntryForMapLanes(
+    const std::uint32_t* const sourceKey,
+    IdPoolMapLaneCopyView* const destination,
+    const moho::IdPool* const sourcePayload
+  )
+  {
+    destination->mKey = *sourceKey;
+    (void)CopyIdPoolPayloadForMapLanes(sourcePayload, &destination->mPayload);
+    return destination;
+  }
+
+  /**
+   * Address: 0x00688A10 (FUN_00688A10)
+   *
+   * What it does:
+   * Copies one packed map-lane key/payload entry into destination storage.
+   */
+  [[maybe_unused]] IdPoolMapLaneCopyView* CopyPackedIdPoolMapLaneEntryForMapLanes(
+    const IdPoolMapLaneCopyView* const source,
+    IdPoolMapLaneCopyView* const destination
+  )
+  {
+    destination->mKey = source->mKey;
+    (void)CopyIdPoolPayloadForMapLanes(&source->mPayload, &destination->mPayload);
+    return destination;
+  }
+
+  /**
+   * Address: 0x00686E60 (FUN_00686E60)
+   *
+   * What it does:
+   * Clears destination ring indices and repopulates history snapshots using the
+   * shared IdPool ring-copy behavior.
+   */
+  [[maybe_unused]] moho::SimSubRes2* ResetAndCopyIdPoolHistoryRingForMapLanes(
+    moho::SimSubRes2* const destination,
+    const moho::SimSubRes2* const source
+  )
+  {
+    destination->mStart = 0;
+    destination->mEnd = 0;
+    (void)CopyIdPoolHistoryRingForMapLanes(destination, source);
+    return destination;
+  }
 } // namespace
 
 /**

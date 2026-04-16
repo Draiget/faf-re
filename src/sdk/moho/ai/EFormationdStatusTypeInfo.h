@@ -19,6 +19,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00566090 (FUN_00566090, Moho::EFormationdStatusTypeInfo::EFormationdStatusTypeInfo)
+     *
+     * What it does:
+     * Preregisters the enum type descriptor for `EFormationdStatus` with the reflection registry.
+     */
+    EFormationdStatusTypeInfo();
+
+    /**
      * Address: 0x00566150 (FUN_00566150, Moho::EFormationdStatusTypeInfo::dtr)
      */
     ~EFormationdStatusTypeInfo() override;
@@ -42,4 +50,3 @@ namespace moho
 
   static_assert(sizeof(EFormationdStatusTypeInfo) == 0x78, "EFormationdStatusTypeInfo size must be 0x78");
 } // namespace moho
-

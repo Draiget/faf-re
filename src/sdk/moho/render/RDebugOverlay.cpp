@@ -4,14 +4,46 @@
 
 #include "gpg/core/utils/Global.h"
 
+namespace
+{
+  /**
+   * Address: 0x0064C1B0 (FUN_0064C1B0, Moho::RDebugOverlay non-deleting dtor body)
+   *
+   * What it does:
+   * Unlinks this debug-overlay intrusive list node and restores singleton link
+   * state before base `gpg::RObject` teardown.
+   */
+  void DestroyRDebugOverlayNonDeletingBody(moho::RDebugOverlay* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(overlay);
+    node->ListUnlinkSelf();
+  }
+} // namespace
+
 namespace moho
 {
   gpg::RType* RDebugOverlay::sType = nullptr;
 
   /**
+   * Address: 0x00651AE0 (FUN_00651AE0)
+   *
+   * What it does:
+   * Initializes the debug-overlay base lane and seeds intrusive links as a
+   * singleton ring.
+   */
+  RDebugOverlay::RDebugOverlay() = default;
+
+  /**
    * Address: 0x0064C1E0 (FUN_0064C1E0, scalar deleting body)
    */
-  RDebugOverlay::~RDebugOverlay() = default;
+  RDebugOverlay::~RDebugOverlay()
+  {
+    DestroyRDebugOverlayNonDeletingBody(this);
+  }
 
   /**
    * Address: 0x00651AF0 (FUN_00651AF0, nullsub_1684)

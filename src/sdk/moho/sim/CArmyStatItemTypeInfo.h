@@ -45,6 +45,15 @@ namespace moho
 
   private:
     /**
+     * Address: 0x0070EE90 (FUN_0070EE90)
+     *
+     * What it does:
+     * Installs CArmyStatItem allocation/construct/delete/destruct callback
+     * slots on one reflected type descriptor.
+     */
+    static gpg::RType* AssignLifecycleCallbacks(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x007111C0 (FUN_007111C0)
      *
      * What it does:

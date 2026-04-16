@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -22,6 +23,82 @@ namespace
 constexpr std::size_t kInitialContextCapacity = 4;
 constexpr std::size_t kPipeChunkSize = 0x1000;
 constexpr std::size_t kDebugOutputPayloadSize = 0x100;
+
+struct IntrusiveLinkNodeRuntime
+{
+    IntrusiveLinkNodeRuntime* prev;
+    IntrusiveLinkNodeRuntime* next;
+};
+static_assert(sizeof(IntrusiveLinkNodeRuntime) == 0x08, "IntrusiveLinkNodeRuntime size must be 0x08");
+
+[[nodiscard]] IntrusiveLinkNodeRuntime* UnlinkIntrusiveNodeAndReturnNext(
+    IntrusiveLinkNodeRuntime* const node
+)
+{
+    if (node == nullptr || node->prev == nullptr || node->next == nullptr) {
+        return nullptr;
+    }
+
+    IntrusiveLinkNodeRuntime* const next = node->next;
+    node->prev->next = next;
+    next->prev = node->prev;
+    node->prev = node;
+    node->next = node;
+    return next;
+}
+
+/**
+ * Address: 0x009064B0 (FUN_009064B0)
+ *
+ * What it does:
+ * Unlinks one intrusive chunk-list node and self-links it as a singleton,
+ * returning the previous forward-link successor lane.
+ */
+[[maybe_unused]] IntrusiveLinkNodeRuntime* UnlinkPipeChunkNodeAndReturnNextRuntime(
+    IntrusiveLinkNodeRuntime* const node
+)
+{
+    return UnlinkIntrusiveNodeAndReturnNext(node);
+}
+
+/**
+ * Address: 0x00936200 (FUN_00936200)
+ *
+ * What it does:
+ * Unlinks one intrusive log-target node and self-links it as a singleton,
+ * returning the previous forward-link successor lane.
+ */
+[[maybe_unused]] IntrusiveLinkNodeRuntime* UnlinkLogTargetNodeAndReturnNextRuntime(
+    IntrusiveLinkNodeRuntime* const node
+)
+{
+    return UnlinkIntrusiveNodeAndReturnNext(node);
+}
+
+struct PointerRangeDwordRuntimeView
+{
+    std::uint8_t reserved00_03[0x04]{};
+    const std::uint32_t* begin = nullptr; // +0x04
+    const std::uint32_t* end = nullptr;   // +0x08
+};
+static_assert(offsetof(PointerRangeDwordRuntimeView, begin) == 0x04, "PointerRangeDwordRuntimeView::begin offset must be 0x04");
+static_assert(offsetof(PointerRangeDwordRuntimeView, end) == 0x08, "PointerRangeDwordRuntimeView::end offset must be 0x08");
+
+/**
+ * Address: 0x009358F0 (FUN_009358F0)
+ *
+ * What it does:
+ * Returns whether a `[begin,end)` dword lane is empty (or has no begin lane).
+ */
+[[maybe_unused]] bool IsPointerRangeDwordEmptyRuntime(
+    const PointerRangeDwordRuntimeView* const runtime
+) noexcept
+{
+    if (runtime == nullptr || runtime->begin == nullptr) {
+        return true;
+    }
+    return runtime->begin == runtime->end;
+}
 
 class HistoryLogTarget final : public gpg::LogTarget
 {
@@ -371,11 +448,23 @@ const char* SeverityText(const gpg::LogSeverity level)
     return kSeverity[index];
 }
 
-void WriteIndent(std::ostream& stream, const int count)
+/**
+ * Address: 0x00906CC0 (FUN_00906CC0)
+ *
+ * What it does:
+ * Emits repeated single-space padding into one stream and returns that stream.
+ */
+std::ostream& WriteSpacePadding(std::ostream& stream, const int count)
 {
     for (int i = 0; i < count; ++i) {
         stream.put(' ');
     }
+    return stream;
+}
+
+void WriteIndent(std::ostream& stream, const int count)
+{
+    WriteSpacePadding(stream, count);
 }
 
 /**
@@ -415,6 +504,19 @@ void gpg::InitLogContextSingleton()
 
     g_LogCtx = new LogContext();
     std::atexit(&DestroyLogContextSingleton);
+}
+
+/**
+ * Address: 0x00937B30 (FUN_00937B30)
+ *
+ * What it does:
+ * Initializes the global log-context singleton on first use and returns the
+ * process-global context pointer lane.
+ */
+[[maybe_unused]] gpg::LogContext* gpg::GetLogContextSingletonRuntime()
+{
+    std::call_once(g_LogOnce, &InitLogContextSingleton);
+    return g_LogCtx;
 }
 
 /**
@@ -775,8 +877,8 @@ PipeBuf::PipeBuf()
 }
 
 /**
- * Address: 0x00906BD0 (FUN_00906BD0)
- * Demangled: gpg::PipeBuf deleting dtor thunk
+ * Address: 0x00906B30 (FUN_00906B30, complete dtor body)
+ * Address: 0x00906BD0 (FUN_00906BD0, deleting dtor thunk)
  *
  * What it does:
  * Releases all queued stream chunks and destroys synchronization state.
@@ -1223,16 +1325,35 @@ ScopedLogContext::ScopedLogContext(const char* const text)
 {
 }
 
+/**
+ * Address: 0x00937B90 (FUN_00937B90, ??1LogContext@gpg@@QAE@XZ_0)
+ *
+ * What it does:
+ * Removes one scoped thread-context entry from active thread state under the
+ * global logging lock and releases entry storage.
+ */
 ScopedLogContext::~ScopedLogContext()
 {
     if (!mEntry) {
         return;
     }
 
+    std::call_once(g_LogOnce, &InitLogSingleton);
+    if (!g_LogCtx) {
+        HandleAssertFailure("state", 323, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
+        delete mEntry;
+        mEntry = nullptr;
+        mTls = nullptr;
+        return;
+    }
+
+    g_LogCtx->rw.lock();
     if (mTls) {
         RemoveThreadContext(mTls, mEntry);
     }
     delete mEntry;
+    g_LogCtx->rw.unlock();
+
     mEntry = nullptr;
     mTls = nullptr;
 }

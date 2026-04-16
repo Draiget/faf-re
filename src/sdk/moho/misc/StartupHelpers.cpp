@@ -7,8 +7,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <fstream>
+#include <ios>
 #include <limits>
 #include <mutex>
+#include <new>
+#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -34,12 +39,14 @@
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/XFileError.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/SpecialFileType.h"
+#include "moho/task/CTaskThread.h"
 #include "moho/ui/CUIManager.h"
 
 extern int __argc;
@@ -64,6 +71,12 @@ namespace
   constexpr const char* kHeadAliases[] = {"head", "monitor", "mon", "display"};
   constexpr const char* kFullscreenAliases[] = {"fullscreen"};
   constexpr const char* kWindowedAliases[] = {"windowed", "window", "size"};
+  constexpr std::array<std::uint32_t, 4> kDefaultGameIdParts{
+    0xFA42B43Au,
+    0x68BC5B02u,
+    0x4F701F15u,
+    0x7C3E8FB0u
+  };
 
   constexpr moho::CfgAliasSet kOptionPrefixesSet{kOptionPrefixes, sizeof(kOptionPrefixes) / sizeof(kOptionPrefixes[0])};
   constexpr moho::CfgAliasSet kAdapterAliasesSet{kAdapterAliases, sizeof(kAdapterAliases) / sizeof(kAdapterAliases[0])};
@@ -82,7 +95,11 @@ namespace
   constexpr char kOptionsLogicModulePath[] = "/lua/options/optionslogic.lua";
   constexpr char kGetOptionMethodName[] = "GetOption";
   constexpr char kGetCurrentProfileMethodName[] = "GetCurrentProfile";
+  constexpr char kProfileProfilesPath[] = "profile.profiles";
+  constexpr char kProfileRootKey[] = "profile";
+  constexpr char kProfileCurrentIndexKey[] = "current";
   constexpr char kProfileNameFieldName[] = "Name";
+  constexpr char kProfileNetNameFieldName[] = "NetName";
   constexpr char kProfilesExistMethodName[] = "ProfilesExist";
   constexpr char kCreateProfileMethodName[] = "CreateProfile";
   constexpr char kApplyMethodName[] = "Apply";
@@ -128,6 +145,69 @@ namespace
   constexpr float kWordFloatScale = 65536.0f;
   constexpr std::int32_t kSofdecHeaderTypeMovie = 1;
   constexpr std::int32_t kSofdecHeaderTypeMovieAlt = 3;
+  struct MovieManagerRuntimeView
+  {
+    IDirectSound* mDirectSound = nullptr;               // +0x00
+    IDirectSoundBuffer* mPrimarySoundBuffer = nullptr;  // +0x04
+    float mVolume = 0.0f;                               // +0x08
+  };
+  static_assert(sizeof(MovieManagerRuntimeView) == 0x0C, "MovieManagerRuntimeView size must be 0x0C");
+  static_assert(offsetof(MovieManagerRuntimeView, mVolume) == 0x08, "MovieManagerRuntimeView::mVolume offset must be 0x08");
+
+  /**
+   * Address: 0x00874BD0 (FUN_00874BD0)
+   *
+   * What it does:
+   * Clamps one normalized movie volume lane to `<= 1.0`, converts it into the
+   * legacy DirectSound dB floor range (`[-10000,0]`), stores the converted
+   * value in the manager runtime, and returns the integer dB lane.
+   */
+  [[maybe_unused]] std::int32_t ApplyMovieVolumeLinearDbScale(
+    moho::CMovieManager* const manager,
+    float normalizedVolume
+  ) noexcept
+  {
+    if (normalizedVolume >= 1.0f) {
+      normalizedVolume = 1.0f;
+    }
+
+    const std::int32_t storedDbVolume =
+      static_cast<std::int32_t>(kLuaMovieVolumeDbFloor - (normalizedVolume * kLuaMovieVolumeDbFloor));
+    auto* const runtime = reinterpret_cast<MovieManagerRuntimeView*>(manager);
+    runtime->mVolume = static_cast<float>(storedDbVolume);
+    return storedDbVolume;
+  }
+
+  /**
+   * Address: 0x00874F80 (FUN_00874F80)
+   *
+   * What it does:
+   * Returns the global movie-manager stored volume lane, or `1.0f` when the
+   * singleton has not been created.
+   */
+  [[maybe_unused]] [[nodiscard]] float ResolveMovieVolumeForLuaOrUnityFallback() noexcept
+  {
+    if (gMovieManager != nullptr) {
+      const auto* const runtime = reinterpret_cast<const MovieManagerRuntimeView*>(gMovieManager);
+      return runtime->mVolume;
+    }
+
+    return 1.0f;
+  }
+
+  /**
+   * Address: 0x00875210 (FUN_00875210)
+   *
+   * What it does:
+   * Clears the global movie-manager singleton storage lane and returns the
+   * address of that storage slot.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CMovieManager** ResetMovieManagerSingletonStorageLane() noexcept
+  {
+    gMovieManager = nullptr;
+    return &gMovieManager;
+  }
+
 
   /**
    * Address: 0x008C8700 (FUN_008C8700, func_CpyFile)
@@ -163,6 +243,111 @@ namespace
         reinterpret_cast<const char*>(sourcePath),
         errorCode
       );
+    }
+  }
+
+  /**
+   * Address: 0x008C8230 (FUN_008C8230)
+   *
+   * IDA signature:
+   * void __stdcall sub_8C8230(std::ostream *lpOutputString, std::string *a2, LuaPlus::LuaObject a3, LuaPlus::LuaObject tableObj);
+   *
+   * What it does:
+   * Serializes one Lua key/value lane to preferences text, recursively formatting
+   * nested tables using indentation.
+   */
+  void SerializePreferenceLuaEntry(
+    std::ostream& output,
+    const msvc8::string& indent,
+    LuaPlus::LuaObject keyObject,
+    LuaPlus::LuaObject valueObject
+  )
+  {
+    if (keyObject.Type() == LUA_TSTRING) {
+      const char* const keyText = keyObject.GetString();
+      if (gpg::STR_IsIdent(keyText != nullptr ? keyText : "")) {
+        output << (keyText != nullptr ? keyText : "");
+      } else {
+        const msvc8::string quotedKey = moho::SCR_QuoteLuaString(keyText != nullptr ? keyText : "");
+        output << '[' << quotedKey.c_str() << ']';
+      }
+      output << " = ";
+    }
+
+    switch (valueObject.Type()) {
+      case LUA_TBOOLEAN:
+        output << (valueObject.GetBoolean() ? "true" : "false");
+        break;
+
+      case LUA_TNUMBER: {
+        const char* const valueText = valueObject.ToString();
+        output << (valueText != nullptr ? valueText : "0");
+        break;
+      }
+
+      case LUA_TSTRING: {
+        const char* const valueText = valueObject.GetString();
+        const msvc8::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
+        output << quotedValue.c_str();
+        break;
+      }
+
+      case LUA_TTABLE: {
+        output << "{";
+        msvc8::string nestedIndent = indent;
+        nestedIndent.append("    ");
+
+        int entryIndex = 0;
+        for (LuaPlus::LuaTableIterator iter(&valueObject, 1); !iter.m_isDone; iter.Next()) {
+          if (entryIndex > 0) {
+            output << ',';
+          }
+
+          output << '\n' << nestedIndent.c_str();
+          LuaPlus::LuaObject nestedValue(iter.GetValue());
+          LuaPlus::LuaObject nestedKey(iter.GetKey());
+          SerializePreferenceLuaEntry(output, nestedIndent, nestedKey, nestedValue);
+          ++entryIndex;
+        }
+
+        if (entryIndex == 0) {
+          output << " }";
+        } else {
+          output << '\n' << indent.c_str() << '}';
+        }
+        break;
+      }
+
+      default: {
+        LuaPlus::LuaState* const activeState = valueObject.GetActiveState();
+        lua_State* const rawState = activeState != nullptr ? activeState->m_state : nullptr;
+        const char* const typeName = rawState != nullptr ? lua_typename(rawState, valueObject.Type()) : "<unknown>";
+        gpg::Warnf("Attempting to write unsupported type in prefs: %s", typeName != nullptr ? typeName : "<unknown>");
+        break;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x008C80A0 (FUN_008C80A0)
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject *__usercall sub_8C80A0@<eax>(int a1@<edi>, const CHAR *a2@<esi>);
+   *
+   * What it does:
+   * Iterates root preferences table entries and emits one serialized Lua line
+   * per entry to the target output stream.
+   */
+  void SerializePreferenceRootTable(std::ostream& output, LuaPlus::LuaObject preferenceTable)
+  {
+    LuaPlus::LuaTableIterator iter(&preferenceTable, 1);
+    while (!iter.m_isDone) {
+      msvc8::string indent;
+      LuaPlus::LuaObject valueObject(iter.GetValue());
+      LuaPlus::LuaObject keyObject(iter.GetKey());
+      SerializePreferenceLuaEntry(output, indent, keyObject, valueObject);
+      output << '\n';
+      iter.Next();
     }
   }
 
@@ -662,6 +847,8 @@ namespace
 
   /**
    * Address: 0x0045C2D0 (FUN_0045C2D0, sub_45C2D0)
+   * Address: 0x00881FD0 (FUN_00881FD0)
+   * Address: 0x008F5E00 (FUN_008F5E00)
    *
    * What it does:
    * Returns the count of configured allowed URL protocols.
@@ -788,9 +975,200 @@ namespace
     return false;
   }
 
+  struct AdapterModeSortKeyRuntimeView
+  {
+    std::uint32_t mReserved00; // +0x00
+    std::uint32_t mWidth;      // +0x04
+    std::uint32_t mHeight;     // +0x08
+    std::uint32_t mRefresh;    // +0x0C
+  };
+  static_assert(
+    offsetof(AdapterModeSortKeyRuntimeView, mWidth) == 0x04,
+    "AdapterModeSortKeyRuntimeView::mWidth offset must be 0x04"
+  );
+  static_assert(
+    offsetof(AdapterModeSortKeyRuntimeView, mHeight) == 0x08,
+    "AdapterModeSortKeyRuntimeView::mHeight offset must be 0x08"
+  );
+  static_assert(
+    offsetof(AdapterModeSortKeyRuntimeView, mRefresh) == 0x0C,
+    "AdapterModeSortKeyRuntimeView::mRefresh offset must be 0x0C"
+  );
+
+  struct AdapterModeSortTreeNodeRuntimeView
+  {
+    AdapterModeSortTreeNodeRuntimeView* mLeft;   // +0x00
+    AdapterModeSortTreeNodeRuntimeView* mParent; // +0x04
+    AdapterModeSortTreeNodeRuntimeView* mRight;  // +0x08
+    void* mResolutionVtable;                     // +0x0C
+    std::uint32_t mWidth;                        // +0x10
+    std::uint32_t mHeight;                       // +0x14
+    std::uint32_t mRefresh;                      // +0x18
+    std::uint8_t mColor;                         // +0x1C
+    std::uint8_t mIsNil;                         // +0x1D
+    std::uint8_t mPad1E_1F[0x02];
+  };
+  static_assert(sizeof(AdapterModeSortTreeNodeRuntimeView) == 0x20, "AdapterModeSortTreeNodeRuntimeView size must be 0x20");
+  static_assert(
+    offsetof(AdapterModeSortTreeNodeRuntimeView, mResolutionVtable) == 0x0C,
+    "AdapterModeSortTreeNodeRuntimeView::mResolutionVtable offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(AdapterModeSortTreeNodeRuntimeView, mWidth) == 0x10,
+    "AdapterModeSortTreeNodeRuntimeView::mWidth offset must be 0x10"
+  );
+  static_assert(
+    offsetof(AdapterModeSortTreeNodeRuntimeView, mHeight) == 0x14,
+    "AdapterModeSortTreeNodeRuntimeView::mHeight offset must be 0x14"
+  );
+  static_assert(
+    offsetof(AdapterModeSortTreeNodeRuntimeView, mRefresh) == 0x18,
+    "AdapterModeSortTreeNodeRuntimeView::mRefresh offset must be 0x18"
+  );
+  static_assert(
+    offsetof(AdapterModeSortTreeNodeRuntimeView, mIsNil) == 0x1D,
+    "AdapterModeSortTreeNodeRuntimeView::mIsNil offset must be 0x1D"
+  );
+
+  [[nodiscard]] void* ResolveResolutionVtableRuntimeTag() noexcept
+  {
+    static const moho::Resolution kResolutionVtableSeed{};
+    return *reinterpret_cast<void* const*>(static_cast<const void*>(&kResolutionVtableSeed));
+  }
+
+  /**
+   * Address: 0x008D6B70 (FUN_008D6B70)
+   *
+   * What it does:
+   * Recursively destroys one adapter-mode sort subtree by walking the right
+   * lane first, then iterating left-lane links until the RB-tree nil sentinel.
+   */
+  [[maybe_unused]] void DestroyAdapterModeSortSubtreeRuntime(
+    void* const ownerRuntime,
+    AdapterModeSortTreeNodeRuntimeView* node
+  )
+  {
+    AdapterModeSortTreeNodeRuntimeView* current = node;
+    AdapterModeSortTreeNodeRuntimeView* previous = node;
+    while (current != nullptr && current->mIsNil == 0u) {
+      DestroyAdapterModeSortSubtreeRuntime(ownerRuntime, current->mRight);
+      current = current->mLeft;
+      previous->mResolutionVtable = ResolveResolutionVtableRuntimeTag();
+      ::operator delete(previous);
+      previous = current;
+    }
+    (void)ownerRuntime;
+  }
+
+  struct AdapterModeSortTreeRuntimeView
+  {
+    void* mAllocProxy;                               // +0x00
+    AdapterModeSortTreeNodeRuntimeView* mHead;      // +0x04
+    std::uint32_t mSize;                            // +0x08
+  };
+  static_assert(sizeof(AdapterModeSortTreeRuntimeView) == 0x0C, "AdapterModeSortTreeRuntimeView size must be 0x0C");
+
+  /**
+   * Address: 0x008D6170 (FUN_008D6170)
+   *
+   * What it does:
+   * Performs lower-bound lookup in the adapter-mode RB-tree using
+   * `(width,height,refresh)` tuple ordering.
+   */
+  [[nodiscard]] AdapterModeSortTreeNodeRuntimeView* FindAdapterModeSortLowerBoundNode(
+    const AdapterModeSortTreeRuntimeView& tree,
+    const AdapterModeSortKeyRuntimeView& key
+  )
+  {
+    AdapterModeSortTreeNodeRuntimeView* result = tree.mHead;
+    AdapterModeSortTreeNodeRuntimeView* node = (tree.mHead != nullptr) ? tree.mHead->mParent : nullptr;
+
+    while (node != nullptr && node->mIsNil == 0u) {
+      const std::uint32_t nodeWidth = node->mWidth;
+      const std::uint32_t nodeHeight = node->mHeight;
+      const std::uint32_t nodeRefresh = node->mRefresh;
+      if (
+        nodeWidth < key.mWidth
+        || (nodeWidth == key.mWidth && nodeHeight < key.mHeight)
+        || (nodeWidth == key.mWidth && nodeHeight == key.mHeight && nodeRefresh < key.mRefresh)
+      ) {
+        node = node->mRight;
+      } else {
+        result = node;
+        node = node->mLeft;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Address: 0x008D5020 (FUN_008D5020, sub_8D5020)
+   *
+   * What it does:
+   * Resolves one adapter-mode tree insertion anchor by lower-bound lookup on
+   * `(width,height,refresh)` and writes the chosen node lane to `*outNode`.
+   */
+  [[maybe_unused]] AdapterModeSortTreeNodeRuntimeView** ResolveAdapterModeSortInsertionAnchor(
+    const AdapterModeSortKeyRuntimeView& key,
+    const AdapterModeSortTreeRuntimeView& tree,
+    AdapterModeSortTreeNodeRuntimeView** const outNode
+  )
+  {
+    AdapterModeSortTreeNodeRuntimeView* const candidate = FindAdapterModeSortLowerBoundNode(tree, key);
+    AdapterModeSortTreeNodeRuntimeView* const head = tree.mHead;
+
+    if (
+      candidate == head
+      || key.mWidth < candidate->mWidth
+      || (key.mWidth == candidate->mWidth && key.mHeight < candidate->mHeight)
+      || (key.mWidth == candidate->mWidth && key.mHeight == candidate->mHeight && key.mRefresh < candidate->mRefresh)
+    ) {
+      *outNode = head;
+    } else {
+      *outNode = candidate;
+    }
+
+    return outNode;
+  }
+
+  struct SelfLinkedDwordNodeRuntimeView
+  {
+    SelfLinkedDwordNodeRuntimeView* mNext; // +0x00
+    SelfLinkedDwordNodeRuntimeView* mPrev; // +0x04
+    std::uint32_t mLane08;                 // +0x08
+  };
+  static_assert(sizeof(SelfLinkedDwordNodeRuntimeView) == 0x0C, "SelfLinkedDwordNodeRuntimeView size must be 0x0C");
+
+  /**
+   * Address: 0x008D63F0 (FUN_008D63F0, sub_8D63F0)
+   *
+   * What it does:
+   * Allocates one 12-byte intrusive-list sentinel lane and self-links the
+   * first two pointer lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] SelfLinkedDwordNodeRuntimeView* CreateSelfLinkedDwordNodeRuntime()
+  {
+    auto* const node = static_cast<SelfLinkedDwordNodeRuntimeView*>(::operator new(sizeof(SelfLinkedDwordNodeRuntimeView)));
+    if (node != nullptr) {
+      node->mNext = node;
+      node->mPrev = node;
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x008CD4F0 (FUN_008CD4F0)
+   *
+   * What it does:
+   * Formats one adapter mode label as `"<width>x<height>(<refresh>)"` for
+   * startup option state text.
+   */
   [[nodiscard]] msvc8::string BuildModeLabel(const gpg::gal::HeadAdapterMode& mode)
   {
-    return gpg::STR_Printf("%ux%u(%u)", mode.width, mode.height, mode.refreshRate);
+    std::ostringstream stream;
+    stream << mode.width << 'x' << mode.height << '(' << mode.refreshRate << ')';
+    return msvc8::string(stream.str().c_str());
   }
 
   [[nodiscard]] msvc8::string BuildModeKey(const gpg::gal::HeadAdapterMode& mode)
@@ -1450,8 +1828,8 @@ namespace
      * creates an empty root preference table.
      */
     CUserPrefsRuntime()
-      : mPreferencesFilePath()
-      , mPreferencesProfileName()
+      : mPreferencesPrimaryString()
+      , mPreferencesPathString()
       , mState(LuaPlus::LuaState::LIB_BASE)
       , mRoot()
     {
@@ -1459,8 +1837,8 @@ namespace
     }
 
     /**
-     * Address: 0x008C74A0 (FUN_008C74A0, Moho::IUserPrefs::~IUserPrefs)
-     * Mangled: ??1IUserPrefs@Moho@@UAE@XZ
+     * Address context:
+     * - Derived runtime teardown lane for `CUserPrefsRuntime`.
      *
      * What it does:
      * Tears down user-preferences runtime storage (Lua root/state and profile
@@ -1472,7 +1850,7 @@ namespace
      * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
      *
      * What it does:
-     * Returns mutable access to the preferences file-path string lane.
+     * Returns mutable access to one primary preferences string lane.
      */
     msvc8::string* GetStr1() override;
 
@@ -1480,7 +1858,7 @@ namespace
      * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
      *
      * What it does:
-     * Returns mutable access to the preferences profile-name string lane.
+     * Returns mutable access to the resolved preferences-path string lane.
      */
     msvc8::string* GetStr2() override;
 
@@ -1493,7 +1871,7 @@ namespace
 
       msvc8::string profileName;
       if (TryGetStringFromLuaValue(currentProfile, &profileName)) {
-        mPreferencesProfileName = profileName;
+        mPreferencesPrimaryString = profileName;
       }
     }
 
@@ -1749,16 +2127,31 @@ namespace
      */
     void* GetState() override;
 
+    [[nodiscard]] LuaPlus::LuaState* GetStateMutable() noexcept
+    {
+      return &mState;
+    }
+
+    [[nodiscard]] LuaPlus::LuaObject* GetPreferenceTableMutable() noexcept
+    {
+      return &mRoot;
+    }
+
+    void ResetPreferenceTable() noexcept
+    {
+      mRoot.AssignNewTable(&mState, 0, 0);
+    }
+
   private:
-    msvc8::string mPreferencesFilePath;
-    msvc8::string mPreferencesProfileName;
+    msvc8::string mPreferencesPrimaryString;
+    msvc8::string mPreferencesPathString;
     LuaPlus::LuaState mState;
     LuaPlus::LuaObject mRoot;
   };
 
   /**
-   * Address: 0x008C74A0 (FUN_008C74A0, Moho::IUserPrefs::~IUserPrefs)
-   * Mangled: ??1IUserPrefs@Moho@@UAE@XZ
+   * Address context:
+   * - Derived runtime teardown lane for `CUserPrefsRuntime`.
    *
    * What it does:
    * Tears down user-preferences runtime storage (Lua root/state and profile
@@ -1767,25 +2160,40 @@ namespace
   CUserPrefsRuntime::~CUserPrefsRuntime() = default;
 
   /**
+   * Address: 0x008C8620 (FUN_008C8620)
+   *
+   * What it does:
+   * Runs one deleting-destructor thunk for `IUserPrefs` runtime storage,
+   * forwarding through `CUserPrefsRuntime` teardown and optional storage release.
+   */
+  void DestroyUserPrefsRuntimeDeleting(CUserPrefsRuntime* const prefs, const unsigned int deleteFlag)
+  {
+    prefs->~CUserPrefsRuntime();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(prefs));
+    }
+  }
+
+  /**
    * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
    *
    * What it does:
-   * Returns mutable access to the preferences file-path string lane.
+   * Returns mutable access to one primary preferences string lane.
    */
   msvc8::string* CUserPrefsRuntime::GetStr1()
   {
-    return &mPreferencesFilePath;
+    return &mPreferencesPrimaryString;
   }
 
   /**
    * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
    *
    * What it does:
-   * Returns mutable access to the preferences profile-name string lane.
+   * Returns mutable access to the resolved preferences-path string lane.
    */
   msvc8::string* CUserPrefsRuntime::GetStr2()
   {
-    return &mPreferencesProfileName;
+    return &mPreferencesPathString;
   }
 
   /**
@@ -1801,6 +2209,23 @@ namespace
 
   static_assert(sizeof(CUserPrefsRuntime) == 0x84, "CUserPrefsRuntime size must be 0x84");
 } // namespace
+
+/**
+ * Address: 0x008C7400 (FUN_008C7400, ??0IUserPrefs@Moho@@QAE@XZ)
+ * Address: 0x008C73F0 (FUN_008C73F0, IUserPrefs ctor lane)
+ *
+ * What it does:
+ * Initializes one user-preferences base interface object.
+ */
+moho::IUserPrefs::IUserPrefs() = default;
+
+/**
+ * Address: 0x008C74A0 (FUN_008C74A0, ??1IUserPrefs@Moho@@UAE@XZ)
+ *
+ * What it does:
+ * Tears down one user-preferences base interface object.
+ */
+moho::IUserPrefs::~IUserPrefs() = default;
 
 std::int32_t moho::wnd_MinCmdLineWidth = 1024;
 std::int32_t moho::wnd_MinCmdLineHeight = 720;
@@ -1958,6 +2383,82 @@ bool moho::CFG_HasMaximizeOption()
 }
 
 /**
+ * Address: 0x008CD4E0 (FUN_008CD4E0, Resolution default ctor lane)
+ *
+ * What it does:
+ * Initializes one adapter-mode entry virtual ownership lane without touching
+ * scalar width/height/refresh lanes.
+ */
+moho::Resolution::Resolution() = default;
+
+/**
+ * Address: 0x008CD4A0 (FUN_008CD4A0, Resolution ctor lane)
+ *
+ * What it does:
+ * Initializes one adapter-mode entry from explicit width/height/refresh
+ * integer lanes.
+ */
+moho::Resolution::Resolution(const std::int32_t requestedWidth, const std::int32_t requestedHeight, const std::int32_t requestedFramesPerSecond)
+  : width(requestedWidth)
+  , height(requestedHeight)
+  , framesPerSecond(requestedFramesPerSecond)
+{}
+
+/**
+ * Address: 0x008D6AB0 (FUN_008D6AB0, Resolution copy ctor lane)
+ *
+ * What it does:
+ * Copy-constructs one adapter-mode entry from another `Resolution`.
+ */
+moho::Resolution::Resolution(const Resolution& other)
+  : width(other.width)
+  , height(other.height)
+  , framesPerSecond(other.framesPerSecond)
+{}
+
+namespace
+{
+  /**
+   * Address: 0x008CD880 (FUN_008CD880, Resolution scalar-deleting destructor)
+   *
+   * What it does:
+   * Executes one scalar-deleting destructor thunk for one `Resolution` runtime
+   * object and conditionally frees it when `deleteFlag & 1` is set.
+   */
+  [[maybe_unused]] moho::Resolution* DestructResolutionRuntime(
+    moho::Resolution* const resolution,
+    const unsigned char deleteFlag
+  ) noexcept
+  {
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(resolution));
+    }
+    return resolution;
+  }
+
+  /**
+   * Address: 0x008CD840 (FUN_008CD840)
+   *
+   * What it does:
+   * Performs strict weak ordering on `Resolution` tuple lanes
+   * `(width, height, framesPerSecond)`, comparing `candidate` against
+   * `reference`.
+   */
+  [[maybe_unused]] [[nodiscard]] bool IsResolutionTupleLessThan(
+    const moho::Resolution* const reference,
+    const moho::Resolution* const candidate
+  ) noexcept
+  {
+    return candidate->width < reference->width
+      || (candidate->width == reference->width && candidate->height < reference->height)
+      || (
+        candidate->width == reference->width && candidate->height == reference->height
+        && candidate->framesPerSecond < reference->framesPerSecond
+      );
+  }
+} // namespace
+
+/**
  * Address: 0x008CD6C0 (Resolution::Resolution parser body)
  *
  * What it does:
@@ -1995,6 +2496,128 @@ bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* 
 }
 
 /**
+ * Address: 0x008C8640 (FUN_008C8640, USER_SetCompanyName)
+ * Mangled: ?USER_SetCompanyName@Moho@@YAXVStrArg@gpg@@@Z
+ *
+ * What it does:
+ * Replaces the startup company-name lane.
+ */
+void moho::USER_SetCompanyName(const gpg::StrArg companyName)
+{
+  SetIdentityString(gAppIdentity.mCompanyName, companyName);
+}
+
+/**
+ * Address: 0x008C8670 (FUN_008C8670, USER_SetAppName)
+ * Mangled: ?USER_SetAppName@Moho@@YAXVStrArg@gpg@@@Z
+ *
+ * What it does:
+ * Replaces the startup app/product-name lane.
+ */
+void moho::USER_SetAppName(const gpg::StrArg appName)
+{
+  SetIdentityString(gAppIdentity.mProductName, appName);
+}
+
+/**
+ * Address: 0x008C86A0 (FUN_008C86A0, USER_SetAppExtensionPrefix)
+ * Mangled: ?USER_SetAppExtensionPrefix@Moho@@YAXVStrArg@gpg@@@Z
+ *
+ * What it does:
+ * Replaces the startup app-extension/prefs-prefix lane.
+ */
+void moho::USER_SetAppExtensionPrefix(const gpg::StrArg extensionPrefix)
+{
+  SetIdentityString(gAppIdentity.mPreferencePrefix, extensionPrefix);
+}
+
+/**
+ * Address: 0x008C86D0 (FUN_008C86D0, USER_SetGameId)
+ *
+ * What it does:
+ * Writes the fixed 4-word game-id tuple used by save/profile identity logic.
+ */
+void moho::USER_SetGameId()
+{
+  gAppIdentity.mGameIdParts[0] = kDefaultGameIdParts[0];
+  gAppIdentity.mGameIdParts[1] = kDefaultGameIdParts[1];
+  gAppIdentity.mGameIdParts[2] = kDefaultGameIdParts[2];
+  gAppIdentity.mGameIdParts[3] = kDefaultGameIdParts[3];
+}
+
+/**
+ * Address: 0x008C8760 (FUN_008C8760, USER_SetCurrentProfile)
+ * Mangled:
+ * ?USER_SetCurrentProfile@Moho@@YAXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+ *
+ * What it does:
+ * Selects one profile by name from `profile.profiles`, updates that profile's
+ * `NetName`, and sets `profile.current`; when the profile name is missing,
+ * imports `/lua/user/prefs.lua` and invokes `CreateProfile(profileName)`.
+ */
+void moho::USER_SetCurrentProfile(const msvc8::string& profileName)
+{
+  try {
+    IUserPrefs* const preferences = USER_GetPreferences();
+    if (preferences == nullptr) {
+      return;
+    }
+
+    LuaPlus::LuaObject rootPreferences = preferences->GetPreferenceTable();
+    LuaPlus::LuaObject profileTable = rootPreferences.Lookup(kProfileProfilesPath);
+
+    int selectedProfileIndex = -1;
+    if (profileTable.IsTable()) {
+      LuaPlus::LuaTableIterator iter(&profileTable, 1);
+      while (!iter.m_isDone) {
+        LuaPlus::LuaObject profileObject = iter.GetValue();
+        LuaPlus::LuaObject nameObject = profileObject[kProfileNameFieldName];
+        if (nameObject.IsString()) {
+          const char* const candidateName = nameObject.GetString();
+          if (profileName == (candidateName != nullptr ? candidateName : "")) {
+            selectedProfileIndex = iter.GetKey().GetInteger();
+            break;
+          }
+        }
+        iter.Next();
+      }
+    }
+
+    if (selectedProfileIndex == -1) {
+      LuaPlus::LuaState* const state = USER_GetLuaState();
+      LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
+      LuaPlus::LuaObject createProfileFnObject = prefsModule[kCreateProfileMethodName];
+      LuaPlus::LuaFunction<LuaPlus::LuaObject> createProfileFn(createProfileFnObject);
+      LuaPlus::LuaObject createdProfile = createProfileFn(profileName.c_str());
+      (void)createdProfile;
+      return;
+    }
+
+    LuaPlus::LuaObject selectedProfile = profileTable[selectedProfileIndex];
+    selectedProfile.SetString(kProfileNetNameFieldName, profileName.c_str());
+
+    LuaPlus::LuaObject profileRoot = rootPreferences[kProfileRootKey];
+    profileRoot.SetInteger(kProfileCurrentIndexKey, selectedProfileIndex);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kUserPrefsLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
+  }
+}
+
+/**
+ * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
+ * Mangled: ?USER_GetGameId@Moho@@YAABU_GUID@@XZ
+ *
+ * What it does:
+ * Returns the process-global 128-bit game-id lane initialized by startup
+ * identity setup.
+ */
+_GUID& moho::USER_GetGameId()
+{
+  APP_InitializeIdentity();
+  return *reinterpret_cast<_GUID*>(gAppIdentity.mGameIdParts);
+}
+
+/**
  * Address context:
  * - 0x008CE0A0 constructor path initializes these global identity lanes.
  *
@@ -2004,13 +2627,10 @@ bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* 
 void moho::APP_InitializeIdentity()
 {
   std::call_once(gAppIdentityInitOnce, [] {
-    SetIdentityString(gAppIdentity.mCompanyName, "Gas Powered Games");
-    SetIdentityString(gAppIdentity.mProductName, "Supreme Commander Forged Alliance");
-    SetIdentityString(gAppIdentity.mPreferencePrefix, "SCFA");
-    gAppIdentity.mGameIdParts[0] = 0xFA42B43A;
-    gAppIdentity.mGameIdParts[1] = 0x68BC5B02;
-    gAppIdentity.mGameIdParts[2] = 0x4F701F15;
-    gAppIdentity.mGameIdParts[3] = 0x7C3E8FB0;
+    USER_SetCompanyName("Gas Powered Games");
+    USER_SetAppName("Supreme Commander Forged Alliance");
+    USER_SetAppExtensionPrefix("SCFA");
+    USER_SetGameId();
   });
 }
 
@@ -2058,6 +2678,17 @@ std::uint8_t moho::APP_GetAqtimeInstrumentationMode()
 }
 
 /**
+ * Address: 0x008C6730 (FUN_008C6730, USER_LuaFrame)
+ *
+ * What it does:
+ * Runs one user-task stage frame through the process-global user stage lane.
+ */
+void moho::USER_LuaFrame()
+{
+  sUserStage->UserFrame();
+}
+
+/**
  * Address: 0x0041B560 (FUN_0041B560)
  * Mangled:
  * ?CFG_GetArgOption@Moho@@YA_NVStrArg@gpg@@IPAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z
@@ -2098,6 +2729,41 @@ bool moho::CFG_GetArgOption(
   }
 
   return false;
+}
+
+/**
+ * Address: 0x00500A90 (FUN_00500A90, Moho::P4_Info)
+ * Mangled: ?P4_Info@Moho@@YAXXZ
+ *
+ * What it does:
+ * Preserves one legacy Perforce info hook as a no-op.
+ */
+void moho::P4_Info()
+{
+}
+
+/**
+ * Address: 0x00500AA0 (FUN_00500AA0, Moho::P4_Edit)
+ * Mangled: ?P4_Edit@Moho@@YAXPBD@Z
+ *
+ * What it does:
+ * Preserves one legacy Perforce edit hook as a no-op.
+ */
+void moho::P4_Edit(const char* const filePath)
+{
+  (void)filePath;
+}
+
+/**
+ * Address: 0x00500AC0 (FUN_00500AC0, Moho::P4_DoPrompt)
+ *
+ * What it does:
+ * Returns whether startup should prompt for Perforce actions. Passing `/p4yes`
+ * on command line suppresses the prompt.
+ */
+bool moho::P4_DoPrompt()
+{
+  return !CFG_GetArgOption("/p4yes", 0u, nullptr);
 }
 
 /**
@@ -2620,12 +3286,7 @@ int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetMovieVolumeHelpText, 0, argumentCount);
   }
 
-  float volume = 1.0f;
-  if (gMovieManager != nullptr) {
-    volume = gMovieManager->GetVolumeForLua();
-  }
-
-  lua_pushnumber(rawState, volume);
+  lua_pushnumber(rawState, ResolveMovieVolumeForLuaOrUnityFallback());
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -3181,6 +3842,29 @@ namespace
     }
 
     return path;
+  }
+
+  /**
+   * Address: 0x008CD100 (FUN_008CD100)
+   *
+   * What it does:
+   * Rewrites every byte in `[begin, end)` that matches `*sourceByte` to
+   * `*replacementByte`, then returns the terminal cursor.
+   */
+  [[maybe_unused]] std::uint8_t* ReplaceByteValueAcrossRange(
+    const std::uint8_t* const sourceByte,
+    const std::uint8_t* const replacementByte,
+    std::uint8_t* const begin,
+    std::uint8_t* const end
+  )
+  {
+    for (std::uint8_t* cursor = begin; cursor != end; ++cursor) {
+      if (*cursor == *sourceByte) {
+        *cursor = *replacementByte;
+      }
+    }
+
+    return end;
   }
 
   /**
@@ -3762,6 +4446,30 @@ namespace
     cursor.mOffset = tokenStart;
     cursor.mToken = path.substr(tokenStart, pathIndex - tokenStart);
     return cursor;
+  }
+
+  /**
+   * Address: 0x004604A0 (FUN_004604A0)
+   *
+   * What it does:
+   * Tail-thunk adapter that forwards one reverse path-component advance lane
+   * into `FUN_004610D0`.
+   */
+  [[maybe_unused]] [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursorThunkA(PathComponentCursor& cursor)
+  {
+    return AdvanceReversePathComponentCursor(cursor);
+  }
+
+  /**
+   * Address: 0x00460610 (FUN_00460610)
+   *
+   * What it does:
+   * Secondary tail-thunk adapter that forwards one reverse path-component
+   * advance lane into `FUN_004610D0`.
+   */
+  [[maybe_unused]] [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursorThunkB(PathComponentCursor& cursor)
+  {
+    return AdvanceReversePathComponentCursor(cursor);
   }
 
   /**
@@ -5332,6 +6040,21 @@ void moho::CMovieManager::ReleaseDirectSoundObjects()
 }
 
 /**
+ * Address: 0x00874B90 (FUN_00874B90)
+ *
+ * What it does:
+ * Shuts down Sofdec runtime lanes and releases owned DirectSound resources
+ * without deleting this movie-manager instance.
+ */
+void moho::CMovieManager::ShutdownMovieRuntimeNoDelete()
+{
+  ::mwPlyFinishSfdFx();
+  ::ADXM_Finish();
+  ReleaseDirectSoundObjects();
+}
+
+/**
+ * Address: 0x00874F20 (FUN_00874F20, sub_874F20)
  * Address context:
  * - `0x00875020` (`cfunc_SetMovieVolumeL`) applies this transform when
  *   script code sets movie volume.
@@ -5349,8 +6072,7 @@ void moho::CMovieManager::SetVolumeFromLua(const float requestedVolume)
     clampedVolume = kLuaMovieVolumeMax;
   }
 
-  mVolume =
-    static_cast<float>(static_cast<std::int32_t>(kLuaMovieVolumeDbFloor - (clampedVolume * kLuaMovieVolumeDbFloor)));
+  (void)ApplyMovieVolumeLinearDbScale(this, clampedVolume);
 }
 
 /**
@@ -5370,10 +6092,98 @@ float moho::CMovieManager::GetVolumeForLua() const
  */
 void moho::CMovieManager::Destroy()
 {
-  ::mwPlyFinishSfdFx();
-  ::ADXM_Finish();
-  ReleaseDirectSoundObjects();
+  ShutdownMovieRuntimeNoDelete();
   delete this;
+}
+
+/**
+ * Address: 0x008C89D0 (FUN_008C89D0, USER_LoadPreferences)
+ * Mangled: ?USER_LoadPreferences@Moho@@YAXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+ *
+ * What it does:
+ * Creates one fresh user-preferences runtime, resolves and ensures the
+ * `%APPDATA%\\<Company>\\<App>` preference directory, attempts to load the
+ * requested preference file with version validation, and falls back to
+ * `../Installed.Prefs` defaults when primary loading fails.
+ */
+void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
+{
+  auto* const loadedPreferences = new CUserPrefsRuntime{};
+  bool loadedPrimaryPreferences = false;
+
+  wchar_t appDataPath[MAX_PATH]{};
+  if (::SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, appDataPath) < 0) {
+    gpg::Warnf("unable to find user's application data directory");
+  } else {
+    std::wstring preferenceDirectory = appDataPath;
+    preferenceDirectory.push_back(L'\\');
+    preferenceDirectory.append(gpg::STR_Utf8ToWide(APP_GetCompanyName().c_str()));
+
+    if (::CreateDirectoryW(preferenceDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
+      gpg::Warnf("Unable to create preferences path: %s", preferenceFileName.c_str());
+    }
+
+    preferenceDirectory.push_back(L'\\');
+    preferenceDirectory.append(gpg::STR_Utf8ToWide(APP_GetProductName().c_str()));
+
+    if (::CreateDirectoryW(preferenceDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
+      gpg::Warnf("Unable to create preferences path: %s", preferenceFileName.c_str());
+    }
+
+    PLAT_InitErrorReportOutputDir(preferenceDirectory.c_str());
+
+    std::wstring preferencePathWide = preferenceDirectory;
+    preferencePathWide.push_back(L'\\');
+    preferencePathWide.append(gpg::STR_Utf8ToWide(preferenceFileName.c_str()));
+
+    loadedPreferences->GetStr1()->assign(preferenceFileName, 0, msvc8::string::npos);
+
+    const msvc8::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
+    loadedPreferences->GetStr2()->assign(preferencePathUtf8, 0, msvc8::string::npos);
+
+    PLAT_RegisterFileForErrorReport(preferencePathWide.c_str());
+
+    if (::PathFileExistsW(preferencePathWide.c_str()) != FALSE) {
+      LuaPlus::LuaObject* const preferenceRoot = loadedPreferences->GetPreferenceTableMutable();
+      const bool loadedFromFile =
+        SCR_LuaDoFile(loadedPreferences->GetStateMutable(), loadedPreferences->GetStr2()->c_str(), preferenceRoot);
+
+      if (loadedFromFile) {
+        const msvc8::string versionKey("version.major");
+        loadedPrimaryPreferences = (loadedPreferences->GetInteger(versionKey, 0) == 1);
+      }
+
+      if (!loadedPrimaryPreferences) {
+        loadedPreferences->ResetPreferenceTable();
+
+        const std::wstring badPreferencePath = preferencePathWide + L".bad";
+        gpg::Warnf(
+          "Unable to load your preferences (corrupt or out-of-date file.)  Current file will be renamed: [%S]",
+          badPreferencePath.c_str()
+        );
+        CopyOrReplacePreferenceFile(preferencePathWide.c_str(), badPreferencePath.c_str());
+      }
+    }
+  }
+
+  if (!loadedPrimaryPreferences) {
+    const std::filesystem::path installedPrefsPath = (DISK_GetLaunchDir() / ".." / "Installed.Prefs").lexically_normal();
+    const std::string installedPrefsText = installedPrefsPath.string();
+
+    LuaPlus::LuaObject* const preferenceRoot = loadedPreferences->GetPreferenceTableMutable();
+    if (!SCR_LuaDoFile(loadedPreferences->GetStateMutable(), installedPrefsText.c_str(), preferenceRoot)) {
+      gpg::Warnf("unable to load Installed.Prefs; using empty initial prefs");
+      loadedPreferences->ResetPreferenceTable();
+    }
+  }
+
+  const msvc8::string versionKey("version.major");
+  loadedPreferences->SetInteger(versionKey, 1);
+
+  if (loadedPreferences != gPreferences && gPreferences != nullptr) {
+    delete gPreferences;
+  }
+  gPreferences = loadedPreferences;
 }
 
 /**
@@ -5393,6 +6203,60 @@ moho::IUserPrefs* moho::USER_GetPreferences()
   gpg::Warnf("preferences not loaded prior to first use, creating defaults");
   gPreferences = new CUserPrefsRuntime{};
   return gPreferences;
+}
+
+/**
+ * Address: 0x008CB470 (FUN_008CB470, user-preferences singleton getter lane)
+ *
+ * What it does:
+ * Returns the process-global user-preferences singleton pointer without
+ * forcing lazy creation.
+ */
+namespace
+{
+  [[maybe_unused]] [[nodiscard]] moho::IUserPrefs* USER_GetPreferencesSingletonRaw() noexcept
+  {
+    return gPreferences;
+  }
+}
+
+/**
+ * Address: 0x008C91A0 (FUN_008C91A0, USER_SavePreferences)
+ *
+ * What it does:
+ * Serializes the current preferences table into `<prefs>.new`, closes the
+ * stream, and atomically replaces the persisted preferences file.
+ */
+void moho::USER_SavePreferences()
+{
+  IUserPrefs* const preferences = gPreferences;
+  if (preferences == nullptr) {
+    gpg::Warnf("preferences not loaded prior to first save, nothing persisted");
+    return;
+  }
+
+  const msvc8::string* const preferencesPathUtf8 = preferences->GetStr2();
+  const char* const preferencesPathText = preferencesPathUtf8 != nullptr ? preferencesPathUtf8->c_str() : "";
+  const std::wstring preferencesPathWide = gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
+  const std::wstring temporaryPathWide = preferencesPathWide + L".new";
+
+  std::ofstream outputStream(temporaryPathWide.c_str());
+  if (!outputStream.is_open()) {
+    const std::wstring warningWide = std::wstring(L"Unable to open preference file: ") + temporaryPathWide;
+    const msvc8::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());
+    gpg::Warnf(warningUtf8.c_str());
+    return;
+  }
+
+  SerializePreferenceRootTable(outputStream, preferences->GetPreferenceTable());
+
+  if (std::filebuf* const fileBuffer = outputStream.rdbuf(); fileBuffer != nullptr) {
+    if (fileBuffer->close() == nullptr) {
+      outputStream.setstate(std::ios::failbit);
+    }
+  }
+
+  CopyOrReplacePreferenceFile(temporaryPathWide.c_str(), preferencesPathWide.c_str());
 }
 
 /**
@@ -5841,6 +6705,20 @@ void moho::SetupAntiAliasingSettings()
 }
 
 /**
+ * Address: 0x008D3FF0 (FUN_008D3FF0, sub_8D3FF0)
+ *
+ * What it does:
+ * Emits one executable build timestamp line to the in-game console.
+ */
+namespace moho
+{
+  [[maybe_unused]] void PrintExecutableTimestampToConsole()
+  {
+    CON_Printf("Exe timestamp : %s", "Mon Jun 22 14:06:14 2009");
+  }
+}
+
+/**
  * Address: 0x00874C20 (FUN_00874C20)
  *
  * What it does:
@@ -5848,12 +6726,81 @@ void moho::SetupAntiAliasingSettings()
  */
 void moho::SetupBasicMovieManager()
 {
-  CMovieManager* const manager = new CMovieManager{};
+  (void)ReplaceMovieManagerSingleton(new CMovieManager{});
+}
+
+/**
+ * Address: 0x00874CA0 (FUN_00874CA0, sub_874CA0)
+ *
+ * What it does:
+ * Destroys the current movie-manager singleton when present and clears the
+ * global owner lane.
+ */
+moho::CMovieManager* moho::DestroyMovieManagerSingleton()
+{
+  CMovieManager* const current = gMovieManager;
+  if (current != nullptr) {
+    current->Destroy();
+  }
+
+  (void)ResetMovieManagerSingletonStorageLane();
+  return current;
+}
+
+/**
+ * Address: 0x00875250 (FUN_00875250, sub_875250)
+ *
+ * What it does:
+ * Replaces the global movie-manager singleton, destroying any existing
+ * different instance before rebinding.
+ */
+moho::CMovieManager* moho::ReplaceMovieManagerSingleton(CMovieManager* const manager)
+{
   if (manager != gMovieManager && gMovieManager != nullptr) {
     gMovieManager->Destroy();
   }
 
   gMovieManager = manager;
+  return gMovieManager;
+}
+
+/**
+ * Address: 0x00875230 (FUN_00875230, movie-manager singleton getter lane)
+ *
+ * What it does:
+ * Returns the process-global movie-manager singleton pointer without creating
+ * or replacing it.
+ */
+namespace
+{
+  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRaw() noexcept
+  {
+    return gMovieManager;
+  }
+
+  /**
+   * Address: 0x00875240 (FUN_00875240, movie-manager singleton getter lane)
+   *
+   * What it does:
+   * Alias entry that returns the same process-global movie-manager singleton
+   * pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRawAliasA() noexcept
+  {
+    return MOV_GetMovieManagerSingletonRaw();
+  }
+
+  /**
+   * Address: 0x008752E0 (FUN_008752E0, movie-manager singleton getter lane)
+   *
+   * What it does:
+   * Alias entry that returns the same process-global movie-manager singleton
+   * pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRawAliasB() noexcept
+  {
+    return MOV_GetMovieManagerSingletonRaw();
+  }
 }
 
 /**

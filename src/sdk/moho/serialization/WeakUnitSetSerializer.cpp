@@ -38,6 +38,12 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x006D2EA0 (FUN_006D2EA0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `WeakEntitySetTemplate<Unit>` lane.
+   */
   [[nodiscard]] gpg::RType* ResolveWeakUnitSetType()
   {
     gpg::RType* type = moho::WeakEntitySetTemplate<moho::Unit>::sType;
@@ -154,7 +160,6 @@ namespace moho
   {
     (void)construct_WeakUnitSetSerializerVariant1();
     (void)construct_WeakUnitSetSerializerVariant2();
-    gWeakUnitSetSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_WeakUnitSetSerializer_00BFE4E0_atexit);
   }
 } // namespace moho

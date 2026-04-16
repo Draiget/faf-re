@@ -48,6 +48,82 @@ namespace
     Wm3::MultiplyQuaternionVector(&out, orbitOffset, labelPitch);
     return out;
   }
+
+  /**
+   * Address: 0x00653790 (FUN_00653790)
+   *
+   * What it does:
+   * Copies one `SDebugWorldText` payload into uninitialized destination
+   * storage: clones world-position floats, reinitializes the legacy string lane
+   * to empty SSO state before assigning full source text, and copies style/depth.
+   */
+  [[maybe_unused]] moho::SDebugWorldText* CopyConstructDebugWorldTextCore(
+    const moho::SDebugWorldText* const source,
+    moho::SDebugWorldText* const destination
+  ) noexcept
+  {
+    if (source == nullptr || destination == nullptr) {
+      return destination;
+    }
+
+    destination->position.x = source->position.x;
+    destination->position.y = source->position.y;
+    destination->position.z = source->position.z;
+    destination->text.reset_and_assign(source->text);
+    destination->style = source->style;
+    destination->depth = source->depth;
+    return destination;
+  }
+
+  /**
+   * Address: 0x00652C70 (FUN_00652C70)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `RDebugWeapons`.
+   */
+  [[nodiscard]] gpg::RType* ResolveRDebugWeaponsTypeCachePrimary()
+  {
+    gpg::RType* type = moho::RDebugWeapons::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::RDebugWeapons));
+      moho::RDebugWeapons::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00653260 (FUN_00653260)
+   *
+   * What it does:
+   * Secondary duplicate lane that resolves/caches `RDebugWeapons`
+   * reflection type.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveRDebugWeaponsTypeCacheSecondary()
+  {
+    gpg::RType* type = moho::RDebugWeapons::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::RDebugWeapons));
+      moho::RDebugWeapons::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00653820 (FUN_00653820, Moho::RDebugWeapons non-deleting dtor body)
+   *
+   * What it does:
+   * Runs the typed debug-overlay intrusive unlink lane for one
+   * `RDebugWeapons` instance and restores singleton link state.
+   */
+  [[maybe_unused]] void DestroyRDebugWeaponsNonDeletingBody(moho::RDebugWeapons* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
+    node->ListUnlinkSelf();
+  }
 } // namespace
 
 namespace moho
@@ -55,11 +131,20 @@ namespace moho
   gpg::RType* RDebugWeapons::sType = nullptr;
 
   /**
+   * Address: 0x006537D0 (FUN_006537D0)
+   *
+   * What it does:
+   * Initializes the weapons-overlay vtable lane and inherited intrusive
+   * debug-overlay links.
+   */
+  RDebugWeapons::RDebugWeapons() = default;
+
+  /**
    * Address: 0x00652C90 (FUN_00652C90, ?GetClass@RDebugWeapons@Moho@@UBEPAVRType@gpg@@XZ)
    */
   gpg::RType* RDebugWeapons::GetClass() const
   {
-    return debug_reflection::ResolveObjectType<RDebugWeapons>(sType);
+    return ResolveRDebugWeaponsTypeCachePrimary();
   }
 
   /**

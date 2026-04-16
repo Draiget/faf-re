@@ -11,6 +11,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00795A10 (FUN_00795A10, Moho::EMauiEventTypeTypeInfo::ctor)
+     *
+     * What it does:
+     * Preregisters the reflected `EMauiEventType` enum metadata.
+     */
+    EMauiEventTypeTypeInfo();
+
+    /**
      * Address: 0x00795AA0 (FUN_00795AA0, Moho::EMauiEventTypeTypeInfo::dtr)
      *
      * What it does:

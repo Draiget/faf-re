@@ -82,9 +82,19 @@ namespace detours {
             void* target,
             Func callback)
         {
+            auto ptr = create_at_disabled(std::move(name), target, callback);
+            if (!ptr) return nullptr;
+            ptr->enable();
+            return ptr;
+        }
+
+        /** Create detour at fixed address but keep it disabled until enable() is called. */
+        static std::unique_ptr<Detour> create_at_disabled(std::string name,
+            void* target,
+            Func callback)
+        {
             auto ptr = std::unique_ptr<Detour>(new Detour(std::move(name), "", "", reinterpret_cast<void*>(callback)));
             if (!ptr->init_common(target)) return nullptr;
-            ptr->enable();
             return ptr;
         }
 

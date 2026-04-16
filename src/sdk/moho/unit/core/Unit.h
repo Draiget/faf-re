@@ -29,6 +29,7 @@ namespace moho
 {
   enum EUnitState : std::int32_t;
   struct CEconRequest;
+  struct SEconValue;
   class CIntel;
   struct RUnitBlueprint;
   class ReconBlip;
@@ -49,6 +50,7 @@ namespace moho
   class CFormationInstance;
   class IFormationInstance;
   class Unit;
+  struct SEntitySetTemplateUnit;
   class IAiBuilder;
   class IAiNavigator;
   class IAiSteering;
@@ -441,11 +443,28 @@ namespace moho
     "UnitWeaponInfo::mUIMaxRangeVisualId offset must be 0x7C"
   );
 
+  /**
+   * Address: 0x0055C020 (FUN_0055C020, preregister_UnitWeaponInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `UnitWeaponInfo`.
+   */
+  [[nodiscard]] gpg::RType* preregister_UnitWeaponInfoTypeInfo();
+
   using SSTIUnitWeaponInfoSnapshot = UnitWeaponInfo;
   static_assert(sizeof(SSTIUnitWeaponInfoSnapshot) == 0x98, "SSTIUnitWeaponInfoSnapshot size must be 0x98");
 
   using SSTIUnitWeaponInfoVector = gpg::fastvector_n<SSTIUnitWeaponInfoSnapshot, 1>;
   static_assert(sizeof(SSTIUnitWeaponInfoVector) == 0xA8, "SSTIUnitWeaponInfoVector size must be 0xA8");
+
+  /**
+   * Address: 0x005C3850 (FUN_005C3850, init_SSTIUnitWeaponInfoVector_inline)
+   *
+   * What it does:
+   * Rebinds one weapon-info fastvector to inline storage and applies the
+   * zero-count resize lane used by `SSTIUnitVariableData` construction.
+   */
+  SSTIUnitWeaponInfoVector* InitializeSSTIUnitWeaponInfoVector(SSTIUnitWeaponInfoVector* weaponInfo);
 
   /**
    * Reflection type in RTTI: Moho::SSTIUnitVariableData
@@ -539,6 +558,15 @@ namespace moho
   static_assert(
     offsetof(SSTIUnitVariableData, mOverchargePaused) == 0x221, "SSTIUnitVariableData::mOverchargePaused offset"
   );
+
+  /**
+   * Address: 0x0055C620 (FUN_0055C620, preregister_SSTIUnitVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIUnitVariableData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIUnitVariableDataTypeInfo();
+
   static_assert(sizeof(gpg::core::FastVectorN<SWeakRefSlot, 20>) == 0xB0, "FastVectorN<SWeakRefSlot,20> must be 0xB0");
   static_assert(sizeof(gpg::core::FastVectorN<ReconBlip*, 2>) == 0x18, "FastVectorN<ReconBlip*,2> must be 0x18");
 
@@ -749,6 +777,24 @@ namespace moho
     void AdjustHealth(Entity* instigator, float delta) override;
 
     /**
+     * Address: 0x006A8090 (FUN_006A8090, ?Kill@Unit@Moho@@UAEXPAVEntity@2@VStrArg@gpg@@M@Z)
+     *
+     * What it does:
+     * Applies unit death gating and teardown, notifies adjacency/transport and
+     * script lanes, then updates army/platoon kill-value statistics.
+     */
+    void Kill(Entity* instigator, gpg::StrArg reason, float excessDamageRatio) override;
+
+    /**
+     * Address: 0x006A88D0 (FUN_006A88D0, ?OnDestroy@Unit@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Dispatches unit destruction-side adjacency/transport cleanup and then
+     * forwards to the base entity destroy-dispatch path.
+     */
+    void OnDestroy() override;
+
+    /**
      * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
      *
      * What it does:
@@ -765,6 +811,16 @@ namespace moho
      * enabled only for the focused army or when no army is focused.
      */
     void UpdateVisibility() override;
+
+    /**
+     * Address: 0x006AB520 (FUN_006AB520, Moho::Unit::UpdateCollision)
+     *
+     * What it does:
+     * Updates base collision transform, expands box-shape X/Z extents to
+     * include blueprint skirt lanes, then forwards relink/bounds refresh to
+     * the base entity collision path.
+     */
+    void UpdateCollision() override;
 
     /**
      * Address: 0x006AB410 (FUN_006AB410, ?AttachTo@Unit@Moho@@UAE_NABUSEntAttachInfo@2@@Z)
@@ -821,6 +877,25 @@ namespace moho
      * damage when a matching lane exists.
      */
     [[nodiscard]] float ProcessArmorOnDamage(float amount, msvc8::string damageType) const;
+
+    /**
+     * Address: 0x0062D460 (FUN_0062D460, Moho::Unit::CollectAllOverlapping)
+     *
+     * What it does:
+     * Gathers nearby non-mobile same-army same-layer structures and appends
+     * those whose skirt rectangles overlap `unit`.
+     */
+    static SEntitySetTemplateUnit* CollectAllOverlapping(SEntitySetTemplateUnit* outSet, Unit* unit);
+
+    /**
+     * Address: 0x006A7E00 (FUN_006A7E00, ?LookForStructureRebuilder@Unit@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Scans same-army REBUILDER units for guard commands matching this
+     * structure blueprint/position and queues one rebuild entry on the first
+     * matching builder.
+     */
+    void LookForStructureRebuilder();
 
     /**
      * Address: 0x006A7DC0
@@ -1013,6 +1088,46 @@ namespace moho
     std::int32_t DecrementCapturers();
 
     /**
+     * Address: 0x00603F30 (FUN_00603F30)
+     *
+     * What it does:
+     * Returns the current non-negative captor reference count lane.
+     */
+    [[nodiscard]] std::int32_t GetCapturerCount() const noexcept;
+
+    /**
+     * Address: 0x005F24C0 (FUN_005F24C0)
+     *
+     * What it does:
+     * Returns whether this unit belongs to the MELEE category lane.
+     */
+    [[nodiscard]] bool IsMeleeUnit() const noexcept;
+
+    /**
+     * Address: 0x005F5570 (FUN_005F5570)
+     *
+     * What it does:
+     * Returns the current retaliation fire-state lane.
+     */
+    [[nodiscard]] std::int32_t GetFireStateValue() const noexcept;
+
+    /**
+     * Address: 0x005F5560 (FUN_005F5560)
+     *
+     * What it does:
+     * Stores one upgraded-unit entity id lane and returns that id.
+     */
+    [[nodiscard]] EntId SetUpgradedToEntityId(EntId upgradedToEntityId) noexcept;
+
+    /**
+     * Address: 0x005F5590 (FUN_005F5590)
+     *
+     * What it does:
+     * Returns the current silo-build implementation lane pointer.
+     */
+    [[nodiscard]] CAiSiloBuildImpl* GetSiloBuildImpl() const noexcept;
+
+    /**
      * Address: 0x006A7640 (FUN_006A7640, Moho::Unit::SetFocusEntity)
      * Mangled: ?SetFocusEntity@Unit@Moho@@QAEXPAVEntity@2@@Z
      *
@@ -1081,6 +1196,36 @@ namespace moho
     [[nodiscard]] bool IsAtPosition(const Wm3::Vec3f& position) const;
 
     /**
+     * Address: 0x006AAEC0 (FUN_006AAEC0, ?AddRecoilImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     * Mangled: ?AddRecoilImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Forwards one recoil impulse to active unit motion when present.
+     */
+    void AddRecoilImpulse(const Wm3::Vec3f& impulse);
+
+    /**
+     * Address: 0x006AAEE0 (FUN_006AAEE0, ?AddImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     * Mangled: ?AddImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Forwards one world impulse into active unit motion as
+     * `CUnitMotion::AddImpulse(impulse, false)` when motion exists.
+     */
+    void AddImpulse(const Wm3::Vec3f& impulse);
+
+    /**
+     * Address: 0x006AAF00 (FUN_006AAF00, ?AddLocalImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z)
+     * Mangled: ?AddLocalImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z
+     *
+     * What it does:
+     * Applies one local-space impulse into the active motion lane: air units
+     * forward to physics-body local impulse, non-air units route through
+     * `CUnitMotion::AddImpulse(..., false)`.
+     */
+    void AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint);
+
+    /**
      * Address: 0x006AA900 (FUN_006AA900, ?SetConsumptionActive@Unit@Moho@@QAEX_N@Z)
      *
      * What it does:
@@ -1088,6 +1233,105 @@ namespace moho
      * consumption and dispatches matching Lua script callbacks.
      */
     void SetConsumptionActive(bool isActive);
+
+    /**
+     * Address: 0x006C3A10 (FUN_006C3A10)
+     *
+     * What it does:
+     * Writes one stunned-state tick lane.
+     */
+    void SetStunnedStateRaw(std::int32_t stunnedState) noexcept;
+
+    /**
+     * Address: 0x006C3A20 (FUN_006C3A20)
+     *
+     * What it does:
+     * Stores one overcharge-paused boolean lane.
+     */
+    void SetOverchargePausedFlag(bool paused) noexcept;
+
+    /**
+     * Address: 0x006C3A30 (FUN_006C3A30)
+     *
+     * What it does:
+     * Returns the overcharge-paused boolean lane.
+     */
+    [[nodiscard]] bool IsOverchargePausedFlag() const noexcept;
+
+    /**
+     * Address: 0x006C3A40 (FUN_006C3A40)
+     *
+     * What it does:
+     * Returns the consumption-active boolean lane.
+     */
+    [[nodiscard]] bool IsConsumptionActiveFlag() const noexcept;
+
+    /**
+     * Address: 0x006C3A50 (FUN_006C3A50)
+     *
+     * What it does:
+     * Returns the valid-target boolean lane.
+     */
+    [[nodiscard]] bool IsValidTargetFlag() const noexcept;
+
+    /**
+     * Address: 0x006C3A60 (FUN_006C3A60)
+     *
+     * What it does:
+     * Stores one valid-target boolean lane.
+     */
+    void SetIsValidTargetFlag(bool validTarget) noexcept;
+
+    /**
+     * Address: 0x006C3A70 (FUN_006C3A70)
+     *
+     * What it does:
+     * Returns the shield-ratio float lane.
+     */
+    [[nodiscard]] float GetShieldRatioRaw() const noexcept;
+
+    /**
+     * Address: 0x006C3A80 (FUN_006C3A80)
+     *
+     * What it does:
+     * Stores one shield-ratio float lane.
+     */
+    void SetShieldRatioRaw(float shieldRatio) noexcept;
+
+    /**
+     * Address: 0x006AAA90 (FUN_006AAA90, ?SetProductionActive@Unit@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Writes one production-active flag lane and dispatches matching
+     * `OnProductionActive` / `OnProductionInActive` script callbacks.
+     */
+    void SetProductionActive(bool isActive);
+
+    /**
+     * Address: 0x006AAE20 (FUN_006AAE20, Moho::Unit::GetConsumptionRequest)
+     *
+     * What it does:
+     * Returns the currently requested upkeep economy pair from
+     * `mConsumptionData`.
+     */
+    [[nodiscard]] SEconValue GetConsumptionRequest() const;
+
+    /**
+     * Address: 0x006AAE40 (FUN_006AAE40, Moho::Unit::UpdateResourceProduction)
+     *
+     * What it does:
+     * Stores the current per-tick maintenance production pair in the shared
+     * economy-rate lane.
+     */
+    void UpdateResourceProduction(const SEconValue& resourceProduction);
+
+    /**
+     * Address: 0x006ABC70 (FUN_006ABC70, ?ResetEconValues@Unit@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Clears the unit's produced and resources-spent economy totals.
+     */
+    Unit* ResetEconValues();
 
     /**
      * Address: 0x006A9370 (FUN_006A9370, ?RenderAIDebugInfo@Unit@Moho@@AAEXXZ)
@@ -1245,6 +1489,16 @@ namespace moho
     void SetGuardedUnit(Unit* guarded);
 
     /**
+     * Address: 0x006AA720 (FUN_006AA720, ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z)
+     * Mangled: ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z
+     *
+     * What it does:
+     * Adds one guarding unit into this unit's guarded-by owner list when non-null,
+     * then clears stale guard-formation ownership.
+     */
+    void RemoveGuardedByUnit(Unit* guardedByUnit);
+
+    /**
      * Address: 0x00585B10 (FUN_00585B10, Moho::Unit::GetFocusEntity)
      *
      * What it does:
@@ -1271,6 +1525,15 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetTransportedBy() const;
+
+    /**
+     * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
+     *
+     * What it does:
+     * Rebinds `AssignedTransportRef` to one transport unit weak-reference
+     * owner lane.
+     */
+    void SetAssignedTransport(Unit* assignedTransport);
 
     /**
      * Address: 0x006A8890 (FUN_006A8890, Moho::Unit::GetTransportFerryBeacon)
@@ -1358,6 +1621,16 @@ namespace moho
      * the O-grid occupation bit-array region as occupied.
      */
     void ReserveOgridRect(const gpg::Rect2i& ogridRect);
+
+    /**
+     * Address: 0x0062B780 (FUN_0062B780, Moho::Unit::PrepareMove)
+     *
+     * What it does:
+     * Coerces one world-space move destination into the nearest valid move
+     * cell for this unit, honoring occupancy/pathability and skirt exclusion.
+     */
+    [[nodiscard]]
+    bool PrepareMove(int moveFlags, Wm3::Vector3f* inOutPos, gpg::Rect2f* skirtRect, bool useWholeMap);
 
     /**
      * Address: 0x0062BEE0 (FUN_0062BEE0, Moho::Unit::HasMeleeSpaceAroundSmallTarget)

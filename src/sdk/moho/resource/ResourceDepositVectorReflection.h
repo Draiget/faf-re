@@ -67,6 +67,13 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Address: 0x00548C70 (FUN_00548C70, preregister_VectorResourceDepositType)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `msvc8::vector<moho::ResourceDeposit>`.
+   */
   [[nodiscard]] gpg::RType* preregister_VectorResourceDepositType();
   int register_VectorResourceDepositTypeAtexit();
 } // namespace moho

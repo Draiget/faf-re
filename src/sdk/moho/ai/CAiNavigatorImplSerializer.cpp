@@ -78,6 +78,46 @@ namespace
     return UnlinkSerializerNode(*AcquireCAiNavigatorImplSerializer());
   }
 
+  /**
+   * Address: 0x005A3A30 (FUN_005A3A30)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAiNavigatorImplSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiNavigatorImplSerializer* InitializeCAiNavigatorImplSerializerStartupThunk()
+  {
+    CAiNavigatorImplSerializer* const serializer = AcquireCAiNavigatorImplSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mLoadCallback = &CAiNavigatorImplSerializer::Deserialize;
+    serializer->mSaveCallback = &CAiNavigatorImplSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x005A3A60 (FUN_005A3A60)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * CAiNavigatorImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorImplSerializerStartupThunkA()
+  {
+    return cleanup_CAiNavigatorImplSerializer();
+  }
+
+  /**
+   * Address: 0x005A3A90 (FUN_005A3A90)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * CAiNavigatorImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorImplSerializerStartupThunkB()
+  {
+    return cleanup_CAiNavigatorImplSerializer();
+  }
+
   void cleanup_CAiNavigatorImplSerializer_atexit()
   {
     (void)cleanup_CAiNavigatorImplSerializer();
@@ -147,7 +187,6 @@ void moho::register_CAiNavigatorImplSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiNavigatorImplSerializer::Deserialize;
   serializer->mSaveCallback = &CAiNavigatorImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiNavigatorImplSerializer_atexit);
 }
 

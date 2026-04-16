@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <new>
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -28,6 +29,25 @@ namespace
     for (boost::shared_ptr<moho::CMauiFrame>* it = begin; it != end; ++it) {
       it->reset();
     }
+  }
+
+  /**
+   * Address: 0x00796F30 (FUN_00796F30, boost::shared_ptr<Moho::CMauiFrame>::shared_ptr(CMauiFrame*))
+   *
+   * What it does:
+   * Constructs one `boost::shared_ptr<CMauiFrame>` from one raw frame pointer
+   * in caller-provided storage.
+   */
+  [[maybe_unused]] boost::shared_ptr<moho::CMauiFrame>* ConstructSharedFrameFromRaw(
+    boost::shared_ptr<moho::CMauiFrame>* const outSharedFrame,
+    moho::CMauiFrame* const rawFrame
+  )
+  {
+    if (outSharedFrame == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (outSharedFrame) boost::shared_ptr<moho::CMauiFrame>(rawFrame);
   }
 
   [[nodiscard]] bool IsValidFrameIndex(const moho::CUIManager& manager, const int frameIdx)

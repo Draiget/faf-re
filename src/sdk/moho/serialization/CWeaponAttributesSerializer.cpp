@@ -9,7 +9,9 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/entity/EntityCategorySetVectorReflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/serialization/SBlackListInfoVectorReflection.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 
 #pragma init_seg(lib)
@@ -44,6 +46,241 @@ namespace
     return cached;
   }
 
+  template <typename TObject>
+  [[nodiscard]] gpg::RType* ResolveCachedArchiveType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(TObject));
+    }
+    return cached;
+  }
+
+  gpg::RType* gLegacyEntityCategorySetVectorType = nullptr;
+  gpg::RType* gLegacySBlackListInfoVectorType = nullptr;
+
+  /**
+   * Address: 0x006E03B0 (FUN_006E03B0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `vector<EntityCategorySet>` lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityCategorySetVectorType()
+  {
+    gpg::RType* type = gLegacyEntityCategorySetVectorType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(msvc8::vector<moho::EntityCategorySet>));
+      gLegacyEntityCategorySetVectorType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x006E03D0 (FUN_006E03D0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for one `vector<SBlackListInfo>` lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacySBlackListInfoVectorType()
+  {
+    gpg::RType* type = gLegacySBlackListInfoVectorType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(msvc8::vector<moho::SBlackListInfo>));
+      gLegacySBlackListInfoVectorType = type;
+    }
+    return type;
+  }
+
+  template <typename TObject>
+  void ReadObjectByCachedType(gpg::ReadArchive* const archive, void* const objectPtr, gpg::RRef* const ownerRef)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    if (gpg::RType* const type = ResolveCachedArchiveType<TObject>()) {
+      archive->Read(type, objectPtr, owner);
+    }
+  }
+
+  template <typename TObject>
+  void WriteObjectByCachedType(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    if (gpg::RType* const type = ResolveCachedArchiveType<TObject>()) {
+      archive->Write(type, objectPtr, owner);
+    }
+  }
+
+  /**
+   * Address: 0x006DFE20 (FUN_006DFE20)
+   *
+   * What it does:
+   * Loads one reflected `vector<SBlackListInfo>` payload using the cached RTTI
+   * descriptor and returns the archive pointer for chaining.
+   */
+  gpg::ReadArchive* ReadCachedSBlackListInfoVectorAndReturnArchive(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
+  {
+    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006DFE90 (FUN_006DFE90)
+   *
+   * What it does:
+   * Saves one reflected `CWeaponAttributes` payload using the cached RTTI
+   * descriptor and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteCachedCWeaponAttributesAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    WriteObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006DFF00 (FUN_006DFF00)
+   *
+   * What it does:
+   * Saves one reflected `vector<EntityCategorySet>` payload using cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteCachedEntityCategorySetVectorAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006DFF40 (FUN_006DFF40)
+   *
+   * What it does:
+   * Saves one reflected `vector<SBlackListInfo>` payload using cached RTTI
+   * lookup and returns the archive pointer for chaining.
+   */
+  gpg::WriteArchive* WriteCachedSBlackListInfoVectorAndReturnArchive(
+    gpg::WriteArchive* const archive,
+    void* const objectPtr,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x006E0240 (FUN_006E0240)
+   *
+   * What it does:
+   * Read-callback bridge that loads one reflected `CWeaponAttributes` payload
+   * through cached RTTI lookup.
+   */
+  void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
+  {
+    ReadObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
+  }
+
+  /**
+   * Address: 0x006E0270 (FUN_006E0270)
+   *
+   * What it does:
+   * Write-callback bridge that saves one reflected `CWeaponAttributes` payload
+   * through cached RTTI lookup.
+   */
+  void WriteCachedCWeaponAttributesCallback(
+    gpg::WriteArchive* archive,
+    void* objectPtr,
+    const gpg::RRef* ownerRef
+  )
+  {
+    WriteObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
+  }
+
+  /**
+   * Address: 0x006E02F0 (FUN_006E02F0)
+   *
+   * What it does:
+   * Read-callback bridge that loads one reflected
+   * `vector<EntityCategorySet>` payload through cached RTTI lookup.
+   */
+  void ReadCachedEntityCategorySetVectorCallback(
+    gpg::ReadArchive* archive,
+    void* objectPtr,
+    gpg::RRef* ownerRef
+  )
+  {
+    ReadObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+  }
+
+  /**
+   * Address: 0x006E0320 (FUN_006E0320)
+   *
+   * What it does:
+   * Write-callback bridge that saves one reflected
+   * `vector<EntityCategorySet>` payload through cached RTTI lookup.
+   */
+  void WriteCachedEntityCategorySetVectorCallback(
+    gpg::WriteArchive* archive,
+    void* objectPtr,
+    const gpg::RRef* ownerRef
+  )
+  {
+    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+  }
+
+  /**
+   * Address: 0x006E0350 (FUN_006E0350)
+   *
+   * What it does:
+   * Read-callback bridge that loads one reflected `vector<SBlackListInfo>`
+   * payload through cached RTTI lookup.
+   */
+  void ReadCachedSBlackListInfoVectorCallback(
+    gpg::ReadArchive* archive,
+    void* objectPtr,
+    gpg::RRef* ownerRef
+  )
+  {
+    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+  }
+
+  /**
+   * Address: 0x006E0380 (FUN_006E0380)
+   *
+   * What it does:
+   * Write-callback bridge that saves one reflected `vector<SBlackListInfo>`
+   * payload through cached RTTI lookup.
+   */
+  void WriteCachedSBlackListInfoVectorCallback(
+    gpg::WriteArchive* archive,
+    void* objectPtr,
+    const gpg::RRef* ownerRef
+  )
+  {
+    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+  }
+
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
@@ -54,6 +291,19 @@ namespace
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
     serializer.mHelperPrev = self;
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
   }
 
   [[nodiscard]] moho::RUnitBlueprintWeapon* ReadRUnitBlueprintWeaponPointer(
@@ -92,26 +342,37 @@ namespace
     return ref;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWeaponAttributesSerializerNode()
+  {
+    return UnlinkSerializerNode(GetCWeaponAttributesSerializer());
+  }
+
   /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, serializer helper unlink cleanup)
+   * Address: 0x006D37E0 (FUN_006D37E0)
    *
    * What it does:
-   * Unlinks the `CWeaponAttributesSerializer` helper node and rewires it as a self-linked singleton.
+   * Splices `CWeaponAttributesSerializer` out of its intrusive helper lane
+   * when linked, then rewires helper links to the serializer self node.
    */
-  gpg::SerHelperBase* cleanup_CWeaponAttributesSerializer_00BFE5F0_Impl()
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCWeaponAttributesSerializerHelperNodeVariantA() noexcept
   {
-    Serializer& serializer = GetCWeaponAttributesSerializer();
-    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    serializer.mHelperPrev = self;
-    serializer.mHelperNext = self;
-    return self;
+    return CleanupCWeaponAttributesSerializerNode();
+  }
+
+  /**
+   * Address: 0x006D3810 (FUN_006D3810)
+   *
+   * What it does:
+   * Secondary serializer helper unlink/reset variant sharing the same behavior.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCWeaponAttributesSerializerHelperNodeVariantB() noexcept
+  {
+    return UnlinkCWeaponAttributesSerializerHelperNodeVariantA();
   }
 
   void cleanup_CWeaponAttributesSerializer_atexit()
   {
-    (void)cleanup_CWeaponAttributesSerializer_00BFE5F0_Impl();
+    (void)moho::cleanup_CWeaponAttributesSerializer();
   }
 
   /**
@@ -139,6 +400,51 @@ namespace
     archive->ReadFloat(&attributes->mDamage);
     archive->ReadFloat(&attributes->mUnknown_0044);
     archive->ReadFloat(&attributes->mUnknown_0048);
+  }
+
+  /**
+   * Address: 0x006DF0C0 (FUN_006DF0C0, serializer load thunk alias)
+   *
+   * What it does:
+   * Loads the same `CWeaponAttributes` lanes as `FUN_006D3780`, but always
+   * uses an empty owner-ref lane for the weapon-pointer read path.
+   */
+  [[maybe_unused]] void LoadCWeaponAttributesNoOwnerRef(
+    gpg::ReadArchive* const archive,
+    moho::CWeaponAttributes* const attributes
+  )
+  {
+    if (archive == nullptr || attributes == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    attributes->mBlueprint = ReadRUnitBlueprintWeaponPointer(archive, owner);
+    archive->ReadFloat(&attributes->mFiringTolerance);
+    archive->ReadFloat(&attributes->mRateOfFire);
+    archive->ReadFloat(&attributes->mMinRadius);
+    archive->ReadFloat(&attributes->mMaxRadius);
+    archive->ReadFloat(&attributes->mMinRadiusSq);
+    archive->ReadFloat(&attributes->mMaxRadiusSq);
+    archive->ReadString(&attributes->mType);
+    archive->ReadFloat(&attributes->mDamageRadius);
+    archive->ReadFloat(&attributes->mDamage);
+    archive->ReadFloat(&attributes->mUnknown_0044);
+    archive->ReadFloat(&attributes->mUnknown_0048);
+  }
+
+  /**
+   * Address: 0x006DD290 (FUN_006DD290)
+   *
+   * What it does:
+   * Jump-thunk alias that forwards to the no-owner-ref load body.
+   */
+  [[maybe_unused]] void LoadCWeaponAttributesNoOwnerRefThunk(
+    gpg::ReadArchive* const archive,
+    moho::CWeaponAttributes* const attributes
+  )
+  {
+    LoadCWeaponAttributesNoOwnerRef(archive, attributes);
   }
 
   /**
@@ -211,17 +517,27 @@ namespace
   }
 
   /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, startup registration + atexit cleanup)
+   * Address: 0x006D37B0 (FUN_006D37B0)
    *
    * What it does:
-   * Initializes `CWeaponAttributesSerializer` callback slots and schedules exit cleanup.
+   * Alternate serializer startup leaf that initializes global helper links,
+   * binds deserialize/serialize callbacks, and returns the helper node.
    */
-  int register_CWeaponAttributesSerializer_00BD87D0_Impl()
+  [[maybe_unused]] gpg::SerHelperBase* construct_CWeaponAttributesSerializer_StartupLeaf()
   {
-    InitializeSerializerNode(GetCWeaponAttributesSerializer());
-    GetCWeaponAttributesSerializer().mDeserialize = &LoadCWeaponAttributes;
-    GetCWeaponAttributesSerializer().mSerialize = &SaveCWeaponAttributes;
-    GetCWeaponAttributesSerializer().RegisterSerializeFunctions();
+    Serializer& serializer = GetCWeaponAttributesSerializer();
+    InitializeSerializerNode(serializer);
+    serializer.mDeserialize = &LoadCWeaponAttributes;
+    serializer.mSerialize = &SaveCWeaponAttributes;
+    return SerializerSelfNode(serializer);
+  }
+
+  int RegisterCWeaponAttributesSerializerStartup()
+  {
+    Serializer& serializer = GetCWeaponAttributesSerializer();
+    (void)construct_CWeaponAttributesSerializer_StartupLeaf();
+    serializer.mDeserialize = &LoadCWeaponAttributes;
+    serializer.mSerialize = &SaveCWeaponAttributes;
     return std::atexit(&cleanup_CWeaponAttributesSerializer_atexit);
   }
 } // namespace
@@ -229,7 +545,7 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x006D3780 (FUN_006D3780, Moho::CWeaponAttributesSerializer::Deserialize)
+    * Alias of FUN_006D3780 (non-canonical helper lane).
    */
   void CWeaponAttributesSerializer::Deserialize(
     gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
@@ -239,7 +555,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D3790 (FUN_006D3790, Moho::CWeaponAttributesSerializer::Serialize)
+    * Alias of FUN_006D3790 (non-canonical helper lane).
    */
   void CWeaponAttributesSerializer::Serialize(
     gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
@@ -261,18 +577,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, sub_BFE5F0)
+   * Address: 0x00BFE5F0 (FUN_00BFE5F0, serializer helper unlink cleanup)
    */
   gpg::SerHelperBase* cleanup_CWeaponAttributesSerializer()
   {
-    return cleanup_CWeaponAttributesSerializer_00BFE5F0_Impl();
+    return UnlinkCWeaponAttributesSerializerHelperNodeVariantA();
   }
 
   /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, register_CWeaponAttributesSerializer)
+   * Address: 0x00BD87D0 (FUN_00BD87D0, startup registration + atexit cleanup)
    */
   int register_CWeaponAttributesSerializer()
   {
-    return register_CWeaponAttributesSerializer_00BD87D0_Impl();
+    return RegisterCWeaponAttributesSerializerStartup();
   }
 } // namespace moho

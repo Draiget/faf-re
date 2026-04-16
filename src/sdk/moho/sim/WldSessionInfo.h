@@ -72,6 +72,24 @@ namespace moho
   static_assert(offsetof(SWldSessionInfo, mSourceId) == 0x2C, "SWldSessionInfo::mSourceId offset must be 0x2C");
 
   /**
+   * Address: 0x007C8FE0 (FUN_007C8FE0)
+   *
+   * What it does:
+   * If `*sessionInfoSlot` is non-null, runs `SWldSessionInfo` destruction and
+   * then frees the same storage via `operator delete`.
+   */
+  void DestroyAndDeleteSessionInfo(SWldSessionInfo** sessionInfoSlot);
+
+  /**
+   * Address: 0x007C90C0 (FUN_007C90C0)
+   *
+   * What it does:
+   * Executes one scalar-delete lane for `SWldSessionInfo` by running
+   * destructor logic and then releasing the same storage.
+   */
+  SWldSessionInfo* DestroyAndDeleteSessionInfoScalar(SWldSessionInfo* sessionInfo);
+
+  /**
    * Address evidence:
    * - extracted by CWldSessionLoaderImpl path at 0x00886170 (FUN_00886170)
    *

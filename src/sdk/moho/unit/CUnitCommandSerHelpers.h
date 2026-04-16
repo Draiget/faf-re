@@ -28,11 +28,10 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
-     * Address: 0x00BD8F50 (FUN_00BD8F50, register_CUnitCommandConstruct)
+     * Address: 0x006EA060 (FUN_006EA060, Moho::CUnitCommandConstruct::RegisterConstructFunction)
      *
      * What it does:
-     * Binds `CUnitCommand` construct/delete callbacks into RTTI and schedules
-     * helper cleanup at process exit.
+     * Binds `CUnitCommand` construct/delete callbacks into RTTI.
      */
     virtual void RegisterConstructFunction();
 
@@ -69,7 +68,7 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00BD8F90 (FUN_00BD8F90, register_CUnitCommandSerializer)
+       * Address: 0x00BD8F90 (FUN_00BD8F90)
      *
      * What it does:
      * Binds `CUnitCommand` load/save callbacks into RTTI and schedules helper
@@ -107,7 +106,7 @@ namespace moho
   gpg::SerHelperBase* cleanup_CUnitCommandSerializer();
 
   /**
-   * Address: 0x00BD8F50 (FUN_00BD8F50, register_CUnitCommandConstruct)
+    * Alias of FUN_00BD8F50 (non-canonical helper lane).
    *
    * What it does:
    * Initializes and registers the `CUnitCommand` construct helper.
@@ -115,7 +114,7 @@ namespace moho
   void register_CUnitCommandConstruct();
 
   /**
-   * Address: 0x00BD8F90 (FUN_00BD8F90, register_CUnitCommandSerializer)
+    * Alias of FUN_00BD8F90 (non-canonical helper lane).
    *
    * What it does:
    * Initializes and registers the `CUnitCommand` serializer helper.

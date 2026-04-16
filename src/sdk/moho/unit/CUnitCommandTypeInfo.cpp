@@ -26,6 +26,24 @@ namespace
     return *reinterpret_cast<TypeInfo*>(gCUnitCommandTypeInfoStorage);
   }
 
+  gpg::RType* gLegacyCUnitCommandSecondaryType = nullptr;
+
+  /**
+   * Address: 0x006E7CD0 (FUN_006E7CD0)
+   *
+   * What it does:
+   * Resolves and caches one secondary RTTI lane for `CUnitCommand`.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyCUnitCommandSecondaryType()
+  {
+    gpg::RType* type = gLegacyCUnitCommandSecondaryType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitCommand));
+      gLegacyCUnitCommandSecondaryType = type;
+    }
+    return type;
+  }
+
   /**
    * Address: 0x00BFEB80 (FUN_00BFEB80, ??1CUnitCommandTypeInfo@Moho@@QAE@@Z)
    *
@@ -46,6 +64,7 @@ namespace
 namespace moho
 {
   gpg::RType* CUnitCommand::sType = nullptr;
+  gpg::RType* CUnitCommand::sPointerType = nullptr;
 
   gpg::RType* CUnitCommand::StaticGetClass()
   {
@@ -53,6 +72,21 @@ namespace moho
       sType = gpg::LookupRType(typeid(CUnitCommand));
     }
     return sType;
+  }
+
+  gpg::RType* CUnitCommand::GetPointerType()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CUnitCommand));
+    }
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(CUnitCommand*));
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**
@@ -65,9 +99,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x006E7F90 (FUN_006E7F90, CUnitCommandTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `CUnitCommandTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyCUnitCommandTypeInfoBody(CUnitCommandTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x006E7F30 (FUN_006E7F30, Moho::CUnitCommandTypeInfo::dtr)
    */
-  CUnitCommandTypeInfo::~CUnitCommandTypeInfo() = default;
+  CUnitCommandTypeInfo::~CUnitCommandTypeInfo()
+  {
+    DestroyCUnitCommandTypeInfoBody(this);
+  }
 
   /**
    * Address: 0x006E7F20 (FUN_006E7F20, Moho::CUnitCommandTypeInfo::GetName)

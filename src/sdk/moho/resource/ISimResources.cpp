@@ -52,6 +52,11 @@ namespace
 namespace moho
 {
   gpg::RType* ISimResources::sType = nullptr;
+
+  /**
+   * Address: 0x00546E70 (FUN_00546E70)
+   */
+  ISimResources::ISimResources() = default;
 } // namespace moho
 
 namespace moho::detail

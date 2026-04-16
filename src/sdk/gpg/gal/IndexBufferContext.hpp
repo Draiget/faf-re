@@ -30,6 +30,14 @@ namespace gpg::gal
         IndexBufferContext(std::uint32_t size, std::uint32_t format, std::uint32_t type);
 
         /**
+         * Address: 0x008F4BF0 (FUN_008F4BF0)
+         *
+         * What it does:
+         * Copies index-buffer metadata payload lanes from another context.
+         */
+        IndexBufferContext& AssignFrom(const IndexBufferContext& other);
+
+        /**
          * Address: 0x00940630 (FUN_00940630, gpg::gal::IndexBufferContext::~IndexBufferContext)
          * Address: 0x00940640 (FUN_00940640, scalar deleting destructor thunk)
          *

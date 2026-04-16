@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/String.h"
 #include "moho/app/WxRuntimeTypes.h"
 
 namespace moho
@@ -49,6 +50,22 @@ namespace moho
     ~ScrSourceCtrl();
 
   private:
+    /**
+     * Address: 0x004C6750 (FUN_004C6750)
+     *
+     * ScrSourcePageRuntimeLane ***,ScrSourcePageRuntimeLane **,ScrSourcePageRuntimeLane **,std::string
+     *
+     * What it does:
+     * Scans one source-page pointer range and returns the iterator slot of the
+     * first page whose mounted source path exactly matches the provided key.
+     */
+    static ScrSourcePageRuntimeLane*** FindPageIteratorByMountedSourcePath(
+      ScrSourcePageRuntimeLane*** outIterator,
+      ScrSourcePageRuntimeLane** begin,
+      ScrSourcePageRuntimeLane** end,
+      msvc8::string mountedSourcePath
+    );
+
     static void InitializeNotebookBaseRuntime(ScrSourceCtrl& object, wxWindowBase* parentWindow) noexcept;
 
   public:

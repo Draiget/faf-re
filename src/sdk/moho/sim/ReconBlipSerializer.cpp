@@ -50,14 +50,17 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
       serializer.mHelperPrev->mNext = serializer.mHelperNext;
     }
 
-    InitializeSerializerNode(serializer);
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+    return self;
   }
 
   [[nodiscard]] moho::SPerArmyReconInfoSerializer* AcquireSPerArmyReconInfoSerializer()
@@ -243,7 +246,35 @@ namespace
     }
 
     moho::SPerArmyReconInfoSerializer* const serializer = AcquireSPerArmyReconInfoSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkSerializerNode(*serializer);
+  }
+
+  /**
+   * Address: 0x005BE530 (FUN_005BE530)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk for `SPerArmyReconInfoSerializer` that unlinks
+   * the intrusive node and returns the helper self node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SPerArmyReconInfoSerializerStartupThunkA()
+  {
+    if (!gSPerArmyReconInfoSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireSPerArmyReconInfoSerializer());
+  }
+
+  /**
+   * Address: 0x005BE560 (FUN_005BE560)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk for
+   * `SPerArmyReconInfoSerializer` with identical unlink/self-link behavior.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SPerArmyReconInfoSerializerStartupThunkB()
+  {
+    return cleanup_SPerArmyReconInfoSerializerStartupThunkA();
   }
 
   /**
@@ -259,7 +290,35 @@ namespace
     }
 
     moho::ReconBlipSerializer* const serializer = AcquireReconBlipSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkSerializerNode(*serializer);
+  }
+
+  /**
+   * Address: 0x005BFCE0 (FUN_005BFCE0)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk for `ReconBlipSerializer` that unlinks the
+   * intrusive node and returns the helper self node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_ReconBlipSerializerStartupThunkA()
+  {
+    if (!gReconBlipSerializerConstructed) {
+      return nullptr;
+    }
+
+    return UnlinkSerializerNode(*AcquireReconBlipSerializer());
+  }
+
+  /**
+   * Address: 0x005BFD10 (FUN_005BFD10)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk for `ReconBlipSerializer` with
+   * identical unlink/self-link behavior.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_ReconBlipSerializerStartupThunkB()
+  {
+    return cleanup_ReconBlipSerializerStartupThunkA();
   }
 
   struct ReconBlipSerializerBootstrap
@@ -323,7 +382,6 @@ namespace moho
     InitializeSerializerNode(*serializer);
     serializer->mLoadCallback = &SPerArmyReconInfoSerializer::Deserialize;
     serializer->mSaveCallback = &SPerArmyReconInfoSerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SPerArmyReconInfoSerializer);
   }
 
@@ -374,7 +432,6 @@ namespace moho
     InitializeSerializerNode(*serializer);
     serializer->mLoadCallback = &ReconBlipSerializer::Deserialize;
     serializer->mSaveCallback = &ReconBlipSerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_ReconBlipSerializer);
   }
 } // namespace moho

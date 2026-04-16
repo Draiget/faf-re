@@ -219,6 +219,30 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x005581D0 (FUN_005581D0, preregister_SSTIEntityAttachInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIEntityAttachInfo`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIEntityAttachInfoTypeInfo();
+
+  /**
+   * Address: 0x00558420 (FUN_00558420, preregister_EntityAttributesTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `EntityAttributes`.
+   */
+  [[nodiscard]] gpg::RType* preregister_EntityAttributesTypeInfo();
+
+  /**
+   * Address: 0x00558620 (FUN_00558620, preregister_SSTIEntityVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIEntityVariableData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIEntityVariableDataTypeInfo();
+
   static_assert(sizeof(SSTIIntelAttributes) == 0x20, "SSTIIntelAttributes size must be 0x20");
   static_assert(sizeof(EUserEntityVisibilityMode) == 0x04, "EUserEntityVisibilityMode size must be 0x04");
 

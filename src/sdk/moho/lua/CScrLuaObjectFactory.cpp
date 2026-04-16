@@ -435,6 +435,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x004C8500 (FUN_004C8500)
+   *
+   * What it does:
+   * Initializes the `CScriptObject*` metatable-factory singleton index lane
+   * and returns that singleton address.
+   */
+  [[maybe_unused]] CScrLuaMetatableFactory<CScriptObject*>* InitializeCScriptObjectMetatableFactoryRuntimeSingleton()
+  {
+    (void)register_CScrLuaMetatableFactory_CScriptObject_Index();
+    return &CScrLuaMetatableFactory<CScriptObject*>::Instance();
+  }
+
+  /**
    * Address: 0x004D22D0 (FUN_004D22D0, ?SCR_CreateSimpleMetatable@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
    * Alias:   0x100C3290 (alt lane)
    */
@@ -687,6 +700,93 @@ namespace moho
     }
 
     return false;
+  }
+
+  /**
+   * Address: 0x004D26D0 (FUN_004D26D0, ?SCR_Copy@Moho@@YA?AVLuaObject@LuaPlus@@ABV23@PAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Deep-copies one Lua object into `state`, recursively cloning tables and
+   * cloning userdata with reflected move handlers when crossing root-state
+   * boundaries.
+   */
+  LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const state)
+  {
+    LuaPlus::LuaObject out{};
+    if (source.m_state == nullptr) {
+      return out;
+    }
+
+    switch (source.Type()) {
+      case LUA_TNIL:
+        out.AssignNil(state);
+        return out;
+
+      case LUA_TBOOLEAN:
+        out.AssignBoolean(state, source.GetBoolean());
+        return out;
+
+      case LUA_TNUMBER:
+        out.AssignNumber(state, source.GetNumber());
+        return out;
+
+      case LUA_TSTRING:
+        if (source.m_state == state->m_rootState) {
+          out = source;
+        } else {
+          out.AssignString(state, source.GetString());
+        }
+        return out;
+
+      case LUA_TTABLE: {
+        out.AssignNewTable(state, 0, 0);
+        LuaPlus::LuaObject mutableSource(source);
+        for (LuaPlus::LuaTableIterator iter(mutableSource, 1); !iter.m_isDone; iter.Next()) {
+          const LuaPlus::LuaObject keyCopy = SCR_Copy(iter.GetKey(), state);
+          const LuaPlus::LuaObject valueCopy = SCR_Copy(iter.GetValue(), state);
+          out.SetObject(keyCopy, valueCopy);
+        }
+        return out;
+      }
+
+      case LUA_TUSERDATA:
+        if (source.m_state == state->m_rootState) {
+          out = source;
+          return out;
+        }
+
+        {
+          gpg::RRef userDataRef{};
+          lua_State* const lstate = source.GetActiveCState();
+          if (lstate != nullptr) {
+            const int savedTop = lua_gettop(lstate);
+            const_cast<LuaPlus::LuaObject&>(source).PushStack(lstate);
+            void* const rawUserData = lua_touserdata(lstate, -1);
+            if (rawUserData != nullptr) {
+              userDataRef = *static_cast<gpg::RRef*>(rawUserData);
+            }
+            lua_settop(lstate, savedTop);
+          }
+
+          if (userDataRef.mType->movRefFunc_ == nullptr) {
+            gpg::Die("Can't clone %s userdata.", userDataRef.mType->GetName());
+          }
+
+          (void)out.AssignNewUserData(state, userDataRef);
+        }
+        return out;
+
+      default:
+        if (source.m_state != state->m_rootState) {
+          gpg::Die(
+            "Can't copy lua objects of type %s from one state to another.",
+            source.TypeName()
+          );
+        }
+
+        out = source;
+        return out;
+    }
   }
 
   /**
@@ -1216,7 +1316,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x10015880 (FUN_10015880, ??0CScrLuaObjectFactory@Moho@@QAE@XZ)
+    * Alias of FUN_10015880 (non-canonical helper lane).
    */
   CScrLuaObjectFactory::CScrLuaObjectFactory()
     : mFactoryObjectIndex(++sNumIds)

@@ -116,10 +116,13 @@ namespace moho
   void CUnitCarrierRetrieveTypeInfo::Init()
   {
     size_ = sizeof(CUnitCarrierRetrieve);
-    newRefFunc_ = &CUnitCarrierRetrieveTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitCarrierRetrieveTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitCarrierRetrieveTypeInfo::Delete;
-    dtrFunc_ = &CUnitCarrierRetrieveTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitCarrierRetrieveTypeInfo::NewRef,
+      &CUnitCarrierRetrieveTypeInfo::CtrRef,
+      &CUnitCarrierRetrieveTypeInfo::Delete,
+      &CUnitCarrierRetrieveTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

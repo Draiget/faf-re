@@ -72,14 +72,14 @@ namespace moho
     void RemoveHandle(HANDLE handle);
 
     /**
-     * Address: 0x004145E0
+       * Address: 0x004145E0 (FUN_004145E0)
      *
      * Wait for either a registered handle or window messages.
      */
     void MsgWaitEx(DWORD timeoutMs);
 
     /**
-     * Address: 0x004145E0
+      * Alias of FUN_004145E0 (non-canonical helper lane).
      *
      * Compatibility wrapper retained while callsites migrate to MsgWaitEx naming.
      */

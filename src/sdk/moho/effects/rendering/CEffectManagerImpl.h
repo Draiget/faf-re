@@ -17,6 +17,15 @@ namespace moho
 
   public:
     /**
+     * Address: 0x0066B3E0 (FUN_0066B3E0, Moho::CEffectManagerImpl::CEffectManagerImpl)
+     *
+     * What it does:
+     * Initializes one effect-manager implementation object by binding the
+     * owning `Sim` lane and self-linking both intrusive effect lists.
+     */
+    explicit CEffectManagerImpl(Sim* sim);
+
+    /**
      * Address: 0x0066B400 (FUN_0066B400, Moho::CEffectManagerImpl::dtr thunk)
      * Address: 0x0066B450 (FUN_0066B450, Moho::CEffectManagerImpl::~CEffectManagerImpl body)
      */

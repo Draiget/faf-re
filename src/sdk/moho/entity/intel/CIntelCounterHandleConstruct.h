@@ -6,7 +6,9 @@
 
 namespace gpg
 {
+  class ReadArchive;
   struct SerHelperBase;
+  class SerConstructResult;
 } // namespace gpg
 
 namespace moho
@@ -18,6 +20,16 @@ namespace moho
   class CIntelCounterHandleConstruct
   {
   public:
+    /**
+     * Address: 0x0076F910 (FUN_0076F910, Moho::CIntelCounterHandleConstruct::Construct)
+     *
+     * What it does:
+     * Allocates one `CIntelCounterHandle` runtime object, zero-initializes its
+     * fields through constructor semantics, and returns it as an unowned
+     * construct-result payload.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
     /**
      * Address: 0x0076FBA0 (FUN_0076FBA0, gpg::SerConstructHelper_CIntelCounterHandle::Init)
      *

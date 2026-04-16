@@ -30,6 +30,22 @@ namespace
     return *reinterpret_cast<moho::SCoordsVec2Serializer*>(gSCoordsVec2SerializerStorage);
   }
 
+  /**
+   * Address: 0x0050CAB0 (FUN_0050CAB0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `SCoordsVec2`.
+   */
+  [[nodiscard]] gpg::RType* ResolveSCoordsVec2Type()
+  {
+    gpg::RType* type = moho::SCoordsVec2::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SCoordsVec2));
+      moho::SCoordsVec2::sType = type;
+    }
+    return type;
+  }
+
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(TSerializer& serializer) noexcept
   {
@@ -45,14 +61,57 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkHelperNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(TSerializer& serializer) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
       serializer.mHelperPrev->mNext = serializer.mHelperNext;
     }
 
-    InitializeHelperNode(serializer);
+    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0050BDA0 (FUN_0050BDA0)
+   *
+   * What it does:
+   * Unlinks the `SCoordsVec2Serializer` helper node and resets both links to
+   * the serializer self-node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupSCoordsVec2SerializerVariant1() noexcept
+  {
+    return UnlinkHelperNode(SCoordsVec2SerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050BDD0 (FUN_0050BDD0)
+   *
+   * What it does:
+   * Duplicate lane of `SCoordsVec2Serializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSCoordsVec2SerializerVariant2() noexcept
+  {
+    return UnlinkHelperNode(SCoordsVec2SerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050BCC0 (FUN_0050BCC0)
+   *
+   * What it does:
+   * Executes one non-deleting `gpg::RType` base-teardown lane for
+   * `SCoordsVec2TypeInfo`.
+   */
+  [[maybe_unused]] void cleanup_SCoordsVec2TypeInfoRTypeBase(moho::SCoordsVec2TypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
+    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
   void CleanupSCoordsVec2TypeInfoAtExit()
@@ -72,7 +131,7 @@ namespace
     }
 
     moho::SCoordsVec2Serializer& serializer = SCoordsVec2SerializerStorageRef();
-    UnlinkHelperNode(serializer);
+    (void)CleanupSCoordsVec2SerializerVariant1();
     serializer.~SCoordsVec2Serializer();
     gSCoordsVec2SerializerConstructed = false;
   }
@@ -80,6 +139,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* SCoordsVec2::sType = nullptr;
+
   /**
    * Address: 0x0050BBD0 (FUN_0050BBD0, Moho::SCoordsVec2TypeInfo::SCoordsVec2TypeInfo)
    *
@@ -149,6 +210,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050BD70 (FUN_0050BD70)
+   *
+   * What it does:
+   * Initializes `SCoordsVec2Serializer` helper links and callback lanes.
+   */
+  [[nodiscard]] SCoordsVec2Serializer* initialize_SCoordsVec2SerializerVariant1()
+  {
+    if (!gSCoordsVec2SerializerConstructed) {
+      new (gSCoordsVec2SerializerStorage) SCoordsVec2Serializer();
+      gSCoordsVec2SerializerConstructed = true;
+    }
+
+    InitializeHelperNode(SCoordsVec2SerializerStorageRef());
+    SCoordsVec2SerializerStorageRef().mDeserialize =
+      reinterpret_cast<gpg::RType::load_func_t>(&SCoordsVec2Serializer::Deserialize);
+    SCoordsVec2SerializerStorageRef().mSerialize =
+      reinterpret_cast<gpg::RType::save_func_t>(&SCoordsVec2Serializer::Serialize);
+    return &SCoordsVec2SerializerStorageRef();
+  }
+
+  /**
+   * Address: 0x0050C700 (FUN_0050C700)
+   *
+   * What it does:
+   * Duplicate lane of `SCoordsVec2Serializer` callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] SCoordsVec2Serializer* initialize_SCoordsVec2SerializerVariant2()
+  {
+    return initialize_SCoordsVec2SerializerVariant1();
+  }
+
+  /**
    * Address: 0x00BC7CC0 (FUN_00BC7CC0, register_SCoordsVec2TypeInfo)
    *
    * What it does:
@@ -173,16 +266,8 @@ namespace moho
    */
   void register_SCoordsVec2Serializer()
   {
-    if (!gSCoordsVec2SerializerConstructed) {
-      new (gSCoordsVec2SerializerStorage) SCoordsVec2Serializer();
-      gSCoordsVec2SerializerConstructed = true;
-    }
-
-    InitializeHelperNode(SCoordsVec2SerializerStorageRef());
-    SCoordsVec2SerializerStorageRef().mDeserialize =
-      reinterpret_cast<gpg::RType::load_func_t>(&SCoordsVec2Serializer::Deserialize);
-    SCoordsVec2SerializerStorageRef().mSerialize =
-      reinterpret_cast<gpg::RType::save_func_t>(&SCoordsVec2Serializer::Serialize);
+    (void)initialize_SCoordsVec2SerializerVariant1();
+    (void)ResolveSCoordsVec2Type();
     (void)std::atexit(&CleanupSCoordsVec2SerializerAtExit);
   }
 

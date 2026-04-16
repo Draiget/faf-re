@@ -139,6 +139,48 @@ namespace moho
       effect.Interpolate();
     }
 
+    /**
+     * Address: 0x00659390 (FUN_00659390)
+     *
+     * What it does:
+     * Fetches one entity bone world transform, copies its position into the
+     * effect payload, rebuilds the effect matrix from the same transform, and
+     * advances interpolation once.
+     */
+    void ApplyBoneTransformToEffect(CEffectImpl& effect, Entity* const entity, const int boneIndex)
+    {
+      const VTransform boneTransform = entity->GetBoneWorldTransform(boneIndex);
+      SetEffectWorldPosition(effect, boneTransform.pos_);
+      effect.mMatrix.Set(boneTransform.orient_, boneTransform.pos_);
+      effect.Interpolate();
+    }
+
+    /**
+     * Address: 0x00659300 (FUN_00659300)
+     *
+     * What it does:
+     * Copies one entity transform payload into stack lanes, writes the world
+     * position lane into effect param slot `0` (`SetNParam(...,3)`), then
+     * advances one interpolation step.
+     */
+    void ApplyEntityWorldPositionToEffect(CEffectImpl& effect, const Entity& entity)
+    {
+      struct EntityTransformStackLane
+      {
+        Vector4f orientation;   // +0x00
+        Wm3::Vector3f position; // +0x10
+      };
+      static_assert(sizeof(EntityTransformStackLane) == 0x1C, "EntityTransformStackLane size must be 0x1C");
+      static_assert(
+        offsetof(EntityTransformStackLane, position) == 0x10,
+        "EntityTransformStackLane::position offset must be 0x10"
+      );
+
+      const EntityTransformStackLane stackLane{entity.Orientation, entity.Position};
+      effect.SetNParam(0, &stackLane.position.x, 3);
+      effect.Interpolate();
+    }
+
     void ApplyTrailBlueprintParams(CEffectImpl& effect, const RTrailBlueprint* const blueprint)
     {
       effect.SetFloatParam(5, 1.0f);
@@ -152,7 +194,50 @@ namespace moho
 
       effect.Interpolate();
     }
+
+    /**
+     * Address: 0x0066B430 (FUN_0066B430)
+     *
+     * What it does:
+     * Unlinks one manager-list node from its current intrusive list and resets
+     * that node back to self-linked sentinel form.
+     */
+    [[maybe_unused]] IEffect::ManagerListNode* UnlinkManagerListNodeAndSelfReference(
+      IEffect::ManagerListNode* const node
+    ) noexcept
+    {
+      if (node == nullptr) {
+        return nullptr;
+      }
+
+      IEffect::ManagerListNode* const previous = node->mPrev;
+      IEffect::ManagerListNode* const next = node->mNext;
+      if (previous != nullptr) {
+        previous->mNext = next;
+      }
+      if (next != nullptr) {
+        next->mPrev = previous;
+      }
+
+      node->mPrev = node;
+      node->mNext = node;
+      return node;
+    }
   } // namespace
+
+  /**
+   * Address: 0x0066B3E0 (FUN_0066B3E0, Moho::CEffectManagerImpl::CEffectManagerImpl)
+   *
+   * What it does:
+   * Initializes one effect-manager implementation object by binding the
+   * owning `Sim` lane and self-linking both intrusive effect lists.
+   */
+  CEffectManagerImpl::CEffectManagerImpl(Sim* const sim)
+    : mSim(sim)
+    , mActiveEffects()
+    , mDestroyedEffects()
+  {
+  }
 
   /**
    * Address: 0x0066B400 (FUN_0066B400, Moho::CEffectManagerImpl::dtr thunk)
@@ -273,15 +358,7 @@ namespace moho
     SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
     ApplyEmitterBlueprintParams(*effect, blueprint);
 
-    const VTransform boneTransform = entity->GetBoneWorldTransform(boneIndex);
-    SetEffectWorldPosition(*effect, boneTransform.pos_);
-    effect->mMatrix = VMatrix4::FromQuatPos(
-      Vector4f(boneTransform.orient_.x, boneTransform.orient_.y, boneTransform.orient_.z, boneTransform.orient_.w),
-      boneTransform.pos_.x,
-      boneTransform.pos_.y,
-      boneTransform.pos_.z
-    );
-    effect->Interpolate();
+    ApplyBoneTransformToEffect(*effect, entity, boneIndex);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
@@ -315,10 +392,7 @@ namespace moho
 
     SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
     ApplyEmitterBlueprintParams(*effect, blueprint);
-
-    const VTransform entityTransform = entity->GetBoneWorldTransform(-2);
-    SetEffectWorldPosition(*effect, entityTransform.pos_);
-    effect->Interpolate();
+    ApplyEntityWorldPositionToEffect(*effect, *entity);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
@@ -401,6 +475,11 @@ namespace moho
    */
   void CEffectManagerImpl::DestroyEffect(IEffect* const effect)
   {
+    if (effect == nullptr) {
+      return;
+    }
+
+    (void)UnlinkManagerListNodeAndSelfReference(&effect->mManagerListNode);
     effect->mManagerListNode.ListLinkBefore(&mDestroyedEffects);
   }
 
@@ -590,9 +669,7 @@ namespace moho
     effect->mBlendMode = beamBlueprint != nullptr ? beamBlueprint->BlendMode : armyIndex;
     LinkActiveEffect(mActiveEffects, effect);
 
-    effect->SetBone(sourceEntity, sourceBoneIndex);
-    effect->mEnd.mAttachTargetWeak.ResetFromObject(targetEntity);
-    effect->mEnd.mParentBoneIndex = targetBoneIndex < 0 ? 0 : targetBoneIndex;
+    effect->AttachEntityToEntity(sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex);
 
     if (!IsBlueprintEnabledForCurrentFidelity(beamBlueprint)) {
       DestroyEffect(effect);

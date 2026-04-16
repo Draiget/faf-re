@@ -1,7 +1,313 @@
 #include "PipeStream.h"
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 using namespace gpg;
+
+namespace
+{
+using PipeBufferNode = DListItem<PipeStreamBuffer, void>;
+
+struct PipeBufferNodeCursorRuntime
+{
+    PipeBufferNode* node = nullptr;
+};
+static_assert(sizeof(PipeBufferNodeCursorRuntime) == 0x04, "PipeBufferNodeCursorRuntime size must be 0x04");
+
+struct PipeBufferNodeSlotRuntime
+{
+    PipeBufferNode* node = nullptr;
+};
+static_assert(sizeof(PipeBufferNodeSlotRuntime) == 0x04, "PipeBufferNodeSlotRuntime size must be 0x04");
+
+/**
+ * Address: 0x009563A0 (FUN_009563A0)
+ *
+ * What it does:
+ * Returns one-past-end byte pointer for a 4KB pipe buffer payload.
+ */
+[[maybe_unused]] [[nodiscard]] char* PipeStreamBufferEndPointerRuntime(PipeStreamBuffer* const buffer) noexcept
+{
+    return buffer->mData + PipeStreamBuffer::kSize;
+}
+
+/**
+ * Address: 0x009563B0 (FUN_009563B0)
+ *
+ * What it does:
+ * Returns the first payload byte pointer for a pipe buffer.
+ */
+[[maybe_unused]] [[nodiscard]] char* PipeStreamBufferBeginPointerRuntime(PipeStreamBuffer* const buffer) noexcept
+{
+    return buffer->mData;
+}
+
+/**
+ * Address: 0x009563D0 (FUN_009563D0)
+ *
+ * What it does:
+ * Initializes one intrusive node as a self-linked singleton.
+ */
+[[maybe_unused]] PipeBufferNode* InitializePipeBufferNodeSelfLinked_A(PipeBufferNode* const node) noexcept
+{
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+}
+
+/**
+ * Address: 0x009563E0 (FUN_009563E0)
+ *
+ * What it does:
+ * Advances one intrusive-node cursor to its next node.
+ */
+[[maybe_unused]] PipeBufferNodeCursorRuntime* AdvancePipeBufferNodeCursor(
+    PipeBufferNodeCursorRuntime* const cursor
+) noexcept
+{
+    cursor->node = cursor->node->mNext;
+    return cursor;
+}
+
+/**
+ * Address: 0x009563F0 (FUN_009563F0)
+ *
+ * What it does:
+ * Rewinds one intrusive-node cursor to its previous node.
+ */
+[[maybe_unused]] PipeBufferNodeCursorRuntime* RewindPipeBufferNodeCursor(
+    PipeBufferNodeCursorRuntime* const cursor
+) noexcept
+{
+    cursor->node = cursor->node->mPrev;
+    return cursor;
+}
+
+/**
+ * Address: 0x00956430 (FUN_00956430)
+ *
+ * What it does:
+ * Unlinks one intrusive node from its list and re-self-links it.
+ */
+[[maybe_unused]] PipeBufferNode* UnlinkPipeBufferNode_A(PipeBufferNode* const node) noexcept
+{
+    node->mPrev->mNext = node->mNext;
+    PipeBufferNode* const next = node->mNext;
+    next->mPrev = node->mPrev;
+    node->mNext = node;
+    node->mPrev = node;
+    return next;
+}
+
+/**
+ * Address: 0x00956450 (FUN_00956450)
+ *
+ * What it does:
+ * Unlinks `node` and inserts it immediately before `anchor`.
+ */
+[[maybe_unused]] PipeBufferNode* RelinkPipeBufferNodeBeforeAnchor(
+    PipeBufferNode* const node,
+    PipeBufferNode* const anchor
+) noexcept
+{
+    node->mPrev->mNext = node->mNext;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node->mPrev;
+}
+
+/**
+ * Address: 0x00956480 (FUN_00956480)
+ *
+ * What it does:
+ * Returns whether an intrusive node is self-linked (unlinked).
+ */
+[[maybe_unused]] [[nodiscard]] bool IsPipeBufferNodeSelfLinked_A(const PipeBufferNode* const node) noexcept
+{
+    return node->mNext == node;
+}
+
+/**
+ * Address: 0x00956490 (FUN_00956490)
+ *
+ * What it does:
+ * Copies one node-slot pointer from `source` into `destination`.
+ */
+[[maybe_unused]] PipeBufferNodeSlotRuntime* CopyPipeBufferNodeSlot_A(
+    PipeBufferNodeSlotRuntime* const destination,
+    const PipeBufferNodeSlotRuntime* const source
+) noexcept
+{
+    destination->node = source->node;
+    return destination;
+}
+
+/**
+ * Address: 0x009564A0 (FUN_009564A0)
+ *
+ * What it does:
+ * Stores one node pointer into a node-slot lane.
+ */
+[[maybe_unused]] PipeBufferNodeSlotRuntime* SetPipeBufferNodeSlot_A(
+    PipeBufferNodeSlotRuntime* const destination,
+    PipeBufferNode* const value
+) noexcept
+{
+    destination->node = value;
+    return destination;
+}
+
+/**
+ * Address: 0x009564B0 (FUN_009564B0)
+ *
+ * What it does:
+ * Alias lane that unlinks one node and re-self-links it.
+ */
+[[maybe_unused]] PipeBufferNode* UnlinkPipeBufferNode_B(PipeBufferNode* const node) noexcept
+{
+    return UnlinkPipeBufferNode_A(node);
+}
+
+/**
+ * Address: 0x009564D0 (FUN_009564D0)
+ *
+ * What it does:
+ * Alias lane that initializes one intrusive node as self-linked.
+ */
+[[maybe_unused]] PipeBufferNode* InitializePipeBufferNodeSelfLinked_B(PipeBufferNode* const node) noexcept
+{
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+}
+
+/**
+ * Address: 0x009564E0 (FUN_009564E0)
+ *
+ * What it does:
+ * Alias lane that reports whether one node is self-linked.
+ */
+[[maybe_unused]] [[nodiscard]] bool IsPipeBufferNodeSelfLinked_B(const PipeBufferNode* const node) noexcept
+{
+    return node->mNext == node;
+}
+
+/**
+ * Address: 0x009564F0 (FUN_009564F0)
+ *
+ * What it does:
+ * Unlinks `node` and inserts it immediately before `anchor`.
+ */
+[[maybe_unused]] PipeBufferNode* InsertPipeBufferNodeBeforeAnchor(
+    PipeBufferNode* const anchor,
+    PipeBufferNode* const node
+) noexcept
+{
+    node->mPrev->mNext = node->mNext;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node;
+}
+
+/**
+ * Address: 0x00956520 (FUN_00956520)
+ *
+ * What it does:
+ * Returns one node's `next` intrusive-link lane.
+ */
+[[maybe_unused]] [[nodiscard]] PipeBufferNode* GetPipeBufferNodeNext(const PipeBufferNode* const node) noexcept
+{
+    return node->mNext;
+}
+
+/**
+ * Address: 0x00956540 (FUN_00956540)
+ *
+ * What it does:
+ * Alias lane that copies one node-slot pointer.
+ */
+[[maybe_unused]] PipeBufferNodeSlotRuntime* CopyPipeBufferNodeSlot_B(
+    PipeBufferNodeSlotRuntime* const destination,
+    const PipeBufferNodeSlotRuntime* const source
+) noexcept
+{
+    destination->node = source->node;
+    return destination;
+}
+
+/**
+ * Address: 0x00956550 (FUN_00956550)
+ *
+ * What it does:
+ * Alias lane that stores one node pointer into a node-slot.
+ */
+[[maybe_unused]] PipeBufferNodeSlotRuntime* SetPipeBufferNodeSlot_B(
+    PipeBufferNodeSlotRuntime* const destination,
+    PipeBufferNode* const value
+) noexcept
+{
+    destination->node = value;
+    return destination;
+}
+
+/**
+ * Address: 0x00956580 (FUN_00956580)
+ *
+ * What it does:
+ * Alias lane that initializes one intrusive node as self-linked.
+ */
+[[maybe_unused]] PipeBufferNode* InitializePipeBufferNodeSelfLinked_C(PipeBufferNode* const node) noexcept
+{
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+}
+
+/**
+ * Address: 0x00956590 (FUN_00956590)
+ *
+ * What it does:
+ * Alias lane that unlinks one node and re-self-links it.
+ */
+[[maybe_unused]] PipeBufferNode* UnlinkPipeBufferNode_C(PipeBufferNode* const node) noexcept
+{
+    return UnlinkPipeBufferNode_A(node);
+}
+
+/**
+ * Address: 0x009565B0 (FUN_009565B0)
+ *
+ * What it does:
+ * Stores one node's `next` lane in `outNext`.
+ */
+[[maybe_unused]] PipeBufferNode** StorePipeBufferNodeNext(
+    const PipeBufferNode* const node,
+    PipeBufferNode** const outNext
+) noexcept
+{
+    *outNext = node->mNext;
+    return outNext;
+}
+
+/**
+ * Address: 0x009565C0 (FUN_009565C0)
+ *
+ * What it does:
+ * Stores one node pointer into `outNode`.
+ */
+[[maybe_unused]] PipeBufferNode** StorePipeBufferNodeSelf(PipeBufferNode* const node, PipeBufferNode** const outNode) noexcept
+{
+    *outNode = node;
+    return outNode;
+}
+} // namespace
 
 /**
  * Address: 0x009565D0 (FUN_009565D0)

@@ -122,7 +122,6 @@ namespace
     {
       moho::register_CRandomStreamTypeInfo();
       moho::register_CRandomStreamSerializer();
-      CRandomStreamSerializerSlot().RegisterSerializeFunctions();
     }
   };
 

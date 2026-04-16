@@ -353,6 +353,28 @@ namespace
     return {outputBegin, outputCursor};
   }
 
+  /**
+   * Address: 0x00835AF0 (FUN_00835AF0)
+   *
+   * What it does:
+   * Writes one lowercased copy result into caller-provided result storage and
+   * returns that same storage slot.
+   */
+  [[maybe_unused]]
+  [[nodiscard]]
+  LowercasedCopyResult* CopyLowercasedRangeIntoOutSlot(
+    LowercasedCopyResult* const outResult,
+    char* const outputBegin,
+    const char* const inputBegin,
+    const char* const inputEnd
+  ) noexcept
+  {
+    if (outResult != nullptr) {
+      *outResult = CopyLowercasedRange(outputBegin, inputBegin, inputEnd);
+    }
+    return outResult;
+  }
+
   [[nodiscard]]
   msvc8::string JoinConCommandTokens(const ConCommandArgsView& args, const std::size_t firstTokenIndex)
   {
@@ -645,7 +667,7 @@ namespace
   }
 
   /**
-   * Address: 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc)
+    * Alias of FUN_004203D0 (non-canonical helper lane).
    *
    * What it does:
    * Moves one command-map iterator to the next in-order entry.
@@ -1043,6 +1065,11 @@ msvc8::string moho::CON_UnparseCommand(const msvc8::vector<msvc8::string>& token
 /**
  * Address: 0x0041C600 (FUN_0041C600, ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
  * Address: 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc)
+ * Address: 0x007E42F0 (FUN_007E42F0)
+ * Address: 0x00592FE0 (FUN_00592FE0)
+ * Address: 0x0052EEC0 (FUN_0052EEC0)
+ * Address: 0x00531C90 (FUN_00531C90)
+ * Address: 0x00531CE0 (FUN_00531CE0)
  *
  * What it does:
  * Appends command listing text into `outText`.
@@ -1084,8 +1111,8 @@ void moho::CON_GetCommandList(msvc8::string& outText, const bool includeDescript
 
 /**
  * Address: 0x0041C770 (FUN_0041C770, ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
- * Address: 0x0041FF10 (FUN_0041FF10, std::map_string_CConCommand::_Lbound)
- * Address: 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc)
+  * Alias of FUN_0041FF10 (non-canonical helper lane).
+  * Alias of FUN_004203D0 (non-canonical helper lane).
  *
  * What it does:
  * Returns command names starting with `prefix` (case-insensitive).
@@ -1224,7 +1251,7 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
 }
 
 /**
- * Address: 0x0041CC90 (FUN_0041CC90, ?CON_Execute@Moho@@YAXPBD@Z)
+  * Alias of FUN_0041CC90 (non-canonical helper lane).
  *
  * What it does:
  * Public console execution entry point used by Lua and UI helpers.
@@ -1321,7 +1348,7 @@ void moho::CON_Echo(void* const commandArgs)
 
 /**
  * Address: 0x0041EF40 (FUN_0041EF40, Moho::CON_ListCommands)
- * Address: 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc)
+  * Alias of FUN_004203D0 (non-canonical helper lane).
  *
  * What it does:
  * Emits one formatted line per registered command.
@@ -1949,7 +1976,7 @@ void moho::UI_DumpControlsUnderCursor(void* const commandArgs)
 
 /**
  * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
- * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
+  * Alias of FUN_004F2400 (non-canonical helper lane).
  *
  * What it does:
  * Requests application main-loop exit through the active wx app object.
@@ -2084,6 +2111,52 @@ void moho::CON_PathDebug(void* const commandArgs)
 }
 
 /**
+ * Address: 0x00833430 (FUN_00833430, Moho::CON_CreateProp)
+ *
+ * What it does:
+ * Resolves one prop blueprint id from command arguments (fallbacks to
+ * placeholder path), lowercases it, and dispatches prop creation at active
+ * world-session cursor position.
+ */
+void moho::CON_CreateProp(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    CON_Printf(noSessionText.c_str());
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const msvc8::string* const blueprintToken = args.At(1u);
+
+  const char* const blueprintPath =
+    blueprintToken != nullptr ? blueprintToken->c_str() : "/props/rplaceholder/rplaceholder_prop";
+
+  std::string normalizedBlueprintPath = blueprintPath != nullptr ? blueprintPath : "";
+  for (char& character : normalizedBlueprintPath) {
+    character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+  }
+
+  SIM_GetActiveDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
+}
+
+/**
+ * Address: 0x00847250 (FUN_00847250)
+ *
+ * What it does:
+ * Invokes `CWldSession::GenerateBuildTemplates()` on the global active
+ * session when it is present, then returns 0.
+ */
+[[maybe_unused]] int GenerateBuildTemplatesOnGlobalSessionIfPresent()
+{
+  if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
+    activeSession->GenerateBuildTemplates();
+  }
+  return 0;
+}
+
+/**
  * Address: 0x00833E50 (FUN_00833E50, Moho::CON_DebugGenerateBuildTemplateFromSelection)
  *
  * What it does:
@@ -2096,7 +2169,7 @@ void moho::CON_DebugGenerateBuildTemplateFromSelection(void* const commandArgs)
 
   if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
     (void)session;
-    gpg::Warnf("CON_DebugGenerateBuildTemplateFromSelection: generation path is not recovered yet.");
+    (void)GenerateBuildTemplatesOnGlobalSessionIfPresent();
     return;
   }
 
@@ -2173,6 +2246,29 @@ void moho::CON_TeleportSelectedUnits(void* const commandArgs)
 
     simDriver->WarpEntity(static_cast<EntId>(entityView->mParams.mEntityId), destination);
   }
+}
+
+/**
+ * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
+ *
+ * What it does:
+ * Legacy startup callback lane for anti-aliasing command wiring: when exactly
+ * two command tokens are present, forwards token `0` to
+ * `d3d_AntiAliasingSamples`.
+ */
+[[maybe_unused]] void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() != 2u) {
+    return;
+  }
+
+  const msvc8::string* const sampleToken = args.At(0u);
+  if (sampleToken == nullptr) {
+    return;
+  }
+
+  CON_Executef("d3d_AntiAliasingSamples %s", sampleToken->c_str());
 }
 
 /**
@@ -2547,7 +2643,7 @@ void moho::TConVar<float>::Handle(void* commandArgs)
 
 /**
  * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
- * Address: 0x103C8880 (FUN_103C8880)
+  * Alias of FUN_103C8880 (non-canonical helper lane).
  *
  * What it does:
  * Handles uint32 convar command; prints current value when no RHS command args are provided.
@@ -2621,6 +2717,7 @@ namespace
     "Generate build templates from current selection.";
   constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
     "Clear all generated build templates.";
+  constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn one prop at cursor world position.";
   constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
   constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
     "Perforce opened-for-edit query command (unsupported in this build).";
@@ -2657,6 +2754,7 @@ namespace
   CConFunc gCConFunc_Debug_Throw{};
   CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
   CConFunc gCConFunc_DebugClearBuildTemplates{};
+  CConFunc gCConFunc_CreateProp{};
   CConFunc gCConFunc_p4_Edit{};
   CConFunc gCConFunc_p4_IsOpenedForEdit{};
   CConFunc gCConFunc_exit{};
@@ -3745,6 +3843,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C06100 (FUN_00C06100, ??1CConFunc_CreateProp@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `CreateProp`.
+   */
+  void cleanup_CConFunc_CreateProp()
+  {
+    CleanupStartupConCommand(gCConFunc_CreateProp);
+  }
+
+  /**
+   * Address: 0x00BE3F70 (FUN_00BE3F70, register_CConFunc_CreateProp)
+   *
+   * What it does:
+   * Registers startup console callback for `CreateProp`.
+   */
+  void register_CConFunc_CreateProp()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_CreateProp,
+      kConsoleStartupConCreatePropDescription,
+      "CreateProp",
+      &CON_CreateProp,
+      &cleanup_CConFunc_CreateProp
+    );
+  }
+
+  /**
    * Address: 0x00BEF8C0 (FUN_00BEF8C0, ??1CConFunc_Log@Moho@@QAE@@Z)
    *
    * What it does:
@@ -4028,6 +4154,7 @@ namespace
       moho::register_CConFunc_p4_Edit();
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
+      moho::register_CConFunc_CreateProp();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();
       moho::register_CConFunc_Debug_Warn();

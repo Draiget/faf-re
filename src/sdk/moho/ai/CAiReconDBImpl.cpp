@@ -88,6 +88,7 @@ namespace
 
   /**
    * Address: 0x005C5CC0 (FUN_005C5CC0)
+   * Address: 0x008D6BD0 (FUN_008D6BD0)
    *
    * What it does:
    * Returns the leftmost (minimum-key) node reachable from `node`.
@@ -102,6 +103,7 @@ namespace
 
   /**
    * Address: 0x005C5CA0 (FUN_005C5CA0)
+   * Address: 0x008D6BB0 (FUN_008D6BB0)
    *
    * What it does:
    * Returns the rightmost (maximum-key) node reachable from `node`.
@@ -396,6 +398,25 @@ namespace
   }
 
   /**
+   * Address: 0x005C44F0 (FUN_005C44F0)
+   *
+   * What it does:
+   * Register-shape adapter that inserts one recon-map node by source-entity id
+   * and stores only the resulting node pointer in `outNode`.
+   */
+  [[maybe_unused]] ReconMapNodeView** InsertMapNodeBySourceEntityIdNodeOutAdapter(
+    CAiReconDBImpl* const owner,
+    const SReconKey& key,
+    ReconBlip* const value,
+    ReconMapNodeView** const outNode
+  )
+  {
+    const ReconMapInsertResult result = InsertMapNodeBySourceEntityId(owner, key, value);
+    *outNode = result.node;
+    return outNode;
+  }
+
+  /**
    * Address: 0x005C4950 (FUN_005C4950)
    *
    * What it does:
@@ -658,6 +679,29 @@ namespace
     head->isNil = 1u;
   }
 
+  /**
+   * Address: 0x005C2330 (FUN_005C2330)
+   *
+   * What it does:
+   * Clears all recon-map nodes, frees map-head storage, and resets map header
+   * lanes to null/zero.
+   */
+  void DestroyReconMapStorage(CAiReconDBImpl* const owner)
+  {
+    if (!owner) {
+      return;
+    }
+
+    if (owner->mBlipMap.mHead) {
+      ClearMap(owner);
+      delete reinterpret_cast<ReconMapNodeView*>(owner->mBlipMap.mHead);
+    }
+
+    owner->mBlipMap.mAllocProxy = nullptr;
+    owner->mBlipMap.mHead = nullptr;
+    owner->mBlipMap.mSize = 0u;
+  }
+
   [[nodiscard]] bool IsInsideRectXZ(const moho::Rect2<int>& rect, const Wm3::Vec3f& pos) noexcept
   {
     return pos.x >= static_cast<float>(rect.x0) && pos.x <= static_cast<float>(rect.x1) &&
@@ -838,6 +882,23 @@ namespace
     return reinterpret_cast<Entity*>(blip)->PendingPosition;
   }
 
+  /**
+   * Address: 0x005C9830 (FUN_005C9830)
+   *
+   * What it does:
+   * Forwards one entity-backed blip lane into `CInfluenceMap::UpdateBlipPosition`
+   * using `Entity::id_`, current `Entity::Position`, and current blueprint.
+   */
+  [[maybe_unused]] void UpdateInfluenceMapFromEntityState(
+    Entity* const blipEntity,
+    CInfluenceMap* const influenceMap
+  )
+  {
+    const auto blipId = static_cast<std::uint32_t>(blipEntity->id_);
+    const RUnitBlueprint* const blueprint = static_cast<const RUnitBlueprint*>(blipEntity->BluePrint);
+    influenceMap->UpdateBlipPosition(blipId, blipEntity->Position, blueprint);
+  }
+
   [[nodiscard]] bool DoesBlipSourceCollideBox(ReconBlip* const blip, const Wm3::Box3f& box) noexcept
   {
     Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
@@ -881,6 +942,33 @@ namespace
       return;
     }
     values.resize(values.size() + appendCount, nullptr);
+  }
+
+  /**
+   * Address: 0x005C4AB0 (FUN_005C4AB0)
+   *
+   * What it does:
+   * Pushes one `ReconBlip*` lane to the destination vector and grows storage
+   * through the canonical helper when capacity is exhausted.
+   */
+  [[maybe_unused]] ReconBlip* PushBackBlipPointerWithGrowth(
+    msvc8::vector<ReconBlip*>& values,
+    ReconBlip* const blip
+  )
+  {
+    auto& view = msvc8::AsVectorRuntimeView(values);
+    if (view.begin == nullptr || view.end == view.capacityEnd) {
+      GrowBlipPointerVector(values, 1u);
+      view = msvc8::AsVectorRuntimeView(values);
+      if (view.end != view.begin) {
+        *(view.end - 1) = blip;
+      }
+      return blip;
+    }
+
+    *view.end = blip;
+    ++view.end;
+    return blip;
   }
 
   /**
@@ -1105,16 +1193,10 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
  */
 CAiReconDBImpl::~CAiReconDBImpl()
 {
-  ClearMap(this);
+  DestroyReconMapStorage(this);
 
   mBblips.clear();
   mTempBlips.clear();
-
-  if (mBlipMap.mHead) {
-    delete reinterpret_cast<ReconMapNodeView*>(mBlipMap.mHead);
-  }
-  mBlipMap.mHead = nullptr;
-  mBlipMap.mSize = 0u;
 
   mVCIGrid.release();
   mSCIGrid.release();
@@ -1971,6 +2053,29 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const f
   const float waterElevation = (mMapData && mMapData->mWaterEnabled != 0u) ? mMapData->mWaterElevation : -10000.0f;
   const bool isUnderwater = waterElevation > y;
   return GetReconFlagsForRect(rect, senseMask, isUnderwater);
+}
+
+/**
+ * Address: 0x005C19C0 (FUN_005C19C0)
+ *
+ * What it does:
+ * Register-shape adapter that computes underwater state from map water lanes
+ * and forwards one rect probe to `CAiReconDBImpl::GetReconFlagsForRect`.
+ */
+[[maybe_unused]] EReconFlags ReconCanDetectRectWithWaterAdapter(
+  const CAiReconDBImpl* const reconDb,
+  const EReconFlags oldFlags,
+  const moho::Rect2<int>& rect,
+  const float y
+)
+{
+  if (reconDb == nullptr) {
+    return oldFlags;
+  }
+
+  const float waterElevation =
+    (reconDb->mMapData && reconDb->mMapData->mWaterEnabled != 0u) ? reconDb->mMapData->mWaterElevation : -10000.0f;
+  return reconDb->GetReconFlagsForRect(rect, oldFlags, waterElevation > y);
 }
 
 /**

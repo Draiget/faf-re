@@ -291,7 +291,6 @@ namespace moho
     InitializeHelperNode(gUnitWeaponSerializer);
     gUnitWeaponSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&UnitWeaponSerializer::Deserialize);
     gUnitWeaponSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&UnitWeaponSerializer::Serialize);
-    gUnitWeaponSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_UnitWeaponSerializer_AtExit);
   }
 } // namespace moho

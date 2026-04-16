@@ -100,6 +100,18 @@ namespace
     InitializeHelperNode(serializer);
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkAndResetVTransformSerializerStartupHelperNode() noexcept
+  {
+    moho::VTransformSerializer& serializer = VTransformSerializerStorageRef();
+    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+    serializer.mHelperPrev->mNext = serializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
   [[nodiscard]] bool CompareQuaternionComponents(
     const Wm3::Quatf& lhs,
     const Wm3::Quatf& rhs,
@@ -235,6 +247,21 @@ namespace moho
     orient_ = rhs.orient_;
     pos_ = rhs.pos_;
     return *this;
+  }
+
+  /**
+   * Address: 0x004F04D0 (FUN_004F04D0, ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ)
+   * Mangled: ??BVTransform@Moho@@QBE?AUVMatrix4@1@XZ
+   *
+   * What it does:
+   * Materializes one matrix from this transform by forwarding to
+   * `VMatrix4::Set(orient_, pos_)`.
+   */
+  VTransform::operator VMatrix4() const
+  {
+    VMatrix4 matrix{};
+    matrix.Set(orient_, pos_);
+    return matrix;
   }
 
   /**
@@ -445,6 +472,30 @@ namespace moho
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
     reinterpret_cast<const VTransform*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x004F07B0 (FUN_004F07B0)
+   *
+   * What it does:
+   * Unlinks the `VTransformSerializer` startup helper node from its intrusive
+   * list, rewires it to self-link, and returns that self node.
+   */
+  gpg::SerHelperBase* cleanup_VTransformSerializerVariant1()
+  {
+    return UnlinkAndResetVTransformSerializerStartupHelperNode();
+  }
+
+  /**
+   * Address: 0x004F07E0 (FUN_004F07E0)
+   *
+   * What it does:
+   * Duplicate cleanup lane for `VTransformSerializer` that performs the same
+   * helper-node unlink and self-link reset, then returns the self node.
+   */
+  gpg::SerHelperBase* cleanup_VTransformSerializerVariant2()
+  {
+    return UnlinkAndResetVTransformSerializerStartupHelperNode();
   }
 
   void VTransformSerializer::RegisterSerializeFunctions()

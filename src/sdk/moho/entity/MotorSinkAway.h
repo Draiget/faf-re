@@ -90,6 +90,15 @@ namespace moho
     "CScrLuaMetatableFactory<MotorSinkAway> size must be 0x8"
   );
 
+  /**
+   * Address: 0x006971D0 (FUN_006971D0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<MotorSinkAway>` and returns that singleton.
+   */
+  CScrLuaMetatableFactory<MotorSinkAway>* startup_CScrLuaMetatableFactory_MotorSinkAway_Index();
+
   class MotorSinkAwayTypeInfo final : public gpg::RType
   {
   public:
@@ -169,7 +178,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006967E0 (FUN_006967E0, construct registration lane)
+     * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::RegisterConstructFunction)
      */
     virtual void RegisterConstructFunction();
 

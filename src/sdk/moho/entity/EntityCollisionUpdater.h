@@ -64,12 +64,12 @@ namespace moho
    * Address: 0x004FE9D0 / 0x004FF2D0
    *
    * What it does:
-   * Segment-shape collision output.
-   * Field at +0x00 is currently not touched by these methods.
+   * Segment-shape collision output. `Entity::Intersects(lineStart, lineEnd, ...)`
+   * stamps the owning source entity into `sourceEntity` (+0x00) on hit.
    */
   struct CollisionLineResult
   {
-    std::uint32_t reserved00;    // +0x00
+    Entity* sourceEntity;        // +0x00
     Wm3::Vec3f direction;        // +0x04
     Wm3::Vec3f position;         // +0x10
     float distanceFromLineStart; // +0x1C
@@ -131,6 +131,21 @@ namespace moho
   ) noexcept;
 
   /**
+   * Address: 0x00723090 (FUN_00723090, sub_723090)
+   *
+   * What it does:
+   * Inserts one `CollisionResult` range `[sourceBegin, sourceEnd)` before
+   * `insertBefore` in `outCollisions`, growing storage when required, and
+   * returns the rebased insertion pointer in the active storage lane.
+   */
+  [[nodiscard]] CollisionResult* InsertCollisionResultRange(
+    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
+    CollisionResult* insertBefore,
+    const CollisionResult* sourceBegin,
+    const CollisionResult* sourceEnd
+  ) noexcept;
+
+  /**
    * Address: 0x0057E9D0 (FUN_0057E9D0, gpg::fastvector_n_CollisionResult::~fastvector_n_CollisionResult)
    *
    * Concrete fastvector alias that materializes the binary-observed
@@ -150,6 +165,14 @@ namespace moho
   class EntityCollisionUpdater
   {
   public:
+    /**
+     * Address: 0x004FFDE0 (FUN_004FFDE0, Moho::CColPrimitiveBase::CColPrimitiveBase)
+     *
+     * What it does:
+     * Initializes one collision-primitive base runtime lane.
+     */
+    EntityCollisionUpdater();
+
     /**
      * Address: 0x004FFC20 / 0x004FF9A0
      *

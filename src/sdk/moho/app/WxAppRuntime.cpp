@@ -76,6 +76,12 @@ bool moho::WxAppRuntime::DestroyWindow(WSupComFrame* const window)
   return DestroyWindow(reinterpret_cast<wxWindowBase*>(window));
 }
 
+/**
+ * Address: 0x008CE050 (FUN_008CE050)
+ *
+ * What it does:
+ * Returns the WM_ACTIVATEAPP-derived active-bit lane from one SupCom frame.
+ */
 bool moho::WxAppRuntime::IsSupComFrameWindowActive(const WSupComFrame* const frame)
 {
   return frame != nullptr && frame->mIsApplicationActive != 0;

@@ -41,7 +41,12 @@ int gpg::STR_Utf8Len(
   return i;
 }
 
-// 0x00938040
+/**
+ * Address: 0x00938040 (FUN_00938040, gpg::STR_NextUtf8Char)
+ *
+ * What it does:
+ * Advances to the next UTF-8 codepoint boundary, stopping at NUL.
+ */
 const char* gpg::STR_NextUtf8Char(
   const char* str
 )
@@ -374,7 +379,13 @@ int gpg::STR_GetNextWordStartIndex(
   return index;
 }
 
-// 0x00938190
+/**
+ * Address: 0x00938190 (FUN_00938190, gpg::STR_EndsWith)
+ *
+ * What it does:
+ * Returns whether `str` has suffix `end`, requiring `str` to be strictly
+ * longer than `end`.
+ */
 bool gpg::STR_EndsWith(
   const StrArg str,
   const StrArg end
@@ -620,6 +631,15 @@ bool gpg::STR_IsAsciiWhitespace(
 
 namespace
 {
+  enum class WildcardMatchStepResult : int
+  {
+    Mismatch = 0,
+    Match = 1,
+    Star = 2,
+    PrefixExhausted = 3,
+    PatternExhausted = 4
+  };
+
   char FoldWildcardChar(
     const char c,
     const bool caseSensitive
@@ -632,6 +652,108 @@ namespace
       return static_cast<char>(c + ('a' - 'A'));
     }
     return c;
+  }
+
+  /**
+   * Address: 0x00938350 (FUN_00938350)
+   *
+   * What it does:
+   * Advances one wildcard match lane across literal/`?`/`*` tokens and reports
+   * the state-machine transition result.
+   */
+  [[nodiscard]] WildcardMatchStepResult AdvanceWildcardLiteralLane(
+    const char*& text,
+    const char*& pattern
+  ) noexcept
+  {
+    const char* textCursor = text;
+    const char* patternCursor = pattern;
+    char patternChar = *patternCursor;
+    if (patternChar == '\0') {
+      return (*textCursor != '\0') ? WildcardMatchStepResult::PatternExhausted : WildcardMatchStepResult::Match;
+    }
+
+    while (true) {
+      ++patternCursor;
+      if (patternChar == '?') {
+        const char textChar = *textCursor++;
+        if (textChar == '\0') {
+          return WildcardMatchStepResult::PrefixExhausted;
+        }
+
+        if (static_cast<signed char>(textChar) < 0 && ((*textCursor & 0xC0) == 0x80)) {
+          char continuationByte = 0;
+          do {
+            continuationByte = *++textCursor;
+          } while ((continuationByte & 0xC0) == 0x80);
+        }
+      } else if (patternChar == '*') {
+        text = textCursor;
+        pattern = patternCursor;
+        return WildcardMatchStepResult::Star;
+      } else {
+        const char textChar = *textCursor++;
+        if (textChar != patternChar) {
+          return (textChar != '\0') ? WildcardMatchStepResult::Mismatch : WildcardMatchStepResult::PrefixExhausted;
+        }
+      }
+
+      patternChar = *patternCursor;
+      if (patternChar == '\0') {
+        return (*textCursor != '\0') ? WildcardMatchStepResult::PatternExhausted : WildcardMatchStepResult::Match;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x009383D0 (FUN_009383D0, wildcard core matcher lane)
+   *
+   * What it does:
+   * Executes the binary wildcard state machine used by
+   * `gpg::STR_MatchWildcard`/`gpg::STR_WildcardValidPrefix`, including UTF-8
+   * aware `?` handling and `*` backtracking semantics.
+   */
+  [[nodiscard]] int MatchWildcardPatternLane(
+    const char* text,
+    const char* pattern
+  ) noexcept
+  {
+    WildcardMatchStepResult result = AdvanceWildcardLiteralLane(text, pattern);
+    if (result != WildcardMatchStepResult::Star) {
+      return static_cast<int>(result);
+    }
+
+    while (true) {
+      for (const char* scan = text;; scan = ++text) {
+        const char patternChar = *pattern;
+        char scanChar = '\0';
+        if (patternChar != '*' && patternChar != '?') {
+          scanChar = *scan;
+          if (scanChar != patternChar) {
+            while (scanChar != '\0') {
+              scanChar = *++scan;
+              text = scan;
+              if (scanChar == patternChar) {
+                break;
+              }
+            }
+            if (scanChar == '\0') {
+              return static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
+            }
+          }
+        }
+
+        result = AdvanceWildcardLiteralLane(text, pattern);
+        if (result != WildcardMatchStepResult::Mismatch) {
+          if (result == WildcardMatchStepResult::Star) {
+            break;
+          }
+          if (result != WildcardMatchStepResult::PatternExhausted) {
+            return static_cast<int>(result);
+          }
+        }
+      }
+    }
   }
 } // namespace
 
@@ -657,6 +779,10 @@ bool gpg::STR_MatchWildcard(
 {
   if (text == nullptr || pattern == nullptr) {
     return false;
+  }
+
+  if (caseSensitive) {
+    return MatchWildcardPatternLane(text, pattern) == static_cast<int>(WildcardMatchStepResult::Match);
   }
 
   const char* starPattern = nullptr;
@@ -714,6 +840,12 @@ bool gpg::STR_WildcardValidPrefix(
 {
   if (prefix == nullptr || pattern == nullptr) {
     return false;
+  }
+
+  if (caseSensitive) {
+    const int result = MatchWildcardPatternLane(prefix, pattern);
+    return result == static_cast<int>(WildcardMatchStepResult::Match)
+      || result == static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
   }
 
   const char* starPattern = nullptr;

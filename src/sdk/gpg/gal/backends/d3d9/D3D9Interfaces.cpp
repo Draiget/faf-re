@@ -20,7 +20,12 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/EffectMacro.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/CubeRenderTarget.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/Head.hpp"
+#include "gpg/gal/PipelineState.hpp"
+#include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 
@@ -28,6 +33,8 @@
 #include "boost/weak_ptr.h"
 
 #include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <cstdio>
 #include <cstring>
@@ -39,6 +46,47 @@
 namespace gpg::gal
 {
 #include <d3d9caps.h>
+
+    /**
+     * Address: 0x008F3810 (FUN_008F3810)
+     * Address: 0x008F3820 (FUN_008F3820)
+     *
+     * What it does:
+     * Initializes one base `EffectTechnique` lane.
+     */
+    EffectTechnique::EffectTechnique() = default;
+
+    /**
+     * Address: 0x008F4B80 (FUN_008F4B80)
+     *
+     * What it does:
+     * Initializes one abstract index-buffer base lane.
+     */
+    IndexBuffer::IndexBuffer() = default;
+
+    /**
+     * Address: 0x008F5250 (FUN_008F5250)
+     *
+     * What it does:
+     * Initializes one abstract render-target base lane.
+     */
+    RenderTarget::RenderTarget() = default;
+
+    /**
+     * Address: 0x008F7F20 (FUN_008F7F20)
+     *
+     * What it does:
+     * Initializes one abstract cube-render-target base lane.
+     */
+    CubeRenderTarget::CubeRenderTarget() = default;
+
+    /**
+     * Address: 0x00902230 (FUN_00902230)
+     *
+     * What it does:
+     * Initializes one base `PipelineState` lane.
+     */
+    PipelineState::PipelineState() = default;
 
     namespace
     {
@@ -213,6 +261,11 @@ namespace gpg::gal
         using d3d9_check_device_format_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, unsigned int, unsigned int, std::uint32_t);
         using d3d9_check_device_multisample_type_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, int, unsigned int, unsigned int*);
         using d3d9_get_adapter_identifier_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void*);
+        using d3d9_get_adapter_count_fn = unsigned int(__stdcall*)(void*);
+        using d3d9_get_adapter_mode_count_fn = unsigned int(__stdcall*)(void*, unsigned int, std::uint32_t);
+        using d3d9_enum_adapter_modes_fn = HRESULT(__stdcall*)(void*, unsigned int, std::uint32_t, unsigned int, void*);
+        using d3d9_create_device_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, HWND, unsigned int, void*, void**);
+        using direct3d_create9_fn = void*(WINAPI*)(unsigned int);
 
         constexpr unsigned int kD3DLockNoOverwrite = 0x10U;
         constexpr unsigned int kD3DLockReadOnly = 0x1000U;
@@ -276,6 +329,14 @@ namespace gpg::gal
         constexpr unsigned int kD3DCmpLessEqual = 4U;
         constexpr unsigned int kD3DFogModeLinear = 3U;
         constexpr int kCubeFaceCount = 6;
+        constexpr unsigned int kCubeFaceByIndex[kCubeFaceCount] = {
+            0U,
+            1U,
+            2U,
+            3U,
+            4U,
+            5U,
+        };
         constexpr std::uint32_t kD3DDeviceLost = 0x88760868U;
         constexpr std::uint32_t kD3DDeviceNotReset = 0x88760869U;
         constexpr HRESULT kMissingD3DXCall = static_cast<HRESULT>(0x80004005L);
@@ -297,6 +358,17 @@ namespace gpg::gal
         };
         std::uint8_t sMeshAllowFloat16 = 1U;
         std::uint8_t sMeshAllowInstancing = 1U;
+
+        /**
+         * Address: 0x00941280 (FUN_00941280)
+         *
+         * What it does:
+         * Maps one cube-face index (`0..5`) to the backend D3D9 face token.
+         */
+        [[nodiscard]] int ResolveD3D9CubeFaceToken(const int faceIndex) noexcept
+        {
+            return static_cast<int>(kCubeFaceByIndex[faceIndex]);
+        }
 
         struct DeviceD3D9RuntimeView final
         {
@@ -694,6 +766,43 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x008E8710 (FUN_008E8710)
+         * Address: 0x0094AC70 (FUN_0094AC70)
+         *
+         * What it does:
+         * Releases one COM-like pointer lane when present and nulls the slot.
+         */
+        [[nodiscard]] std::uint32_t ReleaseComPointerSlotAndReturnReleaseCode(void** const slot) noexcept
+        {
+            std::uint32_t result = 0U;
+            if (slot != nullptr)
+            {
+                void* const object = *slot;
+                if (object != nullptr)
+                {
+                    auto** const vtable = *reinterpret_cast<void***>(object);
+                    auto* const release = reinterpret_cast<release_fn>(vtable[2]);
+                    result = release(object);
+                }
+                *slot = nullptr;
+            }
+            return result;
+        }
+
+        /**
+         * Address: 0x008E8730 (FUN_008E8730)
+         *
+         * What it does:
+         * Releases one COM-like pointer slot via vtable `Release` lane and
+         * always clears that slot to `nullptr`.
+         */
+        [[nodiscard]] std::uint32_t ReleaseComPointerSlotAndClear(void** const slot) noexcept
+        {
+            return ReleaseComPointerSlotAndReturnReleaseCode(slot);
+        }
+
+        /**
+         * Address: 0x008E8710 (FUN_008E8710)
          * Address: 0x0094AC70 (FUN_0094AC70)
          *
          * What it does:
@@ -701,19 +810,16 @@ namespace gpg::gal
          */
         void ReleaseComPointerSlot(void** const slot) noexcept
         {
-            if ((slot != nullptr) && (*slot != nullptr))
-            {
-                auto** const vtable = *reinterpret_cast<void***>(*slot);
-                auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-                release(*slot);
-            }
-
-            if (slot != nullptr)
-            {
-                *slot = nullptr;
-            }
+            (void)ReleaseComPointerSlotAndReturnReleaseCode(slot);
         }
 
+        /**
+         * Address: 0x008E8750 (FUN_008E8750)
+         *
+         * What it does:
+         * Releases one COM-like interface pointer when present and always
+         * clears the caller-owned slot to `nullptr`.
+         */
         void ReleaseComLike(void*& object) noexcept;
 
         class ComObjectScope final
@@ -756,6 +862,13 @@ namespace gpg::gal
             void* pointer_ = nullptr;
         };
 
+        /**
+         * Address: 0x008E8750 (FUN_008E8750)
+         *
+         * What it does:
+         * Releases one COM-like interface pointer when present and always
+         * clears the caller-owned slot to `nullptr`.
+         */
         void ReleaseComLike(void*& object) noexcept
         {
             ReleaseComPointerSlot(&object);
@@ -1647,6 +1760,422 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x008E9D20 (FUN_008E9D20, boost::shared_ptr_RenderTargetD3D9::shared_ptr_RenderTargetD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<RenderTargetD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<RenderTargetD3D9>* ConstructSharedRenderTargetD3D9FromRaw(
+            boost::shared_ptr<RenderTargetD3D9>* const outRenderTarget,
+            RenderTargetD3D9* const renderTarget
+        )
+        {
+            return ::new (outRenderTarget) boost::shared_ptr<RenderTargetD3D9>(renderTarget);
+        }
+
+        /**
+         * Address: 0x008E9D50 (FUN_008E9D50, boost::shared_ptr_CubeRenderTargetD3D9::shared_ptr_CubeRenderTargetD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<CubeRenderTargetD3D9>` from one raw
+         * pointer lane.
+         */
+        boost::shared_ptr<CubeRenderTargetD3D9>* ConstructSharedCubeRenderTargetD3D9FromRaw(
+            boost::shared_ptr<CubeRenderTargetD3D9>* const outCubeRenderTarget,
+            CubeRenderTargetD3D9* const cubeRenderTarget
+        )
+        {
+            return ::new (outCubeRenderTarget) boost::shared_ptr<CubeRenderTargetD3D9>(cubeRenderTarget);
+        }
+
+        /**
+         * Address: 0x008E9D80 (FUN_008E9D80, boost::shared_ptr_DepthStencilTargetD3D9::shared_ptr_DepthStencilTargetD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<DepthStencilTargetD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<DepthStencilTargetD3D9>* ConstructSharedDepthStencilTargetD3D9FromRaw(
+            boost::shared_ptr<DepthStencilTargetD3D9>* const outDepthStencilTarget,
+            DepthStencilTargetD3D9* const depthStencilTarget
+        )
+        {
+            return ::new (outDepthStencilTarget) boost::shared_ptr<DepthStencilTargetD3D9>(depthStencilTarget);
+        }
+
+        /**
+         * Address: 0x008E9DB0 (FUN_008E9DB0, boost::shared_ptr_VertexFormatD3D9::shared_ptr_VertexFormatD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<VertexFormatD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<VertexFormatD3D9>* ConstructSharedVertexFormatD3D9FromRaw(
+            boost::shared_ptr<VertexFormatD3D9>* const outVertexFormat,
+            VertexFormatD3D9* const vertexFormat
+        )
+        {
+            return ::new (outVertexFormat) boost::shared_ptr<VertexFormatD3D9>(vertexFormat);
+        }
+
+        /**
+         * Address: 0x008E9DE0 (FUN_008E9DE0, boost::shared_ptr_VertexBufferD3D9::shared_ptr_VertexBufferD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<VertexBufferD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<VertexBufferD3D9>* ConstructSharedVertexBufferD3D9FromRaw(
+            boost::shared_ptr<VertexBufferD3D9>* const outVertexBuffer,
+            VertexBufferD3D9* const vertexBuffer
+        )
+        {
+            return ::new (outVertexBuffer) boost::shared_ptr<VertexBufferD3D9>(vertexBuffer);
+        }
+
+        /**
+         * Address: 0x008E9E10 (FUN_008E9E10, boost::shared_ptr_IndexBufferD3D9::shared_ptr_IndexBufferD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<IndexBufferD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<IndexBufferD3D9>* ConstructSharedIndexBufferD3D9FromRaw(
+            boost::shared_ptr<IndexBufferD3D9>* const outIndexBuffer,
+            IndexBufferD3D9* const indexBuffer
+        )
+        {
+            return ::new (outIndexBuffer) boost::shared_ptr<IndexBufferD3D9>(indexBuffer);
+        }
+
+        /**
+         * Address: 0x008EA060 (FUN_008EA060, boost::shared_ptr_PipelineStateD3D9::shared_ptr_PipelineStateD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<PipelineStateD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<PipelineStateD3D9>* ConstructSharedPipelineStateD3D9FromRaw(
+            boost::shared_ptr<PipelineStateD3D9>* const outPipelineState,
+            PipelineStateD3D9* const pipelineState
+        )
+        {
+            return ::new (outPipelineState) boost::shared_ptr<PipelineStateD3D9>(pipelineState);
+        }
+
+        struct DwordPairRuntime final
+        {
+            std::uint32_t lane0 = 0U;
+            std::uint32_t lane1 = 0U;
+        };
+        static_assert(sizeof(DwordPairRuntime) == 0x08, "DwordPairRuntime size must be 0x08");
+
+        struct DwordTripleRuntime final
+        {
+            std::uint32_t lane0 = 0U;
+            std::uint32_t lane1 = 0U;
+            std::uint32_t lane2 = 0U;
+        };
+        static_assert(sizeof(DwordTripleRuntime) == 0x0C, "DwordTripleRuntime size must be 0x0C");
+
+        struct DwordHeptRuntime final
+        {
+            std::uint32_t lanes[7]{};
+        };
+        static_assert(sizeof(DwordHeptRuntime) == 0x1C, "DwordHeptRuntime size must be 0x1C");
+
+        /**
+         * Address: 0x008E9FD0 (FUN_008E9FD0)
+         *
+         * What it does:
+         * Copies one half-open 12-byte lane range backward from
+         * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
+         */
+        [[maybe_unused]] [[nodiscard]] DwordTripleRuntime* CopyDwordTripleRangeBackwardD3D9(
+            const DwordTripleRuntime* const sourceBegin,
+            const DwordTripleRuntime* sourceEnd,
+            DwordTripleRuntime* destinationEnd
+        ) noexcept
+        {
+            while (sourceEnd != sourceBegin)
+            {
+                --sourceEnd;
+                --destinationEnd;
+                *destinationEnd = *sourceEnd;
+            }
+
+            return destinationEnd;
+        }
+
+        /**
+         * Address: 0x008EA000 (FUN_008EA000)
+         *
+         * What it does:
+         * Copies one half-open dword range backward from `[sourceBegin,
+         * sourceEnd)` into storage ending at `destinationEnd`.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9A(
+            const std::uint32_t* const sourceBegin,
+            const std::uint32_t* sourceEnd,
+            std::uint32_t* destinationEnd
+        ) noexcept
+        {
+            while (sourceEnd != sourceBegin)
+            {
+                --sourceEnd;
+                --destinationEnd;
+                *destinationEnd = *sourceEnd;
+            }
+
+            return destinationEnd;
+        }
+
+        /**
+         * Address: 0x008EA030 (FUN_008EA030)
+         *
+         * What it does:
+         * Alias lane of `CopyDwordRangeBackwardD3D9A`.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9B(
+            const std::uint32_t* const sourceBegin,
+            const std::uint32_t* const sourceEnd,
+            std::uint32_t* const destinationEnd
+        ) noexcept
+        {
+            return CopyDwordRangeBackwardD3D9A(sourceBegin, sourceEnd, destinationEnd);
+        }
+
+        /**
+         * Address: 0x008F6580 (FUN_008F6580)
+         *
+         * What it does:
+         * Copies one half-open 28-byte lane range backward from
+         * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
+         */
+        [[maybe_unused]] [[nodiscard]] DwordHeptRuntime* CopyDwordHeptRangeBackwardD3D9(
+            const DwordHeptRuntime* const sourceBegin,
+            const DwordHeptRuntime* sourceEnd,
+            DwordHeptRuntime* destinationEnd
+        ) noexcept
+        {
+            while (sourceEnd != sourceBegin)
+            {
+                --sourceEnd;
+                --destinationEnd;
+                *destinationEnd = *sourceEnd;
+            }
+
+            return destinationEnd;
+        }
+
+        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneCore(
+            std::uint32_t* destination,
+            int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            for (int remaining = count; remaining != 0; --remaining, ++destination)
+            {
+                if (destination != nullptr)
+                {
+                    *destination = *sourceLane;
+                }
+            }
+            return destination;
+        }
+
+        /**
+         * Address: 0x008EA0D0 (FUN_008EA0D0)
+         *
+         * What it does:
+         * Writes one repeated dword source lane into `count` consecutive dword
+         * destination slots.
+         */
+        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchA(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            (void)FillDwordRangeWithSourceLaneCore(destination, count, sourceLane);
+        }
+
+        /**
+         * Address: 0x008EA2F0 (FUN_008EA2F0)
+         *
+         * What it does:
+         * Adapter lane forwarding one repeated dword fill request to
+         * `FillDwordRangeWithSourceLaneDispatchA`.
+         */
+        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchAAdapter(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            FillDwordRangeWithSourceLaneDispatchA(destination, count, sourceLane);
+        }
+
+        /**
+         * Address: 0x008EA540 (FUN_008EA540)
+         *
+         * What it does:
+         * Dispatches one repeated dword fill lane through
+         * `FillDwordRangeWithSourceLaneDispatchA` and returns one-past-end
+         * destination cursor.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchAAndReturnEnd(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            FillDwordRangeWithSourceLaneDispatchA(destination, count, sourceLane);
+            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(std::uint32_t);
+            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
+        }
+
+        /**
+         * Address: 0x008EA100 (FUN_008EA100)
+         *
+         * What it does:
+         * Dispatch alias for the repeated dword fill lane used by adjacent D3D9
+         * capability/setup helper chains.
+         */
+        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchB(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            (void)FillDwordRangeWithSourceLaneCore(destination, count, sourceLane);
+        }
+
+        /**
+         * Address: 0x008EA320 (FUN_008EA320)
+         *
+         * What it does:
+         * Adapter lane forwarding one repeated dword fill request to
+         * `FillDwordRangeWithSourceLaneDispatchB`.
+         */
+        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchBAdapter(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            FillDwordRangeWithSourceLaneDispatchB(destination, count, sourceLane);
+        }
+
+        /**
+         * Address: 0x008EA580 (FUN_008EA580)
+         *
+         * What it does:
+         * Dispatches one repeated dword fill lane through
+         * `FillDwordRangeWithSourceLaneDispatchB` and returns one-past-end
+         * destination cursor.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchBAndReturnEnd(
+            std::uint32_t* const destination,
+            const int count,
+            const std::uint32_t* const sourceLane
+        ) noexcept
+        {
+            FillDwordRangeWithSourceLaneDispatchB(destination, count, sourceLane);
+            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(std::uint32_t);
+            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
+        }
+
+        struct PackedAdapterModeRuntime final
+        {
+            std::uint32_t vftable = 0U; // +0x00
+            std::uint32_t width = 0U;   // +0x04
+            std::uint32_t height = 0U;  // +0x08
+            std::uint32_t refresh = 0U; // +0x0C
+        };
+
+        static_assert(sizeof(PackedAdapterModeRuntime) == 0x10, "PackedAdapterModeRuntime size must be 0x10");
+
+        /**
+         * Address: 0x008EA190 (FUN_008EA190)
+         *
+         * What it does:
+         * Copies one packed adapter-mode tail range (`width/height/refresh`)
+         * over `[sourceFirst, sourceLast)` into destination slots and returns
+         * one-past the final destination element.
+         */
+        [[maybe_unused]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRange(
+            const PackedAdapterModeRuntime* sourceFirst,
+            const PackedAdapterModeRuntime* sourceLast,
+            PackedAdapterModeRuntime* destinationFirst
+        ) noexcept
+        {
+            const PackedAdapterModeRuntime* read = sourceFirst;
+            PackedAdapterModeRuntime* write = destinationFirst;
+            while (read != sourceLast)
+            {
+                write->width = read->width;
+                write->height = read->height;
+                write->refresh = read->refresh;
+                ++read;
+                ++write;
+            }
+
+            return write;
+        }
+
+        /**
+         * Address: 0x00940A80 (FUN_00940A80)
+         *
+         * What it does:
+         * Copies one packed adapter-mode tail range (`width/height/refresh`)
+         * backward from `[sourceBegin, sourceEnd)` into storage ending at
+         * `destinationEnd`, then returns the updated destination begin lane.
+         */
+        [[maybe_unused]] [[nodiscard]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRangeBackward(
+            const PackedAdapterModeRuntime* const sourceBegin,
+            const PackedAdapterModeRuntime* sourceEnd,
+            PackedAdapterModeRuntime* destinationEnd
+        ) noexcept
+        {
+            while (sourceEnd != sourceBegin)
+            {
+                --destinationEnd;
+                --sourceEnd;
+                destinationEnd->width = sourceEnd->width;
+                destinationEnd->height = sourceEnd->height;
+                destinationEnd->refresh = sourceEnd->refresh;
+            }
+
+            return destinationEnd;
+        }
+
+        /**
+         * Address: 0x00941A60 (FUN_00941A60, boost::shared_ptr_EffectTechniqueD3D9::shared_ptr_EffectTechniqueD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<EffectTechniqueD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<EffectTechniqueD3D9>* ConstructSharedEffectTechniqueD3D9FromRaw(
+            boost::shared_ptr<EffectTechniqueD3D9>* const outTechnique,
+            EffectTechniqueD3D9* const technique
+        )
+        {
+            return ::new (outTechnique) boost::shared_ptr<EffectTechniqueD3D9>(technique);
+        }
+
+        /**
+         * Address: 0x00941A90 (FUN_00941A90, boost::shared_ptr_EffectVariableD3D9::shared_ptr_EffectVariableD3D9)
+         *
+         * What it does:
+         * Constructs one `shared_ptr<EffectVariableD3D9>` from one raw pointer lane.
+         */
+        boost::shared_ptr<EffectVariableD3D9>* ConstructSharedEffectVariableD3D9FromRaw(
+            boost::shared_ptr<EffectVariableD3D9>* const outVariable,
+            EffectVariableD3D9* const variable
+        )
+        {
+            return ::new (outVariable) boost::shared_ptr<EffectVariableD3D9>(variable);
+        }
+
+        /**
          * Address: 0x008EA250 (FUN_008EA250, boost::shared_ptr_PipelineStateD3D9::operator=)
          *
          * What it does:
@@ -1660,6 +2189,258 @@ namespace gpg::gal
         {
             outPipelineState->reset(pipelineState);
             return outPipelineState;
+        }
+
+        /**
+         * Address: 0x008EA210 (FUN_008EA210)
+         * Address: 0x00940C60 (FUN_00940C60)
+         *
+         * What it does:
+         * Copy-constructs one half-open `AdapterModeD3D9` range into caller
+         * storage and returns one-past-last destination slot.
+         */
+        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRange(
+            AdapterModeD3D9* const destinationBegin,
+            const AdapterModeD3D9* sourceBegin,
+            const AdapterModeD3D9* sourceEnd
+        )
+        {
+            std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
+            for (const AdapterModeD3D9* sourceCursor = sourceBegin;
+                 sourceCursor != sourceEnd;
+                 ++sourceCursor, destinationCursor += sizeof(AdapterModeD3D9))
+            {
+                if (destinationCursor == 0U)
+                {
+                    continue;
+                }
+
+                auto* const destination = reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
+                ::new (static_cast<void*>(destination)) AdapterModeD3D9(
+                    sourceCursor->width_,
+                    sourceCursor->height_,
+                    sourceCursor->refreshRate_
+                );
+            }
+
+            return reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
+        }
+
+        /**
+         * Address: 0x008EA4D0 (FUN_008EA4D0)
+         *
+         * What it does:
+         * Adapter lane forwarding one `AdapterModeD3D9` copy-range request to
+         * `CopyAdapterModeRange`.
+         */
+        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeAdapter(
+            AdapterModeD3D9* const destinationBegin,
+            const AdapterModeD3D9* sourceBegin,
+            const AdapterModeD3D9* sourceEnd
+        )
+        {
+            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
+        }
+
+        /**
+         * Address: 0x008EA750 (FUN_008EA750)
+         *
+         * What it does:
+         * Dispatch alias lane for `CopyAdapterModeRange`.
+         */
+        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatch(
+            AdapterModeD3D9* const destinationBegin,
+            const AdapterModeD3D9* sourceBegin,
+            const AdapterModeD3D9* sourceEnd
+        )
+        {
+            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
+        }
+
+        /**
+         * Address: 0x00940BD0 (FUN_00940BD0)
+         *
+         * What it does:
+         * Dispatch alias lane for `CopyAdapterModeRange`.
+         */
+        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchB(
+            AdapterModeD3D9* const destinationBegin,
+            const AdapterModeD3D9* sourceBegin,
+            const AdapterModeD3D9* sourceEnd
+        )
+        {
+            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
+        }
+
+        /**
+         * Address: 0x00940C30 (FUN_00940C30)
+         *
+         * What it does:
+         * Legacy cdecl adapter lane that forwards one adapter-mode range copy
+         * request to `CopyAdapterModeRange`.
+         */
+        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchLegacyLaneA(
+            AdapterModeD3D9* const destinationBegin,
+            const AdapterModeD3D9* sourceBegin,
+            const AdapterModeD3D9* sourceEnd
+        )
+        {
+            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
+        }
+
+        /**
+         * Address: 0x008EA490 (FUN_008EA490)
+         *
+         * What it does:
+         * Copies one packed adapter-mode range (`4 dwords` stride) into
+         * destination storage and rebinds `AdapterModeD3D9` vtable ownership.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntime(
+            const std::uint32_t* sourceBegin,
+            const std::uint32_t* sourceEnd,
+            std::uint32_t* destinationBegin
+        )
+        {
+            const std::uint32_t* sourceCursor = sourceBegin;
+            std::uint32_t* destinationCursor = destinationBegin;
+
+            while (sourceCursor != sourceEnd)
+            {
+                if (destinationCursor != nullptr)
+                {
+                    auto* const destinationMode = reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
+                    ::new (static_cast<void*>(destinationMode))
+                        AdapterModeD3D9(sourceCursor[1], sourceCursor[2], sourceCursor[3]);
+                }
+
+                sourceCursor += 4;
+                if (destinationCursor != nullptr)
+                {
+                    destinationCursor += 4;
+                }
+            }
+
+            return destinationCursor;
+        }
+
+        /**
+         * Address: 0x008EA6C0 (FUN_008EA6C0)
+         *
+         * What it does:
+         * Cdecl adapter lane forwarding one packed adapter-mode copy-range
+         * request to `CopyPackedAdapterModeRangeRuntime`.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterA(
+            const std::uint32_t* sourceBegin,
+            const std::uint32_t* sourceEnd,
+            std::uint32_t* destinationBegin
+        )
+        {
+            return CopyPackedAdapterModeRangeRuntime(sourceBegin, sourceEnd, destinationBegin);
+        }
+
+        /**
+         * Address: 0x008EA8B0 (FUN_008EA8B0)
+         *
+         * What it does:
+         * Stdcall adapter lane forwarding one packed adapter-mode copy-range
+         * request to `CopyPackedAdapterModeRangeRuntime`.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterB(
+            const std::uint32_t* sourceBegin,
+            const std::uint32_t* sourceEnd,
+            std::uint32_t* destinationBegin
+        )
+        {
+            return CopyPackedAdapterModeRangeRuntime(sourceBegin, sourceEnd, destinationBegin);
+        }
+
+        /**
+         * Address: 0x00940AF0 (FUN_00940AF0)
+         *
+         * What it does:
+         * Writes one packed adapter-mode payload range (`+0x04/+0x08/+0x0C`
+         * dwords per 16-byte lane) from one fixed source mode.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModePayloadRangeRuntime(
+            std::uint32_t* destinationBegin,
+            std::uint32_t* const destinationEnd,
+            const std::uint32_t* const sourceMode
+        )
+        {
+            std::uint32_t* result = destinationBegin;
+            if (destinationBegin != destinationEnd)
+            {
+                result = destinationBegin + 2;
+                do
+                {
+                    result[-1] = sourceMode[1];
+                    result[0] = sourceMode[2];
+                    result[1] = sourceMode[3];
+                    result += 4;
+                } while (result - 2 != destinationEnd);
+            }
+            return result;
+        }
+
+        /**
+         * Address: 0x00940B60 (FUN_00940B60)
+         *
+         * What it does:
+         * Fills `count` packed adapter-mode slots (`4 dwords` stride) from one
+         * source mode payload and rebinds `AdapterModeD3D9` vtable ownership.
+         */
+        [[maybe_unused]] void FillPackedAdapterModeRangeRuntime(
+            std::uint32_t* destinationBegin,
+            std::uint32_t count,
+            const std::uint32_t* const sourceMode
+        )
+        {
+            while (count != 0U)
+            {
+                if (destinationBegin != nullptr && sourceMode != nullptr)
+                {
+                    auto* const destinationMode = reinterpret_cast<AdapterModeD3D9*>(destinationBegin);
+                    ::new (static_cast<void*>(destinationMode))
+                        AdapterModeD3D9(sourceMode[1], sourceMode[2], sourceMode[3]);
+                    destinationBegin += 4;
+                }
+                --count;
+            }
+        }
+
+        /**
+         * Address: 0x00940BA0 (FUN_00940BA0)
+         *
+         * What it does:
+         * Dispatch alias lane for packed adapter-mode fill behavior.
+         */
+        [[maybe_unused]] void FillPackedAdapterModeRangeRuntimeDispatchA(
+            std::uint32_t* const destinationBegin,
+            const std::uint32_t count,
+            const std::uint32_t* const sourceMode
+        )
+        {
+            FillPackedAdapterModeRangeRuntime(destinationBegin, count, sourceMode);
+        }
+
+        /**
+         * Address: 0x00940BF0 (FUN_00940BF0)
+         *
+         * What it does:
+         * Fills `count` packed adapter-mode slots from one source payload and
+         * returns the one-past-end destination cursor lane.
+         */
+        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillPackedAdapterModeRangeAndReturnEnd(
+            std::uint32_t* const destinationBegin,
+            const std::uint32_t count,
+            const std::uint32_t* const sourceMode
+        )
+        {
+            FillPackedAdapterModeRangeRuntime(destinationBegin, count, sourceMode);
+            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
+            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(AdapterModeD3D9);
+            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
         }
 
         /**
@@ -1709,6 +2490,32 @@ namespace gpg::gal
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const showCursor = reinterpret_cast<d3d9_device_show_cursor_fn>(vtable[12]);
             return showCursor(nativeDevice, show ? 1 : 0);
+        }
+
+        struct AdapterVectorCountRuntime final
+        {
+            void* allocatorProxy = nullptr;   // +0x00
+            AdapterD3D9* first = nullptr;     // +0x04
+            AdapterD3D9* last = nullptr;      // +0x08
+        };
+        static_assert(sizeof(AdapterVectorCountRuntime) == 0x0C, "AdapterVectorCountRuntime size must be 0x0C");
+
+        /**
+         * Address: 0x008E83A0 (FUN_008E83A0)
+         *
+         * What it does:
+         * Returns element count from one adapter-vector lane (`_Mylast -
+         * _Myfirst`) with 0x70-byte element stride, or zero when uninitialized.
+         */
+        [[maybe_unused]] [[nodiscard]] int CountAdapterVectorElements(const AdapterVectorCountRuntime* const vectorLane) noexcept
+        {
+            const AdapterD3D9* const first = vectorLane->first;
+            if (first == nullptr)
+            {
+                return 0;
+            }
+
+            return static_cast<int>(vectorLane->last - first);
         }
 
         std::uint32_t GetDeviceContextHeadCount(const DeviceContext* const context) noexcept
@@ -1926,6 +2733,78 @@ namespace gpg::gal
                 multiSampleType,
                 outQualityLevels
             );
+        }
+
+        unsigned int InvokeNativeGetAdapterCount(DeviceD3D9* const device)
+        {
+            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            auto** const vtable = *reinterpret_cast<void***>(idirect);
+            auto* const getAdapterCount = reinterpret_cast<d3d9_get_adapter_count_fn>(vtable[4]);
+            return getAdapterCount(idirect);
+        }
+
+        unsigned int InvokeNativeGetAdapterModeCount(
+            DeviceD3D9* const device,
+            const unsigned int adapter,
+            const std::uint32_t format
+        )
+        {
+            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            auto** const vtable = *reinterpret_cast<void***>(idirect);
+            auto* const getAdapterModeCount = reinterpret_cast<d3d9_get_adapter_mode_count_fn>(vtable[6]);
+            return getAdapterModeCount(idirect, adapter, format);
+        }
+
+        HRESULT InvokeNativeEnumAdapterModes(
+            DeviceD3D9* const device,
+            const unsigned int adapter,
+            const std::uint32_t format,
+            const unsigned int modeIndex,
+            void* const outMode
+        )
+        {
+            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            auto** const vtable = *reinterpret_cast<void***>(idirect);
+            auto* const enumAdapterModes = reinterpret_cast<d3d9_enum_adapter_modes_fn>(vtable[7]);
+            return enumAdapterModes(idirect, adapter, format, modeIndex, outMode);
+        }
+
+        HRESULT InvokeNativeCreateDevice(
+            DeviceD3D9* const device,
+            const unsigned int adapter,
+            const unsigned int deviceType,
+            const HWND focusWindow,
+            const unsigned int behaviorFlags,
+            void* const presentParameters,
+            void** const outDevice
+        )
+        {
+            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            auto** const vtable = *reinterpret_cast<void***>(idirect);
+            auto* const createDevice = reinterpret_cast<d3d9_create_device_fn>(vtable[16]);
+            return createDevice(idirect, adapter, deviceType, focusWindow, behaviorFlags, presentParameters, outDevice);
+        }
+
+        void* InvokeDirect3DCreate9Interface(const unsigned int sdkVersion)
+        {
+            HMODULE module = ::GetModuleHandleA("d3d9.dll");
+            if (module == nullptr)
+            {
+                module = ::LoadLibraryA("d3d9.dll");
+            }
+            if (module == nullptr)
+            {
+                return nullptr;
+            }
+
+            auto* const createDirect3D =
+                reinterpret_cast<direct3d_create9_fn>(::GetProcAddress(module, "Direct3DCreate9"));
+            if (createDirect3D == nullptr)
+            {
+                return nullptr;
+            }
+
+            return createDirect3D(sdkVersion);
         }
 
         HRESULT InvokeNativeGetAdapterIdentifier(
@@ -2312,6 +3191,123 @@ namespace gpg::gal
             {
                 ThrowGalError("DeviceD3D9.cpp", 1235, "invalid primary adapter index");
             }
+        }
+
+        void AppendD3D9SetupLogMessage(const char* const message)
+        {
+            gD3D9LogStorage.push_back(MakeShortString(message));
+        }
+
+        /**
+         * Address: 0x008F1CB0 (FUN_008F1CB0, func_CollectAllAdapters)
+         *
+         * What it does:
+         * Enumerates all Direct3D adapters, captures identity/mode lists, and
+         * appends them to the backend adapter storage.
+         */
+        void CollectAllAdaptersForSetup(DeviceD3D9& device)
+        {
+            device.Func1();
+
+            const unsigned int adapterCount = InvokeNativeGetAdapterCount(&device);
+            for (unsigned int adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
+            {
+                D3DADAPTER_IDENTIFIER9 adapterIdentifier{};
+                const HRESULT identifierResult =
+                    InvokeNativeGetAdapterIdentifier(&device, adapterIndex, 0U, &adapterIdentifier);
+                if (identifierResult < 0)
+                {
+                    AppendD3D9SetupLogMessage("unable to enumerate adapters");
+                    ThrowGalError("DeviceD3D9.cpp", 1199, "unable to enumerate adapters");
+                }
+
+                const msvc8::string description(
+                    adapterIdentifier.Description,
+                    std::strlen(adapterIdentifier.Description)
+                );
+                const msvc8::string deviceName(adapterIdentifier.DeviceName, std::strlen(adapterIdentifier.DeviceName));
+                const msvc8::string driver(adapterIdentifier.Driver, std::strlen(adapterIdentifier.Driver));
+
+                AdapterD3D9 adapter(
+                    adapterIdentifier.VendorId,
+                    adapterIdentifier.DeviceId,
+                    driver,
+                    deviceName,
+                    description
+                );
+
+                const unsigned int modeCount =
+                    InvokeNativeGetAdapterModeCount(&device, adapterIndex, kD3DFormatX8R8G8B8);
+                for (unsigned int modeIndex = 0; modeIndex < modeCount; ++modeIndex)
+                {
+                    D3DDISPLAYMODE displayMode{};
+                    const HRESULT modeResult = InvokeNativeEnumAdapterModes(
+                        &device,
+                        adapterIndex,
+                        kD3DFormatX8R8G8B8,
+                        modeIndex,
+                        &displayMode
+                    );
+                    if (modeResult < 0)
+                    {
+                        AppendD3D9SetupLogMessage("unable to enumerate adapters");
+                        ThrowGalError("DeviceD3D9.cpp", 1212, "unable to enumerate adapters");
+                    }
+
+                    adapter.modes.push_back(
+                        AdapterModeD3D9(displayMode.Width, displayMode.Height, displayMode.RefreshRate)
+                    );
+                }
+
+                AsDeviceD3D9Runtime(device).adapters.push_back(adapter);
+            }
+        }
+
+        /**
+         * Address: 0x008F2F70 (FUN_008F2F70)
+         *
+         * What it does:
+         * Clears setup-owned runtime objects (heads, pipeline, query/device/
+         * interface pointers) and resets the embedded device-context lane.
+         */
+        void ResetDeviceRuntimeForSetup(DeviceD3D9& device)
+        {
+            auto& runtime = AsDeviceD3D9Runtime(device);
+
+            delete[] reinterpret_cast<OutputContext*>(runtime.headsBase);
+            runtime.headsBase = nullptr;
+
+            runtime.pipelineState.reset();
+
+            ReleaseComLike(runtime.frameEventQuery);
+            ReleaseComLike(runtime.nativeDevice);
+            ReleaseComLike(runtime.idirect);
+
+            runtime.deviceContext = DeviceContext(0);
+        }
+
+        [[nodiscard]] bool IsLegacyAtiCreateDeviceFallbackAdapter(const AdapterD3D9& adapter) noexcept
+        {
+            if (adapter.vendorId != kVendorIdAti)
+            {
+                return false;
+            }
+
+            return (adapter.deviceId == kAtiDeviceRadeonX800) ||
+                   (adapter.deviceId == kAtiDeviceRadeonX850) ||
+                   (adapter.deviceId == kAtiDeviceRadeonX1650);
+        }
+
+        [[nodiscard]] bool HeadSupportsCapability2(const Head& head, const int capabilityToken) noexcept
+        {
+            for (const int token : head.validFormats2)
+            {
+                if (token == capabilityToken)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         void CheckHardwareInstancingSupport(DeviceD3D9& device, const D3DCAPS9& caps)
@@ -2737,6 +3733,17 @@ namespace gpg::gal
 
         using EffectTechniqueSharedRef = boost::shared_ptr<EffectTechniqueD3D9>;
 
+        struct EffectTechniqueSharedRefRawRuntime final
+        {
+            EffectTechniqueD3D9* object = nullptr;                    // +0x00
+            boost::detail::sp_counted_base* sharedCount = nullptr;    // +0x04
+        };
+        static_assert(
+            offsetof(EffectTechniqueSharedRefRawRuntime, sharedCount) == 0x04,
+            "EffectTechniqueSharedRefRawRuntime::sharedCount offset must be 0x04"
+        );
+        static_assert(sizeof(EffectTechniqueSharedRefRawRuntime) == 0x08, "EffectTechniqueSharedRefRawRuntime size must be 0x08");
+
         struct EffectContextLane54Runtime final
         {
             void* proxy = nullptr;          // +0x00
@@ -2815,6 +3822,13 @@ namespace gpg::gal
             destination = source;
         }
 
+        /**
+         * Address: 0x008E8400 (FUN_008E8400)
+         *
+         * What it does:
+         * Returns the active `EffectMacro` element count from one legacy
+         * `(proxy, first, last, end)` vector runtime lane.
+         */
         std::size_t EffectMacroCount(const EffectContextLane54Runtime& runtime) noexcept
         {
             if (runtime.first == nullptr)
@@ -3028,6 +4042,185 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x00941AC0 (FUN_00941AC0)
+         *
+         * What it does:
+         * Copy-assigns one initialized raw effect-technique shared-ref range
+         * `[destinationFirst, destinationLast)` from `sourceFirst`, retaining
+         * incoming shared counts and releasing previously bound counts per slot.
+         */
+        EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetain(
+            EffectTechniqueSharedRefRawRuntime* destinationFirst,
+            EffectTechniqueSharedRefRawRuntime* const destinationLast,
+            const EffectTechniqueSharedRefRawRuntime* sourceFirst
+        ) noexcept
+        {
+            EffectTechniqueSharedRefRawRuntime* write = destinationFirst;
+            const EffectTechniqueSharedRefRawRuntime* read = sourceFirst;
+            while (write != destinationLast)
+            {
+                write->object = read->object;
+
+                boost::detail::sp_counted_base* const incomingSharedCount = read->sharedCount;
+                if (incomingSharedCount != write->sharedCount)
+                {
+                    if (incomingSharedCount != nullptr)
+                    {
+                        incomingSharedCount->add_ref_copy();
+                    }
+                    if (write->sharedCount != nullptr)
+                    {
+                        write->sharedCount->release();
+                    }
+                    write->sharedCount = incomingSharedCount;
+                }
+
+                ++read;
+                ++write;
+            }
+
+            return write;
+        }
+
+        /**
+         * Address: 0x00941BC0 (FUN_00941BC0)
+         *
+         * What it does:
+         * Jump-only adapter lane that forwards one initialized raw
+         * effect-technique shared-ref range copy to the canonical retain helper.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetainDispatchLaneA(
+            EffectTechniqueSharedRefRawRuntime* const destinationFirst,
+            EffectTechniqueSharedRefRawRuntime* const destinationLast,
+            const EffectTechniqueSharedRefRawRuntime* const sourceFirst
+        ) noexcept
+        {
+            return CopyAssignEffectTechniqueSharedRefRawRangeRetain(destinationFirst, destinationLast, sourceFirst);
+        }
+
+        /**
+         * Address: 0x00941C00 (FUN_00941C00)
+         *
+         * What it does:
+         * Copy-assigns one `EffectTechnique` shared-pointer range into destination
+         * storage and returns the resulting end pointer.
+         */
+        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRange(
+            const EffectTechniqueSharedRef* sourceFirst,
+            const EffectTechniqueSharedRef* sourceLast,
+            EffectTechniqueSharedRef* destinationFirst
+        )
+        {
+            const std::ptrdiff_t elementCount = sourceLast - sourceFirst;
+            auto* const rawDestinationFirst = reinterpret_cast<EffectTechniqueSharedRefRawRuntime*>(destinationFirst);
+            auto* const rawDestinationLast = rawDestinationFirst + elementCount;
+            const auto* const rawSourceFirst = reinterpret_cast<const EffectTechniqueSharedRefRawRuntime*>(sourceFirst);
+            auto* const rawResult =
+                CopyAssignEffectTechniqueSharedRefRawRangeRetain(rawDestinationFirst, rawDestinationLast, rawSourceFirst);
+            return reinterpret_cast<EffectTechniqueSharedRef*>(rawResult);
+        }
+
+        /**
+         * Address: 0x00941C80 (FUN_00941C80)
+         *
+         * What it does:
+         * Adapter lane forwarding one `EffectTechnique` shared-pointer range
+         * copy-assignment to the canonical helper.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneA(
+            const EffectTechniqueSharedRef* const sourceFirst,
+            const EffectTechniqueSharedRef* const sourceLast,
+            EffectTechniqueSharedRef* const destinationFirst
+        )
+        {
+            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
+        }
+
+        /**
+         * Address: 0x00941CE0 (FUN_00941CE0)
+         *
+         * What it does:
+         * Secondary adapter lane forwarding one `EffectTechnique`
+         * shared-pointer range copy-assignment.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneB(
+            const EffectTechniqueSharedRef* const sourceFirst,
+            const EffectTechniqueSharedRef* const sourceLast,
+            EffectTechniqueSharedRef* const destinationFirst
+        )
+        {
+            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
+        }
+
+        /**
+         * Address: 0x00941C40 (FUN_00941C40)
+         *
+         * What it does:
+         * Copies `repeatCount` raw shared-ref lanes from one fixed source lane
+         * into destination storage and retains each copied shared-control block.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCount(
+            EffectTechniqueSharedRefRawRuntime* destination,
+            const std::int32_t repeatCount,
+            const EffectTechniqueSharedRefRawRuntime* const source
+        ) noexcept
+        {
+            if (repeatCount <= 0)
+            {
+                return destination;
+            }
+
+            EffectTechniqueSharedRefRawRuntime* write = destination;
+            for (std::int32_t remaining = repeatCount; remaining > 0; --remaining)
+            {
+                if (write != nullptr)
+                {
+                    write->object = source != nullptr ? source->object : nullptr;
+                    write->sharedCount = source != nullptr ? source->sharedCount : nullptr;
+                    if (write->sharedCount != nullptr)
+                    {
+                        write->sharedCount->add_ref_copy();
+                    }
+                }
+                ++write;
+            }
+
+            return write;
+        }
+
+        /**
+         * Address: 0x00941CB0 (FUN_00941CB0)
+         *
+         * What it does:
+         * Adapter lane forwarding one counted raw shared-ref copy loop to the
+         * canonical helper.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCountDispatchLaneA(
+            EffectTechniqueSharedRefRawRuntime* const destination,
+            const std::int32_t repeatCount,
+            const EffectTechniqueSharedRefRawRuntime* const source
+        ) noexcept
+        {
+            return CopyConstructEffectTechniqueSharedRefCount(destination, repeatCount, source);
+        }
+
+        /**
+         * Address: 0x00941D40 (FUN_00941D40)
+         *
+         * What it does:
+         * Tertiary adapter lane forwarding one `EffectTechnique` shared-pointer
+         * range copy-assignment.
+         */
+        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneC(
+            const EffectTechniqueSharedRef* const sourceFirst,
+            const EffectTechniqueSharedRef* const sourceLast,
+            EffectTechniqueSharedRef* const destinationFirst
+        )
+        {
+            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
+        }
+
+        /**
          * Address: 0x00942410 (FUN_00942410)
          *
          * What it does:
@@ -3040,16 +4233,7 @@ namespace gpg::gal
             EffectTechniqueSharedRef* destinationFirst
         )
         {
-            EffectTechniqueSharedRef* read = sourceFirst;
-            EffectTechniqueSharedRef* write = destinationFirst;
-            while (read != sourceLast)
-            {
-                *write = *read;
-                ++read;
-                ++write;
-            }
-
-            return write;
+            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
         }
 
         [[noreturn]] void ThrowEffectTechniqueVectorLengthError()
@@ -3250,6 +4434,21 @@ namespace gpg::gal
             context.lane54 = {};
         }
 
+        /**
+         * Address: 0x009419E0 (FUN_009419E0)
+         *
+         * What it does:
+         * Initializes base EffectD3D9 construction lanes: clears weak-self,
+         * initializes embedded effect-context runtime storage, and resets the
+         * retained native effect handle.
+         */
+        void InitializeEffectD3D9ConstructionLanes(EffectD3D9* const effect)
+        {
+            effect->selfWeak_.reset();
+            InitializeEffectContextRuntimeStorage(*AsEffectContextRuntime(effect));
+            effect->dxEffect_ = nullptr;
+        }
+
         void DestroyEffectContextRuntimeStorage(EffectContextRuntime& context) noexcept
         {
             ReleaseSharedCount(context.sharedCount48);
@@ -3372,6 +4571,43 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x008F04A0 (FUN_008F04A0)
+         *
+         * What it does:
+         * Writes one raw byte lane into a target output stream and applies
+         * `badbit` when sentry/buffer writes fail.
+         */
+        std::ostream& WriteRawByteLaneToStream(
+            std::ostream& stream,
+            const void* const data,
+            const std::size_t byteCount
+        )
+        {
+            std::ostream::sentry sentry(stream);
+            std::ios_base::iostate ioState = std::ios_base::goodbit;
+            if (sentry)
+            {
+                std::streambuf* const outputBuffer = stream.rdbuf();
+                const std::streamsize writeCount = static_cast<std::streamsize>(byteCount);
+                if (outputBuffer == nullptr ||
+                    outputBuffer->sputn(static_cast<const char*>(data), writeCount) != writeCount)
+                {
+                    ioState |= std::ios_base::badbit;
+                }
+            }
+            else
+            {
+                ioState |= std::ios_base::badbit;
+            }
+
+            if (ioState != std::ios_base::goodbit)
+            {
+                stream.setstate(ioState);
+            }
+            return stream;
+        }
+
+        /**
          * Address: 0x008F09A0 (FUN_008F09A0)
          *
          * What it does:
@@ -3484,12 +4720,36 @@ namespace gpg::gal
             {
                 const char* const compiledBytes = static_cast<const char*>(GetD3DXBufferPointer(compiledEffectBuffer.get()));
                 const unsigned int compiledBytesCount = GetD3DXBufferSize(compiledEffectBuffer.get());
-                compiledCache.write(compiledBytes, static_cast<std::streamsize>(compiledBytesCount));
+                WriteRawByteLaneToStream(compiledCache, compiledBytes, static_cast<std::size_t>(compiledBytesCount));
                 compiledCache.close();
             }
 
             outEffect->reset(new EffectD3D9(context, nativeEffect.release()));
             return outEffect;
+        }
+
+        /**
+         * Address: 0x008E8F70 (FUN_008E8F70)
+         *
+         * What it does:
+         * Returns the current input-stream position using
+         * `streambuf::pubseekoff(0, cur, in)` when stream state is valid, or
+         * `-1` when fail/bad flags are set.
+         */
+        [[maybe_unused]] std::streampos QueryCurrentInputPosition(
+            std::istream& inputStream
+        ) noexcept
+        {
+            if ((inputStream.rdstate() & (std::ios::failbit | std::ios::badbit)) != 0) {
+                return std::streampos(-1);
+            }
+
+            std::streambuf* const streamBuffer = inputStream.rdbuf();
+            if (streamBuffer == nullptr) {
+                return std::streampos(-1);
+            }
+
+            return streamBuffer->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
         }
 
         /**
@@ -3522,7 +4782,11 @@ namespace gpg::gal
             }
 
             compiledCache.seekg(0, std::ios::end);
-            const std::streamoff compiledSizeStream = compiledCache.tellg();
+            const std::streampos compiledEndPosition = QueryCurrentInputPosition(compiledCache);
+            const std::streamoff compiledSizeStream =
+                (compiledEndPosition != std::streampos(-1))
+                ? static_cast<std::streamoff>(compiledEndPosition)
+                : static_cast<std::streamoff>(0);
             compiledCache.seekg(0, std::ios::beg);
 
             const std::size_t compiledSize = (compiledSizeStream > 0)
@@ -3671,6 +4935,30 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x008F5410 (FUN_008F5410)
+         *
+         * What it does:
+         * Resets one render-target wrapper, stores one caller-provided
+         * `IDirect3DSurface9*` lane as the retained surface payload, snapshots
+         * one D3D9 surface descriptor, and copies descriptor width/height into
+         * the embedded render-target context lane.
+         */
+        [[maybe_unused]] int InitializeRenderTargetD3D9FromSurface(
+            RenderTargetD3D9* const renderTarget,
+            void* const surface
+        ) noexcept
+        {
+            ResetRenderTargetD3D9State(renderTarget);
+            renderTarget->renderTexture_ = surface;
+
+            D3DSurfaceDescRuntime surfaceDesc{};
+            const int getDescResult = static_cast<int>(InvokeSurfaceGetDesc(surface, &surfaceDesc));
+            renderTarget->context_.width_ = surfaceDesc.width;
+            renderTarget->context_.height_ = surfaceDesc.height;
+            return getDescResult;
+        }
+
+        /**
          * Address: 0x008F53B0 (FUN_008F53B0)
          * Mangled: ??1RenderTargetD3D9@gal@gpg@@QAE@XZ
          *
@@ -3756,7 +5044,12 @@ namespace gpg::gal
             for (unsigned int faceIndex = 0; faceIndex < kCubeFaceCount; ++faceIndex)
             {
                 void* faceSurface = nullptr;
-                static_cast<void>(InvokeGetCubeMapSurface(cubeRenderTarget->cubeTexture_, faceIndex, 0U, &faceSurface));
+                static_cast<void>(InvokeGetCubeMapSurface(
+                    cubeRenderTarget->cubeTexture_,
+                    static_cast<unsigned int>(ResolveD3D9CubeFaceToken(static_cast<int>(faceIndex))),
+                    0U,
+                    &faceSurface
+                ));
                 cubeRenderTarget->faceSurfaces_[faceIndex] = faceSurface;
             }
         }
@@ -3875,12 +5168,64 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x009456C0 (FUN_009456C0)
+     *
+     * What it does:
+     * Writes one 4x4 identity matrix (`float[16]`) into caller storage.
+     */
+    [[maybe_unused]] float* InitializeIdentityMatrix4x4Lane(float* const matrix4x4) noexcept
+    {
+        matrix4x4[14] = 0.0f;
+        matrix4x4[13] = 0.0f;
+        matrix4x4[12] = 0.0f;
+        matrix4x4[11] = 0.0f;
+        matrix4x4[9] = 0.0f;
+        matrix4x4[8] = 0.0f;
+        matrix4x4[7] = 0.0f;
+        matrix4x4[6] = 0.0f;
+        matrix4x4[4] = 0.0f;
+        matrix4x4[3] = 0.0f;
+        matrix4x4[2] = 0.0f;
+        matrix4x4[1] = 0.0f;
+        matrix4x4[15] = 1.0f;
+        matrix4x4[10] = 1.0f;
+        matrix4x4[5] = 1.0f;
+        matrix4x4[0] = 1.0f;
+        return matrix4x4;
+    }
+
+    /**
      * Address: 0x009451C0 (FUN_009451C0, ??0HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
      *
      * What it does:
      * Initializes one D3D9 hardware-vertex formatter wrapper.
      */
     HardwareVertexFormatterD3D9::HardwareVertexFormatterD3D9() = default;
+
+    /**
+     * Address: 0x009451D0 (FUN_009451D0)
+     *
+     * What it does:
+     * Runs the non-deleting teardown body and restores the base
+     * `MeshFormatter` vtable lane.
+     */
+    HardwareVertexFormatterD3D9::~HardwareVertexFormatterD3D9() = default;
+
+    /**
+     * Address: 0x00C09610 (FUN_00C09610, ??1HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Preserves one startup-registered shutdown thunk lane by constructing one
+     * typed adapter object and forwarding teardown into
+     * `HardwareVertexFormatterD3D9::~HardwareVertexFormatterD3D9`
+     * (`FUN_009451D0`).
+     */
+    [[maybe_unused]] void ShutdownHardwareVertexFormatterD3D9Adapter()
+    {
+        alignas(HardwareVertexFormatterD3D9) unsigned char formatterStorage[sizeof(HardwareVertexFormatterD3D9)]{};
+        auto* const formatter = new (static_cast<void*>(formatterStorage)) HardwareVertexFormatterD3D9();
+        formatter->~HardwareVertexFormatterD3D9();
+    }
 
     /**
      * Address: 0x00945600 (FUN_00945600)
@@ -3890,6 +5235,7 @@ namespace gpg::gal
      */
     MeshFormatter* HardwareVertexFormatterD3D9::Destroy(const std::uint8_t deleteFlags)
     {
+        this->~HardwareVertexFormatterD3D9();
         auto* const formatter = static_cast<MeshFormatter*>(this);
         if ((deleteFlags & 1U) != 0U)
         {
@@ -3949,6 +5295,32 @@ namespace gpg::gal
     Float16HardwareVertexFormatterD3D9::Float16HardwareVertexFormatterD3D9() = default;
 
     /**
+     * Address: 0x00945390 (FUN_00945390)
+     *
+     * What it does:
+     * Runs the non-deleting teardown body and restores the base
+     * `MeshFormatter` vtable lane.
+     */
+    Float16HardwareVertexFormatterD3D9::~Float16HardwareVertexFormatterD3D9() = default;
+
+    /**
+     * Address: 0x00C09620 (FUN_00C09620, ??1Float16HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Preserves one startup-registered shutdown thunk lane by constructing one
+     * typed adapter object and forwarding teardown into
+     * `Float16HardwareVertexFormatterD3D9::~Float16HardwareVertexFormatterD3D9`
+     * (`FUN_00945390`).
+     */
+    [[maybe_unused]] void ShutdownFloat16HardwareVertexFormatterD3D9Adapter()
+    {
+        alignas(Float16HardwareVertexFormatterD3D9)
+            unsigned char formatterStorage[sizeof(Float16HardwareVertexFormatterD3D9)]{};
+        auto* const formatter = new (static_cast<void*>(formatterStorage)) Float16HardwareVertexFormatterD3D9();
+        formatter->~Float16HardwareVertexFormatterD3D9();
+    }
+
+    /**
      * Address: 0x00945620 (FUN_00945620)
      *
      * What it does:
@@ -3956,6 +5328,7 @@ namespace gpg::gal
      */
     MeshFormatter* Float16HardwareVertexFormatterD3D9::Destroy(const std::uint8_t deleteFlags)
     {
+        this->~Float16HardwareVertexFormatterD3D9();
         auto* const formatter = static_cast<MeshFormatter*>(this);
         if ((deleteFlags & 1U) != 0U)
         {
@@ -4118,6 +5491,24 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x00941040 (FUN_00941040, gpg::gal::AdapterD3D9::AdapterD3D9)
+     * Mangled: ??0AdapterD3D9@gal@gpg@@QAE@@Z
+     *
+     * What it does:
+     * Initializes one empty adapter descriptor with zeroed identifiers,
+     * empty strings, and an empty mode vector.
+     */
+    AdapterD3D9::AdapterD3D9()
+        : vendorId(0U)
+        , deviceId(0U)
+        , driver()
+        , deviceName()
+        , description()
+        , modes()
+    {
+    }
+
+    /**
      * Address: 0x009410A0 (FUN_009410A0, gpg::gal::AdapterD3D9::AdapterD3D9)
      * Mangled: ??0AdapterD3D9@gal@gpg@@QAE@@Z
      *
@@ -4145,6 +5536,27 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008EFF80 (FUN_008EFF80, gpg::gal::AdapterD3D9::AdapterD3D9 copy)
+     *
+     * What it does:
+     * Copy-constructs one adapter descriptor by cloning identifier lanes,
+     * descriptive strings, and the adapter mode vector.
+     */
+    AdapterD3D9::AdapterD3D9(const AdapterD3D9& other)
+        : vendorId(other.vendorId)
+        , deviceId(other.deviceId)
+        , driver()
+        , deviceName()
+        , description()
+        , modes()
+    {
+        driver.assign(other.driver, 0U, msvc8::string::npos);
+        deviceName.assign(other.deviceName, 0U, msvc8::string::npos);
+        description.assign(other.description, 0U, msvc8::string::npos);
+        modes = other.modes;
+    }
+
+    /**
      * Address: 0x00940C90 (FUN_00940C90)
      * Scalar-deleting wrapper: 0x008F0040 (FUN_008F0040)
      *
@@ -4167,6 +5579,20 @@ namespace gpg::gal
         : width_(widthValue)
         , height_(heightValue)
         , refreshRate_(refreshRateValue)
+    {
+    }
+
+    /**
+     * Address: 0x008E8E10 (FUN_008E8E10)
+     *
+     * What it does:
+     * Copy-constructs one adapter-mode lane by cloning width/height/
+     * refresh-rate scalar values.
+     */
+    AdapterModeD3D9::AdapterModeD3D9(const AdapterModeD3D9& other)
+        : width_(other.width_)
+        , height_(other.height_)
+        , refreshRate_(other.refreshRate_)
     {
     }
 
@@ -4332,23 +5758,119 @@ namespace gpg::gal
     }
 
     /**
-     * Address context: 0x008F3320 (FUN_008F3320)
+     * Address: 0x008F3320 (FUN_008F3320)
      *
      * What it does:
-     * Copies startup device-context payload into the recovered embedded D3D9
-     * context lane and records the current thread id.
+     * Runs the full D3D9 startup setup chain: clears previous runtime state,
+     * creates Direct3D/device objects, rebuilds adapters/capabilities/heads,
+     * and initializes pipeline/query lanes.
      */
     void InitializeDeviceD3D9Backend(Device* const device, const DeviceContext* const context)
     {
-        if ((device == nullptr) || (context == nullptr))
+        auto* const backend = reinterpret_cast<DeviceD3D9*>(device);
+        ResetDeviceRuntimeForSetup(*backend);
+
+        const int headCount = context->GetHeadCount();
+        if (headCount == 0)
         {
-            return;
+            ThrowGalError("DeviceD3D9.cpp", 122, "invalid device context specified");
         }
 
-        auto* const backend = reinterpret_cast<DeviceD3D9*>(device);
+        std::vector<D3DPRESENT_PARAMETERS> presentParameters(static_cast<std::size_t>(headCount));
+
         auto& runtime = AsDeviceD3D9Runtime(*backend);
         runtime.curThreadId = static_cast<int>(::GetCurrentThreadId());
-        runtime.deviceContext = *context;
+        runtime.idirect = InvokeDirect3DCreate9Interface(0x20U);
+        if (runtime.idirect == nullptr)
+        {
+            AppendD3D9SetupLogMessage("unable to create Direct3D");
+            ThrowGalError("DeviceD3D9.cpp", 132, "unable to create Direct3D");
+        }
+
+        CollectAllAdaptersForSetup(*backend);
+        CheckAdapterSelectionForSetup(*backend, *context);
+
+        const HWND primaryWindow = reinterpret_cast<HWND>(context->GetHead(0U).mHandle);
+        const unsigned int behaviorFlags = ((headCount > 1) ? 0x200U : 0U) | 0x44U;
+        backend->GetDeviceParameters(presentParameters.data(), context);
+
+        unsigned int selectedAdapter = static_cast<unsigned int>(context->mAdapter);
+        unsigned int deviceType = kD3DDevTypeHal;
+        const std::size_t adapterCount = runtime.adapters.size();
+        for (std::size_t adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
+        {
+            if (runtime.adapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
+            {
+                deviceType = 2U;
+                selectedAdapter = static_cast<unsigned int>(adapterIndex);
+                AppendD3D9SetupLogMessage("using NVPerfHUD adapter");
+                break;
+            }
+        }
+
+        HRESULT createResult = InvokeNativeCreateDevice(
+            backend,
+            selectedAdapter,
+            deviceType,
+            primaryWindow,
+            behaviorFlags,
+            presentParameters.data(),
+            &runtime.nativeDevice
+        );
+        if (createResult < 0)
+        {
+            const std::size_t primaryAdapterIndex = static_cast<std::size_t>(context->mAdapter);
+            if (primaryAdapterIndex < runtime.adapters.size() &&
+                IsLegacyAtiCreateDeviceFallbackAdapter(runtime.adapters[primaryAdapterIndex]))
+            {
+                createResult = InvokeNativeCreateDevice(
+                    backend,
+                    static_cast<unsigned int>(context->mAdapter),
+                    kD3DDevTypeHal,
+                    primaryWindow,
+                    36U,
+                    presentParameters.data(),
+                    &runtime.nativeDevice
+                );
+                if (createResult < 0)
+                {
+                    AppendD3D9SetupLogMessage("unable to create device");
+                    ThrowGalError("DeviceD3D9.cpp", 183, "unable to create device");
+                }
+            }
+            else
+            {
+                AppendD3D9SetupLogMessage("unable to create device");
+                ThrowGalError("DeviceD3D9.cpp", 189, "unable to create device");
+            }
+        }
+
+        PipelineStateD3D9* const pipelineState = new PipelineStateD3D9(runtime.nativeDevice);
+        AssignSharedPipelineStateFromRaw(&runtime.pipelineState, pipelineState);
+        if (runtime.pipelineState.get() != nullptr)
+        {
+            runtime.pipelineState->InitState();
+        }
+
+        static_cast<void>(backend->BuildDeviceCapabilities(context));
+        runtime.deviceContext.mAdapter = static_cast<int>(selectedAdapter);
+        backend->CreateHeads();
+
+        bool supportsDxt = true;
+        const int builtHeadCount = runtime.deviceContext.GetHeadCount();
+        for (int headIndex = 0; headIndex < builtHeadCount; ++headIndex)
+        {
+            supportsDxt = supportsDxt && HeadSupportsCapability2(runtime.deviceContext.GetHead(static_cast<unsigned int>(headIndex)), 12);
+        }
+
+        if (!supportsDxt)
+        {
+            AppendD3D9SetupLogMessage("Device does not support DXT texture formats");
+            ThrowGalError("DeviceD3D9.cpp", 209, "Device does not support DXT texture formats");
+        }
+
+        static_cast<void>(InvokeNativeCreateQuery(backend, kD3DQueryTypeEvent, &runtime.frameEventQuery));
+        AppendD3D9SetupLogMessage("device setup complete");
     }
 
     /**
@@ -4528,6 +6050,22 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008EFDD0 (FUN_008EFDD0)
+     *
+     * What it does:
+     * Appends one adapter-mode projection entry (`width/height/refresh`) to the
+     * destination head-mode vector and returns the inserted slot.
+     */
+    HeadAdapterMode* AppendHeadAdapterMode(
+        msvc8::vector<HeadAdapterMode>& adapterModes,
+        const HeadAdapterMode& mode
+    )
+    {
+        adapterModes.push_back(mode);
+        return &adapterModes.back();
+    }
+
+    /**
      * Address: 0x008F2080 (FUN_008F2080)
      *
      * What it does:
@@ -4558,7 +6096,7 @@ namespace gpg::gal
                 mappedMode.width = mode.width_;
                 mappedMode.height = mode.height_;
                 mappedMode.refreshRate = mode.refreshRate_;
-                head.adapterModes.push_back(mappedMode);
+                static_cast<void>(AppendHeadAdapterMode(head.adapterModes, mappedMode));
             }
 
             head.validFormats1.clear();
@@ -6817,7 +8355,7 @@ namespace gpg::gal
           effectContextPad_{},
           dxEffect_(nullptr)
     {
-        InitializeEffectContextRuntimeStorage(*AsEffectContextRuntime(this));
+        InitializeEffectD3D9ConstructionLanes(this);
         InitializeEffectD3D9State(this, context, dxEffect);
     }
 
@@ -7514,6 +9052,21 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F4B90 (FUN_008F4B90)
+     *
+     * What it does:
+     * Initializes one empty D3D9 index-buffer wrapper with default context
+     * and cleared native/lock tracking lanes.
+     */
+    IndexBufferD3D9::IndexBufferD3D9()
+        : context_()
+        , d3dIndexBuffer_(nullptr)
+        , locked_(false)
+        , lockPadding_{}
+        , indexData_(nullptr)
+    {}
+
+    /**
      * Address: 0x008F4DA0 (FUN_008F4DA0, gpg::gal::IndexBufferD3D9::IndexBufferD3D9)
      *
      * What it does:
@@ -7571,6 +9124,19 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F5260 (FUN_008F5260)
+     *
+     * What it does:
+     * Initializes one empty D3D9 render-target wrapper with default context
+     * and cleared retained texture/surface lanes.
+     */
+    RenderTargetD3D9::RenderTargetD3D9()
+        : context_()
+        , renderTexture_(nullptr)
+        , renderSurface_(nullptr)
+    {}
+
+    /**
      * Address: 0x008F5620 (FUN_008F5620, gpg::gal::RenderTargetD3D9::RenderTargetD3D9)
      *
      * What it does:
@@ -7605,14 +9171,7 @@ namespace gpg::gal
         , renderTexture_(nullptr)
         , renderSurface_(nullptr)
     {
-        ResetRenderTargetD3D9State(this);
-
-        renderTexture_ = backBufferSurface;
-
-        D3DSurfaceDescRuntime surfaceDesc{};
-        static_cast<void>(InvokeSurfaceGetDesc(backBufferSurface, &surfaceDesc));
-        context_.width_ = surfaceDesc.width;
-        context_.height_ = surfaceDesc.height;
+        static_cast<void>(InitializeRenderTargetD3D9FromSurface(this, backBufferSurface));
     }
 
     /**
@@ -7717,6 +9276,22 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E7EB0 (FUN_008E7EB0, DepthStencilTargetD3D9 default-state init lane)
+     *
+     * What it does:
+     * Initializes one D3D9 depth-stencil target object to default context
+     * values and a null retained surface lane.
+     */
+    [[maybe_unused]] [[nodiscard]] DepthStencilTargetD3D9* InitializeDepthStencilTargetD3D9DefaultState(
+        DepthStencilTargetD3D9* const target
+    )
+    {
+        target->context_ = DepthStencilTargetContext{};
+        target->depthStencilSurface_ = nullptr;
+        return target;
+    }
+
+    /**
      * Address: 0x008E8110 (FUN_008E8110, gpg::gal::DepthStencilTargetD3D9::DepthStencilTargetD3D9)
      *
      * What it does:
@@ -7730,6 +9305,7 @@ namespace gpg::gal
         : context_()
         , depthStencilSurface_(nullptr)
     {
+        (void)InitializeDepthStencilTargetD3D9DefaultState(this);
         (void)SetSurface(context, depthStencilSurface);
     }
 
@@ -7794,6 +9370,19 @@ namespace gpg::gal
         depthStencilSurface_ = depthStencilSurface;
         return depthStencilSurface_;
     }
+
+    /**
+     * Address: 0x009411E0 (FUN_009411E0)
+     *
+     * What it does:
+     * Initializes one empty D3D9 cube-render-target wrapper with default
+     * context and cleared texture/face-surface lanes.
+     */
+    CubeRenderTargetD3D9::CubeRenderTargetD3D9()
+        : context_()
+        , cubeTexture_(nullptr)
+        , faceSurfaces_{}
+    {}
 
     /**
      * Address: 0x00941450 (FUN_00941450, gpg::gal::CubeRenderTargetD3D9::CubeRenderTargetD3D9)
@@ -8688,6 +10277,21 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x0094AED0 (FUN_0094AED0)
+     *
+     * What it does:
+     * Initializes one `VertexFormatD3D9` runtime lane with default format code
+     * (`0x17`), empty per-stream stride storage, and null declaration handle.
+     */
+    [[maybe_unused]] VertexFormatD3D9* InitializeVertexFormatD3D9DefaultState(VertexFormatD3D9* const vertexFormat) noexcept
+    {
+        vertexFormat->formatCode_ = 0x17U;
+        vertexFormat->elementStrideByStream_ = msvc8::vector<std::uint32_t>{};
+        vertexFormat->vertexDeclaration_ = nullptr;
+        return vertexFormat;
+    }
+
+    /**
      * Address: 0x0094B0A0 (FUN_0094B0A0, gpg::gal::VertexFormatD3D9::VertexFormatD3D9)
      *
      * What it does:
@@ -8699,6 +10303,7 @@ namespace gpg::gal
         , elementStrideByStream_()
         , vertexDeclaration_(nullptr)
     {
+        (void)InitializeVertexFormatD3D9DefaultState(this);
         SetFormatDeclaration(formatCode, vertexDeclaration);
     }
 

@@ -77,6 +77,14 @@ namespace moho
      */
     explicit CCommandTask(CCommandTask* parent);
 
+    /**
+     * Address: 0x005F24B0 (FUN_005F24B0)
+     *
+     * What it does:
+     * Returns the bound command-task unit lane pointer.
+     */
+    [[nodiscard]] Unit* GetUnit() const noexcept;
+
   public:
     static gpg::RType* sType;
 

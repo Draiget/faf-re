@@ -349,6 +349,32 @@ namespace
   }
 
   /**
+   * Address: 0x0051FC20 (FUN_0051FC20)
+   *
+   * What it does:
+   * Unlinks `ERuleBPUnitMovementType` primitive serializer helper node and
+   * restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
+  }
+
+  /**
+   * Address: 0x0051FC50 (FUN_0051FC50)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `ERuleBPUnitMovementType` primitive
+   * serializer helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitMovementTypePrimitiveSerializerNodeSecondary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
+  }
+
+  /**
    * Address: 0x00BF31E0 (FUN_00BF31E0)
    *
    * What it does:
@@ -357,7 +383,7 @@ namespace
    */
   void cleanup_ERuleBPUnitMovementTypePrimitiveSerializer()
   {
-    (void)UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
+    (void)CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary();
   }
 
   /**
@@ -378,6 +404,32 @@ namespace
   }
 
   /**
+   * Address: 0x0051FFA0 (FUN_0051FFA0)
+   *
+   * What it does:
+   * Unlinks `ERuleBPUnitCommandCaps` primitive serializer helper node and
+   * restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodePrimary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
+  }
+
+  /**
+   * Address: 0x0051FFD0 (FUN_0051FFD0)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `ERuleBPUnitCommandCaps` primitive
+   * serializer helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodeSecondary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
+  }
+
+  /**
    * Address: 0x00BF3220 (FUN_00BF3220)
    *
    * What it does:
@@ -386,7 +438,7 @@ namespace
    */
   void cleanup_ERuleBPUnitCommandCapsPrimitiveSerializer()
   {
-    (void)UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
+    (void)CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodePrimary();
   }
 
   /**
@@ -407,6 +459,32 @@ namespace
   }
 
   /**
+   * Address: 0x00520190 (FUN_00520190)
+   *
+   * What it does:
+   * Unlinks `ERuleBPUnitToggleCaps` primitive serializer helper node and
+   * restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodePrimary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
+  }
+
+  /**
+   * Address: 0x005201C0 (FUN_005201C0)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `ERuleBPUnitToggleCaps` primitive
+   * serializer helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodeSecondary() noexcept
+  {
+    return UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
+  }
+
+  /**
    * Address: 0x00BF3260 (FUN_00BF3260)
    *
    * What it does:
@@ -415,7 +493,7 @@ namespace
    */
   void cleanup_ERuleBPUnitToggleCapsPrimitiveSerializer()
   {
-    (void)UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
+    (void)CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodePrimary();
   }
 
   /**
@@ -976,7 +1054,6 @@ namespace moho
     InitializeSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
     gERuleBPUnitMovementTypePrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitMovementType;
     gERuleBPUnitMovementTypePrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitMovementType;
-    gERuleBPUnitMovementTypePrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_ERuleBPUnitMovementTypePrimitiveSerializer);
   }
 
@@ -998,7 +1075,6 @@ namespace moho
     InitializeSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
     gERuleBPUnitCommandCapsPrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitCommandCaps;
     gERuleBPUnitCommandCapsPrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitCommandCaps;
-    gERuleBPUnitCommandCapsPrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_ERuleBPUnitCommandCapsPrimitiveSerializer);
   }
 
@@ -1020,7 +1096,6 @@ namespace moho
     InitializeSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);
     gERuleBPUnitToggleCapsPrimitiveSerializer.mDeserialize = &Deserialize_ERuleBPUnitToggleCaps;
     gERuleBPUnitToggleCapsPrimitiveSerializer.mSerialize = &Serialize_ERuleBPUnitToggleCaps;
-    gERuleBPUnitToggleCapsPrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_ERuleBPUnitToggleCapsPrimitiveSerializer);
   }
 

@@ -47,6 +47,15 @@ namespace moho
     virtual void Save(const SSaveGameDispatchData& data) = 0;
 
   protected:
+    /**
+     * Address: 0x0087FCE0 (FUN_0087FCE0, ??0ISaveRequest@Moho@@QAE@XZ)
+     * Address: 0x00881390 (FUN_00881390, ISaveRequest ctor lane)
+     *
+     * What it does:
+     * Initializes one save-request base interface object.
+     */
+    ISaveRequest();
+
     ~ISaveRequest() = default;
   };
 

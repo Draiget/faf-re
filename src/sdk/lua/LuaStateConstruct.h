@@ -15,10 +15,59 @@ namespace gpg
 namespace LuaPlus
 {
   /**
-   * VFTABLE: 0x00D44F70
-   * COL: 0x00E518C0
+   * VFTABLE: 0x00D44EE0
    */
   class LuaStateConstruct
+  {
+  public:
+    using construct_fn_t =
+      void (*)(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x0090B860 (FUN_0090B860, LuaPlus::LuaStateConstruct::Construct)
+     *
+     * What it does:
+     * Allocates one `LuaPlus::LuaState` wrapper lane and publishes it as an
+     * unowned construct result.
+     */
+    static void Construct(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x0090B1C0 (FUN_0090B1C0, LuaPlus::LuaStateConstruct::Deconstruct)
+     *
+     * What it does:
+     * Destroys one `LuaPlus::LuaState` wrapper lane and releases its storage.
+     */
+    static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x0090B670 (FUN_0090B670, LuaPlus::LuaStateConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for
+     * `LuaPlus::LuaState`.
+     */
+    void RegisterConstructFunction();
+
+  public:
+    void* vftable_;                  // +0x00
+    gpg::SerHelperBase* mNext;       // +0x04
+    gpg::SerHelperBase* mPrev;       // +0x08
+    construct_fn_t mConstruct;       // +0x0C
+    gpg::RType::delete_func_t mDeconstruct; // +0x10
+  };
+
+  static_assert(offsetof(LuaStateConstruct, vftable_) == 0x00, "LuaStateConstruct::vftable_ offset must be 0x00");
+  static_assert(offsetof(LuaStateConstruct, mNext) == 0x04, "LuaStateConstruct::mNext offset must be 0x04");
+  static_assert(offsetof(LuaStateConstruct, mPrev) == 0x08, "LuaStateConstruct::mPrev offset must be 0x08");
+  static_assert(offsetof(LuaStateConstruct, mConstruct) == 0x0C, "LuaStateConstruct::mConstruct offset must be 0x0C");
+  static_assert(offsetof(LuaStateConstruct, mDeconstruct) == 0x10, "LuaStateConstruct::mDeconstruct offset must be 0x10");
+  static_assert(sizeof(LuaStateConstruct) == 0x14, "LuaStateConstruct size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00D46AA8
+   */
+  class lua_StateConstruct
   {
   public:
     using construct_fn_t =
@@ -41,6 +90,14 @@ namespace LuaPlus
      */
     static void Deconstruct(void* objectPtr);
 
+    /**
+     * Address: 0x00920180 (FUN_00920180, lua_StateConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `lua_State`.
+     */
+    void RegisterConstructFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -49,12 +106,15 @@ namespace LuaPlus
     gpg::RType::delete_func_t mDeconstruct; // +0x10
   };
 
-  static_assert(offsetof(LuaStateConstruct, vftable_) == 0x00, "LuaStateConstruct::vftable_ offset must be 0x00");
-  static_assert(offsetof(LuaStateConstruct, mNext) == 0x04, "LuaStateConstruct::mNext offset must be 0x04");
-  static_assert(offsetof(LuaStateConstruct, mPrev) == 0x08, "LuaStateConstruct::mPrev offset must be 0x08");
-  static_assert(offsetof(LuaStateConstruct, mConstruct) == 0x0C, "LuaStateConstruct::mConstruct offset must be 0x0C");
-  static_assert(offsetof(LuaStateConstruct, mDeconstruct) == 0x10, "LuaStateConstruct::mDeconstruct offset must be 0x10");
-  static_assert(sizeof(LuaStateConstruct) == 0x14, "LuaStateConstruct size must be 0x14");
+  static_assert(offsetof(lua_StateConstruct, vftable_) == 0x00, "lua_StateConstruct::vftable_ offset must be 0x00");
+  static_assert(offsetof(lua_StateConstruct, mNext) == 0x04, "lua_StateConstruct::mNext offset must be 0x04");
+  static_assert(offsetof(lua_StateConstruct, mPrev) == 0x08, "lua_StateConstruct::mPrev offset must be 0x08");
+  static_assert(offsetof(lua_StateConstruct, mConstruct) == 0x0C, "lua_StateConstruct::mConstruct offset must be 0x0C");
+  static_assert(
+    offsetof(lua_StateConstruct, mDeconstruct) == 0x10,
+    "lua_StateConstruct::mDeconstruct offset must be 0x10"
+  );
+  static_assert(sizeof(lua_StateConstruct) == 0x14, "lua_StateConstruct size must be 0x14");
 
   /**
    * VFTABLE: 0x00D46AB8
@@ -66,12 +126,29 @@ namespace LuaPlus
       void (*)(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
 
     /**
+     * Address: 0x00921280 (FUN_00921280, TStringConstruct::Construct)
+     *
+     * What it does:
+     * Reads one serialized string lane, interns it in the owner Lua state, and
+     * returns the resulting `TString` as an owned construct ref.
+     */
+    static void Construct(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
+
+    /**
      * Address: 0x0091E3C0 (FUN_0091E3C0, TStringConstruct::Deserialize)
      *
      * What it does:
      * Releases one constructed Lua string lane through global delete.
      */
     static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x0091F9B0 (FUN_0091F9B0, TStringConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `TString`.
+     */
+    void RegisterConstructFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -104,6 +181,14 @@ namespace LuaPlus
      * Releases one constructed Lua table lane through global delete.
      */
     static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x0091FB40 (FUN_0091FB40, TableConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `Table`.
+     */
+    void RegisterConstructFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -147,6 +232,14 @@ namespace LuaPlus
      */
     static void Deconstruct(void* objectPtr);
 
+    /**
+     * Address: 0x0091FCD0 (FUN_0091FCD0, LClosureConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `LClosure`.
+     */
+    void RegisterConstructFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -184,6 +277,14 @@ namespace LuaPlus
      * Releases one constructed Lua upvalue lane through global delete.
      */
     static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x0091FE60 (FUN_0091FE60, UpValConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `UpVal`.
+     */
+    void RegisterConstructFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -248,6 +349,14 @@ namespace LuaPlus
      */
     static void Deconstruct(void* objectPtr);
 
+    /**
+     * Address: 0x0091FFF0 (FUN_0091FFF0, ProtoConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `Proto`.
+     */
+    void RegisterConstructFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -289,6 +398,14 @@ namespace LuaPlus
      * Releases one constructed Lua userdata lane through global delete.
      */
     static void Deconstruct(void* objectPtr);
+
+    /**
+     * Address: 0x00920310 (FUN_00920310, UdataConstruct::RegisterConstructFunction)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into reflected RTTI for `Udata`.
+     */
+    void RegisterConstructFunction();
 
   public:
     void* vftable_;                  // +0x00

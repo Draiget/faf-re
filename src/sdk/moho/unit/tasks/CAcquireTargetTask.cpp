@@ -233,6 +233,32 @@ namespace moho
   gpg::RType* CAcquireTargetTask::sPointerType = nullptr;
 
   /**
+   * Address: 0x005D88F0 (FUN_005D88F0)
+   *
+   * What it does:
+   * Initializes projectile-impact listener weak-link storage to an empty owner
+   * chain.
+   */
+  ManyToOneListener_EProjectileImpactEvent::ManyToOneListener()
+    : WeakObject()
+  {
+    weakLinkHead_ = 0u;
+  }
+
+  /**
+   * Address: 0x005D8930 (FUN_005D8930)
+   *
+   * What it does:
+   * Initializes collision-beam listener weak-link storage to an empty owner
+   * chain.
+   */
+  ManyToOneListener_ECollisionBeamEvent::ManyToOneListener()
+    : WeakObject()
+  {
+    weakLinkHead_ = 0u;
+  }
+
+  /**
    * Address: 0x005DCDF0 (FUN_005DCDF0, Moho::CAcquireTargetTask::GetPointerType)
    *
    * What it does:
@@ -246,7 +272,10 @@ namespace moho
 
     gpg::RType* cached = sPointerType;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(CAcquireTargetTask*));
+      cached = gpg::preregister_CAcquireTargetTaskPointerTypeStartup();
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(CAcquireTargetTask*));
+      }
       sPointerType = cached;
     }
 
@@ -317,6 +346,88 @@ namespace moho
   int CAcquireTargetTask::Execute()
   {
     return 1;
+  }
+
+  /**
+   * Address: 0x005D79C0 (FUN_005D79C0)
+   *
+   * What it does:
+   * Copies one linked target payload into `outTarget` and relinks its weak
+   * entity reference at the source owner-chain head.
+   */
+  CAiTarget* CAcquireTargetTask::CopyLinkedTargetFromPointer(
+    CAiTarget* const outTarget,
+    const CAiTarget* const sourceTarget
+  )
+  {
+    GPG_ASSERT(outTarget != nullptr);
+    GPG_ASSERT(sourceTarget != nullptr);
+    if (outTarget == nullptr || sourceTarget == nullptr) {
+      return outTarget;
+    }
+
+    outTarget->targetType = sourceTarget->targetType;
+    outTarget->targetEntity.ownerLinkSlot = sourceTarget->targetEntity.ownerLinkSlot;
+    if (outTarget->targetEntity.ownerLinkSlot != nullptr) {
+      auto** const ownerHead =
+        reinterpret_cast<WeakPtr<Entity>**>(outTarget->targetEntity.ownerLinkSlot);
+      outTarget->targetEntity.nextInOwner = *ownerHead;
+      *ownerHead = &outTarget->targetEntity;
+    } else {
+      outTarget->targetEntity.nextInOwner = nullptr;
+    }
+
+    outTarget->position = sourceTarget->position;
+    outTarget->targetPoint = sourceTarget->targetPoint;
+    outTarget->targetIsMobile = sourceTarget->targetIsMobile;
+    return outTarget;
+  }
+
+  /**
+   * Address: 0x005D78E0 (FUN_005D78E0)
+   *
+   * What it does:
+   * Resolves one desired target from the attacker's attached parent unit and
+   * returns that entity when attack/range checks pass.
+   */
+  Entity* CAcquireTargetTask::ResolveAttachedParentDesiredTarget(
+    CAiAttackerImpl* const attacker,
+    UnitWeapon* const weapon
+  )
+  {
+    if (attacker == nullptr || weapon == nullptr) {
+      return nullptr;
+    }
+
+    Unit* const attackerUnit = attacker->GetUnit();
+    if (attackerUnit == nullptr) {
+      return nullptr;
+    }
+
+    Entity* const attachedEntity = attackerUnit->mAttachInfo.GetAttachTargetEntity();
+    Unit* const attachedParentUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;
+    if (attachedParentUnit == nullptr || attachedParentUnit->AiAttacker == nullptr) {
+      return nullptr;
+    }
+
+    CAiTarget* const parentDesiredTarget = attachedParentUnit->AiAttacker->GetDesiredTarget();
+    if (parentDesiredTarget == nullptr) {
+      return nullptr;
+    }
+
+    CAiTarget desiredTarget{};
+    CopyLinkedTargetFromPointer(&desiredTarget, parentDesiredTarget);
+    if (desiredTarget.GetEntity() == nullptr) {
+      return nullptr;
+    }
+    if (!attacker->CanAttackTarget(&desiredTarget)) {
+      return nullptr;
+    }
+    if (weapon->TargetIsTooClose(&desiredTarget) != ESolutionStatus::TRS_Available) {
+      return nullptr;
+    }
+
+    return desiredTarget.GetEntity();
   }
 
   /**
@@ -516,7 +627,8 @@ namespace moho
       const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
       if (commandType == EUnitCommandType::UNITCOMMAND_Attack || commandType == EUnitCommandType::UNITCOMMAND_FormAttack)
       {
-        CAiTarget commandTarget = currentCommand->mTarget;
+        CAiTarget commandTarget{};
+        CopyLinkedTargetFromPointer(&commandTarget, &currentCommand->mTarget);
         Entity* const focusEntity = commandTarget.GetEntity();
         if (
           commandTarget.targetType == EAiTargetType::AITARGET_Entity

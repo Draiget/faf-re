@@ -1,6 +1,7 @@
 #include "CDecoder.h"
 
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 
 #include "gpg/core/algorithms/MD5.h"
@@ -24,13 +25,114 @@ namespace
     explicit XDecoderMessageError(const char* message)
       : std::runtime_error(message ? message : "Decoder message error")
     {}
+
+    /**
+     * Address: 0x006E3F40 (FUN_006E3F40, Moho::XDecoderMessageError string ctor)
+     *
+     * What it does:
+     * Constructs one decoder-message exception from one prebuilt message string.
+     */
+    explicit XDecoderMessageError(const msvc8::string& message);
+
+    /**
+     * Address: 0x006E43E0 (FUN_006E43E0, Moho::XDecoderMessageError copy ctor)
+     *
+     * What it does:
+     * Copy-constructs one decoder-message exception payload while preserving
+     * the `std::runtime_error` base message state.
+     */
+    XDecoderMessageError(const XDecoderMessageError& other);
+
+    /**
+     * Address: 0x006E3FB0 (FUN_006E3FB0, non-deleting dtor lane)
+     *
+     * What it does:
+     * Destroys one decoder-message exception payload by delegating to
+     * `std::runtime_error` teardown.
+     */
+    ~XDecoderMessageError() override = default;
   };
+
+  /**
+   * Address: 0x006E43E0 (FUN_006E43E0, Moho::XDecoderMessageError copy ctor)
+   *
+   * What it does:
+   * Copy-constructs one decoder-message exception payload while preserving
+   * the `std::runtime_error` base message state.
+   */
+  XDecoderMessageError::XDecoderMessageError(const XDecoderMessageError& other)
+    : std::runtime_error(other)
+  {}
+
+  /**
+   * Address: 0x006E3F40 (FUN_006E3F40, Moho::XDecoderMessageError string ctor)
+   *
+   * What it does:
+   * Constructs one decoder-message exception from one prebuilt message string.
+   */
+  XDecoderMessageError::XDecoderMessageError(const msvc8::string& message)
+    : std::runtime_error(message.c_str())
+  {}
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
 
   [[noreturn]] void ThrowDecoderError(const msvc8::string& message)
   {
-    throw XDecoderMessageError(message.c_str());
+    throw XDecoderMessageError(message);
+  }
+
+  struct BVIntSetAddScratch
+  {
+    moho::BVIntSet* ownerSetAlias0 = nullptr; // +0x00
+    moho::BVIntSet* ownerSetAlias1 = nullptr; // +0x04
+    std::uint32_t value = 0;                  // +0x08
+    std::uint8_t wasInserted = 0;             // +0x0C
+    std::uint8_t pad_0D_0F[0x03]{};
+  };
+  static_assert(sizeof(BVIntSetAddScratch) == 0x10, "BVIntSetAddScratch size must be 0x10");
+
+  /**
+   * Address: 0x006E5660 (FUN_006E5660, func_Moho_SetSetSize)
+   *
+   * What it does:
+   * Adds one entity-id value into one decoded `BVSet` payload and mirrors the
+   * binary helper's widened 16-byte scratch-lane writeback pattern.
+   */
+  [[nodiscard]] BVIntSetAddScratch* AddEntityIdSetValueWithScratch(
+    BVIntSetAddScratch* const outRuntime,
+    moho::BVSet<moho::EntId, moho::EntIdUniverse>* const set,
+    const std::uint32_t entityId
+  ) noexcept
+  {
+    const moho::BVIntSetAddResult addResult = set->Bits().Add(entityId);
+    outRuntime->ownerSetAlias0 = addResult.mOwnerSet;
+    outRuntime->ownerSetAlias1 = addResult.mOwnerSet;
+    outRuntime->value = addResult.mValue;
+    outRuntime->wasInserted = static_cast<std::uint8_t>(addResult.mWasInserted ? 1u : 0u);
+    return outRuntime;
+  }
+
+  /**
+   * Address: 0x006E5830 (FUN_006E5830)
+   *
+   * What it does:
+   * Seeds one `SCoordsVec2` with NaN fallback values, then reads the
+   * 8-byte coordinate payload from binary-stream storage.
+   */
+  [[nodiscard]] moho::SCoordsVec2* ReadCoordsVec2OrThrow(
+    gpg::BinaryReader& reader,
+    moho::SCoordsVec2* const outCoords
+  )
+  {
+    if (outCoords == nullptr) {
+      return nullptr;
+    }
+
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    outCoords->x = nan;
+    outCoords->z = nan;
+    reader.Read(reinterpret_cast<char*>(outCoords), sizeof(moho::SCoordsVec2));
+    return outCoords;
   }
 } // namespace
 
@@ -117,19 +219,19 @@ namespace moho
       DecodeSetCommandSource(reader);
       return;
     case ECmdStreamOp::CMDST_CommandSourceTerminated:
-      mSink->OnCommandSourceTerminated();
+      DecodeCommandSourceTerminated(reader);
       return;
     case ECmdStreamOp::CMDST_VerifyChecksum:
       DecodeVerifyChecksum(reader);
       return;
     case ECmdStreamOp::CMDST_RequestPause:
-      mSink->RequestPause();
+      DecodeRequestPause(reader);
       return;
     case ECmdStreamOp::CMDST_Resume:
-      mSink->Resume();
+      DecodeResume(reader);
       return;
     case ECmdStreamOp::CMDST_SingleStep:
-      mSink->SingleStep();
+      DecodeSingleStep(reader);
       return;
     case ECmdStreamOp::CMDST_CreateUnit:
       DecodeCreateUnit(reader);
@@ -245,6 +347,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x006E4470 (FUN_006E4470)
+   *
+   * What it does:
+   * Forwards `CMDST_CommandSourceTerminated` to the sink without consuming
+   * any payload bytes.
+   */
+  void CDecoder::DecodeCommandSourceTerminated(gpg::BinaryReader& reader)
+  {
+    (void)reader;
+    mSink->OnCommandSourceTerminated();
+  }
+
+  /**
    * Address: 0x006E4480 (FUN_006E4480)
    */
   void CDecoder::DecodeVerifyChecksum(gpg::BinaryReader& reader)
@@ -254,6 +369,44 @@ namespace moho
     reader.ReadExact(digest);
     reader.ReadExact(beat);
     mSink->VerifyChecksum(digest, beat);
+  }
+
+  /**
+   * Address: 0x006E44C0 (FUN_006E44C0)
+   *
+   * What it does:
+   * Forwards `CMDST_RequestPause` to the sink without consuming any payload
+   * bytes.
+   */
+  void CDecoder::DecodeRequestPause(gpg::BinaryReader& reader)
+  {
+    (void)reader;
+    mSink->RequestPause();
+  }
+
+  /**
+   * Address: 0x006E44D0 (FUN_006E44D0)
+   *
+   * What it does:
+   * Forwards `CMDST_Resume` to the sink without consuming any payload bytes.
+   */
+  void CDecoder::DecodeResume(gpg::BinaryReader& reader)
+  {
+    (void)reader;
+    mSink->Resume();
+  }
+
+  /**
+   * Address: 0x006E44E0 (FUN_006E44E0)
+   *
+   * What it does:
+   * Forwards `CMDST_SingleStep` to the sink without consuming any payload
+   * bytes.
+   */
+  void CDecoder::DecodeSingleStep(gpg::BinaryReader& reader)
+  {
+    (void)reader;
+    mSink->SingleStep();
   }
 
   /**
@@ -268,7 +421,7 @@ namespace moho
 
     reader.ReadExact(armyIndex);
     reader.ReadString(&blueprintId);
-    reader.ReadExact(pos);
+    (void)ReadCoordsVec2OrThrow(reader, &pos);
     reader.ReadExact(heading);
 
     RResId resId{};
@@ -506,7 +659,7 @@ namespace moho
   BVSet<EntId, EntIdUniverse> CDecoder::DecodeEntIdSet(gpg::BinaryReader& reader)
   {
     BVSet<EntId, EntIdUniverse> entities{};
-    std::int32_t count = 0;
+    std::uint32_t count = 0;
     reader.ReadExact(count);
 
     if (count == 0) {
@@ -517,21 +670,30 @@ namespace moho
     rawIds.Resize(static_cast<std::size_t>(count));
     reader.Read(reinterpret_cast<char*>(rawIds.start_), static_cast<std::size_t>(count) * sizeof(EntId));
 
-    const auto firstType = static_cast<unsigned int>(rawIds[0]) >> 28;
-    for (std::int32_t i = 0; i < count; ++i) {
-      const auto entityId = static_cast<unsigned int>(rawIds[static_cast<std::size_t>(i)]);
-      const auto entityType = entityId >> 28;
-      if (entityType != firstType) {
-        ThrowDecoderError(
-          gpg::STR_Printf(
-            "Attempt to construct EntIdSet with different types of IDs (%d and %d) in DecodeEntIdSet",
-            static_cast<int>(firstType),
-            static_cast<int>(entityType)
-          )
-        );
-      }
+    const auto firstEntityId = static_cast<std::uint32_t>(rawIds[0]);
+    const auto firstType = firstEntityId >> 28;
+    (void)entities.Bits().Add(firstEntityId);
 
-      entities.Bits().Add(entityId);
+    if (count > 1u) {
+      BVIntSetAddScratch tailRuntime{};
+      const auto tailEntityId = static_cast<std::uint32_t>(rawIds[static_cast<std::size_t>(count - 1u)]);
+      (void)AddEntityIdSetValueWithScratch(&tailRuntime, &entities, tailEntityId);
+
+      for (std::uint32_t i = 1u; i < (count - 1u); ++i) {
+        const auto entityId = static_cast<std::uint32_t>(rawIds[static_cast<std::size_t>(i)]);
+        const auto entityType = entityId >> 28;
+        if (entityType != firstType) {
+          ThrowDecoderError(
+            gpg::STR_Printf(
+              "Attempt to construct EntIdSet with different types of IDs (%d and %d) in DecodeEntIdSet",
+              static_cast<int>(firstType),
+              static_cast<int>(entityType)
+            )
+          );
+        }
+
+        (void)entities.Bits().Add(entityId);
+      }
     }
 
     return entities;

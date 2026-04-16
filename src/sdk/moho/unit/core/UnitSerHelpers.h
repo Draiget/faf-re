@@ -32,6 +32,8 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
+     * Address: 0x006AE9A0 (FUN_006AE9A0, Moho::UnitConstruct::RegisterConstructFunction)
+     *
      * What it does:
      * Binds construct/delete callbacks into reflected RTTI for `Unit`.
      */

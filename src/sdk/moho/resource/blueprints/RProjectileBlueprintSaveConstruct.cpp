@@ -24,9 +24,33 @@ namespace
   gpg::RType* gRuleGameRulesType = nullptr;
   moho::RProjectileBlueprintSaveConstruct gProjectileBlueprintSaveConstruct;
 
+  /**
+   * Address: 0x0051C9E0 (FUN_0051C9E0)
+   *
+   * What it does:
+   * Unlinks `RProjectileBlueprintSaveConstruct` helper node from the global
+   * serializer-helper intrusive list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
+  }
+
+  /**
+   * Address: 0x0051CA10 (FUN_0051CA10)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `RProjectileBlueprintSaveConstruct`
+   * helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodeSecondary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
+  }
+
   void CleanupProjectileBlueprintSaveConstructAtexit()
   {
-    (void)moho::cleanup_RProjectileBlueprintSaveConstruct();
+    (void)CleanupProjectileBlueprintSaveConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -79,6 +103,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051CC60 (FUN_0051CC60, sub_51CC60)
+   *
+   * What it does:
+   * Initializes the global `RProjectileBlueprintSaveConstruct` helper links,
+   * binds its save-construct callback lane, and returns the helper instance.
+   */
+  [[maybe_unused]] RProjectileBlueprintSaveConstruct* InitializeRProjectileBlueprintSaveConstructHelperLane()
+  {
+    blueprint_ser::InitializeHelperNode(gProjectileBlueprintSaveConstruct);
+    gProjectileBlueprintSaveConstruct.mSaveConstructArgsCallback =
+      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RProjectileBlueprintThunk);
+    return &gProjectileBlueprintSaveConstruct;
+  }
+
+  /**
    * Address: 0x0051CC90 (FUN_0051CC90, sub_51CC90)
    *
    * What it does:
@@ -101,7 +140,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_RProjectileBlueprintSaveConstruct()
   {
-    return blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
+    return CleanupProjectileBlueprintSaveConstructHelperNodePrimary();
   }
 
   /**
@@ -113,9 +152,7 @@ namespace moho
    */
   int register_RProjectileBlueprintSaveConstruct()
   {
-    blueprint_ser::InitializeHelperNode(gProjectileBlueprintSaveConstruct);
-    gProjectileBlueprintSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RProjectileBlueprintThunk);
+    (void)InitializeRProjectileBlueprintSaveConstructHelperLane();
     gProjectileBlueprintSaveConstruct.RegisterSaveConstructArgsFunction();
     return std::atexit(&CleanupProjectileBlueprintSaveConstructAtexit);
   }

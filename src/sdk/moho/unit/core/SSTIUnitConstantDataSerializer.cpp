@@ -14,6 +14,22 @@
 
 namespace
 {
+  class SSTIUnitConstantDataTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SSTIUnitConstantData";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTIUnitConstantData);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
   moho::SSTIUnitConstantDataSerializer gSSTIUnitConstantDataSerializer;
 
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
@@ -53,6 +69,22 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x005CC860 (FUN_005CC860, destroy_Stats_StatItem_if_present)
+   *
+   * What it does:
+   * Runs one `Stats_StatItem` destructor and frees storage when the incoming
+   * pointer lane is non-null.
+   */
+  void DestroyStatsStatItemIfPresent(moho::Stats_StatItem* const statItem) noexcept
+  {
+    if (statItem == nullptr) {
+      return;
+    }
+
+    delete statItem;
+  }
+
   void ReadStatsRootShared(
     boost::shared_ptr<moho::Stats<moho::StatItem>>& outPointer,
     gpg::ReadArchive* const archive,
@@ -70,7 +102,7 @@ namespace
     return reinterpret_cast<gpg::SerHelperBase*>(&gSSTIUnitConstantDataSerializer.mHelperNext);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeCore() noexcept
   {
     if (
       gSSTIUnitConstantDataSerializer.mHelperNext != nullptr &&
@@ -86,6 +118,30 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x0055C5C0 (FUN_0055C5C0, SerSaveLoadHelper<SSTIUnitConstantData>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `SSTIUnitConstantData` serializer helper links and restores
+   * self-links for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeLaneA() noexcept
+  {
+    return UnlinkSSTIUnitConstantDataSerializerNodeCore();
+  }
+
+  /**
+   * Address: 0x0055C5F0 (FUN_0055C5F0, SerSaveLoadHelper<SSTIUnitConstantData>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the
+   * `SSTIUnitConstantData` serializer helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitConstantDataSerializerNodeLaneB() noexcept
+  {
+    return UnlinkSSTIUnitConstantDataSerializerNodeCore();
+  }
+
   void ResetSerializerNode() noexcept
   {
     if (
@@ -98,7 +154,7 @@ namespace
       return;
     }
 
-    (void)UnlinkSerializerNode();
+    (void)UnlinkSSTIUnitConstantDataSerializerNodeLaneA();
   }
 
   /**
@@ -125,6 +181,20 @@ namespace
 namespace moho
 {
   gpg::RType* SSTIUnitConstantData::sType = nullptr;
+
+  /**
+   * Address: 0x0055C410 (FUN_0055C410, preregister_SSTIUnitConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIUnitConstantData`.
+   */
+  gpg::RType* preregister_SSTIUnitConstantDataTypeInfo()
+  {
+    static SSTIUnitConstantDataTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTIUnitConstantData), &typeInfo);
+    SSTIUnitConstantData::sType = &typeInfo;
+    return &typeInfo;
+  }
 
   /**
    * Address: 0x005BD720 (FUN_005BD720, ??0SSTIUnitConstantData@Moho@@QAE@@Z)
@@ -252,7 +322,7 @@ namespace moho
   {
     gpg::RType* type = SSTIUnitConstantData::sType;
     if (type == nullptr) {
-      type = gpg::LookupRType(typeid(SSTIUnitConstantData));
+      type = preregister_SSTIUnitConstantDataTypeInfo();
       SSTIUnitConstantData::sType = type;
     }
 
@@ -271,7 +341,7 @@ namespace moho
    */
   void cleanup_SSTIUnitConstantDataSerializer()
   {
-    (void)UnlinkSerializerNode();
+    (void)UnlinkSSTIUnitConstantDataSerializerNodeLaneA();
   }
 
   /**
@@ -282,6 +352,7 @@ namespace moho
    */
   void register_SSTIUnitConstantDataSerializer()
   {
+    (void)preregister_SSTIUnitConstantDataTypeInfo();
     (void)InitializeSSTIUnitConstantDataSerializerSingleton();
     (void)std::atexit(&cleanup_SSTIUnitConstantDataSerializer_atexit);
   }

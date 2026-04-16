@@ -12,6 +12,15 @@
 
 namespace
 {
+  alignas(moho::CUnitMoveTaskTypeInfo)
+    unsigned char gCUnitMoveTaskTypeInfoStorage[sizeof(moho::CUnitMoveTaskTypeInfo)];
+  bool gCUnitMoveTaskTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CUnitMoveTaskTypeInfo& CUnitMoveTaskTypeInfoStorageRef() noexcept
+  {
+    return *reinterpret_cast<moho::CUnitMoveTaskTypeInfo*>(gCUnitMoveTaskTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -87,6 +96,29 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00618E60 (FUN_00618E60, preregister_CUnitMoveTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CUnitMoveTaskTypeInfo`
+   * reflection lane.
+   */
+  gpg::RType* preregister_CUnitMoveTaskTypeInfo()
+  {
+    if (!gCUnitMoveTaskTypeInfoConstructed) {
+      new (gCUnitMoveTaskTypeInfoStorage) CUnitMoveTaskTypeInfo();
+      gCUnitMoveTaskTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CUnitMoveTask), &CUnitMoveTaskTypeInfoStorageRef());
+    return &CUnitMoveTaskTypeInfoStorageRef();
+  }
+
+  const char* CUnitMoveTaskTypeInfo::GetName() const
+  {
+    return "CUnitMoveTask";
+  }
+
   /**
    * Address: 0x00618EC0 (FUN_00618EC0, Moho::CUnitMoveTaskTypeInfo::Init)
    *

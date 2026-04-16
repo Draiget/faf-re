@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00717AF0 (FUN_00717AF0, Moho::SThreatSerializer::Deserialize)
+     *
+     * What it does:
+     * Reads 14 contiguous `float` threat lanes from archive into one `SThreat`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00717B00 (FUN_00717B00, Moho::SThreatSerializer::Serialize)
+     *
+     * What it does:
+     * Writes 14 contiguous `float` threat lanes from one `SThreat` to archive.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00719370 (FUN_00719370, gpg::SerSaveLoadHelper_SThreat::Init)
      *
      * What it does:

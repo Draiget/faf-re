@@ -68,7 +68,7 @@ namespace moho
   static_assert(sizeof(SBlackListInfoSerializer) == 0x14, "SBlackListInfoSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BFE680 (FUN_00BFE680, sub_BFE680)
+   * Address: 0x00BFE680 (FUN_00BFE680, serializer helper unlink cleanup)
    *
    * What it does:
    * Unlinks `SBlackListInfoSerializer` helper-node links and rewires self-links.
@@ -76,7 +76,7 @@ namespace moho
   gpg::SerHelperBase* cleanup_SBlackListInfoSerializer();
 
   /**
-   * Address: 0x00BD8830 (FUN_00BD8830, register_SBlackListInfoSerializer)
+   * Address: 0x00BD8830 (FUN_00BD8830, register serializer + atexit cleanup)
    *
    * What it does:
    * Initializes and registers `SBlackListInfo` serializer callbacks.

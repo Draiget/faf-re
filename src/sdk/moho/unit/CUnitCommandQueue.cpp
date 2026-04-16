@@ -10,6 +10,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/EUnitCommandQueueStatus.h"
@@ -285,6 +287,7 @@ void SerializeCUnitCommandQueueThunkVariantA(
 
 /**
  * Address: 0x006F93C0 (FUN_006F93C0, serializer save thunk alias)
+ * Address: 0x005958B0 (FUN_005958B0)
  *
  * What it does:
  * Tail-forwards a second CUnitCommandQueue serialize thunk alias into
@@ -302,7 +305,7 @@ void SerializeCUnitCommandQueueThunkVariantB(
 }
 
 /**
- * Address: 0x006EDAA0 (FUN_006EDAA0, constructor preregisters RTTI)
+  * Alias of FUN_006EDAA0 (non-canonical helper lane).
  *
  * What it does:
  * Resolves/refetches reflection descriptor for CUnitCommandQueue.
@@ -669,7 +672,7 @@ void CUnitCommandQueue::ClearCommandQueue()
 }
 
 /**
- * Address: 0x006EE2D0 (FUN_006EE2D0)
+  * Alias of FUN_006EE2D0 (non-canonical helper lane).
  *
  * What it does:
  * Runs pre-destroy queue cleanup only.
@@ -680,7 +683,7 @@ void CUnitCommandQueue::MarkForUnitKillCleanup()
 }
 
 /**
- * Address: 0x006A4D40 (FUN_006A4D40)
+  * Alias of FUN_006A4D40 (non-canonical helper lane).
  *
  * What it does:
  * Runs full queue teardown (clear + vector storage release + broadcaster unlink reset).
@@ -742,4 +745,39 @@ void CUnitCommandQueue::SetCommandCount(const unsigned int index, const unsigned
   }
 
   mNeedsRefresh = true;
+}
+
+/**
+ * Address: 0x006EE470 (FUN_006EE470)
+ *
+ * What it does:
+ * Rebinds one queued command target from `targetEntity` and marks this queue
+ * refresh lane dirty.
+ */
+void CUnitCommandQueue::SetCommandTarget(const unsigned int index, Entity* const targetEntity)
+{
+  if (targetEntity == nullptr || targetEntity->Dead != 0u) {
+    return;
+  }
+
+  CUnitCommand* const command = GetCommandInQueue(index);
+  if (command == nullptr) {
+    return;
+  }
+
+  CAiTarget targetPayload{};
+  (void)targetPayload.UpdateTarget(targetEntity);
+  command->SetTarget(targetPayload);
+  mNeedsRefresh = true;
+}
+
+/**
+ * Address: 0x006A4DD0 (FUN_006A4DD0)
+ *
+ * What it does:
+ * Returns whether this queue has a pending refresh lane.
+ */
+bool CUnitCommandQueue::IsRefreshPending() const
+{
+  return mNeedsRefresh;
 }
