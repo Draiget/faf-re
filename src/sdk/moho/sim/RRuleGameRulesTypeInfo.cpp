@@ -47,6 +47,7 @@ namespace
 namespace moho
 {
   gpg::RType* RRuleGameRules::sType = nullptr;
+  gpg::RType* RRuleGameRules::sType2 = nullptr;
 
   gpg::RType* RRuleGameRules::StaticGetClass()
   {
@@ -54,6 +55,18 @@ namespace moho
       sType = gpg::LookupRType(typeid(RRuleGameRules));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x0052B490 (FUN_0052B490)
+   *
+   * What it does:
+   * Returns one reflected-type destructor callback lane (`RType::dtrFunc_`)
+   * from the active descriptor object.
+   */
+  [[maybe_unused]] gpg::RType::dtr_func_t QueryReflectedTypeDestructorLane(gpg::RType* const reflectedType) noexcept
+  {
+    return reflectedType->dtrFunc_;
   }
 
   /**

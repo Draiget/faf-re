@@ -24,6 +24,20 @@ namespace
   }
 
   /**
+   * Address: 0x005D5B10 (FUN_005D5B10)
+   *
+   * What it does:
+   * Initializes the startup-owned `IAiAttackerTypeInfo` instance and
+   * preregisters RTTI for `IAiAttacker`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IAiAttackerTypeInfoStartup()
+  {
+    auto* const typeInfo = AcquireIAiAttackerTypeInfo();
+    gpg::PreRegisterRType(typeid(IAiAttacker), typeInfo);
+    return typeInfo;
+  }
+
+  /**
    * Address: 0x00BF8280 (FUN_00BF8280, sub_BF8280)
    *
    * What it does:
@@ -88,8 +102,7 @@ void IAiAttackerTypeInfo::Init()
  */
 int moho::register_IAiAttackerTypeInfo()
 {
-  auto* const type = AcquireIAiAttackerTypeInfo();
-  gpg::PreRegisterRType(typeid(IAiAttacker), type);
+  auto* const type = static_cast<IAiAttackerTypeInfo*>(preregister_IAiAttackerTypeInfoStartup());
   IAiAttacker::sType = type;
   return std::atexit(&cleanup_IAiAttackerTypeInfo);
 }

@@ -2,11 +2,18 @@
 #include "moho/unit/core/IUnit.h"
 
 #include <cstdint>
+#include <typeinfo>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/STIMap.h"
 
 using namespace moho;
+
+namespace moho
+{
+  gpg::RType* IUnit::sType = nullptr;
+}
 
 namespace
 {
@@ -16,6 +23,23 @@ namespace
   constexpr std::uint32_t kLayerMaskWater = 0x08u;
   constexpr std::uint32_t kLayerMaskAirOrOrbit = 0x30u;
 } // namespace
+
+/**
+ * Address: 0x006A5340 (FUN_006A5340, ??0IUnit@Moho@@QAE@XZ)
+ *
+ * Moho::IUnit
+ *
+ * IDA signature:
+ * struct Moho::IUnit *__thiscall Moho::IUnit::IUnit(Moho::IUnit *this)
+ *
+ * What it does:
+ * Initializes the weak-link head lane to null for intrusive weak-pointer
+ * ownership and leaves the vtable install to the constructor prologue.
+ */
+IUnit::IUnit() noexcept
+{
+  weakLinkHead_ = 0;
+}
 
 /**
  * Address: 0x006A48C0 (?IsUnit@IUnit@Moho@@UBEPBVUnit@2@XZ)
@@ -118,3 +142,25 @@ float IUnit::CalcSpawnElevation(
 
   return 0.0f;
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x00541F40 (FUN_00541F40)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `IUnit` and returns the typed object
+   * pointer when the source is compatible.
+   */
+  [[nodiscard]] IUnit* CastIUnitFromRRef(const gpg::RRef& source)
+  {
+    gpg::RType* type = IUnit::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(IUnit));
+      IUnit::sType = type;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
+    return static_cast<IUnit*>(upcast.mObj);
+  }
+} // namespace moho

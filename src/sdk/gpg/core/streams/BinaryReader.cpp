@@ -51,6 +51,61 @@ void BinaryReader::Read(char* buf, const size_t size) const
 }
 
 /**
+ * Address: 0x006E58A0 (FUN_006E58A0)
+ *
+ * What it does:
+ * Reads one fixed 12-byte payload lane and returns the destination pointer.
+ */
+[[maybe_unused]] void* ReadThreeDwordLaneFromBinaryReader(BinaryReader* const reader, void* const out)
+{
+    reader->Read(static_cast<char*>(out), 12u);
+    return out;
+}
+
+/**
+ * Address: 0x006E5950 (FUN_006E5950)
+ *
+ * What it does:
+ * Reads `wordCount` dwords (`wordCount * 4` bytes) into caller storage.
+ */
+[[maybe_unused]] void ReadDwordArrayLanePrimary(
+    BinaryReader* const reader,
+    const int wordCount,
+    void* const out
+)
+{
+    reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
+}
+
+/**
+ * Address: 0x006E5960 (FUN_006E5960)
+ *
+ * What it does:
+ * Reads one fixed 16-byte payload lane and returns the destination pointer.
+ */
+[[maybe_unused]] void* ReadFourDwordLaneFromBinaryReader(BinaryReader* const reader, void* const out)
+{
+    reader->Read(static_cast<char*>(out), 16u);
+    return out;
+}
+
+/**
+ * Address: 0x006E5980 (FUN_006E5980)
+ *
+ * What it does:
+ * Secondary adapter that reads `wordCount` dwords (`wordCount * 4` bytes)
+ * into caller storage.
+ */
+[[maybe_unused]] void ReadDwordArrayLaneSecondary(
+    BinaryReader* const reader,
+    const int wordCount,
+    void* const out
+)
+{
+    reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
+}
+
+/**
  * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
  *
  * int *

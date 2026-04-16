@@ -1,4 +1,5 @@
 #include "INetDatagramSocket.h"
+#include "INetDatagramHandler.h"
 
 #include <new>
 
@@ -6,6 +7,53 @@
 #include "Common.h"
 #include "gpg/core/utils/Logging.h"
 using namespace moho;
+
+namespace
+{
+  class INetDatagramHandlerVtableProbe final : public moho::INetDatagramHandler
+  {
+  public:
+    void OnDatagram(
+      moho::CMessage* /*msg*/,
+      moho::INetDatagramSocket* /*socket*/,
+      u_long /*address*/,
+      u_short /*port*/
+    ) override
+    {
+    }
+  };
+
+  struct INetDatagramHandlerRuntimeView
+  {
+    void* vtable; // +0x00
+  };
+
+  [[nodiscard]] void* INetDatagramHandlerVtableToken() noexcept
+  {
+    static INetDatagramHandlerVtableProbe probe{};
+    return *reinterpret_cast<void**>(&probe);
+  }
+} // namespace
+
+/**
+ * Address: 0x007BF7C0 (FUN_007BF7C0)
+ *
+ * What it does:
+ * Rebinds one datagram-handler runtime lane to the recovered interface
+ * vtable token.
+ */
+[[maybe_unused]] moho::INetDatagramHandler* InitializeINetDatagramHandlerBaseVtable(
+  moho::INetDatagramHandler* const handler
+) noexcept
+{
+  if (handler == nullptr) {
+    return nullptr;
+  }
+
+  auto* const runtime = reinterpret_cast<INetDatagramHandlerRuntimeView*>(handler);
+  runtime->vtable = INetDatagramHandlerVtableToken();
+  return handler;
+}
 
 /**
  * Address: 0x0047EF30 (FUN_0047EF30)

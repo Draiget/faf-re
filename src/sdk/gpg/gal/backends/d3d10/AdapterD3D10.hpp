@@ -44,6 +44,24 @@ namespace gpg::gal
         explicit AdapterD3D10(void* dxgiAdapter);
 
         /**
+         * Address: 0x008FF450 (FUN_008FF450)
+         *
+         * What it does:
+         * Copy-constructs one adapter wrapper by cloning descriptor payload and
+         * deep-copying cached mode vectors from `other`.
+         */
+        AdapterD3D10(const AdapterD3D10& other);
+
+        /**
+         * Address: 0x008FF2F0 (FUN_008FF2F0)
+         *
+         * What it does:
+         * Copy-assigns adapter pointer/descriptor lanes and deep-copies the
+         * cached mode-vector lane from `other`.
+         */
+        AdapterD3D10& operator=(const AdapterD3D10& other);
+
+        /**
          * Address: 0x008F7CF0 (FUN_008F7CF0, sub_8F7CF0)
          *
          * What it does:

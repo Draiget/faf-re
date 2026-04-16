@@ -69,6 +69,30 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x0069E630 (FUN_0069E630)
+   *
+   * What it does:
+   * Unlinks global `ProjectileSerializer` helper links and resets the node to
+   * the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkProjectileSerializerHelperNodePrimary() noexcept
+  {
+    return UnlinkHelperNode(gProjectileSerializer);
+  }
+
+  /**
+   * Address: 0x0069E660 (FUN_0069E660)
+   *
+   * What it does:
+   * Secondary unlink/reset entry for the global `ProjectileSerializer` helper
+   * node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkProjectileSerializerHelperNodeSecondary() noexcept
+  {
+    return UnlinkHelperNode(gProjectileSerializer);
+  }
+
   void CleanupProjectileSaveConstructAtexit()
   {
     (void)moho::cleanup_ProjectileSaveConstruct();
@@ -185,6 +209,8 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069EB80 (FUN_0069EB80, Moho::ProjectileSaveConstruct::RegisterSaveConstructArgsFunction)
+   *
    * What it does:
    * Binds save-construct callback into reflected RTTI for `Projectile`.
    */
@@ -196,13 +222,13 @@ namespace moho
       Projectile::sType = type;
     }
 
-    GPG_ASSERT(
-      type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSaveConstructArgsCallback
-    );
+    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
     type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 
   /**
+   * Address: 0x0069EC00 (FUN_0069EC00, Moho::ProjectileConstruct::RegisterConstructFunction)
+   *
    * What it does:
    * Binds construct/delete callbacks into reflected RTTI for `Projectile`.
    */
@@ -214,8 +240,7 @@ namespace moho
       Projectile::sType = type;
     }
 
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeconstructCallback);
+    GPG_ASSERT(type->serConstructFunc_ == nullptr);
     type->serConstructFunc_ = mConstructCallback;
     type->deleteFunc_ = mDeconstructCallback;
   }
@@ -270,7 +295,22 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_ProjectileSerializer()
   {
-    return UnlinkHelperNode(gProjectileSerializer);
+    return UnlinkProjectileSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x0069E340 (FUN_0069E340, sub_69E340)
+   *
+   * What it does:
+   * Initializes the global `ProjectileSaveConstruct` helper links, binds its
+   * save-construct callback lane, and returns the helper instance.
+   */
+  [[nodiscard]] ProjectileSaveConstruct* InitializeProjectileSaveConstructGenericHelperLane()
+  {
+    InitializeHelperNode(gProjectileSaveConstruct);
+    gProjectileSaveConstruct.mSaveConstructArgsCallback =
+      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&ProjectileSaveConstruct::SaveConstructArgs);
+    return &gProjectileSaveConstruct;
   }
 
   /**
@@ -281,9 +321,7 @@ namespace moho
    */
   int register_ProjectileSaveConstruct()
   {
-    InitializeHelperNode(gProjectileSaveConstruct);
-    gProjectileSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&ProjectileSaveConstruct::SaveConstructArgs);
+    (void)InitializeProjectileSaveConstructGenericHelperLane();
     gProjectileSaveConstruct.RegisterSaveConstructArgsFunction();
     return std::atexit(&CleanupProjectileSaveConstructAtexit);
   }
@@ -314,7 +352,6 @@ namespace moho
     InitializeHelperNode(gProjectileSerializer);
     gProjectileSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&ProjectileSerializer::Deserialize);
     gProjectileSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&ProjectileSerializer::Serialize);
-    gProjectileSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupProjectileSerializerAtexit);
   }
 } // namespace moho

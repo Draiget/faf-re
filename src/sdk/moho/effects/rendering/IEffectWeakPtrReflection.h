@@ -7,6 +7,15 @@ namespace moho
 {
   class IEffect;
 
+  /**
+   * Address: 0x0066A1D0 (FUN_0066A1D0)
+   *
+   * What it does:
+   * Rebinds one `WeakPtr<IEffect>` node to a new owner-link slot and relinks
+   * it at the head of the destination owner's intrusive weak chain.
+   */
+  [[nodiscard]] WeakPtr<IEffect>* RelinkWeakPtrIEffect(WeakPtr<IEffect>* weak, IEffect* effect) noexcept;
+
   struct WeakPtr_IEffect
   {
     /**
@@ -95,4 +104,3 @@ namespace moho
    */
   int register_WeakPtr_IEffect_Type_AtExit();
 } // namespace moho
-

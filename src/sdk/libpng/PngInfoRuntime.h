@@ -79,3 +79,33 @@ extern "C" void png_info_destroy(png_structp png_ptr, png_infop info_ptr);
  * is null.
  */
 extern "C" std::uint32_t png_get_valid(png_structp png_ptr, png_infop info_ptr, std::uint32_t flag);
+
+/**
+ * Address: 0x009E25C1 (FUN_009E25C1)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E25C1(int a1, int a2, char a3, char a4);
+ *
+ * What it does:
+ * Writes row layout lanes on one png_info payload:
+ * - `rowbytes` at `+0x60`
+ * - `channels` at `+0x64`
+ * - `pixel_depth` at `+0x65`
+ */
+extern "C" void png_info_set_row_layout_runtime(
+  png_infop      info_ptr,
+  std::uint32_t  rowbytes,
+  std::uint8_t   channels,
+  std::uint8_t   pixel_depth
+);
+
+/**
+ * Address: 0x009E25DB (FUN_009E25DB)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E25DB(int a1);
+ *
+ * What it does:
+ * Returns `png_info::rowbytes` from lane `+0x60`.
+ */
+extern "C" std::uint32_t png_info_get_rowbytes_runtime(png_infop info_ptr);

@@ -67,6 +67,15 @@ namespace moho
    */
   struct CPathPoint
   {
+    /**
+     * Address: 0x0062F9F0 (FUN_0062F9F0, Moho::CPathPoint::MemberDeserialize)
+     *
+     * What it does:
+     * Loads path-point position/direction vectors and state enum lanes from a
+     * read archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     Wm3::Vector3f mPosition;  // +0x00
     Wm3::Vector3f mDirection; // +0x0C
     EPathPointState mState;   // +0x18
@@ -305,7 +314,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005B2550 (FUN_005B2550, ??0CAiPathSpline@Moho@@QAE@@Z)
+       * Address: 0x005B2550 (FUN_005B2550)
      */
     CAiPathSpline();
 
@@ -349,7 +358,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-     * Address: 0x005B2550 (FUN_005B2550)
+      * Alias of FUN_005B2550 (non-canonical helper lane).
      *
      * What it does:
      * Releases heap-backed node storage and restores inline buffer ownership.
@@ -357,7 +366,7 @@ namespace moho
     void ResetNodesToInline();
 
     /**
-     * Address: 0x005965E0 (FUN_005965E0, sub_5965E0)
+      * Alias of FUN_005965E0 (non-canonical helper lane).
      *
      * What it does:
      * Returns node pointer for an index if it is within `mNodeCount`; otherwise null.
@@ -366,7 +375,7 @@ namespace moho
     CPathPoint* TryGetNode(std::uint32_t index);
 
     /**
-     * Address: 0x005965E0 (FUN_005965E0, sub_5965E0)
+      * Alias of FUN_005965E0 (non-canonical helper lane).
      */
     [[nodiscard]]
     const CPathPoint* TryGetNode(std::uint32_t index) const;

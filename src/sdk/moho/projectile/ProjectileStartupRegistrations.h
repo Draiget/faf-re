@@ -76,6 +76,11 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0069A720 (FUN_0069A720, Moho::EProjectileImpactEventTypeInfo::EProjectileImpactEventTypeInfo)
+     */
+    EProjectileImpactEventTypeInfo();
+
+    /**
      * Address: 0x0069A7B0 (FUN_0069A7B0, Moho::EProjectileImpactEventTypeInfo::dtr)
      */
     ~EProjectileImpactEventTypeInfo() override;

@@ -60,6 +60,14 @@ namespace moho
   class WaterSurface
   {
   public:
+    /**
+     * Address: 0x0080F920 (FUN_0080F920, ??0WaterSurface@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one water-surface base interface object.
+     */
+    WaterSurface();
+
     virtual ~WaterSurface() = default;
 
     /**

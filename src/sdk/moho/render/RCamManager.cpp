@@ -22,6 +22,135 @@ namespace
   alignas(moho::RCamManager) std::uint8_t gCamManagerStorage[sizeof(moho::RCamManager)]{};
   moho::RCamManager* gCamManager = nullptr;
 
+  using CameraPointer = moho::CameraImpl*;
+  using CameraPointerRangeCursor = CameraPointer*;
+  using CameraPointerRangeEndSlot = CameraPointerRangeCursor*;
+
+  struct LegacyCameraVectorStorage
+  {
+    moho::CameraImpl** begin;
+    moho::CameraImpl** end;
+    moho::CameraImpl** capacityEnd;
+  };
+
+  static_assert(sizeof(LegacyCameraVectorStorage) == 0x0C, "LegacyCameraVectorStorage size must be 0x0C");
+
+  /**
+   * Address: 0x007AE820 (FUN_007AE820, sub_7AE820)
+   *
+   * What it does:
+   * Clears the raw `{begin,end,capacity}` camera-vector lanes in static
+   * manager storage and returns the static manager object address.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::RCamManager* ResetStaticCamManagerStorageVectorLanes() noexcept
+  {
+    auto* const manager = reinterpret_cast<moho::RCamManager*>(&gCamManagerStorage[0]);
+    auto* const vectorStorage = reinterpret_cast<LegacyCameraVectorStorage*>(&manager->mCams);
+    vectorStorage->begin = nullptr;
+    vectorStorage->end = nullptr;
+    vectorStorage->capacityEnd = nullptr;
+    return manager;
+  }
+
+  /**
+   * Address: 0x007B1B10 (FUN_007B1B10, sub_7B1B10)
+   *
+   * What it does:
+   * Copies one pointer range `[sourceBegin, sourceEnd)` into `destinationBegin`
+   * while filtering out values equal to `*needleSlot`, stores resulting
+   * destination end pointer through `outDestinationEnd`, and returns that slot
+   * pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] CameraPointerRangeEndSlot CompactCameraPointerRangeExcludingNeedle(
+    CameraPointerRangeEndSlot const outDestinationEnd,
+    CameraPointerRangeCursor sourceBegin,
+    CameraPointerRangeCursor const sourceEnd,
+    CameraPointerRangeCursor destinationBegin,
+    CameraPointer const* const needleSlot
+  ) noexcept
+  {
+    if (sourceBegin == sourceEnd) {
+      *outDestinationEnd = destinationBegin;
+      return outDestinationEnd;
+    }
+
+    CameraPointerRangeCursor writeCursor = destinationBegin;
+    do {
+      const CameraPointer value = *sourceBegin;
+      if (value != *needleSlot) {
+        *writeCursor = value;
+        ++writeCursor;
+      }
+      ++sourceBegin;
+    } while (sourceBegin != sourceEnd);
+
+    *outDestinationEnd = writeCursor;
+    return outDestinationEnd;
+  }
+
+  /**
+   * Address: 0x007B15E0 (FUN_007B15E0, sub_7B15E0)
+   *
+   * What it does:
+   * Adapter lane that forwards pointer-range compaction parameters into
+   * `CompactCameraPointerRangeExcludingNeedle` and returns `outDestinationEnd`.
+   */
+  [[maybe_unused]] [[nodiscard]] CameraPointerRangeEndSlot CompactCameraPointerRangeExcludingNeedleAdapter(
+    CameraPointerRangeCursor const destinationBegin,
+    CameraPointerRangeEndSlot const outDestinationEnd,
+    CameraPointerRangeCursor const sourceBegin,
+    CameraPointerRangeCursor const sourceEnd,
+    CameraPointer const* const needleSlot
+  ) noexcept
+  {
+    (void)CompactCameraPointerRangeExcludingNeedle(
+      outDestinationEnd,
+      sourceBegin,
+      sourceEnd,
+      destinationBegin,
+      needleSlot
+    );
+    return outDestinationEnd;
+  }
+
+  /**
+   * Address: 0x007B0DE0 (FUN_007B0DE0, sub_7B0DE0)
+   *
+   * What it does:
+   * Finds the first pointer equal to `*needleSlot` in `[begin,end)`, compacts
+   * the remaining tail left over that slot while filtering duplicate matches,
+   * stores the resulting logical end through `outDestinationEnd`, and returns
+   * that slot pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] CameraPointerRangeEndSlot RemoveCameraPointerFromRange(
+    CameraPointer const* const needleSlot,
+    CameraPointerRangeEndSlot const outDestinationEnd,
+    CameraPointerRangeCursor begin,
+    CameraPointerRangeCursor const end
+  ) noexcept
+  {
+    CameraPointerRangeCursor match = begin;
+    if (match == end) {
+      *outDestinationEnd = match;
+      return outDestinationEnd;
+    }
+
+    while (*match != *needleSlot) {
+      ++match;
+      if (match == end) {
+        *outDestinationEnd = match;
+        return outDestinationEnd;
+      }
+    }
+
+    if (match == end) {
+      *outDestinationEnd = match;
+      return outDestinationEnd;
+    }
+
+    return CompactCameraPointerRangeExcludingNeedle(outDestinationEnd, match + 1, end, match, needleSlot);
+  }
+
   moho::TConVar<float> gTConVar_cam_HighLOD("cam_HighLOD", "", &moho::cam_HighLOD);
   moho::TConVar<float> gTConVar_cam_MediumLOD("cam_MediumLOD", "", &moho::cam_MediumLOD);
   moho::TConVar<float> gTConVar_cam_LowLOD("cam_LowLOD", "", &moho::cam_LowLOD);
@@ -61,6 +190,14 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x007AA910 (FUN_007AA910, ??0RCamManager@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Default-initializes camera pointer vector storage lanes.
+   */
+  RCamManager::RCamManager() = default;
+
   /**
    * Address: 0x007AA930 (FUN_007AA930, ??1RCamManager@Moho@@QAE@XZ)
    */
@@ -115,11 +252,11 @@ namespace moho
       return;
     }
 
-    for (auto it = mCams.begin(); it != mCams.end(); ++it) {
-      if (*it == camera) {
-        mCams.erase(it);
-        return;
-      }
+    CameraImpl* const needle = const_cast<CameraImpl*>(camera);
+    CameraImpl** compactedEnd = mCams.end();
+    (void)RemoveCameraPointerFromRange(&needle, &compactedEnd, mCams.begin(), compactedEnd);
+    if (compactedEnd != mCams.end()) {
+      mCams.erase(compactedEnd, mCams.end());
     }
   }
 

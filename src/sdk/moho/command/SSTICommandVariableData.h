@@ -177,4 +177,12 @@ namespace moho
     sizeof(SSTICommandVariableDataSerializer) == 0x14, "SSTICommandVariableDataSerializer size must be 0x14"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSTICommandVariableData) == 0x70, "SSTICommandVariableData size must be 0x70");
+
+  /**
+   * Address: 0x005528C0 (FUN_005528C0, preregister_SSTICommandVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTICommandVariableData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTICommandVariableDataTypeInfo();
 } // namespace moho

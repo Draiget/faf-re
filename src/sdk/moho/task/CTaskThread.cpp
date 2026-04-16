@@ -131,7 +131,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040B530 (FUN_0040B530, func_ReadArchive_CTaskPtr)
+    * Alias of FUN_0040B530 (non-canonical helper lane).
    *
    * What it does:
    * Loads an owned CTask pointer record used by task-stack payloads.
@@ -142,7 +142,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040B640 (FUN_0040B640, func_ReadArchive_CTaskWeakPtr)
+    * Alias of FUN_0040B640 (non-canonical helper lane).
    *
    * What it does:
    * Loads an unowned CTask pointer record used by task-stack payloads.
@@ -215,7 +215,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040D650 (FUN_0040D650, func_ReadArchive_CTaskStagePtr)
+    * Alias of FUN_0040D650 (non-canonical helper lane).
    */
   CTaskStage* DeserializeTaskStagePointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {
@@ -265,7 +265,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040B800 (FUN_0040B800, gpg::ReadArchive::ReadPointerOwned_CTaskThread)
+    * Alias of FUN_0040B800 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane, enforces owned-pointer transition
@@ -617,7 +617,7 @@ void CTaskThread::MemberSerialize(gpg::WriteArchive* const archive, gpg::RRef* c
 }
 
 /**
- * Address: 0x004095F0 (FUN_004095F0, Moho::CTaskThreadSerializer::Deserialize)
+  * Alias of FUN_004095F0 (non-canonical helper lane).
  */
 void CTaskThreadSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef)
 {
@@ -625,7 +625,7 @@ void CTaskThreadSerializer::Deserialize(gpg::ReadArchive* const archive, const i
 }
 
 /**
- * Address: 0x00409610 (FUN_00409610, Moho::CTaskThreadSerializer::Serialize)
+  * Alias of FUN_00409610 (non-canonical helper lane).
  */
 void CTaskThreadSerializer::Serialize(
   gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef

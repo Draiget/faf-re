@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x006537D0 (FUN_006537D0)
+     *
+     * What it does:
+     * Initializes the weapons-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugWeapons();
+
+    /**
      * Address: 0x00652C90 (FUN_00652C90, ?GetClass@RDebugWeapons@Moho@@UBEPAVRType@gpg@@XZ)
      * Slot: 0
      *

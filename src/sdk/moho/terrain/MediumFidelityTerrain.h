@@ -92,10 +92,24 @@ namespace moho
      */
     void DrawWaterLine(std::int32_t arg0, std::int32_t arg1);
 
+    /**
+     * Address: 0x00805530 (FUN_00805530, Moho::MediumFidelityTerrain::DrawTerrainSkirt)
+     *
+     * What it does:
+     * Issues one terrain-skirt triangle-list draw for the medium-fidelity
+     * terrain path when skirt rendering is enabled and index-lane constraints
+     * are valid.
+     */
+    virtual void DrawTerrainSkirt();
+
     TerrainWaterResourceView* mTerrainResource;                        // +0x0C
     std::uint8_t mReserved10_27[0x18];                                // +0x10
     GeomCamera3* mCamera;                                              // +0x28
-    std::uint8_t mReserved2C_3F[0x14];                                // +0x2C
+    std::uint32_t mSkirtStartIndex = 0u;                              // +0x2C
+    std::uint32_t mUnknown30 = 0u;                                    // +0x30
+    std::uint32_t mSkirtEndIndex = 0u;                                // +0x34
+    std::int32_t mSkirtEndVertex = 0;                                 // +0x38
+    std::int32_t mSkirtBaseVertex = 0;                                // +0x3C
     MediumPrimaryPatchIndexLane mPrimaryPatchIndices;                  // +0x40
     CTesselator* mTesselator;                                          // +0x2F30
     CD3DVertexSheet* mTerrainVertexSheet;                              // +0x2F34
@@ -120,6 +134,22 @@ namespace moho
   static_assert(
     offsetof(MediumFidelityTerrain, mPrimaryPatchIndices) == 0x40,
     "MediumFidelityTerrain::mPrimaryPatchIndices offset must be 0x40"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mSkirtStartIndex) == 0x2C,
+    "MediumFidelityTerrain::mSkirtStartIndex offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mSkirtEndIndex) == 0x34,
+    "MediumFidelityTerrain::mSkirtEndIndex offset must be 0x34"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mSkirtEndVertex) == 0x38,
+    "MediumFidelityTerrain::mSkirtEndVertex offset must be 0x38"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mSkirtBaseVertex) == 0x3C,
+    "MediumFidelityTerrain::mSkirtBaseVertex offset must be 0x3C"
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mPrimaryPatchIndices) +

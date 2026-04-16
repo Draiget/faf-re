@@ -8,15 +8,44 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/Broadcaster.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class RType;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class CUnitCommand;
   enum class EUnitCommandType : std::int32_t;
+  enum EAiNavigatorEvent : std::int32_t;
   struct SOCellPos;
 
   class CUnitMoveTask : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0061A750 (FUN_0061A750)
+     *
+     * What it does:
+     * Deserializes move-task runtime state (base command-task lane, dispatch
+     * command pointer, move goal, command weak-link lane, and state flags).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0061A880 (FUN_0061A880)
+     *
+     * What it does:
+     * Serializes move-task runtime state (base command-task lane, dispatch
+     * command pointer, move goal, command weak-link lane, and state flags).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     /**
      * Address: 0x00618030 (FUN_00618030, Moho::CUnitMoveTask::CUnitMoveTask)
      *
@@ -59,6 +88,15 @@ namespace moho
      * listener lane before dispatching.
      */
     int Execute() override;
+
+    /**
+     * Address: 0x00618BB0 (FUN_00618BB0)
+     *
+     * What it does:
+     * Applies navigator-event result transitions, clears instant-command lane,
+     * and resumes owner-thread execution immediately.
+     */
+    void HandleNavigatorEvent(EAiNavigatorEvent event);
 
   public:
     std::uint32_t mUnknown0030; // 0x30
@@ -134,4 +172,34 @@ namespace moho
     CUnitCommand* sourceCommand,
     std::uint8_t moveVariant
   );
+
+  /**
+   * Address: 0x0061A3C0 (FUN_0061A3C0)
+   *
+   * What it does:
+   * Thin alias lane that forwards one `(task, archive)` pair into
+   * `CUnitMoveTask::MemberSerialize`.
+   */
+  void CUnitMoveTaskMemberSerializeAlias(const CUnitMoveTask* task, gpg::WriteArchive* archive);
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0061A3F0 (FUN_0061A3F0, gpg::RRef_CUnitMoveTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitMoveTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitMoveTask(gpg::RRef* outRef, moho::CUnitMoveTask* value);
+
+  /**
+   * Address: 0x0061A350 (FUN_0061A350)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CUnitMoveTask` and
+   * copies object/type fields into the destination reference record.
+   */
+  gpg::RRef* AssignCUnitMoveTaskRef(gpg::RRef* outRef, moho::CUnitMoveTask* value);
+} // namespace gpg

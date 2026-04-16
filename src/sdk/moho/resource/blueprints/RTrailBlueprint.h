@@ -50,6 +50,14 @@ namespace moho
     RTrailBlueprint();
 
     /**
+     * Address: 0x0050EE20 (FUN_0050EE20, Moho::RTrailBlueprint::dtr core)
+     *
+     * What it does:
+     * Releases trail texture string storage and resets base resource-id storage.
+     */
+    ~RTrailBlueprint() override;
+
+    /**
      * Address: 0x0050ED40 (FUN_0050ED40)
      * Mangled: ?GetClass@RTrailBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *

@@ -321,6 +321,8 @@ namespace
 
   /**
    * Address: 0x00424D90 (FUN_00424D90)
+   * Address: 0x008140C0 (FUN_008140C0)
+   * Address: 0x008575A0 (FUN_008575A0)
    *
    * What it does:
    * Fills `count` frame-ref slots from one source ref while retaining each copied
@@ -341,6 +343,10 @@ namespace
 
   /**
    * Address: 0x00424E30 (FUN_00424E30)
+   * Address: 0x00814160 (FUN_00814160)
+   * Address: 0x00813E70 (FUN_00813E70)
+   * Address: 0x008576A0 (FUN_008576A0)
+   * Address: 0x00857220 (FUN_00857220)
    *
    * What it does:
    * Assigns a source frame-ref sequence into initialized destination storage
@@ -359,6 +365,10 @@ namespace
 
   /**
    * Address: 0x00424FA0 (FUN_00424FA0)
+   * Address: 0x00814340 (FUN_00814340)
+   * Address: 0x0084FA80 (FUN_0084FA80)
+   * Address: 0x0084FB20 (FUN_0084FB20)
+   * Address: 0x00857880 (FUN_00857880)
    *
    * What it does:
    * Backward-assigns one frame-ref range with retain/release ownership updates.
@@ -375,6 +385,58 @@ namespace
       dst->assign_retain(*src);
     }
     return dst;
+  }
+
+  /**
+   * Address: 0x008141E0 (FUN_008141E0)
+   *
+   * What it does:
+   * Adapter lane that forwards backward frame-ref assignment into the canonical
+   * `CopyBackwardAssignAnimTextureFrameRefRange` helper and returns the updated
+   * destination cursor.
+   */
+  [[maybe_unused]] [[nodiscard]] AnimTextureFrameRef* CopyBackwardAssignAnimTextureFrameRefRangeAdapterA(
+    AnimTextureFrameRef* const outEnd,
+    const AnimTextureFrameRef* const srcBegin,
+    [[maybe_unused]] const AnimTextureFrameRef* const unusedSourceProbe,
+    const AnimTextureFrameRef* const srcEnd
+  )
+  {
+    return CopyBackwardAssignAnimTextureFrameRefRange(outEnd, srcBegin, srcEnd);
+  }
+
+  /**
+   * Address: 0x00813E80 (FUN_00813E80)
+   *
+   * What it does:
+   * Adapter lane that forwards one backward shared-pair assignment range
+   * (`sourceBegin..sourceEnd`) into destination-end storage.
+   */
+  [[maybe_unused]] [[nodiscard]] AnimTextureFrameRef* CopyBackwardAssignAnimTextureFrameRefRangeAdapterB(
+    const AnimTextureFrameRef* const sourceBegin,
+    const AnimTextureFrameRef* const sourceEnd,
+    AnimTextureFrameRef* const destinationEnd
+  )
+  {
+    return CopyBackwardAssignAnimTextureFrameRefRange(destinationEnd, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x0084F740 (FUN_0084F740)
+   * Address: 0x0084F770 (FUN_0084F770)
+   * Address: 0x00857720 (FUN_00857720)
+   *
+   * What it does:
+   * Register-shape adapter lane that forwards one backward frame-ref assignment
+   * range (`sourceBegin..sourceEnd`) into destination-end storage.
+   */
+  [[maybe_unused]] [[nodiscard]] AnimTextureFrameRef* CopyBackwardAssignAnimTextureFrameRefRangeAdapterC(
+    const AnimTextureFrameRef* const sourceBegin,
+    const AnimTextureFrameRef* const sourceEnd,
+    AnimTextureFrameRef* const destinationEnd
+  )
+  {
+    return CopyBackwardAssignAnimTextureFrameRefRange(destinationEnd, sourceBegin, sourceEnd);
   }
 
   /**

@@ -25,6 +25,30 @@ namespace
   gpg::RType* gRuleGameRulesType = nullptr;
   moho::RProjectileBlueprintConstruct gProjectileBlueprintConstruct;
 
+  /**
+   * Address: 0x0051CAC0 (FUN_0051CAC0)
+   *
+   * What it does:
+   * Unlinks `RProjectileBlueprintConstruct` helper node from the global
+   * serializer-helper intrusive list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
+  }
+
+  /**
+   * Address: 0x0051CAF0 (FUN_0051CAF0)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `RProjectileBlueprintConstruct`
+   * helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodeSecondary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
+  }
+
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -44,7 +68,7 @@ namespace
 
   void CleanupProjectileBlueprintConstructAtexit()
   {
-    (void)moho::cleanup_RProjectileBlueprintConstruct();
+    (void)CleanupProjectileBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -119,7 +143,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_RProjectileBlueprintConstruct()
   {
-    return blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
+    return CleanupProjectileBlueprintConstructHelperNodePrimary();
   }
 
   /**

@@ -72,6 +72,19 @@ namespace gpg
 namespace moho
 {
   /**
+   * Address: 0x006DEB80 (FUN_006DEB80)
+   *
+   * What it does:
+   * Resets each `EntityCategorySet` lane in `[begin, end)` so its embedded
+   * bit-word fastvector returns to inline storage (freeing heap words when
+   * active) and rewinds each lane's logical end back to begin.
+   */
+  EntityCategorySet* ResetEntityCategorySetWordStorageRange(
+    EntityCategorySet* begin,
+    EntityCategorySet* end
+  ) noexcept;
+
+  /**
    * Address: 0x006DDF00 (FUN_006DDF00, sub_6DDF00)
    *
    * What it does:

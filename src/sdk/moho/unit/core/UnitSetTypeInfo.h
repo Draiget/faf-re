@@ -12,7 +12,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006D28C0 (FUN_006D28C0, sub_6D28C0)
+       * Address: 0x006D28C0 (FUN_006D28C0)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `EntitySetTemplate<Unit>`.
@@ -48,14 +48,6 @@ namespace moho
   };
 
   static_assert(sizeof(UnitSetTypeInfo) == 0x64, "UnitSetTypeInfo size must be 0x64");
-
-  /**
-   * Address: 0x006D28C0 (FUN_006D28C0, sub_6D28C0)
-   *
-   * What it does:
-   * Ensures global `UnitSetTypeInfo` construction and returns it as `gpg::RType*`.
-   */
-  [[nodiscard]] gpg::RType* construct_UnitSetTypeInfo();
 
   /**
    * Address: 0x00BFE3F0 (FUN_00BFE3F0, sub_BFE3F0)

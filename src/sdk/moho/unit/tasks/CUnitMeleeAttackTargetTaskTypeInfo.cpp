@@ -91,10 +91,13 @@ namespace moho
   void CUnitMeleeAttackTargetTaskTypeInfo::Init()
   {
     size_ = 0x90;
-    newRefFunc_ = &CUnitMeleeAttackTargetTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitMeleeAttackTargetTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitMeleeAttackTargetTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitMeleeAttackTargetTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitMeleeAttackTargetTaskTypeInfo::NewRef,
+      &CUnitMeleeAttackTargetTaskTypeInfo::CtrRef,
+      &CUnitMeleeAttackTargetTaskTypeInfo::Delete,
+      &CUnitMeleeAttackTargetTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_EAiAttackerEvent(this);

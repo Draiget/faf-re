@@ -8,6 +8,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007704E0 (FUN_007704E0)
+     *
+     * What it does:
+     * Preregisters the reflected `EEmitterCurve` enum metadata.
+     */
+    EEmitterCurveTypeInfo();
+
+    /**
      * Address: 0x00770570 (FUN_00770570, scalar deleting thunk)
      */
     ~EEmitterCurveTypeInfo() override;

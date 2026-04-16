@@ -55,7 +55,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040C4A0 (FUN_0040C4A0, gpg::ReadArchive::ReadPointer_CTaskThread)
+    * Alias of FUN_0040C4A0 (non-canonical helper lane).
    */
   [[nodiscard]] moho::CTaskThread* ReadPointerCTaskThread(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {

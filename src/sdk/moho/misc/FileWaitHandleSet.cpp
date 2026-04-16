@@ -209,6 +209,19 @@ namespace
   }
 
   /**
+   * Address: 0x0045DD80 (FUN_0045DD80)
+   *
+   * What it does:
+   * Tail-thunk adapter that forwards one single-node zip-entry allocation
+   * lane into `FUN_0045F260`.
+   */
+  [[maybe_unused]]
+  moho::FWHSZipEntryMapNode* AllocateOneZipEntryMapNodeThunk()
+  {
+    return AllocateZipEntryMapNodes(1u);
+  }
+
+  /**
    * Address: 0x0045F380 (FUN_0045F380, sub_45F380)
    *
    * What it does:
@@ -3223,7 +3236,7 @@ void moho::FWaitHandleSet::InvalidateFileInfoCache(
 }
 
 /**
- * Address: 0x00458D30 (FUN_00458D30, Moho::FWaitHandleSet::GetFileInfo)
+  * Alias of FUN_00458D30 (non-canonical helper lane).
  *
  * What it does:
  * Resolves file metadata through the wait-handle/VFS runtime when available.

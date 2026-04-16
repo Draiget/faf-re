@@ -36,6 +36,14 @@ namespace moho
      */
     RBeamBlueprint();
 
+    /**
+     * Address: 0x0050EFD0 (FUN_0050EFD0, Moho::RBeamBlueprint::dtr core)
+     *
+     * What it does:
+     * Releases beam texture string storage and resets base resource-id storage.
+     */
+    ~RBeamBlueprint() override;
+
     float Length{10.0f};                         // +0x28
     float Lifetime{1.0f};                        // +0x2C
     float Thickness{1.0f};                       // +0x30

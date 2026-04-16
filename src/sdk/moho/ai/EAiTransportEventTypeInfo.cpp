@@ -22,7 +22,6 @@ namespace
   {
     if (!gEAiTransportEventTypeInfoConstructed) {
       auto* const typeInfo = new (gEAiTransportEventTypeInfoStorage) EAiTransportEventTypeInfo();
-      gpg::PreRegisterRType(typeid(EAiTransportEvent), typeInfo);
       gEAiTransportEventTypeInfoConstructed = true;
     }
 
@@ -53,6 +52,40 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  /**
+   * Address: 0x005E8B60 (FUN_005E8B60)
+   *
+   * What it does:
+   * Reinitializes startup helper storage for one primitive-serializer lane of
+   * `EAiTransportEvent` and binds enum load/save callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] EAiTransportEventPrimitiveSerializer*
+  InitializeEAiTransportEventPrimitiveSerializerPrimitiveLane()
+  {
+    EAiTransportEventPrimitiveSerializer* const serializer = AcquireEAiTransportEventPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mLoadCallback = &EAiTransportEventPrimitiveSerializer::Deserialize;
+    serializer->mSaveCallback = &EAiTransportEventPrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x005E9E10 (FUN_005E9E10)
+   *
+   * What it does:
+   * Reinitializes startup helper storage for one save/load-helper lane of
+   * `EAiTransportEvent` and binds enum load/save callbacks.
+   */
+  [[maybe_unused]] [[nodiscard]] EAiTransportEventPrimitiveSerializer*
+  InitializeEAiTransportEventPrimitiveSerializerSaveLoadLane()
+  {
+    EAiTransportEventPrimitiveSerializer* const serializer = AcquireEAiTransportEventPrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mLoadCallback = &EAiTransportEventPrimitiveSerializer::Deserialize;
+    serializer->mSaveCallback = &EAiTransportEventPrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
   template <typename TSerializer>
   void UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
@@ -62,6 +95,17 @@ namespace
     }
 
     InitializeSerializerNode(serializer);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEAiTransportEventPrimitiveSerializerHelperNode()
+  {
+    if (!gEAiTransportEventPrimitiveSerializerConstructed) {
+      return nullptr;
+    }
+
+    EAiTransportEventPrimitiveSerializer* const serializer = AcquireEAiTransportEventPrimitiveSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
   }
 
   [[nodiscard]] gpg::RType* CachedEAiTransportEventType()
@@ -90,11 +134,81 @@ namespace
     }
 
     EAiTransportEventPrimitiveSerializer* const serializer = AcquireEAiTransportEventPrimitiveSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkEAiTransportEventPrimitiveSerializerHelperNode();
     serializer->~EAiTransportEventPrimitiveSerializer();
     gEAiTransportEventPrimitiveSerializerConstructed = false;
   }
+
+  /**
+   * Address: 0x005E3E20 (FUN_005E3E20)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks recovered
+   * `EAiTransportEvent` primitive serializer helper links and restores
+   * self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiTransportEventPrimitiveSerializerStartupThunkA()
+  {
+    return UnlinkEAiTransportEventPrimitiveSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005E3E50 (FUN_005E3E50)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `EAiTransportEvent`
+   * primitive serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiTransportEventPrimitiveSerializerStartupThunkB()
+  {
+    return UnlinkEAiTransportEventPrimitiveSerializerHelperNode();
+  }
+
+  struct EAiTransportEventZeroInitRuntimeView
+  {
+    std::uint32_t lane00 = 0; // +0x00
+    std::uint32_t lane04 = 0; // +0x04
+    std::uint32_t lane08 = 0; // +0x08
+    std::uint32_t lane0C = 0; // +0x0C
+    std::uint32_t lane10 = 0; // +0x10
+    std::uint32_t lane14 = 0; // +0x14
+    std::uint32_t lane18 = 0; // +0x18
+    std::uint32_t lane1C = 0; // +0x1C
+  };
+  static_assert(sizeof(EAiTransportEventZeroInitRuntimeView) == 0x20, "EAiTransportEventZeroInitRuntimeView size must be 0x20");
+
+  /**
+   * Address: 0x005E3E80 (FUN_005E3E80)
+   *
+   * What it does:
+   * Zeroes startup runtime lanes used by the `EAiTransportEvent` reflection
+   * helper object while preserving the lane at `+0x10`.
+   */
+  [[maybe_unused]] EAiTransportEventZeroInitRuntimeView*
+  zero_EAiTransportEventRuntimeLanes(EAiTransportEventZeroInitRuntimeView* const runtime) noexcept
+  {
+    if (runtime == nullptr) {
+      return nullptr;
+    }
+
+    runtime->lane00 = 0;
+    runtime->lane04 = 0;
+    runtime->lane08 = 0;
+    runtime->lane0C = 0;
+    runtime->lane14 = 0;
+    runtime->lane18 = 0;
+    runtime->lane1C = 0;
+    return runtime;
+  }
 } // namespace
+
+/**
+ * Address: 0x005E3D10 (FUN_005E3D10, Moho::EAiTransportEventTypeInfo::EAiTransportEventTypeInfo)
+ */
+EAiTransportEventTypeInfo::EAiTransportEventTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(EAiTransportEvent), this);
+}
 
 /**
  * Address: 0x005E3DA0 (FUN_005E3DA0, scalar deleting thunk)
@@ -209,10 +323,6 @@ int moho::register_EAiTransportEventTypeInfo()
  */
 int moho::register_EAiTransportEventPrimitiveSerializer()
 {
-  EAiTransportEventPrimitiveSerializer* const serializer = AcquireEAiTransportEventPrimitiveSerializer();
-  InitializeSerializerNode(*serializer);
-  serializer->mLoadCallback = &EAiTransportEventPrimitiveSerializer::Deserialize;
-  serializer->mSaveCallback = &EAiTransportEventPrimitiveSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
+  (void)InitializeEAiTransportEventPrimitiveSerializerSaveLoadLane();
   return std::atexit(&cleanup_EAiTransportEventPrimitiveSerializer);
 }

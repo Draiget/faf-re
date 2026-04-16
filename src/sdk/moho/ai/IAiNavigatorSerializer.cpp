@@ -78,6 +78,30 @@ namespace
     return UnlinkSerializerNode(*AcquireIAiNavigatorSerializer());
   }
 
+  /**
+   * Address: 0x005A3320 (FUN_005A3320)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * IAiNavigator serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiNavigatorSerializerStartupThunkA()
+  {
+    return cleanup_IAiNavigatorSerializer();
+  }
+
+  /**
+   * Address: 0x005A3350 (FUN_005A3350)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * IAiNavigator serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiNavigatorSerializerStartupThunkB()
+  {
+    return cleanup_IAiNavigatorSerializer();
+  }
+
   void cleanup_IAiNavigatorSerializer_atexit()
   {
     (void)cleanup_IAiNavigatorSerializer();
@@ -142,7 +166,6 @@ void moho::register_IAiNavigatorSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &IAiNavigatorSerializer::Deserialize;
   serializer->mSaveCallback = &IAiNavigatorSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_IAiNavigatorSerializer_atexit);
 }
 

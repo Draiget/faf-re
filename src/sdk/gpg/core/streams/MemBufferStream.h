@@ -76,6 +76,7 @@ namespace gpg
         /**
          * Address: 0x0045B4C0 (FUN_0045B4C0, gpg::MemBuffer<char>::MemBuffer<char>)
          * Address: 0x0046D9D0 (FUN_0046D9D0, gpg::MemBuffer<char const>::MemBuffer<char const>)
+         * Address: 0x0094E280 (FUN_0094E280, gpg::MemBuffer<char>::MemBuffer<char> lane alias)
          *
          * What it does:
          * Copies one shared owner lane and sets view bounds to
@@ -104,6 +105,7 @@ namespace gpg
         }
 
         /**
+         * Address: 0x0094E600 (FUN_0094E600, gpg::MemBuffer<char>::SubBuffer)
          * Address: 0x0088E780 (FUN_0088E780, gpg::MemBuffer<char const>::SubBuffer)
          *
          * What it does:
@@ -111,7 +113,7 @@ namespace gpg
          */
         MemBuffer SubBuffer(std::size_t start, std::size_t len) const
         {
-            type* b = GetPtr(start, 0);
+            type* b = GetPtr(start, len);
             type* e = GetPtr(start + len, 0);
             return MemBuffer{ this->mData, b, e };
         }

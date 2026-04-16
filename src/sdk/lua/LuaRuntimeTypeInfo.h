@@ -7,6 +7,15 @@ class TStringTypeInfo : public gpg::RType
 {
 public:
   /**
+   * Address: 0x00921FD0 (FUN_00921FD0, TStringTypeInfo::TStringTypeInfo)
+   *
+   * What it does:
+   * Constructs the TString runtime type descriptor and preregisters it with
+   * reflection registry using `typeid(TString)`.
+   */
+  TStringTypeInfo();
+
+  /**
    * Address: 0x00922020 (FUN_00922020, TStringTypeInfo::GetName)
    */
   [[nodiscard]] const char* GetName() const override;
@@ -141,6 +150,15 @@ static_assert(sizeof(lua_StateTypeInfo) == sizeof(gpg::RType), "lua_StateTypeInf
 class UdataTypeInfo : public gpg::RType
 {
 public:
+  /**
+   * Address: 0x00922620 (FUN_00922620, UdataTypeInfo::UdataTypeInfo)
+   *
+   * What it does:
+   * Constructs the Udata runtime type descriptor and preregisters it with
+   * reflection registry using `typeid(Udata)`.
+   */
+  UdataTypeInfo();
+
   /**
    * Address: 0x00922670 (FUN_00922670, UdataTypeInfo::GetName)
    */

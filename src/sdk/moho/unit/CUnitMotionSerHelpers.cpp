@@ -25,6 +25,43 @@ namespace
     helper.mHelperPrev = self;
   }
 
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
+  {
+    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
+      helper.mHelperNext->mPrev = helper.mHelperPrev;
+      helper.mHelperPrev->mNext = helper.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperPrev = self;
+    helper.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x006BA330 (FUN_006BA330)
+   *
+   * What it does:
+   * Splices `CUnitMotionSerializer` out of its intrusive helper lane when
+   * linked, then rewires helper links to the serializer self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMotionSerializerHelperNodeVariantA() noexcept
+  {
+    return UnlinkHelperNode(gCUnitMotionSerializer);
+  }
+
+  /**
+   * Address: 0x006BA360 (FUN_006BA360)
+   *
+   * What it does:
+   * Secondary serializer helper unlink/reset variant sharing the same behavior.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMotionSerializerHelperNodeVariantB() noexcept
+  {
+    return UnlinkCUnitMotionSerializerHelperNodeVariantA();
+  }
+
   /**
    * Address: 0x006BAC40 (FUN_006BAC40, destroy_CUnitMotion)
    *
@@ -50,13 +87,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CUnitMotionSerializer()
   {
-    gCUnitMotionSerializer.mHelperNext->mPrev = gCUnitMotionSerializer.mHelperPrev;
-    gCUnitMotionSerializer.mHelperPrev->mNext = gCUnitMotionSerializer.mHelperNext;
-
-    gpg::SerHelperBase* const self = HelperSelfNode(gCUnitMotionSerializer);
-    gCUnitMotionSerializer.mHelperPrev = self;
-    gCUnitMotionSerializer.mHelperNext = self;
-    return self;
+    return UnlinkCUnitMotionSerializerHelperNodeVariantA();
   }
 
   /**
@@ -95,7 +126,6 @@ namespace moho
       reinterpret_cast<gpg::RType::load_func_t>(&CUnitMotionSerializer::Deserialize);
     gCUnitMotionSerializer.mSaveCallback =
       reinterpret_cast<gpg::RType::save_func_t>(&CUnitMotionSerializer::Serialize);
-    gCUnitMotionSerializer.RegisterSerializeFunctions();
     return std::atexit(reinterpret_cast<void (*)()>(&cleanup_CUnitMotionSerializer));
   }
 } // namespace moho

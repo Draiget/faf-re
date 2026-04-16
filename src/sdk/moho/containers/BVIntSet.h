@@ -299,6 +299,7 @@ namespace moho
 
   /**
    * Address: 0x00401CA0 (FUN_00401CA0)
+   * Address: 0x006D3220 (FUN_006D3220)
    *
    * What it does:
    * Returns whether two sets differ.

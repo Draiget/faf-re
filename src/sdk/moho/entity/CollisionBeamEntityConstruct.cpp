@@ -60,6 +60,24 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x006739D0 (FUN_006739D0)
+   *
+   * What it does:
+   * Unlinks the global `CollisionBeamEntityConstruct` helper node from
+   * the intrusive serializer-helper list, then resets the node to self-links.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCollisionBeamEntityConstructHelperNode() noexcept
+  {
+    gCollisionBeamEntityConstruct.mHelperLinks.mNext->mPrev = gCollisionBeamEntityConstruct.mHelperLinks.mPrev;
+    gCollisionBeamEntityConstruct.mHelperLinks.mPrev->mNext = gCollisionBeamEntityConstruct.mHelperLinks.mNext;
+
+    gpg::SerHelperBase* const self = &gCollisionBeamEntityConstruct.mHelperLinks;
+    gCollisionBeamEntityConstruct.mHelperLinks.mPrev = self;
+    gCollisionBeamEntityConstruct.mHelperLinks.mNext = self;
+    return self;
+  }
+
   void CleanupCollisionBeamEntityConstructAtexit()
   {
     (void)moho::cleanup_CollisionBeamEntityConstruct();
@@ -185,7 +203,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CollisionBeamEntityConstruct()
   {
-    return UnlinkHelperNode(gCollisionBeamEntityConstruct);
+    return UnlinkCollisionBeamEntityConstructHelperNode();
   }
 
   /**

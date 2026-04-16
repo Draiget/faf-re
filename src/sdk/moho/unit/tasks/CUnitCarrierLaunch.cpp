@@ -6,6 +6,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommand.h"
@@ -194,4 +195,64 @@ namespace moho
     const gpg::RRef carriedUnitsOwnerRef{};
     archive->Write(CachedEntitySetTemplateUnitType(), &mCarriedUnits, carriedUnitsOwnerRef);
   }
+
+  /**
+   * Address: 0x00607F80 (FUN_00607F80)
+   *
+   * What it does:
+   * Preserves one deserialize thunk lane for `CUnitCarrierLaunch` serializer
+   * callback registration.
+   */
+  [[maybe_unused]] void CUnitCarrierLaunchMemberDeserializeAdapterLaneA(
+    CUnitCarrierLaunch* const task,
+    gpg::ReadArchive* const archive
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00608070 (FUN_00608070)
+   * Address: 0x0060C990 (FUN_0060C990)
+   *
+   * What it does:
+   * Alternate deserialize thunk lane for `CUnitCarrierLaunch` serializer
+   * callback registration.
+   */
+  [[maybe_unused]] void CUnitCarrierLaunchMemberDeserializeAdapterLaneB(
+    CUnitCarrierLaunch* const task,
+    gpg::ReadArchive* const archive
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
 } // namespace moho
+
+namespace
+{
+  gpg::SerSaveLoadHelperListRuntime gCUnitCarrierLaunchSerializer{};
+
+  /**
+   * Address: 0x00607620 (FUN_00607620)
+   *
+   * What it does:
+   * Unlinks `CUnitCarrierLaunchSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer);
+  }
+
+  /**
+   * Address: 0x00607650 (FUN_00607650)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCarrierLaunchSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer);
+  }
+} // namespace

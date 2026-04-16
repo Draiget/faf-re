@@ -23,6 +23,23 @@ namespace
 
     return *reinterpret_cast<TypeInfo*>(gCSimSoundManagerTypeInfoStorage);
   }
+
+  /**
+   * Address: 0x007623F0 (FUN_007623F0)
+   *
+   * What it does:
+   * Invokes `ISoundManager::Destroy(1)` when the runtime object pointer is
+   * non-null.
+   */
+  [[maybe_unused]] void DeleteSimSoundManagerViaDestroyIfPresent(void* const object)
+  {
+    auto* const manager = static_cast<moho::ISoundManager*>(object);
+    if (!manager) {
+      return;
+    }
+
+    (void)manager->Destroy(1u);
+  }
 } // namespace
 
 namespace moho

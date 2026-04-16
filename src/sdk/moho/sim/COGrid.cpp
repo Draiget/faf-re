@@ -265,6 +265,139 @@ namespace
     const moho::CHeightField* const field = sim->mMapData->GetHeightField();
     return static_cast<std::uint32_t>(field->height - 1);
   }
+
+  [[nodiscard]] std::uint16_t ClampCollisionCellStartToU16(const int value) noexcept
+  {
+    if (value <= 0) {
+      return 0u;
+    }
+    if (value >= 0xFFFF) {
+      return 0xFFFFu;
+    }
+    return static_cast<std::uint16_t>(value);
+  }
+
+  [[nodiscard]] std::uint16_t
+  ClampCollisionCellExtentToU16(const int extentCandidate, const std::uint16_t startCell) noexcept
+  {
+    const int maxExtent = 0xFFFF - static_cast<int>(startCell);
+    int extent = extentCandidate;
+    if (extent >= maxExtent) {
+      extent = maxExtent;
+    }
+    if (extent < 0) {
+      extent = 0;
+    }
+    return static_cast<std::uint16_t>(extent);
+  }
+
+  [[nodiscard]] moho::CollisionDBRect BuildCollisionRectFromBounds(
+    const moho::EntityCollisionBoundsView& bounds
+  ) noexcept
+  {
+    const int minCellX = FloorToInt(bounds.minX) >> 2;
+    const int minCellZ = FloorToInt(bounds.minZ) >> 2;
+    const int maxCellX = (static_cast<int>(std::ceil(bounds.maxX)) + 3) >> 2;
+    const int maxCellZ = (static_cast<int>(std::ceil(bounds.maxZ)) + 3) >> 2;
+
+    moho::CollisionDBRect rect{};
+    rect.mStartX = ClampCollisionCellStartToU16(minCellX);
+    rect.mStartZ = ClampCollisionCellStartToU16(minCellZ);
+    rect.mWidth = ClampCollisionCellExtentToU16(maxCellX - static_cast<int>(rect.mStartX), rect.mStartX);
+    rect.mHeight = ClampCollisionCellExtentToU16(maxCellZ - static_cast<int>(rect.mStartZ), rect.mStartZ);
+    return rect;
+  }
+
+  struct CompactOccupancyRectExtentView
+  {
+    std::uint8_t width; // +0x00
+    std::uint8_t height; // +0x01
+    std::uint8_t caps; // +0x02
+  };
+  static_assert(
+    sizeof(CompactOccupancyRectExtentView) == 0x03,
+    "CompactOccupancyRectExtentView size must be 0x03"
+  );
+
+  struct CompactOccupancyRectOriginView
+  {
+    std::int16_t x; // +0x00
+    std::int16_t z; // +0x02
+  };
+  static_assert(
+    sizeof(CompactOccupancyRectOriginView) == 0x04,
+    "CompactOccupancyRectOriginView size must be 0x04"
+  );
+
+  /**
+   * Address: 0x00720550 (FUN_00720550)
+   *
+   * What it does:
+   * Fills one `BitArray2D` occupancy range defined by `rect` using `value`.
+   */
+  [[maybe_unused]] void FillBitArrayRectFromRect2i(
+    gpg::BitArray2D& occupancy,
+    const gpg::Rect2i& rect,
+    const bool value
+  )
+  {
+    occupancy.FillRect(
+      rect.x0,
+      rect.z0,
+      rect.x1 - rect.x0,
+      rect.z1 - rect.z0,
+      value
+    );
+  }
+
+  /**
+   * Address: 0x00720710 (FUN_00720710)
+   *
+   * What it does:
+   * Clears `COGrid::mOccupation` bits over `rect`.
+   */
+  [[maybe_unused]] void ClearCOGridOccupationRect(const gpg::Rect2i& rect, moho::COGrid& grid)
+  {
+    FillBitArrayRectFromRect2i(grid.mOccupation, rect, false);
+  }
+
+  /**
+   * Address: 0x00720740 (FUN_00720740)
+   *
+   * What it does:
+   * Returns whether any occupied bit is set in `grid.mOccupation` over `rect`.
+   */
+  [[maybe_unused]] bool IsCOGridOccupationRectBlocked(const gpg::Rect2i& rect, const moho::COGrid& grid)
+  {
+    return grid.mOccupation.GetRectOr(
+      rect.x0,
+      rect.z0,
+      rect.x1 - rect.x0,
+      rect.z1 - rect.z0,
+      true
+    );
+  }
+
+  /**
+   * Address: 0x00721B90 (FUN_00721B90)
+   *
+   * What it does:
+   * Expands one compact origin/extent occupancy payload into `Rect2i` and
+   * forwards the release to `COGrid::ReleaseOccupy`.
+   */
+  [[maybe_unused]] void ReleaseCompactOccupancyRect(
+    const CompactOccupancyRectExtentView& extent,
+    const CompactOccupancyRectOriginView& origin,
+    moho::COGrid& grid
+  )
+  {
+    gpg::Rect2i rect{};
+    rect.x0 = static_cast<int>(origin.x);
+    rect.z0 = static_cast<int>(origin.z);
+    rect.x1 = rect.x0 + static_cast<int>(extent.width);
+    rect.z1 = rect.z0 + static_cast<int>(extent.height);
+    grid.ReleaseOccupy(static_cast<moho::EOccupancyCaps>(extent.caps), rect);
+  }
 } // namespace
 
 namespace moho
@@ -311,6 +444,23 @@ namespace moho
     std::memset(mUnitBuckets, 0, bucketBytes);
     std::memset(mPropBuckets, 0, bucketBytes);
     std::memset(mEntityBuckets, 0, bucketBytes);
+  }
+
+  /**
+   * Address: 0x00722DD0 (FUN_00722DD0)
+   *
+   * What it does:
+   * In-place construction adapter for `EntityOccupationManager` that preserves
+   * the binary register/return contract by returning destination storage.
+   */
+  [[maybe_unused]] EntityOccupationManager* ConstructEntityOccupationManagerInPlace(
+    const std::uint32_t width,
+    EntityOccupationManager& destination,
+    const std::uint32_t height
+  )
+  {
+    ::new (&destination) EntityOccupationManager(width, height);
+    return &destination;
   }
 
   /**
@@ -530,7 +680,7 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x00721A90 (FUN_00721A90, Moho::COGrid::ExecuteOccupy)
+    * Alias of FUN_00721A90 (non-canonical helper lane).
    *
    * IDA signature:
    * void __usercall Moho::COGrid::ExecuteOccupy(
@@ -583,6 +733,232 @@ namespace moho
       waterOccupation.FillRect(rect.x0, rect.z0, rectWidth, rectHeight, false);
     }
     sim->mPathTables->DirtyClusters(rect);
+  }
+
+  /**
+   * Address: 0x00721BD0 (FUN_00721BD0)
+   *
+   * What it does:
+   * Converts one world-space collision bounds lane into a quantized
+   * collision-cell rectangle and gathers unmarked entity owners of `flags`
+   * from this grid's occupation manager into `outEntities`.
+   */
+  [[maybe_unused]] int GatherUnmarkedEntitiesInBounds(
+    const EntityCollisionBoundsView& bounds,
+    COGrid& grid,
+    const EEntityType flags,
+    EntityGatherVector& outEntities
+  )
+  {
+    const CollisionDBRect rect = BuildCollisionRectFromBounds(bounds);
+    return grid.mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
+  }
+
+  [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
+  {
+    const float centerX = box.Center[0];
+    const float centerY = box.Center[1];
+    const float centerZ = box.Center[2];
+
+    const float radiusX =
+      (std::fabs(box.Axis[0][0]) * box.Extent[0]) +
+      (std::fabs(box.Axis[1][0]) * box.Extent[1]) +
+      (std::fabs(box.Axis[2][0]) * box.Extent[2]);
+    const float radiusY =
+      (std::fabs(box.Axis[0][1]) * box.Extent[0]) +
+      (std::fabs(box.Axis[1][1]) * box.Extent[1]) +
+      (std::fabs(box.Axis[2][1]) * box.Extent[2]);
+    const float radiusZ =
+      (std::fabs(box.Axis[0][2]) * box.Extent[0]) +
+      (std::fabs(box.Axis[1][2]) * box.Extent[1]) +
+      (std::fabs(box.Axis[2][2]) * box.Extent[2]);
+
+    Wm3::AxisAlignedBox3f out{};
+    out.Min.x = centerX - radiusX;
+    out.Min.y = centerY - radiusY;
+    out.Min.z = centerZ - radiusZ;
+    out.Max.x = centerX + radiusX;
+    out.Max.y = centerY + radiusY;
+    out.Max.z = centerZ + radiusZ;
+    return out;
+  }
+
+  [[nodiscard]] static bool AxisAlignedBoundsOverlapEntityBounds(
+    const Wm3::AxisAlignedBox3f& bounds,
+    const Entity& entity
+  ) noexcept
+  {
+    const Wm3::Vec3f& entityMin = entity.mCollisionBoundsMin;
+    const Wm3::Vec3f& entityMax = entity.mCollisionBoundsMax;
+    return bounds.Min.x <= entityMax.x && entityMin.x <= bounds.Max.x &&
+      bounds.Min.y <= entityMax.y && entityMin.y <= bounds.Max.y &&
+      bounds.Min.z <= entityMax.z && entityMin.z <= bounds.Max.z;
+  }
+
+  [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromSphere(
+    const Wm3::Sphere3f& sphere
+  ) noexcept
+  {
+    Wm3::AxisAlignedBox3f bounds{};
+    bounds.Min.x = sphere.Center.x - sphere.Radius;
+    bounds.Min.y = sphere.Center.y - sphere.Radius;
+    bounds.Min.z = sphere.Center.z - sphere.Radius;
+    bounds.Max.x = sphere.Center.x + sphere.Radius;
+    bounds.Max.y = sphere.Center.y + sphere.Radius;
+    bounds.Max.z = sphere.Center.z + sphere.Radius;
+    return bounds;
+  }
+
+  [[nodiscard]] static bool AxisAlignedBoundsContainEntityBounds(
+    const Wm3::AxisAlignedBox3f& bounds,
+    const Entity& entity
+  ) noexcept
+  {
+    const Wm3::Vec3f& entityMin = entity.mCollisionBoundsMin;
+    const Wm3::Vec3f& entityMax = entity.mCollisionBoundsMax;
+    return bounds.Min.x <= entityMin.x && entityMax.x <= bounds.Max.x &&
+      bounds.Min.y <= entityMin.y && entityMax.y <= bounds.Max.y &&
+      bounds.Min.z <= entityMin.z && entityMax.z <= bounds.Max.z;
+  }
+
+  /**
+   * Address: 0x00721DC0 (FUN_00721DC0, Moho::COGrid::CollectEntitiesInBox)
+   *
+   * What it does:
+   * Gathers unmarked candidate entities in one query box's collision-cell
+   * range, prefilters by cached per-entity AABB overlap, then appends
+   * primitive `CollideBox` hits to `outCollisions`.
+   */
+  void COGrid::CollectEntitiesInBox(
+    CollisionResultFastVectorN10& outCollisions,
+    const EEntityType flags,
+    const Wm3::Box3f& box
+  )
+  {
+    const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
+    const EntityCollisionBoundsView queryBoundsView{
+      queryBounds.Min.x,
+      queryBounds.Min.y,
+      queryBounds.Min.z,
+      queryBounds.Max.x,
+      queryBounds.Max.y,
+      queryBounds.Max.z
+    };
+
+    EntityGatherVector gatheredEntities{};
+    const int gatheredCount = GatherUnmarkedEntitiesInBounds(
+      queryBoundsView,
+      *this,
+      flags,
+      gatheredEntities
+    );
+
+    outCollisions.ResetStorageToInline();
+
+    for (int index = 0; index < gatheredCount; ++index) {
+      Entity* const candidate = gatheredEntities.start_[index];
+      if (candidate == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *candidate)) {
+        continue;
+      }
+
+      EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+      if (collisionPrimitive == nullptr) {
+        continue;
+      }
+
+      CollisionPairResult collisionResult{};
+      if (!collisionPrimitive->CollideBox(&box, &collisionResult)) {
+        continue;
+      }
+
+      collisionResult.sourceEntity = candidate;
+      outCollisions.PushBack(collisionResult);
+    }
+  }
+
+  /**
+   * Address: 0x00721FB0 (FUN_00721FB0, Moho::COGrid::ForAllEntitiesIterator)
+   *
+   * What it does:
+   * Gathers unmarked candidate entities in one sphere bounds lane, then
+   * appends per-entity sphere collision results. For larger radii, first
+   * accepts entities whose cached bounds lie fully inside a reduced inner box.
+   */
+  void COGrid::ForAllEntitiesIterator(
+    CollisionResultFastVectorN10& outCollisions,
+    const EEntityType flags,
+    const Wm3::Sphere3f& sphere
+  )
+  {
+    const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
+    const EntityCollisionBoundsView queryBoundsView{
+      queryBounds.Min.x,
+      queryBounds.Min.y,
+      queryBounds.Min.z,
+      queryBounds.Max.x,
+      queryBounds.Max.y,
+      queryBounds.Max.z
+    };
+
+    EntityGatherVector gatheredEntities{};
+    const int gatheredCount = GatherUnmarkedEntitiesInBounds(
+      queryBoundsView,
+      *this,
+      flags,
+      gatheredEntities
+    );
+
+    outCollisions.ResetStorageToInline();
+
+    CollisionPairResult collisionResult{};
+    if (sphere.Radius <= 3.0f) {
+      for (int index = 0; index < gatheredCount; ++index) {
+        Entity* const candidate = gatheredEntities.start_[index];
+        if (candidate == nullptr) {
+          continue;
+        }
+
+        EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+        if (collisionPrimitive == nullptr || !collisionPrimitive->CollideSphere(&sphere, &collisionResult)) {
+          continue;
+        }
+
+        collisionResult.sourceEntity = candidate;
+        outCollisions.PushBack(collisionResult);
+      }
+      return;
+    }
+
+    constexpr float kInnerBoundsScale = 0.70700002f;
+    const float innerRadius = sphere.Radius * kInnerBoundsScale;
+    Wm3::AxisAlignedBox3f innerBounds{};
+    innerBounds.Min.x = sphere.Center.x - innerRadius;
+    innerBounds.Min.y = sphere.Center.y - innerRadius;
+    innerBounds.Min.z = sphere.Center.z - innerRadius;
+    innerBounds.Max.x = sphere.Center.x + innerRadius;
+    innerBounds.Max.y = sphere.Center.y + innerRadius;
+    innerBounds.Max.z = sphere.Center.z + innerRadius;
+
+    for (int index = 0; index < gatheredCount; ++index) {
+      Entity* const candidate = gatheredEntities.start_[index];
+      if (candidate == nullptr) {
+        continue;
+      }
+
+      if (AxisAlignedBoundsContainEntityBounds(innerBounds, *candidate)) {
+        collisionResult.sourceEntity = candidate;
+        outCollisions.PushBack(collisionResult);
+        continue;
+      }
+
+      EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+      if (collisionPrimitive == nullptr || !collisionPrimitive->CollideSphere(&sphere, &collisionResult)) {
+        continue;
+      }
+
+      collisionResult.sourceEntity = candidate;
+      outCollisions.PushBack(collisionResult);
+    }
   }
 
   /**

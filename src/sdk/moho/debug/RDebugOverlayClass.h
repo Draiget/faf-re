@@ -20,6 +20,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0064C3C0 (FUN_0064C3C0, Moho::RDebugOverlayClass::RDebugOverlayClass)
+     *
+     * What it does:
+     * Initializes one debug-overlay type descriptor with self-linked intrusive
+     * list node lanes and empty token/description strings.
+     */
+    RDebugOverlayClass();
+
+    /**
      * Address: 0x0064C170 (FUN_0064C170, ?GetClass@RDebugOverlayClass@Moho@@UBEPAVRType@gpg@@XZ)
      * Slot: 0
      *
@@ -39,7 +48,8 @@ namespace moho
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
-     * Address: 0x0064C4D0 (FUN_0064C4D0, scalar deleting body)
+     * Address: 0x0064C400 (FUN_0064C400, non-deleting destructor body)
+     * Thunk entry: 0x0064C4D0 (FUN_0064C4D0, scalar deleting destructor)
      * Slot: 2
      */
     ~RDebugOverlayClass() override;

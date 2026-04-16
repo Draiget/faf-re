@@ -607,6 +607,24 @@ namespace moho
   void VEC_LookAt(const Wm3::Vector3f& up, const Wm3::Vector3f& forward, VAxes3* axes);
 
   /**
+   * Address: 0x0050B650 (FUN_0050B650, ?COORDS_LookAt@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
+   *
+   * What it does:
+   * Builds look-at axes using world-up `(0,1,0)` and the supplied forward
+   * direction.
+   */
+  void COORDS_LookAt(const Wm3::Vector3f& forward, VAxes3* axes);
+
+  /**
+   * Address: 0x0050B680 (FUN_0050B680, ?COORDS_LookAtXZ@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
+   *
+   * What it does:
+   * Builds an XZ-plane-aligned basis from one direction vector without
+   * normalizing the projected axes.
+   */
+  VAxes3* COORDS_LookAtXZ(VAxes3* outAxes, const Wm3::Vector3f& direction);
+
+  /**
    * Address: 0x004EC4E0 (FUN_004EC4E0, Moho::VAxes3Serializer::DeserializeThunk)
    */
   void DeserializeVAxes3SerializerThunk(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);

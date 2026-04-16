@@ -23,9 +23,33 @@ namespace
   gpg::RType* gUnitBlueprintWeaponType = nullptr;
   moho::RUnitBlueprintWeaponSaveConstruct gUnitBlueprintWeaponSaveConstruct;
 
+  /**
+   * Address: 0x00522E00 (FUN_00522E00)
+   *
+   * What it does:
+   * Unlinks `RUnitBlueprintWeaponSaveConstruct` helper node from the global
+   * serializer-helper intrusive list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintWeaponSaveConstruct);
+  }
+
+  /**
+   * Address: 0x00522E30 (FUN_00522E30)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `RUnitBlueprintWeaponSaveConstruct`
+   * helper-node cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintWeaponSaveConstructHelperNodeSecondary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintWeaponSaveConstruct);
+  }
+
   void CleanupUnitBlueprintWeaponSaveConstructAtexit()
   {
-    (void)moho::cleanup_RUnitBlueprintWeaponSaveConstruct();
+    (void)CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -100,7 +124,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_RUnitBlueprintWeaponSaveConstruct()
   {
-    return blueprint_ser::UnlinkHelperNode(gUnitBlueprintWeaponSaveConstruct);
+    return CleanupUnitBlueprintWeaponSaveConstructHelperNodePrimary();
   }
 
   /**

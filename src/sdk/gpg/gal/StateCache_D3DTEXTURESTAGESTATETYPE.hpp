@@ -19,6 +19,15 @@ namespace gpg::gal
         using value_type = unsigned int;
 
         /**
+         * Address: 0x00948110 (FUN_00948110)
+         *
+         * What it does:
+         * Initializes texture-stage cache tree sentinel lanes and zeroes the
+         * cached node-count lane.
+         */
+        StateCache();
+
+        /**
          * Address: 0x00948230 (FUN_00948230)
          *
          * Slot: 0

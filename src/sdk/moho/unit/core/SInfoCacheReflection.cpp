@@ -171,6 +171,19 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
   [[nodiscard]] gpg::RType* ResolveSInfoCacheType()
   {
     return gpg::LookupRType(typeid(SInfoCacheView));
@@ -237,6 +250,29 @@ namespace
   }
 
   /**
+   * Address: 0x006A4FF0 (FUN_006A4FF0)
+   *
+   * What it does:
+   * Splices the `SInfoCacheSerializer` helper node out of the intrusive lane
+   * when linked, then rewires helper links to its self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSInfoCacheSerializerHelperNodeVariantA() noexcept
+  {
+    return UnlinkSerializerNode(gSInfoCacheSerializer);
+  }
+
+  /**
+   * Address: 0x006A5020 (FUN_006A5020)
+   *
+   * What it does:
+   * Secondary serializer helper unlink/reset variant sharing the same behavior.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSInfoCacheSerializerHelperNodeVariantB() noexcept
+  {
+    return UnlinkSInfoCacheSerializerHelperNodeVariantA();
+  }
+
+  /**
    * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
    *
    * What it does:
@@ -244,18 +280,7 @@ namespace
    */
   gpg::SerHelperBase* cleanup_SInfoCacheSerializer_00BFD940_Impl()
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gSInfoCacheSerializer);
-    if (gSInfoCacheSerializer.mHelperNext == nullptr || gSInfoCacheSerializer.mHelperPrev == nullptr) {
-      gSInfoCacheSerializer.mHelperPrev = self;
-      gSInfoCacheSerializer.mHelperNext = self;
-      return self;
-    }
-
-    gSInfoCacheSerializer.mHelperNext->mPrev = gSInfoCacheSerializer.mHelperPrev;
-    gSInfoCacheSerializer.mHelperPrev->mNext = gSInfoCacheSerializer.mHelperNext;
-    gSInfoCacheSerializer.mHelperPrev = self;
-    gSInfoCacheSerializer.mHelperNext = self;
-    return self;
+    return UnlinkSInfoCacheSerializerHelperNodeVariantA();
   }
 
   void cleanup_SInfoCacheSerializer_00BFD940_AtExit()
@@ -292,12 +317,12 @@ namespace
    */
   int register_SInfoCacheTypeInfo_Impl()
   {
-    (void)moho::construct_SInfoCacheTypeInfo();
+    (void)AcquireSInfoCacheTypeInfo();
     return std::atexit(&cleanup_SInfoCacheTypeInfo_00BFD8E0_AtExit);
   }
 
   /**
-   * Address: 0x00BD6A90 (FUN_00BD6A90, register_SInfoCacheSerializer)
+    * Alias of FUN_00BD6A90 (non-canonical helper lane).
    *
    * What it does:
    * Initializes `SInfoCacheSerializer` callbacks and schedules exit cleanup.
@@ -307,7 +332,6 @@ namespace
     InitializeSerializerNode(gSInfoCacheSerializer);
     gSInfoCacheSerializer.mDeserialize = &moho::SInfoCacheSerializer::Deserialize;
     gSInfoCacheSerializer.mSerialize = &moho::SInfoCacheSerializer::Serialize;
-    gSInfoCacheSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SInfoCacheSerializer_00BFD940_AtExit);
   }
 
@@ -315,8 +339,8 @@ namespace
   {
     SInfoCacheReflectionBootstrap()
     {
-      (void)moho::register_SInfoCacheTypeInfo();
-      moho::register_SInfoCacheSerializer();
+      (void)register_SInfoCacheTypeInfo_Impl();
+      register_SInfoCacheSerializer_Impl();
     }
   };
 
@@ -362,31 +386,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006A4E60 (FUN_006A4E60, sub_6A4E60)
-   */
-  gpg::RType* construct_SInfoCacheTypeInfo()
-  {
-    return &AcquireSInfoCacheTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BFD8E0 (FUN_00BFD8E0, sub_BFD8E0)
-   */
-  void cleanup_SInfoCacheTypeInfo()
-  {
-    cleanup_SInfoCacheTypeInfo_00BFD8E0_Impl();
-  }
-
-  /**
-   * Address: 0x00BD6A70 (FUN_00BD6A70, register_SInfoCacheTypeInfo)
-   */
-  int register_SInfoCacheTypeInfo()
-  {
-    return register_SInfoCacheTypeInfo_Impl();
-  }
-
-  /**
-   * Address: 0x006B04B0 (FUN_006B04B0, Moho::SInfoCacheSerializer::Deserialize)
+    * Alias of FUN_006B04B0 (non-canonical helper lane).
    */
   void SInfoCacheSerializer::Deserialize(
     gpg::ReadArchive* const archive,
@@ -399,7 +399,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006B0580 (FUN_006B0580, Moho::SInfoCacheSerializer::Serialize)
+    * Alias of FUN_006B0580 (non-canonical helper lane).
    */
   void SInfoCacheSerializer::Serialize(
     gpg::WriteArchive* const archive,
@@ -424,19 +424,4 @@ namespace moho
     type->serSaveFunc_ = mSerialize;
   }
 
-  /**
-   * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
-   */
-  gpg::SerHelperBase* cleanup_SInfoCacheSerializer()
-  {
-    return cleanup_SInfoCacheSerializer_00BFD940_Impl();
-  }
-
-  /**
-   * Address: 0x00BD6A90 (FUN_00BD6A90, register_SInfoCacheSerializer)
-   */
-  void register_SInfoCacheSerializer()
-  {
-    register_SInfoCacheSerializer_Impl();
-  }
 } // namespace moho

@@ -27,6 +27,22 @@ namespace
     return *reinterpret_cast<TypeInfo*>(gMotorTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x006831D0 (FUN_006831D0)
+   *
+   * What it does:
+   * Resolves and caches RTTI for the legacy `Moho::Motor` alias lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyMotorAliasType()
+  {
+    gpg::RType* type = moho::EntityMotor::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::Motor));
+      moho::EntityMotor::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
     if (!moho::EntityMotor::sType) {
@@ -54,13 +70,38 @@ namespace
   template <class TSerializer>
   [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
-    serializer.mHelperLinks.mNext->mPrev = serializer.mHelperLinks.mPrev;
-    serializer.mHelperLinks.mPrev->mNext = serializer.mHelperLinks.mNext;
+    if (serializer.mHelperLinks.mNext != nullptr && serializer.mHelperLinks.mPrev != nullptr) {
+      serializer.mHelperLinks.mNext->mPrev = serializer.mHelperLinks.mPrev;
+      serializer.mHelperLinks.mPrev->mNext = serializer.mHelperLinks.mNext;
+    }
 
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperLinks.mPrev = self;
     serializer.mHelperLinks.mNext = self;
     return self;
+  }
+
+  /**
+   * Address: 0x00694990 (FUN_00694990)
+   *
+   * What it does:
+   * Unlinks global `MotorSerializer` helper links and resets the node to the
+   * canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkMotorSerializerHelperNodePrimary() noexcept
+  {
+    return UnlinkSerializerNode(gMotorSerializer);
+  }
+
+  /**
+   * Address: 0x006949C0 (FUN_006949C0)
+   *
+   * What it does:
+   * Secondary unlink/reset entry for the global `MotorSerializer` helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkMotorSerializerHelperNodeSecondary() noexcept
+  {
+    return UnlinkSerializerNode(gMotorSerializer);
   }
 
   void cleanup_MotorTypeInfo_Atexit()
@@ -94,12 +135,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x006948F0 (FUN_006948F0, MotorTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `MotorTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyMotorTypeInfoBody(MotorTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x00BFCF00 (FUN_00BFCF00, Moho::MotorTypeInfo::~MotorTypeInfo)
    */
   MotorTypeInfo::~MotorTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyMotorTypeInfoBody(this);
   }
 
   /**
@@ -159,7 +216,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_MotorSerializer()
   {
-    return UnlinkSerializerNode(gMotorSerializer);
+    return UnlinkMotorSerializerHelperNodePrimary();
   }
 
   /**
@@ -172,13 +229,41 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer)
+   * Address: 0x00694960 (FUN_00694960)
+   *
+   * What it does:
+   * Startup leaf that initializes global `MotorSerializer` callback lanes and
+   * returns its serializer helper pointer.
    */
-  void register_MotorSerializer()
+  [[maybe_unused]] gpg::SerHelperBase* construct_MotorSerializer_StartupLeaf()
   {
     InitializeSerializerNode(gMotorSerializer);
     gMotorSerializer.mDeserialize = &MotorSerializer::Deserialize;
     gMotorSerializer.mSerialize = &MotorSerializer::Serialize;
+    return SerializerSelfNode(gMotorSerializer);
+  }
+
+  /**
+   * Address: 0x006949F0 (FUN_006949F0)
+   *
+   * What it does:
+   * Alternate startup leaf that rebuilds global `MotorSerializer` helper links,
+   * rewires deserialize/serialize callbacks, and returns the helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_MotorSerializer_SaveLoadStartupLeaf()
+  {
+    InitializeSerializerNode(gMotorSerializer);
+    gMotorSerializer.mDeserialize = &MotorSerializer::Deserialize;
+    gMotorSerializer.mSerialize = &MotorSerializer::Serialize;
+    return SerializerSelfNode(gMotorSerializer);
+  }
+
+  /**
+   * Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer)
+   */
+  void register_MotorSerializer()
+  {
+    (void)construct_MotorSerializer_StartupLeaf();
     (void)std::atexit(&cleanup_MotorSerializer_Atexit);
   }
 } // namespace moho
@@ -196,5 +281,3 @@ namespace
 
   [[maybe_unused]] MotorReflectionBootstrap gMotorReflectionBootstrap;
 } // namespace
-
-

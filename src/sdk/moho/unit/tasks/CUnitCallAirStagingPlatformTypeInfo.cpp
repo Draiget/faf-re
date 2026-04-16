@@ -63,10 +63,13 @@ namespace moho
   void CUnitCallAirStagingPlatformTypeInfo::Init()
   {
     size_ = sizeof(CUnitCallAirStagingPlatform);
-    newRefFunc_ = &CUnitCallAirStagingPlatformTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitCallAirStagingPlatformTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitCallAirStagingPlatformTypeInfo::Delete;
-    dtrFunc_ = &CUnitCallAirStagingPlatformTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitCallAirStagingPlatformTypeInfo::NewRef,
+      &CUnitCallAirStagingPlatformTypeInfo::CtrRef,
+      &CUnitCallAirStagingPlatformTypeInfo::Delete,
+      &CUnitCallAirStagingPlatformTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

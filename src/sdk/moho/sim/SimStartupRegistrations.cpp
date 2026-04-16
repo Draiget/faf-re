@@ -126,6 +126,66 @@ namespace
     return sVar;
   }
 
+  /**
+   * Address: 0x007353C0 (FUN_007353C0)
+   *
+   * What it does:
+   * Constructs one startup `TSimConVar<uint8_t>` lane for
+   * `"sim_TestVarUByte"` with default value `0`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<std::uint8_t>& SimConVar_sim_TestVarUByte()
+  {
+    static moho::TSimConVar<std::uint8_t> sVar(false, "sim_TestVarUByte", static_cast<std::uint8_t>(0));
+    return sVar;
+  }
+
+  /**
+   * Address owner: startup sim-convar registration lane near 0x007353C0.
+   *
+   * What it does:
+   * Constructs one startup `TSimConVar<msvc8::string>` lane for
+   * `"sim_TestVarStr"` with default value `"string"`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<msvc8::string>& SimConVar_sim_TestVarStr()
+  {
+    static moho::TSimConVar<msvc8::string> sVar(false, "sim_TestVarStr", msvc8::string("string"));
+    return sVar;
+  }
+
+  /**
+   * Address: 0x00736830 (FUN_00736830)
+   *
+   * What it does:
+   * Returns one raw storage pointer for the per-sim `sim_TestVarUByte`
+   * runtime convar instance.
+   */
+  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarUByteStorage(moho::Sim* const sim)
+  {
+    if (sim == nullptr) {
+      return nullptr;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarUByte());
+    return instance != nullptr ? instance->GetValueStorage() : nullptr;
+  }
+
+  /**
+   * Address: 0x00736850 (FUN_00736850)
+   *
+   * What it does:
+   * Returns one raw storage pointer for the per-sim `sim_TestVarStr`
+   * runtime convar instance.
+   */
+  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarStrStorage(moho::Sim* const sim)
+  {
+    if (sim == nullptr) {
+      return nullptr;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarStr());
+    return instance != nullptr ? instance->GetValueStorage() : nullptr;
+  }
+
   alignas(moho::CConAlias) unsigned char gReconFlushConAliasStorage[sizeof(moho::CConAlias)] = {};
   bool gReconFlushConAliasConstructed = false;
 

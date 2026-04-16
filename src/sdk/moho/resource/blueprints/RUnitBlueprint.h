@@ -19,6 +19,7 @@ namespace moho
 {
   class CRandomStream;
   class RRuleGameRules;
+  class RRuleGameRulesImpl;
   struct RUnitBlueprint;
   struct SCoordsVec2;
 
@@ -601,6 +602,24 @@ namespace moho
     msvc8::string UIMaxRangeVisualId;               // +0x168
 
     /**
+     * Address: 0x0051F4C0 (FUN_0051F4C0)
+     *
+     * What it does:
+     * Restores default weapon-blueprint runtime state, including canonical
+     * range, ballistic, and damage-profile defaults.
+     */
+    RUnitBlueprintWeapon();
+
+    /**
+     * Address: 0x00524E50 (FUN_00524E50, Moho::RUnitBlueprintWeapon::RUnitBlueprintWeapon)
+     *
+     * What it does:
+     * Copy-constructs one weapon blueprint lane, including all resource-id,
+     * string, and scalar gameplay fields.
+     */
+    RUnitBlueprintWeapon(const RUnitBlueprintWeapon& other);
+
+    /**
      * Address: 0x00523F90 (FUN_00523F90, Moho::RUnitBlueprintWeapon::~RUnitBlueprintWeapon)
      *
      * What it does:
@@ -781,6 +800,15 @@ namespace moho
     void OnInitBlueprint();
 
     /**
+     * Address: 0x00529E90 (FUN_00529E90, Moho::RUnitBlueprint::AddEconomyRestrictions)
+     *
+     * What it does:
+     * Parses each `Economy.BuildableCategories` expression and unions the
+     * resulting category bits into the runtime economy restriction cache.
+     */
+    void AddEconomyRestrictions(RRuleGameRulesImpl* rules);
+
+    /**
      * Address: 0x005A1330 (FUN_005A1330, Moho::RUnitBlueprint::GetPointerType)
      *
      * What it does:
@@ -854,6 +882,18 @@ namespace moho
      */
     [[nodiscard]] gpg::Rect2f GetSkirtRect(const SCoordsVec2& position) const;
   };
+
+  /**
+   * Address: 0x005267A0 (FUN_005267A0, Moho::CopyOccupyRects)
+   *
+   * What it does:
+   * Rebuilds destination `vector<float>` runtime lanes from source occupancy
+   * data and copies the full `[begin,end)` float range.
+   */
+  [[nodiscard]] msvc8::vector<float>* CopyOccupyRects(
+    const msvc8::vector<float>& source,
+    msvc8::vector<float>& destination
+  );
 
   static_assert(
     offsetof(RUnitBlueprintGeneral, UpgradesTo) == 0x08, "RUnitBlueprintGeneral::UpgradesTo offset must be 0x08"

@@ -55,6 +55,14 @@ namespace moho
   static_assert(sizeof(IArmySerializer) == 0x14, "IArmySerializer size must be 0x14");
 
   /**
+   * Address: 0x005506B0 (FUN_005506B0, preregister_SSTIArmyConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIArmyConstantData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIArmyConstantDataTypeInfo();
+
+  /**
    * Address: 0x00BC9B70 (FUN_00BC9B70, register_IArmySerializer)
    *
    * What it does:
@@ -63,4 +71,3 @@ namespace moho
    */
   void register_IArmySerializer();
 } // namespace moho
-

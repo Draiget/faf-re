@@ -45,6 +45,14 @@ namespace moho
 
   private:
     /**
+     * Address: 0x00701D00 (FUN_00701D00, sub_701D00)
+     *
+     * What it does:
+     * Assigns reflected construction/destruction callback lanes for `CArmyImpl`.
+     */
+    static CArmyImplTypeInfo* AssignFactoryCallbacks(CArmyImplTypeInfo* typeInfo);
+
+    /**
      * Address: 0x007034D0 (FUN_007034D0, sub_7034D0)
      *
      * What it does:

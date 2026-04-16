@@ -28,6 +28,7 @@
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 
@@ -102,6 +103,310 @@ namespace
   gpg::RType* gRMeshBlueprintType = nullptr;
   gpg::RType* gRScmResourceType = nullptr;
   gpg::RType* gCAniPoseType = nullptr;
+
+  /**
+   * Address: 0x005C5580 (FUN_005C5580)
+   *
+   * What it does:
+   * Destroys all `SPerArmyReconInfo` lanes, frees vector storage, and resets
+   * begin/end/capacity pointers to null.
+   */
+  [[maybe_unused]] void ResetPerArmyReconInfoVectorStorage(msvc8::vector<moho::SPerArmyReconInfo>& storage)
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (view.begin != nullptr) {
+      for (moho::SPerArmyReconInfo* cursor = view.begin; cursor != view.end; ++cursor) {
+        cursor->~SPerArmyReconInfo();
+      }
+      ::operator delete(view.begin);
+    }
+
+    view.begin = nullptr;
+    view.end = nullptr;
+    view.capacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x005C3C10 (FUN_005C3C10)
+   *
+   * What it does:
+   * Thin call-convention thunk used by constructor lanes that forwards to the
+   * canonical per-army recon-info vector-storage reset helper.
+   */
+  [[maybe_unused]] void ResetPerArmyReconInfoVectorStorageThunk(msvc8::vector<moho::SPerArmyReconInfo>& storage)
+  {
+    ResetPerArmyReconInfoVectorStorage(storage);
+  }
+
+  /**
+   * Address: 0x005C6F70 (FUN_005C6F70)
+   *
+   * What it does:
+   * Destroys one contiguous `SPerArmyReconInfo` range `[begin, end)` by
+   * invoking the element destructor in forward order.
+   */
+  [[maybe_unused]] void DestroyPerArmyReconInfoRange(
+    moho::SPerArmyReconInfo* begin,
+    moho::SPerArmyReconInfo* const end
+  )
+  {
+    while (begin != end) {
+      begin->~SPerArmyReconInfo();
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x005C6F00 (FUN_005C6F00)
+   *
+   * What it does:
+   * Erases one half-open range from `vector<SPerArmyReconInfo>`, compacts the
+   * remaining tail lanes over the gap, destroys stale tail objects, and
+   * returns the erase-begin iterator.
+   */
+  [[nodiscard]] moho::SPerArmyReconInfo** CompactPerArmyReconInfoRangeAndReturnIterator(
+    msvc8::vector<moho::SPerArmyReconInfo>& storage,
+    moho::SPerArmyReconInfo** const outIterator,
+    moho::SPerArmyReconInfo* eraseBegin,
+    moho::SPerArmyReconInfo* eraseEnd
+  )
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (!view.begin || !view.end || eraseBegin == nullptr || eraseEnd == nullptr || eraseBegin > eraseEnd) {
+      if (outIterator) {
+        *outIterator = eraseBegin;
+      }
+      return outIterator;
+    }
+
+    if (eraseEnd > view.end) {
+      eraseEnd = view.end;
+    }
+
+    moho::SPerArmyReconInfo* write = eraseBegin;
+    moho::SPerArmyReconInfo* read = eraseEnd;
+    while (read != view.end) {
+      *write = *read;
+      ++write;
+      ++read;
+    }
+
+    for (moho::SPerArmyReconInfo* stale = write; stale != view.end; ++stale) {
+      stale->~SPerArmyReconInfo();
+    }
+    view.end = write;
+
+    if (outIterator) {
+      *outIterator = eraseBegin;
+    }
+    return outIterator;
+  }
+
+  /**
+   * Address: 0x005C9E70 (FUN_005C9E70)
+   *
+   * What it does:
+   * Copy-assigns one contiguous per-army recon-info range
+   * `[sourceBegin, sourceEnd)` and returns one-past-end destination.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SPerArmyReconInfo* CopyPerArmyReconInfoRangeAndReturnEnd(
+    moho::SPerArmyReconInfo* destination,
+    const moho::SPerArmyReconInfo* sourceBegin,
+    const moho::SPerArmyReconInfo* sourceEnd
+  ) noexcept
+  {
+    while (sourceBegin != sourceEnd) {
+      if (destination != nullptr) {
+        *destination = *sourceBegin;
+      }
+      ++sourceBegin;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  [[nodiscard]] bool AllocatePerArmyReconInfoStorage(
+    msvc8::vector<moho::SPerArmyReconInfo>& storage,
+    const std::size_t elementCount
+  ) noexcept
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (elementCount == 0u) {
+      view.begin = nullptr;
+      view.end = nullptr;
+      view.capacityEnd = nullptr;
+      return true;
+    }
+
+    if (elementCount > (static_cast<std::size_t>(-1) / sizeof(moho::SPerArmyReconInfo))) {
+      return false;
+    }
+
+    void* rawStorage = nullptr;
+    try {
+      rawStorage = ::operator new(sizeof(moho::SPerArmyReconInfo) * elementCount);
+    } catch (...) {
+      return false;
+    }
+
+    view.begin = static_cast<moho::SPerArmyReconInfo*>(rawStorage);
+    view.end = view.begin;
+    view.capacityEnd = view.begin + elementCount;
+    return true;
+  }
+
+  [[nodiscard]] moho::SPerArmyReconInfo* CopyConstructPerArmyReconInfoRange(
+    moho::SPerArmyReconInfo* destination,
+    const moho::SPerArmyReconInfo* sourceBegin,
+    const moho::SPerArmyReconInfo* sourceEnd
+  )
+  {
+    moho::SPerArmyReconInfo* write = destination;
+    try {
+      for (const moho::SPerArmyReconInfo* read = sourceBegin; read != sourceEnd; ++read, ++write) {
+        ::new (write) moho::SPerArmyReconInfo(*read);
+      }
+      return write;
+    } catch (...) {
+      for (moho::SPerArmyReconInfo* destroy = destination; destroy != write; ++destroy) {
+        destroy->~SPerArmyReconInfo();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x005CA980 (FUN_005CA980)
+   *
+   * What it does:
+   * Assigns one `vector<SPerArmyReconInfo>` lane with VC8 growth/cleanup
+   * semantics, reusing existing storage when possible and preserving element
+   * destructor/copy order on shrink and reallocation paths.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::vector<moho::SPerArmyReconInfo>& AssignPerArmyReconInfoVector(
+    msvc8::vector<moho::SPerArmyReconInfo>& destination,
+    const msvc8::vector<moho::SPerArmyReconInfo>& source
+  )
+  {
+    if (&destination == &source) {
+      return destination;
+    }
+
+    auto& destinationView = msvc8::AsVectorRuntimeView(destination);
+    const auto& sourceView = msvc8::AsVectorRuntimeView(source);
+
+    const std::size_t sourceCount =
+      sourceView.begin ? static_cast<std::size_t>(sourceView.end - sourceView.begin) : 0u;
+    if (sourceCount == 0u) {
+      moho::SPerArmyReconInfo* eraseIterator = nullptr;
+      (void)CompactPerArmyReconInfoRangeAndReturnIterator(
+        destination,
+        &eraseIterator,
+        destinationView.begin,
+        destinationView.end
+      );
+      return destination;
+    }
+
+    const std::size_t currentCount =
+      destinationView.begin ? static_cast<std::size_t>(destinationView.end - destinationView.begin) : 0u;
+    const moho::SPerArmyReconInfo* const sourceBegin = sourceView.begin;
+    const moho::SPerArmyReconInfo* const sourceEnd = sourceView.end;
+
+    if (sourceCount > currentCount) {
+      const std::size_t capacityCount =
+        destinationView.begin ? static_cast<std::size_t>(destinationView.capacityEnd - destinationView.begin) : 0u;
+      if (sourceCount <= capacityCount) {
+        const moho::SPerArmyReconInfo* const sourceTailBegin = sourceBegin + currentCount;
+        (void)CopyPerArmyReconInfoRangeAndReturnEnd(destinationView.begin, sourceBegin, sourceTailBegin);
+        destinationView.end = CopyConstructPerArmyReconInfoRange(destinationView.end, sourceTailBegin, sourceEnd);
+        return destination;
+      }
+
+      if (destinationView.begin != nullptr) {
+        ResetPerArmyReconInfoVectorStorage(destination);
+      }
+
+      if (AllocatePerArmyReconInfoStorage(destination, sourceCount)) {
+        try {
+          destinationView.end = CopyConstructPerArmyReconInfoRange(destinationView.begin, sourceBegin, sourceEnd);
+        } catch (...) {
+          ::operator delete(destinationView.begin);
+          destinationView.begin = nullptr;
+          destinationView.end = nullptr;
+          destinationView.capacityEnd = nullptr;
+          throw;
+        }
+      }
+      return destination;
+    }
+
+    moho::SPerArmyReconInfo* const assignedEnd =
+      CopyPerArmyReconInfoRangeAndReturnEnd(destinationView.begin, sourceBegin, sourceEnd);
+    for (moho::SPerArmyReconInfo* stale = assignedEnd; stale != destinationView.end; ++stale) {
+      stale->~SPerArmyReconInfo();
+    }
+    destinationView.end = destinationView.begin + sourceCount;
+    return destination;
+  }
+
+  /**
+   * Address: 0x005C5460 (FUN_005C5460)
+   *
+   * What it does:
+   * Resizes one per-army recon-info vector to an exact count by appending one
+   * fill value for growth and erasing tail lanes for shrink.
+   */
+  void ResizePerArmyReconInfoVector(
+    msvc8::vector<moho::SPerArmyReconInfo>& outReconInfo,
+    const std::size_t targetCount,
+    const moho::SPerArmyReconInfo& fillValue
+  )
+  {
+    const std::size_t currentCount = outReconInfo.size();
+    if (currentCount < targetCount) {
+      outReconInfo.resize(targetCount, fillValue);
+    }
+
+    if (currentCount > targetCount) {
+      auto& view = msvc8::AsVectorRuntimeView(outReconInfo);
+      if (view.begin && view.end) {
+        moho::SPerArmyReconInfo* const eraseBegin = view.begin + targetCount;
+        moho::SPerArmyReconInfo* outIterator = nullptr;
+        (void)CompactPerArmyReconInfoRangeAndReturnIterator(outReconInfo, &outIterator, eraseBegin, view.end);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x005C3C20 (FUN_005C3C20)
+   *
+   * What it does:
+   * Register-shape adapter that resizes one per-army recon-info vector with a
+   * zero-initialized fill lane.
+   */
+  [[maybe_unused]] void ResizePerArmyReconInfoVectorZeroFillAdapter(
+    msvc8::vector<moho::SPerArmyReconInfo>& outReconInfo,
+    const std::size_t targetCount
+  )
+  {
+    const moho::SPerArmyReconInfo fillValue{};
+    ResizePerArmyReconInfoVector(outReconInfo, targetCount, fillValue);
+  }
+
+  struct SimArmyRuntimeView
+  {
+    std::uint8_t mPad00_07[0x08];
+    SSTIArmyConstantData mConstDat;
+  };
+
+  static_assert(offsetof(SimArmyRuntimeView, mConstDat) == 0x08, "SimArmyRuntimeView::mConstDat offset must be 0x08");
+
+  [[nodiscard]] std::int32_t ResolveReconArmyIndex(const SimArmy* const army) noexcept
+  {
+    return reinterpret_cast<const SimArmyRuntimeView*>(army)->mConstDat.mArmyIndex;
+  }
 
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
@@ -181,6 +486,19 @@ namespace
       }
     }
     return path;
+  }
+
+  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
   }
 
   struct ReflectedObjectDeleter
@@ -327,6 +645,30 @@ namespace
       : 0u;
     const std::uint32_t requestBits = (sourceArmyId | kReconEntityFamilyPrefix) << 20u;
     return static_cast<EntId>(sim->mEntityDB->DoReserveId(requestBits));
+  }
+
+  /**
+   * Address: 0x005BDDB0 (FUN_005BDDB0)
+   *
+   * What it does:
+   * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
+   * control-block owner when the control lane is non-null.
+   */
+  [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
+  {
+    boost::SharedPtrRaw<RScmResource> out{};
+    if (source == nullptr) {
+      return out;
+    }
+
+    const auto* const sourceMesh = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&source->mMeshRef);
+    out.px = sourceMesh->px;
+    out.pi = sourceMesh->pi;
+    if (out.pi != nullptr) {
+      out.pi->add_ref_copy();
+    }
+
+    return out;
   }
 
   [[nodiscard]] Wm3::Vec3f ComputeJamOffset(Unit* const sourceUnit, Sim* const sim)
@@ -832,6 +1174,7 @@ ReconBlip::ReconBlip(Sim* const sim) :
     mUnitVarDat{},
     mReconDat{}
 {
+  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), 1L);
 }
 
 /**
@@ -845,6 +1188,31 @@ SPerArmyReconInfo::~SPerArmyReconInfo()
   mPose.release();
   mPriorPose.release();
   mMesh.release();
+}
+
+/**
+ * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
+ * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
+ *
+ * What it does:
+ * Assigns scalar recon flags/health lanes and rebinds mesh/pose shared
+ * control blocks with retain/release semantics in binary field order.
+ */
+SPerArmyReconInfo& SPerArmyReconInfo::operator=(const SPerArmyReconInfo& other)
+{
+  mNeedsFlush = other.mNeedsFlush;
+  mReconFlags = other.mReconFlags;
+  mStiMesh = other.mStiMesh;
+
+  mMesh.assign_retain(other.mMesh);
+  mPriorPose.assign_retain(other.mPriorPose);
+  mPose.assign_retain(other.mPose);
+
+  mHealth = other.mHealth;
+  mMaxHealth = other.mMaxHealth;
+  mFractionComplete = other.mFractionComplete;
+  mMaybeDead = other.mMaybeDead;
+  return *this;
 }
 
 /**
@@ -927,6 +1295,8 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
     mUnitVarDat{},
     mReconDat{}
 {
+  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), 1L);
+
   mCreator.ResetFromObject(sourceUnit);
   mQueueRelinkBlocked = 1u;
 
@@ -935,7 +1305,9 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   } else {
     mJamOffset = {};
     if (sourceUnit) {
-      mMeshRef = sourceUnit->mMeshRef;
+      const boost::SharedPtrRaw<RScmResource> sourceMesh = CopyEntityMeshSharedRetained(sourceUnit);
+      mMeshRef.mObj = sourceMesh.px;
+      mMeshRef.mType = reinterpret_cast<gpg::RType*>(sourceMesh.pi);
       mMeshTypeClassId = sourceUnit->mMeshTypeClassId;
     }
   }
@@ -949,8 +1321,34 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   const std::size_t armyCount = (sim && sim->mArmiesList.begin())
     ? static_cast<std::size_t>(sim->mArmiesList.end() - sim->mArmiesList.begin())
     : 0u;
-  mReconDat.resize(armyCount, SPerArmyReconInfo{});
+  const SPerArmyReconInfo defaultReconInfo{};
+  ResizePerArmyReconInfoVector(mReconDat, armyCount, defaultReconInfo);
   Refresh();
+}
+
+/**
+ * Address: 0x005BEC90 (FUN_005BEC90, Moho::ReconBlip::~ReconBlip)
+ *
+ * What it does:
+ * Destroys recon-blip-owned per-army state lanes, tears down unit variable/
+ * constant payload ownership, unlinks creator weak-reference storage, and
+ * decrements the recon-blip instance counter before base destruction.
+ */
+ReconBlip::~ReconBlip()
+{
+  ResetPerArmyReconInfoVectorStorage(mReconDat);
+
+  static_assert(
+    sizeof(SReconBlipUnitVarData) == sizeof(SSTIUnitVariableData),
+    "SReconBlipUnitVarData layout must match SSTIUnitVariableData"
+  );
+  reinterpret_cast<SSTIUnitVariableData&>(mUnitVarDat).~SSTIUnitVariableData();
+  ::new (&mUnitVarDat) SReconBlipUnitVarData{};
+
+  mUnitConstDat.mStatsRoot.reset();
+  mCreator.UnlinkFromOwnerChain();
+
+  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), -1L);
 }
 
 /**
@@ -1156,6 +1554,72 @@ Unit* ReconBlip::GetCreator() const noexcept
 }
 
 /**
+ * Address: 0x005BDEA0 (FUN_005BDEA0, Moho::ReconBlip::DeleteWhenStale)
+ *
+ * What it does:
+ * Returns whether stale-visibility cleanup may delete this blip.
+ */
+bool ReconBlip::DeleteWhenStale() const
+{
+  return mDeleteWhenStale != 0u;
+}
+
+/**
+ * Address: 0x005BDEB0 (FUN_005BDEB0, Moho::ReconBlip::IsJam)
+ *
+ * What it does:
+ * Returns the jam/fake marker lane stored in recon-const payload.
+ */
+bool ReconBlip::IsJam() const
+{
+  return mUnitConstDat.mFake != 0u;
+}
+
+/**
+ * Address: 0x005BDEC0 (FUN_005BDEC0, Moho::ReconBlip::GetReconInfo)
+ *
+ * What it does:
+ * Returns the mutable per-army recon info lane selected by direct index.
+ */
+SPerArmyReconInfo* ReconBlip::GetReconInfo(const std::int32_t armyIndex)
+{
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(armyIndex);
+}
+
+/**
+ * Address: 0x005BDED0 (FUN_005BDED0, Moho::ReconBlip::GetReconInfo)
+ *
+ * What it does:
+ * Returns the mutable per-army recon info lane selected by `army`.
+ */
+SPerArmyReconInfo* ReconBlip::GetReconInfo(SimArmy* const army)
+{
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(ResolveReconArmyIndex(army));
+}
+
+/**
+ * Address: 0x005BDEE0 (FUN_005BDEE0, Moho::ReconBlip::GetReconInfo)
+ *
+ * What it does:
+ * Returns the const per-army recon info lane selected by direct index.
+ */
+const SPerArmyReconInfo* ReconBlip::GetReconInfo(const std::int32_t armyIndex) const
+{
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(armyIndex);
+}
+
+/**
+ * Address: 0x005BDEF0 (FUN_005BDEF0, Moho::ReconBlip::GetReconInfo)
+ *
+ * What it does:
+ * Returns the const per-army recon info lane selected by `army`.
+ */
+const SPerArmyReconInfo* ReconBlip::GetReconInfo(SimArmy* const army) const
+{
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(ResolveReconArmyIndex(army));
+}
+
+/**
  * Address: 0x005BDF00 (FUN_005BDF00, Moho::ReconBlip::GetFlags)
  *
  * What it does:
@@ -1311,7 +1775,7 @@ void ReconBlip::CreateInterface(SSyncData* const syncData)
   createParams.mConstDat.mBuildStateTag = mUnitConstDat.mBuildStateTag;
   createParams.mConstDat.mStatsRoot = mUnitConstDat.mStatsRoot;
   createParams.mConstDat.mFake = mUnitConstDat.mFake;
-  syncData->mNewUnits.push_back(createParams);
+  (void)QueueCreateUnitParams(syncData, createParams);
   mInterfaceCreated = 1u;
 }
 

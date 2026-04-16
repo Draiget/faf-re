@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0064ED10 (FUN_0064ED10)
+     *
+     * What it does:
+     * Initializes the grid-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugGrid();
+
+    /**
      * Address: 0x0064D020 (FUN_0064D020, Moho::RDebugGrid::GetClass)
      * Slot: 0
      *

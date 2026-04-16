@@ -24,6 +24,14 @@ namespace moho
   class ISTIDriver
   {
   public:
+    /**
+     * Address: 0x0073B0C0 (FUN_0073B0C0, ??0ISTIDriver@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one simulation-driver base interface object.
+     */
+    ISTIDriver();
+
     // Slot 0. Base: 0x0073B0D0 (FUN_0073B0D0); CSimDriver deleting thunk: 0x0073B910 (FUN_0073B910)
     // Base scalar-deleting destructor for ISTIDriver.
     virtual ~ISTIDriver();

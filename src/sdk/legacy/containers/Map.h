@@ -156,6 +156,8 @@ namespace msvc8
 
             /**
              * Address: 0x0094F030 (FUN_0094F030, std::map_RType_int::iterator::operator++)
+             * Address: 0x009488D0 (FUN_009488D0)
+             * Address: 0x00948930 (FUN_00948930)
              *
              * What it does:
              * Advances this iterator by one tree step using header-aware

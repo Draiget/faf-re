@@ -5,14 +5,11 @@
 using namespace moho;
 
 /**
- * Address: <synthetic host-build wrapper>
- *
- * Binary evidence:
- * - 0x0053E330 (FUN_0053E330, CClientManagerImpl::CreateCNullClient)
+ * Address: 0x0053B940 (FUN_0053B940)
  *
  * What it does:
- * Wraps `CClientBase` construction for null-client objects; in FA the
- * derived constructor sequence is inlined in manager creation.
+ * Runs the null-client derived constructor lane by forwarding to
+ * `CClientBase` initialization and binding the `CNullClient` vtable.
  */
 CNullClient::CNullClient(
   const int32_t index,
@@ -49,7 +46,9 @@ float CNullClient::GetStatusMetricB()
 /**
  * Address: 0x0053B990 (FUN_0053B990)
  */
-void CNullClient::Process(CMessage& msg)
+void CNullClient::Process(
+  CMessage& msg
+)
 {
   (void)msg;
 }

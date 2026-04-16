@@ -161,3 +161,29 @@ namespace
   CUnitCallLandTransportSerializerBootstrap gCUnitCallLandTransportSerializerBootstrap;
 } // namespace
 
+namespace
+{
+  /**
+   * Address: 0x00600760 (FUN_00600760)
+   *
+   * What it does:
+   * Unlinks `CUnitCallLandTransportSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallLandTransportSerializerNodePrimary()
+  {
+    return UnlinkSerializerNode(gCUnitCallLandTransportSerializer);
+  }
+
+  /**
+   * Address: 0x00600790 (FUN_00600790)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCallLandTransportSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCallLandTransportSerializerNodeSecondary()
+  {
+    return UnlinkSerializerNode(gCUnitCallLandTransportSerializer);
+  }
+} // namespace

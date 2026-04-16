@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E3D10 (FUN_005E3D10, Moho::EAiTransportEventTypeInfo::EAiTransportEventTypeInfo)
+     *
+     * What it does:
+     * Preregisters `EAiTransportEvent` enum metadata with the reflection runtime.
+     */
+    EAiTransportEventTypeInfo();
+
+    /**
      * Address: 0x005E3DA0 (FUN_005E3DA0, scalar deleting thunk)
      */
     ~EAiTransportEventTypeInfo() override;

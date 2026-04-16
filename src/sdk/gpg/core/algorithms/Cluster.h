@@ -16,6 +16,14 @@ namespace gpg::HaStar
     class ICache {
     public:
         /**
+         * Address: 0x009315C0 (FUN_009315C0)
+         *
+         * What it does:
+         * Initializes one `ICache` interface object by binding its vtable.
+         */
+        ICache();
+
+        /**
          * Address: 0x00A82547
          * Slot: 0
          * Demangled: _purecall
@@ -111,6 +119,15 @@ namespace gpg::HaStar
          * Destroys all cluster elements and releases the backing array.
          */
         ~Subcluster();
+
+        /**
+         * Address: 0x008E3C80 (FUN_008E3C80)
+         *
+         * What it does:
+         * Reinitializes storage for a new width x height cluster grid by
+         * destroying any existing storage and constructing a fresh array.
+         */
+        void ResetStorage(int width, int height);
     };
 
     class IOccupationSource
@@ -118,6 +135,34 @@ namespace gpg::HaStar
     public:
         virtual void GetOccupationData(int worldX, int worldY, OccupationData& outData) = 0;
     };
+
+    /**
+     * Address: 0x0076B8B0 (FUN_0076B8B0)
+     *
+     * IOccupationSource *
+     *
+     * IDA signature:
+     * _DWORD *__usercall sub_76B8B0@<eax>(_DWORD *result@<eax>)
+     *
+     * What it does:
+     * Writes the `IOccupationSource` vtable pointer into one object lane and
+     * returns the same object pointer.
+     */
+    [[nodiscard]] IOccupationSource* InitializeOccupationSourceVTableCloneA(IOccupationSource* source);
+
+    /**
+     * Address: 0x0076CB70 (FUN_0076CB70)
+     *
+     * IOccupationSource *
+     *
+     * IDA signature:
+     * _DWORD *__usercall sub_76CB70@<eax>(_DWORD *result@<eax>)
+     *
+     * What it does:
+     * Clone entry that writes the same `IOccupationSource` vtable pointer into
+     * one object lane and returns that object pointer.
+     */
+    [[nodiscard]] IOccupationSource* InitializeOccupationSourceVTableCloneB(IOccupationSource* source);
 
     struct ClusterCache
     {
@@ -239,6 +284,16 @@ namespace gpg::HaStar
         [[nodiscard]] gpg::Rect2i ClusterIndexRect(int worldX, int worldZ, std::uint8_t level) const;
 
         /**
+         * Address: 0x008E3530 (FUN_008E3530,
+         * ?ClusterRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z)
+         *
+         * What it does:
+         * Expands one world-space rectangle to cluster-aligned world bounds for
+         * the requested level and clamps to map dimensions.
+         */
+        [[nodiscard]] gpg::Rect2i ClusterRect(const gpg::Rect2i& worldRect, std::uint8_t level) const;
+
+        /**
          * Address: 0x008E35A0 (FUN_008E35A0,
          * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z)
          * Alt binary: 0x10035650 (FUN_10035650, ?...@Z_0)
@@ -300,9 +355,11 @@ namespace gpg::HaStar
     };
 
     static_assert(sizeof(OccupationData) == 0x14, "OccupationData size must be 0x14");
+    static_assert(sizeof(ICache) == 0x04, "ICache size must be 0x04");
     static_assert(sizeof(Cluster) == 0x04, "Cluster size must be 0x04");
     static_assert(sizeof(SubclusterData) == 0x44, "SubclusterData size must be 0x44");
     static_assert(sizeof(Subcluster) == 0x0C, "Subcluster size must be 0x0C");
+    static_assert(sizeof(IOccupationSource) == 0x04, "IOccupationSource size must be 0x04");
     static_assert(sizeof(ClusterCache) == 0x08, "ClusterCache size must be 0x08");
     static_assert(sizeof(ClusterMap) == 0xA0, "ClusterMap size must be 0xA0");
 

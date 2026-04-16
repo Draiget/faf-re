@@ -36,11 +36,18 @@ namespace
     gREmitterBlueprintTypeInfoConstructed = false;
   }
 
+  /**
+   * Address: 0x00510490 (FUN_00510490)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `REmitterBlueprint`.
+   */
   [[nodiscard]] gpg::RType* CachedEmitterBlueprintType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = moho::REmitterBlueprint::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::REmitterBlueprint));
+      moho::REmitterBlueprint::sType = cached;
     }
     return cached;
   }
@@ -170,6 +177,22 @@ namespace
     static_cast<moho::REmitterBlueprint*>(objectMemory)->~REmitterBlueprint();
   }
 
+  /**
+   * Address: 0x00510510 (FUN_00510510)
+   *
+   * What it does:
+   * Binds the callback lanes used by `REmitterBlueprintTypeInfo` for object
+   * allocation, placement construction, deletion, and destruction.
+   */
+  [[nodiscard]] TypeInfo* BindEmitterBlueprintTypeInfoHookLanes(TypeInfo* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewEmitterBlueprintRef;
+    typeInfo->ctorRefFunc_ = &moho::REmitterBlueprintTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &DeleteEmitterBlueprintObject;
+    typeInfo->dtrFunc_ = &DestroyEmitterBlueprintObject;
+    return typeInfo;
+  }
+
   struct REmitterBlueprintTypeInfoBootstrap
   {
     REmitterBlueprintTypeInfoBootstrap()
@@ -211,10 +234,7 @@ namespace moho
   void REmitterBlueprintTypeInfo::Init()
   {
     size_ = sizeof(REmitterBlueprint);
-    newRefFunc_ = &NewEmitterBlueprintRef;
-    deleteFunc_ = &DeleteEmitterBlueprintObject;
-    ctorRefFunc_ = &REmitterBlueprintTypeInfo::CtrRef;
-    dtrFunc_ = &DestroyEmitterBlueprintObject;
+    (void)BindEmitterBlueprintTypeInfoHookLanes(this);
     AddEffectBase(this);
     gpg::RType::Init();
     AddFields(this);

@@ -36,9 +36,42 @@ namespace
 
   moho::SEfxCurveSerializer gSEfxCurveSerializer{};
 
+  [[nodiscard]] gpg::SerHelperBase* ResetSEfxCurveSerializerHelperLinks() noexcept
+  {
+    gSEfxCurveSerializer.mHelperNext->mPrev = gSEfxCurveSerializer.mHelperPrev;
+    gSEfxCurveSerializer.mHelperPrev->mNext = gSEfxCurveSerializer.mHelperNext;
+    gpg::SerHelperBase* const self = HelperSelfNode(gSEfxCurveSerializer);
+    gSEfxCurveSerializer.mHelperPrev = self;
+    gSEfxCurveSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00514D90 (FUN_00514D90)
+   *
+   * What it does:
+   * Unlinks `SEfxCurveSerializer` helper node from the global helper list and
+   * restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSEfxCurveSerializerHelperNodePrimary() noexcept
+  {
+    return ResetSEfxCurveSerializerHelperLinks();
+  }
+
+  /**
+   * Address: 0x00514DC0 (FUN_00514DC0)
+   *
+   * What it does:
+   * Secondary entrypoint for `SEfxCurveSerializer` helper unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSEfxCurveSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetSEfxCurveSerializerHelperLinks();
+  }
+
   void cleanup_SEfxCurveSerializer()
   {
-    (void)UnlinkHelperNode(gSEfxCurveSerializer);
+    (void)CleanupSEfxCurveSerializerHelperNodePrimary();
   }
 
   struct SEfxCurveSerializerBootstrap
@@ -79,7 +112,6 @@ namespace moho
     InitializeHelperNode(gSEfxCurveSerializer);
     gSEfxCurveSerializer.mLoadCallback = &SEfxCurve::DeserializeFromArchive;
     gSEfxCurveSerializer.mSaveCallback = &SEfxCurve::SerializeToArchive;
-    gSEfxCurveSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_SEfxCurveSerializer);
   }
 } // namespace moho

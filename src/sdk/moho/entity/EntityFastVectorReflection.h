@@ -12,7 +12,7 @@ namespace moho
   struct WeakPtr_Entity
   {
     /**
-     * Address: 0x0067CD30 (FUN_0067CD30, Moho::RWeakPtrType_Entity::SerLoad)
+      * Alias of FUN_0067CD30 (non-canonical helper lane).
      *
      * What it does:
      * Deserializes one `WeakPtr<Entity>` payload from tracked pointer lanes.
@@ -20,7 +20,7 @@ namespace moho
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x0067CD60 (FUN_0067CD60, Moho::RWeakPtrType_Entity::SerSave)
+      * Alias of FUN_0067CD60 (non-canonical helper lane).
      *
      * What it does:
      * Serializes one `WeakPtr<Entity>` payload as an unowned tracked pointer.
@@ -140,32 +140,32 @@ namespace gpg
     [[nodiscard]] const char* GetName() const override;
 
     /**
-     * Address: 0x00694380 family (vector lexical lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
-     * Address: 0x00694380 family (indexed interface lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
     /**
-     * Address: 0x00694380 (FUN_00694380, type init lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     void Init() override;
 
     /**
-     * Address: 0x00694380 family (index-subscript lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
 
     /**
-     * Address: 0x00694380 family (count lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     size_t GetCount(void* obj) const override;
 
     /**
-     * Address: 0x00694380 family (resize lane)
+      * Alias of FUN_00694380 (non-canonical helper lane).
      */
     void SetCount(void* obj, int count) const override;
   };
@@ -224,7 +224,7 @@ namespace moho
   int register_VectorEntityPtr_Type_AtExit();
 
   /**
-   * Address: 0x00694380 (FUN_00694380, register_FastVectorEntityPtrType_00)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Constructs and preregisters RTTI for `fastvector<Entity*>`.
@@ -232,7 +232,7 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorEntityPtrType_00();
 
   /**
-   * Address: 0x00BFCEA0 (FUN_00BFCEA0, cleanup_FastVectorEntityPtrType)
+    * Alias of FUN_00BFCEA0 (non-canonical helper lane).
    *
    * What it does:
    * Tears down startup-owned `fastvector<Entity*>` reflection storage.

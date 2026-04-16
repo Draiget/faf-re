@@ -3,6 +3,139 @@
 #include <typeinfo>
 
 /**
+ * Address: 0x00923280 (FUN_00923280, TStringTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `TStringTypeInfo` descriptor via `gpg::RType` base teardown
+ * and conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyTStringTypeInfoDeleting(
+  TStringTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00923300 (FUN_00923300, TableTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `TableTypeInfo` descriptor via `gpg::RType` base teardown and
+ * conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyTableTypeInfoDeleting(
+  TableTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x009233D0 (FUN_009233D0, LClosureTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `LClosureTypeInfo` descriptor via `gpg::RType` base teardown
+ * and conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyLClosureTypeInfoDeleting(
+  LClosureTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00923460 (FUN_00923460, UpValTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `UpValTypeInfo` descriptor via `gpg::RType` base teardown and
+ * conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyUpValTypeInfoDeleting(
+  UpValTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x009234C0 (FUN_009234C0, ProtoTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `ProtoTypeInfo` descriptor via `gpg::RType` base teardown and
+ * conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyProtoTypeInfoDeleting(
+  ProtoTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00923550 (FUN_00923550, lua_StateTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `lua_StateTypeInfo` descriptor via `gpg::RType` base teardown
+ * and conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyLuaStateTypeInfoDeleting(
+  lua_StateTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00923600 (FUN_00923600, UdataTypeInfo deleting-dtor thunk)
+ *
+ * What it does:
+ * Tears down one `UdataTypeInfo` descriptor via `gpg::RType` base teardown and
+ * conditionally frees storage when `deleteFlag & 1`.
+ */
+[[maybe_unused]] gpg::RType* DestroyUdataTypeInfoDeleting(
+  UdataTypeInfo* const typeInfo,
+  const unsigned char deleteFlag
+)
+{
+  typeInfo->gpg::RType::~RType();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(static_cast<void*>(typeInfo));
+  }
+  return typeInfo;
+}
+
+/**
  * Address: 0x009220B0 (FUN_009220B0, TableTypeInfo::TableTypeInfo)
  *
  * What it does:
@@ -12,6 +145,18 @@
 TableTypeInfo::TableTypeInfo()
 {
   gpg::PreRegisterRType(typeid(Table), this);
+}
+
+/**
+ * Address: 0x00921FD0 (FUN_00921FD0, TStringTypeInfo::TStringTypeInfo)
+ *
+ * What it does:
+ * Constructs the TString runtime type descriptor and preregisters it with
+ * reflection registry using `typeid(TString)`.
+ */
+TStringTypeInfo::TStringTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(TString), this);
 }
 
 /**
@@ -192,6 +337,18 @@ void lua_StateTypeInfo::Init()
   size_ = 0x48;
   gpg::RType::Init();
   Finish();
+}
+
+/**
+ * Address: 0x00922620 (FUN_00922620, UdataTypeInfo::UdataTypeInfo)
+ *
+ * What it does:
+ * Constructs the Udata runtime type descriptor and preregisters it with
+ * reflection registry using `typeid(Udata)`.
+ */
+UdataTypeInfo::UdataTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(Udata), this);
 }
 
 /**

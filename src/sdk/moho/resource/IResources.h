@@ -30,19 +30,21 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x00546E80 (loc_00546E80, shared constructor/destructor helper chunk)
+     * Address: 0x00546CB0 (FUN_00546CB0, ??0IResources@Moho@@IAE@XZ)
+     * Shared helper: 0x00546E80 (loc_00546E80)
      *
      * What it does:
-     * Initializes this interface subobject's vtable pointer.
+     * Initializes this interface subobject's base vtable pointer.
      */
     IResources() noexcept;
 
   public:
     /**
-     * Address: 0x00546E80 (loc_00546E80, shared constructor/destructor helper chunk)
+     * Address: 0x00546CC0 (FUN_00546CC0, ??1IResources@Moho@@UAE@XZ)
+     * Shared helper: 0x00546E80 (loc_00546E80)
      *
      * What it does:
-     * Finalizes this interface subobject by restoring the base vtable state.
+     * Restores the base vtable lane for this interface during teardown.
      */
     virtual ~IResources() noexcept;
 
@@ -59,6 +61,23 @@ namespace moho
     virtual bool DepositIsInAreaPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) = 0;
     virtual bool FindClosestDeposit(GridPos* from, GridPos* outPos, float radius, EDepositType type) = 0;
     virtual bool AreaHasDeposit(EDepositType type, gpg::Rect2f* area) = 0;
+
+    /**
+     * Address: 0x00546CD0 (FUN_00546CD0, ?Translate@IResources@Moho@@SA?AW4EResourceType@2@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     *
+     * What it does:
+     * Maps one deposit-type string to its `EDepositType` enum lane (`""`,
+     * `"Mass"`, `"Hydrocarbon"`), returning `kNone` when unmatched.
+     */
+    [[nodiscard]] static EDepositType Translate(const msvc8::string& depositTypeName);
+
+    /**
+     * Address: 0x00546D10 (FUN_00546D10)
+     *
+     * What it does:
+     * Returns one deposit-type string table entry by enum index.
+     */
+    [[nodiscard]] static const msvc8::string* Translate(EDepositType depositType);
   };
 
   /**

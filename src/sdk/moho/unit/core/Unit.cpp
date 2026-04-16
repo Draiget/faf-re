@@ -13,10 +13,12 @@
 #include <string>
 #include <stdexcept>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiReconDBImpl.h"
@@ -32,6 +34,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/entity/EntityTransformPayload.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -50,6 +53,7 @@
 #include "moho/path/PathTables.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
+#include "moho/sim/CPlatoon.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/COGrid.h"
@@ -128,6 +132,7 @@ namespace moho
   int cfunc_UnitSetCreatorL(LuaPlus::LuaState* state);
   int cfunc_UnitSetCreator(lua_State* luaContext);
   CScrLuaInitForm* func_UnitSetCreator_LuaFuncDef();
+  void AssignCreatorWeakRefAndMarkSyncDirty(Unit* unit, Unit* creator);
   int cfunc_UnitGetCargoL(LuaPlus::LuaState* state);
   int cfunc_UnitGetCargo(lua_State* luaContext);
   CScrLuaInitForm* func_UnitGetCargo_LuaFuncDef();
@@ -209,6 +214,12 @@ namespace moho
   int cfunc_UnitHasValidTeleportDestL(LuaPlus::LuaState* state);
   int cfunc_UnitHasValidTeleportDest(lua_State* luaContext);
   CScrLuaInitForm* func_UnitHasValidTeleportDest_LuaFuncDef();
+  int cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState* state);
+  int cfunc_UnitHasMeleeSpaceAroundTarget(lua_State* luaContext);
+  CScrLuaInitForm* func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
+  int cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState* state);
+  int cfunc_UnitMeleeWarpAdjacentToTarget(lua_State* luaContext);
+  CScrLuaInitForm* func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
   int cfunc_UnitAddUnitToStorageL(LuaPlus::LuaState* state);
   int cfunc_UnitAddUnitToStorage(lua_State* luaContext);
   CScrLuaInitForm* func_UnitAddUnitToStorage_LuaFuncDef();
@@ -710,6 +721,10 @@ namespace
   constexpr const char* kUnitGetTransportFerryBeaconHelpText = "Unit:GetTransportFerryBeacon()";
   constexpr const char* kUnitHasValidTeleportDestName = "HasValidTeleportDest";
   constexpr const char* kUnitHasValidTeleportDestHelpText = "Unit:HasValidTeleportDest()";
+  constexpr const char* kUnitMeleeWarpAdjacentToTargetName = "MeleeWarpAdjacentToTarget";
+  constexpr const char* kUnitMeleeWarpAdjacentToTargetHelpText = "Unit:MeleeWarpAdjacentToTarget(target)";
+  constexpr const char* kUnitHasMeleeSpaceAroundTargetName = "HasMeleeSpaceAroundTarget";
+  constexpr const char* kUnitHasMeleeSpaceAroundTargetHelpText = "Unit:HasMeleeSpaceAroundTarget(target)";
   constexpr const char* kUnitAddUnitToStorageName = "AddUnitToStorage";
   constexpr const char* kUnitAddUnitToStorageHelpText = "Unit:AddUnitToStorage( storedUnit )";
   constexpr const char* kUnitAddUnitToStorageNoRoomWarning = "No more room available in carrier for unit to be stored";
@@ -1526,6 +1541,77 @@ namespace
 #endif
   }
 
+  /**
+   * Address: 0x00593290 (FUN_00593290)
+   *
+   * What it does:
+   * Resolves one army stat lane by name, synchronizes it as a float, and
+   * applies one pointed float delta through `StatItem::AddFloat`.
+   */
+  std::int32_t AddArmyStatFloatByName(
+    CArmyStats* const armyStats,
+    float* const deltaValue,
+    const char* const statPath
+  )
+  {
+    CArmyStatItem* const statItem = armyStats->TraverseTables(statPath, true);
+    statItem->SynchronizeAsFloat();
+    return statItem->AddFloat(deltaValue);
+  }
+
+  [[nodiscard]] const ArmyBlueprintNameView* ToArmyBlueprintNameView(const RUnitBlueprint* const blueprint) noexcept
+  {
+    return reinterpret_cast<const ArmyBlueprintNameView*>(blueprint);
+  }
+
+  void IncrementArmyBlueprintFloatStat(
+    CArmyStats* const armyStats,
+    const char* const statPath,
+    const RUnitBlueprint* const blueprint,
+    const float delta
+  )
+  {
+    if (armyStats == nullptr || statPath == nullptr || blueprint == nullptr) {
+      return;
+    }
+
+    (void)armyStats->AddBlueprintStatDelta(statPath, ToArmyBlueprintNameView(blueprint), delta);
+  }
+
+  void IncrementArmyIntStatByName(CArmyStats* const armyStats, const char* const statPath)
+  {
+    if (armyStats == nullptr || statPath == nullptr) {
+      return;
+    }
+
+    CArmyStatItem* const item = armyStats->GetItem(statPath);
+    if (item == nullptr) {
+      return;
+    }
+
+    item->SynchronizeAsInt();
+    AddIntStatCounter(item, 1L);
+  }
+
+  [[nodiscard]] bool IsWithinPlayableRectOrNotCommander(const Unit& unit)
+  {
+    static const std::string kCommanderCategory = "COMMAND";
+    if (!unit.Entity::IsInCategory(kCommanderCategory.c_str())) {
+      return true;
+    }
+
+    const Sim* const sim = unit.SimulationRef;
+    const STIMap* const mapData = (sim != nullptr) ? sim->mMapData : nullptr;
+    if (mapData == nullptr) {
+      return true;
+    }
+
+    const Wm3::Vec3f& position = unit.GetPosition();
+    const gpg::Rect2i playableRect = mapData->mPlayableRect;
+    return !(static_cast<float>(playableRect.x0) > position.x || static_cast<float>(playableRect.z0) > position.z ||
+             position.x > static_cast<float>(playableRect.x1) || position.z > static_cast<float>(playableRect.z1));
+  }
+
   void IncrementAIDebugStateStat(CArmyStats* const armyStats, const msvc8::string& statPath)
   {
     if (!armyStats || statPath.empty()) {
@@ -1678,6 +1764,82 @@ namespace
   [[nodiscard]] bool IsArmorMapSentinel(const SArmorMultiplierMapNode* const node) noexcept
   {
     return node == nullptr || node->isNil != 0u;
+  }
+
+  /**
+   * Address: 0x00736760 (FUN_00736760)
+   *
+   * What it does:
+   * Advances one armor-multiplier map node cursor to the next in-order
+   * sentinel-tree node and writes the advanced node back to the caller lane.
+   */
+  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode*
+  AdvanceArmorMultiplierNodeCursor(SArmorMultiplierMapNode*& cursor) noexcept
+  {
+    if (IsArmorMapSentinel(cursor)) {
+      return cursor;
+    }
+
+    SArmorMultiplierMapNode* rightNode = cursor->right;
+    if (rightNode == nullptr) {
+      cursor = nullptr;
+      return cursor;
+    }
+
+    if (rightNode->isNil != 0u) {
+      for (SArmorMultiplierMapNode* parent = cursor->parent; parent != nullptr && parent->isNil == 0u; parent = parent->parent)
+      {
+        if (cursor != parent->right) {
+          cursor = parent;
+          return cursor;
+        }
+        cursor = parent;
+      }
+      cursor = (cursor != nullptr) ? cursor->parent : nullptr;
+      return cursor;
+    }
+
+    SArmorMultiplierMapNode* next = rightNode->left;
+    while (next != nullptr && next->isNil == 0u) {
+      rightNode = next;
+      next = next->left;
+    }
+
+    cursor = rightNode;
+    return cursor;
+  }
+
+  /**
+   * Address: 0x00736320 (FUN_00736320)
+   *
+   * What it does:
+   * Adapter lane that advances one armor-multiplier node cursor slot and
+   * returns the slot pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode** AdvanceArmorMultiplierNodeCursorSlotAdapter(
+    const std::uint32_t /*laneTag*/,
+    SArmorMultiplierMapNode** const cursorSlot
+  ) noexcept
+  {
+    (void)AdvanceArmorMultiplierNodeCursor(*cursorSlot);
+    return cursorSlot;
+  }
+
+  /**
+   * Address: 0x00736330 (FUN_00736330)
+   *
+   * What it does:
+   * Copies one armor-multiplier cursor slot into `destinationCursorSlot`, then
+   * advances the source slot to the next in-order node.
+   */
+  [[maybe_unused]] [[nodiscard]] SArmorMultiplierMapNode** CopyAndAdvanceArmorMultiplierNodeCursorSlot(
+    SArmorMultiplierMapNode** const sourceCursorSlot,
+    SArmorMultiplierMapNode** const destinationCursorSlot
+  ) noexcept
+  {
+    *destinationCursorSlot = *sourceCursorSlot;
+    (void)AdvanceArmorMultiplierNodeCursor(*sourceCursorSlot);
+    return destinationCursorSlot;
   }
 
   [[nodiscard]] bool ArmorTypeNameLess(const msvc8::string& lhs, const std::string_view rhs) noexcept
@@ -2097,6 +2259,12 @@ namespace
     return !currentCollisionRect.NotEqual(zeroCollisionRect);
   }
 
+  /**
+   * Address: 0x006A4BF0 (FUN_006A4BF0)
+   *
+   * What it does:
+   * Copies this unit's reserved O-grid rectangle bounds into one `Rect2i`.
+   */
   [[nodiscard]] gpg::Rect2i GetReservedOgridRect(const Unit& unit) noexcept
   {
     return {
@@ -2126,9 +2294,66 @@ namespace
   constexpr std::uint8_t kTerrainOccupancyMask = static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND) |
     static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED) | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
 
+  /**
+   * Address: 0x00565980 (FUN_00565980)
+   *
+   * What it does:
+   * Returns the larger of the footprint X/Z side lengths.
+   */
   [[nodiscard]] std::uint8_t FootprintMaxSide(const SFootprint& footprint) noexcept
   {
     return (footprint.mSizeX > footprint.mSizeZ) ? footprint.mSizeX : footprint.mSizeZ;
+  }
+
+  [[nodiscard]] bool IsMeleeCandidateCellNavigable(
+    Unit& moveUnit,
+    Unit* ignoreUnit,
+    const SFootprint& moverFootprint,
+    ELayer moveLayer,
+    COGrid& ogrid,
+    const STIMap& mapData,
+    const SOCellPos& candidateCell
+  );
+
+  [[nodiscard]] bool ShouldTestPrepareMoveCellAgainstSkirt(
+    const SOCellPos& candidateCell,
+    const gpg::Rect2f& skirtRect
+  ) noexcept
+  {
+    const float cellMinX = static_cast<float>(candidateCell.x);
+    const float cellMinZ = static_cast<float>(candidateCell.z);
+    const float cellMaxX = static_cast<float>(candidateCell.x + 1);
+    const float cellMaxZ = static_cast<float>(candidateCell.z + 1);
+
+    return skirtRect.x0 > cellMaxX || cellMinX > skirtRect.x1 || skirtRect.z0 > cellMaxZ || cellMinZ > skirtRect.z1 ||
+      skirtRect.x1 <= skirtRect.x0 || skirtRect.z0 >= skirtRect.z1 || cellMaxX <= cellMinX || cellMinZ >= cellMaxZ;
+  }
+
+  [[nodiscard]] bool IsPrepareMoveCandidateValid(
+    Unit& unit,
+    const SFootprint& footprint,
+    const ELayer moveLayer,
+    const SOCellPos& cell,
+    const Wm3::Vector3f& worldPos,
+    const gpg::Rect2f& skirtRect,
+    const bool useWholeMap
+  )
+  {
+    Sim* const sim = unit.SimulationRef;
+    if (sim == nullptr || sim->mMapData == nullptr || sim->mOGrid == nullptr) {
+      return false;
+    }
+
+    if (!ShouldTestPrepareMoveCellAgainstSkirt(cell, skirtRect)) {
+      return false;
+    }
+
+    const float border = static_cast<float>(FootprintMaxSide(footprint));
+    if (!sim->mMapData->IsWithin(worldPos, border, useWholeMap)) {
+      return false;
+    }
+
+    return IsMeleeCandidateCellNavigable(unit, nullptr, footprint, moveLayer, *sim->mOGrid, *sim->mMapData, cell);
   }
 
   [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionProbe(
@@ -2297,6 +2522,13 @@ namespace
       return out_ ? out_->pairsEnd : nullptr;
     }
 
+    /**
+     * Address: 0x006AD6E0 (FUN_006AD6E0)
+     *
+     * What it does:
+     * Appends one `SExtraUnitDataPair` lane into output storage, expanding
+     * capacity when the cursor reaches `pairsCapacityEnd`.
+     */
     [[nodiscard]] bool push_back(const SExtraUnitDataPair& pair) noexcept
     {
       if (!out_) {
@@ -2371,7 +2603,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00593970 (FUN_00593970, func_GetUnitOpt)
+  * Alias of FUN_00593970 (non-canonical helper lane).
  *
  * What it does:
  * Public wrapper that mirrors the anonymous-namespace `GetUnitOptional`
@@ -2520,6 +2752,94 @@ msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
 }
 
 /**
+ * Address: 0x006C3A10 (FUN_006C3A10)
+ *
+ * What it does:
+ * Stores one stunned-state tick lane.
+ */
+void Unit::SetStunnedStateRaw(const std::int32_t stunnedState) noexcept
+{
+  StunnedState = stunnedState;
+}
+
+/**
+ * Address: 0x006C3A20 (FUN_006C3A20)
+ *
+ * What it does:
+ * Stores one overcharge-paused boolean lane.
+ */
+void Unit::SetOverchargePausedFlag(const bool paused) noexcept
+{
+  OverchargePaused = paused;
+}
+
+/**
+ * Address: 0x006C3A30 (FUN_006C3A30)
+ *
+ * What it does:
+ * Returns the overcharge-paused boolean lane.
+ */
+bool Unit::IsOverchargePausedFlag() const noexcept
+{
+  return OverchargePaused;
+}
+
+/**
+ * Address: 0x006C3A40 (FUN_006C3A40)
+ *
+ * What it does:
+ * Returns the consumption-active boolean lane.
+ */
+bool Unit::IsConsumptionActiveFlag() const noexcept
+{
+  return ConsumptionActive;
+}
+
+/**
+ * Address: 0x006C3A50 (FUN_006C3A50)
+ *
+ * What it does:
+ * Returns the valid-target boolean lane.
+ */
+bool Unit::IsValidTargetFlag() const noexcept
+{
+  return IsValidTarget;
+}
+
+/**
+ * Address: 0x006C3A60 (FUN_006C3A60)
+ *
+ * What it does:
+ * Stores one valid-target boolean lane.
+ */
+void Unit::SetIsValidTargetFlag(const bool validTarget) noexcept
+{
+  IsValidTarget = validTarget;
+}
+
+/**
+ * Address: 0x006C3A70 (FUN_006C3A70)
+ *
+ * What it does:
+ * Returns the shield-ratio float lane.
+ */
+float Unit::GetShieldRatioRaw() const noexcept
+{
+  return ShieldRatio;
+}
+
+/**
+ * Address: 0x006C3A80 (FUN_006C3A80)
+ *
+ * What it does:
+ * Stores one shield-ratio float lane.
+ */
+void Unit::SetShieldRatioRaw(const float shieldRatio) noexcept
+{
+  ShieldRatio = shieldRatio;
+}
+
+/**
  * Address: 0x006C3AB0 (FUN_006C3AB0, cfunc_UnitGetUnitId)
  *
  * What it does:
@@ -2608,6 +2928,19 @@ CScrLuaInitForm* moho::func_UnitSetCreator_LuaFuncDef()
 }
 
 /**
+ * Address: 0x006C39F0 (FUN_006C39F0)
+ *
+ * What it does:
+ * Rebinds this unit's creator weak-reference lane and marks game-data sync
+ * dirty for replication.
+ */
+[[maybe_unused]] void moho::AssignCreatorWeakRefAndMarkSyncDirty(Unit* const unit, Unit* const creator)
+{
+  unit->CreatorRef.AsWeakPtr<Unit>().Set(creator);
+  unit->NeedSyncGameData = true;
+}
+
+/**
  * Address: 0x006C3C80 (FUN_006C3C80, cfunc_UnitSetCreatorL)
  *
  * What it does:
@@ -2628,8 +2961,7 @@ int moho::cfunc_UnitSetCreatorL(LuaPlus::LuaState* const state)
   Unit* const creator = SCR_FromLua_Unit(creatorObject);
 
   if (unit != nullptr && creator != nullptr) {
-    unit->CreatorRef.ResetObjectPtr<Unit>(creator);
-    unit->NeedSyncGameData = true;
+    AssignCreatorWeakRefAndMarkSyncDirty(unit, creator);
   }
 
   return 0;
@@ -4456,6 +4788,44 @@ CScrLuaInitForm* moho::func_UnitAddUnitToStorage_LuaFuncDef()
     &CScrLuaMetatableFactory<Unit>::Instance(),
     kUnitLuaClassName,
     kUnitAddUnitToStorageHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x006CDCB0 (FUN_006CDCB0, func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Unit:HasMeleeSpaceAroundTarget(target)` Lua binder definition.
+ */
+CScrLuaInitForm* moho::func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kUnitHasMeleeSpaceAroundTargetName,
+    &moho::cfunc_UnitHasMeleeSpaceAroundTarget,
+    &CScrLuaMetatableFactory<Unit>::Instance(),
+    kUnitLuaClassName,
+    kUnitHasMeleeSpaceAroundTargetHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x006CDEF0 (FUN_006CDEF0, func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Unit:MeleeWarpAdjacentToTarget(target)` Lua binder definition.
+ */
+CScrLuaInitForm* moho::func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kUnitMeleeWarpAdjacentToTargetName,
+    &moho::cfunc_UnitMeleeWarpAdjacentToTarget,
+    &CScrLuaMetatableFactory<Unit>::Instance(),
+    kUnitLuaClassName,
+    kUnitMeleeWarpAdjacentToTargetHelpText
   );
   return &binder;
 }
@@ -6700,6 +7070,34 @@ CScrLuaInitForm* moho::func_UnitSetStat_LuaFuncDef()
 }
 
 /**
+ * Address: 0x006D24F0 (FUN_006D24F0)
+ *
+ * What it does:
+ * Atomically stores one primary stat-value lane and returns the previously
+ * observed lane.
+ */
+[[maybe_unused]] std::int32_t StorePrimaryStatBitsAtomic(
+  StatItem* const statItem,
+  const std::int32_t* const newValueBits
+) noexcept
+{
+#if defined(_WIN32)
+  volatile long* const slot = reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits);
+  for (;;) {
+    const long observed = InterlockedCompareExchange(slot, 0L, 0L);
+    const long exchanged = InterlockedCompareExchange(slot, static_cast<long>(*newValueBits), observed);
+    if (exchanged == observed) {
+      return static_cast<std::int32_t>(observed);
+    }
+  }
+#else
+  const std::int32_t previous = statItem->mPrimaryValueBits;
+  statItem->mPrimaryValueBits = *newValueBits;
+  return previous;
+#endif
+}
+
+/**
  * Address: 0x006CC960 (FUN_006CC960, cfunc_UnitSetStatL)
  *
  * What it does:
@@ -6728,21 +7126,6 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  const auto storePrimaryBits = [](StatItem* const item, const std::int32_t valueBits) noexcept {
-#if defined(_WIN32)
-    volatile long* const slot = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
-    for (;;) {
-      const long observed = InterlockedCompareExchange(slot, 0L, 0L);
-      const long exchanged = InterlockedCompareExchange(slot, static_cast<long>(valueBits), observed);
-      if (exchanged == observed) {
-        return;
-      }
-    }
-#else
-    item->mPrimaryValueBits = valueBits;
-#endif
-  };
-
   if (lua_type(rawState, 3) == LUA_TNUMBER) {
     const LuaPlus::LuaStackObject valueArg(state, 3);
     if (lua_type(rawState, 3) != LUA_TNUMBER) {
@@ -6750,7 +7133,7 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
     }
 
     const std::int32_t value = static_cast<std::int32_t>(lua_tonumber(rawState, 3));
-    storePrimaryBits(statItem, value);
+    (void)StorePrimaryStatBitsAtomic(statItem, &value);
     return 0;
   }
 
@@ -6759,7 +7142,7 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
     const float value = static_cast<float>(valueArg.ToNumber());
     std::int32_t valueBits = 0;
     std::memcpy(&valueBits, &value, sizeof(valueBits));
-    storePrimaryBits(statItem, valueBits);
+    (void)StorePrimaryStatBitsAtomic(statItem, &valueBits);
     return 0;
   }
 
@@ -6771,7 +7154,7 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
 
   const std::int32_t valueBits =
     static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(value != nullptr ? value : ""));
-  storePrimaryBits(statItem, valueBits);
+  (void)StorePrimaryStatBitsAtomic(statItem, &valueBits);
   return 0;
 }
 
@@ -6902,10 +7285,7 @@ int moho::cfunc_UnitSetProductionActiveL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaStackObject activeArg(state, 2);
   const bool isActive = activeArg.GetBoolean();
-  unit->ProductionActive = isActive;
-
-  Entity* const entitySubObject = static_cast<Entity*>(unit);
-  (void)entitySubObject->RunScript(isActive ? kUnitOnProductionActiveScript : kUnitOnProductionInactiveScript);
+  unit->SetProductionActive(isActive);
   return 1;
 }
 
@@ -8169,7 +8549,7 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
   const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
 
   CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
-  AsCategoryWordBitset(restrictionWords).AddAllFrom(&categorySet->Bits());
+  (void)EntityCategory::Add(&restrictionWords, categorySet);
   unit->DirtySyncState = 1;
   return 0;
 }
@@ -10652,12 +11032,72 @@ CIntel const* Unit::GetIntelManager() const noexcept
 
 namespace
 {
+  /**
+   * Address: 0x00561C80 (FUN_00561C80, sub_561C80)
+   *
+   * What it does:
+   * Copy-assigns one `fastvector_n<WeakPtr<CUnitCommand>,4>` lane, preserving
+   * element order while reusing existing storage when capacity allows.
+   */
+  void CopyUnitCommandWeakVector(
+    gpg::fastvector_n<moho::WeakPtr<moho::CUnitCommand>, 4>& destination,
+    const gpg::fastvector_n<moho::WeakPtr<moho::CUnitCommand>, 4>& source
+  )
+  {
+    auto& destinationView = gpg::AsFastVectorRuntimeView<moho::WeakPtr<moho::CUnitCommand>>(&destination);
+    const auto& sourceView = gpg::AsFastVectorRuntimeView<moho::WeakPtr<moho::CUnitCommand>>(&source);
+    gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
+  }
+
   template <class T, std::size_t N>
   void CopyFastVectorN(gpg::fastvector_n<T, N>& destination, const gpg::fastvector_n<T, N>& source)
   {
     auto& destinationView = gpg::AsFastVectorRuntimeView<T>(&destination);
     const auto& sourceView = gpg::AsFastVectorRuntimeView<T>(&source);
     gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
+  }
+
+  /**
+   * Address: 0x005BF420 (FUN_005BF420)
+   *
+   * What it does:
+   * Copies the `UnitAttributes` lanes touched by the binary helper used by
+   * `SSTIUnitVariableData::AssignFrom` (intentionally excluding reserved tail
+   * bytes and non-copied metadata lanes).
+   */
+  [[maybe_unused]] moho::UnitAttributes* CopyUnitAttributesSnapshot(
+    moho::UnitAttributes* const destination,
+    const moho::UnitAttributes* const source
+  )
+  {
+    destination->blueprint = source->blueprint;
+    destination->restrictionCategory.mUniverse = source->restrictionCategory.mUniverse;
+    destination->restrictionCategory.mBits.mFirstWordIndex = source->restrictionCategory.mBits.mFirstWordIndex;
+
+    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&destination->restrictionCategory.mBits.mWords);
+    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&source->restrictionCategory.mBits.mWords);
+    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+
+    destination->spawnElevationOffset = source->spawnElevationOffset;
+    destination->moveSpeedMult = source->moveSpeedMult;
+    destination->accelerationMult = source->accelerationMult;
+    destination->turnMult = source->turnMult;
+    destination->breakOffTriggerMult = source->breakOffTriggerMult;
+    destination->breakOffDistanceMult = source->breakOffDistanceMult;
+    destination->consumptionPerSecondEnergy = source->consumptionPerSecondEnergy;
+    destination->consumptionPerSecondMass = source->consumptionPerSecondMass;
+    destination->productionPerSecondEnergy = source->productionPerSecondEnergy;
+    destination->productionPerSecondMass = source->productionPerSecondMass;
+    destination->buildRate = source->buildRate;
+    destination->regenRate = source->regenRate;
+    destination->commandCapsMask = source->commandCapsMask;
+    destination->toggleCapsMask = source->toggleCapsMask;
+    destination->mReclaimable = source->mReclaimable;
+    destination->mCapturable = source->mCapturable;
+    destination->unknown_006A = source->unknown_006A;
+    destination->unknown_006B = source->unknown_006B;
+    destination->unknown_006C = source->unknown_006C;
+    return destination;
   }
 
   [[nodiscard]] gpg::RType* CachedELayerType()
@@ -10667,6 +11107,489 @@ namespace
       cached = gpg::LookupRType(typeid(ELayer));
     }
     return cached;
+  }
+
+  class UnitWeaponInfoTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "UnitWeaponInfo";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::UnitWeaponInfo);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  class SSTIUnitVariableDataTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SSTIUnitVariableData";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTIUnitVariableData);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  gpg::SerSaveLoadHelperListRuntime gUnitWeaponInfoSerializer{};
+  gpg::SerSaveLoadHelperListRuntime gSSTIUnitVariableDataSerializer{};
+
+  /**
+   * Address: 0x0055C1B0 (FUN_0055C1B0, SerSaveLoadHelper<UnitWeaponInfo>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `UnitWeaponInfo` serializer helper links and restores self-links
+   * for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer);
+  }
+
+  /**
+   * Address: 0x0055C1E0 (FUN_0055C1E0, SerSaveLoadHelper<UnitWeaponInfo>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the `UnitWeaponInfo` serializer
+   * helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer);
+  }
+
+  /**
+   * Address: 0x0055C7C0 (FUN_0055C7C0, SerSaveLoadHelper<SSTIUnitVariableData>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `SSTIUnitVariableData` serializer helper links and restores
+   * self-links for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer);
+  }
+
+  /**
+   * Address: 0x0055C7F0 (FUN_0055C7F0, SerSaveLoadHelper<SSTIUnitVariableData>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the
+   * `SSTIUnitVariableData` serializer helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer);
+  }
+} // namespace
+
+// Wrapped in `namespace moho` so the linker mangles these as
+// `?preregister_*@moho@@YAPAVRType@gpg@@XZ`, matching the call sites that
+// reference them as `moho::preregister_*`. Without the wrapper the file-scope
+// versions exist but with no-namespace mangling, which the callers don't see.
+namespace moho
+{
+
+/**
+ * Address: 0x0055C020 (FUN_0055C020, preregister_UnitWeaponInfoTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `UnitWeaponInfo`.
+ */
+gpg::RType* preregister_UnitWeaponInfoTypeInfo()
+{
+  static UnitWeaponInfoTypeInfo typeInfo;
+  gpg::PreRegisterRType(typeid(UnitWeaponInfo), &typeInfo);
+  return &typeInfo;
+}
+
+/**
+ * Address: 0x0055C620 (FUN_0055C620, preregister_SSTIUnitVariableDataTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `SSTIUnitVariableData`.
+ */
+gpg::RType* preregister_SSTIUnitVariableDataTypeInfo()
+{
+  static SSTIUnitVariableDataTypeInfo typeInfo;
+  gpg::PreRegisterRType(typeid(SSTIUnitVariableData), &typeInfo);
+  return &typeInfo;
+}
+
+} // namespace moho
+
+namespace
+{
+  struct UnitTypeInfoPreRegisterBootstrap
+  {
+    UnitTypeInfoPreRegisterBootstrap()
+    {
+      (void)moho::preregister_UnitWeaponInfoTypeInfo();
+      (void)moho::preregister_SSTIUnitVariableDataTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] UnitTypeInfoPreRegisterBootstrap gUnitTypeInfoPreRegisterBootstrap;
+
+  struct SSTIUnitVariableDataSlotRuntime
+  {
+    std::uint32_t mHeaderWord0 = 0;               // +0x00
+    std::uint32_t mHeaderWord1 = 0;               // +0x04
+    moho::SSTIUnitVariableData mVariableData{};   // +0x08
+    std::uint32_t mTailWord0 = 0;                 // +0x230
+  };
+
+  static_assert(
+    offsetof(SSTIUnitVariableDataSlotRuntime, mVariableData) == 0x08,
+    "SSTIUnitVariableDataSlotRuntime::mVariableData offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SSTIUnitVariableDataSlotRuntime, mTailWord0) == 0x230,
+    "SSTIUnitVariableDataSlotRuntime::mTailWord0 offset must be 0x230"
+  );
+  static_assert(sizeof(SSTIUnitVariableDataSlotRuntime) == 0x238, "SSTIUnitVariableDataSlotRuntime size must be 0x238");
+
+  /**
+   * Address: 0x005617C0 (FUN_005617C0)
+   *
+   * What it does:
+   * Destroys one contiguous slot range by invoking `SSTIUnitVariableData`
+   * destructor on each embedded payload lane at slot offset `+0x08`.
+   */
+  [[maybe_unused]] void DestroySSTIUnitVariableDataSlotPayloadRange(
+    SSTIUnitVariableDataSlotRuntime* begin,
+    SSTIUnitVariableDataSlotRuntime* const end
+  )
+  {
+    while (begin != end) {
+      begin->mVariableData.~SSTIUnitVariableData();
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x005BDA80 (FUN_005BDA80)
+   *
+   * What it does:
+   * Seeds one `SSTIUnitVariableData` slot header with the invalid-id sentinel
+   * (`0xF0000000`) and default-constructs the payload lane at `+0x08`.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* InitializeSSTIUnitVariableDataSlotHeaderAndPayload(
+    SSTIUnitVariableDataSlotRuntime* const slot
+  )
+  {
+    slot->mHeaderWord0 = 0xF0000000u;
+    ::new (&slot->mVariableData) SSTIUnitVariableData();
+    return slot;
+  }
+
+  /**
+   * Address: 0x0055D980 (FUN_0055D980, copy_UnitWeaponInfo_range_with_rollback)
+   *
+   * What it does:
+   * Copy-constructs one half-open `UnitWeaponInfo` range into destination
+   * storage and destroys already-constructed entries before rethrowing if a
+   * copy step throws.
+   */
+  [[maybe_unused]] UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
+    const UnitWeaponInfo* const sourceBegin,
+    const UnitWeaponInfo* const sourceEnd,
+    UnitWeaponInfo* const destinationBegin
+  )
+  {
+    if (sourceBegin == sourceEnd) {
+      return destinationBegin;
+    }
+
+    if (sourceBegin == nullptr || sourceEnd == nullptr || destinationBegin == nullptr) {
+      return destinationBegin;
+    }
+
+    UnitWeaponInfo* destinationCursor = destinationBegin;
+    try {
+      for (const UnitWeaponInfo* sourceCursor = sourceBegin;
+           sourceCursor != sourceEnd;
+           ++sourceCursor, ++destinationCursor) {
+        ::new (destinationCursor) UnitWeaponInfo();
+        destinationCursor->mCat1 = sourceCursor->mCat1;
+        destinationCursor->mCat2 = sourceCursor->mCat2;
+        destinationCursor->mLayer = sourceCursor->mLayer;
+        destinationCursor->mMinRadius = sourceCursor->mMinRadius;
+        destinationCursor->mMaxRadius = sourceCursor->mMaxRadius;
+        destinationCursor->mEffectiveRadius = sourceCursor->mEffectiveRadius;
+        destinationCursor->mUIMinRangeVisualId = sourceCursor->mUIMinRangeVisualId;
+        destinationCursor->mUIMaxRangeVisualId = sourceCursor->mUIMaxRangeVisualId;
+      }
+      return destinationCursor;
+    } catch (...) {
+      while (destinationCursor != destinationBegin) {
+        --destinationCursor;
+        destinationCursor->~UnitWeaponInfo();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x00563430 (FUN_00563430, copy_SSTIUnitVariableData_slot_range_with_rollback)
+   * Address: 0x005CDF60 (FUN_005CDF60)
+   *
+   * What it does:
+   * Copy-constructs one contiguous slot range (`header + SSTIUnitVariableData +
+   * tail dword`) into destination storage and destroys already-constructed
+   * payload lanes before rethrowing if a copy step throws.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollback(
+    const SSTIUnitVariableDataSlotRuntime* sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* sourceEnd,
+    SSTIUnitVariableDataSlotRuntime* destinationBegin
+  )
+  {
+    SSTIUnitVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (const SSTIUnitVariableDataSlotRuntime* sourceCursor = sourceBegin;
+           sourceCursor != sourceEnd;
+           ++sourceCursor, ++destinationCursor) {
+        if (destinationCursor != nullptr) {
+          destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+          ::new (&destinationCursor->mVariableData) SSTIUnitVariableData(sourceCursor->mVariableData);
+          destinationCursor->mTailWord0 = sourceCursor->mTailWord0;
+        }
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTIUnitVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTIUnitVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x00562B70 (FUN_00562B70)
+   *
+   * What it does:
+   * Primary adapter lane that forwards one contiguous
+   * `SSTIUnitVariableData` slot-range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIUnitVariableDataSlotRangeWithRollbackAdapterLaneA(
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIUnitVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00563070 (FUN_00563070)
+   *
+   * What it does:
+   * Secondary adapter lane that forwards one contiguous
+   * `SSTIUnitVariableData` slot-range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIUnitVariableDataSlotRangeWithRollbackAdapterLaneB(
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIUnitVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00563250 (FUN_00563250)
+   *
+   * What it does:
+   * Tertiary adapter lane that forwards one contiguous
+   * `SSTIUnitVariableData` slot-range copy into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopySSTIUnitVariableDataSlotRangeWithRollbackAdapterLaneC(
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIUnitVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005CD1C0 (FUN_005CD1C0)
+   * Address: 0x005CDA00 (FUN_005CDA00)
+   *
+   * What it does:
+   * Source-first adapter lane for contiguous `SSTIUnitVariableData` slot
+   * copy-construction with rollback.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollbackSourceFirstAdapterLaneA(
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceEnd,
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin
+  )
+  {
+    return CopySSTIUnitVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005CBB20 (FUN_005CBB20, copy_SSTIUnitVariableData_slot_range_with_rollback_counted)
+   *
+   * What it does:
+   * Copy-constructs one counted slot range (`header + SSTIUnitVariableData +
+   * tail dword`) into destination storage and destroys already-constructed
+   * payload lanes before rethrowing if a copy step throws.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(
+    const std::uint32_t count,
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin
+  )
+  {
+    if (count == 0u) {
+      return destinationBegin;
+    }
+
+    if (destinationBegin == nullptr || sourceBegin == nullptr) {
+      return destinationBegin;
+    }
+
+    SSTIUnitVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (std::uint32_t i = 0; i < count; ++i, ++destinationCursor) {
+        const SSTIUnitVariableDataSlotRuntime* const sourceCursor = sourceBegin + i;
+        destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+        ::new (&destinationCursor->mVariableData) SSTIUnitVariableData(sourceCursor->mVariableData);
+        destinationCursor->mTailWord0 = sourceCursor->mTailWord0;
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTIUnitVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTIUnitVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x005C9AD0 (FUN_005C9AD0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards counted
+   * `SSTIUnitVariableData` slot copy-construction into the canonical helper.
+   */
+  [[maybe_unused]] void CopySSTIUnitVariableDataSlotRangeWithRollbackCountedAdapterLaneA(
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const std::uint32_t count
+  )
+  {
+    (void)CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00562680 (FUN_00562680)
+   *
+   * What it does:
+   * Register-shape adapter for guarded contiguous
+   * `SSTIUnitVariableData` slot copy-construction.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollbackRegisterAdapter(
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    const SSTIUnitVariableDataSlotRuntime* const sourceEnd,
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin
+  )
+  {
+    if (!sourceBegin || !sourceEnd || sourceEnd < sourceBegin) {
+      return destinationBegin;
+    }
+
+    const std::uint32_t count = static_cast<std::uint32_t>(sourceEnd - sourceBegin);
+    return CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  /**
+   * Address: 0x005CD1F0 (FUN_005CD1F0)
+   *
+   * What it does:
+   * Copy-assigns one contiguous `SSTIUnitVariableData` slot range in reverse
+   * order and returns the beginning of the destination range.
+   */
+  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRangeReverse(
+    SSTIUnitVariableDataSlotRuntime* destinationEnd,
+    const SSTIUnitVariableDataSlotRuntime* sourceEnd,
+    const SSTIUnitVariableDataSlotRuntime* sourceBegin
+  )
+  {
+    const SSTIUnitVariableDataSlotRuntime* sourceCursor = sourceEnd;
+    SSTIUnitVariableDataSlotRuntime* destinationCursor = destinationEnd;
+
+    if (sourceBegin != sourceEnd) {
+      do {
+        --sourceCursor;
+        --destinationCursor;
+        destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+        destinationCursor->mVariableData.AssignFrom(sourceCursor->mVariableData);
+        destinationCursor->mTailWord0 = sourceCursor->mTailWord0;
+      } while (sourceCursor != sourceBegin);
+    }
+
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x005CBDE0 (FUN_005CBDE0)
+   *
+   * What it does:
+   * Copy-assigns one contiguous `SSTIUnitVariableData` slot range and returns
+   * the advanced source cursor.
+   */
+  [[maybe_unused]] const SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRange(
+    SSTIUnitVariableDataSlotRuntime* destinationBegin,
+    SSTIUnitVariableDataSlotRuntime* destinationEnd,
+    const SSTIUnitVariableDataSlotRuntime* sourceBegin
+  )
+  {
+    SSTIUnitVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    const SSTIUnitVariableDataSlotRuntime* sourceCursor = sourceBegin;
+
+    while (destinationCursor != destinationEnd) {
+      destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+      destinationCursor->mVariableData.AssignFrom(sourceCursor->mVariableData);
+      destinationCursor->mTailWord0 = sourceCursor->mTailWord0;
+      ++destinationCursor;
+      ++sourceCursor;
+    }
+
+    return sourceCursor;
+  }
+
+  /**
+   * Address: 0x005C9E00 (FUN_005C9E00)
+   *
+   * What it does:
+   * Register-shape adapter that forwards slot-range copy-assignment into the
+   * canonical `FUN_005CBDE0` helper with source-first caller layout.
+   */
+  [[maybe_unused]] const SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRangeAdapterLaneA(
+    const SSTIUnitVariableDataSlotRuntime* const sourceBegin,
+    SSTIUnitVariableDataSlotRuntime* const destinationBegin,
+    SSTIUnitVariableDataSlotRuntime* const destinationEnd
+  )
+  {
+    return CopyAssignSSTIUnitVariableDataSlotRange(destinationBegin, destinationEnd, sourceBegin);
   }
 } // namespace
 
@@ -10757,6 +11680,24 @@ void UnitWeaponInfo::MemberSerialize(gpg::WriteArchive* const archive) const
 }
 
 /**
+ * Address: 0x005C3850 (FUN_005C3850, init_SSTIUnitWeaponInfoVector_inline)
+ *
+ * What it does:
+ * Rebinds one weapon-info fastvector to inline storage and applies the
+ * zero-count resize lane used during unit-variable-data construction.
+ */
+SSTIUnitWeaponInfoVector* InitializeSSTIUnitWeaponInfoVector(SSTIUnitWeaponInfoVector* const weaponInfo)
+{
+  if (!weaponInfo) {
+    return weaponInfo;
+  }
+
+  weaponInfo->RebindInlineNoFree();
+  weaponInfo->Resize(0u);
+  return weaponInfo;
+}
+
+/**
  * Address: 0x005BD7A0 (FUN_005BD7A0, ??0SSTIUnitVariableData@Moho@@QAE@@Z)
  *
  * What it does:
@@ -10807,6 +11748,7 @@ SSTIUnitVariableData::SSTIUnitVariableData()
   , mPad222_227{}
 {
   mCustomName.tidy(false, 0U);
+  (void)InitializeSSTIUnitWeaponInfoVector(&mWeaponInfo);
 
   mAttributes.blueprint = nullptr;
   mAttributes.unknown_0004 = 0;
@@ -10897,10 +11839,10 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   mPriorSharedPose = other.mPriorSharedPose;
   mSharedPose = other.mSharedPose;
   std::memcpy(mPad094_097, other.mPad094_097, sizeof(mPad094_097));
-  CopyFastVectorN(mCommands, other.mCommands);
-  CopyFastVectorN(mBuildQueue, other.mBuildQueue);
+  CopyUnitCommandWeakVector(mCommands, other.mCommands);
+  CopyUnitCommandWeakVector(mBuildQueue, other.mBuildQueue);
   CopyFastVectorN(mWeaponInfo, other.mWeaponInfo);
-  mAttributes = other.mAttributes;
+  (void)CopyUnitAttributesSnapshot(&mAttributes, &other.mAttributes);
   mScriptbits = other.mScriptbits;
   mUnitStates = other.mUnitStates;
   mDidRefresh = other.mDidRefresh;
@@ -11058,6 +12000,62 @@ bool Unit::IsAtPosition(const Wm3::Vec3f& position) const
   );
 
   return currentCellX == targetCellX && currentCellZ == targetCellZ;
+}
+
+/**
+ * Address: 0x006AAEC0 (FUN_006AAEC0, ?AddRecoilImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+ * Mangled: ?AddRecoilImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+ *
+ * What it does:
+ * Forwards one recoil impulse into `UnitMotion` when present.
+ */
+void Unit::AddRecoilImpulse(const Wm3::Vec3f& impulse)
+{
+  CUnitMotion* const unitMotion = UnitMotion;
+  if (unitMotion != nullptr) {
+    unitMotion->AddRecoilImpulse(impulse);
+  }
+}
+
+/**
+ * Address: 0x006AAEE0 (FUN_006AAEE0, ?AddImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+ * Mangled: ?AddImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+ *
+ * What it does:
+ * Forwards one world impulse to `UnitMotion` when present.
+ */
+void Unit::AddImpulse(const Wm3::Vec3f& impulse)
+{
+  CUnitMotion* const unitMotion = UnitMotion;
+  if (unitMotion != nullptr) {
+    unitMotion->AddImpulse(impulse, false);
+  }
+}
+
+/**
+ * Address: 0x006AAF00 (FUN_006AAF00, ?AddLocalImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z)
+ * Mangled: ?AddLocalImpulse@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@0@Z
+ *
+ * What it does:
+ * Routes local impulse handling by motion type: airborne units use body-local
+ * impulse integration, non-air units feed unit-motion impulse blending.
+ */
+void Unit::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
+{
+  CUnitMotion* const unitMotion = UnitMotion;
+  if (unitMotion == nullptr) {
+    return;
+  }
+
+  const Unit* const motionOwner = unitMotion->mUnit;
+  const RUnitBlueprint* const blueprint = motionOwner->GetBlueprint();
+  if (blueprint->Physics.MotionType == RULEUMT_Air) {
+    SPhysBody* const body = static_cast<Entity*>(unitMotion->mUnit)->GetPhysBody(false);
+    body->AddLocalImpulse(localImpulse, localPoint);
+    return;
+  }
+
+  unitMotion->AddImpulse(localImpulse, false);
 }
 
 /**
@@ -11361,6 +12359,62 @@ std::int32_t Unit::DecrementCapturers()
 }
 
 /**
+ * Address: 0x00603F30 (FUN_00603F30)
+ *
+ * What it does:
+ * Returns the current non-negative captor reference count lane.
+ */
+std::int32_t Unit::GetCapturerCount() const noexcept
+{
+  return CaptorCount;
+}
+
+/**
+ * Address: 0x005F24C0 (FUN_005F24C0)
+ *
+ * What it does:
+ * Returns whether this unit belongs to the MELEE category lane.
+ */
+bool Unit::IsMeleeUnit() const noexcept
+{
+  return mIsMelee;
+}
+
+/**
+ * Address: 0x005F5570 (FUN_005F5570)
+ *
+ * What it does:
+ * Returns the current retaliation fire-state lane.
+ */
+std::int32_t Unit::GetFireStateValue() const noexcept
+{
+  return FireState;
+}
+
+/**
+ * Address: 0x005F5560 (FUN_005F5560)
+ *
+ * What it does:
+ * Stores one upgraded-unit entity id lane and returns that id.
+ */
+EntId Unit::SetUpgradedToEntityId(const EntId upgradedToEntityId) noexcept
+{
+  UpgradedToEntityId = upgradedToEntityId;
+  return upgradedToEntityId;
+}
+
+/**
+ * Address: 0x005F5590 (FUN_005F5590)
+ *
+ * What it does:
+ * Returns the current silo-build implementation lane pointer.
+ */
+CAiSiloBuildImpl* Unit::GetSiloBuildImpl() const noexcept
+{
+  return AiSiloBuild;
+}
+
+/**
  * Address: 0x006A75C0 (FUN_006A75C0, ?GetMaxFootprintSize@Unit@Moho@@QBEHXZ)
  *
  * What it does:
@@ -11499,7 +12553,9 @@ float Unit::GetUniformScale() const
 Wm3::Vec3f Unit::GetVelocity() const
 {
   if (UnitMotion != nullptr && mCurrentLayer != LAYER_Air) {
-    return UnitMotion->mVelocity;
+    Wm3::Vec3f velocity{};
+    (void)UnitMotion->GetVelocity(&velocity);
+    return velocity;
   }
 
   Wm3::Vec3f velocity{};
@@ -11550,6 +12606,41 @@ void Unit::HandleTerranEffects()
   if (Health <= 0.0f) {
     Kill(nullptr, "", 0.0f);
   }
+}
+
+/**
+ * Address: 0x006AB520 (FUN_006AB520, Moho::Unit::UpdateCollision)
+ *
+ * What it does:
+ * Pushes current transform into the active collision primitive, widens
+ * box-shape X/Z extents to include blueprint skirt dimensions, and then
+ * forwards to `Entity::UpdateCollision` for relink and bounds refresh.
+ */
+void Unit::UpdateCollision()
+{
+  if (CollisionExtents == nullptr) {
+    return;
+  }
+
+  const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
+  CollisionExtents->SetTransform(current);
+
+  if (const Wm3::Box3f* const existingBox = CollisionExtents->GetBox(); existingBox != nullptr) {
+    const RUnitBlueprint* const blueprint = GetBlueprint();
+    if (blueprint != nullptr) {
+      Wm3::Box3f expandedBox(*existingBox);
+
+      const float skirtExtentX = std::fabs(blueprint->Physics.SkirtOffsetX) + blueprint->Physics.SkirtSizeX;
+      const float skirtExtentZ = std::fabs(blueprint->Physics.SkirtOffsetZ) + blueprint->Physics.SkirtSizeZ;
+
+      expandedBox.Extent[0] = 0.5f * std::max(blueprint->mSizeX, skirtExtentX);
+      expandedBox.Extent[2] = 0.5f * std::max(blueprint->mSizeZ, skirtExtentZ);
+
+      static_cast<BoxCollisionPrimitive*>(CollisionExtents)->mShape = expandedBox;
+    }
+  }
+
+  Entity::UpdateCollision();
 }
 
 /**
@@ -11981,6 +13072,23 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 }
 
 /**
+ * Address: 0x006AA720 (FUN_006AA720, ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z)
+ * Mangled: ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z
+ *
+ * What it does:
+ * Inserts one guarding owner into this unit's guarded-by list when non-null,
+ * then clears this unit's guard-formation lane.
+ */
+void Unit::RemoveGuardedByUnit(Unit* const guardedByUnit)
+{
+  if (guardedByUnit != nullptr) {
+    AddGuardedByOwner(GuardedByList, guardedByUnit);
+  }
+
+  ClearGuardFormation(this);
+}
+
+/**
  * Address: 0x00585B10 (FUN_00585B10, Moho::Unit::GetFocusEntity)
  */
 Entity* Unit::GetFocusEntity() const
@@ -12016,6 +13124,17 @@ Unit* Unit::GetStagingPlatform() const
 Unit* Unit::GetTransportedBy() const
 {
   return TransportedByRef.ResolveObjectPtr<Unit>();
+}
+
+/**
+ * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
+ *
+ * What it does:
+ * Rebinds this unit's assigned-transport weak-reference lane.
+ */
+void Unit::SetAssignedTransport(Unit* const assignedTransport)
+{
+  AssignedTransportRef.AsWeakPtr<Unit>().Set(assignedTransport);
 }
 
 /**
@@ -12389,6 +13508,180 @@ bool Unit::IsHigherPriorityThan(const Unit* const other) const
 
   return static_cast<std::uint32_t>(GetEntityId()) < static_cast<std::uint32_t>(other->GetEntityId());
 }
+
+/**
+ * Address: 0x0062B780 (FUN_0062B780, Moho::Unit::PrepareMove)
+ *
+ * What it does:
+ * Coerces one world-space move destination into the nearest valid move cell
+ * for this unit, honoring occupancy/pathability and skirt exclusion.
+ */
+bool Unit::PrepareMove(
+  const int moveFlags,
+  Wm3::Vector3f* const inOutPos,
+  gpg::Rect2f* const skirtRect,
+  const bool useWholeMap
+)
+{
+  if (inOutPos == nullptr || skirtRect == nullptr) {
+    return false;
+  }
+
+  Sim* const sim = SimulationRef;
+  if (sim == nullptr || sim->mMapData == nullptr || sim->mOGrid == nullptr) {
+    return false;
+  }
+
+  SFootprint footprint = GetFootprint();
+  const std::uint8_t footprintSearchSide = FootprintMaxSide(footprint);
+  const int searchStep = (moveFlags > 0) ? moveFlags : static_cast<int>(footprintSearchSide) * 2;
+
+  const ELayer moveLayer = mCurrentLayer;
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  if (blueprint != nullptr && blueprint->Air.CanFly) {
+    const std::uint8_t adjustedCaps = static_cast<std::uint8_t>(
+      (static_cast<std::uint8_t>(footprint.mOccupancyCaps) - static_cast<std::uint8_t>(EOccupancyCaps::OC_AIR)) |
+      static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)
+    );
+    footprint.mOccupancyCaps = static_cast<EOccupancyCaps>(adjustedCaps);
+
+    const std::uint8_t maxSide = FootprintMaxSide(footprint);
+    footprint.mSizeX = maxSide;
+    footprint.mSizeZ = maxSide;
+
+    if (IsInCategory("CANLANDONWATER")) {
+      const STIMap* const mapData = sim->mMapData;
+      const CHeightField* const heightField = (mapData != nullptr && mapData->mHeightField) ? mapData->mHeightField.get() : nullptr;
+      const float terrainElevation = (heightField != nullptr) ? heightField->GetElevation(inOutPos->x, inOutPos->z) : inOutPos->y;
+      const float waterElevation = (mapData != nullptr && mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+      if (waterElevation > terrainElevation) {
+        const std::uint8_t withWaterCaps = static_cast<std::uint8_t>(
+          static_cast<std::uint8_t>(footprint.mOccupancyCaps) | static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)
+        );
+        footprint.mOccupancyCaps = static_cast<EOccupancyCaps>(withWaterCaps);
+      }
+    }
+  }
+
+  const float halfSizeX = static_cast<float>(footprint.mSizeX) * 0.5f;
+  const float halfSizeZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
+
+  const int rawStartX = static_cast<int>(inOutPos->x - halfSizeX);
+  const int rawStartZ = static_cast<int>(inOutPos->z - halfSizeZ);
+  SOCellPos startCell{
+    static_cast<std::int16_t>(rawStartX),
+    static_cast<std::int16_t>(rawStartZ),
+  };
+
+  if (IsPrepareMoveCandidateValid(*this, footprint, moveLayer, startCell, *inOutPos, *skirtRect, useWholeMap)) {
+    return true;
+  }
+
+  std::vector<Wm3::Vector3f> candidatePositions{};
+  candidatePositions.reserve(16);
+
+  int minRing = -1;
+  int maxRing = 1;
+  int checkedCellCount = 0;
+  constexpr int kPrepareMoveMaxCheckedCells = 900;
+  while (true) {
+    candidatePositions.clear();
+
+    for (int ringX = minRing; ringX <= maxRing; ++ringX) {
+      const int ringStepZ = (ringX == minRing || ringX == maxRing) ? 1 : (2 * maxRing);
+      const int rawX = static_cast<int>(startCell.x) + (ringX * searchStep);
+      const std::int16_t cellX = static_cast<std::int16_t>(rawX);
+
+      for (int ringZ = minRing; ringZ <= maxRing; ringZ += ringStepZ) {
+        ++checkedCellCount;
+
+        const int rawZ = static_cast<int>(startCell.z) + (ringZ * searchStep);
+        const std::int16_t cellZ = static_cast<std::int16_t>(rawZ);
+        const SOCellPos candidateCell{cellX, cellZ};
+
+        const Wm3::Vector3f candidateWorldPos{
+          static_cast<float>(cellX) + halfSizeX,
+          0.0f,
+          static_cast<float>(cellZ) + halfSizeZ,
+        };
+
+        if (!IsPrepareMoveCandidateValid(
+              *this,
+              footprint,
+              moveLayer,
+              candidateCell,
+              candidateWorldPos,
+              *skirtRect,
+              useWholeMap
+            ))
+        {
+          continue;
+        }
+
+        candidatePositions.push_back(candidateWorldPos);
+      }
+    }
+
+    if (!candidatePositions.empty()) {
+      break;
+    }
+
+    if (checkedCellCount >= kPrepareMoveMaxCheckedCells) {
+      return false;
+    }
+
+    ++maxRing;
+    --minRing;
+  }
+
+  const Wm3::Vector3f unitPosition = GetPosition();
+  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  Wm3::Vector3f bestCandidatePos = *inOutPos;
+  for (const Wm3::Vector3f& candidateWorldPos : candidatePositions) {
+    const float dx = candidateWorldPos.x - unitPosition.x;
+    const float dy = candidateWorldPos.y - unitPosition.y;
+    const float dz = candidateWorldPos.z - unitPosition.z;
+    const float distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
+    if (distanceSq < bestDistanceSq) {
+      bestDistanceSq = distanceSq;
+      bestCandidatePos = candidateWorldPos;
+    }
+  }
+
+  inOutPos->x = bestCandidatePos.x;
+  inOutPos->y = bestCandidatePos.y;
+  inOutPos->z = bestCandidatePos.z;
+  return true;
+}
+
+[[nodiscard]] bool PrepareMove(
+  int moveFlags,
+  Unit* unit,
+  Wm3::Vector3f* inOutPos,
+  gpg::Rect2f* outSkirtRect,
+  bool useWholeMap
+)
+{
+  // Alias of FUN_0062B780 canonical body in Unit::PrepareMove.
+  if (unit == nullptr) {
+    return false;
+  }
+  return unit->PrepareMove(moveFlags, inOutPos, outSkirtRect, useWholeMap);
+}
+
+namespace moho
+{
+  [[nodiscard]] bool PrepareMove(
+    int moveFlags,
+    Unit* unit,
+    Wm3::Vector3f* inOutPos,
+    gpg::Rect2f* outSkirtRect,
+    bool useWholeMap
+  )
+  {
+    return ::PrepareMove(moveFlags, unit, inOutPos, outSkirtRect, useWholeMap);
+  }
+} // namespace moho
 
 /**
  * Address: 0x0062BEE0 (FUN_0062BEE0, Moho::Unit::HasMeleeSpaceAroundSmallTarget)
@@ -12829,6 +14122,316 @@ std::string Unit::GetCustomName() const
 }
 
 /**
+ * Address: 0x0062D460 (FUN_0062D460, Moho::Unit::CollectAllOverlapping)
+ *
+ * What it does:
+ * Gathers nearby non-mobile same-army same-layer structures and appends
+ * those whose skirt rectangles overlap `unit`.
+ */
+SEntitySetTemplateUnit* Unit::CollectAllOverlapping(SEntitySetTemplateUnit* const outSet, Unit* const unit)
+{
+  if (outSet == nullptr) {
+    return nullptr;
+  }
+
+  outSet->ListResetLinks();
+  outSet->mVec.RebindInlineNoFree();
+
+  if (unit == nullptr || unit->SimulationRef == nullptr || unit->SimulationRef->mOGrid == nullptr) {
+    return outSet;
+  }
+
+  const Wm3::Vec3f& position = unit->GetPosition();
+  gpg::Rect2f queryRect{};
+  queryRect.x0 = position.x - 20.0f;
+  queryRect.z0 = position.z - 20.0f;
+  queryRect.x1 = position.x + 20.0f;
+  queryRect.z1 = position.z + 20.0f;
+
+  CollisionDBRect collisionRect{};
+  (void)func_Rect2fToInt16(&collisionRect, queryRect);
+
+  EntityGatherVector gatheredEntities{};
+  (void)unit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
+    gatheredEntities,
+    collisionRect,
+    ENTITYTYPE_Unit
+  );
+
+  for (Entity* const entity : gatheredEntities) {
+    Unit* const other = (entity != nullptr) ? entity->IsUnit() : nullptr;
+    if (other == nullptr) {
+      continue;
+    }
+
+    const Wm3::Vec3f& otherPosition = other->GetPosition();
+    const float deltaX = otherPosition.x - position.x;
+    const float deltaZ = otherPosition.z - position.z;
+    if ((deltaX * deltaX) + (deltaZ * deltaZ) > (20.0f * 20.0f)) {
+      continue;
+    }
+
+    if (other->IsDead() || other->IsMobile()) {
+      continue;
+    }
+    if (unit->ArmyRef != other->ArmyRef) {
+      continue;
+    }
+    if (other == unit) {
+      continue;
+    }
+    if (other->mCurrentLayer != unit->mCurrentLayer) {
+      continue;
+    }
+    if (!unit->OverlapsWith(other)) {
+      continue;
+    }
+
+    (void)outSet->AddUnit(other);
+  }
+
+  return outSet;
+}
+
+/**
+ * Address: 0x006A7E00 (FUN_006A7E00, ?LookForStructureRebuilder@Unit@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Scans same-army REBUILDER units for guard commands matching this structure
+ * blueprint/position and queues one rebuild entry on the first matching
+ * command per builder.
+ */
+void Unit::LookForStructureRebuilder()
+{
+  if (ArmyRef == nullptr || SimulationRef == nullptr || SimulationRef->mRules == nullptr) {
+    return;
+  }
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  if (blueprint == nullptr) {
+    return;
+  }
+
+  const CategoryWordRangeView* const rebuilderCategory = SimulationRef->mRules->GetEntityCategory("REBUILDER");
+  if (rebuilderCategory == nullptr) {
+    return;
+  }
+
+  SEntitySetTemplateUnit rebuilderUnits{};
+  (void)ArmyRef->GetUnits(&rebuilderUnits, const_cast<CategoryWordRangeView*>(rebuilderCategory));
+
+  for (Entity* const entry : rebuilderUnits.mVec) {
+    Unit* const rebuilder = SEntitySetTemplateUnit::UnitFromEntry(entry);
+    if (rebuilder == nullptr) {
+      continue;
+    }
+
+    if (rebuilder->IsDead() || rebuilder->DestroyQueued() || rebuilder->IsBeingBuilt() || rebuilder->AiBuilder == nullptr ||
+        rebuilder->CommandQueue == nullptr) {
+      continue;
+    }
+
+    const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot(rebuilder->CommandQueue->mCommandVec);
+    for (const WeakPtr<CUnitCommand>& commandRef : commandSnapshot) {
+      CUnitCommand* const command = commandRef.GetObjectPtr();
+      if (command == nullptr || command->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Guard) {
+        continue;
+      }
+
+      const RUnitBlueprint* const commandBlueprint = static_cast<const RUnitBlueprint*>(command->mConstDat.blueprint);
+      if (commandBlueprint != blueprint) {
+        continue;
+      }
+
+      const Wm3::Vec3f targetPosition = command->mTarget.GetTargetPosGun(false);
+      const Wm3::Vec3f& myPosition = GetPosition();
+      const float deltaX = targetPosition.x - myPosition.x;
+      const float deltaZ = targetPosition.z - myPosition.z;
+      if (std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ)) >= 0.001f) {
+        continue;
+      }
+
+      const SOCellPos cellPos = GetFootprint().ToCellPos(GetPosition());
+      rebuilder->AiBuilder->BuilderAddRebuildStructure(cellPos, blueprint);
+      break;
+    }
+  }
+}
+
+/**
+ * Address: 0x006A8090 (FUN_006A8090, ?Kill@Unit@Moho@@UAEXPAVEntity@2@VStrArg@gpg@@M@Z)
+ *
+ * What it does:
+ * Applies unit death gating and teardown, notifies adjacency/transport and
+ * script lanes, then updates army/platoon kill-value statistics.
+ */
+void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excessDamageRatio)
+{
+  if (IsDead()) {
+    return;
+  }
+
+  const bool scriptAllowsKill = RunScriptUnitBool("CheckCanBeKilled", this);
+  if (!scriptAllowsKill && IsWithinPlayableRectOrNotCommander(*this)) {
+    return;
+  }
+
+  UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_TransportUnloading));
+
+  SEntitySetTemplateUnit overlappingStructures{};
+  if (!IsMobile()) {
+    CollectAllOverlapping(&overlappingStructures, this);
+    LookForStructureRebuilder();
+  }
+
+  if (Unit* const transportOwner = GetTransportedBy(); transportOwner != nullptr) {
+    if (transportOwner->AiTransport != nullptr && mAttachInfo.GetAttachTargetEntity() != nullptr) {
+      (void)transportOwner->AiTransport->TransportDetachUnit(this);
+    }
+    TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    excessDamageRatio = 10.0f;
+  }
+
+  if (IsBeingBuilt() && WorkProgress < 0.5f) {
+    excessDamageRatio = 10.0f;
+  }
+
+  (void)RunScript("SetDead");
+  Entity::Kill(nullptr, "", 0.0f);
+  mNeedsKillCleanup = true;
+
+  if (!IsMobile() && !IsBeingBuilt()) {
+    for (Entity* const entry : overlappingStructures.mVec) {
+      Unit* const adjacent = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      if (adjacent == nullptr) {
+        continue;
+      }
+
+      RunScriptUnit("OnNotAdjacentTo", adjacent);
+      adjacent->RunScriptUnit("OnNotAdjacentTo", this);
+      adjacent->ReserveOgridRect(GetReservedOgridRect(*adjacent));
+    }
+  }
+
+  if (AiTransport != nullptr) {
+    (void)AiTransport->TransportDetachAllUnits(true);
+  }
+
+  if (CommandQueue != nullptr) {
+    CommandQueue->ClearCommandQueue();
+  }
+
+  RunScriptUnitOnKilled(instigator, reason, excessDamageRatio);
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  float massValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostMass : 0.0f;
+  float energyValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostEnergy : 0.0f;
+  if (IsBeingBuilt()) {
+    massValue *= WorkProgress;
+    energyValue *= WorkProgress;
+  }
+
+  if (ArmyRef != nullptr) {
+    if (CArmyStats* const armyStats = ArmyRef->GetArmyStats(); armyStats != nullptr) {
+      if (blueprint != nullptr) {
+        IncrementArmyBlueprintFloatStat(armyStats, "Units_Killed", blueprint, 1.0f);
+      }
+      IncrementArmyIntStatByName(armyStats, "Units_Killed");
+      (void)AddArmyStatFloatByName(armyStats, &massValue, "Units_MassValue_Lost");
+      (void)AddArmyStatFloatByName(armyStats, &energyValue, "Units_EnergyValue_Lost");
+    }
+
+    ESquadClass squadClass = ESquadClass::Unassigned;
+    if (CPlatoon* const platoon =
+          ArmyRef->GetPlatoonFor(static_cast<int>(reinterpret_cast<std::uintptr_t>(this)), &squadClass);
+        platoon != nullptr) {
+      ++platoon->mLifetimeStat2;
+    }
+  }
+
+  CArmyImpl* const instigatorArmy = (instigator != nullptr) ? instigator->ArmyRef : nullptr;
+  if (instigatorArmy == nullptr || ArmyRef == nullptr ||
+      !ArmyRef->IsEnemy(static_cast<std::uint32_t>(instigatorArmy->ArmyId))) {
+    return;
+  }
+
+  if (Unit* const instigatorUnit = instigator->IsUnit(); instigatorUnit != nullptr && instigatorUnit->ArmyRef != nullptr) {
+    ESquadClass instigatorSquadClass = ESquadClass::Unassigned;
+    if (CPlatoon* const instigatorPlatoon = instigatorUnit->ArmyRef->GetPlatoonFor(
+          static_cast<int>(reinterpret_cast<std::uintptr_t>(instigatorUnit)),
+          &instigatorSquadClass
+        );
+        instigatorPlatoon != nullptr) {
+      ++instigatorPlatoon->mLifetimeStat1;
+    }
+  }
+
+  CArmyStats* const enemyArmyStats = instigatorArmy->GetArmyStats();
+  if (enemyArmyStats == nullptr) {
+    return;
+  }
+
+  IncrementArmyIntStatByName(enemyArmyStats, "Enemies_Killed");
+  if (blueprint != nullptr) {
+    IncrementArmyBlueprintFloatStat(enemyArmyStats, "Enemies_Killed", blueprint, 1.0f);
+  }
+  (void)AddArmyStatFloatByName(enemyArmyStats, &massValue, "Enemies_MassValue_Destroyed");
+  (void)AddArmyStatFloatByName(enemyArmyStats, &energyValue, "Enemies_EnergyValue_Destroyed");
+
+  static const std::string kCommanderCategory = "COMMAND";
+  if (Entity::IsInCategory(kCommanderCategory.c_str())) {
+    const std::int32_t delta = 1;
+    (void)enemyArmyStats->UpdateUnitStat("Enemies_Commanders_Destroyed", &delta);
+  }
+}
+
+/**
+ * Address: 0x006A88D0 (FUN_006A88D0, ?OnDestroy@Unit@Moho@@UAEXXZ)
+ *
+ * What it does:
+ * Dispatches unit destruction-side adjacency/transport cleanup and then
+ * forwards to the base entity destroy-dispatch path.
+ */
+void Unit::OnDestroy()
+{
+  if (AiAttacker != nullptr) {
+    AiAttacker->WeaponsOnDestroy();
+  }
+
+  if (FootprintDown) {
+    FreeOgridRect();
+  }
+
+  if (!IsDead()) {
+    if (!IsMobile() && !IsBeingBuilt()) {
+      SEntitySetTemplateUnit adjacentUnits{};
+      CollectAllOverlapping(&adjacentUnits, this);
+      for (Entity* const entry : adjacentUnits.mVec) {
+        Unit* const adjacent = SEntitySetTemplateUnit::UnitFromEntry(entry);
+        RunScriptUnit("OnNotAdjacentTo", adjacent);
+        adjacent->RunScriptUnit("OnNotAdjacentTo", this);
+        adjacent->ReserveOgridRect(GetReservedOgridRect(*adjacent));
+      }
+    }
+
+    RunScriptUnit("SetDead", this);
+    Dead = 1u;
+
+    if (Unit* const transportOwner = GetTransportedBy(); transportOwner != nullptr && !transportOwner->IsDead()) {
+      (void)transportOwner->AiTransport->TransportDetachUnit(this);
+      TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    }
+
+    if (AiTransport != nullptr) {
+      EntitySetTemplate<Unit> detachedUnits = AiTransport->TransportDetachAllUnits(false);
+      (void)detachedUnits;
+    }
+  }
+
+  Entity::OnDestroy();
+}
+
+/**
  * Address: 0x006A8790 (FUN_006A8790)
  *
  * What it does:
@@ -12972,6 +14575,48 @@ void Unit::SetRepeatQueue(const bool enabled)
 }
 
 /**
+ * Address: 0x006AAE20 (FUN_006AAE20, Moho::Unit::GetConsumptionRequest)
+ *
+ * What it does:
+ * Returns the requested per-tick consumption pair from `mConsumptionData`.
+ */
+SEconValue Unit::GetConsumptionRequest() const
+{
+  SEconValue request{};
+  request.energy = mConsumptionData->mRequested.energy;
+  request.mass = mConsumptionData->mRequested.mass;
+  return request;
+}
+
+/**
+ * Address: 0x006AAE40 (FUN_006AAE40, Moho::Unit::UpdateResourceProduction)
+ *
+ * What it does:
+ * Stores one economy-rate pair in the shared runtime production lane.
+ */
+void Unit::UpdateResourceProduction(const SEconValue& resourceProduction)
+{
+  SharedEconomyRateEnergy = resourceProduction.energy;
+  SharedEconomyRateMass = resourceProduction.mass;
+}
+
+/**
+ * Address: 0x006ABC70 (FUN_006ABC70, ?ResetEconValues@Unit@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Clears the unit's produced and resources-spent economy totals.
+ */
+Unit* Unit::ResetEconValues()
+{
+  SSTIUnitVariableData& varDat = VarDat();
+  varDat.mResourcesSpent.ENERGY = 0.0f;
+  varDat.mResourcesSpent.MASS = 0.0f;
+  varDat.mProduced.ENERGY = 0.0f;
+  varDat.mProduced.MASS = 0.0f;
+  return this;
+}
+
+/**
  * Address: 0x006AA900 (FUN_006AA900, ?SetConsumptionActive@Unit@Moho@@QAEX_N@Z)
  *
  * What it does:
@@ -13032,6 +14677,19 @@ void Unit::SetConsumptionActive(const bool isActive)
       CallbackStr("OnConsumptionInActive");
     }
   }
+}
+
+/**
+ * Address: 0x006AAA90 (FUN_006AAA90, ?SetProductionActive@Unit@Moho@@QAEX_N@Z)
+ *
+ * What it does:
+ * Writes one production-active flag lane and dispatches matching
+ * `OnProductionActive` / `OnProductionInActive` script callbacks.
+ */
+void Unit::SetProductionActive(const bool isActive)
+{
+  ProductionActive = isActive;
+  (void)RunScript(isActive ? kUnitOnProductionActiveScript : kUnitOnProductionInactiveScript);
 }
 
 /**
@@ -13102,7 +14760,7 @@ void Unit::CreateInterface(SSyncData* const syncData)
     createParams.mConstDat.mBuildStateTag = mConstDat.mBuildStateTag;
     createParams.mConstDat.mStatsRoot = mConstDat.mStatsRoot;
     createParams.mConstDat.mFake = mConstDat.mFake;
-    syncData->mNewUnits.push_back(createParams);
+    (void)QueueCreateUnitParams(syncData, createParams);
   }
 
   mInterfaceCreated = 1u;

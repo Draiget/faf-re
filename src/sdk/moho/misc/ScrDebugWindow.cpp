@@ -24,6 +24,7 @@
 #include "moho/misc/ScrActivation.h"
 #include "moho/misc/ScrBreakpoint.h"
 #include "moho/misc/ScrDebugHooks.h"
+#include "moho/misc/ScrFileCtrl.h"
 #include "moho/misc/ScrGotoDialog.h"
 #include "moho/misc/ScrPauseEvent.h"
 #include "moho/misc/ScrWatchCtrl.h"
@@ -937,6 +938,37 @@ namespace
       }
 
       RefreshSourcePageLineMarker(page, lineIndexZeroBased);
+    }
+  }
+
+  /**
+   * Address: 0x004C3B90 (FUN_004C3B90)
+   *
+   * What it does:
+   * Iterates every open source page and clears breakpoint markers line-by-line
+   * by forwarding one-based line indices into `ScrFileCtrl::ClearBreakpointMarkerAtLine`.
+   */
+  void ClearAllSourcePageBreakpointMarkers(ScrSourceControlRuntimeView* const sourceControl) noexcept
+  {
+    if (sourceControl == nullptr || sourceControl->mPagesBegin == nullptr || sourceControl->mPagesEnd == nullptr) {
+      return;
+    }
+
+    for (ScrSourcePageRuntime** page = sourceControl->mPagesBegin; page != sourceControl->mPagesEnd; ++page) {
+      ScrSourcePageRuntime* const sourcePage = *page;
+      if (sourcePage == nullptr || sourcePage->mLineRecordsBegin == nullptr) {
+        continue;
+      }
+
+      const std::int32_t lineCount = static_cast<std::int32_t>(sourcePage->mLineRecordsEnd - sourcePage->mLineRecordsBegin);
+      if (lineCount <= 0) {
+        continue;
+      }
+
+      auto* const fileControl = reinterpret_cast<moho::ScrFileCtrl*>(sourcePage);
+      for (std::int32_t lineOneBased = 1; lineOneBased <= lineCount; ++lineOneBased) {
+        fileControl->ClearBreakpointMarkerAtLine(lineOneBased);
+      }
     }
   }
 

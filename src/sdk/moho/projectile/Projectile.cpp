@@ -16,6 +16,7 @@
 #include "moho/projectile/CProjectileAttributes.h"
 #include "moho/projectile/ProjectileStartupRegistrations.h"
 #include "moho/sim/EImpactTypeTypeInfo.h"
+#include "moho/sim/Sim.h"
 
 namespace gpg
 {
@@ -238,6 +239,24 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0069F8B0 (FUN_0069F8B0)
+   *
+   * What it does:
+   * Builds one temporary projectile reference and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackProjectileRef(
+    gpg::RRef* const out,
+    moho::Projectile* const object
+  )
+  {
+    const gpg::RRef ref = MakeProjectileRef(object);
+    out->mObj = ref.mObj;
+    out->mType = ref.mType;
+    return out;
+  }
+
   void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
   {
     if (!statItem) {
@@ -316,11 +335,7 @@ namespace moho
     view.mUnknownBounceCount = 0;
     view.mUnknownGroundVector = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     view.mImpactType = IMPACT_Air;
-    view.mAttributes.mBlueprint = nullptr;
-    view.mAttributes.mMaxZigZag = kProjectileUnsetValue;
-    view.mAttributes.mZigZagFrequency = kProjectileUnsetValue;
-    view.mAttributes.mDetonateAboveHeight = kProjectileUnsetValue;
-    view.mAttributes.mDetonateBelowHeight = kProjectileUnsetValue;
+    view.mAttributes = CProjectileAttributes();
     view.mUnknownTailFlag = false;
   }
 
@@ -351,6 +366,43 @@ namespace moho
   Projectile* Projectile::IsProjectile()
   {
     return this;
+  }
+
+  /**
+   * Address: 0x0069A5D0 (FUN_0069A5D0)
+   *
+   * What it does:
+   * Returns this projectile's owning army pointer lane.
+   */
+  CArmyImpl* Projectile::GetArmyOwner() const
+  {
+    return ArmyRef;
+  }
+
+  /**
+   * Address: 0x0069A5E0 (FUN_0069A5E0)
+   *
+   * What it does:
+   * Returns the resolved launcher entity from this projectile weak-launcher
+   * lane.
+   */
+  Entity* Projectile::GetLauncherEntity() const
+  {
+    const auto& view = *reinterpret_cast<const ProjectileDeserializeRuntimeView*>(this);
+    return view.mLauncherWeak.GetObjectPtr();
+  }
+
+  /**
+   * Address: 0x0069DE80 (FUN_0069DE80, Moho::Projectile::SetLifetime)
+   *
+   * What it does:
+   * Sets the projectile expiration tick to `mCurTick + int(seconds * 10.0f)`.
+   */
+  void Projectile::SetLifetime(const float lifetimeSeconds)
+  {
+    auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(static_cast<std::int32_t>(lifetimeSeconds * 10.0f));
+    view.mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 
   /**
@@ -399,6 +451,8 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069F8E0 (FUN_0069F8E0, member-deserialize thunk lane)
+   * Address: 0x00680790 (FUN_00680790)
    * Address: 0x006A0370 (FUN_006A0370, Moho::Projectile::MemberDeserialize)
    *
    * What it does:
@@ -520,5 +574,40 @@ namespace moho
     archive->Write(CachedVector3fType(), &view.mUnknownGroundVector, ownerRef);
     archive->Write(CachedProjectileAttributesType(), &view.mAttributes, ownerRef);
     archive->WriteBool(view.mUnknownTailFlag);
+  }
+
+  /**
+   * Address: 0x0069F8F0 (FUN_0069F8F0)
+   *
+   * What it does:
+   * Thin serialization thunk that forwards to `Projectile::MemberSerialize`.
+   */
+  [[maybe_unused]] void ProjectileMemberSerializeThunkA(Projectile* const projectile, gpg::WriteArchive* const archive)
+  {
+    projectile->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x006A0050 (FUN_006A0050)
+   *
+   * What it does:
+   * Thin deserialization thunk that forwards to
+   * `Projectile::MemberDeserialize`.
+   */
+  [[maybe_unused]] void ProjectileMemberDeserializeThunk(Projectile* const projectile, gpg::ReadArchive* const archive)
+  {
+    projectile->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006A0060 (FUN_006A0060)
+   *
+   * What it does:
+   * Thin serialization thunk alias that forwards to
+   * `Projectile::MemberSerialize`.
+   */
+  [[maybe_unused]] void ProjectileMemberSerializeThunkB(Projectile* const projectile, gpg::WriteArchive* const archive)
+  {
+    projectile->MemberSerialize(archive);
   }
 } // namespace moho

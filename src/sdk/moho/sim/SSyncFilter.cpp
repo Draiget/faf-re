@@ -21,7 +21,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00401C50 (FUN_00401C50)
+  * Alias of FUN_00401C50 (non-canonical helper lane).
  *
  * What it does:
  * Compares the binary-significant mask payload (`rawWord` + full vector data).

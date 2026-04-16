@@ -185,8 +185,8 @@ namespace gpg
         PipeBuf();
 
         /**
-         * Address: 0x00906BD0 (FUN_00906BD0)
-         * Demangled: gpg::PipeBuf deleting dtor thunk
+         * Address: 0x00906B30 (FUN_00906B30, complete dtor body)
+         * Address: 0x00906BD0 (FUN_00906BD0, deleting dtor thunk)
          *
          * What it does:
          * Releases all queued stream chunks and destroys synchronization state.
@@ -400,6 +400,14 @@ namespace gpg
     public:
         explicit ScopedLogContext(const msvc8::string& text);
         explicit ScopedLogContext(const char* text);
+
+        /**
+         * Address: 0x00937B90 (FUN_00937B90, ??1LogContext@gpg@@QAE@XZ_0)
+         *
+         * What it does:
+         * Removes one scoped thread-context entry from the active thread context
+         * list under global logging lock and releases entry storage.
+         */
         ~ScopedLogContext();
 
         ScopedLogContext(const ScopedLogContext&) = delete;
@@ -424,6 +432,15 @@ namespace gpg
      * handler that destroys it.
      */
     void InitLogContextSingleton();
+
+    /**
+     * Address: 0x00937B30 (FUN_00937B30)
+     *
+     * What it does:
+     * Initializes the global log-context singleton on first use and returns the
+     * process-global context pointer lane.
+     */
+    LogContext* GetLogContextSingletonRuntime();
 
     /**
      * One-time initializer for logging singleton.

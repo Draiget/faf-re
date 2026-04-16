@@ -63,6 +63,15 @@ namespace gpg::gal
         Head(const Head& other);
 
         /**
+         * Address: 0x008D7310 (FUN_008D7310)
+         *
+         * What it does:
+         * Copies one head descriptor lane in-place, including owned text and
+         * nested vector payloads, without changing the vftable.
+         */
+        Head& operator=(const Head& other);
+
+        /**
          * Address: 0x008E6EA0 (FUN_008E6EA0, gpg::gal::Head::~Head)
          * Address: 0x00436990 (FUN_00436990)
          *

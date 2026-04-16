@@ -11,6 +11,12 @@ namespace LuaPlus
   class LuaState;
 } // namespace LuaPlus
 
+namespace gpg
+{
+  class ReadArchive;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -67,10 +73,12 @@ namespace moho
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
-     * Address: 0x00776570 (FUN_00776570)
+     * Address: 0x00776570 (FUN_00776570, deleting dtor thunk)
+     * Address: 0x00776600 (FUN_00776600, non-deleting dtor core)
      *
      * What it does:
-     * Unlinks this shield from Sim shield-list, then runs base entity teardown.
+     * Unlinks this shield from Sim shield-list and decrements the shield
+     * instance-stat lane before base entity teardown.
      */
     ~Shield() override;
 
@@ -107,6 +115,29 @@ namespace moho
    * `spec.Owner`, creates one `Shield`, and pushes its Lua object.
    */
   int cfunc__c_CreateShieldL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00776860 (FUN_00776860)
+   *
+   * What it does:
+   * Reads one owning `Sim*` lane from archive, constructs one `Shield`, and
+   * returns it through serializer construct-result output.
+   */
+  void ConstructShieldForSerializerFromArchive(gpg::ReadArchive* archive, gpg::SerConstructResult* result);
+
+  /**
+   * Address: 0x00776840 (FUN_00776840)
+   *
+   * What it does:
+   * Serializer construct-callback thunk that forwards to
+   * `ConstructShieldForSerializerFromArchive`.
+   */
+  void ConstructShieldSerializerThunk(
+    gpg::ReadArchive* archive,
+    int objectPtr,
+    int version,
+    gpg::SerConstructResult* result
+  );
 
   /**
    * VFTABLE: 0x00E3713C

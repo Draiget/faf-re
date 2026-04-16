@@ -41,13 +41,6 @@ namespace moho
     bool useSkirt
   );
 
-  /**
-   * Address: 0x0062B780 (FUN_0062B780, Moho::PrepareMove)
-   *
-   * What it does:
-   * Coerces one world-space move destination into a valid passable location
-   * for `unit`, optionally producing skirt extents for footprint alignment.
-   */
   [[nodiscard]]
   bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);
 } // namespace moho
@@ -90,17 +83,6 @@ namespace
       static_cast<std::int32_t>(cellPos.x) + static_cast<std::int32_t>(footprint.mSizeX),
       static_cast<std::int32_t>(cellPos.z) + static_cast<std::int32_t>(footprint.mSizeZ),
     };
-  }
-
-  [[nodiscard]] moho::CAiTarget BuildGroundTarget(const Wm3::Vector3f& worldPos) noexcept
-  {
-    moho::CAiTarget target{};
-    target.targetType = moho::EAiTargetType::AITARGET_Ground;
-    target.targetEntity.ClearLinkState();
-    target.position = worldPos;
-    target.targetPoint = -1;
-    target.targetIsMobile = false;
-    return target;
   }
 
   [[nodiscard]] int FailTeleportCallTaskTick(moho::CUnitCallTeleport* const task) noexcept
@@ -174,6 +156,24 @@ namespace
 namespace moho
 {
   gpg::RType* CUnitCallTeleport::sType = nullptr;
+
+  /**
+   * Address: 0x005E2340 (FUN_005E2340, CUnitCallTeleport::BuildGroundTeleportTarget)
+   *
+   * What it does:
+   * Builds one ground-target payload from world position, clears entity-link
+   * lanes, and resets target-point/mobile flags.
+   */
+  CAiTarget CUnitCallTeleport::BuildGroundTeleportTarget(const Wm3::Vector3f& worldPos) noexcept
+  {
+    CAiTarget target{};
+    target.targetType = EAiTargetType::AITARGET_Ground;
+    target.targetEntity.ClearLinkState();
+    target.position = worldPos;
+    target.targetPoint = -1;
+    target.targetIsMobile = false;
+    return target;
+  }
 
   /**
    * Address: 0x006013D0 (FUN_006013D0, Moho::CUnitCallTeleport::TaskTick)
@@ -272,7 +272,7 @@ namespace moho
         mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, teleportDestination));
         mIsOccupying = true;
 
-        CAiTarget teleportTarget = BuildGroundTarget(teleportDestination);
+        CAiTarget teleportTarget = BuildGroundTeleportTarget(teleportDestination);
         const VTransform& sourceTransform = mUnit->GetTransform();
         (void)CUnitTeleportTask::Create(&teleportTarget, this, transportUnit, &sourceTransform);
 
@@ -527,6 +527,75 @@ namespace moho
     archive->WriteBool(task->mCompletedSuccessfully);
     archive->WriteBool(task->mIsOccupying);
   }
+
+  /**
+   * Address: 0x00602F00 (FUN_00602F00)
+   * Address: 0x0060C580 (FUN_0060C580)
+   *
+   * What it does:
+   * Preserves one deserialize callback thunk lane for call-teleport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallTeleportMemberDeserializeAdapterLaneA(
+    gpg::ReadArchive* const archive,
+    CUnitCallTeleport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTeleport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00602F10 (FUN_00602F10)
+   *
+   * What it does:
+   * Preserves one serialize callback thunk lane for call-teleport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallTeleportMemberSerializeAdapterLaneA(
+    gpg::WriteArchive* const archive,
+    const CUnitCallTeleport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00603190 (FUN_00603190)
+   *
+   * What it does:
+   * Alternate deserialize callback thunk lane for call-teleport task serializer
+   * registration.
+   */
+  [[maybe_unused]] void CUnitCallTeleportMemberDeserializeAdapterLaneB(
+    gpg::ReadArchive* const archive,
+    CUnitCallTeleport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTeleport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x006031A0 (FUN_006031A0)
+   *
+   * What it does:
+   * Alternate serialize callback thunk lane for call-teleport task serializer
+   * registration.
+   */
+  [[maybe_unused]] void CUnitCallTeleportMemberSerializeAdapterLaneB(
+    gpg::WriteArchive* const archive,
+    const CUnitCallTeleport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
+  }
 } // namespace moho
 
 namespace gpg
@@ -545,6 +614,25 @@ namespace gpg
     }
 
     *outRef = MakeDerivedRef(value, CachedCUnitCallTeleportType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x00603000 (FUN_00603000)
+   *
+   * What it does:
+   * Materializes one `RRef_CUnitCallTeleport` result into a stack local and
+   * copies that pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreRRefCUnitCallTeleportAdapter(
+    moho::CUnitCallTeleport* const value,
+    gpg::RRef* const outRef
+  )
+  {
+    gpg::RRef temp{};
+    (void)RRef_CUnitCallTeleport(&temp, value);
+    outRef->mObj = temp.mObj;
+    outRef->mType = temp.mType;
     return outRef;
   }
 } // namespace gpg

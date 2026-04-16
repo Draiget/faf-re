@@ -26,6 +26,8 @@ namespace gpg
 {
   class RType;
   class RRef;
+  template <class T>
+  class MemBuffer;
 } // namespace gpg
 
 #ifndef FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
@@ -67,6 +69,8 @@ namespace moho
   class CD3DPrimBatcher;
   class CD3DBatchTexture;
   class CameraImpl;
+  class UserEntity;
+  class UserUnit;
   class CWldSession;
   struct RMeshBlueprint;
   struct SClientBottleneckInfo;
@@ -74,6 +78,15 @@ namespace moho
   class IWldUIProvider
   {
   public:
+    /**
+     * Address: 0x0086A350 (FUN_0086A350, ??0IWldUIProvider@Moho@@QAE@XZ)
+     * Address: 0x0086A5C0 (FUN_0086A5C0, IWldUIProvider ctor lane)
+     *
+     * What it does:
+     * Initializes one world-UI-provider base interface object.
+     */
+    IWldUIProvider();
+
     /**
      * Address: 0x00A82547 (_purecall slot)
      *
@@ -296,7 +309,14 @@ namespace moho
    * mode is active.
    */
   extern bool ui_DisableCursorFixing;
-  extern CScriptObject* sWldUIProvider;
+  /**
+   * Address: 0x010A63EE (?ui_WindowedAlwaysShowsCursor@Moho@@3_NA)
+   *
+   * What it does:
+   * Forces cursor visibility when the primary render head runs fullscreen.
+   */
+  extern bool ui_WindowedAlwaysShowsCursor;
+  extern IWldUIProvider* sWldUIProvider;
 
   enum EMauiEventType : std::int32_t
   {
@@ -467,10 +487,121 @@ namespace moho
   class CUIKeyHandlerRuntime final : public wxEvtHandlerRuntime
   {
   public:
+    /**
+     * Address: 0x00838C60 (FUN_00838C60, sub_838C60)
+     *
+     * What it does:
+     * Runs the key-handler teardown lane and then falls through to the
+     * wx-event-handler base cleanup.
+     */
+    ~CUIKeyHandlerRuntime() override;
+
     std::uint8_t mUnknown04To27[0x24]{};
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CUIKeyHandlerRuntime) == 0x28, "moho::CUIKeyHandlerRuntime size must be 0x28");
+
+  /**
+   * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
+   *
+   * What it does:
+   * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into
+   * one packed keycode/modifier mask lane.
+   */
+  int IN_ParseKeyModifiers(const std::string& keyBindingSpec);
+
+  /**
+   * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_ClearCurrentFactoryForQueueDisplayL`.
+   */
+  int cfunc_ClearCurrentFactoryForQueueDisplay(lua_State* luaContext);
+
+  /**
+   * Address: 0x008365D0 (FUN_008365D0, func_ClearCurrentFactoryForQueueDisplay_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `ClearCurrentFactoryForQueueDisplay()` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_ClearCurrentFactoryForQueueDisplay_LuaFuncDef();
+
+  /**
+   * Address: 0x00836630 (FUN_00836630, cfunc_ClearCurrentFactoryForQueueDisplayL)
+   */
+  int cfunc_ClearCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00BE4690 (FUN_00BE4690, register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef();
+
+  /**
+   * Address: 0x0083A190 (FUN_0083A190, cfunc_IN_AddKeyMapTable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to `cfunc_IN_AddKeyMapTableL`.
+   */
+  int cfunc_IN_AddKeyMapTable(lua_State* luaContext);
+
+  /**
+   * Address: 0x0083A1B0 (FUN_0083A1B0, func_IN_AddKeyMapTable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `IN_AddKeyMapTable(keyMapTable)` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_IN_AddKeyMapTable_LuaFuncDef();
+
+  /**
+   * Address: 0x0083A210 (FUN_0083A210, cfunc_IN_AddKeyMapTableL)
+   */
+  int cfunc_IN_AddKeyMapTableL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00BE4950 (FUN_00BE4950, register_IN_AddKeyMapTable_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_IN_AddKeyMapTable_LuaFuncDef();
+
+  /**
+   * Address: 0x0083A2B0 (FUN_0083A2B0, cfunc_IN_RemoveKeyMapTable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_IN_RemoveKeyMapTableL`.
+   */
+  int cfunc_IN_RemoveKeyMapTable(lua_State* luaContext);
+
+  /**
+   * Address: 0x0083A2D0 (FUN_0083A2D0, func_IN_RemoveKeyMapTable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `IN_RemoveKeyMapTable(keyMapTable)` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_IN_RemoveKeyMapTable_LuaFuncDef();
+
+  /**
+   * Address: 0x0083A330 (FUN_0083A330, cfunc_IN_RemoveKeyMapTableL)
+   */
+  int cfunc_IN_RemoveKeyMapTableL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00BE4960 (FUN_00BE4960, register_IN_RemoveKeyMapTable_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_IN_RemoveKeyMapTable_LuaFuncDef();
+
+  /**
+   * Address: 0x0083A410 (FUN_0083A410, func_IN_ClearKeyMap_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `IN_ClearKeyMap()` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_IN_ClearKeyMap_LuaFuncDef();
+
+  /**
+   * Address: 0x00BE4970 (FUN_00BE4970, register_IN_ClearKeyMap_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_IN_ClearKeyMap_LuaFuncDef();
 
   /**
    * Binary-backed lazy-var wrapper stored with `LuaPlus::LuaObject` layout.
@@ -566,7 +697,14 @@ namespace moho
      */
     void ResetToDefault();
 
-    virtual ~CMauiCursor() = default;
+    /**
+     * Address: 0x0078CBF0 (FUN_0078CBF0, Moho::CMauiCursor::~CMauiCursor body)
+     *
+     * What it does:
+     * Releases active/default cursor texture weak-owner lanes and destroys
+     * the embedded script object runtime base.
+     */
+    virtual ~CMauiCursor();
   };
 
   struct CMauiCursorRuntimeView
@@ -954,6 +1092,14 @@ namespace moho
     [[nodiscard]] float GetAlpha();
 
     /**
+     * Address: 0x00786450 (FUN_00786450, Moho::CMauiControl::IsInvisible)
+     *
+     * What it does:
+     * Returns whether this control is currently marked invisible.
+     */
+    [[nodiscard]] bool IsInvisible();
+
+    /**
      * Address: 0x007863F0 (FUN_007863F0, Moho::CMauiControl::SetAlpha)
      *
      * What it does:
@@ -1118,6 +1264,15 @@ namespace moho
     void AbandonKeyboardFocus() override;
 
     /**
+     * Address: 0x007915A0 (FUN_007915A0, Moho::CMauiEdit::LosingKeyboardFocus)
+     *
+     * What it does:
+     * Drops keyboard focus through the virtual abandon lane, then dispatches
+     * `OnLoseKeyboardFocus` script callback.
+     */
+    void LosingKeyboardFocus() override;
+
+    /**
      * Address: 0x0078EDD0 (FUN_0078EDD0, Moho::CMauiEdit::GetText)
      *
      * What it does:
@@ -1257,6 +1412,14 @@ namespace moho
     void MoveCaretLeft(int amount);
 
     /**
+     * Address: 0x00791270 (FUN_00791270, Moho::CMauiEdit::MoveCaretRight)
+     *
+     * What it does:
+     * Moves caret right by `amount` UTF-8 characters via `SetCaretPosition`.
+     */
+    void MoveCaretRight(int amount);
+
+    /**
      * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
      *
      * What it does:
@@ -1368,6 +1531,14 @@ namespace moho
     [[nodiscard]] float GetTopmostDepth();
 
     /**
+     * Address: 0x007966F0 (FUN_007966F0, Moho::CMauiFrame::DumpGraph)
+     *
+     * What it does:
+     * Walks this frame subtree depth-first and calls `Dump()` for each control.
+     */
+    void DumpGraph();
+
+    /**
      * Address: 0x00796550 (FUN_00796550, Moho::CMauiFrame::SetBounds)
      *
      * What it does:
@@ -1424,6 +1595,15 @@ namespace moho
      * duration elapses.
      */
     void Frame(float deltaSeconds) override;
+
+    /**
+     * Address: 0x007800C0 (FUN_007800C0)
+     *
+     * What it does:
+     * Stops animated playback and dispatches `OnAnimationStopped` when active
+     * multi-frame texture state is present.
+     */
+    void StopAnimationPlayback();
 
     /**
      * Address: 0x0077FF70 (FUN_0077FF70, Moho::CMauiBitmap::HitTest)
@@ -1536,9 +1716,7 @@ namespace moho
   {
   public:
     /**
-     * Address context: constructor path in `cfunc_InternalCreateGroupL`
-     * (`FUN_00797390`) allocates one `CMauiGroup` and initializes it through
-     * `CMauiControl(luaObject, parent, "group")`.
+     * Address: 0x00797280 (FUN_00797280, ??0CMauiGroup@Moho@@QAE@@Z)
      *
      * What it does:
      * Constructs one group control from Lua object + parent lanes.
@@ -1622,8 +1800,16 @@ namespace moho
      * What it does:
      * Scrolls to the bottommost list row by setting top-scroll to current
      * item count.
-     */
+    */
     void ScrollToBottom();
+
+    /**
+     * Address: 0x0079A8C0 (FUN_0079A8C0, Moho::CMauiItemList::ShowItem)
+     *
+     * What it does:
+     * Scrolls the item list so `index` is visible inside the current viewport.
+     */
+    void ShowItem(std::int32_t index);
 
     /**
      * Address: 0x0079A8F0 (FUN_0079A8F0, Moho::CMauiItemList::NeedsScrollBar)
@@ -1712,7 +1898,14 @@ namespace moho
      */
     void Dump() override;
 
-    virtual ~CMauiItemList() = default;
+    /**
+     * Address: 0x007994C0 (FUN_007994C0, sub_7994C0)
+     *
+     * What it does:
+     * Releases list-item string storage and one intrusive font reference, then
+     * continues base `CMauiControl` teardown.
+     */
+    ~CMauiItemList() override;
   };
 
   class CMauiMesh : public CMauiControl
@@ -1763,7 +1956,7 @@ namespace moho
     void Dump() override;
 
     /**
-     * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
+       * Address: 0x0079E930 (FUN_0079E930)
      *
      * What it does:
      * Stores one new mesh orientation quaternion and marks this mesh as
@@ -1771,7 +1964,14 @@ namespace moho
      */
     void SetOrientation(const Wm3::Quaternionf& orientation);
 
-    virtual ~CMauiMesh() = default;
+    /**
+     * Address: 0x0079DE70 (FUN_0079DE70, Moho::CMauiMesh::dtr)
+     *
+     * What it does:
+     * Releases the mesh preview texture shared-pointer lane and continues
+     * base `CMauiControl` teardown.
+     */
+    ~CMauiMesh() override;
   };
 
   class CMauiMovie : public CMauiControl
@@ -1821,7 +2021,7 @@ namespace moho
     void OnMinimized(bool minimized) override;
 
     /**
-     * Address: 0x0079F8F0 (FUN_0079F8F0, cfunc_CMauiMovieLoopL)
+       * Address: 0x0079F8F0 (FUN_0079F8F0)
      *
      * What it does:
      * Updates movie looping state used by playback runtime.
@@ -1829,7 +2029,7 @@ namespace moho
     void Loop(bool shouldLoop);
 
     /**
-     * Address: 0x0079FA40 (FUN_0079FA40, cfunc_CMauiMoviePlayL)
+       * Address: 0x0079FA40 (FUN_0079FA40)
      *
      * What it does:
      * Starts movie playback when an internal movie resource is attached.
@@ -1837,7 +2037,7 @@ namespace moho
     void Play();
 
     /**
-     * Address: 0x0079FBA0 (FUN_0079FBA0, cfunc_CMauiMovieStopL)
+       * Address: 0x0079FBA0 (FUN_0079FBA0)
      *
      * What it does:
      * Stops movie playback when an internal movie resource is attached.
@@ -1845,7 +2045,7 @@ namespace moho
     void Stop();
 
     /**
-     * Address: 0x0079FCF0 (FUN_0079FCF0, cfunc_CMauiMovieIsLoadedL)
+       * Address: 0x0079FCF0 (FUN_0079FCF0)
      *
      * What it does:
      * Returns whether an internal movie resource is attached and loaded.
@@ -1853,7 +2053,7 @@ namespace moho
     [[nodiscard]] bool IsLoaded() const;
 
     /**
-     * Address: 0x0079FE50 (FUN_0079FE50, cfunc_CMauiMovieGetNumFramesL)
+       * Address: 0x0079FE50 (FUN_0079FE50)
      *
      * What it does:
      * Returns frame count from the attached movie resource.
@@ -1861,7 +2061,7 @@ namespace moho
     [[nodiscard]] std::int32_t GetNumFrames() const;
 
     /**
-     * Address: 0x0079FFA0 (FUN_0079FFA0, cfunc_CMauiMovieGetFrameRateL)
+       * Address: 0x0079FFA0 (FUN_0079FFA0)
      *
      * What it does:
      * Returns playback frame rate from the attached movie resource.
@@ -2808,8 +3008,40 @@ namespace moho
     "CUIMapPreviewRuntimeView::mTexture offset must be 0x11C"
   );
 
+  /**
+   * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
+   *
+   * What it does:
+   * Lazily initializes and returns the process user Lua state, wiring the user
+   * task stage, script-disk watcher task, and core/user init-form execution.
+   */
   [[nodiscard]] LuaPlus::LuaState* USER_GetLuaState();
+
+  /**
+   * Address: 0x0083CD30 (FUN_0083CD30, Moho::MAUI_StartMainScript)
+   *
+   * What it does:
+   * Imports `/lua/ui/uimain.lua`, resolves `SetupUI`, and executes the entry
+   * callback against the active UI Lua state.
+   */
   [[nodiscard]] bool MAUI_StartMainScript();
+
+  /**
+   * Address: 0x0083D810 (FUN_0083D810, Moho::MAUI_ToggleConsole)
+   *
+   * What it does:
+   * Imports `/lua/ui/uimain.lua`, resolves `ToggleConsole`, and executes the
+   * callback against the active UI Lua state.
+   */
+  void MAUI_ToggleConsole();
+
+  /**
+   * Address: 0x0078CEF0 (FUN_0078CEF0, sub_78CEF0)
+   *
+   * What it does:
+   * Commits pending cursor texture/visibility state to the D3D device when
+   * the cursor default/show flags have changed.
+   */
   void MAUI_UpdateCursor(CMauiCursor* cursor);
   void MAUI_ReleaseCursor(CMauiCursor* cursor);
 
@@ -4308,6 +4540,18 @@ namespace moho
   int cfunc_CMauiHistogramSetDataL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
+   *
+   * What it does:
+   * Initializes one Lua dragger runtime object, clears its embedded
+   * `IMauiDragger` list-head lane, and binds the incoming Lua object payload.
+   */
+  CMauiLuaDragger* func_CMauiLuaDraggerConstruct(
+    CMauiLuaDragger* luaDragger,
+    const LuaPlus::LuaObject* luaObject
+  );
+
+  /**
    * Address: 0x0078DF80 (FUN_0078DF80, cfunc_CMauiLuaDraggerDestroy)
    *
    * What it does:
@@ -5265,6 +5509,58 @@ namespace moho
   CScrLuaInitForm* func_InternalCreateText_LuaFuncDef();
 
   /**
+   * Address: 0x0086A8D0 (FUN_0086A8D0, cfunc_InternalCreateWldUIProvider)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_InternalCreateWldUIProviderL`.
+   */
+  int cfunc_InternalCreateWldUIProvider(lua_State* luaContext);
+
+  /**
+   * Address: 0x0086A8F0 (FUN_0086A8F0, func_InternalCreateWldUIProvider_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateWldUIProvider(luaobj)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateWldUIProvider_LuaFuncDef();
+
+  /**
+   * Address: 0x0086A950 (FUN_0086A950, cfunc_InternalCreateWldUIProviderL)
+   *
+   * What it does:
+   * Constructs one `CLuaWldUIProvider` from a Lua object lane, pushes the
+   * created script object, and updates global provider ownership.
+   */
+  int cfunc_InternalCreateWldUIProviderL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0086BB30 (FUN_0086BB30, cfunc_InternalCreateWorldMesh)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_InternalCreateWorldMeshL`.
+   */
+  int cfunc_InternalCreateWorldMesh(lua_State* luaContext);
+
+  /**
+   * Address: 0x0086BB50 (FUN_0086BB50, func_InternalCreateWorldMesh_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateWorldMesh(luaobj)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateWorldMesh_LuaFuncDef();
+
+  /**
+   * Address: 0x0086BBB0 (FUN_0086BBB0, cfunc_InternalCreateWorldMeshL)
+   *
+   * What it does:
+   * Constructs one `CUIWorldMesh` from a Lua object lane and pushes the
+   * created script object.
+   */
+  int cfunc_InternalCreateWorldMeshL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0079AB10 (FUN_0079AB10, cfunc_CMauiItemListSetNewFont)
    *
    * What it does:
@@ -5790,7 +6086,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMeshSetOrientation_LuaFuncDef();
 
   /**
-   * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
+    * Alias of FUN_0079E930 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMesh` plus quaternion arg and stores mesh orientation.
@@ -5840,7 +6136,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieLoop_LuaFuncDef();
 
   /**
-   * Address: 0x0079F8F0 (FUN_0079F8F0, cfunc_CMauiMovieLoopL)
+    * Alias of FUN_0079F8F0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` plus bool and updates loop state.
@@ -5864,7 +6160,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMoviePlay_LuaFuncDef();
 
   /**
-   * Address: 0x0079FA40 (FUN_0079FA40, cfunc_CMauiMoviePlayL)
+    * Alias of FUN_0079FA40 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and starts playback.
@@ -5888,7 +6184,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieStop_LuaFuncDef();
 
   /**
-   * Address: 0x0079FBA0 (FUN_0079FBA0, cfunc_CMauiMovieStopL)
+    * Alias of FUN_0079FBA0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and stops playback.
@@ -5913,7 +6209,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieIsLoaded_LuaFuncDef();
 
   /**
-   * Address: 0x0079FCF0 (FUN_0079FCF0, cfunc_CMauiMovieIsLoadedL)
+    * Alias of FUN_0079FCF0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns its load state.
@@ -5938,7 +6234,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieGetNumFrames_LuaFuncDef();
 
   /**
-   * Address: 0x0079FE50 (FUN_0079FE50, cfunc_CMauiMovieGetNumFramesL)
+    * Alias of FUN_0079FE50 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns frame count.
@@ -5963,7 +6259,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieGetFrameRate_LuaFuncDef();
 
   /**
-   * Address: 0x0079FFA0 (FUN_0079FFA0, cfunc_CMauiMovieGetFrameRateL)
+    * Alias of FUN_0079FFA0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns frame rate.
@@ -6516,6 +6812,19 @@ namespace moho
    * Reads active UI controls-alpha lane and pushes it, or `nil` if unavailable.
    */
   int cfunc_GetUIControlsAlphaL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0084E140 (FUN_0084E140, func_FlushEvents_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `FlushEvents()` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_FlushEvents_LuaFuncDef();
+
+  /**
+   * Address: 0x00BE4EC0 (FUN_00BE4EC0, register_FlushEvents_LuaFuncDef)
+   */
+  CScrLuaInitForm* register_FlushEvents_LuaFuncDef();
 
   /**
    * Address: 0x008725B0 (FUN_008725B0, cfunc_CUIWorldViewZoomScale)
@@ -7564,6 +7873,24 @@ namespace moho
   [[nodiscard]] bool UI_LuaBeat();
 
   /**
+   * Address: 0x0083E9A0 (FUN_0083E9A0, sub_83E9A0)
+   *
+   * What it does:
+   * When UI state is `UIS_game`, builds one modifiers table and invokes
+   * `/lua/ui/game/chat.lua:ActivateChat(modifiers)`.
+   */
+  void UI_ActivateChat(bool shiftDown, bool ctrlDown, bool altDown);
+
+  /**
+   * Address: 0x0083EBC0 (FUN_0083EBC0, func_ReceiveChat)
+   *
+   * What it does:
+   * Decodes one serialized Lua payload from network chat bytes and invokes
+   * `/lua/ui/game/gamemain.lua:ReceiveChat(senderName, payloadObject)`.
+   */
+  int func_ReceiveChat(const char* senderName, gpg::MemBuffer<const char> data);
+
+  /**
    * Address: 0x0083EDF0 (FUN_0083EDF0, ?UI_StopCursorText@Moho@@YAXXZ)
    *
    * What it does:
@@ -7571,6 +7898,75 @@ namespace moho
    * state.
    */
   void UI_StopCursorText();
+
+  /**
+   * Address: 0x007FDAF0 (FUN_007FDAF0, cfunc_AddBlinkyBox)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_AddBlinkyBoxL`.
+   */
+  int cfunc_AddBlinkyBox(lua_State* luaContext);
+
+  /**
+   * Address: 0x007FDB10 (FUN_007FDB10, func_AddBlinkyBox_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `AddBlinkyBox(entityId, onTime, offTime, totalTime)` Lua
+   * binder metadata.
+   */
+  CScrLuaInitForm* func_AddBlinkyBox_LuaFuncDef();
+
+  /**
+   * Address: 0x007FDB70 (FUN_007FDB70, cfunc_AddBlinkyBoxL)
+   *
+   * What it does:
+   * Resolves one entity id and pushes one blinky-box runtime entry with the
+   * supplied on/off/total timing lanes.
+   */
+  int cfunc_AddBlinkyBoxL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007FD9F0 (FUN_007FD9F0, func_PushBlinkyBox)
+   *
+   * What it does:
+   * Allocates and links one blinky-box runtime node onto the global intrusive
+   * blinky list.
+   */
+  void func_PushBlinkyBox(UserEntity* entity, float onTime, float offTime, float totalTime);
+
+  /**
+   * Address: 0x007FDA90 (FUN_007FDA90)
+   *
+   * What it does:
+   * Adds one user-unit lane into the global selection-bracket weak-set.
+   */
+  std::int32_t func_AddSelectionBracketUserUnit(UserUnit* unit);
+
+  /**
+   * Address: 0x007FDAB0 (FUN_007FDAB0)
+   *
+   * What it does:
+   * Clears the global selection-bracket weak-set subtree and restores empty
+   * head links.
+   */
+  std::int32_t func_ClearSelectionBracketUserUnits();
+
+  /**
+   * Address: 0x00857B60 (FUN_00857B60, cfunc_AddCommandFeedbackBlip)
+   *
+   * What it does:
+   * Lua callback target for `func_AddCommandFeedbackBlip_LuaFuncDef`.
+   */
+  int cfunc_AddCommandFeedbackBlip(lua_State* luaContext);
+
+  /**
+   * Address: 0x00857B80 (FUN_00857B80, func_AddCommandFeedbackBlip_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `AddCommandFeedbackBlip(meshInfoTable, duration)` Lua
+   * binder metadata.
+   */
+  CScrLuaInitForm* func_AddCommandFeedbackBlip_LuaFuncDef();
 
   /**
    * Address: 0x008586C0 (FUN_008586C0, Moho::RemoveCommandFeedbackBlips)

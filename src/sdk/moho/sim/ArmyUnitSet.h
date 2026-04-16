@@ -68,6 +68,13 @@ namespace moho
     [[nodiscard]] bool ContainsEntity(const Entity* entity) const noexcept;
     void AppendUniqueEntity(Entity* entity);
 
+    /**
+     * Address: 0x005E89E0 (FUN_005E89E0)
+     *
+     * What it does:
+     * Binary-searches one candidate by unit/entity id and returns true only
+     * on exact pointer match.
+     */
     [[nodiscard]] bool ContainsUnit(const Unit* unit) const noexcept;
     /**
      * Address: 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)

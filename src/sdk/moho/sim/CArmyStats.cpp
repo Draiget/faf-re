@@ -10,6 +10,7 @@
 #include <intrin.h>
 #endif
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -104,6 +105,20 @@ namespace
     }
     return observed;
 #endif
+  }
+
+  [[nodiscard]] float IntBitsToFloat(const std::int32_t bits) noexcept
+  {
+    float value = 0.0f;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+  }
+
+  [[nodiscard]] std::int32_t FloatToIntBits(const float value) noexcept
+  {
+    std::int32_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits;
   }
 
   [[nodiscard]] moho::ArmyNameIndexNode* FindNameIndexNode(
@@ -209,6 +224,208 @@ namespace
       parent = parent->parent;
     }
     return (parent != nullptr) ? parent : head;
+  }
+
+  [[nodiscard]] int CompareBlueprintStatKey(
+    const moho::ArmyBlueprintNameView* const lhs,
+    const moho::ArmyBlueprintNameView* const rhs
+  ) noexcept
+  {
+    const std::uintptr_t lhsValue = reinterpret_cast<std::uintptr_t>(lhs);
+    const std::uintptr_t rhsValue = reinterpret_cast<std::uintptr_t>(rhs);
+    if (lhsValue < rhsValue) {
+      return -1;
+    }
+    if (lhsValue > rhsValue) {
+      return 1;
+    }
+    return 0;
+  }
+
+  [[nodiscard]] bool IsBlueprintNodeNil(const moho::ArmyBlueprintStatNode* const node)
+  {
+    return node == nullptr || node->isNil != 0u;
+  }
+
+  [[nodiscard]] moho::ArmyBlueprintStatNode*
+  BlueprintNodeMin(moho::ArmyBlueprintStatNode* node, moho::ArmyBlueprintStatNode* head)
+  {
+    while (!IsBlueprintNodeNil(node) && !IsBlueprintNodeNil(node->left)) {
+      node = node->left;
+    }
+    return IsBlueprintNodeNil(node) ? head : node;
+  }
+
+  [[nodiscard]] moho::ArmyBlueprintStatNode*
+  BlueprintNodeMax(moho::ArmyBlueprintStatNode* node, moho::ArmyBlueprintStatNode* head)
+  {
+    while (!IsBlueprintNodeNil(node) && !IsBlueprintNodeNil(node->right)) {
+      node = node->right;
+    }
+    return IsBlueprintNodeNil(node) ? head : node;
+  }
+
+  void RecomputeBlueprintExtrema(moho::ArmyBlueprintStatTree* const tree)
+  {
+    if (tree == nullptr || tree->head == nullptr) {
+      return;
+    }
+
+    moho::ArmyBlueprintStatNode* const head = tree->head;
+    moho::ArmyBlueprintStatNode* const root = head->parent;
+    if (IsBlueprintNodeNil(root)) {
+      head->parent = head;
+      head->left = head;
+      head->right = head;
+      return;
+    }
+
+    head->left = BlueprintNodeMin(root, head);
+    head->right = BlueprintNodeMax(root, head);
+  }
+
+  void RotateBlueprintLeft(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
+  {
+    moho::ArmyBlueprintStatNode* const head = tree->head;
+    moho::ArmyBlueprintStatNode* const pivot = node->right;
+    node->right = pivot->left;
+    if (!IsBlueprintNodeNil(pivot->left)) {
+      pivot->left->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node->parent == head) {
+      head->parent = pivot;
+    } else if (node == node->parent->left) {
+      node->parent->left = pivot;
+    } else {
+      node->parent->right = pivot;
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+  }
+
+  void RotateBlueprintRight(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
+  {
+    moho::ArmyBlueprintStatNode* const head = tree->head;
+    moho::ArmyBlueprintStatNode* const pivot = node->left;
+    node->left = pivot->right;
+    if (!IsBlueprintNodeNil(pivot->right)) {
+      pivot->right->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node->parent == head) {
+      head->parent = pivot;
+    } else if (node == node->parent->right) {
+      node->parent->right = pivot;
+    } else {
+      node->parent->left = pivot;
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+  }
+
+  void FixupAfterBlueprintInsert(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* node)
+  {
+    moho::ArmyBlueprintStatNode* const head = tree->head;
+    while (node != head->parent && node->parent->color == 0u) {
+      moho::ArmyBlueprintStatNode* const parent = node->parent;
+      moho::ArmyBlueprintStatNode* const grand = parent->parent;
+      if (grand == nullptr || grand == head) {
+        break;
+      }
+
+      if (parent == grand->left) {
+        moho::ArmyBlueprintStatNode* const uncle = grand->right;
+        if (!IsBlueprintNodeNil(uncle) && uncle->color == 0u) {
+          parent->color = 1;
+          uncle->color = 1;
+          grand->color = 0;
+          node = grand;
+          continue;
+        }
+
+        if (node == parent->right) {
+          node = parent;
+          RotateBlueprintLeft(tree, node);
+        }
+
+        node->parent->color = 1;
+        grand->color = 0;
+        RotateBlueprintRight(tree, grand);
+        continue;
+      }
+
+      moho::ArmyBlueprintStatNode* const uncle = grand->left;
+      if (!IsBlueprintNodeNil(uncle) && uncle->color == 0u) {
+        parent->color = 1;
+        uncle->color = 1;
+        grand->color = 0;
+        node = grand;
+        continue;
+      }
+
+      if (node == parent->left) {
+        node = parent;
+        RotateBlueprintRight(tree, node);
+      }
+
+      node->parent->color = 1;
+      grand->color = 0;
+      RotateBlueprintLeft(tree, grand);
+    }
+
+    if (head->parent != nullptr && head->parent != head) {
+      head->parent->color = 1;
+    }
+  }
+
+  [[nodiscard]] moho::ArmyBlueprintStatNode* FindOrInsertBlueprintStatNode(
+    moho::ArmyBlueprintStatTree* const tree,
+    const moho::ArmyBlueprintNameView* const blueprintName
+  )
+  {
+    if (tree == nullptr || tree->head == nullptr || blueprintName == nullptr) {
+      return nullptr;
+    }
+
+    moho::ArmyBlueprintStatNode* const head = tree->head;
+    moho::ArmyBlueprintStatNode* parent = head;
+    moho::ArmyBlueprintStatNode* node = head->parent;
+    int compareResult = 0;
+    while (!IsBlueprintNodeNil(node)) {
+      parent = node;
+      compareResult = CompareBlueprintStatKey(blueprintName, node->blueprintName);
+      if (compareResult == 0) {
+        return node;
+      }
+      node = (compareResult < 0) ? node->left : node->right;
+    }
+
+    auto* const inserted = new moho::ArmyBlueprintStatNode{};
+    inserted->left = head;
+    inserted->right = head;
+    inserted->parent = parent;
+    inserted->blueprintName = blueprintName;
+    inserted->value = 0.0f;
+    inserted->color = 0;
+    inserted->isNil = 0;
+
+    if (parent == head) {
+      head->parent = inserted;
+    } else if (compareResult < 0) {
+      parent->left = inserted;
+    } else {
+      parent->right = inserted;
+    }
+
+    ++tree->size;
+    FixupAfterBlueprintInsert(tree, inserted);
+    RecomputeBlueprintExtrema(tree);
+    return inserted;
   }
 
   [[nodiscard]] moho::ArmyNameIndexNode* CreateNameIndexSentinel()
@@ -555,6 +772,31 @@ namespace
     return head;
   }
 
+  struct ArmyTriggerSentinelRuntimeNode
+  {
+    ArmyTriggerSentinelRuntimeNode* next;
+    ArmyTriggerSentinelRuntimeNode* prev;
+    std::uint32_t payload0;
+    std::uint32_t payload1;
+  };
+  static_assert(sizeof(ArmyTriggerSentinelRuntimeNode) == 0x10, "ArmyTriggerSentinelRuntimeNode size must be 0x10");
+
+  /**
+   * Address: 0x00702090 (FUN_00702090, CArmyStats trigger-list sentinel allocator)
+   *
+   * What it does:
+   * Allocates one 16-byte trigger-list sentinel lane and self-links its
+   * `{next,prev}` pointers.
+   */
+  [[maybe_unused]] [[nodiscard]] ArmyTriggerSentinelRuntimeNode* AllocateSelfLinkedArmyTriggerSentinel()
+  {
+    auto* const node =
+      static_cast<ArmyTriggerSentinelRuntimeNode*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
+    node->next = node;
+    node->prev = node;
+    return node;
+  }
+
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -598,6 +840,84 @@ namespace
   [[nodiscard]] const ArmyTriggerListRuntime* TriggerListRuntimeView(const moho::CArmyStats* const object)
   {
     return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
+  }
+
+  /**
+   * Address: 0x00701570 (FUN_00701570)
+   *
+   * What it does:
+   * Clears one name-index tree payload, frees the map-header sentinel node,
+   * and zeros `{head,size}` lanes.
+   */
+  [[maybe_unused]] int ReleaseArmyNameIndexStorage(ArmyNameIndexMapRuntime& nameIndexRuntime) noexcept
+  {
+    if (nameIndexRuntime.head != nullptr) {
+      DestroyNilTree(nameIndexRuntime.head->parent, &moho::ArmyNameIndexNode::isNil);
+      delete nameIndexRuntime.head;
+    }
+
+    nameIndexRuntime.head = nullptr;
+    nameIndexRuntime.size = 0u;
+    return 0;
+  }
+
+  /**
+   * Address: 0x007020B0 (FUN_007020B0)
+   *
+   * What it does:
+   * Clears one trigger-list payload, frees the list-header sentinel node, and
+   * zeros `{head,size}` lanes.
+   */
+  [[maybe_unused]] void ReleaseArmyTriggerListStorage(ArmyTriggerListRuntime& triggerListRuntime) noexcept
+  {
+    if (triggerListRuntime.head != nullptr) {
+      moho::ArmyTriggerNode* node = triggerListRuntime.head->next;
+      while (node != triggerListRuntime.head) {
+        moho::ArmyTriggerNode* const next = node->next;
+        delete node;
+        node = next;
+      }
+
+      delete triggerListRuntime.head;
+    }
+
+    triggerListRuntime.head = nullptr;
+    triggerListRuntime.size = 0u;
+  }
+
+  /**
+   * Address: 0x0070E460 (FUN_0070E460)
+   *
+   * What it does:
+   * Erases one trigger-list node, updates list links and size, and stores the
+   * following iterator node in `outNext`.
+   */
+  [[nodiscard]] moho::ArmyTriggerNode** EraseTriggerListNodeAndAdvance(
+    ArmyTriggerListRuntime* const listRuntime,
+    moho::ArmyTriggerNode** const outNext,
+    moho::ArmyTriggerNode* const node
+  )
+  {
+    if (outNext == nullptr || listRuntime == nullptr || listRuntime->head == nullptr || node == nullptr) {
+      return outNext;
+    }
+
+    moho::ArmyTriggerNode* const head = listRuntime->head;
+    moho::ArmyTriggerNode* const next = node->next;
+    if (node == head) {
+      *outNext = next;
+      return outNext;
+    }
+
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
+    delete node;
+    if (listRuntime->size > 0u) {
+      --listRuntime->size;
+    }
+
+    *outNext = next;
+    return outNext;
   }
 
   gpg::RType* gArmyStatsBaseType = nullptr;
@@ -738,6 +1058,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x0070E2B0 (FUN_0070E2B0)
+   *
+   * What it does:
+   * Resolves one per-blueprint float lane in `mBlueprintStats`, inserting a
+   * zero-initialized node when missing, and returns a writable pointer to that
+   * lane.
+   */
+  float* CArmyStatItem::FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* const blueprintName)
+  {
+    ArmyBlueprintStatNode* const node = FindOrInsertBlueprintStatNode(&mBlueprintStats, blueprintName);
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    return &node->value;
+  }
+
+  /**
    * Address: 0x007014A0 (FUN_007014A0, Stats<CArmyStatItem> constructor)
    */
   Stats<CArmyStatItem>::Stats()
@@ -827,8 +1165,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x005944F0 (FUN_005944F0, func_TraverseTables2)
+   *
+   * What it does:
+   * Create-enabled wrapper lane over token traversal used by legacy
+   * CArmyStats helper callsites.
+   */
+  CArmyStatItem* Stats<CArmyStatItem>::TraverseTablesCreate(const gpg::StrArg statPath)
+  {
+    return TraverseTables(statPath, true);
+  }
+
+  /**
    * Address: 0x00706360 (FUN_00706360, sub_706360)
    * Alias:   0x00705BD0 (FUN_00705BD0, thunk)
+   * Alias:   0x006105A0 (FUN_006105A0)
    */
   CArmyStatItem* Stats<CArmyStatItem>::GetStringItem(const gpg::StrArg statPath)
   {
@@ -1046,6 +1397,42 @@ namespace moho
   }
 
   /**
+   * Address: 0x00594720 (FUN_00594720, func_GetArmyStat2)
+   *
+   * What it does:
+   * Resolves one army-stat item by path from the name-index cache and creates
+   * and caches the lane when missing.
+   */
+  CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* const armyStats, const char* const statPath)
+  {
+    const msvc8::string key(statPath);
+    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&armyStats->mNameIndex, key)) {
+      return foundNode->value;
+    }
+
+    CArmyStatItem* const item = armyStats->TraverseTablesCreate(statPath);
+    item->Release(0);
+    InsertOrAssignNameIndexNode(&armyStats->mNameIndex, key, item);
+    return item;
+  }
+
+  /**
+   * Address: 0x0070B820 (FUN_0070B820)
+   *
+   * What it does:
+   * Resolves one army-stat item by path, resolves one per-blueprint float lane
+   * in that item, applies `delta`, and returns the updated lane pointer.
+   */
+  float*
+  CArmyStats::AddBlueprintStatDelta(const char* const statPath, const ArmyBlueprintNameView* const blueprintName, const float delta)
+  {
+    CArmyStatItem* const statItem = ResolveArmyStatItemCachedCreate(this, statPath);
+    float* const lane = statItem->FindOrCreateBlueprintStatValue(blueprintName);
+    *lane += delta;
+    return lane;
+  }
+
+  /**
    * Address: 0x00593260 (FUN_00593260, func_UpdateUnitStat)
    */
   std::int32_t CArmyStats::UpdateUnitStat(const char* const statPath, const std::int32_t* const delta)
@@ -1053,6 +1440,47 @@ namespace moho
     CArmyStatItem* const item = GetItem(statPath);
     item->SynchronizeAsInt();
     return AtomicExchangeAddI32(&item->mPrimaryValueBits, *delta);
+  }
+
+  /**
+   * Address: 0x00593220 (FUN_00593220, func_SetUnitStat)
+   */
+  std::int32_t CArmyStats::SetUnitStat(const char* const statPath, const std::int32_t* const value)
+  {
+    CArmyStatItem* const item = GetItem(statPath);
+    item->SynchronizeAsInt();
+
+    volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+    for (;;) {
+      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
+      const std::int32_t result = AtomicCompareExchangeI32(counter, *value, observed);
+      if (result == observed) {
+        return result;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x005931E0 (FUN_005931E0, Moho::CArmyStats::SetIntStatAtomic)
+   *
+   * What it does:
+   * Resolves one stat item by path, marks it as an integer lane, and then
+   * repeatedly compares and swaps the stored counter until the replace
+   * succeeds, returning the previous counter value.
+   */
+  std::int32_t CArmyStats::SetIntStatAtomic(const char* const statPath, const std::int32_t* const value)
+  {
+    CArmyStatItem* const item = GetItem(statPath);
+    item->SynchronizeAsInt();
+
+    volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+    for (;;) {
+      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
+      const std::int32_t previous = AtomicCompareExchangeI32(counter, *value, observed);
+      if (previous == observed) {
+        return previous;
+      }
+    }
   }
 
   /**
@@ -1077,6 +1505,37 @@ namespace moho
     }
 
     return result;
+  }
+
+  /**
+   * Address: 0x00593310 (FUN_00593310, sub_593310)
+   *
+   * What it does:
+   * Sets one float stat counter to `max(current, *candidate)` using an
+   * atomic compare-exchange loop over the bitwise float lane.
+   */
+  void CArmyStats::SetUnitStatGreaterFloat(const char* const statPath, const float* const candidate)
+  {
+    CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(this, statPath);
+    volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+
+    const std::int32_t currentBits = AtomicCompareExchangeI32(counter, 0, 0);
+    const float currentValue = IntBitsToFloat(currentBits);
+    const float candidateValue = *candidate;
+    const float targetValue = (currentValue > candidateValue) ? currentValue : candidateValue;
+    if (targetValue == currentValue) {
+      return;
+    }
+
+    item->SynchronizeAsFloat();
+    const std::int32_t targetBits = FloatToIntBits(targetValue);
+    for (;;) {
+      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
+      const std::int32_t previous = AtomicCompareExchangeI32(counter, targetBits, observed);
+      if (previous == observed) {
+        return;
+      }
+    }
   }
 
   /**
@@ -1164,19 +1623,17 @@ namespace moho
    */
   void CArmyStats::RemoveArmyStatsTrigger(const char* const triggerName)
   {
-    ArmyTriggerNode* const head = mAuxHead;
+    ArmyTriggerListRuntime* const triggerRuntime = TriggerListRuntimeView(this);
+    ArmyTriggerNode* const head = (triggerRuntime != nullptr) ? triggerRuntime->head : nullptr;
     if (head == nullptr) {
       return;
     }
 
     for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
       if (node->trigger && _stricmp(node->trigger->mName.c_str(), triggerName) == 0) {
-        node->prev->next = node->next;
-        node->next->prev = node->prev;
-        delete node;
-        if (mAuxSize > 0u) {
-          --mAuxSize;
-        }
+        ArmyTriggerNode* nextNode = nullptr;
+        (void)EraseTriggerListNodeAndAdvance(triggerRuntime, &nextNode, node);
+        (void)nextNode;
         return;
       }
     }
@@ -1258,6 +1715,13 @@ namespace moho
     item->SetValue(value);
   }
 
+  /**
+   * Address: 0x0070DDC0 (FUN_0070DDC0, CArmyStats name-index tree cleanup)
+   *
+   * What it does:
+   * Destroys all name-index nodes, frees the sentinel head, and resets the
+   * name-index runtime lane.
+   */
   void CArmyStats::DestroyNameIndexTree()
   {
     ArmyNameIndexNode* const head = mNameIndex.head;
@@ -1271,6 +1735,13 @@ namespace moho
     mNameIndex.size = 0;
   }
 
+  /**
+   * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
+   *
+   * What it does:
+   * Destroys all trigger-list nodes, frees the sentinel head, and resets the
+   * auxiliary trigger runtime lane.
+   */
   void CArmyStats::DestroyAuxList()
   {
     ArmyTriggerNode* const head = mAuxHead;

@@ -93,6 +93,15 @@ namespace moho
   void InsertEmitterCurveKey(SEfxCurve& curve, const Wm3::Vector3f& key);
 
   /**
+   * Address: 0x00515090 (FUN_00515090, rescale_emitter_curve_x_range)
+   *
+   * What it does:
+   * Rescales all key X lanes to a new `[minX,maxX]` range using the
+   * current range ratio, then recomputes Y bounds from retained keys.
+   */
+  SEfxCurve* RescaleEmitterCurveXRange(SEfxCurve* curve, float minX, float maxX);
+
+  /**
    * Address: 0x00515320 (FUN_00515320, make_emitter_curve_from_blueprint)
    *
    * What it does:

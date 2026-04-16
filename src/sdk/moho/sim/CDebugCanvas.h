@@ -31,6 +31,14 @@ namespace moho
     CDebugCanvas();
 
     /**
+     * Address: 0x00756C30 (FUN_00756C30, ??1CDebugCanvas@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases all debug line/text/decal vector storage lanes.
+     */
+    ~CDebugCanvas();
+
+    /**
      * Address: 0x00450030 (FUN_00450030, ?AddWireCircle@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@0MII@Z)
      *
      * What it does:

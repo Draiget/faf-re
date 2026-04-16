@@ -8,6 +8,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00770AC0 (FUN_00770AC0)
+     *
+     * What it does:
+     * Preregisters the reflected `EBeamParam` enum metadata.
+     */
+    EBeamParamTypeInfo();
+
+    /**
      * Address: 0x00770B50 (FUN_00770B50, scalar deleting thunk)
      */
     ~EBeamParamTypeInfo() override;

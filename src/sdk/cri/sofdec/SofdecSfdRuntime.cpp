@@ -321,6 +321,53 @@
   }
 
   /**
+   * Address: 0x00AE7110 (FUN_00AE7110, _MEM_CopySq)
+   * Address: 0x009C4020 (FUN_009C4020)
+   * Address: 0x00A16D90 (FUN_00A16D90)
+   *
+   * What it does:
+   * Forwards one square-copy lane to `MEM_Copy`.
+   */
+  extern "C" void* MEM_CopySq(void* const destination, const void* const source, const std::uint32_t sizeBytes)
+  {
+    return MEM_Copy(destination, source, sizeBytes);
+  }
+
+  /**
+   * Address: 0x00AE7120 (FUN_00AE7120, _MEM_CopySq4)
+   *
+   * What it does:
+   * Forwards one square-copy lane to `MEM_Copy4`.
+   */
+  extern "C" void* MEM_CopySq4(void* const destination, const void* const source, const std::uint32_t sizeBytes)
+  {
+    return MEM_Copy4(destination, source, sizeBytes);
+  }
+
+  /**
+   * Address: 0x00AE7130 (FUN_00AE7130, _MEM_CopySq8)
+   *
+   * What it does:
+   * Forwards one square-copy lane to `MEM_Copy8`.
+   */
+  extern "C" void* MEM_CopySq8(void* const destination, const void* const source, const std::uint32_t sizeBytes)
+  {
+    return MEM_Copy8(destination, source, sizeBytes);
+  }
+
+  /**
+   * Address: 0x00AE7140 (FUN_00AE7140, _MEM_CopySq32)
+   * Address: 0x00A2BBF0 (FUN_00A2BBF0)
+   *
+   * What it does:
+   * Forwards one square-copy lane to `MEM_Copy32`.
+   */
+  extern "C" void* MEM_CopySq32(void* const destination, const void* const source, const std::uint32_t sizeBytes)
+  {
+    return MEM_Copy32(destination, source, sizeBytes);
+  }
+
+  /**
    * Address: 0x00ADD7A0 (FUN_00ADD7A0, _getPicRate)
    *
    * What it does:
@@ -439,6 +486,17 @@
   }
 
   /**
+   * Address: 0x00AE3270 (FUN_00AE3270, _M2T_Finish)
+   *
+   * What it does:
+   * Decrements the process-global M2T init reference counter.
+   */
+  extern "C" void M2T_Finish()
+  {
+    --M2T_libobj.m2tInitRefCount;
+  }
+
+  /**
    * Address: 0x00AE3230 (FUN_00AE3230, _M2T_GetVersionStr)
    *
    * What it does:
@@ -471,6 +529,17 @@
   }
 
   /**
+   * Address: 0x00AE0CB0 (FUN_00AE0CB0, _M2PES_Finish)
+   *
+   * What it does:
+   * Decrements the process-global M2PES init reference counter.
+   */
+  extern "C" void M2PES_Finish()
+  {
+    --M2T_libobj.m2pesInitRefCount;
+  }
+
+  /**
    * Address: 0x00AE0C70 (FUN_00AE0C70, _M2PES_GetVersionStr)
    *
    * What it does:
@@ -479,6 +548,25 @@
   extern "C" const char* M2PES_GetVersionStr()
   {
     return kM2PesVersionString;
+  }
+
+  extern "C" std::int32_t MPS_CheckDelim(const void* packetPrefix);
+
+  /**
+   * Address: 0x00AE0CC0 (FUN_00AE0CC0, _M2PES_IsConformable)
+   *
+   * What it does:
+   * Validates minimum PES probe size and returns whether the current window
+   * starts with an M2S/MPS program-stream-map delimiter.
+   */
+  extern "C" std::int32_t M2PES_IsConformable(std::uint8_t* const buffer, const std::int32_t sizeBytes)
+  {
+    if (sizeBytes < 4) {
+      return 0;
+    }
+
+    constexpr std::int32_t kDelimiterProgramStreamMap = static_cast<std::int32_t>(0x00040000u);
+    return (MPS_CheckDelim(buffer) & kDelimiterProgramStreamMap) != 0 ? 1 : 0;
   }
 
   extern "C" std::int32_t M2TSD_Init();
@@ -2473,6 +2561,7 @@
   extern "C" void SFLIB_UnlockCs();
   extern "C" SfcreHeaderRuntimeView sfcre_fhd;
   alignas(4) std::uint8_t sfcre_tmpbuf[2048]{};
+  extern "C" std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
   extern "C" std::int32_t M2T_IsConformable(char* buffer, std::int32_t sizeBytes);
   /**
    * Address: 0x00AF5860 (FUN_00AF5860, _M2S_SearchSyncByteGap)
@@ -3151,6 +3240,64 @@
   }
 
   /**
+   * Address: 0x00ADFDF0 (FUN_00ADFDF0, _M2TSD_IsConformable)
+   *
+   * What it does:
+   * Acquires one stream-supply chunk window, probes M2T sync conformance over
+   * that window, then releases the chunk back to the same supply lane.
+   */
+  extern "C" std::int32_t M2TSD_IsConformable(moho::SofdecSjSupplyHandle* const streamSupplyHandle)
+  {
+    moho::SjChunkRange chunkRange{};
+    streamSupplyHandle->dispatchTable->getChunk(
+      streamSupplyHandle,
+      1,
+      static_cast<std::int32_t>(0x7FFFFFFFu),
+      &chunkRange
+    );
+
+    const std::int32_t isConformable = M2T_IsConformable(
+      reinterpret_cast<char*>(SjAddressToPointer(chunkRange.bufferAddress)),
+      chunkRange.byteCount
+    );
+
+    streamSupplyHandle->dispatchTable->putChunk(streamSupplyHandle, 1, &chunkRange);
+    return (isConformable != 0) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00AF5810 (FUN_00AF5810, _M2S_SearchSyncByte)
+   *
+   * What it does:
+   * Searches one byte stream for the first MPEG sync-byte cursor where three
+   * consecutive 188-byte packet starts contain `0x47`.
+   */
+  extern "C" char* M2S_SearchSyncByte(char* const buffer, const std::int32_t sizeBytes)
+  {
+    constexpr std::int32_t kSyncByteValue = 0x47;
+    constexpr std::int32_t kPacketStrideBytes = 188;
+    constexpr std::int32_t kThreePacketStrideBytes = 564;
+
+    if (sizeBytes <= kThreePacketStrideBytes) {
+      return nullptr;
+    }
+
+    std::int32_t scanOffset = 0;
+    while (
+      buffer[scanOffset] != kSyncByteValue
+      || buffer[scanOffset + kPacketStrideBytes] != kSyncByteValue
+      || buffer[scanOffset + (2 * kPacketStrideBytes)] != kSyncByteValue
+    ) {
+      ++scanOffset;
+      if ((scanOffset + kThreePacketStrideBytes) >= sizeBytes) {
+        return nullptr;
+      }
+    }
+
+    return &buffer[scanOffset];
+  }
+
+  /**
    * Address: 0x00AF5860 (FUN_00AF5860, _M2S_SearchSyncByteGap)
    *
    * What it does:
@@ -3758,6 +3905,19 @@
   static_assert(offsetof(SfcreAauHeaderRuntimeView, word2) == 0x08, "SfcreAauHeaderRuntimeView::word2 offset must be 0x08");
   static_assert(sizeof(SfcreAauHeaderRuntimeView) == 0x0C, "SfcreAauHeaderRuntimeView size must be 0x0C");
 
+  static constexpr std::array<std::int32_t, 64> kSfcreAauBitrateKbpsByVersionAndIndex{
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, -1,
+    -1, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, -1,
+    -1, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, -1
+  };
+  static constexpr std::array<std::int32_t, 4> kSfcreAauFrequencyHzByIndex{
+    44100, 48000, 32000, 0
+  };
+  static constexpr std::array<std::int32_t, 4> kSfcreAauConstantSamplesByLayer{
+    -1, 1152, 1152, 384
+  };
+
   /**
    * Address: 0x00ADA800 (FUN_00ADA800, _sfcre_ReadAauHdr)
    *
@@ -3824,6 +3984,55 @@
     }
 
     return buffer;
+  }
+
+  /**
+   * Address: 0x00ADA610 (FUN_00ADA610, _SFCRE_AnalyMpaBitrate)
+   *
+   * What it does:
+   * Finds one MPA AAU sync header, decodes bitrate index/version lanes, and
+   * returns bitrate in bps (`kbps * 1000`) or `-1` when unavailable.
+   */
+  extern "C" std::int32_t sfcre_AnalyMpaBitrate(std::uint8_t* const buffer, const std::int32_t sizeBytes)
+  {
+    SfcreAauHeaderRuntimeView header{};
+    if (sfcre_SerachMpaAau(&header, buffer, sizeBytes) == nullptr) {
+      return -1;
+    }
+
+    const std::size_t tableIndex =
+      (static_cast<std::size_t>(header.word0[0]) << 4u) + static_cast<std::size_t>(header.word0[2]);
+    std::int32_t bitrateKbps = kSfcreAauBitrateKbpsByVersionAndIndex[tableIndex];
+    if (bitrateKbps != -1) {
+      bitrateKbps *= 1000;
+    }
+    return bitrateKbps;
+  }
+
+  /**
+   * Address: 0x00ADA670 (FUN_00ADA670, _SFCRE_AnalyAauSiz)
+   *
+   * What it does:
+   * Finds one MPA AAU header and computes the frame size in bytes from the
+   * layer/bitrate/frequency lane tables; returns `-1` when analysis fails.
+   */
+  extern "C" std::int32_t SFCRE_AnalyAauSiz(std::uint8_t* const buffer, const std::int32_t sizeBytes)
+  {
+    SfcreAauHeaderRuntimeView header{};
+    if (sfcre_SerachMpaAau(&header, buffer, sizeBytes) == nullptr) {
+      return -1;
+    }
+
+    const std::size_t layerIndex = static_cast<std::size_t>(header.word0[0]);
+    const std::size_t bitrateIndex = static_cast<std::size_t>(header.word0[2]);
+    const std::int32_t bitrateKbps = kSfcreAauBitrateKbpsByVersionAndIndex[(layerIndex << 4u) + bitrateIndex];
+    if (bitrateKbps == -1) {
+      return -1;
+    }
+
+    const std::int32_t frameSamples = kSfcreAauConstantSamplesByLayer[layerIndex];
+    const std::int32_t frequencyHz = kSfcreAauFrequencyHzByIndex[static_cast<std::size_t>(header.word0[3])];
+    return (1000 * bitrateKbps * frameSamples) / (8 * frequencyHz);
   }
 
   /**
@@ -4206,6 +4415,42 @@
       return 0;
     }
     return SFD_SetCond(workctrlSubobj, 84, audioStreamType);
+  }
+
+  /**
+   * Address: 0x00ACF050 (FUN_00ACF050, _SFD_SetVideoPid)
+   *
+   * What it does:
+   * Forwards one video PID handle lane into SFD condition `81` when the
+   * work-control handle is non-null.
+   */
+  std::int32_t
+  SFD_SetVideoPid(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, void* const videoPidHandle)
+  {
+    if (workctrlSubobj == nullptr) {
+      return 0;
+    }
+
+    const std::int32_t videoPidValue = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(videoPidHandle));
+    return SFD_SetCond(workctrlSubobj, 81, videoPidValue);
+  }
+
+  /**
+   * Address: 0x00ACF070 (FUN_00ACF070, _SFD_SetAudioPid)
+   *
+   * What it does:
+   * Forwards one audio PID handle lane into SFD condition `82` when the
+   * work-control handle is non-null.
+   */
+  std::int32_t
+  SFD_SetAudioPid(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, void* const audioPidHandle)
+  {
+    if (workctrlSubobj == nullptr) {
+      return 0;
+    }
+
+    const std::int32_t audioPidValue = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(audioPidHandle));
+    return SFD_SetCond(workctrlSubobj, 82, audioPidValue);
   }
 
   /**
@@ -4615,6 +4860,7 @@
       offsetof(SfseeRuntimeView, seekBaseReadTotalBytes) == 0x0DD4,
       "SfseeRuntimeView::seekBaseReadTotalBytes offset must be 0x0DD4"
     );
+    static_assert(sizeof(SfseeRuntimeView) == 0x0DD8, "SfseeRuntimeView size must be 0x0DD8");
 
     struct SfdSfseeOwnerRuntimeView
     {
@@ -5029,6 +5275,55 @@
     return movingAverage;
   }
 
+  std::int32_t gSftstDebOutBuffer = 0;
+  std::int32_t gSftstDebOutSize = 0;
+  std::uintptr_t gSftstDebOutWrite = 0;
+  std::uintptr_t gSftstDebOutWriteHighWater = 0;
+
+  /**
+   * Address: 0x00AE6B70 (FUN_00AE6B70, _SFDEB_InitTst)
+   *
+   * What it does:
+   * Caches SFTST debug output buffer id/size lanes and returns the selected
+   * buffer id.
+   */
+  extern "C" std::int32_t SFDEB_InitTst(const std::int32_t outputBufferId, const std::int32_t outputBufferSize)
+  {
+    gSftstDebOutBuffer = outputBufferId;
+    gSftstDebOutSize = outputBufferSize;
+    return outputBufferId;
+  }
+
+  /**
+   * Address: 0x00AE6B90 (FUN_00AE6B90, _sftst_DebInit)
+   *
+   * What it does:
+   * Clears the configured SFTST debug output buffer, seeds the canonical CSV
+   * header text, and updates write/high-water cursors.
+   */
+  extern "C" std::uint32_t sftst_DebInit()
+  {
+    constexpr char kSftstDebHeader[] =
+      "tst, help_time_sec, help_time_msec, help_time_64, help_time, mt_max, master_time, out_time,  mt_ot, mtmax_ot,  diff_l_max, diff_l_min, diff_a_max, tst->diff_a_min, pastat, adjmode, resethist, excesserr, adj_limit, adj_front, adj_rear,  movave_1st, movave_2nd,  adxt_stat \n"
+      "\n";
+
+    std::uint32_t result = static_cast<std::uint32_t>(gSftstDebOutWrite);
+    if (gSftstDebOutBuffer == 0) {
+      return result;
+    }
+
+    auto* const outputBuffer = reinterpret_cast<char*>(static_cast<std::uintptr_t>(gSftstDebOutBuffer));
+    const std::size_t outputSize = static_cast<std::size_t>(static_cast<std::uint32_t>(gSftstDebOutSize));
+    std::memset(outputBuffer, 0, outputSize);
+
+    gSftstDebOutWrite = static_cast<std::uintptr_t>(gSftstDebOutBuffer);
+    std::strcpy(outputBuffer, kSftstDebHeader);
+    gSftstDebOutWrite += std::strlen(kSftstDebHeader);
+    gSftstDebOutWriteHighWater = gSftstDebOutWrite;
+    result = static_cast<std::uint32_t>(gSftstDebOutWrite);
+    return result;
+  }
+
   /**
    * Address: 0x00AE6470 (FUN_00AE6470, _SFTST_GoNextFrame)
    *
@@ -5118,6 +5413,24 @@
     handle->word2 = -3;
     handle->word3 = 1;
     return handle;
+  }
+
+  std::int32_t sfsee_InitSeekInf(SfseeRuntimeView* const sfseeHandle);
+
+  /**
+   * Address: 0x00AECD50 (FUN_00AECD50, _SFD_InitSeek)
+   *
+   * What it does:
+   * Reinitializes each SFSEE seek-runtime lane in one contiguous handle array.
+   */
+  std::int32_t SFD_InitSeek(SfseeRuntimeView* sfseeHandleArray, const std::int32_t handleCount)
+  {
+    std::int32_t initResult = 0;
+    for (std::int32_t remaining = handleCount; remaining > 0; --remaining) {
+      initResult = sfsee_InitSeekInf(sfseeHandleArray);
+      ++sfseeHandleArray;
+    }
+    return initResult;
   }
 
   /**
@@ -6130,6 +6443,70 @@
   extern "C" SfdMpvParameterSnapshot sfmpv_para;
   extern "C" std::int32_t sfmpv_rfb_adr_tbl[2];
   extern "C" std::int32_t sSofDec_tabs[16];
+
+  struct SfdMpvRfbInfoRuntimeView
+  {
+    std::int32_t lumaPlaneAddress = 0; // +0x00
+    std::int32_t chromaPlaneAddress = 0; // +0x04
+    std::int32_t frameBaseAddress = 0; // +0x08
+    std::uint16_t chromaStrideBytes = 0; // +0x0C
+    std::uint16_t lumaStrideBytes = 0; // +0x0E
+  };
+  static_assert(
+    offsetof(SfdMpvRfbInfoRuntimeView, lumaPlaneAddress) == 0x00,
+    "SfdMpvRfbInfoRuntimeView::lumaPlaneAddress offset must be 0x00"
+  );
+  static_assert(
+    offsetof(SfdMpvRfbInfoRuntimeView, chromaPlaneAddress) == 0x04,
+    "SfdMpvRfbInfoRuntimeView::chromaPlaneAddress offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SfdMpvRfbInfoRuntimeView, frameBaseAddress) == 0x08,
+    "SfdMpvRfbInfoRuntimeView::frameBaseAddress offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SfdMpvRfbInfoRuntimeView, chromaStrideBytes) == 0x0C,
+    "SfdMpvRfbInfoRuntimeView::chromaStrideBytes offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SfdMpvRfbInfoRuntimeView, lumaStrideBytes) == 0x0E,
+    "SfdMpvRfbInfoRuntimeView::lumaStrideBytes offset must be 0x0E"
+  );
+  static_assert(sizeof(SfdMpvRfbInfoRuntimeView) == 0x10, "SfdMpvRfbInfoRuntimeView size must be 0x10");
+
+  /**
+   * Address: 0x00AD1790 (FUN_00AD1790, _SFD_MakeRfbInfo)
+   *
+   * What it does:
+   * Builds one MPV frame-buffer descriptor from one MPV parameter snapshot by
+   * aligning luma/chroma strides and deriving plane start addresses.
+   */
+  extern "C" std::int32_t SFD_MakeRfbInfo(
+    const SfdMpvParameterSnapshot* const parameterSnapshot,
+    void* const outRfbInfoLane
+  )
+  {
+    auto* const rfbInfo = static_cast<SfdMpvRfbInfoRuntimeView*>(outRfbInfoLane);
+
+    const std::int32_t alignedWidth16 = 16 * ((parameterSnapshot->field_0x00 + 15) / 16);
+    const std::int32_t alignedLumaStrideBytes = 32 * ((alignedWidth16 + 31) / 32);
+    const std::int32_t alignedChromaStrideBytes = 32 * (((alignedWidth16 / 2) + 31) / 32);
+
+    rfbInfo->lumaStrideBytes = static_cast<std::uint16_t>(alignedLumaStrideBytes);
+    rfbInfo->chromaStrideBytes = static_cast<std::uint16_t>(alignedChromaStrideBytes);
+
+    const std::int32_t frameBaseAddress = parameterSnapshot->val8;
+    rfbInfo->frameBaseAddress = frameBaseAddress;
+
+    const std::int32_t macroblockRows = (parameterSnapshot->field_0x04 + 31) / 32;
+    const std::int32_t lumaStrideBlocks = alignedLumaStrideBytes / 32;
+    rfbInfo->lumaPlaneAddress = frameBaseAddress + ((macroblockRows * lumaStrideBlocks) << 10);
+
+    const std::int32_t chromaRowsBytes = (32 * macroblockRows) / 2;
+    const std::int32_t chromaStrideBlocks = alignedChromaStrideBytes / 32;
+    rfbInfo->chromaPlaneAddress = rfbInfo->lumaPlaneAddress + (32 * chromaRowsBytes * chromaStrideBlocks);
+    return chromaRowsBytes;
+  }
 
   /**
    * Address: 0x00AD1970 (FUN_00AD1970, _SFMPV_SaveCond)
@@ -11620,6 +11997,38 @@
     return 0;
   }
 
+  /**
+   * Address: 0x00ADBF10 (FUN_00ADBF10, _UTY_MulAbDivC)
+   *
+   * What it does:
+   * Forwards signed multiply/divide parameters to `UTY_MulDiv`.
+   */
+  extern "C" std::int32_t
+  UTY_MulAbDivC(const std::int32_t lhsValue, const std::int32_t rhsValue, const std::int32_t divisorValue)
+  {
+    return UTY_MulDiv(lhsValue, rhsValue, divisorValue);
+  }
+
+  /**
+   * Address: 0x00ADBF20 (FUN_00ADBF20, _UTY_MulDiv)
+   *
+   * What it does:
+   * Computes signed `(lhs * rhs) / divisor` with divide-by-zero saturation to
+   * `0x7FFFFFFF` or `0x80000000` based on operand sign.
+   */
+  extern "C" std::int32_t
+  UTY_MulDiv(const std::int32_t lhsValue, const std::int32_t rhsValue, const std::int32_t divisorValue)
+  {
+    if (divisorValue == 0) {
+      return ((lhsValue ^ rhsValue) < 0)
+        ? static_cast<std::int32_t>(0x80000000u)
+        : static_cast<std::int32_t>(0x7FFFFFFFu);
+    }
+
+    const std::int64_t product = static_cast<std::int64_t>(lhsValue) * static_cast<std::int64_t>(rhsValue);
+    return static_cast<std::int32_t>(product / static_cast<std::int64_t>(divisorValue));
+  }
+
   struct SfdOutputSyncRuntimeView
   {
     std::uint8_t reserved0000_0043[0x44]{}; // +0x0000
@@ -14157,6 +14566,20 @@
     return (SFD_CmpTime(autoStopTime, 1000, currentTimeMajor, currentTimeMinor) != 0) ? 1 : 0;
   }
 
+  /**
+   * Address: 0x00AD8400 (FUN_00AD8400, _SFPLY_IsTermSupply)
+   *
+   * What it does:
+   * Returns whether the active SFPLY supply lane has latched its SFBUF
+   * termination flag.
+   */
+  std::int32_t SFPLY_IsTermSupply(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    const auto* const runtimeView = reinterpret_cast<const SfmpsWorkctrlRuntimeView*>(workctrlSubobj);
+    const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
+    return (SFBUF_GetTermFlg(workctrlAddress, runtimeView->activeSupplyLaneIndex) != 0) ? 1 : 0;
+  }
+
   extern "C" std::int64_t UTY_GetTmr();
   extern "C" std::int64_t UTY_GetTmrUnit();
   extern "C" std::int64_t SFTMR_GetTmr();
@@ -14273,7 +14696,7 @@
    * Reduces all SFLIB handle states into one decode-server status lane:
    * `0` (idle), `1` (active work), or `2` (terminal/error-wait present).
    */
-  std::int32_t sfply_DecideSvrStat()
+  std::int32_t SFPLY_DecideSvrStat()
   {
     std::int32_t idleHandleCount = 0;
     std::int32_t activeHandleCount = 0;
@@ -16112,6 +16535,86 @@
     offsetof(SfdPlaybackInfoRuntimeView, playbackInfo) == 0x950,
     "SfdPlaybackInfoRuntimeView::playbackInfo offset must be 0x950"
   );
+
+  struct SfdPlaybackTimestampSourceRuntimeView
+  {
+    std::uint8_t reserved00_03[0x04]{};
+    const SofdecCreateStreamDescriptor* streamDescriptor = nullptr; // +0x04
+    std::uint8_t reserved08_1F7B[0x1F74]{};
+    SfmpsStreamPrepRuntimeView* streamPrepRuntime = nullptr; // +0x1F7C
+  };
+  static_assert(
+    offsetof(SfdPlaybackTimestampSourceRuntimeView, streamDescriptor) == 0x04,
+    "SfdPlaybackTimestampSourceRuntimeView::streamDescriptor offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SfdPlaybackTimestampSourceRuntimeView, streamPrepRuntime) == 0x1F7C,
+    "SfdPlaybackTimestampSourceRuntimeView::streamPrepRuntime offset must be 0x1F7C"
+  );
+
+  struct M2TsdPlaybackTimestampLaneView
+  {
+    std::int32_t timestampMajor = 0; // +0x00
+    std::int32_t timestampMinor = 0; // +0x04
+    std::uint8_t reserved08_27[0x20]{};
+    std::int32_t playbackClockMajor = 0; // +0x28
+    std::int32_t playbackClockMinor = 0; // +0x2C
+  };
+  static_assert(
+    offsetof(M2TsdPlaybackTimestampLaneView, timestampMajor) == 0x00,
+    "M2TsdPlaybackTimestampLaneView::timestampMajor offset must be 0x00"
+  );
+  static_assert(
+    offsetof(M2TsdPlaybackTimestampLaneView, timestampMinor) == 0x04,
+    "M2TsdPlaybackTimestampLaneView::timestampMinor offset must be 0x04"
+  );
+  static_assert(
+    offsetof(M2TsdPlaybackTimestampLaneView, playbackClockMajor) == 0x28,
+    "M2TsdPlaybackTimestampLaneView::playbackClockMajor offset must be 0x28"
+  );
+  static_assert(
+    offsetof(M2TsdPlaybackTimestampLaneView, playbackClockMinor) == 0x2C,
+    "M2TsdPlaybackTimestampLaneView::playbackClockMinor offset must be 0x2C"
+  );
+
+  /**
+   * Address: 0x00ACF090 (FUN_00ACF090, _SFD_GetPlyTsInf)
+   *
+   * What it does:
+   * Initializes one 5-word playback timestamp output with defaults and, for
+   * M2TS stream lanes, fills it from the M2TSD playback state runtime.
+   */
+  std::int32_t* SFD_GetPlyTsInf(
+    moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
+    std::int32_t* const outPlaybackTimestampWords
+  )
+  {
+    outPlaybackTimestampWords[0] = -1;
+    outPlaybackTimestampWords[2] = -1;
+    outPlaybackTimestampWords[4] = -1;
+    outPlaybackTimestampWords[1] = 0;
+    outPlaybackTimestampWords[3] = 0;
+
+    if (workctrlSubobj != nullptr) {
+      const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSourceRuntimeView*>(workctrlSubobj);
+      if (runtimeView->streamDescriptor == &SFD_tr_sd_m2ts) {
+        const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdRuntimeView*>(
+          SjAddressToPointer(runtimeView->streamPrepRuntime->m2tsdRuntimeAddress)
+        );
+        const auto* const playbackTimestampLane = reinterpret_cast<const M2TsdPlaybackTimestampLaneView*>(
+          m2tsdRuntime->laneEntries
+        );
+
+        outPlaybackTimestampWords[0] = m2tsdRuntime->streamEndCode;
+        outPlaybackTimestampWords[1] = playbackTimestampLane->timestampMajor;
+        outPlaybackTimestampWords[2] = playbackTimestampLane->timestampMinor;
+        outPlaybackTimestampWords[3] = playbackTimestampLane->playbackClockMajor;
+        outPlaybackTimestampWords[4] = playbackTimestampLane->playbackClockMinor;
+      }
+    }
+
+    return outPlaybackTimestampWords;
+  }
 
   /**
    * Address: 0x00AD8990 (FUN_00AD8990, _SFD_GetPlyInf)

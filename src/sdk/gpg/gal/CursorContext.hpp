@@ -25,6 +25,22 @@ namespace gpg::gal
         CursorContext();
 
         /**
+         * Address: 0x0093EF20 (FUN_0093EF20)
+         *
+         * int,int,CursorPixelSourceRuntime *,boost::detail::sp_counted_base *
+         *
+         * What it does:
+         * Initializes hotspot/pixel-source lanes from caller payload and
+         * preserves legacy shared-count transfer side effects on cursor control.
+         */
+        CursorContext(
+            std::int32_t hotspotX,
+            std::int32_t hotspotY,
+            CursorPixelSourceRuntime* pixelSource,
+            boost::detail::sp_counted_base* cursorControl
+        );
+
+        /**
          * Address: 0x0093EEC0 (FUN_0093EEC0)
          *
          * What it does:

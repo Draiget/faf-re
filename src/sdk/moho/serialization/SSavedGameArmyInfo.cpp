@@ -45,12 +45,73 @@ namespace
   moho::SSavedGameArmyInfoTypeInfo gSavedGameArmyInfoTypeInfo;
   moho::SSavedGameArmyInfoSerializer gSavedGameArmyInfoSerializer;
 
+  [[nodiscard]] gpg::SerHelperBase* SavedGameArmyInfoSerializerSelfNode() noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&gSavedGameArmyInfoSerializer.mNext);
+  }
+
+  void InitializeSavedGameArmyInfoSerializerLinks() noexcept
+  {
+    gpg::SerHelperBase* const self = SavedGameArmyInfoSerializerSelfNode();
+    gSavedGameArmyInfoSerializer.mNext = self;
+    gSavedGameArmyInfoSerializer.mPrev = self;
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameArmyInfoSerializerHelperNode() noexcept
+  {
+    auto* const next = static_cast<gpg::SerHelperBase*>(gSavedGameArmyInfoSerializer.mNext);
+    auto* const prev = static_cast<gpg::SerHelperBase*>(gSavedGameArmyInfoSerializer.mPrev);
+    next->mPrev = prev;
+    prev->mNext = next;
+
+    gpg::SerHelperBase* const self = SavedGameArmyInfoSerializerSelfNode();
+    gSavedGameArmyInfoSerializer.mPrev = self;
+    gSavedGameArmyInfoSerializer.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x008800B0 (FUN_008800B0)
+   *
+   * What it does:
+   * Unlinks global `SSavedGameArmyInfoSerializer` helper node from the
+   * intrusive helper list, rewires self-links, and returns the helper self
+   * node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameArmyInfoSerializerHelperPrimary() noexcept
+  {
+    return UnlinkSavedGameArmyInfoSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x008800E0 (FUN_008800E0)
+   *
+   * What it does:
+   * Secondary entrypoint for `SSavedGameArmyInfoSerializer` helper-node
+   * intrusive unlink + self-link reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameArmyInfoSerializerHelperSecondary() noexcept
+  {
+    return UnlinkSavedGameArmyInfoSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x0087FF00 (FUN_0087FF00, preregister_SSavedGameArmyInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::SSavedGameArmyInfo`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSavedGameArmyInfoTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(moho::SSavedGameArmyInfo), &gSavedGameArmyInfoTypeInfo);
+    return &gSavedGameArmyInfoTypeInfo;
+  }
+
   void EnsureSavedGameArmyInfoRegistered()
   {
     static const bool kRegistered = []() {
-      gpg::PreRegisterRType(typeid(moho::SSavedGameArmyInfo), &gSavedGameArmyInfoTypeInfo);
-      gSavedGameArmyInfoSerializer.mNext = nullptr;
-      gSavedGameArmyInfoSerializer.mPrev = nullptr;
+      (void)preregister_SSavedGameArmyInfoTypeInfo();
+      InitializeSavedGameArmyInfoSerializerLinks();
       gSavedGameArmyInfoSerializer.mSerLoadFunc = &LoadSavedGameArmyInfo;
       gSavedGameArmyInfoSerializer.mSerSaveFunc = &SaveSavedGameArmyInfo;
       gSavedGameArmyInfoSerializer.RegisterSerializeFunctions();

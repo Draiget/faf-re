@@ -30,6 +30,14 @@ namespace gpg
 		BitArray2D(unsigned int width, unsigned int height);
 
 		/**
+		 * Address: 0x008D8320 (FUN_008D8320, ??0BitArray2D@gpg@@QAE@ABV01@@Z_0)
+		 *
+		 * What it does:
+		 * Copy-constructs dimensions/word storage and clones packed bit words.
+		 */
+		BitArray2D(const BitArray2D& other);
+
+		/**
 		 * Address: 0x008D8200 (FUN_008D8200, ??1BitArray2D@gpg@@QAE@XZ)
 		 *
 		 * What it does:
@@ -62,6 +70,14 @@ namespace gpg
 		[[nodiscard]] bool AnyBitSet(unsigned int* storeWidth, unsigned int* storeHeight, unsigned int* progress) const;
 
 		/**
+		 * Address: 0x008E3380 (FUN_008E3380)
+		 *
+		 * What it does:
+		 * Clears one packed bit at `(x,z)` and returns the touched 32-bit word.
+		 */
+		[[nodiscard]] int32_t* ClearBitAndReturnWord(int x, unsigned int z);
+
+		/**
 		 * Address: 0x008D8460 (FUN_008D8460, ?GetRectOr@BitArray2D@gpg@@QBE_NHHHH_N@Z)
 		 *
 		 * What it does:
@@ -81,11 +97,23 @@ namespace gpg
 		[[nodiscard]] bool GetRectNeg(const Rect2i& rect) const;
 
 		/**
+		 * Address: 0x00720510 (FUN_00720510)
+		 *
 		 * What it does:
-		 * Returns true when `(x,z)` is out of bounds or the corresponding bit is set.
+		 * Returns true when the queried bit is set or the coordinates fall
+		 * outside the logical width/height.
 		 */
-		[[nodiscard]] bool IsBitSetOrOutOfBounds(int x, int z) const;
+		[[nodiscard]] bool IsBitSetOrOutOfBounds(unsigned int x, unsigned int z) const;
 	};
 
 	static_assert(sizeof(BitArray2D) == 0x10, "BitArray2D size must be 0x10");
+
+	/**
+	 * Address: 0x0077FF50 (FUN_0077FF50)
+	 *
+	 * What it does:
+	 * Runs `BitArray2D` destruction for one heap object and releases the same
+	 * storage via global `operator delete`.
+	 */
+	BitArray2D* DestroyAndDeleteBitArray2D(BitArray2D* bitArray);
 }

@@ -11,6 +11,15 @@ namespace gal {
     class Texture {
     public:
       /**
+       * Address: 0x00903300 (FUN_00903300)
+       *
+       * What it does:
+       * Initializes one abstract texture base lane by installing the class
+       * vtable.
+       */
+      Texture();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall
@@ -47,5 +56,7 @@ namespace gal {
        */
       virtual void purecall5() = 0;
     };
+
+    static_assert(sizeof(Texture) == 0x4, "Texture size must be 0x4");
 } // namespace gal
 } // namespace gpg

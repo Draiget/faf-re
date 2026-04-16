@@ -47,16 +47,29 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x005A7F00 (FUN_005A7F00)
+   *
+   * What it does:
+   * Populates one reflected `RRef` payload for a `CAiNavigatorAir` object.
+   */
+  [[nodiscard]] gpg::RRef* PopulateCAiNavigatorAirRef(gpg::RRef* const out, CAiNavigatorAir* const object)
+  {
+    gpg::RRef temp{};
+    gpg::RRef_CAiNavigatorAir(&temp, object);
+    *out = temp;
+    return out;
+  }
+
   [[nodiscard]] gpg::RRef MakeCAiNavigatorAirRef(CAiNavigatorAir* const object)
   {
     gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = CachedCAiNavigatorAirType();
+    (void)PopulateCAiNavigatorAirRef(&ref, object);
     return ref;
   }
 
   /**
-   * Address: 0x005A5630 (FUN_005A5630, construct callback)
+   * Address: 0x005A5640 (FUN_005A5640, construct body callback)
    *
    * What it does:
    * Allocates one `CAiNavigatorAir` and publishes it as unowned construct
@@ -65,7 +78,7 @@ namespace
   void ConstructAiNavigatorAirForResult(gpg::SerConstructResult* const result)
   {
     CAiNavigatorAir* object = nullptr;
-    void* const storage = ::operator new(sizeof(CAiNavigatorAir), std::nothrow);
+    void* const storage = ::operator new(sizeof(CAiNavigatorAir));
     if (storage) {
       object = new (storage) CAiNavigatorAir();
     }
@@ -97,6 +110,18 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x005A5600 (FUN_005A5600)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the global
+   * `CAiNavigatorAirConstruct` helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiNavigatorAirConstructStartupThunk()
+  {
+    return cleanup_CAiNavigatorAirConstruct();
+  }
+
   void cleanup_CAiNavigatorAirConstruct_atexit()
   {
     (void)cleanup_CAiNavigatorAirConstruct();
@@ -104,7 +129,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005A5630 (FUN_005A5630, construct callback)
+  * Alias of FUN_005A5630 (non-canonical helper lane).
  */
 void CAiNavigatorAirConstruct::Construct(
   gpg::ReadArchive* const,

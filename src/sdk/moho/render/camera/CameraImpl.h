@@ -27,6 +27,7 @@ namespace moho
   class CScrLuaInitForm;
   class STIMap;
   class UserEntity;
+  enum ECamTimeSource : std::int32_t;
   struct SSelectionSetUserEntity;
 
   struct CameraUserEntityWeakRef
@@ -89,6 +90,27 @@ namespace moho
     "SCamShakeParams::mMaxMagnitude offset must be 0x14"
   );
   static_assert(offsetof(SCamShakeParams, mDuration) == 0x18, "SCamShakeParams::mDuration offset must be 0x18");
+
+  struct SCamFollowParams
+  {
+    std::int32_t mCurrentEntityId = 0; // +0x00
+    std::int32_t mTargetEntityId = 0;  // +0x04
+    float mTargetTimeLeft = 0.0f;      // +0x08
+  };
+
+  static_assert(sizeof(SCamFollowParams) == 0x0C, "SCamFollowParams size must be 0x0C");
+  static_assert(
+    offsetof(SCamFollowParams, mCurrentEntityId) == 0x00,
+    "SCamFollowParams::mCurrentEntityId offset must be 0x00"
+  );
+  static_assert(
+    offsetof(SCamFollowParams, mTargetEntityId) == 0x04,
+    "SCamFollowParams::mTargetEntityId offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SCamFollowParams, mTargetTimeLeft) == 0x08,
+    "SCamFollowParams::mTargetTimeLeft offset must be 0x08"
+  );
 
   class CameraImpl
   {
@@ -365,7 +387,7 @@ namespace moho
     [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
 
     /**
-     * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
+      * Alias of FUN_007A6BF0 (non-canonical helper lane).
      * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
      *
      * What it does:
@@ -382,6 +404,16 @@ namespace moho
      * Returns current live entity target when target mode is entity/nose-cam.
      */
     [[nodiscard]] virtual UserEntity* GetTargetEntity() const;
+
+    /**
+     * Address: 0x007A71B0 (FUN_007A71B0, Moho::CameraImpl::CameraFollow)
+     * Mangled: ?CameraFollow@CameraImpl@Moho@@UAEXABUSCamFollowParams@2@@Z
+     *
+     * What it does:
+     * Promotes one follow target into the active camera target list when the
+     * current entity-id gate still matches.
+     */
+    virtual void CameraFollow(const SCamFollowParams& followParams);
 
     /**
      * Address: 0x007A73E0 (FUN_007A73E0, Moho::CameraImpl::GetTargetPosition)
@@ -411,6 +443,17 @@ namespace moho
      * either applies the result immediately or seeds Hermite transition state.
      */
     virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds);
+
+    /**
+     * Address: 0x007A8E90 (FUN_007A8E90, Moho::CameraImpl::SetZoom)
+     * Mangled: ?SetZoom@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Re-applies manual targeting at the current target position while keeping
+     * the active heading and far-pitch lanes and substituting a new
+     * zoom/seconds pair.
+     */
+    void SetZoom(float zoom, float seconds);
 
     /**
      * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
@@ -541,6 +584,16 @@ namespace moho
      * Updates one runtime multiplier that scales the max zoom limit.
      */
     virtual void SetMaxZoomMult(float maxZoomMult);
+
+    /**
+     * Address: 0x007A6A30 (FUN_007A6A30, Moho::CameraImpl::SetTimeSource)
+     * Mangled: ?SetTimeSource@CameraImpl@Moho@@QAEXW4ECamTimeSource@2@@Z
+     *
+     * What it does:
+     * Stores the active runtime time-source selector in the camera runtime
+     * view.
+     */
+    void SetTimeSource(ECamTimeSource timeSource);
 
     /**
      * Address: 0x007A72C0 (FUN_007A72C0, Moho::CameraImpl::LODMetric)

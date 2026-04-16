@@ -1,10 +1,22 @@
 #include "moho/render/EBeamParamTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/render/EBeamParam.h"
 
 using namespace moho;
+
+/**
+ * Address: 0x00770AC0 (FUN_00770AC0)
+ *
+ * What it does:
+ * Preregisters the reflected `EBeamParam` enum metadata.
+ */
+EBeamParamTypeInfo::EBeamParamTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(EBeamParam), this);
+}
 
 /**
  * Address: 0x00770B50 (FUN_00770B50, scalar deleting thunk)

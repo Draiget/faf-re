@@ -48,11 +48,25 @@ namespace
     }
   }
 
-  void ClearTextureRange(moho::CParticleTexture** it, moho::CParticleTexture** const end) noexcept
+  /**
+   * Address: 0x00658170 (FUN_00658170)
+   *
+   * What it does:
+   * Releases every intrusive-counted texture pointer in `[begin, end)` and
+   * clears each slot after release.
+   */
+  void ReleaseCountedTexturePointerRangeAndClear(
+    moho::CParticleTexture** begin,
+    moho::CParticleTexture** const end
+  ) noexcept
   {
-    while (it != end) {
-      ReleaseParticleTextureRef(*it);
-      ++it;
+    while (begin != end) {
+      moho::CParticleTexture* const texture = *begin;
+      if (texture != nullptr) {
+        static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+      }
+      *begin = nullptr;
+      ++begin;
     }
   }
 } // namespace
@@ -61,8 +75,34 @@ namespace moho
 {
   gpg::RType* CEffectImpl::sType = nullptr;
 
+  /**
+   * Address: 0x00659090 (FUN_00659090, Moho::CEffectImpl::CEffectImpl)
+   *
+   * What it does:
+   * Initializes effect parameter inline vectors, detached entity attachment
+   * state, and identity matrix defaults.
+   */
   CEffectImpl::CEffectImpl()
     : IEffect()
+    , mUnknown44(0)
+    , mParams()
+    , mParticleTextures()
+    , mStrings()
+    , mEntityInfo(SEntAttachInfo::MakeDetached())
+    , mNewAttachment(0)
+    , mPad14D{0, 0, 0}
+    , mMatrix(VMatrix4::Identity())
+  {}
+
+  /**
+   * Address: 0x00659190 (FUN_00659190, Moho::CEffectImpl::CEffectImpl)
+   *
+   * What it does:
+   * Initializes one manager-bound effect lane while preserving the same member
+   * default state used by the no-arg constructor.
+   */
+  CEffectImpl::CEffectImpl(CEffectManagerImpl* const manager, const int scriptObjectToken)
+    : IEffect(manager, scriptObjectToken)
     , mUnknown44(0)
     , mParams()
     , mParticleTextures()
@@ -84,7 +124,7 @@ namespace moho
     ClearStringRange(mStrings.start_, mStrings.end_);
     mStrings.ResetStorageToInline();
 
-    ClearTextureRange(mParticleTextures.start_, mParticleTextures.end_);
+    ReleaseCountedTexturePointerRangeAndClear(mParticleTextures.start_, mParticleTextures.end_);
     mParticleTextures.ResetStorageToInline();
 
     mParams.ResetStorageToInline();

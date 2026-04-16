@@ -238,7 +238,7 @@ gpg::RType* moho::CLuaConOutputHandler::GetClass() const
 /**
  * Address: 0x0041E820 (FUN_0041E820, ?GetDerivedObjectRef@CLuaConOutputHandler@Moho@@UAE?AVRRef@gpg@@XZ)
  * Address: 0x00421B60 (FUN_00421B60, sub_421B60 helper lane)
- * Address: 0x004220D0 (FUN_004220D0, gpg::RRef_CLuaConOutputHandler helper lane)
+  * Alias of FUN_004220D0 (non-canonical helper lane).
  */
 gpg::RRef moho::CLuaConOutputHandler::GetDerivedObjectRef()
 {
@@ -256,7 +256,7 @@ void moho::CLuaConOutputHandler::Handle(const char* const text)
 }
 
 /**
- * Address: 0x1001FDE0 (FUN_1001FDE0, MohoEngine.dll)
+  * Alias of FUN_1001FDE0 (non-canonical helper lane).
  */
 moho::CScrLuaMetatableFactory<moho::CLuaConOutputHandler*>::CScrLuaMetatableFactory()
   : CScrLuaObjectFactory(CScrLuaObjectFactory::AllocateFactoryObjectIndex())

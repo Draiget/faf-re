@@ -147,6 +147,19 @@ namespace moho
   void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads);
 
   /**
+   * Address: 0x006C1070 (FUN_006C1070)
+   *
+   * What it does:
+   * Extracts one axis-angle representation from a quaternion, returning the
+   * normalized axis in `axisOut` and angle (radians) in `angleRadiansOut`.
+   */
+  void QuatToAxisAndAngle(
+    const Wm3::Quaternionf& quaternion,
+    Wm3::Vector3f* axisOut,
+    float* angleRadiansOut
+  ) noexcept;
+
+  /**
    * Address: 0x00697360 (FUN_00697360, func_VecToQuatB)
    *
    * What it does:

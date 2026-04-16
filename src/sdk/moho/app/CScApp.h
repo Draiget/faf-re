@@ -23,11 +23,21 @@ public:
 
     /**
      * Address: 0x008D5280 (FUN_008D5280, sub_8D5280)
+     * Address: 0x008D4B90 (FUN_008D4B90)
      *
      * What it does:
      * Flushes the ring and resets start/end indexes to zero.
      */
     void Reset();
+
+    /**
+     * Address: 0x008D4AE0 (FUN_008D4AE0)
+     *
+     * What it does:
+     * Writes one sample into the ring, advances the head when the buffer is
+     * full, advances the tail, and returns the integer carry from end+1.
+     */
+    std::int32_t Push(float deltaSeconds);
 
     /**
      * Address: 0x008D4B20 (FUN_008D4B20, struct_RollingFrameRates::median)
@@ -70,7 +80,7 @@ public:
   bool Init() override;
 
   /**
-   * Address: 0x008D1470 (FUN_008D1470)
+     * Address: 0x008D1470 (FUN_008D1470)
    * Mangled: ?Main@CScApp@@UAEXXZ
    *
    * What it does:

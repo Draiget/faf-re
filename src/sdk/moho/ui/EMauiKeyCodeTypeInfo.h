@@ -130,6 +130,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0079CCD0 (FUN_0079CCD0, Moho::EMauiKeyCodeTypeInfo::ctor)
+     *
+     * What it does:
+     * Preregisters the reflected `EMauiKeyCode` enum metadata.
+     */
+    EMauiKeyCodeTypeInfo();
+
+    /**
      * Address: 0x0079CD60 (FUN_0079CD60, Moho::EMauiKeyCodeTypeInfo::dtr)
      *
      * What it does:
@@ -165,4 +173,3 @@ namespace moho
 
   static_assert(sizeof(EMauiKeyCodeTypeInfo) == 0x78, "EMauiKeyCodeTypeInfo size must be 0x78");
 } // namespace moho
-

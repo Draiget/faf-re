@@ -11,6 +11,15 @@ namespace gal {
     class CubeRenderTarget {
     public:
       /**
+       * Address: 0x008F7F20 (FUN_008F7F20)
+       *
+       * What it does:
+       * Initializes one abstract cube-render-target base lane by installing
+       * the class vtable.
+       */
+      CubeRenderTarget();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

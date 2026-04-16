@@ -26,6 +26,30 @@ namespace
   gpg::RType* gUnitBlueprintType = nullptr;
   moho::RUnitBlueprintConstruct gUnitBlueprintConstruct;
 
+  /**
+   * Address: 0x00522C60 (FUN_00522C60)
+   *
+   * What it does:
+   * Unlinks `RUnitBlueprintConstruct` helper node from the global
+   * serializer-helper intrusive list and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintConstructHelperNodePrimary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintConstruct);
+  }
+
+  /**
+   * Address: 0x00522C90 (FUN_00522C90)
+   *
+   * What it does:
+   * Secondary unlink entrypoint for `RUnitBlueprintConstruct` helper-node
+   * cleanup; behavior matches the primary lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintConstructHelperNodeSecondary() noexcept
+  {
+    return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintConstruct);
+  }
+
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -45,7 +69,7 @@ namespace
 
   void CleanupUnitBlueprintConstructAtexit()
   {
-    (void)moho::cleanup_RUnitBlueprintConstruct();
+    (void)CleanupUnitBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 
@@ -119,7 +143,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_RUnitBlueprintConstruct()
   {
-    return blueprint_ser::UnlinkHelperNode(gUnitBlueprintConstruct);
+    return CleanupUnitBlueprintConstructHelperNodePrimary();
   }
 
   /**

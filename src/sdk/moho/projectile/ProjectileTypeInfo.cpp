@@ -16,6 +16,25 @@ namespace
     typeInfo.fields_ = msvc8::vector<gpg::RField>{};
     typeInfo.bases_ = msvc8::vector<gpg::RField>{};
   }
+
+  /**
+   * Address: 0x0069E300 (FUN_0069E300)
+   *
+   * What it does:
+   * Publishes `Damage` and `DamageRadius` float reflection lanes for one
+   * projectile type descriptor.
+   */
+  gpg::RField* AddProjectileDamageFloatFields(gpg::RType* const typeInfo)
+  {
+    gpg::RField* const damageField = typeInfo->AddFieldFloat("Damage", 0x2C8);
+    damageField->v4 = 1;
+    damageField->mDesc = "Damage per hit (configured by weapon)";
+
+    gpg::RField* const damageRadiusField = typeInfo->AddFieldFloat("DamageRadius", 0x2CC);
+    damageRadiusField->v4 = 1;
+    damageRadiusField->mDesc = "Radius to inflict damage within (configured by weapon)";
+    return damageRadiusField;
+  }
 } // namespace
 
 namespace moho
@@ -30,9 +49,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069E2C0 (FUN_0069E2C0, ProjectileTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `ProjectileTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyProjectileTypeInfoBody(ProjectileTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x0069E260 (FUN_0069E260, Moho::ProjectileTypeInfo::dtr)
    */
-  ProjectileTypeInfo::~ProjectileTypeInfo() = default;
+  ProjectileTypeInfo::~ProjectileTypeInfo()
+  {
+    DestroyProjectileTypeInfoBody(this);
+  }
 
   /**
    * Address: 0x0069E250 (FUN_0069E250, Moho::ProjectileTypeInfo::GetName)
@@ -50,14 +89,7 @@ namespace moho
     size_ = sizeof(Projectile);
     AddBase_Entity(this);
     gpg::RType::Init();
-
-    gpg::RField* const damageField = AddFieldFloat("Damage", 0x2C8);
-    damageField->v4 = 1;
-    damageField->mDesc = "Damage per hit (configured by weapon)";
-
-    gpg::RField* const damageRadiusField = AddFieldFloat("DamageRadius", 0x2CC);
-    damageRadiusField->v4 = 1;
-    damageRadiusField->mDesc = "Radius to inflict damage within (configured by weapon)";
+    (void)AddProjectileDamageFloatFields(this);
 
     Finish();
   }

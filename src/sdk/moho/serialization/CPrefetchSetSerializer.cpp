@@ -130,7 +130,6 @@ namespace moho
     InitializeSerializerNode(gCPrefetchSetSerializer);
     gCPrefetchSetSerializer.mDeserialize = &CPrefetchSetSerializer::Deserialize;
     gCPrefetchSetSerializer.mSerialize = &CPrefetchSetSerializer::Serialize;
-    gCPrefetchSetSerializer.RegisterSerializeFunctions();
 
     (void)std::atexit(&CleanupPrefetchSetSerializerAtExit);
   }

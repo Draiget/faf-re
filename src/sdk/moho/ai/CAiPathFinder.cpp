@@ -14,6 +14,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/ai/CAiPathNavigator.h"
+#include "moho/misc/Listener.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
@@ -28,12 +29,209 @@ namespace moho
   class RBroadcasterRType_NavPath final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00764010 (FUN_00764010, Moho::RBroadcasterRType_NavPath::dtr)
+     *
+     * What it does:
+     * Tears down one broadcaster-navpath type-info descriptor and releases
+     * inherited `gpg::RType` reflection storage lanes.
+     */
+    ~RBroadcasterRType_NavPath() override;
+
+    [[nodiscard]] const char* GetName() const override;
+  };
+
+  class RListenerRType_NavPath final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00764070 (FUN_00764070, Moho::RListenerRType_NavPath::dtr)
+     *
+     * What it does:
+     * Tears down one listener-navpath type-info descriptor and releases
+     * inherited `gpg::RType` reflection storage lanes.
+     */
+    ~RListenerRType_NavPath() override;
+
     [[nodiscard]] const char* GetName() const override;
   };
 } // namespace moho
 
 namespace
 {
+  using PathCellVector = msvc8::vector<moho::HPathCell>;
+
+  /**
+   * Address: 0x005A9890 (FUN_005A9890)
+   *
+   * What it does:
+   * Swaps two 32-bit payload lanes and returns the first lane pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapDwordPayloadLanes(
+    std::uint32_t* const lhs,
+    std::uint32_t* const rhs
+  ) noexcept
+  {
+    if (!lhs || !rhs) {
+      return lhs;
+    }
+
+    const std::uint32_t temp = *lhs;
+    *lhs = *rhs;
+    *rhs = temp;
+    return lhs;
+  }
+
+  /**
+   * Address: 0x005A9C90 (FUN_005A9C90)
+   *
+   * What it does:
+   * Clears one packed `HPathCell` lane to zero.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::HPathCell* ClearPackedPathCell(moho::HPathCell* const outCell) noexcept
+  {
+    if (!outCell) {
+      return nullptr;
+    }
+
+    outCell->x = 0u;
+    outCell->z = 0u;
+    return outCell;
+  }
+
+  /**
+   * Address: 0x005A9CA0 (FUN_005A9CA0)
+   *
+   * What it does:
+   * Copies one packed `HPathCell` lane into destination storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::HPathCell* CopyPackedPathCell(
+    moho::HPathCell* const outCell,
+    const moho::HPathCell* const sourceCell
+  ) noexcept
+  {
+    if (!outCell || !sourceCell) {
+      return outCell;
+    }
+
+    *outCell = *sourceCell;
+    return outCell;
+  }
+
+  /**
+   * Address: 0x005A9CB0 (FUN_005A9CB0)
+   *
+   * What it does:
+   * Returns the first 16-bit lane from one packed path-cell payload.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint16_t ReadPackedPathCellLane0(const moho::HPathCell* const cell) noexcept
+  {
+    return cell ? cell->x : 0u;
+  }
+
+  /**
+   * Address: 0x005A9CC0 (FUN_005A9CC0)
+   *
+   * What it does:
+   * Returns the second 16-bit lane from one packed path-cell payload.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint16_t ReadPackedPathCellLane1(const moho::HPathCell* const cell) noexcept
+  {
+    return cell ? cell->z : 0u;
+  }
+
+  /**
+   * Address: 0x005A9D20 (FUN_005A9D20)
+   *
+   * What it does:
+   * Returns the owner-unit alt-footprint mode flag byte.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadUnitAltFootprintFlag(const moho::Unit* const unit) noexcept
+  {
+    return unit ? unit->mUseAltFootprint : 0u;
+  }
+
+  /**
+   * Address: 0x005AA100 (FUN_005AA100)
+   *
+   * What it does:
+   * Writes one anchor-cell `(x, z)` word pair into a path-finder instance.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderAnchorCellWords(
+    moho::CAiPathFinder* const pathFinder,
+    const std::uint16_t lane0,
+    const std::uint16_t lane1
+  ) noexcept
+  {
+    if (!pathFinder) {
+      return nullptr;
+    }
+
+    pathFinder->mAnchorCell.x = lane0;
+    pathFinder->mAnchorCell.z = lane1;
+    return pathFinder;
+  }
+
+  /**
+   * Address: 0x005AA580 (FUN_005AA580)
+   *
+   * What it does:
+   * Returns whether one path-finder currently has an active queued-path flag.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadPathFinderQueuedFlag(const moho::CAiPathFinder& pathFinder) noexcept
+  {
+    return pathFinder.mIsQueuedOnPathQueue;
+  }
+
+  /**
+   * Address: 0x005AD1E0 (FUN_005AD1E0)
+   *
+   * What it does:
+   * Stores one raw search-mode lane into the path-finder search-type field.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderSearchModeRaw(
+    moho::CAiPathFinder* const pathFinder,
+    const std::int32_t mode
+  ) noexcept
+  {
+    if (!pathFinder) {
+      return nullptr;
+    }
+
+    pathFinder->mSearchType = static_cast<moho::EAiPathSearchType>(mode);
+    return pathFinder;
+  }
+
+  /**
+   * Address: 0x005AD1F0 (FUN_005AD1F0)
+   *
+   * What it does:
+   * Stores one goal-boundary probe mode flag byte onto a path-finder.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderGoalBoundaryProbeFlag(
+    moho::CAiPathFinder* const pathFinder,
+    const std::uint8_t enabled
+  ) noexcept
+  {
+    if (!pathFinder) {
+      return nullptr;
+    }
+
+    pathFinder->mUseGoalBoundaryProbe = enabled;
+    return pathFinder;
+  }
+
+  /**
+   * Address: 0x005AD220 (FUN_005AD220)
+   *
+   * What it does:
+   * Returns the path-finder owner unit pointer lane.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::Unit* ReadPathFinderOwnerUnit(moho::CAiPathFinder* const pathFinder) noexcept
+  {
+    return pathFinder ? pathFinder->mUnit : nullptr;
+  }
+
   struct RectHistoryNode
   {
     RectHistoryNode* next;
@@ -313,6 +511,102 @@ const char* moho::RBroadcasterRType_NavPath::GetName() const
   return gBroadcasterNavPathTypeName.c_str();
 }
 
+/**
+ * Address: 0x00764010 (FUN_00764010, Moho::RBroadcasterRType_NavPath::dtr)
+ *
+ * What it does:
+ * Tears down one broadcaster-navpath type-info descriptor and releases
+ * inherited `gpg::RType` reflection storage lanes.
+ */
+moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
+
+/**
+ * Address: 0x00763850 (FUN_00763850)
+ *
+ * What it does:
+ * Serializes one reflected `vector<HPathCell>` payload by writing count and
+ * then each path-cell element lane.
+ */
+[[maybe_unused]] void SerializePathCellVectorArchive(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  if (archive == nullptr) {
+    return;
+  }
+
+  const auto* const vectorObject = reinterpret_cast<const PathCellVector*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+  );
+
+  const unsigned int count = vectorObject != nullptr ? static_cast<unsigned int>(vectorObject->size()) : 0u;
+  archive->WriteUInt(count);
+  if (count == 0u || vectorObject == nullptr) {
+    return;
+  }
+
+  gpg::RType* const pathCellType = CachedPathCellType();
+  GPG_ASSERT(pathCellType != nullptr);
+  if (!pathCellType) {
+    return;
+  }
+
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    archive->Write(pathCellType, const_cast<moho::HPathCell*>(&(*vectorObject)[static_cast<std::size_t>(i)]), owner);
+  }
+}
+
+/**
+ * Address: 0x00763F50 (FUN_00763F50, preregister_RBroadcasterRType_NavPath)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `moho::Broadcaster`.
+ */
+[[nodiscard]] gpg::RType* preregister_RBroadcasterRType_NavPath()
+{
+  static RBroadcasterRType_NavPath typeInfo;
+  gpg::PreRegisterRType(typeid(Broadcaster), &typeInfo);
+  return &typeInfo;
+}
+
+/**
+ * What it does:
+ * Returns the lexical type label for `Listener<NavPath>`.
+ */
+const char* moho::RListenerRType_NavPath::GetName() const
+{
+  return "Listener<NavPath>";
+}
+
+/**
+ * Address: 0x00764070 (FUN_00764070, Moho::RListenerRType_NavPath::dtr)
+ *
+ * What it does:
+ * Tears down one listener-navpath type-info descriptor and releases
+ * inherited `gpg::RType` reflection storage lanes.
+ */
+moho::RListenerRType_NavPath::~RListenerRType_NavPath() = default;
+
+/**
+ * Address: 0x00763FB0 (FUN_00763FB0, preregister_RListenerRType_NavPath)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `moho::Listener<const moho::SNavPath&>`.
+ */
+[[nodiscard]] gpg::RType* preregister_RListenerRType_NavPath()
+{
+  using NavPathListener = Listener<const SNavPath&>;
+
+  static RListenerRType_NavPath typeInfo;
+  gpg::PreRegisterRType(typeid(NavPathListener), &typeInfo);
+  return &typeInfo;
+}
+
 gpg::RType* CAiPathFinder::sType = nullptr;
 
 /**
@@ -495,7 +789,7 @@ void CAiPathFinder::QueueSearch()
  */
 const SFootprint* CAiPathFinder::GetFootprint() const
 {
-  if (mUnit && mUnit->mUseAltFootprint != 0 && mAltFootprint) {
+  if (mUnit && ReadUnitAltFootprintFlag(mUnit) != 0u && mAltFootprint) {
     return mAltFootprint;
   }
   return mFootprint;
@@ -544,6 +838,24 @@ bool CAiPathFinder::IsInBounds(const SOCellPos& cellPos) const
 }
 
 /**
+ * Address: 0x005A9D60 (FUN_005A9D60)
+ *
+ * What it does:
+ * Computes the octile-distance core term `max(|a|,|b|) + min(|a|,|b|) *
+ * 0.41421354f` used by AI pathfinder heuristic lanes.
+ */
+[[maybe_unused]] static float ComputeOctileDistanceCore(const float a, const float b) noexcept
+{
+  float major = std::fabs(a);
+  float minor = std::fabs(b);
+  if (minor > major) {
+    std::swap(major, minor);
+  }
+
+  return major + minor * 0.41421354f;
+}
+
+/**
  * Address: 0x005AA590 (FUN_005AA590)
  */
 float CAiPathFinder::GetHeuristicCost(const SOCellPos& cellPos) const
@@ -558,9 +870,7 @@ float CAiPathFinder::GetHeuristicCost(const SOCellPos& cellPos) const
 
   const float adx = std::fabs(static_cast<float>(dx));
   const float adz = std::fabs(static_cast<float>(dz));
-  const float major = std::max(adx, adz);
-  const float minor = std::min(adx, adz);
-  return (minor * 0.41421354f + major) * 1.01f;
+  return ComputeOctileDistanceCore(adx, adz) * 1.01f;
 }
 
 /**
@@ -571,7 +881,7 @@ void CAiPathFinder::GetAnchorCell(HPathCell* const outCell) const
   if (!outCell) {
     return;
   }
-  *outCell = mAnchorCell;
+  (void)CopyPackedPathCell(outCell, &mAnchorCell);
 }
 
 /**
@@ -657,21 +967,22 @@ void CAiPathFinder::OnPathRejected(const SNavPath& path)
  */
 std::int32_t CAiPathFinder::GetPathcap() const
 {
-  if (!mUnit || !mUnit->ArmyRef) {
+  Unit* const ownerUnit = ReadPathFinderOwnerUnit(const_cast<CAiPathFinder*>(this));
+  if (!ownerUnit || !ownerUnit->ArmyRef) {
     return 0;
   }
 
   if (mIsGoalBoundaryBlocked == 0u) {
-    return mUnit->ArmyRef->GetPathcapBoth();
+    return ownerUnit->ArmyRef->GetPathcapBoth();
   }
 
   if (mPathLayerSelector == 1) {
-    return mUnit->ArmyRef->GetPathcapLand();
+    return ownerUnit->ArmyRef->GetPathcapLand();
   }
   if (mPathLayerSelector == 3) {
-    return mUnit->ArmyRef->GetPathcapSea();
+    return ownerUnit->ArmyRef->GetPathcapSea();
   }
-  return mUnit->ArmyRef->GetPathcapBoth();
+  return ownerUnit->ArmyRef->GetPathcapBoth();
 }
 
 /**
@@ -682,7 +993,7 @@ void CAiPathFinder::GetResultCell(HPathCell* const outCell) const
   if (!outCell) {
     return;
   }
-  *outCell = mResultCell;
+  (void)CopyPackedPathCell(outCell, &mResultCell);
 }
 
 /**
@@ -708,7 +1019,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
   archive->ReadBool(&boolValue);
   mUseWholeMap = boolValue ? 1u : 0u;
   archive->ReadBool(&boolValue);
-  mUseGoalBoundaryProbe = boolValue ? 1u : 0u;
+  (void)SetPathFinderGoalBoundaryProbeFlag(this, boolValue ? 1u : 0u);
   archive->ReadBool(&boolValue);
   mInsidePlayableRect = boolValue ? 1u : 0u;
 
@@ -733,7 +1044,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
   if (gpg::RType* const searchType = CachedSearchType()) {
     ESearchType search = AIPATHSEARCH_None;
     archive->Read(searchType, &search, owner);
-    mSearchType = search;
+    (void)SetPathFinderSearchModeRaw(this, static_cast<std::int32_t>(search));
   }
 
   archive->ReadBool(&boolValue);
@@ -777,7 +1088,7 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
   }
 
   archive->WriteBool(mIsGoalBoundaryBlocked != 0u);
-  archive->WriteBool(mIsQueuedOnPathQueue != 0u);
+  archive->WriteBool(ReadPathFinderQueuedFlag(*this) != 0u);
   archive->WriteBool(mUseWholeMap != 0u);
   archive->WriteBool(mUseGoalBoundaryProbe != 0u);
   archive->WriteBool(mInsidePlayableRect != 0u);

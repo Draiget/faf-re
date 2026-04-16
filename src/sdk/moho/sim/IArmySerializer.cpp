@@ -14,6 +14,22 @@
 
 namespace
 {
+  class SSTIArmyConstantDataTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SSTIArmyConstantData";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTIArmyConstantData);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
   struct IArmySerializedView
   {
     moho::SSTIArmyConstantData mConstantData; // +0x000
@@ -72,6 +88,40 @@ namespace
     return self;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* ResetIArmySerializerHelperLinks() noexcept
+  {
+    moho::IArmySerializer* const serializer = AcquireIArmySerializer();
+    serializer->mHelperNext->mPrev = serializer->mHelperPrev;
+    serializer->mHelperPrev->mNext = serializer->mHelperNext;
+    gpg::SerHelperBase* const self = SerializerSelfNode(*serializer);
+    serializer->mHelperPrev = self;
+    serializer->mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00550C50 (FUN_00550C50)
+   *
+   * What it does:
+   * Unlinks `IArmySerializer` helper node from the intrusive helper list and
+   * restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupIArmySerializerHelperNodePrimary() noexcept
+  {
+    return ResetIArmySerializerHelperLinks();
+  }
+
+  /**
+   * Address: 0x00550C80 (FUN_00550C80)
+   *
+   * What it does:
+   * Secondary entrypoint for `IArmySerializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupIArmySerializerHelperNodeSecondary() noexcept
+  {
+    return ResetIArmySerializerHelperLinks();
+  }
+
   [[nodiscard]] gpg::RType* ResolveIArmyType()
   {
     gpg::RType* type = moho::IArmy::sType;
@@ -86,6 +136,9 @@ namespace
   {
     if (!gSSTIArmyConstantDataType) {
       gSSTIArmyConstantDataType = gpg::LookupRType(typeid(moho::SSTIArmyConstantData));
+      if (!gSSTIArmyConstantDataType) {
+        gSSTIArmyConstantDataType = moho::preregister_SSTIArmyConstantDataTypeInfo();
+      }
     }
     return gSSTIArmyConstantDataType;
   }
@@ -107,12 +160,25 @@ namespace
       return;
     }
 
-    (void)UnlinkSerializerNode(*AcquireIArmySerializer());
+    (void)CleanupIArmySerializerHelperNodePrimary();
   }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005506B0 (FUN_005506B0, preregister_SSTIArmyConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIArmyConstantData`.
+   */
+  gpg::RType* preregister_SSTIArmyConstantDataTypeInfo()
+  {
+    static SSTIArmyConstantDataTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTIArmyConstantData), &typeInfo);
+    return &typeInfo;
+  }
+
   /**
    * Address: 0x005517A0 (FUN_005517A0, Moho::IArmy::MemberDeserialize)
    */
@@ -133,6 +199,34 @@ namespace moho
 
     gpg::RRef variableOwnerRef{};
     archive->Read(variableType, &view->mVariableData, variableOwnerRef);
+  }
+
+  /**
+   * Address: 0x00550F40 (FUN_00550F40)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards one army-load lane into
+   * `IArmy::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeIArmyMemberThunkA(IArmy* const army, gpg::ReadArchive* const archive)
+  {
+    if (army != nullptr) {
+      army->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x00550FA0 (FUN_00550FA0)
+   *
+   * What it does:
+   * Secondary tail-thunk alias that forwards one army-load lane into
+   * `IArmy::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeIArmyMemberThunkB(IArmy* const army, gpg::ReadArchive* const archive)
+  {
+    if (army != nullptr) {
+      army->MemberDeserialize(archive);
+    }
   }
 
   /**
@@ -208,6 +302,72 @@ namespace moho
   }
 
   /**
+   * Address: 0x00707C40 (FUN_00707C40)
+   */
+  void IArmy::SetPlayerColorBgra(const std::uint32_t playerColorBgra)
+  {
+    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
+    view->mVariableData.mPlayerColorBgra = playerColorBgra;
+  }
+
+  /**
+   * Address: 0x00707C50 (FUN_00707C50)
+   */
+  void IArmy::SetArmyColorBgra(const std::uint32_t armyColorBgra)
+  {
+    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
+    view->mVariableData.mArmyColorBgra = armyColorBgra;
+  }
+
+  /**
+   * Address: 0x00707C60 (FUN_00707C60)
+   */
+  void IArmy::SetFactionIndex(const std::int32_t factionIndex)
+  {
+    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
+    view->mVariableData.mFaction = factionIndex;
+  }
+
+  /**
+   * Address: 0x00707C90 (FUN_00707C90)
+   */
+  void IArmy::SetShowScoreFlag(const bool enabled)
+  {
+    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
+    view->mVariableData.mShowScore = enabled ? 1u : 0u;
+  }
+
+  /**
+   * Address: 0x00707CA0 (FUN_00707CA0)
+   */
+  bool IArmy::IsCivilian() const
+  {
+    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
+    return view->mConstantData.mIsCivilian != 0u;
+  }
+
+  /**
+   * Address: 0x00707CB0 (FUN_00707CB0)
+   */
+  bool IArmy::IsOutOfGame() const
+  {
+    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
+    return view->mVariableData.mIsOutOfGame != 0u;
+  }
+
+  /**
+   * Address: 0x00707CD0 (FUN_00707CD0)
+   */
+  float IArmy::GetHandicap() const
+  {
+    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
+    if (view->mVariableData.mHandicapValue != 0.0f) {
+      return view->mVariableData.mHandicapExtra;
+    }
+    return 0.0f;
+  }
+
+  /**
    * Address: 0x00550C00 (FUN_00550C00, Moho::IArmySerializer::Deserialize)
    */
   void IArmySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
@@ -254,11 +414,11 @@ namespace moho
    */
   void register_IArmySerializer()
   {
+    (void)preregister_SSTIArmyConstantDataTypeInfo();
     auto* const serializer = AcquireIArmySerializer();
     InitializeSerializerNode(*serializer);
     serializer->mLoadCallback = &IArmySerializer::Deserialize;
     serializer->mSaveCallback = &IArmySerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_IArmySerializer);
   }
 } // namespace moho

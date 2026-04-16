@@ -137,6 +137,14 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant2();
 
+  /**
+   * Address: 0x00506ED0 (FUN_00506ED0, preregister_SDelayedSubVizInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters reflection metadata for `SDelayedSubVizInfo`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SDelayedSubVizInfoTypeInfo();
+
   [[nodiscard]] gpg::RType* register_SDelayedSubVizInfoVectorType();
 
   /**

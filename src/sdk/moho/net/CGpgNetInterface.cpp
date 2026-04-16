@@ -1,8 +1,11 @@
 #include "CGpgNetInterface.h"
 
 #include <cstring>
+#include <cstdint>
 #include <limits>
+#include <new>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "Common.h"
@@ -22,6 +25,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/net/INetNATTraversalProviderWeakPtrReflection.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -34,6 +38,18 @@
 
 using namespace moho;
 
+namespace moho
+{
+  class IEditorDispatchHook
+  {
+  public:
+    virtual ~IEditorDispatchHook() = default;
+    virtual int Dispatch() = 0;
+  };
+
+  IEditorDispatchHook* ed_Hook = nullptr;
+} // namespace moho
+
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
@@ -42,6 +58,84 @@ namespace
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
 
   boost::shared_ptr<CGpgNetInterface> sGPGNet;
+
+  /**
+   * Address: 0x007B6450 (FUN_007B6450)
+   *
+   * What it does:
+   * Dispatches one optional editor hook lane when present and returns its
+   * integer result; returns `0` when no hook is installed.
+   */
+  [[maybe_unused]] int DispatchEditorHookIfPresent()
+  {
+    return moho::ed_Hook != nullptr ? moho::ed_Hook->Dispatch() : 0;
+  }
+
+  /**
+   * Address: 0x007BBC10 (FUN_007BBC10, swap helper for global sGPGNet raw lane)
+   *
+   * What it does:
+   * Swaps the process-global GPGNet shared-pointer lane with another shared
+   * pointer lane and preserves the reference-counted payload ownership.
+   */
+  void SwapGlobalGpgNetPtr(
+    boost::shared_ptr<CGpgNetInterface>& lane
+  ) noexcept
+  {
+    using std::swap;
+    swap(sGPGNet, lane);
+  }
+
+  struct SharedPtrRawLaneView
+  {
+    void* object = nullptr;  // +0x00
+    void* counter = nullptr; // +0x04
+  };
+
+  static_assert(sizeof(SharedPtrRawLaneView) == 0x8, "SharedPtrRawLaneView size must be 0x8");
+
+  /**
+   * Address: 0x007BCCC0 (FUN_007BCCC0, raw-object lane swap for global sGPGNet)
+   *
+   * What it does:
+   * Swaps only the raw object pointer lane (`px`) of process-global `sGPGNet`
+   * with caller-provided pointer storage, preserving legacy lane semantics.
+   */
+  [[maybe_unused]] CGpgNetInterface** SwapGlobalGpgNetRawObjectLane(CGpgNetInterface** const lane) noexcept
+  {
+    auto* const rawShared = reinterpret_cast<SharedPtrRawLaneView*>(&sGPGNet);
+    CGpgNetInterface* const previous = static_cast<CGpgNetInterface*>(rawShared->object);
+    rawShared->object = (lane != nullptr) ? *lane : nullptr;
+    if (lane != nullptr) {
+      *lane = previous;
+    }
+    return lane;
+  }
+
+  /**
+   * Address: 0x007BDB70 (FUN_007BDB70, register_WeakPtr_INetNATTraversalProvider_Type_00)
+   *
+   * What it does:
+   * Forces the `boost::weak_ptr<INetNATTraversalProvider>` reflection lane to
+   * materialize during startup.
+   */
+  [[nodiscard]] gpg::RType* RegisterWeakPtrINetNATTraversalProviderType()
+  {
+    return gpg::ResolveWeakPtrINetNATTraversalProviderType();
+  }
+
+  namespace
+  {
+    struct GpgNetReflectionBootstrap
+    {
+      GpgNetReflectionBootstrap()
+      {
+        (void)RegisterWeakPtrINetNATTraversalProviderType();
+      }
+    };
+
+    GpgNetReflectionBootstrap gGpgNetReflectionBootstrap;
+  } // namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
@@ -100,6 +194,864 @@ namespace
   {
     gpg::Warnf("GPGNET: Ignoring unknown gpg.net command \"%s\".", commandName.c_str());
   }
+
+  /**
+   * Address: 0x007B7DB0 (FUN_007B7DB0)
+   *
+   * What it does:
+   * Resets one legacy VC8 string lane back to empty SSO storage and releases
+   * any heap buffer owned by that string.
+   */
+  [[maybe_unused]] void ResetLegacyStringStorage(
+    msvc8::string& value
+  ) noexcept
+  {
+    value.tidy(true, 0U);
+  }
+
+  /**
+   * Address: 0x007B6500 (FUN_007B6500)
+   *
+   * What it does:
+   * Returns whether one `LuaStackObject` currently points at a Lua boolean
+   * stack slot (`lua_type == LUA_TBOOLEAN`).
+   */
+  [[maybe_unused]] bool IsLuaStackObjectBooleanType(
+    const LuaPlus::LuaStackObject& stackObject
+  ) noexcept
+  {
+    if (stackObject.m_state == nullptr || stackObject.m_state->GetCState() == nullptr) {
+      return false;
+    }
+
+    return lua_type(stackObject.m_state->GetCState(), stackObject.m_stackIndex) == LUA_TBOOLEAN;
+  }
+
+  /**
+   * Address: 0x007B8190 (FUN_007B8190)
+   *
+   * What it does:
+   * Drops one shared pointer lane and releases the last ownership reference
+   * when this was the final live handle.
+   */
+  void ReleaseGlobalGpgNetPtr(
+    boost::shared_ptr<CGpgNetInterface>& ptr
+  ) noexcept
+  {
+    ptr.reset();
+  }
+
+  struct SharedCountControlBlockVTable
+  {
+    std::uint8_t reserved_00[0x04];
+    void(__thiscall* disposeObject)(void* self); // +0x04
+    void(__thiscall* destroySelf)(void* self);   // +0x08
+  };
+
+  struct SharedCountControlBlockRuntime
+  {
+    SharedCountControlBlockVTable* vtable; // +0x00
+    volatile long useCount;                // +0x04
+    volatile long weakCount;               // +0x08
+  };
+
+  struct SharedCountRuntimeLane
+  {
+    std::uint32_t reserved_00 = 0u;
+    SharedCountControlBlockRuntime* control = nullptr; // +0x04
+  };
+
+  /**
+   * Address: 0x007B8DE0 (FUN_007B8DE0)
+   *
+   * What it does:
+   * Releases one shared-count control block lane by decrementing strong/weak
+   * reference counts and dispatching dispose/destroy virtual callbacks on the
+   * last references.
+   */
+  [[maybe_unused]] SharedCountRuntimeLane* ReleaseSharedCountRuntimeLane(
+    SharedCountRuntimeLane* const lane
+  ) noexcept
+  {
+    if (lane == nullptr || lane->control == nullptr) {
+      return lane;
+    }
+
+    SharedCountControlBlockRuntime* const control = lane->control;
+    if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
+      if (control->vtable != nullptr && control->vtable->disposeObject != nullptr) {
+        control->vtable->disposeObject(control);
+      }
+
+      if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
+        if (control->vtable != nullptr && control->vtable->destroySelf != nullptr) {
+          control->vtable->destroySelf(control);
+        }
+      }
+    }
+
+    return lane;
+  }
+
+  /**
+   * Address: 0x007BB0E0 (FUN_007BB0E0)
+   *
+   * What it does:
+   * Returns the live element count for one legacy vector lane.
+   */
+  [[nodiscard]] std::size_t GetCommandArgCount(
+    const msvc8::vector<SNetCommandArg>& args
+  ) noexcept
+  {
+    return args.size();
+  }
+
+  /**
+   * Address: 0x007BB0A0 (FUN_007BB0A0)
+   *
+   * What it does:
+   * Clears one command-argument vector lane before the owning command object
+   * finishes destruction.
+   */
+  void DestroyCommandArgStorage(
+    msvc8::vector<SNetCommandArg>& args
+  ) noexcept
+  {
+    args = msvc8::vector<SNetCommandArg>{};
+  }
+
+  /**
+   * Address: 0x007BBA90 (FUN_007BBA90)
+   *
+   * What it does:
+   * Clears the queued command deque and releases its element payload lanes.
+   */
+  void ClearCommandQueue(
+    msvc8::deque<SNetCommand>& commands
+  ) noexcept
+  {
+    commands.clear();
+  }
+
+  /**
+   * Address: 0x007BB3C0 (FUN_007BB3C0, queue-clear thunk)
+   * Address: 0x007BB4D0 (FUN_007BB4D0, queue-clear thunk)
+   *
+   * What it does:
+   * Tail-forwards one queued-command deque clear lane into
+   * `ClearCommandQueue`.
+   */
+  [[maybe_unused]] void ClearCommandQueueThunk(
+    msvc8::deque<SNetCommand>& commands
+  ) noexcept
+  {
+    ClearCommandQueue(commands);
+  }
+
+  template <class T>
+  struct LegacyDequeRuntimeView
+  {
+    void* mProxy;
+    T** mMap;
+    std::size_t mMapSize;
+    std::size_t mOffset;
+    std::size_t mSize;
+  };
+
+  static_assert(sizeof(LegacyDequeRuntimeView<SNetCommand>) == 0x14, "LegacyDequeRuntimeView size must be 0x14");
+
+  template <class T>
+  [[nodiscard]] LegacyDequeRuntimeView<T>& AsLegacyDequeRuntimeView(
+    msvc8::deque<T>& deque
+  ) noexcept
+  {
+    return *reinterpret_cast<LegacyDequeRuntimeView<T>*>(&deque);
+  }
+
+  /**
+   * Address: 0x007BCF50 (FUN_007BCF50)
+   *
+   * What it does:
+   * Swaps one legacy deque's map/offset/size storage lanes with another
+   * deque, preserving proxy ownership in each object.
+   */
+  [[maybe_unused]] msvc8::deque<SNetCommand>& SwapQueuedCommandDequeStorage(
+    msvc8::deque<SNetCommand>& left,
+    msvc8::deque<SNetCommand>& right
+  ) noexcept
+  {
+    LegacyDequeRuntimeView<SNetCommand>& leftView = AsLegacyDequeRuntimeView(left);
+    LegacyDequeRuntimeView<SNetCommand>& rightView = AsLegacyDequeRuntimeView(right);
+
+    std::swap(leftView.mMap, rightView.mMap);
+    std::swap(leftView.mMapSize, rightView.mMapSize);
+    std::swap(leftView.mOffset, rightView.mOffset);
+    std::swap(leftView.mSize, rightView.mSize);
+    return left;
+  }
+
+  /**
+   * Address: 0x007BC5B0 (FUN_007BC5B0)
+   *
+   * What it does:
+   * Jump-adapter lane that forwards deque storage swap to
+   * `SwapQueuedCommandDequeStorage`.
+   */
+  [[maybe_unused]] msvc8::deque<SNetCommand>& SwapQueuedCommandDequeStorageThunk(
+    msvc8::deque<SNetCommand>& left,
+    msvc8::deque<SNetCommand>& right
+  ) noexcept
+  {
+    return SwapQueuedCommandDequeStorage(left, right);
+  }
+
+  /**
+   * Address: 0x007BB920 (FUN_007BB920)
+   *
+   * What it does:
+   * Grows one legacy deque map by the binary's guarded step policy, moves the
+   * existing slot map into the new allocation, and zero-fills the newly added
+   * pointer lanes.
+   */
+  [[maybe_unused]] SNetCommand** GrowLegacyDequeMap(
+    msvc8::deque<SNetCommand>& deque
+  )
+  {
+    LegacyDequeRuntimeView<SNetCommand>& view = AsLegacyDequeRuntimeView(deque);
+
+    constexpr std::size_t kMaxDequeSlots = 0x05555555u;
+    if (view.mMapSize == kMaxDequeSlots) {
+      throw std::length_error("deque<T> too long");
+    }
+
+    std::size_t growth = 1U;
+    const std::size_t halfMapSize = view.mMapSize >> 1U;
+    if (halfMapSize >= 8U) {
+      if (halfMapSize > 1U) {
+        growth = halfMapSize;
+      }
+    } else {
+      growth = 8U;
+    }
+
+    if (view.mMapSize > kMaxDequeSlots - growth) {
+      growth = 1U;
+    }
+
+    const std::size_t newMapSize = view.mMapSize + growth;
+    SNetCommand** const newMap = static_cast<SNetCommand**>(::operator new(sizeof(SNetCommand*) * newMapSize));
+    std::memset(newMap, 0, sizeof(SNetCommand*) * newMapSize);
+
+    const std::size_t oldMapSize = view.mMapSize;
+    const std::size_t offset = view.mOffset;
+    SNetCommand** const oldMap = view.mMap;
+
+    if (oldMap != nullptr && oldMapSize != 0U) {
+      const std::size_t tailCount = offset < oldMapSize ? oldMapSize - offset : 0U;
+      if (tailCount != 0U) {
+        (void)memmove_s(
+          newMap + offset,
+          tailCount * sizeof(SNetCommand*),
+          oldMap + offset,
+          tailCount * sizeof(SNetCommand*)
+        );
+      }
+
+      if (offset > growth) {
+        const std::size_t prefixCount = growth;
+        if (prefixCount != 0U) {
+          (void)memmove_s(
+            newMap + oldMapSize,
+            prefixCount * sizeof(SNetCommand*),
+            oldMap,
+            prefixCount * sizeof(SNetCommand*)
+          );
+        }
+
+        const std::size_t middleCount = offset - growth;
+        if (middleCount != 0U) {
+          (void)memmove_s(
+            newMap,
+            middleCount * sizeof(SNetCommand*),
+            oldMap + growth,
+            middleCount * sizeof(SNetCommand*)
+          );
+        }
+      } else {
+        const std::size_t copiedCount = offset;
+        if (copiedCount != 0U) {
+          (void)memmove_s(
+            newMap + oldMapSize,
+            copiedCount * sizeof(SNetCommand*),
+            oldMap,
+            copiedCount * sizeof(SNetCommand*)
+          );
+        }
+
+        if (growth > copiedCount) {
+          std::memset(
+            newMap + oldMapSize + copiedCount,
+            0,
+            (growth - copiedCount) * sizeof(SNetCommand*)
+          );
+        }
+      }
+    }
+
+    if (oldMap != nullptr) {
+      ::operator delete(static_cast<void*>(oldMap));
+    }
+
+    view.mMap = newMap;
+    view.mMapSize = newMapSize;
+    return newMap;
+  }
+
+  /**
+   * Address: 0x007BB440 (FUN_007BB440, deque push-back lane)
+   *
+   * What it does:
+   * Appends one `SNetCommand` to the back of the legacy deque command queue.
+   */
+  [[maybe_unused]] void PushBackQueuedCommand(
+    msvc8::deque<SNetCommand>& commandQueue,
+    const SNetCommand& command
+  )
+  {
+    commandQueue.push_back(command);
+  }
+
+  /**
+   * Address: 0x007BE750 (FUN_007BE750, deque push-front lane)
+   *
+   * What it does:
+   * Prepends one `SNetCommand` to the front of the legacy deque command queue
+   * and returns the stored front element address.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommand* PushFrontQueuedCommand(
+    msvc8::deque<SNetCommand>& commandQueue,
+    const SNetCommand& command
+  )
+  {
+    commandQueue.push_front(command);
+    return commandQueue.empty() ? nullptr : &commandQueue.front();
+  }
+
+  /**
+   * Address: 0x007BB400 (FUN_007BB400)
+   *
+   * What it does:
+   * Destroys one queued command at the front ring slot, advances the ring
+   * offset, and decrements queue size.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t PopFrontQueuedCommandRing(
+    msvc8::deque<SNetCommand>& commandQueue
+  )
+  {
+    LegacyDequeRuntimeView<SNetCommand>& view = AsLegacyDequeRuntimeView(commandQueue);
+    if (view.mSize == 0U) {
+      return static_cast<std::uint32_t>(view.mOffset);
+    }
+
+    view.mMap[view.mOffset]->~SNetCommand();
+    ++view.mOffset;
+    if (view.mOffset >= view.mMapSize) {
+      view.mOffset = 0U;
+    }
+
+    const std::size_t previousSize = view.mSize;
+    view.mSize = previousSize - 1U;
+    if (previousSize == 1U) {
+      view.mOffset = 0U;
+    }
+
+    return static_cast<std::uint32_t>(view.mOffset);
+  }
+
+  /**
+   * Address: 0x007BC110 (FUN_007BC110)
+   *
+   * What it does:
+   * Destroys one queued command at the back ring slot and decrements queue
+   * size, resetting offset when the queue becomes empty.
+   */
+  [[maybe_unused]] void PopBackQueuedCommandRing(
+    msvc8::deque<SNetCommand>& commandQueue
+  )
+  {
+    LegacyDequeRuntimeView<SNetCommand>& view = AsLegacyDequeRuntimeView(commandQueue);
+    const std::size_t size = view.mSize;
+    if (size == 0U) {
+      return;
+    }
+
+    std::size_t tailOffset = (view.mOffset + size) - 1U;
+    if (tailOffset >= view.mMapSize) {
+      tailOffset -= view.mMapSize;
+    }
+
+    view.mMap[tailOffset]->~SNetCommand();
+    view.mSize = size - 1U;
+    if (size == 1U) {
+      view.mOffset = 0U;
+    }
+  }
+
+  /**
+   * Address: 0x007BDBB0 (FUN_007BDBB0)
+   *
+   * What it does:
+   * Resets one command-argument string lane to empty SSO storage while
+   * preserving the scalar `mType/mNum` lanes.
+   */
+  [[maybe_unused]] void ResetSingleCommandArgStorage(
+    SNetCommandArg& arg
+  ) noexcept
+  {
+    ResetLegacyStringStorage(arg.mStr);
+  }
+
+  /**
+   * Address: 0x007B6D80 (FUN_007B6D80)
+   *
+   * What it does:
+   * Resets one `SNetCommandArg` string payload lane back to empty storage
+   * while preserving `mType/mNum` scalars and returns `0`.
+   */
+  [[maybe_unused]] int ResetSingleCommandArgStringStorageLaneA(
+    SNetCommandArg* const arg
+  ) noexcept
+  {
+    if (arg != nullptr) {
+      ResetLegacyStringStorage(arg->mStr);
+    }
+    return 0;
+  }
+
+  /**
+   * Address: 0x007B6570 (FUN_007B6570)
+   *
+   * What it does:
+   * Initializes one `SNetCommandArg` as `NETARG_Data` and copies a byte range
+   * into the embedded legacy string payload.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* ConstructDataCommandArgFromRangeLaneA(
+    const std::size_t length,
+    const char* const begin,
+    SNetCommandArg* const out
+  )
+  {
+    if (out == nullptr) {
+      return nullptr;
+    }
+
+    out->mType = SNetCommandArg::NETARG_Data;
+    out->mNum = 0;
+    ResetLegacyStringStorage(out->mStr);
+    if (begin != nullptr && length != 0U) {
+      out->mStr.assign(begin, length);
+    }
+    return out;
+  }
+
+  /**
+   * Address: 0x007BE4B0 (FUN_007BE4B0)
+   *
+   * What it does:
+   * Copy-assigns one `SNetCommandArg` lane by mirroring scalar fields and
+   * rebuilding the legacy string payload from source text.
+   */
+  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArg(
+    SNetCommandArg* const destination,
+    const SNetCommandArg& source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    destination->mType = source.mType;
+    destination->mNum = source.mNum;
+    destination->mStr.reset_and_assign(source.mStr);
+    return destination;
+  }
+
+  /**
+   * Address: 0x007BDBA0 (FUN_007BDBA0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one single-lane command-argument
+   * copy-assignment into the canonical `CopyAssignSingleCommandArg` helper.
+   */
+  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArgRegisterAdapter(
+    SNetCommandArg* const destination,
+    const SNetCommandArg& source
+  )
+  {
+    return CopyAssignSingleCommandArg(destination, source);
+  }
+
+  /**
+   * Address: 0x007BAE30 (FUN_007BAE30)
+   *
+   * What it does:
+   * Copy-assigns one command-argument lane by mirroring scalar fields and
+   * assigning the full legacy string payload via `assign`.
+   */
+  [[maybe_unused]] SNetCommandArg* CopyAssignSingleCommandArgLaneA(
+    SNetCommandArg* const destination,
+    const SNetCommandArg& source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    destination->mType = source.mType;
+    destination->mNum = source.mNum;
+    destination->mStr.assign(source.mStr, 0, msvc8::string::npos);
+    return destination;
+  }
+
+  /**
+   * Address: 0x007BD950 (FUN_007BD950)
+   *
+   * What it does:
+   * Fills one half-open command-arg range with a single prototype argument by
+   * copying scalar lanes and cloning the legacy string payload.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* FillCommandArgRangeFromPrototype(
+    SNetCommandArg* destinationBegin,
+    SNetCommandArg* destinationEnd,
+    const SNetCommandArg& prototype
+  )
+  {
+    while (destinationBegin != destinationEnd) {
+      destinationBegin->mType = prototype.mType;
+      destinationBegin->mNum = prototype.mNum;
+      destinationBegin->mStr.assign(prototype.mStr, 0, msvc8::string::npos);
+      ++destinationBegin;
+    }
+    return destinationEnd;
+  }
+
+  /**
+   * Address: 0x007BD810 (FUN_007BD810)
+   *
+   * What it does:
+   * Writes `count` copies of one command-argument prototype into contiguous
+   * destination lanes, and on exception destroys already-written lanes before
+   * rethrowing.
+   */
+  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
+    const SNetCommandArg& prototype,
+    std::uint32_t count,
+    SNetCommandArg* const destination
+  )
+  {
+    if (destination == nullptr || count == 0U) {
+      return;
+    }
+
+    SNetCommandArg* const begin = destination;
+    SNetCommandArg* cursor = destination;
+    try {
+      for (std::uint32_t i = 0; i < count; ++i, ++cursor) {
+        (void)CopyAssignSingleCommandArg(cursor, prototype);
+      }
+    } catch (...) {
+      for (SNetCommandArg* rollback = begin; rollback != cursor; ++rollback) {
+        ResetSingleCommandArgStorage(*rollback);
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x007BCB90 (FUN_007BCB90)
+   *
+   * What it does:
+   * Register-order adapter for prototype-range copy/rollback; forwards to
+   * `CopyAssignCommandArgRangeWithRollback` and returns destination lane.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackAdapterA(
+    const SNetCommandArg* const prototype,
+    const std::uint32_t count,
+    SNetCommandArg* const destination
+  )
+  {
+    if (prototype != nullptr) {
+      CopyAssignCommandArgRangeWithRollback(*prototype, count, destination);
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x007BEE10 (FUN_007BEE10, command-arg range copy-assign)
+   *
+   * What it does:
+   * Copy-assigns one half-open contiguous `SNetCommandArg` range into
+   * destination lanes and returns one-past-last written pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRange(
+    SNetCommandArg* destination,
+    const SNetCommandArg* sourceBegin,
+    const SNetCommandArg* sourceEnd
+  )
+  {
+    while (sourceBegin != sourceEnd) {
+      destination->mType = sourceBegin->mType;
+      destination->mNum = sourceBegin->mNum;
+      destination->mStr.assign(sourceBegin->mStr, 0, msvc8::string::npos);
+      ++destination;
+      ++sourceBegin;
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x007BDE40 (FUN_007BDE40)
+   *
+   * What it does:
+   * Copy-assigns one half-open command-argument source range into destination
+   * lanes and rolls back already-written destination entries on exception.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(
+    const SNetCommandArg* sourceBegin,
+    const SNetCommandArg* sourceEnd,
+    SNetCommandArg* destination
+  )
+  {
+    SNetCommandArg* const writtenBegin = destination;
+    SNetCommandArg* cursor = destination;
+    try {
+      while (sourceBegin != sourceEnd) {
+        (void)CopyAssignSingleCommandArg(cursor, *sourceBegin);
+        ++cursor;
+        ++sourceBegin;
+      }
+    } catch (...) {
+      for (SNetCommandArg* rollback = writtenBegin; rollback != cursor; ++rollback) {
+        ResetSingleCommandArgStorage(*rollback);
+      }
+      throw;
+    }
+    return cursor;
+  }
+
+  /**
+   * Address: 0x007BD7D0 (FUN_007BD7D0)
+   *
+   * What it does:
+   * Register-lane adapter that forwards source-range command-argument
+   * copy/rollback into `CopyAssignCommandArgRangeWithRollbackFromSourceLaneA`.
+   */
+  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollbackFromSourceAdapterRegisterLane(
+    SNetCommandArg* const destination,
+    const SNetCommandArg* const sourceBegin,
+    const SNetCommandArg* const sourceEnd
+  )
+  {
+    (void)CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x007BCB00 (FUN_007BCB00)
+   *
+   * What it does:
+   * Adapter lane that forwards source-range command-argument copy/rollback
+   * into `CopyAssignCommandArgRangeWithRollbackFromSourceLaneA`.
+   */
+  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackFromSourceAdapterA(
+    const SNetCommandArg* const sourceBegin,
+    const SNetCommandArg* const sourceEnd,
+    SNetCommandArg* const destination
+  )
+  {
+    return CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x007BD1B0 (FUN_007BD1B0)
+   *
+   * What it does:
+   * Assigns one command-argument vector lane from source into destination,
+   * preserving self-assignment and empty-source clear semantics.
+   */
+  [[maybe_unused]] msvc8::vector<SNetCommandArg>* AssignCommandArgVectorStorage(
+    msvc8::vector<SNetCommandArg>* const destination,
+    const int /*destroyContext*/,
+    const msvc8::vector<SNetCommandArg>* const source
+  )
+  {
+    if (destination == nullptr || source == nullptr) {
+      return destination;
+    }
+
+    if (destination == source) {
+      return destination;
+    }
+
+    if (source->empty()) {
+      destination->clear();
+      return destination;
+    }
+
+    *destination = *source;
+    return destination;
+  }
+
+  struct RuntimeSharedPtrLikeLane
+  {
+    void* object = nullptr;                 // +0x00
+    boost::detail::shared_count count{};    // +0x04
+  };
+  static_assert(sizeof(RuntimeSharedPtrLikeLane) == 0x08, "RuntimeSharedPtrLikeLane size must be 0x08");
+
+  struct RuntimeWeakPtrLikeLane
+  {
+    void* object = nullptr;               // +0x00
+    boost::detail::weak_count count{};    // +0x04
+  };
+  static_assert(sizeof(RuntimeWeakPtrLikeLane) == 0x08, "RuntimeWeakPtrLikeLane size must be 0x08");
+
+  /**
+   * Address: 0x007BCB30 (FUN_007BCB30)
+   *
+   * What it does:
+   * Copies one pointer lane and rebuilds one weak-count lane from source
+   * shared-count ownership.
+   */
+  [[maybe_unused]] [[nodiscard]] RuntimeWeakPtrLikeLane* CopyWeakPtrLikeLaneFromSharedLaneA(
+    const RuntimeSharedPtrLikeLane* const source,
+    RuntimeWeakPtrLikeLane* const destination
+  )
+  {
+    if (source == nullptr || destination == nullptr) {
+      return destination;
+    }
+
+    destination->count = boost::detail::weak_count(source->count);
+    destination->object = source->object;
+    return destination;
+  }
+
+  /**
+   * Address: 0x007BCB70 (FUN_007BCB70)
+   *
+   * What it does:
+   * Secondary copy lane for shared-to-weak pointer payload cloning.
+   */
+  [[maybe_unused]] [[nodiscard]] RuntimeWeakPtrLikeLane* CopyWeakPtrLikeLaneFromSharedLaneB(
+    const RuntimeSharedPtrLikeLane* const source,
+    RuntimeWeakPtrLikeLane* const destination
+  )
+  {
+    return CopyWeakPtrLikeLaneFromSharedLaneA(source, destination);
+  }
+
+  struct RuntimeCommandDispatchLane
+  {
+    using DispatchFn = int(__thiscall*)(std::uint32_t adjustedThis, std::uint32_t dwordArg, std::uint32_t wordArg);
+
+    DispatchFn dispatch;        // +0x00
+    std::uint32_t thisBase;     // +0x04
+    std::uint32_t thisOffset;   // +0x08
+    std::uint32_t dwordArg;     // +0x0C
+    std::uint16_t wordArg;      // +0x10
+    std::uint16_t reserved12;   // +0x12
+  };
+  static_assert(sizeof(RuntimeCommandDispatchLane) == 0x14, "RuntimeCommandDispatchLane size must be 0x14");
+
+  /**
+   * Address: 0x007BEE50 (FUN_007BEE50)
+   *
+   * What it does:
+   * Rebuilds one adjusted this-pointer lane (`base + offset`) and dispatches
+   * through the stored thiscall function pointer with one dword and one
+   * zero-extended word payload argument.
+   */
+  [[maybe_unused]] int DispatchCommandThroughAdjustedThiscall(
+    RuntimeCommandDispatchLane* const lane
+  )
+  {
+    const std::uint32_t adjustedThis = lane->thisBase + lane->thisOffset;
+    return lane->dispatch(adjustedThis, lane->dwordArg, static_cast<std::uint32_t>(lane->wordArg));
+  }
+
+  /**
+   * Address: 0x007BD8F0 (FUN_007BD8F0)
+   *
+   * What it does:
+   * Destroys one half-open `SNetCommandArg` range by releasing each string
+   * payload lane in turn.
+   */
+  [[maybe_unused]] void DestroyCommandArgRange(
+    SNetCommandArg* first,
+    SNetCommandArg* last
+  ) noexcept
+  {
+    for (; first != last; ++first) {
+      ResetLegacyStringStorage(first->mStr);
+    }
+  }
+
+  /**
+   * Address: 0x007BBD40 (FUN_007BBD40)
+   *
+   * What it does:
+   * Adapts one thiscall range-destroy lane into
+   * `DestroyCommandArgRange(begin, end)`.
+   */
+  [[maybe_unused]] void DestroyCommandArgRangeThiscallAdapter(
+    SNetCommandArg* const rangeEnd,
+    SNetCommandArg* const rangeBegin
+  ) noexcept
+  {
+    DestroyCommandArgRange(rangeBegin, rangeEnd);
+  }
+
+  [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresent(
+    moho::SNetCommand* const destination,
+    const moho::SNetCommand* const source
+  )
+  {
+    if (source == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (destination) moho::SNetCommand(*source);
+  }
+
+  /**
+   * Address: 0x007BBB90 (FUN_007BBB90)
+   *
+   * What it does:
+   * Primary adapter lane for nullable `SNetCommand` copy-construction into
+   * caller-provided queue storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresentPrimary(
+    moho::SNetCommand* const destination,
+    const moho::SNetCommand* const source
+  )
+  {
+    return CopyConstructSNetCommandIfPresent(destination, source);
+  }
+
+  /**
+   * Address: 0x007BCC60 (FUN_007BCC60)
+   *
+   * What it does:
+   * Secondary adapter lane for nullable `SNetCommand` copy-construction into
+   * caller-provided queue storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SNetCommand* CopyConstructSNetCommandIfPresentSecondary(
+    moho::SNetCommand* const destination,
+    const moho::SNetCommand* const source
+  )
+  {
+    return CopyConstructSNetCommandIfPresent(destination, source);
+  }
 } // namespace
 
 /**
@@ -112,7 +1064,8 @@ void moho::GPGNET_SetPtr(
   const boost::shared_ptr<CGpgNetInterface>& ptr
 )
 {
-  sGPGNet = ptr;
+  boost::shared_ptr<CGpgNetInterface> lane = ptr;
+  SwapGlobalGpgNetPtr(lane);
 }
 
 boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
@@ -277,7 +1230,7 @@ void moho::GPGNET_Attach(
  */
 void moho::GPGNET_Shutdown()
 {
-  sGPGNet = boost::shared_ptr<CGpgNetInterface>{};
+  ReleaseGlobalGpgNetPtr(sGPGNet);
 }
 
 /**
@@ -451,12 +1404,34 @@ moho::SNetCommand::SNetCommand(
 {}
 
 /**
+ * Address: 0x007BCE70 (FUN_007BCE70)
+ *
+ * What it does:
+ * Copy-constructs one queued command entry by initializing destination name
+ * and argument-vector storage from source lanes, then copying queued value.
+ */
+moho::SNetCommand::SNetCommand(
+  const SNetCommand& source
+)
+  : mName()
+  , mArgs()
+  , mVal(0)
+{
+  mName.reset_and_assign(source.mName);
+  (void)AssignCommandArgVectorStorage(&mArgs, 0, &source.mArgs);
+  mVal = source.mVal;
+}
+
+/**
  * Address: 0x007BAEF0 (FUN_007BAEF0, ??1SNetCommand@Moho@@QAE@@Z)
  *
  * What it does:
  * Runs member destructors for queued-command name/argument storage.
  */
-moho::SNetCommand::~SNetCommand() = default;
+moho::SNetCommand::~SNetCommand()
+{
+  DestroyCommandArgStorage(mArgs);
+}
 
 /**
  * Address: 0x007BCA70 (FUN_007BCA70, Moho::CGpgNetInterface::CreatePtr)
@@ -544,7 +1519,7 @@ bool CGpgNetInterface::Shutdown()
     mConnectThreadWorker = nullptr;
   }
 
-  mCommands.clear();
+  ClearCommandQueue(mCommands);
 
   if (mTcpSocket) {
     delete mTcpSocket;
@@ -599,12 +1574,8 @@ void CGpgNetInterface::ReceivePacket(
   const msvc8::string connStr = gpg::STR_Printf("%s:%d", ip.c_str(), static_cast<int>(port));
   SNetCommandArg argFrom(connStr);
 
-  msvc8::string blob;
-  if (data && size) {
-    blob.assign(data, size);
-  }
-  SNetCommandArg argData(blob);
-  argData.mType = SNetCommandArg::NETARG_Data;
+  SNetCommandArg argData(0);
+  (void)ConstructDataCommandArgFromRangeLaneA(size, data, &argData);
 
   WriteCommandWith2Args("ProcessNatPacket", &argFrom, &argData);
 }
@@ -760,7 +1731,7 @@ void CGpgNetInterface::WriteCommand(
 
   WriteCommandName(name);
 
-  const uint32_t argc = static_cast<uint32_t>(args.size());
+  const uint32_t argc = static_cast<uint32_t>(GetCommandArgCount(args));
   mTcpSocket->Write(argc);
 
   for (const SNetCommandArg& arg : args) {
@@ -996,6 +1967,26 @@ void CGpgNetInterface::WriteArg(
 }
 
 /**
+ * Address: 0x007B75D0 (FUN_007B75D0)
+ *
+ * What it does:
+ * Validates GPGNet connected state under `mLock` and closes one active TCP
+ * socket lane with bidirectional shutdown.
+ */
+void CGpgNetInterface::EnsureConnectedAndCloseSocket()
+{
+  boost::mutex::scoped_lock lock(mLock);
+
+  if (mConnectionState != kNetStateEstablishing) {
+    throw std::runtime_error("Gpg.net not connected");
+  }
+
+  if (mTcpSocket != nullptr) {
+    mTcpSocket->VirtClose(gpg::Stream::ModeBoth);
+  }
+}
+
+/**
  * Address: 0x007B7710 (FUN_007B7710 / func_GPGNETProcess)
  *
  * What it does:
@@ -1004,21 +1995,18 @@ void CGpgNetInterface::WriteArg(
  */
 void CGpgNetInterface::Process()
 {
-  msvc8::vector<SNetCommand> pending;
+  msvc8::deque<SNetCommand> pending;
 
   {
     boost::mutex::scoped_lock lock(mLock);
-    while (!mCommands.empty()) {
-      pending.push_back(mCommands.front());
-      mCommands.pop_front();
-    }
+    (void)SwapQueuedCommandDequeStorage(mCommands, pending);
     if (mQueueEvent) {
       ResetEvent(mQueueEvent);
     }
   }
 
-  for (std::size_t i = 0; i < pending.size(); ++i) {
-    SNetCommand& command = pending[i];
+  while (!pending.empty()) {
+    SNetCommand& command = pending.front();
     mConnectionState = static_cast<DWORD>(command.mVal);
 
     try {
@@ -1051,6 +2039,8 @@ void CGpgNetInterface::Process()
     } catch (const std::exception& ex) {
       gpg::Logf("GPGNET: command processing failed: %s", ex.what());
     }
+
+    pending.pop_front();
   }
 }
 
@@ -1064,9 +2054,10 @@ void CGpgNetInterface::Test(
   msvc8::vector<SNetCommandArg>& args
 )
 {
-  gpg::Logf("GPGNET: test message, %d args", static_cast<int>(args.size()));
+  const std::size_t argCount = GetCommandArgCount(args);
+  gpg::Logf("GPGNET: test message, %d args", static_cast<int>(argCount));
 
-  for (std::size_t i = 0; i < args.size(); ++i) {
+  for (std::size_t i = 0; i < argCount; ++i) {
     const SNetCommandArg& arg = args[i];
     switch (arg.mType) {
     case SNetCommandArg::NETARG_Num:
@@ -1583,7 +2574,7 @@ void CGpgNetInterface::EnqueueCommand(
   }
 
   const SNetCommand command(name, args, val);
-  mCommands.push_back(command);
+  PushBackQueuedCommand(mCommands, command);
 }
 
 namespace

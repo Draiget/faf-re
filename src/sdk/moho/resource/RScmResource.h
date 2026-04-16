@@ -34,6 +34,14 @@ namespace moho
     RScmResource(gpg::StrArg resourcePath, const boost::shared_ptr<const SScmFile>& scmFile);
 
     /**
+     * Address: 0x00539FB0 (FUN_00539FB0)
+     *
+     * What it does:
+     * Releases owned skeleton payload and tears down shared resource lanes.
+     */
+    ~RScmResource();
+
+    /**
      * Address: 0x00538DB0 (FUN_00538DB0,
      * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
      */

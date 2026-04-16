@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <new>
 #include <typeinfo>
 
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/audio/CSndParams.h"
@@ -17,6 +19,169 @@ namespace
 {
   constexpr std::uint32_t kAttachmentParentSentinel = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
   constexpr moho::EUserEntityVisibilityMode kDefaultVisibilityMode = moho::EUserEntityVisibilityMode::MapPlayableRect;
+
+  class SSTIEntityAttachInfoTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "SSTIEntityAttachInfo";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTIEntityAttachInfo);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  class EntityAttributesTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "EntityAttributes";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::SSTIIntelAttributes);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  gpg::SerSaveLoadHelperListRuntime gSSTIEntityAttachInfoSerializer{};
+  gpg::SerSaveLoadHelperListRuntime gEntityAttributesSerializer{};
+  moho::SSTIEntityVariableDataSerializer gSSTIEntityVariableDataSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime&
+  AsSerSaveLoadHelperListRuntime(moho::SSTIEntityVariableDataSerializer& serializer) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&serializer);
+  }
+
+  /**
+   * Address: 0x005583C0 (FUN_005583C0, SerSaveLoadHelper<SSTIEntityAttachInfo>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `SSTIEntityAttachInfo` serializer helper links and restores
+   * self-links for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityAttachInfoSerializer);
+  }
+
+  /**
+   * Address: 0x005583F0 (FUN_005583F0, SerSaveLoadHelper<SSTIEntityAttachInfo>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the
+   * `SSTIEntityAttachInfo` serializer helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityAttachInfoSerializer);
+  }
+
+  /**
+   * Address: 0x005585C0 (FUN_005585C0, SerSaveLoadHelper<EntityAttributes>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `EntityAttributes` serializer helper links and restores
+   * self-links for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkEntityAttributesSerializerLaneA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gEntityAttributesSerializer);
+  }
+
+  /**
+   * Address: 0x005585F0 (FUN_005585F0, SerSaveLoadHelper<EntityAttributes>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the
+   * `EntityAttributes` serializer helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkEntityAttributesSerializerLaneB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gEntityAttributesSerializer);
+  }
+
+  /**
+   * Address: 0x00558900 (FUN_00558900, SerSaveLoadHelper<SSTIEntityVariableData>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `SSTIEntityVariableData` serializer helper links and restores
+   * self-links for intrusive-list sentinel state.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityVariableDataSerializer));
+  }
+
+  /**
+   * Address: 0x00558930 (FUN_00558930, SerSaveLoadHelper<SSTIEntityVariableData>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the
+   * `SSTIEntityVariableData` serializer helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityVariableDataSerializer));
+  }
+
+  void DeserializeSSTIEntityVariableDataSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || object == nullptr) {
+      return;
+    }
+
+    // Load callback body is still being reconstructed; keep object alive and
+    // leave fields at their current/default state for now.
+  }
+
+  void SerializeSSTIEntityVariableDataSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || object == nullptr) {
+      return;
+    }
+
+    object->MemberSerialize(archive, 2);
+  }
+
+  /**
+   * Address: 0x005588D0 (FUN_005588D0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `SSTIEntityVariableDataSerializer`
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SSTIEntityVariableDataSerializer*
+  InitializeSSTIEntityVariableDataSerializerStartupThunk()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gSSTIEntityVariableDataSerializer.mNext);
+    gSSTIEntityVariableDataSerializer.mPrev = self;
+    gSSTIEntityVariableDataSerializer.mNext = self;
+    gSSTIEntityVariableDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityVariableDataSerializerCallback;
+    gSSTIEntityVariableDataSerializer.mSerSaveFunc = &SerializeSSTIEntityVariableDataSerializerCallback;
+    return &gSSTIEntityVariableDataSerializer;
+  }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {
@@ -145,9 +310,9 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EntityAttributes", "Moho::EntityAttributes"});
+      sType = ResolveTypeByAnyName({"EntityAttributes", "Moho::EntityAttributes", "SSTIIntelAttributes"});
       if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::SSTIIntelAttributes));
+        sType = moho::preregister_EntityAttributesTypeInfo();
       }
     }
     return sType;
@@ -160,6 +325,296 @@ namespace
     ref.mObj = object;
     ref.mType = type;
     return ref;
+  }
+
+  struct SSTIEntityVariableDataSlotRuntime
+  {
+    std::uint32_t mHeaderWord0 = 0;               // +0x00
+    std::uint32_t mHeaderWord1 = 0;               // +0x04
+    moho::SSTIEntityVariableData mVariableData{}; // +0x08
+  };
+
+  static_assert(
+    offsetof(SSTIEntityVariableDataSlotRuntime, mVariableData) == 0x08,
+    "SSTIEntityVariableDataSlotRuntime::mVariableData offset must be 0x08"
+  );
+  static_assert(sizeof(SSTIEntityVariableDataSlotRuntime) == 0xD8, "SSTIEntityVariableDataSlotRuntime size must be 0xD8");
+
+  /**
+   * Address: 0x005616A0 (FUN_005616A0)
+   *
+   * What it does:
+   * Destroys one contiguous slot range by invoking
+   * `SSTIEntityVariableData` destructor on each embedded payload lane at
+   * slot offset `+0x08`.
+   */
+  [[maybe_unused]] void DestroySSTIEntityVariableDataSlotPayloadRange(
+    SSTIEntityVariableDataSlotRuntime* begin,
+    SSTIEntityVariableDataSlotRuntime* const end
+  )
+  {
+    while (begin != end) {
+      begin->mVariableData.~SSTIEntityVariableData();
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x00676AC0 (FUN_00676AC0)
+   *
+   * What it does:
+   * Initializes one counted slot header to `0xF0000000` and default-constructs
+   * the embedded `SSTIEntityVariableData` payload at offset `+0x08`.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* ConstructSSTIEntityVariableDataSlotRuntime(
+    SSTIEntityVariableDataSlotRuntime* const slot
+  )
+  {
+    slot->mHeaderWord0 = 0xF0000000u;
+    ::new (&slot->mVariableData) moho::SSTIEntityVariableData();
+    return slot;
+  }
+
+  /**
+   * Address: 0x00563380 (FUN_00563380, copy_SSTIEntityVariableData_slot_range_with_rollback)
+   *
+   * What it does:
+   * Copy-constructs one contiguous slot range (`header + SSTIEntityVariableData`)
+   * into destination storage and destroys already-constructed payload lanes
+   * before rethrowing if a copy step throws.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollback(
+    const SSTIEntityVariableDataSlotRuntime* sourceBegin,
+    const SSTIEntityVariableDataSlotRuntime* sourceEnd,
+    SSTIEntityVariableDataSlotRuntime* destinationBegin
+  )
+  {
+    SSTIEntityVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (const SSTIEntityVariableDataSlotRuntime* sourceCursor = sourceBegin;
+           sourceCursor != sourceEnd;
+           ++sourceCursor, ++destinationCursor) {
+        if (destinationCursor != nullptr) {
+          destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+          ::new (&destinationCursor->mVariableData) moho::SSTIEntityVariableData();
+          (void)sourceCursor->mVariableData.cpy(&destinationCursor->mVariableData);
+        }
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTIEntityVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTIEntityVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x00562B40 (FUN_00562B40)
+   *
+   * What it does:
+   * Primary adapter lane that forwards one contiguous
+   * `SSTIEntityVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTIEntityVariableDataSlotRangeWithRollbackAdapterLaneA(
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIEntityVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00563030 (FUN_00563030)
+   *
+   * What it does:
+   * Secondary adapter lane that forwards one contiguous
+   * `SSTIEntityVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTIEntityVariableDataSlotRangeWithRollbackAdapterLaneB(
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIEntityVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00563220 (FUN_00563220)
+   *
+   * What it does:
+   * Tertiary adapter lane that forwards one contiguous
+   * `SSTIEntityVariableData` slot-range copy into the canonical rollback
+   * helper.
+   */
+  [[maybe_unused]] void CopySSTIEntityVariableDataSlotRangeWithRollbackAdapterLaneC(
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceEnd
+  )
+  {
+    (void)CopySSTIEntityVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00680970 (FUN_00680970, copy_SSTIEntityVariableData_slot_range_with_rollback_counted)
+   *
+   * What it does:
+   * Copy-constructs one counted slot range (`header + SSTIEntityVariableData`)
+   * into destination storage and destroys already-constructed payload lanes
+   * before rethrowing if a copy step throws.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(
+    const std::uint32_t count,
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin
+  )
+  {
+    if (count == 0u) {
+      return destinationBegin;
+    }
+
+    if (destinationBegin == nullptr || sourceBegin == nullptr) {
+      return destinationBegin;
+    }
+
+    SSTIEntityVariableDataSlotRuntime* destinationCursor = destinationBegin;
+    try {
+      for (std::uint32_t i = 0; i < count; ++i, ++destinationCursor) {
+        const SSTIEntityVariableDataSlotRuntime* const sourceCursor = sourceBegin + i;
+        destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
+        ::new (&destinationCursor->mVariableData) moho::SSTIEntityVariableData();
+        (void)sourceCursor->mVariableData.cpy(&destinationCursor->mVariableData);
+      }
+      return destinationCursor;
+    } catch (...) {
+      for (SSTIEntityVariableDataSlotRuntime* destroyCursor = destinationBegin;
+           destroyCursor != destinationCursor;
+           ++destroyCursor) {
+        destroyCursor->mVariableData.~SSTIEntityVariableData();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x0067F750 (FUN_0067F750)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one pre-counted contiguous
+   * `SSTIEntityVariableData` slot copy lane into the canonical counted helper.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackCountedRegisterAdapter(
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const std::uint32_t count
+  )
+  {
+    return CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  /**
+   * Address: 0x0067C7C0 (FUN_0067C7C0)
+   *
+   * What it does:
+   * Alternate register-lane adapter for counted contiguous
+   * `SSTIEntityVariableData` slot copy-construction.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackCountedAdapterLaneB(
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin,
+    const std::uint32_t count
+  )
+  {
+    return CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00562650 (FUN_00562650)
+   *
+   * What it does:
+   * Register-shape adapter for guarded contiguous
+   * `SSTIEntityVariableData` slot copy-construction.
+   */
+  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackRegisterAdapter(
+    const SSTIEntityVariableDataSlotRuntime* const sourceBegin,
+    const SSTIEntityVariableDataSlotRuntime* const sourceEnd,
+    SSTIEntityVariableDataSlotRuntime* const destinationBegin
+  )
+  {
+    if (!sourceBegin || !sourceEnd || sourceEnd < sourceBegin) {
+      return destinationBegin;
+    }
+
+    const std::uint32_t count = static_cast<std::uint32_t>(sourceEnd - sourceBegin);
+    return CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
+  }
+
+  constexpr const char* kSerializationHeaderPath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
+
+  struct SerSaveLoadHelperInitRuntimeView
+  {
+    void* mVTable = nullptr;                    // +0x00
+    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
+    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
+    gpg::RType::load_func_t mLoadCallback = nullptr; // +0x0C
+    gpg::RType::save_func_t mSaveCallback = nullptr; // +0x10
+  };
+  static_assert(
+    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperNext) == 0x04,
+    "SerSaveLoadHelperInitRuntimeView::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SerSaveLoadHelperInitRuntimeView, mHelperPrev) == 0x08,
+    "SerSaveLoadHelperInitRuntimeView::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SerSaveLoadHelperInitRuntimeView, mLoadCallback) == 0x0C,
+    "SerSaveLoadHelperInitRuntimeView::mLoadCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerSaveLoadHelperInitRuntimeView, mSaveCallback) == 0x10,
+    "SerSaveLoadHelperInitRuntimeView::mSaveCallback offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SerSaveLoadHelperInitRuntimeView) == 0x14,
+    "SerSaveLoadHelperInitRuntimeView size must be 0x14"
+  );
+
+  /**
+   * Address: 0x00558B20 (FUN_00558B20, gpg::SerSaveLoadHelper_SSTIEntityAttachInfo::Init)
+   *
+   * What it does:
+   * Resolves reflected type metadata for `SSTIEntityAttachInfo` and binds one
+   * serializer helper's load/save callback lanes into that RTTI entry.
+   */
+  void InstallSSTIEntityAttachInfoSerializerCallbacks(SerSaveLoadHelperInitRuntimeView* const helper)
+  {
+    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::SSTIEntityAttachInfo));
+      moho::SSTIEntityAttachInfo::sType = type;
+    }
+
+    if (type->serLoadFunc_ != nullptr) {
+      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
+    }
+
+    const bool saveWasNull = type->serSaveFunc_ == nullptr;
+    type->serLoadFunc_ = helper->mLoadCallback;
+
+    if (!saveWasNull) {
+      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
+    }
+
+    type->serSaveFunc_ = helper->mSaveCallback;
   }
 } // namespace
 
@@ -478,6 +933,46 @@ namespace moho
   }
 
   /**
+   * Address: 0x005581D0 (FUN_005581D0, preregister_SSTIEntityAttachInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIEntityAttachInfo`.
+   */
+  gpg::RType* preregister_SSTIEntityAttachInfoTypeInfo()
+  {
+    static SSTIEntityAttachInfoTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTIEntityAttachInfo), &typeInfo);
+    SSTIEntityAttachInfo::sType = &typeInfo;
+    return &typeInfo;
+  }
+
+  /**
+   * Address: 0x00558420 (FUN_00558420, preregister_EntityAttributesTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `EntityAttributes`.
+   */
+  gpg::RType* preregister_EntityAttributesTypeInfo()
+  {
+    static EntityAttributesTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTIIntelAttributes), &typeInfo);
+    return &typeInfo;
+  }
+
+  /**
+   * Address: 0x00558620 (FUN_00558620, preregister_SSTIEntityVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIEntityVariableData`.
+   */
+  gpg::RType* preregister_SSTIEntityVariableDataTypeInfo()
+  {
+    static SSTIEntityVariableDataTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(SSTIEntityVariableData), &typeInfo);
+    return &typeInfo;
+  }
+
+  /**
    * Address: 0x005586B0 (FUN_005586B0, sub_5586B0)
    */
   SSTIEntityVariableDataTypeInfo::~SSTIEntityVariableDataTypeInfo() = default;
@@ -501,10 +996,6 @@ namespace moho
     Finish();
   }
 
-  // Static cached RType slot for the recovered placeholder
-  // `SSTIEntityAttachInfo` type. Populated by the first
-  // `gpg::RRef_SSTIEntityAttachInfo` call via cached lookup; no
-  // additional registration is required because the binary's only
-  // observed access to `sType` is through the same RRef helper.
+  // Cached reflected `SSTIEntityAttachInfo` lane.
   gpg::RType* SSTIEntityAttachInfo::sType = nullptr;
 } // namespace moho

@@ -16,6 +16,14 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x00902D20 (FUN_00902D20, ??0RenderTargetD3D10@gal@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Initializes default context lanes and clears retained D3D10 pointers.
+         */
+        RenderTargetD3D10();
+
+        /**
          * Address: 0x00902FE0 (FUN_00902FE0)
          *
          * void *,void *,void *

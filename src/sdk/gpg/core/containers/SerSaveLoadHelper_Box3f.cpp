@@ -19,7 +19,7 @@ namespace
 namespace gpg
 {
   /**
-   * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper_Box3f::Init)
+    * Alias of FUN_004756D0 (non-canonical helper lane).
    */
   void SerSaveLoadHelper_Box3f::RegisterSerializeFunctions()
   {

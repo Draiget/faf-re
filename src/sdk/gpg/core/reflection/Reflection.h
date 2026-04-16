@@ -69,6 +69,7 @@ namespace moho
   class CAiReconDBImpl;
   class CAiSteeringImpl;
   class CAiSiloBuildImpl;
+  class CAiTransportImpl;
   class LAiAttackerImpl;
   class IAiCommandDispatchImpl;
   template <class TEvent>
@@ -101,6 +102,7 @@ namespace moho
   enum EAiTransportEvent : std::int32_t;
   enum EProjectileImpactEvent : int;
   enum class EAiTargetType : std::int32_t;
+  enum class ESTITargetType : std::int32_t;
   enum EAiResult : std::int32_t;
   enum class ESquadClass : std::int32_t;
   enum EVisibilityMode : std::int32_t;
@@ -146,6 +148,7 @@ namespace moho
   class CUnitMotion;
   class IEffect;
   class IEffectManager;
+  class CEffectManagerImpl;
   class CEfxBeam;
   class CEfxEmitter;
   class CEfxTrailEmitter;
@@ -265,6 +268,9 @@ namespace gpg
      * write-archive save paths run.
      */
     static void InitNewHelpers();
+
+    // Address: 0x00F8ECB8 - process-global pending helper intrusive-list root.
+    static SerHelperBase* sNewHelpers;
   };
   static_assert(sizeof(SerHelperBase) == 0x8, "SerHelperBase size must be 0x8");
 
@@ -303,6 +309,25 @@ namespace gpg
     }
   };
 
+  /**
+   * Strict weak ordering for reflected references.
+   *
+   * The binary compares the reflected type lane first and only falls back to
+   * the underlying object pointer when the type lanes match.
+   */
+  struct RRefCompare
+  {
+    /**
+     * Address: 0x0094F730 (FUN_0094F730, gpg::RRefCompare::operator())
+     *
+     * What it does:
+     * Orders two reflected references lexicographically by reflected type lane
+     * and then by object pointer lane.
+     */
+    [[nodiscard]] bool operator()(const RRef& lhs, const RRef& rhs) const noexcept;
+  };
+  static_assert(sizeof(RRefCompare) == 0x1, "RRefCompare size must be 0x1");
+
   using TypeMap = std::map<const char*, RType*, CStrLess>;
   using TypeVec = msvc8::vector<RType*>;
   using TypeInfoMap = std::map<const std::type_info*, RType*, TypeInfoLess>;
@@ -331,6 +356,15 @@ namespace gpg
      * VFTable SLOT: 1
      */
     virtual RRef GetDerivedObjectRef() = 0;
+
+    /**
+     * Address: 0x008DD460 (FUN_008DD460, ?IsA@RObject@gpg@@QBE_NPAVRType@2@@Z_0)
+     *
+     * What it does:
+     * Returns whether this object's dynamic reflected type is derived from one
+     * requested target type lane.
+     */
+    [[nodiscard]] bool IsA(RType* type) const;
 
     /**
      * Address: 0x004012D0 (FUN_004012D0)
@@ -366,6 +400,132 @@ namespace gpg
      * Initializes a reflection reference from explicit object/type lanes.
      */
     RRef(void* ptr, gpg::RType* type) noexcept;
+
+    /**
+     * Address: 0x009204A0 (FUN_009204A0)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `TString*` by routing
+     * through the canonical `gpg::RRef_TString` helper lane.
+     */
+    explicit RRef(TString* value) noexcept;
+
+    /**
+     * Address: 0x009204D0 (FUN_009204D0)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `Table*` by routing
+     * through the canonical `gpg::RRef_Table` helper lane.
+     */
+    explicit RRef(Table* value) noexcept;
+
+    /**
+     * Address: 0x00920670 (FUN_00920670)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `LClosure*` by routing
+     * through the canonical `gpg::RRef_LClosure` helper lane.
+     */
+    explicit RRef(LClosure* value) noexcept;
+
+    /**
+     * Address: 0x009206A0 (FUN_009206A0)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `UpVal*` by routing
+     * through the canonical `gpg::RRef_UpVal` helper lane.
+     */
+    explicit RRef(UpVal* value) noexcept;
+
+    /**
+     * Address: 0x00920750 (FUN_00920750)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `Proto*` by routing
+     * through the canonical `gpg::RRef_Proto` helper lane.
+     */
+    explicit RRef(Proto* value) noexcept;
+
+    /**
+     * Address: 0x00920780 (FUN_00920780)
+     *
+     * What it does:
+     * Initializes one reflection reference from a raw Lua `lua_State*` by
+     * routing through `gpg::RRef_lua_State`.
+     */
+    explicit RRef(lua_State* value) noexcept;
+
+    /**
+     * Address: 0x009207B0 (FUN_009207B0)
+     *
+     * What it does:
+     * Initializes one reflection reference from a Lua `Udata*` by routing
+     * through the canonical `gpg::RRef_Udata` helper lane.
+     */
+    explicit RRef(Udata* value) noexcept;
+
+    /**
+     * Address: 0x00950640 (FUN_00950640)
+     *
+     * What it does:
+     * Initializes one reflection reference from `gpg::ArchiveToken*` by
+     * routing through `gpg::RRef_ArchiveToken`.
+     */
+    explicit RRef(ArchiveToken* value) noexcept;
+
+    /**
+     * Address: 0x008D6DA0 (FUN_008D6DA0)
+     *
+     * What it does:
+     * Initializes one reflection reference from `moho::RUnitBlueprint*` by
+     * routing through `gpg::RRef_RUnitBlueprint`.
+     */
+    explicit RRef(moho::RUnitBlueprint* value) noexcept;
+
+    /**
+     * Address: 0x008E1580 (FUN_008E1580)
+     *
+     * What it does:
+     * Initializes one reflection reference from `char*` by routing through
+     * `gpg::RRef_char`.
+     */
+    explicit RRef(char* value) noexcept;
+
+    /**
+     * Address: 0x008E1650 (FUN_008E1650)
+     *
+     * What it does:
+     * Initializes one reflection reference from `short*` by routing through
+     * `gpg::RRef_short`.
+     */
+    explicit RRef(short* value) noexcept;
+
+    /**
+     * Address: 0x008E17C0 (FUN_008E17C0)
+     *
+     * What it does:
+     * Initializes one reflection reference from `long*` by routing through
+     * `gpg::RRef_long`.
+     */
+    explicit RRef(long* value) noexcept;
+
+    /**
+     * Address: 0x008E1890 (FUN_008E1890)
+     *
+     * What it does:
+     * Initializes one reflection reference from `signed char*` by routing
+     * through `gpg::RRef_schar`.
+     */
+    explicit RRef(signed char* value) noexcept;
+
+    /**
+     * Address: 0x008E1A00 (FUN_008E1A00)
+     *
+     * What it does:
+     * Initializes one reflection reference from `unsigned short*` by routing
+     * through `gpg::RRef_ushort`.
+     */
+    explicit RRef(unsigned short* value) noexcept;
 
     /**
      * Address: 0x004012B0 (FUN_004012B0)
@@ -620,6 +780,34 @@ namespace gpg
     [[nodiscard]] moho::CEconomyEvent** TryUpcastCEconomyEventPointerSlot() const;
 
     /**
+     * Address: 0x006EC5E0 (FUN_006EC5E0, gpg::RRef::TryUpcast_Listener_ECommandEvent)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `Listener<ECommandEvent>` object
+     * lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::Listener<moho::ECommandEvent>* TryUpcastListenerECommandEvent() const;
+
+    /**
+     * Address: 0x006F93D0 (FUN_006F93D0, gpg::RRef::TryUpcast_Listener_EUnitCommandQueueStatus)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one
+     * `Listener<EUnitCommandQueueStatus>` object lane and throws
+     * `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::Listener<moho::EUnitCommandQueueStatus>* TryUpcastListenerEUnitCommandQueueStatus() const;
+
+    /**
+     * Address: 0x006FD290 (FUN_006FD290, gpg::RRef::TryUpcast_Prop)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `Prop` object lane and throws
+     * `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::Prop* TryUpcastProp() const;
+
+    /**
      * Address: 0x006E3E10 (FUN_006E3E10, gpg::RRef::TryUpcast_CUnitCommand_P)
      *
      * What it does:
@@ -735,6 +923,15 @@ namespace gpg
   void PreRegisterRType(const std::type_info& typeInfo, RType* type);
 
   /**
+   * Address: 0x005DE010 (FUN_005DE010, preregister_CAcquireTargetTaskPointerTypeStartup)
+   *
+   * What it does:
+   * Preregisters the startup-owned pointer reflection descriptor for
+   * `moho::CAcquireTargetTask*`.
+   */
+  [[nodiscard]] RType* preregister_CAcquireTargetTaskPointerTypeStartup();
+
+  /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
    * Address: 0x1001CEB0 (gpgcore.dll)
    *
@@ -744,6 +941,7 @@ namespace gpg
   void REF_RegisterAllTypes();
 
   /**
+   * Address: 0x008DD940 (FUN_008DD940, gpg::REF_GetTypeIndexed)
    * Address: 0x10018CB0 (gpgcore.dll)
    *
    * int
@@ -752,6 +950,14 @@ namespace gpg
    * Returns the type descriptor at an index in the global registration vector.
    */
   const RType* REF_GetTypeIndexed(int index);
+
+  /**
+   * Address: 0x008DF950 (FUN_008DF950, gpg::REF_GetTypeCount)
+   *
+   * What it does:
+   * Returns the total reflected type count stored in the global type map.
+   */
+  std::size_t REF_GetTypeCount();
 
   /**
    * Address: 0x008DF8A0
@@ -792,6 +998,15 @@ namespace gpg
   RRef* RRef_int(RRef* out, int* value);
 
   /**
+   * Address: 0x00582080 (FUN_00582080, gpg::RRef_int pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_int` and copies its `(mObj,mType)` pair into
+   * caller-owned output storage.
+   */
+  RRef* PackRRef_int(RRef* out, int* value);
+
+  /**
    * Address: 0x00526FD0 (FUN_00526FD0, gpg::RRef_float)
    *
    * What it does:
@@ -806,6 +1021,15 @@ namespace gpg
    * Builds a reflected reference for one `bool` value pointer.
    */
   RRef* RRef_bool(RRef* out, bool* value);
+
+  /**
+   * Address: 0x00582050 (FUN_00582050, gpg::RRef_bool pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_bool` and copies its `(mObj,mType)` pair into
+   * caller-owned output storage.
+   */
+  RRef* PackRRef_bool(RRef* out, bool* value);
 
   /**
    * Address: 0x00642860 (FUN_00642860, gpg::RRef__Vb_reference)
@@ -897,6 +1121,14 @@ namespace gpg
   RRef* AssignUIntRef(RRef* out, unsigned int* value);
 
   /**
+   * Address: 0x008E1B70 (FUN_008E1B70)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_ulong` output lanes into the provided `RRef`.
+   */
+  RRef* AssignULongRef(RRef* out, unsigned long* value);
+
+  /**
    * Address: 0x00593520 (FUN_00593520, gpg::RRef_EEconResource)
    *
    * What it does:
@@ -953,6 +1185,23 @@ namespace gpg
   RRef* RRef_EAiTargetType(RRef* out, moho::EAiTargetType* value);
 
   /**
+   * Address: 0x0084A6F0 (FUN_0084A6F0, gpg::RRef_ESTITargetType)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::ESTITargetType` value pointer.
+   */
+  RRef* RRef_ESTITargetType(RRef* out, moho::ESTITargetType* value);
+
+  /**
+   * Address: 0x0084A140 (FUN_0084A140, sub_84A140)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_ESTITargetType` output lanes into provided
+   * `RRef`.
+   */
+  RRef* AssignESTITargetTypeRef(RRef* out, moho::ESTITargetType* value);
+
+  /**
    * Address: 0x00704040 (FUN_00704040, sub_704040)
    *
    * What it does:
@@ -967,6 +1216,15 @@ namespace gpg
    * Builds a reflected reference for one `moho::EMauiScrollAxis` value pointer.
    */
   RRef* RRef_EMauiScrollAxis(RRef* out, moho::EMauiScrollAxis* value);
+
+  /**
+   * Address: 0x0078A9D0 (FUN_0078A9D0, sub_78A9D0)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_EMauiScrollAxis` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignEMauiScrollAxisRef(RRef* out, moho::EMauiScrollAxis* value);
 
   /**
    * Address: 0x0078E880 (FUN_0078E880, gpg::RRef_EMauiKeyCode)
@@ -985,12 +1243,39 @@ namespace gpg
   RRef* RRef_EMauiEventType(RRef* out, moho::EMauiEventType* value);
 
   /**
+   * Address: 0x00795DD0 (FUN_00795DD0, sub_795DD0)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_EMauiEventType` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignEMauiEventTypeRef(RRef* out, moho::EMauiEventType* value);
+
+  /**
    * Address: 0x00831EC0 (FUN_00831EC0, gpg::RRef_EUnitCommandType)
    *
    * What it does:
    * Builds a reflected reference for one `moho::EUnitCommandType` value pointer.
    */
   RRef* RRef_EUnitCommandType(RRef* out, moho::EUnitCommandType* value);
+
+  /**
+   * Address: 0x00830D40 (FUN_00830D40, sub_830D40)
+   *
+   * What it does:
+   * Primary wrapper that materializes one temporary `RRef_EUnitCommandType`
+   * and copies its object/type lanes into the destination ref.
+   */
+  RRef* AssignEUnitCommandTypeRefPrimary(RRef* out, moho::EUnitCommandType* value);
+
+  /**
+   * Address: 0x0084A170 (FUN_0084A170, sub_84A170)
+   *
+   * What it does:
+   * Secondary wrapper that materializes one temporary `RRef_EUnitCommandType`
+   * and copies its object/type lanes into the destination ref.
+   */
+  RRef* AssignEUnitCommandTypeRefSecondary(RRef* out, moho::EUnitCommandType* value);
 
   /**
    * Address: 0x0060D7A0 (FUN_0060D7A0, gpg::RRef_EAiResult)
@@ -1017,12 +1302,30 @@ namespace gpg
   RRef* RRef_EUnitState(RRef* out, moho::EUnitState* value);
 
   /**
+   * Address: 0x006B0C20 (FUN_006B0C20)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_EUnitState` and copies `(mObj,mType)`
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_EUnitState(RRef* out, moho::EUnitState* value);
+
+  /**
    * Address: 0x006D2150 (FUN_006D2150, gpg::RRef_EFireState)
    *
    * What it does:
    * Builds a reflected reference for one `moho::EFireState` value pointer.
    */
   RRef* RRef_EFireState(RRef* out, moho::EFireState* value);
+
+  /**
+   * Address: 0x008BEC10 (FUN_008BEC10)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_EFireState` and copies `(mObj,mType)`
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_EFireState(RRef* out, moho::EFireState* value);
 
   /**
    * Address: 0x006DD790 (FUN_006DD790, gpg::RRef_ELayer)
@@ -1082,12 +1385,31 @@ namespace gpg
   RRef* RRef_ESpecialFileType(RRef* out, moho::ESpecialFileType* value);
 
   /**
+   * Address: 0x0084A380 (FUN_0084A380)
+   * Address: 0x008CD130 (FUN_008CD130)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_ESpecialFileType` and copies
+   * `(mObj,mType)` into caller-owned output storage.
+   */
+  RRef* AssignESpecialFileTypeRefAdapter(RRef* out, moho::ESpecialFileType* value);
+
+  /**
    * Address: 0x0085FB70 (FUN_0085FB70, gpg::RRef_EGenericIconType)
    *
    * What it does:
    * Builds a reflected reference for one `moho::EGenericIconType` value pointer.
    */
   RRef* RRef_EGenericIconType(RRef* out, moho::EGenericIconType* value);
+
+  /**
+   * Address: 0x0085F840 (FUN_0085F840, sub_85F840)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_EGenericIconType` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignEGenericIconTypeRef(RRef* out, moho::EGenericIconType* value);
 
   /**
    * Address: 0x0040C030 (FUN_0040C030, gpg::RRef_CTaskThread_P)
@@ -1105,6 +1427,16 @@ namespace gpg
    * object pointer with derived-type normalization.
    */
   RRef* RRef_CFootPlantManipulator(RRef* out, moho::CFootPlantManipulator* value);
+
+  /**
+   * Address: 0x0063A230 (FUN_0063A230)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary
+   * `RRef_CFootPlantManipulator` and copies object/type fields into the
+   * destination reference record.
+   */
+  RRef* AssignCFootPlantManipulatorRef(RRef* out, moho::CFootPlantManipulator* value);
 
   /**
    * Address: 0x006456F0 (FUN_006456F0, gpg::RRef_CRotateManipulator)
@@ -1207,6 +1539,15 @@ namespace gpg
   RRef* RRef_CAcquireTargetTask_P(RRef* out, moho::CAcquireTargetTask** value);
 
   /**
+   * Address: 0x005DF0C0 (FUN_005DF0C0)
+   *
+   * What it does:
+   * Packs one `RRef_CAcquireTargetTask_P` result into caller-owned output
+   * storage.
+   */
+  RRef* PackRRef_CAcquireTargetTask_P(RRef* out, moho::CAcquireTargetTask** value);
+
+  /**
    * Address: 0x0059E080 (FUN_0059E080, gpg::RRef_IFormationInstance_P)
    *
    * What it does:
@@ -1224,6 +1565,33 @@ namespace gpg
   RRef* RRef_IEffect(RRef* out, moho::IEffect* value);
 
   /**
+   * Address: 0x0066C480 (FUN_0066C480, gpg::RRef_CEffectManagerImpl)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CEffectManagerImpl` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CEffectManagerImpl(RRef* out, moho::CEffectManagerImpl* value);
+
+  /**
+   * Address: 0x0066C2A0 (FUN_0066C2A0, gpg::RRef_CEffectManagerImpl pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CEffectManagerImpl` and copies its
+   * `(mObj,mType)` pair into caller-owned output storage.
+   */
+  RRef* PackRRef_CEffectManagerImpl(RRef* out, moho::CEffectManagerImpl* value);
+
+  /**
+   * Address: 0x0066D0B0 (FUN_0066D0B0, gpg::RRef_IEffect pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_IEffect` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_IEffect(RRef* out, moho::IEffect* value);
+
+  /**
    * Address: 0x00658860 (FUN_00658860, gpg::RRef_CEfxBeam)
    *
    * What it does:
@@ -1231,6 +1599,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_CEfxBeam(RRef* out, moho::CEfxBeam* value);
+
+  /**
+   * Address: 0x00658750 (FUN_00658750, gpg::RRef_CEfxBeam pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CEfxBeam` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_CEfxBeam(RRef* out, moho::CEfxBeam* value);
 
   /**
    * Address: 0x0065ADC0 (FUN_0065ADC0, gpg::RRef_CountedPtr_CParticleTexture)
@@ -1242,12 +1619,30 @@ namespace gpg
   RRef* RRef_CountedPtr_CParticleTexture(RRef* out, moho::CountedPtr<moho::CParticleTexture>* value);
 
   /**
+   * Address: 0x0065A7E0 (FUN_0065A7E0, gpg::RRef_CountedPtr_CParticleTexture pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CountedPtr_CParticleTexture` and copies its
+   * `(mObj,mType)` pair into caller-owned output storage.
+   */
+  RRef* PackRRef_CountedPtr_CParticleTexture(RRef* out, moho::CountedPtr<moho::CParticleTexture>* value);
+
+  /**
    * Address: 0x0065FCF0 (FUN_0065FCF0, gpg::RRef_SEfxCurve)
    *
    * What it does:
    * Builds a reflected reference for one `moho::SEfxCurve` value pointer.
    */
   RRef* RRef_SEfxCurve(RRef* out, moho::SEfxCurve* value);
+
+  /**
+   * Address: 0x0065FA20 (FUN_0065FA20, gpg::RRef_SEfxCurve pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SEfxCurve` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_SEfxCurve(RRef* out, moho::SEfxCurve* value);
 
   /**
    * Address: 0x0065FF20 (FUN_0065FF20, gpg::RRef_CEfxEmitter)
@@ -1259,6 +1654,16 @@ namespace gpg
   RRef* RRef_CEfxEmitter(RRef* out, moho::CEfxEmitter* value);
 
   /**
+   * Address: 0x0065FB30 (FUN_0065FB30, gpg::RRef_CEfxEmitter pack lane)
+   * Address: 0x00608000 (FUN_00608000)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CEfxEmitter` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_CEfxEmitter(RRef* out, moho::CEfxEmitter* value);
+
+  /**
    * Address: 0x00672560 (FUN_00672560, gpg::RRef_CEfxTrailEmitter)
    *
    * What it does:
@@ -1268,12 +1673,30 @@ namespace gpg
   RRef* RRef_CEfxTrailEmitter(RRef* out, moho::CEfxTrailEmitter* value);
 
   /**
+   * Address: 0x00672510 (FUN_00672510, gpg::RRef_CEfxTrailEmitter pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CEfxTrailEmitter` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_CEfxTrailEmitter(RRef* out, moho::CEfxTrailEmitter* value);
+
+  /**
    * Address: 0x0066C800 (FUN_0066C800, gpg::RRef_IEffect_P)
    *
    * What it does:
    * Builds a reflected reference for one `moho::IEffect*` slot.
    */
   RRef* RRef_IEffect_P(RRef* out, moho::IEffect** value);
+
+  /**
+   * Address: 0x0066D0E0 (FUN_0066D0E0, gpg::RRef_IEffect_P pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_IEffect_P` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_IEffect_P(RRef* out, moho::IEffect** value);
 
   /**
    * Address: 0x0054EA20 (FUN_0054EA20, gpg::RRef_CAniPose)
@@ -1398,6 +1821,15 @@ namespace gpg
   RRef* RRef_SAudioRequest(RRef* out, moho::SAudioRequest* value);
 
   /**
+   * Address: 0x00761B70 (FUN_00761B70)
+   *
+   * What it does:
+   * Builds one reflected reference from the `index`-th contiguous
+   * `SAudioRequest` lane starting at `(*firstElementSlot)`.
+   */
+  RRef* RRef_SAudioRequestArraySlot(RRef* out, moho::SAudioRequest* const* firstElementSlot, int index);
+
+  /**
    * Address: 0x006805E0 (FUN_006805E0, gpg::RRef_Entity)
    *
    * What it does:
@@ -1434,6 +1866,14 @@ namespace gpg
   RRef* RRef_Prop(RRef* out, moho::Prop* value);
 
   /**
+   * Address: 0x006FAE00 (FUN_006FAE00)
+   *
+   * What it does:
+   * Packs one `RRef_Prop` result into caller-owned output storage.
+   */
+  RRef* PackRRef_Prop(RRef* out, moho::Prop* value);
+
+  /**
    * Address: 0x005541F0 (FUN_005541F0, gpg::RRef_EntId)
    *
    * What it does:
@@ -1450,12 +1890,30 @@ namespace gpg
   RRef* RRef_Entity_P(RRef* out, moho::Entity** value);
 
   /**
+   * Address: 0x0067F700 (FUN_0067F700, gpg::RRef_Entity_P pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_Entity_P` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_Entity_P(RRef* out, moho::Entity** value);
+
+  /**
    * Address: 0x006B21E0 (FUN_006B21E0, gpg::RRef_WeakPtr_Entity)
    *
    * What it does:
    * Builds a reflected reference for one `WeakPtr<Entity>` wrapper value.
    */
   RRef* RRef_WeakPtr_Entity(RRef* out, moho::WeakPtr<moho::Entity>* value);
+
+  /**
+   * Address: 0x006B1320 (FUN_006B1320)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_WeakPtr_Entity` and copies `(mObj,mType)`
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_WeakPtr_Entity(RRef* out, moho::WeakPtr<moho::Entity>* value);
 
   /**
    * Address: 0x00689360 (FUN_00689360, gpg::RRef_EntityDB)
@@ -1465,6 +1923,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_EntityDB(RRef* out, moho::CEntityDb* value);
+
+  /**
+   * Address: 0x00688D30 (FUN_00688D30, sub_688D30)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_EntityDB` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignEntityDBRef(RRef* out, moho::CEntityDb* value);
 
   /**
    * Address: 0x00689920 (FUN_00689920, gpg::RRef_EntitySetBase)
@@ -1484,12 +1951,39 @@ namespace gpg
   RRef* RRef_SPhysConstants(RRef* out, moho::SPhysConstants* value);
 
   /**
+   * Address: 0x00698D60 (FUN_00698D60, gpg::RRef_SPhysConstants pack lane A)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SPhysConstants` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SPhysConstantsA(RRef* out, moho::SPhysConstants* value);
+
+  /**
+   * Address: 0x0069A0A0 (FUN_0069A0A0, gpg::RRef_SPhysConstants pack lane B)
+   *
+   * What it does:
+   * Secondary pack lane that builds one temporary `RRef_SPhysConstants` and
+   * copies its `(mObj,mType)` pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SPhysConstantsB(RRef* out, moho::SPhysConstants* value);
+
+  /**
    * Address: 0x006837E0 (FUN_006837E0, gpg::RRef_SPhysBody)
    *
    * What it does:
    * Builds a reflected reference for one `moho::SPhysBody` value pointer.
    */
   RRef* RRef_SPhysBody(RRef* out, moho::SPhysBody* value);
+
+  /**
+   * Address: 0x00698850 (FUN_00698850, sub_698850)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_SPhysBody` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignSPhysBodyRef(RRef* out, moho::SPhysBody* value);
 
   /**
    * Address: 0x005A2A40 (FUN_005A2A40, gpg::RRef_Unit)
@@ -1501,6 +1995,15 @@ namespace gpg
   RRef* RRef_Unit(RRef* out, moho::Unit* value);
 
   /**
+   * Address: 0x006B1040 (FUN_006B1040)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_Unit` and copies `(mObj,mType)` into
+   * caller-owned output storage.
+   */
+  RRef* PackRRef_Unit(RRef* out, moho::Unit* value);
+
+  /**
    * Address: 0x00541C50 (FUN_00541C50, gpg::RRef_IUnit)
    *
    * What it does:
@@ -1510,12 +2013,30 @@ namespace gpg
   RRef* RRef_IUnit(RRef* out, moho::IUnit* value);
 
   /**
+   * Address: 0x00541A90 (FUN_00541A90, gpg::RRef_IUnit pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_IUnit` and copies its `(mObj,mType)` pair into
+   * caller-owned output storage.
+   */
+  RRef* PackRRef_IUnit(RRef* out, moho::IUnit* value);
+
+  /**
    * Address: 0x005725F0 (FUN_005725F0, gpg::RRef_WeakPtr_IUnit)
    *
    * What it does:
    * Builds a reflected reference for one `WeakPtr<IUnit>` wrapper value.
    */
   RRef* RRef_WeakPtr_IUnit(RRef* out, moho::WeakPtr<moho::IUnit>* value);
+
+  /**
+   * Address: 0x00571030 (FUN_00571030)
+   *
+   * What it does:
+   * Builds one temporary `RRef_WeakPtr_IUnit` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_WeakPtr_IUnit(RRef* out, moho::WeakPtr<moho::IUnit>* value);
 
   /**
    * Address: 0x00559790 (FUN_00559790, gpg::RRef_SSTIEntityAttachInfo)
@@ -1536,6 +2057,15 @@ namespace gpg
   RRef* RRef_PathQueue(RRef* out, moho::PathQueue* value);
 
   /**
+   * Address: 0x00768C70 (FUN_00768C70)
+   *
+   * What it does:
+   * Builds one temporary `RRef_PathQueue` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_PathQueue(RRef* out, moho::PathQueue* value);
+
+  /**
    * Address: 0x00526C80 (FUN_00526C80, gpg::RRef_RUnitBlueprint)
    *
    * What it does:
@@ -1552,6 +2082,15 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_RBlueprint(RRef* out, moho::RBlueprint* value);
+
+  /**
+   * Address: 0x0050E270 (FUN_0050E270, gpg::RRef_RBlueprint pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RBlueprint` and copies its `(mObj,mType)` pair
+   * into caller-provided storage.
+   */
+  RRef* PackRRef_RBlueprint(RRef* out, moho::RBlueprint* value);
 
   /**
    * Address: 0x00557BD0 (FUN_00557BD0, gpg::RRef_RBlueprint_P)
@@ -1588,6 +2127,14 @@ namespace gpg
   RRef* RRef_RRuleGameRules(RRef* out, moho::RRuleGameRules* value);
 
   /**
+   * Address: 0x00537850 (FUN_00537850)
+   *
+   * What it does:
+   * Thin adapter lane that forwards `{out,value}` into `RRef_RRuleGameRules`.
+   */
+  RRef* AssignRRuleGameRulesRef(RRef* out, moho::RRuleGameRules* value);
+
+  /**
    * Address: 0x00536BA0 (FUN_00536BA0, gpg::RRef_SRuleFootprintsBlueprint)
    *
    * What it does:
@@ -1595,6 +2142,15 @@ namespace gpg
    * value pointer.
    */
   RRef* RRef_SRuleFootprintsBlueprint(RRef* out, moho::SRuleFootprintsBlueprint* value);
+
+  /**
+   * Address: 0x00533210 (FUN_00533210)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_SRuleFootprintsBlueprint` and copies
+   * object/type lanes into `out`.
+   */
+  RRef* AssignSRuleFootprintsBlueprintRef(RRef* out, moho::SRuleFootprintsBlueprint* value);
 
   /**
    * Address: 0x0055AB70 (FUN_0055AB70, gpg::RRef_RScmResource)
@@ -1615,6 +2171,16 @@ namespace gpg
   RRef* RRef_ResourceDeposit(RRef* out, moho::ResourceDeposit* value);
 
   /**
+   * Address: 0x00548950 (FUN_00548950, gpg::RRef_ResourceDeposit pack lane)
+   * Address: 0x005FD5D0 (FUN_005FD5D0)
+   *
+   * What it does:
+   * Builds one temporary `RRef_ResourceDeposit` and copies its `(mObj,mType)`
+   * pair into caller-provided storage.
+   */
+  RRef* PackRRef_ResourceDeposit(RRef* out, moho::ResourceDeposit* value);
+
+  /**
    * Address: 0x00511250 (FUN_00511250, gpg::RRef_REmitterBlueprint)
    *
    * What it does:
@@ -1622,6 +2188,15 @@ namespace gpg
    * pointer with derived-type normalization.
    */
   RRef* RRef_REmitterBlueprint(RRef* out, moho::REmitterBlueprint* value);
+
+  /**
+   * Address: 0x005110D0 (FUN_005110D0, gpg::RRef_REmitterBlueprint pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_REmitterBlueprint` and copies its
+   * `(mObj,mType)` pair into caller-provided storage.
+   */
+  RRef* PackRRef_REmitterBlueprint(RRef* out, moho::REmitterBlueprint* value);
 
   /**
    * Address: 0x00517AE0 (FUN_00517AE0, gpg::RRef_REmitterCurveKey)
@@ -1651,6 +2226,15 @@ namespace gpg
   RRef* RRef_RBeamBlueprint(RRef* out, moho::RBeamBlueprint* value);
 
   /**
+   * Address: 0x00511170 (FUN_00511170, gpg::RRef_RBeamBlueprint pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RBeamBlueprint` and copies its `(mObj,mType)`
+   * pair into caller-provided storage.
+   */
+  RRef* PackRRef_RBeamBlueprint(RRef* out, moho::RBeamBlueprint* value);
+
+  /**
    * Address: 0x00511400 (FUN_00511400, gpg::RRef_RTrailBlueprint)
    *
    * What it does:
@@ -1658,6 +2242,15 @@ namespace gpg
    * pointer with derived-type normalization.
    */
   RRef* RRef_RTrailBlueprint(RRef* out, moho::RTrailBlueprint* value);
+
+  /**
+   * Address: 0x00511120 (FUN_00511120, gpg::RRef_RTrailBlueprint pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RTrailBlueprint` and copies its `(mObj,mType)`
+   * pair into caller-provided storage.
+   */
+  RRef* PackRRef_RTrailBlueprint(RRef* out, moho::RTrailBlueprint* value);
 
   /**
    * Address: 0x0051CFF0 (FUN_0051CFF0, gpg::RRef_RProjectileBlueprint)
@@ -1723,6 +2316,15 @@ namespace gpg
   RRef* RRef_EntityCategory(RRef* out, moho::EntityCategorySet* value);
 
   /**
+   * Address: 0x00536B70 (FUN_00536B70)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_EntityCategory` and copies object/type
+   * lanes into `out`.
+   */
+  RRef* AssignEntityCategoryRef(RRef* out, moho::EntityCategorySet* value);
+
+  /**
    * Address: 0x005ACE80 (FUN_005ACE80, gpg::RRef_COGrid)
    *
    * What it does:
@@ -1730,6 +2332,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_COGrid(RRef* out, moho::COGrid* value);
+
+  /**
+   * Address: 0x00723A10 (FUN_00723A10, sub_723A10)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_COGrid` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignCOGridRef(RRef* out, moho::COGrid* value);
 
   /**
    * Address: 0x005852B0 (FUN_005852B0, gpg::RRef_SimArmy)
@@ -1750,12 +2361,48 @@ namespace gpg
   RRef* RRef_CArmyImpl(RRef* out, moho::CArmyImpl* value);
 
   /**
+   * Address: 0x007047B0 (FUN_007047B0)
+   *
+   * What it does:
+   * Packs one `RRef_CArmyImpl` result into caller-owned output storage.
+   */
+  RRef* PackRRef_CArmyImpl(RRef* out, moho::CArmyImpl* value);
+
+  /**
    * Address: 0x00753910 (FUN_00753910, gpg::RRef_SimArmy_P)
    *
    * What it does:
    * Builds a reflected reference for one `moho::SimArmy*` slot.
    */
   RRef* RRef_SimArmy_P(RRef* out, moho::SimArmy** value);
+
+  /**
+   * Address: 0x00751790 (FUN_00751790)
+   *
+   * What it does:
+   * Packs one temporary `RRef_SimArmy_P` result into caller-owned output
+   * storage by copying the `(mObj,mType)` lane pair.
+   */
+  RRef* PackRRef_SimArmy_P(RRef* out, moho::SimArmy** value);
+
+  /**
+   * Address: 0x00751E20 (FUN_00751E20)
+   *
+   * What it does:
+   * Packs one temporary `RRef_SimArmy` result into caller-owned output storage
+   * by copying the `(mObj,mType)` lane pair.
+   */
+  RRef* PackRRef_SimArmy(RRef* out, moho::SimArmy* value);
+
+  /**
+   * Address: 0x0074FD80 (FUN_0074FD80)
+   *
+   * What it does:
+   * Builds and caches one pointer-type name lane (`"Type*"`) for
+   * `moho::SimArmy*`.
+   */
+  const char* BuildSimArmyPointerTypeName();
+  msvc8::string* BuildSimArmyPointerLexical(msvc8::string* out, moho::SimArmy*** slot);
 
   /**
    * Address: 0x00544EE0 (FUN_00544EE0, gpg::RRef_LaunchInfoNew)
@@ -1767,12 +2414,30 @@ namespace gpg
   RRef* RRef_LaunchInfoNew(RRef* out, moho::LaunchInfoNew* value);
 
   /**
+   * Address: 0x005446D0 (FUN_005446D0, gpg::RRef_LaunchInfoNew pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_LaunchInfoNew` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_LaunchInfoNew(RRef* out, moho::LaunchInfoNew* value);
+
+  /**
    * Address: 0x00544C80 (FUN_00544C80, gpg::RRef_ArmyLaunchInfo)
    *
    * What it does:
    * Builds a reflected reference for one `moho::ArmyLaunchInfo` value pointer.
    */
   RRef* RRef_ArmyLaunchInfo(RRef* out, moho::ArmyLaunchInfo* value);
+
+  /**
+   * Address: 0x005444E0 (FUN_005444E0, gpg::RRef_ArmyLaunchInfo pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_ArmyLaunchInfo` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_ArmyLaunchInfo(RRef* out, moho::ArmyLaunchInfo* value);
 
   /**
    * Address: 0x00549550 (FUN_00549550, gpg::RRef_CSimResources)
@@ -1784,6 +2449,15 @@ namespace gpg
   RRef* RRef_CSimResources(RRef* out, moho::CSimResources* value);
 
   /**
+   * Address: 0x00548BD0 (FUN_00548BD0, gpg::RRef_CSimResources pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CSimResources` and copies its `(mObj,mType)`
+   * pair into caller-provided storage.
+   */
+  RRef* PackRRef_CSimResources(RRef* out, moho::CSimResources* value);
+
+  /**
    * Address: 0x00582B50 (FUN_00582B50, gpg::RRef_CAiBrain)
    *
    * What it does:
@@ -1791,6 +2465,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_CAiBrain(RRef* out, moho::CAiBrain* value);
+
+  /**
+   * Address: 0x005818C0 (FUN_005818C0, gpg::RRef_CAiBrain pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CAiBrain` and copies its `(mObj,mType)` pair
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_CAiBrain(RRef* out, moho::CAiBrain* value);
 
   /**
    * Address: 0x005854A0 (FUN_005854A0, gpg::RRef_CAiPersonality)
@@ -1882,6 +2565,15 @@ namespace gpg
   RRef* RRef_SAssignedLocInfo(RRef* out, moho::SAssignedLocInfo* value);
 
   /**
+   * Address: 0x00571090 (FUN_00571090)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SAssignedLocInfo` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SAssignedLocInfo(RRef* out, moho::SAssignedLocInfo* value);
+
+  /**
    * Address: 0x006288A0 (FUN_006288A0, gpg::RRef_SPickUpInfo)
    *
    * What it does:
@@ -1899,6 +2591,15 @@ namespace gpg
   RRef* RRef_CUnitCommand(RRef* out, moho::CUnitCommand* value);
 
   /**
+   * Address: 0x006E3DB0 (FUN_006E3DB0)
+   *
+   * What it does:
+   * Packs one temporary `RRef_CUnitCommand` result into caller-owned output
+   * storage.
+   */
+  RRef* PackRRef_CUnitCommand(RRef* out, moho::CUnitCommand* value);
+
+  /**
    * Address: 0x006E3150 (FUN_006E3150, gpg::RRef_CCommandDB)
    *
    * What it does:
@@ -1912,8 +2613,17 @@ namespace gpg
    *
    * What it does:
    * Builds a reflected reference for one `moho::CUnitCommand*` slot.
-   */
+  */
   RRef* RRef_CUnitCommand_P(RRef* out, moho::CUnitCommand** value);
+
+  /**
+   * Address: 0x006E3DE0 (FUN_006E3DE0)
+   *
+   * What it does:
+   * Packs one temporary `RRef_CUnitCommand_P` result into caller-owned output
+   * storage.
+   */
+  RRef* PackRRef_CUnitCommand_P(RRef* out, moho::CUnitCommand** value);
 
   /**
    * Address: 0x006EC1D0 (FUN_006EC1D0, gpg::RRef_WeakPtr_CUnitCommand)
@@ -1925,6 +2635,15 @@ namespace gpg
   RRef* RRef_WeakPtr_CUnitCommand(RRef* out, moho::WeakPtr<moho::CUnitCommand>* value);
 
   /**
+   * Address: 0x006EB770 (FUN_006EB770)
+   *
+   * What it does:
+   * Packs one `RRef_WeakPtr_CUnitCommand` result into caller-owned output
+   * storage.
+   */
+  RRef* PackRRef_WeakPtr_CUnitCommand(RRef* out, moho::WeakPtr<moho::CUnitCommand>* value);
+
+  /**
    * Address: 0x0059A070 (FUN_0059A070, gpg::RRef_CUnitCommandQueue)
    *
    * What it does:
@@ -1934,6 +2653,15 @@ namespace gpg
   RRef* RRef_CUnitCommandQueue(RRef* out, moho::CUnitCommandQueue* value);
 
   /**
+   * Address: 0x006F8D30 (FUN_006F8D30)
+   *
+   * What it does:
+   * Packs one `RRef_CUnitCommandQueue` result into caller-owned output
+   * storage.
+   */
+  RRef* PackRRef_CUnitCommandQueue(RRef* out, moho::CUnitCommandQueue* value);
+
+  /**
    * Address: 0x005D1750 (FUN_005D1750, gpg::RRef_UnitWeapon)
    *
    * What it does:
@@ -1941,6 +2669,14 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_UnitWeapon(RRef* out, moho::UnitWeapon* value);
+
+  /**
+   * Address: 0x005DF5E0 (FUN_005DF5E0)
+   *
+   * What it does:
+   * Packs one `RRef_UnitWeapon` result into caller-owned output storage.
+   */
+  RRef* PackRRef_UnitWeapon(RRef* out, moho::UnitWeapon* value);
 
   /**
    * Address: 0x0055F020 (FUN_0055F020, gpg::RRef_UnitWeaponInfo)
@@ -1957,6 +2693,14 @@ namespace gpg
    * Builds a reflected reference for one `moho::UnitWeapon*` slot.
    */
   RRef* RRef_UnitWeapon_P(RRef* out, moho::UnitWeapon** value);
+
+  /**
+   * Address: 0x005DF090 (FUN_005DF090)
+   *
+   * What it does:
+   * Packs one `RRef_UnitWeapon_P` result into caller-owned output storage.
+   */
+  RRef* PackRRef_UnitWeapon_P(RRef* out, moho::UnitWeapon** value);
 
   /**
    * Address: 0x004041F0 (FUN_004041F0, gpg::RRef_IdPool)
@@ -2008,12 +2752,30 @@ namespace gpg
   RRef* RRef_SOffsetInfo(RRef* out, moho::SOffsetInfo* value);
 
   /**
+   * Address: 0x00571060 (FUN_00571060)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SOffsetInfo` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SOffsetInfo(RRef* out, moho::SOffsetInfo* value);
+
+  /**
    * Address: 0x00764280 (FUN_00764280, gpg::RRef_HPathCell)
    *
    * What it does:
    * Builds a reflected reference for one `moho::HPathCell` object pointer.
    */
   RRef* RRef_HPathCell(RRef* out, moho::HPathCell* value);
+
+  /**
+   * Address: 0x00763C20 (FUN_00763C20, sub_763C20)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_HPathCell` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignHPathCellRef(RRef* out, moho::HPathCell* value);
 
   /**
    * Address: 0x007571F0 (FUN_007571F0, gpg::RRef_PathTables)
@@ -2050,6 +2812,15 @@ namespace gpg
   RRef* RRef_CArmyStatItem_P(RRef* out, moho::CArmyStatItem** value);
 
   /**
+   * Address: 0x00712AF0 (FUN_00712AF0, sub_712AF0)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_CArmyStatItem_P` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignCArmyStatItemPointerRef(RRef* out, moho::CArmyStatItem** value);
+
+  /**
    * Address: 0x005CADE0 (FUN_005CADE0, gpg::RRef_ReconBlip)
    *
    * What it does:
@@ -2084,6 +2855,15 @@ namespace gpg
   RRef* RRef_CEconomyEvent_P(RRef* out, moho::CEconomyEvent** value);
 
   /**
+   * Address: 0x006B3CD0 (FUN_006B3CD0)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CEconomyEvent_P` and copies
+   * `(mObj,mType)` into caller-owned output storage.
+   */
+  RRef* PackRRef_CEconomyEvent_P(RRef* out, moho::CEconomyEvent** value);
+
+  /**
    * Address: 0x006B3AD0 (FUN_006B3AD0, gpg::RRef_CEconomyEvent)
    *
    * What it does:
@@ -2091,6 +2871,15 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_CEconomyEvent(RRef* out, moho::CEconomyEvent* value);
+
+  /**
+   * Address: 0x006B3CA0 (FUN_006B3CA0, sub_6B3CA0)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_CEconomyEvent` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignCEconomyEventRef(RRef* out, moho::CEconomyEvent* value);
 
   /**
    * Address: 0x00758730 (FUN_00758730, gpg::RRef_CDecalBuffer)
@@ -2102,12 +2891,40 @@ namespace gpg
   RRef* RRef_CDecalBuffer(RRef* out, moho::CDecalBuffer* value);
 
   /**
+   * Address: 0x0077DAF0 (FUN_0077DAF0)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CDecalBuffer` and copies
+   * `(mObj,mType)` into caller-owned output storage.
+   */
+  RRef* PackRRef_CDecalBuffer(RRef* out, moho::CDecalBuffer* value);
+
+  /**
    * Address: 0x0077E540 (FUN_0077E540, gpg::RRef_CDecalHandle_P)
    *
    * What it does:
    * Builds a reflected reference for one `moho::CDecalHandle*` slot.
    */
   RRef* RRef_CDecalHandle_P(RRef* out, moho::CDecalHandle** value);
+
+  /**
+   * Address: 0x0077F400 (FUN_0077F400)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CDecalHandle_P` and copies
+   * `(mObj,mType)` into caller-owned output storage.
+   */
+  RRef* PackRRef_CDecalHandle_P(RRef* out, moho::CDecalHandle** value);
+
+  /**
+   * Address: 0x0077EAB0 (FUN_0077EAB0)
+   *
+   * What it does:
+   * Builds and caches one pointer-type name lane (`"Type*"`) for
+   * `moho::CDecalHandle*`.
+   */
+  const char* BuildCDecalHandlePointerTypeName();
+  msvc8::string* BuildCDecalHandlePointerLexical(msvc8::string* out, moho::CDecalHandle*** slot);
 
   /**
    * Address: 0x0077E390 (FUN_0077E390, gpg::RRef_CDecalHandle)
@@ -2119,6 +2936,24 @@ namespace gpg
   RRef* RRef_CDecalHandle(RRef* out, moho::CDecalHandle* value);
 
   /**
+   * Address: 0x0077DB30 (FUN_0077DB30)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CDecalHandle` and copies
+   * `(mObj,mType)` into caller-owned output storage.
+   */
+  RRef* PackRRef_CDecalHandle(RRef* out, moho::CDecalHandle* value);
+
+  /**
+   * Address: 0x0077EDF0 (FUN_0077EDF0)
+   *
+   * What it does:
+   * Builds one reflected reference from the `index`-th contiguous
+   * `CDecalHandle` lane starting at `(*firstElementSlot)`.
+   */
+  RRef* RRef_CDecalHandleArraySlot(RRef* out, moho::CDecalHandle* const* firstElementSlot, int index);
+
+  /**
    * Address: 0x005E0300 (FUN_005E0300, gpg::RRef_CAiAttackerImpl)
    *
    * What it does:
@@ -2126,6 +2961,32 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_CAiAttackerImpl(RRef* out, moho::CAiAttackerImpl* value);
+
+  /**
+   * Address: 0x005DEB80 (FUN_005DEB80)
+   *
+   * What it does:
+   * Packs one `RRef_CAiAttackerImpl` result into caller-owned output storage.
+   */
+  RRef* PackRRef_CAiAttackerImpl(RRef* out, moho::CAiAttackerImpl* value);
+
+  /**
+   * Address: 0x005EDB00 (FUN_005EDB00, gpg::RRef_CAiTransportImpl)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CAiTransportImpl` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CAiTransportImpl(RRef* out, moho::CAiTransportImpl* value);
+
+  /**
+   * Address: 0x005EC3B0 (FUN_005EC3B0, gpg::RRef_CAiTransportImpl pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_CAiTransportImpl` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_CAiTransportImpl(RRef* out, moho::CAiTransportImpl* value);
 
   /**
    * Address: 0x005CC0D0 (FUN_005CC0D0, gpg::RRef_CAiReconDBImpl)
@@ -2146,6 +3007,14 @@ namespace gpg
   RRef* RRef_CAiSteeringImpl(RRef* out, moho::CAiSteeringImpl* value);
 
   /**
+   * Address: 0x005D4680 (FUN_005D4680)
+   *
+   * What it does:
+   * Packs one `RRef_CAiSteeringImpl` result into caller-owned output storage.
+   */
+  RRef* PackRRef_CAiSteeringImpl(RRef* out, moho::CAiSteeringImpl* value);
+
+  /**
    * Address: 0x005D0E70 (FUN_005D0E70, gpg::RRef_CAiSiloBuildImpl)
    *
    * What it does:
@@ -2153,6 +3022,14 @@ namespace gpg
    * RTTI lookup and derived-type normalization.
    */
   RRef* RRef_CAiSiloBuildImpl(RRef* out, moho::CAiSiloBuildImpl* value);
+
+  /**
+   * Address: 0x005D08A0 (FUN_005D08A0)
+   *
+   * What it does:
+   * Packs one `RRef_CAiSiloBuildImpl` result into caller-owned output storage.
+   */
+  RRef* PackRRef_CAiSiloBuildImpl(RRef* out, moho::CAiSiloBuildImpl* value);
 
   /**
    * Address: 0x005E0E80 (FUN_005E0E80, gpg::RRef_LAiAttackerImpl)
@@ -2301,6 +3178,15 @@ namespace gpg
   RRef* RRef_SAiReservedTransportBone(RRef* out, moho::SAiReservedTransportBone* value);
 
   /**
+   * Address: 0x005EC420 (FUN_005EC420, gpg::RRef_SAiReservedTransportBone pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SAiReservedTransportBone` and copies its
+   * `(mObj,mType)` pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SAiReservedTransportBone(RRef* out, moho::SAiReservedTransportBone* value);
+
+  /**
    * Address: 0x005EDED0 (FUN_005EDED0, gpg::RRef_SAttachPoint)
    *
    * What it does:
@@ -2309,12 +3195,30 @@ namespace gpg
   RRef* RRef_SAttachPoint(RRef* out, moho::SAttachPoint* value);
 
   /**
+   * Address: 0x005EC450 (FUN_005EC450, gpg::RRef_SAttachPoint pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SAttachPoint` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SAttachPoint(RRef* out, moho::SAttachPoint* value);
+
+  /**
    * Address: 0x00582F00 (FUN_00582F00, gpg::RRef_SPointVector)
    *
    * What it does:
    * Builds a reflected reference for one `moho::SPointVector` value pointer.
    */
   RRef* RRef_SPointVector(RRef* out, moho::SPointVector* value);
+
+  /**
+   * Address: 0x00581D60 (FUN_00581D60, gpg::RRef_SPointVector pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_SPointVector` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_SPointVector(RRef* out, moho::SPointVector* value);
 
   /**
    * Address: 0x007582F0 (FUN_007582F0, gpg::RRef_IAiFormationDB)
@@ -2414,6 +3318,15 @@ namespace gpg
   RRef* RRef_RDebugNavPath(RRef* out, moho::RDebugNavPath* value);
 
   /**
+   * Address: 0x00651170 (FUN_00651170, gpg::RRef_RDebugNavPath pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RDebugNavPath` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_RDebugNavPath(RRef* out, moho::RDebugNavPath* value);
+
+  /**
    * Address: 0x006513B0 (FUN_006513B0, gpg::RRef_RDebugNavWaypoints)
    *
    * What it does:
@@ -2421,6 +3334,15 @@ namespace gpg
    * pointer with derived-type normalization.
    */
   RRef* RRef_RDebugNavWaypoints(RRef* out, moho::RDebugNavWaypoints* value);
+
+  /**
+   * Address: 0x006511A0 (FUN_006511A0, gpg::RRef_RDebugNavWaypoints pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RDebugNavWaypoints` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_RDebugNavWaypoints(RRef* out, moho::RDebugNavWaypoints* value);
 
   /**
    * Address: 0x00651560 (FUN_00651560, gpg::RRef_RDebugNavSteering)
@@ -2432,6 +3354,15 @@ namespace gpg
   RRef* RRef_RDebugNavSteering(RRef* out, moho::RDebugNavSteering* value);
 
   /**
+   * Address: 0x006511D0 (FUN_006511D0, gpg::RRef_RDebugNavSteering pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RDebugNavSteering` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_RDebugNavSteering(RRef* out, moho::RDebugNavSteering* value);
+
+  /**
    * Address: 0x00653C50 (FUN_00653C50, gpg::RRef_RDebugWeapons)
    *
    * What it does:
@@ -2439,6 +3370,15 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_RDebugWeapons(RRef* out, moho::RDebugWeapons* value);
+
+  /**
+   * Address: 0x00653A50 (FUN_00653A50, gpg::RRef_RDebugWeapons pack lane)
+   *
+   * What it does:
+   * Builds one temporary `RRef_RDebugWeapons` and copies its `(mObj,mType)`
+   * pair into caller-owned output storage.
+   */
+  RRef* PackRRef_RDebugWeapons(RRef* out, moho::RDebugWeapons* value);
 
   /**
    * Address: 0x00683420 (FUN_00683420, gpg::RRef_CIntel)
@@ -2450,6 +3390,15 @@ namespace gpg
   RRef* RRef_CIntel(RRef* out, moho::CIntel* value);
 
   /**
+   * Address: 0x0076EA10 (FUN_0076EA10, sub_76EA10)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_CIntel` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignCIntelRef(RRef* out, moho::CIntel* value);
+
+  /**
    * Address: 0x0076EDD0 (FUN_0076EDD0, gpg::RRef_CIntelPosHandle)
    *
    * What it does:
@@ -2457,6 +3406,15 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_CIntelPosHandle(RRef* out, moho::CIntelPosHandle* value);
+
+  /**
+   * Address: 0x0076FCE0 (FUN_0076FCE0, sub_76FCE0)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_CIntelPosHandle` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignCIntelPosHandleRef(RRef* out, moho::CIntelPosHandle* value);
 
   /**
    * Address: 0x0076FE30 (FUN_0076FE30, gpg::RRef_CIntelCounterHandle)
@@ -2494,6 +3452,15 @@ namespace gpg
   RRef* RRef_PositionHistory(RRef* out, moho::PositionHistory* value);
 
   /**
+   * Address: 0x0067FB70 (FUN_0067FB70, sub_67FB70)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_PositionHistory` and copies
+   * its object/type lanes into the destination ref.
+   */
+  RRef* AssignPositionHistoryRef(RRef* out, moho::PositionHistory* value);
+
+  /**
    * Address: 0x005D5300 (FUN_005D5300, gpg::RRef_CUnitMotion)
    *
    * What it does:
@@ -2501,6 +3468,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_CUnitMotion(RRef* out, moho::CUnitMotion* value);
+
+  /**
+   * Address: 0x006BAC70 (FUN_006BAC70)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CUnitMotion` and copies `(mObj,mType)`
+   * into caller-owned output storage.
+   */
+  RRef* PackRRef_CUnitMotion(RRef* out, moho::CUnitMotion* value);
 
   /**
    * Address: 0x00753FC0 (FUN_00753FC0, gpg::RRef_Shield)
@@ -2518,6 +3494,34 @@ namespace gpg
    * Builds a reflected reference for one `moho::Shield*` slot.
    */
   RRef* RRef_Shield_P(RRef* out, moho::Shield** value);
+
+  /**
+   * Address: 0x00751E60 (FUN_00751E60)
+   *
+   * What it does:
+   * Packs one temporary `RRef_Shield` result into caller-owned output storage
+   * by copying the `(mObj,mType)` lane pair.
+   */
+  RRef* PackRRef_Shield(RRef* out, moho::Shield* value);
+
+  /**
+   * Address: 0x00751F90 (FUN_00751F90)
+   *
+   * What it does:
+   * Packs one temporary `RRef_Shield_P` result into caller-owned output
+   * storage by copying the `(mObj,mType)` lane pair.
+   */
+  RRef* PackRRef_Shield_P(RRef* out, moho::Shield** value);
+
+  /**
+   * Address: 0x00750190 (FUN_00750190)
+   *
+   * What it does:
+   * Builds and caches one pointer-type name lane (`"Type*"`) for
+   * `moho::Shield*`.
+   */
+  const char* BuildShieldPointerTypeName();
+  msvc8::string* BuildShieldPointerLexical(msvc8::string* out, moho::Shield*** slot);
 
   /**
    * Address: 0x00758910 (FUN_00758910, gpg::RRef_IEffectManager)
@@ -2544,6 +3548,15 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_CPlatoon(RRef* out, moho::CPlatoon* value);
+
+  /**
+   * Address: 0x0072AC80 (FUN_0072AC80, sub_72AC80)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_CPlatoon` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignCPlatoonRef(RRef* out, moho::CPlatoon* value);
 
   /**
    * Address: 0x00884A10 (FUN_00884A10, gpg::RRef_SSessionSaveData)
@@ -2586,6 +3599,15 @@ namespace gpg
    * Builds a reflected reference for Lua `Table` object pointers.
    */
   RRef* RRef_Table(RRef* out, Table* value);
+
+  /**
+   * Address: 0x00920500 (FUN_00920500, sub_920500)
+   *
+   * What it does:
+   * Wrapper that materializes one temporary `RRef_Table` and copies its
+   * object/type lanes into the destination ref.
+   */
+  RRef* AssignTableRef(RRef* out, Table* value);
 
   /**
    * Address: 0x0091E900 (FUN_0091E900, gpg::RRef_LClosure)
@@ -2731,7 +3753,19 @@ namespace gpg
     /**
      * Destructor.
      *
-     * Address: 0x008DD9D0
+     * Address: 0x008DD9D0 (FUN_008DD9D0, gpg::RType::dtr)
+     * Address: 0x00786760 (FUN_00786760, RType teardown COMDAT clone)
+     * Address: 0x0078CB00 (FUN_0078CB00, RType teardown COMDAT clone)
+     * Address: 0x0078DD70 (FUN_0078DD70, RType teardown COMDAT clone)
+     * Address: 0x0078EF90 (FUN_0078EF90, RType teardown COMDAT clone)
+     * Address: 0x00796160 (FUN_00796160, RType teardown COMDAT clone)
+     * Address: 0x00797230 (FUN_00797230, RType teardown COMDAT clone)
+     * Address: 0x00797750 (FUN_00797750, RType teardown COMDAT clone)
+     * Address: 0x007992F0 (FUN_007992F0, RType teardown COMDAT clone)
+     * Address: 0x007A2B90 (FUN_007A2B90, RType teardown COMDAT clone)
+     * Address: 0x007B5E10 (FUN_007B5E10, RType teardown COMDAT clone)
+     * Address: 0x007C0920 (FUN_007C0920, RType teardown COMDAT clone)
+     * Address: 0x0086A4E0 (FUN_0086A4E0, RType teardown COMDAT clone)
      * SLOT: 2
      */
     virtual ~RType();
@@ -3018,6 +4052,15 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00905FD0 (FUN_00905FD0, gpg::Rect2iTypeInfo::Rect2iTypeInfo)
+     *
+     * What it does:
+     * Constructs the Rect2<int> runtime type descriptor and preregisters it
+     * with reflection registry using `typeid(Rect2i)`.
+     */
+    Rect2iTypeInfo();
+
+    /**
      * Address: 0x00906020 (FUN_00906020)
      * Demangled: gpg::Rect2iTypeInfo::GetName
      *
@@ -3045,6 +4088,15 @@ namespace gpg
   class Rect2fTypeInfo final : public RType
   {
   public:
+    /**
+     * Address: 0x00906080 (FUN_00906080, gpg::Rect2fTypeInfo::Rect2fTypeInfo)
+     *
+     * What it does:
+     * Constructs the Rect2<float> runtime type descriptor and preregisters it
+     * with reflection registry using `typeid(Rect2f)`.
+     */
+    Rect2fTypeInfo();
+
     /**
      * Address: 0x009060D0 (FUN_009060D0)
      * Demangled: gpg::Rect2fTypeInfo::GetName
@@ -3207,6 +4259,13 @@ namespace gpg
      */
     const char* StripPrefix(const char*) const;
 
+    /**
+     * Address: 0x008D9FD0 (FUN_008D9FD0)
+     *
+     * What it does:
+     * Scans the enum option table and returns the numeric value for a
+     * case-insensitive option-name match.
+     */
     bool GetEnumValue(const char*, int*) const;
 
     /**
@@ -3882,9 +4941,9 @@ namespace gpg
 
     /**
      * Address: 0x00421310 (FUN_00421310)
-     * Address: 0x00421620 (FUN_00421620, sub_421620 helper lane)
-     * Address: 0x00421660 (FUN_00421660, sub_421660 helper lane)
-     * Address: 0x00421670 (FUN_00421670, sub_421670 helper lane)
+      * Alias of FUN_00421620 (non-canonical helper lane).
+      * Alias of FUN_00421660 (non-canonical helper lane).
+      * Alias of FUN_00421670 (non-canonical helper lane).
      * Demangled: gpg::RPointerType_CLuaConOutputHandler::Init
      */
     void Init() override;
@@ -4268,6 +5327,16 @@ namespace gpg
     const RIndexed* IsPointer() const override;
 
     /**
+     * Address: 0x00711950 (FUN_00711950)
+     * Demangled: gpg::RPointerType_CArmyStatItem::AssignPointer
+     *
+     * What it does:
+     * Upcasts one reflected source reference to `CArmyStatItem*` and stores
+     * it in the destination pointer slot.
+     */
+    void AssignPointer(void* obj, const RRef& from) const override;
+
+    /**
      * Address: 0x00711730 (FUN_00711730)
      * Demangled: gpg::RPointerType_CArmyStatItem::Init
      */
@@ -4284,4 +5353,61 @@ namespace gpg
   static_assert(
     sizeof(RPointerType<moho::CArmyStatItem>) == 0x68, "RPointerType<CArmyStatItem> size must be 0x68"
   );
+
+
+  /**
+   * Address: 0x005F1A20 (FUN_005F1A20)
+   * Address: 0x005F44A0 (FUN_005F44A0)
+   * Address: 0x005FBB50 (FUN_005FBB50)
+   * Address: 0x005FBC40 (FUN_005FBC40)
+   * Address: 0x005FBD00 (FUN_005FBD00)
+   * Address: 0x005FBDC0 (FUN_005FBDC0)
+   * Address: 0x005FBE80 (FUN_005FBE80)
+   * Address: 0x005FBFC0 (FUN_005FBFC0)
+   * Address: 0x00602360 (FUN_00602360)
+   * Address: 0x00602420 (FUN_00602420)
+   * Address: 0x006024E0 (FUN_006024E0)
+   * Address: 0x006025A0 (FUN_006025A0)
+   * Address: 0x006052D0 (FUN_006052D0)
+   * Address: 0x006076E0 (FUN_006076E0)
+   * Address: 0x006077A0 (FUN_006077A0)
+   * Address: 0x00607860 (FUN_00607860)
+   * Address: 0x0060BA90 (FUN_0060BA90)
+   * Address: 0x0060BB50 (FUN_0060BB50)
+   * Address: 0x0060BC10 (FUN_0060BC10)
+   * Address: 0x00610070 (FUN_00610070)
+   * Address: 0x00614850 (FUN_00614850)
+   * Address: 0x00617760 (FUN_00617760)
+   * Address: 0x0061E4B0 (FUN_0061E4B0)
+   * Address: 0x006221C0 (FUN_006221C0)
+   * Address: 0x00623B30 (FUN_00623B30)
+   * Address: 0x00626F40 (FUN_00626F40)
+   * Address: 0x00627000 (FUN_00627000)
+   * Address: 0x00632D30 (FUN_00632D30)
+   * Address: 0x006350F0 (FUN_006350F0)
+   * Address: 0x00638690 (FUN_00638690)
+   * Address: 0x0064E270 (FUN_0064E270)
+   * Address: 0x0064E2B0 (FUN_0064E2B0)
+   * Address: 0x00650B90 (FUN_00650B90)
+   * Address: 0x00650BD0 (FUN_00650BD0)
+   * Address: 0x00650C10 (FUN_00650C10)
+   * Address: 0x00653280 (FUN_00653280)
+   * Address: 0x00657B30 (FUN_00657B30)
+   * Address: 0x0065F100 (FUN_0065F100)
+   * Address: 0x00699E80 (FUN_00699E80)
+   * Address: 0x006DB800 (FUN_006DB800)
+   * Address: 0x0076E7C0 (FUN_0076E7C0)
+   * Address: 0x00897450 (FUN_00897450)
+   *
+   * What it does:
+   * Writes one RType lifecycle callback lane set (`newRef`, `ctorRef`,
+   * `delete`, `destruct`) into the destination type-info object.
+   */
+  [[nodiscard]] RType* BindRTypeLifecycleCallbacks(
+    RType* typeInfo,
+    RType::new_ref_func_t newRefFunc,
+    RType::ctor_ref_func_t ctorRefFunc,
+    RType::delete_func_t deleteFunc,
+    RType::dtr_func_t dtrFunc
+  ) noexcept;
 } // namespace gpg

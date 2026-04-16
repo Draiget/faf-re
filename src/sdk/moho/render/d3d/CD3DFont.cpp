@@ -226,6 +226,18 @@ namespace moho
     }
 
     /**
+     * Address: 0x004283E0 (FUN_004283E0)
+     *
+     * What it does:
+     * Tail-thunk adapter that forwards one glyph-page cache init lane into
+     * `FUN_00429140`.
+     */
+    [[maybe_unused]] void InitializeGlyphPageCacheThunk(CD3DFont::SCharInfoPages& pages)
+    {
+      InitializeGlyphPageCache(pages);
+    }
+
+    /**
      * Address: 0x00426D70 (FUN_00426D70)
      * Address: 0x004294B0 (FUN_004294B0)
      * Address: 0x004298C0 (FUN_004298C0)
@@ -585,6 +597,18 @@ namespace moho
           return PackKerningKey(lhs) < PackKerningKey(rhs);
         }
       );
+    }
+
+    /**
+     * Address: 0x00429D90 (FUN_00429D90)
+     *
+     * What it does:
+     * Tail-thunk adapter that forwards one kerning-pair sort lane into
+     * `FUN_0042A3F0`.
+     */
+    [[maybe_unused]] void SortKerningPairsByPackedKeyThunk(CD3DFont::KerningPairVector& pairs)
+    {
+      SortKerningPairsByPackedKey(pairs);
     }
   } // namespace
 

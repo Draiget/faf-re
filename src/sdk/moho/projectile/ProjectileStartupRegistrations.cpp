@@ -26,10 +26,27 @@
 
 #pragma init_seg(lib)
 
+namespace gpg
+{
+  void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
+    gpg::ReadArchive* archive,
+    int objectPtr,
+    int version,
+    gpg::RRef* ownerRef
+  );
+
+  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
+    gpg::WriteArchive* archive,
+    std::uint32_t* intrusiveListHeadSlot
+  );
+} // namespace gpg
+
 namespace moho
 {
   bool dbg_Projectile = false;
   gpg::RType* CProjectileAttributes::sType = nullptr;
+  gpg::RType* ManyToOneBroadcaster<EProjectileImpactEvent>::sType = nullptr;
+  gpg::RType* ManyToOneListener<EProjectileImpactEvent>::sType = nullptr;
   CScrLuaMetatableFactory<Projectile> CScrLuaMetatableFactory<Projectile>::sInstance{};
 } // namespace moho
 
@@ -52,8 +69,10 @@ namespace
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
-    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-    serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
 
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperPrev = self;
@@ -114,6 +133,29 @@ namespace
   constexpr const char* kMissingProjectileBlueprintError =
     "Blueprint for projectile %s not found!, returning a nil object instead";
 
+  /**
+   * Address: 0x006A1370 (FUN_006A1370)
+   *
+   * What it does:
+   * Clears and reassigns one destination string from projectile
+   * `mDamageTypeName`.
+   */
+  [[maybe_unused]] msvc8::string* CopyProjectileDamageTypeNameRuntime(
+    const moho::Projectile* const projectile,
+    msvc8::string* const outName
+  )
+  {
+    if (outName == nullptr) {
+      return nullptr;
+    }
+
+    outName->clear();
+    if (projectile != nullptr) {
+      *outName = projectile->mDamageTypeName;
+    }
+    return outName;
+  }
+
   struct ProjectileVelocityRuntimeView
   {
     std::uint8_t mUnknown0000[0x280];
@@ -151,17 +193,6 @@ namespace
     "ProjectileTargetingRuntimeView::mStayUnderwater offset must be 0x2AE"
   );
   static_assert(sizeof(ProjectileTargetingRuntimeView) == 0x2B0, "ProjectileTargetingRuntimeView size must be 0x2B0");
-
-  struct ProjectileLifetimeRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x330];
-    std::uint32_t mLifetimeEnd; // +0x330
-  };
-  static_assert(
-    offsetof(ProjectileLifetimeRuntimeView, mLifetimeEnd) == 0x330,
-    "ProjectileLifetimeRuntimeView::mLifetimeEnd offset must be 0x330"
-  );
-  static_assert(sizeof(ProjectileLifetimeRuntimeView) == 0x334, "ProjectileLifetimeRuntimeView size must be 0x334");
 
   struct ProjectileMotionControlRuntimeView
   {
@@ -236,11 +267,6 @@ namespace
     return *reinterpret_cast<ProjectileVelocityRuntimeView*>(&projectile);
   }
 
-  [[nodiscard]] ProjectileLifetimeRuntimeView& AccessProjectileLifetimeView(moho::Projectile& projectile) noexcept
-  {
-    return *reinterpret_cast<ProjectileLifetimeRuntimeView*>(&projectile);
-  }
-
   [[nodiscard]] ProjectileTargetingRuntimeView& AccessProjectileTargetingView(moho::Projectile& projectile) noexcept
   {
     return *reinterpret_cast<ProjectileTargetingRuntimeView*>(&projectile);
@@ -262,6 +288,111 @@ namespace
   AccessProjectileAttributesView(moho::Projectile& projectile) noexcept
   {
     return reinterpret_cast<ProjectileAttributesRuntimeView*>(&projectile)->mAttributes;
+  }
+
+  /**
+   * Address: 0x006A11C0 (FUN_006A11C0)
+   *
+   * What it does:
+   * Writes projectile collide-entity enable lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileCollideEntity(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mDoCollision = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A11D0 (FUN_006A11D0)
+   *
+   * What it does:
+   * Writes projectile collide-surface enable lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileCollideSurface(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mCollideSurface = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A11E0 (FUN_006A11E0)
+   *
+   * What it does:
+   * Writes projectile target-tracking enable lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileTrackTarget(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mTrackTarget = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A11F0 (FUN_006A11F0)
+   *
+   * What it does:
+   * Writes projectile stay-underwater lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileStayUnderwater(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mStayUnderwater = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A1200 (FUN_006A1200)
+   *
+   * What it does:
+   * Writes projectile stay-upright enable lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileStayUpright(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mStayUpright = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A1210 (FUN_006A1210)
+   *
+   * What it does:
+   * Writes projectile velocity-alignment enable lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileVelocityAlign(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileTargetingView(*projectile).mVelocityAlign = enabled;
+    return projectile;
+  }
+
+  /**
+   * Address: 0x006A1220 (FUN_006A1220)
+   *
+   * What it does:
+   * Writes projectile destroy-on-water lane.
+   */
+  [[maybe_unused]] moho::Projectile* SetProjectileDestroyOnWater(
+    moho::Projectile* const projectile,
+    const bool enabled
+  ) noexcept
+  {
+    AccessProjectileWaterBehaviorView(*projectile).mDestroyOnWater = enabled;
+    return projectile;
   }
 
   [[nodiscard]] float ReadProjectileRandomUpSpeed(const moho::Projectile& projectile) noexcept
@@ -335,34 +466,113 @@ namespace
   class RManyToOneBroadcasterProjectileImpactTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0069FBC0 (FUN_0069FBC0, Moho::RManyBroadcasterRType_EProjectileImpactEvent::RManyBroadcasterRType_EProjectileImpactEvent)
+     *
+     * What it does:
+     * Preregisters `ManyToOneBroadcaster<EProjectileImpactEvent>` reflection
+     * metadata at startup.
+     */
+    RManyToOneBroadcasterProjectileImpactTypeInfo()
+      : gpg::RType()
+    {
+      gpg::PreRegisterRType(typeid(moho::ManyToOneBroadcaster_EProjectileImpactEvent), this);
+    }
+
+    /**
+     * Address: 0x0069FC80 (FUN_0069FC80, Moho::RManyBroadcasterRType_EProjectileImpactEvent::dtr)
+     *
+     * What it does:
+     * Tears down one broadcaster type-info descriptor and releases inherited
+     * `gpg::RType` reflection storage lanes.
+     */
+    ~RManyToOneBroadcasterProjectileImpactTypeInfo() override;
+
     [[nodiscard]] const char* GetName() const override
     {
       return "ManyToOneBroadcaster<EProjectileImpactEvent>";
     }
 
+    /**
+     * Address: 0x0069EA10 (FUN_0069EA10)
+     *
+     * What it does:
+     * Binds serializer load/save callback lanes and version metadata for
+     * `ManyToOneBroadcaster<EProjectileImpactEvent>` reflection.
+     */
     void Init() override
     {
       size_ = 0x08;
-      gpg::RType::Init();
-      Finish();
+      version_ = 1;
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
+        &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent
+      );
+      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
+        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
+      );
     }
   };
 
   class RManyToOneListenerProjectileImpactTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0069FC20 (FUN_0069FC20, Moho::RManyListenerRType_EProjectileImpactEvent::RManyListenerRType_EProjectileImpactEvent)
+     *
+     * What it does:
+     * Preregisters `ManyToOneListener<EProjectileImpactEvent>` reflection
+     * metadata at startup.
+     */
+    RManyToOneListenerProjectileImpactTypeInfo()
+      : gpg::RType()
+    {
+      gpg::PreRegisterRType(typeid(moho::ManyToOneListener_EProjectileImpactEvent), this);
+    }
+
+    /**
+     * Address: 0x0069FCE0 (FUN_0069FCE0, Moho::RManyListenerRType_EProjectileImpactEvent::dtr)
+     *
+     * What it does:
+     * Tears down one listener type-info descriptor and releases inherited
+     * `gpg::RType` reflection storage lanes.
+     */
+    ~RManyToOneListenerProjectileImpactTypeInfo() override;
+
     [[nodiscard]] const char* GetName() const override
     {
       return "ManyToOneListener<EProjectileImpactEvent>";
     }
 
+    /**
+     * Address: 0x0069EAD0 (FUN_0069EAD0)
+     *
+     * What it does:
+     * Sets the reflected runtime object size for
+     * `ManyToOneListener<EProjectileImpactEvent>`.
+     */
     void Init() override
     {
-      size_ = 0x0C;
-      gpg::RType::Init();
-      Finish();
+      size_ = 0x08;
     }
   };
+
+  /**
+   * Address: 0x0069FC80 (FUN_0069FC80, Moho::RManyBroadcasterRType_EProjectileImpactEvent::dtr)
+   *
+   * What it does:
+   * Tears down one broadcaster type-info descriptor and releases inherited
+   * `gpg::RType` reflection storage lanes.
+   */
+  RManyToOneBroadcasterProjectileImpactTypeInfo::~RManyToOneBroadcasterProjectileImpactTypeInfo() = default;
+
+  /**
+   * Address: 0x0069FCE0 (FUN_0069FCE0, Moho::RManyListenerRType_EProjectileImpactEvent::dtr)
+   *
+   * What it does:
+   * Tears down one listener type-info descriptor and releases inherited
+   * `gpg::RType` reflection storage lanes.
+   */
+  RManyToOneListenerProjectileImpactTypeInfo::~RManyToOneListenerProjectileImpactTypeInfo() = default;
 
   template <typename TEnum>
   class PrimitiveEnumSerializer
@@ -453,7 +663,6 @@ namespace
     }
 
     auto& typeInfo = EProjectileImpactEventTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::EProjectileImpactEvent), &typeInfo);
     return &typeInfo;
   }
 
@@ -465,7 +674,6 @@ namespace
     }
 
     auto& typeInfo = CProjectileAttributesTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::CProjectileAttributes), &typeInfo);
     moho::CProjectileAttributes::sType = &typeInfo;
     return &typeInfo;
   }
@@ -478,7 +686,6 @@ namespace
     }
 
     auto& typeInfo = ManyToOneBroadcasterTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::ManyToOneBroadcaster_EProjectileImpactEvent), &typeInfo);
     moho::ManyToOneBroadcaster_EProjectileImpactEvent::sType = &typeInfo;
     return &typeInfo;
   }
@@ -491,7 +698,6 @@ namespace
     }
 
     auto& typeInfo = ManyToOneListenerTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::ManyToOneListener_EProjectileImpactEvent), &typeInfo);
     moho::ManyToOneListener_EProjectileImpactEvent::sType = &typeInfo;
     return &typeInfo;
   }
@@ -616,6 +822,30 @@ namespace
   void cleanup_CProjectileAttributesSerializer_atexit()
   {
     (void)moho::cleanup_CProjectileAttributesSerializer();
+  }
+
+  /**
+   * Address: 0x0069A9F0 (FUN_0069A9F0)
+   *
+   * What it does:
+   * Unlinks global `CProjectileAttributesSerializer` helper links and resets
+   * the node to the canonical self-linked state.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCProjectileAttributesSerializerHelperNodePrimary() noexcept
+  {
+    return UnlinkSerializerNode(CProjectileAttributesSerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0069AA20 (FUN_0069AA20)
+   *
+   * What it does:
+   * Secondary unlink/reset entry for the global
+   * `CProjectileAttributesSerializer` helper node.
+   */
+  [[nodiscard, maybe_unused]] gpg::SerHelperBase* UnlinkCProjectileAttributesSerializerHelperNodeSecondary() noexcept
+  {
+    return UnlinkSerializerNode(CProjectileAttributesSerializerStorageRef());
   }
 
   struct ProjectileStartupBootstrap
@@ -772,7 +1002,7 @@ namespace moho
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
-    Entity* const launcher = AccessProjectileTargetingView(*projectile).mLauncherWeak.GetObjectPtr();
+    Entity* const launcher = projectile->GetLauncherEntity();
     if (launcher != nullptr) {
       launcher->mLuaObj.PushStack(state);
     } else {
@@ -1093,9 +1323,7 @@ namespace moho
       LuaPlus::LuaStackObject::TypeError(&lifetimeArg, "number");
     }
 
-    const float lifetimeTicks = static_cast<float>(lua_tonumber(rawState, 2) * 10.0);
-    AccessProjectileLifetimeView(*projectile).mLifetimeEnd =
-      projectile->SimulationRef->mCurTick + static_cast<std::uint32_t>(lifetimeTicks);
+    projectile->SetLifetime(static_cast<float>(lua_tonumber(rawState, 2)));
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -1456,7 +1684,7 @@ namespace moho
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
     LuaPlus::LuaStackObject destroyOnWaterArg(state, 2);
-    AccessProjectileWaterBehaviorView(*projectile).mDestroyOnWater = destroyOnWaterArg.GetBoolean();
+    (void)SetProjectileDestroyOnWater(projectile, destroyOnWaterArg.GetBoolean());
     return 0;
   }
 
@@ -1953,12 +2181,10 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
     const bool enabled = enabledArg.GetBoolean();
-    targetingView.mCollideSurface = enabled;
-    targetingView.mDoCollision = enabled;
+    (void)SetProjectileCollideSurface(projectile, enabled);
+    (void)SetProjectileCollideEntity(projectile, enabled);
 
     projectile->mLuaObj.PushStack(state);
     return 1;
@@ -2016,10 +2242,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mCollideSurface = enabledArg.GetBoolean();
+    (void)SetProjectileCollideSurface(projectile, enabledArg.GetBoolean());
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -2077,10 +2301,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mDoCollision = enabledArg.GetBoolean();
+    (void)SetProjectileCollideEntity(projectile, enabledArg.GetBoolean());
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -2138,10 +2360,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mStayUnderwater = enabledArg.GetBoolean();
+    (void)SetProjectileStayUnderwater(projectile, enabledArg.GetBoolean());
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -2199,10 +2419,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mTrackTarget = enabledArg.GetBoolean();
+    (void)SetProjectileTrackTarget(projectile, enabledArg.GetBoolean());
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -2258,10 +2476,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mStayUpright = enabledArg.GetBoolean();
+    (void)SetProjectileStayUpright(projectile, enabledArg.GetBoolean());
     return 0;
   }
 
@@ -2317,10 +2533,8 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-
     LuaPlus::LuaStackObject enabledArg(state, 2);
-    targetingView.mVelocityAlign = enabledArg.GetBoolean();
+    (void)SetProjectileVelocityAlign(projectile, enabledArg.GetBoolean());
     return 0;
   }
 
@@ -2398,15 +2612,18 @@ namespace moho
       return 1;
     }
 
+    msvc8::string copiedDamageTypeName{};
+    (void)CopyProjectileDamageTypeNameRuntime(sourceProjectile, &copiedDamageTypeName);
+
     Projectile* const childProjectile = PROJ_Create(
       sim,
       blueprint,
-      sourceProjectile->ArmyRef,
+      sourceProjectile->GetArmyOwner(),
       sourceProjectile,
       sourceProjectile->GetTransformWm3(),
       sourceProjectile->mDamage,
       sourceProjectile->mDamageRadius,
-      sourceProjectile->mDamageTypeName,
+      copiedDamageTypeName,
       sourceProjectile->mTargetPosData,
       true
     );
@@ -2766,6 +2983,14 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A720 (FUN_0069A720, Moho::EProjectileImpactEventTypeInfo::EProjectileImpactEventTypeInfo)
+   */
+  EProjectileImpactEventTypeInfo::EProjectileImpactEventTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(EProjectileImpactEvent), this);
+  }
+
+  /**
    * Address: 0x0069A7B0 (FUN_0069A7B0, Moho::EProjectileImpactEventTypeInfo::dtr)
    */
   EProjectileImpactEventTypeInfo::~EProjectileImpactEventTypeInfo() = default;
@@ -2789,9 +3014,71 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A4A0 (FUN_0069A4A0, Moho::CProjectileAttributes::CProjectileAttributes)
+   *
+   * What it does:
+   * Initializes projectile zig-zag/detonation override lanes to unset
+   * sentinel values and clears blueprint pointer ownership.
+   */
+  CProjectileAttributes::CProjectileAttributes() noexcept
+    : mBlueprint(nullptr)
+    , mMaxZigZag(-1.0f)
+    , mZigZagFrequency(-1.0f)
+    , mDetonateAboveHeight(-1.0f)
+    , mDetonateBelowHeight(-1.0f)
+  {
+  }
+
+  /**
+   * Address: 0x0069A4D0 (FUN_0069A4D0, Moho::CProjectileAttributes::CProjectileAttributes)
+   *
+   * What it does:
+   * Initializes one projectile-attributes payload from a blueprint pointer
+   * while keeping zig-zag/detonation override lanes unset.
+   */
+  CProjectileAttributes::CProjectileAttributes(RProjectileBlueprint* const blueprint) noexcept
+    : CProjectileAttributes()
+  {
+    mBlueprint = blueprint;
+  }
+
+  /**
+   * Address: 0x0069A850 (FUN_0069A850, Moho::CProjectileAttributesTypeInfo::CProjectileAttributesTypeInfo)
+   *
+   * What it does:
+   * Preregisters `CProjectileAttributes` reflection metadata at startup.
+   */
+  CProjectileAttributesTypeInfo::CProjectileAttributesTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CProjectileAttributes), this);
+  }
+
+  /**
+   * Address: 0x0069A940 (FUN_0069A940, CProjectileAttributesTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one
+   * `CProjectileAttributesTypeInfo` instance while preserving outer storage
+   * ownership.
+   */
+  [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(CProjectileAttributesTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x0069A8E0 (FUN_0069A8E0, Moho::CProjectileAttributesTypeInfo::dtr)
    */
-  CProjectileAttributesTypeInfo::~CProjectileAttributesTypeInfo() = default;
+  CProjectileAttributesTypeInfo::~CProjectileAttributesTypeInfo()
+  {
+    DestroyCProjectileAttributesTypeInfoBody(this);
+  }
 
   /**
    * Address: 0x0069A8D0 (FUN_0069A8D0, Moho::CProjectileAttributesTypeInfo::GetName)
@@ -2956,7 +3243,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_CProjectileAttributesSerializer()
   {
-    return UnlinkSerializerNode(CProjectileAttributesSerializerStorageRef());
+    return UnlinkCProjectileAttributesSerializerHelperNodePrimary();
   }
 
   /**

@@ -112,6 +112,30 @@ namespace
     return UnlinkSerializerNode(*AcquireCAiNavigatorLandSerializer());
   }
 
+  /**
+   * Address: 0x005A4820 (FUN_005A4820)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * CAiNavigatorLand serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorLandSerializerStartupThunkA()
+  {
+    return cleanup_CAiNavigatorLandSerializer();
+  }
+
+  /**
+   * Address: 0x005A4850 (FUN_005A4850)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * CAiNavigatorLand serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiNavigatorLandSerializerStartupThunkB()
+  {
+    return cleanup_CAiNavigatorLandSerializer();
+  }
+
   void cleanup_CAiNavigatorLandSerializer_atexit()
   {
     (void)cleanup_CAiNavigatorLandSerializer();
@@ -182,7 +206,6 @@ void moho::register_CAiNavigatorLandSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiNavigatorLandSerializer::Deserialize;
   serializer->mSaveCallback = &CAiNavigatorLandSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiNavigatorLandSerializer_atexit);
 }
 

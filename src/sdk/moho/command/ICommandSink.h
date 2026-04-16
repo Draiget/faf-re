@@ -31,6 +31,14 @@ namespace moho
     // Primary vftable (24 entries)
   public:
     /**
+     * Address: 0x006E59F0 (FUN_006E59F0, ??0ICommandSink@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one command-sink base interface object.
+     */
+    ICommandSink();
+
+    /**
      * Address: 0x00748650
      *
      * VFTable SLOT: 0
@@ -80,7 +88,7 @@ namespace moho
     virtual void CreateUnit(uint32_t, RResId const&, SCoordsVec2 const&, float) = 0;
 
     /**
-     * Address: 0x00748C00
+      * Alias of FUN_00748C00 (non-canonical helper lane).
      *
      * VFTable SLOT: 7
      */
@@ -212,4 +220,21 @@ namespace moho
      */
     virtual void EndGame();
   };
+
+  /**
+   * Address: 0x0073F8A0 (FUN_0073F8A0)
+   *
+   * What it does:
+   * Replaces one owned command-sink storage pointer and releases the previous
+   * storage lane with raw `operator delete` when present.
+   */
+  void ReplaceOwnedCommandSinkStorage(ICommandSink*& slot, ICommandSink* replacement) noexcept;
+
+  /**
+   * Address: 0x007418D0 (FUN_007418D0)
+   *
+   * What it does:
+   * Releases one owned command-sink storage lane with raw `operator delete`.
+   */
+  void DeleteOwnedCommandSinkStorage(ICommandSink* sink) noexcept;
 } // namespace moho

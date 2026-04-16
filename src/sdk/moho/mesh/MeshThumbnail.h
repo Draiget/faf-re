@@ -16,6 +16,15 @@ namespace moho
   class MeshThumbnail
   {
   public:
+    /**
+     * Address: 0x007EA700 (FUN_007EA700, ??0MeshThumbnail@Moho@@QAE@XZ)
+     * Mangled: ??0MeshThumbnail@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Initializes one empty thumbnail request with default camera state,
+     * identity-forward orientation lane, magenta tint sentinel, and normalized
+     * output rectangle `[0,0,1,1]`.
+     */
     MeshThumbnail();
 
     /**

@@ -125,10 +125,13 @@ namespace moho
   void CUnitWaitForFerryTaskTypeInfo::Init()
   {
     size_ = sizeof(CUnitWaitForFerryTask);
-    newRefFunc_ = &CUnitWaitForFerryTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitWaitForFerryTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitWaitForFerryTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitWaitForFerryTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitWaitForFerryTaskTypeInfo::NewRef,
+      &CUnitWaitForFerryTaskTypeInfo::CtrRef,
+      &CUnitWaitForFerryTaskTypeInfo::Delete,
+      &CUnitWaitForFerryTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

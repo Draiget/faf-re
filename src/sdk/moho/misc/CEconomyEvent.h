@@ -299,7 +299,7 @@ namespace moho
   using EconomyEventIsDone_LuaFuncDef = ::moho::CScrLuaBinder;
 
   /**
-   * Address: 0x00775630 (FUN_00775630, cfunc_CreateEconomyEvent)
+    * Alias of FUN_00775630 (non-canonical helper lane).
    */
   int cfunc_CreateEconomyEvent(lua_State* luaContext);
 
@@ -317,7 +317,7 @@ namespace moho
   CScrLuaInitForm* func_CreateEconomyEvent_LuaFuncDef();
 
   /**
-   * Address: 0x00775910 (FUN_00775910, cfunc_RemoveEconomyEvent)
+    * Alias of FUN_00775910 (non-canonical helper lane).
    */
   int cfunc_RemoveEconomyEvent(lua_State* luaContext);
 
@@ -335,7 +335,7 @@ namespace moho
   CScrLuaInitForm* func_RemoveEconomyEvent_LuaFuncDef();
 
   /**
-   * Address: 0x00775A40 (FUN_00775A40, cfunc_EconomyEventIsDone)
+    * Alias of FUN_00775A40 (non-canonical helper lane).
    */
   int cfunc_EconomyEventIsDone(lua_State* luaContext);
 
@@ -357,6 +357,29 @@ namespace moho
    */
   [[nodiscard]]
   CEconomyEvent* func_GetCEconomyEvent(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007754E0 (FUN_007754E0, sub_7754E0)
+   *
+   * What it does:
+   * Allocates one default `CEconomyEvent` and publishes it as an unowned
+   * serializer construct-result reference.
+   */
+  void ConstructCEconomyEventForSerializer(gpg::SerConstructResult* result);
+
+  /**
+   * Address: 0x007754D0 (FUN_007754D0)
+   *
+   * What it does:
+   * Serializer construct-callback thunk that forwards to
+   * `ConstructCEconomyEventForSerializer`.
+   */
+  void ConstructCEconomyEventSerializerThunk(
+    gpg::ReadArchive* archive,
+    int objectPtr,
+    int version,
+    gpg::SerConstructResult* result
+  );
 
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(offsetof(CEconomyEvent, mUnitEventNode) == 0x48, "CEconomyEvent::mUnitEventNode offset must be 0x48");

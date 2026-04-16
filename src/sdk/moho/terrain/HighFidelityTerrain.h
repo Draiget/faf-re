@@ -3,10 +3,16 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/weak_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/water/Shoreline.h"
+
+namespace gpg::gal
+{
+  class TextureD3D9;
+}
 
 namespace moho
 {
@@ -82,6 +88,16 @@ namespace moho
     bool Init();
 
     /**
+     * Address: 0x00800DC0 (FUN_00800DC0, Moho::HighFidelityTerrain::LoadShaderVars)
+     *
+     * What it does:
+     * Binds terrain shader texture lanes, writes terrain scale + viewport
+     * normalization constants, and forwards the optional terrain-normal texture
+     * weak handle into the active terrain effect.
+     */
+    void LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture);
+
+    /**
      * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterline)
      *
      * What it does:
@@ -89,6 +105,25 @@ namespace moho
      * shoreline overlays for the active terrain camera.
      */
     void DrawWaterline(std::int32_t arg0, std::int32_t arg1);
+
+    /**
+     * Address: 0x008014F0 (FUN_008014F0, Moho::HighFidelityTerrain::DrawTerrainSkirt)
+     *
+     * What it does:
+     * Issues one terrain-skirt indexed draw for the high-fidelity terrain
+     * path when terrain/skirt flags are enabled and skirt index lanes are
+     * valid for triangle-list submission.
+     */
+    void DrawTerrainSkirt();
+
+    /**
+     * Address: 0x00801460 (FUN_00801460, Moho::HighFidelityTerrain::DrawTriangles)
+     *
+     * What it does:
+     * Draws one triangle-list pass using high-fidelity terrain index/vertex
+     * sheets when the legacy index-count lane is positive and divisible by 3.
+     */
+    void DrawTriangles();
 
     /**
      * Address: 0x008131D0 (FUN_008131D0, Moho::HighFidelityTerrain::DrawShoreline)
@@ -100,9 +135,18 @@ namespace moho
     static void DrawShoreline(const Shoreline* shoreline, const GeomCamera3* camera);
 
     TerrainWaterResourceView* mTerrainResource = nullptr; // +0x0C
-    std::uint8_t mUnknown10_27[0x18];                     // +0x10..+0x27
+    std::int32_t mViewportOriginX = 0;                    // +0x10
+    std::int32_t mViewportOriginY = 0;                    // +0x14
+    std::int32_t mViewportWidth = 0;                      // +0x18
+    std::int32_t mViewportHeight = 0;                     // +0x1C
+    std::int32_t mViewportRenderWidth = 0;                // +0x20
+    std::int32_t mViewportRenderHeight = 0;               // +0x24
     GeomCamera3* mCamera = nullptr;                       // +0x28
-    std::uint8_t mUnknown2C_3F[0x14];                     // +0x2C..+0x3F
+    std::uint32_t mSkirtStartIndex = 0u;                  // +0x2C
+    std::uint32_t mUnknown30 = 0u;                        // +0x30
+    std::uint32_t mSkirtEndIndex = 0u;                    // +0x34
+    std::int32_t mSkirtEndVertex = 0;                     // +0x38
+    std::int32_t mSkirtBaseVertex = 0;                    // +0x3C
 
     PrimaryPatchIndexLane mPrimaryPatchData;              // +0x40
     CTesselator* mTesselator = nullptr;                   // +0x2F30
@@ -123,8 +167,48 @@ namespace moho
     "HighFidelityTerrain::mTerrainResource offset must be 0x0C"
   );
   static_assert(
+    offsetof(HighFidelityTerrain, mViewportOriginX) == 0x10,
+    "HighFidelityTerrain::mViewportOriginX offset must be 0x10"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mViewportOriginY) == 0x14,
+    "HighFidelityTerrain::mViewportOriginY offset must be 0x14"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mViewportWidth) == 0x18,
+    "HighFidelityTerrain::mViewportWidth offset must be 0x18"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mViewportHeight) == 0x1C,
+    "HighFidelityTerrain::mViewportHeight offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mViewportRenderWidth) == 0x20,
+    "HighFidelityTerrain::mViewportRenderWidth offset must be 0x20"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mViewportRenderHeight) == 0x24,
+    "HighFidelityTerrain::mViewportRenderHeight offset must be 0x24"
+  );
+  static_assert(
     offsetof(HighFidelityTerrain, mPrimaryPatchData) == 0x40,
     "HighFidelityTerrain::mPrimaryPatchData offset must be 0x40"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mSkirtStartIndex) == 0x2C,
+    "HighFidelityTerrain::mSkirtStartIndex offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mSkirtEndIndex) == 0x34,
+    "HighFidelityTerrain::mSkirtEndIndex offset must be 0x34"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mSkirtEndVertex) == 0x38,
+    "HighFidelityTerrain::mSkirtEndVertex offset must be 0x38"
+  );
+  static_assert(
+    offsetof(HighFidelityTerrain, mSkirtBaseVertex) == 0x3C,
+    "HighFidelityTerrain::mSkirtBaseVertex offset must be 0x3C"
   );
   static_assert(
     offsetof(HighFidelityTerrain, mTesselator) == 0x2F30,

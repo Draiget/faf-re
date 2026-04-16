@@ -14,7 +14,7 @@ namespace gpg
   {
   public:
     /**
-     * Address: 0x00952AB0 (FUN_00952AB0, ArchiveTokenTypeInfo::ArchiveTokenTypeInfo)
+       * Address: 0x00952AB0 (FUN_00952AB0)
      */
     ArchiveTokenTypeInfo();
 
@@ -41,14 +41,6 @@ namespace gpg
   };
 
   static_assert(sizeof(ArchiveTokenTypeInfo) == 0x78, "ArchiveTokenTypeInfo size must be 0x78");
-
-  /**
-   * Address: 0x00952AB0 (FUN_00952AB0, preregister_ArchiveTokenTypeInfo lane)
-   *
-   * What it does:
-   * Constructs/accesses startup-owned `ArchiveTokenTypeInfo` storage.
-   */
-  [[nodiscard]] gpg::REnumType* preregister_ArchiveTokenTypeInfo();
 
   /**
    * Address: 0x00C0A210 (FUN_00C0A210, ArchiveTokenTypeInfo::~ArchiveTokenTypeInfo)

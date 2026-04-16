@@ -23,13 +23,67 @@ namespace
     return reinterpret_cast<CAiTargetSerializer*>(gCAiTargetSerializerStorage);
   }
 
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  template <typename TSerializer>
+  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x005E2E60 (FUN_005E2E60)
+   *
+   * What it does:
+   * Unlinks the global `CAiTargetSerializer` helper node from the intrusive
+   * serializer chain and restores it to a self-linked node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiTargetSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(*AcquireCAiTargetSerializer());
+  }
+
+  /**
+   * Address: 0x005E2E90 (FUN_005E2E90)
+   *
+   * What it does:
+   * Secondary unlink/reset thunk for the global `CAiTargetSerializer` helper
+   * node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiTargetSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(*AcquireCAiTargetSerializer());
+  }
+
   void cleanup_CAiTargetSerializer()
   {
     if (!gCAiTargetSerializerConstructed) {
       return;
     }
 
-    AcquireCAiTargetSerializer()->~CAiTargetSerializer();
+    CAiTargetSerializer* const serializer = AcquireCAiTargetSerializer();
+    (void)cleanup_CAiTargetSerializerStartupThunkA();
+    serializer->~CAiTargetSerializer();
     gCAiTargetSerializerConstructed = false;
   }
 
@@ -72,10 +126,8 @@ void CAiTargetSerializer::RegisterSerializeFunctions()
 int moho::register_CAiTargetSerializer()
 {
   CAiTargetSerializer* const serializer = AcquireCAiTargetSerializer();
-  serializer->mHelperNext = nullptr;
-  serializer->mHelperPrev = nullptr;
+  InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiTarget::DeserializeFromArchive;
   serializer->mSaveCallback = &CAiTarget::SerializeToArchive;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_CAiTargetSerializer);
 }

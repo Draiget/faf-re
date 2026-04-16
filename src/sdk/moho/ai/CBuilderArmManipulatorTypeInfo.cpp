@@ -7,6 +7,11 @@
 #include "moho/ai/CBuilderArmManipulator.h"
 #include "moho/animation/IAniManipulator.h"
 
+namespace moho
+{
+  gpg::RType* CBuilderArmManipulator::sType = nullptr;
+}
+
 namespace
 {
   using TypeInfo = moho::CBuilderArmManipulatorTypeInfo;
@@ -48,13 +53,43 @@ namespace
     gCBuilderArmManipulatorTypeInfoConstructed = false;
   }
 
+  /**
+   * Address: 0x006358F0 (FUN_006358F0)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for
+   * `CBuilderArmManipulator`.
+   */
+  [[nodiscard]] gpg::RType* ResolveCBuilderArmManipulatorTypeCachePrimary()
+  {
+    gpg::RType* type = moho::CBuilderArmManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CBuilderArmManipulator));
+      moho::CBuilderArmManipulator::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00636F10 (FUN_00636F10)
+   *
+   * What it does:
+   * Secondary duplicate lane that resolves/caches
+   * `CBuilderArmManipulator` reflection type.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCBuilderArmManipulatorTypeCacheSecondary()
+  {
+    gpg::RType* type = moho::CBuilderArmManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CBuilderArmManipulator));
+      moho::CBuilderArmManipulator::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedCBuilderArmManipulatorType()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CBuilderArmManipulator));
-    }
-    return cached;
+    return ResolveCBuilderArmManipulatorTypeCachePrimary();
   }
 
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
@@ -91,6 +126,20 @@ namespace moho
   /**
    * Address: 0x00635A40 (FUN_00635A40, scalar deleting thunk)
    */
+  /**
+   * Address: 0x00635AA0 (FUN_00635AA0, CBuilderArmManipulatorTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Executes one non-deleting destruction lane for
+   * `CBuilderArmManipulatorTypeInfo`.
+   */
+  [[maybe_unused]] void DestroyCBuilderArmManipulatorTypeInfoBody(
+    CBuilderArmManipulatorTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->~CBuilderArmManipulatorTypeInfo();
+  }
+
   CBuilderArmManipulatorTypeInfo::~CBuilderArmManipulatorTypeInfo() = default;
 
   /**

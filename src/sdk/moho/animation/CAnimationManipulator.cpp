@@ -12,11 +12,13 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/resource/RScaResource.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
@@ -102,6 +104,32 @@ namespace
 
     auto* const resource = static_cast<const AnimationResourceView*>(ref.px);
     return resource->mClipHeader;
+  }
+
+  /**
+   * Address: 0x0063EFB0 (FUN_0063EFB0)
+   *
+   * What it does:
+   * Returns animation clip bone-track count from one resource payload lane.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipBoneTrackCount(
+    const AnimationResourceView* const resource
+  ) noexcept
+  {
+    return resource->mClipHeader->mBoneTrackCount;
+  }
+
+  /**
+   * Address: 0x0063EFC0 (FUN_0063EFC0)
+   *
+   * What it does:
+   * Returns animation clip frame count from one resource payload lane.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipFrameCount(
+    const AnimationResourceView* const resource
+  ) noexcept
+  {
+    return resource->mClipHeader->mFrameCount;
   }
 
   [[nodiscard]] float WrapToRange(const float value, const float range)
@@ -194,6 +222,40 @@ namespace
       moho::CAnimationManipulator::sType = gpg::LookupRType(typeid(moho::CAnimationManipulator));
     }
     return moho::CAnimationManipulator::sType;
+  }
+
+  /**
+   * Address: 0x00642820 (FUN_00642820)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CAnimationManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCAnimationManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCAnimationManipulatorType());
+    return upcast.mObj;
+  }
+
+  /**
+   * Address: 0x006422B0 (FUN_006422B0)
+   *
+   * What it does:
+   * Copies one packed vector<bool>-cursor lane, advances it by `bitDelta`,
+   * then stores the advanced `{word,bit}` pair in caller output storage.
+   */
+  [[maybe_unused]] msvc8::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
+    const msvc8::detail::vector_bool_word_cursor* const sourceCursor,
+    msvc8::detail::vector_bool_word_cursor* const destinationCursor,
+    const int bitDelta
+  )
+  {
+    *destinationCursor = *sourceCursor;
+    (void)msvc8::detail::AdvanceCursorBits(destinationCursor, bitDelta);
+    return destinationCursor;
   }
 
   template <typename TObject>
@@ -523,6 +585,70 @@ namespace
     return UnlinkHelperNode(gCAnimationManipulatorSerializer);
   }
 
+  /**
+   * Address: 0x0063F2F0 (FUN_0063F2F0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAnimationManipulatorSerializer`
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAnimationManipulatorSerializer*
+  InitializeCAnimationManipulatorSerializerStartupThunk()
+  {
+    InitializeHelperNode(gCAnimationManipulatorSerializer);
+    gCAnimationManipulatorSerializer.mSerLoadFunc = &moho::CAnimationManipulatorSerializer::Deserialize;
+    gCAnimationManipulatorSerializer.mSerSaveFunc = &moho::CAnimationManipulatorSerializer::Serialize;
+    return &gCAnimationManipulatorSerializer;
+  }
+
+  /**
+   * Address: 0x0063F1C0 (FUN_0063F1C0)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CAnimationManipulator construct helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructStartupThunkA()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
+  }
+
+  /**
+   * Address: 0x0063F1F0 (FUN_0063F1F0)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CAnimationManipulator construct helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructStartupThunkB()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
+  }
+
+  /**
+   * Address: 0x0063F320 (FUN_0063F320)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CAnimationManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
+  }
+
+  /**
+   * Address: 0x0063F350 (FUN_0063F350)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CAnimationManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
+  }
+
   void cleanup_CAnimationManipulatorTypeInfoImpl()
   {
     if (!gCAnimationManipulatorTypeInfoConstructed) {
@@ -564,6 +690,7 @@ namespace moho
 
   int cfunc_CreateAnimator(lua_State* luaContext);
   int cfunc_CAnimationManipulatorPlayAnim(lua_State* luaContext);
+  int cfunc_CAnimationManipulatorPlayAnimL(LuaPlus::LuaState* state);
 
   gpg::RType* CAnimationManipulator::sType = nullptr;
   CScrLuaMetatableFactory<CAnimationManipulator> CScrLuaMetatableFactory<CAnimationManipulator>::sInstance{};
@@ -646,6 +773,72 @@ namespace moho
     CAnimationManipulator* const manipulator =
       new CAnimationManipulator(unit->SimulationRef, unit->AniActor, bindGoalUnit ? unit : nullptr);
     manipulator->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00640670 (FUN_00640670, cfunc_CAnimationManipulatorPlayAnim)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorPlayAnimL`.
+   */
+  int cfunc_CAnimationManipulatorPlayAnim(lua_State* const luaContext)
+  {
+    return cfunc_CAnimationManipulatorPlayAnimL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006406F0 (FUN_006406F0, cfunc_CAnimationManipulatorPlayAnimL)
+   *
+   * What it does:
+   * Reads `(animManipulator, filename, [looping])`, validates filename, loads
+   * one animation resource by path, and applies it as current clip state.
+   */
+  int cfunc_CAnimationManipulatorPlayAnimL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedRangeWarning, kPlayAnimHelpText, 2, 3, argumentCount);
+    }
+
+    if (lua_type(rawState, 2) == LUA_TNIL) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
+    CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
+
+    LuaPlus::LuaStackObject filenameArg(state, 2);
+    const char* const filename = lua_tostring(rawState, 2);
+    if (filename == nullptr) {
+      filenameArg.TypeError("string");
+      lua_pushstring(rawState, "PlayAnim: Got empty filename");
+      (void)lua_gettop(rawState);
+      lua_error(rawState);
+    }
+    if (filename[0] == '\0') {
+      lua_pushstring(rawState, "PlayAnim: Got empty filename");
+      (void)lua_gettop(rawState);
+      lua_error(rawState);
+    }
+
+    bool looping = false;
+    if (lua_gettop(rawState) >= 3) {
+      LuaPlus::LuaStackObject loopingArg(state, 3);
+      looping = loopingArg.GetBoolean();
+    }
+
+    gpg::RRef resourceRef{};
+    (void)moho::GetScaResource(&resourceRef, filename);
+
+    CAnimationManipulator::AnimationResourceRef animationResource{};
+    animationResource.px = resourceRef.mObj;
+    animationResource.pi = nullptr;
+
+    manipulator->SetAnimationResource(animationResource, looping);
+    lua_settop(rawState, 1);
     return 1;
   }
 
@@ -1532,16 +1725,34 @@ namespace moho
     return clip->mDurationSeconds;
   }
 
+  /**
+   * Address: 0x0063EF80 (FUN_0063EF80)
+   *
+   * What it does:
+   * Sets overwrite-mode flag lane controlling pose overwrite behavior.
+   */
   void CAnimationManipulator::SetOverwriteMode(const bool enabled) noexcept
   {
     mOverwriteMode = enabled;
   }
 
+  /**
+   * Address: 0x0063EF90 (FUN_0063EF90)
+   *
+   * What it does:
+   * Sets disable-on-signal behavior flag lane.
+   */
   void CAnimationManipulator::SetDisableOnSignal(const bool enabled) noexcept
   {
     mDisableOnSignal = enabled;
   }
 
+  /**
+   * Address: 0x0063EFA0 (FUN_0063EFA0)
+   *
+   * What it does:
+   * Sets directional-animation playback flag lane.
+   */
   void CAnimationManipulator::SetDirectionalAnim(const bool enabled) noexcept
   {
     mDirectionalAnim = enabled;
@@ -1550,6 +1761,20 @@ namespace moho
   void CAnimationManipulator::InitializeBoneMask(const std::uint32_t boneCount)
   {
     mBoneMask.Resize(boneCount, true);
+  }
+
+  /**
+   * Address: 0x0063F230 (FUN_0063F230, Moho::CAnimationManipulator::MemberConstruct)
+   *
+   * What it does:
+   * Allocates one `CAnimationManipulator`, builds one typed `RRef` for that
+   * object, and stores it as unowned in the construct-result lane.
+   */
+  [[maybe_unused]] void CAnimationManipulatorMemberConstruct(gpg::SerConstructResult* const result)
+  {
+    auto* const object = new CAnimationManipulator();
+    const gpg::RRef objectRef = MakeTypedRef(object, CachedCAnimationManipulatorType());
+    result->SetUnowned(objectRef, 0u);
   }
 
   /**
@@ -1562,14 +1787,11 @@ namespace moho
     gpg::SerConstructResult* const result
   )
   {
-    CAnimationManipulator* const object = new (std::nothrow) CAnimationManipulator();
     if (result == nullptr) {
-      delete object;
       return;
     }
 
-    const gpg::RRef objectRef = MakeTypedRef(object, CachedCAnimationManipulatorType());
-    result->SetUnowned(objectRef, 0u);
+    CAnimationManipulatorMemberConstruct(result);
   }
 
   /**
@@ -1703,7 +1925,6 @@ namespace moho
     InitializeHelperNode(gCAnimationManipulatorSerializer);
     gCAnimationManipulatorSerializer.mSerLoadFunc = &CAnimationManipulatorSerializer::Deserialize;
     gCAnimationManipulatorSerializer.mSerSaveFunc = &CAnimationManipulatorSerializer::Serialize;
-    gCAnimationManipulatorSerializer.RegisterSerializeFunctions();
     return std::atexit(&CleanupCAnimationManipulatorSerializerAtexit);
   }
 

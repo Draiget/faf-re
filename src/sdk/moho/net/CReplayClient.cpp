@@ -41,6 +41,67 @@ namespace
       SetEvent(manager->mCurrentEvent);
     }
   }
+
+  struct ReplayThreadTask
+  {
+    using ThreadProc = void (*)(CReplayClient*);
+
+    ThreadProc mProc{nullptr};
+    CReplayClient* mSelf{nullptr};
+
+    void operator()() const
+    {
+      if (mProc != nullptr) {
+        mProc(mSelf);
+      }
+    }
+  };
+
+  /**
+   * Address: 0x00540D70 (FUN_00540D70)
+   *
+   * What it does:
+   * Builds a replay-thread task with the static entry point only.
+   */
+  ReplayThreadTask::ThreadProc* StoreReplayThreadEntryProc(
+    ReplayThreadTask::ThreadProc* const outProc
+  )
+  {
+    *outProc = &CReplayClient::ReplayThreadMain;
+    return outProc;
+  }
+
+  /**
+   * Address: 0x00540D60 (FUN_00540D60)
+   *
+   * What it does:
+   * Builds one replay-thread task from one entry-proc lane and one
+   * dereferenced self-pointer lane.
+   */
+  ReplayThreadTask BindReplayThreadTaskFromSlot(
+    CReplayClient* const* const selfSlot,
+    const ReplayThreadTask::ThreadProc proc
+  )
+  {
+    ReplayThreadTask task{};
+    task.mProc = proc;
+    task.mSelf = *selfSlot;
+    return task;
+  }
+
+  /**
+   * Address: 0x00540A90 (FUN_00540A90)
+   *
+   * What it does:
+   * Builds a replay-thread task bound to a specific client instance.
+   */
+  ReplayThreadTask MakeReplayThreadTask(CReplayClient* self)
+  {
+    ReplayThreadTask::ThreadProc proc = nullptr;
+    (void)StoreReplayThreadEntryProc(&proc);
+    CReplayClient* selfSlot = self;
+    return BindReplayThreadTaskFromSlot(&selfSlot, proc);
+  }
 } // namespace
 
 /**
@@ -226,9 +287,8 @@ void CReplayClient::Start()
   }
 
   if (mReplayThread == nullptr) {
-    auto* const worker = new (std::nothrow) boost::thread([this]() {
-      ReplayThreadMain(this);
-    });
+    const auto replayTask = MakeReplayThreadTask(this);
+    auto* const worker = new (std::nothrow) boost::thread(replayTask);
     ReplaceReplayThread(mReplayThread, worker);
   }
 

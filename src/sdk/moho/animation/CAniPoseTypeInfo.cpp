@@ -11,13 +11,20 @@ using namespace moho;
 
 namespace
 {
+  /**
+   * Address: 0x0054CFE0 (FUN_0054CFE0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `CAniPose`.
+   */
   [[nodiscard]] gpg::RType* CachedCAniPoseType()
   {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(CAniPose));
+    gpg::RType* type = moho::CAniPose::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CAniPose));
+      moho::CAniPose::sType = type;
     }
-    return sType;
+    return type;
   }
 
   [[nodiscard]] CAniPose* TryUpcastCAniPoseOrThrow(const gpg::RRef& sourceRef)
@@ -39,6 +46,56 @@ namespace
     gpg::RRef out{};
     gpg::RRef_CAniPose(&out, pose);
     return out;
+  }
+
+  /**
+   * Address: 0x0054AED0 (FUN_0054AED0)
+   *
+   * What it does:
+   * Installs all six `CAniPose` reflection reference lifecycle callbacks on one
+   * `RType` lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoAllRefCallbacks(gpg::RType* const result)
+  {
+    result->newRefFunc_ = &CAniPoseTypeInfo::NewRef;
+    result->ctorRefFunc_ = &CAniPoseTypeInfo::CtrRef;
+    result->cpyRefFunc_ = &CAniPoseTypeInfo::CpyRef;
+    result->movRefFunc_ = &CAniPoseTypeInfo::MovRef;
+    result->deleteFunc_ = &CAniPoseTypeInfo::Delete;
+    result->dtrFunc_ = &CAniPoseTypeInfo::Destruct;
+    return result;
+  }
+
+  /**
+   * Address: 0x0054C5A0 (FUN_0054C5A0)
+   *
+   * What it does:
+   * Installs new/construct/delete/destruct callback lanes for one `CAniPose`
+   * reflection type descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoCreateDeleteRefCallbacks(gpg::RType* const result)
+  {
+    result->newRefFunc_ = &CAniPoseTypeInfo::NewRef;
+    result->ctorRefFunc_ = &CAniPoseTypeInfo::CtrRef;
+    result->deleteFunc_ = &CAniPoseTypeInfo::Delete;
+    result->dtrFunc_ = &CAniPoseTypeInfo::Destruct;
+    return result;
+  }
+
+  /**
+   * Address: 0x0054C5C0 (FUN_0054C5C0)
+   *
+   * What it does:
+   * Installs copy/move/delete/destruct callback lanes for one `CAniPose`
+   * reflection type descriptor.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoCopyMoveDeleteRefCallbacks(gpg::RType* const result)
+  {
+    result->cpyRefFunc_ = &CAniPoseTypeInfo::CpyRef;
+    result->movRefFunc_ = &CAniPoseTypeInfo::MovRef;
+    result->deleteFunc_ = &CAniPoseTypeInfo::Delete;
+    result->dtrFunc_ = &CAniPoseTypeInfo::Destruct;
+    return result;
   }
 
   void InitializeDefaultPoseStorage(CAniPose& pose)
@@ -137,13 +194,8 @@ const char* CAniPoseTypeInfo::GetName() const
 void CAniPoseTypeInfo::Init()
 {
   size_ = sizeof(CAniPose);
-  newRefFunc_ = &CAniPoseTypeInfo::NewRef;
-  ctorRefFunc_ = &CAniPoseTypeInfo::CtrRef;
-  cpyRefFunc_ = &CAniPoseTypeInfo::CpyRef;
-  movRefFunc_ = &CAniPoseTypeInfo::MovRef;
-  deleteFunc_ = &CAniPoseTypeInfo::Delete;
-  dtrFunc_ = &CAniPoseTypeInfo::Destruct;
   gpg::RType::Init();
+  (void)InstallPoseTypeInfoAllRefCallbacks(this);
   Finish();
 }
 

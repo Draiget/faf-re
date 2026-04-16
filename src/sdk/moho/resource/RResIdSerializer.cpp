@@ -132,7 +132,6 @@ namespace moho
     InitializeSerializerNode(gRResIdSerializer);
     gRResIdSerializer.mDeserialize = &RResIdSerializer::Deserialize;
     gRResIdSerializer.mSerialize = &RResIdSerializer::Serialize;
-    gRResIdSerializer.RegisterSerializeFunctions();
     return std::atexit(&CleanupRResIdSerializerAtExit);
   }
 } // namespace moho

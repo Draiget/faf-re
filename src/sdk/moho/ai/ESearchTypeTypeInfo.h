@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A9D90 (FUN_005A9D90, Moho::ESearchTypeTypeInfo::ESearchTypeTypeInfo)
+     *
+     * What it does:
+     * Preregisters `ESearchType` enum metadata with the reflection runtime.
+     */
+    ESearchTypeTypeInfo();
+
+    /**
      * Address: 0x005A9E20 (FUN_005A9E20, scalar deleting thunk)
      */
     ~ESearchTypeTypeInfo() override;

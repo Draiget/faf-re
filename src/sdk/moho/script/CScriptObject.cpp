@@ -391,6 +391,43 @@ namespace
   }
 
   /**
+   * Address: 0x004D42C0 (FUN_004D42C0)
+   *
+   * LuaPlus::LuaObject *,LuaPlus::LuaState *
+   *
+   * What it does:
+   * Resolves the global `tostring` callable for one Lua state and validates
+   * it is invokable.
+   */
+  [[nodiscard]] LuaPlus::LuaObject ResolveToStringGlobalCallable(LuaPlus::LuaState* const state)
+  {
+    LuaPlus::LuaObject out{};
+    if (state == nullptr) {
+      return out;
+    }
+
+    LuaPlus::LuaObject globals = state->GetGlobals();
+    out = globals["tostring"];
+    if (!out.IsFunction()) {
+      out.TypeError("call");
+    }
+    return out;
+  }
+
+  /**
+   * Address: 0x004CD970 (FUN_004CD970)
+   *
+   * What it does:
+   * Direct-state adapter lane that forwards to `SCR_ConcatArgsAndCall` with
+   * tab delimiter and console output sink.
+   */
+  [[maybe_unused]] int EmitConcatArgsToConsoleDirect(LuaPlus::LuaState* const state)
+  {
+    moho::SCR_ConcatArgsAndCall(state, '\t', &EmitConcatLineToConsole);
+    return 0;
+  }
+
+  /**
    * Address: 0x004CD990 (FUN_004CD990)
    *
    * What it does:
@@ -427,7 +464,7 @@ namespace
   }
 
   /**
-   * Address: 0x006B0940 (FUN_006B0940) guard prologue/epilogue pattern
+    * Alias of FUN_006B0940 (non-canonical helper lane).
    *
    * Mirrors the weak-object intrusive guard chain used by callback wrappers.
    * Shared guard mechanics live in WeakObject so callback helpers do not
@@ -453,6 +490,27 @@ namespace
   private:
     WeakObject::ScopedWeakLinkGuard m_guard;
   };
+
+  /**
+   * Address: 0x00795509 (FUN_00795509, func_CMauiEdit_OnCharPressed_LogError)
+   *
+   * What it does:
+   * Emits the `OnCharPressed` script-warning lane for one caught C++ exception
+   * during `CScriptObject::RunScriptOnCharPressed`.
+   */
+  [[maybe_unused]] void LogOnCharPressedExceptionWarning(
+    const CallbackWeakGuard& weakGuard,
+    const std::exception& exceptionObject
+  )
+  {
+    if (CScriptObject* const warningOwner = weakGuard.ResolveObjectForWarning(); warningOwner != nullptr) {
+      warningOwner->LogScriptWarning(
+        warningOwner,
+        "OnCharPressed",
+        exceptionObject.what()
+      );
+    }
+  }
 
   /**
    * Address: 0x004C7C30 (FUN_004C7C30)
@@ -585,6 +643,23 @@ CScriptObject::~CScriptObject()
 
   AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), -1);
   ClearWeakObjectChain(*static_cast<WeakObject*>(this));
+}
+
+/**
+ * Address: 0x007B5D00 (FUN_007B5D00)
+ *
+ * What it does:
+ * Tail-forwards one `CScriptObject` instance pointer into the canonical
+ * destructor body.
+ */
+[[maybe_unused]] CScriptObject* DestroyScriptObjectThunk(
+  CScriptObject* const object
+)
+{
+  if (object != nullptr) {
+    object->~CScriptObject();
+  }
+  return object;
 }
 
 gpg::RType* CScriptObject::StaticGetClass()
@@ -930,10 +1005,7 @@ void moho::SCR_ConcatArgsAndCall(
     return;
   }
 
-  LuaPlus::LuaObject toStringObject = state->GetGlobals()["tostring"];
-  if (!toStringObject.IsFunction()) {
-    toStringObject.TypeError("call");
-  }
+  LuaPlus::LuaObject toStringObject = ResolveToStringGlobalCallable(state);
   LuaPlus::LuaFunction<LuaPlus::LuaObject> toStringCallable(toStringObject);
 
   lua_State* const rawState = state->m_state;
@@ -1877,7 +1949,7 @@ bool CScriptObject::RunScriptOnCharPressed(const int keyCode)
     const LuaPlus::LuaObject result = fn(mLuaObj, keyCode);
     return LuaValueToBool(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCharPressed, ex.what());
+    LogOnCharPressedExceptionWarning(weakGuard, ex);
   } catch (...) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCharPressed, "unknown exception");
   }

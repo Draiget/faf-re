@@ -43,6 +43,20 @@ namespace moho
 
   struct MeshBatchBucket
   {
+    /**
+     * Local source compatibility constructor for default-constructed bucket lanes.
+     */
+    MeshBatchBucket();
+
+    /**
+     * Address: 0x007E36C0 (FUN_007E36C0, ??0MeshBatchBucket@Moho@@QAE@ABU01@@Z)
+     *
+     * What it does:
+     * Copy-constructs one mesh-batch bucket by cloning key lanes and
+     * duplicating the owned instance-pointer vector payload.
+     */
+    MeshBatchBucket(const MeshBatchBucket& other);
+
     MeshBatchKey key;                  // +0x00
     MeshBatchInstanceVector instances; // +0x10
   };

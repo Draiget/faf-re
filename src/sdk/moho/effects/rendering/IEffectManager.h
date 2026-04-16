@@ -104,6 +104,15 @@ namespace moho
     [[nodiscard]]
     static gpg::RType* StaticGetClass();
 
+  protected:
+    /**
+     * Address: 0x0066B420 (FUN_0066B420, ??0IEffectManager@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes the interface base vtable for effect-manager ownership.
+     */
+    IEffectManager();
+
   public:
     /**
      * Address: 0x0066B1E0 (FUN_0066B1E0, Moho::IEffectManager::~IEffectManager base lane)

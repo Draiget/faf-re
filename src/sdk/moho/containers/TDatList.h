@@ -32,6 +32,7 @@ namespace moho
      * Address: 0x00442DA0 (FUN_00442DA0)
      * Address: 0x00443020 (FUN_00443020)
      * Address: 0x00443230 (FUN_00443230)
+     * Address: 0x0063C060 (FUN_0063C060, typed-instantiation lane)
      * Address: 0x004856F0 (FUN_004856F0, typed-instantiation lane)
      * Address: 0x00485780 (FUN_00485780, typed-instantiation lane)
      *
@@ -68,6 +69,32 @@ namespace moho
       mNext->mPrev = mPrev;
       ListResetLinks();
       return nxt;
+    }
+
+    /**
+     * Address: 0x00632BC0 (FUN_00632BC0)
+     * Address: 0x00565CE0 (FUN_00565CE0)
+     * Address: 0x00565D00 (FUN_00565D00)
+     * Address: 0x005A2D70 (FUN_005A2D70)
+     * Address: 0x005A2D90 (FUN_005A2D90)
+     * Address: 0x005D5800 (FUN_005D5800)
+     * Address: 0x005E3CD0 (FUN_005E3CD0)
+     * Address: 0x00599840 (FUN_00599840)
+     * Address: 0x00760F20 (FUN_00760F20)
+     * Address: 0x00765B70 (FUN_00765B70)
+     * Address: 0x00786A80 (FUN_00786A80)
+     * Address: 0x00779220 (FUN_00779220)
+     *
+     * What it does:
+     * Unlinks this node from its current ring and returns this node after
+     * restoring singleton self-links.
+     */
+    item_t* ListUnlinkSelf() noexcept
+    {
+      mPrev->mNext = mNext;
+      mNext->mPrev = mPrev;
+      ListResetLinks();
+      return this;
     }
 
     /**
@@ -140,6 +167,24 @@ namespace moho
 
     /**
      * Address: 0x00443240 (FUN_00443240)
+     * Address: 0x00626DF0 (FUN_00626DF0)
+     * Address: 0x00628700 (FUN_00628700)
+     * Address: 0x0063C000 (FUN_0063C000)
+     * Address: 0x0064C230 (FUN_0064C230)
+     * Address: 0x00651ED0 (FUN_00651ED0)
+     * Address: 0x00651F30 (FUN_00651F30)
+     * Address: 0x006521C0 (FUN_006521C0)
+     * Address: 0x0066A100 (FUN_0066A100)
+     * Address: 0x0066A540 (FUN_0066A540)
+     * Address: 0x0067CCF0 (FUN_0067CCF0)
+     * Address: 0x0067D080 (FUN_0067D080)
+     * Address: 0x0067D650 (FUN_0067D650)
+     * Address: 0x00680350 (FUN_00680350)
+     * Address: 0x00685890 (FUN_00685890)
+     * Address: 0x006858B0 (FUN_006858B0)
+     * Address: 0x006870C0 (FUN_006870C0)
+     * Address: 0x006874D0 (FUN_006874D0)
+     * Address: 0x00688280 (FUN_00688280)
      *
      * What it does:
      * Returns the `mNext` node lane from one intrusive list node.
@@ -285,6 +330,7 @@ namespace moho
 
       /**
        * Address: 0x00443250 (FUN_00443250)
+       * Address: 0x0063C0C0 (FUN_0063C0C0, typed-instantiation lane)
        *
        * What it does:
        * Initializes one iterator cursor from a raw node pointer.

@@ -4,6 +4,7 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 
 #include <Windows.h>
+#include <new>
 
 namespace gpg::gal
 {
@@ -36,6 +37,53 @@ namespace gpg::gal
 
             return static_cast<int>(heads.end() - start);
         }
+
+        /**
+         * Address: 0x008D7C20 (FUN_008D7C20)
+         *
+         * What it does:
+         * Copy-constructs one `Head` range into uninitialized destination
+         * storage and, on exception, destroys the partially constructed prefix
+         * before rethrowing.
+         */
+        [[nodiscard]] Head* CopyConstructHeadRangeIntoUninitializedStorageOrRethrow(
+            const Head* const sourceBegin,
+            const Head* const sourceEnd,
+            Head* const destinationBegin
+        )
+        {
+            Head* destinationCursor = destinationBegin;
+            try
+            {
+                for (const Head* sourceCursor = sourceBegin; sourceCursor != sourceEnd; ++sourceCursor, ++destinationCursor)
+                {
+                    new (destinationCursor) Head(*sourceCursor);
+                }
+                return destinationCursor;
+            }
+            catch (...)
+            {
+                for (Head* unwindCursor = destinationBegin; unwindCursor != destinationCursor; ++unwindCursor)
+                {
+                    unwindCursor->~Head();
+                }
+                throw;
+            }
+        }
+    }
+
+    /**
+     * Address: 0x004369B0 (FUN_004369B0)
+     *
+     * What it does:
+     * Copy-constructs one head-sample option lane including its owned label
+     * string payload.
+     */
+    HeadSampleOption::HeadSampleOption(const HeadSampleOption& other)
+        : sampleType(other.sampleType),
+          sampleQuality(other.sampleQuality),
+          label(other.label)
+    {
     }
 
     /**
@@ -227,16 +275,22 @@ namespace gpg::gal
     }
 
     /**
-     * Address family:
-     * - 0x008E69C0 (const)
-     * - mutable callsites in startup path (`FUN_008D0370`)
+     * Address: 0x008E6A90 (FUN_008E6A90)
      *
      * What it does:
-     * Returns one validated mutable head descriptor by index.
+     * Validates one mutable head index and returns the matching head descriptor.
      */
     Head& DeviceContext::GetHead(const std::uint32_t index)
     {
-        return const_cast<Head&>(static_cast<const DeviceContext*>(this)->GetHead(index));
+        Head* const start = mHeads.begin();
+        const Head* const finish = mHeads.end();
+        const std::uint32_t count = (start == nullptr) ? 0U : static_cast<std::uint32_t>(finish - start);
+        if ((start == nullptr) || (index >= count))
+        {
+            ThrowDeviceContextError(97, "invalid head index");
+        }
+
+        return start[index];
     }
 
     /**

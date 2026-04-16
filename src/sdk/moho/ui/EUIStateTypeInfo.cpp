@@ -1,11 +1,23 @@
 #include "moho/ui/EUIStateTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
 {
+  /**
+   * Address: 0x0083CBA0 (FUN_0083CBA0, Moho::EUIStateTypeInfo::ctor)
+   *
+   * What it does:
+   * Preregisters the reflected `EUIState` enum metadata.
+   */
+  EUIStateTypeInfo::EUIStateTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(EUIState), this);
+  }
+
   /**
    * Address: 0x0083CC30 (FUN_0083CC30, Moho::EUIStateTypeInfo::dtr)
    */
@@ -44,4 +56,3 @@ namespace moho
     AddEnum(StripPrefix("UIS_lobby"), static_cast<std::int32_t>(UIS_lobby));
   }
 } // namespace moho
-

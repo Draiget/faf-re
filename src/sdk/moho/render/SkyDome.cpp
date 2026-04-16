@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -43,6 +44,104 @@ namespace
     0, 1, 2,
     2, 1, 3,
   };
+
+  /**
+   * Address: 0x008153C0 (FUN_008153C0)
+   *
+   * What it does:
+   * Clears the retained dome vertex-buffer handle, writes the incoming dome
+   * origin/shape lanes, and restores default tessellation lanes (`16x6`) plus
+   * the default start-angle lane (`1.2566371f`).
+   */
+  [[maybe_unused]] void InitializeSkyDomeShapeRuntime(
+    moho::SkyDome* const skyDome,
+    const Wm3::Vector3f& domeOrigin,
+    const float domeHeight,
+    const float domeRadius
+  ) noexcept
+  {
+    if (skyDome == nullptr) {
+      return;
+    }
+
+    skyDome->mDomeVertBuf.reset();
+    skyDome->mDomeOrigin = domeOrigin;
+    skyDome->mDomeShapeParams.x = domeHeight;
+    skyDome->mDomeShapeParams.y = domeRadius;
+    skyDome->mDomeShapeParams.z = 1.2566371f;
+    skyDome->mWidth = 16;
+    skyDome->mHeight = 6;
+  }
+
+  /**
+   * Address: 0x0081A590 (FUN_0081A590)
+   *
+   * What it does:
+   * Allocates one decal-upload node and initializes link lanes plus the
+   * 0x28-byte packed decal-vertex payload.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadNode(
+    moho::SkyDomeDecalUploadNode* const next,
+    moho::SkyDomeDecalUploadNode* const prev,
+    const void* const vertexData
+  )
+  {
+    auto* const node = static_cast<moho::SkyDomeDecalUploadNode*>(
+      gpg::core::legacy::AllocateChecked48ByteLane(1u)
+    );
+
+    node->mNext = next;
+    node->mPrev = prev;
+    if (vertexData != nullptr) {
+      std::memcpy(node->mVertexData, vertexData, sizeof(node->mVertexData));
+    } else {
+      std::memset(node->mVertexData, 0, sizeof(node->mVertexData));
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x0081A440 (FUN_0081A440)
+   *
+   * What it does:
+   * Allocates one 48-byte sky-decal upload sentinel and self-links
+   * `next/prev`.
+   */
+  [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadListSentinel()
+  {
+    auto* const node = static_cast<moho::SkyDomeDecalUploadNode*>(
+      gpg::core::legacy::AllocateChecked48ByteLane(1u)
+    );
+    node->mNext = node;
+    node->mPrev = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x0081A550 (FUN_0081A550)
+   *
+   * What it does:
+   * Clears one intrusive sky-decal upload list by unlinking all payload nodes,
+   * preserving the head sentinel, and releasing removed nodes.
+   */
+  [[maybe_unused]] void ClearSkyDomeDecalUploadList(
+    moho::SkyDomeDecalUploadNode* const listHead
+  ) noexcept
+  {
+    if (listHead == nullptr) {
+      return;
+    }
+
+    moho::SkyDomeDecalUploadNode* node = listHead->mNext;
+    listHead->mNext = listHead;
+    listHead->mPrev = listHead;
+
+    while (node != listHead) {
+      moho::SkyDomeDecalUploadNode* const next = node->mNext;
+      ::operator delete(node);
+      node = next;
+    }
+  }
 } // namespace
 
 namespace moho
@@ -59,6 +158,7 @@ namespace moho
     : mHorizonLookupPath("/textures/environment/horizonLookup.dds")
     , mCirrusTexPath("/textures/environment/cirrus000.dds")
   {
+    mDecalUploadHead = AllocateSkyDomeDecalUploadListSentinel();
   }
 
   /**
@@ -141,6 +241,7 @@ namespace moho
    */
 void SkyDome::Destroy()
 {
+    ClearSkyDomeDecalUploadList(mDecalUploadHead);
     mHorizonLookupTex = {};
     mCirrusTex = {};
     mDecalTex3 = {};

@@ -34,6 +34,8 @@ namespace moho
 
   struct SFootprint
   {
+    static gpg::RType* sType;
+
     std::uint8_t mSizeX;           // +0x00
     std::uint8_t mSizeZ;           // +0x01
     EOccupancyCaps mOccupancyCaps; // +0x02

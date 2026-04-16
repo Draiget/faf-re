@@ -150,7 +150,7 @@ namespace moho
     bool ProcessAckInternal(const SNetPacket* packet);
 
     /**
-     * Address: 0x00486DB0
+       * Address: 0x00486DB0 (FUN_00486DB0)
      */
     void ProcessData(SNetPacket* packet);
 
@@ -253,7 +253,7 @@ namespace moho
     SNetPacket* NewPacket(bool inherit, int size, EPacketType state) const;
 
     /**
-     * Address: 0x00488D80
+       * Address: 0x00488D80 (FUN_00488D80)
      */
     void SendPacket(SNetPacket* packet);
 
@@ -326,27 +326,27 @@ namespace moho
     void UpdatePingInfoFromPacket(const SNetPacket& packet);
 
     /**
-     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+      * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
 
     /**
-     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+      * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE SNetPacket* EarlyPopFront();
 
     /**
-     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+      * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void EarlyRebuildAckMask(uint16_t expected, uint32_t& mask);
 
     /**
-     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+      * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void ConsumePacketHeaderData(SNetPacket* packet);
 
     /**
-     * Address: 0x00488D80 (inlined helper inside FUN_00488D80)
+      * Alias of FUN_00488D80 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void InsertUnAckedSorted(SNetPacket* packet);
 

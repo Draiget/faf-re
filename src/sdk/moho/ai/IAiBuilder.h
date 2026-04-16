@@ -26,6 +26,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059ED60 (FUN_0059ED60, ??0IAiBuilder@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes the IAiBuilder interface base lane for derived builders.
+     */
+    IAiBuilder();
+
+    /**
      * Address: 0x0059ED70 (FUN_0059ED70, scalar deleting thunk)
      *
      * VFTable SLOT: 0

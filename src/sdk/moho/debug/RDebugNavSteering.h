@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x00650EF0 (FUN_00650EF0)
+     *
+     * What it does:
+     * Initializes the steering-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugNavSteering();
+
+    /**
      * Address: 0x00650930 (FUN_00650930, Moho::RDebugNavSteering::GetClass)
      * Slot: 0
      *

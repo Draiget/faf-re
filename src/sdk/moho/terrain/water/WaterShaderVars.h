@@ -38,6 +38,16 @@ namespace moho
   [[nodiscard]] ShaderVar& GetWater2SunGlowShaderVar();
   [[nodiscard]] ShaderVar& GetWater2TerrainScaleShaderVar();
 
+  /**
+   * Address: 0x008111E0 (FUN_008111E0)
+   *
+   * What it does:
+   * Updates the `water2/TerrainScale` shader variable raw pointer lane with a
+   * fixed 16-byte payload when the variable exists, then returns that shader
+   * variable instance.
+   */
+  [[nodiscard]] ShaderVar* SetWater2TerrainScaleShaderVarData(const void* terrainScaleData) noexcept;
+
   [[nodiscard]] ShaderVar& GetWater2WorldToViewShorelineShaderVar();
   [[nodiscard]] ShaderVar& GetWater2ProjectionShorelineShaderVar();
   [[nodiscard]] ShaderVar& GetWater2WaterElevationTShorelineShaderVar();

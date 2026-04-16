@@ -42,6 +42,15 @@ namespace moho
   {
     static gpg::RType* sType;
 
+    /**
+     * Address: 0x00541F90 (FUN_00541F90)
+     *
+     * What it does:
+     * Initializes the embedded unit-source bitset lane to the empty runtime
+     * state expected by `ArmyLaunchInfo` callers.
+     */
+    ArmyLaunchInfo();
+
     BVIntSet mUnitSources;                        // +0x00
   };
 
@@ -397,6 +406,14 @@ namespace moho
     "LaunchInfoNewSerializer::mSerialize offset must be 0x10"
   );
   static_assert(sizeof(LaunchInfoNewSerializer) == 0x14, "LaunchInfoNewSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00544800 (FUN_00544800, preregister_ArmyLaunchInfoVectorTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `vector<ArmyLaunchInfo>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_ArmyLaunchInfoVectorTypeStartup();
 
   /**
    * Address: 0x00BC9460 (FUN_00BC9460, register_ArmyLaunchInfoSerializer)

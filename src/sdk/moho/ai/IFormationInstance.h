@@ -28,6 +28,15 @@ namespace moho
     inline static gpg::RType* sPointerType = nullptr;
 
     /**
+     * Address: 0x00569450 (FUN_00569450, Moho::IFormationInstance::IFormationInstance)
+     *
+     * What it does:
+     * Initializes the base runtime lane and self-links the embedded
+     * formation-status broadcaster node.
+     */
+    IFormationInstance();
+
+    /**
      * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
      *
      * What it does:

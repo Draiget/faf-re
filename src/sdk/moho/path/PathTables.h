@@ -10,6 +10,8 @@ namespace gpg
 
 namespace moho
 {
+  class COGrid;
+  struct SRuleFootprintsBlueprint;
   struct PathTablesImpl;
 
   /**
@@ -53,6 +55,15 @@ namespace moho
   class PathTables
   {
   public:
+    /**
+     * Address: 0x0076B8C0 (FUN_0076B8C0, ??0PathTables@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Builds per-footprint occupation-source bindings and cluster-map lanes
+     * for one `(width,height)` grid.
+     */
+    PathTables(const SRuleFootprintsBlueprint& footprints, COGrid* grid, int width, int height);
+
     /**
      * Address: 0x0076BAC0 (FUN_0076BAC0, ??1PathTables@Moho@@QAE@@Z)
      *

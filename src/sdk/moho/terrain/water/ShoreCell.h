@@ -20,7 +20,24 @@ namespace moho
   class ShoreCell
   {
   public:
-    virtual ~ShoreCell() = default;
+    /**
+     * Address: 0x008126E0 (FUN_008126E0, ??0ShoreCell@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one shoreline-cell object by setting `mType` to zero,
+     * clearing the embedded spatial-db entry lanes, and zeroing all five
+     * shoreline point pairs.
+     */
+    ShoreCell();
+
+    /**
+     * Address: 0x00812770 (FUN_00812770, sub_812770)
+     *
+     * What it does:
+     * Runs one shoreline-cell teardown lane and releases the embedded spatial
+     * DB mesh-instance binding when present.
+     */
+    virtual ~ShoreCell();
 
     std::uint16_t mType;                    // +0x04
     std::uint16_t mPad06;                   // +0x06

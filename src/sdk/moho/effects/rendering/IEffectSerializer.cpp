@@ -12,6 +12,47 @@
 
 namespace
 {
+  moho::IEffectSerializer gIEffectSerializer{};
+
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::IEffectSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(moho::IEffectSerializer& serializer) noexcept
+  {
+    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+    serializer.mHelperPrev->mNext = serializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00771240 (FUN_00771240)
+   *
+   * What it does:
+   * Unlinks startup `IEffectSerializer` helper links and rewires the node into
+   * one self-linked sentinel lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIEffectSerializerNodeVariantA() noexcept
+  {
+    return UnlinkSerializerNode(gIEffectSerializer);
+  }
+
+  /**
+   * Address: 0x00771270 (FUN_00771270)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for startup `IEffectSerializer` helper links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIEffectSerializerNodeVariantB() noexcept
+  {
+    return UnlinkSerializerNode(gIEffectSerializer);
+  }
+
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     if (!moho::CScriptObject::sType) {

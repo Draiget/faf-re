@@ -349,6 +349,74 @@ namespace moho
     archive->Write(CachedWeakPtrUnitType(), &task->mPlatform, nullOwner);
     archive->WriteBool(task->mDone);
   }
+
+  /**
+   * Address: 0x00602F80 (FUN_00602F80)
+   *
+   * What it does:
+   * Preserves one deserialize callback thunk lane for call-air-staging task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberDeserializeAdapterLaneA(
+    gpg::ReadArchive* const archive,
+    CUnitCallAirStagingPlatform* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallAirStagingPlatform::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00602F90 (FUN_00602F90)
+   *
+   * What it does:
+   * Preserves one serialize callback thunk lane for call-air-staging task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberSerializeAdapterLaneA(
+    gpg::WriteArchive* const archive,
+    const CUnitCallAirStagingPlatform* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallAirStagingPlatform::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x006031B0 (FUN_006031B0)
+   *
+   * What it does:
+   * Alternate deserialize callback thunk lane for call-air-staging task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberDeserializeAdapterLaneB(
+    gpg::ReadArchive* const archive,
+    CUnitCallAirStagingPlatform* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallAirStagingPlatform::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x006031C0 (FUN_006031C0)
+   *
+   * What it does:
+   * Alternate serialize callback thunk lane for call-air-staging task serializer
+   * registration.
+   */
+  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberSerializeAdapterLaneB(
+    gpg::WriteArchive* const archive,
+    const CUnitCallAirStagingPlatform* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallAirStagingPlatform::MemberSerialize(archive, task, version, ownerRef);
+  }
 } // namespace moho
 
 namespace gpg
@@ -370,6 +438,25 @@ namespace gpg
     }
 
     *outRef = MakeDerivedRef(value, CachedCUnitCallAirStagingPlatformType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x00603030 (FUN_00603030)
+   *
+   * What it does:
+   * Materializes one `RRef_CUnitCallAirStagingPlatform` result into a stack
+   * local and copies that pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreRRefCUnitCallAirStagingPlatformAdapter(
+    moho::CUnitCallAirStagingPlatform* const value,
+    gpg::RRef* const outRef
+  )
+  {
+    gpg::RRef temp{};
+    (void)RRef_CUnitCallAirStagingPlatform(&temp, value);
+    outRef->mObj = temp.mObj;
+    outRef->mType = temp.mType;
     return outRef;
   }
 } // namespace gpg

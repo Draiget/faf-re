@@ -90,6 +90,36 @@ namespace
     return &typeInfo->fields_.back();
   }
 
+  struct ScalarDeleteSlot2VTable
+  {
+    void* mSlot0;
+    void* mSlot1;
+
+    using deleting_dtor_t = int(__thiscall*)(void* self, int deleteFlag);
+    deleting_dtor_t mDeletingDtor;
+  };
+
+  struct ScalarDeleteSlot2Object
+  {
+    ScalarDeleteSlot2VTable* mVTable;
+  };
+
+  /**
+   * Address: 0x0051E080 (FUN_0051E080)
+   *
+   * What it does:
+   * Invokes the scalar deleting-destructor lane for a prop blueprint object.
+   */
+  [[maybe_unused]] void DeleteRPropBlueprintObject(void* const object)
+  {
+    if (object == nullptr) {
+      return;
+    }
+
+    auto* const scalarDeleteObject = static_cast<ScalarDeleteSlot2Object*>(object);
+    scalarDeleteObject->mVTable->mDeletingDtor(object, 1);
+  }
+
   struct RPropBlueprintTypeInfoBootstrap
   {
     RPropBlueprintTypeInfoBootstrap()
@@ -103,6 +133,64 @@ namespace
 
 namespace moho
 {
+  class RPropBlueprintDefenseTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "RPropBlueprintDefense";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(RPropBlueprintDefense);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  class RPropBlueprintEconomyTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "RPropBlueprintEconomy";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(RPropBlueprintEconomy);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  /**
+   * Address: 0x0051D5F0 (FUN_0051D5F0, preregister_RPropBlueprintDefenseTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters reflection metadata for `RPropBlueprintDefense`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RPropBlueprintDefenseTypeInfo()
+  {
+    static RPropBlueprintDefenseTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(RPropBlueprintDefense), &typeInfo);
+    return &typeInfo;
+  }
+
+  /**
+   * Address: 0x0051D7A0 (FUN_0051D7A0, preregister_RPropBlueprintEconomyTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters reflection metadata for `RPropBlueprintEconomy`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RPropBlueprintEconomyTypeInfo()
+  {
+    static RPropBlueprintEconomyTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(RPropBlueprintEconomy), &typeInfo);
+    return &typeInfo;
+  }
+
   /**
    * Address: 0x0051D950 (FUN_0051D950, Moho::RPropBlueprintTypeInfo::RPropBlueprintTypeInfo)
    */
@@ -193,6 +281,8 @@ namespace moho
    */
   void register_RPropBlueprintTypeInfo()
   {
+    (void)preregister_RPropBlueprintDefenseTypeInfo();
+    (void)preregister_RPropBlueprintEconomyTypeInfo();
     (void)AcquireRPropBlueprintTypeInfo();
     (void)std::atexit(&cleanup_RPropBlueprintTypeInfo);
   }

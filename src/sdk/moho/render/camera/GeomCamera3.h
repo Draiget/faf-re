@@ -238,6 +238,21 @@ namespace moho
     const Wm3::Vector3f& up
   );
 
+  /**
+   * Address: 0x004EF930 (FUN_004EF930, ?VEC_LookAtViewMatrix@Moho@@YA?AUVMatrix4@1@ABV?$Vector3@M@Wm3@@00@Z)
+   *
+   * What it does:
+   * Builds one camera view matrix from `eye`/`target`/`up` by transposing the
+   * orientation rows from `VEC_LookAtMatrix` and composing translated row-3
+   * lanes (`-dot(position, basisAxis)`).
+   */
+  VMatrix4* VEC_LookAtViewMatrix(
+    const Wm3::Vector3f& eye,
+    const Wm3::Vector3f& target,
+    VMatrix4* dest,
+    const Wm3::Vector3f& up
+  );
+
   static_assert(offsetof(GeomCamera3, solid1) == 0x1A0, "GeomCamera3::solid1 offset must be 0x1A0");
   static_assert(offsetof(GeomCamera3, solid2) == 0x210, "GeomCamera3::solid2 offset must be 0x210");
   static_assert(offsetof(GeomCamera3, lodScale) == 0x280, "GeomCamera3::lodScale offset must be 0x280");

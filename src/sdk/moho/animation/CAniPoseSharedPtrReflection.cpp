@@ -1,6 +1,7 @@
 #include "moho/animation/CAniPoseSharedPtrReflection.h"
 
 #include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -8,9 +9,23 @@
 
 namespace
 {
+  alignas(gpg::RSharedPointerType_CAniPose) unsigned char
+    gSharedPtrCAniPoseTypeStorage[sizeof(gpg::RSharedPointerType_CAniPose)]{};
+  bool gSharedPtrCAniPoseTypeConstructed = false;
+
   gpg::RType* gCAniPoseSharedPtrPointeeType = nullptr;
   msvc8::string gCAniPoseSharedPtrTypeName;
   bool gCAniPoseSharedPtrTypeNameCleanupRegistered = false;
+
+  [[nodiscard]] gpg::RSharedPointerType_CAniPose* AcquireSharedPtrCAniPoseType()
+  {
+    if (!gSharedPtrCAniPoseTypeConstructed) {
+      ::new (static_cast<void*>(gSharedPtrCAniPoseTypeStorage)) gpg::RSharedPointerType_CAniPose();
+      gSharedPtrCAniPoseTypeConstructed = true;
+    }
+
+    return reinterpret_cast<gpg::RSharedPointerType_CAniPose*>(gSharedPtrCAniPoseTypeStorage);
+  }
 
   [[nodiscard]] gpg::RType* CachedCAniPoseType()
   {
@@ -123,5 +138,18 @@ namespace gpg
     const auto* const shared = static_cast<const boost::SharedPtrRaw<moho::CAniPose>*>(obj);
     return (shared && shared->px) ? 1u : 0u;
   }
-} // namespace gpg
 
+  /**
+   * Address: 0x0055EA20 (FUN_0055EA20, preregister_SharedPtrCAniPoseTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `boost::shared_ptr<moho::CAniPose>`.
+   */
+  gpg::RType* preregister_SharedPtrCAniPoseTypeStartup()
+  {
+    auto* const typeInfo = AcquireSharedPtrCAniPoseType();
+    gpg::PreRegisterRType(typeid(boost::shared_ptr<moho::CAniPose>), typeInfo);
+    return typeInfo;
+  }
+} // namespace gpg

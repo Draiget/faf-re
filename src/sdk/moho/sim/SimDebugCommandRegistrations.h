@@ -544,7 +544,7 @@ namespace moho
    */
   void register_DestroyAll_SimConFuncDef();
 
-  /** Address: 0x00BFE370 (FUN_00BFE370, sub_BFE370) */
+  /** Alias of FUN_00BFE370 (non-canonical helper lane). */
   void cleanup_DebugAIStatesOff_ConAlias();
 
   /** Address: 0x00BFE3C0 (FUN_00BFE3C0, sub_BFE3C0) */

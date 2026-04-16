@@ -275,6 +275,15 @@ namespace moho
   class IWldTerrainRes
   {
   public:
+    /**
+     * Address: 0x008A74D0 (FUN_008A74D0, IWldTerrainRes ctor lane)
+     *
+     * What it does:
+     * Initializes one terrain-resource interface base and clears playable-rect
+     * source ownership to null.
+     */
+    IWldTerrainRes();
+
     virtual ~IWldTerrainRes() = default;
 
     /**
@@ -966,6 +975,15 @@ namespace moho
     void SetStratumDefaults();
 
   private:
+    /**
+     * Address: 0x008A61B0 (FUN_008A61B0, ?SetWaterDefaults@CWldTerrainRes@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Replaces the active water-shader property payload with a freshly
+     * default-constructed property block.
+     */
+    void SetWaterDefaults();
+
     /**
      * Address: 0x008A54D0 (FUN_008A54D0, ?InitNormalMap@CWldTerrainRes@Moho@@AAEXAAVCBackgroundTaskControl@2@@Z)
      *

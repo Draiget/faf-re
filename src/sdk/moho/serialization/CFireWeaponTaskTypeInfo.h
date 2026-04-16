@@ -13,7 +13,7 @@ namespace moho
    * Forces `CFireWeaponTaskTypeInfo` construction and schedules cleanup at
    * process exit.
    */
-  int register_CFireWeaponTaskTypeInfo();
+  void register_CFireWeaponTaskTypeInfo();
 
   /**
    * Address: 0x00BFE6B0 (FUN_00BFE6B0, cleanup_CFireWeaponTaskTypeInfo)

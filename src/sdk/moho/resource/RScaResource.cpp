@@ -1,17 +1,259 @@
 // RScaResource recovered implementation.
 
 #include "moho/resource/RScaResource.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/ResourceManager.h"
 
+#include <cstddef>
 #include <cstring>
 #include <new>
 #include <typeinfo>
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetShared(const boost::shared_ptr<void>& object, gpg::RType* type, unsigned int flags);
+  };
+
+  class SerSaveConstructArgsResult
+  {
+  public:
+    void SetShared(unsigned int flags);
+  };
+} // namespace gpg
 
 namespace moho
 {
 
 gpg::RType* RScaResource::sType = nullptr;
+
+namespace
+{
+  struct SerSaveLoadHelperNodeRuntime
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+  };
+
+  static_assert(
+    offsetof(SerSaveLoadHelperNodeRuntime, mNext) == 0x04,
+    "SerSaveLoadHelperNodeRuntime::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SerSaveLoadHelperNodeRuntime, mPrev) == 0x08,
+    "SerSaveLoadHelperNodeRuntime::mPrev offset must be 0x08"
+  );
+  static_assert(sizeof(SerSaveLoadHelperNodeRuntime) == 0x0C, "SerSaveLoadHelperNodeRuntime size must be 0x0C");
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerSaveLoadHelperNode(SerSaveLoadHelperNodeRuntime& helper) noexcept
+  {
+    helper.mNext->mPrev = helper.mPrev;
+    helper.mPrev->mNext = helper.mNext;
+
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  SerSaveLoadHelperNodeRuntime gRScaResourceSaveConstructHelper{};
+
+  class RScaResourceTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "RScaResource";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(RScaResource);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  [[nodiscard]] CScaResourceFactory& ScaResourceFactorySingleton()
+  {
+    static CScaResourceFactory sFactory;
+    return sFactory;
+  }
+} // namespace
+
+/**
+ * Address: 0x0053A710 (FUN_0053A710)
+ *
+ * What it does:
+ * Unlinks `RScaResource` save-construct helper links and restores the node
+ * to self-linked sentinel state.
+ */
+[[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupRScaResourceSaveConstructHelperPrimary() noexcept
+{
+  return UnlinkSerSaveLoadHelperNode(gRScaResourceSaveConstructHelper);
+}
+
+/**
+ * Address: 0x0053A2D0 (FUN_0053A2D0, preregister_RScaResourceTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters reflection metadata for `RScaResource`.
+ */
+[[nodiscard]] gpg::RType* preregister_RScaResourceTypeInfo()
+{
+  static RScaResourceTypeInfo typeInfo;
+  gpg::PreRegisterRType(typeid(RScaResource), &typeInfo);
+  return &typeInfo;
+}
+
+/**
+ * Address: 0x0053B2A0 (FUN_0053B2A0, boost::shared_ptr_RScaResource::shared_ptr_RScaResource)
+ *
+ * What it does:
+ * Constructs one `shared_ptr<RScaResource>` from one raw resource pointer lane.
+ */
+boost::shared_ptr<RScaResource>* ConstructSharedRScaResourceFromRaw(
+  boost::shared_ptr<RScaResource>* const outResource,
+  RScaResource* const resource
+)
+{
+  return ::new (outResource) boost::shared_ptr<RScaResource>(resource);
+}
+
+/**
+ * Address: 0x0053B3B0 (FUN_0053B3B0)
+ *
+ * What it does:
+ * Constructs one `boost::detail::sp_counted_impl_p<RScaResource>` control
+ * block in caller-provided storage with both initial reference counters set to
+ * `1` and payload pointer bound to `resource`.
+ */
+boost::detail::sp_counted_impl_p<RScaResource>* ConstructRScaSharedCountedImpl(
+  boost::detail::sp_counted_impl_p<RScaResource>* const outControlBlock,
+  RScaResource* const resource
+)
+{
+  return ::new (outControlBlock) boost::detail::sp_counted_impl_p<RScaResource>(resource);
+}
+
+/**
+ * Address: 0x0053B1E0 (FUN_0053B1E0)
+ *
+ * What it does:
+ * Packages one shared `RScaResource` lane into construct-result shared
+ * payload with resolved `RScaResource` runtime type metadata.
+ */
+void SetConstructResultSharedScaResource(
+  gpg::SerConstructResult* const result,
+  const boost::shared_ptr<RScaResource>& resource
+)
+{
+  gpg::RType* resourceType = RScaResource::sType;
+  if (resourceType == nullptr) {
+    resourceType = gpg::LookupRType(typeid(RScaResource));
+    RScaResource::sType = resourceType;
+  }
+
+  const boost::shared_ptr<void>& sharedAny =
+    reinterpret_cast<const boost::shared_ptr<void>&>(resource);
+  result->SetShared(sharedAny, resourceType, 1u);
+}
+
+/**
+ * Address: 0x0053A8C0 (FUN_0053A8C0)
+ *
+ * What it does:
+ * Reads one animation path from archive, resolves/loads the referenced SCA
+ * resource, and forwards it into construct-result shared ownership.
+ */
+void Construct_RScaResource(
+  gpg::ReadArchive* const archive,
+  const int,
+  const int,
+  gpg::SerConstructResult* const result
+)
+{
+  msvc8::string resourcePath{};
+  archive->ReadString(&resourcePath);
+
+  gpg::RType* resourceType = RScaResource::sType;
+  if (resourceType == nullptr) {
+    resourceType = gpg::LookupRType(typeid(RScaResource));
+    RScaResource::sType = resourceType;
+  }
+
+  boost::weak_ptr<RScaResource> weakResource{};
+  (void)RES_GetResource(&weakResource, resourcePath.c_str(), nullptr, resourceType);
+  const boost::shared_ptr<RScaResource> sharedResource = weakResource.lock();
+  SetConstructResultSharedScaResource(result, sharedResource);
+}
+
+/**
+ * Address: 0x0053A770 (FUN_0053A770)
+ *
+ * What it does:
+ * Writes one mounted-path string save-construct arg for one `RScaResource`
+ * and marks the construct-result ownership lane as shared.
+ */
+void SaveConstructArgs_RScaResource(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const,
+  gpg::SerSaveConstructArgsResult* const result
+)
+{
+  const auto* const resource = reinterpret_cast<const RScaResource*>(static_cast<std::uintptr_t>(objectPtr));
+
+  msvc8::string mountedPath{};
+  (void)FILE_ToMountedPath(&mountedPath, resource->mFilename.c_str());
+  archive->WriteString(&mountedPath);
+  result->SetShared(1u);
+}
+
+/**
+ * Address: 0x0053A6F0 (FUN_0053A6F0)
+ *
+ * What it does:
+ * Thin callback thunk forwarding save-construct arg serialization for one
+ * `RScaResource`.
+ */
+void SaveConstructArgs_RScaResourceThunk(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int version,
+  gpg::RRef* const ownerRef,
+  gpg::SerSaveConstructArgsResult* const result
+)
+{
+  SaveConstructArgs_RScaResource(archive, objectPtr, version, ownerRef, result);
+}
+
+/**
+ * Address: 0x0053AA40 (FUN_0053AA40)
+ *
+ * What it does:
+ * Ensures the resource-manager singleton, attaches process-lifetime SCA
+ * factory registration, and returns the attached factory object.
+ */
+CScaResourceFactory* construct_CScaResourceFactoryPreload()
+{
+  RES_EnsureResourceManager();
+
+  ResourceManager* const manager = RES_GetResourceManager();
+  CScaResourceFactory& factory = ScaResourceFactorySingleton();
+  if (manager != nullptr) {
+    manager->AttachFactory(&factory);
+  }
+
+  return &factory;
+}
 
 /**
  * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
@@ -22,6 +264,8 @@ gpg::RType* RScaResource::sType = nullptr;
  */
 void CScaResourceFactory::Init()
 {
+  (void)preregister_RScaResourceTypeInfo();
+
   gpg::RType* firstResolvedType = RScaResource::sType;
   if (firstResolvedType == nullptr) {
     firstResolvedType = gpg::LookupRType(typeid(RScaResource));

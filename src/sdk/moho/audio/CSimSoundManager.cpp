@@ -21,20 +21,49 @@ namespace
     manager.mRequests.PushBack(request);
   }
 
-  void CopyRequests(
+  /**
+   * Address: 0x007618B0 (FUN_007618B0, sub_7618B0)
+   *
+   * What it does:
+   * Assigns one `fastvector_n<SAudioRequest, 64>` into another while reusing
+   * destination storage when capacity is sufficient.
+   */
+  [[nodiscard]] gpg::fastvector_n<moho::SAudioRequest, 64>* CopyRequests(
     gpg::fastvector_n<moho::SAudioRequest, 64>& destination, const gpg::fastvector_n<moho::SAudioRequest, 64>& source
   )
   {
-    // Mirrors FUN_007618B0 behavior: reuse destination storage when possible.
-    const std::size_t requestCount = source.Size();
-    if (destination.Capacity() < requestCount) {
-      destination.Grow(requestCount);
+    if (&destination == &source) {
+      return &destination;
     }
 
-    if (requestCount != 0u) {
-      std::copy_n(source.start_, requestCount, destination.start_);
+    const std::size_t destinationCount = destination.Size();
+    const std::size_t sourceCount = source.Size();
+
+    if (destinationCount >= sourceCount) {
+      if (sourceCount != 0u) {
+        std::copy_n(source.start_, sourceCount, destination.start_);
+      }
+      destination.SetSizeUnchecked(sourceCount);
+      return &destination;
     }
-    destination.SetSizeUnchecked(requestCount);
+
+    if (destination.Capacity() < sourceCount) {
+      destination.Grow(sourceCount);
+    }
+
+    if (destinationCount != 0u) {
+      std::copy_n(source.start_, destinationCount, destination.start_);
+    }
+    if (sourceCount > destinationCount) {
+      std::copy(
+        source.start_ + static_cast<std::ptrdiff_t>(destinationCount),
+        source.start_ + static_cast<std::ptrdiff_t>(sourceCount),
+        destination.start_ + static_cast<std::ptrdiff_t>(destinationCount)
+      );
+    }
+
+    destination.SetSizeUnchecked(sourceCount);
+    return &destination;
   }
 
   void ResetRequestQueueInline(moho::CSimSoundManager& manager)
@@ -50,6 +79,28 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00760C80 (FUN_00760C80)
+   *
+   * Sim* ownerSim
+   *
+   * IDA signature:
+   * Moho::ISimSoundManager_vtbl **__usercall sub_760C80@<eax>(Moho::ISimSoundManager_vtbl **result@<eax>,
+   * Moho::ISimSoundManager_vtbl *a2@<ecx>);
+   *
+   * What it does:
+   * Initializes one `CSimSoundManager` runtime object with owner-sim pointer,
+   * inline request-vector lanes, and self-linked active-loop sentinel.
+   */
+  CSimSoundManager::CSimSoundManager(Sim* const ownerSim)
+    : mOwnerSim(ownerSim)
+    , mRequests()
+    , mActiveLoops()
+  {
+    mRequests.ResetStorageToInline();
+    mActiveLoops.ListUnlink();
+  }
+
   /**
    * Address: 0x00760CC0 (FUN_00760CC0)
    *

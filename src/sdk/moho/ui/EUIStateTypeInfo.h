@@ -11,6 +11,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0083CBA0 (FUN_0083CBA0, Moho::EUIStateTypeInfo::ctor)
+     *
+     * What it does:
+     * Preregisters the reflected `EUIState` enum metadata.
+     */
+    EUIStateTypeInfo();
+
+    /**
      * Address: 0x0083CC30 (FUN_0083CC30, Moho::EUIStateTypeInfo::dtr)
      *
      * What it does:
@@ -46,4 +54,3 @@ namespace moho
 
   static_assert(sizeof(EUIStateTypeInfo) == 0x78, "EUIStateTypeInfo size must be 0x78");
 } // namespace moho
-

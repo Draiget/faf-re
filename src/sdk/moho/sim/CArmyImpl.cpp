@@ -24,6 +24,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/path/PathTables.h"
 #include "moho/sim/ArmyUnitSetVectorReflection.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -220,20 +221,8 @@ namespace
 
   void ApplyEconStorageDelta(const std::int32_t direction, CEconStorageView& storage)
   {
-    // Address: 0x007732C0 (FUN_007732C0, Moho::CEconStorage::Chng)
-    if (storage.economyRuntime == nullptr) {
-      return;
-    }
-
-    const std::int64_t signedDirection = static_cast<std::int64_t>(direction);
-    constexpr std::size_t kAccumOffset = 0x40;
-    constexpr std::size_t kAccumCount = 4;
-    for (std::size_t i = 0; i < kAccumCount; ++i) {
-      auto* const accumulator =
-        reinterpret_cast<std::int64_t*>(storage.economyRuntime + kAccumOffset + (i * sizeof(std::int64_t)));
-      const std::int64_t delta = static_cast<std::int64_t>(storage.amounts[i]) * signedDirection;
-      *accumulator += delta;
-    }
+    auto* const econStorage = reinterpret_cast<moho::CEconStorage*>(&storage);
+    (void)econStorage->Chng(direction);
   }
 
   void DestroyArmyEconomyInfo(moho::CSimArmyEconomyInfo*& economyInfo)
@@ -449,7 +438,7 @@ namespace
   }
 
   /**
-   * Address: 0x007040E0 (FUN_007040E0, gpg::ReadArchive::ReadPointerOwned_CPlatoon)
+    * Alias of FUN_007040E0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane, enforces owned-pointer transition
@@ -913,6 +902,46 @@ namespace
     return target;
   }
 
+  struct CategoryRuleCursor
+  {
+    moho::RRuleGameRules* rules;
+    const moho::BVIntSet* categoryOrdinals;
+    unsigned int currentOrdinal;
+  };
+
+  static_assert(sizeof(CategoryRuleCursor) == 0x0C, "CategoryRuleCursor size must be 0x0C");
+  static_assert(offsetof(CategoryRuleCursor, rules) == 0x00, "CategoryRuleCursor::rules offset must be 0x00");
+  static_assert(
+    offsetof(CategoryRuleCursor, categoryOrdinals) == 0x04,
+    "CategoryRuleCursor::categoryOrdinals offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CategoryRuleCursor, currentOrdinal) == 0x08, "CategoryRuleCursor::currentOrdinal offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x0052CBA0 (FUN_0052CBA0)
+   *
+   * What it does:
+   * Initializes one category-rule traversal cursor with game-rules owner,
+   * category ordinal bitset pointer, and first selected ordinal.
+   */
+  [[maybe_unused]] [[nodiscard]] CategoryRuleCursor* InitializeCategoryRuleCursor(
+    CategoryRuleCursor* const outCursor,
+    moho::RRuleGameRules* const rules,
+    const moho::BVIntSet& categoryOrdinals
+  ) noexcept
+  {
+    if (outCursor == nullptr) {
+      return nullptr;
+    }
+
+    outCursor->rules = rules;
+    outCursor->categoryOrdinals = &categoryOrdinals;
+    outCursor->currentOrdinal = categoryOrdinals.GetNext(std::numeric_limits<unsigned int>::max());
+    return outCursor;
+  }
+
   [[nodiscard]] float GetUnitCapCost(const moho::Unit* unit)
   {
     if (unit == nullptr) {
@@ -1329,6 +1358,23 @@ namespace moho
   CAiBrain* CArmyImpl::GetArmyBrain()
   {
     return AiBrain;
+  }
+
+  /**
+   * Address: 0x005A2C20 (FUN_005A2C20, Moho::AI_Tick)
+   *
+   * What it does:
+   * Runs one AI brain task tick for the army's AI, attacker, and reserved
+   * thread stages.
+   */
+  void AI_Tick(CArmyImpl* army)
+  {
+    (void)army->GetSim();
+
+    CAiBrain* const brain = army->GetArmyBrain();
+    brain->mAiThreadStage->UserFrame();
+    brain->mAttackerThreadStage->UserFrame();
+    brain->mReservedThreadStage->UserFrame();
   }
 
   /**
@@ -2238,11 +2284,13 @@ namespace moho
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(filterBuckets);
     const BVIntSet& categoryOrdinals = categorySet->Bits();
+    CategoryRuleCursor cursor{};
+    (void)InitializeCategoryRuleCursor(&cursor, Simulation->mRules, categoryOrdinals);
     const unsigned int sentinel = categoryOrdinals.Max();
 
-    for (unsigned int ordinal = categoryOrdinals.GetNext(std::numeric_limits<unsigned int>::max()); ordinal != sentinel;
-         ordinal = categoryOrdinals.GetNext(ordinal)) {
-      const RBlueprint* const blueprint = Simulation->mRules->GetBlueprintFromOrdinal(static_cast<int>(ordinal));
+    for (unsigned int ordinal = cursor.currentOrdinal; ordinal != sentinel;
+         ordinal = cursor.categoryOrdinals->GetNext(ordinal)) {
+      const RBlueprint* const blueprint = cursor.rules->GetBlueprintFromOrdinal(static_cast<int>(ordinal));
       if (blueprint == nullptr) {
         continue;
       }
@@ -2402,7 +2450,7 @@ namespace moho
     }
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
-    CategoryWordRangeAsBitset(ArmyBuildCategoryFilterWords(*this)).AddAllFrom(&categorySet->Bits());
+    (void)EntityCategory::Add(&ArmyBuildCategoryFilterWords(*this), categorySet);
     MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 

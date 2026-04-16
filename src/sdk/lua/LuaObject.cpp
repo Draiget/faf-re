@@ -1,7 +1,11 @@
 #include "LuaObject.h"
 
+#include <Windows.h>
+
 #include <cerrno>
 #include <cctype>
+#include <clocale>
+#include <cstddef>
 #include <cmath>
 #include <cstdio>
 #include <cstdarg>
@@ -32,6 +36,74 @@
 using namespace LuaPlus;
 
 extern "C" void __cdecl _free_crt(void* ptr);
+extern "C" int luaG_checkcode(const Proto* f);
+
+/**
+ * Address: 0x004F2730 (legacy CRT compat thunk)
+ *
+ * What it does:
+ * Forwards to `std::free`. Provides the legacy `_free_crt` symbol expected by
+ * recovered code that allocates via the legacy CRT free path. Defined here
+ * because `legacy_stdio_definitions.lib` does not export this thunk on UCRT.
+ */
+extern "C" void __cdecl _free_crt(void* const ptr)
+{
+	std::free(ptr);
+}
+
+/**
+ * Legacy CRT `_iob[]` global array shim.
+ *
+ * The old MSVCRT exported `_iob` as `FILE _iob[_IOB_ENTRIES]` via
+ * `__imp___iob`. UCRT removed the global in favor of `__acrt_iob_func()`,
+ * but third-party .lib files compiled against the old CRT (e.g. LuaPlus's
+ * `lauxlib.obj`, `lbaselib.obj`, `liolib.obj`) still reference
+ * `__imp___iob`. Provide a private backing array so the link resolves; the
+ * streams are not functional — callers that actually use them will route
+ * through `__iob_func()` above which dispatches to UCRT at runtime.
+ */
+extern "C" __declspec(selectany) std::FILE _iob[20]{};
+
+/**
+ * Legacy CRT errno-mapping thunk.
+ *
+ * Maps a Win32 error code to a POSIX `errno` value. The old MSVCRT exported
+ * `_dosmaperr` (single underscore C, `__dosmaperr` with the linker's extra
+ * underscore decoration); UCRT still provides the mapping through internal
+ * helpers but not under this exact symbol when /MDd is combined with legacy
+ * obj files. No-op here since callers only use it to propagate errors.
+ */
+extern "C" void __cdecl _dosmaperr(unsigned long) {}
+
+/**
+ * Address: 0x00A89E54 (legacy CRT compat thunk)
+ *
+ * What it does:
+ * Returns the base of the legacy `_iob[]` array. On UCRT, dispatches to
+ * `__acrt_iob_func(0)` from `ucrtbase.dll` (the modern replacement) and
+ * falls back to a static placeholder array if the symbol is unavailable.
+ * Provided here because UCRT does not export `__iob_func` directly.
+ */
+extern "C" std::FILE* __cdecl __iob_func(void)
+{
+	using AcrtIobFunc = std::FILE* (__cdecl*)(unsigned int);
+	static AcrtIobFunc sAcrtIobFunc = []() noexcept -> AcrtIobFunc {
+		HMODULE const ucrtModule = ::GetModuleHandleA("ucrtbase.dll");
+		if (ucrtModule == nullptr) {
+			return nullptr;
+		}
+		return reinterpret_cast<AcrtIobFunc>(
+			reinterpret_cast<void(*)()>(::GetProcAddress(ucrtModule, "__acrt_iob_func"))
+		);
+	}();
+
+	if (sAcrtIobFunc != nullptr) {
+		return sAcrtIobFunc(0u);
+	}
+
+	static std::FILE sLegacyIobFallback[20]{};
+	return sLegacyIobFallback;
+}
 
 /**
  * Address: 0x00923F20 (FUN_00923F20, luaHelper_ReallocFunction)
@@ -159,6 +231,7 @@ class LClosureSerializer
 public:
 	/**
 	 * Address: 0x00921370 (FUN_00921370, LClosureSerializer::Serialize)
+	 * Address: 0x0098FF80 (FUN_0098FF80)
 	 *
 	 * What it does:
 	 * Forwards one closure save lane into `LClosure::MemberSerialize`.
@@ -179,17 +252,55 @@ class ProtoSerializer
 {
 public:
 	/**
+	 * Address: 0x00923530 (FUN_00923530, ProtoSerializer::ProtoSerializer)
+	 *
+	 * What it does:
+	 * Initializes one proto serializer helper node by self-linking intrusive
+	 * helper lanes and wiring deserialize/serialize callback slots.
+	 */
+	ProtoSerializer();
+
+	/**
+	 * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
+	 *
+	 * What it does:
+	 * Forwards one proto load lane into `Proto::MemberDeserialize`.
+	 */
+	static void Deserialize(gpg::ReadArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+
+	/**
 	 * Address: 0x009213C0 (FUN_009213C0, ProtoSerializer::Serialize)
 	 *
 	 * What it does:
 	 * Forwards one proto save lane into `Proto::MemberSerialize`.
 	 */
 	static void Serialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+
+	virtual void RegisterSerializeFunctions();
+
+	gpg::SerHelperBase* mHelperNext;
+	gpg::SerHelperBase* mHelperPrev;
+	gpg::RType::load_func_t mDeserialize;
+	gpg::RType::save_func_t mSerialize;
 };
+
+static_assert(offsetof(ProtoSerializer, mHelperNext) == 0x04, "ProtoSerializer::mHelperNext offset must be 0x04");
+static_assert(offsetof(ProtoSerializer, mHelperPrev) == 0x08, "ProtoSerializer::mHelperPrev offset must be 0x08");
+static_assert(offsetof(ProtoSerializer, mDeserialize) == 0x0C, "ProtoSerializer::mDeserialize offset must be 0x0C");
+static_assert(offsetof(ProtoSerializer, mSerialize) == 0x10, "ProtoSerializer::mSerialize offset must be 0x10");
+static_assert(sizeof(ProtoSerializer) == 0x14, "ProtoSerializer size must be 0x14");
 
 class lua_StateSerializer
 {
 public:
+	/**
+	 * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
+	 *
+	 * What it does:
+	 * Forwards one Lua thread load lane into `lua_State::MemberDeserialize`.
+	 */
+	static void Deserialize(gpg::ReadArchive* archive, lua_State* state, int version, gpg::RRef* ownerRef);
+
 	/**
 	 * Address: 0x009213F0 (FUN_009213F0, lua_StateSerializer::Serialize)
 	 *
@@ -219,6 +330,109 @@ public:
 	static void Deserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
 };
 
+class UdataSerializer
+{
+public:
+	/**
+	 * Address: 0x00923660 (FUN_00923660)
+	 *
+	 * What it does:
+	 * Forwards one userdata load lane into `Udata::MemberDeserialize`.
+	 */
+	static void Deserialize(gpg::ReadArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00920D90 (FUN_00920D90)
+	 *
+	 * What it does:
+	 * Forwards one userdata save lane into `Udata::MemberSerialize`.
+	 */
+	static void Serialize(gpg::WriteArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
+};
+
+namespace
+{
+	struct SerializerHelperRuntimeView
+	{
+		void* vftable;
+		gpg::SerHelperBase* mNext;
+		gpg::SerHelperBase* mPrev;
+		gpg::RType::load_func_t mDeserialize;
+		gpg::RType::save_func_t mSerialize;
+	};
+
+	static_assert(sizeof(SerializerHelperRuntimeView) == 0x14, "SerializerHelperRuntimeView size must be 0x14");
+
+	/**
+	 * Address: 0x00923260 (FUN_00923260)
+	 *
+	 * What it does:
+	 * Initializes one serializer-helper lane for `TObject` load/save callbacks.
+	 */
+	[[maybe_unused]] SerializerHelperRuntimeView* InitializeTObjectSerializerHelper(
+		SerializerHelperRuntimeView* const helper
+	) noexcept
+	{
+		if (helper == nullptr) {
+			return nullptr;
+		}
+
+		helper->vftable = nullptr;
+		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
+		helper->mNext = self;
+		helper->mPrev = self;
+		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&TObjectSerializer::Deserialize);
+		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&TObjectSerializer::Serialize);
+		return helper;
+	}
+
+	/**
+	 * Address: 0x00923440 (FUN_00923440)
+	 *
+	 * What it does:
+	 * Initializes one serializer-helper lane for `LClosure` load/save callbacks.
+	 */
+	[[maybe_unused]] SerializerHelperRuntimeView* InitializeLClosureSerializerHelper(
+		SerializerHelperRuntimeView* const helper
+	) noexcept
+	{
+		if (helper == nullptr) {
+			return nullptr;
+		}
+
+		helper->vftable = nullptr;
+		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
+		helper->mNext = self;
+		helper->mPrev = self;
+		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&LClosureSerializer::Deserialize);
+		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&LClosureSerializer::Serialize);
+		return helper;
+	}
+
+	/**
+	 * Address: 0x00923670 (FUN_00923670)
+	 *
+	 * What it does:
+	 * Initializes one serializer-helper lane for userdata load/save callbacks.
+	 */
+	[[maybe_unused]] SerializerHelperRuntimeView* InitializeUdataSerializerHelper(
+		SerializerHelperRuntimeView* const helper
+	) noexcept
+	{
+		if (helper == nullptr) {
+			return nullptr;
+		}
+
+		helper->vftable = nullptr;
+		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
+		helper->mNext = self;
+		helper->mPrev = self;
+		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&UdataSerializer::Deserialize);
+		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&UdataSerializer::Serialize);
+		return helper;
+	}
+}
+
 /**
  * Address: 0x00921370 (FUN_00921370, LClosureSerializer::Serialize)
  *
@@ -247,6 +461,40 @@ void LClosureSerializer::Deserialize(
 }
 
 /**
+ * Address: 0x00923530 (FUN_00923530, ProtoSerializer::ProtoSerializer)
+ *
+ * What it does:
+ * Initializes one proto serializer helper node by self-linking intrusive
+ * helper lanes and wiring deserialize/serialize callback slots.
+ */
+ProtoSerializer::ProtoSerializer()
+{
+	auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&mHelperNext);
+	mHelperNext = self;
+	mHelperPrev = self;
+	mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&ProtoSerializer::Deserialize);
+	mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&ProtoSerializer::Serialize);
+}
+
+void ProtoSerializer::RegisterSerializeFunctions() {}
+
+/**
+ * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
+ *
+ * What it does:
+ * Forwards one proto load lane into `Proto::MemberDeserialize`.
+ */
+void ProtoSerializer::Deserialize(
+	gpg::ReadArchive* const archive,
+	Proto* const object,
+	const int version,
+	gpg::RRef* const ownerRef
+)
+{
+	Proto::MemberDeserialize(archive, object, version, ownerRef);
+}
+
+/**
  * Address: 0x009213C0 (FUN_009213C0, ProtoSerializer::Serialize)
  *
  * What it does:
@@ -260,6 +508,22 @@ void ProtoSerializer::Serialize(
 )
 {
 	Proto::MemberSerialize(archive, object, version, ownerRef);
+}
+
+/**
+ * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
+ *
+ * What it does:
+ * Forwards one Lua thread load lane into `lua_State::MemberDeserialize`.
+ */
+void lua_StateSerializer::Deserialize(
+	gpg::ReadArchive* const archive,
+	lua_State* const state,
+	const int version,
+	gpg::RRef* const ownerRef
+)
+{
+	lua_State::MemberDeserialize(archive, state, version, ownerRef);
 }
 
 /**
@@ -308,6 +572,39 @@ void TObjectSerializer::Deserialize(
 )
 {
 	TObject::MemberDeserialize(archive, object, version, ownerRef);
+}
+
+/**
+ * Address: 0x00923660 (FUN_00923660)
+ *
+ * What it does:
+ * Forwards one userdata load lane into `Udata::MemberDeserialize`.
+ */
+void UdataSerializer::Deserialize(
+	gpg::ReadArchive* const archive,
+	Udata* const object,
+	const int version,
+	gpg::RRef* const ownerRef
+)
+{
+	const gpg::RRef nullOwner{};
+	Udata::MemberDeserialize(archive, object, version, ownerRef != nullptr ? *ownerRef : nullOwner);
+}
+
+/**
+ * Address: 0x00920D90 (FUN_00920D90)
+ *
+ * What it does:
+ * Forwards one userdata save lane into `Udata::MemberSerialize`.
+ */
+void UdataSerializer::Serialize(
+	gpg::WriteArchive* const archive,
+	Udata* const object,
+	const int version,
+	gpg::RRef* const ownerRef
+)
+{
+	Udata::MemberSerialize(archive, object, version, ownerRef);
 }
 
 namespace
@@ -498,16 +795,22 @@ extern "C"
 {
 	void luaC_collectgarbage(lua_State* L);
 	void luaC_link(lua_State* L, GCObject* object, int typeTag);
+	int luaC_sweep(lua_State* L, int all);
+	void luaF_close(lua_State* L, StkId level);
 	Closure* luaF_newCclosure(lua_State* L, int nelems);
 	lua_State* luaE_newthread(lua_State* L);
 	void luaD_growstack(lua_State* L, int n);
 	void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
+	void luaS_freeall(lua_State* L);
 	void* luaM_growaux(lua_State* L, void* block, int* size, int sizeElem, int limit, const char* what);
 	const char* luaO_pushvfstring(lua_State* L, const char* fmt, va_list argp);
 	int _errorfb(lua_State* L, int level);
 	void luaG_runerror(lua_State* L, const char* format, ...);
 	void luaV_concat(lua_State* L, int total, int last);
 	int luaV_tostring(lua_State* L, TObject* obj);
+	int luaV_equalval(lua_State* L, const TObject* left, const TObject* right);
+	int luaV_lessthan(lua_State* L, const TObject* left, const TObject* right);
+	Proto* luaF_newproto(lua_State* L);
 	void discharge2reg(expdesc* e, int reg, FuncState* fs);
 	int luaK_code(FuncState* fs, Instruction i, int line);
 	int luaK_codeABC(FuncState* fs, int o, int a, int b, int c);
@@ -531,7 +834,6 @@ extern "C"
 	TObject* luaH_set(lua_State* L, Table* t, const TObject* key);
 	TObject* luaH_setnum(lua_State* L, Table* t, int key);
 	TObject* negindex(lua_State* L, int idx);
-
 	/**
 	 * Address: 0x009240C0 (FUN_009240C0, lua_stack_init)
 	 *
@@ -580,6 +882,57 @@ extern "C"
 		ci->top = threadState->top + kInitialCallFrameTopSpan;
 		threadState->size_ci = static_cast<std::uint16_t>(kInitialCallInfoSlots);
 		threadState->end_ci = threadState->base_ci + kInitialCallInfoSlots;
+	}
+
+	/**
+	 * Address: 0x00924210 (FUN_00924210, close_state)
+	 *
+	 * What it does:
+	 * Closes pending Lua upvalues, sweeps/frees GC and scratch-buffer lanes,
+	 * releases callinfo+stack arrays, then frees global and thread state using
+	 * allocator callbacks captured from `global_State`.
+	 */
+	[[maybe_unused]] static void close_state(lua_State* const state)
+	{
+		luaF_close(state, state->stack);
+
+		global_State* const globalState = state->l_G;
+		lua_State allocatorState{};
+		global_State allocatorGlobal{};
+		allocatorState.l_G = &allocatorGlobal;
+		allocatorGlobal.memData = globalState->memData;
+		allocatorGlobal.reallocFunc = globalState->reallocFunc;
+		allocatorGlobal.freeFunc = globalState->freeFunc;
+
+		if (globalState != nullptr) {
+			(void)luaC_sweep(state, 1);
+			luaS_freeall(state);
+			globalState->buff.buffer = static_cast<char*>(luaM_realloc(
+				state,
+				globalState->buff.buffer,
+				static_cast<lu_mem>(globalState->buff.buffsize),
+				0u
+			));
+			globalState->buff.buffsize = 0u;
+		}
+
+		(void)luaM_realloc(
+			state,
+			state->base_ci,
+			static_cast<lu_mem>(sizeof(CallInfo) * state->size_ci),
+			0u
+		);
+		(void)luaM_realloc(
+			state,
+			state->stack,
+			static_cast<lu_mem>(sizeof(TObject) * state->stacksize),
+			0u
+		);
+
+		if (globalState != nullptr) {
+			(void)luaM_realloc(&allocatorState, globalState, static_cast<lu_mem>(0x160u), 0u);
+		}
+		(void)luaM_realloc(&allocatorState, state, static_cast<lu_mem>(0x48u), 0u);
 	}
 
 	/**
@@ -653,6 +1006,41 @@ extern "C"
 
 		++state->top;
 		return newThread;
+	}
+
+	/**
+	 * Address: 0x0090C900 (FUN_0090C900, lua_equal)
+	 *
+	 * What it does:
+	 * Resolves two Lua API stack indices, validates same-type operands, then
+	 * performs one Lua semantic equality test via `luaV_equalval`.
+	 */
+	int lua_equal(lua_State* const state, const int leftIndex, const int rightIndex)
+	{
+		TObject* leftObject = nullptr;
+		if (leftIndex > 0) {
+			TObject* const candidate = state->base + leftIndex - 1;
+			if (candidate < state->top) {
+				leftObject = candidate;
+			}
+		} else {
+			leftObject = negindex(state, leftIndex);
+		}
+
+		TObject* rightObject = nullptr;
+		if (rightIndex > 0) {
+			TObject* const candidate = state->base + rightIndex - 1;
+			if (candidate < state->top) {
+				rightObject = candidate;
+			}
+		} else {
+			rightObject = negindex(state, rightIndex);
+		}
+
+		return leftObject != nullptr
+			&& rightObject != nullptr
+			&& leftObject->tt == rightObject->tt
+			&& luaV_equalval(state, leftObject, rightObject) != 0;
 	}
 
 	/**
@@ -819,6 +1207,33 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090D8E0 (FUN_0090D8E0, lua_pushupvalues)
+	 *
+	 * What it does:
+	 * Pushes all upvalue lanes from the current closure (`base[-1]`) onto the
+	 * Lua stack, preserving the original growth guard (`nup + 20` slots).
+	 */
+	extern "C" int lua_pushupvalues(lua_State* const state)
+	{
+		const auto* const closure = static_cast<const Closure*>(state->base[-1].value.p);
+		const int upvalueCount = static_cast<int>(closure->c.nupvalues);
+		const int requiredStackSlots = upvalueCount + 20;
+
+		if ((state->stack_last - state->top) <= requiredStackSlots) {
+			luaD_growstack(state, requiredStackSlots);
+		}
+
+		const TObject* sourceUpvalue = &closure->c.upvalue[0];
+		for (int upvalueIndex = 0; upvalueIndex < upvalueCount; ++upvalueIndex, ++sourceUpvalue) {
+			TObject* const stackTop = state->top;
+			*stackTop = *sourceUpvalue;
+			state->top = stackTop + 1;
+		}
+
+		return upvalueCount;
+	}
+
+	/**
 	 * Address: 0x0090D940 (FUN_0090D940, aux_upvalue)
 	 *
 	 * What it does:
@@ -919,6 +1334,22 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090E9E0 (FUN_0090E9E0, tag_error)
+	 *
+	 * What it does:
+	 * Formats one Lua type-mismatch message (`"%s expected, got %s"`) and raises
+	 * argument error for the offending stack index.
+	 */
+	[[maybe_unused]] static int tag_error(const int expectedTag, const int argumentIndex, lua_State* const state)
+	{
+		const char* const expectedName = lua_typename(state, expectedTag);
+		const int gotTag = lua_type(state, argumentIndex);
+		const char* const gotName = lua_typename(state, gotTag);
+		const char* const message = lua_pushfstring(state, "%s expected, got %s", expectedName, gotName);
+		return luaL_argerror(state, argumentIndex, message);
+	}
+
+	/**
 	 * Address: 0x0090CC10 (FUN_0090CC10, lua_tolightuserdata)
 	 *
 	 * What it does:
@@ -942,6 +1373,34 @@ extern "C"
 		}
 
 		return object->value.p;
+	}
+
+	/**
+	 * Address: 0x0090ADE0 (FUN_0090ADE0)
+	 *
+	 * What it does:
+	 * Loads one light-userdata function pointer from pseudo-index `-10002` and
+	 * invokes that callback with the current Lua state.
+	 */
+	int lua_calllightuserdata(lua_State* const state)
+	{
+		using LuaRegistryStdCall = int(__stdcall*)(lua_State*);
+		auto* const callback = reinterpret_cast<LuaRegistryStdCall>(lua_tolightuserdata(state, -10002));
+		return callback(state);
+	}
+
+	/**
+	 * Address: 0x0090AE30 (FUN_0090AE30)
+	 *
+	 * What it does:
+	 * Copies one Lua string value (including trailing `\0`) from stack index
+	 * `idx` into caller-provided destination storage.
+	 */
+	[[maybe_unused]] char* lua_copystring_to_buffer(lua_State* const state, const int idx, void* const destination)
+	{
+		char* const source = const_cast<char*>(lua_tostring(state, idx));
+		const size_t length = lua_strlen(state, idx);
+		return static_cast<char*>(std::memcpy(destination, source, length + 1u));
 	}
 
 	/**
@@ -1076,6 +1535,26 @@ extern "C"
 		const char* const pushedString = luaO_pushvfstring(state, format, argp);
 		va_end(argp);
 		return pushedString;
+	}
+
+	/**
+	 * Address: 0x00913810 (FUN_00913810)
+	 *
+	 * What it does:
+	 * Interns one C-string, writes that tagged string object into caller-chosen
+	 * stack slot `slot`, and moves `L->top` to one-past that slot.
+	 */
+	[[maybe_unused]] TString* PushLuaStringAtStackSlot(
+		lua_State* const L,
+		TObject* const slot,
+		const char* const source
+	)
+	{
+		TString* const stringObject = luaS_newlstr(L, source, std::strlen(source));
+		slot->tt = stringObject->tt;
+		slot->value.p = stringObject;
+		L->top = slot + 1;
+		return stringObject;
 	}
 
 	/**
@@ -2147,6 +2626,28 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x00910260 (lcode.c::luaK_fixjump, file-local in original Lua)
+	 *
+	 * What it does:
+	 * Patches the sBx field of one jump instruction in `fs->f->code[from]` to
+	 * encode the signed offset `to - (from + 1)`, raising a syntax error when
+	 * the offset exceeds the 18-bit signed range. Recovered as a free function
+	 * here because `luaK_concat` (recovered into LuaObject.cpp) calls it.
+	 */
+	extern "C" void luaK_fixjump(const int to, const int from, FuncState* const fs)
+	{
+		auto* const fsRuntime = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
+		Instruction* const jmp = &fsRuntime->functionProto->code[from];
+		const int offset = to - (from + 1);
+		constexpr int kMaxArgSBx = 0x1FFFF;
+		if (offset > kMaxArgSBx || offset < -kMaxArgSBx) {
+			luaX_syntaxerror(fsRuntime->lexState, "control structure too long");
+		}
+		*jmp = (*jmp & ~(static_cast<Instruction>(0x3FFFFu) << 6))
+			| ((static_cast<Instruction>(offset) + kMaxArgSBx) << 6);
+	}
+
+	/**
 	 * Address: 0x009102F0 (FUN_009102F0, luaK_concat)
 	 *
 	 * What it does:
@@ -3038,6 +3539,7 @@ namespace
 		void luaG_runerror(lua_State* L, const char* format, ...);
 		int luaZ_fill(LuaZioRuntimeView* stream);
 		int luaZ_read(LuaZioRuntimeView* stream, void* buffer, size_t size);
+		char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
 		std::FILE* __cdecl __iob_func(void);
 		void luaO_chunkid(char* out, const char* source, size_t bufflen);
 		void luaA_pushobject(lua_State* L, const TObject* o);
@@ -3326,6 +3828,40 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00912CD0 (ldebug.c::getobjname, file-local in original Lua)
+	 *
+	 * What it does:
+	 * Resolves a human-readable name for a stack-slot value to enrich runtime
+	 * error messages. Tries to find a local variable name from `Proto::locvars`
+	 * via `luaF_getlocalname` for the active program counter; if nothing
+	 * matches, returns nullptr (the original walks bytecode with `luaG_symbexec`
+	 * to recognize globals, fields, and self-calls — that path is not yet
+	 * recovered, so error messages drop to "value" instead of "global `foo`").
+	 */
+	extern "C" const char* getobjname(const int stackPos, CallInfo* const callInfo, const char** const nameOut)
+	{
+		constexpr int kCiSavedPc = 3;
+		if (callInfo->state >= kCiSavedPc) {
+			return nullptr;
+		}
+
+		const auto* const closure = static_cast<const Closure*>(callInfo->base[-1].value.p);
+		const Proto* const proto = closure->l.p;
+		const int instructionIndex = static_cast<int>(callInfo->savedpc - proto->code);
+		if (instructionIndex < 0) {
+			return nullptr;
+		}
+
+		if (const char* const localName = luaF_getlocalname(proto, stackPos + 1, instructionIndex);
+			localName != nullptr) {
+			*nameOut = localName;
+			return "local";
+		}
+
+		return nullptr;
+	}
+
+	/**
 	 * Address: 0x00912F30 (FUN_00912F30, addinfo)
 	 *
 	 * What it does:
@@ -3402,6 +3938,28 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00913440 (FUN_00913440, luaG_aritherror)
+	 *
+	 * What it does:
+	 * Selects the non-numeric arithmetic operand (when present) and raises
+	 * `luaG_typeerror(..., "perform arithmetic on")`.
+	 */
+	[[maybe_unused]] [[noreturn]] void luaG_aritherror(
+		lua_State* const state,
+		TObject* const leftOperand,
+		TObject* const rightOperand
+	)
+	{
+		TObject* errorOperand = leftOperand;
+		if (leftOperand != nullptr && leftOperand->tt == LUA_TNUMBER) {
+			errorOperand = rightOperand;
+		}
+
+		luaG_typeerror(state, errorOperand, "perform arithmetic on");
+		std::abort();
+	}
+
+	/**
 	 * Address: 0x00914240 (FUN_00914240, luaD_growCI)
 	 *
 	 * What it does:
@@ -3419,6 +3977,29 @@ namespace
 		if (state->size_ci > kLuaMaxCallInfoFrames) {
 			luaG_runerror(state, "stack overflow");
 		}
+	}
+
+	/**
+	 * Address: 0x00914080 (FUN_00914080)
+	 *
+	 * What it does:
+	 * Refreshes `stack_last` from the current stack allocation and clamps an
+	 * oversized call-info arena back to `kLuaMaxCallInfoFrames` when active
+	 * frames fit below that threshold.
+	 */
+	extern "C" TObject* luaD_refreshstacklimit(lua_State* const state)
+	{
+		TObject* const stackLast = &state->stack[state->stacksize - 1];
+		state->stack_last = stackLast;
+
+		if (state->size_ci > kLuaMaxCallInfoFrames) {
+			const auto activeFrameCount = (state->ci - state->base_ci) + 1;
+			if (activeFrameCount < static_cast<decltype(activeFrameCount)>(kLuaMaxCallInfoFrames)) {
+				luaD_reallocCI(state, static_cast<int>(kLuaMaxCallInfoFrames));
+			}
+		}
+
+		return stackLast;
 	}
 
 	/**
@@ -3582,6 +4163,58 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00929530 (FUN_00929530)
+	 *
+	 * What it does:
+	 * Resolves one binary-operation metamethod across both operands, executes it
+	 * when callable, and writes the result back to caller-selected stack slot.
+	 */
+	[[maybe_unused]] int call_binTM(
+		lua_State* const state,
+		const TObject* const firstOperand,
+		const TObject* const secondOperand,
+		StkId const resultSlot,
+		const int event
+	)
+	{
+		const auto resultStackOffset = resultSlot - state->stack;
+		const TObject* metamethodFunction = LookupTagMethodByObject(state, firstOperand, event);
+		if (metamethodFunction->tt == LUA_TNIL) {
+			metamethodFunction = LookupTagMethodByObject(state, secondOperand, event);
+		}
+
+		if ((metamethodFunction->tt | 1) != 7) {
+			return 0;
+		}
+
+		(void)callTMres(metamethodFunction, firstOperand, secondOperand, state);
+		state->stack[resultStackOffset] = *state->top;
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00929B90 (FUN_00929B90)
+	 *
+	 * What it does:
+	 * Attempts one binary-arithmetic metamethod dispatch, then raises one
+	 * arithmetic type error when no metamethod resolves.
+	 */
+	[[maybe_unused]] int CallBinTmOrRaiseArithmeticTypeError(
+		const int event,
+		TObject* const leftOperand,
+		lua_State* const state,
+		TObject* const rightOperand,
+		const StkId resultSlot
+	)
+	{
+		const int result = call_binTM(state, leftOperand, rightOperand, resultSlot, event);
+		if (result == 0) {
+			luaG_aritherror(state, leftOperand, rightOperand);
+		}
+		return result;
+	}
+
+	/**
 	 * Address: 0x00929610 (FUN_00929610, call_orderTM)
 	 *
 	 * What it does:
@@ -3734,6 +4367,15 @@ namespace
 	class WrapFileTypeInfo final : public gpg::RType
 	{
 	public:
+		/**
+		 * Address: 0x00917F80 (FUN_00917F80, WrapFileTypeInfo::WrapFileTypeInfo)
+		 *
+		 * What it does:
+		 * Constructs the WrapFile runtime type descriptor and preregisters it
+		 * with reflection registry using `typeid(WrapFile)`.
+		 */
+		WrapFileTypeInfo();
+
 		[[nodiscard]] const char* GetName() const override;
 
 		/**
@@ -3749,6 +4391,15 @@ namespace
 	class TObjectTypeInfo final : public gpg::RType
 	{
 	public:
+		/**
+		 * Address: 0x00921EF0 (FUN_00921EF0, TObjectTypeInfo::TObjectTypeInfo)
+		 *
+		 * What it does:
+		 * Constructs the TObject runtime type descriptor and preregisters it with
+		 * reflection registry using `typeid(TObject)`.
+		 */
+		TObjectTypeInfo();
+
 		[[nodiscard]] const char* GetName() const override;
 
 		/**
@@ -3772,7 +4423,7 @@ namespace
 	{
 		lua_State* state;
 		LuaZioRuntimeView* stream;
-		void* reserved08;
+		Mbuffer* scratchBuffer;
 		int swapBytes;
 		const char* chunkName;
 	};
@@ -4298,6 +4949,18 @@ namespace
 		return BuildWrapFileRef(out, wrapFile);
 	}
 
+	/**
+	 * Address: 0x00917F80 (FUN_00917F80, WrapFileTypeInfo::WrapFileTypeInfo)
+	 *
+	 * What it does:
+	 * Constructs the WrapFile runtime type descriptor and preregisters it with
+	 * reflection registry using `typeid(WrapFile)`.
+	 */
+	WrapFileTypeInfo::WrapFileTypeInfo()
+	{
+		gpg::PreRegisterRType(typeid(WrapFile), this);
+	}
+
 	const char* WrapFileTypeInfo::GetName() const
 	{
 		return "WrapFile";
@@ -4319,6 +4982,56 @@ namespace
 		deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		Finish();
+	}
+
+	/**
+	 * Address: 0x00918070 (FUN_00918070, WrapFileTypeInfo deleting-dtor thunk)
+	 *
+	 * What it does:
+	 * Tears down one `WrapFileTypeInfo` descriptor via `gpg::RType` base
+	 * teardown and conditionally frees storage when `deleteFlag & 1`.
+	 */
+	[[maybe_unused]] gpg::RType* DestroyWrapFileTypeInfoDeleting(
+		WrapFileTypeInfo* const typeInfo,
+		const unsigned char deleteFlag
+	)
+	{
+		typeInfo->gpg::RType::~RType();
+		if ((deleteFlag & 1u) != 0u) {
+			::operator delete(static_cast<void*>(typeInfo));
+		}
+		return typeInfo;
+	}
+
+	/**
+	 * Address: 0x009231F0 (FUN_009231F0, TObjectTypeInfo deleting-dtor thunk)
+	 *
+	 * What it does:
+	 * Tears down one `TObjectTypeInfo` descriptor via `gpg::RType` base teardown
+	 * and conditionally frees storage when `deleteFlag & 1`.
+	 */
+	[[maybe_unused]] gpg::RType* DestroyTObjectTypeInfoDeleting(
+		TObjectTypeInfo* const typeInfo,
+		const unsigned char deleteFlag
+	)
+	{
+		typeInfo->gpg::RType::~RType();
+		if ((deleteFlag & 1u) != 0u) {
+			::operator delete(static_cast<void*>(typeInfo));
+		}
+		return typeInfo;
+	}
+
+	/**
+	 * Address: 0x00921EF0 (FUN_00921EF0, TObjectTypeInfo::TObjectTypeInfo)
+	 *
+	 * What it does:
+	 * Constructs the TObject runtime type descriptor and preregisters it with
+	 * reflection registry using `typeid(TObject)`.
+	 */
+	TObjectTypeInfo::TObjectTypeInfo()
+	{
+		gpg::PreRegisterRType(typeid(TObject), this);
 	}
 
 	const char* TObjectTypeInfo::GetName() const
@@ -4381,6 +5094,21 @@ namespace
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 		return type;
+	}
+
+	/**
+	 * Address: 0x00917F60 (FUN_00917F60, sub_917F60)
+	 *
+	 * What it does:
+	 * Binds the full WrapFile callback suite directly onto one reflection type
+	 * descriptor lane without returning the descriptor.
+	 */
+	[[maybe_unused]] void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
+	{
+		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
+		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
+		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
 	}
 
 	/**
@@ -4487,6 +5215,52 @@ namespace
 		return 1;
 	}
 
+	constexpr int kLuaLocaleCategories[] = {
+		LC_ALL,
+		LC_COLLATE,
+		LC_CTYPE,
+		LC_MONETARY,
+		LC_NUMERIC,
+		LC_TIME
+	};
+
+	constexpr const char* const kLuaLocaleCategoryNames[] = {
+		"all",
+		"collate",
+		"ctype",
+		"monetary",
+		"numeric",
+		"time",
+		nullptr
+	};
+
+	/**
+	 * Address: 0x00916CD0 (FUN_00916CD0, io_setloc)
+	 *
+	 * What it does:
+	 * Applies/query one locale category from optional arg-2 selector and pushes
+	 * the CRT `setlocale` result string.
+	 */
+	[[maybe_unused]] int io_setloc(lua_State* const state)
+	{
+		const char* const locale = lua_tostring(state, 1);
+		const char* const categoryName = luaL_optlstring(state, 2, "all", nullptr);
+		const int categoryIndex = luaL_findstring(categoryName, kLuaLocaleCategoryNames);
+
+		if (locale == nullptr) {
+			if (lua_type(state, 1) > LUA_TNONE) {
+				luaL_argerror(state, 1, "string expected");
+			}
+		}
+		if (categoryIndex == -1) {
+			luaL_argerror(state, 2, "invalid option");
+		}
+
+		const char* const localeResult = std::setlocale(kLuaLocaleCategories[categoryIndex], locale);
+		lua_pushstring(state, localeResult);
+		return 1;
+	}
+
 	/**
 	 * Address: 0x00917350 (FUN_00917350, lua::io_tostring)
 	 *
@@ -4525,6 +5299,14 @@ namespace
 		return 3;
 	}
 
+	/**
+	 * Address: 0x00915EE0 (FUN_00915EE0, pushresult)
+	 *
+	 * What it does:
+	 * Pushes io-library success boolean for successful operations, or the
+	 * standard `(nil, strerror(errno), errno)` tuple (with optional path prefix)
+	 * for failures.
+	 */
 	int pushresult(const char* const path, lua_State* const state, const bool success)
 	{
 		if (success) {
@@ -4879,6 +5661,316 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00928650 (FUN_00928650, sub_928650)
+	 *
+	 * What it does:
+	 * Loads one element array from chunk stream; byte-swap mode reverses each
+	 * element lane byte order, otherwise it bulk-reads contiguous bytes.
+	 */
+	[[maybe_unused]] void LuaLoadElementArray(
+		char* const destination,
+		LuaLoadStateRuntimeView* const loadState,
+		int elementCount,
+		const int elementSize
+	)
+	{
+		if (loadState->swapBytes != 0) {
+			if (elementCount != 0) {
+				int bytesRemainingInLane = elementSize;
+				char* writeCursor = destination + static_cast<std::ptrdiff_t>(elementSize) - 1;
+				char* laneTail = writeCursor;
+				do {
+					--elementCount;
+					if (bytesRemainingInLane != 0) {
+						do {
+							--bytesRemainingInLane;
+							const int byteValue = ReadZioByte(loadState->stream);
+							if (byteValue == -1) {
+								luaG_runerror(loadState->state, "unexpected end of file in %s", loadState->chunkName);
+							}
+							*writeCursor-- = static_cast<char>(byteValue);
+						} while (bytesRemainingInLane != 0);
+						bytesRemainingInLane = elementSize;
+					}
+
+					writeCursor = laneTail + bytesRemainingInLane;
+					laneTail += bytesRemainingInLane;
+				} while (elementCount != 0);
+			}
+			return;
+		}
+
+		const int byteCount = elementSize * elementCount;
+		if (luaZ_read(loadState->stream, destination, static_cast<size_t>(byteCount)) != 0) {
+			luaG_runerror(loadState->state, "unexpected end of file in %s", loadState->chunkName);
+		}
+	}
+
+	/**
+	 * Address: 0x009287A0 (FUN_009287A0, sub_9287A0)
+	 *
+	 * What it does:
+	 * Reads one size-prefixed Lua chunk string payload and interns it (without
+	 * trailing NUL) into the owner Lua state string table.
+	 */
+	[[maybe_unused]] [[nodiscard]] TString* LuaLoadTString(LuaLoadStateRuntimeView* const loadState)
+	{
+		std::uint32_t byteCount = 0u;
+		LuaLoadBlock(4u, &byteCount, loadState);
+		if (byteCount == 0u) {
+			return nullptr;
+		}
+
+		char* const scratch = luaZ_openspace(loadState->state, loadState->scratchBuffer, byteCount);
+		if (luaZ_read(loadState->stream, scratch, byteCount) != 0) {
+			luaG_runerror(loadState->state, "unexpected end of file in %s", loadState->chunkName);
+		}
+
+		return luaS_newlstr(loadState->state, scratch, static_cast<size_t>(byteCount - 1u));
+	}
+
+	/**
+	 * Address: 0x00928810 (FUN_00928810, sub_928810)
+	 *
+	 * What it does:
+	 * Reads proto bytecode instruction count, allocates `Proto::code`, and
+	 * loads one contiguous instruction vector from chunk stream.
+	 */
+	[[maybe_unused]] void LuaLoadProtoCode(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	{
+		int count = 0;
+		LuaLoadBlock(4u, &count, loadState);
+		if (count < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		proto->code = static_cast<Instruction*>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count)));
+		proto->sizecode = count;
+		LuaLoadElementArray(reinterpret_cast<char*>(proto->code), loadState, count, 4);
+	}
+
+	/**
+	 * Address: 0x00928960 (FUN_00928960, sub_928960)
+	 *
+	 * What it does:
+	 * Reads proto line-info count, allocates `Proto::lineinfo`, and loads one
+	 * contiguous source-line map vector from chunk stream.
+	 */
+	[[maybe_unused]] void LuaLoadProtoLineInfo(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	{
+		int count = 0;
+		LuaLoadBlock(4u, &count, loadState);
+		if (count < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		proto->lineinfo = static_cast<int*>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count)));
+		proto->sizelineinfo = count;
+		LuaLoadElementArray(reinterpret_cast<char*>(proto->lineinfo), loadState, count, 4);
+	}
+
+	[[nodiscard]] int LuaReadChunkByteOrThrow(LuaLoadStateRuntimeView* const loadState)
+	{
+		const int byteValue = ReadZioByte(loadState->stream);
+		if (byteValue == -1) {
+			luaG_runerror(loadState->state, "unexpected end of file in %s", loadState->chunkName);
+		}
+		return byteValue;
+	}
+
+	[[nodiscard]] Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
+
+	/**
+	 * Address: 0x00928870 (FUN_00928870, sub_928870)
+	 *
+	 * What it does:
+	 * Reads local-variable debug lane count and fills one `Proto::locvars`
+	 * array with `{name,startpc,endpc}` entries.
+	 */
+	[[maybe_unused]] void LuaLoadProtoLocalVariableDebugInfo(
+		LuaLoadStateRuntimeView* const loadState,
+		Proto* const proto
+	)
+	{
+		int count = 0;
+		LuaLoadBlock(4u, &count, loadState);
+		if (count < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		proto->locvars = static_cast<LocVar*>(
+			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(static_cast<int>(sizeof(LocVar)) * count))
+		);
+		proto->sizelocvars = count;
+
+		if (count <= 0) {
+			return;
+		}
+
+		for (int index = 0; index < count; ++index) {
+			LocVar& lane = proto->locvars[index];
+			lane.varname = LuaLoadTString(loadState);
+
+			int startPc = 0;
+			LuaLoadBlock(4u, &startPc, loadState);
+			if (startPc < 0) {
+				luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+			}
+			lane.startpc = startPc;
+
+			int endPc = 0;
+			LuaLoadBlock(4u, &endPc, loadState);
+			if (endPc < 0) {
+				luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+			}
+			lane.endpc = endPc;
+		}
+	}
+
+	/**
+	 * Address: 0x009289C0 (FUN_009289C0, sub_9289C0)
+	 *
+	 * What it does:
+	 * Reads upvalue-name count, validates it against `Proto::nups`, and fills
+	 * one `Proto::upvalues` string-pointer lane array.
+	 */
+	[[maybe_unused]] void LuaLoadProtoUpvalueNames(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	{
+		int count = 0;
+		LuaLoadBlock(4u, &count, loadState);
+		if (count < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		if (count != 0 && count != static_cast<int>(proto->nups)) {
+			luaG_runerror(
+				loadState->state,
+				"bad nupvalues in %s: read %d; expected %d",
+				loadState->chunkName,
+				count,
+				static_cast<int>(proto->nups)
+			);
+		}
+
+		proto->upvalues = static_cast<TString**>(
+			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * count))
+		);
+		proto->sizeupvalues = count;
+
+		for (int index = 0; index < count; ++index) {
+			proto->upvalues[index] = LuaLoadTString(loadState);
+		}
+	}
+
+	/**
+	 * Address: 0x00928A60 (FUN_00928A60, sub_928A60)
+	 *
+	 * What it does:
+	 * Loads one proto constant table lane (`Proto::k`) followed by nested child
+	 * proto pointers (`Proto::p`) from the chunk stream.
+	 */
+	[[maybe_unused]] void LuaLoadProtoConstantsAndNestedProtos(
+		LuaLoadStateRuntimeView* const loadState,
+		Proto* const proto
+	)
+	{
+		int constantCount = 0;
+		LuaLoadBlock(4u, &constantCount, loadState);
+		if (constantCount < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		proto->k = static_cast<LuaPlus::TObject*>(
+			luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(8 * constantCount))
+		);
+		proto->sizek = constantCount;
+
+		for (int index = 0; index < constantCount; ++index) {
+			LuaPlus::TObject& constantLane = proto->k[index];
+			const int constantType = LuaReadChunkByteOrThrow(loadState);
+			const unsigned int typeTag = static_cast<unsigned int>(static_cast<unsigned char>(constantType));
+
+			if (typeTag == LUA_TNIL) {
+				constantLane.tt = LUA_TNIL;
+				continue;
+			}
+
+			if (typeTag == LUA_TNUMBER) {
+				float numberValue = 0.0f;
+				LuaLoadBlock(4u, &numberValue, loadState);
+				constantLane.tt = LUA_TNUMBER;
+				constantLane.value.n = numberValue;
+				continue;
+			}
+
+			if (typeTag == LUA_TSTRING) {
+				TString* const stringValue = LuaLoadTString(loadState);
+				constantLane.tt = static_cast<int>(stringValue->tt);
+				constantLane.value.p = stringValue;
+				continue;
+			}
+
+			luaG_runerror(loadState->state, "bad constant type (%d) in %s", static_cast<int>(typeTag), loadState->chunkName);
+		}
+
+		int childCount = 0;
+		LuaLoadBlock(4u, &childCount, loadState);
+		if (childCount < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+
+		proto->p = static_cast<Proto**>(luaM_realloc(loadState->state, nullptr, 0u, static_cast<lu_mem>(4 * childCount)));
+		proto->sizep = childCount;
+
+		for (int index = 0; index < childCount; ++index) {
+			proto->p[index] = LuaLoadProtoObject(loadState, proto->source);
+		}
+	}
+
+	/**
+	 * Address: 0x00928C10 (FUN_00928C10, sub_928C10)
+	 *
+	 * What it does:
+	 * Loads one serialized Lua proto object from chunk stream and recursively
+	 * decodes all dependent proto lanes (line info, locals, upvalues, constants,
+	 * children, and bytecode).
+	 */
+	[[maybe_unused]] [[nodiscard]] Proto* LuaLoadProtoObject(
+		LuaLoadStateRuntimeView* const loadState,
+		TString* const fallbackSource
+	)
+	{
+		Proto* const proto = luaF_newproto(loadState->state);
+
+		TString* const loadedSource = LuaLoadTString(loadState);
+		proto->source = (loadedSource != nullptr) ? loadedSource : fallbackSource;
+
+		int lineDefined = 0;
+		LuaLoadBlock(4u, &lineDefined, loadState);
+		if (lineDefined < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+		proto->lineDefined = lineDefined;
+
+		proto->nups = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->numparams = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->is_vararg = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->maxstacksize = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+
+		LuaLoadProtoLineInfo(loadState, proto);
+		LuaLoadProtoLocalVariableDebugInfo(loadState, proto);
+		LuaLoadProtoUpvalueNames(loadState, proto);
+		LuaLoadProtoConstantsAndNestedProtos(loadState, proto);
+		LuaLoadProtoCode(loadState, proto);
+
+		if (luaG_checkcode(proto) == 0) {
+			luaG_runerror(loadState->state, "bad code in %s", loadState->chunkName);
+		}
+
+		return proto;
+	}
+
+	/**
 	 * Address: 0x0090A780 (FUN_0090A780, LuaPlusGCFunction)
 	 *
 	 * What it does:
@@ -5117,6 +6209,29 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00915600 (FUN_00915600)
+	 *
+	 * What it does:
+	 * Shrinks call-info and stack allocations when the live usage window is
+	 * sparse enough to satisfy the legacy Lua GC compaction thresholds.
+	 */
+	[[maybe_unused]] void ShrinkThreadRuntimeStacksIfSparse(
+		TObject* const liveStackLimit,
+		lua_State* const state
+	)
+	{
+		const unsigned __int16 callInfoCapacity = state->size_ci;
+		if (4 * (state->ci - state->base_ci) < callInfoCapacity && callInfoCapacity > 0x10u) {
+			luaD_reallocCI(state, callInfoCapacity >> 1);
+		}
+
+		const int stackCapacity = state->stacksize;
+		if (4 * (liveStackLimit - state->stack) < stackCapacity && stackCapacity > 90) {
+			luaD_reallocstack(state, stackCapacity / 2);
+		}
+	}
+
+	/**
 	 * Address: 0x00915670 (FUN_00915670, traversestack)
 	 *
 	 * What it does:
@@ -5155,13 +6270,7 @@ namespace
 			object->value.p = nullptr;
 		}
 
-		if ((4 * (L1->ci - L1->base_ci) < L1->size_ci) && L1->size_ci > 0x10u) {
-			luaD_reallocCI(L1, L1->size_ci >> 1);
-		}
-
-		if ((4 * (lim - L1->stack) < L1->stacksize) && L1->stacksize > 90) {
-			luaD_reallocstack(L1, L1->stacksize / 2);
-		}
+		ShrinkThreadRuntimeStacksIfSparse(lim, L1);
 	}
 
 	/**
@@ -5247,6 +6356,57 @@ namespace
 	}
 
 	extern "C" void freeobj(GCObject* object, lua_State* state);
+	extern "C" void luaF_freeproto(lua_State* L, Proto* proto);
+	extern "C" void luaF_freeclosure(lua_State* L, Closure* closure);
+	extern "C" void luaE_freethread(lua_State* L, lua_State* thread);
+
+	/**
+	 * Address: 0x00915530 (lgc.c::freeobj, file-local in original Lua)
+	 *
+	 * What it does:
+	 * Dispatches one dead GC object to its type-specific free function:
+	 * `LUA_TPROTO`/`LUA_TFUNCTION`/`LUA_TTABLE`/`LUA_TTHREAD` route to the
+	 * corresponding `luaF_free*` / `luaH_free` / `luaE_freethread` helper;
+	 * `LUA_TUPVALUE`/`LUA_TSTRING`/`LUA_TUSERDATA` are released through
+	 * `luaM_realloc(..., 0)` with the appropriate variable-length size.
+	 * Recovered as a free function here because `sweeplist` (recovered above)
+	 * calls it across translation-unit boundaries.
+	 */
+	extern "C" void freeobj(GCObject* const object, lua_State* const state)
+	{
+		switch (object->gch.tt) {
+			case LUA_TPROTO:
+				luaF_freeproto(state, reinterpret_cast<Proto*>(object));
+				break;
+			case LUA_TFUNCTION:
+				luaF_freeclosure(state, reinterpret_cast<Closure*>(object));
+				break;
+			case LUA_TUPVALUE:
+				(void)luaM_realloc(state, object, static_cast<lu_mem>(sizeof(UpVal)), 0u);
+				break;
+			case LUA_TTABLE:
+				luaH_free(state, reinterpret_cast<Table*>(object));
+				break;
+			case LUA_TTHREAD:
+				luaE_freethread(state, reinterpret_cast<lua_State*>(object));
+				break;
+			case LUA_TSTRING: {
+				const auto* const ts = reinterpret_cast<const TString*>(object);
+				const lu_mem stringByteSize =
+					static_cast<lu_mem>(sizeof(TString) + (ts->len + 1u) * sizeof(char));
+				(void)luaM_realloc(state, object, stringByteSize, 0u);
+				break;
+			}
+			case LUA_TUSERDATA: {
+				const auto* const ud = reinterpret_cast<const Udata*>(object);
+				const lu_mem udataByteSize = static_cast<lu_mem>(sizeof(Udata) + ud->len);
+				(void)luaM_realloc(state, object, udataByteSize, 0u);
+				break;
+			}
+			default:
+				break;
+		}
+	}
 
 	/**
 	 * Address: 0x00915A00 (FUN_00915A00, sweeplist)
@@ -6787,6 +7947,68 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00919930 (FUN_00919930)
+	 *
+	 * What it does:
+	 * Bridges one Lua numeric value into `frexp` mantissa/exponent extraction
+	 * and returns the mantissa lane as `double`.
+	 */
+	[[maybe_unused]] double LuaFrexpMantissaBridgeA(const lua_Number value, int* const exponentOut)
+	{
+		if (exponentOut == nullptr) {
+			errno = EINVAL;
+			return 0.0;
+		}
+
+		return std::frexp(static_cast<double>(value), exponentOut);
+	}
+
+	/**
+	 * Address: 0x00919950 (FUN_00919950)
+	 *
+	 * What it does:
+	 * Bridges one Lua numeric value plus exponent lane into `ldexp`.
+	 */
+	[[maybe_unused]] double LuaLdexpBridgeA(const lua_Number value, const int exponent)
+	{
+		return std::ldexp(static_cast<double>(value), exponent);
+	}
+
+	/**
+	 * Address: 0x009199F0 (FUN_009199F0)
+	 *
+	 * What it does:
+	 * Secondary dispatch lane into the Lua `frexp` bridge helper.
+	 */
+	[[maybe_unused]] double LuaFrexpMantissaBridgeB(const lua_Number value, int* const exponentOut)
+	{
+		return LuaFrexpMantissaBridgeA(value, exponentOut);
+	}
+
+	/**
+	 * Address: 0x00919A10 (FUN_00919A10)
+	 *
+	 * What it does:
+	 * Secondary dispatch lane into the Lua `ldexp` bridge helper.
+	 */
+	[[maybe_unused]] double LuaLdexpBridgeB(const lua_Number value, const int exponent)
+	{
+		return LuaLdexpBridgeA(value, exponent);
+	}
+
+	/**
+	 * Address: 0x009199B0 (FUN_009199B0)
+	 *
+	 * What it does:
+	 * Promotes one Lua numeric value to `double`, applies `ceil`, and returns
+	 * the x87-compatible double-precision result lane.
+	 */
+	[[maybe_unused]] double LuaCeilBridge(const lua_Number value)
+	{
+		return std::ceil(static_cast<double>(value));
+	}
+
+	/**
 	 * Address: 0x00919A50 (FUN_00919A50, math_abs)
 	 *
 	 * What it does:
@@ -6901,7 +8123,7 @@ namespace
 	[[maybe_unused]] int math_ceil(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::ceil(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(LuaCeilBridge(value)));
 		return 1;
 	}
 
@@ -7046,7 +8268,7 @@ namespace
 	{
 		int exponent = 0;
 		const lua_Number value = luaL_checknumber(state, 1);
-		const lua_Number mantissa = static_cast<lua_Number>(std::frexp(static_cast<double>(value), &exponent));
+		const lua_Number mantissa = static_cast<lua_Number>(LuaFrexpMantissaBridgeB(value, &exponent));
 		lua_pushnumber(state, mantissa);
 		lua_pushnumber(state, static_cast<lua_Number>(exponent));
 		return 2;
@@ -7063,7 +8285,7 @@ namespace
 	{
 		const int exponent = static_cast<int>(luaL_checknumber(state, 2));
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::ldexp(static_cast<double>(value), exponent)));
+		lua_pushnumber(state, static_cast<lua_Number>(LuaLdexpBridgeB(value, exponent)));
 		return 1;
 	}
 
@@ -7960,6 +9182,74 @@ namespace
 		return value;
 	}
 
+	struct LuaCallFrameRuntimeView
+	{
+		LuaState* state = nullptr;              // +0x00
+		std::uint8_t reserved04[0x14] = {};    // +0x04
+		int argumentCount = 0;                 // +0x18
+		int nextTopIndex = 0;                  // +0x1C
+	};
+	static_assert(offsetof(LuaCallFrameRuntimeView, state) == 0x00, "LuaCallFrameRuntimeView::state offset must be 0x00");
+	static_assert(offsetof(LuaCallFrameRuntimeView, argumentCount) == 0x18, "LuaCallFrameRuntimeView::argumentCount offset must be 0x18");
+	static_assert(offsetof(LuaCallFrameRuntimeView, nextTopIndex) == 0x1C, "LuaCallFrameRuntimeView::nextTopIndex offset must be 0x1C");
+	static_assert(sizeof(LuaCallFrameRuntimeView) == 0x20, "LuaCallFrameRuntimeView size must be 0x20");
+
+	/**
+	 * Address: 0x00907270 (FUN_00907270)
+	 *
+	 * What it does:
+	 * Runs one prepared Lua call frame using retained argument-count lanes, then
+	 * materializes one stack-object view for the top result slot.
+	 */
+	[[maybe_unused]] LuaStackObject* InvokeLuaCallFrame(
+		LuaCallFrameRuntimeView* const frame,
+		LuaStackObject* const outResult,
+		const int* const resultCount
+	)
+	{
+		lua_call(frame->state->m_state, frame->argumentCount, *resultCount);
+		outResult->m_state = frame->state;
+		outResult->m_stackIndex = frame->nextTopIndex - 1;
+		return outResult;
+	}
+
+	/**
+	 * Address: 0x00907480 (FUN_00907480)
+	 *
+	 * What it does:
+	 * Copies one tagged Lua value to `state->top`, grows stack when needed, and
+	 * advances top by one slot.
+	 */
+	[[maybe_unused]] StkId PushRawLuaObjectToStack(const TObject* const object, lua_State* const state)
+	{
+		StkId const top = state->top;
+		*top = *object;
+		if (top >= state->ci->top) {
+			(void)lua_checkstack(state, 1);
+		}
+
+		state->top = top + 1;
+		return top;
+	}
+
+	/**
+	 * Address: 0x00908940 (FUN_00908940)
+	 *
+	 * What it does:
+	 * Pushes one LuaObject argument onto a prepared Lua call frame and bumps the
+	 * retained argument-count lane.
+	 */
+	[[maybe_unused]] LuaCallFrameRuntimeView* PushLuaObjectArgumentToCallFrame(
+		LuaCallFrameRuntimeView* const frame,
+		LuaObject* const argument
+	)
+	{
+		const StkId pushed = argument->PushStack(frame->state);
+		(void)pushed;
+		++frame->argumentCount;
+		return frame;
+	}
+
 	void PushTObject(lua_State* state, const TObject& object)
 	{
 		switch (object.tt) {
@@ -8035,6 +9325,80 @@ extern "C"
 }
 
 /**
+ * Address: 0x00911DD0 (ldblib.c::errorfb core, recovered)
+ *
+ * What it does:
+ * Walks the active Lua call stack starting at `level + 1`, pushing one
+ * `"stack traceback:"` header followed by a `\n\t<chunk>:<line>: in
+ * function <name>` line for each frame. Compresses the middle of very deep
+ * stacks with a single ellipsis (`LEVELS1=12`, `LEVELS2=10`). Concatenates
+ * the result into one string at top-of-stack and returns 1. Recovered as a
+ * free function here because callers (e.g. `errorfb`, `lua_traceback`) live
+ * in our recovered LuaObject.cpp.
+ */
+extern "C" int _errorfb(lua_State* const state, int level)
+{
+	constexpr int kLevels1 = 12;
+	constexpr int kLevels2 = 10;
+	int firstpart = 1;
+	lua_Debug ar;
+
+	if (lua_gettop(state) == 0) {
+		lua_pushlstring(state, "", 0);
+	} else if (!lua_isstring(state, 1)) {
+		return 1;
+	} else {
+		lua_pushlstring(state, "\n", 1);
+	}
+
+	lua_pushlstring(state, "stack traceback:", 16);
+	++level;
+	while (lua_getstack(state, level++, &ar)) {
+		if (level > kLevels1 && firstpart) {
+			if (!lua_getstack(state, level + kLevels2, &ar)) {
+				--level;
+			} else {
+				lua_pushlstring(state, "\n\t...", 5);
+				while (lua_getstack(state, level + kLevels2, &ar)) {
+					++level;
+				}
+			}
+			firstpart = 0;
+			continue;
+		}
+
+		lua_pushlstring(state, "\n\t", 2);
+		lua_getinfo(state, "Snl", &ar);
+		lua_pushfstring(state, "%s:", ar.short_src);
+		if (ar.currentline > 0) {
+			lua_pushfstring(state, "%d:", ar.currentline);
+		}
+
+		switch (*ar.namewhat) {
+			case 'g':
+			case 'l':
+			case 'f':
+			case 'm':
+				lua_pushfstring(state, " in function `%s'", ar.name);
+				break;
+			default:
+				if (*ar.what == 'm') {
+					lua_pushfstring(state, " in main chunk");
+				} else if (*ar.what == 'C' || *ar.what == 't') {
+					lua_pushlstring(state, " ?", 2);
+				} else {
+					lua_pushfstring(state, " in function <%s:%d>", ar.short_src, ar.linedefined);
+				}
+		}
+
+		lua_concat(state, lua_gettop(state));
+	}
+
+	lua_concat(state, lua_gettop(state));
+	return 1;
+}
+
+/**
  * Address: 0x00911E90 (FUN_00911E90, errorfb)
  *
  * What it does:
@@ -8079,6 +9443,25 @@ namespace
 		{"profiledata", &LuaDebugProfileData},
 		{nullptr, nullptr}
 	};
+}
+
+/**
+ * Address: 0x00923690 (FUN_00923690, luaopen_serialize)
+ *
+ * What it does:
+ * Opens the LuaPlus `serialize` library table. The original binary registers
+ * two functions through `serializelib` at `0x00D47068` (data table contents
+ * not yet recovered); for now this opens an empty table so callers see the
+ * library exists. Runtime `serialize.*` calls will return nil until the
+ * function lane is recovered.
+ */
+extern "C" int luaopen_serialize(lua_State* const state)
+{
+	static const luaL_reg kSerializeLibrary[] = {
+		{nullptr, nullptr}
+	};
+	luaL_openlib(state, "serialize", kSerializeLibrary, 0);
+	return 1;
 }
 
 /**
@@ -8264,6 +9647,35 @@ LuaObject& LuaObject::operator=(const LuaObject& other)
 	return *this;
 }
 
+namespace
+{
+	struct LuaObjectAssignmentLaneOwnerRuntimeView
+	{
+		std::uint8_t lane00_77[0x78]{};
+		LuaObject embeddedLuaObject; // +0x78
+	};
+	static_assert(
+		offsetof(LuaObjectAssignmentLaneOwnerRuntimeView, embeddedLuaObject) == 0x78,
+		"LuaObjectAssignmentLaneOwnerRuntimeView::embeddedLuaObject offset must be 0x78"
+	);
+}
+
+/**
+ * Address: 0x006ED960 (FUN_006ED960)
+ *
+ * What it does:
+ * Resolves one embedded LuaObject lane at owner offset `+0x78`, assigns from
+ * one source object lane, and returns the owner runtime pointer.
+ */
+[[maybe_unused]] LuaObjectAssignmentLaneOwnerRuntimeView* AssignEmbeddedLuaObjectAtOffset78(
+	LuaObjectAssignmentLaneOwnerRuntimeView* const ownerRuntime,
+	const LuaObject& sourceObject
+)
+{
+	ownerRuntime->embeddedLuaObject = sourceObject;
+	return ownerRuntime;
+}
+
 /**
  * Address: 0x00908B00 (FUN_00908B00, LuaPlus::LuaObject::operator=)
  *
@@ -8287,6 +9699,8 @@ LuaObject& LuaObject::operator=(const LuaStackObject& stackObject)
 
 /**
  * Address: 0x009075D0 (FUN_009075D0, LuaPlus::LuaObject::~LuaObject)
+ * Address: 0x005790D0 (FUN_005790D0, LuaObject::j_Dtr_3 thunk)
+ * Address: 0x005791A0 (FUN_005791A0, LuaObject::j_Dtr_4 thunk)
  * Address: 0x005D0A90 (FUN_005D0A90, LuaObject::j_Dtr_6 thunk)
  * Address: 0x00624120 (FUN_00624120, LuaObject::j_Dtr_7 thunk)
  * Address: 0x00BA2E8B (FUN_00BA2E8B, LuaObject::j_Dtr_9 thunk)
@@ -8305,7 +9719,29 @@ LuaObject::~LuaObject()
 }
 
 /**
- * Address: 0x005D0A90 (FUN_005D0A90, LuaObject::j_Dtr_6 thunk)
+  * Alias of FUN_005790D0 (non-canonical helper lane).
+ *
+ * What it does:
+ * Forwards one import-thunk lane to `LuaObject::~LuaObject`.
+ */
+[[maybe_unused]] void LuaObjectDtrThunk3(LuaObject* const object)
+{
+	object->~LuaObject();
+}
+
+/**
+  * Alias of FUN_005791A0 (non-canonical helper lane).
+ *
+ * What it does:
+ * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
+ */
+[[maybe_unused]] void LuaObjectDtrThunk4(LuaObject* const object)
+{
+	object->~LuaObject();
+}
+
+/**
+  * Alias of FUN_005D0A90 (non-canonical helper lane).
  *
  * What it does:
  * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
@@ -8316,7 +9752,7 @@ LuaObject::~LuaObject()
 }
 
 /**
- * Address: 0x00624120 (FUN_00624120, LuaObject::j_Dtr_7 thunk)
+  * Alias of FUN_00624120 (non-canonical helper lane).
  *
  * What it does:
  * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
@@ -8823,6 +10259,111 @@ void Proto::MemberSerialize(
 }
 
 /**
+ * Address: 0x00922B20 (FUN_00922B20, Proto::MemberDeserialize)
+ *
+ * What it does:
+ * Deserializes proto scalar metadata, constants/code/nested-proto lanes, and
+ * debug name/source pointer lanes, then validates bytecode consistency.
+ */
+void Proto::MemberDeserialize(
+	gpg::ReadArchive* const archive,
+	Proto* const object,
+	const int,
+	gpg::RRef* const ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(object != nullptr, "object");
+	Ensure(ownerRef != nullptr, "ownerRef");
+
+	lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
+	Ensure(ownerState != nullptr, "ownerState");
+
+	archive->ReadInt(&object->sizeupvalues);
+	archive->ReadInt(&object->sizek);
+	archive->ReadInt(&object->sizecode);
+	archive->ReadInt(&object->sizelineinfo);
+	archive->ReadInt(&object->sizep);
+	archive->ReadInt(&object->sizelocvars);
+	archive->ReadInt(&object->lineDefined);
+	archive->ReadUByte(&object->nups);
+	archive->ReadUByte(&object->numparams);
+	archive->ReadUByte(&object->is_vararg);
+	archive->ReadUByte(&object->maxstacksize);
+
+	const gpg::RRef& owner = *ownerRef;
+	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
+
+	object->k = static_cast<TObject*>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(TObject) * static_cast<std::size_t>(object->sizek))
+	));
+	for (int index = 0; index < object->sizek; ++index) {
+		archive->Read(tObjectType, &object->k[index], owner);
+	}
+
+	object->code = static_cast<Instruction*>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(Instruction) * static_cast<std::size_t>(object->sizecode))
+	));
+	archive->ReadBytes(
+		reinterpret_cast<char*>(object->code),
+		sizeof(Instruction) * static_cast<std::size_t>(object->sizecode)
+	);
+
+	object->p = static_cast<Proto**>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(Proto*) * static_cast<std::size_t>(object->sizep))
+	));
+	for (int index = 0; index < object->sizep; ++index) {
+		archive->ReadPointer_Proto(&object->p[index], ownerRef);
+	}
+
+	object->lineinfo = static_cast<int*>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(int) * static_cast<std::size_t>(object->sizelineinfo))
+	));
+	for (int index = 0; index < object->sizelineinfo; ++index) {
+		archive->ReadInt(&object->lineinfo[index]);
+	}
+
+	object->locvars = static_cast<LocVar*>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(LocVar) * static_cast<std::size_t>(object->sizelocvars))
+	));
+	for (int index = 0; index < object->sizelocvars; ++index) {
+		archive->ReadPointer_TString(&object->locvars[index].varname, ownerRef);
+		archive->ReadInt(&object->locvars[index].startpc);
+		archive->ReadInt(&object->locvars[index].endpc);
+	}
+
+	object->upvalues = static_cast<TString**>(luaM_realloc(
+		ownerState,
+		nullptr,
+		0u,
+		static_cast<lu_mem>(sizeof(TString*) * static_cast<std::size_t>(object->nups))
+	));
+	for (int index = 0; index < object->nups; ++index) {
+		archive->ReadPointer_TString(&object->upvalues[index], ownerRef);
+	}
+
+	archive->ReadPointer_TString(&object->source, ownerRef);
+	if (!luaG_checkcode(object)) {
+		throw gpg::SerializationError("Consistency check failed: luaG_checkcode(&value)");
+	}
+}
+
+/**
  * Address: 0x00920530 (FUN_00920530, Table::MemberSerialize)
  *
  * What it does:
@@ -9033,6 +10574,137 @@ void LClosure::MemberDeserialize(
 	}
 }
 
+/**
+ * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
+ *
+ * What it does:
+ * Restores one Lua thread stack/callframe/global/upvalue lane set from a
+ * serialized archive payload.
+ */
+void lua_State::MemberDeserialize(
+	gpg::ReadArchive* const archive,
+	lua_State* const state,
+	const int,
+	gpg::RRef* const ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(state != nullptr, "state");
+
+	int stackSize = 0;
+	int topIndex = 0;
+	int baseIndex = 0;
+	archive->ReadInt(&stackSize);
+	archive->ReadInt(&topIndex);
+	archive->ReadInt(&baseIndex);
+
+	if (baseIndex < 0 || baseIndex > topIndex || topIndex > stackSize) {
+		throw gpg::SerializationError("Consistency check failed: 0 <= ibase && ibase <= itop && itop <= stacksize");
+	}
+
+	luaD_reallocstack(state, stackSize);
+
+	const gpg::RRef nullOwner{};
+	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
+	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
+	for (int stackIndex = 0; stackIndex < topIndex; ++stackIndex) {
+		archive->Read(tObjectType, &state->stack[stackIndex], owner);
+	}
+
+	TObject* const stackBase = state->stack;
+	state->base = &stackBase[baseIndex];
+	state->top = &stackBase[topIndex];
+
+	std::uint16_t callInfoCapacity = 0u;
+	archive->ReadUShort(&callInfoCapacity);
+	luaD_reallocCI(state, static_cast<int>(callInfoCapacity));
+
+	std::uint16_t currentCallInfoIndex = 0u;
+	archive->ReadUShort(&currentCallInfoIndex);
+	if (currentCallInfoIndex >= callInfoCapacity) {
+		throw gpg::SerializationError("Consistency check failed: ici < size_ci");
+	}
+
+	state->ci = &state->base_ci[currentCallInfoIndex];
+
+	for (std::uint16_t callInfoIndex = 0; callInfoIndex <= currentCallInfoIndex; ++callInfoIndex) {
+		CallInfo* const callInfo = state->base_ci + callInfoIndex;
+
+		int ciBaseByteOffset = 0;
+		int ciTopByteOffset = 0;
+		archive->ReadInt(&ciBaseByteOffset);
+		archive->ReadInt(&ciTopByteOffset);
+
+		if (ciBaseByteOffset < 0) {
+			throw gpg::SerializationError("Consistency check failed: 0 <= cibase");
+		}
+		if (ciBaseByteOffset > ciTopByteOffset) {
+			throw gpg::SerializationError("Consistency check failed: cibase <= citop");
+		}
+		if (ciTopByteOffset > static_cast<int>(sizeof(TObject) * static_cast<std::size_t>(state->stacksize))) {
+			throw gpg::SerializationError("Consistency check failed: citop <= (int)(value.stacksize*sizeof(TObject))");
+		}
+
+		auto* const stackBytes = reinterpret_cast<std::uint8_t*>(state->stack);
+		callInfo->base = reinterpret_cast<TObject*>(stackBytes + ciBaseByteOffset);
+		callInfo->top = reinterpret_cast<TObject*>(stackBytes + ciTopByteOffset);
+
+		archive->ReadInt(&callInfo->state);
+		archive->ReadInt(&callInfo->tailcalls);
+
+		if (callInfo->state < 3) {
+			int savedProgramCounterIndex = 0;
+			archive->ReadInt(&savedProgramCounterIndex);
+
+			const TObject* const functionSlot = callInfo->base - 1;
+			const auto* const closure = static_cast<const Closure*>(functionSlot->value.p);
+			const Instruction* const codeBase = closure->l.p->code;
+			callInfo->savedpc = codeBase + savedProgramCounterIndex;
+		} else {
+			callInfo->savedpc = nullptr;
+		}
+	}
+
+	archive->Read(tObjectType, &state->_gt, owner);
+
+	int upvalueLastStackIndex = topIndex;
+	GCObject** openUpvalueInsert = &state->openupval;
+
+	int upvalueStackIndex = -1;
+	archive->ReadInt(&upvalueStackIndex);
+	while (upvalueStackIndex != -1) {
+		if (upvalueStackIndex < 0 || upvalueStackIndex >= upvalueLastStackIndex) {
+			throw gpg::SerializationError("Consistency check failed: 0 <= stackindex && stackindex < upval_last_stackindex");
+		}
+
+		UpVal* upvalue = nullptr;
+		archive->ReadPointer_UpVal(&upvalue, &owner);
+		if (upvalue == nullptr) {
+			throw gpg::SerializationError("Consistency check failed: u");
+		}
+		if (upvalue->v != &upvalue->value) {
+			throw gpg::SerializationError("Consistency check failed: u->v == &u->value");
+		}
+
+		auto* const upvalueObject = reinterpret_cast<GCObject*>(upvalue);
+		GCObject** link = &state->openupval;
+		while (*link != nullptr && *link != upvalueObject) {
+			link = &(*link)->gch.next;
+		}
+		if (*link == upvalueObject) {
+			*link = upvalueObject->gch.next;
+			upvalueObject->gch.next = nullptr;
+		}
+
+		upvalue->v = &state->stack[upvalueStackIndex];
+		*openUpvalueInsert = upvalueObject;
+		openUpvalueInsert = &upvalueObject->gch.next;
+
+		upvalueLastStackIndex = upvalueStackIndex;
+		archive->ReadInt(&upvalueStackIndex);
+	}
+}
+
 void lua_State::MemberSerialize(
 	gpg::WriteArchive* const archive,
 	lua_State* const state,
@@ -9066,8 +10738,15 @@ void lua_State::MemberSerialize(
 	for (std::uint16_t callInfoIndex = 0; callInfoIndex <= currentCallInfoIndex; ++callInfoIndex) {
 		CallInfo* const callInfo = state->base_ci + callInfoIndex;
 
-		archive->WriteInt(static_cast<int>(callInfo->base - stackBase));
-		archive->WriteInt(static_cast<int>(callInfo->top - stackBase));
+		const int callInfoBaseByteOffset = static_cast<int>(
+			reinterpret_cast<const std::uint8_t*>(callInfo->base) - reinterpret_cast<const std::uint8_t*>(stackBase)
+		);
+		const int callInfoTopByteOffset = static_cast<int>(
+			reinterpret_cast<const std::uint8_t*>(callInfo->top) - reinterpret_cast<const std::uint8_t*>(stackBase)
+		);
+
+		archive->WriteInt(callInfoBaseByteOffset);
+		archive->WriteInt(callInfoTopByteOffset);
 		archive->WriteInt(callInfo->state);
 		archive->WriteInt(callInfo->tailcalls);
 
@@ -9184,6 +10863,66 @@ const LuaObject* LuaState::GetThreadObject() const
 }
 
 /**
+ * Address: 0x004CCA70 (FUN_004CCA70)
+ *
+ * What it does:
+ * Bridges one `lua_State*` slot in `ECX` into `lua_call(L, nargs, nresults)`,
+ * preserving the original thiscall adapter stack shape.
+ */
+[[maybe_unused]] __declspec(naked) void __stdcall LuaStateSlotCallBridge(
+	const int /*nargs*/,
+	const int /*nresults*/
+)
+{
+	__asm
+	{
+		mov     eax, [esp+8]
+		mov     edx, [esp+4]
+		push    eax
+		mov     eax, [ecx]
+		push    edx
+		push    eax
+		call    lua_call
+		add     esp, 0Ch
+		retn    8
+	}
+}
+
+/**
+ * Address: 0x004CCA90 (FUN_004CCA90)
+ *
+ * What it does:
+ * Bridges register/stack lanes into `luaL_loadbuffer(*slot, buff, size, name)`
+ * using the original stdcall adapter sequence.
+ */
+[[maybe_unused]] __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stateSlot*/)
+{
+	__asm
+	{
+		push    eax
+		mov     eax, [esp+8]
+		push    ecx
+		mov     ecx, [eax]
+		push    edx
+		push    ecx
+		call    luaL_loadbuffer
+		add     esp, 10h
+		retn    4
+	}
+}
+
+/**
+ * Address: 0x004CCAB0 (FUN_004CCAB0)
+ *
+ * What it does:
+ * Pops one value from a Lua stack slot by rebasing top to `-2`.
+ */
+[[maybe_unused]] static void LuaStateSlotPopOne(lua_State** const stateSlot)
+{
+	lua_settop(*stateSlot, -2);
+}
+
+/**
  * Address: 0x004CCA10 (FUN_004CCA10, LuaPlus::LuaState::PushNil)
  *
  * What it does:
@@ -9235,6 +10974,51 @@ const char* LuaState::CheckString(const int32_t index, size_t* const lengthOut)
 void LuaState::CheckAny(const int32_t index)
 {
 	luaL_checkany(m_state, index);
+}
+
+/**
+ * Address: 0x0090BF90 (FUN_0090BF90)
+ *
+ * What it does:
+ * Raises one Lua argument error for argument lane `narg`.
+ */
+int LuaState::ArgError(const int narg, char* const extraMessage)
+{
+	return luaL_argerror(m_state, narg, extraMessage);
+}
+
+/**
+ * Address: 0x0090BFD0 (FUN_0090BFD0)
+ *
+ * What it does:
+ * Returns optional string argument `narg` or `defaultValue`, and writes string
+ * byte length when `lengthOut` is non-null.
+ */
+const char* LuaState::OptString(const int narg, char* const defaultValue, size_t* const lengthOut)
+{
+	return luaL_optlstring(m_state, narg, defaultValue, lengthOut);
+}
+
+/**
+ * Address: 0x0090BFF0 (FUN_0090BFF0)
+ *
+ * What it does:
+ * Validates numeric argument `index` and returns its number lane.
+ */
+lua_Number LuaState::CheckNumber(const int index)
+{
+	return luaL_checknumber(m_state, index);
+}
+
+/**
+ * Address: 0x0090C010 (FUN_0090C010)
+ *
+ * What it does:
+ * Returns optional numeric argument `index` or `defaultValue`.
+ */
+lua_Number LuaState::OptNumber(const int index, const lua_Number defaultValue)
+{
+	return luaL_optnumber(m_state, index, defaultValue);
 }
 
 int32_t LuaState::GetTop() const
@@ -9397,6 +11181,139 @@ LuaStackObject LuaStackObject::GetByName(const char* const name) const
 	lua_pushstring(cState, name);
 	lua_rawget(cState, m_stackIndex);
 	return LuaStackObject(m_state, lua_gettop(cState));
+}
+
+/**
+ * Address: 0x005280F0 (FUN_005280F0)
+ *
+ * What it does:
+ * Reads one Lua stack-object lane pair `(state, stackIndex)` and returns the
+ * legacy `lua_getn` length for that stack slot.
+ */
+[[maybe_unused]] int32_t GetLuaStackObjectLengthLegacy(const LuaStackObject* const stackObject)
+{
+	return lua_getn(stackObject->m_state->GetCState(), stackObject->m_stackIndex);
+}
+
+namespace
+{
+	class VirtualLaneDispatchTarget
+	{
+	public:
+		virtual std::uint32_t DispatchLane0() = 0;
+		virtual std::uint32_t DispatchLane1() = 0;
+		virtual std::uint32_t DispatchLane2() = 0;
+		virtual std::uint32_t DispatchLane3() = 0;
+		virtual std::uint32_t DispatchLane4() = 0;
+		virtual std::uint32_t DispatchMainLane() = 0;
+	};
+
+	struct VirtualLaneDispatchSlotView
+	{
+		VirtualLaneDispatchTarget* mTarget;
+	};
+
+	struct AuxiliaryWordRuntimeView
+	{
+		std::uint8_t mOpaquePrefix[0x5C];
+		std::uint32_t mAuxiliaryWord;
+	};
+
+	struct InlineOrHeapStringView
+	{
+		std::uint8_t mOpaquePrefix[0x0C];
+
+		union Storage
+		{
+			const char* mHeapData;
+			char mInlineData[16];
+		} mStorage;
+
+		std::uint32_t mCapacityOrFlags;
+		std::uint32_t mLength;
+	};
+
+	struct PointerWordSourceView
+	{
+		std::uint32_t mOpaquePrefix;
+		std::uint32_t* mWordPointer;
+	};
+
+	static_assert(offsetof(VirtualLaneDispatchSlotView, mTarget) == 0x00, "VirtualLaneDispatchSlotView::mTarget offset must be 0x00");
+	static_assert(sizeof(VirtualLaneDispatchSlotView) == 0x04, "VirtualLaneDispatchSlotView size must be 0x04");
+	static_assert(offsetof(AuxiliaryWordRuntimeView, mAuxiliaryWord) == 0x5C, "AuxiliaryWordRuntimeView::mAuxiliaryWord offset must be 0x5C");
+	static_assert(offsetof(InlineOrHeapStringView, mStorage) == 0x0C, "InlineOrHeapStringView::mStorage offset must be 0x0C");
+	static_assert(offsetof(InlineOrHeapStringView, mLength) == 0x20, "InlineOrHeapStringView::mLength offset must be 0x20");
+	static_assert(offsetof(PointerWordSourceView, mWordPointer) == 0x04, "PointerWordSourceView::mWordPointer offset must be 0x04");
+}
+
+/**
+ * Address: 0x005280B0 (FUN_005280B0)
+ *
+ * What it does:
+ * Loads one object pointer from the dispatch slot and tail-calls its sixth
+ * virtual lane.
+ */
+[[maybe_unused]] std::uint32_t InvokeMainVirtualLaneFromSlot(VirtualLaneDispatchSlotView* const slot)
+{
+	return slot->mTarget->DispatchMainLane();
+}
+
+/**
+ * Address: 0x005281C0 (FUN_005281C0)
+ *
+ * What it does:
+ * Returns one cached auxiliary 32-bit lane from the runtime view.
+ */
+[[maybe_unused]] std::uint32_t ReadAuxiliaryRuntimeWord(const AuxiliaryWordRuntimeView* const view)
+{
+	return view->mAuxiliaryWord;
+}
+
+/**
+ * Address: 0x005281D0 (FUN_005281D0)
+ *
+ * What it does:
+ * Returns inline string storage for short payloads and heap storage for long
+ * payloads.
+ */
+[[maybe_unused]] const char* ResolveInlineOrHeapStringData(const InlineOrHeapStringView* const view)
+{
+	if (view->mLength < 0x10u) {
+		return view->mStorage.mInlineData;
+	}
+	return view->mStorage.mHeapData;
+}
+
+/**
+ * Address: 0x005281E0 (FUN_005281E0)
+ *
+ * What it does:
+ * Stores one dereferenced 32-bit lane from the source pointer slot into
+ * `outValue`.
+ */
+[[maybe_unused]] std::uint32_t* StoreIndirectWordFromPointerSlot(
+	std::uint32_t* const outValue,
+	const PointerWordSourceView* const source
+)
+{
+	*outValue = *source->mWordPointer;
+	return outValue;
+}
+
+/**
+ * Address: 0x005281F0 (FUN_005281F0)
+ *
+ * What it does:
+ * Stores one pointer-slot address lane into `outValue`.
+ */
+[[maybe_unused]] std::uint32_t* StorePointerSlotAddressWord(
+	std::uint32_t* const outValue,
+	const PointerWordSourceView* const source
+)
+{
+	*outValue = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(source->mWordPointer));
+	return outValue;
 }
 
 /**
@@ -9636,6 +11553,33 @@ LuaObject::operator bool() const noexcept
 }
 
 /**
+ * Address: 0x0090BF00 (FUN_0090BF00)
+ *
+ * What it does:
+ * Performs Lua semantic equality on this value and `other` after matching
+ * type tags.
+ */
+bool LuaObject::operator==(const LuaObject& other) const
+{
+	if (m_object.tt != other.m_object.tt) {
+		return false;
+	}
+
+	return luaV_equalval(m_state->m_state, &m_object, &other.m_object) != 0;
+}
+
+/**
+ * Address: 0x0090BF40 (FUN_0090BF40)
+ *
+ * What it does:
+ * Performs Lua semantic less-than comparison between this value and `other`.
+ */
+bool LuaObject::operator<(const LuaObject& other) const
+{
+	return luaV_lessthan(m_state->m_state, &m_object, &other.m_object) != 0;
+}
+
+/**
  * Address: 0x009072F0 (FUN_009072F0, LuaPlus::LuaObject::IsNil)
  *
  * What it does:
@@ -9644,6 +11588,19 @@ LuaObject::operator bool() const noexcept
 bool LuaObject::IsNil() const noexcept
 {
 	return m_state != nullptr && m_object.tt == LUA_TNIL;
+}
+
+/**
+ * Address: 0x00907850 (FUN_00907850, LuaPlus::LuaObject::IsNone)
+ *
+ * What it does:
+ * Asserts state binding and returns whether this object carries Lua's
+ * `LUA_TNONE` sentinel tag.
+ */
+bool LuaObject::IsNone() const
+{
+	Ensure(m_state != nullptr, "m_state");
+	return m_object.tt == LUA_TNONE;
 }
 
 /**
@@ -9670,6 +11627,17 @@ bool LuaObject::IsNumber() const noexcept
 }
 
 /**
+ * Address: 0x0077F680 (FUN_0077F680, LuaObject::j_IsNumber2 thunk)
+ *
+ * What it does:
+ * Forwards one import-thunk lane to `LuaObject::IsNumber`.
+ */
+[[maybe_unused]] bool LuaObjectIsNumberThunk2(const LuaObject* const object)
+{
+	return object->IsNumber();
+}
+
+/**
  * Address: 0x00907370 (FUN_00907370, LuaPlus::LuaObject::IsString)
  *
  * What it does:
@@ -9678,6 +11646,19 @@ bool LuaObject::IsNumber() const noexcept
 bool LuaObject::IsString() const noexcept
 {
 	return m_object.tt == LUA_TSTRING;
+}
+
+/**
+ * Address: 0x00907890 (FUN_00907890, LuaPlus::LuaObject::IsLightUserData)
+ *
+ * What it does:
+ * Asserts state binding and returns whether this value carries a light-
+ * userdata tag.
+ */
+bool LuaObject::IsLightUserData() const
+{
+	Ensure(m_state != nullptr, "m_state");
+	return m_object.tt == LUA_TLIGHTUSERDATA;
 }
 
 /**
@@ -9705,6 +11686,44 @@ bool LuaObject::IsFunction() const
 	}
 
 	return (m_object.tt | 1) == LUA_TFUNCTION;
+}
+
+/**
+ * Address: 0x00907700 (FUN_00907700, LuaPlus::LuaObject::IsConvertibleToInteger)
+ *
+ * What it does:
+ * Returns true when this value is already numeric or can be converted to one
+ * via `luaV_tonumber`.
+ */
+bool LuaObject::IsConvertibleToInteger() const
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	TObject numericValue{};
+	if (m_object.tt == LUA_TNUMBER) {
+		return true;
+	}
+
+	return luaV_tonumber(&m_object, &numericValue) != 0;
+}
+
+/**
+ * Address: 0x00907760 (FUN_00907760, LuaPlus::LuaObject::IsConvertibleToNumber)
+ *
+ * What it does:
+ * Returns true when this value is already numeric or can be converted to one
+ * via `luaV_tonumber`.
+ */
+bool LuaObject::IsConvertibleToNumber() const
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	TObject numericValue{};
+	if (m_object.tt == LUA_TNUMBER) {
+		return true;
+	}
+
+	return luaV_tonumber(&m_object, &numericValue) != 0;
 }
 
 /**
@@ -9786,20 +11805,43 @@ void LuaObject::SetTableHelper(const char* key, TObject* object)
 	lua_settop(lstate, oldTop);
 }
 
-void LuaObject::SetTableHelper(const int32_t index, TObject* object)
+/**
+ * Address: 0x00907510 (FUN_00907510)
+ *
+ * What it does:
+ * Builds one numeric-key TValue and writes `valueSlot` into this object's
+ * table lane using `luaV_settable`.
+ */
+void LuaObject::SetTableHelperRaw(const int32_t index, const StkId valueSlot)
 {
 	Ensure(m_state != nullptr, "m_state");
-	Ensure(object != nullptr, "obj");
+	Ensure(valueSlot != nullptr, "valueSlot");
 
-	lua_State* lstate = GetActiveCState();
+	lua_State* const lstate = GetActiveCState();
 	Ensure(lstate != nullptr, "active lua state");
 
-	const int oldTop = lua_gettop(lstate);
-	PushStack(lstate);
-	lua_pushnumber(lstate, static_cast<lua_Number>(index));
-	PushTObject(lstate, *object);
-	lua_settable(lstate, -3);
-	lua_settop(lstate, oldTop);
+	TObject key{};
+	key.tt = LUA_TNUMBER;
+	key.value.n = static_cast<float>(index);
+	luaV_settable(lstate, &m_object, &key, valueSlot);
+}
+
+/**
+ * Address: 0x00907550 (FUN_00907550)
+ *
+ * What it does:
+ * Writes one table entry by Lua-object key through `luaV_settable` using one
+ * caller-provided value slot.
+ */
+void LuaObject::SetTableHelperRaw(const LuaObject& key, const StkId valueSlot)
+{
+	lua_State* const lstate = GetActiveCState();
+	luaV_settable(lstate, &m_object, const_cast<TObject*>(&key.m_object), valueSlot);
+}
+
+void LuaObject::SetTableHelper(const int32_t index, TObject* object)
+{
+	SetTableHelperRaw(index, object);
 }
 
 /**
@@ -9839,14 +11881,7 @@ StkId LuaObject::PushStack(lua_State* state) const
 		throw LuaAssertion("state->l_G == m_state->m_state->l_G");
 	}
 
-	StkId const slot = state->top;
-	*slot = m_object;
-
-	if (slot >= state->ci->top) {
-		lua_checkstack(state, 1);
-	}
-	state->top = slot + 1;
-	return slot;
+	return PushRawLuaObjectToStack(&m_object, state);
 }
 
 StkId LuaObject::PushStack(LuaState* state) const
@@ -9870,6 +11905,24 @@ void LuaObject::AssignNewTable(LuaState* state, const int32_t nArray, const uint
 	Ensure(table != nullptr, "luaH_new returned null");
 	m_object.tt = table->tt;
 	m_object.value.p = table;
+}
+
+/**
+ * Address: 0x00909900 (FUN_00909900, LuaPlus::LuaObject::AssignObject)
+ *
+ * What it does:
+ * Copies one source LuaObject tagged payload into this object after enforcing
+ * shared-state ownership.
+ */
+void LuaObject::AssignObject(
+	LuaState* const state,
+	const LuaObject& value
+)
+{
+	(void)state;
+	Ensure(m_state == value.m_state, "m_state == value.m_state");
+	m_object.tt = value.m_object.tt;
+	m_object.value = value.m_object.value;
 }
 
 /**
@@ -10066,6 +12119,88 @@ void LuaObject::SetString(const char* key, const char* value)
 }
 
 /**
+ * Address: 0x00908590 (FUN_00908590, LuaPlus::LuaObject::SetString)
+ *
+ * What it does:
+ * Writes one table entry by LuaObject key using a string-or-nil payload after
+ * enforcing shared-state ownership with `key`.
+ */
+void LuaObject::SetString(const LuaObject& key, const char* value)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	lua_State* const lstate = GetActiveCState();
+
+	TObject valueObject{};
+	if (value != nullptr) {
+		TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
+		valueObject.tt = interned->tt;
+		valueObject.value.p = interned;
+	} else {
+		valueObject.tt = LUA_TNIL;
+	}
+
+	SetTableHelperRaw(key, &valueObject);
+}
+
+/**
+ * Address: 0x00908630 (FUN_00908630, LuaPlus::LuaObject::SetLightUserData)
+ *
+ * What it does:
+ * Writes one light-userdata payload into this table by string key.
+ */
+void LuaObject::SetLightUserData(const char* const key, void* const value)
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	TObject object{};
+	object.tt = LUA_TLIGHTUSERDATA;
+	object.value.p = value;
+	SetTableHelper(key, &object);
+}
+
+/**
+ * Address: 0x00908680 (FUN_00908680, LuaPlus::LuaObject::SetLightUserData)
+ *
+ * What it does:
+ * Writes one light-userdata payload into this table by integer key.
+ */
+void LuaObject::SetLightUserData(const int32_t index, void* const value)
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	lua_State* const lstate = GetActiveCState();
+
+	TObject val{};
+	val.value.p = value;
+	val.tt = LUA_TLIGHTUSERDATA;
+
+	TObject key{};
+	key.value.n = static_cast<float>(index);
+	key.tt = LUA_TNUMBER;
+
+	luaV_settable(lstate, &m_object, &key, &val);
+}
+
+/**
+ * Address: 0x009086F0 (FUN_009086F0, LuaPlus::LuaObject::SetLightUserData)
+ *
+ * What it does:
+ * Writes one light-userdata payload into this table by LuaObject key after
+ * validating shared-state ownership with `key`.
+ */
+void LuaObject::SetLightUserData(const LuaObject& key, void* const value)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	TObject val{};
+	val.value.p = value;
+	val.tt = LUA_TLIGHTUSERDATA;
+
+	SetTableHelperRaw(key, &val);
+}
+
+/**
  * Address: 0x00907FF0 (FUN_00907FF0, LuaPlus::LuaObject::SetNil)
  *
  * What it does:
@@ -10103,6 +12238,24 @@ void LuaObject::SetNil(const int32_t index)
 	nilObject.value.p = nullptr;
 
 	luaV_settable(lstate, &m_object, &keyObject, &nilObject);
+}
+
+/**
+ * Address: 0x00908060 (FUN_00908060, LuaPlus::LuaObject::SetNil)
+ *
+ * What it does:
+ * Writes one nil payload to this table by LuaObject key after validating
+ * shared-state ownership with `key`.
+ */
+void LuaObject::SetNil(const LuaObject& key)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	TObject nilObject{};
+	nilObject.tt = LUA_TNIL;
+	nilObject.value.p = nullptr;
+
+	SetTableHelperRaw(key, &nilObject);
 }
 
 /**
@@ -10146,6 +12299,24 @@ void LuaObject::SetNumber(const int32_t index, const float value)
 }
 
 /**
+ * Address: 0x009083E0 (FUN_009083E0, LuaPlus::LuaObject::SetNumber)
+ *
+ * What it does:
+ * Writes one table entry by LuaObject key using a numeric payload after
+ * validating shared-state ownership with `key`.
+ */
+void LuaObject::SetNumber(const LuaObject& key, const float value)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	TObject val{};
+	val.tt = LUA_TNUMBER;
+	val.value.n = value;
+
+	SetTableHelperRaw(key, &val);
+}
+
+/**
  * Address: 0x00908240 (FUN_00908240, ?SetInteger@LuaObject@LuaPlus@@QBEXHH@Z)
  *
  * What it does:
@@ -10186,6 +12357,24 @@ void LuaObject::SetInteger(const char* key, const int32_t value)
 }
 
 /**
+ * Address: 0x009082B0 (FUN_009082B0, LuaPlus::LuaObject::SetInteger)
+ *
+ * What it does:
+ * Writes one table entry by LuaObject key using an integer payload lane after
+ * validating shared-state ownership with `key`.
+ */
+void LuaObject::SetInteger(const LuaObject& key, const int32_t value)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	TObject val{};
+	val.tt = LUA_TNUMBER;
+	val.value.n = static_cast<float>(value);
+
+	SetTableHelperRaw(key, &val);
+}
+
+/**
  * Address: 0x009080C0 (FUN_009080C0, LuaPlus::LuaObject::SetBoolean)
  *
  * What it does:
@@ -10199,6 +12388,47 @@ void LuaObject::SetBoolean(const char* key, const bool value)
 	object.tt = LUA_TBOOLEAN;
 	object.value.b = value ? 1 : 0;
 	SetTableHelper(key, &object);
+}
+
+/**
+ * Address: 0x00908110 (FUN_00908110, LuaPlus::LuaObject::SetBoolean)
+ *
+ * What it does:
+ * Writes one boolean payload into this table by integer key.
+ */
+void LuaObject::SetBoolean(const int32_t index, const bool value)
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	lua_State* const lstate = GetActiveCState();
+
+	TObject val{};
+	val.value.b = value ? 1 : 0;
+	val.tt = LUA_TBOOLEAN;
+
+	TObject key{};
+	key.value.n = static_cast<float>(index);
+	key.tt = LUA_TNUMBER;
+
+	luaV_settable(lstate, &m_object, &key, &val);
+}
+
+/**
+ * Address: 0x00908180 (FUN_00908180, LuaPlus::LuaObject::SetBoolean)
+ *
+ * What it does:
+ * Writes one boolean payload into this table by LuaObject key after
+ * validating shared-state ownership with `key`.
+ */
+void LuaObject::SetBoolean(const LuaObject& key, const bool value)
+{
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	TObject val{};
+	val.value.b = value ? 1 : 0;
+	val.tt = LUA_TBOOLEAN;
+
+	SetTableHelperRaw(key, &val);
 }
 
 /**
@@ -10240,12 +12470,7 @@ void LuaObject::SetObject(const LuaObject& key, const LuaObject& value)
 	lua_State* const lstate = GetActiveCState();
 	Ensure(lstate != nullptr, "active lua state");
 
-	luaV_settable(
-		lstate,
-		&m_object,
-		const_cast<TObject*>(&key.m_object),
-		const_cast<TObject*>(&value.m_object)
-	);
+	SetTableHelperRaw(key, const_cast<TObject*>(&value.m_object));
 }
 
 /**
@@ -10272,6 +12497,124 @@ void LuaObject::SetObject(const int32_t index, LuaObject* value)
 	SetTableHelper(index, &nilValue);
 }
 
+namespace
+{
+	struct LuaDefaultMetatypeSlotRuntime
+	{
+		int tt;
+		LuaPlus::Value value;
+	};
+	static_assert(sizeof(LuaDefaultMetatypeSlotRuntime) == sizeof(LuaPlus::TObject), "LuaDefaultMetatypeSlotRuntime size mismatch");
+
+	/**
+	 * Address: 0x00915E20 (FUN_00915E20)
+	 *
+	 * What it does:
+	 * Unlinks one `UpVal` node from `lua_State::openupval` forward chain and
+	 * clears the removed node's `next` link lane.
+	 */
+	[[maybe_unused]] GCObject** UnlinkOpenUpvalueFromState(
+		lua_State* const state,
+		GCObject* const upvalue
+	)
+	{
+		if (state == nullptr || upvalue == nullptr) {
+			return nullptr;
+		}
+
+		GCObject** link = &state->openupval;
+		while (*link != nullptr && *link != upvalue) {
+			link = &(*link)->gch.next;
+		}
+
+		if (*link == upvalue) {
+			*link = upvalue->gch.next;
+			upvalue->gch.next = nullptr;
+		}
+
+		return link;
+	}
+
+	struct OwnerWordLaneAt68Runtime
+	{
+		std::byte pad00[68];
+		std::uint32_t lane44;
+	};
+	static_assert(offsetof(OwnerWordLaneAt68Runtime, lane44) == 68, "OwnerWordLaneAt68Runtime::lane44 offset must be 68");
+
+	struct OwnerWordWritePairRuntime
+	{
+		OwnerWordLaneAt68Runtime* owner;
+		std::uint32_t value;
+	};
+	static_assert(sizeof(OwnerWordWritePairRuntime) == 0x08, "OwnerWordWritePairRuntime size must be 0x08");
+
+	/**
+	 * Address: 0x00929BE0 (FUN_00929BE0)
+	 *
+	 * What it does:
+	 * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
+	 * returns the owner pointer lane.
+	 */
+	[[maybe_unused]] OwnerWordLaneAt68Runtime* StoreOwnerWordLaneAt68(
+		OwnerWordWritePairRuntime* const writePair
+	)
+	{
+		if (writePair == nullptr || writePair->owner == nullptr) {
+			return nullptr;
+		}
+
+		writePair->owner->lane44 = writePair->value;
+		return writePair->owner;
+	}
+
+	/**
+	 * Address: 0x009284D0 (FUN_009284D0)
+	 *
+	 * What it does:
+	 * Assigns one metatable object to a tagged Lua value:
+	 * table/userdata instances store direct metatable pointers while all other
+	 * tag lanes update `global_State::_defaultmetatypes[tt]`.
+	 */
+	[[maybe_unused]] LuaDefaultMetatypeSlotRuntime* AssignMetatableByTaggedValueType(
+		lua_State* const state,
+		LuaPlus::TObject* const object,
+		GCObject* const metatableObject
+	)
+	{
+		if (state == nullptr || state->l_G == nullptr || object == nullptr) {
+			return nullptr;
+		}
+
+		if (object->tt == LUA_TTABLE) {
+			if (object->value.p != nullptr) {
+				auto* const table = static_cast<Table*>(object->value.p);
+				table->metatable = reinterpret_cast<Table*>(metatableObject);
+				return reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(table->metatable);
+			}
+			return nullptr;
+		}
+
+		if (object->tt == LUA_TUSERDATA) {
+			if (object->value.p != nullptr) {
+				auto* const userData = static_cast<Udata*>(object->value.p);
+				userData->metatable = reinterpret_cast<Table*>(metatableObject);
+				return reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(userData->metatable);
+			}
+			return nullptr;
+		}
+
+		if (object->tt < 0 || object->tt >= 11) {
+			return nullptr;
+		}
+
+		auto* const slot = reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(&state->l_G->_defaultmetatypes[object->tt]);
+		slot->tt = metatableObject != nullptr ? static_cast<int>(metatableObject->gch.tt) : LUA_TNIL;
+		slot->value.p = metatableObject;
+		return slot;
+	}
+}
+
 /**
  * Address: 0x00907E00 (FUN_00907E00, LuaPlus::LuaObject::SetMetaTable)
  *
@@ -10283,14 +12626,14 @@ void LuaObject::SetMetaTable(const LuaObject& valueObj)
 {
 	Ensure(m_state && m_state == valueObj.m_state, "m_state && m_state == valueObj.m_state");
 
-	lua_State* lstate = m_state->GetCState();
+	lua_State* const lstate = m_state->GetCState();
 	Ensure(lstate != nullptr, "m_state->GetCState() != nullptr");
 
-	const int oldTop = lua_gettop(lstate);
-	PushStack(lstate);
-	const_cast<LuaObject&>(valueObj).PushStack(lstate);
-	lua_setmetatable(lstate, -2);
-	lua_settop(lstate, oldTop);
+	(void)AssignMetatableByTaggedValueType(
+		lstate,
+		&m_object,
+		static_cast<GCObject*>(valueObj.m_object.value.p)
+	);
 }
 
 /**
@@ -10360,6 +12703,34 @@ LuaObject LuaObject::CreateTable(const int32_t index, const int32_t narray, cons
 }
 
 /**
+ * Address: 0x00908D50 (FUN_00908D50, LuaPlus::LuaObject::CreateTable)
+ *
+ * What it does:
+ * Creates one new Lua table and stores it in this table under LuaObject key
+ * `key`.
+ */
+LuaObject LuaObject::CreateTable(
+	const LuaObject& key,
+	const int32_t narray,
+	const int32_t lnhash
+)
+{
+	Ensure(m_state != nullptr, "m_state");
+	Ensure(m_state == key.m_state, "m_state == key.m_state");
+
+	lua_State* const lstate = GetActiveCState();
+	Ensure(lstate != nullptr, "active lua state");
+
+	LuaObject out(m_state);
+	Table* const table = luaH_new(lstate, narray, lnhash);
+	out.m_object.tt = table->tt;
+	out.m_object.value.p = table;
+
+	SetTableHelperRaw(key, &out.m_object);
+	return out;
+}
+
+/**
  * Address: 0x00909CE0 (FUN_00909CE0, LuaPlus::LuaObject::Insert)
  *
  * What it does:
@@ -10385,6 +12756,57 @@ void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
 		lua_pushnumber(lstate, static_cast<lua_Number>(key));
 		const_cast<LuaObject&>(obj).PushStack(activeState);
 		lua_call(lstate, 3, LUA_MULTRET);
+	}
+
+	lua_settop(lstate, oldTop);
+}
+
+/**
+ * Address: 0x00909EB0 (FUN_00909EB0, LuaPlus::LuaObject::Remove)
+ *
+ * What it does:
+ * Calls `table.remove(this, index)` in the active Lua state and restores the
+ * original stack top after the call.
+ */
+void LuaObject::Remove(const int32_t index) const
+{
+	LuaState* const activeState = m_state->GetActiveState();
+	lua_State* const lstate = activeState->m_state;
+	const int oldTop = lua_gettop(lstate);
+
+	{
+		LuaObject tableObject = activeState->GetGlobal("table");
+		LuaObject removeFunction = tableObject["remove"];
+		removeFunction.PushStack(activeState);
+
+		const_cast<LuaObject*>(this)->PushStack(activeState);
+		lua_pushnumber(lstate, static_cast<lua_Number>(index));
+		lua_call(lstate, 2, LUA_MULTRET);
+	}
+
+	lua_settop(lstate, oldTop);
+}
+
+/**
+ * Address: 0x0090A020 (FUN_0090A020, LuaPlus::LuaObject::Sort)
+ *
+ * What it does:
+ * Calls `table.sort(this)` in the active Lua state and restores the original
+ * stack top after the call.
+ */
+void LuaObject::Sort() const
+{
+	LuaState* const activeState = m_state->GetActiveState();
+	lua_State* const lstate = activeState->m_state;
+	const int oldTop = lua_gettop(lstate);
+
+	{
+		LuaObject tableObject = activeState->GetGlobal("table");
+		LuaObject sortFunction = tableObject["sort"];
+		sortFunction.PushStack(activeState);
+
+		const_cast<LuaObject*>(this)->PushStack(activeState);
+		lua_call(lstate, 1, LUA_MULTRET);
 	}
 
 	lua_settop(lstate, oldTop);
@@ -10431,6 +12853,23 @@ LuaObject LuaObject::GetByObject(const LuaObject& key) const
 	LuaObject out;
 	out.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return out;
+}
+
+/**
+ * Address: 0x00908EE0 (FUN_00908EE0, LuaPlus::LuaObject::GetByObject)
+ *
+ * What it does:
+ * Looks up this table using one `LuaStackObject` key lane and returns the
+ * resolved raw slot value as a bound LuaObject.
+ */
+LuaObject LuaObject::GetByObject(const LuaStackObject& obj) const
+{
+	Ensure(m_state == obj.m_state->m_rootState, "m_state == obj.m_state->m_rootState");
+
+	lua_State* const lstate = GetActiveCState();
+	TObject* const keyObject = luaA_index(lstate, obj.m_stackIndex);
+	const TObject* const rawValue = luaV_gettable(lstate, &m_object, keyObject, nullptr);
+	return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
 LuaObject LuaObject::GetByName(const char* name) const
@@ -10490,6 +12929,30 @@ LuaObject LuaObject::operator[](const char* const name) const
 }
 
 /**
+ * Address: 0x00909280 (FUN_00909280, LuaPlus::LuaObject::operator[])
+ *
+ * What it does:
+ * Validates state + table type for LuaObject-key indexing, then fetches the
+ * raw keyed slot directly from Lua's table storage.
+ */
+LuaObject LuaObject::operator[](const LuaObject& key) const
+{
+	if (m_state != key.m_state) {
+		throw LuaAssertion("m_state == obj.m_state");
+	}
+
+	lua_State* const lstate = GetActiveCState();
+	if (m_object.tt != LUA_TTABLE) {
+		luaG_typeerror(lstate, &m_object, "index");
+	}
+
+	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), &key.m_object);
+	LuaObject result;
+	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+	return result;
+}
+
+/**
  * Address: 0x009091E0 (FUN_009091E0, LuaPlus::LuaObject::operator[])
  *
  * What it does:
@@ -10511,6 +12974,33 @@ LuaObject LuaObject::operator[](const int32_t index) const
 	}
 
 	const TObject* const rawValue = luaH_getnum(reinterpret_cast<Table*>(m_object.value.p), index);
+	LuaObject result;
+	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+	return result;
+}
+
+/**
+ * Address: 0x00909310 (FUN_00909310, LuaPlus::LuaObject::operator[])
+ *
+ * What it does:
+ * Validates root-state compatibility for LuaStackObject-key indexing, then
+ * resolves the stack key and fetches the raw keyed table slot.
+ */
+LuaObject LuaObject::operator[](const LuaStackObject& key) const
+{
+	const LuaState* const rootState = m_state;
+	const LuaState* const keyRootState = (key.m_state != nullptr) ? key.m_state->m_rootState : nullptr;
+	if (rootState != keyRootState) {
+		throw LuaAssertion("m_state == obj.m_state->m_rootState");
+	}
+
+	lua_State* const lstate = GetActiveCState();
+	if (m_object.tt != LUA_TTABLE) {
+		luaG_typeerror(lstate, &m_object, "index");
+	}
+
+	TObject* const stackKey = luaA_index(lstate, key.m_stackIndex);
+	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), stackKey);
 	LuaObject result;
 	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return result;
@@ -10721,7 +13211,7 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
 			}
 
 			while (true) {
-				const int8_t nextType = stream->GetByte();
+				const int nextType = stream->GetByte();
 				if (nextType == -1) {
 					gpg::Warnf("Error deserializing lua table: unexpected EOF.");
 					result.AssignNil(state);
@@ -10829,6 +13319,22 @@ int32_t LuaObject::ToStrLen()
 }
 
 /**
+ * Address: 0x00907380 (FUN_00907380)
+ *
+ * What it does:
+ * Returns one integer truncation of this value when numeric/coercible,
+ * otherwise returns `0`.
+ */
+int32_t LuaObject::ToInteger() const
+{
+	TObject numericValue{};
+	if (m_object.tt == LUA_TNUMBER || luaV_tonumber(&m_object, &numericValue) != 0) {
+		return static_cast<int32_t>(m_object.value.n);
+	}
+	return 0;
+}
+
+/**
  * Address: 0x009073B0 (FUN_009073B0, LuaPlus::LuaObject::ToNumber)
  *
  * What it does:
@@ -10879,6 +13385,148 @@ double LuaObject::GetNumber() const
 		luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as number");
 	}
 	return static_cast<double>(m_object.value.n);
+}
+
+/**
+ * Address: 0x009079D0 (FUN_009079D0)
+ *
+ * What it does:
+ * Validates LuaObject state/type and returns the numeric payload as one float
+ * lane (`Value::n`), raising Lua's type-error lane for non-numeric values.
+ */
+[[maybe_unused]] float LuaObjectGetNumberAsFloat(const LuaObject* const object)
+{
+	Ensure(object != nullptr, "object");
+	Ensure(object->m_state != nullptr, "m_state");
+	if (object->m_object.tt != LUA_TNUMBER) {
+		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as number");
+	}
+	return object->m_object.value.n;
+}
+
+/**
+ * Address: 0x00907AF0 (FUN_00907AF0)
+ *
+ * What it does:
+ * Validates LuaObject state/type and returns one interned Lua string buffer,
+ * raising Lua's typed-operation error lane on non-string values.
+ */
+[[maybe_unused]] const char* LuaObjectGetStringChecked(const LuaObject* const object)
+{
+	Ensure(object != nullptr, "object");
+	Ensure(object->m_state != nullptr, "m_state");
+	if (object->m_object.tt != LUA_TSTRING) {
+		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "string");
+	}
+
+	const auto* const text = static_cast<const TString*>(object->m_object.value.p);
+	return text->str;
+}
+
+/**
+ * Address: 0x00907B50 (FUN_00907B50)
+ *
+ * What it does:
+ * Validates LuaObject state/type for function access and returns one C closure
+ * entrypoint pointer, or `nullptr` if Lua still reports a non-function lane.
+ */
+[[maybe_unused]] CFunction LuaObjectGetCFunctionChecked(const LuaObject* const object)
+{
+	Ensure(object != nullptr, "object");
+	Ensure(object->m_state != nullptr, "m_state");
+
+	bool isFunctionType = object->m_object.tt == LUA_TFUNCTION;
+	if (!isFunctionType) {
+		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as C function");
+		isFunctionType = object->m_object.tt == LUA_TFUNCTION;
+	}
+
+	if (!isFunctionType) {
+		return nullptr;
+	}
+
+	const auto* const closure = static_cast<const CClosure*>(object->m_object.value.p);
+	return closure != nullptr ? closure->f : nullptr;
+}
+
+/**
+ * Address: 0x00907C30 (FUN_00907C30)
+ *
+ * What it does:
+ * Validates LuaObject state/type and returns the raw light-userdata pointer
+ * payload (`Value::p`) from this tagged object.
+ */
+[[maybe_unused]] void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
+{
+	Ensure(object != nullptr, "object");
+	Ensure(object->m_state != nullptr, "m_state");
+	if (object->m_object.tt != LUA_TLIGHTUSERDATA) {
+		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as light userdata");
+	}
+
+	return object->m_object.value.p;
+}
+
+/**
+ * Address: 0x009166B0 (FUN_009166B0)
+ *
+ * What it does:
+ * Fetches one boolean field from the date-table lane at stack index `-2` and
+ * returns the converted truth-value while restoring the original stack top.
+ */
+[[maybe_unused]] bool LuaDateGetBooleanField(
+	const char* const fieldName,
+	lua_State* const  state
+)
+{
+	Ensure(state != nullptr, "state");
+	Ensure(fieldName != nullptr, "fieldName");
+
+	lua_pushstring(state, fieldName);
+	lua_gettable(state, -2);
+	const bool value = lua_toboolean(state, -1) != 0;
+	lua_settop(state, -2);
+	return value;
+}
+
+/**
+ * Address: 0x009166E0 (FUN_009166E0)
+ *
+ * What it does:
+ * Fetches one numeric field from the date-table lane at stack index `-2`;
+ * returns `defaultValue` on non-number fields and raises when required.
+ */
+[[maybe_unused]] int LuaDateGetNumericFieldOrDefault(
+	int               defaultValue,
+	const char* const fieldName,
+	lua_State* const  state
+)
+{
+	Ensure(state != nullptr, "state");
+	Ensure(fieldName != nullptr, "fieldName");
+
+	lua_pushstring(state, fieldName);
+	lua_gettable(state, -2);
+
+	if (lua_isnumber(state, -1)) {
+		defaultValue = static_cast<int>(lua_tonumber(state, -1));
+	} else if (defaultValue == -2) {
+		luaL_error(state, "field `%s' missing in date table", fieldName);
+	}
+
+	lua_settop(state, -2);
+	return defaultValue;
+}
+
+/**
+ * Address: 0x0077F660 (FUN_0077F660, LuaObject::j_GetNumber2 thunk)
+ *
+ * What it does:
+ * Forwards one import-thunk lane to `LuaObject::GetNumber`.
+ */
+[[maybe_unused]] double LuaObjectGetNumberThunk2(const LuaObject* const object)
+{
+	return object->GetNumber();
 }
 
 /**
@@ -10994,6 +13642,123 @@ bool LuaObject::ToByteStream(gpg::Stream& stream)
 
 namespace LuaPlus
 {
+	struct LuaObjectEmbeddedRecord24
+	{
+		std::uint32_t reserved00 = 0; // +0x00
+		LuaPlus::LuaObject object{};  // +0x04
+	};
+	static_assert(sizeof(LuaObjectEmbeddedRecord24) == 0x18, "LuaObjectEmbeddedRecord24 size must be 0x18");
+	static_assert(
+		offsetof(LuaObjectEmbeddedRecord24, object) == 0x04,
+		"LuaObjectEmbeddedRecord24::object offset must be 0x04"
+	);
+
+	/**
+	 * Address: 0x00578960 (FUN_00578960)
+	 *
+	 * What it does:
+	 * Destroys every live `LuaObject` in one contiguous range
+	 * `[beginObject, endObject)`.
+	 */
+	[[maybe_unused]] void DestroyLuaObjectRangeForward(
+		LuaPlus::LuaObject* const beginObject,
+		LuaPlus::LuaObject* const endObject
+	)
+	{
+		for (LuaPlus::LuaObject* cursor = beginObject; cursor != endObject; ++cursor) {
+			cursor->~LuaObject();
+		}
+	}
+
+	/**
+	 * Address: 0x007CA2E0 (FUN_007CA2E0)
+	 *
+	 * What it does:
+	 * Destroys embedded `LuaObject` subobjects that live at `+0x04` inside one
+	 * 24-byte record range and returns the original record-begin lane.
+	 */
+	[[maybe_unused]] LuaPlus::LuaObject* DestroyEmbeddedLuaObjectRangeIn24ByteRecords(
+		LuaPlus::LuaObject* const recordBegin,
+		LuaPlus::LuaObject* const recordEnd
+	)
+	{
+		auto* cursor = reinterpret_cast<LuaObjectEmbeddedRecord24*>(recordBegin);
+		auto* const end = reinterpret_cast<LuaObjectEmbeddedRecord24*>(recordEnd);
+		while (cursor != end) {
+			cursor->object.~LuaObject();
+			++cursor;
+		}
+
+		return recordBegin;
+	}
+
+	/**
+	 * Address: 0x005788E0 (FUN_005788E0)
+	 *
+	 * What it does:
+	 * Copy-constructs `count` consecutive destination lanes from one source
+	 * `LuaObject` and returns destination end.
+	 */
+	[[maybe_unused]] LuaPlus::LuaObject* CopyConstructLuaObjectCountAndReturnEnd(
+		const LuaPlus::LuaObject* const source,
+		LuaPlus::LuaObject* destination,
+		const int count
+	)
+	{
+		for (int remaining = count; remaining > 0; --remaining) {
+			if (destination != nullptr) {
+				::new (destination) LuaPlus::LuaObject(*source);
+			}
+			++destination;
+		}
+
+		return destination;
+	}
+
+	/**
+	 * Address: 0x00578ED0 (FUN_00578ED0)
+	 *
+	 * What it does:
+	 * Assigns one source `LuaObject` value into each destination lane in
+	 * `[destinationBegin, destinationEnd)` and returns the pointer returned by
+	 * the final assignment call (or `destinationBegin` when the range is empty).
+	 */
+	[[maybe_unused]] LuaPlus::LuaObject* AssignLuaObjectRangeForward(
+		LuaPlus::LuaObject* const destinationBegin,
+		const LuaPlus::LuaObject* const source,
+		LuaPlus::LuaObject* const destinationEnd
+	)
+	{
+		LuaPlus::LuaObject* lastAssigned = destinationBegin;
+		for (LuaPlus::LuaObject* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
+			lastAssigned = &((*cursor) = *source);
+		}
+
+		return lastAssigned;
+	}
+
+	/**
+	 * Address: 0x00578EF0 (FUN_00578EF0)
+	 *
+	 * What it does:
+	 * Reverse-assigns one source range `[sourceBegin, sourceEnd)` into
+	 * destination lanes ending at `destinationEnd`, returning destination begin.
+	 */
+	[[maybe_unused]] LuaPlus::LuaObject* AssignLuaObjectRangeBackward(
+		LuaPlus::LuaObject* sourceEnd,
+		LuaPlus::LuaObject* destinationEnd,
+		LuaPlus::LuaObject* const sourceBegin
+	)
+	{
+		while (sourceEnd != sourceBegin) {
+			--sourceEnd;
+			--destinationEnd;
+			*destinationEnd = *sourceEnd;
+		}
+
+		return destinationEnd;
+	}
+
 	/**
 	 * Address: 0x004C7C70 (FUN_004C7C70, gpg::fastvector_LuaObject::clear)
 	 *

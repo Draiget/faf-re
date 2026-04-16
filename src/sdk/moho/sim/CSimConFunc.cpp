@@ -8,6 +8,12 @@ namespace moho
   {
   }
 
+  /**
+   * Address: 0x005BE360 (FUN_005BE360)
+   *
+   * What it does:
+   * Constructs one console-function command entry and binds its callback lane.
+   */
   CSimConFunc::CSimConFunc(const bool requiresCheat, const char* const name, Callback const handler) noexcept
     : CSimConCommand(requiresCheat, name)
     , mHandler(handler)

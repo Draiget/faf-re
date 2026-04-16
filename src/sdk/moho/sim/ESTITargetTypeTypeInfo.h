@@ -67,6 +67,59 @@ namespace moho
     static void AddEnums(gpg::REnumType* enumType);
   };
 
+  class ESTITargetTypePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x0055B310 (FUN_0055B310, PrimitiveSerHelper<ESTITargetType>::Deserialize)
+     *
+     * What it does:
+     * Deserializes one `ESTITargetType` lane from archive storage.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0055B330 (FUN_0055B330, PrimitiveSerHelper<ESTITargetType>::Serialize)
+     *
+     * What it does:
+     * Serializes one `ESTITargetType` lane into archive storage.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `ESTITargetType`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mDeserialize;
+    gpg::RType::save_func_t mSerialize;
+  };
+
+  static_assert(
+    offsetof(ESTITargetTypePrimitiveSerializer, mHelperNext) == 0x04,
+    "ESTITargetTypePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(ESTITargetTypePrimitiveSerializer, mHelperPrev) == 0x08,
+    "ESTITargetTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(ESTITargetTypePrimitiveSerializer, mDeserialize) == 0x0C,
+    "ESTITargetTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(ESTITargetTypePrimitiveSerializer, mSerialize) == 0x10,
+    "ESTITargetTypePrimitiveSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(
+    sizeof(ESTITargetTypePrimitiveSerializer) == 0x14,
+    "ESTITargetTypePrimitiveSerializer size must be 0x14"
+  );
+
   static_assert(sizeof(ESTITargetTypeTypeInfo) == 0x78, "ESTITargetTypeTypeInfo size must be 0x78");
 
   /**

@@ -26,6 +26,40 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  /**
+   * Address: 0x005D98D0 (FUN_005D98D0)
+   *
+   * What it does:
+   * Splices this serializer helper node out of its intrusive lane when linked,
+   * then resets helper links to self and returns the self node pointer.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkAcquireTargetTaskSerializerHelperNodeVariantA(
+    Serializer& serializer
+  ) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    InitializeSerializerNode(serializer);
+    return SerializerSelfNode(serializer);
+  }
+
+  /**
+   * Address: 0x005D9900 (FUN_005D9900)
+   *
+   * What it does:
+   * Secondary helper-node unlink/reset variant that preserves the same
+   * intrusive unlink semantics and returns the helper self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkAcquireTargetTaskSerializerHelperNodeVariantB(
+    Serializer& serializer
+  ) noexcept
+  {
+    return UnlinkAcquireTargetTaskSerializerHelperNodeVariantA(serializer);
+  }
+
   [[nodiscard]] Serializer* AcquireSerializer()
   {
     if (!gCAcquireTargetTaskSerializerConstructed) {
@@ -43,8 +77,7 @@ namespace
     }
 
     Serializer& serializer = *AcquireSerializer();
-    serializer.mHelperNext = SerializerSelfNode(serializer);
-    serializer.mHelperPrev = SerializerSelfNode(serializer);
+    (void)UnlinkAcquireTargetTaskSerializerHelperNodeVariantA(serializer);
     serializer.~CAcquireTargetTaskSerializer();
     gCAcquireTargetTaskSerializerConstructed = false;
   }
@@ -88,6 +121,5 @@ int moho::register_CAcquireTargetTaskSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&moho::CAcquireTargetTask::MemberDeserialize);
   serializer->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&moho::CAcquireTargetTask::MemberSerialize);
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_CAcquireTargetTaskSerializer);
 }

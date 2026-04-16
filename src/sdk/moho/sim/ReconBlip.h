@@ -25,6 +25,7 @@ namespace moho
 {
   class CAniPose;
   class CArmyImpl;
+  class SimArmy;
   struct RMeshBlueprint;
   class RScmResource;
   class Sim;
@@ -67,6 +68,16 @@ namespace moho
      * in binary destructor order.
      */
     ~SPerArmyReconInfo();
+
+    /**
+     * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
+     * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
+     *
+     * What it does:
+     * Copies one per-army recon snapshot lane, retaining/releasing shared
+     * ownership control blocks for mesh/pause payload pointers in binary order.
+     */
+    SPerArmyReconInfo& operator=(const SPerArmyReconInfo& other);
 
     /**
      * Address: 0x005C8DE0 (FUN_005C8DE0, Moho::SPerArmyReconInfo::MemberDeserialize)
@@ -215,6 +226,16 @@ namespace moho
     ReconBlip(Unit* sourceUnit, Sim* sim, bool fake);
 
     /**
+     * Address: 0x005BEC90 (FUN_005BEC90, Moho::ReconBlip::~ReconBlip)
+     *
+     * What it does:
+     * Destroys per-army recon lanes, releases unit-const/variable payload
+     * ownership, unlinks creator weak-link storage, and decrements the
+     * recon-blip instance counter before base teardown.
+     */
+    ~ReconBlip() override;
+
+    /**
      * Address: 0x005BFBE0 (FUN_005BFBE0, Moho::ReconBlip::MemberConstruct)
      *
      * gpg::ReadArchive &,int,gpg::RRef const &,gpg::SerConstructResult &
@@ -282,6 +303,54 @@ namespace moho
      * blip is detached.
      */
     [[nodiscard]] Unit* GetCreator() const noexcept;
+
+    /**
+     * Address: 0x005BDEA0 (FUN_005BDEA0, Moho::ReconBlip::DeleteWhenStale)
+     *
+     * What it does:
+     * Returns the stale-delete policy flag for this blip.
+     */
+    [[nodiscard]] bool DeleteWhenStale() const;
+
+    /**
+     * Address: 0x005BDEB0 (FUN_005BDEB0, Moho::ReconBlip::IsJam)
+     *
+     * What it does:
+     * Returns the per-blip jam/fake marker lane stored in unit-const data.
+     */
+    [[nodiscard]] bool IsJam() const;
+
+    /**
+     * Address: 0x005BDEC0 (FUN_005BDEC0, Moho::ReconBlip::GetReconInfo)
+     *
+     * What it does:
+     * Returns the mutable per-army recon lane selected by direct army index.
+     */
+    [[nodiscard]] SPerArmyReconInfo* GetReconInfo(std::int32_t armyIndex);
+
+    /**
+     * Address: 0x005BDED0 (FUN_005BDED0, Moho::ReconBlip::GetReconInfo)
+     *
+     * What it does:
+     * Returns the mutable per-army recon lane selected by `army` index.
+     */
+    [[nodiscard]] SPerArmyReconInfo* GetReconInfo(SimArmy* army);
+
+    /**
+     * Address: 0x005BDEE0 (FUN_005BDEE0, Moho::ReconBlip::GetReconInfo)
+     *
+     * What it does:
+     * Returns the const per-army recon lane selected by direct army index.
+     */
+    [[nodiscard]] const SPerArmyReconInfo* GetReconInfo(std::int32_t armyIndex) const;
+
+    /**
+     * Address: 0x005BDEF0 (FUN_005BDEF0, Moho::ReconBlip::GetReconInfo)
+     *
+     * What it does:
+     * Returns the const per-army recon lane selected by `army` index.
+     */
+    [[nodiscard]] const SPerArmyReconInfo* GetReconInfo(SimArmy* army) const;
 
     /**
      * Address: 0x005BDF00 (FUN_005BDF00, Moho::ReconBlip::GetFlags)

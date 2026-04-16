@@ -4,6 +4,13 @@
 
 namespace moho
 {
+  /**
+   * Address: 0x007DD660 (FUN_007DD660, ??0CResourceWatcher@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes inline watched-resource storage and seeds the fallback
+   * inline-capacity slot used by the small-vector reset lane.
+   */
   CResourceWatcher::CResourceWatcher() noexcept
     : mWatcherFlags(0)
     , mWatchedBegin(mWatchedInline)

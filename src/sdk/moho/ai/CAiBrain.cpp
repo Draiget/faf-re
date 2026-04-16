@@ -4,6 +4,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <limits>
+#include <map>
 #include <new>
 #include <string>
 #include <typeinfo>
@@ -32,12 +33,16 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/serialization/SBuildReserveInfo.h"
+#include "moho/serialization/typeinfo/SBuildReserveInfoTypeInfo.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/sim/SConditionTriggerTypes.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/CSquad.h"
 #include "moho/sim/ReconBlip.h"
@@ -56,6 +61,10 @@ namespace moho
 {
   class CUnitCommand;
 
+  int cfunc_CAiBrainCreateUnitNearSpot(lua_State* luaContext);
+  int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* luaContext);
+  int cfunc_CAiBrainFindPlaceToBuild(lua_State* luaContext);
+
   CUnitCommand* func_OrderBuildStructure(
     Wm3::Vector3f* ori,
     CAiBrain* brain,
@@ -64,6 +73,14 @@ namespace moho
     Wm3::Vector3f* pos,
     float angle
   );
+
+  /**
+   * Address: 0x0057CA20 (FUN_0057CA20, func_ScheduleBuildStructure)
+   *
+   * What it does:
+   * Records one `(builder, command)` weak reservation pair in
+   * `brain->mBuildStructureMap` at `where`.
+   */
   void func_ScheduleBuildStructure(Unit* builder, CAiBrain* brain, CUnitCommand* command, Wm3::Vector2i where);
 }
 
@@ -79,6 +96,15 @@ namespace
   constexpr const char* kAiBrainSetResourceSharingName = "SetResourceSharing";
   constexpr const char* kAiBrainGetArmyStartPosHelpText = "brain:GetArmyStartPos()";
   constexpr const char* kAiBrainGetArmyStartPosName = "GetArmyStartPos";
+  constexpr const char* kAiBrainCreateUnitNearSpotHelpText = "brain:CreateUnitNearSpot(unitName, posX, posY)";
+  constexpr const char* kAiBrainCreateUnitNearSpotName = "CreateUnitNearSpot";
+  constexpr const char* kAiBrainCreateResourceBuildingNearestHelpText =
+    "brain:CreateResourceBuildingNearest(structureName, posX, posY)";
+  constexpr const char* kAiBrainCreateResourceBuildingNearestName = "CreateResourceBuildingNearest";
+  constexpr const char* kAiBrainFindPlaceToBuildHelpText =
+    "brain:FindPlaceToBuild(type, structureName, buildingTypes, relative, builder, "
+    "optIgnoreAlliance, optOverridePosX, optOverridePosZ, optIgnoreThreatOver)";
+  constexpr const char* kAiBrainFindPlaceToBuildName = "FindPlaceToBuild";
   constexpr const char* kAiBrainGetCurrentEnemyHelpText = "Return this brain's current enemy";
   constexpr const char* kAiBrainGetCurrentEnemyName = "GetCurrentEnemy";
   constexpr const char* kAiBrainGetUnitBlueprintName = "GetUnitBlueprint";
@@ -288,6 +314,159 @@ namespace
     }
 
     return destination;
+  }
+
+  /**
+   * Address: 0x0057D8B0 (FUN_0057D8B0)
+   *
+   * What it does:
+   * Resets one `vector<SPointVector>` logical size to zero while preserving the
+   * current allocation block.
+   */
+  [[maybe_unused]] [[nodiscard]] SPointVector* ResetSPointVectorVectorEndToBegin(
+    msvc8::vector<SPointVector>& storage
+  ) noexcept
+  {
+    auto& runtime = msvc8::AsVectorRuntimeView(storage);
+    if (runtime.begin != runtime.end) {
+      runtime.end = CopyPointVectorRangeAndReturnEnd(runtime.begin, runtime.end, runtime.end);
+    }
+
+    return runtime.end;
+  }
+
+  /**
+   * Address: 0x00583A20 (FUN_00583A20, vector-int assign lane)
+   *
+   * What it does:
+   * Copy-assigns one legacy `msvc8::vector<int>` lane into destination and
+   * returns destination.
+   */
+  [[maybe_unused]] [[nodiscard]] msvc8::vector<int>* CopyAssignLegacyIntVector(
+    msvc8::vector<int>* const destination,
+    const msvc8::vector<int>* const source
+  )
+  {
+    if (destination == nullptr || source == nullptr) {
+      return destination;
+    }
+
+    if (destination != source) {
+      *destination = *source;
+    }
+    return destination;
+  }
+
+  struct ScalarAndIntVectorLane
+  {
+    std::int32_t mScalar = 0;
+    msvc8::vector<int> mValues{};
+  };
+  static_assert(sizeof(ScalarAndIntVectorLane) == 0x14, "ScalarAndIntVectorLane size must be 0x14");
+
+  /**
+   * Address: 0x005837F0 (FUN_005837F0, scalar+vector reset range lane)
+   * Address: 0x00580D10 (FUN_00580D10)
+   *
+   * What it does:
+   * Resets each scalar lane to zero and releases each backing int-vector
+   * allocation in one half-open `[begin, end)` range.
+   */
+  [[maybe_unused]] void ResetScalarAndIntVectorLaneRange(
+    ScalarAndIntVectorLane* begin,
+    ScalarAndIntVectorLane* const end
+  ) noexcept
+  {
+    while (begin != end) {
+      begin->mScalar = 0;
+
+      auto& valuesView = msvc8::AsVectorRuntimeView(begin->mValues);
+      if (valuesView.begin != nullptr) {
+        ::operator delete(valuesView.begin);
+      }
+      valuesView.begin = nullptr;
+      valuesView.end = nullptr;
+      valuesView.capacityEnd = nullptr;
+
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x00583C30 (FUN_00583C30, vector-int clear logical range lane)
+   *
+   * What it does:
+   * Clears one legacy int-vector logical range while retaining capacity.
+   */
+  [[maybe_unused]] void ClearLegacyIntVectorLogicalRange(msvc8::vector<int>* const storage) noexcept
+  {
+    if (storage != nullptr) {
+      storage->clear();
+    }
+  }
+
+  /**
+   * Address: 0x00584480 (FUN_00584480, copy int range lane)
+   *
+   * What it does:
+   * Copies one half-open int range into `destination` and returns the
+   * one-past-end destination pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] int* CopyLegacyIntRangeAndReturnEnd(
+    int* const destination,
+    const int* const sourceBegin,
+    const int* const sourceEnd
+  ) noexcept
+  {
+    if (destination == nullptr || sourceBegin == nullptr || sourceEnd == nullptr || sourceEnd <= sourceBegin) {
+      return destination;
+    }
+
+    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
+    std::memmove(destination, sourceBegin, count * sizeof(int));
+    return destination + count;
+  }
+
+  /**
+   * Address: 0x00583850 (FUN_00583850, scalar+vector fill-copy range lane)
+   *
+   * What it does:
+   * Fills one half-open destination range by copying the scalar lane and
+   * legacy int-vector lane from a single prototype element.
+   */
+  [[maybe_unused]] [[nodiscard]] ScalarAndIntVectorLane* FillScalarAndIntVectorRangeFromPrototype(
+    ScalarAndIntVectorLane* destinationBegin,
+    ScalarAndIntVectorLane* const destinationEnd,
+    const ScalarAndIntVectorLane& prototype
+  )
+  {
+    while (destinationBegin != destinationEnd) {
+      destinationBegin->mScalar = prototype.mScalar;
+      (void)CopyAssignLegacyIntVector(&destinationBegin->mValues, &prototype.mValues);
+      ++destinationBegin;
+    }
+
+    return destinationBegin;
+  }
+
+  /**
+   * Address: 0x00582380 (FUN_00582380)
+   *
+   * What it does:
+   * Source-first register adapter for one scalar+legacy-int-vector
+   * fill-from-prototype range-copy lane.
+   */
+  [[maybe_unused]] [[nodiscard]] ScalarAndIntVectorLane* FillScalarAndIntVectorRangeFromPrototypeSourceFirstAdapter(
+    const ScalarAndIntVectorLane* const prototype,
+    ScalarAndIntVectorLane* const destinationEnd,
+    ScalarAndIntVectorLane* const destinationBegin
+  )
+  {
+    if (prototype == nullptr) {
+      return destinationBegin;
+    }
+
+    return FillScalarAndIntVectorRangeFromPrototype(destinationBegin, destinationEnd, *prototype);
   }
 
   struct CSquadUnitsRuntimeView
@@ -609,20 +788,8 @@ namespace
 
   void ApplyEconStorageDelta(CEconStorageRuntimeView& storage, const std::int32_t direction)
   {
-    // Address: 0x007732C0 (FUN_007732C0, Moho::CEconStorage::Chng)
-    if (storage.economyRuntime == nullptr) {
-      return;
-    }
-
-    const std::int64_t signedDirection = static_cast<std::int64_t>(direction);
-    constexpr std::size_t kAccumOffset = 0x40;
-    constexpr std::size_t kAccumCount = 4;
-    for (std::size_t i = 0; i < kAccumCount; ++i) {
-      auto* const accumulator =
-        reinterpret_cast<std::int64_t*>(storage.economyRuntime + kAccumOffset + (i * sizeof(std::int64_t)));
-      const std::int64_t delta = static_cast<std::int64_t>(storage.amounts[i]) * signedDirection;
-      *accumulator += delta;
-    }
+    auto* const econStorage = reinterpret_cast<moho::CEconStorage*>(&storage);
+    (void)econStorage->Chng(direction);
   }
 
   struct UnitBuilderSubsystemView
@@ -968,23 +1135,144 @@ namespace
     map.mSize = 0;
   }
 
-  void UnlinkBuildResourceInfoLink(SBuildResourceInfoLink& link)
+  [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinkNoReset(SBuildResourceInfoLink& link) noexcept
   {
     SBuildResourceInfoLink** cursor = link.mOwnerSlot;
     if (!cursor) {
-      return;
+      return nullptr;
     }
 
     while (*cursor != &link) {
       if (!*cursor) {
-        return;
+        return cursor;
       }
       cursor = &(*cursor)->mNext;
     }
 
     *cursor = link.mNext;
+    return cursor;
+  }
+
+  void UnlinkBuildResourceInfoLink(SBuildResourceInfoLink& link)
+  {
+    (void)UnlinkBuildResourceInfoLinkNoReset(link);
     link.mOwnerSlot = nullptr;
     link.mNext = nullptr;
+  }
+
+  /**
+   * Address: 0x0057CAF0 (FUN_0057CAF0, sub_57CAF0)
+   *
+   * What it does:
+   * Unlinks both intrusive lanes in one `SBuildResourceInfo` in binary order
+   * (resource lane first, placement lane second) without rewriting local
+   * link fields.
+   */
+  [[maybe_unused]] [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinksNoReset(
+    SBuildResourceInfo& info
+  ) noexcept
+  {
+    (void)UnlinkBuildResourceInfoLinkNoReset(info.mResourceLink);
+    return UnlinkBuildResourceInfoLinkNoReset(info.mPlacementLink);
+  }
+
+  void RebindBuildResourceInfoLinkToOwnerSlot(
+    SBuildResourceInfoLink& link,
+    SBuildResourceInfoLink** const newOwnerSlot
+  ) noexcept
+  {
+    if (link.mOwnerSlot == newOwnerSlot) {
+      return;
+    }
+
+    if (SBuildResourceInfoLink** cursor = link.mOwnerSlot; cursor != nullptr) {
+      while (*cursor != &link) {
+        cursor = &(*cursor)->mNext;
+      }
+      *cursor = link.mNext;
+    }
+
+    link.mOwnerSlot = newOwnerSlot;
+    if (newOwnerSlot != nullptr) {
+      link.mNext = *newOwnerSlot;
+      *newOwnerSlot = &link;
+      return;
+    }
+
+    link.mNext = nullptr;
+  }
+
+  /**
+   * Address: 0x0057CB30 (FUN_0057CB30)
+   *
+   * What it does:
+   * Rebinds both intrusive-link lanes in one `SBuildResourceInfo` to the
+   * owner-slot heads from another link-pair, preserving list-head insertion
+   * and unlink ordering for each lane.
+   */
+  [[maybe_unused]] void RebindBuildResourceInfoLinks(
+    SBuildResourceInfo& destination,
+    const SBuildResourceInfo& source
+  ) noexcept
+  {
+    RebindBuildResourceInfoLinkToOwnerSlot(destination.mPlacementLink, source.mPlacementLink.mOwnerSlot);
+    RebindBuildResourceInfoLinkToOwnerSlot(destination.mResourceLink, source.mResourceLink.mOwnerSlot);
+  }
+
+  struct SBuildResourceInfoOwnerSlots
+  {
+    SBuildResourceInfoLink** mPlacementOwnerSlot; // +0x00
+    SBuildResourceInfoLink** mResourceOwnerSlot;  // +0x04
+  };
+  static_assert(sizeof(SBuildResourceInfoOwnerSlots) == 0x08, "SBuildResourceInfoOwnerSlots size must be 0x08");
+
+  struct SBuildStructurePositionValue
+  {
+    Wm3::Vector2i mGridPosition;      // +0x00
+    SBuildResourceInfo mBuildInfo;    // +0x08
+  };
+  static_assert(sizeof(SBuildStructurePositionValue) == 0x18, "SBuildStructurePositionValue size must be 0x18");
+  static_assert(
+    offsetof(SBuildStructurePositionValue, mGridPosition) == 0x00,
+    "SBuildStructurePositionValue::mGridPosition offset must be 0x00"
+  );
+  static_assert(
+    offsetof(SBuildStructurePositionValue, mBuildInfo) == 0x08,
+    "SBuildStructurePositionValue::mBuildInfo offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x0057FBF0 (FUN_0057FBF0)
+   *
+   * What it does:
+   * Copies one `(gridPosition, buildInfo)` value lane and relinks both
+   * intrusive build-resource links at the head of caller-supplied owner slots.
+   */
+  [[maybe_unused]] [[nodiscard]] SBuildStructurePositionValue* CopyBuildStructurePositionValueWithRelink(
+    SBuildStructurePositionValue* const destination,
+    const SBuildResourceInfoOwnerSlots& ownerSlots,
+    const SBuildStructurePositionValue& source
+  ) noexcept
+  {
+    destination->mGridPosition = source.mGridPosition;
+
+    destination->mBuildInfo.mPlacementLink.mOwnerSlot = ownerSlots.mPlacementOwnerSlot;
+    if (ownerSlots.mPlacementOwnerSlot != nullptr) {
+      destination->mBuildInfo.mPlacementLink.mNext = *ownerSlots.mPlacementOwnerSlot;
+      *ownerSlots.mPlacementOwnerSlot = &destination->mBuildInfo.mPlacementLink;
+    } else {
+      destination->mBuildInfo.mPlacementLink.mNext = nullptr;
+    }
+
+    destination->mBuildInfo.mResourceLink.mOwnerSlot = ownerSlots.mResourceOwnerSlot;
+    if (ownerSlots.mResourceOwnerSlot != nullptr) {
+      destination->mBuildInfo.mResourceLink.mNext = *ownerSlots.mResourceOwnerSlot;
+      *ownerSlots.mResourceOwnerSlot = &destination->mBuildInfo.mResourceLink;
+    } else {
+      destination->mBuildInfo.mResourceLink.mNext = nullptr;
+    }
+
+    return destination;
   }
 
   void DestroyBuildStructureTree(SBuildStructurePositionNode* node)
@@ -994,14 +1282,20 @@ namespace
       SBuildStructurePositionNode* const left = node->left;
 
       // Matches sub_5812C0 unlink order (+0x1C link first, then +0x14 link).
-      UnlinkBuildResourceInfoLink(node->mBuildInfo.mResourceLink);
-      UnlinkBuildResourceInfoLink(node->mBuildInfo.mPlacementLink);
+      (void)UnlinkBuildResourceInfoLinksNoReset(node->mBuildInfo);
       ::operator delete(node);
 
       node = left;
     }
   }
 
+  /**
+   * Address: 0x00579F50 (FUN_00579F50)
+   *
+   * What it does:
+   * Clears and releases one build-structure reservation map by deleting all
+   * owned tree nodes, deleting the sentinel node, and zeroing map lanes.
+   */
   void DestroyBuildStructureMap(SBuildStructurePositionMap& map)
   {
     if (!map.mHead) {
@@ -1056,6 +1350,165 @@ namespace
     return nullptr;
   }
 
+  using BuildReserveMapStorage = std::map<Wm3::Vector2i, moho::SBuildReserveInfo>;
+
+  struct LegacyMapRuntimeView
+  {
+    void* allocProxy;
+    void* head;
+    std::uint32_t size;
+  };
+
+  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
+  {
+    if (object == nullptr) {
+      return 0u;
+    }
+
+    const auto* const mapView = static_cast<const LegacyMapRuntimeView*>(object);
+    return mapView->size;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveBuildReserveKeyType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector2i));
+      if (!type) {
+        type = ResolveTypeByAnyName({"Wm3::IVector2<int>", "Wm3::Vector2i", "Vector2i"});
+      }
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveBuildReserveValueType()
+  {
+    gpg::RType* type = moho::SBuildReserveInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SBuildReserveInfo));
+      if (!type) {
+        type = moho::preregister_SBuildReserveInfoTypeInfo();
+      }
+      moho::SBuildReserveInfo::sType = type;
+    }
+    return type;
+  }
+
+  class BuildReserveMapTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>";
+    }
+
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+    }
+
+    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      );
+      if (!archive || !mapObject) {
+        return;
+      }
+
+      unsigned int count = 0u;
+      archive->ReadUInt(&count);
+      mapObject->clear();
+
+      gpg::RType* const keyType = ResolveBuildReserveKeyType();
+      gpg::RType* const valueType = ResolveBuildReserveValueType();
+      GPG_ASSERT(keyType != nullptr);
+      GPG_ASSERT(valueType != nullptr);
+      if (!keyType || !valueType) {
+        return;
+      }
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (unsigned int i = 0u; i < count; ++i) {
+        Wm3::Vector2i key{};
+        moho::SBuildReserveInfo value{};
+        archive->Read(keyType, &key, owner);
+        archive->Read(valueType, &value, owner);
+        (*mapObject)[key] = value;
+      }
+    }
+
+    /**
+     * Address: 0x0057F680 (FUN_0057F680, gpg::RMapType_IVector2i_SBuildReserveInfo::SerSave)
+     *
+     * What it does:
+     * Serializes one `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>` payload
+     * by writing each key/value pair through reflected type lanes.
+     */
+    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      const auto* const mapObject = reinterpret_cast<const BuildReserveMapStorage*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      );
+      if (!archive || !mapObject) {
+        return;
+      }
+
+      archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
+
+      gpg::RType* const keyType = ResolveBuildReserveKeyType();
+      gpg::RType* const valueType = ResolveBuildReserveValueType();
+      GPG_ASSERT(keyType != nullptr);
+      GPG_ASSERT(valueType != nullptr);
+      if (!keyType || !valueType) {
+        return;
+      }
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (auto it = mapObject->begin(); it != mapObject->end(); ++it) {
+        Wm3::Vector2i key = it->first;
+        moho::SBuildReserveInfo value = it->second;
+        archive->Write(keyType, &key, owner);
+        archive->Write(valueType, &value, owner);
+      }
+    }
+
+    void Init() override
+    {
+      size_ = 0x0C;
+      version_ = 1;
+      serLoadFunc_ = &BuildReserveMapTypeInfo::SerLoad;
+      serSaveFunc_ = &BuildReserveMapTypeInfo::SerSave;
+    }
+  };
+
+  alignas(BuildReserveMapTypeInfo) unsigned char gBuildReserveMapTypeInfoStorage[sizeof(BuildReserveMapTypeInfo)]{};
+  bool gBuildReserveMapTypeInfoConstructed = false;
+
+  [[nodiscard]] BuildReserveMapTypeInfo& AcquireBuildReserveMapTypeInfo()
+  {
+    if (!gBuildReserveMapTypeInfoConstructed) {
+      new (gBuildReserveMapTypeInfoStorage) BuildReserveMapTypeInfo();
+      gBuildReserveMapTypeInfoConstructed = true;
+    }
+    return *reinterpret_cast<BuildReserveMapTypeInfo*>(gBuildReserveMapTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00582610 (FUN_00582610, preregister_BuildReserveMapTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters reflection metadata for
+   * `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_BuildReserveMapTypeInfo()
+  {
+    BuildReserveMapTypeInfo& typeInfo = AcquireBuildReserveMapTypeInfo();
+    gpg::PreRegisterRType(typeid(BuildReserveMapStorage), &typeInfo);
+    return &typeInfo;
+  }
+
   [[nodiscard]] gpg::RType* CachedScriptObjectType()
   {
     gpg::RType* type = CScriptObject::sType;
@@ -1084,11 +1537,17 @@ namespace
   {
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = ResolveTypeByAnyName(
-        {"std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>",
-         "std::map<Wm3::IVector2<int>, Moho::SBuildReserveInfo>",
-         "map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>"}
-      );
+      type = gpg::LookupRType(typeid(BuildReserveMapStorage));
+      if (!type) {
+        type = preregister_BuildReserveMapTypeInfo();
+      }
+      if (!type) {
+        type = ResolveTypeByAnyName(
+          {"std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>",
+           "std::map<Wm3::IVector2<int>, Moho::SBuildReserveInfo>",
+           "map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>"}
+        );
+      }
     }
     return type;
   }
@@ -1113,6 +1572,22 @@ namespace
       if (!type) {
         type = ResolveTypeByAnyName({"Moho::CTaskStage", "CTaskStage"});
       }
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00579570 (FUN_00579570)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `CAiBrain`.
+   */
+  [[nodiscard]] gpg::RType* ResolveCAiBrainTypeCachePrimary()
+  {
+    gpg::RType* type = moho::CAiBrain::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CAiBrain));
+      moho::CAiBrain::sType = type;
     }
     return type;
   }
@@ -1193,6 +1668,76 @@ namespace
     }
 
     return outTable;
+  }
+
+  constexpr int kAiBrainAllianceAnySentinel = 3;
+
+  /**
+   * Address: 0x0057B290 (FUN_0057B290, func_GetUnitsAroundPoint)
+   *
+   * What it does:
+   * Resets one output unit-set lane, gathers nearby unit entities around
+   * `position` within `dist`, filters by liveness/destroy-queue/alliance/recon
+   * visibility/category membership, and appends matching units.
+   */
+  [[maybe_unused]] SEntitySetTemplateUnit* CollectUnitsAroundPointFiltered(
+    CAiBrain* const brain,
+    SEntitySetTemplateUnit* const outUnits,
+    const EntityCategorySet* const categorySet,
+    const Wm3::Vector3f& position,
+    const float dist,
+    const EAlliance alliance
+  )
+  {
+    outUnits->ListResetLinks();
+    outUnits->mVec.ResetStorageToInline();
+
+    CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
+
+    const gpg::Rect2f queryRect{
+      position.x - dist,
+      position.z - dist,
+      position.x + dist,
+      position.z + dist
+    };
+    CollisionDBRect collisionRect{};
+    (void)func_Rect2fToInt16(&collisionRect, queryRect);
+
+    EntityGatherVector gatheredEntities{};
+    (void)brain->mSim->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
+      gatheredEntities,
+      collisionRect,
+      ENTITYTYPE_Unit
+    );
+
+    for (Entity* const candidateEntity : gatheredEntities) {
+      if (candidateEntity == nullptr || candidateEntity->Dead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
+        continue;
+      }
+
+      if (static_cast<int>(alliance) != kAiBrainAllianceAnySentinel) {
+        const IArmy* const candidateArmy =
+          (candidateEntity->ArmyRef != nullptr) ? static_cast<const IArmy*>(candidateEntity->ArmyRef) : nullptr;
+        if (brain->mArmy->GetAllianceWith(candidateArmy) != alliance) {
+          continue;
+        }
+      }
+
+      Unit* const candidateUnit = candidateEntity->IsUnit();
+      if (candidateUnit == nullptr) {
+        continue;
+      }
+
+      if (brain->mArmy != candidateEntity->ArmyRef && reconDb->ReconGetBlip(candidateUnit) == nullptr) {
+        continue;
+      }
+
+      if (EntityCategory::HasBlueprint(candidateEntity->BluePrint, categorySet)) {
+        (void)outUnits->AddUnit(candidateUnit);
+      }
+    }
+
+    return outUnits;
   }
 } // namespace
 
@@ -1298,12 +1843,7 @@ void CAiBrain::Initialize()
  */
 gpg::RType* CAiBrain::GetClass() const
 {
-  gpg::RType* type = sType;
-  if (!type) {
-    type = gpg::LookupRType(typeid(CAiBrain));
-    sType = type;
-  }
-  return type;
+  return ResolveCAiBrainTypeCachePrimary();
 }
 
 /**
@@ -3156,6 +3696,62 @@ int moho::cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x005898B0 (FUN_005898B0, func_CAiBrainCreateUnitNearSpot_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `brain:CreateUnitNearSpot(unitName, posX, posY)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainCreateUnitNearSpot_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainCreateUnitNearSpotName,
+    &moho::cfunc_CAiBrainCreateUnitNearSpot,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainCreateUnitNearSpotHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00589DD0 (FUN_00589DD0, func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `brain:CreateResourceBuildingNearest(structureName, posX, posY)` Lua binder.
+ */
+void moho::func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef()
+{
+  [[maybe_unused]] static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainCreateResourceBuildingNearestName,
+    &moho::cfunc_CAiBrainCreateResourceBuildingNearest,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainCreateResourceBuildingNearestHelpText
+  );
+}
+
+/**
+ * Address: 0x0058A460 (FUN_0058A460, func_CAiBrainFindPlaceToBuild_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `brain:FindPlaceToBuild(...)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainFindPlaceToBuild_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainFindPlaceToBuildName,
+    &moho::cfunc_CAiBrainFindPlaceToBuild,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainFindPlaceToBuildHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x0058ED60 (FUN_0058ED60, cfunc_CAiBrainGetAttackVectors)
  *
  * What it does:
@@ -4192,6 +4788,36 @@ CScrLuaInitForm* moho::func_CAiBrainDecideWhatToBuild_LuaFuncDef()
     kAiBrainDecideWhatToBuildHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0057CA20 (FUN_0057CA20, func_ScheduleBuildStructure)
+ *
+ * What it does:
+ * Stages one temporary weak `(builder, command)` reservation pair, ensures
+ * one reservation entry exists at `where`, rebases both intrusive weak-link
+ * lanes into that map entry, then unlinks the temporary staging lanes.
+ */
+void moho::func_ScheduleBuildStructure(
+  Unit* const builder,
+  CAiBrain* const brain,
+  CUnitCommand* const command,
+  const Wm3::Vector2i where
+)
+{
+  SBuildResourceInfo pendingReservation{};
+  reinterpret_cast<WeakPtr<Unit>&>(pendingReservation.mPlacementLink).Set(builder);
+  reinterpret_cast<WeakPtr<CUnitCommand>&>(pendingReservation.mResourceLink).Set(command);
+
+  auto& reserveMap = reinterpret_cast<BuildReserveMapStorage&>(brain->mBuildStructureMap);
+  SBuildReserveInfo& reserveEntry = reserveMap[where];
+  auto& reserveEntryLinks = reinterpret_cast<SBuildResourceInfo&>(reserveEntry);
+
+  RebindBuildResourceInfoLinks(reserveEntryLinks, pendingReservation);
+
+  // Binary cleanup order: command lane first, then unit lane.
+  UnlinkBuildResourceInfoLink(pendingReservation.mResourceLink);
+  UnlinkBuildResourceInfoLink(pendingReservation.mPlacementLink);
 }
 
 /**

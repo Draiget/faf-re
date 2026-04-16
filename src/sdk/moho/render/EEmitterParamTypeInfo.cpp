@@ -1,10 +1,22 @@
 #include "moho/render/EEmitterParamTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 #include "moho/render/EEmitterParam.h"
 
 using namespace moho;
+
+/**
+ * Address: 0x00770790 (FUN_00770790)
+ *
+ * What it does:
+ * Preregisters the reflected `EEmitterParam` enum metadata.
+ */
+EEmitterParamTypeInfo::EEmitterParamTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(EEmitterParam), this);
+}
 
 /**
  * Address: 0x00770820 (FUN_00770820, scalar deleting thunk)

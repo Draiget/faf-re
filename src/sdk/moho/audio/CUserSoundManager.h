@@ -29,6 +29,14 @@ namespace moho
 
   struct SoundHandleIdPool
   {
+    /**
+     * Address: 0x008AA7A0 (FUN_008AA7A0)
+     *
+     * What it does:
+     * Initializes the free-id bitset runtime lanes and resets next-id to zero.
+     */
+    SoundHandleIdPool();
+
     BVIntSet mFreeIds;     // +0x00
     std::uint32_t mNextId; // +0x20
   };

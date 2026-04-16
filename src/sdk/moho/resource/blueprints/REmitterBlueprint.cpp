@@ -25,6 +25,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x005108A0 (FUN_005108A0)
+   *
+   * What it does:
+   * Destroys each curve-key entry in the half-open `[begin,end)` lane, frees
+   * the backing payload, and resets begin/end/capacity pointers to null.
+   */
+  void ResetEmitterCurveKeyStorageRuntime(REmitterCurveKeyListStorage* const storage)
+  {
+    if (storage == nullptr) {
+      return;
+    }
+
+    REmitterCurveKey* cursor = storage->mBegin;
+    if (cursor != nullptr) {
+      const REmitterCurveKey* const end = storage->mEnd;
+      while (cursor != end) {
+        cursor->~REmitterCurveKey();
+        ++cursor;
+      }
+
+      ::operator delete(storage->mBegin);
+    }
+
+    storage->mBegin = nullptr;
+    storage->mEnd = nullptr;
+    storage->mCapacityEnd = nullptr;
+  }
+
+  /**
    * Address: 0x00514B30 (FUN_00514B30)
    * Mangled: ?GetClass@REmitterCurveKey@Moho@@UBEPAVRType@gpg@@XZ
    *
@@ -61,6 +90,14 @@ namespace moho
    * Runtime destructor for curve-key samples.
    */
   REmitterCurveKey::~REmitterCurveKey() = default;
+
+  /**
+   * Address: 0x0050E530 (FUN_0050E530, ??0REmitterBlueprintCurve@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Installs the curve vftable and zero-initializes range/key-storage lanes.
+   */
+  REmitterBlueprintCurve::REmitterBlueprintCurve() = default;
 
   /**
    * Address: 0x0050E4F0 (FUN_0050E4F0)
@@ -102,20 +139,8 @@ namespace moho
    */
   REmitterBlueprintCurve::~REmitterBlueprintCurve()
   {
-    if (Keys.mBegin && Keys.mEnd && Keys.mEnd >= Keys.mBegin) {
-      for (REmitterCurveKey* it = Keys.mBegin; it != Keys.mEnd; ++it) {
-        it->~REmitterCurveKey();
-      }
-    }
-
-    if (Keys.mBegin) {
-      ::operator delete(Keys.mBegin);
-    }
-
+    ResetEmitterCurveKeyStorageRuntime(&Keys);
     Keys.mAllocProxy = nullptr;
-    Keys.mBegin = nullptr;
-    Keys.mEnd = nullptr;
-    Keys.mCapacityEnd = nullptr;
   }
 
   /**

@@ -14,19 +14,38 @@
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/EUnitCommandQueueStatus.h"
 
+namespace gpg
+{
+  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(WriteArchive* archive, int objectPtr);
+} // namespace gpg
+
 namespace
 {
   void cleanup_RBroadcasterRType_ECommandEvent_Name();
   void cleanup_RListenerRType_ECommandEvent_Name();
 
+  gpg::RType* gECommandEventTypeCache = nullptr;
+
+  /**
+   * Address: 0x005F45D0 (FUN_005F45D0)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `ECommandEvent`.
+   */
+  [[nodiscard]] gpg::RType* ResolveECommandEventTypeCachePrimary()
+  {
+    if (!gECommandEventTypeCache) {
+      gECommandEventTypeCache = gpg::LookupRType(typeid(moho::ECommandEvent));
+    }
+    return gECommandEventTypeCache;
+  }
+
   [[nodiscard]] gpg::RType* CachedECommandEventType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = ResolveECommandEventTypeCachePrimary();
     if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::ECommandEvent));
-      if (!cached) {
-        cached = gpg::REF_FindTypeNamed("ECommandEvent");
-      }
+      cached = gpg::REF_FindTypeNamed("ECommandEvent");
+      gECommandEventTypeCache = cached;
     }
     return cached;
   }
@@ -58,6 +77,8 @@ namespace
   class RBroadcasterRType_ECommandEvent final : public gpg::RType
   {
   public:
+    ~RBroadcasterRType_ECommandEvent() override;
+
     /**
      * Address: 0x006EA7A0 (FUN_006EA7A0, Moho::RBroadcasterRType_ECommandEvent::SerLoad)
      *
@@ -114,15 +135,45 @@ namespace
   class RBroadcasterRType_EUnitCommandQueueStatus final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x006F85E0 (FUN_006F85E0, Moho::RBroadcasterRType_EUnitCommandQueueStatus::SerLoad)
+     *
+     * What it does:
+     * Deserializes one intrusive `Broadcaster<EUnitCommandQueueStatus>` lane by
+     * reading listener pointers until a null sentinel and relinking each
+     * listener node into the broadcaster ring.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006F92F0 (FUN_006F92F0, Moho::RBroadcasterRType_EUnitCommandQueueStatus::dtr)
+     *
+     * What it does:
+     * Tears down one broadcaster-status type-info descriptor and releases
+     * inherited `gpg::RType` reflection storage lanes.
+     */
+    ~RBroadcasterRType_EUnitCommandQueueStatus() override;
+
     [[nodiscard]] const char* GetName() const override
     {
       return "Broadcaster<EUnitCommandQueueStatus>";
     }
 
+    /**
+     * Address: 0x006F8210 (FUN_006F8210)
+     *
+     * What it does:
+     * Binds serializer load/save callback lanes and version metadata for
+     * `Broadcaster<EUnitCommandQueueStatus>` reflection.
+     */
     void Init() override
     {
       size_ = sizeof(moho::Broadcaster);
-      Finish();
+      version_ = 1;
+      serLoadFunc_ = &RBroadcasterRType_EUnitCommandQueueStatus::SerLoad;
+      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
+        &gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus
+      );
     }
   };
 
@@ -148,6 +199,15 @@ namespace
   class RListenerRType_EUnitCommandQueueStatus final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x006F9350 (FUN_006F9350, Moho::RListenerRType_EUnitCommandQueueStatus::dtr)
+     *
+     * What it does:
+     * Tears down one listener-status type-info descriptor and releases
+     * inherited `gpg::RType` reflection storage lanes.
+     */
+    ~RListenerRType_EUnitCommandQueueStatus() override;
+
     [[nodiscard]] const char* GetName() const override
     {
       return "Listener<EUnitCommandQueueStatus>";
@@ -159,6 +219,49 @@ namespace
       Finish();
     }
   };
+
+  /**
+   * Address: 0x006EBCC0 (FUN_006EBCC0, RBroadcasterRType_ECommandEvent non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one
+   * `RBroadcasterRType_ECommandEvent` instance while preserving outer storage
+   * ownership.
+   */
+  [[maybe_unused]] void DestroyBroadcasterCommandEventRTypeBody(
+    RBroadcasterRType_ECommandEvent* const typeInfo
+  ) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  RBroadcasterRType_ECommandEvent::~RBroadcasterRType_ECommandEvent()
+  {
+    DestroyBroadcasterCommandEventRTypeBody(this);
+  }
+
+  /**
+   * Address: 0x006F92F0 (FUN_006F92F0, Moho::RBroadcasterRType_EUnitCommandQueueStatus::dtr)
+   *
+   * What it does:
+   * Tears down one broadcaster-status type-info descriptor and releases
+   * inherited `gpg::RType` reflection storage lanes.
+   */
+  RBroadcasterRType_EUnitCommandQueueStatus::~RBroadcasterRType_EUnitCommandQueueStatus() = default;
+
+  /**
+   * Address: 0x006F9350 (FUN_006F9350, Moho::RListenerRType_EUnitCommandQueueStatus::dtr)
+   *
+   * What it does:
+   * Tears down one listener-status type-info descriptor and releases
+   * inherited `gpg::RType` reflection storage lanes.
+   */
+  RListenerRType_EUnitCommandQueueStatus::~RListenerRType_EUnitCommandQueueStatus() = default;
 
   [[nodiscard]] RBroadcasterRType_EUnitCommandQueueStatus& BroadcasterStatusRType()
   {
@@ -175,6 +278,12 @@ namespace
   [[nodiscard]] RListenerRType_EUnitCommandQueueStatus& ListenerStatusRType()
   {
     static RListenerRType_EUnitCommandQueueStatus sType;
+    return sType;
+  }
+
+  [[nodiscard]] RListenerRType_ECommandEvent& ListenerCommandEventRType()
+  {
+    static RListenerRType_ECommandEvent sType;
     return sType;
   }
 
@@ -201,6 +310,187 @@ namespace
     return reinterpret_cast<moho::Listener<moho::ECommandEvent>*>(
       bytePtr - offsetof(moho::Listener<moho::ECommandEvent>, mListenerLink)
     );
+  }
+
+  /**
+   * Address: 0x006E8190 (FUN_006E8190)
+   *
+   * What it does:
+   * Unlinks one broadcaster intrusive-list node and resets it to self-linked
+   * sentinel state.
+   */
+  [[maybe_unused]] moho::Broadcaster* UnlinkBroadcasterNodeAndResetSentinel(moho::Broadcaster* const node) noexcept
+  {
+    if (node == nullptr || node->mPrev == nullptr || node->mNext == nullptr) {
+      return node;
+    }
+
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F4567 (FUN_005F4567)
+   *
+   * What it does:
+   * Unlinks one broadcaster node from its current intrusive ring, restores it
+   * to singleton links, then relinks it directly before `anchor`.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkBroadcasterNodeBeforeAnchor(
+    moho::Broadcaster* const node,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    if (node == nullptr || anchor == nullptr) {
+      return node;
+    }
+
+    node->mPrev->mNext = node->mNext;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev = node;
+    node->mNext = node;
+
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node;
+  }
+
+  struct BroadcasterOwnerNodeOffset4RuntimeView
+  {
+    std::uint32_t ownerWord; // +0x00
+    moho::Broadcaster node;  // +0x04
+  };
+  static_assert(
+    offsetof(BroadcasterOwnerNodeOffset4RuntimeView, node) == 0x04,
+    "BroadcasterOwnerNodeOffset4RuntimeView::node offset must be 0x04"
+  );
+  static_assert(
+    sizeof(BroadcasterOwnerNodeOffset4RuntimeView) == 0x0C,
+    "BroadcasterOwnerNodeOffset4RuntimeView size must be 0x0C"
+  );
+
+  /**
+   * Address: 0x005F4560 (FUN_005F4560)
+   *
+   * What it does:
+   * Adjusts one owner pointer to its embedded broadcaster node at `+0x04`
+   * and dispatches to the canonical intrusive relink lane.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4NodeDispatchToCanonicalRelink(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    moho::Broadcaster* node = nullptr;
+    if (owner != nullptr) {
+      node = &owner->node;
+    }
+    return RelinkBroadcasterNodeBeforeAnchor(node, anchor);
+  }
+
+  /**
+   * Address: 0x005F4360 (FUN_005F4360)
+   *
+   * What it does:
+   * Resets one broadcaster link node to singleton self-links.
+   */
+  [[maybe_unused]] moho::Broadcaster* ResetBroadcasterNodeSelfLinks(moho::Broadcaster* const node) noexcept
+  {
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F4370 (FUN_005F4370)
+   * Address: 0x005F4590 (FUN_005F4590)
+   *
+   * What it does:
+   * Unlinks one broadcaster node from its current intrusive ring and restores
+   * singleton self-links.
+   */
+  [[maybe_unused]] moho::Broadcaster* UnlinkBroadcasterNodeSelfLinkAlias(moho::Broadcaster* const node) noexcept
+  {
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F4610 (FUN_005F4610)
+   *
+   * What it does:
+   * Unlinks one broadcaster node from its current ring and relinks it
+   * directly before `anchor`.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkBroadcasterNodeBeforeAnchorAlias(
+    moho::Broadcaster* const node,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F42F0 (FUN_005F42F0)
+   * Address: 0x005F4340 (FUN_005F4340)
+   *
+   * What it does:
+   * Unlinks the owner node at offset `+0x04` and returns that node lane after
+   * singleton self-link reset.
+   */
+  [[maybe_unused]] moho::Broadcaster* UnlinkOwnerOffset4BroadcasterNodeAndReturnNode(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner
+  ) noexcept
+  {
+    moho::Broadcaster* const node = &owner->node;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+    return node;
+  }
+
+  /**
+   * Address: 0x005F42C0 (FUN_005F42C0)
+   * Address: 0x005F4310 (FUN_005F4310)
+   *
+   * What it does:
+   * Unlinks the owner node at offset `+0x04`, resets it to singleton links,
+   * and relinks it directly before `anchor`.
+   */
+  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4BroadcasterNodeBeforeAnchor(
+    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
+    moho::Broadcaster* const anchor
+  ) noexcept
+  {
+    moho::Broadcaster* const node = &owner->node;
+    node->mNext->mPrev = node->mPrev;
+    node->mPrev->mNext = node->mNext;
+    node->mPrev = node;
+    node->mNext = node;
+
+    node->mPrev = anchor->mPrev;
+    node->mNext = anchor;
+    anchor->mPrev = node;
+    node->mPrev->mNext = node;
+    return node;
   }
 
   /**
@@ -271,6 +561,39 @@ namespace
 
     (void)gpg::RRef_Listener_ECommandEvent(&pointerRef, nullptr);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
+
+  /**
+   * Address: 0x006F85E0 (FUN_006F85E0, Moho::RBroadcasterRType_EUnitCommandQueueStatus::SerLoad)
+   *
+   * What it does:
+   * Reads listener pointers until a null sentinel and relinks each
+   * `Listener<EUnitCommandQueueStatus>` node before the destination
+   * broadcaster sentinel.
+   */
+  void RBroadcasterRType_EUnitCommandQueueStatus::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(broadcaster != nullptr);
+    if (!archive || !broadcaster) {
+      return;
+    }
+
+    moho::Listener<moho::EUnitCommandQueueStatus>* listener = nullptr;
+    archive->ReadPointer_Listener_EUnitCommandQueueStatus(&listener, ownerRef);
+    while (listener != nullptr) {
+      listener->mListenerLink.ListUnlink();
+      listener->mListenerLink.ListLinkBefore(broadcaster);
+      archive->ReadPointer_Listener_EUnitCommandQueueStatus(&listener, ownerRef);
+    }
   }
 
   template <class TType>
@@ -369,6 +692,19 @@ namespace
 
 namespace moho
 {
+  namespace
+  {
+    struct CommandEventBroadcasterOwnerRuntimeView
+    {
+      std::byte lane00_33[0x34]{};
+      Broadcaster commandEventBroadcaster; // +0x34
+    };
+    static_assert(
+      offsetof(CommandEventBroadcasterOwnerRuntimeView, commandEventBroadcaster) == 0x34,
+      "CommandEventBroadcasterOwnerRuntimeView::commandEventBroadcaster offset must be 0x34"
+    );
+  } // namespace
+
   /**
    * Address: 0x006E94A0 (FUN_006E94A0,
    * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
@@ -403,6 +739,21 @@ namespace moho
 
     detached.mNext->mPrev = detached.mPrev;
     detached.mPrev->mNext = detached.mNext;
+  }
+
+  /**
+   * Address: 0x006E9110 (FUN_006E9110)
+   *
+   * What it does:
+   * Resolves one embedded broadcaster lane at owner offset `+0x34` and
+   * forwards one command-event broadcast into that lane.
+   */
+  [[maybe_unused]] void BroadcastEmbeddedCommandEventLane(
+    CommandEventBroadcasterOwnerRuntimeView* const ownerRuntime,
+    const ECommandEvent event
+  )
+  {
+    ownerRuntime->commandEventBroadcaster.BroadcastEvent(event);
   }
 
   /**
@@ -452,6 +803,20 @@ namespace moho
   {
     auto& type = BroadcasterCommandEventRType();
     gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::ECommandEvent>), &type);
+    return &type;
+  }
+
+  /**
+   * Address: 0x005F4A70 (FUN_005F4A70, register_Listener_ECommandEvent_RType)
+   *
+   * What it does:
+   * Initializes/preregisters reflection type metadata for the
+   * `Listener< ECommandEvent >` event-link family.
+   */
+  gpg::RType* register_Listener_ECommandEvent_RType()
+  {
+    auto& type = ListenerCommandEventRType();
+    gpg::PreRegisterRType(typeid(moho::Listener<moho::ECommandEvent>), &type);
     return &type;
   }
 

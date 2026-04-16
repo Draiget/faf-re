@@ -539,6 +539,8 @@ namespace gpg::core
     /**
      * Address: 0x0047C590 (FUN_0047C590, gpg::fastvector_n64_char::InsertAt char lane)
      * Address: 0x004C7EB0 (FUN_004C7EB0, gpg::fastvector_n<LuaPlus::LuaObject>::InsertAt lane)
+     * Address: 0x0057FE30 (FUN_0057FE30, gpg::fastvector_Entity::InsertAt)
+     * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -621,6 +623,56 @@ namespace gpg::core
         }
         ++this->end_;
       }
+    }
+
+    /**
+     * Address: 0x0057EB00 (FUN_0057EB00, gpg::fastvector_Entity::AddAll)
+     *
+     * What it does:
+     * Replaces this payload with `source` while preserving inline/heap storage
+     * rules and minimizing reallocations when capacity is already sufficient.
+     */
+    FastVectorN<T, N>* AddAll(const FastVectorN<T, N>* const source)
+    {
+      if (this == source) {
+        return this;
+      }
+
+      const std::size_t currentCount = static_cast<std::size_t>(this->end_ - this->start_);
+      const std::size_t sourceCount = static_cast<std::size_t>(source->end_ - source->start_);
+
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        if (currentCount >= sourceCount) {
+          if (sourceCount > 0) {
+            std::memmove(this->start_, source->start_, sourceCount * ElemSize);
+          }
+          this->end_ = this->start_ + sourceCount;
+          return this;
+        }
+
+        const std::size_t activeCapacity = static_cast<std::size_t>(this->capacity_ - this->start_);
+        if (sourceCount > activeCapacity) {
+          GrowInsert(this->start_, sourceCount, this->start_, this->start_);
+        }
+
+        if (currentCount > 0) {
+          std::memmove(this->start_, source->start_, currentCount * ElemSize);
+        }
+
+        this->InsertAt(this->end_, source->start_ + currentCount, source->end_);
+        return this;
+      }
+
+      if (sourceCount > this->Capacity()) {
+        GrowToCapacity(sourceCount);
+      }
+
+      this->end_ = this->start_;
+      for (const T* it = source->start_; it != source->end_; ++it) {
+        push_back(*it);
+      }
+
+      return this;
     }
 
     // Reset to inline storage and copy from a plain FastVector view

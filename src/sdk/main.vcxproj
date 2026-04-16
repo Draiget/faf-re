@@ -22,31 +22,32 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{a6f8502f-3d49-4578-ac83-d434981ad676}</ProjectGuid>
-    <RootNamespace>sdk</RootNamespace>
+    <RootNamespace>main</RootNamespace>
+    <ProjectName>main</ProjectName>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -73,12 +74,15 @@
   <PropertyGroup>
     <FafRepoRoot Condition="'$(SolutionPath)' != ''">$(SolutionDir)</FafRepoRoot>
     <FafRepoRoot Condition="'$(SolutionPath)' == ''">$(MSBuildProjectDirectory)\..\..\</FafRepoRoot>
+    <DirectXLibX86>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x86</DirectXLibX86>
+    <DirectXLibX64>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x64</DirectXLibX64>
     <Wm3FoundationDir>$(FafRepoRoot)dependencies\WildMagic3p8\Foundation</Wm3FoundationDir>
     <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(FafRepoRoot)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(FafRepoRoot)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -100,23 +104,23 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
-      <DisableSpecificWarnings>4073;4244;4273;4834;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\LuaPlus_Build1081\Prebuilt\Lib\win32;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
-    </Lib>
+      <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ForceFileOutput>Enabled</ForceFileOutput>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -124,44 +128,41 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
-      <DisableSpecificWarnings>4073;4244;4273;4834;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\LuaPlus_Build1081\Prebuilt\Lib\win32;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
-    </Lib>
+      <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
-      <DisableSpecificWarnings>4073;4244;4273;4834;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;dbghelp.lib;winmm.lib;version.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -169,22 +170,20 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
-      <DisableSpecificWarnings>4073;4244;4273;4834;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4073;4244;4273;4834;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;$(Wm3IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;dbghelp.lib;winmm.lib;version.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gpg\core\algorithms\Cluster.cpp" />
@@ -211,6 +210,8 @@
     <ClCompile Include="gpg\core\reflection\RTypeTypeInfo.cpp" />
     <ClCompile Include="gpg\core\reflection\RObjectTypeInfo.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorUIntReflection.cpp" />
+    <ClCompile Include="gpg\core\containers\FastVectorInsertLanes.cpp" />
+    <ClCompile Include="gpg\core\containers\CheckedArrayAllocationLanes.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseVectorReflection.cpp" />
     <ClCompile Include="moho\serialization\CPrefetchSet.cpp" />
     <ClCompile Include="moho\serialization\CPrefetchSetSerializer.cpp" />
@@ -242,6 +243,54 @@
     <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
     <ClCompile Include="gpg\core\utils\Global.cpp" />
     <ClCompile Include="gpg\core\utils\Logging.cpp" />
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\barrier.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_barrier.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\condition.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_condition.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\exceptions.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_exceptions.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\mutex.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_mutex.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\once.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_once.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\recursive_mutex.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_recursive_mutex.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\thread.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_thread.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\tss_hooks.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_tss_hooks.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\tss_dll.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_tss_dll.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\tss_pe.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_tss_pe.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\tss.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_tss.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\xtime.cpp">
+      <ObjectFileName>$(IntDir)boost_thread_xtime.obj</ObjectFileName>
+      <PreprocessorDefinitions>_HAS_AUTO_PTR_ETC=1;BOOST_THREAD_BUILD_LIB=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="gpg\gal\ContextInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Device.cpp" />
     <ClCompile Include="gpg\gal\Effect.cpp" />
@@ -273,6 +322,10 @@
     <ClCompile Include="lua\LuaStateSaveConstruct.cpp" />
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
     <ClCompile Include="lua\LuaStateTypeInfo.cpp" />
+    <ClCompile Include="moho\lua\UnrecoveredLuaCallbackStubs.cpp" />
+    <ClCompile Include="moho\EngineUnrecoveredStubs.cpp" />
+    <ClCompile Include="moho\EngineMethodStubs.cpp" />
+    <ClCompile Include="moho\EngineMethodStubs2.cpp" />
     <ClCompile Include="lua\LuaTypeInfoRegistration.cpp" />
     <ClCompile Include="lua\LuaTableIterator.cpp" />
     <ClCompile Include="moho\ai\CAiAttackerImpl.cpp" />
@@ -361,6 +414,7 @@
     <ClCompile Include="moho\ai\IAiTransport.cpp" />
     <ClCompile Include="moho\ai\IAiTransportSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiTransportTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\SPickUpInfo.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImpl.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplSerializer.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplTypeInfo.cpp" />
@@ -414,6 +468,7 @@
     <ClCompile Include="moho\animation\CAnimTexture.cpp" />
     <ClCompile Include="moho\animation\CAniActor.cpp" />
     <ClCompile Include="moho\animation\CAniPose.cpp" />
+    <ClCompile Include="moho\animation\CAniPoseBoneTypeInfo.cpp" />
     <ClCompile Include="moho\animation\CAniPoseSharedPtrReflection.cpp" />
     <ClCompile Include="moho\animation\CAniPoseTypeInfo.cpp" />
     <ClCompile Include="moho\animation\CAniSkel.cpp" />
@@ -422,6 +477,8 @@
     <ClCompile Include="moho\animation\CRotateManipulator.cpp" />
     <ClCompile Include="moho\animation\CSlideManipulator.cpp" />
     <ClCompile Include="moho\animation\CSlaveManipulator.cpp" />
+    <ClCompile Include="moho\animation\CStorageManipulator.cpp" />
+    <ClCompile Include="moho\animation\CThrustManipulator.cpp" />
     <ClCompile Include="moho\animation\SAniManipBindingReflection.cpp" />
     <ClCompile Include="moho\animation\CAnimationManipulator.cpp" />
     <ClCompile Include="moho\audio\AudioEngine.cpp" />
@@ -452,6 +509,7 @@
     <ClCompile Include="moho\app\WinMain.cpp" />
     <ClCompile Include="moho\app\WinApp.cpp" />
     <ClCompile Include="moho\app\WxAppRuntime.cpp" />
+    <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp" />
     <ClCompile Include="moho\app\WxRuntimeTypes.cpp" />
     <ClCompile Include="moho\collision\CCollisionManipulator.cpp" />
     <ClCompile Include="moho\collision\CCollisionManipulatorSerializer.cpp" />
@@ -537,6 +595,9 @@
     <ClCompile Include="moho\containers\BVIntSetTypeInfo.cpp" />
     <ClCompile Include="moho\containers\BVSet.cpp" />
     <ClCompile Include="moho\containers\BitStorage32.cpp" />
+    <ClCompile Include="moho\containers\LegacyContainerFillLanes.cpp" />
+    <ClCompile Include="moho\containers\LegacyContainerFillLanesB.cpp" />
+    <ClCompile Include="moho\containers\LegacyContainerRuntime.cpp" />
     <ClCompile Include="moho\containers\SCoordsVec2TypeInfo.cpp" />
     <ClCompile Include="moho\core\Thread.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
@@ -569,6 +630,7 @@
     <ClCompile Include="moho\effects\rendering\CEfxBeamSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitter.cpp" />
+    <ClCompile Include="moho\effects\rendering\CEfxEmitterSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxTrailEmitter.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitterTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectManagerImpl.cpp" />
@@ -686,6 +748,7 @@
     <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="moho\misc\RuntimeTuningGlobals.cpp" />
     <ClCompile Include="moho\misc\DName.cpp" />
     <ClCompile Include="moho\misc\StringUtils.cpp" />
     <ClCompile Include="moho\misc\ID3DDeviceResources.cpp" />
@@ -738,6 +801,7 @@
     <ClCompile Include="moho\net\CHostManager.cpp" />
     <ClCompile Include="moho\net\CLobby.cpp" />
     <ClCompile Include="moho\net\CLobbyTypeInfo.cpp" />
+    <ClCompile Include="moho\net\CDiscoveryService.cpp" />
     <ClCompile Include="moho\net\CDiscoveryServiceTypeInfo.cpp" />
     <ClCompile Include="moho\net\SPeer.cpp" />
     <ClCompile Include="moho\net\CMessage.cpp" />
@@ -875,6 +939,7 @@
     <ClCompile Include="moho\sim\SimGravityCommandRegistrations.cpp" />
     <ClCompile Include="moho\sim\SimDebugCommandRegistrations.cpp" />
     <ClCompile Include="moho\sim\SimFloatInitializers.cpp" />
+    <ClCompile Include="moho\sim\SimRecoveryRuntime.cpp" />
     <ClCompile Include="moho\sim\ManipulatorStartupRegistrations.cpp" />
     <ClCompile Include="moho\sim\SimStartupRegistrations.cpp" />
     <ClCompile Include="moho\sim\SPhysConstantsTypeInfo.cpp" />
@@ -931,6 +996,7 @@
     <ClCompile Include="moho\sim\CEconomyTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CEconStorageTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CEconRequestTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\SMassInfoSerializer.cpp" />
     <ClCompile Include="moho\sim\SMassInfoTypeInfo.cpp" />
     <ClCompile Include="moho\sim\ESTITargetTypeTypeInfo.cpp" />
     <ClCompile Include="moho\sim\EReconFlagsTypeInfo.cpp" />
@@ -999,6 +1065,7 @@
     <ClCompile Include="moho\ui\CUIWorldMeshTypeInfo.cpp" />
     <ClCompile Include="moho\ui\IUIManager.cpp" />
     <ClCompile Include="moho\ui\SelectionDragger.cpp" />
+    <ClCompile Include="moho\ui\UiRuntimeTypeUpcastBridges.cpp" />
     <ClCompile Include="moho\ui\UiRuntimeTypes.cpp" />
     <ClCompile Include="moho\unit\core\IUnit.cpp" />
     <ClCompile Include="moho\unit\core\IUnitWeakPtrReflection.cpp" />
@@ -1021,6 +1088,7 @@
     <ClCompile Include="moho\unit\tasks\CUnitCallTeleport.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitTeleportTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitWaitForFerryTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitWaitForFerryTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransport.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransportTypeInfo.cpp" />
@@ -1030,10 +1098,12 @@
     <ClCompile Include="moho\unit\tasks\CBuildTaskHelperTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitGuardTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitFerryTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitFerryTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitFormAndMoveTaskTypeInfo.cpp" />
@@ -1042,6 +1112,7 @@
     <ClCompile Include="moho\unit\tasks\CUnitReclaimTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.cpp" />
+      <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.cpp" />
@@ -1052,8 +1123,12 @@
     <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMoveTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitPatrolTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitPatrolTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitPodAssistTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnits.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsSerializer.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnits.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnitsTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUpgradeTask.cpp" />
@@ -1164,6 +1239,8 @@
     <ClInclude Include="gpg\core\reflection\RMapStringFloatTypeInfo.h" />
     <ClInclude Include="gpg\core\reflection\Reflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorUIntReflection.h" />
+    <ClInclude Include="gpg\core\containers\FastVectorInsertLanes.h" />
+    <ClInclude Include="gpg\core\containers\CheckedArrayAllocationLanes.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseVectorReflection.h" />
     <ClInclude Include="moho\serialization\CPrefetchSet.h" />
     <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h" />
@@ -1293,6 +1370,7 @@
     <ClInclude Include="moho\animation\CAnimTexture.h" />
     <ClInclude Include="moho\animation\CAniActor.h" />
     <ClInclude Include="moho\animation\CAniPose.h" />
+    <ClInclude Include="moho\animation\CAniPoseBoneTypeInfo.h" />
     <ClInclude Include="moho\animation\CAniPoseSharedPtrReflection.h" />
     <ClInclude Include="moho\animation\CAniPoseTypeInfo.h" />
     <ClInclude Include="moho\animation\CAniSkel.h" />
@@ -1684,6 +1762,7 @@
     <ClInclude Include="moho\ai\IAiTransport.h" />
     <ClInclude Include="moho\ai\IAiTransportSerializer.h" />
     <ClInclude Include="moho\ai\IAiTransportTypeInfo.h" />
+    <ClInclude Include="moho\ai\SPickUpInfo.h" />
     <ClInclude Include="moho\ai\LAiAttackerImpl.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h" />
@@ -1964,6 +2043,7 @@
     <ClInclude Include="moho\sim\CEconStorageTypeInfo.h" />
     <ClInclude Include="moho\sim\CEconRequestTypeInfo.h" />
     <ClInclude Include="moho\sim\SMassInfo.h" />
+    <ClInclude Include="moho\sim\SMassInfoSerializer.h" />
     <ClInclude Include="moho\sim\SMassInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\SSessionSaveDataTypeInfo.h" />
     <ClInclude Include="moho\sim\CWldSessionLoaderImpl.h" />
@@ -2069,6 +2149,7 @@
     <ClInclude Include="moho\unit\tasks\CUnitGuardTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitFerryTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitFerryTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitFormAndMoveTask.h" />
@@ -2086,8 +2167,12 @@
     <ClInclude Include="moho\unit\tasks\CUnitMoveTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMoveTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitPatrolTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitPatrolTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h" />
     <ClInclude Include="moho\unit\tasks\CUnitPodAssistTypeInfo.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnits.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsSerializer.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitUnloadUnits.h" />
     <ClInclude Include="moho\unit\tasks\CUnitUnloadUnitsTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitUpgradeTask.h" />
@@ -2165,6 +2250,7 @@
     <ClInclude Include="moho\ui\EUIActionTypeTypeInfo.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cri\sofdec\SofdecExternalStubs.cpp" />
     <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp" />
     <None Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp" />
     <None Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp" />
@@ -2177,7 +2263,7 @@
     <None Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp" />
     <None Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp" />
     <None Include="cri\sofdec\SofdecMpaRuntime.cpp" />
-    <None Include="cri\sofdec\SofdecMpvRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecMpvRuntime.cpp" />
     <None Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp" />
     <None Include="cri\sofdec\SofdecSfdRuntime.cpp" />
     <None Include="cri\sofdec\SofdecSfxRuntime.cpp" />
@@ -2222,12 +2308,12 @@
     <ClCompile Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SPhysBody.cpp" />
   
-    <None Include="gpg\core\reflection\RFloatType.cpp" />
-    <None Include="gpg\core\reflection\RIntegerTypes.cpp" />
-    <None Include="gpg\core\reflection\RStringType.cpp" />
+    <ClCompile Include="gpg\core\reflection\RFloatType.cpp" />
+    <ClCompile Include="gpg\core\reflection\RIntegerTypes.cpp" />
+    <ClCompile Include="gpg\core\reflection\RStringType.cpp" />
     <None Include="lua\LuaError.cpp" />
-    <None Include="moho\command\SSTICommandIssueData.cpp" />
-    <None Include="moho\render\d3d\D3DResUnreachableStubs.cpp" />
+    <ClCompile Include="moho\command\SSTICommandIssueData.cpp" />
+    <ClCompile Include="moho\render\d3d\D3DResUnreachableStubs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gpg\gal\AppRuntimeView.h" />

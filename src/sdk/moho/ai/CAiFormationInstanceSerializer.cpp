@@ -78,6 +78,30 @@ namespace
     return UnlinkSerializerNode(*AcquireCAiFormationInstanceSerializer());
   }
 
+  /**
+   * Address: 0x0059BF40 (FUN_0059BF40)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * CAiFormationInstance serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiFormationInstanceSerializerStartupThunkA()
+  {
+    return cleanup_CAiFormationInstanceSerializer();
+  }
+
+  /**
+   * Address: 0x0059BF70 (FUN_0059BF70)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * CAiFormationInstance serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiFormationInstanceSerializerStartupThunkB()
+  {
+    return cleanup_CAiFormationInstanceSerializer();
+  }
+
   void cleanup_CAiFormationInstanceSerializer_atexit()
   {
     (void)cleanup_CAiFormationInstanceSerializer();
@@ -149,7 +173,6 @@ void moho::register_CAiFormationInstanceSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiFormationInstanceSerializer::Deserialize;
   serializer->mSaveCallback = &CAiFormationInstanceSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiFormationInstanceSerializer_atexit);
 }
 

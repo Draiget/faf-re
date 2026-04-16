@@ -5,7 +5,14 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
+
+namespace boost
+{
+  template <typename T>
+  class shared_ptr;
+}
 
 namespace gpg
 {
@@ -34,6 +41,18 @@ namespace gpg
 namespace moho
 {
   class STIMap;
+
+  /**
+   * Address: 0x005CAFB0 (FUN_005CAFB0, boost::shared_ptr_CIntelGrid::shared_ptr_CIntelGrid)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<CIntelGrid>` from one raw intel-grid pointer
+   * lane.
+   */
+  boost::shared_ptr<CIntelGrid>* ConstructSharedIntelGridFromRaw(
+    boost::shared_ptr<CIntelGrid>* outIntelGrid,
+    CIntelGrid* intelGrid
+  );
 
   struct SDelayedSubVizInfo
   {
@@ -90,7 +109,7 @@ namespace moho
     CIntelGrid(const STIMap* map, std::uint32_t size);
 
     /**
-     * Address: 0x00508D80 (FUN_00508D80, CIntelGrid storage-release lane)
+       * Address: 0x00508D80 (FUN_00508D80)
      *
      * What it does:
      * Releases delayed-sub-viz storage and backing visibility grid memory.
@@ -105,6 +124,15 @@ namespace moho
      * visibility byte is non-zero.
      */
     [[nodiscard]] bool IsVisible(std::int32_t x, std::int32_t z) const;
+
+    /**
+     * Address: 0x005BE180 (FUN_005BE180, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector2@H@Wm3@@@Z)
+     *
+     * What it does:
+     * Returns true when integer grid coordinates are inside bounds and the
+     * addressed visibility byte is non-zero.
+     */
+    [[nodiscard]] bool IsVisible(const Wm3::Vector2i& gridCell) const;
 
     /**
      * Address: 0x005BE1C0 (FUN_005BE1C0, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z)

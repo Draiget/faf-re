@@ -192,10 +192,13 @@ namespace moho
   void CUnitRepairTaskTypeInfo::Init()
   {
     size_ = 0x9C;
-    newRefFunc_ = &CUnitRepairTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitRepairTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitRepairTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitRepairTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitRepairTaskTypeInfo::NewRef,
+      &CUnitRepairTaskTypeInfo::CtrRef,
+      &CUnitRepairTaskTypeInfo::Delete,
+      &CUnitRepairTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_ECommandEvent(this);

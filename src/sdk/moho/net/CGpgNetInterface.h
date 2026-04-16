@@ -68,6 +68,15 @@ namespace moho
     SNetCommand(const char* name, const msvc8::vector<SNetCommandArg>& args, int val);
 
     /**
+     * Address: 0x007BCE70 (FUN_007BCE70)
+     *
+     * What it does:
+     * Copy-constructs one queued command entry by cloning command name,
+     * argument vector lanes, and queued value state.
+     */
+    SNetCommand(const SNetCommand& source);
+
+    /**
      * Address: 0x007BAEF0 (FUN_007BAEF0, ??1SNetCommand@Moho@@QAE@@Z)
      *
      * What it does:
@@ -271,6 +280,15 @@ namespace moho
      * @param arg
      */
     void WriteArg(const SNetCommandArg* arg);
+
+    /**
+     * Address: 0x007B75D0 (FUN_007B75D0)
+     *
+     * What it does:
+     * Validates connected state under `mLock` and closes the active TCP
+     * socket lane with `ModeBoth`.
+     */
+    void EnsureConnectedAndCloseSocket();
 
     /**
      * Address: 0x007B7710

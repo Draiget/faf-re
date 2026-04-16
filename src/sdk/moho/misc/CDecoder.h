@@ -92,9 +92,38 @@ namespace moho
      */
     void DecodeSetCommandSource(gpg::BinaryReader& reader);
     /**
+     * Address: 0x006E4470 (FUN_006E4470)
+     *
+     * What it does:
+     * Forwards `CMDST_CommandSourceTerminated` directly to the configured
+     * command sink.
+     */
+    void DecodeCommandSourceTerminated(gpg::BinaryReader& reader);
+    /**
      * Address: 0x006E4480 (FUN_006E4480)
      */
     void DecodeVerifyChecksum(gpg::BinaryReader& reader);
+    /**
+     * Address: 0x006E44C0 (FUN_006E44C0)
+     *
+     * What it does:
+     * Forwards `CMDST_RequestPause` directly to the configured command sink.
+     */
+    void DecodeRequestPause(gpg::BinaryReader& reader);
+    /**
+     * Address: 0x006E44D0 (FUN_006E44D0)
+     *
+     * What it does:
+     * Forwards `CMDST_Resume` directly to the configured command sink.
+     */
+    void DecodeResume(gpg::BinaryReader& reader);
+    /**
+     * Address: 0x006E44E0 (FUN_006E44E0)
+     *
+     * What it does:
+     * Forwards `CMDST_SingleStep` directly to the configured command sink.
+     */
+    void DecodeSingleStep(gpg::BinaryReader& reader);
     /**
      * Address: 0x006E44F0 (FUN_006E44F0)
      */

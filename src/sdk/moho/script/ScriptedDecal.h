@@ -8,6 +8,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptObject.h"
+#include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
 struct lua_State;
@@ -115,6 +116,23 @@ namespace moho
      * runtime decal entry.
      */
     [[nodiscard]] bool SetPosition(const Wm3::Vector3f* worldPosition);
+
+    /**
+     * Address: 0x0087ED70 (FUN_0087ED70, Moho::ScriptedDecal::SetPositionByScreen)
+     *
+     * What it does:
+     * Projects one screen-space point through the active world camera and
+     * applies the resulting world-space position.
+     */
+    [[nodiscard]] bool SetPositionByScreen(const Wm3::Vector2f* screenPoint);
+
+    /**
+     * Address: 0x0087ED90 (FUN_0087ED90, Moho::ScriptedDecal::SetScale)
+     *
+     * What it does:
+     * Updates local/runtime decal scale lanes and reapplies world positioning.
+     */
+    [[nodiscard]] bool SetScale(const Wm3::Vector3f* scale);
 
     /**
      * Address: 0x0087EDE0 (FUN_0087EDE0, Moho::ScriptedDecal::SetTexture)

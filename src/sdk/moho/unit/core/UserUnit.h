@@ -6,6 +6,8 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/math/Vector3f.h"
+#include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -23,11 +25,13 @@ namespace moho
   struct SSTIEntityVariableData;
   class UserEntity;
   struct UserUnitManager;
+  struct UserCommand;
   class UserUnitWeapon;
   class CWldSession;
   struct RUnitBlueprint;
   struct SCoordsVec2;
   struct SFootprint;
+  struct SOccupationResult;
   struct SOCellPos;
 } // namespace moho
 
@@ -332,6 +336,15 @@ namespace moho
     [[nodiscard]] gpg::Rect2f* GetSkirt(gpg::Rect2f* outSkirtRect) const;
 
     /**
+     * Address: 0x0083EEC0 (FUN_0083EEC0, moho::UserUnit::DoOnDetectAdjacencyBonusFor)
+     *
+     * What it does:
+     * Invokes `/lua/ui/game/gamemain.lua:OnDetectAdjacencyBonus(unitObject, blueprintObject)`
+     * and returns the callback boolean result.
+     */
+    [[nodiscard]] bool DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* blueprint);
+
+    /**
      * Address: 0x00893080 (FUN_00893080, Moho::UserUnit::AddSelectionSet)
      *
      * What it does:
@@ -364,7 +377,8 @@ namespace moho
     // +0x148: IUnit subobject (22-slot vtable), +0x150: CScriptObject-style 4-slot subobject.
     std::uint8_t mIUnitAndScriptBridge[0x190 - 0x148]{};
     bool mIsFake; // 0x0190
-    std::uint8_t pad_0191_01A0[0x1A0 - 0x191]{};
+    std::uint8_t pad_0191_019C[0x19C - 0x191]{};
+    std::int32_t mBuildTemplateOrderLane; // 0x019C
     bool mAutoMode;           // 0x01A0
     bool mAutoSurfaceMode;    // 0x01A1
     bool mSelectableOverride; // 0x01A2
@@ -415,6 +429,10 @@ namespace moho
   };
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(sizeof(UserUnit) == 0x3E8, "UserUnit size must be 0x3E8");
+  static_assert(
+    offsetof(UserUnit, mBuildTemplateOrderLane) == 0x019C,
+    "UserUnit::mBuildTemplateOrderLane offset must be 0x019C"
+  );
   static_assert(offsetof(UserUnit, mAutoMode) == 0x01A0, "UserUnit::mAutoMode offset must be 0x01A0");
   static_assert(offsetof(UserUnit, mAutoSurfaceMode) == 0x01A1, "UserUnit::mAutoSurfaceMode offset must be 0x01A1");
   static_assert(
@@ -670,6 +688,37 @@ namespace moho
   bool USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint, SOCellPos& position);
 
   /**
+   * Address: 0x008C1880 (FUN_008C1880, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
+   *
+   * What it does:
+   * Runs world-space placement validation, then rejects when nearby static/dead
+   * visible units or queued mobile-build commands overlap the candidate skirt.
+   */
+  bool USERUNIT_CanBeBuiltAt(
+    CWldSession& session,
+    const RUnitBlueprint* buildBlueprint,
+    const SCoordsVec2& buildPosition,
+    bool allowCommandOverlap,
+    SOccupationResult* buildInfo,
+    const UserCommand* ignoredCommand
+  );
+
+  /**
+   * Address: 0x008C1BC0 (FUN_008C1BC0, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSOCellPos@1@_NPAUSBuildInfo@1@@Z)
+   *
+   * What it does:
+   * Converts one cell-origin placement probe into world-space center
+   * coordinates and forwards to the world-space buildability path.
+   */
+  bool USERUNIT_CanBeBuiltAt(
+    CWldSession& session,
+    const RUnitBlueprint* buildBlueprint,
+    const SOCellPos& cellPosition,
+    bool allowCommandOverlap,
+    SOccupationResult* buildInfo
+  );
+
+  /**
    * Address: 0x008C1610 (FUN_008C1610, ?USERUNIT_WithinBuildDistance@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@@Z)
    *
    * What it does:
@@ -679,6 +728,18 @@ namespace moho
    */
   bool USERUNIT_WithinBuildDistance(
     CWldSession& session, const RUnitBlueprint* buildBlueprint, const SCoordsVec2& buildPosition
+  );
+
+  /**
+   * Address: 0x008C1C30 (FUN_008C1C30, ?USERUNIT_GetBounds@Moho@@YA?AV?$AxisAlignedBox3@M@Wm3@@PBVRUnitBlueprint@1@ABV?$Vector3@M@3@@Z)
+   *
+   * What it does:
+   * Builds one world-space unit bounds AABB from blueprint collision/skirt
+   * lanes and one world position sample.
+   */
+  [[nodiscard]] Wm3::AxisAlignedBox3f USERUNIT_GetBounds(
+    const RUnitBlueprint* unitBlueprint,
+    const Wm3::Vector3f& worldPosition
   );
 
   /**

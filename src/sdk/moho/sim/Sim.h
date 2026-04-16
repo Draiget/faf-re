@@ -30,6 +30,7 @@ namespace moho
   struct SUnitConstructionParams;
   class CDecalBuffer;
   class CCommandDb;
+  class CUnitCommand;
   class CEntityDb;
   class CAiFormationDBImpl;
   class CSimConVarBase;
@@ -56,6 +57,46 @@ namespace moho
   struct SParticleBuffer;
   struct SEntitySetTemplateUnit;
   class CScrLuaInitForm;
+
+  /**
+   * Address: 0x007538C0 (FUN_007538C0, boost::shared_ptr_SParticleBuffer::shared_ptr_SParticleBuffer)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<SParticleBuffer>` from one raw particle-buffer
+   * pointer lane.
+   */
+  boost::shared_ptr<SParticleBuffer>* ConstructSharedParticleBufferFromRaw(
+    boost::shared_ptr<SParticleBuffer>* outBuffer,
+    SParticleBuffer* buffer
+  );
+
+  /**
+   * Address: 0x006F14D0 (FUN_006F14D0, Moho::UNIT_IssueFactoryCommand)
+   *
+   * What it does:
+   * Dispatches one factory command payload across selected factories and
+   * returns the shared command object when enqueue succeeds.
+   */
+  [[nodiscard]] CUnitCommand* IssueFactoryCommandToSelectedUnits(
+    Sim* sim,
+    const SEntitySetTemplateUnit& selectedUnits,
+    const SSTICommandIssueData& commandIssueData,
+    bool clearQueue
+  );
+
+  /**
+   * Address: 0x006F12C0 (FUN_006F12C0, UNIT_IssueCommand)
+   *
+   * What it does:
+   * Dispatches one command payload across selected units and returns the
+   * shared command object when queue insertion succeeds.
+   */
+  [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnits(
+    Sim* sim,
+    SEntitySetTemplateUnit& selectedUnits,
+    const SSTICommandIssueData& commandIssueData,
+    bool clearQueue
+  );
 
   class Sim final : public ICommandSink
   {
@@ -85,6 +126,15 @@ namespace moho
     void VerifyChecksum(const gpg::MD5Digest&, CSeqNo) override;
 
     /**
+     * Address: 0x00748600 (FUN_00748600, ?GetBeatChecksum@Sim@Moho@@QBE_NVCSeqNo@2@AAUMD5Digest@gpg@@@Z)
+     *
+     * What it does:
+     * Copies one retained beat checksum out of the 128-entry rolling ring when
+     * the requested beat is still available.
+     */
+    bool GetBeatChecksum(gpg::MD5Digest* outChecksum, CSeqNo beat) const;
+
+    /**
      * Address: 0x00748960
      */
     void RequestPause() override;
@@ -111,7 +161,7 @@ namespace moho
     void CreateUnit(uint32_t, const RResId& blueprintId, const SCoordsVec2&, float) override;
 
     /**
-     * Address: 0x00748C00 (FUN_00748C00)
+      * Alias of FUN_00748C00 (non-canonical helper lane).
      *
      * gpg::StrArg, Wm3::Vector3<float> const &
      *
@@ -948,7 +998,7 @@ namespace moho
     void UpdateChecksum();
 
     /**
-     * Address: 0x00754C60 (FUN_00754C60, sub_754C60)
+      * Alias of FUN_00754C60 (non-canonical helper lane).
      *
      * What it does:
      * Core Sim load-serialization routine used by Sim serializer callback.
@@ -1332,6 +1382,32 @@ namespace moho
    * Validates no Lua args and returns system timer elapsed seconds.
    */
   int cfunc_GetSystemTimeSecondsOnlyForProfileUseL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0075AA30 (FUN_0075AA30, cfunc_GetEntitiesInRect)
+   *
+   * What it does:
+   * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards
+   * to `cfunc_GetEntitiesInRectL`.
+   */
+  int cfunc_GetEntitiesInRect(lua_State* luaContext);
+
+  /**
+   * Address: 0x0075AA50 (FUN_0075AA50, func_GetEntitiesInRect_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `GetEntitiesInRect(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_GetEntitiesInRect_LuaFuncDef();
+
+  /**
+   * Address: 0x0075AAB0 (FUN_0075AAB0, cfunc_GetEntitiesInRectL)
+   *
+   * What it does:
+   * Reads one rectangle (`rect` or `x0,z0,x1,z1`) and returns a Lua table of
+   * entities (unit/prop/projectile/entity) inside the query rectangle.
+   */
+  int cfunc_GetEntitiesInRectL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0075AE00 (FUN_0075AE00, cfunc_GetUnitsInRect)
@@ -3957,6 +4033,16 @@ namespace moho
   int cfunc_ExitGame(lua_State* luaContext);
 
   /**
+   * Address: 0x0083F360 (FUN_0083F360, sub_83F360)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Validates zero args and requests world-frame action `Exit`.
+   */
+  int cfunc_ExitGameL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0083F300 (FUN_0083F300, func_ExitGame_LuaFuncDef)
    *
    * What it does:
@@ -5151,6 +5237,22 @@ namespace moho
    * `CWldSession::mOverlayFilters`.
    */
   int cfunc_SetOverlayFiltersL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008471C0 (FUN_008471C0, cfunc_GenerateBuildTemplateFromSelection)
+   *
+   * What it does:
+   * Lua callback target for `func_GenerateBuildTemplateFromSelection_LuaFuncDef`.
+   */
+  int cfunc_GenerateBuildTemplateFromSelection(lua_State* luaContext);
+
+  /**
+   * Address: 0x008471F0 (FUN_008471F0, func_GenerateBuildTemplateFromSelection_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `GenerateBuildTemplateFromSelection()` Lua binder metadata.
+   */
+  CScrLuaInitForm* func_GenerateBuildTemplateFromSelection_LuaFuncDef();
 
   /**
    * Address: 0x00847A20 (FUN_00847A20, cfunc_ClearBuildTemplates)
@@ -6513,8 +6615,8 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
     // Set by Sim serializer init helpers (0x0074CF80 / 0x00744F90) to 0x00744F70.
     gpg::RType::load_func_t mSerLoadFunc;
     // Set by Sim serializer init helpers (0x0074CF80 / 0x00744F90) to 0x00744F80.

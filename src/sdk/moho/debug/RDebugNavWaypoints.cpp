@@ -15,16 +15,19 @@ namespace
   constexpr std::uint32_t kWaypointCircleDepth = 0xFFFF0000u;
   constexpr std::uint32_t kWaypointCirclePrecision = 6u;
 
+  /**
+   * Address: 0x00650490 (FUN_00650490, Moho::RDebugNavWaypoints::DrawWaypointCircles helper)
+   *
+   * What it does:
+   * Draws one wire-circle marker for each waypoint in the contiguous batch.
+   */
   void DrawSteeringWaypoints(moho::Sim* const sim, const Wm3::Vector3f* const waypoints, const int waypointCount)
   {
-    if (sim == nullptr || waypoints == nullptr || waypointCount <= 0) {
+    if (waypointCount <= 0) {
       return;
     }
 
     moho::CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
-    if (debugCanvas == nullptr) {
-      return;
-    }
 
     Wm3::Vector3f up{};
     up.x = 0.0f;
@@ -37,11 +40,37 @@ namespace
       );
     }
   }
+
+  /**
+   * Address: 0x00650FF0 (FUN_00650FF0, Moho::RDebugNavWaypoints non-deleting dtor body)
+   *
+   * What it does:
+   * Runs the typed debug-overlay intrusive unlink lane for one
+   * `RDebugNavWaypoints` instance and restores singleton link state.
+   */
+  [[maybe_unused]] void DestroyRDebugNavWaypointsNonDeletingBody(moho::RDebugNavWaypoints* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
+    node->ListUnlinkSelf();
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* RDebugNavWaypoints::sType = nullptr;
+
+  /**
+   * Address: 0x00650EE0 (FUN_00650EE0)
+   *
+   * What it does:
+   * Initializes the waypoint-overlay vtable lane and inherited intrusive
+   * debug-overlay links.
+   */
+  RDebugNavWaypoints::RDebugNavWaypoints() = default;
 
   /**
    * Address: 0x00650730 (FUN_00650730, Moho::RDebugNavWaypoints::GetClass)

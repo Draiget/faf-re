@@ -26,6 +26,19 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(Serializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
   [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
   {
     gpg::RType* type = moho::EntitySetBase::sType;
@@ -48,6 +61,58 @@ namespace
 
     GPG_ASSERT(type != nullptr);
     return type;
+  }
+
+  /**
+   * Address: 0x006D2F20 (FUN_006D2F20)
+   *
+   * What it does:
+   * Deserializes one `EntitySetBase` object lane using one local null-owner
+   * reference.
+   */
+  void ReadEntitySetBaseArchiveObjectWithNullOwner_UnitSet(gpg::ReadArchive* const archive, void* const object)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(ResolveEntitySetBaseType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x006D2F60 (FUN_006D2F60)
+   *
+   * What it does:
+   * Serializes one `EntitySetBase` object lane using one local null-owner
+   * reference.
+   */
+  void WriteEntitySetBaseArchiveObjectWithNullOwner_UnitSet(gpg::WriteArchive* const archive, void** const objectSlot)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(ResolveEntitySetBaseType(), objectSlot, ownerRef);
+  }
+
+  /**
+   * Address: 0x006D3000 (FUN_006D3000)
+   *
+   * What it does:
+   * Deserializes one `EntitySetTemplate<Unit>` object lane using one local
+   * null-owner reference.
+   */
+  void ReadUnitSetArchiveObjectWithNullOwner(gpg::ReadArchive* const archive, void* const object)
+  {
+    gpg::RRef ownerRef{};
+    archive->Read(ResolveUnitSetType(), object, ownerRef);
+  }
+
+  /**
+   * Address: 0x006D3040 (FUN_006D3040)
+   *
+   * What it does:
+   * Serializes one `EntitySetTemplate<Unit>` object lane using one local
+   * null-owner reference.
+   */
+  void WriteUnitSetArchiveObjectWithNullOwner(gpg::WriteArchive* const archive, void** const objectSlot)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(ResolveUnitSetType(), objectSlot, ownerRef);
   }
 
   /**
@@ -74,6 +139,29 @@ namespace
   Serializer& construct_UnitSetSerializerVariant2()
   {
     return construct_UnitSetSerializerVariant1();
+  }
+
+  /**
+   * Address: 0x006D2AB0 (FUN_006D2AB0)
+   *
+   * What it does:
+   * Splices `UnitSetSerializer` out of its intrusive helper lane when linked,
+   * then rewires helper links to the serializer self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSetSerializerHelperNodeVariantA() noexcept
+  {
+    return UnlinkSerializerNode(gUnitSetSerializer);
+  }
+
+  /**
+   * Address: 0x006D2AE0 (FUN_006D2AE0)
+   *
+   * What it does:
+   * Secondary serializer helper unlink/reset variant sharing the same behavior.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitSetSerializerHelperNodeVariantB() noexcept
+  {
+    return UnlinkUnitSetSerializerHelperNodeVariantA();
   }
 
   void cleanup_UnitSetSerializer_00BFE450_atexit()
@@ -131,18 +219,7 @@ namespace moho
    */
   gpg::SerHelperBase* cleanup_UnitSetSerializer()
   {
-    gpg::SerHelperBase* const self = SerializerSelfNode(gUnitSetSerializer);
-    if (!gUnitSetSerializer.mHelperNext || !gUnitSetSerializer.mHelperPrev) {
-      gUnitSetSerializer.mHelperNext = self;
-      gUnitSetSerializer.mHelperPrev = self;
-      return self;
-    }
-
-    gUnitSetSerializer.mHelperNext->mPrev = gUnitSetSerializer.mHelperPrev;
-    gUnitSetSerializer.mHelperPrev->mNext = gUnitSetSerializer.mHelperNext;
-    gUnitSetSerializer.mHelperPrev = self;
-    gUnitSetSerializer.mHelperNext = self;
-    return self;
+    return UnlinkUnitSetSerializerHelperNodeVariantA();
   }
 
   /**
@@ -152,7 +229,6 @@ namespace moho
   {
     (void)construct_UnitSetSerializerVariant1();
     (void)construct_UnitSetSerializerVariant2();
-    gUnitSetSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_UnitSetSerializer_00BFE450_atexit);
   }
 } // namespace moho

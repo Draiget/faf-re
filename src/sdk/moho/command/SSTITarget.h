@@ -7,6 +7,7 @@
 
 namespace gpg
 {
+  class RType;
   class ReadArchive;
   class WriteArchive;
 } // namespace gpg
@@ -46,4 +47,20 @@ namespace moho
   static_assert(offsetof(SSTITarget, mEntityId) == 0x04, "SSTITarget::mEntityId offset must be 0x04");
   static_assert(offsetof(SSTITarget, mPos) == 0x08, "SSTITarget::mPos offset must be 0x08");
   static_assert(sizeof(SSTITarget) == 0x14, "SSTITarget size must be 0x14");
+
+  /**
+   * Address: 0x00557DB0 (FUN_00557DB0, preregister_EntIdTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `EntId`.
+   */
+  [[nodiscard]] gpg::RType* preregister_EntIdTypeInfo();
+
+  /**
+   * Address: 0x0055AFE0 (FUN_0055AFE0, preregister_SSTITargetTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTITarget`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTITargetTypeInfo();
 } // namespace moho

@@ -21,7 +21,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00693570 (FUN_00693570, sub_693570)
+       * Address: 0x00693570 (FUN_00693570)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `EntitySetBase`.
@@ -63,7 +63,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00693760 (FUN_00693760, sub_693760)
+       * Address: 0x00693760 (FUN_00693760)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `EntitySetTemplate<Entity>`.
@@ -109,7 +109,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x006939B0 (FUN_006939B0, sub_6939B0)
+       * Address: 0x006939B0 (FUN_006939B0)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `WeakEntitySetTemplate<Entity>`.
@@ -298,14 +298,6 @@ namespace moho
   static_assert(sizeof(WeakEntitySetSerializer) == 0x14, "WeakEntitySetSerializer size must be 0x14");
 
   /**
-   * Address: 0x00693570 (FUN_00693570, sub_693570)
-   *
-   * What it does:
-   * Ensures global `EntitySetBaseTypeInfo` construction and returns it as `gpg::RType*`.
-   */
-  [[nodiscard]] gpg::RType* construct_EntitySetBaseTypeInfo();
-
-  /**
    * Address: 0x00BD5770 (FUN_00BD5770, sub_BD5770)
    *
    * What it does:
@@ -322,14 +314,6 @@ namespace moho
   void register_EntitySetBaseSerializer();
 
   /**
-   * Address: 0x00693760 (FUN_00693760, sub_693760)
-   *
-   * What it does:
-   * Ensures global `EntitySetTypeInfo` construction and returns it as `gpg::RType*`.
-   */
-  [[nodiscard]] gpg::RType* construct_EntitySetTypeInfo();
-
-  /**
    * Address: 0x00BD57D0 (FUN_00BD57D0, sub_BD57D0)
    *
    * What it does:
@@ -344,14 +328,6 @@ namespace moho
    * Initializes `EntitySetSerializer` callback lanes and registers exit cleanup.
    */
   void register_EntitySetSerializer();
-
-  /**
-   * Address: 0x006939B0 (FUN_006939B0, sub_6939B0)
-   *
-   * What it does:
-   * Ensures global `WeakEntitySetTypeInfo` construction and returns it as `gpg::RType*`.
-   */
-  [[nodiscard]] gpg::RType* construct_WeakEntitySetTypeInfo();
 
   /**
    * Address: 0x00BD5830 (FUN_00BD5830, sub_BD5830)

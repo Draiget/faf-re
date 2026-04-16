@@ -140,6 +140,15 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00952B60 (FUN_00952B60, ??0ReadArchive@gpg@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes tracked-type and tracked-pointer tables to empty state and
+     * resets the null tracked-pointer sentinel to the reserved ownership lane.
+     */
+    ReadArchive();
+
+    /**
      * Address: 0x00953700 (FUN_00953700)
      * Demangled: gpg::ReadArchive::dtr
      *
@@ -1477,6 +1486,9 @@ namespace gpg
     );
     friend void
     ReadPointerShared_CIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+    friend void ReadPointerShared_RScaResource(
+      boost::SharedPtrRaw<moho::RScaResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
+    );
     friend void ReadPointerShared_RScmResource(
       boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
     );
@@ -1484,6 +1496,21 @@ namespace gpg
     ReadPointerShared_STrigger(boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* archive, const RRef& ownerRef);
   };
   static_assert(sizeof(ReadArchive) == 0x38, "ReadArchive size must be 0x38");
+
+  /**
+   * Address: 0x007638D0 (FUN_007638D0)
+   *
+   * What it does:
+   * Repeatedly reads `Listener<const SNavPath&>` pointers from `archive` and
+   * relinks each non-null listener node into the intrusive ring immediately
+   * before `listHead`.
+   */
+  moho::Listener<const moho::SNavPath&>* ReadAndLinkNavPathListeners(
+    ReadArchive* archive,
+    moho::Listener<const moho::SNavPath&>* listHead,
+    int version,
+    const gpg::RRef* ownerRef
+  );
 
   /**
    * Address: 0x009048B0 (FUN_009048B0)

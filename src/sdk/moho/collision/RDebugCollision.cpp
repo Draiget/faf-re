@@ -82,6 +82,23 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0064C8A0 (FUN_0064C8A0, Moho::RDebugCollision non-deleting dtor body)
+   *
+   * What it does:
+   * Runs the typed debug-overlay intrusive unlink lane for one
+   * `RDebugCollision` instance and restores singleton link state.
+   */
+  [[maybe_unused]] void DestroyRDebugCollisionNonDeletingBody(moho::RDebugCollision* const overlay) noexcept
+  {
+    if (overlay == nullptr) {
+      return;
+    }
+
+    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
+    node->ListUnlinkSelf();
+  }
+
   void AddRDebugOverlayBase(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedRDebugOverlayType();
@@ -92,6 +109,17 @@ namespace
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x0064C4F0 (FUN_0064C4F0)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for collision box rendering.
+   */
+  void RegisterRDebugCollisionOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display collision boxes for all units", "Collision");
   }
 
   [[nodiscard]] TypeInfo& GetRDebugCollisionTypeInfo() noexcept
@@ -123,6 +151,15 @@ namespace
 namespace moho
 {
   gpg::RType* RDebugCollision::sType = nullptr;
+
+  /**
+   * Address: 0x0064C850 (FUN_0064C850)
+   *
+   * What it does:
+   * Initializes the collision-overlay vtable lane and inherited intrusive
+   * debug-overlay links.
+   */
+  RDebugCollision::RDebugCollision() = default;
 
   /**
    * Address: 0x0064C270 (FUN_0064C270, ?GetClass@RDebugCollision@Moho@@UBEPAVRType@gpg@@XZ)
@@ -200,7 +237,7 @@ namespace moho
     dtrFunc_ = &DestroyRDebugCollisionInPlace;
     AddRDebugOverlayBase(this);
     gpg::RType::Init();
-    RegisterOverlayClass("Display collision boxes for all units", "Collision");
+    RegisterRDebugCollisionOverlayClass(this);
     Finish();
   }
 

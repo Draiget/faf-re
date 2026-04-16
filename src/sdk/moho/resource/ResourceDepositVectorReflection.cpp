@@ -1,6 +1,8 @@
 #include "moho/resource/ResourceDepositVectorReflection.h"
 
+#include <cstddef>
 #include <cstdlib>
+#include <cstdint>
 #include <new>
 #include <typeinfo>
 
@@ -23,6 +25,266 @@ namespace
       cached = gpg::LookupRType(typeid(moho::ResourceDeposit));
     }
     return cached;
+  }
+
+  struct ResourceDepositVectorFieldView
+  {
+    std::uint8_t reserved00[0x0C];
+    ResourceDepositVector mDeposits;
+  };
+
+  static_assert(
+    offsetof(ResourceDepositVectorFieldView, mDeposits) == 0x0C,
+    "ResourceDepositVectorFieldView::mDeposits offset must be 0x0C"
+  );
+
+  [[nodiscard]] gpg::RType* CachedResourceDepositVectorFieldType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(ResourceDepositVector));
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x00549850 (FUN_00549850)
+   *
+   * What it does:
+   * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
+   * one archive read for the vector field stored at offset `+0x0C`.
+   */
+  void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(object != nullptr);
+    if (!archive || !object) {
+      return;
+    }
+
+    auto* const view = static_cast<ResourceDepositVectorFieldView*>(object);
+    gpg::RRef owner{};
+    archive->Read(CachedResourceDepositVectorFieldType(), &view->mDeposits, owner);
+  }
+
+  /**
+   * Address: 0x005498A0 (FUN_005498A0)
+   *
+   * What it does:
+   * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
+   * one archive write for the vector field stored at offset `+0x0C`.
+   */
+  void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(object != nullptr);
+    if (!archive || !object) {
+      return;
+    }
+
+    auto* const view = static_cast<ResourceDepositVectorFieldView*>(object);
+    gpg::RRef owner{};
+    archive->Write(CachedResourceDepositVectorFieldType(), &view->mDeposits, owner);
+  }
+
+  /**
+   * Address: 0x00547E00 (FUN_00547E00)
+   *
+   * What it does:
+   * Ensures one `msvc8::vector<moho::ResourceDeposit>` can hold at least the
+   * requested number of elements before reflected load fills it.
+   */
+  void EnsureResourceDepositLoadCapacity(ResourceDepositVector& storage, const std::size_t requiredCount)
+  {
+    if (requiredCount > 0x0CCCCCCCu) {
+      throw std::bad_alloc{};
+    }
+
+    if (requiredCount <= storage.capacity()) {
+      return;
+    }
+
+    storage.reserve(requiredCount);
+  }
+
+  /**
+   * Address: 0x00549BC0 (FUN_00549BC0)
+   *
+   * What it does:
+   * Copies one contiguous `ResourceDeposit` range `[sourceBegin, sourceEnd)`
+   * into destination storage and returns one-past the last destination lane.
+   */
+  [[nodiscard]] std::uint32_t* CopyResourceDepositWordQuintRange(
+    std::uint32_t* destination,
+    const std::uint32_t* const sourceEnd,
+    const std::uint32_t* sourceBegin
+  ) noexcept
+  {
+    while (sourceBegin != sourceEnd) {
+      if (destination != nullptr) {
+        destination[0] = sourceBegin[0];
+        destination[1] = sourceBegin[1];
+        destination[2] = sourceBegin[2];
+        destination[3] = sourceBegin[3];
+        destination[4] = sourceBegin[4];
+      }
+
+      destination += 5;
+      sourceBegin += 5;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x00549A90 (FUN_00549A90)
+   *
+   * What it does:
+   * Source-first adapter lane for copying one 5-dword `ResourceDeposit` range
+   * `[sourceBegin, sourceEnd)` and returning one-past-end destination storage.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeSourceFirst(
+    std::uint32_t* const destination,
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRange(destination, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00548AB0 (FUN_00548AB0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one 5-dword `ResourceDeposit` range
+   * into the canonical range-copy helper.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeRegisterAdapterLaneA(
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* const destinationBegin
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRange(destinationBegin, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00549480 (FUN_00549480)
+   *
+   * What it does:
+   * Secondary register-shape adapter for 5-dword `ResourceDeposit` range copy.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeRegisterAdapterLaneB(
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* const destinationBegin
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRange(destinationBegin, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x005498F0 (FUN_005498F0)
+   *
+   * What it does:
+   * Third register-shape adapter for 5-dword `ResourceDeposit` range copy.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeRegisterAdapterLaneC(
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* const destinationBegin
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRange(destinationBegin, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00549A50 (FUN_00549A50)
+   * Address: 0x006E3D30 (FUN_006E3D30)
+   *
+   * What it does:
+   * Fourth register-shape adapter for 5-dword `ResourceDeposit` range copy.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeRegisterAdapterLaneD(
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd,
+    std::uint32_t* const destinationBegin
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRange(destinationBegin, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00549750 (FUN_00549750)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one source-first 5-dword
+   * `ResourceDeposit` range copy lane.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeSourceFirstAdapterLaneA(
+    std::uint32_t* const destinationBegin,
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRangeSourceFirst(destinationBegin, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00549940 (FUN_00549940)
+   *
+   * What it does:
+   * Secondary register-shape adapter for source-first 5-dword
+   * `ResourceDeposit` range copy.
+   */
+  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeSourceFirstAdapterLaneB(
+    std::uint32_t* const destinationBegin,
+    const std::uint32_t* const sourceBegin,
+    const std::uint32_t* const sourceEnd
+  ) noexcept
+  {
+    return CopyResourceDepositWordQuintRangeSourceFirst(destinationBegin, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00548C00 (FUN_00548C00)
+   *
+   * What it does:
+   * Copies one contiguous 5-dword `ResourceDeposit` lane range and returns
+   * one-past the last destination lane.
+   */
+  [[maybe_unused]] moho::ResourceDeposit* CopyResourceDepositRangeNullable(
+    moho::ResourceDeposit* destination,
+    const moho::ResourceDeposit* const sourceBegin,
+    const moho::ResourceDeposit* const sourceEnd
+  ) noexcept
+  {
+    auto* const copiedEnd = CopyResourceDepositWordQuintRange(
+      reinterpret_cast<std::uint32_t*>(destination),
+      reinterpret_cast<const std::uint32_t*>(sourceEnd),
+      reinterpret_cast<const std::uint32_t*>(sourceBegin)
+    );
+    return reinterpret_cast<moho::ResourceDeposit*>(copiedEnd);
+  }
+
+  /**
+   * Address: 0x00548ED0 (FUN_00548ED0)
+   *
+   * What it does:
+   * Copy-assigns one `msvc8::vector<moho::ResourceDeposit>` lane and preserves
+   * self-assignment fast-path semantics.
+   */
+  [[maybe_unused]] ResourceDepositVector* AssignResourceDepositVector(
+    ResourceDepositVector* const destination,
+    const ResourceDepositVector& source
+  )
+  {
+    if (destination == &source) {
+      return destination;
+    }
+
+    *destination = source;
+    return destination;
   }
 
   [[nodiscard]] gpg::RVectorType_ResourceDeposit& AcquireResourceDepositVectorType()
@@ -132,7 +394,7 @@ void gpg::RVectorType_ResourceDeposit::SerLoad(
   archive->ReadUInt(&count);
 
   ResourceDepositVector loaded{};
-  loaded.reserve(static_cast<std::size_t>(count));
+  EnsureResourceDepositLoadCapacity(loaded, static_cast<std::size_t>(count));
 
   gpg::RType* const elementType = CachedResourceDepositType();
   if (!elementType) {
@@ -228,6 +490,13 @@ void gpg::RVectorType_ResourceDeposit::SetCount(void* const obj, const int count
   storage->resize(static_cast<std::size_t>(count));
 }
 
+/**
+ * Address: 0x00548C70 (FUN_00548C70, preregister_VectorResourceDepositType)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `msvc8::vector<moho::ResourceDeposit>`.
+ */
 gpg::RType* moho::preregister_VectorResourceDepositType()
 {
   auto* const typeInfo = &AcquireResourceDepositVectorType();

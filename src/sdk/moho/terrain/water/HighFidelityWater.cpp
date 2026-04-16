@@ -375,7 +375,7 @@ namespace moho
       0.0f,
       1.0f,
     };
-    SetShaderVarRawData(GetWater2TerrainScaleShaderVar(), terrainScale, sizeof(terrainScale));
+    (void)SetWater2TerrainScaleShaderVarData(terrainScale);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);

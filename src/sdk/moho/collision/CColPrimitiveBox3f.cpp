@@ -227,7 +227,6 @@ namespace moho
     gBox3fSerializer.mHelperPrev = self;
     gBox3fSerializer.mLoadCallback = &Box3fSerializer::Deserialize;
     gBox3fSerializer.mSaveCallback = &Box3fSerializer::Serialize;
-    gBox3fSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupBox3fSerializer);
   }
 
@@ -296,7 +295,6 @@ namespace
   template <typename THelper>
   void InitializeHelperNode(THelper& helper) noexcept
   {
-    new (HelperSelfNode(helper)) gpg::SerHelperBase();
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
     helper.mHelperNext = self;
     helper.mHelperPrev = self;
@@ -313,6 +311,43 @@ namespace
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
     helper.mHelperPrev = self;
     helper.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x004FF8D0 (FUN_004FF8D0, DColPrimBoxSerializer helper unlink/reset)
+   *
+   * What it does:
+   * Unlinks the global `DColPrimBoxSerializer` helper node from its current
+   * intrusive lane, rewires it to a self-linked singleton node, and returns
+   * that self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimBoxSerializerHelperPrimary() noexcept
+  {
+    gDColPrimBoxSerializer.mHelperNext->mPrev = gDColPrimBoxSerializer.mHelperPrev;
+    gDColPrimBoxSerializer.mHelperPrev->mNext = gDColPrimBoxSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimBoxSerializer);
+    gDColPrimBoxSerializer.mHelperPrev = self;
+    gDColPrimBoxSerializer.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x004FF900 (FUN_004FF900, DColPrimBoxSerializer helper unlink/reset variant)
+   *
+   * What it does:
+   * Executes the duplicate serializer-helper unlink/reset lane and returns the
+   * self-linked helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkDColPrimBoxSerializerHelperSecondary() noexcept
+  {
+    gDColPrimBoxSerializer.mHelperNext->mPrev = gDColPrimBoxSerializer.mHelperPrev;
+    gDColPrimBoxSerializer.mHelperPrev->mNext = gDColPrimBoxSerializer.mHelperNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gDColPrimBoxSerializer);
+    gDColPrimBoxSerializer.mHelperPrev = self;
+    gDColPrimBoxSerializer.mHelperNext = self;
     return self;
   }
 
@@ -390,7 +425,7 @@ namespace
 
   void CleanupDColPrimBoxSerializerAtExit()
   {
-    (void)UnlinkHelperNode(gDColPrimBoxSerializer);
+    (void)UnlinkDColPrimBoxSerializerHelperPrimary();
   }
 
   void CleanupDColPrimBoxConstructAtExit()
@@ -428,23 +463,40 @@ namespace
   }
 
   /**
+   * Address: 0x004FF620 (FUN_004FF620)
+   *
+   * What it does:
+   * Serializes one box primitive's shape payload and local-center payload
+   * through the primitive virtual accessors used by save-construct lanes.
+   */
+  void SaveBoxPrimitiveConstructArgs(
+    moho::BoxCollisionPrimitive* const primitive,
+    gpg::WriteArchive* const archive,
+    gpg::SerSaveConstructArgsResult* const result
+  )
+  {
+    Wm3::Vec3f center{};
+    gpg::RRef shapeOwnerRef{};
+    archive->Write(CachedDColPrimBoxShapeType(), primitive->GetBox(), shapeOwnerRef);
+
+    gpg::RRef centerOwnerRef{};
+    archive->Write(CachedDColPrimBoxVector3fType(), primitive->GetCenter(&center), centerOwnerRef);
+    result->SetUnowned(0u);
+  }
+
+  /**
    * Address: 0x004FF570 (FUN_004FF570)
    *
    * What it does:
-   * Saves one box collision primitive's shape and local-center construct
-   * arguments in binary archive order.
+   * Tail-forwards save-construct-args dispatch into the shared box primitive
+   * serialization helper.
    */
   void SaveConstructArgsDColPrimBox(
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const primitive = reinterpret_cast<moho::BoxCollisionPrimitive*>(objectPtr);
-    Wm3::Vec3f center{};
-    const gpg::RRef ownerRef{};
-
-    archive->Write(CachedDColPrimBoxShapeType(), primitive->GetBox(), ownerRef);
-    archive->Write(CachedDColPrimBoxVector3fType(), primitive->GetCenter(&center), ownerRef);
-    result->SetUnowned(0u);
+    SaveBoxPrimitiveConstructArgs(primitive, archive, result);
   }
 
   /**
@@ -642,5 +694,3 @@ namespace
 
   [[maybe_unused]] DColPrimBoxBootstrap gDColPrimBoxBootstrap;
 } // namespace
-
-

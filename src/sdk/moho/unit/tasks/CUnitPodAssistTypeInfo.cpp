@@ -106,10 +106,13 @@ namespace moho
     size_ = sizeof(CUnitPodAssist);
     gpg::RType::Init();
     AddBase_CCommandTask(this);
-    newRefFunc_ = &CUnitPodAssistTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitPodAssistTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitPodAssistTypeInfo::Delete;
-    dtrFunc_ = &CUnitPodAssistTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitPodAssistTypeInfo::NewRef,
+      &CUnitPodAssistTypeInfo::CtrRef,
+      &CUnitPodAssistTypeInfo::Delete,
+      &CUnitPodAssistTypeInfo::Destruct
+    );
     Finish();
   }
 

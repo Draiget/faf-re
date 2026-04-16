@@ -29,6 +29,14 @@ namespace moho
     , mBlendMode(3)
   {}
 
+  /**
+   * Address: 0x0066B420 (FUN_0066B420, ??0IEffectManager@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes the base interface vtable pointer for effect-manager objects.
+   */
+  IEffectManager::IEffectManager() = default;
+
   gpg::RType* IEffectManager::StaticGetClass()
   {
     if (!sType) {

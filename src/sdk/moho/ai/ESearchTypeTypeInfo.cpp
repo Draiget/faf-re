@@ -24,7 +24,6 @@ namespace
   {
     if (!gESearchTypeTypeInfoConstructed) {
       auto* const typeInfo = new (gESearchTypeTypeInfoStorage) ESearchTypeTypeInfo();
-      gpg::PreRegisterRType(typeid(ESearchType), typeInfo);
       gESearchTypeRuntimeType = typeInfo;
       gESearchTypeTypeInfoConstructed = true;
     }
@@ -111,11 +110,43 @@ namespace
     return UnlinkSerializerNode(*AcquireESearchTypePrimitiveSerializer());
   }
 
+  /**
+   * Address: 0x005A9E60 (FUN_005A9E60)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the recovered `ESearchType`
+   * primitive serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_ESearchTypePrimitiveSerializerStartupThunkA()
+  {
+    return cleanup_ESearchTypePrimitiveSerializer();
+  }
+
+  /**
+   * Address: 0x005A9E90 (FUN_005A9E90)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `ESearchType` primitive
+   * serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_ESearchTypePrimitiveSerializerStartupThunkB()
+  {
+    return cleanup_ESearchTypePrimitiveSerializer();
+  }
+
   void cleanup_ESearchTypePrimitiveSerializer_atexit()
   {
     (void)cleanup_ESearchTypePrimitiveSerializer();
   }
 } // namespace
+
+/**
+ * Address: 0x005A9D90 (FUN_005A9D90, Moho::ESearchTypeTypeInfo::ESearchTypeTypeInfo)
+ */
+ESearchTypeTypeInfo::ESearchTypeTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(ESearchType), this);
+}
 
 /**
  * Address: 0x005A9E20 (FUN_005A9E20, scalar deleting thunk)

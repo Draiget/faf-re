@@ -1,5 +1,7 @@
 #include "moho/debug/CPathDebuggerTypeInfo.h"
 
+#include <typeinfo>
+
 #include "moho/debug/CPathDebugger.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
@@ -30,6 +32,19 @@ namespace moho
     AddBase_CScriptObject(this);
     gpg::RType::Init();
     Finish();
+  }
+
+  /**
+   * Address: 0x007B5D10 (FUN_007B5D10, preregister_CPathDebuggerTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::CPathDebugger`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CPathDebuggerTypeInfo()
+  {
+    static CPathDebuggerTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(CPathDebugger), &typeInfo);
+    return &typeInfo;
   }
 
   /**

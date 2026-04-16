@@ -16,6 +16,7 @@ namespace gpg
 
 namespace moho
 {
+  class Broadcaster;
   class Entity;
   class Unit;
   struct SOCellPos;
@@ -93,6 +94,24 @@ namespace moho
      * result code for task-thread dispatch.
      */
     int TaskTick();
+
+    /**
+     * Address: 0x00617D00 (FUN_00617D00)
+     *
+     * What it does:
+     * Deserializes base command-task state, melee-task pointer lanes, target
+     * payload, navigation flags, destination cell, and planted-state lane.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00617E70 (FUN_00617E70)
+     *
+     * What it does:
+     * Serializes base command-task state, melee-task pointer lanes, target
+     * payload, navigation flags, destination cell, and planted-state lane.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
 
   private:
     /**
@@ -203,6 +222,15 @@ namespace moho
     [[nodiscard]] bool UpdateDesiredTarget(CAiTarget* desiredTarget);
 
     /**
+     * Address: 0x005F42C0 (FUN_005F42C0, CUnitMeleeAttackTargetTask::RelinkAiAttackerListener)
+     *
+     * What it does:
+     * Unlinks this task's attacker-listener node from its current intrusive
+     * list and relinks it before `attackerListenerHead`.
+     */
+    void RelinkAiAttackerListener(Broadcaster* attackerListenerHead);
+
+    /**
      * Address: 0x00615CA0 (FUN_00615CA0)
      *
      * What it does:
@@ -239,6 +267,24 @@ namespace moho
   class CUnitMeleeAttackTargetTaskSerializer
   {
   public:
+    /**
+     * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)
+     *
+     * What it does:
+     * Load-callback thunk that forwards one melee-task serializer lane into
+     * `CUnitMeleeAttackTargetTask::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00615400 (FUN_00615400, Moho::CUnitMeleeAttackTargetTaskSerializer::Serialize)
+     *
+     * What it does:
+     * Save-callback thunk that forwards one melee-task serializer lane into
+     * `CUnitMeleeAttackTargetTask::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     /**
      * Address: 0x006177B0 (FUN_006177B0)
      *

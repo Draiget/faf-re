@@ -135,12 +135,35 @@ namespace
     return std::isfinite(worldPosition.x) && std::isfinite(worldPosition.y) && std::isfinite(worldPosition.z);
   }
 
+  /**
+   * Address: 0x0087F010 (FUN_0087F010)
+   *
+   * What it does:
+   * Lazily resolves and caches reflection RTTI for `moho::ScriptedDecal`.
+   */
   [[nodiscard]] gpg::RType* CachedScriptedDecalType()
   {
     if (!ScriptedDecal::sType) {
       ScriptedDecal::sType = gpg::LookupRType(typeid(ScriptedDecal));
     }
     return ScriptedDecal::sType;
+  }
+
+  /**
+   * Address: 0x0087FA80 (FUN_0087FA80)
+   *
+   * What it does:
+   * Adapter lane that forwards scripted-decal RTTI cache lookup to the
+   * canonical cached-type helper.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedScriptedDecalTypeAdapter()
+  {
+    gpg::RType* result = ScriptedDecal::sType;
+    if (!ScriptedDecal::sType) {
+      result = gpg::LookupRType(typeid(ScriptedDecal));
+      ScriptedDecal::sType = result;
+    }
+    return result;
   }
 
   [[nodiscard]] gpg::RRef MakeScriptedDecalRef(ScriptedDecal* object)
@@ -389,6 +412,40 @@ bool ScriptedDecal::SetPosition(const Wm3::Vector3f* const worldPosition)
 }
 
 /**
+ * Address: 0x0087ED70 (FUN_0087ED70, Moho::ScriptedDecal::SetPositionByScreen)
+ *
+ * What it does:
+ * Projects one screen-space point through the active world camera and applies
+ * the resulting world-space position.
+ */
+bool ScriptedDecal::SetPositionByScreen(const Wm3::Vector2f* const screenPoint)
+{
+  Wm3::Vector3f worldPoint{};
+  auto* const camera = reinterpret_cast<IScriptedDecalWorldCamera*>(mWorldCamera);
+  return SetPosition(camera->CameraScreenToSurface(&worldPoint, screenPoint));
+}
+
+/**
+ * Address: 0x0087ED90 (FUN_0087ED90, Moho::ScriptedDecal::SetScale)
+ *
+ * What it does:
+ * Updates local/runtime decal scale lanes and reapplies world positioning.
+ */
+bool ScriptedDecal::SetScale(const Wm3::Vector3f* const scale)
+{
+  mScaleX = scale->x;
+  mScaleY = scale->y;
+  mScaleZ = scale->z;
+
+  ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead);
+  runtimeEntry->mScaleX = scale->x;
+  runtimeEntry->mScaleY = scale->y;
+  runtimeEntry->mScaleZ = scale->z;
+  runtimeEntry->mVftable->Slot06_CommitTransform();
+  return SetPosition(&mWorldPosition);
+}
+
+/**
  * Address: 0x0087EDE0 (FUN_0087EDE0, Moho::ScriptedDecal::SetTexture)
  *
  * What it does:
@@ -542,19 +599,7 @@ int moho::cfunc_ScriptedDecalSetScaleL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject scaleObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f scale = SCR_FromLuaCopy<Wm3::Vector3f>(scaleObject);
-
-  decal->mScaleX = scale.x;
-  decal->mScaleY = scale.y;
-  decal->mScaleZ = scale.z;
-
-  if (ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(decal->mRuntimeLink.mHead); runtimeEntry != nullptr) {
-    runtimeEntry->mScaleX = scale.x;
-    runtimeEntry->mScaleY = scale.y;
-    runtimeEntry->mScaleZ = scale.z;
-    runtimeEntry->mVftable->Slot06_CommitTransform();
-  }
-
-  (void)decal->SetPosition(&decal->mWorldPosition);
+  (void)decal->SetScale(&scale);
   return 0;
 }
 
@@ -614,14 +659,7 @@ int moho::cfunc_ScriptedDecalSetPositionByScreenL(LuaPlus::LuaState* const state
 
   const LuaPlus::LuaObject screenPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector2f screenPoint = SCR_FromLuaCopy<Wm3::Vector2f>(screenPointObject);
-
-  Wm3::Vector3f worldPoint{};
-  if (decal->mWorldCamera != nullptr) {
-    auto* const camera = reinterpret_cast<IScriptedDecalWorldCamera*>(decal->mWorldCamera);
-    camera->CameraScreenToSurface(&worldPoint, &screenPoint);
-  }
-
-  (void)decal->SetPosition(&worldPoint);
+  (void)decal->SetPositionByScreen(&screenPoint);
   return 0;
 }
 

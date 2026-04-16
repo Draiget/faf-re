@@ -6,6 +6,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/sim/Sim.h"
 
@@ -120,6 +121,32 @@ namespace
     ::operator delete(commandDb);
   }
 
+  /**
+   * Address: 0x006E1B70 (FUN_006E1B70)
+   *
+   * What it does:
+   * Initializes the generic construct-helper lane for `CCommandDb`.
+   */
+  [[nodiscard]] moho::CCommandDBConstruct* InitializeCCommandDbConstructGenericHelperLane()
+  {
+    InitializeHelperNode(gCCommandDBConstruct);
+    gCCommandDBConstruct.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&moho::CCommandDBConstruct::Construct);
+    gCCommandDBConstruct.mDeconstructCallback = &DeleteConstructedCCommandDb;
+    return &gCCommandDBConstruct;
+  }
+
+  /**
+   * Address: 0x006E1190 (FUN_006E1190)
+   *
+   * What it does:
+   * Initializes the custom construct-helper lane for `CCommandDb`.
+   */
+  [[nodiscard]] moho::CCommandDBConstruct* InitializeCCommandDbConstructCustomHelperLane()
+  {
+    return InitializeCCommandDbConstructGenericHelperLane();
+  }
+
   void CleanupSaveConstructAtexit()
   {
     (void)cleanup_CCommandDBSaveConstruct_00BFE9A0_Impl();
@@ -167,6 +194,29 @@ namespace moho
    * Unlinks the `CCommandDBSerializer` helper node from the intrusive list.
    */
   gpg::SerHelperBase* cleanup_CCommandDBSerializer()
+  {
+    return cleanup_CCommandDBSerializer_00BFEA00_Impl();
+  }
+
+  /**
+   * Address: 0x006E1340 (FUN_006E1340)
+   *
+   * What it does:
+   * Duplicated serializer-helper teardown lane for `CCommandDBSerializer`.
+   */
+  gpg::SerHelperBase* cleanup_CCommandDBSerializer_variant_primary()
+  {
+    return cleanup_CCommandDBSerializer_00BFEA00_Impl();
+  }
+
+  /**
+   * Address: 0x006E1370 (FUN_006E1370)
+   *
+   * What it does:
+   * Secondary duplicated serializer-helper teardown lane for
+   * `CCommandDBSerializer`.
+   */
+  gpg::SerHelperBase* cleanup_CCommandDBSerializer_variant_secondary()
   {
     return cleanup_CCommandDBSerializer_00BFEA00_Impl();
   }
@@ -260,6 +310,97 @@ namespace moho
   }
 
   /**
+   * Address: 0x006E1310 (FUN_006E1310)
+   *
+   * What it does:
+   * Alternate startup leaf that initializes `CCommandDBSerializer` helper links,
+   * binds deserialize/serialize callbacks, and returns the helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_CCommandDBSerializer_ClassStartupLeaf()
+  {
+    InitializeHelperNode(gCCommandDBSerializer);
+    gCCommandDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CCommandDBSerializer::Deserialize);
+    gCCommandDBSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CCommandDBSerializer::Serialize);
+    return HelperSelfNode(gCCommandDBSerializer);
+  }
+
+  /**
+   * Address: 0x006E1BF0 (FUN_006E1BF0)
+   *
+   * What it does:
+   * Alternate startup leaf that rebuilds `CCommandDBSerializer` helper links,
+   * rewires deserialize/serialize callbacks, and returns the helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* construct_CCommandDBSerializer_SaveLoadStartupLeaf()
+  {
+    InitializeHelperNode(gCCommandDBSerializer);
+    gCCommandDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CCommandDBSerializer::Deserialize);
+    gCCommandDBSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CCommandDBSerializer::Serialize);
+    return HelperSelfNode(gCCommandDBSerializer);
+  }
+
+  /**
+   * Address: 0x006E2AB0 (FUN_006E2AB0)
+   *
+   * What it does:
+   * Builds one reflected `RRef` for `CCommandDb` and stores it into the
+   * caller-owned output pair.
+   */
+  [[maybe_unused]] gpg::RRef* BuildCommandDbRRefOutputLane(CCommandDb* const commandDb, gpg::RRef* const out)
+  {
+    if (out == nullptr) {
+      return nullptr;
+    }
+
+    gpg::RRef localRef{};
+    (void)gpg::RRef_CCommandDB(&localRef, commandDb);
+    *out = localRef;
+    return out;
+  }
+
+  /**
+   * Address: 0x006E2AE0 (FUN_006E2AE0)
+   *
+   * What it does:
+   * Forwards one command-db member-deserialize callback lane.
+   */
+  [[maybe_unused]] void ForwardCommandDbMemberDeserialize(CCommandDb* const commandDb, gpg::ReadArchive* const archive)
+  {
+    if (commandDb == nullptr) {
+      return;
+    }
+    commandDb->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006E2AF0 (FUN_006E2AF0)
+   *
+   * What it does:
+   * Thunk lane that forwards one command-db member-serialize callback.
+   */
+  [[maybe_unused]] void ForwardCommandDbMemberSerialize(gpg::WriteArchive* const archive, CCommandDb* const commandDb)
+  {
+    if (commandDb == nullptr) {
+      return;
+    }
+    commandDb->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x006E32F0 (FUN_006E32F0)
+   *
+   * What it does:
+   * Duplicate command-db member-deserialize callback forward lane.
+   */
+  [[maybe_unused]] void ForwardCommandDbMemberDeserializeVariant(
+    CCommandDb* const commandDb,
+    gpg::ReadArchive* const archive
+  )
+  {
+    ForwardCommandDbMemberDeserialize(commandDb, archive);
+  }
+
+  /**
    * Address: 0x006E1B20 (FUN_006E1B20, Moho::CCommandDBSaveConstruct::RegisterSaveConstructArgsFunction)
    *
    * What it does:
@@ -306,6 +447,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x006E1010 (FUN_006E1010, sub_6E1010)
+   *
+   * What it does:
+   * Initializes the global `CCommandDBSaveConstruct` helper links, binds the
+   * save-construct callback lane, and returns the helper instance.
+   */
+  [[nodiscard]] CCommandDBSaveConstruct* InitializeCCommandDbSaveConstructCustomHelperLane()
+  {
+    InitializeHelperNode(gCCommandDBSaveConstruct);
+    gCCommandDBSaveConstruct.mSaveConstructArgsCallback =
+      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CCommandDBSaveConstruct::SaveConstructArgs);
+    return &gCCommandDBSaveConstruct;
+  }
+
+  /**
+   * Address: 0x006E1AF0 (FUN_006E1AF0, sub_6E1AF0)
+   *
+   * What it does:
+   * Alternate save-construct helper initialization lane for `CCommandDb`; in
+   * the typed recovered implementation it converges to the same helper setup
+   * as the custom lane.
+   */
+  [[maybe_unused]] [[nodiscard]] CCommandDBSaveConstruct* InitializeCCommandDbSaveConstructGenericHelperLane()
+  {
+    return InitializeCCommandDbSaveConstructCustomHelperLane();
+  }
+
+  /**
    * Address: 0x00BD8C60 (FUN_00BD8C60, sub_BD8C60)
    *
    * What it does:
@@ -313,9 +482,7 @@ namespace moho
    */
   void register_CCommandDBSaveConstruct()
   {
-    InitializeHelperNode(gCCommandDBSaveConstruct);
-    gCCommandDBSaveConstruct.mSaveConstructArgsCallback =
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CCommandDBSaveConstruct::SaveConstructArgs);
+    (void)InitializeCCommandDbSaveConstructCustomHelperLane();
     gCCommandDBSaveConstruct.RegisterSaveConstructArgsFunction();
     (void)std::atexit(&CleanupSaveConstructAtexit);
   }
@@ -328,10 +495,7 @@ namespace moho
    */
   void register_CCommandDBConstruct()
   {
-    InitializeHelperNode(gCCommandDBConstruct);
-    gCCommandDBConstruct.mConstructCallback =
-      reinterpret_cast<gpg::RType::construct_func_t>(&CCommandDBConstruct::Construct);
-    gCCommandDBConstruct.mDeconstructCallback = &DeleteConstructedCCommandDb;
+    (void)InitializeCCommandDbConstructCustomHelperLane();
     gCCommandDBConstruct.RegisterConstructFunction();
     (void)std::atexit(&CleanupConstructAtexit);
   }
@@ -344,10 +508,7 @@ namespace moho
    */
   void register_CCommandDBSerializer()
   {
-    InitializeHelperNode(gCCommandDBSerializer);
-    gCCommandDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&CCommandDBSerializer::Deserialize);
-    gCCommandDBSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&CCommandDBSerializer::Serialize);
-    gCCommandDBSerializer.RegisterSerializeFunctions();
+    (void)construct_CCommandDBSerializer_SaveLoadStartupLeaf();
     (void)std::atexit(&CleanupSerializerAtexit);
   }
 } // namespace moho

@@ -230,4 +230,13 @@ namespace moho
   };
 
   static_assert(sizeof(CScrLuaMetatableFactory<CDamage>) == 0x8, "CScrLuaMetatableFactory<CDamage> size must be 0x8");
+
+  /**
+   * Address: 0x0073AA90 (FUN_0073AA90)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CDamage>` and returns that singleton.
+   */
+  CScrLuaMetatableFactory<CDamage>* startup_CScrLuaMetatableFactory_CDamage_Index();
 } // namespace moho

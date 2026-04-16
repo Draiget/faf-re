@@ -448,6 +448,74 @@ namespace moho
   }
 
   /**
+   * Address: 0x00602C80 (FUN_00602C80)
+   *
+   * What it does:
+   * Preserves one deserialize callback thunk lane for call-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallTransportMemberDeserializeAdapterLaneA(
+    gpg::ReadArchive* const archive,
+    CUnitCallTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTransport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00602C90 (FUN_00602C90)
+   *
+   * What it does:
+   * Preserves one serialize callback thunk lane for call-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallTransportMemberSerializeAdapterLaneA(
+    gpg::WriteArchive* const archive,
+    const CUnitCallTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTransport::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00603060 (FUN_00603060)
+   *
+   * What it does:
+   * Alternate deserialize callback thunk lane for call-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallTransportMemberDeserializeAdapterLaneB(
+    gpg::ReadArchive* const archive,
+    CUnitCallTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTransport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00603070 (FUN_00603070)
+   *
+   * What it does:
+   * Alternate serialize callback thunk lane for call-transport task serializer
+   * registration.
+   */
+  [[maybe_unused]] void CUnitCallTransportMemberSerializeAdapterLaneB(
+    gpg::WriteArchive* const archive,
+    const CUnitCallTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallTransport::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
    * Address: 0x005FFBB0 (FUN_005FFBB0, Moho::NewCallTransportCommand)
    *
    * What it does:
@@ -485,6 +553,25 @@ namespace gpg
     }
 
     *outRef = MakeDerivedRef(value, CachedCUnitCallTransportType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x00602FA0 (FUN_00602FA0)
+   *
+   * What it does:
+   * Materializes one `RRef_CUnitCallTransport` result into a stack local and
+   * copies that pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreRRefCUnitCallTransportAdapter(
+    moho::CUnitCallTransport* const value,
+    gpg::RRef* const outRef
+  )
+  {
+    gpg::RRef temp{};
+    (void)RRef_CUnitCallTransport(&temp, value);
+    outRef->mObj = temp.mObj;
+    outRef->mType = temp.mType;
     return outRef;
   }
 } // namespace gpg

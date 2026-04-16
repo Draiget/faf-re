@@ -118,6 +118,23 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x0066A1D0 (FUN_0066A1D0)
+   *
+   * What it does:
+   * Rebinds one `WeakPtr<IEffect>` node to a new owner link and updates the
+   * intrusive owner chain in-place without allocating.
+   */
+  WeakPtr<IEffect>* RelinkWeakPtrIEffect(WeakPtr<IEffect>* const weak, IEffect* const effect) noexcept
+  {
+    if (weak == nullptr) {
+      return nullptr;
+    }
+
+    weak->ResetFromObject(effect);
+    return weak;
+  }
+
+  /**
    * Address: 0x006751B0 (FUN_006751B0, Moho::WeakPtr_IEffect::Deserialize)
    */
   void WeakPtr_IEffect::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
@@ -128,7 +145,7 @@ namespace moho
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    weak->ResetFromObject(ReadPointerIEffect(archive, owner));
+    (void)RelinkWeakPtrIEffect(weak, ReadPointerIEffect(archive, owner));
   }
 
   /**

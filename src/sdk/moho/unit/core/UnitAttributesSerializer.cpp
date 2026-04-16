@@ -15,7 +15,7 @@ namespace
     return reinterpret_cast<gpg::SerHelperBase*>(&gUnitAttributesSerializer.mHelperNext);
   }
 
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitAttributesSerializerNodeCore() noexcept
   {
     if (gUnitAttributesSerializer.mHelperNext != nullptr && gUnitAttributesSerializer.mHelperPrev != nullptr) {
       gUnitAttributesSerializer.mHelperNext->mPrev = gUnitAttributesSerializer.mHelperPrev;
@@ -28,6 +28,29 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x0055C3B0 (FUN_0055C3B0, SerSaveLoadHelper<UnitAttributes>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks the UnitAttributes serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitAttributesSerializerNodeLaneA() noexcept
+  {
+    return UnlinkUnitAttributesSerializerNodeCore();
+  }
+
+  /**
+   * Address: 0x0055C3E0 (FUN_0055C3E0, SerSaveLoadHelper<UnitAttributes>::unlink lane B)
+   *
+   * What it does:
+   * Mirrors lane A unlink/self-link reset for the UnitAttributes serializer
+   * helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitAttributesSerializerNodeLaneB() noexcept
+  {
+    return UnlinkUnitAttributesSerializerNodeCore();
+  }
+
   void ResetSerializerNode() noexcept
   {
     if (gUnitAttributesSerializer.mHelperNext == nullptr || gUnitAttributesSerializer.mHelperPrev == nullptr) {
@@ -37,7 +60,7 @@ namespace
       return;
     }
 
-    (void)UnlinkSerializerNode();
+    (void)UnlinkUnitAttributesSerializerNodeLaneA();
   }
 
   void cleanup_UnitAttributesSerializer_atexit()
@@ -105,7 +128,7 @@ namespace moho
    */
   void cleanup_UnitAttributesSerializer()
   {
-    (void)UnlinkSerializerNode();
+    (void)UnlinkUnitAttributesSerializerNodeLaneA();
   }
 
   /**
@@ -119,7 +142,6 @@ namespace moho
     ResetSerializerNode();
     gUnitAttributesSerializer.mDeserialize = &UnitAttributesSerializer::Deserialize;
     gUnitAttributesSerializer.mSerialize = &UnitAttributesSerializer::Serialize;
-    gUnitAttributesSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_UnitAttributesSerializer_atexit);
   }
 } // namespace moho

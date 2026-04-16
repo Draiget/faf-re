@@ -1,17 +1,126 @@
 #include "moho/ui/IUIManager.h"
 
+#include <cstdint>
 #include <exception>
 
+#include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_Color.h"
+#include "moho/render/d3d/CD3DDevice.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/ui/UiRuntimeTypes.h"
 
 moho::CUIManager* moho::g_UIManager = nullptr;
 
 namespace
 {
+  /**
+   * Address: 0x0084C790 (FUN_0084C790, sub_84C790)
+   *
+   * What it does:
+   * Converts one normalized UI point (`[0..1]` per lane) into head-pixel
+   * coordinates using active D3D head dimensions.
+   */
+  [[maybe_unused]] float* ScaleNormalizedUiPointToHeadPixels(
+    const float* const normalizedPoint,
+    float* const outPixelPoint,
+    const int headIndex
+  )
+  {
+    moho::CD3DDevice* const widthDevice = moho::D3D_GetDevice();
+    moho::CD3DDevice* const heightDevice = moho::D3D_GetDevice();
+    const float headWidth = static_cast<float>(static_cast<unsigned int>(widthDevice->GetHeadWidth(headIndex)));
+    const float headHeight = static_cast<float>(static_cast<unsigned int>(heightDevice->GetHeadHeight(headIndex)));
+
+    outPixelPoint[0] = normalizedPoint[0] * headWidth;
+    outPixelPoint[1] = normalizedPoint[1] * headHeight;
+    return outPixelPoint;
+  }
+
+  /**
+   * Address: 0x0084C800 (FUN_0084C800, sub_84C800)
+   *
+   * What it does:
+   * Converts one head-pixel UI point into normalized (`[0..1]`) coordinates
+   * using active D3D head dimensions.
+   */
+  [[maybe_unused]] float* ScaleHeadPixelsToNormalizedUiPoint(
+    const float* const pixelPoint,
+    float* const outNormalizedPoint,
+    const int headIndex
+  )
+  {
+    moho::CD3DDevice* const widthDevice = moho::D3D_GetDevice();
+    moho::CD3DDevice* const heightDevice = moho::D3D_GetDevice();
+    const float headWidth = static_cast<float>(static_cast<unsigned int>(widthDevice->GetHeadWidth(headIndex)));
+    const float headHeight = static_cast<float>(static_cast<unsigned int>(heightDevice->GetHeadHeight(headIndex)));
+
+    outNormalizedPoint[0] = pixelPoint[0] / headWidth;
+    outNormalizedPoint[1] = pixelPoint[1] / headHeight;
+    return outNormalizedPoint;
+  }
+
+  std::uint32_t gUiRuntimeScratchLaneA = 0u;
+  std::uint32_t gUiRuntimeScratchLaneB = 0u;
+
+  /**
+   * Address: 0x0083C2A0 (FUN_0083C2A0)
+   *
+   * What it does:
+   * Returns the primary UI runtime scratch-lane owner pointer.
+   */
+  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryA(const int /*unused*/) noexcept
+  {
+    return &gUiRuntimeScratchLaneA;
+  }
+
+  /**
+   * Address: 0x0083C380 (FUN_0083C380)
+   *
+   * What it does:
+   * Returns the secondary UI runtime scratch-lane owner pointer.
+   */
+  [[maybe_unused]] void* GetUiRuntimeScratchLaneBEntryA(const int /*unused*/) noexcept
+  {
+    return &gUiRuntimeScratchLaneB;
+  }
+
+  /**
+   * Address: 0x0083C3C0 (FUN_0083C3C0)
+   *
+   * What it does:
+   * Secondary entry lane that returns the primary UI runtime scratch owner.
+   */
+  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryB(const int /*unused*/) noexcept
+  {
+    return GetUiRuntimeScratchLaneAEntryA(0);
+  }
+
+  /**
+   * Address: 0x0083C560 (FUN_0083C560)
+   *
+   * What it does:
+   * Secondary entry lane that returns the secondary UI runtime scratch owner.
+   */
+  [[maybe_unused]] void* GetUiRuntimeScratchLaneBEntryB(const int /*unused*/) noexcept
+  {
+    return GetUiRuntimeScratchLaneBEntryA(0);
+  }
+
+  /**
+   * Address: 0x0083C570 (FUN_0083C570)
+   *
+   * What it does:
+   * Third entry lane that returns the primary UI runtime scratch owner.
+   */
+  [[maybe_unused]] void* GetUiRuntimeScratchLaneAEntryC(const int /*unused*/) noexcept
+  {
+    return GetUiRuntimeScratchLaneAEntryA(0);
+  }
+
   template <typename TCall>
   bool StartUIMainEntryWithState(
     LuaPlus::LuaState* const state,
@@ -124,6 +233,28 @@ moho::IUIManager* moho::UI_GetManager()
 }
 
 /**
+ * Address: 0x0084C680 (FUN_0084C680)
+ *
+ * What it does:
+ * Returns the global UI-manager singleton lane.
+ */
+[[maybe_unused]] moho::CUIManager* moho::GetUiManagerGlobalLaneA() noexcept
+{
+  return g_UIManager;
+}
+
+/**
+ * Address: 0x0084C960 (FUN_0084C960)
+ *
+ * What it does:
+ * Secondary lane returning the global UI-manager singleton pointer.
+ */
+[[maybe_unused]] moho::CUIManager* moho::GetUiManagerGlobalLaneB() noexcept
+{
+  return g_UIManager;
+}
+
+/**
  * Address: 0x00833C20 (FUN_00833C20, Moho::UICommandModeData::UICommandModeData)
  * Mangled: ??0UICommandModeData@Moho@@QAE@XZ
  *
@@ -131,6 +262,26 @@ moho::IUIManager* moho::UI_GetManager()
  * Default-constructs command-mode name and payload Lua-object lanes.
  */
 moho::UICommandModeData::UICommandModeData() = default;
+
+/**
+ * Address: 0x0083DF60 (FUN_0083DF60, ??0UICommandModeData@Moho@@QAE@ABU01@@Z)
+ *
+ * What it does:
+ * Copy-constructs command-mode name and payload Lua-object lanes.
+ */
+moho::UICommandModeData::UICommandModeData(const UICommandModeData& other)
+  : mMode(other.mMode)
+  , mPayload(other.mPayload)
+{
+}
+
+/**
+ * Address: 0x0081F700 (FUN_0081F700, ??1UICommandModeData@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Releases one payload Lua object and one command-mode text lane.
+ */
+moho::UICommandModeData::~UICommandModeData() = default;
 
 /**
  * Address: 0x0083D140 (FUN_0083D140, ?UI_StartFrontEnd@Moho@@YA_NXZ)
@@ -158,6 +309,94 @@ bool moho::UI_StartSplashScreens()
   return StartUIMainEntry(UIS_splash, "StartSplashScreen", [](const LuaPlus::LuaFunction<void>& entryPointFn) {
     entryPointFn();
   });
+}
+
+/**
+ * Address: 0x0083CE10 (FUN_0083CE10)
+ *
+ * What it does:
+ * Forces UI state to lobby-mode.
+ */
+[[maybe_unused]] void moho::ForceUiStateLobbyMode()
+{
+  sUIState = UIS_lobby;
+}
+
+/**
+ * Address: 0x0083E9A0 (FUN_0083E9A0, sub_83E9A0)
+ *
+ * What it does:
+ * When UI state is `UIS_game`, builds one modifiers table and invokes
+ * `/lua/ui/game/chat.lua:ActivateChat(modifiers)`.
+ */
+void moho::UI_ActivateChat(const bool shiftDown, const bool ctrlDown, const bool altDown)
+{
+  if (sUIState != UIS_game || g_UIManager == nullptr || g_UIManager->mLuaState == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaState* const state = g_UIManager->mLuaState;
+  LuaPlus::LuaObject modifierTable{};
+  modifierTable.AssignNewTable(state, 3, 0);
+  if (shiftDown) {
+    modifierTable.SetBoolean("Shift", true);
+  }
+  if (ctrlDown) {
+    modifierTable.SetBoolean("Ctrl", true);
+  }
+  if (altDown) {
+    modifierTable.SetBoolean("Alt", true);
+  }
+
+  LuaPlus::LuaObject chatModule = SCR_Import(state, "/lua/ui/game/chat.lua");
+  LuaPlus::LuaObject activateChat = chatModule["ActivateChat"];
+  LuaPlus::LuaFunction callback(activateChat);
+  try {
+    callback.Call_Object(modifierTable);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/game/chat.lua:ActivateChat': %s",
+      exception.what() != nullptr ? exception.what() : "<unknown>"
+    );
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/game/chat.lua:ActivateChat': %s", "<unknown>");
+  }
+}
+
+/**
+ * Address: 0x0083EBC0 (FUN_0083EBC0, func_ReceiveChat)
+ *
+ * What it does:
+ * Decodes one serialized Lua payload from network chat bytes and invokes
+ * `/lua/ui/game/gamemain.lua:ReceiveChat(senderName, payloadObject)`.
+ */
+int moho::func_ReceiveChat(const char* const senderName, const gpg::MemBuffer<const char> data)
+{
+  if (g_UIManager == nullptr || g_UIManager->mLuaState == nullptr) {
+    return 0;
+  }
+
+  LuaPlus::LuaState* const state = g_UIManager->mLuaState;
+  gpg::MemBufferStream stream(data, 0xFFFFFFFFu);
+  gpg::BinaryReader reader(&stream);
+  LuaPlus::LuaObject payloadObject{};
+  payloadObject.SCR_FromByteStream(payloadObject, state, &reader);
+
+  LuaPlus::LuaObject gameMainModule = SCR_Import(state, "/lua/ui/game/gamemain.lua");
+  LuaPlus::LuaObject receiveChat = gameMainModule["ReceiveChat"];
+  LuaPlus::LuaFunction callback(receiveChat);
+  try {
+    callback.Call_StrObject(senderName != nullptr ? senderName : "", payloadObject);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/game/gamemain.lua:ReceiveChat': %s",
+      exception.what() != nullptr ? exception.what() : "<unknown>"
+    );
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:ReceiveChat': %s", "<unknown>");
+  }
+
+  return 0;
 }
 
 /**

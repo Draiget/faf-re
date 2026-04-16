@@ -20,6 +20,15 @@ namespace gpg
   class RVectorType<moho::SEntitySetTemplateUnit> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x00704C60 (FUN_00704C60, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::dtr)
+     *
+     * What it does:
+     * Tears down one `RVectorType<SEntitySetTemplateUnit>` descriptor and
+     * releases inherited `gpg::RType` reflection storage lanes.
+     */
+    ~RVectorType() override;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;

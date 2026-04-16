@@ -114,6 +114,7 @@ namespace
   bool gArmyLaunchInfoVectorTypeRegistered = false;
   msvc8::string gArmyLaunchInfoVectorTypeName;
   bool gArmyLaunchInfoVectorTypeNameCleanupRegistered = false;
+  gpg::RType* gArmyLaunchInfoVectorType = nullptr;
   gpg::RType* gStringVectorType = nullptr;
 
   [[nodiscard]] moho::LaunchInfoNewTypeInfo& LaunchInfoNewTypeInfoStorageRef() noexcept
@@ -148,21 +149,38 @@ namespace
     return &gArmyLaunchInfoTypeInfo;
   }
 
+  /**
+   * Address: 0x00545470 (FUN_00545470)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for
+   * `msvc8::vector<moho::ArmyLaunchInfo>`.
+   */
+  [[nodiscard]] gpg::RType* ResolveArmyLaunchInfoVectorTypeFast()
+  {
+    gpg::RType* type = gArmyLaunchInfoVectorType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(ArmyLaunchInfoVector));
+      gArmyLaunchInfoVectorType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* ResolveArmyLaunchInfoVectorType()
   {
     (void)RegisterArmyLaunchInfoTypeInfoStartup();
 
     if (!gArmyLaunchInfoVectorTypeRegistered) {
-      gpg::PreRegisterRType(typeid(ArmyLaunchInfoVector), &gArmyLaunchInfoVectorTypeInfo);
-      gArmyLaunchInfoVectorTypeRegistered = true;
+      (void)moho::preregister_ArmyLaunchInfoVectorTypeStartup();
     }
 
-    gpg::RType* type = gpg::LookupRType(typeid(ArmyLaunchInfoVector));
+    gpg::RType* type = ResolveArmyLaunchInfoVectorTypeFast();
     if (!type) {
       type = gpg::REF_FindTypeNamed("vector<ArmyLaunchInfo>");
       if (!type) {
         type = gpg::REF_FindTypeNamed("vector<Moho::ArmyLaunchInfo>");
       }
+      gArmyLaunchInfoVectorType = type;
     }
     return type;
   }
@@ -190,6 +208,322 @@ namespace
       gStringVectorType = gpg::LookupRType(typeid(msvc8::vector<msvc8::string>));
     }
     return gStringVectorType;
+  }
+
+  /**
+   * Address: 0x00543200 (FUN_00543200)
+   *
+   * What it does:
+   * Wires the reflected `LaunchInfoNew` constructor and destructor callback
+   * lanes into an initialized `gpg::RType` descriptor.
+   */
+  void InitializeLaunchInfoNewTypeInfoCallbacks(gpg::RType* const typeInfo)
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    if (!typeInfo) {
+      return;
+    }
+
+    typeInfo->newRefFunc_ = &moho::LaunchInfoNewTypeInfo::NewRef;
+    typeInfo->deleteFunc_ = &moho::LaunchInfoNewTypeInfo::Delete;
+    typeInfo->ctorRefFunc_ = &moho::LaunchInfoNewTypeInfo::CtrRef;
+    typeInfo->dtrFunc_ = &moho::LaunchInfoNewTypeInfo::Destruct;
+  }
+
+  /**
+   * Address: 0x00544870 (FUN_00544870)
+   *
+   * What it does:
+   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one
+   * archive read for the provided object lane.
+   */
+  void ReadArmyLaunchInfoReflectedObject(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* type = moho::ArmyLaunchInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::ArmyLaunchInfo));
+      moho::ArmyLaunchInfo::sType = type;
+    }
+    archive->Read(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x005448A0 (FUN_005448A0)
+   *
+   * What it does:
+   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one
+   * archive write for the provided object lane.
+   */
+  void WriteArmyLaunchInfoReflectedObject(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* type = moho::ArmyLaunchInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::ArmyLaunchInfo));
+      moho::ArmyLaunchInfo::sType = type;
+    }
+    archive->Write(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x00545380 (FUN_00545380)
+   *
+   * What it does:
+   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one
+   * archive read for the provided object lane.
+   */
+  void ReadLaunchInfoBaseReflectedObject(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* type = moho::LaunchInfoBase::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::LaunchInfoBase));
+      moho::LaunchInfoBase::sType = type;
+    }
+    archive->Read(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x005453B0 (FUN_005453B0)
+   *
+   * What it does:
+   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one
+   * archive write for the provided object lane.
+   */
+  void WriteLaunchInfoBaseReflectedObject(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* type = moho::LaunchInfoBase::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::LaunchInfoBase));
+      moho::LaunchInfoBase::sType = type;
+    }
+    archive->Write(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x005453E0 (FUN_005453E0)
+   *
+   * What it does:
+   * Lazily resolves `vector<string>` reflection type and dispatches one archive
+   * read for the provided object lane.
+   */
+  void ReadStringVectorReflectedObject(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* const type = ResolveStringVectorType();
+    archive->Read(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x00545410 (FUN_00545410)
+   *
+   * What it does:
+   * Lazily resolves `vector<string>` reflection type and dispatches one archive
+   * write for the provided object lane.
+   */
+  void WriteStringVectorReflectedObject(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RType* const type = ResolveStringVectorType();
+    archive->Write(type, object, ownerRef);
+  }
+
+  /**
+   * Address: 0x00544530 (FUN_00544530)
+   *
+   * What it does:
+   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
+   * read for the provided object lane.
+   */
+  gpg::ReadArchive* ReadArmyLaunchInfoArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    ReadArmyLaunchInfoReflectedObject(archive, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x005445A0 (FUN_005445A0)
+   *
+   * What it does:
+   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
+   * write for the provided object lane.
+   */
+  gpg::WriteArchive* WriteArmyLaunchInfoArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    WriteArmyLaunchInfoReflectedObject(archive, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x005449F0 (FUN_005449F0)
+   *
+   * What it does:
+   * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
+   * archive read for the provided object lane.
+   */
+  gpg::ReadArchive* ReadArmyLaunchInfoVectorArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    gpg::RType* const type = ResolveArmyLaunchInfoVectorType();
+    archive->Read(type, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00544A30 (FUN_00544A30)
+   *
+   * What it does:
+   * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
+   * archive write for the provided object lane.
+   */
+  gpg::WriteArchive* WriteArmyLaunchInfoVectorArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    gpg::RType* const type = ResolveArmyLaunchInfoVectorType();
+    archive->Write(type, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00544B00 (FUN_00544B00)
+   *
+   * What it does:
+   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
+   * read for the provided object lane.
+   */
+  gpg::ReadArchive* ReadLaunchInfoBaseArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    ReadLaunchInfoBaseReflectedObject(archive, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00544B80 (FUN_00544B80)
+   *
+   * What it does:
+   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
+   * write for the provided object lane.
+   */
+  gpg::WriteArchive* WriteLaunchInfoBaseArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    WriteLaunchInfoBaseReflectedObject(archive, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00544B40 (FUN_00544B40)
+   *
+   * What it does:
+   * Lazily resolves `vector<string>` reflection type and dispatches one archive
+   * read for the provided object lane.
+   */
+  gpg::ReadArchive* ReadLaunchInfoStringVectorArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    ReadStringVectorReflectedObject(archive, object, *ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x00544BC0 (FUN_00544BC0)
+   *
+   * What it does:
+   * Lazily resolves `vector<string>` reflection type and dispatches one archive
+   * write for the provided object lane.
+   */
+  gpg::WriteArchive* WriteLaunchInfoStringVectorArchiveAdapter(
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    GPG_ASSERT(ownerRef != nullptr);
+    if (!archive || !ownerRef) {
+      return archive;
+    }
+
+    WriteStringVectorReflectedObject(archive, object, *ownerRef);
+    return archive;
   }
 
   void CleanupArmyLaunchInfoVectorTypeName()
@@ -303,10 +637,9 @@ namespace
 
     ArmyLaunchInfoVector loaded;
     loaded.resize(itemCount);
-    gpg::RType* const elementType = ResolveArmyLaunchInfoType();
-    const gpg::RRef& owner = NullOwnerRef();
+    const gpg::RRef owner = NullOwnerRef();
     for (unsigned int i = 0; i < itemCount; ++i) {
-      archive->Read(elementType, &loaded[static_cast<std::size_t>(i)], owner);
+      ReadArmyLaunchInfoReflectedObject(archive, &loaded[static_cast<std::size_t>(i)], owner);
     }
 
     *vectorStorage = std::move(loaded);
@@ -331,10 +664,9 @@ namespace
       return;
     }
 
-    gpg::RType* const elementType = ResolveArmyLaunchInfoType();
     const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
     for (const moho::ArmyLaunchInfo& item : *vectorStorage) {
-      archive->Write(elementType, &item, owner);
+      WriteArmyLaunchInfoReflectedObject(archive, &item, owner);
     }
   }
 
@@ -486,6 +818,115 @@ namespace
   }
 
   /**
+   * Address: 0x00545130 (FUN_00545130)
+   * Address: 0x00544770 (FUN_00544770)
+   *
+   * What it does:
+   * Copy-constructs `count` contiguous `BVIntSet` lanes from one source set.
+   * On failure, it resets already-constructed lanes to inline storage and
+   * rethrows.
+   */
+  [[maybe_unused]] void CopyConstructBVIntSetFillRange(
+    const moho::BVIntSet& source, moho::BVIntSet* const destination, std::size_t count
+  )
+  {
+    if (destination == nullptr || count == 0u) {
+      return;
+    }
+
+    moho::BVIntSet* write = destination;
+    try {
+      while (count != 0u) {
+        write->mFirstWordIndex = source.mFirstWordIndex;
+        write->mWords.RebindInlineNoFree();
+        (void)gpg::core::legacy::CopyFrom(
+          write->mWords, source.mWords, write->mWords.originalVec_
+        );
+        --count;
+        ++write;
+      }
+    } catch (...) {
+      write->mWords.ResetStorageToInline();
+      for (moho::BVIntSet* constructed = destination; constructed != write; ++constructed) {
+        constructed->mWords.ResetStorageToInline();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x00544060 (FUN_00544060)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one counted contiguous `BVIntSet`
+   * copy-construction lane into the canonical rollback helper.
+   */
+  [[maybe_unused]] void CopyConstructBVIntSetFillRangeRegisterAdapter(
+    const moho::BVIntSet* const source,
+    const std::size_t count,
+    moho::BVIntSet* const destination
+  )
+  {
+    CopyConstructBVIntSetFillRange(*source, destination, count);
+  }
+
+  /**
+   * Address: 0x00545230 (FUN_00545230)
+   * Address: 0x00545250 (FUN_00545250)
+   *
+   * What it does:
+   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
+   * `destination`, preserving the destination reserved meta-word lane.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesLane(
+    const moho::ArmyLaunchInfo* const source,
+    moho::ArmyLaunchInfo* const destination
+  )
+  {
+    destination->mUnitSources.mFirstWordIndex = source->mUnitSources.mFirstWordIndex;
+    (void)gpg::core::legacy::CopyFrom(
+      destination->mUnitSources.mWords,
+      source->mUnitSources.mWords,
+      destination->mUnitSources.mWords.originalVec_
+    );
+    return destination;
+  }
+
+  /**
+   * Address: 0x005450C0 (FUN_005450C0)
+   *
+   * What it does:
+   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
+   * every destination object in `[destinationBegin, destinationEnd)`.
+   */
+  [[maybe_unused]] void CopyArmyLaunchInfoUnitSourcesRangeAssign(
+    moho::ArmyLaunchInfo* const destinationBegin,
+    moho::ArmyLaunchInfo* const destinationEnd,
+    const moho::ArmyLaunchInfo* const source
+  )
+  {
+    for (moho::ArmyLaunchInfo* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
+      (void)CopyArmyLaunchInfoUnitSourcesLane(source, cursor);
+    }
+  }
+
+  /**
+   * Address: 0x00544730 (FUN_00544730)
+   *
+   * What it does:
+   * Alternate register/stack adapter lane for one
+   * `ArmyLaunchInfo::mUnitSources` range-assignment call.
+   */
+  [[maybe_unused]] void CopyArmyLaunchInfoUnitSourcesRangeAssignAdapter(
+    moho::ArmyLaunchInfo* const destinationBegin,
+    moho::ArmyLaunchInfo* const destinationEnd,
+    const moho::ArmyLaunchInfo* const source
+  )
+  {
+    CopyArmyLaunchInfoUnitSourcesRangeAssign(destinationBegin, destinationEnd, source);
+  }
+
+  /**
    * Address: 0x00542CD0 (FUN_00542CD0)
    *
    * What it does:
@@ -500,6 +941,333 @@ namespace
       destination = source;
     }
     return destination;
+  }
+
+  /**
+   * Address: 0x00544E20 (FUN_00544E20)
+   *
+   * What it does:
+   * Rewinds one half-open ArmyLaunchInfo range by releasing heap-backed
+   * `BVIntSet::mWords` storage and restoring inline fastvector lanes.
+   */
+  [[maybe_unused]] moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
+    moho::ArmyLaunchInfo* const begin,
+    moho::ArmyLaunchInfo* const end
+  )
+  {
+    for (moho::ArmyLaunchInfo* cursor = begin; cursor != end; ++cursor) {
+      cursor->mUnitSources.mWords.ResetStorageToInline();
+    }
+    return begin;
+  }
+
+  /**
+   * Address: 0x005454A0 (FUN_005454A0)
+   *
+   * What it does:
+   * Copy-constructs one contiguous `ArmyLaunchInfo` range from
+   * `[sourceBegin, sourceEnd)` into `destinationBegin`, rebuilding each
+   * `mUnitSources.mWords` lane from inline storage and rolling back partial
+   * construction on failure.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollback(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    const moho::ArmyLaunchInfo* sourceCursor = sourceBegin;
+    moho::ArmyLaunchInfo* destinationCursor = destinationBegin;
+
+    try {
+      while (sourceCursor != sourceEnd) {
+        if (destinationCursor != nullptr) {
+          destinationCursor->mUnitSources.mFirstWordIndex = sourceCursor->mUnitSources.mFirstWordIndex;
+          destinationCursor->mUnitSources.mWords.RebindInlineNoFree();
+          (void)gpg::core::legacy::CopyFrom(
+            destinationCursor->mUnitSources.mWords,
+            sourceCursor->mUnitSources.mWords,
+            destinationCursor->mUnitSources.mWords.originalVec_
+          );
+        }
+
+        ++sourceCursor;
+        ++destinationCursor;
+      }
+    } catch (...) {
+      if (destinationCursor != nullptr) {
+        destinationCursor->mUnitSources.mWords.ResetStorageToInline();
+      }
+      (void)ResetArmyLaunchInfoUnitSourcesRange(destinationBegin, destinationCursor);
+      throw;
+    }
+
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x00544C60 (FUN_00544C60)
+   * Address: 0x00545090 (FUN_00545090)
+   * Address: 0x00545580 (FUN_00545580)
+   *
+   * What it does:
+   * Bridges legacy register/EH-shaped wrapper lanes into the canonical
+   * `CopyConstructArmyLaunchInfoRangeRollback` helper.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackRegisterAdapter(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00545620 (FUN_00545620)
+   *
+   * What it does:
+   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
+   * `destination`, rebinding destination word storage to inline lanes first.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesRebindAndCopy(
+    const moho::ArmyLaunchInfo* const source,
+    moho::ArmyLaunchInfo* const destination
+  )
+  {
+    if (destination == nullptr) {
+      return destination;
+    }
+
+    destination->mUnitSources.mFirstWordIndex = source->mUnitSources.mFirstWordIndex;
+    (void)gpg::FastVectorN2RebindAndCopy<unsigned int>(
+      &destination->mUnitSources.mWords,
+      &source->mUnitSources.mWords
+    );
+    return destination;
+  }
+
+  /**
+   * Address: 0x00545270 (FUN_00545270)
+   *
+   * What it does:
+   * Thin adapter lane forwarding one `ArmyLaunchInfo` unit-source copy into
+   * the inline-rebind helper.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesRebindAndCopyAdapter(
+    const moho::ArmyLaunchInfo* const source,
+    moho::ArmyLaunchInfo* const destination
+  )
+  {
+    return CopyArmyLaunchInfoUnitSourcesRebindAndCopy(source, destination);
+  }
+
+  /**
+   * Address: 0x005457A0 (FUN_005457A0)
+   *
+   * What it does:
+   * Adapter lane that forwards ArmyLaunchInfo range copy-construction into the
+   * canonical rollback-capable helper.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackAdapterA(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00545880 (FUN_00545880)
+   *
+   * What it does:
+   * Alternate adapter lane that forwards ArmyLaunchInfo range copy-construction
+   * into the canonical rollback-capable helper.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeRollbackAdapterB(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollback(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00545200 (FUN_00545200)
+   *
+   * What it does:
+   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
+   * copy-construction call into `FUN_005457A0`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkA(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollbackAdapterA(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x005445E0 (FUN_005445E0)
+   *
+   * What it does:
+   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
+   * copy-construction call into `FUN_00545880`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkB(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00544E60 (FUN_00544E60)
+   *
+   * What it does:
+   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
+   * copy-construction call into `FUN_00545880`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkC(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  /**
+   * Address: 0x00545550 (FUN_00545550)
+   *
+   * What it does:
+   * Register/stack-shape thunk lane forwarding one ArmyLaunchInfo range
+   * copy-construction call into `FUN_00545880`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyConstructArmyLaunchInfoRangeThunkD(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    return CopyConstructArmyLaunchInfoRangeRollbackAdapterB(sourceBegin, sourceEnd, destinationBegin);
+  }
+
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardCore(
+    moho::ArmyLaunchInfo* destinationEnd,
+    const moho::ArmyLaunchInfo* sourceEnd,
+    const moho::ArmyLaunchInfo* const sourceBegin
+  )
+  {
+    const moho::ArmyLaunchInfo* read = sourceEnd;
+    moho::ArmyLaunchInfo* write = destinationEnd;
+    while (read != sourceBegin) {
+      --read;
+      --write;
+      write->mUnitSources.mFirstWordIndex = read->mUnitSources.mFirstWordIndex;
+      (void)gpg::core::legacy::CopyFrom(
+        write->mUnitSources.mWords,
+        read->mUnitSources.mWords,
+        write->mUnitSources.mWords.originalVec_
+      );
+    }
+    return write;
+  }
+
+  /**
+   * Address: 0x00544740 (FUN_00544740)
+   *
+   * What it does:
+   * Backward-copy adapter lane for one contiguous ArmyLaunchInfo range.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterA(
+    moho::ArmyLaunchInfo* const destinationEnd,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    const moho::ArmyLaunchInfo* const sourceBegin
+  )
+  {
+    return CopyArmyLaunchInfoRangeBackwardCore(destinationEnd, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00545100 (FUN_00545100)
+   *
+   * What it does:
+   * Alternate backward-copy adapter lane for one contiguous ArmyLaunchInfo
+   * range.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterB(
+    moho::ArmyLaunchInfo* const destinationEnd,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    const moho::ArmyLaunchInfo* const sourceBegin
+  )
+  {
+    return CopyArmyLaunchInfoRangeBackwardCore(destinationEnd, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00543410 (FUN_00543410)
+   *
+   * What it does:
+   * Resets one legacy `vector<ArmyLaunchInfo>` lane by clearing each element's
+   * unit-source storage, releasing the heap buffer, and nulling begin/end/
+   * capacity pointers.
+   */
+  [[maybe_unused]] void ResetArmyLaunchInfoVectorStorage(ArmyLaunchInfoVector& storage)
+  {
+    auto& runtime = msvc8::AsVectorRuntimeView(storage);
+    if (runtime.begin != nullptr) {
+      (void)ResetArmyLaunchInfoUnitSourcesRange(runtime.begin, runtime.end);
+      ::operator delete(runtime.begin);
+    }
+
+    runtime.begin = nullptr;
+    runtime.end = nullptr;
+    runtime.capacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x00544EA0 (FUN_00544EA0)
+   * Address: 0x00544660 (FUN_00544660)
+   *
+   * What it does:
+   * Rewinds one half-open command-source range by releasing heap-backed
+   * name-string storage and restoring empty SSO lanes for each entry.
+   */
+  [[maybe_unused]] void ResetCommandSourceNameRange(
+    moho::SSTICommandSource* const begin,
+    moho::SSTICommandSource* const end
+  )
+  {
+    for (moho::SSTICommandSource* cursor = begin; cursor != end; ++cursor) {
+      cursor->mName.tidy(true, 0U);
+    }
+  }
+
+  /**
+   * Address: 0x005434D0 (FUN_005434D0)
+   *
+   * What it does:
+   * Resets one legacy `vector<SSTICommandSource>` lane by clearing each
+   * command-source name, releasing the heap buffer, and nulling begin/end/
+   * capacity pointers.
+   */
+  [[maybe_unused]] void ResetCommandSourceVectorStorage(msvc8::vector<moho::SSTICommandSource>& storage)
+  {
+    auto& runtime = msvc8::AsVectorRuntimeView(storage);
+    if (runtime.begin != nullptr) {
+      (void)ResetCommandSourceNameRange(runtime.begin, runtime.end);
+      ::operator delete(runtime.begin);
+    }
+
+    runtime.begin = nullptr;
+    runtime.end = nullptr;
+    runtime.capacityEnd = nullptr;
   }
 
   template <typename THelper>
@@ -717,6 +1485,35 @@ namespace moho
   gpg::RType* LaunchInfoBase::sType = nullptr;
 
   /**
+   * Address: 0x00544800 (FUN_00544800, preregister_ArmyLaunchInfoVectorTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `vector<ArmyLaunchInfo>`.
+   */
+  gpg::RType* preregister_ArmyLaunchInfoVectorTypeStartup()
+  {
+    auto* const typeInfo = &gArmyLaunchInfoVectorTypeInfo;
+    gpg::PreRegisterRType(typeid(ArmyLaunchInfoVector), typeInfo);
+    gArmyLaunchInfoVectorTypeRegistered = true;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x00544320 (FUN_00544320, boost::shared_ptr_LaunchInfoNew::shared_ptr_LaunchInfoNew)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<LaunchInfoNew>` from one raw launch-info
+   * pointer lane.
+   */
+  boost::shared_ptr<LaunchInfoNew>* ConstructSharedLaunchInfoNewFromRaw(
+    boost::shared_ptr<LaunchInfoNew>* const outLaunchInfo,
+    LaunchInfoNew* const launchInfo
+  )
+  {
+    return ::new (outLaunchInfo) boost::shared_ptr<LaunchInfoNew>(launchInfo);
+  }
+
+  /**
    * Address: 0x00542110 (FUN_00542110, scalar deleting destructor thunk)
    */
   ArmyLaunchInfoTypeInfo::~ArmyLaunchInfoTypeInfo() = default;
@@ -860,10 +1657,7 @@ namespace moho
   {
     size_ = sizeof(LaunchInfoNew);
     gpg::RType::Init();
-    newRefFunc_ = &LaunchInfoNewTypeInfo::NewRef;
-    ctorRefFunc_ = &LaunchInfoNewTypeInfo::CtrRef;
-    deleteFunc_ = &LaunchInfoNewTypeInfo::Delete;
-    dtrFunc_ = &LaunchInfoNewTypeInfo::Destruct;
+    InitializeLaunchInfoNewTypeInfoCallbacks(this);
     AddBase_LaunchInfoBase(this);
     Finish();
   }
@@ -965,6 +1759,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00541F90 (FUN_00541F90)
+   *
+   * What it does:
+   * Initializes the embedded `BVIntSet` lane used by `ArmyLaunchInfo` to its
+   * empty inline-storage state.
+   */
+  ArmyLaunchInfo::ArmyLaunchInfo()
+    : mUnitSources()
+  {
+  }
+
+  /**
    * Address: 0x00542440 (FUN_00542440, deleting dtor thunk)
    * Address: 0x00542460 (FUN_00542460, destructor core)
    */
@@ -1061,18 +1867,11 @@ namespace moho
       return;
     }
 
-    gpg::RType* baseType = LaunchInfoBase::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(LaunchInfoBase));
-      LaunchInfoBase::sType = baseType;
-    }
-
     gpg::RRef baseOwner{};
-    archive->Read(baseType, static_cast<LaunchInfoBase*>(this), baseOwner);
+    ReadLaunchInfoBaseReflectedObject(archive, static_cast<LaunchInfoBase*>(this), baseOwner);
 
-    gpg::RType* const stringVectorType = ResolveStringVectorType();
     gpg::RRef stringVectorOwner{};
-    archive->Read(stringVectorType, &mStrVec, stringVectorOwner);
+    ReadStringVectorReflectedObject(archive, &mStrVec, stringVectorOwner);
 
     unsigned int seed = 0;
     archive->ReadUInt(&seed);
@@ -1089,18 +1888,11 @@ namespace moho
       return;
     }
 
-    gpg::RType* baseType = LaunchInfoBase::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(LaunchInfoBase));
-      LaunchInfoBase::sType = baseType;
-    }
-
     gpg::RRef baseOwner{};
-    archive->Write(baseType, static_cast<const LaunchInfoBase*>(this), baseOwner);
+    WriteLaunchInfoBaseReflectedObject(archive, static_cast<const LaunchInfoBase*>(this), baseOwner);
 
-    gpg::RType* const stringVectorType = ResolveStringVectorType();
     gpg::RRef stringVectorOwner{};
-    archive->Write(stringVectorType, &mStrVec, stringVectorOwner);
+    WriteStringVectorReflectedObject(archive, &mStrVec, stringVectorOwner);
 
     archive->WriteUInt(static_cast<unsigned int>(mInitSeed));
   }
@@ -1208,10 +2000,7 @@ namespace moho
    */
   void register_ArmyLaunchInfoSerializer()
   {
-    ArmyLaunchInfoSerializer* const serializer = InitializeArmyLaunchInfoSerializerCallbacks();
-    if (serializer != nullptr) {
-      serializer->RegisterSerializeFunctions();
-    }
+    (void)InitializeArmyLaunchInfoSerializerCallbacks();
     (void)std::atexit(&CleanupArmyLaunchInfoSerializerAtexit);
   }
 
@@ -1246,7 +2035,6 @@ namespace moho
     InitializeHelperNode(gLaunchInfoBaseSerializer);
     gLaunchInfoBaseSerializer.mSerLoadFunc = &LaunchInfoBaseSerializer::Deserialize;
     gLaunchInfoBaseSerializer.mSerSaveFunc = &LaunchInfoBaseSerializer::Serialize;
-    gLaunchInfoBaseSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupLaunchInfoBaseSerializerAtexit);
   }
 

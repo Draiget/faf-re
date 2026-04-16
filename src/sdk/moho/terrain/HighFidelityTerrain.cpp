@@ -2,17 +2,22 @@
 
 #include <cstdint>
 
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
+#include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
@@ -22,6 +27,8 @@ namespace
 {
   using TextureSheetHandle = boost::shared_ptr<moho::CD3DDynamicTextureSheet>;
   using TextureResourceHandle = boost::shared_ptr<moho::RD3DTextureResource>;
+  using GenericTextureSheetHandle = boost::shared_ptr<moho::ID3DTextureSheet>;
+  using TextureWeakHandle = boost::weak_ptr<gpg::gal::TextureD3D9>;
 
   moho::WaterSurface* sHighFidelityWaterSurface = nullptr;
   TextureSheetHandle sHighFidelityNoiseFillTexture{};
@@ -33,6 +40,7 @@ namespace
   constexpr std::uint32_t kDynamicIndexCount = 15000;
   constexpr std::uint16_t kDynamicVertexLoopStop = 10002u;
   constexpr std::int32_t kTriangleListPrimitiveToken = 4;
+  constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr int kNoiseFillTextureFormat = 2;
   constexpr const char* kNoiseFillName = "NoiseFill";
   constexpr const char* kNoiseFillShaderSource =
@@ -82,10 +90,154 @@ namespace
 
     indexSheet->Unlock();
   }
+
+  struct TerrainShaderVarSet
+  {
+    moho::ShaderVar skirtTexture;
+    moho::ShaderVar utilityTextureA;
+    moho::ShaderVar utilityTextureB;
+    moho::ShaderVar utilityTextureC;
+
+    moho::ShaderVar lowerAlbedoTexture;
+    moho::ShaderVar stratum0AlbedoTexture;
+    moho::ShaderVar stratum1AlbedoTexture;
+    moho::ShaderVar stratum2AlbedoTexture;
+    moho::ShaderVar stratum3AlbedoTexture;
+    moho::ShaderVar stratum4AlbedoTexture;
+    moho::ShaderVar stratum5AlbedoTexture;
+    moho::ShaderVar stratum6AlbedoTexture;
+    moho::ShaderVar stratum7AlbedoTexture;
+    moho::ShaderVar upperAlbedoTexture;
+
+    moho::ShaderVar lowerNormalTexture;
+    moho::ShaderVar stratum0NormalTexture;
+    moho::ShaderVar stratum1NormalTexture;
+    moho::ShaderVar stratum2NormalTexture;
+    moho::ShaderVar stratum3NormalTexture;
+    moho::ShaderVar stratum4NormalTexture;
+    moho::ShaderVar stratum5NormalTexture;
+    moho::ShaderVar stratum6NormalTexture;
+    moho::ShaderVar stratum7NormalTexture;
+
+    moho::ShaderVar lowerAlbedoTile;
+    moho::ShaderVar stratum0AlbedoTile;
+    moho::ShaderVar stratum1AlbedoTile;
+    moho::ShaderVar stratum2AlbedoTile;
+    moho::ShaderVar stratum3AlbedoTile;
+    moho::ShaderVar stratum4AlbedoTile;
+    moho::ShaderVar stratum5AlbedoTile;
+    moho::ShaderVar stratum6AlbedoTile;
+    moho::ShaderVar stratum7AlbedoTile;
+    moho::ShaderVar upperAlbedoTile;
+
+    moho::ShaderVar lowerNormalTile;
+    moho::ShaderVar stratum0NormalTile;
+    moho::ShaderVar stratum1NormalTile;
+    moho::ShaderVar stratum2NormalTile;
+    moho::ShaderVar stratum3NormalTile;
+    moho::ShaderVar stratum4NormalTile;
+    moho::ShaderVar stratum5NormalTile;
+    moho::ShaderVar stratum6NormalTile;
+    moho::ShaderVar stratum7NormalTile;
+
+    moho::ShaderVar normalTexture;
+    moho::ShaderVar terrainScale;
+    moho::ShaderVar viewportScale;
+    moho::ShaderVar viewportOffset;
+
+    TerrainShaderVarSet()
+    {
+      moho::RegisterShaderVar("SkirtTexture", &skirtTexture, "terrain");
+      moho::RegisterShaderVar("UtilityTextureA", &utilityTextureA, "terrain");
+      moho::RegisterShaderVar("UtilityTextureB", &utilityTextureB, "terrain");
+      moho::RegisterShaderVar("UtilityTextureC", &utilityTextureC, "terrain");
+
+      moho::RegisterShaderVar("LowerAlbedoTexture", &lowerAlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum0AlbedoTexture", &stratum0AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum1AlbedoTexture", &stratum1AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum2AlbedoTexture", &stratum2AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum3AlbedoTexture", &stratum3AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum4AlbedoTexture", &stratum4AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum5AlbedoTexture", &stratum5AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum6AlbedoTexture", &stratum6AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("Stratum7AlbedoTexture", &stratum7AlbedoTexture, "terrain");
+      moho::RegisterShaderVar("UpperAlbedoTexture", &upperAlbedoTexture, "terrain");
+
+      moho::RegisterShaderVar("LowerNormalTexture", &lowerNormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum0NormalTexture", &stratum0NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum1NormalTexture", &stratum1NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum2NormalTexture", &stratum2NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum3NormalTexture", &stratum3NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum4NormalTexture", &stratum4NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum5NormalTexture", &stratum5NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum6NormalTexture", &stratum6NormalTexture, "terrain");
+      moho::RegisterShaderVar("Stratum7NormalTexture", &stratum7NormalTexture, "terrain");
+
+      moho::RegisterShaderVar("LowerAlbedoTile", &lowerAlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum0AlbedoTile", &stratum0AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum1AlbedoTile", &stratum1AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum2AlbedoTile", &stratum2AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum3AlbedoTile", &stratum3AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum4AlbedoTile", &stratum4AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum5AlbedoTile", &stratum5AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum6AlbedoTile", &stratum6AlbedoTile, "terrain");
+      moho::RegisterShaderVar("Stratum7AlbedoTile", &stratum7AlbedoTile, "terrain");
+      moho::RegisterShaderVar("UpperAlbedoTile", &upperAlbedoTile, "terrain");
+
+      moho::RegisterShaderVar("LowerNormalTile", &lowerNormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum0NormalTile", &stratum0NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum1NormalTile", &stratum1NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum2NormalTile", &stratum2NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum3NormalTile", &stratum3NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum4NormalTile", &stratum4NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum5NormalTile", &stratum5NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum6NormalTile", &stratum6NormalTile, "terrain");
+      moho::RegisterShaderVar("Stratum7NormalTile", &stratum7NormalTile, "terrain");
+
+      moho::RegisterShaderVar("NormalTexture", &normalTexture, "terrain");
+      moho::RegisterShaderVar("TerrainScale", &terrainScale, "terrain");
+      moho::RegisterShaderVar("ViewportScale", &viewportScale, "terrain");
+      moho::RegisterShaderVar("ViewportOffset", &viewportOffset, "terrain");
+    }
+  };
+
+  [[nodiscard]] TerrainShaderVarSet& GetTerrainShaderVars()
+  {
+    static TerrainShaderVarSet shaderVars{};
+    return shaderVars;
+  }
+
+  void BindTextureShaderVar(moho::ShaderVar& shaderVar, const GenericTextureSheetHandle& textureSheet)
+  {
+    moho::ID3DTextureSheet::TextureHandle textureHandle{};
+    if (textureSheet != nullptr) {
+      textureSheet->GetTexture(textureHandle);
+    }
+    shaderVar.GetTexture(TextureWeakHandle(textureHandle));
+  }
+
+  void BindTextureShaderVar(
+    moho::ShaderVar& shaderVar,
+    const boost::SharedPtrRaw<moho::RD3DTextureResource>& textureResource
+  )
+  {
+    const boost::shared_ptr<moho::RD3DTextureResource> retainedTexture = boost::SharedPtrFromRawRetained(textureResource);
+    BindTextureShaderVar(shaderVar, boost::static_pointer_cast<moho::ID3DTextureSheet>(retainedTexture));
+  }
+
+  void SetShaderVarMem(moho::ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
+  {
+    if (shaderVar.Exists()) {
+      shaderVar.mEffectVariable->SetMem(floatCount, values);
+    }
+  }
 } // namespace
 
 namespace moho
 {
+  extern bool ren_Terrain;
+  extern bool ren_Skirt;
+
   /**
    * Address: 0x007FF940 (??0HighFidelityTerrain@Moho@@QAE@@Z)
    * Mangled: ??0HighFidelityTerrain@Moho@@QAE@@Z
@@ -213,6 +365,107 @@ namespace moho
   }
 
   /**
+   * Address: 0x00800DC0 (FUN_00800DC0, Moho::HighFidelityTerrain::LoadShaderVars)
+   *
+   * What it does:
+   * Binds terrain shader texture lanes from world stratum material + water map,
+   * updates terrain-scale and viewport normalization constants, and forwards
+   * the optional terrain-normal map texture handle for terrain normal passes.
+   */
+  void HighFidelityTerrain::LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture)
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    StratumMaterial& strata = terrainRes->GetStratumMaterial();
+    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+
+    BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture));
+    BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
+    BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
+    BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
+
+    BindTextureShaderVar(shaderVars.lowerAlbedoTexture, strata.mLowerAlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum0AlbedoTexture, strata.mStratum0AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum1AlbedoTexture, strata.mStratum1AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum2AlbedoTexture, strata.mStratum2AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum3AlbedoTexture, strata.mStratum3AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum4AlbedoTexture, strata.mStratum4AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum5AlbedoTexture, strata.mStratum5AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum6AlbedoTexture, strata.mStratum6AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum7AlbedoTexture, strata.mStratum7AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.upperAlbedoTexture, strata.mUpperAlbedoTexture.mTextureSheet);
+
+    BindTextureShaderVar(shaderVars.lowerNormalTexture, strata.mLowerNormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum0NormalTexture, strata.mStratum0NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum1NormalTexture, strata.mStratum1NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum2NormalTexture, strata.mStratum2NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum3NormalTexture, strata.mStratum3NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum4NormalTexture, strata.mStratum4NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum5NormalTexture, strata.mStratum5NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum6NormalTexture, strata.mStratum6NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum7NormalTexture, strata.mStratum7NormalTexture.mTextureSheet);
+
+    SetShaderVarMem(shaderVars.lowerAlbedoTile, 4U, &strata.mLowerAlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum0AlbedoTile, 4U, &strata.mStratum0AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum1AlbedoTile, 4U, &strata.mStratum1AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum2AlbedoTile, 4U, &strata.mStratum2AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum3AlbedoTile, 4U, &strata.mStratum3AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum4AlbedoTile, 4U, &strata.mStratum4AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum5AlbedoTile, 4U, &strata.mStratum5AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum6AlbedoTile, 4U, &strata.mStratum6AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum7AlbedoTile, 4U, &strata.mStratum7AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.upperAlbedoTile, 4U, &strata.mUpperAlbedoTexture.mScaleX);
+
+    SetShaderVarMem(shaderVars.lowerNormalTile, 4U, &strata.mLowerNormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum0NormalTile, 4U, &strata.mStratum0NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum1NormalTile, 4U, &strata.mStratum1NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum2NormalTile, 4U, &strata.mStratum2NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum3NormalTile, 4U, &strata.mStratum3NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum4NormalTile, 4U, &strata.mStratum4NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum5NormalTile, 4U, &strata.mStratum5NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
+
+    shaderVars.normalTexture.GetTexture(terrainNormalTexture);
+
+    const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
+    const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);
+    const TerrainHeightFieldRuntimeView* const heightField = activeTerrainView->mMap->mHeightFieldObject;
+
+    const float terrainScale[4] = {
+      1.0f / static_cast<float>(heightField->width - 1),
+      1.0f / static_cast<float>(heightField->height - 1),
+      0.0f,
+      1.0f
+    };
+    SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
+
+    CD3DDevice* const device = D3D_GetDevice();
+    (void)device->GetHeadWidth(0U);
+    (void)device->GetHeadHeight(0U);
+
+    const float inverseViewportWidth = 1.0f / static_cast<float>(mViewportRenderWidth);
+    const float inverseViewportHeight = 1.0f / static_cast<float>(mViewportRenderHeight);
+    const float viewportWidthNdc = static_cast<float>(mViewportWidth) * inverseViewportWidth;
+    const float viewportHeightNdc = static_cast<float>(mViewportHeight) * inverseViewportHeight;
+
+    const float viewportScale[2] = {
+      viewportWidthNdc * 0.5f,
+      viewportHeightNdc * -0.5f
+    };
+
+    const float viewportOffset[2] = {
+      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) + (inverseViewportWidth * 0.5f),
+      (inverseViewportHeight * 0.5f)
+        + ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
+    };
+
+    SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
+    SetShaderVarMem(shaderVars.viewportOffset, 2U, viewportOffset);
+  }
+
+  /**
    * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterline)
    *
    * What it does:
@@ -223,6 +476,84 @@ namespace moho
   {
     (void)sHighFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
     DrawShoreline(&mShoreline, mCamera);
+  }
+
+  /**
+   * Address: 0x008014F0 (FUN_008014F0, Moho::HighFidelityTerrain::DrawTerrainSkirt)
+   *
+   * What it does:
+   * Selects the terrain-skirt technique and emits one indexed triangle-list
+   * draw using high-fidelity skirt lanes when terrain/skirt flags are enabled
+   * and index-count constraints pass.
+   */
+  void HighFidelityTerrain::DrawTerrainSkirt()
+  {
+    if (!ren_Terrain || !ren_Skirt) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectTechnique("TTerrainSkirt");
+
+    std::int32_t indexCount = static_cast<std::int32_t>(mSkirtEndIndex - mSkirtStartIndex);
+    if (indexCount > kSkirtMaxIndexCount) {
+      indexCount = kSkirtMaxIndexCount;
+    } else if (indexCount <= 0) {
+      return;
+    }
+
+    if ((indexCount % 3) != 0) {
+      return;
+    }
+
+    std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = static_cast<std::int32_t>(mSkirtStartIndex);
+    indexView.indexCount = indexCount;
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = mSkirtBaseVertex;
+    vertexView.endVertex = mSkirtEndVertex;
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00801460 (FUN_00801460, Moho::HighFidelityTerrain::DrawTriangles)
+   *
+   * What it does:
+   * Draws one terrain triangle-list pass using `mTerrainIndexSheet` and
+   * `mTerrainVertexSheet` with `(start=0, base=0)` and clamped index count.
+   */
+  void HighFidelityTerrain::DrawTriangles()
+  {
+    std::int32_t indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+    if (indexCount <= 0 || (indexCount % 3) != 0) {
+      return;
+    }
+
+    if (indexCount > kSkirtMaxIndexCount) {
+      indexCount = kSkirtMaxIndexCount;
+    }
+
+    std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = indexCount;
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(mUnknown30);
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
 
   /**

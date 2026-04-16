@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00717BB0 (FUN_00717BB0, Moho::InfluenceGridTypeInfo::InfluenceGridTypeInfo)
+     *
+     * What it does:
+     * Preregisters `InfluenceGrid` reflection metadata at startup.
+     */
+    InfluenceGridTypeInfo();
+
+    /**
      * Address: 0x00717C40 (FUN_00717C40, Moho::InfluenceGridTypeInfo::dtr)
      *
      * What it does:

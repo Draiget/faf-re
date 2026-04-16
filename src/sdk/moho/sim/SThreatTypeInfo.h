@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007179B0 (FUN_007179B0, Moho::SThreatTypeInfo::SThreatTypeInfo)
+     *
+     * What it does:
+     * Preregisters `SThreat` reflection metadata at startup.
+     */
+    SThreatTypeInfo();
+
+    /**
      * Address: 0x00717A40 (FUN_00717A40, Moho::SThreatTypeInfo::dtr)
      *
      * What it does:

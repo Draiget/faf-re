@@ -69,7 +69,7 @@ namespace moho
     STrigger();
 
     /**
-     * Address: 0x00711A90 (FUN_00711A90, sub_711A90)
+       * Address: 0x00711A90 (FUN_00711A90)
      *
      * What it does:
      * Releases condition category bit-storage lanes, resets fastvector storage to inline, and clears trigger name.

@@ -24,8 +24,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00638770 (FUN_00638770, CCollisionManipulatorTypeInfo::newRefFunc_)
-     * Address: 0x00638830 (FUN_00638830, CCollisionManipulatorTypeInfo::ctorRefFunc_)
+       * Address: 0x00638770 (FUN_00638770)
+       * Address: 0x00638830 (FUN_00638830)
      *
      * What it does:
      * Constructs default collision-manipulator state used by RTTI allocation paths.
@@ -248,6 +248,16 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CCollisionManipulator>) == 0x8,
     "CScrLuaMetatableFactory<CCollisionManipulator> size must be 0x8"
   );
+  /**
+   * Address: 0x00638BF0 (FUN_00638BF0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CCollisionManipulator>` and returns that
+   * singleton.
+   */
+  CScrLuaMetatableFactory<CCollisionManipulator>* startup_CScrLuaMetatableFactory_CCollisionManipulator_Index();
+
   static_assert(sizeof(CCollisionManipulatorSerializer) == 0x14, "CCollisionManipulatorSerializer size must be 0x14");
   static_assert(sizeof(CCollisionManipulatorTypeInfo) == 0x64, "CCollisionManipulatorTypeInfo size must be 0x64");
 

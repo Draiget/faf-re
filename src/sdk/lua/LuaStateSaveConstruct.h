@@ -9,6 +9,7 @@ struct UpVal;
 struct Proto;
 struct TString;
 struct Table;
+struct Udata;
 struct lua_State;
 
 namespace gpg
@@ -47,6 +48,15 @@ namespace LuaPlus
       gpg::SerSaveConstructArgsResult* result
     );
 
+    /**
+     * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for
+     * `LuaPlus::LuaState`.
+     */
+    void RegisterSaveConstructArgsFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -84,6 +94,15 @@ namespace LuaPlus
       gpg::SerSaveConstructArgsResult* result
     );
 
+    /**
+     * Address: 0x0091FC50 (FUN_0091FC50, LClosureSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for
+     * `LClosure`.
+     */
+    void RegisterSaveConstructArgsFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -119,6 +138,14 @@ namespace LuaPlus
       gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
+
+    /**
+     * Address: 0x0091FDE0 (FUN_0091FDE0, UpValSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for `UpVal`.
+     */
+    void RegisterSaveConstructArgsFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -156,6 +183,14 @@ namespace LuaPlus
       gpg::SerSaveConstructArgsResult* result
     );
 
+    /**
+     * Address: 0x0091FF70 (FUN_0091FF70, ProtoSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for `Proto`.
+     */
+    void RegisterSaveConstructArgsFunction();
+
   public:
     void* vftable_;                  // +0x00
     gpg::SerHelperBase* mNext;       // +0x04
@@ -176,6 +211,15 @@ namespace LuaPlus
       void (*)(gpg::WriteArchive*, TString*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
 
     /**
+     * Address: 0x009232E0 (FUN_009232E0)
+     *
+     * What it does:
+     * Initializes TString save-construct helper links and binds the construct
+     * callback lane.
+     */
+    TStringSaveConstruct();
+
+    /**
      * Address: 0x009220A0 (FUN_009220A0, TStringSaveConstruct::Construct)
      *
      * What it does:
@@ -188,6 +232,15 @@ namespace LuaPlus
       gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
+
+    /**
+     * Address: 0x0091F930 (FUN_0091F930, TStringSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for
+     * `TString`.
+     */
+    void RegisterSaveConstructArgsFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -209,6 +262,15 @@ namespace LuaPlus
       void (*)(gpg::WriteArchive*, Table*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
 
     /**
+     * Address: 0x00923360 (FUN_00923360)
+     *
+     * What it does:
+     * Initializes table save-construct helper links and binds the construct
+     * callback lane.
+     */
+    TableSaveConstruct();
+
+    /**
      * Address: 0x00922180 (FUN_00922180, TableSaveConstruct::Construct)
      *
      * What it does:
@@ -221,6 +283,14 @@ namespace LuaPlus
       gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
+
+    /**
+     * Address: 0x0091FAC0 (FUN_0091FAC0, TableSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for `Table`.
+     */
+    void RegisterSaveConstructArgsFunction();
 
   public:
     void* vftable_;                  // +0x00
@@ -235,11 +305,63 @@ namespace LuaPlus
   static_assert(offsetof(TableSaveConstruct, mConstruct) == 0x0C, "TableSaveConstruct::mConstruct offset must be 0x0C");
   static_assert(sizeof(TableSaveConstruct) == 0x10, "TableSaveConstruct size must be 0x10");
 
+  class UdataSaveConstruct
+  {
+  public:
+    using construct_fn_t =
+      void (*)(gpg::WriteArchive*, Udata*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x0091E530 (FUN_0091E530, UdataSaveConstruct::Construct)
+     *
+     * What it does:
+     * Writes one userdata payload-type handle lane into archive type-refcounts
+     * and marks save-construct ownership as owned.
+     */
+    static void Construct(
+      gpg::WriteArchive* archive,
+      Udata* value,
+      int version,
+      gpg::RRef* ownerRef,
+      gpg::SerSaveConstructArgsResult* result
+    );
+
+    /**
+     * Address: 0x00920290 (FUN_00920290, UdataSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for
+     * `Udata`.
+     */
+    void RegisterSaveConstructArgsFunction();
+
+  public:
+    void* vftable_;                  // +0x00
+    gpg::SerHelperBase* mNext;       // +0x04
+    gpg::SerHelperBase* mPrev;       // +0x08
+    construct_fn_t mConstruct;       // +0x0C
+  };
+
+  static_assert(offsetof(UdataSaveConstruct, vftable_) == 0x00, "UdataSaveConstruct::vftable_ offset must be 0x00");
+  static_assert(offsetof(UdataSaveConstruct, mNext) == 0x04, "UdataSaveConstruct::mNext offset must be 0x04");
+  static_assert(offsetof(UdataSaveConstruct, mPrev) == 0x08, "UdataSaveConstruct::mPrev offset must be 0x08");
+  static_assert(offsetof(UdataSaveConstruct, mConstruct) == 0x0C, "UdataSaveConstruct::mConstruct offset must be 0x0C");
+  static_assert(sizeof(UdataSaveConstruct) == 0x10, "UdataSaveConstruct size must be 0x10");
+
   class lua_StateSaveConstruct
   {
   public:
     using construct_fn_t =
       void (*)(gpg::WriteArchive*, lua_State*, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult*);
+
+    /**
+     * Address: 0x009235B0 (FUN_009235B0)
+     *
+     * What it does:
+     * Initializes lua-thread save-construct helper links and binds the
+     * construct callback lane.
+     */
+    lua_StateSaveConstruct();
 
     /**
      * Address: 0x00922610 (FUN_00922610, lua_StateSaveConstruct::Construct)
@@ -254,6 +376,15 @@ namespace LuaPlus
       gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
+
+    /**
+     * Address: 0x00920100 (FUN_00920100, lua_StateSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
+     * What it does:
+     * Binds the save-construct-args callback into reflected RTTI for
+     * `lua_State`.
+     */
+    void RegisterSaveConstructArgsFunction();
 
   public:
     void* vftable_;                  // +0x00

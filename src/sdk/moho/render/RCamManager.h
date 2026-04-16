@@ -20,6 +20,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007AA910 (FUN_007AA910, ??0RCamManager@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Default-initializes camera pointer vector storage lanes.
+     */
+    RCamManager();
+
+    /**
      * Address: 0x007AA930 (FUN_007AA930, ??1RCamManager@Moho@@QAE@XZ)
      *
      * What it does:

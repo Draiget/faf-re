@@ -21,6 +21,7 @@ namespace gpg
 
 namespace moho
 {
+  class Entity;
   class Unit;
 
   class CUnitCommandQueue : public Broadcaster
@@ -35,7 +36,7 @@ namespace moho
     explicit CUnitCommandQueue(Unit* unit);
 
     /**
-     * Address: 0x006A4D40 (FUN_006A4D40, ??1CUnitCommandQueue@Moho@@QAE@XZ)
+       * Address: 0x006A4D40 (FUN_006A4D40)
      *
      * What it does:
      * Clears queued commands, releases weak-command storage, and unlinks the
@@ -88,7 +89,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive& archive) const;
 
     /**
-     * Address: 0x006EDAA0 (FUN_006EDAA0, constructor preregisters RTTI)
+      * Alias of FUN_006EDAA0 (non-canonical helper lane).
      *
      * What it does:
      * Resolves/refetches reflection descriptor for CUnitCommandQueue.
@@ -209,7 +210,7 @@ namespace moho
     bool RemoveCommandFromQueue(unsigned int index);
 
     /**
-     * Address: 0x006EE2D0 (FUN_006EE2D0)
+       * Address: 0x006EE2D0 (FUN_006EE2D0)
      *
      * What it does:
      * Clears queued commands in reverse order and marks owner sync state dirty
@@ -218,14 +219,14 @@ namespace moho
     void ClearCommandQueue();
 
     /**
-     * Address: 0x006EE2D0 (FUN_006EE2D0)
+      * Alias of FUN_006EE2D0 (non-canonical helper lane).
      *
      * Applies pre-destroy queue cleanup and marks owning unit dirty when needed.
      */
     void MarkForUnitKillCleanup();
 
     /**
-     * Address: 0x006A4D40 (FUN_006A4D40)
+      * Alias of FUN_006A4D40 (non-canonical helper lane).
      *
      * Runs full queue teardown logic (list unlink + internal buffers cleanup).
      */
@@ -248,6 +249,23 @@ namespace moho
      * and applies queue-head/queue-removal transitions when count is zero.
      */
     void SetCommandCount(unsigned int index, unsigned int count);
+
+    /**
+     * Address: 0x006EE470 (FUN_006EE470)
+     *
+     * What it does:
+     * Updates one queued command target payload from `targetEntity` and marks
+     * queue refresh state dirty when index/target are valid.
+     */
+    void SetCommandTarget(unsigned int index, Entity* targetEntity);
+
+    /**
+     * Address: 0x006A4DD0 (FUN_006A4DD0)
+     *
+     * What it does:
+     * Returns whether this queue has a pending refresh lane.
+     */
+    [[nodiscard]] bool IsRefreshPending() const;
 
   private:
     /**

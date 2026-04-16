@@ -78,7 +78,7 @@ namespace
   {
     UnitWeaponTypeInfoBootstrap()
     {
-      moho::register_UnitWeaponTypeInfo();
+      (void)register_UnitWeaponTypeInfo_00BD88D0_Impl();
     }
   };
 
@@ -144,19 +144,4 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00BFE740 (FUN_00BFE740, sub_BFE740)
-   */
-  void cleanup_UnitWeaponTypeInfo()
-  {
-    cleanup_UnitWeaponTypeInfo_00BFE740_Impl();
-  }
-
-  /**
-   * Address: 0x00BD88D0 (FUN_00BD88D0, register_UnitWeaponTypeInfo)
-   */
-  void register_UnitWeaponTypeInfo()
-  {
-    (void)register_UnitWeaponTypeInfo_00BD88D0_Impl();
-  }
 } // namespace moho

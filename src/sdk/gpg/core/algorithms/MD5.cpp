@@ -123,6 +123,34 @@ namespace gpg
     }
   }
 
+  namespace
+  {
+    struct EmbeddedMd5UpdateOwnerRuntimeView
+    {
+      std::uint8_t lane00_4F[0x50]{};
+      MD5Context embeddedMd5Context; // +0x50
+    };
+    static_assert(
+      offsetof(EmbeddedMd5UpdateOwnerRuntimeView, embeddedMd5Context) == 0x50,
+      "EmbeddedMd5UpdateOwnerRuntimeView::embeddedMd5Context offset must be 0x50"
+    );
+  } // namespace
+
+  /**
+   * Address: 0x006EB6E0 (FUN_006EB6E0)
+   *
+   * What it does:
+   * Resolves one embedded MD5 context lane at owner offset `+0x50` and
+   * extends it with one 4-byte payload span.
+   */
+  [[maybe_unused]] void UpdateEmbeddedMd5WithDwordPayload(
+    EmbeddedMd5UpdateOwnerRuntimeView* const ownerRuntime,
+    const void* const payloadWord
+  )
+  {
+    ownerRuntime->embeddedMd5Context.Update(payloadWord, 4u);
+  }
+
   /**
    * Address: 0x008E5790 (FUN_008E5790, gpg::MD5Context::Digest)
    *

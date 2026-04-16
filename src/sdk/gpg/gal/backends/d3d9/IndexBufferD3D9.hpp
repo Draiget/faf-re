@@ -18,6 +18,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x008F4B90 (FUN_008F4B90)
+         *
+         * What it does:
+         * Initializes one empty D3D9 index-buffer wrapper with default context
+         * and cleared native/lock tracking lanes.
+         */
+        IndexBufferD3D9();
+
+        /**
          * Address: 0x008F4DA0 (FUN_008F4DA0)
          *
          * What it does:

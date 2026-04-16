@@ -20,7 +20,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005A5630 (FUN_005A5630, construct callback)
+      * Alias of FUN_005A5630 (non-canonical helper lane).
      *
      * What it does:
      * Allocates one `CAiNavigatorAir` and publishes it as unowned construct

@@ -11,6 +11,7 @@ namespace gpg
 {
   class ReadArchive;
   class RType;
+  class WriteArchive;
 }
 
 namespace moho
@@ -62,6 +63,15 @@ namespace moho
      * runtime metadata fields from archive payload.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0077D5A0 (FUN_0077D5A0)
+     *
+     * What it does:
+     * Saves decal position/size/rotation vectors, texture/type lanes, and
+     * runtime metadata fields to archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     Wm3::Vec3f mPos;         // +0x00
     Wm3::Vec3f mSize;        // +0x0C

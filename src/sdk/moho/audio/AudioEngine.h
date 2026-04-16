@@ -57,6 +57,13 @@ namespace moho
      */
     virtual std::int32_t __stdcall
     Play(std::uint16_t cueIndex, std::uint32_t flags, std::uint32_t timeOffset, IXACTCue** outCue) = 0;
+
+    virtual std::int32_t __stdcall Reserved14() = 0; // +0x14
+
+    /**
+     * VTable slot 6 (+0x18).
+     */
+    virtual void __stdcall Destroy() = 0;
   };
 
   class IXACTCue
@@ -695,6 +702,15 @@ namespace moho
    * resets the global sound-configuration frame timer.
    */
   void SND_Frame();
+
+  /**
+   * Address: 0x004D8F90 (FUN_004D8F90)
+   *
+   * What it does:
+   * Issues one extra sound-engine work frame when the debug convar gate is
+   * enabled and more than 100ms elapsed on the global sound timer.
+   */
+  void SND_FrameExtraDoWorkTick();
 
   /**
    * Address: 0x004D8FC0 (FUN_004D8FC0, ?SND_Mute@Moho@@YAX_N@Z)

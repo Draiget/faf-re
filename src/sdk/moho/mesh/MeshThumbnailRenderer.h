@@ -138,6 +138,22 @@ namespace moho
     MeshThumbnailQueue mCompletedRequests;             // +0x30
   };
 
+  /**
+   * Address: 0x007FA620 (FUN_007FA620, ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
+   * Mangled: ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
+   *
+   * What it does:
+   * Forwards one thumbnail request into the active global viewport renderer queue.
+   */
+  [[nodiscard]] std::uint32_t REN_RequestThumbnail(
+    const RMeshBlueprint* blueprint,
+    const Wm3::Quatf& orientation,
+    std::uint32_t color,
+    const Wm3::Vec3f& viewOffsetHint,
+    boost::shared_ptr<ID3DTextureSheet> outputSheet,
+    const gpg::Rect2f& outputRect
+  );
+
   static_assert(sizeof(boost::shared_ptr<TextureD3D9>) == 0x08, "boost::shared_ptr<TextureD3D9> size must be 0x08");
   static_assert(
     sizeof(boost::shared_ptr<ID3DRenderTarget>) == 0x08, "boost::shared_ptr<ID3DRenderTarget> size must be 0x08"

@@ -88,6 +88,15 @@ namespace moho
   gpg::RType* register_Broadcaster_ECommandEvent_RType();
 
   /**
+   * Address: 0x005F4A70 (FUN_005F4A70, register_Listener_ECommandEvent_RType)
+   *
+   * What it does:
+   * Initializes/preregisters reflection type metadata for the
+   * `Listener< ECommandEvent >` event-link family.
+   */
+  gpg::RType* register_Listener_ECommandEvent_RType();
+
+  /**
    * Address: 0x00BD8FD0 (FUN_00BD8FD0, sub_BD8FD0)
    *
    * What it does:

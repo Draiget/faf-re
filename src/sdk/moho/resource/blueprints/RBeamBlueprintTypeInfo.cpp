@@ -141,6 +141,22 @@ namespace
     static_cast<moho::RBeamBlueprint*>(objectMemory)->~RBeamBlueprint();
   }
 
+  /**
+   * Address: 0x00510530 (FUN_00510530)
+   *
+   * What it does:
+   * Binds the callback lanes used by `RBeamBlueprintTypeInfo` for object
+   * allocation, placement construction, deletion, and destruction.
+   */
+  [[nodiscard]] TypeInfo* BindBeamBlueprintTypeInfoHookLanes(TypeInfo* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewBeamBlueprintRef;
+    typeInfo->ctorRefFunc_ = &ConstructBeamBlueprintRef;
+    typeInfo->deleteFunc_ = &DeleteBeamBlueprintObject;
+    typeInfo->dtrFunc_ = &DestroyBeamBlueprintObject;
+    return typeInfo;
+  }
+
   struct RBeamBlueprintTypeInfoBootstrap
   {
     RBeamBlueprintTypeInfoBootstrap()
@@ -182,10 +198,7 @@ namespace moho
   void RBeamBlueprintTypeInfo::Init()
   {
     size_ = sizeof(RBeamBlueprint);
-    newRefFunc_ = &NewBeamBlueprintRef;
-    deleteFunc_ = &DeleteBeamBlueprintObject;
-    ctorRefFunc_ = &ConstructBeamBlueprintRef;
-    dtrFunc_ = &DestroyBeamBlueprintObject;
+    (void)BindBeamBlueprintTypeInfoHookLanes(this);
     AddEffectBase(this);
     gpg::RType::Init();
     AddFields(this);

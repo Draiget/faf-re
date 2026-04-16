@@ -2,8 +2,21 @@
 
 #include <complex>
 
+#include "gpg/core/containers/String.h"
+
 namespace moho
 {
+  /**
+   * Address: 0x004ECED0 (FUN_004ECED0, Moho::ToString)
+   *
+   * What it does:
+   * Formats one `Vector4f` lane set as `x=%f,y=%f,z=%f,w=%f`.
+   */
+  msvc8::string ToString(const Vector4f& value)
+  {
+    return gpg::STR_Printf("x=%f,y=%f,z=%f,w=%f", value.x, value.y, value.z, value.w);
+  }
+
   /**
    * Address: 0x0046FAB0 (FUN_0046FAB0, Moho::Vector4f::Vector4f)
    *

@@ -128,10 +128,13 @@ namespace moho
   void CUnitFireAtTaskTypeInfo::Init()
   {
     size_ = sizeof(CUnitFireAtTask);
-    newRefFunc_ = &CUnitFireAtTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitFireAtTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitFireAtTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitFireAtTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitFireAtTaskTypeInfo::NewRef,
+      &CUnitFireAtTaskTypeInfo::CtrRef,
+      &CUnitFireAtTaskTypeInfo::Delete,
+      &CUnitFireAtTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

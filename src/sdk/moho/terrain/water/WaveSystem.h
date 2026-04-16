@@ -205,6 +205,15 @@ namespace moho
       float textureSelectionRange
     );
 
+    /**
+     * Address: 0x00888F20 (FUN_00888F20, sub_888F20)
+     *
+     * What it does:
+     * Removes all cached references to `generator` from active wave-generator
+     * storage and runs one deleting-destructor lane for that generator.
+     */
+    WaveGenerator* RemoveAndDeleteGenerator(WaveGenerator* generator);
+
   public:
     std::uint32_t mReserved04;                            // +0x04
     SpatialDB_MeshInstance mSpatialMeshInstance;          // +0x08

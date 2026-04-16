@@ -67,6 +67,15 @@ namespace moho
     std::int32_t UpdatePos(std::int32_t curTick, const Wm3::Vec3f& newPos);
 
     /**
+     * Address: 0x0076F280 (FUN_0076F280)
+     *
+     * What it does:
+     * Updates visualized position immediately when enabled (or writes raw
+     * position when disabled), then stores `curTick` as last-update tick.
+     */
+    void UpdatePosImmediate(std::int32_t curTick, const Wm3::Vec3f& newPos);
+
+    /**
      * Address: 0x0076D980 (FUN_0076D980, Moho::CIntelPosHandle::ChangeRadius)
      *
      * What it does:

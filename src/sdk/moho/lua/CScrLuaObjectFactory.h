@@ -86,6 +86,16 @@ namespace moho
   [[nodiscard]] bool SCR_ToBool(const LuaPlus::LuaObject& object);
 
   /**
+   * Address: 0x004D26D0 (FUN_004D26D0, ?SCR_Copy@Moho@@YA?AVLuaObject@LuaPlus@@ABV23@PAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Deep-copies one Lua object into `state`, recursively cloning table keys and
+   * values and cloning userdata through reflected `movRef` handlers when
+   * crossing root-state boundaries.
+   */
+  [[nodiscard]] LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
    *
    * What it does:
@@ -197,7 +207,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x10015880 (FUN_10015880, ??0CScrLuaObjectFactory@Moho@@QAE@XZ)
+      * Alias of FUN_10015880 (non-canonical helper lane).
      *
      * What it does:
      * Initializes the base factory and assigns a unique cached object index.

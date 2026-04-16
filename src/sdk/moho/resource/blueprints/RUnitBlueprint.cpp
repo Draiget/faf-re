@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <new>
 #include <string>
 #include <string_view>
 #include <typeinfo>
@@ -23,6 +24,228 @@ namespace moho
 
   namespace
   {
+    /**
+     * Address: 0x005273B0 (FUN_005273B0, copy_RUnitBlueprintWeapon_counted_range_with_rollback)
+     *
+     * What it does:
+     * Copy-constructs `count` contiguous `RUnitBlueprintWeapon` elements from
+     * `source` into destination storage, then tears down constructed elements
+     * before rethrowing if construction fails.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeWithRollback(
+      int count,
+      RUnitBlueprintWeapon* destination,
+      const RUnitBlueprintWeapon* source
+    )
+    {
+      RUnitBlueprintWeapon* destinationCursor = destination;
+      try {
+        while (count > 0) {
+          if (destinationCursor != nullptr) {
+            ::new (destinationCursor) RUnitBlueprintWeapon(*source);
+          }
+          --count;
+          ++destinationCursor;
+          ++source;
+        }
+        return destinationCursor;
+      } catch (...) {
+        for (RUnitBlueprintWeapon* destroyCursor = destination; destroyCursor != destinationCursor; ++destroyCursor) {
+          destroyCursor->~RUnitBlueprintWeapon();
+        }
+        throw;
+      }
+    }
+
+    /**
+     * Address: 0x00524DD0 (FUN_00524DD0)
+     *
+     * What it does:
+     * Adapts one register-lane caller shape into the canonical counted
+     * `RUnitBlueprintWeapon` copy-with-rollback helper.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeRegisterAdapter(
+      RUnitBlueprintWeapon* const destination,
+      const int count,
+      const RUnitBlueprintWeapon* const source
+    )
+    {
+      return CopyRUnitBlueprintWeaponCountedRangeWithRollback(count, destination, source);
+    }
+
+    /**
+     * Address: 0x00526220 (FUN_00526220)
+     *
+     * What it does:
+     * Alternate register-shape adapter lane that forwards one counted
+     * `RUnitBlueprintWeapon` copy-with-rollback request into the canonical
+     * helper.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeRegisterAdapterAlt(
+      RUnitBlueprintWeapon* const destination,
+      const int count,
+      const RUnitBlueprintWeapon* const source
+    )
+    {
+      return CopyRUnitBlueprintWeaponCountedRangeWithRollback(count, destination, source);
+    }
+
+    /**
+     * Address: 0x00527D30 (FUN_00527D30, copy_RUnitBlueprintWeapon_range_with_rollback)
+     *
+     * What it does:
+     * Copy-constructs one contiguous source range into destination storage and
+     * destroys already-built destination elements before rethrowing on failure.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollback(
+      RUnitBlueprintWeapon* destinationBegin,
+      RUnitBlueprintWeapon* destinationEnd,
+      const RUnitBlueprintWeapon* sourceBegin
+    )
+    {
+      RUnitBlueprintWeapon* destinationCursor = destinationBegin;
+      const RUnitBlueprintWeapon* sourceCursor = sourceBegin;
+      try {
+        while (destinationCursor != destinationEnd) {
+          if (sourceCursor != nullptr) {
+            ::new (destinationCursor) RUnitBlueprintWeapon(*sourceCursor);
+          }
+          ++destinationCursor;
+          ++sourceCursor;
+        }
+        return destinationCursor;
+      } catch (...) {
+        for (RUnitBlueprintWeapon* destroyCursor = destinationBegin; destroyCursor != destinationCursor; ++destroyCursor) {
+          destroyCursor->~RUnitBlueprintWeapon();
+        }
+        throw;
+      }
+    }
+
+    /**
+     * Address: 0x00527620 (FUN_00527620)
+     *
+     * What it does:
+     * Register-shape adapter lane that forwards one range-copy request into
+     * `CopyRUnitBlueprintWeaponRangeWithRollback`.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollbackRegisterAdapter(
+      const std::uintptr_t /*unusedLane*/,
+      const RUnitBlueprintWeapon* const sourceBegin,
+      RUnitBlueprintWeapon* const destinationBegin,
+      RUnitBlueprintWeapon* const destinationEnd
+    )
+    {
+      return CopyRUnitBlueprintWeaponRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
+    }
+
+    /**
+     * Address: 0x00527B70 (FUN_00527B70)
+     *
+     * What it does:
+     * Alternate register-shape adapter lane that forwards one range-copy
+     * request into `CopyRUnitBlueprintWeaponRangeWithRollback`.
+     */
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollbackRegisterAdapterAlt(
+      const RUnitBlueprintWeapon* const sourceBegin,
+      RUnitBlueprintWeapon* const destinationBegin,
+      RUnitBlueprintWeapon* const destinationEnd
+    )
+    {
+      return CopyRUnitBlueprintWeaponRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
+    }
+
+    [[nodiscard]] RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponIfPresent(
+      RUnitBlueprintWeapon* const destination,
+      const RUnitBlueprintWeapon* const source
+    )
+    {
+      if (source == nullptr) {
+        return nullptr;
+      }
+
+      return ::new (destination) RUnitBlueprintWeapon(*source);
+    }
+
+    /**
+     * Address: 0x00527960 (FUN_00527960)
+     *
+     * What it does:
+     * Primary register-shape adapter for nullable `RUnitBlueprintWeapon`
+     * copy-construction into caller-provided storage.
+     */
+    [[maybe_unused]] [[nodiscard]] RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponIfPresentPrimary(
+      RUnitBlueprintWeapon* const destination,
+      const RUnitBlueprintWeapon* const source
+    )
+    {
+      return CopyConstructRUnitBlueprintWeaponIfPresent(destination, source);
+    }
+
+    /**
+     * Address: 0x00527BC0 (FUN_00527BC0)
+     *
+     * What it does:
+     * Secondary register-shape adapter for nullable `RUnitBlueprintWeapon`
+     * copy-construction into caller-provided storage.
+     */
+    [[maybe_unused]] [[nodiscard]] RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponIfPresentSecondary(
+      RUnitBlueprintWeapon* const destination,
+      const RUnitBlueprintWeapon* const source
+    )
+    {
+      return CopyConstructRUnitBlueprintWeaponIfPresent(destination, source);
+    }
+
+    /**
+     * Address: 0x0051E330 (FUN_0051E330)
+     *
+     * What it does:
+     * Reinitializes one destination string lane and copies the full source
+     * payload into it.
+     */
+    [[maybe_unused]] msvc8::string* CopyStringLane(
+      msvc8::string* const destination,
+      const msvc8::string* const source
+    )
+    {
+      destination->assign_owned(source->view());
+      return destination;
+    }
+
+    /**
+     * Address: 0x0051E3F0 (FUN_0051E3F0)
+     *
+     * What it does:
+     * Writes one 32-bit scalar lane into destination storage.
+     */
+    [[maybe_unused]] std::uint32_t* StoreU32Lane(
+      std::uint32_t* const destination,
+      const std::uint32_t value
+    ) noexcept
+    {
+      *destination = value;
+      return destination;
+    }
+
+    /**
+     * Address: 0x0051F780 (FUN_0051F780)
+     *
+     * What it does:
+     * Writes one two-dword payload pair into destination storage in
+     * `(lane0,lane1)` order.
+     */
+    [[maybe_unused]] std::uint32_t* StoreU32PairLanes(
+      std::uint32_t* const destination,
+      const std::uint32_t lane1,
+      const std::uint32_t lane0
+    ) noexcept
+    {
+      destination[0] = lane0;
+      destination[1] = lane1;
+      return destination;
+    }
+
     constexpr std::uint8_t kGroundOccupancyMask = 0x0F;
     constexpr float kBlueprintExtentMultiplier = 3.0f;
     constexpr std::int8_t kDefaultFootprintFlags = -1;
@@ -86,6 +309,47 @@ namespace moho
     }
 
   } // namespace
+
+  /**
+   * Address: 0x005267A0 (FUN_005267A0, Moho::CopyOccupyRects)
+   *
+   * What it does:
+   * Rebuilds destination float-vector runtime lanes from source occupancy
+   * storage and copies the full `[begin,end)` float range.
+   */
+  msvc8::vector<float>* CopyOccupyRects(
+    const msvc8::vector<float>& source,
+    msvc8::vector<float>& destination
+  )
+  {
+    const auto& sourceView = msvc8::AsVectorRuntimeView(source);
+    auto& destinationView = msvc8::AsVectorRuntimeView(destination);
+
+    const std::uint32_t sourceCount = (sourceView.begin != nullptr)
+      ? static_cast<std::uint32_t>(sourceView.end - sourceView.begin)
+      : 0u;
+
+    destinationView.proxy = nullptr;
+    destinationView.begin = nullptr;
+    destinationView.end = nullptr;
+    destinationView.capacityEnd = nullptr;
+
+    if (sourceCount != 0u) {
+      if (sourceCount > msvc8::vector<float>::max_elements_sentinel()) {
+        msvc8::vector<float>::throw_too_long();
+      }
+
+      auto* const destinationBegin = static_cast<float*>(
+        ::operator new(static_cast<std::size_t>(sourceCount) * sizeof(float))
+      );
+      destinationView.begin = destinationBegin;
+      destinationView.end = destinationBegin;
+      destinationView.capacityEnd = destinationBegin + sourceCount;
+      destinationView.end = std::copy(sourceView.begin, sourceView.end, destinationBegin);
+    }
+
+    return &destination;
+  }
 
   /**
    * Address: 0x0051EE10 (FUN_0051EE10)
@@ -571,6 +835,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x00529E90 (FUN_00529E90, Moho::RUnitBlueprint::AddEconomyRestrictions)
+   *
+   * What it does:
+   * Parses each buildable-category expression and unions the resulting
+   * category bits into the runtime economy category cache.
+   */
+  void RUnitBlueprint::AddEconomyRestrictions(RRuleGameRulesImpl* const rules)
+  {
+    auto& buildableCategoriesView = msvc8::AsVectorRuntimeView(Economy.BuildableCategories);
+    auto* const economyCategoryCache = reinterpret_cast<EntityCategorySet*>(&Economy.CategoryCache);
+
+    for (msvc8::string* it = buildableCategoriesView.begin; it != buildableCategoriesView.end; ++it) {
+      const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(it->c_str());
+      CategoryWordRangeView mergedCategory{};
+      (void)func_EntityCategoryAdd(&parsedCategory, &mergedCategory, economyCategoryCache);
+      *economyCategoryCache = mergedCategory;
+    }
+  }
+
+  /**
    * Address: 0x0051E400 (FUN_0051E400, ?StaticGetClass@RUnitBlueprint@Moho@@SAPAVRType@gpg@@XZ)
    *
    * What it does:
@@ -720,6 +1004,95 @@ namespace moho
 
     return skirtRect;
   }
+
+  /**
+   * Address: 0x0051F4C0 (FUN_0051F4C0)
+   *
+   * What it does:
+   * Restores default weapon-blueprint runtime state, including canonical
+   * range, ballistic, and damage-profile defaults.
+   */
+  RUnitBlueprintWeapon::RUnitBlueprintWeapon() :
+    OwnerBlueprint(nullptr),
+    WeaponIndex(static_cast<std::uint32_t>(-1)),
+    Label(),
+    DisplayName(),
+    RangeCategory(UWRC_Undefined),
+    DummyWeapon(0),
+    PrefersPrimaryWeaponTarget(0),
+    StopOnPrimaryWeaponBusy(0),
+    SlavedToBody(0),
+    SlavedToBodyArcRange(1.0f),
+    AutoInitiateAttackCommand(0),
+    pad_004D_0050{},
+    TargetCheckInterval(3.0f),
+    AlwaysRecheckTarget(1),
+    pad_0055_0058{},
+    MinRadius(1.0f),
+    MaxRadius(3.0f),
+    MaximumBeamLength(0.0f),
+    EffectiveRadius(-1.0f),
+    MaxHeightDiff(std::numeric_limits<float>::infinity()),
+    TrackingRadius(1.0f),
+    HeadingArcCenter(0.0f),
+    HeadingArcRange(180.0f),
+    FiringTolerance(0.01f),
+    FiringRandomness(0.0f),
+    RequiresEnergy(0.0f),
+    RequiresMass(0.0f),
+    MuzzleVelocity(0.0f),
+    MuzzleVelocityRandom(0.0f),
+    MuzzleVelocityReduceDistance(0.0f),
+    LeadTarget(1),
+    pad_0095_0098{},
+    ProjectileLifetime(0.0f),
+    ProjectileLifetimeUsesMultiplier(0.0f),
+    Damage(0.0f),
+    DamageRadius(0.0f),
+    DamageType("Normal"),
+    RateOfFire(1.0f),
+    ProjectileId(),
+    BallisticArc(RULEUBA_None),
+    TargetRestrictOnlyAllow(),
+    TargetRestrictDisallow(),
+    ManualFire(0),
+    NukeWeapon(0),
+    OverChargeWeapon(0),
+    NeedPrep(0),
+    CountedProjectile(0),
+    pad_0125_0128{},
+    MaxProjectileStorage(0),
+    IgnoresAlly(1),
+    pad_012D_0130{},
+    TargetType(static_cast<ERuleBPUnitWeaponTargetType>(3)),
+    AttackGroundTries(0),
+    AimsStraightOnDisable(0),
+    Turreted(0),
+    YawOnlyOnTarget(0),
+    AboveWaterFireOnly(0),
+    BelowWaterFireOnly(0),
+    AboveWaterTargetsOnly(0),
+    BelowWaterTargetsOnly(0),
+    ReTargetOnMiss(0),
+    NeedToComputeBombDrop(0),
+    pad_0141_0144{},
+    BombDropThreshold(1.5f),
+    UseFiringSolutionInsteadOfAimBone(0),
+    IgnoreIfDisabled(0),
+    CannotAttackGround(0),
+    pad_014B_014C{},
+    UIMinRangeVisualId(),
+    UIMaxRangeVisualId()
+  {}
+
+  /**
+   * Address: 0x00524E50 (FUN_00524E50, Moho::RUnitBlueprintWeapon::RUnitBlueprintWeapon)
+   *
+   * What it does:
+   * Copy-constructs one weapon blueprint lane, preserving complete field
+   * payload across ids, strings, and scalar gameplay properties.
+   */
+  RUnitBlueprintWeapon::RUnitBlueprintWeapon(const RUnitBlueprintWeapon& other) = default;
 
   /**
    * Address: 0x00523F90 (FUN_00523F90, Moho::RUnitBlueprintWeapon::~RUnitBlueprintWeapon)

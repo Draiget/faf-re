@@ -14,6 +14,8 @@ namespace moho
   class CUnitCaptureTaskTypeInfo final : public gpg::RType
   {
   public:
+    [[nodiscard]] const char* GetName() const override;
+
     /**
      * Address: 0x006041A0 (FUN_006041A0, Moho::CUnitCaptureTaskTypeInfo::Init)
      *
@@ -73,6 +75,15 @@ namespace moho
      */
     static void __stdcall AddBase_Listener_ECommandEvent(gpg::RType* typeInfo);
   };
+
+  /**
+   * Address: 0x00604140 (FUN_00604140, preregister_CUnitCaptureTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup `CUnitCaptureTaskTypeInfo`
+   * reflection lane.
+   */
+  [[nodiscard]] gpg::RType* preregister_CUnitCaptureTaskTypeInfo();
 
   static_assert(sizeof(CUnitCaptureTaskTypeInfo) == 0x64, "CUnitCaptureTaskTypeInfo size must be 0x64");
 } // namespace moho

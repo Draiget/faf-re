@@ -1,9 +1,64 @@
 #include "Stream.h"
+#include <cstddef>
 #include <cstdarg>
 #include <cstring>
 
 #include "gpg/core/utils/Global.h"
 using namespace gpg;
+
+namespace
+{
+constexpr int kCarriageReturnByte = 13;
+constexpr int kLineFeedByte = 10;
+constexpr int kEndOfFileByte = -1;
+
+struct TextReaderRuntimeView
+{
+  Stream* stream = nullptr;       // +0x00
+  bool normalizeCrAsLf = false;   // +0x04
+};
+static_assert(offsetof(TextReaderRuntimeView, stream) == 0x00, "TextReaderRuntimeView::stream offset must be 0x00");
+static_assert(offsetof(TextReaderRuntimeView, normalizeCrAsLf) == 0x04, "TextReaderRuntimeView::normalizeCrAsLf offset must be 0x04");
+static_assert(sizeof(TextReaderRuntimeView) == 0x08, "TextReaderRuntimeView size must be 0x08");
+
+[[nodiscard]] int ReadRawByteFromStreamRuntime(Stream& stream)
+{
+  if (stream.mReadHead != stream.mReadEnd) {
+    const unsigned char value = static_cast<unsigned char>(*stream.mReadHead);
+    ++stream.mReadHead;
+    return static_cast<int>(value);
+  }
+
+  unsigned char value = 0;
+  if (stream.VirtRead(reinterpret_cast<char*>(&value), 1U) == 1U) {
+    return static_cast<int>(value);
+  }
+
+  return kEndOfFileByte;
+}
+
+/**
+ * Address: 0x00907020 (FUN_00907020)
+ *
+ * What it does:
+ * Reads one byte from a stream-backed text reader state and normalizes CR/LF
+ * sequences to LF when enabled.
+ */
+[[maybe_unused]] int ReadTextByteWithCrLfNormalizationRuntime(TextReaderRuntimeView& reader)
+{
+  int value = ReadRawByteFromStreamRuntime(*reader.stream);
+  if (!reader.normalizeCrAsLf || value != kCarriageReturnByte) {
+    return value;
+  }
+
+  const int trailing = ReadRawByteFromStreamRuntime(*reader.stream);
+  if (trailing != kLineFeedByte && trailing != kEndOfFileByte) {
+    reader.stream->UnGetByte(trailing);
+  }
+
+  return kLineFeedByte;
+}
+} // namespace
 
 /**
  * Address: 0x00956DB0 (FUN_00956DB0)
@@ -39,6 +94,26 @@ Stream::~Stream() = default;
 Stream::UnsupportedOperation::UnsupportedOperation()
   : std::logic_error{std::string{"Unsupported stream operation."}}
 {}
+
+/**
+ * Address: 0x00956F70 (FUN_00956F70)
+ *
+ * What it does:
+ * Copy-constructs one unsupported-operation exception payload.
+ */
+Stream::UnsupportedOperation::UnsupportedOperation(const UnsupportedOperation& other)
+  : std::logic_error{other}
+{}
+
+/**
+ * Address: 0x00956EC0 (FUN_00956EC0, non-deleting dtor lane)
+ * Address: 0x00956F00 (FUN_00956F00, deleting dtor lane)
+ *
+ * What it does:
+ * Tears down `UnsupportedOperation` logic-error payload storage and supports
+ * scalar-delete dispatch.
+ */
+Stream::UnsupportedOperation::~UnsupportedOperation() = default;
 
 /**
  * Address: 0x00956F50 (FUN_00956F50)
@@ -304,21 +379,27 @@ size_t Stream::ReadNonBlocking(char* buf, size_t size)
   return size;
 }
 
-int8_t Stream::GetByte()
+/**
+ * Address: 0x004CCBD0 (FUN_004CCBD0)
+ *
+ * What it does:
+ * Returns one byte from the stream read lane (inline buffer fast path or
+ * virtual read fallback); returns `-1` when no byte is available.
+ */
+int Stream::GetByte()
 {
-  if (mReadHead != mReadEnd) {
-    const unsigned char c = static_cast<unsigned char>(*mReadHead);
-    ++mReadHead;
-    return static_cast<int8_t>(c);
+  char* const readHead = mReadHead;
+  if (readHead == mReadEnd) {
+    unsigned char value = 0u;
+    if (VirtRead(reinterpret_cast<char*>(&value), 1u) < 1u) {
+      return -1;
+    }
+    return static_cast<int>(value);
   }
 
-  unsigned char b = 0;
-  const size_t got = VirtRead(reinterpret_cast<char*>(&b), 1u);
-  if (got == 1u) {
-    return static_cast<int8_t>(b);
-  }
-
-  return -1;
+  const unsigned char value = static_cast<unsigned char>(*readHead);
+  mReadHead = readHead + 1;
+  return static_cast<int>(value);
 }
 
 /**
@@ -333,15 +414,24 @@ TextWriter::TextWriter(Stream* const stream, const int mode)
   , mSawCarriageReturn(false)
 {}
 
-void TextWriter::WriteByte(const char value)
+/**
+ * Address: 0x00957010 (FUN_00957010)
+ *
+ * What it does:
+ * Writes one byte to the stream write lane using inline-buffer fast path and
+ * virtual write fallback when the inline window is full.
+ */
+char* TextWriter::WriteByte(const char value)
 {
   if (mStream->mWriteHead == mStream->mWriteEnd) {
     mStream->VirtWrite(&value, 1);
-    return;
+    return mStream->mWriteHead;
   }
 
-  *mStream->mWriteHead = value;
+  char* const writeLane = mStream->mWriteHead;
+  *writeLane = value;
   ++mStream->mWriteHead;
+  return writeLane;
 }
 
 /**
@@ -404,6 +494,20 @@ void TextWriter::WriteChar(const char value)
 
   mSawCarriageReturn = false;
   WriteByte(value);
+}
+
+/**
+ * Address: 0x009571E0 (FUN_009571E0)
+ *
+ * What it does:
+ * Writes `length` bytes from `value` by forwarding each byte through
+ * `WriteChar` normalization semantics.
+ */
+void TextWriter::WriteChars(const char* const value, const int length)
+{
+  for (int index = 0; index < length; ++index) {
+    WriteChar(value[index]);
+  }
 }
 
 /**

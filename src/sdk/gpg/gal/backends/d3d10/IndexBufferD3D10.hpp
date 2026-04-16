@@ -18,6 +18,15 @@ namespace gal {
     class IndexBufferD3D10 {
     public:
       /**
+       * Address: 0x00901B80 (FUN_00901B80)
+       *
+       * What it does:
+       * Initializes one empty D3D10 index-buffer wrapper with default context
+       * and cleared native/staging/lock tracking lanes.
+       */
+      IndexBufferD3D10();
+
+      /**
        * Address: 0x00901D60 (FUN_00901D60)
        *
        * IndexBufferContext const *,void *,void *,void *

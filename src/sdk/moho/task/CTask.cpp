@@ -72,6 +72,63 @@ namespace
   }
 
   /**
+   * Address: 0x007BB640 (FUN_007BB640)
+   *
+   * What it does:
+   * Runs the shared `CTask` teardown lane for the `CPullTask<CGpgNetInterface>`
+   * deleting-destructor vtable slot and frees storage when requested.
+   */
+  [[nodiscard]] CTask* DestroyPullTaskGpgNetInterfaceDeleting(
+    CTask* const task,
+    const unsigned char deleteFlag
+  )
+  {
+    task->CTask::~CTask();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(task));
+    }
+    return task;
+  }
+
+  /**
+   * Address: 0x007C9040 (FUN_007C9040)
+   *
+   * What it does:
+   * Runs the shared `CTask` teardown lane for the `CPullTask<CDiscoveryService>`
+   * deleting-destructor vtable slot and frees storage when requested.
+   */
+  [[nodiscard]] CTask* DestroyPullTaskDiscoveryServiceDeleting(
+    CTask* const task,
+    const unsigned char deleteFlag
+  )
+  {
+    task->CTask::~CTask();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(task));
+    }
+    return task;
+  }
+
+  /**
+   * Address: 0x007C9060 (FUN_007C9060)
+   *
+   * What it does:
+   * Runs the shared `CTask` teardown lane for the `CPushTask<CDiscoveryService>`
+   * deleting-destructor vtable slot and frees storage when requested.
+   */
+  [[nodiscard]] CTask* DestroyPushTaskDiscoveryServiceDeleting(
+    CTask* const task,
+    const unsigned char deleteFlag
+  )
+  {
+    task->CTask::~CTask();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(task));
+    }
+    return task;
+  }
+
+  /**
    * Address: 0x0040BDE0 (FUN_0040BDE0, gpg::RRef_CTask)
    *
    * What it does:
@@ -195,7 +252,6 @@ namespace
     gCTaskSerializer.mPrev = nullptr;
     gCTaskSerializer.mSerLoadFunc = &DeserializeCTask;
     gCTaskSerializer.mSerSaveFunc = &SerializeCTask;
-    gCTaskSerializer.RegisterSerializeFunctions();
   }
 
   struct CTaskReflectionBootstrap

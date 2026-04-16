@@ -22,6 +22,13 @@ namespace moho
     );
 
     CSimConFunc() noexcept;
+
+    /**
+     * Address: 0x005BE360 (FUN_005BE360)
+     *
+     * What it does:
+     * Constructs one console-function command entry and binds its callback lane.
+     */
     CSimConFunc(bool requiresCheat, const char* name, Callback handler) noexcept;
 
     /**

@@ -390,6 +390,74 @@ namespace moho
     archive->Write(CachedVTransformType(), &task->mDestinationTransform, nullOwner);
     archive->WriteBool(task->mIsOccupying);
   }
+
+  /**
+   * Address: 0x00602E80 (FUN_00602E80)
+   *
+   * What it does:
+   * Preserves one deserialize callback thunk lane for call-land-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallLandTransportMemberDeserializeAdapterLaneA(
+    gpg::ReadArchive* const archive,
+    CUnitCallLandTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallLandTransport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00602E90 (FUN_00602E90)
+   *
+   * What it does:
+   * Preserves one serialize callback thunk lane for call-land-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallLandTransportMemberSerializeAdapterLaneA(
+    gpg::WriteArchive* const archive,
+    const CUnitCallLandTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallLandTransport::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00603170 (FUN_00603170)
+   *
+   * What it does:
+   * Alternate deserialize callback thunk lane for call-land-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallLandTransportMemberDeserializeAdapterLaneB(
+    gpg::ReadArchive* const archive,
+    CUnitCallLandTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallLandTransport::MemberDeserialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00603180 (FUN_00603180)
+   *
+   * What it does:
+   * Alternate serialize callback thunk lane for call-land-transport task
+   * serializer registration.
+   */
+  [[maybe_unused]] void CUnitCallLandTransportMemberSerializeAdapterLaneB(
+    gpg::WriteArchive* const archive,
+    const CUnitCallLandTransport* const task,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    CUnitCallLandTransport::MemberSerialize(archive, task, version, ownerRef);
+  }
 } // namespace moho
 
 namespace gpg
@@ -408,6 +476,25 @@ namespace gpg
     }
 
     *outRef = MakeDerivedRef(value, CachedCUnitCallLandTransportType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x00602FD0 (FUN_00602FD0)
+   *
+   * What it does:
+   * Materializes one `RRef_CUnitCallLandTransport` result into a stack local
+   * and copies that pair into caller-owned output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreRRefCUnitCallLandTransportAdapter(
+    moho::CUnitCallLandTransport* const value,
+    gpg::RRef* const outRef
+  )
+  {
+    gpg::RRef temp{};
+    (void)RRef_CUnitCallLandTransport(&temp, value);
+    outRef->mObj = temp.mObj;
+    outRef->mType = temp.mType;
     return outRef;
   }
 } // namespace gpg

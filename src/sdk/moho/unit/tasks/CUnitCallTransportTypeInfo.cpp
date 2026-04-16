@@ -56,10 +56,13 @@ namespace moho
   void CUnitCallTransportTypeInfo::Init()
   {
     size_ = sizeof(CUnitCallTransport);
-    newRefFunc_ = &CUnitCallTransportTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitCallTransportTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitCallTransportTypeInfo::Delete;
-    dtrFunc_ = &CUnitCallTransportTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitCallTransportTypeInfo::NewRef,
+      &CUnitCallTransportTypeInfo::CtrRef,
+      &CUnitCallTransportTypeInfo::Delete,
+      &CUnitCallTransportTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

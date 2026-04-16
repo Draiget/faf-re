@@ -174,6 +174,17 @@ namespace moho
     std::int32_t footprintSize; // +0x08
     std::int32_t laneToken;     // +0x0C
 
+    SFormationOccupiedSlot() = default;
+
+    /**
+     * Address: 0x0059A3F0 (FUN_0059A3F0)
+     *
+     * What it does:
+     * Initializes one occupied-slot payload from `(position, footprintSize,
+     * laneToken)`.
+     */
+    SFormationOccupiedSlot(const SCoordsVec2& slotPosition, std::int32_t footprintSizeValue, std::int32_t laneTokenValue) noexcept;
+
     /**
      * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
      *
@@ -248,6 +259,17 @@ namespace moho
   class CAiFormationInstance : public IFormationInstance
   {
   public:
+    /**
+     * Address: 0x005692D0 (FUN_005692D0, ??0CFormationInstance@Moho@@QAE@@Z)
+     * Mangled: ??0CFormationInstance@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Initializes base formation intrusive links, lane vectors, coord-cache
+     * map heads, and default scalar state for newly constructed formation
+     * instances.
+     */
+    CAiFormationInstance();
+
     /**
      * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
      * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
@@ -486,6 +508,15 @@ namespace moho
      */
     bool RemoveDeadUnits(Unit* checkForUnit);
 
+    /**
+     * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)
+     *
+     * What it does:
+     * Scales one script-local formation offset, optionally rotates it by the
+     * current formation orientation, then multiplies by slot-span scale.
+     */
+    SCoordsVec2* ComputeRunScriptOffset(const SCoordsVec2* sourceOffset, SCoordsVec2* dest) const;
+
   public:
     std::int32_t mUnitCount;                      // +0x04
     TDatListItem<void, void> mUnitLinkListHead;   // +0x08
@@ -563,6 +594,56 @@ namespace moho
   );
   static_assert(offsetof(CAiFormationInstance, mSim) == 0x328, "CAiFormationInstance::mSim offset must be 0x328");
   static_assert(sizeof(CAiFormationInstance) == 0x330, "CAiFormationInstance size must be 0x330");
+
+  /**
+   * Address: 0x005661C0 (FUN_005661C0, preregister_SUnitOffsetInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SUnitOffsetInfo`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SUnitOffsetInfoTypeInfo();
+
+  /**
+   * Address: 0x005665B0 (FUN_005665B0, preregister_IFormationInstanceTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `IFormationInstance`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IFormationInstanceTypeInfo();
+
+  /**
+   * Address: 0x00571A70 (FUN_00571A70, preregister_RMapType_EntId_SUnitOffsetInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `std::map<EntId,SUnitOffsetInfo>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RMapType_EntId_SUnitOffsetInfo();
+
+  /**
+   * Address: 0x00571AD0 (FUN_00571AD0, preregister_RBroadcasterRType_EFormationdStatus)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `Broadcaster<EFormationdStatus>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RBroadcasterRType_EFormationdStatus();
+
+  /**
+   * Address: 0x00571B30 (FUN_00571B30, preregister_RListenerRType_EFormationdStatus)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `Listener<EFormationdStatus>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RListenerRType_EFormationdStatus();
+
+  /**
+   * Address: 0x00571CE0 (FUN_00571CE0, preregister_RMapType_EntId_SCoordsVec2)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `std::map<EntId,SCoordsVec2>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_RMapType_EntId_SCoordsVec2();
 
   /**
    * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)

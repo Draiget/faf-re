@@ -10,6 +10,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x00940930 (FUN_00940930)
+         *
+         * What it does:
+         * Initializes one abstract `gal::Class` base lane by installing the class
+         * vtable.
+         */
+        Class();
+
+        /**
          * Address: 0x00940950 (FUN_00940950)
          *
          * What it does:

@@ -102,10 +102,13 @@ namespace moho
   void CUnitSacrificeTaskTypeInfo::Init()
   {
     size_ = 0x4C;
-    newRefFunc_ = &CUnitSacrificeTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitSacrificeTaskTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitSacrificeTaskTypeInfo::Delete;
-    dtrFunc_ = &CUnitSacrificeTaskTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitSacrificeTaskTypeInfo::NewRef,
+      &CUnitSacrificeTaskTypeInfo::CtrRef,
+      &CUnitSacrificeTaskTypeInfo::Delete,
+      &CUnitSacrificeTaskTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     AddBase_Listener_ECommandEvent(this);

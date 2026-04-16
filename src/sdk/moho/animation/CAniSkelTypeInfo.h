@@ -30,4 +30,28 @@ namespace moho
   };
 
   static_assert(sizeof(CAniSkelTypeInfo) == 0x64, "CAniSkelTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00549F60 (FUN_00549F60, preregister_CAniSkelTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI metadata for `CAniSkel`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CAniSkelTypeInfo();
+
+  /**
+   * Address: 0x00BF4480 (FUN_00BF4480, cleanup_CAniSkelTypeInfo)
+   *
+   * What it does:
+   * Releases startup-owned `CAniSkelTypeInfo` field/base metadata storage.
+   */
+  void cleanup_CAniSkelTypeInfo();
+
+  /**
+   * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfoAtexit)
+   *
+   * What it does:
+   * Preregisters `CAniSkel` RTTI and installs process-exit cleanup.
+   */
+  int register_CAniSkelTypeInfoAtexit();
 } // namespace moho

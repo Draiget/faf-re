@@ -23,6 +23,11 @@
 #include "moho/unit/core/Unit.h"
 #include "Wm3Quaternion.h"
 
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
+
 namespace
 {
   constexpr const char* kCollisionManipulatorLuaClassName = "CCollisionManipulator";
@@ -81,12 +86,83 @@ namespace
     return *reinterpret_cast<moho::CCollisionManipulatorTypeInfo*>(gCCollisionManipulatorTypeInfoStorage);
   }
 
-  gpg::RType* CachedCCollisionManipulatorType()
+  /**
+   * Address: 0x00637840 (FUN_00637840)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for
+   * `CCollisionManipulator`.
+   */
+  [[nodiscard]] gpg::RType* ResolveCCollisionManipulatorTypeCachePrimary()
   {
     if (!moho::CCollisionManipulator::sType) {
       moho::CCollisionManipulator::sType = gpg::LookupRType(typeid(moho::CCollisionManipulator));
     }
     return moho::CCollisionManipulator::sType;
+  }
+
+  /**
+   * Address: 0x00638670 (FUN_00638670)
+   *
+   * What it does:
+   * Secondary duplicate lane that resolves/caches
+   * `CCollisionManipulator` reflection type.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCCollisionManipulatorTypeCacheSecondary()
+  {
+    if (!moho::CCollisionManipulator::sType) {
+      moho::CCollisionManipulator::sType = gpg::LookupRType(typeid(moho::CCollisionManipulator));
+    }
+    return moho::CCollisionManipulator::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCollisionManipulatorType()
+  {
+    return ResolveCCollisionManipulatorTypeCachePrimary();
+  }
+
+  /**
+   * Address: 0x006377B0 (FUN_006377B0)
+   *
+   * What it does:
+   * Translates one world-space point into a local origin lane and rotates it
+   * by the inverse of one quaternion lane set.
+   */
+  [[maybe_unused]] Wm3::Vector3f* TransformWorldPointByInverseQuaternionLanes(
+    const float* const transformLanes,
+    Wm3::Vector3f* const outVector,
+    const float* const worldPointLanes
+  )
+  {
+    Wm3::Vector3f localPoint{};
+    localPoint.x = worldPointLanes[0] - transformLanes[4];
+    localPoint.y = worldPointLanes[1] - transformLanes[5];
+    localPoint.z = worldPointLanes[2] - transformLanes[6];
+
+    Wm3::Quaternionf inverseRotation{};
+    inverseRotation.x = transformLanes[0];
+    inverseRotation.y = -transformLanes[1];
+    inverseRotation.z = -transformLanes[2];
+    inverseRotation.w = -transformLanes[3];
+
+    moho::MultQuadVec(outVector, &localPoint, &inverseRotation);
+    return outVector;
+  }
+
+  /**
+   * Address: 0x00638D10 (FUN_00638D10)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CCollisionManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCCollisionManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCCollisionManipulatorType());
+    return upcast.mObj;
   }
 
   gpg::RType* CachedIAniManipulatorType()
@@ -344,7 +420,7 @@ namespace
   }
 
   /**
-   * Address: 0x00638770 (FUN_00638770, CCollisionManipulatorTypeInfo::newRefFunc_)
+    * Alias of FUN_00638770 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::RRef CreateCollisionManipulatorRefOwned()
   {
@@ -360,7 +436,7 @@ namespace
   }
 
   /**
-   * Address: 0x00638830 (FUN_00638830, CCollisionManipulatorTypeInfo::ctorRefFunc_)
+    * Alias of FUN_00638830 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::RRef ConstructCollisionManipulatorRefInPlace(void* objectStorage)
   {
@@ -369,6 +445,20 @@ namespace
       new (object) moho::CCollisionManipulator();
     }
     return MakeTypedRef(object, CachedCCollisionManipulatorType());
+  }
+
+  /**
+   * Address: 0x00637B10 (FUN_00637B10)
+   *
+   * What it does:
+   * In-place constructor lane that initializes one `CCollisionManipulator`
+   * object and returns that same storage pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulator* ConstructCollisionManipulatorInPlaceAlias(
+    moho::CCollisionManipulator* const objectStorage
+  )
+  {
+    return new (objectStorage) moho::CCollisionManipulator();
   }
 
   /**
@@ -832,6 +922,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x00638BF0 (FUN_00638BF0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CCollisionManipulator>` and returns that
+   * singleton.
+   */
+  CScrLuaMetatableFactory<CCollisionManipulator>* startup_CScrLuaMetatableFactory_CCollisionManipulator_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<CCollisionManipulator>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
+  }
+
+  /**
    * What it does:
    * Stores one factory-table slot index used by CScrLuaObjectFactory::Get.
    */
@@ -852,7 +957,7 @@ namespace moho
    */
   void CCollisionManipulatorSerializer::RegisterSerializeFunctions()
   {
-    gpg::RType* const type = CachedCCollisionManipulatorType();
+    gpg::RType* const type = ResolveCCollisionManipulatorTypeCacheSecondary();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mSerLoadFunc ? mSerLoadFunc : &DeserializeCCollisionManipulator;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
@@ -862,6 +967,20 @@ namespace moho
   /**
    * Address: 0x006379A0 (FUN_006379A0, scalar deleting destructor thunk)
    */
+  /**
+   * Address: 0x00637A00 (FUN_00637A00, CCollisionManipulatorTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Executes one non-deleting destruction lane for
+   * `CCollisionManipulatorTypeInfo`.
+   */
+  [[maybe_unused]] void DestroyCCollisionManipulatorTypeInfoBody(
+    CCollisionManipulatorTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->~CCollisionManipulatorTypeInfo();
+  }
+
   CCollisionManipulatorTypeInfo::~CCollisionManipulatorTypeInfo() = default;
 
   /**
@@ -878,10 +997,13 @@ namespace moho
   void CCollisionManipulatorTypeInfo::Init()
   {
     size_ = sizeof(CCollisionManipulator);
-    newRefFunc_ = &CreateCollisionManipulatorRefOwned;
-    deleteFunc_ = &DeleteCollisionManipulatorOwned;
-    ctorRefFunc_ = &ConstructCollisionManipulatorRefInPlace;
-    dtrFunc_ = &DestroyCollisionManipulatorInPlace;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CreateCollisionManipulatorRefOwned,
+      &ConstructCollisionManipulatorRefInPlace,
+      &DeleteCollisionManipulatorOwned,
+      &DestroyCollisionManipulatorInPlace
+    );
     gpg::RType::Init();
     AddIAniManipulatorBase(this);
     Finish();
@@ -917,6 +1039,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x00637A80 (FUN_00637A80)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CCollisionManipulatorSerializer`
+   * helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulatorSerializer*
+  InitializeCCollisionManipulatorSerializerStartupThunkPrimary()
+  {
+    InitializeHelperNode(gCCollisionManipulatorSerializer);
+    gCCollisionManipulatorSerializer.mSerLoadFunc = &DeserializeCCollisionManipulator;
+    gCCollisionManipulatorSerializer.mSerSaveFunc = &SerializeCCollisionManipulator;
+    return &gCCollisionManipulatorSerializer;
+  }
+
+  /**
+   * Address: 0x006386B0 (FUN_006386B0)
+   *
+   * What it does:
+   * Secondary startup-init entry for global
+   * `CCollisionManipulatorSerializer` helper storage that mirrors the primary
+   * callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulatorSerializer*
+  InitializeCCollisionManipulatorSerializerStartupThunkSecondary()
+  {
+    return InitializeCCollisionManipulatorSerializerStartupThunkPrimary();
+  }
+
+  /**
    * Address: 0x00BFAB70 (FUN_00BFAB70, cleanup_CCollisionManipulatorSerializer)
    *
    * What it does:
@@ -935,6 +1087,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00637AB0 (FUN_00637AB0, cleanup_CCollisionManipulatorSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the global
+   * `CCollisionManipulatorSerializer` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializerStartupThunkA()
+  {
+    return cleanup_CCollisionManipulatorSerializer();
+  }
+
+  /**
+   * Address: 0x00637AE0 (FUN_00637AE0, cleanup_CCollisionManipulatorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the global
+   * `CCollisionManipulatorSerializer` node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializerStartupThunkB()
+  {
+    return cleanup_CCollisionManipulatorSerializer();
+  }
+
+  /**
    * Address: 0x00BD2720 (FUN_00BD2720, register_CCollisionManipulatorSerializer)
    *
    * What it does:
@@ -946,7 +1122,6 @@ namespace moho
     InitializeHelperNode(gCCollisionManipulatorSerializer);
     gCCollisionManipulatorSerializer.mSerLoadFunc = &DeserializeCCollisionManipulator;
     gCCollisionManipulatorSerializer.mSerSaveFunc = &SerializeCCollisionManipulator;
-    gCCollisionManipulatorSerializer.RegisterSerializeFunctions();
     (void)std::atexit(reinterpret_cast<void (*)()>(&cleanup_CCollisionManipulatorSerializer));
   }
 
@@ -980,6 +1155,28 @@ namespace gpg
     }
 
     *outRef = MakeTypedRef(value, CachedCCollisionManipulatorType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x00638BC0 (FUN_00638BC0)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CCollisionManipulator`
+   * and copies object/type fields into the destination reference record.
+   */
+  [[maybe_unused]] gpg::RRef* AssignCCollisionManipulatorRef(
+    gpg::RRef* const outRef, moho::CCollisionManipulator* const value
+  )
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef tmp{};
+    (void)RRef_CCollisionManipulator(&tmp, value);
+    outRef->mObj = tmp.mObj;
+    outRef->mType = tmp.mType;
     return outRef;
   }
 } // namespace gpg

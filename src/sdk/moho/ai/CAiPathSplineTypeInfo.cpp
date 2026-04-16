@@ -115,6 +115,28 @@ namespace
   }
 
   /**
+   * Address: 0x005B4890 (FUN_005B4890)
+   *
+   * What it does:
+   * Assigns `CAiPathSpline` lifecycle callback lanes (`newRefFunc_`,
+   * `deleteFunc_`, `ctorRefFunc_`, `dtrFunc_`) on one reflected type
+   * descriptor and returns the same descriptor pointer.
+   */
+  [[nodiscard]] CAiPathSplineTypeInfo*
+  ConfigureCAiPathSplineTypeInfoLifecycleCallbacks(CAiPathSplineTypeInfo* const typeInfo)
+  {
+    if (typeInfo == nullptr) {
+      return nullptr;
+    }
+
+    typeInfo->newRefFunc_ = &CreateAiPathSplineRefOwned;
+    typeInfo->deleteFunc_ = &DeleteAiPathSplineOwned;
+    typeInfo->ctorRefFunc_ = &ConstructAiPathSplineRefInPlace;
+    typeInfo->dtrFunc_ = &DestroyAiPathSplineInPlace;
+    return typeInfo;
+  }
+
+  /**
    * Address: 0x00BF74E0 (FUN_00BF74E0, cleanup_CAiPathSplineTypeInfo)
    *
    * What it does:
@@ -150,10 +172,7 @@ const char* CAiPathSplineTypeInfo::GetName() const
 void CAiPathSplineTypeInfo::Init()
 {
   size_ = sizeof(CAiPathSpline);
-  newRefFunc_ = &CreateAiPathSplineRefOwned;
-  ctorRefFunc_ = &ConstructAiPathSplineRefInPlace;
-  deleteFunc_ = &DeleteAiPathSplineOwned;
-  dtrFunc_ = &DestroyAiPathSplineInPlace;
+  (void)ConfigureCAiPathSplineTypeInfoLifecycleCallbacks(this);
   gpg::RType::Init();
   Finish();
 }

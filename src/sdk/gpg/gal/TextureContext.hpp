@@ -43,6 +43,21 @@ namespace gpg::gal
     TextureContext(const char* location, std::uint32_t format, std::uint32_t width, std::uint32_t height);
 
     /**
+     * Address: 0x008E7DF0 (FUN_008E7DF0)
+     *
+     * What it does:
+     * Initializes archive-backed texture source metadata from one location
+     * string, one retained shared data buffer view, and explicit format/dimensions.
+     */
+    TextureContext(
+      const char* location,
+      const gpg::MemBuffer<const char>& data,
+      std::uint32_t format,
+      std::uint32_t width,
+      std::uint32_t height
+    );
+
+    /**
      * Address: 0x00903B60 (FUN_00903B60)
      *
      * What it does:

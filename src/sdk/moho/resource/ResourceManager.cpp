@@ -749,6 +749,21 @@ namespace
     queue->mQueuedCount = 0U;
   }
 
+  /**
+   * Address: 0x004AC9E0 (FUN_004AC9E0)
+   * Address: 0x00560CB0 (FUN_00560CB0)
+   *
+   * What it does:
+   * Thunk lane that forwards one prefetch weak-pair ring-queue cleanup request
+   * into `FUN_004ADA70`.
+   */
+  [[maybe_unused]] void CleanupPrefetchWeakPairRingQueueThunk(
+    PrefetchWeakPairRingQueueRuntime* const queue
+  ) noexcept
+  {
+    CleanupPrefetchWeakPairRingQueue_004ADA70(queue);
+  }
+
   PrefetchWeakPairRingQueueRuntime sPrefetchPayloadQueue_004AB180{};
   std::chrono::steady_clock::time_point sLastResourceResolveTime_004AA690{};
 
@@ -1919,6 +1934,8 @@ namespace
 
   /**
    * Address: 0x004AD440 (FUN_004AD440)
+   * Address: 0x00899690 (FUN_00899690)
+   * Address: 0x008B6510 (FUN_008B6510)
    *
    * What it does:
    * Walks to the rightmost descendant while skipping the sentinel node.
@@ -4504,7 +4521,21 @@ moho::ResourceManager::~ResourceManager()
 }
 
 /**
- * Address: 0x00461DC0 (?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
+ * Address: 0x00BF05B0 (FUN_00BF05B0, ??1ResourceManager@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Thunk lane that forwards one resource-manager teardown request into
+ * `FUN_004A9C00`.
+ */
+[[maybe_unused]] void DestroyResourceManagerRuntimeAdapter(moho::ResourceManager* const manager) noexcept
+{
+  if (manager != nullptr) {
+    manager->~ResourceManager();
+  }
+}
+
+/**
+  * Alias of FUN_00461DC0 (non-canonical helper lane).
  */
 void moho::ResourceManager::OnEvent(const SDiskWatchEvent& event)
 {
@@ -5158,7 +5189,7 @@ boost::SharedCountPair* moho::RES_GetResource(
 }
 
 /**
- * Address: 0x004AA090 (FUN_004AA090)
+  * Alias of FUN_004AA090 (non-canonical helper lane).
  *
  * What it does:
  * Executes the startup pending-factory activation phase on the singleton.

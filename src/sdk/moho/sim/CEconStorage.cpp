@@ -16,17 +16,18 @@ namespace gpg
   public:
     void SetUnowned(const RRef& ref, unsigned int flags);
   };
+
+  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value);
 } // namespace gpg
 
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCEconStorageType()
   {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CEconStorage));
+    if (moho::CEconStorage::sType == nullptr) {
+      moho::CEconStorage::sType = gpg::LookupRType(typeid(moho::CEconStorage));
     }
-    return cached;
+    return moho::CEconStorage::sType;
   }
 
   [[nodiscard]] gpg::RType* CachedSEconValueType()
@@ -35,6 +36,227 @@ namespace
       moho::SEconValue::sType = gpg::LookupRType(typeid(moho::SEconValue));
     }
     return moho::SEconValue::sType;
+  }
+
+  struct SerHelperNodeRuntime
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::construct_func_t mConstructCallback = nullptr;
+    gpg::RType::delete_func_t mDeleteCallback = nullptr;
+  };
+  static_assert(offsetof(SerHelperNodeRuntime, mNext) == 0x04, "SerHelperNodeRuntime::mNext offset must be 0x04");
+  static_assert(offsetof(SerHelperNodeRuntime, mPrev) == 0x08, "SerHelperNodeRuntime::mPrev offset must be 0x08");
+  static_assert(sizeof(SerHelperNodeRuntime) == 0x14, "SerHelperNodeRuntime size must be 0x14");
+
+  constexpr const char* kSerializationSourcePath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+  constexpr int kSerializationConstructLine = 231;
+
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(SerHelperNodeRuntime& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  void InitializeHelperNode(SerHelperNodeRuntime& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mNext = self;
+    helper.mPrev = self;
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(SerHelperNodeRuntime& helper) noexcept
+  {
+    helper.mNext->mPrev = helper.mPrev;
+    helper.mPrev->mNext = helper.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  SerHelperNodeRuntime gCEconStorageConstructHelper{};
+  SerHelperNodeRuntime gCEconStorageSerializerHelper{};
+
+  /**
+   * Address: 0x00773490 (FUN_00773490)
+   *
+   * What it does:
+   * Unlinks startup `CEconStorageConstruct` helper links and rewires the node
+   * into one self-linked sentinel lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageConstructNodeVariantA() noexcept
+  {
+    return UnlinkHelperNode(gCEconStorageConstructHelper);
+  }
+
+  /**
+   * Address: 0x007734C0 (FUN_007734C0)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for startup `CEconStorageConstruct` helper
+   * links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageConstructNodeVariantB() noexcept
+  {
+    return UnlinkHelperNode(gCEconStorageConstructHelper);
+  }
+
+  /**
+   * Address: 0x007735B0 (FUN_007735B0)
+   *
+   * What it does:
+   * Unlinks startup `CEconStorageSerializer` helper links and rewires the node
+   * into one self-linked sentinel lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageSerializerNodeVariantA() noexcept
+  {
+    return UnlinkHelperNode(gCEconStorageSerializerHelper);
+  }
+
+  /**
+   * Address: 0x007735E0 (FUN_007735E0)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for startup `CEconStorageSerializer` helper
+   * links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCEconStorageSerializerNodeVariantB() noexcept
+  {
+    return UnlinkHelperNode(gCEconStorageSerializerHelper);
+  }
+
+  /**
+   * Address: 0x00773DA0 (FUN_00773DA0, Moho::CEconStorageConstruct::RegisterConstructFunction)
+   *
+   * What it does:
+   * Resolves `CEconStorage` RTTI and installs startup construct/delete
+   * callbacks from one construct-helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RType::construct_func_t RegisterCEconStorageConstructCallbacks(
+    SerHelperNodeRuntime* const helper
+  )
+  {
+    gpg::RType* const type = CachedCEconStorageType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+
+    type->serConstructFunc_ = helper->mConstructCallback;
+    type->deleteFunc_ = helper->mDeleteCallback;
+    return helper->mConstructCallback;
+  }
+
+  /**
+   * Address: 0x007734F0 (FUN_007734F0, Moho::CEconStorageConstruct::Construct)
+   *
+   * What it does:
+   * Allocates one `CEconStorage`, zero-initializes owner/value lanes, and
+   * publishes the object as an unowned construct result.
+   */
+  [[maybe_unused]] void ConstructCEconStorageSerializerCallback(
+    gpg::ReadArchive* const,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    if (result == nullptr) {
+      return;
+    }
+
+    auto* const storage = new (std::nothrow) moho::CEconStorage{};
+    gpg::RRef storageRef{};
+    gpg::RRef_CEconStorage(&storageRef, storage);
+    result->SetUnowned(storageRef, 0u);
+  }
+
+  /**
+   * Address: 0x00774350 (FUN_00774350, Moho::CEconStorageConstruct::Deconstruct)
+   *
+   * What it does:
+   * Removes one storage contribution from owning economy totals when present,
+   * then releases the storage object.
+   */
+  [[maybe_unused]] void DeconstructCEconStorageSerializerCallback(moho::CEconStorage* const storage)
+  {
+    if (storage == nullptr) {
+      return;
+    }
+
+    if (storage->mEconomy != nullptr) {
+      (void)storage->Chng(-1);
+    }
+    ::operator delete(storage);
+  }
+
+  /**
+   * Address: 0x00773560 (FUN_00773560, Moho::CEconStorageSerializer::Deserialize)
+   *
+   * What it does:
+   * Forwards serializer-load callback lanes into `CEconStorage::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCEconStorageSerializerCallback(
+    gpg::ReadArchive* const archive,
+    moho::CEconStorage* const storage
+  )
+  {
+    if (storage != nullptr) {
+      storage->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x00773570 (FUN_00773570, Moho::CEconStorageSerializer::Serialize)
+   *
+   * What it does:
+   * Forwards serializer-save callback lanes into `CEconStorage::MemberSerialize`.
+   */
+  [[maybe_unused]] void SerializeCEconStorageSerializerCallback(
+    gpg::WriteArchive* const archive,
+    moho::CEconStorage* const storage
+  )
+  {
+    if (storage != nullptr) {
+      storage->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x00773460 (FUN_00773460)
+   *
+   * What it does:
+   * Initializes startup `CEconStorageConstruct` helper links and binds
+   * construct/deconstruct callback lanes.
+   */
+  [[nodiscard]] SerHelperNodeRuntime* InitializeCEconStorageConstructHelperStorage() noexcept
+  {
+    InitializeHelperNode(gCEconStorageConstructHelper);
+    gCEconStorageConstructHelper.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconStorageSerializerCallback);
+    gCEconStorageConstructHelper.mDeleteCallback =
+      reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconStorageSerializerCallback);
+    return &gCEconStorageConstructHelper;
+  }
+
+  /**
+   * Address: 0x00773580 (FUN_00773580)
+   *
+   * What it does:
+   * Initializes startup `CEconStorageSerializer` helper links and binds
+   * deserialize/serialize callback lanes.
+   */
+  [[nodiscard]] SerHelperNodeRuntime* InitializeCEconStorageSerializerHelperStorage() noexcept
+  {
+    InitializeHelperNode(gCEconStorageSerializerHelper);
+    gCEconStorageSerializerHelper.mConstructCallback =
+      reinterpret_cast<gpg::RType::construct_func_t>(&DeserializeCEconStorageSerializerCallback);
+    gCEconStorageSerializerHelper.mDeleteCallback =
+      reinterpret_cast<gpg::RType::delete_func_t>(&SerializeCEconStorageSerializerCallback);
+    return &gCEconStorageSerializerHelper;
   }
 
   /**
@@ -74,6 +296,23 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CEconStorage::sType = nullptr;
+
+  /**
+   * Address: 0x00773270 (FUN_00773270)
+   *
+   * What it does:
+   * Removes one storage contribution from owning economy max-storage totals
+   * when this storage lane is currently bound to an economy.
+   */
+  [[maybe_unused]] [[nodiscard]] CEconStorage* RemoveCEconStorageContributionIfBound(CEconStorage* const storage)
+  {
+    if (storage->mEconomy != nullptr) {
+      (void)storage->Chng(-1);
+    }
+    return storage;
+  }
+
   /**
    * Address: 0x00773250 (FUN_00773250, Moho::CEconStorage::CEconStorage)
    *
@@ -192,4 +431,52 @@ namespace moho
     GPG_ASSERT(econValueType != nullptr);
     archive->Write(econValueType, &mAmt, nullOwner);
   }
+
+  /**
+   * Address: 0x007743D0 (FUN_007743D0)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards econ-storage save lanes into
+   * `CEconStorage::MemberSerialize`.
+   */
+  [[maybe_unused]] void SerializeCEconStorageThunkA(
+    CEconStorage* const storage,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (storage != nullptr) {
+      storage->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x00774540 (FUN_00774540)
+   *
+   * What it does:
+   * Secondary tail-thunk alias that forwards econ-storage save lanes into
+   * `CEconStorage::MemberSerialize`.
+   */
+  [[maybe_unused]] void SerializeCEconStorageThunkB(
+    CEconStorage* const storage,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (storage != nullptr) {
+      storage->MemberSerialize(archive);
+    }
+  }
 } // namespace moho
+
+namespace
+{
+  struct CEconStorageHelperBootstrap
+  {
+    CEconStorageHelperBootstrap()
+    {
+      (void)InitializeCEconStorageConstructHelperStorage();
+      (void)InitializeCEconStorageSerializerHelperStorage();
+    }
+  };
+
+  [[maybe_unused]] CEconStorageHelperBootstrap gCEconStorageHelperBootstrap;
+} // namespace

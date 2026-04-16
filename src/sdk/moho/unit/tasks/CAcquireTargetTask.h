@@ -22,6 +22,15 @@ namespace moho
   class ManyToOneListener<EProjectileImpactEvent> : public WeakObject
   {
   public:
+    /**
+     * Address: 0x005D88F0 (FUN_005D88F0)
+     *
+     * What it does:
+     * Initializes projectile-impact listener weak-link storage to an empty
+     * owner chain.
+     */
+    ManyToOneListener();
+
     virtual int HandleProjectileImpactListenerState(int action) = 0;
 
   public:
@@ -32,6 +41,15 @@ namespace moho
   class ManyToOneListener<ECollisionBeamEvent> : public WeakObject
   {
   public:
+    /**
+     * Address: 0x005D8930 (FUN_005D8930)
+     *
+     * What it does:
+     * Initializes collision-beam listener weak-link storage to an empty owner
+     * chain.
+     */
+    ManyToOneListener();
+
     virtual int HandleCollisionBeamListenerState(int action) = 0;
 
   public:
@@ -111,6 +129,26 @@ namespace moho
     int HandleCollisionBeamListenerState(int action);
 
   private:
+
+    /**
+     * Address: 0x005D79C0 (FUN_005D79C0)
+     *
+     * What it does:
+     * Copies one linked `CAiTarget` payload from `sourceTarget` into
+     * `outTarget`, inserting the copied weak-entity node at the owner-chain
+     * head when the source carries a live owner-link slot.
+     */
+    static CAiTarget* CopyLinkedTargetFromPointer(CAiTarget* outTarget, const CAiTarget* sourceTarget);
+
+    /**
+     * Address: 0x005D78E0 (FUN_005D78E0)
+     *
+     * What it does:
+     * Resolves one desired target from the attacker's attached parent unit and
+     * returns it when this attacker can engage and the weapon range test
+     * reports `TRS_Available`.
+     */
+    static Entity* ResolveAttachedParentDesiredTarget(CAiAttackerImpl* attacker, UnitWeapon* weapon);
 
     /**
      * Address: 0x005D9630 (FUN_005D9630, helper used by listener action==1 lanes)

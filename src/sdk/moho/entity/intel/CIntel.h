@@ -45,6 +45,13 @@ namespace moho
   public:
     static constexpr std::size_t kHandleCount = 9u;
 
+    /**
+     * Address: 0x00683170 (FUN_00683170)
+     *
+     * What it does:
+     * Returns cached reflected type metadata for `CIntel`, resolving it
+     * through RTTI lookup on first use.
+     */
     [[nodiscard]] static gpg::RType* StaticGetClass();
     static gpg::RType* sType;
 

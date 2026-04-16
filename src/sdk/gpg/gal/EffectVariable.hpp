@@ -11,6 +11,15 @@ namespace gal {
     class EffectVariable {
     public:
       /**
+       * Address: 0x00942F70 (FUN_00942F70)
+       *
+       * What it does:
+       * Initializes one base `EffectVariable` lane and installs the class
+       * vtable.
+       */
+      EffectVariable();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

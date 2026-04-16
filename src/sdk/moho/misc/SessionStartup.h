@@ -221,4 +221,55 @@ namespace moho
    * on the active sim driver.
    */
   int cfunc_InternalSaveGameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00880C40 (FUN_00880C40, cfunc_LoadSavedGame)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_LoadSavedGameL`.
+   */
+  int cfunc_LoadSavedGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x00880C60 (FUN_00880C60, func_LoadSavedGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LoadSavedGame`.
+   */
+  CScrLuaInitForm* func_LoadSavedGame_LuaFuncDef();
+
+  /**
+   * Address: 0x00886350 (FUN_00886350, cfunc_PrefetchSession)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_PrefetchSessionL`.
+   */
+  int cfunc_PrefetchSession(lua_State* luaContext);
+
+  /**
+   * Address: 0x00886370 (FUN_00886370, func_PrefetchSession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `PrefetchSession`.
+   */
+  CScrLuaInitForm* func_PrefetchSession_LuaFuncDef();
+
+  /**
+   * Address: 0x0088D4C0 (FUN_0088D4C0, cfunc_GetSessionClients)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetSessionClientsL`.
+   */
+  int cfunc_GetSessionClients(lua_State* luaContext);
+
+  /**
+   * Address: 0x0088D4E0 (FUN_0088D4E0, func_GetSessionClients_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetSessionClients`.
+   */
+  CScrLuaInitForm* func_GetSessionClients_LuaFuncDef();
 } // namespace moho

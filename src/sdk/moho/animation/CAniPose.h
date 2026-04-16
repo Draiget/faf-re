@@ -9,6 +9,7 @@
 namespace gpg
 {
   class ReadArchive;
+  class RType;
   class WriteArchive;
 } // namespace gpg
 
@@ -16,10 +17,24 @@ namespace moho
 {
   class CAniSkel;
   class CAniPose;
+  struct SAniSkelBone;
+
+  /**
+   * Address: 0x0063D210 (FUN_0063D210, boost::shared_ptr_CAniPose::shared_ptr_CAniPose)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<CAniPose>` from one raw pose pointer lane.
+   */
+  boost::shared_ptr<CAniPose>* ConstructSharedAniPoseFromRaw(
+    boost::shared_ptr<CAniPose>* outPose,
+    CAniPose* pose
+  );
 
   class CAniPoseBone
   {
   public:
+    static gpg::RType* sType;
+
     CAniPoseBone() = default;
 
     /**
@@ -50,6 +65,15 @@ namespace moho
     void Rotate(const Wm3::Quaternionf& rotation);
 
     /**
+     * Address: 0x0054BDD0 (FUN_0054BDD0)
+     *
+     * What it does:
+     * Replaces this bone's local transform with `transform` and marks the
+     * owning pose bone lane dirty for composite rebuild.
+     */
+    void SetLocalTransform(const VTransform& transform);
+
+    /**
      * Address: 0x0054BEC0 (FUN_0054BEC0, Moho::CAniPoseBone::GetCompositeTransform)
      *
      * What it does:
@@ -57,6 +81,15 @@ namespace moho
      * lanes when dirty.
      */
     [[nodiscard]] const VTransform& GetCompositeTransform() const;
+
+    /**
+     * Address: 0x0063EE30 (FUN_0063EE30, sub_63EE30)
+     *
+     * What it does:
+     * Resolves this pose bone's corresponding skeleton-bone lane from the
+     * owning pose skeleton and returns null when the index is out of range.
+     */
+    [[nodiscard]] const SAniSkelBone* ResolveSkeletonBone() const;
 
     /**
      * Address: 0x0054F630 (FUN_0054F630, Moho::CAniPoseBone::MemberSerialize)
@@ -124,6 +157,8 @@ namespace moho
   class CAniPose
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0054AF00 (FUN_0054AF00, ??0CAniPose@Moho@@QAE@V?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@M@Z)
      *
@@ -200,6 +235,15 @@ namespace moho
     boost::shared_ptr<const CAniSkel> GetSkeleton() const;
 
     /**
+     * Address: 0x0054F380 (FUN_0054F380, Moho::CAniPose::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes skeleton/shared lanes, local transform, and pose-bone
+     * payload, then rebuilds per-bone pose/parent links from skeleton data.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x0054F4F0 (FUN_0054F4F0, Moho::CAniPose::MemberSerialize)
      *
      * What it does:
@@ -207,6 +251,8 @@ namespace moho
      * payload, and max-offset cache value.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    friend class CAniPoseBone;
 
   private:
     /**
@@ -217,6 +263,15 @@ namespace moho
      * downstream bones whose parent is already dirty.
      */
     void MarkBoneDirty(int idx);
+
+    /**
+     * Address: 0x0054BD80 (FUN_0054BD80)
+     *
+     * What it does:
+     * Composes one pose-bone local transform with an incoming transform and
+     * marks that bone dirty through its pose/index ownership lanes.
+     */
+    static void ApplyBoneLocalTransform(CAniPoseBone* bone, const VTransform& transform);
 
   public:
     boost::shared_ptr<const CAniSkel> mSkeleton; // +0x00

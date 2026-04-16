@@ -27,11 +27,40 @@ BitArray2D::BitArray2D(const unsigned int newWidth, const unsigned int newHeight
 }
 
 /**
+ * Address: 0x008D8320 (FUN_008D8320, ??0BitArray2D@gpg@@QAE@ABV01@@Z_0)
+ */
+BitArray2D::BitArray2D(const BitArray2D& other)
+  : ptr(nullptr)
+  , size(0)
+  , width(0)
+  , height(0)
+{
+  Reset(static_cast<unsigned int>(other.width), static_cast<unsigned int>(other.height));
+  if (size > 0 && ptr != nullptr && other.ptr != nullptr) {
+    std::memcpy(ptr, other.ptr, static_cast<std::size_t>(size) * sizeof(std::int32_t));
+  }
+}
+
+/**
  * Address: 0x008D8200 (FUN_008D8200, ??1BitArray2D@gpg@@QAE@XZ)
  */
 BitArray2D::~BitArray2D()
 {
     operator delete(ptr);
+}
+
+/**
+ * Address: 0x0077FF50 (FUN_0077FF50)
+ *
+ * What it does:
+ * Executes one `BitArray2D` scalar-delete lane by destroying the object and
+ * then releasing its storage via global `operator delete`.
+ */
+BitArray2D* DestroyAndDeleteBitArray2D(BitArray2D* const bitArray)
+{
+  bitArray->~BitArray2D();
+  ::operator delete(bitArray);
+  return bitArray;
 }
 
 /**
@@ -141,6 +170,21 @@ bool BitArray2D::AnyBitSet(unsigned int* storeWidth, unsigned int* storeHeight, 
 }
 
 /**
+ * Address: 0x008E3380 (FUN_008E3380)
+ *
+ * What it does:
+ * Clears one packed bit at `(x,z)` and returns the modified backing word lane.
+ */
+int32_t* BitArray2D::ClearBitAndReturnWord(const int x, const unsigned int z)
+{
+    const unsigned int wordRow = z >> 5u;
+    const int index = x + static_cast<int>(static_cast<unsigned int>(width) * wordRow);
+    int32_t* const word = &ptr[index];
+    *word &= ~static_cast<int32_t>(1u << (z & 0x1Fu));
+    return word;
+}
+
+/**
  * Address: 0x008D8460 (FUN_008D8460, ?GetRectOr@BitArray2D@gpg@@QBE_NHHHH_N@Z)
  */
 bool BitArray2D::GetRectOr(int x0, int z0, const int w, const int h, const bool disallowNegative) const
@@ -205,16 +249,21 @@ bool BitArray2D::GetRectNeg(const Rect2i& rect) const
   return GetRectOr(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
 }
 
-bool BitArray2D::IsBitSetOrOutOfBounds(const int x, const int z) const
+/**
+ * Address: 0x00720510 (FUN_00720510)
+ *
+ * What it does:
+ * Returns true when the queried bit is set or the coordinates fall outside
+ * the logical width/height.
+ */
+bool BitArray2D::IsBitSetOrOutOfBounds(const unsigned int x, const unsigned int z) const
 {
-    if (!ptr || x < 0 || z < 0 || x >= width || z >= height) {
+    if (x >= static_cast<unsigned int>(width) || z >= static_cast<unsigned int>(height)) {
         return true;
     }
 
-    const std::size_t index =
-      static_cast<std::size_t>(x) + static_cast<std::size_t>(width) * static_cast<std::size_t>(z >> 5);
-    const std::uint32_t word = static_cast<std::uint32_t>(ptr[index]);
-    const std::uint32_t bitMask = 1u << (z & 0x1F);
-    return (word & bitMask) != 0u;
+    const std::size_t index = static_cast<std::size_t>(x) +
+                              static_cast<std::size_t>(width) * static_cast<std::size_t>(z >> 5);
+    return (static_cast<std::uint32_t>(ptr[index]) & (1u << (z & 0x1Fu))) != 0u;
 }
 }

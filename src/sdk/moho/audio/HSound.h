@@ -7,6 +7,11 @@
 #include "moho/containers/TDatList.h"
 #include "moho/script/CScriptEvent.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class CSndParams;
@@ -27,6 +32,8 @@ namespace moho
   class HSound : public CScriptEvent
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x004E10F0 (FUN_004E10F0, ??0HSound@Moho@@QAE@@Z)
      *

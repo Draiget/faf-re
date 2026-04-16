@@ -122,6 +122,32 @@ namespace
   }
 
   /**
+   * Address: 0x006DCB10 (FUN_006DCB10)
+   *
+   * What it does:
+   * Adjusts one `vector<SBlackListInfo>` length to `requestedCount` and uses
+   * one caller-provided fill lane for growth.
+   */
+  [[nodiscard]] std::size_t ResizeSBlackListInfoVectorWithFill(
+    SBlackListInfoVector& storage,
+    const std::size_t requestedCount,
+    const moho::SBlackListInfo& fillValue
+  )
+  {
+    const std::size_t currentCount = storage.size();
+    if (currentCount < requestedCount) {
+      storage.resize(requestedCount, fillValue);
+      return requestedCount;
+    }
+
+    if (requestedCount < currentCount) {
+      storage.resize(requestedCount);
+    }
+
+    return requestedCount;
+  }
+
+  /**
    * Address: 0x00BFE860 (FUN_00BFE860, sub_BFE860)
    *
    * What it does:
@@ -170,6 +196,25 @@ gpg::RRef* gpg::RRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInf
 
   outRef->mObj = value;
   outRef->mType = ResolveSBlackListInfoType();
+  return outRef;
+}
+
+/**
+ * Address: 0x006DDA30 (FUN_006DDA30)
+ *
+ * What it does:
+ * Packs one `RRef_SBlackListInfo` lane into caller-owned output storage.
+ */
+[[maybe_unused]] gpg::RRef* gpg::PackRRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInfo* const value)
+{
+  if (!outRef) {
+    return nullptr;
+  }
+
+  gpg::RRef tmp{};
+  (void)gpg::RRef_SBlackListInfo(&tmp, value);
+  outRef->mObj = tmp.mObj;
+  outRef->mType = tmp.mType;
   return outRef;
 }
 
@@ -270,7 +315,7 @@ void gpg::RVectorType<moho::SBlackListInfo>::SetCount(void* const obj, const int
   }
 
   const moho::SBlackListInfo zeroFill{};
-  storage->resize(static_cast<std::size_t>(count), zeroFill);
+  (void)ResizeSBlackListInfoVectorWithFill(*storage, static_cast<std::size_t>(count), zeroFill);
 }
 
 /**

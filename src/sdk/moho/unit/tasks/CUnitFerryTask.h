@@ -7,9 +7,14 @@
 #include "moho/task/CCommandTask.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class RRef;
+  class RType;
+}
+
 namespace moho
 {
-  class CUnitCommand;
   class IAiCommandDispatchImpl;
   class Unit;
 
@@ -19,6 +24,8 @@ namespace moho
   class CUnitFerryTask : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0060E2C0 (FUN_0060E2C0, Moho::CUnitFerryTask::~CUnitFerryTask)
      *
@@ -29,13 +36,35 @@ namespace moho
     ~CUnitFerryTask() override;
 
     /**
+     * Address: 0x0060DD70 (FUN_0060DD70, Moho::CUnitFerryTask::CUnitFerryTask)
+     *
+     * What it does:
+     * Initializes one ferry task from dispatch + world-position context,
+     * snapshots transport-load state, and binds current ferry-beacon command
+     * ownership when present.
+     */
+    CUnitFerryTask(IAiCommandDispatchImpl* dispatch, const Wm3::Vector3f& ferryPosition);
+
+    /**
      * Address: 0x0060DFC0 (FUN_0060DFC0, Moho::CUnitFerryTask::CUnitFerryTask)
      *
      * What it does:
-     * Initializes one ferry-task lane from parent command-task and command
+     * Initializes one ferry-task lane from parent command-task and target-unit
      * payload context.
      */
-    CUnitFerryTask(CCommandTask* parentTask, CUnitCommand* command);
+    CUnitFerryTask(CCommandTask* parentTask, Unit* targetUnit);
+
+    /**
+     * Address: 0x0060F790 (FUN_0060F790, Moho::CUnitFerryTask::operator new)
+     *
+     * What it does:
+     * Allocates one ferry-task object and forwards dispatch-position context
+     * into in-place construction.
+     */
+    [[nodiscard]] static CUnitFerryTask* CreateFromDispatch(
+      IAiCommandDispatchImpl* dispatch,
+      const Wm3::Vector3f& ferryPosition
+    );
 
     /**
      * Address: 0x0060F7E0 (FUN_0060F7E0, Moho::CUnitFerryTask::operator new)
@@ -44,7 +73,7 @@ namespace moho
      * Allocates one ferry-task object and forwards constructor arguments into
      * in-place construction.
      */
-    [[nodiscard]] static CUnitFerryTask* Create(CCommandTask* parentTask, CUnitCommand* command);
+    [[nodiscard]] static CUnitFerryTask* Create(CCommandTask* parentTask, Unit* targetUnit);
 
   public:
     IAiCommandDispatchImpl* mDispatch; // 0x30
@@ -72,3 +101,24 @@ namespace moho
   static_assert(offsetof(CUnitFerryTask, mFerryUnit) == 0x50, "CUnitFerryTask::mFerryUnit offset must be 0x50");
   static_assert(offsetof(CUnitFerryTask, mBeacon) == 0x58, "CUnitFerryTask::mBeacon offset must be 0x58");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00610650 (FUN_00610650, gpg::RRef_CUnitFerryTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitFerryTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitFerryTask(gpg::RRef* outRef, moho::CUnitFerryTask* value);
+
+  /**
+   * Address: 0x006105B0 (FUN_006105B0)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CUnitFerryTask` and
+   * copies object/type fields into the destination reference record.
+   */
+  gpg::RRef* AssignCUnitFerryTaskRef(gpg::RRef* outRef, moho::CUnitFerryTask* value);
+} // namespace gpg

@@ -11,6 +11,18 @@ using namespace moho;
 
 namespace
 {
+  /**
+   * Address: 0x00556450 (FUN_00556450)
+   *
+   * What it does:
+   * Completes startup preregistration for `EntityCategoryTypeInfo` by
+   * publishing RTTI for `EntityCategory`.
+   */
+  void preregister_EntityCategoryTypeInfoCtorLane(gpg::RType* const typeInfo)
+  {
+    gpg::PreRegisterRType(typeid(moho::EntityCategory), typeInfo);
+  }
+
   [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
   {
     gpg::RType* type = moho::EntityCategorySet::sType;
@@ -40,6 +52,62 @@ namespace
     gpg::RRef out{};
     (void)gpg::RRef_EntityCategory(&out, categorySet);
     return out;
+  }
+
+  /**
+   * Address: 0x005564D0 (FUN_005564D0)
+   *
+   * What it does:
+   * Installs the primary reference-lifecycle callbacks for
+   * `EntityCategoryTypeInfo` (`NewRef`, `CtrRef`, `Delete`, `Destruct`).
+   */
+  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksPrimary(
+    EntityCategoryTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->newRefFunc_ = &EntityCategoryTypeInfo::NewRef;
+    typeInfo->ctorRefFunc_ = &EntityCategoryTypeInfo::CtrRef;
+    typeInfo->deleteFunc_ = &EntityCategoryTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &EntityCategoryTypeInfo::Destruct;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x005564F0 (FUN_005564F0)
+   *
+   * What it does:
+   * Installs the copy/move reference-lifecycle callbacks for
+   * `EntityCategoryTypeInfo` (`CpyRef`, `MovRef`, `Delete`, `Destruct`).
+   */
+  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksSecondary(
+    EntityCategoryTypeInfo* const typeInfo
+  ) noexcept
+  {
+    typeInfo->cpyRefFunc_ = &EntityCategoryTypeInfo::CpyRef;
+    typeInfo->movRefFunc_ = &EntityCategoryTypeInfo::MovRef;
+    typeInfo->deleteFunc_ = &EntityCategoryTypeInfo::Delete;
+    typeInfo->dtrFunc_ = &EntityCategoryTypeInfo::Destruct;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x00556030 (FUN_00556030)
+   *
+   * What it does:
+   * Configures `EntityCategoryTypeInfo` callback lanes, element size/version,
+   * and serializer entrypoints for `EntityCategorySet`.
+   */
+  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeInitLanes(
+    EntityCategoryTypeInfo* const typeInfo
+  ) noexcept
+  {
+    (void)ConfigureEntityCategoryTypeRefCallbacksPrimary(typeInfo);
+    (void)ConfigureEntityCategoryTypeRefCallbacksSecondary(typeInfo);
+    typeInfo->size_ = sizeof(EntityCategorySet);
+    typeInfo->Version(1);
+    typeInfo->serLoadFunc_ = &EntityCategory::SerLoad;
+    typeInfo->serSaveFunc_ = &EntityCategory::SerSave;
+    return typeInfo;
   }
 
   alignas(EntityCategoryTypeInfo) unsigned char gStorage[sizeof(EntityCategoryTypeInfo)];
@@ -76,7 +144,7 @@ namespace
 EntityCategoryTypeInfo::EntityCategoryTypeInfo()
   : gpg::RType()
 {
-  gpg::PreRegisterRType(typeid(EntityCategory), this);
+  preregister_EntityCategoryTypeInfoCtorLane(this);
 }
 
 EntityCategoryTypeInfo::~EntityCategoryTypeInfo() = default;
@@ -93,16 +161,7 @@ const char* EntityCategoryTypeInfo::GetName() const { return "EntityCategory"; }
  */
 void EntityCategoryTypeInfo::Init()
 {
-  newRefFunc_ = &EntityCategoryTypeInfo::NewRef;
-  ctorRefFunc_ = &EntityCategoryTypeInfo::CtrRef;
-  cpyRefFunc_ = &EntityCategoryTypeInfo::CpyRef;
-  movRefFunc_ = &EntityCategoryTypeInfo::MovRef;
-  deleteFunc_ = &EntityCategoryTypeInfo::Delete;
-  dtrFunc_ = &EntityCategoryTypeInfo::Destruct;
-  size_ = sizeof(EntityCategorySet);
-  Version(1);
-  serLoadFunc_ = &EntityCategory::SerLoad;
-  serSaveFunc_ = &EntityCategory::SerSave;
+  (void)ConfigureEntityCategoryTypeInitLanes(this);
   Finish();
 }
 

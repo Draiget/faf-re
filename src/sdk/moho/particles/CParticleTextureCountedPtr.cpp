@@ -209,6 +209,12 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, owner);
   }
 
+  [[nodiscard]] unsigned int ResizeFastVectorCountedPtrCParticleTexture(
+    gpg::fastvector_runtime_view<moho::CountedPtr_CParticleTexture>& view,
+    const moho::CountedPtr_CParticleTexture* fillValue,
+    unsigned int requestedCount
+  );
+
   /**
    * Address: 0x0065A4C0 (FUN_0065A4C0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SerLoad)
    *
@@ -228,7 +234,7 @@ namespace
     archive->ReadUInt(&count);
 
     moho::CountedPtr_CParticleTexture fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    (void)ResizeFastVectorCountedPtrCParticleTexture(view, &fill, count);
 
     gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -260,6 +266,44 @@ namespace
       archive->Write(elementType, &view.begin[i], owner);
     }
   }
+
+  /**
+   * Address: 0x00657900 (FUN_00657900)
+   *
+   * What it does:
+   * Resizes one runtime `fastvector<CountedPtr<CParticleTexture>>` lane,
+   * releasing trimmed references and retaining the fill texture for appended
+   * lanes.
+   */
+  [[nodiscard]] unsigned int ResizeFastVectorCountedPtrCParticleTexture(
+    gpg::fastvector_runtime_view<moho::CountedPtr_CParticleTexture>& view,
+    const moho::CountedPtr_CParticleTexture* const fillValue,
+    const unsigned int requestedCount
+  )
+  {
+    const unsigned int currentCount = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    if (requestedCount < currentCount) {
+      moho::CountedPtr_CParticleTexture* const newEnd = view.begin + requestedCount;
+      for (moho::CountedPtr_CParticleTexture* cursor = newEnd; cursor != view.end; ++cursor) {
+        moho::ResetCountedParticleTexturePtr(*cursor);
+      }
+      view.end = newEnd;
+      return requestedCount;
+    }
+
+    if (requestedCount > currentCount) {
+      gpg::FastVectorRuntimeEnsureCapacity(static_cast<std::size_t>(requestedCount), view);
+      moho::CParticleTexture* const fillTexture = fillValue ? fillValue->tex : nullptr;
+      moho::CountedPtr_CParticleTexture* const requestedEnd = view.begin + requestedCount;
+      while (view.end != requestedEnd) {
+        moho::CountedPtr_CParticleTexture* const slot = view.end;
+        view.end = slot + 1;
+        (void)moho::AssignCountedParticleTexturePtr(slot, fillTexture);
+      }
+    }
+
+    return view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+  }
 } // namespace
 
 namespace moho
@@ -274,6 +318,25 @@ namespace moho
   CParticleTexture* GetCountedParticleTextureRawPointer(const CountedPtr_CParticleTexture& countedTexture) noexcept
   {
     return countedTexture.tex;
+  }
+
+  /**
+   * Address: 0x006576F0 (FUN_006576F0)
+   *
+   * What it does:
+   * Initializes one counted particle-texture pointer lane to null and returns
+   * the same storage lane.
+   */
+  [[maybe_unused]] CountedPtr_CParticleTexture* ConstructCountedParticleTexturePtrNull(
+    CountedPtr_CParticleTexture* const countedTexture
+  ) noexcept
+  {
+    if (countedTexture == nullptr) {
+      return nullptr;
+    }
+
+    countedTexture->tex = nullptr;
+    return countedTexture;
   }
 
   /**
@@ -465,7 +528,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 (FUN_0065AAD0, preregister_CountedPtrCParticleTextureType)
+    * Alias of FUN_0065AAD0 (non-canonical helper lane).
    *
    * What it does:
    * Constructs/preregisters RTTI metadata for `CountedPtr<CParticleTexture>`.
@@ -684,7 +747,7 @@ namespace gpg
 
     auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(obj);
     moho::CountedPtr_CParticleTexture fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+    (void)ResizeFastVectorCountedPtrCParticleTexture(view, &fill, static_cast<unsigned int>(count));
   }
 } // namespace gpg
 

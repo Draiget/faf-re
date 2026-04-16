@@ -17,6 +17,8 @@ namespace moho
   class CD3DBatchTexture;
   class CD3DTextureBatcher;
   class CDecalGroup;
+  class UserEntity;
+  struct GeomCamera3;
 
   struct DecalGroupLookupNode
   {
@@ -146,8 +148,48 @@ namespace moho
    * Terrain decal manager lane that owns decals, splat overlays, and one
    * spatial-db registration used by newly created decals.
    */
-  class CDecalManager
+  class IDecalManager
   {
+  public:
+    /**
+     * Address: 0x00877250 (FUN_00877250, ??0IDecalManager@Moho@@QAE@XZ)
+     * Address: 0x00878D20 (FUN_00878D20, IDecalManager ctor lane)
+     *
+     * What it does:
+     * Initializes one decal-manager base interface object.
+     */
+    IDecalManager();
+
+    virtual ~IDecalManager() = default;
+  };
+
+  static_assert(sizeof(IDecalManager) == 0x04, "IDecalManager size must be 0x04");
+
+  /**
+   * Terrain decal manager lane that owns decals, splat overlays, and one
+   * spatial-db registration used by newly created decals.
+   */
+  class CDecalManager : public IDecalManager
+  {
+  public:
+    /**
+     * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
+     *
+     * What it does:
+     * Initializes decal vectors, keyed lookup sentinels, and embedded spatial
+     * db storage for the owning terrain map.
+     */
+    explicit CDecalManager(IWldTerrainRes* terrainRes);
+
+    /**
+     * Address: 0x00877B70 (FUN_00877B70, Moho::CDecalManager::~CDecalManager)
+     *
+     * What it does:
+     * Deletes active decals/groups/splats, clears both keyed lookup trees, and
+     * tears down embedded spatial-db registration storage.
+     */
+    ~CDecalManager() override;
+
   public:
     /**
      * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
@@ -221,6 +263,69 @@ namespace moho
      */
     void MoveDecalTowardFront(CWldTerrainDecal* decal);
 
+    /**
+     * Address: 0x00878020 (FUN_00878020, Moho::CDecalManager::NewDecal)
+     *
+     * What it does:
+     * Allocates one terrain decal for the requested runtime index, marks the
+     * manager dirty, and forwards to `LoadDecal`.
+     */
+    [[nodiscard]] CWldTerrainDecal* NewDecal(std::int32_t decalIndex);
+
+    /**
+     * Address: 0x008780A0 (FUN_008780A0, Moho::CDecalManager::LoadDecal)
+     *
+     * What it does:
+     * Loads one existing decal (or allocates a new one), appends it to active
+     * manager storage, and updates the decal-index lookup lane.
+     */
+    [[nodiscard]] CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x00878460 (FUN_00878460, Moho::CDecalManager::DestroyDecalGroup)
+     *
+     * What it does:
+     * Removes one decal-group mapping, erases the group from manager storage,
+     * then deletes the group object.
+     */
+    std::int32_t DestroyDecalGroup(CDecalGroup* group);
+
+    /**
+     * Address: 0x00878530 (FUN_00878530, Moho::CDecalManager::AddSplat)
+     *
+     * What it does:
+     * Moves one existing decal pointer to the end of the active decal vector
+     * and reindexes after the move.
+     */
+    void AddSplat(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x00878A90 (FUN_00878A90, Moho::CDecalManager::ProcessRemovals)
+     *
+     * What it does:
+     * Fades scheduled decals/splats toward zero alpha and erases fully faded
+     * entries from manager storage.
+     */
+    void ProcessRemovals(std::int32_t tick);
+
+    /**
+     * Address: 0x00878BE0 (FUN_00878BE0, Moho::CDecalManager::EntitiesInView)
+     *
+     * What it does:
+     * Collects one camera-visible entity lane from the manager spatial-db
+     * registration and sorts the collected pointer range.
+     */
+    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod);
+
+    /**
+     * Address: 0x00878C40 (FUN_00878C40, Moho::CDecalManager::PropsInView)
+     *
+     * What it does:
+     * Collects one camera-visible prop lane from the manager spatial-db
+     * registration and sorts the collected pointer range.
+     */
+    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
+
   public:
     /**
      * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)
@@ -250,7 +355,6 @@ namespace moho
     void Save(gpg::BinaryWriter& writer);
 
   public:
-    void* mVtable; // +0x00
     std::uint32_t mDecalCount; // +0x04
     std::uint32_t mNumDecals; // +0x08
     std::uint8_t mUnknown0C_0F[0x04]; // +0x0C
@@ -288,5 +392,6 @@ namespace moho
     offsetof(CDecalManager, mDidSomething) == 0x110,
     "CDecalManager::mDidSomething offset must be 0x110"
   );
+  static_assert(sizeof(CDecalManager) == 0x114, "CDecalManager size must be 0x114");
 #endif
 } // namespace moho

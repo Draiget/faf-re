@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include "boost/shared_ptr.h"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
@@ -175,4 +176,23 @@ namespace moho
   static_assert(offsetof(RangeRenderer, mDynamicVertexBuffer) == 0x44, "RangeRenderer::mDynamicVertexBuffer");
   static_assert(offsetof(RangeRenderer, mFrame) == 0x4C, "RangeRenderer::mFrame");
   static_assert(sizeof(RangeRenderer) == 0x94, "RangeRenderer size must be 0x94");
+
+  /**
+   * Address: 0x007EE5A0 (FUN_007EE5A0, sub_7EE5A0)
+   *
+   * What it does:
+   * Finds-or-inserts one range-profile map entry by extractor name, copies one
+   * category-filter payload, and stores packed build/selected/highlight colors
+   * plus inner/outer ring radius parameters.
+   */
+  void ApplyRangeProfileFilterToRenderer(
+    std::uint32_t highlightedColorPacked,
+    const CategoryWordRangeView* categoryFilter,
+    RangeRenderer* rangeRenderer,
+    std::string_view extractorName,
+    std::uint32_t buildColorPacked,
+    std::uint32_t selectedColorPacked,
+    const RangeRingRadiusParams& innerRingParams,
+    const RangeRingRadiusParams& outerRingParams
+  );
 } // namespace moho

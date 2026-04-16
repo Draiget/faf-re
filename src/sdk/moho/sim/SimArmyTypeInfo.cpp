@@ -66,6 +66,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x006FDAA0 (FUN_006FDAA0)
+   *
+   * What it does:
+   * Wrapper lane that forwards one base-registration dispatch to
+   * `AddBase_IArmy`.
+   */
+  void SimArmyTypeInfo::AddBase_IArmyAdapter(gpg::RType* const typeInfo)
+  {
+    AddBase_IArmy(typeInfo);
+  }
+
+  /**
    * Address: 0x00BD9BA0 (FUN_00BD9BA0, sub_BD9BA0)
    *
    * What it does:

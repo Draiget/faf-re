@@ -1,8 +1,19 @@
 #include "lua/LuaObjectTypeInfo.h"
 
+#include <typeinfo>
+
 #include "lua/LuaObject.h"
 
 using namespace LuaPlus;
+
+/**
+ * Address: 0x0090BB80 (FUN_0090BB80, LuaPlus::LuaObjectTypeInfo::LuaObjectTypeInfo)
+ */
+LuaObjectTypeInfo::LuaObjectTypeInfo()
+	: gpg::RType()
+{
+	gpg::PreRegisterRType(typeid(LuaObject), this);
+}
 
 /**
  * Address: 0x0090BCE0

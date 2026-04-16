@@ -3,9 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -31,16 +35,38 @@
 
 namespace moho
 {
-  /**
-   * Address: 0x0062B780 (FUN_0062B780, Moho::PrepareMove)
-   *
-   * What it does:
-   * Coerces one world-space move destination into a valid passable location
-   * for `unit`, optionally producing skirt extents for footprint alignment.
-   */
   [[nodiscard]]
   bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);
 } // namespace moho
+
+namespace
+{
+  gpg::SerSaveLoadHelperListRuntime gCUnitCaptureTaskSerializer{};
+
+  /**
+   * Address: 0x00604300 (FUN_00604300)
+   *
+   * What it does:
+   * Unlinks `CUnitCaptureTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCaptureTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCaptureTaskSerializer);
+  }
+
+  /**
+   * Address: 0x00604330 (FUN_00604330)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitCaptureTaskSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCaptureTaskSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCaptureTaskSerializer);
+  }
+} // namespace
 
 namespace
 {
@@ -175,6 +201,36 @@ namespace
     }
 
     return targetUnit->GetAttributes().mCapturable;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Entity>::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
+      moho::WeakPtr<moho::Entity>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSEconValueType()
+  {
+    gpg::RType* type = moho::SEconValue::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::SEconValue));
+      moho::SEconValue::sType = type;
+    }
+    return type;
   }
 } // namespace
 
@@ -501,6 +557,38 @@ namespace moho
   int CUnitCaptureTask::Execute()
   {
     return TaskTick();
+  }
+
+  /**
+   * Address: 0x00605BA0 (FUN_00605BA0, Moho::CUnitCaptureTask::MemberSerialize)
+   *
+   * What it does:
+   * Saves base command-task state plus capture-task command/target/economy
+   * ownership lanes and capture progress/rate values.
+   */
+  void CUnitCaptureTask::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    gpg::RRef commandRef{};
+    (void)gpg::RRef_CUnitCommand(&commandRef, mCommand);
+    gpg::WriteRawPointer(archive, commandRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedWeakPtrEntityType(), &mTargetEntity, ownerRef);
+    archive->WriteBool(mHasStarted);
+    archive->WriteInt(mCaptureProgress);
+    archive->WriteInt(mCaptureTime);
+
+    gpg::RRef economyRequestRef{};
+    (void)gpg::RRef_CEconRequest(&economyRequestRef, mConsumptionData);
+    gpg::WriteRawPointer(archive, economyRequestRef, gpg::TrackedPointerState::Owned, ownerRef);
+
+    archive->Write(CachedSEconValueType(), &mCaptureRate, ownerRef);
   }
 
   /**

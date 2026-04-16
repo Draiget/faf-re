@@ -82,6 +82,17 @@ namespace moho
   /**
    * Address: 0x0062FF80 (FUN_0062FF80, scalar deleting thunk)
    */
+  /**
+   * Address: 0x0062FFE0 (FUN_0062FFE0, CAimManipulatorTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Executes one non-deleting destruction lane for `CAimManipulatorTypeInfo`.
+   */
+  [[maybe_unused]] void DestroyCAimManipulatorTypeInfoBody(CAimManipulatorTypeInfo* const typeInfo) noexcept
+  {
+    typeInfo->~CAimManipulatorTypeInfo();
+  }
+
   CAimManipulatorTypeInfo::~CAimManipulatorTypeInfo() = default;
 
   /**
@@ -98,10 +109,13 @@ namespace moho
   void CAimManipulatorTypeInfo::Init()
   {
     size_ = 0x110;
-    newRefFunc_ = &CAimManipulatorTypeInfo::NewRef;
-    ctorRefFunc_ = &CAimManipulatorTypeInfo::CtrRef;
-    deleteFunc_ = &CAimManipulatorTypeInfo::Delete;
-    dtrFunc_ = &CAimManipulatorTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CAimManipulatorTypeInfo::NewRef,
+      &CAimManipulatorTypeInfo::CtrRef,
+      &CAimManipulatorTypeInfo::Delete,
+      &CAimManipulatorTypeInfo::Destruct
+    );
     AddBase_IAniManipulator(this);
     gpg::RType::Init();
     Finish();

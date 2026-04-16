@@ -111,10 +111,13 @@ namespace moho
   void CUnitRefuelTypeInfo::Init()
   {
     size_ = sizeof(CUnitRefuel);
-    newRefFunc_ = &CUnitRefuelTypeInfo::NewRef;
-    ctorRefFunc_ = &CUnitRefuelTypeInfo::CtrRef;
-    deleteFunc_ = &CUnitRefuelTypeInfo::Delete;
-    dtrFunc_ = &CUnitRefuelTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CUnitRefuelTypeInfo::NewRef,
+      &CUnitRefuelTypeInfo::CtrRef,
+      &CUnitRefuelTypeInfo::Delete,
+      &CUnitRefuelTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     Finish();

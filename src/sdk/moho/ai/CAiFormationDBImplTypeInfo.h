@@ -36,6 +36,15 @@ namespace moho
 
   private:
     /**
+     * Address: 0x0059CB50 (FUN_0059CB50)
+     *
+     * What it does:
+     * Wires `newRef/ctorRef/delete/dtr` callback lanes for
+     * `CAiFormationDBImpl` reflection ownership.
+     */
+    static gpg::RType* InitializeAllocationCallbacks(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x0059D390 (FUN_0059D390, Moho::CAiFormationDBImplTypeInfo::NewRef)
      *
      * What it does:

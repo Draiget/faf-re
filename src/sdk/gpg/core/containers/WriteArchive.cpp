@@ -1,5 +1,6 @@
 #include "WriteArchive.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <new>
@@ -34,6 +35,189 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
+using TrackedPointerMap = std::map<const void*, WriteArchive::TrackedPointerRecord>;
+
+/**
+ * Address: 0x0094FB40 (FUN_0094FB40)
+ *
+ * What it does:
+ * Advances one tracked-pointer map iterator to the next in-order tree node.
+ */
+[[maybe_unused]] TrackedPointerMap::const_iterator* AdvanceTrackedPointerMapIterator(
+    TrackedPointerMap::const_iterator* const cursor
+) noexcept
+{
+    ++(*cursor);
+    return cursor;
+}
+
+class BinaryWriteArchive;
+
+struct BinaryWriteArchiveFileRuntimeView
+{
+    std::uint8_t reserved00[0x28];
+    std::FILE* stream;
+};
+
+static_assert(
+    offsetof(BinaryWriteArchiveFileRuntimeView, stream) == 0x28,
+    "BinaryWriteArchiveFileRuntimeView::stream offset must be 0x28"
+);
+
+void WriteBinaryCompatibilityLane(
+    BinaryWriteArchive* const archive,
+    const void* const buffer,
+    const std::size_t elementSize
+)
+{
+    const auto* const view = reinterpret_cast<const BinaryWriteArchiveFileRuntimeView*>(archive);
+    if (std::fwrite(buffer, elementSize, 1u, view->stream) != 1u) {
+        ThrowSerializationError("nowrite");
+    }
+}
+
+/**
+ * Address: 0x00905200 (FUN_00905200)
+ *
+ * What it does:
+ * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneA(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 1u);
+}
+
+/**
+ * Address: 0x00905240 (FUN_00905240)
+ *
+ * What it does:
+ * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneB(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 1u);
+}
+
+/**
+ * Address: 0x00905280 (FUN_00905280)
+ *
+ * What it does:
+ * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneC(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 1u);
+}
+
+/**
+ * Address: 0x009052C0 (FUN_009052C0)
+ *
+ * What it does:
+ * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneD(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 2u);
+}
+
+/**
+ * Address: 0x00905300 (FUN_00905300)
+ *
+ * What it does:
+ * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneE(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 2u);
+}
+
+/**
+ * Address: 0x00905340 (FUN_00905340)
+ *
+ * What it does:
+ * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneF(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 4u);
+}
+
+/**
+ * Address: 0x00905380 (FUN_00905380)
+ *
+ * What it does:
+ * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneG(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 4u);
+}
+
+/**
+ * Address: 0x009053C0 (FUN_009053C0)
+ *
+ * What it does:
+ * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneH(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 4u);
+}
+
+/**
+ * Address: 0x00905400 (FUN_00905400)
+ *
+ * What it does:
+ * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneI(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 4u);
+}
+
+/**
+ * Address: 0x00905440 (FUN_00905440)
+ *
+ * What it does:
+ * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneJ(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 8u);
+}
+
+/**
+ * Address: 0x00905480 (FUN_00905480)
+ *
+ * What it does:
+ * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneK(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 8u);
+}
+
+/**
+ * Address: 0x009054C0 (FUN_009054C0)
+ *
+ * What it does:
+ * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneL(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 4u);
+}
+
+/**
+ * Address: 0x00905500 (FUN_00905500)
+ *
+ * What it does:
+ * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+ */
+[[maybe_unused]] void WriteBinaryCompatibilityLaneM(BinaryWriteArchive* const archive, const void* const buffer)
+{
+    WriteBinaryCompatibilityLane(archive, buffer, 1u);
+}
 
 class TextWriteArchive final : public gpg::WriteArchive
 {
@@ -262,6 +446,15 @@ public:
     }
 
     /**
+     * Address: 0x009046C0 (FUN_009046C0)
+     *
+     * What it does:
+     * Runs non-deleting teardown for one binary-write archive lane, releasing
+     * file shared-owner state before base `WriteArchive` destruction.
+     */
+    ~BinaryWriteArchive() override = default;
+
+    /**
      * Address: 0x00904A60 (FUN_00904A60, BinaryWriteArchive::WriteBytes)
      *
      * What it does:
@@ -469,6 +662,25 @@ private:
 private:
     boost::shared_ptr<std::FILE> mFile;
 };
+
+/**
+ * Address: 0x00904940 (FUN_00904940)
+ *
+ * What it does:
+ * Runs one deleting-destructor thunk for `BinaryWriteArchive`, forwarding
+ * through non-deleting teardown and optional storage release.
+ */
+[[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
+    BinaryWriteArchive* const archive,
+    const unsigned char deleteFlag
+)
+{
+    archive->~BinaryWriteArchive();
+    if ((deleteFlag & 1u) != 0u) {
+        ::operator delete(static_cast<void*>(archive));
+    }
+    return archive;
+}
 } // namespace
 
 /**
@@ -678,7 +890,7 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
         );
     }
 
-    TrackedPointerRecord record{};
+    WriteArchive::TrackedPointerRecord record{};
     record.type = objectRef.mType;
     record.index = static_cast<int>(mObjRefs.size());
     record.ownership = TrackedPointerState::Owned;
@@ -696,9 +908,8 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
     if (!skipOwnershipValidation) {
-        for (std::map<const void*, TrackedPointerRecord>::const_iterator it = mObjRefs.begin(); it != mObjRefs.end();
-             ++it) {
-            const TrackedPointerRecord& ptr = it->second;
+        for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end();) {
+            const WriteArchive::TrackedPointerRecord& ptr = it->second;
             if (ptr.ownership == TrackedPointerState::Unowned) {
                 ThrowSerializationError(STR_Printf(
                     "Error while creating archive: nobody claimed ownership of %s 0x%08x",
@@ -706,6 +917,8 @@ void WriteArchive::EndSection(const bool skipOwnershipValidation)
                     reinterpret_cast<unsigned int>(it->first)
                 ));
             }
+
+            (void)AdvanceTrackedPointerMapIterator(&it);
         }
     }
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <emmintrin.h>
 #include <mmintrin.h>
 #include <xmmintrin.h>
 
@@ -132,6 +133,9 @@ namespace
     int MPV_CheckDelim(const std::uint8_t* bitstreamCursor);
     std::uint8_t* MPV_BsearchDelim(std::uint8_t* bitstreamCursor, unsigned int scanLengthBytes, int delimiterMask);
     std::uint8_t* MPV_SearchDelim(const std::uint8_t* bitstreamCursor, int scanLengthBytes, int delimiterMask);
+    std::uint8_t* MPV_CopyAndSearchDelim(
+      std::uint8_t* destinationCursor, const std::uint8_t* sourceCursor, int scanLengthBytes, int delimiterMask
+    );
     int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
     int UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
     std::int32_t* UTY_MemcpyDword(void* destination, const void* source, unsigned int dwordCount);
@@ -244,7 +248,7 @@ namespace
      * setup to `mpvcmc_InitMcOiTa`.
      */
     int MPVCMC_InitObj(void* handleAddress);
-    int sub_AF7E40(void* dctPlaneStateAddress);
+    int mpvlib_ResetDctPlaneState(void* dctPlaneStateAddress);
     std::int32_t* MPV_SetUsrSj(int handleAddress, int streamIndex, int streamObject, int streamCallback, int streamContext);
     std::int32_t* MPV_SetPicUsrBuf(int handleAddress, int userBufferAddress, int userContextAddress);
     std::uint8_t mpvhdec_ReadKernelIntraIdcPrec3(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
@@ -427,6 +431,7 @@ namespace
     int secondaryScratchAddress;   // +0x30
     std::uint8_t reserved_34[0x48 - 0x34];
     int coefficientScratchAddress; // +0x48
+    std::uint8_t reserved_4C[0x54 - 0x4C];
   };
 
   struct MPVUserSjLane
@@ -446,7 +451,7 @@ namespace
 
   static_assert(sizeof(MPVPictureDataRange) == 0x08, "MPVPictureDataRange size must be 0x08");
 
-  static_assert(sizeof(MPVDctPlaneStateView) == 0x4C, "MPVDctPlaneStateView size must be 0x4C");
+  static_assert(sizeof(MPVDctPlaneStateView) == 0x54, "MPVDctPlaneStateView size must be 0x54");
   static_assert(offsetof(MPVDctPlaneStateView, primaryDecodeCount) == 0x18, "MPVDctPlaneStateView::primaryDecodeCount offset must be 0x18");
   static_assert(offsetof(MPVDctPlaneStateView, secondaryDecodeCount) == 0x1C, "MPVDctPlaneStateView::secondaryDecodeCount offset must be 0x1C");
   static_assert(offsetof(MPVDctPlaneStateView, primaryScratchAddress) == 0x2C, "MPVDctPlaneStateView::primaryScratchAddress offset must be 0x2C");
@@ -598,7 +603,6 @@ namespace
     int clipBaseAddress;           // +0x40
     std::uint8_t reserved_044[0x78 - 0x44];
     MPVDctPlaneStateView dctPlaneState; // +0x78
-    std::uint8_t reserved_0C4[0xCC - 0xC4];
     int mcOiRuntimeHeaderWords[4]; // +0xCC
     std::uint8_t reserved_0DC[0x110 - 0xDC];
     int clipBaseAddressMirror;     // +0x110
@@ -1078,6 +1082,13 @@ extern "C" int mpvlib_DefaultConditionNoOp();
 extern "C" int mpvlib_InitDctPa(int handleAddress);
 extern "C" int mpvlib_SetCondAll(int conditionIndex, int callbackAddress);
 
+// These DCT/M2V/MPV symbols are defined inside the moho/audio/SofdecRuntime.cpp
+// translation-unit-assembly with C linkage (the SofdecRuntime.h declarations
+// further up live inside an `extern "C" {}` block). MPVDecoder.cpp is a
+// separate TU, so without `extern "C"` here the compiler would mangle these
+// as C++ free functions and the link would fall back to our SofdecExternalStubs
+// instead of the real recovered bodies.
+extern "C" {
 const char* DCT_GetVerStr();
 char* DCT_AcInit();
 std::int32_t DCT_AcIdctDouble(const double* inputCoefficients, double* outputCoefficients);
@@ -1102,6 +1113,7 @@ std::int32_t M2V_GetVbvBufSiz(
 std::int32_t M2V_GetLinkFlg(std::int32_t decoderHandle, std::int32_t* outLinkFlag, std::int32_t* outLinkState);
 std::int32_t mpvcdec_InitDct();
 std::int32_t M2VAPRD_Init();
+}
 
 namespace
 {
@@ -1479,6 +1491,39 @@ extern "C" int MPVVLC_IsVlcSizErr()
 }
 
 /**
+ * Address: 0x00AE78E0 (FUN_00AE78E0, _MPV_IsConformable)
+ *
+ * What it does:
+ * Locates the sequence-header delimiter, then checks follow-up delimiter class
+ * to decide whether this chunk is conformable for the MPV decode path.
+ */
+extern "C" int MPV_IsConformable(const std::uint8_t* const bitstreamCursor, const int scanLengthBytes)
+{
+  std::uint8_t* const sequenceHeader = MPV_SearchDelim(bitstreamCursor, scanLengthBytes, 0x40);
+  if (sequenceHeader == nullptr) {
+    return 0;
+  }
+
+  if (MPVM2V_IsSetup() != 0) {
+    return 1;
+  }
+
+  const std::uint8_t* const probeStart = sequenceHeader + 4;
+  const int remainingBytes = scanLengthBytes - static_cast<int>(probeStart - bitstreamCursor);
+  if (remainingBytes <= 0) {
+    return 0;
+  }
+
+  const std::uint8_t* const nextDelimiter = MPV_SearchDelim(probeStart, remainingBytes, -1);
+  if (nextDelimiter == nullptr) {
+    return 0;
+  }
+
+  const int delimiterType = MPV_CheckDelim(nextDelimiter);
+  return (static_cast<unsigned int>((~delimiterType) & 0x10) >> 4);
+}
+
+/**
  * Address: 0x00AE79E0 (FUN_00AE79E0, _mpvlib_ChkFatal)
  *
  * What it does:
@@ -1837,6 +1882,22 @@ extern "C" int MPV_Create()
 }
 
 /**
+ * Address: 0x00AF7E40 (FUN_00AF7E40)
+ *
+ * What it does:
+ * Clears one 0x54-byte DCT plane runtime lane and returns zero.
+ */
+extern "C" int mpvlib_ResetDctPlaneState(void* const dctPlaneStateAddress)
+{
+  if (dctPlaneStateAddress == nullptr) {
+    return 0;
+  }
+
+  std::memset(dctPlaneStateAddress, 0, 0x54u);
+  return 0;
+}
+
+/**
  * Address: 0x00AE7F10 (FUN_00AE7F10, _mpvlib_InitDctPa)
  *
  * What it does:
@@ -1846,7 +1907,7 @@ extern "C" int MPV_Create()
 extern "C" int mpvlib_InitDctPa(const int handleAddress)
 {
   MPVHandleInitView* const handle = AsHandleView(handleAddress);
-  sub_AF7E40(&handle->dctPlaneState);
+  mpvlib_ResetDctPlaneState(&handle->dctPlaneState);
   handle->dctPlaneState.primaryScratchAddress = handleAddress + 0x6A0;
   handle->dctPlaneState.secondaryScratchAddress = handleAddress + 0x36C;
   handle->dctPlaneState.coefficientScratchAddress = handleAddress + 0xD20;
@@ -2341,6 +2402,31 @@ extern "C" int MPVCDEC_Init()
 extern "C" int MPVUMC_Init()
 {
   return M2VAPRD_Init();
+}
+
+/**
+ * Address: 0x00AF7CF0 (FUN_00AF7CF0, _UTY_MemcpyDword)
+ *
+ * What it does:
+ * Copies `dwordCount` 32-bit lanes from `source` to `destination` and returns
+ * the destination pointer.
+ */
+extern "C" std::int32_t* UTY_MemcpyDword(
+  void* const destination,
+  const void* const source,
+  const unsigned int dwordCount
+)
+{
+  auto* const destinationWords = static_cast<std::uint32_t*>(destination);
+  const auto* const sourceWords = static_cast<const std::uint32_t*>(source);
+  if (destinationWords == nullptr || sourceWords == nullptr || dwordCount == 0u) {
+    return reinterpret_cast<std::int32_t*>(destinationWords);
+  }
+
+  for (unsigned int wordIndex = 0; wordIndex < dwordCount; ++wordIndex) {
+    destinationWords[wordIndex] = sourceWords[wordIndex];
+  }
+  return reinterpret_cast<std::int32_t*>(destinationWords);
 }
 
 /**
@@ -2985,6 +3071,64 @@ extern "C" std::uint8_t* MPV_SearchDelim(const std::uint8_t* const bitstreamCurs
       return nullptr;
     }
   }
+}
+
+/**
+ * Address: 0x00AEA0D0 (FUN_00AEA0D0, _MPV_CopyAndSearchDelim)
+ *
+ * What it does:
+ * Copies one source byte range into destination storage while scanning for an
+ * MPEG delimiter, then returns the advanced source cursor (either at match or
+ * range end).
+ */
+extern "C" std::uint8_t* MPV_CopyAndSearchDelim(
+  std::uint8_t* const destinationCursor,
+  const std::uint8_t* const sourceCursor,
+  const int scanLengthBytes,
+  const int delimiterMask
+)
+{
+  std::uint8_t* write = destinationCursor;
+  const std::uint8_t* read = sourceCursor;
+  int state = 0;
+
+  if (scanLengthBytes <= 0) {
+    return const_cast<std::uint8_t*>(read);
+  }
+
+  const std::uint8_t* const scanEnd = sourceCursor + scanLengthBytes;
+  while (read < scanEnd) {
+    const std::uint8_t currentByte = *read++;
+    *write++ = currentByte;
+
+    switch (state) {
+      case 0:
+        if (currentByte == 0) {
+          state = 1;
+        }
+        break;
+      case 1:
+        state = (currentByte == 0) ? 2 : 0;
+        break;
+      case 2:
+        if (currentByte == 1) {
+          state = 3;
+        } else if (currentByte != 0) {
+          state = 0;
+        }
+        break;
+      case 3:
+        if ((MPV_CheckDelim(read - 4) & delimiterMask) != 0) {
+          return const_cast<std::uint8_t*>(read);
+        }
+        state = 0;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return const_cast<std::uint8_t*>(read);
 }
 
 /**
@@ -4703,15 +4847,17 @@ DCT_FsriTrans(const float* const sourceCoefficients, std::int32_t* const destina
     workspace += 8;
   }
 
-  auto packToWordLane = [] (const __m128& values) -> __m64 {
-    return _m_packssdw(
-      _mm_cvt_ps2pi(values),
-      _mm_cvt_ps2pi(_mm_shuffle_ps(values, values, _MM_SHUFFLE(3, 2, 3, 2)))
-    );
+  auto packToWordLane = [] (const __m128& values) -> std::uint64_t {
+    const __m128i asI32 = _mm_cvtps_epi32(values);
+    const __m128i asI16 = _mm_packs_epi32(asI32, asI32);
+
+    std::uint64_t packedWords = 0u;
+    _mm_storel_epi64(reinterpret_cast<__m128i*>(&packedWords), asI16);
+    return packedWords;
   };
 
   auto* columnWorkspace = reinterpret_cast<__m128*>(AddressToMutablePointer(scaleTableBaseAddress));
-  auto* packedOutput = reinterpret_cast<__m64*>(destinationPackedWords);
+  auto* packedOutput = reinterpret_cast<std::uint64_t*>(destinationPackedWords);
   for (int pass = 0; pass < 2; ++pass) {
     const __m128 row0 = columnWorkspace[0];
     const __m128 row2 = columnWorkspace[4];

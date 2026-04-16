@@ -1219,6 +1219,37 @@
   constexpr std::int32_t kMwsfdBufFmtDefault = 0;
   constexpr std::int32_t kMwsfdBufFmtAinfSjOverride = 0x101;
 
+  std::int32_t gMwsfcreExternalFramePoolCount = 0;
+  std::int32_t gMwsfcreExternalFrameBytes = 0;
+  std::int32_t gMwsfcreExternalFramePoolAddresses[32]{};
+
+  /**
+   * Address: 0x00AC7D40 (FUN_00AC7D40)
+   *
+   * What it does:
+   * Writes externally supplied MWSFCRE frame-pool configuration lanes and
+   * copies `framePoolCount` address lanes into process-global storage.
+   */
+  std::int32_t mwsfcre_SetExternalFramePool(
+    const std::int32_t framePoolCount,
+    const std::int32_t frameBytes,
+    const std::int32_t* const framePoolAddresses
+  )
+  {
+    gMwsfcreExternalFrameBytes = frameBytes;
+    gMwsfcreExternalFramePoolCount = framePoolCount;
+
+    std::int32_t copied = 0;
+    if (framePoolCount <= 0 || framePoolAddresses == nullptr) {
+      return copied;
+    }
+
+    for (; copied < framePoolCount; ++copied) {
+      gMwsfcreExternalFramePoolAddresses[copied] = framePoolAddresses[copied];
+    }
+    return copied;
+  }
+
   /**
    * Address: 0x00AC6F20 (FUN_00AC6F20, _MWSFTAG_IsUseAinfSj)
    *
@@ -2189,6 +2220,160 @@
     }
 
     return SFD_GetCond(nullptr, conditionId, outConditionValue);
+  }
+
+  /**
+   * Address: 0x00ACBF60 (FUN_00ACBF60)
+   *
+   * What it does:
+   * Writes condition lane `36` on one playback handle when non-null.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetCondition36(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t conditionValue
+  )
+  {
+    if (ply != nullptr) {
+      return SFD_SetCond(reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle), 36, conditionValue);
+    }
+    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
+  }
+
+  /**
+   * Address: 0x00ACBF90 (FUN_00ACBF90)
+   *
+   * What it does:
+   * Writes condition lane `37` on one playback handle when non-null.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetCondition37(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t conditionValue
+  )
+  {
+    if (ply != nullptr) {
+      return SFD_SetCond(reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle), 37, conditionValue);
+    }
+    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
+  }
+
+  /**
+   * Address: 0x00ACC4A0 (FUN_00ACC4A0)
+   *
+   * What it does:
+   * Writes condition lanes `93` then `94` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions93And94(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value93,
+    const std::int32_t value94
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 93, value93);
+    return SFD_SetCond(workctrlSubobj, 94, value94);
+  }
+
+  /**
+   * Address: 0x00ACC4D0 (FUN_00ACC4D0)
+   *
+   * What it does:
+   * Writes condition lanes `78` then `77` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions78And77(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value77,
+    const std::int32_t value78
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 78, value78);
+    return SFD_SetCond(workctrlSubobj, 77, value77);
+  }
+
+  /**
+   * Address: 0x00ACC500 (FUN_00ACC500)
+   *
+   * What it does:
+   * Writes condition lanes `86` then `85` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions86And85(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value85,
+    const std::int32_t value86
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 86, value86);
+    return SFD_SetCond(workctrlSubobj, 85, value85);
+  }
+
+  /**
+   * Address: 0x00ACC530 (FUN_00ACC530)
+   *
+   * What it does:
+   * Writes condition lanes `88` then `87` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions88And87(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value87,
+    const std::int32_t value88
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 88, value88);
+    return SFD_SetCond(workctrlSubobj, 87, value87);
+  }
+
+  /**
+   * Address: 0x00ACC560 (FUN_00ACC560)
+   *
+   * What it does:
+   * Writes condition lanes `90` then `89` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions90And89(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value89,
+    const std::int32_t value90
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 90, value90);
+    return SFD_SetCond(workctrlSubobj, 89, value89);
+  }
+
+  /**
+   * Address: 0x00ACC590 (FUN_00ACC590)
+   *
+   * What it does:
+   * Writes condition lanes `92` then `91` on one playback handle.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetConditions92And91(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t value91,
+    const std::int32_t value92
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 92, value92);
+    return SFD_SetCond(workctrlSubobj, 91, value91);
+  }
+
+  /**
+   * Address: 0x00ACC5C0 (FUN_00ACC5C0)
+   *
+   * What it does:
+   * Writes condition lane `95` twice on one playback handle, returning the
+   * second write result.
+   */
+  [[maybe_unused]] std::int32_t mwPlySetCondition95Pair(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t firstValue,
+    const std::int32_t secondValue
+  )
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(workctrlSubobj, 95, secondValue);
+    return SFD_SetCond(workctrlSubobj, 95, firstValue);
   }
 
   /**
@@ -6307,6 +6492,18 @@
    */
   [[maybe_unused]] void ADXRNA_NoopHook1()
   {
+  }
+
+  /**
+   * Address: 0x00B17DB0 (FUN_00B17DB0)
+   *
+   * What it does:
+   * Thunk lane that forwards one global ADXRNA pause-all state update into
+   * `FUN_00B15530`.
+   */
+  [[maybe_unused]] std::int32_t ADXRNA_SetPauseAllStateAdapter(const std::int32_t pauseAllEnabled)
+  {
+    return adxrna_SetPauseAllState(pauseAllEnabled);
   }
 
   /**
@@ -15952,6 +16149,78 @@
       return 2;
     }
     return 3;
+  }
+
+  struct MwsfdFrameInfoToSfdInputView
+  {
+    std::int32_t lane00;        // +0x00
+    std::int32_t lane04;        // +0x04
+    std::int32_t bufferFormat;  // +0x08
+    std::int32_t lane0C;        // +0x0C
+    std::int32_t lane10;        // +0x10
+    std::int32_t lane14;        // +0x14
+    std::int32_t lane18;        // +0x18
+    std::int32_t pictureType;   // +0x1C
+    std::int32_t lane20;        // +0x20
+    std::int32_t lane24;        // +0x24
+    std::int32_t lane28;        // +0x28
+    std::int32_t lane2C;        // +0x2C
+    std::int32_t lane30;        // +0x30
+    std::int32_t lane34;        // +0x34
+    std::int32_t lane38;        // +0x38
+    std::int32_t lane3C;        // +0x3C
+    std::int32_t lane40;        // +0x40
+  };
+
+  struct MwsfdFrameInfoToSfdOutputView
+  {
+    std::int32_t lane00;  // +0x00
+    std::int32_t lane04;  // +0x04
+    std::int32_t lane08;  // +0x08
+    std::int32_t lane0C;  // +0x0C
+    std::int32_t lane10;  // +0x10
+    std::int32_t lane14;  // +0x14
+    std::int32_t lane18;  // +0x18
+    std::int32_t lane1C;  // +0x1C
+    std::int32_t lane20;  // +0x20
+    std::int32_t lane24;  // +0x24
+    std::int32_t lane28;  // +0x28
+    std::int32_t lane2C;  // +0x2C
+  };
+
+  static_assert(sizeof(MwsfdFrameInfoToSfdInputView) == 0x44, "MwsfdFrameInfoToSfdInputView size must be 0x44");
+  static_assert(offsetof(MwsfdFrameInfoToSfdInputView, pictureType) == 0x1C, "MwsfdFrameInfoToSfdInputView::pictureType offset must be 0x1C");
+  static_assert(sizeof(MwsfdFrameInfoToSfdOutputView) == 0x30, "MwsfdFrameInfoToSfdOutputView size must be 0x30");
+
+  /**
+   * Address: 0x00ACA5E0 (FUN_00ACA5E0, _mwl_convFrmInfToSFD)
+   *
+   * What it does:
+   * Converts one MWSFD frame-info lane block into the SFD frame-info lane
+   * order, remapping buffer-format and picture-type enums through the
+   * `mwl_conv*ToSFD` helpers.
+   */
+  std::int32_t mwl_convFrmInfToSFD(
+    const MwsfdFrameInfoToSfdInputView* const source,
+    MwsfdFrameInfoToSfdOutputView* const destination
+  )
+  {
+    const std::int32_t sfdBufferFormat = mwl_convBufFmtToSFD(source->bufferFormat);
+    const std::int32_t sfdPictureType = mwl_convPtypeToSFD(source->pictureType);
+
+    destination->lane20 = source->lane00;
+    destination->lane04 = source->lane10;
+    destination->lane08 = source->lane14;
+    destination->lane14 = source->lane28;
+    destination->lane0C = source->lane18;
+    destination->lane10 = sfdPictureType;
+    destination->lane18 = source->lane2C;
+    destination->lane2C = source->lane30;
+    destination->lane00 = source->lane0C;
+    destination->lane1C = sfdBufferFormat;
+    destination->lane24 = source->lane3C;
+    destination->lane28 = source->lane40;
+    return source->lane3C;
   }
 
   /**

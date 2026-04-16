@@ -22,6 +22,15 @@ namespace gpg::gal
         AdapterModeD3D9(std::uint32_t width, std::uint32_t height, std::uint32_t refreshRate);
 
         /**
+         * Address: 0x008E8E10 (FUN_008E8E10)
+         *
+         * What it does:
+         * Copy-constructs one adapter-mode lane by cloning width/height/
+         * refresh-rate scalar values.
+         */
+        AdapterModeD3D9(const AdapterModeD3D9& other);
+
+        /**
          * Address: 0x008E8E40 (FUN_008E8E40)
          *
          * What it does:

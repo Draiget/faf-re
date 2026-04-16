@@ -97,7 +97,6 @@ namespace
     IdPoolSerializerRegistration()
     {
       moho::register_IdPoolSerializer();
-      gIdPoolSerializer.RegisterSerializeFunctions();
     }
   };
 

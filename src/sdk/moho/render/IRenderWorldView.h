@@ -18,6 +18,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007F6280 (FUN_007F6280, ??0IRenderWorldView@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes one world-view render interface base object.
+     */
+    IRenderWorldView();
+
+    /**
      * Address: 0x00A82547 (_purecall)
      * Slot: 0
      *

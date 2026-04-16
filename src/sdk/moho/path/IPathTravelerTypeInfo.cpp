@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -244,6 +245,33 @@ void gpg::RDListType_IPathTraveler::SerSave(
   gpg::RRef nullTravelerRef{};
   (void)gpg::RRef_IPathTraveler(&nullTravelerRef, nullptr);
   gpg::WriteRawPointer(archive, nullTravelerRef, gpg::TrackedPointerState::Unowned, owner);
+}
+
+/**
+ * Address: 0x00769190 (FUN_00769190, preregister_RDListType_IPathTraveler)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `gpg::DList<moho::IPathTraveler,void>`.
+ */
+[[nodiscard]] gpg::RType* preregister_RDListType_IPathTraveler()
+{
+  static gpg::RDListType_IPathTraveler typeInfo;
+  gpg::PreRegisterRType(typeid(gpg::DList<moho::IPathTraveler, void>), &typeInfo);
+  return &typeInfo;
+}
+
+/**
+ * Address: 0x0076D560 (FUN_0076D560, preregister_IPathTravelerTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `moho::IPathTraveler`.
+ */
+[[nodiscard]] gpg::RType* preregister_IPathTravelerTypeInfo()
+{
+  static moho::IPathTravelerTypeInfo typeInfo;
+  gpg::PreRegisterRType(typeid(moho::IPathTraveler), &typeInfo);
+  return &typeInfo;
 }
 
 namespace moho

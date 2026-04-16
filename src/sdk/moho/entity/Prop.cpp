@@ -125,6 +125,40 @@ namespace
     }
   }
 
+  struct OccupancyFootprintRuntimeView
+  {
+    std::uint8_t widthCells = 0;         // +0x00
+    std::uint8_t heightCells = 0;        // +0x01
+    std::uint8_t occupancyCapsBits = 0;  // +0x02
+  };
+  static_assert(sizeof(OccupancyFootprintRuntimeView) == 0x03, "OccupancyFootprintRuntimeView size must be 0x03");
+
+  /**
+   * Address: 0x00721AF0 (FUN_00721AF0)
+   *
+   * What it does:
+   * Converts one footprint lane (`width/height/caps`) and top-left occupancy
+   * cell origin into a `Rect2i`, then forwards to `COGrid::ExecuteOccupy`.
+   */
+  [[maybe_unused]] void LoadOccupancyFromFootprintCellRuntime(
+    const OccupancyFootprintRuntimeView& footprint,
+    const std::int16_t originX,
+    const std::int16_t originZ,
+    moho::COGrid* const grid
+  )
+  {
+    if (grid == nullptr) {
+      return;
+    }
+
+    gpg::Rect2i rect{};
+    rect.x0 = static_cast<int>(originX);
+    rect.z0 = static_cast<int>(originZ);
+    rect.x1 = rect.x0 + static_cast<int>(footprint.widthCells);
+    rect.z1 = rect.z0 + static_cast<int>(footprint.heightCells);
+    grid->ExecuteOccupy(static_cast<moho::EOccupancyCaps>(footprint.occupancyCapsBits), rect);
+  }
+
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     static moho::CScrLuaInitFormSet sSet("sim");
@@ -347,13 +381,20 @@ namespace moho
       mTracksReclaimArea = true;
 
       if (sim && sim->mOGrid) {
-        gpg::Rect2i rect{};
-        rect.x0 = static_cast<int>(transform.pos_.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f);
-        rect.z0 = static_cast<int>(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f);
-        rect.x1 = rect.x0 + static_cast<int>(blueprint->mFootprint.mSizeX);
-        rect.z1 = rect.z0 + static_cast<int>(blueprint->mFootprint.mSizeZ);
+        const int originX = static_cast<int>(transform.pos_.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f);
+        const int originZ = static_cast<int>(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f);
 
-        LoadOccupancy(static_cast<std::uint8_t>(blueprint->mFootprint.mOccupancyCaps), sim->mOGrid, rect);
+        const OccupancyFootprintRuntimeView footprint{
+          static_cast<std::uint8_t>(blueprint->mFootprint.mSizeX),
+          static_cast<std::uint8_t>(blueprint->mFootprint.mSizeZ),
+          static_cast<std::uint8_t>(blueprint->mFootprint.mOccupancyCaps)
+        };
+        LoadOccupancyFromFootprintCellRuntime(
+          footprint,
+          static_cast<std::int16_t>(originX),
+          static_cast<std::int16_t>(originZ),
+          sim->mOGrid
+        );
       }
     }
   }

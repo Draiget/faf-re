@@ -46,6 +46,37 @@ namespace
     return EnsureTypeInfo(gCLobbyTypeInfoStorage);
   }
 
+  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
+  {
+    if (!moho::CScriptObject::sType) {
+      moho::CScriptObject::sType = gpg::LookupRType(typeid(moho::CScriptObject));
+    }
+    return moho::CScriptObject::sType;
+  }
+
+  /**
+   * Address: 0x007CB630 (FUN_007CB630)
+   *
+   * What it does:
+   * Registers `CScriptObject` as one reflected `CLobby` base lane at
+   * offset `+0x00`.
+   */
+  void AddCScriptObjectBaseToCLobbyType(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedCScriptObjectType();
+    if (!baseType) {
+      return;
+    }
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
   /**
    * Address: 0x00C039C0 (FUN_00C039C0, Moho::CLobbyTypeInfo::~CLobbyTypeInfo)
    *
@@ -117,7 +148,7 @@ namespace moho
   void CLobbyTypeInfo::Init()
   {
     size_ = sizeof(CLobby);
-    AddBase<CLobby, CScriptObject>();
+    AddCScriptObjectBaseToCLobbyType(this);
     gpg::RType::Init();
     Finish();
   }

@@ -16,6 +16,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0064ED20 (FUN_0064ED20)
+     *
+     * What it does:
+     * Initializes the radar-overlay vtable lane and inherited intrusive
+     * debug-overlay links.
+     */
+    RDebugRadar();
+
+    /**
      * Address: 0x0064D880 (FUN_0064D880, Moho::RDebugRadar::GetClass)
      * Slot: 0
      *

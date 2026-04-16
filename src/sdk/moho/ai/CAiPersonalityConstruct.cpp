@@ -98,6 +98,30 @@ namespace
     return selfNode;
   }
 
+  /**
+   * Address: 0x005B6980 (FUN_005B6980)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the global
+   * `CAiPersonalityConstruct` helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiPersonalityConstructStartupThunkA()
+  {
+    return cleanup_CAiPersonalityConstruct();
+  }
+
+  /**
+   * Address: 0x005B69B0 (FUN_005B69B0)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same
+   * `CAiPersonalityConstruct` helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiPersonalityConstructStartupThunkB()
+  {
+    return cleanup_CAiPersonalityConstruct();
+  }
+
   void CleanupCAiPersonalityConstructAtexit()
   {
     (void)cleanup_CAiPersonalityConstruct();

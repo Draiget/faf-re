@@ -94,7 +94,14 @@ namespace
     return out;
   }
 
-  void AddCFormationInstanceBase(gpg::RType* const typeInfo)
+  /**
+   * Address: 0x0059DB00 (FUN_0059DB00)
+   *
+   * What it does:
+   * Registers `CFormationInstance` as one reflected base lane for
+   * `CAiFormationInstance` at offset `+0x00`.
+   */
+  void AddCFormationInstanceBaseToCAiFormationInstanceType(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCFormationInstanceType();
     if (!baseType) {
@@ -159,14 +166,27 @@ const char* CAiFormationInstanceTypeInfo::GetName() const
 void CAiFormationInstanceTypeInfo::Init()
 {
   size_ = sizeof(CAiFormationInstance);
-  newRefFunc_ = &CAiFormationInstanceTypeInfo::NewRef;
-  ctorRefFunc_ = &CAiFormationInstanceTypeInfo::CtrRef;
-  deleteFunc_ = &CAiFormationInstanceTypeInfo::Delete;
-  dtrFunc_ = &CAiFormationInstanceTypeInfo::Destruct;
+  (void)InitializeAllocationCallbacks(this);
 
   gpg::RType::Init();
-  AddCFormationInstanceBase(this);
+  AddCFormationInstanceBaseToCAiFormationInstanceType(this);
   Finish();
+}
+
+/**
+ * Address: 0x0059C7D0 (FUN_0059C7D0)
+ *
+ * What it does:
+ * Wires `newRef/ctorRef/delete/dtr` callback lanes for
+ * `CAiFormationInstance` reflection ownership.
+ */
+gpg::RType* CAiFormationInstanceTypeInfo::InitializeAllocationCallbacks(gpg::RType* const typeInfo)
+{
+  typeInfo->newRefFunc_ = &CAiFormationInstanceTypeInfo::NewRef;
+  typeInfo->ctorRefFunc_ = &CAiFormationInstanceTypeInfo::CtrRef;
+  typeInfo->deleteFunc_ = &CAiFormationInstanceTypeInfo::Delete;
+  typeInfo->dtrFunc_ = &CAiFormationInstanceTypeInfo::Destruct;
+  return typeInfo;
 }
 
 /**

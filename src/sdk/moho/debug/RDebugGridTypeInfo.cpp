@@ -3,6 +3,20 @@
 #include "moho/debug/RDebugGrid.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
+namespace
+{
+  /**
+   * Address: 0x0064D180 (FUN_0064D180)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for world-grid rendering.
+   */
+  void RegisterRDebugGridOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display the world grid", "Grid");
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -27,13 +41,16 @@ namespace moho
   void RDebugGridTypeInfo::Init()
   {
     size_ = sizeof(RDebugGrid);
-    newRefFunc_ = &RDebugGridTypeInfo::NewRef;
-    ctorRefFunc_ = &RDebugGridTypeInfo::CtrRef;
-    deleteFunc_ = &RDebugGridTypeInfo::Delete;
-    dtrFunc_ = &RDebugGridTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &RDebugGridTypeInfo::NewRef,
+      &RDebugGridTypeInfo::CtrRef,
+      &RDebugGridTypeInfo::Delete,
+      &RDebugGridTypeInfo::Destruct
+    );
     AddBase_RDebugOverlay(this);
     gpg::RType::Init();
-    RegisterOverlayClass("Display the world grid", "Grid");
+    RegisterRDebugGridOverlayClass(this);
     Finish();
   }
 

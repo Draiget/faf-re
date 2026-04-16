@@ -173,7 +173,7 @@ namespace
   }
 
   /**
-   * Address: 0x004CA830 (FUN_004CA830, CWaitForTask serializer cleanup alias A)
+    * Alias of FUN_004CA830 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskSerializerVariantAliasA()
   {
@@ -181,7 +181,7 @@ namespace
   }
 
   /**
-   * Address: 0x004CA860 (FUN_004CA860, CWaitForTask serializer cleanup alias B)
+    * Alias of FUN_004CA860 (non-canonical helper lane).
    */
   [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskSerializerVariantAliasB()
   {

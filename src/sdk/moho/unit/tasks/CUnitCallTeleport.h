@@ -68,6 +68,16 @@ namespace moho
      */
     int Execute() override;
 
+  private:
+    /**
+     * Address: 0x005E2340 (FUN_005E2340, CUnitCallTeleport::BuildGroundTeleportTarget)
+     *
+     * What it does:
+     * Builds one ground-target payload from world position, clears entity-link
+     * lanes, and resets target-point/mobile flags.
+     */
+    [[nodiscard]] static CAiTarget BuildGroundTeleportTarget(const Wm3::Vector3f& worldPos) noexcept;
+
   public:
     WeakPtr<Unit> mTargetTransportUnit; // 0x30
     bool mCompletedSuccessfully;         // 0x38

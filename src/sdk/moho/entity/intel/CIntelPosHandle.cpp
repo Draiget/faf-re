@@ -37,6 +37,50 @@ namespace
     out.mType = CachedCIntelGridType();
     return out;
   }
+
+  /**
+   * Address: 0x0076D8D0 (FUN_0076D8D0)
+   *
+   * What it does:
+   * Rebuilds one position-watch entry's coverage when the requested position
+   * or radius differs from the stored state by calling `SubViz`, updating the
+   * cached fields, then calling `AddViz`.
+   */
+  [[maybe_unused]] void RebuildEntityPositionWatchCoverage(
+    moho::EntityPositionWatchEntry* const entry,
+    const Wm3::Vec3f& newPos,
+    const std::uint32_t requestedRadius
+  )
+  {
+    const int compareResult = Wm3::Vec3f::Compare(&newPos, &entry->mLastPos);
+    if (compareResult != 0 || requestedRadius != entry->mRadius) {
+      entry->SubViz();
+      entry->mLastPos = newPos;
+      entry->mRadius = requestedRadius;
+      entry->AddViz();
+    }
+  }
+
+  /**
+   * Address: 0x0076E770 (FUN_0076E770, boost::shared_ptr_CIntelPosHandle::~shared_ptr_CIntelPosHandle)
+   *
+   * What it does:
+   * Destroys one `CIntelPosHandle*` lane when present via virtual
+   * `CIntelPosHandle::Destroy(1)` dispatch.
+   */
+  [[maybe_unused]] void DestroyIntelPosHandleViaDestroyIfPresent(
+    moho::CIntelPosHandle* const* const handleSlot
+  )
+  {
+    if (handleSlot == nullptr) {
+      return;
+    }
+
+    moho::CIntelPosHandle* const handle = *handleSlot;
+    if (handle != nullptr) {
+      handle->Destroy(1);
+    }
+  }
 } // namespace
 
 namespace moho
@@ -92,13 +136,7 @@ namespace moho
    */
   void CIntelPosHandle::Update(const Wm3::Vec3f& pos)
   {
-    const std::uint32_t savedRadius = mRadius;
-    if (Wm3::Vec3f::Compare(&pos, &mLastPos)) {
-      SubViz();
-      mLastPos = pos;
-      mRadius = savedRadius;
-      AddViz();
-    }
+    RebuildEntityPositionWatchCoverage(this, pos, mRadius);
   }
 
   /**
@@ -131,6 +169,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076F280 (FUN_0076F280)
+   *
+   * What it does:
+   * Updates visualized position immediately when enabled (or writes raw
+   * position when disabled), then stores `curTick` as last-update tick.
+   */
+  void CIntelPosHandle::UpdatePosImmediate(const std::int32_t curTick, const Wm3::Vec3f& newPos)
+  {
+    if (mEnabled != 0u) {
+      Update(newPos);
+      mLastTickUpdated = curTick;
+      return;
+    }
+
+    mLastPos = newPos;
+    mLastTickUpdated = curTick;
+  }
+
+  /**
    * Address: 0x0076D980 (FUN_0076D980, Moho::CIntelPosHandle::ChangeRadius)
    *
    * What it does:
@@ -139,12 +196,7 @@ namespace moho
    */
   void CIntelPosHandle::ChangeRadius(const std::int32_t newRadius)
   {
-    if (Wm3::Vec3f::Compare(&mLastPos, &mLastPos) || newRadius != static_cast<std::int32_t>(mRadius)) {
-      SubViz();
-      mLastPos = mLastPos;
-      mRadius = static_cast<std::uint32_t>(newRadius);
-      AddViz();
-    }
+    RebuildEntityPositionWatchCoverage(this, mLastPos, static_cast<std::uint32_t>(newRadius));
   }
 
   /**
@@ -261,6 +313,7 @@ namespace moho
 
   /**
    * Address: 0x0076FE20 (FUN_0076FE20)
+   * Address: 0x00649B40 (FUN_00649B40)
    *
    * What it does:
    * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberSerialize`.

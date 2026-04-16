@@ -24,6 +24,15 @@ namespace gpg
             explicit IOError(DWORD messageId);
 
             /**
+             * Address: 0x00955A50 (FUN_00955A50)
+             *
+             * What it does:
+             * Copy-constructs IOError by cloning runtime_error payload and cached
+             * Win32 error code lane.
+             */
+            IOError(const IOError& other);
+
+            /**
              * Address: 0x00955900 (FUN_00955900)
              * Deleting owner: 0x00955940 (FUN_00955940)
              * Demangled: gpg::FileStream::IOError::dtr

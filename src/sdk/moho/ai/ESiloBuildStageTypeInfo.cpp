@@ -82,6 +82,17 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkESiloBuildStagePrimitiveSerializerHelperNode()
+  {
+    if (!gESiloBuildStagePrimitiveSerializerConstructed) {
+      return nullptr;
+    }
+
+    ESiloBuildStagePrimitiveSerializer* const serializer = AcquireESiloBuildStagePrimitiveSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
   /**
    * Address: 0x00BF7E00 (FUN_00BF7E00, sub_BF7E00)
    *
@@ -110,9 +121,32 @@ namespace
       return;
     }
 
-    ESiloBuildStagePrimitiveSerializer* const serializer = AcquireESiloBuildStagePrimitiveSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkESiloBuildStagePrimitiveSerializerHelperNode();
     gESiloBuildStagePrimitiveSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x005CEAC0 (FUN_005CEAC0)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the recovered `ESiloBuildStage`
+   * primitive serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_ESiloBuildStagePrimitiveSerializerStartupThunkA()
+  {
+    return UnlinkESiloBuildStagePrimitiveSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005CEAF0 (FUN_005CEAF0)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `ESiloBuildStage`
+   * primitive serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_ESiloBuildStagePrimitiveSerializerStartupThunkB()
+  {
+    return UnlinkESiloBuildStagePrimitiveSerializerHelperNode();
   }
 } // namespace
 
@@ -224,7 +258,6 @@ int moho::register_ESiloBuildStagePrimitiveSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &ESiloBuildStagePrimitiveSerializer::Deserialize;
   serializer->mSaveCallback = &ESiloBuildStagePrimitiveSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_ESiloBuildStagePrimitiveSerializer);
 }
 

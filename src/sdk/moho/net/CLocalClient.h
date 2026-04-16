@@ -14,15 +14,11 @@ namespace moho
   {
   public:
     /**
-     * Address: <synthetic host-build wrapper>
-     *
-     * Binary evidence:
-     * - 0x0053E180 (FUN_0053E180, CClientManagerImpl::CreateLocalClient)
-     * - 0x1012B540 (sub_1012B540, MohoEngine CreateLocalClient equivalent)
+     * Address: 0x0053B9D0 (FUN_0053B9D0)
      *
      * What it does:
-     * Wraps `CClientBase` construction for local client objects; in FA/Moho the
-     * derived-constructor sequence is inlined inside `CreateLocalClient`.
+     * Runs the local-client derived constructor lane by forwarding to
+     * `CClientBase` initialization and binding the `CLocalClient` vtable.
      */
     CLocalClient(
       int32_t index,

@@ -3,6 +3,23 @@
 namespace moho
 {
   /**
+   * Address: 0x0050E5F0 (FUN_0050E5F0, Moho::REffectBlueprint::REffectBlueprint)
+   *
+   * What it does:
+   * Initializes the base effect-blueprint lane with null owner, empty
+   * resource id, and all fidelity flags enabled.
+   */
+  REffectBlueprint::REffectBlueprint()
+    : mOwnerRules(nullptr)
+    , BlueprintId()
+    , HighFidelity(1)
+    , MedFidelity(1)
+    , LowFidelity(1)
+    , pad_0027(0)
+  {
+  }
+
+  /**
    * Address: 0x0050E650 (FUN_0050E650, scalar deleting dtor thunk)
    *
    * What it does:

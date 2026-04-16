@@ -233,7 +233,6 @@ namespace moho
       reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSWorldParticleBlendMode);
     gSWorldParticleBlendModePrimitiveSerializer.mSerialize =
       reinterpret_cast<gpg::RType::save_func_t>(&SerializeSWorldParticleBlendMode);
-    gSWorldParticleBlendModePrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_SWorldParticleBlendModePrimitiveSerializer_atexit);
   }
 
@@ -267,7 +266,6 @@ namespace moho
       reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSWorldParticleZMode);
     gSWorldParticleZModePrimitiveSerializer.mSerialize =
       reinterpret_cast<gpg::RType::save_func_t>(&SerializeSWorldParticleZMode);
-    gSWorldParticleZModePrimitiveSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_SWorldParticleZModePrimitiveSerializer_atexit);
   }
 
@@ -287,7 +285,6 @@ namespace moho
     InitializeSerializerNode(gSWorldParticleSerializer);
     gSWorldParticleSerializer.mDeserialize = &SWorldParticleSerializer::Deserialize;
     gSWorldParticleSerializer.mSerialize = &SWorldParticleSerializer::Serialize;
-    gSWorldParticleSerializer.RegisterSerializeFunctions();
     return std::atexit(&cleanup_SWorldParticleSerializer_atexit);
   }
 } // namespace moho

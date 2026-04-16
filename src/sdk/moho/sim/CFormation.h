@@ -35,6 +35,15 @@ namespace moho
     CFormation();
 
     /**
+     * Address: 0x0089B370 (FUN_0089B370, ??1CFormation@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases current formation-instance ownership, tears down the intrusive
+     * formation-node tree head/lane, and clears node-count state.
+     */
+    ~CFormation();
+
+    /**
      * Address: 0x008380E0 (FUN_008380E0, Moho::CFormation::Reset)
      *
      * What it does:

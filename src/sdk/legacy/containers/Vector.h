@@ -140,6 +140,7 @@ namespace msvc8
          * Address: 0x00446AB0 (FUN_00446AB0)
          * Address: 0x00446BD0 (FUN_00446BD0)
          * Address: 0x00446C90 (FUN_00446C90)
+         * Address: 0x00537ED0 (FUN_00537ED0)
          *
          * What it does:
          * Fills `count` 32-bit words in `destination` using one dereferenced source word.
@@ -219,6 +220,17 @@ namespace msvc8
          * Address: 0x004C6A30 (FUN_004C6A30)
          * Address: 0x004C6BE0 (FUN_004C6BE0)
          * Address: 0x004C6CE0 (FUN_004C6CE0)
+         * Address: 0x00525E90 (FUN_00525E90)
+         * Address: 0x00506470 (FUN_00506470)
+         * Address: 0x00506500 (FUN_00506500)
+         * Address: 0x005065A0 (FUN_005065A0)
+         * Address: 0x005065F0 (FUN_005065F0)
+         * Address: 0x00506660 (FUN_00506660)
+         * Address: 0x00506690 (FUN_00506690)
+         * Address: 0x00538010 (FUN_00538010)
+         * Address: 0x00538160 (FUN_00538160)
+         * Address: 0x00538200 (FUN_00538200)
+         * Address: 0x00538260 (FUN_00538260)
          *
          * What it does:
          * Moves one half-open source word range `[sourceBegin, sourceEnd)` into
@@ -250,6 +262,17 @@ namespace msvc8
          * Address: 0x00446750 (FUN_00446750)
          * Address: 0x004C65B0 (FUN_004C65B0)
          * Address: 0x004C6A80 (FUN_004C6A80)
+         * Address: 0x004FDE90 (FUN_004FDE90)
+         * Address: 0x005060E0 (FUN_005060E0)
+         * Address: 0x00506110 (FUN_00506110)
+         * Address: 0x005061A0 (FUN_005061A0)
+         * Address: 0x00506270 (FUN_00506270)
+         * Address: 0x005064C0 (FUN_005064C0)
+         * Address: 0x00506550 (FUN_00506550)
+         * Address: 0x00526120 (FUN_00526120)
+         * Address: 0x00537030 (FUN_00537030)
+         * Address: 0x00538080 (FUN_00538080)
+         * Address: 0x005381B0 (FUN_005381B0)
          *
          * What it does:
          * Moves one source word range `[sourceBegin, sourceEnd)` so the copied block
@@ -276,6 +299,21 @@ namespace msvc8
          * Address: 0x00445F10 (FUN_00445F10)
          * Address: 0x00446430 (FUN_00446430)
          * Address: 0x004466E0 (FUN_004466E0)
+         * Address: 0x00506300 (FUN_00506300)
+         * Address: 0x00506310 (FUN_00506310)
+         * Address: 0x00506580 (FUN_00506580)
+         * Address: 0x00506590 (FUN_00506590)
+         * Address: 0x00506640 (FUN_00506640)
+         * Address: 0x00506650 (FUN_00506650)
+         * Address: 0x005066D0 (FUN_005066D0)
+         * Address: 0x005066F0 (FUN_005066F0)
+         * Address: 0x00506740 (FUN_00506740)
+         * Address: 0x00506750 (FUN_00506750)
+         * Address: 0x005380C0 (FUN_005380C0)
+         * Address: 0x005381F0 (FUN_005381F0)
+         * Address: 0x00538250 (FUN_00538250)
+         * Address: 0x005382A0 (FUN_005382A0)
+         * Address: 0x005382D0 (FUN_005382D0)
          * Address: 0x00446D70 (FUN_00446D70)
          * Address: 0x00446DF0 (FUN_00446DF0)
          * Address: 0x00446E80 (FUN_00446E80)
@@ -303,12 +341,18 @@ namespace msvc8
          * Address: 0x00445C50 (FUN_00445C50)
          * Address: 0x00445D80 (FUN_00445D80)
          * Address: 0x00445E40 (FUN_00445E40)
+         * Address: 0x00506190 (FUN_00506190)
+         * Address: 0x00506260 (FUN_00506260)
+         * Address: 0x005064A0 (FUN_005064A0)
+         * Address: 0x00506530 (FUN_00506530)
          * Address: 0x00445F50 (FUN_00445F50)
          * Address: 0x00446500 (FUN_00446500)
          * Address: 0x00446610 (FUN_00446610)
          * Address: 0x00446690 (FUN_00446690)
          * Address: 0x00446720 (FUN_00446720)
          * Address: 0x004C6A60 (FUN_004C6A60)
+         * Address: 0x00538070 (FUN_00538070)
+         * Address: 0x00538190 (FUN_00538190)
          *
          * What it does:
          * Fills one destination word range `[destinationBegin, destinationEnd)` from
@@ -335,6 +379,10 @@ namespace msvc8
          * Address: 0x00446BB0 (FUN_00446BB0)
          * Address: 0x004C6C10 (FUN_004C6C10)
          * Address: 0x004C6DC0 (FUN_004C6DC0)
+         * Address: 0x00506440 (FUN_00506440)
+         * Address: 0x005065D0 (FUN_005065D0)
+         * Address: 0x00506620 (FUN_00506620)
+         * Address: 0x00538230 (FUN_00538230)
          *
          * What it does:
          * Moves `wordCount` 32-bit words from `source` into `destination`.
@@ -358,6 +406,12 @@ namespace msvc8
          * Address: 0x00446E20 (FUN_00446E20)
          * Address: 0x00446E40 (FUN_00446E40)
          * Address: 0x00446E60 (FUN_00446E60)
+         * Address: 0x005063C0 (FUN_005063C0)
+         * Address: 0x00506400 (FUN_00506400)
+         * Address: 0x00506700 (FUN_00506700)
+         * Address: 0x00506720 (FUN_00506720)
+         * Address: 0x00538140 (FUN_00538140)
+         * Address: 0x005382B0 (FUN_005382B0)
          *
          * What it does:
          * Moves `wordCount` words from `source` to `destination` and returns one
@@ -658,6 +712,11 @@ namespace msvc8
          * Address: 0x00445140 (FUN_00445140)
          * Address: 0x00445170 (FUN_00445170)
          * Address: 0x00445390 (FUN_00445390)
+         * Address: 0x00535FE0 (FUN_00535FE0)
+         * Address: 0x00536830 (FUN_00536830)
+         * Address: 0x00536850 (FUN_00536850)
+         * Address: 0x00537FA0 (FUN_00537FA0)
+         * Address: 0x00537FE0 (FUN_00537FE0)
          *
          * What it does:
          * Stores one 32-bit word pointer lane and returns the destination slot.
@@ -672,7 +731,46 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x00505040 (FUN_00505040)
+         * Address: 0x005051B0 (FUN_005051B0)
+         * Address: 0x005051D0 (FUN_005051D0)
+         * Address: 0x00505B30 (FUN_00505B30)
+         * Address: 0x00505CB0 (FUN_00505CB0)
+         * Address: 0x00505EA0 (FUN_00505EA0)
+         * Address: 0x00561F30 (FUN_00561F30)
+         * Address: 0x00562590 (FUN_00562590)
+         * Address: 0x005625A0 (FUN_005625A0)
+         * Address: 0x005625B0 (FUN_005625B0)
+         * Address: 0x005625C0 (FUN_005625C0)
+         * Address: 0x0056D060 (FUN_0056D060)
+         * Address: 0x0056E820 (FUN_0056E820)
+         * Address: 0x0056E850 (FUN_0056E850)
+         * Address: 0x0056EED0 (FUN_0056EED0)
+         * Address: 0x005927D0 (FUN_005927D0)
+         * Address: 0x005928E0 (FUN_005928E0)
+         * Address: 0x005928F0 (FUN_005928F0)
+         * Address: 0x00592DC0 (FUN_00592DC0)
+         * Address: 0x00592DF0 (FUN_00592DF0)
+         * Address: 0x00592FB0 (FUN_00592FB0)
+         *
+         * What it does:
+         * Stores one 32-bit word value and returns the destination slot.
+         */
+        [[nodiscard]] inline std::uint32_t* SetWordSlotValue(
+            std::uint32_t* const destination,
+            const std::uint32_t value
+        ) noexcept
+        {
+            *destination = value;
+            return destination;
+        }
+
+        /**
          * Address: 0x00446FA0 (FUN_00446FA0)
+         * Address: 0x00504820 (FUN_00504820)
+         * Address: 0x00505050 (FUN_00505050)
+         * Address: 0x00595190 (FUN_00595190)
+         * Address: 0x00595280 (FUN_00595280)
          *
          * What it does:
          * Zeros one 32-bit slot and returns the same slot pointer.
@@ -681,6 +779,24 @@ namespace msvc8
         {
             *slot = 0u;
             return slot;
+        }
+
+        /**
+         * Address: 0x00506390 (FUN_00506390)
+         *
+         * What it does:
+         * Copies one 32-bit word from `source` when `destination` is non-null
+         * and returns the destination slot.
+         */
+        [[nodiscard]] inline std::uint32_t* CopyWordSlotIfNonNull(
+            std::uint32_t* const destination,
+            const std::uint32_t* const source
+        ) noexcept
+        {
+            if (destination != nullptr) {
+                *destination = *source;
+            }
+            return destination;
         }
 
         /**
@@ -741,6 +857,7 @@ namespace msvc8
         /**
          * Address: 0x00446330 (FUN_00446330)
          * Address: 0x00445A70 (FUN_00445A70)
+         * Address: 0x007BDA50 (FUN_007BDA50)
          *
          * What it does:
          * Copies bits from one source cursor range into destination cursor range
@@ -863,6 +980,8 @@ namespace msvc8
          * Address: 0x00444E40 (FUN_00444E40)
          * Address: 0x00444E70 (FUN_00444E70)
          * Address: 0x00445180 (FUN_00445180)
+         * Address: 0x00535FF0 (FUN_00535FF0)
+         * Address: 0x00537E80 (FUN_00537E80)
          *
          * What it does:
          * Stores `base + wordOffset` into one pointer destination slot.
@@ -912,6 +1031,8 @@ namespace msvc8
          * Address: 0x00445370 (FUN_00445370)
          * Address: 0x00445380 (FUN_00445380)
          * Address: 0x00445460 (FUN_00445460)
+         * Address: 0x00537FB0 (FUN_00537FB0)
+         * Address: 0x00537FF0 (FUN_00537FF0)
          *
          * What it does:
          * Adds one word offset to an existing pointer slot in place.
@@ -1090,6 +1211,7 @@ namespace msvc8
         /**
          * Address: 0x00444F60 (FUN_00444F60)
          * Address: 0x00445410 (FUN_00445410)
+         * Address: 0x00537E90 (FUN_00537E90)
          *
          * What it does:
          * Returns word span count when begin pointer is present; otherwise returns zero.

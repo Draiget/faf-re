@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <limits>
+#include <new>
 
 namespace
 {
@@ -40,6 +41,27 @@ namespace moho
    * Constructs mutex/vector members for resource deposit bookkeeping.
    */
   CSimResources::CSimResources() = default;
+
+  /**
+   * Address: 0x00546E90 (FUN_00546E90, Moho::CSimResources::operator new)
+   *
+   * What it does:
+   * Allocates and constructs one `CSimResources` instance.
+   */
+  CSimResources* CSimResources::Create()
+  {
+    void* const storage = ::operator new(sizeof(CSimResources), std::nothrow);
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    try {
+      return ::new (storage) CSimResources();
+    } catch (...) {
+      ::operator delete(storage);
+      throw;
+    }
+  }
 
   /**
    * Address: 0x00545E10 (FUN_00545E10, core dtor body)

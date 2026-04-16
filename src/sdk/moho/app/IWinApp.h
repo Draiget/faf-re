@@ -88,6 +88,14 @@ namespace moho
      */
     virtual bool AppDoSuppressWindowsKeys() const;
 
+    /**
+     * Address: 0x008CD450 (FUN_008CD450)
+     *
+     * What it does:
+     * Returns the cached process exit code lane stored in `exitValue`.
+     */
+    [[nodiscard]] std::int32_t GetExitValue() const;
+
   public:
     // +0x04
     msvc8::string shortName;

@@ -101,6 +101,7 @@ namespace moho
      */
     void DestroyNonDeleting();
 
+  public:
     /**
      * Address: 0x0053D7A0 (FUN_0053D7A0, func_ReplayThread)
      *
@@ -109,7 +110,6 @@ namespace moho
      */
     static void ReplayThreadMain(CReplayClient* self);
 
-  public:
     gpg::Stream* mReplayStream{nullptr};     // 0x0D8
     CMessage mReplayMessage;                 // 0x0E0
     std::uint32_t mReserved134{0};           // 0x134

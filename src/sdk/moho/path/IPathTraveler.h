@@ -21,6 +21,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A9F80 (FUN_005A9F80)
+     *
+     * What it does:
+     * Initializes one detached path-traveler queue node.
+     */
+    IPathTraveler();
+
+    /**
      * Address: 0x00A82547 (_purecall in FA binary)
      */
     [[nodiscard]]

@@ -80,6 +80,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x004FE500 (FUN_004FE500, preregister_CColPrimitiveBaseTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters the startup-owned `CColPrimitiveBaseTypeInfo`
+   * instance for `typeid(CColPrimitiveBase)`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CColPrimitiveBaseTypeInfo()
+  {
+    if (!gCColPrimitiveBaseTypeInfoConstructed) {
+      new (gCColPrimitiveBaseTypeInfoStorage) CColPrimitiveBaseTypeInfo();
+      gCColPrimitiveBaseTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CColPrimitiveBase), &CColPrimitiveBaseTypeInfoStorageRef());
+    return &CColPrimitiveBaseTypeInfoStorageRef();
+  }
+
+  /**
    * Address: 0x00BC7530 (FUN_00BC7530, register_CColPrimitiveBaseTypeInfo)
    *
    * What it does:
@@ -88,12 +106,7 @@ namespace moho
    */
   int register_CColPrimitiveBaseTypeInfo()
   {
-    if (!gCColPrimitiveBaseTypeInfoConstructed) {
-      new (gCColPrimitiveBaseTypeInfoStorage) CColPrimitiveBaseTypeInfo();
-      gCColPrimitiveBaseTypeInfoConstructed = true;
-      gpg::PreRegisterRType(typeid(CColPrimitiveBase), &CColPrimitiveBaseTypeInfoStorageRef());
-    }
-
+    (void)preregister_CColPrimitiveBaseTypeInfo();
     return std::atexit(&CleanupCColPrimitiveBaseTypeInfoAtExit);
   }
 

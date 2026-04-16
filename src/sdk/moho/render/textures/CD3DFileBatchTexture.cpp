@@ -241,6 +241,8 @@ namespace moho
 
     /**
      * Address: 0x0044ED70 (FUN_0044ED70)
+     * Address: 0x00857520 (FUN_00857520)
+     * Address: 0x00784760 (FUN_00784760)
      *
      * What it does:
      * Copies one contiguous retain-queue lane forward, preserving shared_ptr
@@ -253,6 +255,23 @@ namespace moho
     )
     {
       return detail::CopyRange(first, last, destination);
+    }
+
+    /**
+     * Address: 0x00784690 (FUN_00784690)
+     * Address: 0x00857130 (FUN_00857130)
+     *
+     * What it does:
+     * Register-shape adapter that forwards one contiguous retain-queue copy
+     * range (`first..last`) into destination storage.
+     */
+    [[maybe_unused]] FileTextureRetainIterator CopyFileTextureRetainRangeRegisterAdapterA(
+      const FileTextureRetainIterator first,
+      const FileTextureRetainIterator last,
+      FileTextureRetainIterator destination
+    )
+    {
+      return CopyFileTextureRetainRange(destination, first, last);
     }
 
     /**

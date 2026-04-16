@@ -26,6 +26,8 @@ namespace
 
   constexpr std::uint32_t kOverlayIndexCount = 15000;
   constexpr std::uint16_t kOverlayVertexLoopStop = 0x2712u;
+  constexpr std::int32_t kSkirtMaxIndexCount = 199998;
+  constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr int kNoiseFillTextureFormat = 2;
   constexpr const char* kNoiseFillName = "NoiseFill";
   constexpr const char* kNoiseFillShaderSource =
@@ -79,6 +81,9 @@ namespace
 
 namespace moho
 {
+  extern bool ren_Terrain;
+  extern bool ren_Skirt;
+
   /**
    * Address: 0x00803A10 (FUN_00803A10, ??0MediumFidelityTerrain@Moho@@QAE@@Z)
    * Mangled: ??0MediumFidelityTerrain@Moho@@QAE@@Z
@@ -223,6 +228,50 @@ namespace moho
   void MediumFidelityTerrain::DrawWaterLine(const std::int32_t /*arg0*/, const std::int32_t /*arg1*/)
   {
     (void)sMediumFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
+  }
+
+  /**
+   * Address: 0x00805530 (FUN_00805530, Moho::MediumFidelityTerrain::DrawTerrainSkirt)
+   *
+   * What it does:
+   * Selects the terrain-skirt technique and emits one indexed triangle-list
+   * draw using medium-fidelity skirt lanes when terrain/skirt flags are
+   * enabled and index-count constraints pass.
+   */
+  void MediumFidelityTerrain::DrawTerrainSkirt()
+  {
+    if (!ren_Terrain || !ren_Skirt) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectTechnique("TTerrainSkirt");
+
+    std::int32_t indexCount = static_cast<std::int32_t>(mSkirtEndIndex - mSkirtStartIndex);
+    if (indexCount > kSkirtMaxIndexCount) {
+      indexCount = kSkirtMaxIndexCount;
+    } else if (indexCount <= 0) {
+      return;
+    }
+
+    if ((indexCount % 3) != 0) {
+      return;
+    }
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = static_cast<std::int32_t>(mSkirtStartIndex);
+    indexView.indexCount = indexCount;
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = mSkirtBaseVertex;
+    vertexView.endVertex = mSkirtEndVertex;
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
 
   /**

@@ -9,6 +9,8 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
@@ -46,6 +48,248 @@ namespace
   constexpr const char* kSetGoalHelpText = "CSlideManipulator:SetGoal(goal_x, goal_y, goal_z)";
   constexpr const char* kBeenDestroyedName = "BeenDestroyed";
   constexpr const char* kBeenDestroyedHelpText = "CSlideManipulator:BeenDestroyed()";
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
+  {
+    gpg::RType* type = moho::IAniManipulator::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::IAniManipulator));
+      moho::IAniManipulator::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fSerializationType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00648B10 (FUN_00648B10)
+   *
+   * What it does:
+   * Deserializes one `CSlideManipulator` lane by loading `IAniManipulator`
+   * base state, current/goal vectors, scalar motion parameters, and the
+   * world-units flag.
+   */
+  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerBody(
+    moho::CSlideManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(manipulator), owner);
+
+    gpg::RType* const vectorType = CachedVector3fSerializationType();
+    archive->Read(vectorType, &manipulator->mCurrentPosition, owner);
+    archive->Read(vectorType, &manipulator->mGoal, owner);
+
+    archive->ReadFloat(&manipulator->mSpeed);
+    archive->ReadFloat(&manipulator->mCurrentSpeed);
+    archive->ReadFloat(&manipulator->mAcceleration);
+    archive->ReadFloat(&manipulator->mDeceleration);
+
+    bool worldUnits = manipulator->mWorldUnits != 0u;
+    archive->ReadBool(&worldUnits);
+    manipulator->mWorldUnits = worldUnits ? 1u : 0u;
+  }
+
+  /**
+   * Address: 0x00648C20 (FUN_00648C20)
+   *
+   * What it does:
+   * Serializes one `CSlideManipulator` lane by writing `IAniManipulator` base
+   * state, current/goal vectors, scalar motion parameters, and the world-units
+   * flag.
+   */
+  [[maybe_unused]] void SerializeCSlideManipulatorSerializerBody(
+    const moho::CSlideManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !manipulator) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(
+      CachedIAniManipulatorType(),
+      const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(manipulator)),
+      owner
+    );
+
+    gpg::RType* const vectorType = CachedVector3fSerializationType();
+    archive->Write(vectorType, &manipulator->mCurrentPosition, owner);
+    archive->Write(vectorType, &manipulator->mGoal, owner);
+
+    archive->WriteFloat(manipulator->mSpeed);
+    archive->WriteFloat(manipulator->mCurrentSpeed);
+    archive->WriteFloat(manipulator->mAcceleration);
+    archive->WriteFloat(manipulator->mDeceleration);
+    archive->WriteBool(manipulator->mWorldUnits != 0u);
+  }
+
+  /**
+   * Address: 0x006486D0 (FUN_006486D0)
+   *
+   * What it does:
+   * First tail-thunk alias that forwards slide manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerThunkAliasA(
+    moho::CSlideManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x006486E0 (FUN_006486E0)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards slide manipulator serialize lanes into the
+   * shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCSlideManipulatorSerializerThunkAliasA(
+    const moho::CSlideManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00648900 (FUN_00648900)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards slide manipulator deserialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerThunkAliasB(
+    moho::CSlideManipulator* const manipulator,
+    gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00648910 (FUN_00648910)
+   *
+   * What it does:
+   * Second tail-thunk alias that forwards slide manipulator serialize lanes
+   * into the shared serializer body.
+   */
+  [[maybe_unused]] void SerializeCSlideManipulatorSerializerThunkAliasB(
+    const moho::CSlideManipulator* const manipulator,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  struct CSlideManipulatorSerializerHelperNode
+  {
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(sizeof(CSlideManipulatorSerializerHelperNode) == 0x10, "CSlideManipulatorSerializerHelperNode size must be 0x10");
+
+  CSlideManipulatorSerializerHelperNode gCSlideManipulatorSerializer;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(THelper& helper) noexcept
+  {
+    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
+      helper.mNext->mPrev = helper.mPrev;
+      helper.mPrev->mNext = helper.mNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(helper);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  void DeserializeCSlideManipulatorSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const manipulator = reinterpret_cast<moho::CSlideManipulator*>(static_cast<std::uintptr_t>(objectPtr));
+    DeserializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  void SerializeCSlideManipulatorSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    const auto* const manipulator = reinterpret_cast<const moho::CSlideManipulator*>(static_cast<std::uintptr_t>(objectPtr));
+    SerializeCSlideManipulatorSerializerBody(manipulator, archive);
+  }
+
+  /**
+   * Address: 0x00648490 (FUN_00648490)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CSlideManipulator` serializer helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CSlideManipulatorSerializerHelperNode* InitializeCSlideManipulatorSerializerStartupThunk()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCSlideManipulatorSerializer);
+    gCSlideManipulatorSerializer.mPrev = self;
+    gCSlideManipulatorSerializer.mNext = self;
+    gCSlideManipulatorSerializer.mSerLoadFunc = &DeserializeCSlideManipulatorSerializerCallback;
+    gCSlideManipulatorSerializer.mSerSaveFunc = &SerializeCSlideManipulatorSerializerCallback;
+    return &gCSlideManipulatorSerializer;
+  }
+
+  /**
+   * Address: 0x00646FC0 (FUN_00646FC0)
+   *
+   * What it does:
+   * Startup cleanup variant that unlinks and self-resets the global
+   * CSlideManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCSlideManipulatorSerializer);
+  }
+
+  /**
+   * Address: 0x00646FF0 (FUN_00646FF0)
+   *
+   * What it does:
+   * Secondary startup cleanup variant that unlinks and self-resets the global
+   * CSlideManipulator serializer helper node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCSlideManipulatorSerializer);
+  }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -221,6 +465,22 @@ namespace
     return moho::CSlideManipulator::sType;
   }
 
+  /**
+   * Address: 0x00648920 (FUN_00648920)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CSlideManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlideManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCSlideManipulatorType());
+    return upcast.mObj;
+  }
+
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
   {
@@ -307,6 +567,34 @@ namespace
   }
 
   /**
+   * Address: 0x006475C0 (FUN_006475C0)
+   *
+   * What it does:
+   * Applies one requested slide speed to the runtime lanes, clamping
+   * non-positive values to disabled speed (`-1`) and optionally converting to
+   * pose-space units when world-units mode is disabled.
+   */
+  [[nodiscard]] moho::CSlideManipulator* ApplySlideManipulatorRequestedSpeed(
+    moho::CSlideManipulator* const manipulator,
+    const float requestedSpeed
+  ) noexcept
+  {
+    if (requestedSpeed <= 0.0f) {
+      manipulator->mSpeed = -1.0f;
+      manipulator->mCurrentSpeed = 0.0f;
+      return manipulator;
+    }
+
+    const float scaledSpeed = requestedSpeed * kSlideRateScale;
+    manipulator->mSpeed = scaledSpeed;
+    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor != nullptr && manipulator->mOwnerActor->mPose.px != nullptr) {
+      manipulator->mSpeed = manipulator->mOwnerActor->mPose.px->mScale * scaledSpeed;
+    }
+
+    return manipulator;
+  }
+
+  /**
    * Address: 0x006486F0 (FUN_006486F0, func_CreateCSlideManipulatorObject)
    *
    * What it does:
@@ -328,7 +616,7 @@ namespace moho
 } // namespace moho
 
 /**
- * Address: 0x10015880 (constructor shape)
+  * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -477,6 +765,43 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
 }
 
 /**
+ * Address: 0x00647620 (FUN_00647620)
+ *
+ * What it does:
+ * Stores clamped acceleration scalar as runtime rate (`max(0,value) * 0.1`).
+ */
+moho::CSlideManipulator* moho::CSlideManipulator::SetAccelerationRateFromScript(const float value) noexcept
+{
+  const float clampedValue = value > 0.0f ? value : 0.0f;
+  mAcceleration = clampedValue * kSlideRateScale;
+  return this;
+}
+
+/**
+ * Address: 0x00647640 (FUN_00647640)
+ *
+ * What it does:
+ * Stores clamped deceleration scalar as runtime rate (`max(0,value) * 0.1`).
+ */
+moho::CSlideManipulator* moho::CSlideManipulator::SetDecelerationRateFromScript(const float value) noexcept
+{
+  const float clampedValue = value > 0.0f ? value : 0.0f;
+  mDeceleration = clampedValue * kSlideRateScale;
+  return this;
+}
+
+/**
+ * Address: 0x00647520 (FUN_00647520)
+ *
+ * What it does:
+ * Sets world-units flag lane used by goal/move conversion logic.
+ */
+void moho::CSlideManipulator::SetWorldUnits(const bool enabled) noexcept
+{
+  mWorldUnits = enabled ? 1u : 0u;
+}
+
+/**
  * Address: 0x00647660 (FUN_00647660, cfunc_CreateSlider)
  *
  * What it does:
@@ -522,7 +847,7 @@ int moho::cfunc_CreateSliderL(LuaPlus::LuaState* const state)
   moho::CSlideManipulator* const manipulator = new moho::CSlideManipulator(unit->SimulationRef, unit->AniActor, boneIndex);
 
   if (argumentCount >= 7) {
-    manipulator->mWorldUnits = LuaPlus::LuaStackObject(state, 7).GetBoolean() ? 1u : 0u;
+    manipulator->SetWorldUnits(LuaPlus::LuaStackObject(state, 7).GetBoolean());
   }
 
   if (argumentCount >= 3) {
@@ -555,16 +880,7 @@ int moho::cfunc_CreateSliderL(LuaPlus::LuaState* const state)
     }
 
     const float requestedSpeed = static_cast<float>(lua_tonumber(rawState, 6));
-    if (requestedSpeed <= 0.0f) {
-      manipulator->mSpeed = -1.0f;
-      manipulator->mCurrentSpeed = 0.0f;
-    } else {
-      const float scaledSpeed = requestedSpeed * kSlideRateScale;
-      manipulator->mSpeed = scaledSpeed;
-      if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor && manipulator->mOwnerActor->mPose.px) {
-        manipulator->mSpeed = manipulator->mOwnerActor->mPose.px->mScale * scaledSpeed;
-      }
-    }
+    (void)ApplySlideManipulatorRequestedSpeed(manipulator, requestedSpeed);
   }
 
   manipulator->mLuaObj.PushStack(state);
@@ -637,7 +953,7 @@ int moho::cfunc_CSlideManipulatorSetWorldUnitsL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = SCR_FromLua_CSlideManipulator(manipObject, state);
-  manipulator->mWorldUnits = LuaPlus::LuaStackObject(state, 2).GetBoolean() ? 1u : 0u;
+  manipulator->SetWorldUnits(LuaPlus::LuaStackObject(state, 2).GetBoolean());
 
   lua_settop(rawState, 1);
   return 1;
@@ -700,19 +1016,7 @@ int moho::cfunc_CSlideManipulatorSetSpeedL(LuaPlus::LuaState* const state)
     speedArg.TypeError("number");
   }
   const float requestedSpeed = static_cast<float>(lua_tonumber(rawState, 2));
-
-  if (requestedSpeed <= 0.0f) {
-    manipulator->mSpeed = -1.0f;
-    manipulator->mCurrentSpeed = 0.0f;
-    lua_settop(rawState, 1);
-    return 1;
-  }
-
-  const float scaledSpeed = requestedSpeed * kSlideRateScale;
-  manipulator->mSpeed = scaledSpeed;
-  if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor && manipulator->mOwnerActor->mPose.px) {
-    manipulator->mSpeed = manipulator->mOwnerActor->mPose.px->mScale * scaledSpeed;
-  }
+  (void)ApplySlideManipulatorRequestedSpeed(manipulator, requestedSpeed);
 
   lua_settop(rawState, 1);
   return 1;
@@ -772,8 +1076,7 @@ int moho::cfunc_CSlideManipulatorSetAccelerationL(LuaPlus::LuaState* const state
   }
 
   const float requestedAcceleration = static_cast<float>(lua_tonumber(rawState, 2));
-  const float clampedAcceleration = requestedAcceleration > 0.0f ? requestedAcceleration : 0.0f;
-  manipulator->mAcceleration = clampedAcceleration * kSlideRateScale;
+  (void)manipulator->SetAccelerationRateFromScript(requestedAcceleration);
 
   lua_settop(rawState, 1);
   return 1;
@@ -833,8 +1136,7 @@ int moho::cfunc_CSlideManipulatorSetDecelerationL(LuaPlus::LuaState* const state
   }
 
   const float requestedDeceleration = static_cast<float>(lua_tonumber(rawState, 2));
-  const float clampedDeceleration = requestedDeceleration > 0.0f ? requestedDeceleration : 0.0f;
-  manipulator->mDeceleration = clampedDeceleration * kSlideRateScale;
+  (void)manipulator->SetDecelerationRateFromScript(requestedDeceleration);
 
   lua_settop(rawState, 1);
   return 1;

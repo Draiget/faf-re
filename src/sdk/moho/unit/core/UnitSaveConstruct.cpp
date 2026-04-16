@@ -92,14 +92,17 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x006AE920 (FUN_006AE920, Moho::UnitSaveConstruct::RegisterSaveConstructArgsFunction)
+   *
    * Binds the `moho::Unit` save-construct-args callback into RTTI using
    * `typeid(moho::Unit)`.
    */
   void UnitSaveConstruct::RegisterSaveConstructArgsFunction()
   {
     gpg::RType* const type = ResolveCachedType<moho::Unit>(gUnitType);
+
     GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSaveConstructArgsCallback);
+    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
     type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
   }
 

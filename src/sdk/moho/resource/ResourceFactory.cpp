@@ -68,6 +68,31 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x005391A0 (FUN_005391A0)
+   *
+   * What it does:
+   * Materializes the process-lifetime SCM resource-factory singleton object and
+   * returns the canonical storage pointer.
+   */
+  [[maybe_unused]] CScmResourceFactory* ConstructScmResourceFactorySingletonObject()
+  {
+    CScmResourceFactory& factory = ScmResourceFactorySingleton();
+    return &factory;
+  }
+
+  /**
+   * Address: 0x005391C0 (FUN_005391C0)
+   *
+   * What it does:
+   * Legacy startup lane that ensures the resource-manager singleton is alive
+   * and attaches the process-lifetime SCM factory instance.
+   */
+  [[maybe_unused]] void AttachScmResourceFactoryLegacyInitLane()
+  {
+    (void)AttachScmResourceFactory();
+  }
+
+  /**
    * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
    *
    * What it does:
@@ -166,6 +191,7 @@ namespace moho
    */
   CScmResourceFactory* construct_CScmResourceFactory()
   {
+    (void)ConstructScmResourceFactorySingletonObject();
     return AttachScmResourceFactory();
   }
 

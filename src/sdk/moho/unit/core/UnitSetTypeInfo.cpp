@@ -36,12 +36,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x006D29B0 (FUN_006D29B0, UnitSetTypeInfo non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `UnitSetTypeInfo`
+   * instance while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyUnitSetTypeInfoBody(UnitSetTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Address: 0x006D2950 (FUN_006D2950, sub_6D2950)
    */
   UnitSetTypeInfo::~UnitSetTypeInfo()
   {
-    fields_ = {};
-    bases_ = {};
+    DestroyUnitSetTypeInfoBody(this);
   }
 
   /**
@@ -94,14 +110,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D28C0 (FUN_006D28C0, sub_6D28C0)
-   */
-  gpg::RType* construct_UnitSetTypeInfo()
-  {
-    return &AcquireUnitSetTypeInfo();
-  }
-
-  /**
    * Address: 0x00BFE3F0 (FUN_00BFE3F0, sub_BFE3F0)
    */
   void cleanup_UnitSetTypeInfo()
@@ -119,7 +127,7 @@ namespace moho
    */
   int register_UnitSetTypeInfo()
   {
-    (void)construct_UnitSetTypeInfo();
+    (void)AcquireUnitSetTypeInfo();
     return std::atexit(&cleanup_UnitSetTypeInfo);
   }
 } // namespace moho

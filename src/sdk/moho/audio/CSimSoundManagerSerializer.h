@@ -6,7 +6,9 @@
 
 namespace gpg
 {
+  class ReadArchive;
   struct SerHelperBase;
+  class WriteArchive;
 } // namespace gpg
 
 namespace moho
@@ -18,6 +20,22 @@ namespace moho
   class CSimSoundManagerSerializer
   {
   public:
+    /**
+     * Address: 0x00762440 (FUN_00762440)
+     *
+     * What it does:
+     * Reflection load callback wrapper for `CSimSoundManager`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00762450 (FUN_00762450)
+     *
+     * What it does:
+     * Reflection save callback wrapper for `CSimSoundManager`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     /**
      * Address: 0x00761E90 (FUN_00761E90, gpg::SerSaveLoadHelper_CSimSoundManager::Init)
      *
@@ -51,4 +69,3 @@ namespace moho
   );
   static_assert(sizeof(CSimSoundManagerSerializer) == 0x14, "CSimSoundManagerSerializer size must be 0x14");
 } // namespace moho
-

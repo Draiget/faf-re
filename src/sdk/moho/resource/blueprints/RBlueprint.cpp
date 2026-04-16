@@ -91,6 +91,22 @@ namespace
     (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
   }
 
+  /**
+   * Address: 0x0050E060 (FUN_0050E060, Moho::InstanceCounter<Moho::RBlueprint>::InstanceCounter<Moho::RBlueprint>)
+   *
+   * What it does:
+   * Increments the reflected `InstanceCounter<RBlueprint>` stat lane and
+   * returns the incoming base-subobject pointer.
+   */
+  [[maybe_unused]]
+  moho::InstanceCounter<moho::RBlueprint>* ConstructRBlueprintInstanceCounterBaseFromThis(
+    moho::InstanceCounter<moho::RBlueprint>* const self
+  ) noexcept
+  {
+    AddRBlueprintInstanceCounterDelta(moho::InstanceCounter<moho::RBlueprint>::GetStatItem(), 1L);
+    return self;
+  }
+
   void AddRObjectBase(gpg::RType* const typeInfo)
   {
     gpg::RType* const rObjectType = CachedRObjectType();
@@ -114,6 +130,67 @@ namespace
   [[nodiscard]] const RBlueprintVTableView* GetVTableView(const moho::RBlueprint* const blueprint) noexcept
   {
     return reinterpret_cast<const RBlueprintVTableView*>(blueprint ? blueprint->mVTable : nullptr);
+  }
+
+  struct SerializerCallbackRuntimeView
+  {
+    void* vtableLane;            // +0x00
+    void* helperNextLane;        // +0x04
+    void* helperPrevLane;        // +0x08
+    void* deserializeCallback;   // +0x0C
+    void* serializeCallback;     // +0x10
+  };
+
+  static_assert(
+    offsetof(SerializerCallbackRuntimeView, deserializeCallback) == 0x0C,
+    "SerializerCallbackRuntimeView::deserializeCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerializerCallbackRuntimeView, serializeCallback) == 0x10,
+    "SerializerCallbackRuntimeView::serializeCallback offset must be 0x10"
+  );
+  static_assert(sizeof(SerializerCallbackRuntimeView) == 0x14, "SerializerCallbackRuntimeView size must be 0x14");
+
+  /**
+   * Address: 0x0050DB70 (FUN_0050DB70)
+   *
+   * What it does:
+   * Stores one serializer deserialize callback lane at offset `+0x0C`.
+   */
+  [[maybe_unused]] [[nodiscard]] SerializerCallbackRuntimeView* SetSerializerDeserializeCallbackLane(
+    SerializerCallbackRuntimeView* const result,
+    void* const callback
+  ) noexcept
+  {
+    result->deserializeCallback = callback;
+    return result;
+  }
+
+  /**
+   * Address: 0x0050DB80 (FUN_0050DB80)
+   *
+   * What it does:
+   * Stores one serializer serialize callback lane at offset `+0x10`.
+   */
+  [[maybe_unused]] [[nodiscard]] SerializerCallbackRuntimeView* SetSerializerSerializeCallbackLane(
+    SerializerCallbackRuntimeView* const result,
+    void* const callback
+  ) noexcept
+  {
+    result->serializeCallback = callback;
+    return result;
+  }
+
+  /**
+   * Address: 0x0050DB90 (FUN_0050DB90)
+   *
+   * What it does:
+   * Returns mutable string data pointer using legacy MSVC8 SSO policy
+   * (`myRes < 16` uses inline buffer, otherwise heap pointer).
+   */
+  [[maybe_unused]] [[nodiscard]] char* ResolveLegacyStringDataPointer(msvc8::string* const text) noexcept
+  {
+    return text->myRes < 16u ? text->bx.buf : text->bx.ptr;
   }
 } // namespace
 
@@ -200,6 +277,25 @@ namespace moho
 
     AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), -1L);
     reinterpret_cast<gpg::RObject*>(this)->~RObject();
+  }
+
+  /**
+   * Address: 0x0050DE40 (FUN_0050DE40, deleting-destructor thunk)
+   *
+   * What it does:
+   * Runs one `RBlueprint` destructor lane and conditionally frees this object
+   * storage when the low delete flag bit is set.
+   */
+  [[maybe_unused]] RBlueprint* DestroyRBlueprintAndMaybeDelete(
+    RBlueprint* const object,
+    const unsigned char deleteFlag
+  ) noexcept
+  {
+    object->~RBlueprint();
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(static_cast<void*>(object));
+    }
+    return object;
   }
 
   /**

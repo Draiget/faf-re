@@ -522,6 +522,9 @@
     <ClCompile Include="moho\sim\SimFloatInitializers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\SimRecoveryRuntime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\ManipulatorStartupRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -793,6 +796,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\containers\FastVectorUIntReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\containers\FastVectorInsertLanes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\containers\CheckedArrayAllocationLanes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\serialization\PrefetchHandleBaseVectorReflection.cpp">
@@ -1146,6 +1155,9 @@
     <ClCompile Include="moho\ai\IAiTransportTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\SPickUpInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\LAiAttackerImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1218,6 +1230,9 @@
     <ClCompile Include="moho\unit\tasks\CUnitTeleportTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitWaitForFerryTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitWaitForFerryTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1246,6 +1261,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitFerryTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitFerryTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp">
@@ -1278,10 +1296,22 @@
     <ClCompile Include="moho\unit\tasks\CUnitPatrolTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitPatrolTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitPodAssistTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnits.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnits.cpp">
@@ -1578,6 +1608,9 @@
     <ClCompile Include="moho\ui\SelectionDragger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ui\UiRuntimeTypeUpcastBridges.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ui\UiRuntimeTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1585,6 +1618,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\app\WxAppRuntime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\app\WxRuntimeTypes.cpp">
@@ -1711,6 +1747,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\containers\BitStorage32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\LegacyContainerFillLanes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\LegacyContainerFillLanesB.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\LegacyContainerRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\containers\SCoordsVec2TypeInfo.cpp">
@@ -1978,6 +2023,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\CEfxEmitterSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\effects\rendering\CEfxTrailEmitter.cpp">
@@ -2491,6 +2539,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\animation\CSlaveManipulator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\animation\CStorageManipulator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\animation\CThrustManipulator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\animation\SAniManipBindingReflection.cpp">
@@ -3465,6 +3519,12 @@
     <ClInclude Include="gpg\core\containers\FastVectorUIntReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gpg\core\containers\FastVectorInsertLanes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\containers\CheckedArrayAllocationLanes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\serialization\PrefetchHandleBaseVectorReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4059,6 +4119,9 @@
     <ClInclude Include="moho\ai\IAiTransportTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\ai\SPickUpInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\ai\LAiAttackerImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4173,6 +4236,9 @@
     <ClInclude Include="moho\unit\tasks\CUnitFerryTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitFerryTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4200,10 +4266,22 @@
     <ClInclude Include="moho\unit\tasks\CUnitPatrolTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitPatrolTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitPodAssistTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitUnloadUnits.h">
@@ -5556,6 +5634,8 @@
     <ClInclude Include="libpng\PngWriteRuntime.h"><Filter>Header Files</Filter></ClInclude>
     
     <ClInclude Include="lua\LuaError.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\animation\CAniPoseBoneTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="moho\animation\CAniPoseBoneTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\animation\CAniPoseTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\animation\CAniPoseTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\audio\SofdecMpaDecodeRuntime.cpp"><Filter>Source Files</Filter></ClCompile>
@@ -5570,6 +5650,7 @@
     <ClCompile Include="moho\math\QuaternionMath.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\math\QuaternionMath.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\net\CDiscoveryService.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\net\CDiscoveryService.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\net\CDiscoveryServiceTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\net\CDiscoveryServiceTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\render\camera\CameraImplTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
@@ -5595,6 +5676,8 @@
     <ClCompile Include="moho\sim\ESTITargetTypeTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\sim\ESTITargetTypeTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\sim\SMassInfo.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\sim\SMassInfoSerializer.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="moho\sim\SMassInfoSerializer.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\sim\SMassInfoTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\sim\SMassInfoTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\sim\SSessionSaveDataTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
@@ -5617,12 +5700,14 @@
     <ClCompile Include="moho\unit\tasks\CFactoryBuildTask.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\unit\tasks\CFactoryBuildTask.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitAssistMoveTask.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTask.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitAttackTargetTask.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTask.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTask.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>

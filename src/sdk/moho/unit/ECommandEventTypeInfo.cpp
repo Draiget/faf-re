@@ -139,6 +139,33 @@ namespace
       reinterpret_cast<const moho::ECommandEvent*>(static_cast<std::uintptr_t>(objectPtr));
     archive->WriteInt(static_cast<int>(*eventValue));
   }
+
+  /**
+   * Address: 0x006EA770 (FUN_006EA770)
+   *
+   * What it does:
+   * Initializes the generic save/load helper lane for `ECommandEvent`.
+   */
+  [[nodiscard]] moho::ECommandEventPrimitiveSerializer* InitializeECommandEventGenericHelperLane()
+  {
+    InitializeHelperNode(gECommandEventPrimitiveSerializer);
+    gECommandEventPrimitiveSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(
+      &Deserialize_ECommandEvent_00
+    );
+    gECommandEventPrimitiveSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&Serialize_ECommandEvent_00);
+    return &gECommandEventPrimitiveSerializer;
+  }
+
+  /**
+   * Address: 0x006E9730 (FUN_006E9730)
+   *
+   * What it does:
+   * Initializes the primitive enum helper lane for `ECommandEvent`.
+   */
+  [[nodiscard]] moho::ECommandEventPrimitiveSerializer* InitializeECommandEventPrimitiveHelperLane()
+  {
+    return InitializeECommandEventGenericHelperLane();
+  }
 } // namespace
 
 namespace moho
@@ -192,14 +219,7 @@ namespace moho
    */
   int register_ECommandEventPrimitiveSerializer()
   {
-    InitializeHelperNode(gECommandEventPrimitiveSerializer);
-    gECommandEventPrimitiveSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(
-      &Deserialize_ECommandEvent_00
-    );
-    gECommandEventPrimitiveSerializer.mSerialize = reinterpret_cast<gpg::RType::save_func_t>(
-      &Serialize_ECommandEvent_00
-    );
-    gECommandEventPrimitiveSerializer.RegisterSerializeFunctions();
+    (void)InitializeECommandEventPrimitiveHelperLane();
     return std::atexit(&cleanup_ECommandEventPrimitiveSerializer_atexit);
   }
 } // namespace moho

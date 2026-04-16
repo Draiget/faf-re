@@ -24,6 +24,20 @@ namespace
   }
 
   /**
+   * Address: 0x005D1FD0 (FUN_005D1FD0)
+   *
+   * What it does:
+   * Initializes the startup-owned `IAiSteeringTypeInfo` instance and
+   * preregisters RTTI for `IAiSteering`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IAiSteeringTypeInfoStartup()
+  {
+    auto* const typeInfo = AcquireIAiSteeringTypeInfo();
+    gpg::PreRegisterRType(typeid(IAiSteering), typeInfo);
+    return typeInfo;
+  }
+
+  /**
    * Address: 0x00BF80D0 (FUN_00BF80D0, cleanup_IAiSteeringTypeInfo)
    *
    * What it does:
@@ -82,8 +96,7 @@ void IAiSteeringTypeInfo::Init()
  */
 int moho::register_IAiSteeringTypeInfo()
 {
-  IAiSteeringTypeInfo* const typeInfo = AcquireIAiSteeringTypeInfo();
-  gpg::PreRegisterRType(typeid(IAiSteering), typeInfo);
+  auto* const typeInfo = static_cast<IAiSteeringTypeInfo*>(preregister_IAiSteeringTypeInfoStartup());
   IAiSteering::sType = typeInfo;
   return std::atexit(&cleanup_IAiSteeringTypeInfo);
 }

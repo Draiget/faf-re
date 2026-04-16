@@ -20,6 +20,7 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
+#include <typeinfo>
 #include <type_traits>
 #include <vector>
 
@@ -48,10 +49,20 @@
 int wxEntry(HINSTANCE hInstance, HINSTANCE hPrevInstance, char* pCmdLine, int nCmdShow, bool shouldInit);
 int wxNewEventType();
 
+// Stub body for the HINSTANCE-typed wxEntry overload. The prebuilt wxmsw.lib
+// exports `wxEntry(void*, void*, char*, int, bool)` (void* instead of
+// HINSTANCE__*), so the mangling differs and the linker can't find it. This
+// no-op keeps the link clean; the one callsite at line 2728 runs the native
+// Win32 message loop instead of wx's entrypoint at runtime.
+int wxEntry(HINSTANCE, HINSTANCE, char*, int, bool) { return 0; }
+
 namespace moho
 {
+  struct STimeBarThreadInfo;
+
   msvc8::vector<ManagedWindowSlot> managedWindows{};
   msvc8::vector<ManagedWindowSlot> managedFrames{};
+  CWinLogTarget sLogWindowTarget{};
 }
 
 namespace
@@ -79,25 +90,346 @@ namespace
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
 
-  moho::CWinLogTarget sLogWindowTarget{};
+  moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
   moho::SplashScreenRuntime* sSplashScreenPtr = nullptr;
   int gRecoveredWinAppEventType = 0;
   using WinAppFactoryFn = moho::IWinApp* (*)();
   WinAppFactoryFn sWinAppFactory = nullptr;
+
+  using LegacyUnaryCdeclCallback = int(__cdecl*)(int value);
+  using LegacyUnaryDispatchAdapter = int(__cdecl*)(LegacyUnaryCdeclCallback* callbackLane, int value);
+  using LegacyTypeInfoLane = const std::type_info*;
+  using LegacyTypeInfoDispatchAdapter = LegacyTypeInfoLane* (__cdecl*)(
+    LegacyTypeInfoLane* sourceLane,
+    LegacyTypeInfoLane* destinationLane,
+    LegacyTypeInfoLane* queryLane
+  );
+  using WxAppInitAllocatorLane = void* (__cdecl*)();
+  using LegacyCallbackLifecycleAdapter = int(__cdecl*)(void* sourceLane, void* destinationLane, int action);
+
+  struct LegacyCallbackPayloadLane {
+    LegacyCallbackLifecycleAdapter lifecycleAdapter;
+    std::uint32_t reserved04;
+    std::byte payload[0x18];
+  };
+  static_assert(sizeof(LegacyCallbackPayloadLane) == 0x20, "LegacyCallbackPayloadLane size must be 0x20");
+
+  LegacyUnaryDispatchAdapter gLegacyTimeBarUnaryDispatchAdapter = nullptr;
+  LegacyTypeInfoDispatchAdapter gLegacyTimeBarTypeInfoDispatchAdapter = nullptr;
+  WxAppInitAllocatorLane gWxAppInitAllocatorLane = nullptr;
+  std::uint8_t gWxAppInitAnchorLane = 0u;
+
+  int __cdecl LegacyInvokeUnaryCallback(
+    LegacyUnaryCdeclCallback* const callbackLane,
+    const int value
+  )
+  {
+    return (*callbackLane)(value);
+  }
+
+  LegacyTypeInfoLane* __cdecl LegacyResolveTimeBarThreadCallbackTypeInfo(
+    LegacyTypeInfoLane* const sourceLane,
+    LegacyTypeInfoLane* const destinationLane,
+    LegacyTypeInfoLane* const queryLane
+  )
+  {
+    using TimeBarThreadCallback = void(__cdecl*)(moho::STimeBarThreadInfo*);
+
+    constexpr std::uintptr_t kQueryCopy = 0u;
+    constexpr std::uintptr_t kQueryReset = 1u;
+    constexpr std::uintptr_t kQueryPublishType = 3u;
+
+    LegacyTypeInfoLane* result = queryLane;
+    const std::uintptr_t queryToken = reinterpret_cast<std::uintptr_t>(queryLane);
+    const LegacyTypeInfoLane callbackTypeInfo = &typeid(TimeBarThreadCallback);
+
+    if (queryToken == kQueryPublishType) {
+      *destinationLane = callbackTypeInfo;
+      return result;
+    }
+
+    if (queryToken == kQueryCopy) {
+      *destinationLane = *sourceLane;
+      return sourceLane;
+    }
+
+    if (queryToken == kQueryReset) {
+      *destinationLane = nullptr;
+      return destinationLane;
+    }
+
+    result = (*destinationLane == callbackTypeInfo) ? sourceLane : nullptr;
+    *destinationLane = (result != nullptr) ? *result : nullptr;
+    return result;
+  }
+
+  void* __cdecl AllocateMohoAppStorageForWxBootstrap()
+  {
+    return ::operator new(sizeof(moho::MohoApp));
+  }
+
+  /**
+   * Address: 0x004E7F70 (FUN_004E7F70)
+   *
+   * What it does:
+   * Clones one 0x20-byte legacy callback payload lane to heap storage and
+   * returns the callback adapter lane after running the source cleanup path.
+   */
+  [[maybe_unused]] LegacyCallbackLifecycleAdapter CloneLegacyCallbackPayloadLaneToHeap(
+    LegacyCallbackPayloadLane* const sourceLane,
+    LegacyCallbackPayloadLane** const destinationHeapLane
+  )
+  {
+    auto* const destinationLane = static_cast<LegacyCallbackPayloadLane*>(::operator new(sizeof(LegacyCallbackPayloadLane)));
+    destinationLane->lifecycleAdapter = nullptr;
+
+    if (sourceLane != nullptr && sourceLane->lifecycleAdapter != nullptr) {
+      destinationLane->lifecycleAdapter = sourceLane->lifecycleAdapter;
+      destinationLane->lifecycleAdapter(sourceLane->payload, destinationLane->payload, 0);
+    }
+
+    *destinationHeapLane = destinationLane;
+
+    LegacyCallbackLifecycleAdapter result = (sourceLane != nullptr) ? sourceLane->lifecycleAdapter : nullptr;
+    if (result != nullptr) {
+      result(sourceLane->payload, sourceLane->payload, 1);
+    }
+
+    return result;
+  }
+
+  /**
+   * Address: 0x004E7ED0 (FUN_004E7ED0)
+   *
+   * What it does:
+   * Publishes the legacy CRT callback adapter pair used by RTTI callback
+   * dispatch for TimeBar thread callback lanes.
+   */
+  [[maybe_unused]] void InitializeLegacyTimeBarTypeInfoDispatchAdapters()
+  {
+    gLegacyTimeBarUnaryDispatchAdapter = &LegacyInvokeUnaryCallback;
+    gLegacyTimeBarTypeInfoDispatchAdapter = &LegacyResolveTimeBarThreadCallbackTypeInfo;
+  }
+
+  /**
+   * Address: 0x004E8150 (FUN_004E8150)
+   *
+   * What it does:
+   * stdcall adapter lane that republishes the same TimeBar RTTI callback
+   * dispatch pair as `FUN_004E7ED0`.
+   */
+  [[maybe_unused]] void __stdcall InitializeLegacyTimeBarTypeInfoDispatchAdaptersStdcall(
+    int /*unused*/
+  )
+  {
+    InitializeLegacyTimeBarTypeInfoDispatchAdapters();
+  }
+
+  /**
+   * Address: 0x004F1B50 (FUN_004F1B50)
+   *
+   * What it does:
+   * Publishes the wx app-bootstrap allocation callback lane for `MohoApp`
+   * construction.
+   */
+  [[maybe_unused]] void InitializeMohoAppBootstrapAllocatorCallback()
+  {
+    gWxAppInitAllocatorLane = &AllocateMohoAppStorageForWxBootstrap;
+  }
+
+  /**
+   * Address: 0x004F1B90 (FUN_004F1B90)
+   *
+   * What it does:
+   * Publishes the wx app-bootstrap allocation callback lane for `MohoApp` and
+   * returns the static bootstrap anchor lane used by the registration path.
+   */
+  [[maybe_unused]] void* InitializeMohoAppBootstrapAllocatorLane()
+  {
+    gWxAppInitAllocatorLane = &AllocateMohoAppStorageForWxBootstrap;
+    return &gWxAppInitAnchorLane;
+  }
 
   [[nodiscard]] moho::IWinApp* CreateRecoveredWinAppFactory()
   {
     return new CScApp();
   }
 
-  void CleanupManagedWindowsAtExit()
+  void UnlinkManagedWindowSlotRangeCommon(
+    moho::ManagedWindowSlot* begin,
+    moho::ManagedWindowSlot* end
+  ) noexcept
   {
-    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
+    while (begin != end) {
+      begin->UnlinkFromOwner();
+      ++begin;
+    }
   }
 
+  /**
+   * Address: 0x004FADE0 (FUN_004FADE0)
+   *
+   * What it does:
+   * Unlinks one contiguous managed-dialog slot range from all owner chains.
+   */
+  moho::ManagedWindowSlot* UnlinkManagedDialogSlotRange(
+    moho::ManagedWindowSlot* const begin,
+    moho::ManagedWindowSlot* const end
+  ) noexcept
+  {
+    UnlinkManagedWindowSlotRangeCommon(begin, end);
+    return end;
+  }
+
+  /**
+   * Address: 0x004FAED0 (FUN_004FAED0)
+   *
+   * What it does:
+   * Unlinks one contiguous managed-frame slot range from all owner chains.
+   */
+  void UnlinkManagedFrameSlotRange(
+    moho::ManagedWindowSlot* const begin,
+    moho::ManagedWindowSlot* const end
+  ) noexcept
+  {
+    UnlinkManagedWindowSlotRangeCommon(begin, end);
+  }
+
+  /**
+   * Address: 0x004F8140 (FUN_004F8140)
+   *
+   * What it does:
+   * Allocates one managed-dialog slot-storage block for `managedWindows`,
+   * initializes `{begin,end}` to the allocation base, and sets capacity to
+   * `begin + slotCount`.
+   */
+  [[maybe_unused]] bool InitializeManagedWindowsStorage(const unsigned int slotCount)
+  {
+    constexpr unsigned int kMaxManagedWindowSlots = 0x1FFFFFFFu;
+    if (slotCount > kMaxManagedWindowSlots) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    moho::ManagedWindowSlot* storage = nullptr;
+    if (slotCount == 0u) {
+      storage = static_cast<moho::ManagedWindowSlot*>(::operator new(0u));
+    } else {
+      const std::size_t storageBytes =
+        static_cast<std::size_t>(slotCount) * sizeof(moho::ManagedWindowSlot);
+      storage = static_cast<moho::ManagedWindowSlot*>(::operator new(storageBytes));
+    }
+
+    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedWindows);
+    slotRuntime.begin = storage;
+    slotRuntime.end = storage;
+    slotRuntime.capacityEnd = storage + slotCount;
+    return true;
+  }
+
+  /**
+   * Address: 0x004F8180 (FUN_004F8180)
+   *
+   * What it does:
+   * Unlinks every managed-dialog slot node, frees the backing slot-storage
+   * lane, and clears begin/end/capacity lanes on the global dialog slot
+   * vector.
+   */
+  void CleanupManagedWindowsAtExit()
+  {
+    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedWindows);
+    if (slotRuntime.begin != nullptr) {
+      (void)UnlinkManagedDialogSlotRange(slotRuntime.begin, slotRuntime.end);
+      ::operator delete(static_cast<void*>(slotRuntime.begin));
+    }
+    slotRuntime.begin = nullptr;
+    slotRuntime.end = nullptr;
+    slotRuntime.capacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x004F82D0 (FUN_004F82D0)
+   *
+   * What it does:
+   * Unlinks every managed-frame slot node, frees the backing slot-storage
+   * lane, and clears begin/end/capacity lanes on the global frame slot
+   * vector.
+   */
   void CleanupManagedFramesAtExit()
   {
-    moho::managedFrames = msvc8::vector<moho::ManagedWindowSlot>{};
+    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedFrames);
+    if (slotRuntime.begin != nullptr) {
+      UnlinkManagedFrameSlotRange(slotRuntime.begin, slotRuntime.end);
+      ::operator delete(static_cast<void*>(slotRuntime.begin));
+    }
+    slotRuntime.begin = nullptr;
+    slotRuntime.end = nullptr;
+    slotRuntime.capacityEnd = nullptr;
+  }
+
+  /**
+   * Address: 0x00BF18B0 (FUN_00BF18B0)
+   *
+   * What it does:
+   * Preserves one startup-registered shutdown thunk lane by forwarding into
+   * `CleanupManagedWindowsAtExit` (`FUN_004F8180`).
+   */
+  [[maybe_unused]] void ShutdownManagedWindowsCleanupAdapter()
+  {
+    CleanupManagedWindowsAtExit();
+  }
+
+  /**
+   * Address: 0x00BF18C0 (FUN_00BF18C0)
+   *
+   * What it does:
+   * Preserves one startup-registered shutdown thunk lane by forwarding into
+   * `CleanupManagedFramesAtExit` (`FUN_004F82D0`).
+   */
+  [[maybe_unused]] void ShutdownManagedFramesCleanupAdapter(void* const runtimeOwner)
+  {
+    static_cast<void>(runtimeOwner);
+    CleanupManagedFramesAtExit();
+  }
+
+  /**
+   * Address: 0x004F7060 (FUN_004F7060)
+   *
+   * What it does:
+   * Forwards one managed-dialog cleanup thunk lane into
+   * `CleanupManagedWindowsAtExit`.
+   */
+  [[maybe_unused]] void CleanupManagedWindowsAtExitThunk(
+    void* const /*unused*/
+  ) noexcept
+  {
+    CleanupManagedWindowsAtExit();
+  }
+
+  /**
+   * Address: 0x004F7130 (FUN_004F7130)
+   *
+   * What it does:
+   * Forwards one managed-frame cleanup thunk lane into
+   * `CleanupManagedFramesAtExit`.
+   */
+  [[maybe_unused]] void CleanupManagedFramesAtExitThunk(
+    void* const /*unused*/
+  ) noexcept
+  {
+    CleanupManagedFramesAtExit();
+  }
+
+  /**
+   * Address: 0x004F7360 (FUN_004F7360)
+   *
+   * What it does:
+   * Clears the process-global splash-screen owner lane and returns the storage
+   * address used by startup registration code.
+   */
+  [[maybe_unused]] moho::SplashScreenRuntime** ResetSplashScreenPointerAndGetStorageLane() noexcept
+  {
+    sSplashScreenPtr = nullptr;
+    return &sSplashScreenPtr;
   }
 
   [[maybe_unused]] const bool gWinAppBootstrap = []() {
@@ -1279,7 +1611,7 @@ namespace
   {
   public:
     using MiniDmpSenderCtorFn =
-      void(__thiscall*)(void*, const char*, const char*, const char*, const char*, unsigned long);
+      void* (__thiscall*)(void*, const char*, const char*, const char*, const char*, unsigned long);
     using MiniDmpSenderDtorFn = void(__thiscall*)(void*);
     using MiniDmpSenderSetCallbackFn = void(__thiscall*)(void*, BugSplatAttachmentCallbackFn);
     using MiniDmpSenderCreateReportFn = void(__thiscall*)(void*, _EXCEPTION_POINTERS*);
@@ -1310,6 +1642,12 @@ namespace
       return ctor_ != nullptr && dtor_ != nullptr && setCallback_ != nullptr && createReport_ != nullptr;
     }
 
+    /**
+     * Address: 0x00A814F0 (FUN_00A814F0, ??0MiniDmpSender@@QAE@PBD000K@Z)
+     *
+     * What it does:
+     * Typed import-thunk model for `MiniDmpSender` constructor export.
+     */
     void Construct(
       BugSplatMiniDmpSenderRuntime* const senderStorage,
       const char* const database,
@@ -1319,20 +1657,38 @@ namespace
       const unsigned long flags
     ) const
     {
-      ctor_(static_cast<void*>(senderStorage), database, appName, versionText, userName, flags);
+      (void)ctor_(static_cast<void*>(senderStorage), database, appName, versionText, userName, flags);
     }
 
+    /**
+     * Address: 0x00A814EA (FUN_00A814EA, ??1MiniDmpSender@@UAE@XZ)
+     *
+     * What it does:
+     * Typed import-thunk model for `MiniDmpSender` destructor export.
+     */
     void Destroy(BugSplatMiniDmpSenderRuntime* const senderStorage) const
     {
       dtor_(static_cast<void*>(senderStorage));
     }
 
+    /**
+     * Address: 0x00A814DE (FUN_00A814DE, ?setCallback@MiniDmpSender@@QAEXP6A_NIPAX0@Z@Z)
+     *
+     * What it does:
+     * Typed import-thunk model for `MiniDmpSender::setCallback` export.
+     */
     void SetCallback(BugSplatMiniDmpSenderRuntime* const senderStorage, const BugSplatAttachmentCallbackFn callback)
       const
     {
       setCallback_(static_cast<void*>(senderStorage), callback);
     }
 
+    /**
+     * Address: 0x00A814E4 (FUN_00A814E4, ?createReport@MiniDmpSender@@QAEXPAU_EXCEPTION_POINTERS@@@Z)
+     *
+     * What it does:
+     * Typed import-thunk model for `MiniDmpSender::createReport` export.
+     */
     void CreateReport(BugSplatMiniDmpSenderRuntime* const senderStorage, _EXCEPTION_POINTERS* const exceptionInfo)
       const
     {
@@ -1779,8 +2135,31 @@ namespace
     gpg::StrArg body;
   };
 
-  [[nodiscard]]
-  msvc8::string NormalizeDialogNewlines(const gpg::StrArg text)
+  /**
+   * Address: 0x004F0EA0 (FUN_004F0EA0)
+   *
+   * What it does:
+   * Stores two 32-bit lanes into one output pair lane (`[0]=first`, `[1]=second`).
+   */
+  [[maybe_unused]] std::int32_t* InitializeDwordPairLane(
+    std::int32_t* const outPair,
+    const std::int32_t second,
+    const std::int32_t first
+  ) noexcept
+  {
+    outPair[0] = first;
+    outPair[1] = second;
+    return outPair;
+  }
+
+  /**
+   * Address: 0x004F0EB0 (FUN_004F0EB0, sub_4F0EB0)
+   *
+   * What it does:
+   * Converts lone `\n` bytes in one UTF-8 crash/body payload into CRLF
+   * sequences while preserving existing `\r\n` pairs.
+   */
+  [[nodiscard]] msvc8::string NormalizeDialogNewlines(const gpg::StrArg text)
   {
     const char* const source = text != nullptr ? text : "";
     std::string normalized;
@@ -1798,54 +2177,6 @@ namespace
     msvc8::string result;
     result.assign_owned(normalized);
     return result;
-  }
-
-  /**
-   * Address: 0x004F2730 (FUN_004F2730, ?WIN_CopyToClipboard@Moho@@YA_NVStrArgW@gpg@@@Z)
-   *
-   * What it does:
-   * Copies a wide-string payload to the Windows clipboard as `CF_UNICODETEXT`,
-   * allocating a movable global block, locking it, copying the data, and
-   * publishing it under an exclusive open/empty/set/close cycle.
-   */
-  bool WIN_CopyToClipboard(const wchar_t* const text)
-  {
-    if (text == nullptr) {
-      return false;
-    }
-
-    const std::size_t characterCount = std::wcslen(text) + 1;
-    const std::size_t payloadBytes = characterCount * sizeof(wchar_t);
-
-    if (::OpenClipboard(nullptr) == FALSE) {
-      return false;
-    }
-
-    (void)::EmptyClipboard();
-    HGLOBAL globalBlock = ::GlobalAlloc(GMEM_MOVEABLE, payloadBytes);
-    if (globalBlock == nullptr) {
-      ::CloseClipboard();
-      return false;
-    }
-
-    void* const targetBuffer = ::GlobalLock(globalBlock);
-    if (targetBuffer == nullptr) {
-      ::GlobalFree(globalBlock);
-      ::CloseClipboard();
-      return false;
-    }
-
-    std::memcpy(targetBuffer, text, payloadBytes);
-    ::GlobalUnlock(globalBlock);
-
-    if (::SetClipboardData(CF_UNICODETEXT, globalBlock) == nullptr) {
-      ::GlobalFree(globalBlock);
-      ::CloseClipboard();
-      return false;
-    }
-
-    ::CloseClipboard();
-    return true;
   }
 
   /**
@@ -1887,7 +2218,7 @@ namespace
         const auto* const initData = reinterpret_cast<const CrashDialogInitData*>(::GetWindowLongPtrW(hWnd, DWLP_USER));
         if (initData != nullptr) {
           const std::wstring bodyText = gpg::STR_Utf8ToWide(initData->body != nullptr ? initData->body : "");
-          (void)WIN_CopyToClipboard(bodyText.c_str());
+          (void)moho::WIN_CopyToClipboard(bodyText.c_str());
         }
         return TRUE;
       }
@@ -2131,6 +2462,54 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x004F2730 (FUN_004F2730, ?WIN_CopyToClipboard@Moho@@YA_NVStrArgW@gpg@@@Z)
+ *
+ * What it does:
+ * Copies a wide-string payload to the Windows clipboard as `CF_UNICODETEXT`,
+ * allocating a movable global block, locking it, copying the data, and
+ * publishing it under an exclusive open/empty/set/close cycle.
+ */
+bool moho::WIN_CopyToClipboard(const wchar_t* const text)
+{
+  if (text == nullptr) {
+    return false;
+  }
+
+  const std::size_t characterCount = std::wcslen(text) + 1;
+  const std::size_t payloadBytes = characterCount * sizeof(wchar_t);
+
+  if (::OpenClipboard(nullptr) == FALSE) {
+    return false;
+  }
+
+  (void)::EmptyClipboard();
+  HGLOBAL globalBlock = ::GlobalAlloc(GMEM_MOVEABLE, payloadBytes);
+  if (globalBlock == nullptr) {
+    ::CloseClipboard();
+    return false;
+  }
+
+  void* const targetBuffer = ::GlobalLock(globalBlock);
+  if (targetBuffer == nullptr) {
+    ::GlobalFree(globalBlock);
+    ::CloseClipboard();
+    return false;
+  }
+
+  std::memcpy(targetBuffer, text, payloadBytes);
+  ::GlobalUnlock(globalBlock);
+
+  if (::SetClipboardData(CF_UNICODETEXT, globalBlock) == nullptr) {
+    ::GlobalFree(globalBlock);
+    ::CloseClipboard();
+    return false;
+  }
+
+  ::CloseClipboard();
+  return true;
+}
+
+/**
  * Address: 0x00BC7230 (FUN_00BC7230, register_startTime)
  *
  * What it does:
@@ -2264,18 +2643,66 @@ msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 }
 
 /**
- * Address: 0x004F1FC0
+ * Address: 0x004F2560 (FUN_004F2560, ?WIN_SetWakeupTimer@Moho@@YAXM@Z)
  *
  * What it does:
- * Requests that the main wait loop wake no later than `milliseconds` from now.
+ * Converts non-negative relative timeout to an absolute wakeup deadline and
+ * keeps only the earliest deadline; negative input requests immediate wake.
  */
-void moho::WIN_SetWakeupTimer(const float milliseconds)
+void moho::WIN_SetWakeupTimer(float milliseconds)
 {
-  if (milliseconds < wakeupTimerDur) {
-    wakeupTimerDur = milliseconds;
+  float resolvedWakeup = 0.0f;
+  if (milliseconds >= 0.0f) {
+    const float absoluteWakeupMs = gpg::time::CyclesToMilliseconds(wakeupTimer.ElapsedCycles()) + milliseconds;
+    if (wakeupTimerDur <= absoluteWakeupMs) {
+      return;
+    }
+    milliseconds = absoluteWakeupMs;
+    resolvedWakeup = milliseconds;
   }
+
+  wakeupTimerDur = resolvedWakeup;
 }
 
+/**
+ * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
+ *
+ * What it does:
+ * Requests immediate exit from the active wx app main loop.
+ */
+void moho::WIN_AppRequestExit()
+{
+  wxTheApp->ExitMainLoop();
+}
+
+/**
+ * Address: 0x004F2410 (FUN_004F2410, ?WIN_GetCurrentApp@Moho@@YAPAVIWinApp@1@XZ)
+ *
+ * What it does:
+ * Returns the process-global active app owner pointer.
+ */
+moho::IWinApp* moho::WIN_GetCurrentApp()
+{
+  return sSupComApp;
+}
+
+/**
+ * Address: 0x004F25B0 (FUN_004F25B0, ?WIN_GetMainWindow@Moho@@YAPAVwxWindow@@XZ)
+ *
+ * What it does:
+ * Returns the process-global main-window owner pointer.
+ */
+wxWindowBase* moho::WIN_GetMainWindow()
+{
+  return sMainWindow;
+}
+
+/**
+ * Address: 0x004F25C0 (FUN_004F25C0, ?WIN_SetMainWindow@Moho@@YAXPAVwxWindow@@@Z)
+ *
+ * What it does:
+ * Updates the process-global main-window owner pointer.
+ */
 void moho::WIN_SetMainWindow(wxWindowBase* const mainWindow)
 {
   sMainWindow = mainWindow;
@@ -3146,6 +3573,7 @@ void moho::WINX_InitSplash(const gpg::StrArg filename)
 
 /**
  * Address: 0x004F67E0 (FUN_004F67E0, ?WINX_PrecreateLogWindow@Moho@@YAXXZ)
+ * Thunk entry: 0x004F3CD0 (FUN_004F3CD0)
  *
  * What it does:
  * Lazily allocates the global log window object and stores it under the

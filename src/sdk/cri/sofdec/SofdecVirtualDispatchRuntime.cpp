@@ -52,6 +52,7 @@
 
   /**
    * Address: 0x00B208C0 (SofDecVirt::Func4)
+   * Address: 0x00934810 (FUN_00934810)
    *
    * What it does:
    * Thunk slot forwarding to timing-state reset helper.

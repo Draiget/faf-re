@@ -2,14 +2,21 @@
 
 #include <cstdint>
 #include <limits>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/math/QuaternionMath.h"
+
+namespace moho
+{
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
 
 namespace
 {
@@ -31,6 +38,22 @@ namespace
     return sType;
   }
 
+  /**
+   * Address: 0x0054D000 (FUN_0054D000)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `CAniPoseBone`.
+   */
+  [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
+  {
+    gpg::RType* type = moho::CAniPoseBone::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CAniPoseBone));
+      moho::CAniPoseBone::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedCAniSkelType()
   {
     static gpg::RType* sType = nullptr;
@@ -38,6 +61,236 @@ namespace
       sType = gpg::LookupRType(typeid(moho::CAniSkel));
     }
     return sType;
+  }
+
+  struct SerSaveLoadHelperNodeView
+  {
+    void* mVTable;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mLoadCallback;
+    gpg::RType::save_func_t mSaveCallback;
+  };
+  static_assert(
+    offsetof(SerSaveLoadHelperNodeView, mHelperNext) == 0x04,
+    "SerSaveLoadHelperNodeView::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SerSaveLoadHelperNodeView, mHelperPrev) == 0x08,
+    "SerSaveLoadHelperNodeView::mHelperPrev offset must be 0x08"
+  );
+  static_assert(sizeof(SerSaveLoadHelperNodeView) == 0x14, "SerSaveLoadHelperNodeView size must be 0x14");
+
+  SerSaveLoadHelperNodeView gCAniPoseSerializer{};
+  SerSaveLoadHelperNodeView gCAniPoseBoneSerializer{};
+
+  [[nodiscard]] gpg::SerHelperBase* HelperNodeSelf(SerSaveLoadHelperNodeView& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* ResetHelperNodeLinks(SerSaveLoadHelperNodeView& helper) noexcept
+  {
+    helper.mHelperNext->mPrev = helper.mHelperPrev;
+    helper.mHelperPrev->mNext = helper.mHelperNext;
+    gpg::SerHelperBase* const self = HelperNodeSelf(helper);
+    helper.mHelperPrev = self;
+    helper.mHelperNext = self;
+    return self;
+  }
+
+  void DeserializeCAniPoseSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const object = reinterpret_cast<moho::CAniPose*>(static_cast<std::uintptr_t>(objectPtr));
+    object->MemberDeserialize(archive);
+  }
+
+  void SerializeCAniPoseSerializerCallback(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const object = reinterpret_cast<moho::CAniPose*>(static_cast<std::uintptr_t>(objectPtr));
+    object->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x0054DEB0 (FUN_0054DEB0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards archive load to
+   * `moho::CAniPose::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCAniPoseRegisterAdapter(moho::CAniPose* const pose, gpg::ReadArchive* const archive)
+  {
+    if (!pose) {
+      return;
+    }
+    pose->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0054DF20 (FUN_0054DF20)
+   *
+   * What it does:
+   * Materializes one temporary `RRef_CAniPoseBone` and copies its object/type
+   * lanes into caller-owned output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::RRef* PackCAniPoseBoneRef(
+    gpg::RRef* const out,
+    moho::CAniPoseBone* const value
+  )
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    gpg::RRef tmp{};
+    (void)gpg::RRef_CAniPoseBone(&tmp, value);
+    out->mObj = tmp.mObj;
+    out->mType = tmp.mType;
+    return out;
+  }
+
+  /**
+   * Address: 0x0054DF80 (FUN_0054DF80)
+   *
+   * What it does:
+   * Reads one archive object lane using cached `CAniPoseBone` reflection type.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadCAniPoseBoneArchiveObjectLane(
+    gpg::ReadArchive* const archive,
+    void* const objectStorage,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (!archive) {
+      return nullptr;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    archive->Read(CachedCAniPoseBoneType(), objectStorage, owner);
+    return archive;
+  }
+
+  /**
+   * Address: 0x0054DFC0 (FUN_0054DFC0)
+   *
+   * What it does:
+   * Writes one archive object lane using cached `CAniPoseBone` reflection type.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteCAniPoseBoneArchiveObjectLane(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot,
+    const gpg::RRef* const ownerRef
+  )
+  {
+    if (!archive) {
+      return nullptr;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    archive->Write(CachedCAniPoseBoneType(), objectSlot, owner);
+    return archive;
+  }
+
+  void DeserializeCAniPoseBoneSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::CAniPoseBone*>(static_cast<std::uintptr_t>(objectPtr));
+    object->MemberDeserialize(archive);
+  }
+
+  void SerializeCAniPoseBoneSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const object = reinterpret_cast<moho::CAniPoseBone*>(static_cast<std::uintptr_t>(objectPtr));
+    object->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x0054C5E0 (FUN_0054C5E0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAniPoseSerializer` helper storage
+   * and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseSerializerStartupThunk() noexcept
+  {
+    gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseSerializer);
+    gCAniPoseSerializer.mHelperPrev = self;
+    gCAniPoseSerializer.mHelperNext = self;
+    gCAniPoseSerializer.mLoadCallback = &DeserializeCAniPoseSerializerCallback;
+    gCAniPoseSerializer.mSaveCallback = &SerializeCAniPoseSerializerCallback;
+    return &gCAniPoseSerializer;
+  }
+
+  /**
+   * Address: 0x0054C8C0 (FUN_0054C8C0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAniPoseBoneSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseBoneSerializerStartupThunk() noexcept
+  {
+    gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseBoneSerializer);
+    gCAniPoseBoneSerializer.mHelperPrev = self;
+    gCAniPoseBoneSerializer.mHelperNext = self;
+    gCAniPoseBoneSerializer.mLoadCallback = &DeserializeCAniPoseBoneSerializerCallback;
+    gCAniPoseBoneSerializer.mSaveCallback = &SerializeCAniPoseBoneSerializerCallback;
+    return &gCAniPoseBoneSerializer;
+  }
+
+  /**
+   * Address: 0x0054BA60 (FUN_0054BA60)
+   *
+   * What it does:
+   * Unlinks `CAniPoseSerializer` helper node from the intrusive helper list
+   * and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodePrimary() noexcept
+  {
+    return ResetHelperNodeLinks(gCAniPoseSerializer);
+  }
+
+  /**
+   * Address: 0x0054BA90 (FUN_0054BA90)
+   *
+   * What it does:
+   * Secondary entrypoint for `CAniPoseSerializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetHelperNodeLinks(gCAniPoseSerializer);
+  }
+
+  /**
+   * Address: 0x0054BFD0 (FUN_0054BFD0)
+   *
+   * What it does:
+   * Unlinks `CAniPoseBoneSerializer` helper node from the intrusive helper
+   * list and restores self-linked sentinel links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodePrimary() noexcept
+  {
+    return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
+  }
+
+  /**
+   * Address: 0x0054C000 (FUN_0054C000)
+   *
+   * What it does:
+   * Secondary entrypoint for `CAniPoseBoneSerializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodeSecondary() noexcept
+  {
+    return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
   }
 
   template <typename TObject>
@@ -83,12 +336,290 @@ namespace
     return transform;
   }
 
+  struct PoseDualTransformTailLaneView
+  {
+    float lane00;
+    float lane04;
+    float lane08;
+    float lane0C;
+    float lane10;
+    float lane14;
+    float lane18;
+    float lane1C;
+    float lane20;
+    float lane24;
+    float lane28;
+    float lane2C;
+    float lane30;
+    float lane34;
+    float lane38;
+    float lane3C;
+  };
+  static_assert(sizeof(PoseDualTransformTailLaneView) == 0x40, "PoseDualTransformTailLaneView size must be 0x40");
+
+  /**
+   * Address: 0x0054C960 (FUN_0054C960)
+   *
+   * What it does:
+   * Initializes the recovered tail-float lanes used by one paired-transform
+   * pose payload: sets both scale-diagonal lanes to `1.0f` and clears the
+   * remaining tail lanes.
+   */
+  [[maybe_unused]] PoseDualTransformTailLaneView* InitializePoseDualTransformTailLanes(
+    PoseDualTransformTailLaneView* const laneView
+  ) noexcept
+  {
+    if (laneView == nullptr) {
+      return nullptr;
+    }
+
+    laneView->lane08 = 1.0f;
+    laneView->lane0C = 0.0f;
+    laneView->lane10 = 0.0f;
+    laneView->lane14 = 0.0f;
+    laneView->lane18 = 0.0f;
+    laneView->lane1C = 0.0f;
+    laneView->lane20 = 0.0f;
+    laneView->lane24 = 1.0f;
+    laneView->lane28 = 0.0f;
+    laneView->lane2C = 0.0f;
+    laneView->lane30 = 0.0f;
+    laneView->lane34 = 0.0f;
+    laneView->lane38 = 0.0f;
+    laneView->lane3C = 0.0f;
+    return laneView;
+  }
+
+  [[nodiscard]] constexpr std::intptr_t PoseBoneStrideBytes() noexcept
+  {
+    return static_cast<std::intptr_t>(sizeof(moho::CAniPoseBone));
+  }
+
+  [[nodiscard]] moho::CAniPoseBone* PoseBoneByteOffset(
+    moho::CAniPoseBone* const begin,
+    const std::int32_t elementOffset
+  ) noexcept
+  {
+    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
+    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
+    return reinterpret_cast<moho::CAniPoseBone*>(beginBytes + offsetBytes);
+  }
+
+  [[nodiscard]] const moho::CAniPoseBone* PoseBoneByteOffset(
+    const moho::CAniPoseBone* const begin,
+    const std::int32_t elementOffset
+  ) noexcept
+  {
+    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
+    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
+    return reinterpret_cast<const moho::CAniPoseBone*>(beginBytes + offsetBytes);
+  }
+
+  /**
+   * Address: 0x0054C210 (FUN_0054C210)
+   *
+   * What it does:
+   * Initializes one pose-bone array runtime lane set to use its inline storage
+   * block: begin/end/original point at inline, capacity points one element past.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* InitializePoseBoneArrayInlineLanes(
+    moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    storage->mBegin = &storage->mInlineStorage;
+    storage->mEnd = &storage->mInlineStorage;
+    storage->mCapacity = &storage->mInlineStorage + 1;
+    storage->mOriginal = &storage->mInlineStorage;
+    return storage;
+  }
+
+  /**
+   * Address: 0x0054C260 (FUN_0054C260)
+   *
+   * What it does:
+   * Returns one pose-bone array size lane by dividing `(end - begin)` bytes by
+   * `sizeof(CAniPoseBone)`.
+   */
+  [[maybe_unused]] [[nodiscard]] int PoseBoneArrayCountFromEnd(const moho::CAniPoseBoneArray* const storage) noexcept
+  {
+    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(storage->mBegin);
+    const std::intptr_t endBytes = reinterpret_cast<std::intptr_t>(storage->mEnd);
+    return static_cast<int>((endBytes - beginBytes) / PoseBoneStrideBytes());
+  }
+
+  /**
+   * Address: 0x0054C320 (FUN_0054C320)
+   *
+   * What it does:
+   * Returns one mutable pose-bone pointer lane at `begin + index`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone* PoseBoneArrayAt(
+    const std::int32_t index,
+    moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    return PoseBoneByteOffset(storage->mBegin, index);
+  }
+
+  /**
+   * Address: 0x0054C330 (FUN_0054C330)
+   *
+   * What it does:
+   * Returns one const pose-bone pointer lane at `begin + index`.
+   */
+  [[maybe_unused]] [[nodiscard]] const moho::CAniPoseBone* PoseBoneArrayAt(
+    const std::int32_t index,
+    const moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    return PoseBoneByteOffset(storage->mBegin, index);
+  }
+
+  /**
+   * Address: 0x0054C340 (FUN_0054C340)
+   *
+   * What it does:
+   * Clears one pose-bone array tail lane triplet (`end`, `capacity`,
+   * `original`) and leaves `begin` unchanged.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* ClearPoseBoneArrayTailLanes(
+    moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    storage->mEnd = nullptr;
+    storage->mCapacity = nullptr;
+    storage->mOriginal = nullptr;
+    return storage;
+  }
+
+  /**
+   * Address: 0x0054CCE0 (FUN_0054CCE0)
+   *
+   * What it does:
+   * Seeds one pose-bone array with `begin=end=original=beginLane` and
+   * `capacity=beginLane+1`.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* SeedPoseBoneArraySingleElementSpan(
+    moho::CAniPoseBoneArray* const storage,
+    moho::CAniPoseBone* const beginLane
+  ) noexcept
+  {
+    storage->mBegin = beginLane;
+    storage->mEnd = beginLane;
+    storage->mCapacity = PoseBoneByteOffset(beginLane, 1);
+    storage->mOriginal = beginLane;
+    return storage;
+  }
+
+  /**
+   * Address: 0x0054CD20 (FUN_0054CD20)
+   *
+   * What it does:
+   * Clears one pose-bone array head lane pair (`begin`, `end`).
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* ClearPoseBoneArrayHeadLanes(
+    moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    storage->mBegin = nullptr;
+    storage->mEnd = nullptr;
+    return storage;
+  }
+
+  /**
+   * Address: 0x0054CDC0 (FUN_0054CDC0)
+   *
+   * What it does:
+   * Stores one pose-bone pointer lane into caller output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBonePointerLane(
+    moho::CAniPoseBone** const outLane,
+    moho::CAniPoseBone* const valueLane
+  ) noexcept
+  {
+    *outLane = valueLane;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x0054CDD0 (FUN_0054CDD0)
+   *
+   * What it does:
+   * Stores one pose-bone array `end` lane into caller output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneEndLanePrimary(
+    moho::CAniPoseBone** const outLane,
+    const moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    *outLane = storage->mEnd;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x0054CDE0 (FUN_0054CDE0)
+   *
+   * What it does:
+   * Stores one pose-bone array `capacity` lane into caller output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneCapacityLanePrimary(
+    moho::CAniPoseBone** const outLane,
+    const moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    *outLane = storage->mCapacity;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x0054D020 (FUN_0054D020)
+   *
+   * What it does:
+   * Alias entrypoint that stores one pose-bone array `end` lane into caller
+   * output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneEndLaneSecondary(
+    moho::CAniPoseBone** const outLane,
+    const moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    *outLane = storage->mEnd;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x0054D030 (FUN_0054D030)
+   *
+   * What it does:
+   * Alias entrypoint that stores one pose-bone array `capacity` lane into
+   * caller output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBone** StorePoseBoneCapacityLaneSecondary(
+    moho::CAniPoseBone** const outLane,
+    const moho::CAniPoseBoneArray* const storage
+  ) noexcept
+  {
+    *outLane = storage->mCapacity;
+    return outLane;
+  }
+
+  /**
+   * Address: 0x0054D740 (FUN_0054D740)
+   *
+   * What it does:
+   * Returns one pose-bone array capacity count lane by dividing
+   * `(capacity - begin)` bytes by `sizeof(CAniPoseBone)`.
+   */
+  [[maybe_unused]] [[nodiscard]] int PoseBoneArrayCapacityFromBegin(const moho::CAniPoseBoneArray* const storage) noexcept
+  {
+    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(storage->mBegin);
+    const std::intptr_t capacityBytes = reinterpret_cast<std::intptr_t>(storage->mCapacity);
+    return static_cast<int>((capacityBytes - beginBytes) / PoseBoneStrideBytes());
+  }
+
   void InitializePoseBonesInlineStorage(moho::CAniPose& pose)
   {
-    pose.mBones.mBegin = &pose.mBones.mInlineStorage;
-    pose.mBones.mEnd = &pose.mBones.mInlineStorage;
-    pose.mBones.mCapacity = reinterpret_cast<moho::CAniPoseBone*>(reinterpret_cast<std::uint8_t*>(&pose) + 0x84);
-    pose.mBones.mOriginal = &pose.mBones.mInlineStorage;
+    (void)InitializePoseBoneArrayInlineLanes(&pose.mBones);
   }
 
   [[nodiscard]] gpg::fastvector_runtime_view<moho::CAniPoseBone>&
@@ -105,6 +636,32 @@ namespace
   {
     auto& runtimeView = PoseBoneRuntimeView(storage);
     gpg::FastVectorRuntimeResizeFill(&fillValue, count, runtimeView);
+  }
+
+  /**
+   * Address: 0x0054DCF0 (FUN_0054DCF0)
+   *
+   * What it does:
+   * Copy-constructs one contiguous `CAniPoseBone` range
+   * `[sourceBegin, sourceEnd)` into destination storage and returns the end of
+   * the constructed destination range.
+   */
+  [[maybe_unused]] moho::CAniPoseBone* CopyConstructCAniPoseBoneRangeForward(
+    moho::CAniPoseBone* destinationBegin,
+    const moho::CAniPoseBone* sourceBegin,
+    const moho::CAniPoseBone* sourceEnd
+  )
+  {
+    moho::CAniPoseBone* destinationCursor = destinationBegin;
+    for (const moho::CAniPoseBone* sourceCursor = sourceBegin;
+         sourceCursor != sourceEnd;
+         ++sourceCursor, ++destinationCursor) {
+      if (destinationCursor != nullptr) {
+        ::new (destinationCursor) moho::CAniPoseBone(*sourceCursor);
+      }
+    }
+
+    return destinationCursor;
   }
 
   [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
@@ -147,6 +704,23 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CAniPoseBone::sType = nullptr;
+  gpg::RType* CAniPose::sType = nullptr;
+
+  /**
+   * Address: 0x0063D210 (FUN_0063D210, boost::shared_ptr_CAniPose::shared_ptr_CAniPose)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<CAniPose>` from one raw pose pointer lane.
+   */
+  boost::shared_ptr<CAniPose>* ConstructSharedAniPoseFromRaw(
+    boost::shared_ptr<CAniPose>* const outPose,
+    CAniPose* const pose
+  )
+  {
+    return ::new (outPose) boost::shared_ptr<CAniPose>(pose);
+  }
+
   /**
    * Address: 0x0054C9C0 (FUN_0054C9C0, Moho::CAniPoseBone::CAniPoseBone)
    *
@@ -169,6 +743,85 @@ namespace moho
     pad_1E_1F[1] = copy.pad_1E_1F[1];
     pad_4A_4B[0] = copy.pad_4A_4B[0];
     pad_4A_4B[1] = copy.pad_4A_4B[1];
+  }
+
+  /**
+   * Address: 0x0054BC00 (FUN_0054BC00, Moho::CAniPoseBone::Rotate)
+   *
+   * What it does:
+   * Applies one local-space quaternion delta to this bone orientation and
+   * marks the owning pose lane dirty for composite rebuild.
+   */
+  void CAniPoseBone::Rotate(const Wm3::Quaternionf& rotation)
+  {
+    mLocalTransform.orient_ = Wm3::Quaternionf::Multiply(rotation, mLocalTransform.orient_);
+    if (mPose != nullptr) {
+      mPose->MarkBoneDirty(mIdx);
+    }
+  }
+
+  /**
+   * Address: 0x0054BDD0 (FUN_0054BDD0)
+   *
+   * What it does:
+   * Replaces this bone local transform and marks the owning pose lane dirty.
+   */
+  void CAniPoseBone::SetLocalTransform(const VTransform& transform)
+  {
+    mLocalTransform = transform;
+    if (mPose != nullptr) {
+      mPose->MarkBoneDirty(mIdx);
+    }
+  }
+
+  /**
+   * Address: 0x0054BEC0 (FUN_0054BEC0, Moho::CAniPoseBone::GetCompositeTransform)
+   *
+   * What it does:
+   * Returns this bone composite transform, lazily rebuilding from parent/local
+   * lanes when the dirty flag is set.
+   */
+  const VTransform& CAniPoseBone::GetCompositeTransform() const
+  {
+    auto* const self = const_cast<CAniPoseBone*>(this);
+    if (self->mCompositeDirty == 0u) {
+      return self->mCompositeTransform;
+    }
+
+    if (self->mCompositeIsLocal != 0u) {
+      if (self->mParent != nullptr) {
+        self->mCompositeTransform = VTransform::Compose(self->mLocalTransform, self->mParent->GetCompositeTransform());
+      } else if (self->mPose != nullptr) {
+        self->mCompositeTransform = VTransform::Compose(self->mLocalTransform, self->mPose->mLocalTransform);
+      } else {
+        self->mCompositeTransform = self->mLocalTransform;
+      }
+    } else {
+      self->mCompositeTransform = self->mLocalTransform;
+    }
+
+    self->mCompositeDirty = 0u;
+    return self->mCompositeTransform;
+  }
+
+  /**
+   * Address: 0x0063EE30 (FUN_0063EE30, sub_63EE30)
+   *
+   * What it does:
+   * Resolves this pose-bone lane into the owning skeleton-bone lane and
+   * returns null when the bone index is not valid for that skeleton.
+   */
+  const SAniSkelBone* CAniPoseBone::ResolveSkeletonBone() const
+  {
+    const boost::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
+    const CAniSkel* const skeleton = skeletonHandle.get();
+    const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
+    const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
+    if (bonesBegin
+        && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
+      return bonesBegin + boneIndex;
+    }
+    return nullptr;
   }
 
   /**
@@ -584,6 +1237,7 @@ namespace moho
 
   /**
    * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+   * Address: 0x007DB020 (FUN_007DB020)
    */
   boost::shared_ptr<const CAniSkel> CAniPose::GetSkeleton() const
   {
@@ -618,6 +1272,112 @@ namespace moho
         candidate.mCompositeDirty = 1u;
       }
     }
+  }
+
+  /**
+   * Address: 0x0054BD30 (FUN_0054BD30)
+   *
+   * What it does:
+   * Rotates one local-space position delta by the bone local orientation,
+   * accumulates it into local position, and marks the bone dirty.
+   */
+  [[maybe_unused]] void ApplyBoneLocalPositionDelta(CAniPoseBone* const bone, const Wm3::Vector3f& localDelta)
+  {
+    Wm3::Vector3f rotatedDelta{};
+    const Wm3::Vector3f* const deltaInPoseSpace = MultQuadVec(&rotatedDelta, &localDelta, &bone->mLocalTransform.orient_);
+
+    bone->mLocalTransform.pos_.x += deltaInPoseSpace->x;
+    bone->mLocalTransform.pos_.y += deltaInPoseSpace->y;
+    bone->mLocalTransform.pos_.z += deltaInPoseSpace->z;
+
+    // Mirrors FUN_0054BD30's tail call into FUN_0054B990 without requiring
+    // private-member access from this translation-unit local helper.
+    const int idx = bone->mIdx;
+    CAniPose* const pose = bone->mPose;
+    CAniPoseBone* const bonesBegin = pose->mBones.begin();
+    CAniPoseBone* const bonesEnd = pose->mBones.end();
+    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesEnd < bonesBegin || idx < 0) {
+      return;
+    }
+
+    const int boneCount = static_cast<int>(bonesEnd - bonesBegin);
+    if (idx >= boneCount) {
+      return;
+    }
+
+    CAniPoseBone& baseBone = bonesBegin[idx];
+    if (baseBone.mCompositeDirty != 0u) {
+      return;
+    }
+
+    baseBone.mCompositeDirty = 1u;
+    for (int boneIndex = idx + 1; boneIndex < boneCount; ++boneIndex) {
+      CAniPoseBone& candidate = bonesBegin[boneIndex];
+      if (candidate.mParent != nullptr && candidate.mParent->mCompositeDirty != 0u) {
+        candidate.mCompositeDirty = 1u;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x0054BD80 (FUN_0054BD80)
+   *
+   * What it does:
+   * Composes one pose-bone local transform with an incoming transform and then
+   * marks that bone dirty through its owning pose/index lanes.
+   */
+  void CAniPose::ApplyBoneLocalTransform(CAniPoseBone* const bone, const VTransform& transform)
+  {
+    bone->mLocalTransform = VTransform::Compose(transform, bone->mLocalTransform);
+    bone->mPose->MarkBoneDirty(bone->mIdx);
+  }
+
+  /**
+   * Address: 0x0054F380 (FUN_0054F380, Moho::CAniPose::MemberDeserialize)
+   *
+   * What it does:
+   * Loads skeleton/shared-pointer state, scalar/local transform lanes, and the
+   * pose-bone array, then rebuilds each bone's owning-pose/index/parent links.
+   */
+  void CAniPose::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    boost::SharedPtrRaw<CAniSkel> skeletonRaw{};
+    gpg::ReadPointerShared_CAniSkel(skeletonRaw, archive, nullOwner);
+    mSkeleton = boost::SharedPtrFromRawRetained(skeletonRaw);
+    archive->ReadFloat(&mScale);
+    archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
+    archive->Read(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
+
+    CAniPoseBone* const bonesBegin = mBones.begin();
+    CAniPoseBone* const bonesEnd = mBones.end();
+    const std::uint32_t boneCount =
+      (bonesBegin && bonesEnd) ? static_cast<std::uint32_t>(bonesEnd - bonesBegin) : 0u;
+
+    for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+      CAniPoseBone& bone = bonesBegin[boneIndex];
+      bone.mPose = this;
+      bone.mIdx = static_cast<std::int32_t>(boneIndex);
+
+      std::int32_t parentIndex = -1;
+      if (mSkeleton) {
+        if (const SAniSkelBone* const skeletonBone = mSkeleton->GetBone(boneIndex); skeletonBone != nullptr) {
+          parentIndex = skeletonBone->mParentBoneIndex;
+        }
+      }
+
+      if (parentIndex >= 0 && static_cast<std::uint32_t>(parentIndex) < boneCount) {
+        bone.mParent = &bonesBegin[parentIndex];
+      } else {
+        bone.mParent = nullptr;
+      }
+    }
+
+    archive->ReadFloat(&mMaxOffset);
   }
 
   /**

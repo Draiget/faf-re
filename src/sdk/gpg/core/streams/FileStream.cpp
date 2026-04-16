@@ -1,6 +1,7 @@
 #include "FileStream.h"
 
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 
 #include "gpg/core/containers/String.h"
@@ -29,6 +30,17 @@ namespace
 
     constexpr const char* kReadModeError = "Attempt to read from a file that isn't open for input.";
     constexpr const char* kWriteModeError = "Attempt to write to a file that isn't open for output.";
+
+    /**
+     * Address: 0x009557D0 (FUN_009557D0)
+     *
+     * What it does:
+     * Pass-through lane that returns the input 64-bit value unchanged.
+     */
+    [[maybe_unused]] [[nodiscard]] std::int64_t IdentityInt64StreamLane(const std::int64_t value) noexcept
+    {
+        return value;
+    }
 }
 
 /**
@@ -39,6 +51,17 @@ namespace
  */
 FileStream::IOError::IOError(const DWORD messageId)
     : std::runtime_error(BuildMessage(messageId)), mMsg(messageId)
+{
+}
+
+/**
+ * Address: 0x00955A50 (FUN_00955A50)
+ *
+ * What it does:
+ * Copy-constructs IOError by copying runtime_error payload and error id lane.
+ */
+FileStream::IOError::IOError(const IOError& other)
+    : std::runtime_error(other), mMsg(other.mMsg)
 {
 }
 

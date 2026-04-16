@@ -19,9 +19,9 @@ namespace moho
   {
   public:
     /**
-     * Address context:
-     * Inlined in mesh/skydome constructors (`0x007DD5E0`, `0x007DD680`,
-     * `0x008149E0`).
+     * Address: 0x007DD660 (FUN_007DD660, ??0CResourceWatcher@Moho@@QAE@@Z)
+     * Also inlined in mesh/skydome constructor lanes (`0x007DD5E0`,
+     * `0x007DD680`, `0x008149E0`).
      *
      * What it does:
      * Initializes watched-resource small-vector storage to inline mode.

@@ -19,6 +19,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A1D0 (FUN_0069A1D0, sub_69A1D0)
+   *
+   * What it does:
+   * Returns true when the vector squared-length is within `0.001f` of unit
+   * length.
+   */
+  bool IsUnitLengthVector3f(const Wm3::Vector3f& value) noexcept
+  {
+    const float squaredLength = (value.x * value.x) + (value.y * value.y) + (value.z * value.z);
+    return std::fabs(squaredLength - 1.0f) <= 0.001f;
+  }
+
+  /**
    * Address: 0x004CC960 (FUN_004CC960)
    *
    * What it does:
@@ -30,6 +43,21 @@ namespace moho
     const float dy = to.y - from.y;
     const float dz = to.z - from.z;
     return (dx * dx) + (dy * dy) + (dz * dz);
+  }
+
+  /**
+   * Address: 0x004CCB40 (FUN_004CCB40)
+   *
+   * What it does:
+   * Writes two consecutive Vector3f lanes from the shared zero-vector payload
+   * and returns the destination pair base pointer.
+   */
+  [[maybe_unused]] Wm3::Vector3f* InitializeZeroVector3fPair(Wm3::Vector3f* const destinationPair) noexcept
+  {
+    static const Wm3::Vector3f kZeroVector{0.0f, 0.0f, 0.0f};
+    destinationPair[0] = kZeroVector;
+    destinationPair[1] = kZeroVector;
+    return destinationPair;
   }
 
   /**
@@ -49,6 +77,18 @@ namespace moho
     }
 
     return 2;
+  }
+
+  /**
+   * Address: 0x00565A10 (FUN_00565A10)
+   *
+   * What it does:
+   * Returns the planar heading angle in radians for one vector using
+   * `atan2(x, z)`.
+   */
+  float VEC_HeadingFromXZ(const Wm3::Vector3f* const value) noexcept
+  {
+    return std::atan2(value->x, value->z);
   }
 
   /**
@@ -72,6 +112,33 @@ namespace moho
     vector->y *= scale;
     vector->z *= scale;
     return true;
+  }
+
+  /**
+   * Address: 0x004ED810 (FUN_004ED810)
+   *
+   * What it does:
+   * Scales one vector in place by `1/divisor`; when `divisor == 0`, writes
+   * `FLT_MAX` into all lanes.
+   */
+  Wm3::Vector3f* VecScaleByReciprocalOrSetMax(
+    Wm3::Vector3f* const vector,
+    const float divisor
+  ) noexcept
+  {
+    if (divisor == 0.0f) {
+      constexpr float kMaxFloat = std::numeric_limits<float>::max();
+      vector->x = kMaxFloat;
+      vector->y = kMaxFloat;
+      vector->z = kMaxFloat;
+      return vector;
+    }
+
+    const float reciprocal = 1.0f / divisor;
+    vector->x *= reciprocal;
+    vector->y *= reciprocal;
+    vector->z *= reciprocal;
+    return vector;
   }
 
   /**
@@ -107,6 +174,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A230 (FUN_0069A230)
+   *
+   * What it does:
+   * Reflects one incident vector about one surface-normal vector and writes
+   * the resulting vector lanes to `destination`.
+   */
+  Wm3::Vector3f* ReflectVector3fAcrossNormal(
+    Wm3::Vector3f* const destination,
+    const Wm3::Vector3f* const incident,
+    const Wm3::Vector3f* const normal
+  ) noexcept
+  {
+    const float projectionScale =
+      ((incident->x * normal->x) + (incident->y * normal->y) + (incident->z * normal->z)) * 2.0f;
+    destination->x = incident->x - (normal->x * projectionScale);
+    destination->y = incident->y - (normal->y * projectionScale);
+    destination->z = incident->z - (normal->z * projectionScale);
+    return destination;
+  }
+
+  /**
    * Address: 0x004EBEC0 (FUN_004EBEC0, Moho::Zeroed<Wm3::Quaternion<float>>)
    *
    * What it does:
@@ -127,6 +215,19 @@ namespace moho
     }
 
     return zeroQuaternion;
+  }
+
+  /**
+   * Address: 0x004EAD30 (FUN_004EAD30, Moho::Zeroed<Wm3::Vector3<float>>)
+   *
+   * What it does:
+   * Returns one process-static zero vector singleton.
+   */
+  template <>
+  const Wm3::Vector3f& Zeroed<Wm3::Vector3f>()
+  {
+    static Wm3::Vector3f zeroVector{0.0f, 0.0f, 0.0f};
+    return zeroVector;
   }
 
   /**

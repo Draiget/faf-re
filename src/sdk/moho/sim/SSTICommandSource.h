@@ -69,6 +69,20 @@ namespace moho
   );
 
   /**
+   * Address: 0x007CECC0 (FUN_007CECC0)
+   *
+   * What it does:
+   * Copy-assigns one half-open `SSTICommandSource` source range into
+   * destination lanes and, if assignment throws, destroys already-written
+   * destination entries before rethrowing.
+   */
+  SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
+    const SSTICommandSource* sourceBegin,
+    const SSTICommandSource* sourceEnd,
+    SSTICommandSource* destinationBegin
+  );
+
+  /**
    * Address: 0x007C84D0 (FUN_007C84D0, func_vec_SSTICommandSource_Append)
    *
    * What it does:

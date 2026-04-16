@@ -68,6 +68,14 @@ namespace gpg
    * Creates a typed `RRef` lane for one `SBlackListInfo` object pointer.
    */
   gpg::RRef* RRef_SBlackListInfo(gpg::RRef* outRef, moho::SBlackListInfo* value);
+
+  /**
+   * Address: 0x006DDA30 (FUN_006DDA30)
+   *
+   * What it does:
+   * Packs one `RRef_SBlackListInfo` lane into caller-owned output storage.
+   */
+  gpg::RRef* PackRRef_SBlackListInfo(gpg::RRef* outRef, moho::SBlackListInfo* value);
 } // namespace gpg
 
 namespace moho
@@ -89,4 +97,3 @@ namespace moho
    */
   int register_SBlackListInfoVectorType_AtExit();
 } // namespace moho
-

@@ -2,7 +2,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <new>
+#include <type_traits>
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
@@ -99,6 +101,192 @@ namespace
   {
     static_cast<void>(sizeof(TValue));
     static_cast<void>(slotObject);
+  }
+
+  template <class TValue>
+  [[nodiscard]] bool ParseLegacyIntegerLexicalBounded(
+    const char* const text,
+    const char* const end,
+    TValue* const outValue
+  ) noexcept
+  {
+    using UnsignedValue = std::make_unsigned_t<TValue>;
+
+    const char* cursor = text;
+    bool isNegative = false;
+    if (*cursor == '-') {
+      isNegative = true;
+      ++cursor;
+    }
+
+    std::uint32_t radix = 10u;
+    if (*cursor == '0') {
+      if (cursor[1] == 'x') {
+        radix = 16u;
+        cursor += 2;
+      } else {
+        radix = 8u;
+      }
+    }
+
+    UnsignedValue value = 0;
+    char ch = *cursor;
+    do {
+      int digit = 0;
+      const unsigned char decimalDigit = static_cast<unsigned char>(ch - '0');
+      if (decimalDigit <= 9u) {
+        digit = static_cast<int>(ch - '0');
+      } else {
+        const unsigned char lowerAlphaDigit = static_cast<unsigned char>(ch - 'a');
+        if (lowerAlphaDigit > 0x19u && ch != 'A') {
+          return false;
+        }
+        digit = static_cast<int>(ch - 'W');
+      }
+
+      if (digit >= static_cast<int>(radix)) {
+        return false;
+      }
+
+      value = static_cast<UnsignedValue>(
+        static_cast<UnsignedValue>(value * static_cast<UnsignedValue>(radix))
+        + static_cast<UnsignedValue>(digit)
+      );
+
+      ++cursor;
+      ch = *cursor;
+    } while (ch != '\0' && cursor != end);
+
+    if (isNegative) {
+      value = static_cast<UnsignedValue>(0u - value);
+    }
+
+    *outValue = static_cast<TValue>(value);
+    return true;
+  }
+
+  /**
+   * Address: 0x008DDA60 (FUN_008DDA60)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `char` destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeCharLexical(
+    const char* const text,
+    const char* const end,
+    char* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<char>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DDCC0 (FUN_008DDCC0)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `short` destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeShortLexical(
+    const char* const text,
+    const char* const end,
+    short* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<short>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DE0E0 (FUN_008DE0E0)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `long` destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeLongLexical(
+    const char* const text,
+    const char* const end,
+    long* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<long>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DE340 (FUN_008DE340)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `signed char` destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeSignedCharLexical(
+    const char* const text,
+    const char* const end,
+    signed char* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<signed char>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DE590 (FUN_008DE590)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `unsigned char`
+   * destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeUnsignedCharLexical(
+    const char* const text,
+    const char* const end,
+    unsigned char* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<unsigned char>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DE7F0 (FUN_008DE7F0)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `unsigned short`
+   * destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeUnsignedShortLexical(
+    const char* const text,
+    const char* const end,
+    unsigned short* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<unsigned short>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DEA50 (FUN_008DEA50)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `unsigned int`
+   * destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeUnsignedIntLexical(
+    const char* const text,
+    const char* const end,
+    unsigned int* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<unsigned int>(text, end, outValue);
+  }
+
+  /**
+   * Address: 0x008DECB0 (FUN_008DECB0)
+   *
+   * What it does:
+   * Parses one bounded lexical integer lane into one `unsigned long`
+   * destination.
+   */
+  [[nodiscard]] bool ParseRIntTypeUnsignedLongLexical(
+    const char* const text,
+    const char* const end,
+    unsigned long* const outValue
+  ) noexcept
+  {
+    return ParseLegacyIntegerLexicalBounded<unsigned long>(text, end, outValue);
   }
 
   /**
@@ -586,6 +774,294 @@ namespace
   {
     static_cast<void>(slotObject);
   }
+
+  /**
+   * Address: 0x008E2C30 (FUN_008E2C30)
+   *
+   * What it does:
+   * Binds the `char` create/destroy callback subset on one reflected type
+   * descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindCharCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewCharRef;
+    typeInfo->ctorRefFunc_ = &ConstructCharRef;
+    typeInfo->deleteFunc_ = &DeleteCharRef;
+    typeInfo->dtrFunc_ = &DestructCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2C60 (FUN_008E2C60)
+   *
+   * What it does:
+   * Binds the `char` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindCharCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyCharRef;
+    typeInfo->movRefFunc_ = &MoveCharRef;
+    typeInfo->deleteFunc_ = &DeleteCharRef;
+    typeInfo->dtrFunc_ = &DestructCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2C90 (FUN_008E2C90)
+   *
+   * What it does:
+   * Binds the `short` create/destroy callback subset on one reflected type
+   * descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindShortCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewShortRef;
+    typeInfo->ctorRefFunc_ = &ConstructShortRef;
+    typeInfo->deleteFunc_ = &DeleteShortRef;
+    typeInfo->dtrFunc_ = &DestructShortRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2CC0 (FUN_008E2CC0)
+   *
+   * What it does:
+   * Binds the `short` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindShortCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyShortRef;
+    typeInfo->movRefFunc_ = &MoveShortRef;
+    typeInfo->deleteFunc_ = &DeleteShortRef;
+    typeInfo->dtrFunc_ = &DestructShortRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2CF0 (FUN_008E2CF0)
+   *
+   * What it does:
+   * Binds the `int` create/destroy callback subset on one reflected type
+   * descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindIntCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewIntRef;
+    typeInfo->ctorRefFunc_ = &ConstructIntRef;
+    typeInfo->deleteFunc_ = &DeleteIntRef;
+    typeInfo->dtrFunc_ = &DestructIntRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2D20 (FUN_008E2D20)
+   *
+   * What it does:
+   * Binds the `int` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindIntCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyIntRef;
+    typeInfo->movRefFunc_ = &MoveIntRef;
+    typeInfo->deleteFunc_ = &DeleteIntRef;
+    typeInfo->dtrFunc_ = &DestructIntRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2D50 (FUN_008E2D50)
+   *
+   * What it does:
+   * Binds the `long` create/destroy callback subset on one reflected type
+   * descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindLongCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewLongRef;
+    typeInfo->ctorRefFunc_ = &ConstructLongRef;
+    typeInfo->deleteFunc_ = &DeleteLongRef;
+    typeInfo->dtrFunc_ = &DestructLongRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2D80 (FUN_008E2D80)
+   *
+   * What it does:
+   * Binds the `long` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindLongCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyLongRef;
+    typeInfo->movRefFunc_ = &MoveLongRef;
+    typeInfo->deleteFunc_ = &DeleteLongRef;
+    typeInfo->dtrFunc_ = &DestructLongRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2DB0 (FUN_008E2DB0)
+   *
+   * What it does:
+   * Binds the `signed char` create/destroy callback subset on one reflected
+   * type descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindSignedCharCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewSignedCharRef;
+    typeInfo->ctorRefFunc_ = &ConstructSignedCharRef;
+    typeInfo->deleteFunc_ = &DeleteSignedCharRef;
+    typeInfo->dtrFunc_ = &DestructSignedCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2DE0 (FUN_008E2DE0)
+   *
+   * What it does:
+   * Binds the `signed char` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindSignedCharCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopySignedCharRef;
+    typeInfo->movRefFunc_ = &MoveSignedCharRef;
+    typeInfo->deleteFunc_ = &DeleteSignedCharRef;
+    typeInfo->dtrFunc_ = &DestructSignedCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2E10 (FUN_008E2E10)
+   *
+   * What it does:
+   * Binds the `unsigned char` create/destroy callback subset on one reflected
+   * type descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedCharCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewUnsignedCharRef;
+    typeInfo->ctorRefFunc_ = &ConstructUnsignedCharRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedCharRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2E40 (FUN_008E2E40)
+   *
+   * What it does:
+   * Binds the `unsigned char` copy/move callback subset on one reflected
+   * type descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedCharCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyUnsignedCharRef;
+    typeInfo->movRefFunc_ = &MoveUnsignedCharRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedCharRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedCharRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2E70 (FUN_008E2E70)
+   *
+   * What it does:
+   * Binds the `unsigned short` create/destroy callback subset on one reflected
+   * type descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedShortCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewUnsignedShortRef;
+    typeInfo->ctorRefFunc_ = &ConstructUnsignedShortRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedShortRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedShortRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2EA0 (FUN_008E2EA0)
+   *
+   * What it does:
+   * Binds the `unsigned short` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedShortCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyUnsignedShortRef;
+    typeInfo->movRefFunc_ = &MoveUnsignedShortRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedShortRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedShortRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2ED0 (FUN_008E2ED0)
+   *
+   * What it does:
+   * Binds the `unsigned int` create/destroy callback subset on one reflected
+   * type descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedIntCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewUnsignedIntRef;
+    typeInfo->ctorRefFunc_ = &ConstructUnsignedIntRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedIntRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedIntRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2F00 (FUN_008E2F00)
+   *
+   * What it does:
+   * Binds the `unsigned int` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedIntCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyUnsignedIntRef;
+    typeInfo->movRefFunc_ = &MoveUnsignedIntRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedIntRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedIntRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2F30 (FUN_008E2F30)
+   *
+   * What it does:
+   * Binds the `unsigned long` create/destroy callback subset on one reflected
+   * type descriptor lane (`new/ctor/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedLongCreateDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &NewUnsignedLongRef;
+    typeInfo->ctorRefFunc_ = &ConstructUnsignedLongRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedLongRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedLongRef;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x008E2F60 (FUN_008E2F60)
+   *
+   * What it does:
+   * Binds the `unsigned long` copy/move callback subset on one reflected type
+   * descriptor lane (`copy/move/delete/dtor`).
+   */
+  [[maybe_unused]] gpg::RType* BindUnsignedLongCopyMoveDestroyRefLanes(gpg::RType* const typeInfo)
+  {
+    typeInfo->cpyRefFunc_ = &CopyUnsignedLongRef;
+    typeInfo->movRefFunc_ = &MoveUnsignedLongRef;
+    typeInfo->deleteFunc_ = &DeleteUnsignedLongRef;
+    typeInfo->dtrFunc_ = &DestructUnsignedLongRef;
+    return typeInfo;
+  }
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -643,8 +1119,26 @@ msvc8::string RIntType<T>::GetLexical(const gpg::RRef& ref) const
 template <class T>
 bool RIntType<T>::SetLexical(const gpg::RRef& ref, const char* const str) const
 {
-  *static_cast<T*>(ref.mObj) = static_cast<T>(std::strtoll(str, nullptr, 10));
-  return true;
+  T* const destination = static_cast<T*>(ref.mObj);
+  if constexpr (std::is_same_v<T, char>) {
+    return ParseRIntTypeCharLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, short>) {
+    return ParseRIntTypeShortLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, long>) {
+    return ParseRIntTypeLongLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, signed char>) {
+    return ParseRIntTypeSignedCharLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, unsigned char>) {
+    return ParseRIntTypeUnsignedCharLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, unsigned short>) {
+    return ParseRIntTypeUnsignedShortLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, unsigned int>) {
+    return ParseRIntTypeUnsignedIntLexical(str, nullptr, destination);
+  } else if constexpr (std::is_same_v<T, unsigned long>) {
+    return ParseRIntTypeUnsignedLongLexical(str, nullptr, destination);
+  } else {
+    return ParseLegacyIntegerLexicalBounded<T>(str, nullptr, destination);
+  }
 }
 
 /**
@@ -656,12 +1150,8 @@ bool RIntType<T>::SetLexical(const gpg::RRef& ref, const char* const str) const
 template <>
 void RIntType<char>::Init()
 {
-  newRefFunc_ = &NewCharRef;
-  ctorRefFunc_ = &ConstructCharRef;
-  cpyRefFunc_ = &CopyCharRef;
-  movRefFunc_ = &MoveCharRef;
-  deleteFunc_ = &DeleteCharRef;
-  dtrFunc_ = &DestructCharRef;
+  (void)BindCharCreateDestroyRefLanes(this);
+  (void)BindCharCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -673,12 +1163,8 @@ void RIntType<char>::Init()
 template <>
 void RIntType<short>::Init()
 {
-  newRefFunc_ = &NewShortRef;
-  ctorRefFunc_ = &ConstructShortRef;
-  cpyRefFunc_ = &CopyShortRef;
-  movRefFunc_ = &MoveShortRef;
-  deleteFunc_ = &DeleteShortRef;
-  dtrFunc_ = &DestructShortRef;
+  (void)BindShortCreateDestroyRefLanes(this);
+  (void)BindShortCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -690,12 +1176,8 @@ void RIntType<short>::Init()
 template <>
 void RIntType<int>::Init()
 {
-  newRefFunc_ = &NewIntRef;
-  ctorRefFunc_ = &ConstructIntRef;
-  cpyRefFunc_ = &CopyIntRef;
-  movRefFunc_ = &MoveIntRef;
-  deleteFunc_ = &DeleteIntRef;
-  dtrFunc_ = &DestructIntRef;
+  (void)BindIntCreateDestroyRefLanes(this);
+  (void)BindIntCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -707,12 +1189,8 @@ void RIntType<int>::Init()
 template <>
 void RIntType<long>::Init()
 {
-  newRefFunc_ = &NewLongRef;
-  ctorRefFunc_ = &ConstructLongRef;
-  cpyRefFunc_ = &CopyLongRef;
-  movRefFunc_ = &MoveLongRef;
-  deleteFunc_ = &DeleteLongRef;
-  dtrFunc_ = &DestructLongRef;
+  (void)BindLongCreateDestroyRefLanes(this);
+  (void)BindLongCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -724,12 +1202,8 @@ void RIntType<long>::Init()
 template <>
 void RIntType<signed char>::Init()
 {
-  newRefFunc_ = &NewSignedCharRef;
-  ctorRefFunc_ = &ConstructSignedCharRef;
-  cpyRefFunc_ = &CopySignedCharRef;
-  movRefFunc_ = &MoveSignedCharRef;
-  deleteFunc_ = &DeleteSignedCharRef;
-  dtrFunc_ = &DestructSignedCharRef;
+  (void)BindSignedCharCreateDestroyRefLanes(this);
+  (void)BindSignedCharCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -741,12 +1215,8 @@ void RIntType<signed char>::Init()
 template <>
 void RIntType<unsigned char>::Init()
 {
-  newRefFunc_ = &NewUnsignedCharRef;
-  ctorRefFunc_ = &ConstructUnsignedCharRef;
-  cpyRefFunc_ = &CopyUnsignedCharRef;
-  movRefFunc_ = &MoveUnsignedCharRef;
-  deleteFunc_ = &DeleteUnsignedCharRef;
-  dtrFunc_ = &DestructUnsignedCharRef;
+  (void)BindUnsignedCharCreateDestroyRefLanes(this);
+  (void)BindUnsignedCharCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -758,12 +1228,8 @@ void RIntType<unsigned char>::Init()
 template <>
 void RIntType<unsigned short>::Init()
 {
-  newRefFunc_ = &NewUnsignedShortRef;
-  ctorRefFunc_ = &ConstructUnsignedShortRef;
-  cpyRefFunc_ = &CopyUnsignedShortRef;
-  movRefFunc_ = &MoveUnsignedShortRef;
-  deleteFunc_ = &DeleteUnsignedShortRef;
-  dtrFunc_ = &DestructUnsignedShortRef;
+  (void)BindUnsignedShortCreateDestroyRefLanes(this);
+  (void)BindUnsignedShortCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -775,12 +1241,8 @@ void RIntType<unsigned short>::Init()
 template <>
 void RIntType<unsigned int>::Init()
 {
-  newRefFunc_ = &NewUnsignedIntRef;
-  ctorRefFunc_ = &ConstructUnsignedIntRef;
-  cpyRefFunc_ = &CopyUnsignedIntRef;
-  movRefFunc_ = &MoveUnsignedIntRef;
-  deleteFunc_ = &DeleteUnsignedIntRef;
-  dtrFunc_ = &DestructUnsignedIntRef;
+  (void)BindUnsignedIntCreateDestroyRefLanes(this);
+  (void)BindUnsignedIntCopyMoveDestroyRefLanes(this);
 }
 
 /**
@@ -792,12 +1254,8 @@ void RIntType<unsigned int>::Init()
 template <>
 void RIntType<unsigned long>::Init()
 {
-  newRefFunc_ = &NewUnsignedLongRef;
-  ctorRefFunc_ = &ConstructUnsignedLongRef;
-  cpyRefFunc_ = &CopyUnsignedLongRef;
-  movRefFunc_ = &MoveUnsignedLongRef;
-  deleteFunc_ = &DeleteUnsignedLongRef;
-  dtrFunc_ = &DestructUnsignedLongRef;
+  (void)BindUnsignedLongCreateDestroyRefLanes(this);
+  (void)BindUnsignedLongCopyMoveDestroyRefLanes(this);
 }
 
 // Explicit instantiations for the binary's concrete types

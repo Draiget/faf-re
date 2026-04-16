@@ -5,6 +5,7 @@
 
 namespace gpg
 {
+  class RType;
   class ReadArchive;
   class WriteArchive;
 } // namespace gpg
@@ -40,4 +41,12 @@ namespace moho
   static_assert(offsetof(SSTIEntityConstantData, mBlueprint) == 0x04, "SSTIEntityConstantData::mBlueprint offset must be 0x04");
   static_assert(offsetof(SSTIEntityConstantData, mTickCreated) == 0x08, "SSTIEntityConstantData::mTickCreated offset must be 0x08");
   static_assert(sizeof(SSTIEntityConstantData) == 0x0C, "SSTIEntityConstantData size must be 0x0C");
+
+  /**
+   * Address: 0x00557FC0 (FUN_00557FC0, preregister_SSTIEntityConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIEntityConstantData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIEntityConstantDataTypeInfo();
 } // namespace moho

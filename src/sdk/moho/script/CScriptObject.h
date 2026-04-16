@@ -183,7 +183,7 @@ namespace moho
     void CallbackStr(const char* callback, const char** arg0, const char** arg1);
 
     /**
-     * Address: 0x006B0940
+       * Address: 0x006B0940 (FUN_006B0940)
      *
      * Calls script callback with a single integer argument.
      */

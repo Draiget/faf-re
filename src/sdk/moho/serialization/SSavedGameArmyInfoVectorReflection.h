@@ -62,6 +62,15 @@ namespace gpg
   RRef* RRef_SSavedGameArmyInfo(RRef* outRef, moho::SSavedGameArmyInfo* value);
 
   /**
+   * Address: 0x00883960 (FUN_00883960, preregister_SSavedGameArmyInfoVectorTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `msvc8::vector<moho::SSavedGameArmyInfo>`.
+   */
+  [[nodiscard]] RType* preregister_SSavedGameArmyInfoVectorTypeStartup();
+
+  /**
    * Lazily ensures preregistration and returns RTTI for
    * `msvc8::vector<moho::SSavedGameArmyInfo>`.
    */

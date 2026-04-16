@@ -245,6 +245,26 @@ namespace
     "CAimManipulatorRuntimeView::mHeadingOffset offset must be 0x10C"
   );
 
+  /**
+   * Address: 0x0062FEB0 (FUN_0062FEB0)
+   *
+   * What it does:
+   * Stores one heading-offset scalar in radians (`degrees * pi/180`) into the
+   * runtime lane at `+0x10C`.
+   */
+  [[nodiscard]] CAimManipulatorRuntimeView* ApplyAimHeadingOffsetDegrees(
+    CAimManipulatorRuntimeView* const runtimeView,
+    const float headingOffsetDegrees
+  ) noexcept
+  {
+    if (runtimeView == nullptr) {
+      return nullptr;
+    }
+
+    runtimeView->mHeadingOffset = headingOffsetDegrees * kDegreesToRadians;
+    return runtimeView;
+  }
+
   [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
   {
     gpg::RType* type = moho::CAimManipulator::sType;
@@ -263,6 +283,44 @@ namespace
       moho::IAniManipulator::sType = type;
     }
     return type;
+  }
+
+  /**
+   * Address: 0x00633540 (FUN_00633540)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CAimManipulator*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCAimManipulatorRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCAimManipulatorType());
+    return upcast.mObj;
+  }
+
+  /**
+   * Address: 0x00633CD0 (FUN_00633CD0)
+   *
+   * What it does:
+   * Reads one archive object lane using cached `IAniManipulator` reflection
+   * type metadata.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadIAniManipulatorArchiveObjectLane(
+    gpg::ReadArchive* const archive,
+    void* const objectStorage,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (!archive) {
+      return nullptr;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    archive->Read(CachedIAniManipulatorType(), objectStorage, owner);
+    return archive;
   }
 
   [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
@@ -1771,7 +1829,8 @@ int moho::cfunc_CAimManipulatorSetAimHeadingOffsetL(LuaPlus::LuaState* const sta
   }
 
   auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
-  runtimeView->mHeadingOffset = static_cast<float>(lua_tonumber(rawState, 2)) * kDegreesToRadians;
+  const float headingOffsetDegrees = static_cast<float>(lua_tonumber(rawState, 2));
+  (void)ApplyAimHeadingOffsetDegrees(runtimeView, headingOffsetDegrees);
   return 0;
 }
 
@@ -1897,6 +1956,26 @@ namespace gpg
     }
 
     *outRef = MakeDerivedRef(value, CachedCAimManipulatorType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x006333C0 (FUN_006333C0)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CAimManipulator` and
+   * copies object/type fields into the destination reference record.
+   */
+  [[maybe_unused]] gpg::RRef* AssignCAimManipulatorRef(gpg::RRef* const outRef, moho::CAimManipulator* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef tmp{};
+    (void)RRef_CAimManipulator(&tmp, value);
+    outRef->mObj = tmp.mObj;
+    outRef->mType = tmp.mType;
     return outRef;
   }
 } // namespace gpg

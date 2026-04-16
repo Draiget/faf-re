@@ -155,6 +155,23 @@ namespace
       ApplyCounterIntelToReconGrid(handle, reconDB, doAdd);
     }
   }
+
+  /**
+   * Address: 0x0076FD90 (FUN_0076FD90)
+   *
+   * What it does:
+   * Invokes `CIntelCounterHandle::Destroy(1)` for one runtime object when the
+   * pointer lane is non-null.
+   */
+  [[maybe_unused]] void DeleteIntelCounterHandleViaDestroyIfPresent(void* const object)
+  {
+    auto* const handle = static_cast<moho::CIntelCounterHandle*>(object);
+    if (!handle) {
+      return;
+    }
+
+    handle->Destroy(1);
+  }
 } // namespace
 
 namespace moho
@@ -284,6 +301,7 @@ CIntelCounterHandle::CIntelCounterHandle(
 
   /**
    * Address: 0x0076FE00 (FUN_0076FE00)
+   * Address: 0x00649B50 (FUN_00649B50)
    *
    * What it does:
    * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberSerialize`.

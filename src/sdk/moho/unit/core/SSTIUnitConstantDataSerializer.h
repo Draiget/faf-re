@@ -73,6 +73,14 @@ namespace moho
   );
 
   /**
+   * Address: 0x0055C410 (FUN_0055C410, preregister_SSTIUnitConstantDataTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `SSTIUnitConstantData`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSTIUnitConstantDataTypeInfo();
+
+  /**
    * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
    *
    * What it does:

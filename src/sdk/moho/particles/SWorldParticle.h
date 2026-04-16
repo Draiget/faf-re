@@ -38,6 +38,15 @@ namespace moho
     inline static gpg::RType* sBlendModeType = nullptr;
     inline static gpg::RType* sZModeType = nullptr;
 
+    /**
+     * Address: 0x0065B7F0 (FUN_0065B7F0, ??0SParticle@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one world-particle payload with default resistance, size,
+     * blend/z modes, texture lanes, and army-index sentinel.
+     */
+    SWorldParticle();
+
     bool mEnabled = false;                            // +0x00
     std::uint8_t mPadding01[3]{};                     // +0x01
     float mResistance = 0.0f;                         // +0x04

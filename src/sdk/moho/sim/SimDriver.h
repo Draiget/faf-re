@@ -156,6 +156,15 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 
   /**
+   * Address: 0x005C38E0 (FUN_005C38E0)
+   *
+   * What it does:
+   * Appends one unit-create sync packet to `syncData->mNewUnits` and returns
+   * a pointer to the stored element.
+   */
+  SCreateUnitParams* QueueCreateUnitParams(SSyncData* syncData, const SCreateUnitParams& params);
+
+  /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
    */
   struct SDriverMutex
@@ -183,6 +192,16 @@ namespace moho
     bool Empty() const;
     void PushBack(SSyncData* data);
     SSyncData* PopFront();
+
+    /**
+     * Address: 0x007411A0 (FUN_007411A0)
+     *
+     * What it does:
+     * Destroys every non-null queued sync payload slot, releases queue storage,
+     * and resets ring bookkeeping lanes.
+     */
+    void ReleaseOwnedSlotsAndReset();
+
     void ClearAndDelete();
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncDataQueue) == 0x14, "SSyncDataQueue size must be 0x14");
@@ -442,6 +461,30 @@ namespace moho
     void FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock);
     // Shared tail lifted from FUN_0073B1B0/FUN_0073BBF0 and command wrappers.
     void MarkFirstConnectionActivityLocked();
+    /**
+     * Address: 0x0073C640 (FUN_0073C640, sub_73C640)
+     *
+     * What it does:
+     * Stamps `mLastSyncCycleTime`, signals the connection event, and writes
+     * the current command-cookie lane to one output pointer.
+     */
+    std::int32_t* SignalConnectionAndWriteCommandCookie(std::int32_t* outCommandCookie);
+    /**
+     * Address: 0x0073C4C0 (FUN_0073C4C0)
+     *
+     * What it does:
+     * Queries the client-manager available beat lane and promotes
+     * `mState` to `Dispatching` when the available beat has reached
+     * `mDispatchBeat`.
+     */
+    void PromoteToDispatchingWhenBeatAvailable(int beatQuerySeed);
+    /**
+     * Address: 0x0073DE90 (FUN_0073DE90)
+     *
+     * What it does:
+     * Stores one driver-state lane and notifies all waiters on `mStateChanged`.
+     */
+    void SetStateAndNotify(EDriverState state);
     /**
      * Address: 0x0073DD70 (FUN_0073DD70) + exception-recovery tail 0x0073DDF9..0x0073DE2B
      */

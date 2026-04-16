@@ -126,6 +126,16 @@ namespace moho
      */
     [[nodiscard]] float SumCategory(const EntityCategorySet* categorySet) const;
 
+    /**
+     * Address: 0x0070E2B0 (FUN_0070E2B0)
+     *
+     * What it does:
+     * Resolves one per-blueprint float lane in `mBlueprintStats`, inserting a
+     * zero-initialized node when the key is missing, and returns a writable
+     * pointer to that lane.
+     */
+    [[nodiscard]] float* FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* blueprintName);
+
   private:
     void DestroyBlueprintTree();
 
@@ -199,6 +209,19 @@ namespace moho
     [[nodiscard]] CArmyStatItem* GetItem(const char* statPath);
 
     /**
+     * Address: 0x0070B820 (FUN_0070B820)
+     *
+     * What it does:
+     * Resolves one army-stat item by path, resolves one per-blueprint float
+     * lane in that item, applies `delta`, and returns the updated lane pointer.
+     */
+    [[nodiscard]] float* AddBlueprintStatDelta(
+      const char* statPath,
+      const ArmyBlueprintNameView* blueprintName,
+      float delta
+    );
+
+    /**
      * Address: 0x00593260 (FUN_00593260, func_UpdateUnitStat)
      *
      * What it does:
@@ -208,6 +231,25 @@ namespace moho
     [[nodiscard]] std::int32_t UpdateUnitStat(const char* statPath, const std::int32_t* delta);
 
     /**
+     * Address: 0x00593220 (FUN_00593220, func_SetUnitStat)
+     *
+     * What it does:
+     * Resolves one stat item by path, coerces it to integer type, and
+     * atomically replaces the integer counter lane with `*value`.
+     */
+    [[nodiscard]] std::int32_t SetUnitStat(const char* statPath, const std::int32_t* value);
+
+    /**
+     * Address: 0x005931E0 (FUN_005931E0, Moho::CArmyStats::SetIntStatAtomic)
+     *
+     * What it does:
+     * Resolves one stat item by path, coerces it to integer storage, and
+     * atomically replaces the counter lane with `*value`, returning the
+     * previous value on success.
+     */
+    [[nodiscard]] std::int32_t SetIntStatAtomic(const char* statPath, const std::int32_t* value);
+
+    /**
      * Address: 0x005932C0 (FUN_005932C0, sub_5932C0)
      *
      * What it does:
@@ -215,6 +257,15 @@ namespace moho
      * greater than the current value, using an atomic compare-exchange loop.
      */
     [[nodiscard]] std::int32_t SetUnitStatGreaterOf(const char* statPath, const std::int32_t* candidate);
+
+    /**
+     * Address: 0x00593310 (FUN_00593310, sub_593310)
+     *
+     * What it does:
+     * Sets one float stat counter to `max(current, *candidate)` using an
+     * atomic compare-exchange loop over the bitwise float lane.
+     */
+    void SetUnitStatGreaterFloat(const char* statPath, const float* candidate);
 
     /**
      * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
@@ -292,7 +343,22 @@ namespace moho
      */
     [[nodiscard]] ArmyNameIndexNode* EraseNameIndexNodeAndAdvance(ArmyNameIndexNode* node);
 
+    /**
+     * Address: 0x0070DDC0 (FUN_0070DDC0, CArmyStats name-index tree cleanup)
+     *
+     * What it does:
+     * Destroys all name-index nodes, frees the sentinel head, and resets the
+     * name-index runtime lane.
+     */
     void DestroyNameIndexTree();
+
+    /**
+     * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
+     *
+     * What it does:
+     * Destroys all trigger-list nodes, frees the sentinel head, and resets the
+     * auxiliary trigger runtime lane.
+     */
     void DestroyAuxList();
 
   public:
@@ -306,6 +372,15 @@ namespace moho
   static_assert(offsetof(CArmyStats, mAuxHead) == 0x24, "CArmyStats::mAuxHead offset must be 0x24");
   static_assert(offsetof(CArmyStats, mAuxSize) == 0x28, "CArmyStats::mAuxSize offset must be 0x28");
   static_assert(sizeof(CArmyStats) == 0x2C, "CArmyStats size must be 0x2C");
+
+  /**
+   * Address: 0x00594720 (FUN_00594720, func_GetArmyStat2)
+   *
+   * What it does:
+   * Resolves one army-stat item by path from the name-index cache and creates
+   * and caches the lane when missing.
+   */
+  [[nodiscard]] CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* armyStats, const char* statPath);
 } // namespace moho
 
 namespace gpg

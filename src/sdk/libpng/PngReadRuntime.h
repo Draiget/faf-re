@@ -7,6 +7,22 @@
 #include "libpng/PngInfoRuntime.h"    // png_infop, png_infopp
 #include "libpng/PngWriteRuntime.h"
 
+struct png_time
+{
+  std::uint16_t year = 0;
+  std::uint8_t month = 0;
+  std::uint8_t day = 0;
+  std::uint8_t hour = 0;
+  std::uint8_t minute = 0;
+  std::uint8_t second = 0;
+};
+static_assert(offsetof(png_time, year) == 0x00, "png_time::year offset must be 0x00");
+static_assert(offsetof(png_time, month) == 0x02, "png_time::month offset must be 0x02");
+static_assert(offsetof(png_time, day) == 0x03, "png_time::day offset must be 0x03");
+static_assert(offsetof(png_time, hour) == 0x04, "png_time::hour offset must be 0x04");
+static_assert(offsetof(png_time, minute) == 0x05, "png_time::minute offset must be 0x05");
+static_assert(offsetof(png_time, second) == 0x06, "png_time::second offset must be 0x06");
+
 // ============================================================================
 // libpng read-side runtime helpers recovered from ForgedAlliance.exe.
 //
@@ -28,6 +44,42 @@
 extern "C" void* png_get_io_ptr(png_structp png_ptr);
 
 /**
+ * Address: 0x009E09B2 (FUN_009E09B2)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E09B2(int a1, int a2);
+ *
+ * What it does:
+ * Stores one caller-provided IO state pointer into `png_struct::io_ptr`.
+ * This is the leaf setter counterpart of `png_get_io_ptr`.
+ */
+extern "C" void png_set_io_ptr(png_structp png_ptr, void* io_ptr);
+
+/**
+ * Address: 0x009E09BE (FUN_009E09BE)
+ * Mangled: png_convert_to_rfc1123
+ *
+ * IDA signature:
+ * png_charp __cdecl png_convert_to_rfc1123(png_structp png_ptr, png_time* ptime);
+ *
+ * What it does:
+ * Allocates `png_ptr->time_buffer` on first use and formats one PNG `tIME`
+ * value as RFC1123 UTC text (`\"day Mon year HH:MM:SS +0000\"`).
+ */
+extern "C" char* png_convert_to_rfc1123(png_structp png_ptr, const png_time* ptime);
+
+/**
+ * Address: 0x009E7792 (FUN_009E7792)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E7792(int a1);
+ *
+ * What it does:
+ * Returns the opaque libpng error context pointer (`png_struct::error_ptr`).
+ */
+extern "C" void* png_get_error_ptr(png_structp png_ptr);
+
+/**
  * Address: 0x009E753F (FUN_009E753F)
  * Mangled: png_push_fill_buffer
  *
@@ -39,6 +91,54 @@ extern "C" void* png_get_io_ptr(png_structp png_ptr);
  * raising png_error when the callback slot is null.
  */
 extern "C" void png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length);
+
+/**
+ * Address: 0x009E0A46 (FUN_009E0A46)
+ * Mangled: png_get_copyright
+ *
+ * IDA signature:
+ * const char* __cdecl png_get_copyright(png_structp png_ptr);
+ *
+ * What it does:
+ * Returns the embedded libpng copyright/version banner text.
+ */
+extern "C" const char* png_get_copyright(png_structp png_ptr);
+
+/**
+ * Address: 0x009E0A4C (FUN_009E0A4C)
+ * Mangled: png_get_libpng_ver
+ *
+ * IDA signature:
+ * const char* __cdecl png_get_libpng_ver(png_structp png_ptr);
+ *
+ * What it does:
+ * Returns the embedded libpng version string (`"1.2.5rc3"`).
+ */
+extern "C" const char* png_get_libpng_ver(png_structp png_ptr);
+
+/**
+ * Address: 0x009E0A52 (FUN_009E0A52)
+ * Mangled: png_get_header_ver
+ *
+ * IDA signature:
+ * const char* __cdecl sub_9E0A52();
+ *
+ * What it does:
+ * Returns the embedded libpng header-version token (`"1.2.5rc3"`).
+ */
+extern "C" const char* png_get_header_ver();
+
+/**
+ * Address: 0x009E0A58 (FUN_009E0A58)
+ * Mangled: png_get_header_version
+ *
+ * IDA signature:
+ * const char* __cdecl sub_9E0A58();
+ *
+ * What it does:
+ * Returns the embedded libpng header-version banner string.
+ */
+extern "C" const char* png_get_header_version();
 
 /**
  * Address: 0x009E0A5E (FUN_009E0A5E)
@@ -68,6 +168,33 @@ extern "C" int png_handle_as_unknown(png_structp png_ptr, const std::uint8_t* ch
  * path is disabled at runtime, effectively turning off all MMX code routes.
  */
 extern "C" void png_init_mmx_flags(png_structp png_ptr);
+
+/**
+ * Address: 0x009E0D7F (FUN_009E0D7F)
+ * Mangled: png_read_init_2
+ *
+ * IDA signature:
+ * void __cdecl png_read_init_2(png_structpp png_ptr_ptr, png_const_charp user_png_ver, png_size_t png_struct_size);
+ *
+ * What it does:
+ * Reinitializes one already-allocated read `png_struct` lane for legacy
+ * callers. Preserves the first 0x40-byte callback/state prefix, optionally
+ * reallocates when the caller-provided struct size is below 0x260, rebuilds
+ * zlib read buffers/callbacks, and restores default read callbacks.
+ */
+extern "C" void png_read_init_2(png_structp* png_ptr_ptr, const char* user_png_ver, std::uint32_t png_struct_size);
+
+/**
+ * Address: 0x009E1E86 (FUN_009E1E86)
+ *
+ * IDA signature:
+ * int __cdecl sub_9E1E86(int a1, int a2);
+ *
+ * What it does:
+ * Stores one read-status callback lane into `png_struct` at offset `+0x198`.
+ * This callback is invoked by read-side row/status reporting paths.
+ */
+extern "C" void png_set_read_status_fn(png_structp png_ptr, void* read_status_fn);
 
 // libpng external function pointer typedefs.
 using png_error_ptr  = void (*)(png_structp, const char*);

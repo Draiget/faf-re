@@ -64,6 +64,47 @@ namespace
     serializer.mHelperPrev = self;
   }
 
+  /**
+   * Address: 0x0050A740 (FUN_0050A740)
+   *
+   * What it does:
+   * Initializes callback lanes for startup-owned `EVisibilityMode` primitive
+   * serializer helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
+  InitializeEVisibilityModePrimitiveSerializerStartupThunkPrimary()
+  {
+    auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EVisibilityModePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EVisibilityModePrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050AA40 (FUN_0050AA40)
+   *
+   * What it does:
+   * Secondary startup-init entry for the `EVisibilityMode` primitive
+   * serializer helper storage that mirrors the primary callback
+   * initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
+  InitializeEVisibilityModePrimitiveSerializerStartupThunkSecondary()
+  {
+    auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::EVisibilityModePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::EVisibilityModePrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050AB90 (FUN_0050AB90)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `EVisibilityMode`.
+   */
   [[nodiscard]] gpg::RType* ResolveEVisibilityModeType()
   {
     if (!gEVisibilityModeCachedType) {
@@ -217,10 +258,7 @@ namespace moho
    */
   int register_EVisibilityModePrimitiveSerializer()
   {
-    auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &EVisibilityModePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &EVisibilityModePrimitiveSerializer::Serialize;
+    (void)InitializeEVisibilityModePrimitiveSerializerStartupThunkPrimary();
     return std::atexit(&cleanup_EVisibilityModePrimitiveSerializer);
   }
 } // namespace moho

@@ -8,15 +8,11 @@
 using namespace moho;
 
 /**
- * Address: <synthetic host-build wrapper>
- *
- * Binary evidence:
- * - 0x0053E180 (FUN_0053E180, CClientManagerImpl::CreateLocalClient)
- * - 0x1012B540 (sub_1012B540, MohoEngine CreateLocalClient equivalent)
+ * Address: 0x0053B9D0 (FUN_0053B9D0)
  *
  * What it does:
- * Wraps `CClientBase` construction for local client objects; in FA/Moho the
- * derived-constructor sequence is inlined inside `CreateLocalClient`.
+ * Runs the local-client derived constructor lane by forwarding to
+ * `CClientBase` initialization and binding the `CLocalClient` vtable.
  */
 CLocalClient::CLocalClient(
   int32_t index,
@@ -85,7 +81,9 @@ float CLocalClient::GetStatusMetricB()
  * Takes manager lock, runs shared base incoming-message processing, and
  * signals current manager event when marshaller has no bound manager.
  */
-void CLocalClient::Process(CMessage& msg)
+void CLocalClient::Process(
+  CMessage& msg
+)
 {
   std::scoped_lock lock(mManager->mLock);
   CClientBase::Process(msg);

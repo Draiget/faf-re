@@ -660,11 +660,12 @@ namespace gal {
     Device* CreateDeviceD3D9Backend();
 
     /**
-     * Address context: 0x008F3320 (FUN_008F3320)
+     * Address: 0x008F3320 (FUN_008F3320)
      *
      * What it does:
-     * Initializes recovered startup-visible D3D9 runtime lanes from one caller
-     * device-context payload.
+     * Runs the full D3D9 startup setup chain from one caller device-context
+     * payload (interface/device creation, adapter scan, capabilities, heads,
+     * and pipeline/query initialization).
      */
     void InitializeDeviceD3D9Backend(Device* device, const DeviceContext* context);
 } // namespace gal

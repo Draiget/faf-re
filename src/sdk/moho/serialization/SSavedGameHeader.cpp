@@ -76,12 +76,72 @@ namespace
   moho::SSavedGameHeaderTypeInfo gSavedGameHeaderTypeInfo;
   moho::SSavedGameHeaderSerializer gSavedGameHeaderSerializer;
 
+  [[nodiscard]] gpg::SerHelperBase* SavedGameHeaderSerializerSelfNode() noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&gSavedGameHeaderSerializer.mNext);
+  }
+
+  void InitializeSavedGameHeaderSerializerLinks() noexcept
+  {
+    gpg::SerHelperBase* const self = SavedGameHeaderSerializerSelfNode();
+    gSavedGameHeaderSerializer.mNext = self;
+    gSavedGameHeaderSerializer.mPrev = self;
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperNode() noexcept
+  {
+    auto* const next = static_cast<gpg::SerHelperBase*>(gSavedGameHeaderSerializer.mNext);
+    auto* const prev = static_cast<gpg::SerHelperBase*>(gSavedGameHeaderSerializer.mPrev);
+    next->mPrev = prev;
+    prev->mNext = next;
+
+    gpg::SerHelperBase* const self = SavedGameHeaderSerializerSelfNode();
+    gSavedGameHeaderSerializer.mPrev = self;
+    gSavedGameHeaderSerializer.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x008802D0 (FUN_008802D0)
+   *
+   * What it does:
+   * Unlinks global `SSavedGameHeaderSerializer` helper node from the intrusive
+   * helper list, rewires self-links, and returns the helper self node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperPrimary() noexcept
+  {
+    return UnlinkSavedGameHeaderSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x00880300 (FUN_00880300)
+   *
+   * What it does:
+   * Secondary entrypoint for `SSavedGameHeaderSerializer` helper-node
+   * intrusive unlink + self-link reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSavedGameHeaderSerializerHelperSecondary() noexcept
+  {
+    return UnlinkSavedGameHeaderSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x00880110 (FUN_00880110, preregister_SSavedGameHeaderTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::SSavedGameHeader`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SSavedGameHeaderTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(moho::SSavedGameHeader), &gSavedGameHeaderTypeInfo);
+    return &gSavedGameHeaderTypeInfo;
+  }
+
   void EnsureSavedGameHeaderRegistered()
   {
     static const bool kRegistered = []() {
-      gpg::PreRegisterRType(typeid(moho::SSavedGameHeader), &gSavedGameHeaderTypeInfo);
-      gSavedGameHeaderSerializer.mNext = nullptr;
-      gSavedGameHeaderSerializer.mPrev = nullptr;
+      (void)preregister_SSavedGameHeaderTypeInfo();
+      InitializeSavedGameHeaderSerializerLinks();
       gSavedGameHeaderSerializer.mSerLoadFunc = &LoadSavedGameHeader;
       gSavedGameHeaderSerializer.mSerSaveFunc = &SaveSavedGameHeader;
       gSavedGameHeaderSerializer.RegisterSerializeFunctions();

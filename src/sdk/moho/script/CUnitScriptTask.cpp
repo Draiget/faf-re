@@ -14,6 +14,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
@@ -39,12 +40,34 @@ namespace
     return fallbackSet;
   }
 
+  /**
+   * Address: 0x00623B10 (FUN_00623B10)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `CUnitScriptTask`.
+   */
   [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
   {
     if (!CUnitScriptTask::sType) {
       CUnitScriptTask::sType = gpg::LookupRType(typeid(CUnitScriptTask));
     }
     return CUnitScriptTask::sType;
+  }
+
+  /**
+   * Address: 0x00624260 (FUN_00624260)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `moho::CUnitScriptTask*`.
+   */
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCUnitScriptTaskRefObject(gpg::RRef* const sourceRef)
+  {
+    if (!sourceRef) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCUnitScriptTaskType());
+    return upcast.mObj;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -228,13 +251,92 @@ namespace
       reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
     );
   }
+
+  struct CUnitScriptTaskListenerLaneRuntime
+  {
+    moho::TDatListItem<moho::Broadcaster, void>* mPrev = nullptr;   // +0x00
+    moho::TDatListItem<moho::Broadcaster, void>* mNext = nullptr;   // +0x04
+    std::uint8_t reserved08_0B[0x04]{};
+    moho::TDatListItem<moho::Broadcaster, void>* mAnchor = nullptr; // +0x0C
+    std::uint8_t reserved10_13[0x04]{};
+    std::uint32_t dispatchState = 0;            // +0x14
+    std::uint8_t linkState = 0;                 // +0x18
+  };
+  static_assert(
+    offsetof(CUnitScriptTaskListenerLaneRuntime, mAnchor) == 0x0C,
+    "CUnitScriptTaskListenerLaneRuntime::mAnchor offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitScriptTaskListenerLaneRuntime, dispatchState) == 0x14,
+    "CUnitScriptTaskListenerLaneRuntime::dispatchState offset must be 0x14"
+  );
+  static_assert(
+    offsetof(CUnitScriptTaskListenerLaneRuntime, linkState) == 0x18,
+    "CUnitScriptTaskListenerLaneRuntime::linkState offset must be 0x18"
+  );
+
+  struct CUnitScriptTaskListenerBridgeRuntime
+  {
+    std::uint8_t reserved00_0B[0x0C]{};
+    CUnitScriptTaskListenerLaneRuntime* listenerLane = nullptr; // +0x0C
+    std::uint8_t reserved10_23[0x14]{};
+    std::uint32_t pendingEventState = 0;                        // +0x24
+  };
+  static_assert(
+    offsetof(CUnitScriptTaskListenerBridgeRuntime, listenerLane) == 0x0C,
+    "CUnitScriptTaskListenerBridgeRuntime::listenerLane offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitScriptTaskListenerBridgeRuntime, pendingEventState) == 0x24,
+    "CUnitScriptTaskListenerBridgeRuntime::pendingEventState offset must be 0x24"
+  );
+
+  /**
+   * Address: 0x006230F0 (FUN_006230F0)
+   *
+   * What it does:
+   * Clears one pending listener-event state lane and, when linked, unlinks and
+   * reinserts the listener node before its anchor broadcaster.
+   */
+  [[maybe_unused]] int CUnitScriptTaskRepairListenerLinkRuntime(
+    void* const listenerRuntime,
+    int
+  ) noexcept
+  {
+    auto* const listenerBase = static_cast<std::uint8_t*>(listenerRuntime);
+    auto* const taskRuntime = reinterpret_cast<CUnitScriptTaskListenerBridgeRuntime*>(listenerBase - 0x64);
+    taskRuntime->pendingEventState = 0;
+
+    CUnitScriptTaskListenerLaneRuntime* const lane = taskRuntime->listenerLane;
+    if (lane == nullptr) {
+      return 0;
+    }
+
+    const bool alreadyUnlinked = (lane->linkState == 0);
+    lane->dispatchState = 0;
+    if (!alreadyUnlinked) {
+      auto* const anchor = lane->mAnchor;
+      auto* const laneLink = reinterpret_cast<moho::TDatListItem<moho::Broadcaster, void>*>(lane);
+      lane->mPrev->mNext = lane->mNext;
+      lane->mNext->mPrev = lane->mPrev;
+      lane->mPrev = laneLink;
+      lane->mNext = laneLink;
+      lane->mPrev = anchor->mPrev;
+      lane->mNext = anchor;
+      anchor->mPrev = laneLink;
+      lane->mPrev->mNext = laneLink;
+      lane->linkState = 0;
+    }
+
+    return static_cast<int>(reinterpret_cast<std::intptr_t>(lane));
+  }
 } // namespace
 
 gpg::RType* CUnitScriptTask::sType = nullptr;
 CScrLuaMetatableFactory<CUnitScriptTask> CScrLuaMetatableFactory<CUnitScriptTask>::sInstance{};
 
 /**
- * Address: 0x10015880 (constructor shape)
+  * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -247,6 +349,21 @@ moho::CScrLuaMetatableFactory<moho::CUnitScriptTask>&
 moho::CScrLuaMetatableFactory<moho::CUnitScriptTask>::Instance()
 {
   return sInstance;
+}
+
+/**
+ * Address: 0x006240F0 (FUN_006240F0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<CUnitScriptTask>` and returns that singleton.
+ */
+moho::CScrLuaMetatableFactory<moho::CUnitScriptTask>*
+moho::startup_CScrLuaMetatableFactory_CUnitScriptTask_Index()
+{
+  auto& instance = CScrLuaMetatableFactory<CUnitScriptTask>::Instance();
+  instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+  return &instance;
 }
 
 /**
@@ -457,6 +574,73 @@ int moho::cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x00623EF0 (FUN_00623EF0, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CUnitScriptTask serializer-load thunk alias into
+ * `CUnitScriptTask::MemberDeserialize`.
+ */
+namespace moho
+{
+[[maybe_unused]] void DeserializeCUnitScriptTaskThunkVariantA(
+  const int version,
+  CUnitScriptTask* const task,
+  gpg::ReadArchive* const archive
+)
+{
+  CUnitScriptTask::MemberDeserialize(archive, task, version);
+}
+
+/**
+ * Address: 0x00624190 (FUN_00624190, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CUnitScriptTask serializer-load thunk alias into
+ * `CUnitScriptTask::MemberDeserialize`.
+ */
+[[maybe_unused]] void DeserializeCUnitScriptTaskThunkVariantB(
+  const int version,
+  CUnitScriptTask* const task,
+  gpg::ReadArchive* const archive
+)
+{
+  CUnitScriptTask::MemberDeserialize(archive, task, version);
+}
+
+/**
+ * Address: 0x00623F00 (FUN_00623F00, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CUnitScriptTask serializer-save thunk alias into
+ * `CUnitScriptTask::MemberSerialize`.
+ */
+[[maybe_unused]] void SerializeCUnitScriptTaskThunkVariantA(
+  const int version,
+  gpg::WriteArchive* const archive,
+  CUnitScriptTask* const task
+)
+{
+  CUnitScriptTask::MemberSerialize(task, archive, version);
+}
+
+/**
+ * Address: 0x006241A0 (FUN_006241A0, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CUnitScriptTask serializer-save thunk alias into
+ * `CUnitScriptTask::MemberSerialize`.
+ */
+[[maybe_unused]] void SerializeCUnitScriptTaskThunkVariantB(
+  const int version,
+  gpg::WriteArchive* const archive,
+  CUnitScriptTask* const task
+)
+{
+  CUnitScriptTask::MemberSerialize(task, archive, version);
+}
+} // namespace moho
+
+/**
  * Address: 0x00624450 (FUN_00624450, Moho::CUnitScriptTask::MemberDeserialize)
  */
 void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, CUnitScriptTask* const task, const int version)
@@ -527,6 +711,24 @@ void CUnitScriptTask::OnEvent(const ECommandEvent)
 
 namespace gpg
 {
+  /**
+   * Address: 0x006240C0 (FUN_006240C0, reflection pair-pack thunk alias)
+   *
+   * What it does:
+   * Builds one `CUnitScriptTask` reflection reference then writes the pair into
+   * caller-provided `RRef` storage.
+   */
+  gpg::RRef* PackCUnitScriptTaskRefPair(
+    moho::CUnitScriptTask* const value,
+    gpg::RRef* const outPair
+  )
+  {
+    gpg::RRef typedRef{};
+    (void)gpg::RRef_CUnitScriptTask(&typedRef, value);
+    *outPair = typedRef;
+    return outPair;
+  }
+
   /**
    * Address: 0x006242A0 (FUN_006242A0, gpg::RRef_CUnitScriptTask)
    *

@@ -22,7 +22,6 @@ namespace
   {
     if (!gEAiAttackerEventTypeInfoConstructed) {
       auto* const typeInfo = new (gEAiAttackerEventTypeInfoStorage) EAiAttackerEventTypeInfo();
-      gpg::PreRegisterRType(typeid(EAiAttackerEvent), typeInfo);
       gEAiAttackerEventTypeInfoConstructed = true;
     }
 
@@ -73,6 +72,17 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkEAiAttackerEventPrimitiveSerializerHelperNode()
+  {
+    if (!gEAiAttackerEventPrimitiveSerializerConstructed) {
+      return nullptr;
+    }
+
+    EAiAttackerEventPrimitiveSerializer* const serializer = AcquireEAiAttackerEventPrimitiveSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
   /**
    * Address: 0x00BF8240 (FUN_00BF8240, sub_BF8240)
    *
@@ -101,11 +111,42 @@ namespace
       return;
     }
 
-    EAiAttackerEventPrimitiveSerializer* const serializer = AcquireEAiAttackerEventPrimitiveSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
     gEAiAttackerEventPrimitiveSerializerConstructed = false;
   }
+
+  /**
+   * Address: 0x005D5AB0 (FUN_005D5AB0)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks the recovered `EAiAttackerEvent`
+   * primitive serializer helper node and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiAttackerEventPrimitiveSerializerStartupThunkA()
+  {
+    return UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005D5AE0 (FUN_005D5AE0)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same `EAiAttackerEvent`
+   * primitive serializer helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_EAiAttackerEventPrimitiveSerializerStartupThunkB()
+  {
+    return UnlinkEAiAttackerEventPrimitiveSerializerHelperNode();
+  }
 } // namespace
+
+/**
+ * Address: 0x005D59A0 (FUN_005D59A0, Moho::EAiAttackerEventTypeInfo::EAiAttackerEventTypeInfo)
+ */
+EAiAttackerEventTypeInfo::EAiAttackerEventTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(EAiAttackerEvent), this);
+}
 
 /**
  * Address: 0x005D5A30 (FUN_005D5A30, scalar deleting thunk)
@@ -227,6 +268,5 @@ int moho::register_EAiAttackerEventPrimitiveSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &EAiAttackerEventPrimitiveSerializer::Deserialize;
   serializer->mSaveCallback = &EAiAttackerEventPrimitiveSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_EAiAttackerEventPrimitiveSerializer);
 }

@@ -21,6 +21,15 @@ namespace
   {
   public:
     /**
+     * Address: 0x005B6670 (FUN_005B6670, Moho::SValuePairTypeInfo::dtr)
+     *
+     * What it does:
+     * Tears down one `SValuePair` reflection type-info object and releases
+     * inherited `gpg::RType` field/base vector storage.
+     */
+    ~SValuePairTypeInfo() override;
+
+    /**
      * Address: 0x005B6660 (FUN_005B6660, Moho::SValuePairTypeInfo::GetName)
      */
     [[nodiscard]] const char* GetName() const override
@@ -39,6 +48,15 @@ namespace
     }
   };
   static_assert(sizeof(SValuePairTypeInfo) == 0x64, "SValuePairTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x005B6670 (FUN_005B6670, Moho::SValuePairTypeInfo::dtr)
+   *
+   * What it does:
+   * Tears down one `SValuePair` reflection type-info object and releases
+   * inherited `gpg::RType` field/base vector storage.
+   */
+  SValuePairTypeInfo::~SValuePairTypeInfo() = default;
 
   /**
    * VFTABLE: 0x00E1CA80
@@ -95,6 +113,7 @@ namespace
 
   /**
    * Address: 0x005B95F0 (FUN_005B95F0, j_Moho::CAiPersonality::MemberSerialize)
+   * Address: 0x0087CF70 (FUN_0087CF70)
    *
    * What it does:
    * Thin forwarding thunk to `CAiPersonality::MemberSerialize`.
@@ -239,6 +258,30 @@ namespace
     return UnlinkSerializerNode(*AcquireSValuePairSerializer());
   }
 
+  /**
+   * Address: 0x005B67B0 (FUN_005B67B0)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk that forwards to the canonical
+   * `SValuePairSerializer` unlink/self-link lane.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SValuePairSerializerStartupThunkA()
+  {
+    return cleanup_SValuePairSerializer();
+  }
+
+  /**
+   * Address: 0x005B67E0 (FUN_005B67E0)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk that forwards to the canonical
+   * `SValuePairSerializer` unlink/self-link lane.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SValuePairSerializerStartupThunkB()
+  {
+    return cleanup_SValuePairSerializer();
+  }
+
   void CleanupSValuePairSerializerAtexit()
   {
     (void)cleanup_SValuePairSerializer();
@@ -267,6 +310,30 @@ namespace
     }
 
     return UnlinkSerializerNode(*AcquireCAiPersonalitySerializer());
+  }
+
+  /**
+   * Address: 0x005B6AE0 (FUN_005B6AE0)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk that forwards to the canonical
+   * `CAiPersonalitySerializer` unlink/self-link lane.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPersonalitySerializerStartupThunkA()
+  {
+    return cleanup_CAiPersonalitySerializer();
+  }
+
+  /**
+   * Address: 0x005B6B10 (FUN_005B6B10)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk that forwards to the canonical
+   * `CAiPersonalitySerializer` unlink/self-link lane.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiPersonalitySerializerStartupThunkB()
+  {
+    return cleanup_CAiPersonalitySerializer();
   }
 
   void CleanupCAiPersonalitySerializerAtexit()

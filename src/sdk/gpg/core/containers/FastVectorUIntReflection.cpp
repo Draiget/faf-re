@@ -1,5 +1,7 @@
 #include "gpg/core/containers/FastVectorUIntReflection.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -139,6 +141,13 @@ namespace gpg
     void Init() override;
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x00515F40 (FUN_00515F40, gpg::RFastVectorType_Vector3f::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<Wm3::Vector3f>` lane and zero-fills
+     * appended elements.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -162,8 +171,118 @@ namespace
     return cached;
   }
 
+  struct FastVectorUIntRuntimeView
+  {
+    unsigned int* begin;
+    unsigned int* end;
+    unsigned int* capacityEnd;
+    unsigned int* metadata;
+  };
+
+  struct FastVectorUIntInlineScratchView
+  {
+    unsigned int* begin;
+    unsigned int* end;
+    unsigned int* capacityEnd;
+    unsigned int* metadata;
+    unsigned int inlineStorage[2];
+  };
+  static_assert(offsetof(FastVectorUIntInlineScratchView, inlineStorage) == 0x10, "FastVectorUIntInlineScratchView::inlineStorage offset must be 0x10");
+
+  /**
+   * Address: 0x00552050 (FUN_00552050)
+   *
+   * What it does:
+   * Writes the invalid `EntId` sentinel word (`0xF0000000`) to output
+   * storage.
+   */
+  [[maybe_unused]] [[nodiscard]] unsigned int* WriteInvalidEntIdSentinelWordLaneA(unsigned int* const outWord) noexcept
+  {
+    *outWord = 0xF0000000u;
+    return outWord;
+  }
+
+  /**
+   * Address: 0x00552080 (FUN_00552080)
+   *
+   * What it does:
+   * Writes the all-bits-set sentinel word (`0xFFFFFFFF`) to output storage.
+   */
+  [[maybe_unused]] [[nodiscard]] unsigned int* WriteAllBitsSetWordLaneA(unsigned int* const outWord) noexcept
+  {
+    *outWord = 0xFFFFFFFFu;
+    return outWord;
+  }
+
+  /**
+   * Address: 0x00552C40 (FUN_00552C40)
+   *
+   * What it does:
+   * Initializes one inline-backed dword fastvector scratch lane to empty
+   * state with two-word inline capacity.
+   */
+  [[maybe_unused]] [[nodiscard]] FastVectorUIntInlineScratchView* InitializeInlineUIntScratchViewLaneA(
+    FastVectorUIntInlineScratchView* const view
+  ) noexcept
+  {
+    view->begin = view->inlineStorage;
+    view->end = view->inlineStorage;
+    view->capacityEnd = view->inlineStorage + 2;
+    view->metadata = view->inlineStorage;
+    return view;
+  }
+
+  /**
+   * Address: 0x00552CE0 (FUN_00552CE0)
+   *
+   * What it does:
+   * Secondary entrypoint for the same inline scratch-view initialization lane.
+   */
+  [[maybe_unused]] [[nodiscard]] FastVectorUIntInlineScratchView* InitializeInlineUIntScratchViewLaneB(
+    FastVectorUIntInlineScratchView* const view
+  ) noexcept
+  {
+    return InitializeInlineUIntScratchViewLaneA(view);
+  }
+
+  /**
+   * Address: 0x00553430 (FUN_00553430)
+   *
+   * What it does:
+   * Binds one dword fastvector runtime view to external `[buffer, buffer +
+   * elementCount)` storage and records `buffer` as metadata lane.
+   */
+  [[maybe_unused]] [[nodiscard]] FastVectorUIntRuntimeView* BindUIntRuntimeViewToExternalStorageLaneA(
+    FastVectorUIntRuntimeView* const view,
+    const unsigned int elementCount,
+    unsigned int* const buffer
+  ) noexcept
+  {
+    view->begin = buffer;
+    view->end = buffer;
+    view->capacityEnd = buffer + elementCount;
+    view->metadata = buffer;
+    return view;
+  }
+
+  /**
+   * Address: 0x00553500 (FUN_00553500)
+   *
+   * What it does:
+   * Secondary entrypoint for the same external-storage bind lane.
+   */
+  [[maybe_unused]] [[nodiscard]] FastVectorUIntRuntimeView* BindUIntRuntimeViewToExternalStorageLaneB(
+    FastVectorUIntRuntimeView* const view,
+    const unsigned int elementCount,
+    unsigned int* const buffer
+  ) noexcept
+  {
+    return BindUIntRuntimeViewToExternalStorageLaneA(view, elementCount, buffer);
+  }
+
   /**
    * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
+   * Address: 0x00553480 (FUN_00553480)
    *
    * What it does:
    * Resizes reflected unsigned-int fastvector storage and fills newly appended
@@ -279,10 +398,130 @@ namespace
     gFastVectorFloatTypeNameCleanupRegistered = false;
   }
 
-  void FastVectorFloatResize(const float* fillValue, const unsigned int newSize, void* objectStorage)
+  struct DwordVectorHeaderRuntimeView
+  {
+    std::uint32_t* begin = nullptr; // +0x00
+    std::uint32_t* end = nullptr; // +0x04
+    std::uint32_t* capacityEnd = nullptr; // +0x08
+    std::uint32_t* metadata = nullptr; // +0x0C
+  };
+  static_assert(sizeof(DwordVectorHeaderRuntimeView) == 0x10, "DwordVectorHeaderRuntimeView size must be 0x10");
+  static_assert(offsetof(DwordVectorHeaderRuntimeView, begin) == 0x00, "DwordVectorHeaderRuntimeView::begin offset must be 0x00");
+  static_assert(offsetof(DwordVectorHeaderRuntimeView, end) == 0x04, "DwordVectorHeaderRuntimeView::end offset must be 0x04");
+  static_assert(
+    offsetof(DwordVectorHeaderRuntimeView, capacityEnd) == 0x08,
+    "DwordVectorHeaderRuntimeView::capacityEnd offset must be 0x08"
+  );
+  static_assert(
+    offsetof(DwordVectorHeaderRuntimeView, metadata) == 0x0C,
+    "DwordVectorHeaderRuntimeView::metadata offset must be 0x0C"
+  );
+
+  template <std::size_t InlineCapacityWords>
+  [[nodiscard]] DwordVectorHeaderRuntimeView* InitializeInlineDwordVectorHeader(
+    DwordVectorHeaderRuntimeView* const outHeader
+  ) noexcept
+  {
+    auto* const inlineStorage = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::byte*>(outHeader) + 0x10u);
+    outHeader->begin = inlineStorage;
+    outHeader->end = inlineStorage;
+    outHeader->capacityEnd = inlineStorage + InlineCapacityWords;
+    outHeader->metadata = inlineStorage;
+    return outHeader;
+  }
+
+  template <std::size_t CapacityWords>
+  [[nodiscard]] DwordVectorHeaderRuntimeView* BindDwordVectorHeaderToExternalStorage(
+    DwordVectorHeaderRuntimeView* const outHeader,
+    std::uint32_t* const base
+  ) noexcept
+  {
+    outHeader->begin = base;
+    outHeader->end = base;
+    outHeader->capacityEnd = base + CapacityWords;
+    outHeader->metadata = base;
+    return outHeader;
+  }
+
+  /**
+   * Address: 0x00659980 (FUN_00659980)
+   *
+   * What it does:
+   * Initializes one inline dword-vector header with 26-word inline capacity.
+   */
+  [[maybe_unused]] DwordVectorHeaderRuntimeView* InitializeInlineDwordVectorHeaderCapacity26(
+    DwordVectorHeaderRuntimeView* const outHeader
+  ) noexcept
+  {
+    return InitializeInlineDwordVectorHeader<26u>(outHeader);
+  }
+
+  /**
+   * Address: 0x006599A0 (FUN_006599A0)
+   *
+   * What it does:
+   * Initializes one inline dword-vector header with 2-word inline capacity.
+   */
+  [[maybe_unused]] DwordVectorHeaderRuntimeView* InitializeInlineDwordVectorHeaderCapacity2(
+    DwordVectorHeaderRuntimeView* const outHeader
+  ) noexcept
+  {
+    return InitializeInlineDwordVectorHeader<2u>(outHeader);
+  }
+
+  /**
+   * Address: 0x006599C0 (FUN_006599C0)
+   *
+   * What it does:
+   * Initializes one inline dword-vector header with 14-word inline capacity.
+   */
+  [[maybe_unused]] DwordVectorHeaderRuntimeView* InitializeInlineDwordVectorHeaderCapacity14(
+    DwordVectorHeaderRuntimeView* const outHeader
+  ) noexcept
+  {
+    return InitializeInlineDwordVectorHeader<14u>(outHeader);
+  }
+
+  /**
+   * Address: 0x0065A340 (FUN_0065A340)
+   *
+   * What it does:
+   * Binds one dword-vector header to external storage with 26-word capacity.
+   */
+  [[maybe_unused]] DwordVectorHeaderRuntimeView* BindDwordVectorHeaderCapacity26(
+    DwordVectorHeaderRuntimeView* const outHeader,
+    std::uint32_t* const base
+  ) noexcept
+  {
+    return BindDwordVectorHeaderToExternalStorage<26u>(outHeader, base);
+  }
+
+  /**
+   * Address: 0x0065A350 (FUN_0065A350)
+   *
+   * What it does:
+   * Binds one dword-vector header to external storage with 2-word capacity.
+   */
+  [[maybe_unused]] DwordVectorHeaderRuntimeView* BindDwordVectorHeaderCapacity2(
+    DwordVectorHeaderRuntimeView* const outHeader,
+    std::uint32_t* const base
+  ) noexcept
+  {
+    return BindDwordVectorHeaderToExternalStorage<2u>(outHeader, base);
+  }
+
+  /**
+   * Address: 0x00657820 (FUN_00657820)
+   *
+   * What it does:
+   * Resizes one runtime `fastvector<float>` lane to `newSize`, truncating or
+   * appending `*fillValue` as needed.
+   */
+  [[nodiscard]] unsigned int FastVectorFloatResize(const float* fillValue, const unsigned int newSize, void* objectStorage)
   {
     auto& view = gpg::AsFastVectorRuntimeView<float>(objectStorage);
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+    return static_cast<unsigned int>(view.begin ? (view.end - view.begin) : 0u);
   }
 
   /**
@@ -496,6 +735,224 @@ namespace
     return type;
   }
 
+  msvc8::string gFastVectorEntIdTypeName;
+  bool gFastVectorEntIdTypeNameCleanupRegistered = false;
+  msvc8::string gFastVectorSOCellPosTypeName;
+  bool gFastVectorSOCellPosTypeNameCleanupRegistered = false;
+  msvc8::string gFastVectorSSTIEntityAttachInfoTypeName;
+  bool gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = false;
+  msvc8::string gFastVectorUnitWeaponInfoTypeName;
+  bool gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = false;
+  msvc8::string gFastVectorSOffsetInfoTypeName;
+  bool gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
+  msvc8::string gFastVectorSAssignedLocInfoTypeName;
+  bool gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
+
+  void cleanup_FastVectorEntIdTypeName()
+  {
+    gFastVectorEntIdTypeName = msvc8::string{};
+    gFastVectorEntIdTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_FastVectorSOCellPosTypeName()
+  {
+    gFastVectorSOCellPosTypeName = msvc8::string{};
+    gFastVectorSOCellPosTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_FastVectorSSTIEntityAttachInfoTypeName()
+  {
+    gFastVectorSSTIEntityAttachInfoTypeName = msvc8::string{};
+    gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_FastVectorUnitWeaponInfoTypeName()
+  {
+    gFastVectorUnitWeaponInfoTypeName = msvc8::string{};
+    gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_FastVectorSOffsetInfoTypeName()
+  {
+    gFastVectorSOffsetInfoTypeName = msvc8::string{};
+    gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_FastVectorSAssignedLocInfoTypeName()
+  {
+    gFastVectorSAssignedLocInfoTypeName = msvc8::string{};
+    gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitWeaponInfoType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("Moho::UnitWeaponInfo");
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(int));
+      }
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSOffsetInfoTypeCompat()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("Moho::SOffsetInfo");
+      if (!cached) {
+        cached = gpg::REF_FindTypeNamed("Moho::SUnitOffsetInfo");
+      }
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(int));
+      }
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoTypeCompat()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::REF_FindTypeNamed("Moho::SAssignedLocInfo");
+      if (!cached) {
+        cached = gpg::REF_FindTypeNamed("Moho::SFormationOccupiedSlot");
+      }
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(int));
+      }
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x00552E70 (FUN_00552E70, gpg::RFastVectorType_EntId::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<EntId>` type name.
+   */
+  [[maybe_unused]] const char* GetFastVectorEntIdTypeName()
+  {
+    if (gFastVectorEntIdTypeName.empty()) {
+      gpg::RType* const elementType = CachedEntIdType();
+      const char* const elementName = elementType ? elementType->GetName() : "EntId";
+      gFastVectorEntIdTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "EntId");
+      if (!gFastVectorEntIdTypeNameCleanupRegistered) {
+        gFastVectorEntIdTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorEntIdTypeName);
+      }
+    }
+    return gFastVectorEntIdTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x00553050 (FUN_00553050, gpg::RFastVectorType_SOCellPos::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<SOCellPos>` type name.
+   */
+  [[maybe_unused]] const char* GetFastVectorSOCellPosTypeName()
+  {
+    if (gFastVectorSOCellPosTypeName.empty()) {
+      gpg::RType* const elementType = CachedSOCellPosType();
+      const char* const elementName = elementType ? elementType->GetName() : "SOCellPos";
+      gFastVectorSOCellPosTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SOCellPos");
+      if (!gFastVectorSOCellPosTypeNameCleanupRegistered) {
+        gFastVectorSOCellPosTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorSOCellPosTypeName);
+      }
+    }
+    return gFastVectorSOCellPosTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x00558C30 (FUN_00558C30, gpg::RFastVectorType_SSTIEntityAttachInfo::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected
+   * `fastvector<SSTIEntityAttachInfo>` type name.
+   */
+  [[maybe_unused]] const char* GetFastVectorSSTIEntityAttachInfoTypeName()
+  {
+    if (gFastVectorSSTIEntityAttachInfoTypeName.empty()) {
+      gpg::RType* const elementType = CachedSSTIEntityAttachInfoType();
+      const char* const elementName = elementType ? elementType->GetName() : "SSTIEntityAttachInfo";
+      gFastVectorSSTIEntityAttachInfoTypeName = gpg::STR_Printf(
+        "fastvector<%s>",
+        elementName ? elementName : "SSTIEntityAttachInfo"
+      );
+      if (!gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered) {
+        gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorSSTIEntityAttachInfoTypeName);
+      }
+    }
+    return gFastVectorSSTIEntityAttachInfoTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x0055CBF0 (FUN_0055CBF0, gpg::RFastVectorType_UnitWeaponInfo::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<UnitWeaponInfo>` type
+   * name.
+   */
+  [[maybe_unused]] const char* GetFastVectorUnitWeaponInfoTypeName()
+  {
+    if (gFastVectorUnitWeaponInfoTypeName.empty()) {
+      gpg::RType* const elementType = CachedUnitWeaponInfoType();
+      const char* const elementName = elementType ? elementType->GetName() : "UnitWeaponInfo";
+      gFastVectorUnitWeaponInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "UnitWeaponInfo");
+      if (!gFastVectorUnitWeaponInfoTypeNameCleanupRegistered) {
+        gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorUnitWeaponInfoTypeName);
+      }
+    }
+    return gFastVectorUnitWeaponInfoTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x0056C020 (FUN_0056C020, gpg::RFastVectorType_SOffsetInfo::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<SOffsetInfo>` type
+   * name.
+   */
+  [[maybe_unused]] const char* GetFastVectorSOffsetInfoTypeName()
+  {
+    if (gFastVectorSOffsetInfoTypeName.empty()) {
+      gpg::RType* const elementType = CachedSOffsetInfoTypeCompat();
+      const char* const elementName = elementType ? elementType->GetName() : "SOffsetInfo";
+      gFastVectorSOffsetInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SOffsetInfo");
+      if (!gFastVectorSOffsetInfoTypeNameCleanupRegistered) {
+        gFastVectorSOffsetInfoTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorSOffsetInfoTypeName);
+      }
+    }
+    return gFastVectorSOffsetInfoTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x0056C240 (FUN_0056C240, gpg::RFastVectorType_SAssignedLocInfo::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<SAssignedLocInfo>` type
+   * name.
+   */
+  [[maybe_unused]] const char* GetFastVectorSAssignedLocInfoTypeName()
+  {
+    if (gFastVectorSAssignedLocInfoTypeName.empty()) {
+      gpg::RType* const elementType = CachedSAssignedLocInfoTypeCompat();
+      const char* const elementName = elementType ? elementType->GetName() : "SAssignedLocInfo";
+      gFastVectorSAssignedLocInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SAssignedLocInfo");
+      if (!gFastVectorSAssignedLocInfoTypeNameCleanupRegistered) {
+        gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_FastVectorSAssignedLocInfoTypeName);
+      }
+    }
+    return gFastVectorSAssignedLocInfoTypeName.c_str();
+  }
+
   void cleanup_FastVectorVector3fTypeName()
   {
     gFastVectorVector3fTypeName = msvc8::string{};
@@ -514,6 +971,13 @@ namespace
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
   }
 
+  /**
+   * Address: 0x00558EC0 (FUN_00558EC0, gpg::fastvector_n1_SSTIEntityAttachInfo::resize_fill)
+   *
+   * What it does:
+   * Resizes one runtime `fastvector<moho::SSTIEntityAttachInfo>` lane and
+   * fills appended elements from `*fillValue`.
+   */
   void FastVectorSSTIEntityAttachInfoResize(
     const moho::SSTIEntityAttachInfo* fillValue,
     const unsigned int newSize,
@@ -903,7 +1367,7 @@ void gpg::RFastVectorType<unsigned int>::SetCount(void* obj, const int count) co
 }
 
 /**
- * Address: 0x0065AA60 (FUN_0065AA60, preregister_FastVectorFloatType)
+  * Alias of FUN_0065AA60 (non-canonical helper lane).
  *
  * What it does:
  * Constructs and preregisters startup RTTI descriptor for `gpg::fastvector<float>`.
@@ -1258,7 +1722,7 @@ void gpg::RFastVectorType<msvc8::string>::SetCount(void* obj, const int count) c
 namespace gpg
 {
 /**
- * Address: 0x005173B0 (FUN_005173B0, preregister_FastVectorVector3fType)
+  * Alias of FUN_005173B0 (non-canonical helper lane).
  *
  * What it does:
  * Constructs and preregisters startup RTTI descriptor for
@@ -1345,7 +1809,7 @@ const gpg::RIndexed* gpg::RFastVectorType<Wm3::Vector3f>::IsIndexed() const
 }
 
 /**
- * Address: 0x005173B0 family
+  * Alias of FUN_005173B0 (non-canonical helper lane).
  */
 void gpg::RFastVectorType<Wm3::Vector3f>::Init()
 {
@@ -1356,7 +1820,7 @@ void gpg::RFastVectorType<Wm3::Vector3f>::Init()
 }
 
 /**
- * Address: 0x005173B0 family
+  * Alias of FUN_005173B0 (non-canonical helper lane).
  */
 gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const int ind) const
 {
@@ -1385,7 +1849,7 @@ gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const i
 }
 
 /**
- * Address: 0x005173B0 family
+  * Alias of FUN_005173B0 (non-canonical helper lane).
  */
 size_t gpg::RFastVectorType<Wm3::Vector3f>::GetCount(void* obj) const
 {
@@ -1401,7 +1865,11 @@ size_t gpg::RFastVectorType<Wm3::Vector3f>::GetCount(void* obj) const
 }
 
 /**
- * Address: 0x005173B0 family
+ * Address: 0x00515F40 (FUN_00515F40, gpg::RFastVectorType_Vector3f::SetCount)
+ *
+ * What it does:
+ * Resizes one reflected `fastvector<Wm3::Vector3f>` lane and zero-fills
+ * appended elements.
  */
 void gpg::RFastVectorType<Wm3::Vector3f>::SetCount(void* obj, const int count) const
 {

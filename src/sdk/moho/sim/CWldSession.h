@@ -3,12 +3,14 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/FastVector.h"
 #include "CArmyImpl.h"
 #include "gpg/core/containers/IntrusiveLink.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/VisionDb.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
@@ -39,6 +41,10 @@ namespace moho
   class CFormation;
   class CDebugCanvas;
   class CSimResources;
+  class ISTIDriver;
+  struct SSTICommandIssueData;
+  class STIMap;
+  class IWldUIProvider;
   struct SBuildTemplateInfo;
   struct GeomCamera3;
 
@@ -128,6 +134,25 @@ namespace moho
      * Copy-constructs command mode state, including both cursor snapshots.
      */
     CommandModeData(const CommandModeData& other);
+
+    /**
+     * Address: 0x0081CEA0 (FUN_0081CEA0)
+     *
+     * What it does:
+     * Initializes command mode from one cursor snapshot and one modifier lane:
+     * mode/caps/blueprint are reset, drag-start is copied, drag-end is reset,
+     * and trailing sentinel fields are set to `-1`.
+     */
+    CommandModeData(const MouseInfo& mouseInfo, int modifiers);
+
+    /**
+     * Address: 0x007EF070 (FUN_007EF070, ??1SCommandModeData@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Destroys command-mode cursor snapshots and unlinks both hovered-unit
+     * weak-owner lanes.
+     */
+    ~CommandModeData();
 
     /**
      * Address: 0x0082B230 (FUN_0082B230, ??0SCommandModeData@Moho@@QAE@@Z_0)
@@ -305,6 +330,40 @@ namespace moho
     [[nodiscard]] std::int32_t size() const;
 
     /**
+     * Address: 0x007B2620 (FUN_007B2620, sub_7B2620)
+     *
+     * What it does:
+     * Returns true when tombstone pruning from the left-most node reaches the
+     * head sentinel immediately (no live weak-set entries remain).
+     */
+    [[nodiscard]] bool IsEmptyAfterPrune();
+
+    /**
+     * Address: 0x0066A090 (FUN_0066A090, sub_66A090)
+     *
+     * What it does:
+     * Starts from the tree left-most lane and returns true when `find`
+     * resolves directly to the head sentinel (no live weak-set entries).
+     */
+    [[nodiscard]] bool IsEmptyFromHeadFind();
+
+    /**
+     * Address: 0x00863760 (FUN_00863760, sub_863760)
+     *
+     * What it does:
+     * Counts live weak-set entries in this set that are absent from `other`.
+     */
+    [[nodiscard]] std::int32_t CountEntitiesMissingFrom(const SSelectionSetUserEntity& other) const;
+
+    /**
+     * Address: 0x00868690 (FUN_00868690, sub_868690)
+     *
+     * What it does:
+     * Returns true when this set and `other` contain the same live entity keys.
+     */
+    [[nodiscard]] bool HasSameLiveEntitySet(const SSelectionSetUserEntity& other) const;
+
+    /**
      * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
      *
      * What it does:
@@ -315,6 +374,38 @@ namespace moho
      */
     [[nodiscard]] static SSelectionNodeUserEntity*
       find(SSelectionSetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
+
+    /**
+     * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
+     *
+     * What it does:
+     * Starting at `start`, removes tombstone weak-set entries (null/`(void*)8`
+     * owner-link slots) until reaching one live node or the head sentinel.
+     * Writes the resulting node to `*outNode`.
+     */
+    [[nodiscard]] SSelectionNodeUserEntity**
+      PruneTombstonesAndFindLive(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* start);
+
+    /**
+     * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
+     *
+     * What it does:
+     * Erases one half-open weak-set node range `[first,last)`. When the range
+     * is the full tree, it tears down the entire subtree in one pass and resets
+     * head links/size to the empty-state sentinel shape.
+     */
+    [[nodiscard]] SSelectionNodeUserEntity**
+      EraseRange(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* first, SSelectionNodeUserEntity* last);
+
+    /**
+     * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
+     * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
+     *
+     * What it does:
+     * Clears all weak-set nodes, destroys the tree head sentinel, and resets
+     * persistent storage pointers/counters.
+     */
+    std::int32_t ReleaseStorage();
 
     /**
      * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
@@ -335,6 +426,16 @@ namespace moho
      * the current node is already the sentinel.
      */
     static void Iterator_inc(SSelectionNodeUserEntity** cursor);
+
+  private:
+    /**
+     * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
+     *
+     * What it does:
+     * Recursively destroys one weak-set subtree and unlinks each node from its
+     * user-entity weak-owner intrusive lane before delete.
+     */
+    void DestroySubtree(SSelectionNodeUserEntity* node);
   };
 
   static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
@@ -359,7 +460,7 @@ namespace moho
     SSessionSaveNodeMap mNodeMap; // +0x00
 
     /**
-     * Address: 0x00896F00 init path (FUN_00896F00 -> sub_89A930).
+       * Address: 0x00896F00 (FUN_00896F00)
      *
      * What it does:
      * Initializes save-data RB-tree header node and resets map size.
@@ -367,7 +468,7 @@ namespace moho
     SSessionSaveData();
 
     /**
-     * Address: 0x008971A0 cleanup path (FUN_008971A0 + sub_89AC40).
+       * Address: 0x008971A0 (FUN_008971A0)
      *
      * What it does:
      * Releases all map nodes and their string payloads.
@@ -375,7 +476,7 @@ namespace moho
     ~SSessionSaveData();
 
     /**
-     * Address: 0x008992D0/0x00899DC0/0x0089A970 helper chain.
+       * Address: 0x008992D0 (FUN_008992D0)
      *
      * What it does:
      * Inserts one `(commandSourceId, saveNodeName)` record into session save-data map.
@@ -388,6 +489,18 @@ namespace moho
 
   static_assert(sizeof(SSessionSaveData) == 0x0C, "SSessionSaveData size must be 0x0C");
   static_assert(offsetof(SSessionSaveData, mNodeMap) == 0x00, "SSessionSaveData::mNodeMap offset must be 0x00");
+
+  /**
+   * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
+   *
+   * What it does:
+   * Constructs one `shared_ptr<SSessionSaveData>` from one raw save-data
+   * pointer lane.
+   */
+  boost::shared_ptr<SSessionSaveData>* ConstructSharedSessionSaveDataFromRaw(
+    boost::shared_ptr<SSessionSaveData>* outSaveData,
+    SSessionSaveData* saveData
+  );
 
   class CWldSession
   {
@@ -416,7 +529,7 @@ namespace moho
     ~CWldSession();
 
     /**
-     * Address: 0x008B9580 callsite through session->mWldMap->mTerrainRes.
+      * Alias of FUN_008B9580 (non-canonical helper lane).
      *
      * What it does:
      * Reads terrain playable-bounds rectangle used by user-entity visibility checks.
@@ -442,6 +555,48 @@ namespace moho
     [[nodiscard]] bool IsObserver() const;
 
     /**
+     * Address: 0x00896570 (FUN_00896570, ?SetCursorInfo@CWldSession@Moho@@QAEXABUUICursorInfo@2@@Z)
+     *
+     * What it does:
+     * Copies one cursor-info payload into the session cursor-info lane.
+     */
+    void SetCursorInfo(const MouseInfo& cursorInfo);
+
+    /**
+     * Address: 0x00895FF0 (FUN_00895FF0, ?GetSelection@CWldSession@Moho@@QBEABV?$WeakSet@VUserEntity@Moho@@@2@XZ)
+     *
+     * What it does:
+     * Returns the current world-session selection weak-set.
+     */
+    [[nodiscard]] const SSelectionSetUserEntity& GetSelection() const;
+
+    /**
+     * Address: 0x00896730 (FUN_00896730, ?GetExtraSelectList@CWldSession@Moho@@QBE?AV?$WeakSet@VUserEntity@Moho@@@2@XZ)
+     *
+     * What it does:
+     * Returns a by-value copy of the world-session extra-selection weak-set
+     * using the same iterator-range clone path as the original binary.
+     */
+    [[nodiscard]] SSelectionSetUserEntity GetExtraSelectList() const;
+
+    /**
+     * Address: 0x00896580 (FUN_00896580, ?GetCursorInfo@CWldSession@Moho@@QBEABUUICursorInfo@2@XZ)
+     *
+     * What it does:
+     * Returns the current cursor-info payload stored by this world session.
+     */
+    [[nodiscard]] const MouseInfo& GetCursorInfo() const;
+
+    /**
+     * Address: 0x008965C0 (FUN_008965C0, ?BecomeObserver@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Validates observer focus request (`-1`) and applies it to the active sim
+     * driver when allowed.
+     */
+    void BecomeObserver();
+
+    /**
      * Address context: compatibility wrapper lane used by recovered callsites.
      *
      * What it does:
@@ -460,7 +615,7 @@ namespace moho
     void RequestFocusArmy(int index);
 
     /**
-     * Address: 0x008B97C0/0x008621B0 callsites (rule category lookup path).
+      * Alias of FUN_008B97C0 (non-canonical helper lane).
      *
      * What it does:
      * Returns typed category resolver interface for `rules`.
@@ -469,13 +624,54 @@ namespace moho
     [[nodiscard]] const EntityCategoryLookupResolver* GetCategoryLookupResolver() const;
 
     /**
-     * Address: 0x008B85E0 callsite (UserEntity ctor, sub_501A80 path).
+      * Alias of FUN_008B85E0 (non-canonical helper lane).
      *
      * What it does:
      * Returns storage root used as SpatialDB_MeshInstance owner for user-entity DB entries.
      */
     [[nodiscard]] void* GetEntitySpatialDbStorage();
     [[nodiscard]] const void* GetEntitySpatialDbStorage() const;
+
+    /**
+     * Address: 0x00894120 (FUN_00894120, ?GetTerrainRes@CWldSession@Moho@@QBEPAVIWldTerrainRes@2@XZ)
+     *
+     * What it does:
+     * Returns the world-map terrain resource lane owned by this world session.
+     */
+    [[nodiscard]] IWldTerrainRes* GetTerrainRes() const;
+
+    /**
+     * Address: 0x00894130 (FUN_00894130, ?GetSTIMap@CWldSession@Moho@@QBEPAVSTIMap@2@XZ)
+     *
+     * What it does:
+     * Returns the terrain STI map lane owned by the world-map terrain resource.
+     */
+    [[nodiscard]] STIMap* GetSTIMap() const;
+
+    /**
+     * Address: 0x00894140 (FUN_00894140, ?AddEntity@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Inserts one `(entityId, entity*)` mapping into the world-session entity map.
+     */
+    void AddEntity(UserEntity* entity);
+
+    /**
+     * Address: 0x00894170 (FUN_00894170, ?RemoveEntity@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Removes one entity-id mapping from the world-session entity map.
+     */
+    void RemoveEntity(UserEntity* entity);
+
+    /**
+     * Address: 0x008941B0 (FUN_008941B0, ?OrphanEntity@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Removes one entity-id mapping from the session entity tree, marks the
+     * entity for deletion, and enqueues it in the session orphan weak-set lane.
+     */
+    void OrphanEntity(UserEntity* entity);
 
     /**
      * Address: 0x00894210 (FUN_00894210, ?AddToVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
@@ -537,6 +733,14 @@ namespace moho
     [[nodiscard]] float GetDelayToNextBeat() const;
 
     /**
+     * Address: 0x00895FD0 (FUN_00895FD0, ?GetGameTime@CWldSession@Moho@@QBEMXZ)
+     *
+     * What it does:
+     * Returns total game time in seconds (`(mGameTick + mTimeSinceLastTick) * 0.1`).
+     */
+    [[nodiscard]] float GetGameTime() const;
+
+    /**
      * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
      *
      * What it does:
@@ -562,6 +766,16 @@ namespace moho
      * and returns the live `UserEntity*` when the key is present.
      */
     [[nodiscard]] UserEntity* LookupEntityId(EntId entityId);
+
+    /**
+     * Address: 0x00896140 (FUN_00896140, ?SetSelection@CWldSession@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@@Z)
+     *
+     * What it does:
+     * Replaces world-session selection from one supplied weak-set, broadcasts
+     * one `{previous,current,added,removed}` selection-event payload, updates
+     * max-selection bookkeeping, and refreshes sync-filter mask B when changed.
+     */
+    void SetSelection(const SSelectionSetUserEntity& selection);
 
     /**
      * Address context:
@@ -647,7 +861,7 @@ namespace moho
     void SyncPlayableRect(const gpg::Rect2i& playableRect);
 
     /**
-     * Address: 0x00896F00 (FUN_00896F00,
+      * Alias of FUN_00896F00 (non-canonical helper lane).
      * ?GetSaveData@CWldSession@Moho@@QBE?AV?$shared_ptr@USSessionSaveData@Moho@@@boost@@XZ)
      *
      * What it does:
@@ -720,6 +934,16 @@ namespace moho
 
   public:
     /**
+     * Address: 0x00896AA0 (FUN_00896AA0, ?GenerateBuildTemplates@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Rebuilds build-template entries from the current selection using
+     * non-mobile, non-dead units; computes template extents and normalizes all
+     * entry positions relative to the first sorted template lane.
+     */
+    void GenerateBuildTemplates();
+
+    /**
      * Address: 0x008969E0 (FUN_008969E0, ?ClearBuildTemplates@CWldSession@Moho@@QAEXXZ)
      *
      * What it does:
@@ -746,6 +970,15 @@ namespace moho
      * Locks/returns cached command-graph weak handle and optionally creates it.
      */
     [[nodiscard]] boost::SharedPtrRaw<UICommandGraph> GetCommandGraph(bool allowCreate);
+
+    /**
+     * Address: 0x00895DC0 (FUN_00895DC0, ?HandleFogEdge@CWldSession@Moho@@AAEXABV?$Rect2@H@gpg@@HH@Z)
+     *
+     * What it does:
+     * Clears/marks edge-fog rows outside the supplied visible rectangle and
+     * refreshes the backing edge-fog buffer.
+     */
+    void HandleFogEdge(const gpg::Rect2i& visibleRect, int width, int height);
 
     /**
      * Address: 0x00896670 (FUN_00896670, ?ValidateFocusArmyRequest@CWldSession@Moho@@AAE_NH@Z)
@@ -828,10 +1061,11 @@ namespace moho
     bool IsCheatsEnabled;                                   // 0x04D4
     char pad_04D5[3];                                       // 0x04D5
     msvc8::vector<msvc8::string> mOverlayFilters;           // 0x04D8
-    char pad_04E4[4];                                       // 0x04E4
     bool DisplayEconomyOverlay;                             // 0x04E8
     bool mTeamColorMode;                                    // 0x04E9
-    char pad_04EA[30];                                      // 0x04EA
+    char pad_04EA[2];                                       // 0x04EA
+    gpg::MemBuffer<char> mEdgeFog;                          // 0x04EC
+    char pad_04FC[12];                                      // 0x04FC
   };
 
   static_assert(
@@ -878,6 +1112,7 @@ namespace moho
   static_assert(
     offsetof(CWldSession, mOverlayFilters) == 0x4D8, "CWldSession::mOverlayFilters offset must be 0x4D8"
   );
+  static_assert(offsetof(CWldSession, mEdgeFog) == 0x4EC, "CWldSession::mEdgeFog offset must be 0x4EC");
 
   enum class EWldFrameAction : std::int32_t
   {
@@ -910,11 +1145,93 @@ namespace moho
   using WldTeardownCallbackVector = msvc8::vector<IWldTeardownCallback*>;
 
   /**
+   * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
+   *
+   * What it does:
+   * Builds one Lua command-issue descriptor table (`Units`, `Blueprint`,
+   * `Target`, optional `LuaParams`, `CommandType`, `Clear`) used by UI script
+   * command callbacks.
+   */
+  [[nodiscard]] LuaPlus::LuaObject* BuildUserScriptCommandObject(
+    LuaPlus::LuaObject* outCommandObject,
+    LuaPlus::LuaState* state,
+    const gpg::fastvector<UserUnit*>& units,
+    const SSTICommandIssueData& commandIssueData,
+    bool doClear
+  );
+
+  /**
+   * Address: 0x0083E640 (FUN_0083E640,
+   * ?UI_VerifyScriptCommand@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$fastvector@PAVUserUnit@Moho@@@gpg@@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Builds one script command descriptor from explicit `UserUnit*` lanes,
+   * calls `/lua/user/UserScriptCommand.lua:VerifyScriptCommand`, and returns
+   * the Lua result object (or the command descriptor on callback failure).
+   */
+  [[nodiscard]] LuaPlus::LuaObject UI_VerifyScriptCommand(
+    const gpg::fastvector<UserUnit*>& units,
+    const SSTICommandIssueData& commandIssueData,
+    bool doClear
+  );
+
+  /**
+   * Address: 0x0083E500 (FUN_0083E500,
+   * ?UI_VerifyScriptCommand@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Converts one selected weak-set of user entities into live `UserUnit*`
+   * lanes and forwards to the explicit-unit `UI_VerifyScriptCommand` overload.
+   */
+  [[nodiscard]] LuaPlus::LuaObject UI_VerifyScriptCommand(
+    const SSelectionSetUserEntity& entities,
+    const SSTICommandIssueData& commandIssueData,
+    bool doClear
+  );
+
+  /**
+   * Address: 0x0083E770 (FUN_0083E770,
+   * ?UI_OnCommandIssued@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Builds one Lua command descriptor table from explicit `UserUnit*` lanes and
+   * invokes `/lua/ui/game/commandmode.lua:OnCommandIssued`.
+   */
+  void UI_OnCommandIssued(
+    const gpg::fastvector<UserUnit*>& units,
+    const SSTICommandIssueData& commandIssueData,
+    bool doClear
+  );
+
+  /**
+   * Address: 0x0083E870 (FUN_0083E870,
+   * ?UI_OnCommandIssued@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Converts one selected weak-set of user entities into live `UserUnit*`
+   * lanes and forwards to the explicit-unit `UI_OnCommandIssued` overload.
+   */
+  void UI_OnCommandIssued(
+    const SSelectionSetUserEntity& entities,
+    const SSTICommandIssueData& commandIssueData,
+    bool doClear
+  );
+
+  /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
    *   `WLD_Frame`.
    */
   [[nodiscard]] EWldFrameAction WLD_GetFrameAction();
+
+  /**
+   * Address: 0x0088BD20 (FUN_0088BD20, ?WLD_SetUIProvider@Moho@@YAXPAVIWldUIProvider@1@@Z)
+   *
+   * What it does:
+   * Replaces the process-global world-UI provider ownership lane, deleting the
+   * previous provider when it differs from the new one.
+   */
+  void WLD_SetUIProvider(IWldUIProvider* provider);
 
   /**
    * Address context:
@@ -932,6 +1249,48 @@ namespace moho
   [[nodiscard]] bool WLD_Frame(float deltaSeconds);
 
   /**
+   * Address: 0x0088BEA0 (FUN_0088BEA0, ?WLD_RequestEndSession@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Requests world-session exit when frame dispatch is currently active.
+   */
+  void WLD_RequestEndSession();
+
+  /**
+   * Address: 0x0088E6F0 (FUN_0088E6F0)
+   *
+   * What it does:
+   * Console-command callback that requests world-session exit when frame
+   * dispatch is currently active.
+   */
+  void CON_WLD_RequestEndSession(void* commandArgs);
+
+  /**
+   * Address: 0x0088BE80 (FUN_0088BE80, ?WLD_IsSessionActive@Moho@@YA_NXZ)
+   *
+   * What it does:
+   * Returns whether world-frame dispatch is active (`!= Inactive`).
+   */
+  [[nodiscard]] bool WLD_IsSessionActive();
+
+  /**
+   * Address: 0x0088BE90 (FUN_0088BE90, world-frame playing-state probe)
+   *
+   * What it does:
+   * Returns whether world-frame dispatch is currently in the `Playing` state.
+   */
+  [[nodiscard]] bool WLD_IsSessionPlaying();
+
+  /**
+   * Address: 0x0088BEC0 (FUN_0088BEC0, ?WLD_RequestRestartSession@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Requests world-session recreation when frame dispatch is active and the
+   * active session carries restart launch info.
+   */
+  void WLD_RequestRestartSession();
+
+  /**
    * Address: 0x00869810 (FUN_00869810, func_WldSessionLoader_GetOnTeardownCallbacks)
    *
    * What it does:
@@ -939,6 +1298,15 @@ namespace moho
    * vector used by session-loader teardown paths.
    */
   [[nodiscard]] WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks();
+
+  /**
+   * Address: 0x00869950 (FUN_00869950)
+   *
+   * What it does:
+   * Appends one teardown-callback pointer to the process-global teardown
+   * callback vector, growing vector storage when needed.
+   */
+  [[nodiscard]] WldTeardownCallbackVector* WLD_AddOnTeardownCallback(IWldTeardownCallback* callback);
 
   /**
    * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)
@@ -972,6 +1340,23 @@ namespace moho
   );
 
   /**
+   * Address: 0x008972A0 (FUN_008972A0, ?WLD_DestroySession@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Destroys the active world-session object when present and clears the
+   * process-global active-session pointer.
+   */
+  void WLD_DestroySession();
+
+  /**
+   * Address: 0x008972F0 (FUN_008972F0, ?WLD_GetSession@Moho@@YAPAVCWldSession@1@XZ)
+   *
+   * What it does:
+   * Returns the process-global active world-session pointer.
+   */
+  [[nodiscard]] CWldSession* WLD_GetSession();
+
+  /**
    * Address: 0x0088D060 (FUN_0088D060, ?WLD_BeginSession@Moho@@YAXV?$auto_ptr@USWldSessionInfo@Moho@@@std@@@Z)
    *
    * What it does:
@@ -987,6 +1372,15 @@ namespace moho
    * skew-rate adjustment limits.
    */
   [[nodiscard]] float WLD_GetSimRate();
+
+  /**
+   * Address: 0x0088D170 (FUN_0088D170, session sim-rate permission probe)
+   *
+   * What it does:
+   * Returns whether the active session context may issue local sim-rate
+   * changes (`replay`, focused local army, or non-multiplayer).
+   */
+  [[nodiscard]] bool WLD_CanAdjustSimRate();
 
   /**
    * Address: 0x0088D1B0 (FUN_0088D1B0, ?WLD_IncreaseSimRate@Moho@@YAXXZ)
@@ -1014,6 +1408,23 @@ namespace moho
    * local session contexts.
    */
   void WLD_DecreaseSimRate();
+
+  /**
+   * Address: 0x0088D2F0 (FUN_0088D2F0, ?WLD_SetGameSpeed@Moho@@YAXH@Z)
+   *
+   * What it does:
+   * Clamps one requested game-speed lane to `[-10, 10]` and forwards it to the
+   * active client manager when a sim driver is available.
+   */
+  void WLD_SetGameSpeed(int gameSpeed);
+
+  /**
+   * Address: 0x0088D330 (FUN_0088D330, ?WLD_GetDriver@Moho@@YAPAVISTIDriver@1@XZ)
+   *
+   * What it does:
+   * Returns the process-global active sim-driver pointer.
+   */
+  [[nodiscard]] ISTIDriver* WLD_GetDriver();
 
   /**
    * Address context:

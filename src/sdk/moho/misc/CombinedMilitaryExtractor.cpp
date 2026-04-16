@@ -8,6 +8,28 @@ namespace
 {
   constexpr std::int32_t kWeaponRangeCategoryAll = 6;
   constexpr char kOverlayMiscCategory[] = "OVERLAYMISC";
+
+  struct ExtractorVtableOnlyRuntimeView
+  {
+    void* vtable = nullptr; // +0x00
+  };
+
+  /**
+   * Address: 0x007EC390 (FUN_007EC390)
+   *
+   * What it does:
+   * Rebinds one runtime lane to the `CombinedMilitaryExtractor` vtable tag.
+   */
+  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindCombinedMilitaryExtractorVtableLane(
+    ExtractorVtableOnlyRuntimeView* const runtimeView
+  ) noexcept
+  {
+    static std::uint8_t sCombinedMilitaryExtractorVtableTag = 0;
+    if (runtimeView != nullptr) {
+      runtimeView->vtable = &sCombinedMilitaryExtractorVtableTag;
+    }
+    return runtimeView;
+  }
 }
 
 namespace moho

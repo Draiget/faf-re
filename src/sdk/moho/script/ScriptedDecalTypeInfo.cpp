@@ -55,3 +55,15 @@ void ScriptedDecalTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x0087F090 (FUN_0087F090, preregister_ScriptedDecalTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `moho::ScriptedDecal`.
+ */
+[[nodiscard]] gpg::RType* preregister_ScriptedDecalTypeInfo()
+{
+  static ScriptedDecalTypeInfo typeInfo;
+  gpg::PreRegisterRType(typeid(ScriptedDecal), &typeInfo);
+  return &typeInfo;
+}

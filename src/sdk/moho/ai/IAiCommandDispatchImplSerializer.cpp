@@ -27,6 +27,7 @@ namespace
 
   /**
    * Address: 0x00599A40 (FUN_00599A40, j_Moho::IAiCommandDispatchImpl::MemberSerialize)
+   * Address: 0x0063A1B0 (FUN_0063A1B0)
    *
    * What it does:
    * Thin forwarding thunk to `IAiCommandDispatchImpl::MemberSerialize`.
@@ -122,6 +123,30 @@ namespace
     return UnlinkSerializerNode(*AcquireIAiCommandDispatchImplSerializer());
   }
 
+  /**
+   * Address: 0x00599410 (FUN_00599410)
+   *
+   * What it does:
+   * Legacy startup-cleanup thunk lane that forwards to the canonical
+   * IAiCommandDispatchImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplSerializerStartupThunkA()
+  {
+    return cleanup_IAiCommandDispatchImplSerializer();
+  }
+
+  /**
+   * Address: 0x00599440 (FUN_00599440)
+   *
+   * What it does:
+   * Secondary startup-cleanup thunk lane that forwards to the canonical
+   * IAiCommandDispatchImpl serializer helper unlink path.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_IAiCommandDispatchImplSerializerStartupThunkB()
+  {
+    return cleanup_IAiCommandDispatchImplSerializer();
+  }
+
   void cleanup_IAiCommandDispatchImplSerializer_atexit()
   {
     (void)cleanup_IAiCommandDispatchImplSerializer();
@@ -209,7 +234,6 @@ void moho::register_IAiCommandDispatchImplSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &IAiCommandDispatchImplSerializer::Deserialize;
   serializer->mSaveCallback = &IAiCommandDispatchImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_IAiCommandDispatchImplSerializer_atexit);
 }
 

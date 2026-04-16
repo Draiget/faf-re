@@ -31,6 +31,8 @@ namespace moho
     );
 
     /**
+     * Address: 0x0069EB80 (FUN_0069EB80, Moho::ProjectileSaveConstruct::RegisterSaveConstructArgsFunction)
+     *
      * What it does:
      * Binds save-construct callback into reflected RTTI for `Projectile`.
      */
@@ -70,6 +72,8 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
+     * Address: 0x0069EC00 (FUN_0069EC00, Moho::ProjectileConstruct::RegisterConstructFunction)
+     *
      * What it does:
      * Binds construct/delete callbacks into reflected RTTI for `Projectile`.
      */

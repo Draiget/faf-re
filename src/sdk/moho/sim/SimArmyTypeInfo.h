@@ -51,6 +51,15 @@ namespace moho
      * Registers IArmy as a reflected base at subobject offset +0x08.
      */
     static void AddBase_IArmy(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x006FDAA0 (FUN_006FDAA0)
+     *
+     * What it does:
+     * Wrapper lane that forwards one base-registration dispatch to
+     * `AddBase_IArmy`.
+     */
+    [[maybe_unused]] static void AddBase_IArmyAdapter(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(SimArmyTypeInfo) == 0x64, "SimArmyTypeInfo size must be 0x64");

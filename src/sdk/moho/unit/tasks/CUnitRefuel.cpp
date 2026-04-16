@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitRefuel.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <typeinfo>
@@ -64,6 +65,8 @@ namespace
 
   /**
    * Address: 0x006224B0 (FUN_006224B0, CUnitRefuel::MemberDeserialize thunk)
+   * Address: 0x0063A290 (FUN_0063A290)
+   * Address: 0x0089BEA0 (FUN_0089BEA0)
    *
    * What it does:
    * Secondary load-callback forwarder to `CUnitRefuel::MemberDeserialize`.
@@ -76,6 +79,48 @@ namespace
     if (task != nullptr) {
       task->MemberDeserialize(archive);
     }
+  }
+
+  struct CUnitRefuelSerializerStartupNode
+  {
+    void* mVtable = nullptr;                    // +0x00
+    gpg::SerHelperBase* mHelperNext = nullptr; // +0x04
+    gpg::SerHelperBase* mHelperPrev = nullptr; // +0x08
+    gpg::RType::load_func_t mLoad = nullptr;   // +0x0C
+    gpg::RType::save_func_t mSave = nullptr;   // +0x10
+  };
+
+  static_assert(
+    offsetof(CUnitRefuelSerializerStartupNode, mHelperNext) == 0x04,
+    "CUnitRefuelSerializerStartupNode::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitRefuelSerializerStartupNode, mHelperPrev) == 0x08,
+    "CUnitRefuelSerializerStartupNode::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CUnitRefuelSerializerStartupNode) == 0x14,
+    "CUnitRefuelSerializerStartupNode size must be 0x14"
+  );
+
+  CUnitRefuelSerializerStartupNode gCUnitRefuelSerializerStartupNode{};
+
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(CUnitRefuelSerializerStartupNode& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(CUnitRefuelSerializerStartupNode& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
   }
 
   template <class TObject>
@@ -114,6 +159,22 @@ namespace moho
   gpg::RType* CUnitRefuel::sType = nullptr;
 
   /**
+   * Address: 0x00620F30 (FUN_00620F30, ??0CUnitRefuel@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Builds one default refuel-task lane with null target and cleared
+   * reservation/carrier flags.
+   */
+  CUnitRefuel::CUnitRefuel()
+    : CCommandTask()
+    , mTargetUnit{}
+    , mHasTransportReservation(false)
+    , mIsCarrier(false)
+    , mPad3A{}
+  {
+  }
+
+  /**
    * Address: 0x00620F50 (FUN_00620F50, ??0CUnitRefuel@Moho@@QAE@@Z)
    */
   CUnitRefuel::CUnitRefuel(Unit* const targetUnit, IAiCommandDispatchImpl* const dispatchTask)
@@ -136,6 +197,30 @@ namespace moho
     if (mUnit != nullptr && mUnit->AiNavigator != nullptr) {
       mUnit->AiNavigator->IgnoreFormation(true);
     }
+  }
+
+  /**
+   * Address: 0x00621430 (FUN_00621430, cleanup_CUnitRefuelSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the `CUnitRefuel` serializer helper
+   * node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(gCUnitRefuelSerializerStartupNode);
+  }
+
+  /**
+   * Address: 0x00621460 (FUN_00621460, cleanup_CUnitRefuelSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the `CUnitRefuel` serializer
+   * helper node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(gCUnitRefuelSerializerStartupNode);
   }
 
   /**

@@ -58,6 +58,50 @@ namespace
   }
 
   /**
+   * Address: 0x00630060 (FUN_00630060)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAimManipulatorSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CAimManipulatorSerializer* InitializeCAimManipulatorSerializerStartupThunk()
+  {
+    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::CAimManipulatorSerializer::Deserialize;
+    serializer->mSerialize = &moho::CAimManipulatorSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x00630090 (FUN_00630090, cleanup_CAimManipulatorSerializerStartupThunkA)
+   *
+   * What it does:
+   * Unlinks one startup helper lane for the recovered `CAimManipulator`
+   * serializer node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAimManipulatorSerializerStartupThunkA()
+  {
+    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
+  /**
+   * Address: 0x006300C0 (FUN_006300C0, cleanup_CAimManipulatorSerializerStartupThunkB)
+   *
+   * What it does:
+   * Unlinks the mirrored startup helper lane for the recovered
+   * `CAimManipulator` serializer node and restores self-links.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAimManipulatorSerializerStartupThunkB()
+  {
+    moho::CAimManipulatorSerializer* const serializer = AcquireCAimManipulatorSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
+  /**
    * Address: 0x00BFA960 (FUN_00BFA960, cleanup_CAimManipulatorSerializer)
    *
    * What it does:
@@ -125,7 +169,6 @@ namespace moho
     InitializeSerializerNode(*serializer);
     serializer->mDeserialize = &CAimManipulatorSerializer::Deserialize;
     serializer->mSerialize = &CAimManipulatorSerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_CAimManipulatorSerializer);
   }
 } // namespace moho

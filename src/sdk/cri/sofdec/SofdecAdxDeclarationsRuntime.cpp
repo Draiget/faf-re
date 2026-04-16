@@ -1167,6 +1167,32 @@
   );
 
   /**
+   * Address: 0x00AF2A90 (FUN_00AF2A90, _CFT_Ycc420plnToArgb8888Split)
+   *
+   * What it does:
+   * Repackages YCC420 planar input/output lanes and dispatches split-frame
+   * ARGB8888 conversion through user/default table selection.
+   */
+  std::int32_t CFT_Ycc420plnToArgb8888Split(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords,
+    const std::int32_t* userTableAddress
+  );
+
+  /**
+   * Address: 0x00AEED20 (FUN_00AEED20, _CFT_Ycc420plnToYcc422pix2Int)
+   *
+   * What it does:
+   * Repackages packed conversion lanes and dispatches one-sample or two-sample
+   * YCC420->YCC422 conversion path using optimize/alignment rules.
+   */
+  std::int32_t CFT_Ycc420plnToYcc422pix2Int(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords,
+    const std::int32_t* scratchBufferWords
+  );
+
+  /**
    * Address: 0x00B03EA0 (FUN_00B03EA0, _CFT_Ycc420plnToYcc422pix2Int1smp)
    *
    * What it does:
@@ -1202,6 +1228,16 @@
     const CftPixelSurfaceLanes* outputSurface
   );
   /**
+   * Address: 0x00AF1B60 (FUN_00AF1B60, _cft_c_Ycc420plnToYcc422pix2Int2smp)
+   *
+   * What it does:
+   * Scalar two-sample conversion path with weighted vertical chroma blending.
+   */
+  std::uint8_t* cft_c_Ycc420plnToYcc422pix2Int2smp(
+    const CftYcc420PlanarInputLanes* inputLanes,
+    const CftPixelSurfaceLanes* outputSurface
+  );
+  /**
    * Address: 0x00B062C0 (FUN_00B062C0, _cft_sse_Ycc420plnToArgb8888Prg1smp)
    *
    * What it does:
@@ -1223,6 +1259,19 @@
   std::int32_t cft_sse_Ycc420plnToYcc422pix2Int1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface
+  );
+  /**
+   * Address: 0x00B03600 (FUN_00B03600, _cft_sse_Ycc420plnToYcc422pix2Int2smp)
+   *
+   * What it does:
+   * SSE-eligible two-sample conversion lane using caller-provided scratch
+   * workspace.
+   */
+  std::int32_t cft_sse_Ycc420plnToYcc422pix2Int2smp(
+    const CftYcc420PlanarInputLanes* inputLanes,
+    const CftPixelSurfaceLanes* outputSurface,
+    std::uintptr_t scratchBufferAddress,
+    std::int32_t scratchBufferSizeBytes
   );
   void CFT_Ycc420plnToRgb565Init();
   void CFT_Ycc420plnToRgb555Init();

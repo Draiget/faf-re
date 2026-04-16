@@ -929,6 +929,20 @@ namespace
   }
 
   /**
+   * Address: 0x0047E300 (FUN_0047E300)
+   *
+   * What it does:
+   * Tail-thunk adapter that forwards one stamp-range fill lane into
+   * `FUN_0047E530`.
+   */
+  [[maybe_unused]] SSendStamp* FillStampRangeWithValueThunk(
+    SSendStamp* first, SSendStamp* const last, const SSendStamp& value
+  ) noexcept
+  {
+    return FillStampRangeWithValue(first, last, value);
+  }
+
+  /**
    * Address: 0x0047E310 (FUN_0047E310, CopyStampRangeBackwardThunk)
    */
   [[maybe_unused]] SSendStamp* CopyStampRangeBackwardThunk(
@@ -1104,6 +1118,7 @@ namespace
 
   /**
    * Address: 0x0047E8F0 (FUN_0047E8F0, CopyStampRangeForwardFromCurrentThunkAlias3)
+   * Address: 0x005411B0 (FUN_005411B0)
    */
   [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias3(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
@@ -1114,6 +1129,7 @@ namespace
 
   /**
    * Address: 0x0047E910 (FUN_0047E910, CopyBandwidthRangeForwardFromCurrentThunkAlias3)
+   * Address: 0x00518250 (FUN_00518250)
    */
   [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias3(
     SBandwidthUsageSample* destination,

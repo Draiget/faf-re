@@ -7,6 +7,12 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CBuildTaskHelper.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class CUnitCommand;
@@ -52,7 +58,8 @@ namespace moho
                       CUnitCommand* command, Unit* rallyPointUnit);
 
     /**
-     * Address: 0x005FA110 (FUN_005FA110, scalar deleting destructor thunk)
+     * Address: 0x005FA010 (FUN_005FA010, non-deleting destructor body)
+     * Thunk entry: 0x005FA110 (FUN_005FA110, scalar deleting destructor thunk)
      *
      * VFTable SLOT: 0
      */
@@ -68,6 +75,26 @@ namespace moho
      * links build focus, and advances helper work-progress.
      */
     int Execute() override;
+
+    /**
+     * Address: 0x005FF020 (FUN_005FF020, Moho::CFactoryBuildTask::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes the factory-build task lanes in binary order: command-task
+     * base, dispatch pointer, blueprint pointer, helper, rally unit, counters,
+     * and command weak lane.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005FF160 (FUN_005FF160, Moho::CFactoryBuildTask::MemberSerialize)
+     *
+     * What it does:
+     * Serializes the factory-build task lanes in binary order: command-task
+     * base, dispatch pointer, blueprint pointer, helper, rally unit, counters,
+     * and command weak lane.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005FAD00 (FUN_005FAD00, ??2CFactoryBuildTask@Moho@@QAE@@Z_0)

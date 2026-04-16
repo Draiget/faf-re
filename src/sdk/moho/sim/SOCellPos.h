@@ -7,11 +7,24 @@
 
 namespace moho
 {
+  template <class T>
+  [[nodiscard]] const T& Invalid();
+
   struct SOCellPos
   {
+    static gpg::RType* sType;
+
     int16_t x;
     int16_t z;
   };
+
+  /**
+   * Address: 0x005A2C70 (FUN_005A2C70)
+   *
+   * What it does:
+   * Returns whether two cell-position lanes carry identical `(x, z)` values.
+   */
+  [[nodiscard]] bool operator==(const SOCellPos& lhs, const SOCellPos& rhs) noexcept;
 
   /**
    * Owns reflected metadata for `SOCellPos`.
@@ -92,6 +105,16 @@ namespace moho
   static_assert(sizeof(SOCellPos) == 0x04, "SOCellPos size must be 0x04");
   static_assert(offsetof(SOCellPos, x) == 0x00, "SOCellPos::x offset must be 0x00");
   static_assert(offsetof(SOCellPos, z) == 0x02, "SOCellPos::z offset must be 0x02");
+
+  /**
+   * Address: 0x0050AEB0 (FUN_0050AEB0, Moho::Invalid<Moho::SOCellPos>)
+   *
+   * What it does:
+   * Returns process-lifetime singleton invalid cell coordinates
+   * (`x = z = 0x8000`).
+   */
+  template <>
+  [[nodiscard]] const SOCellPos& Invalid<SOCellPos>();
 
   /**
    * Address: 0x00BC7D20 (FUN_00BC7D20, register_SOCellPosTypeInfo)

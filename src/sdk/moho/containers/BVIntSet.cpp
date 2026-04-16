@@ -35,6 +35,149 @@ namespace
     return {set.mFirstWordIndex, set.mFirstWordIndex + static_cast<unsigned int>(set.Buckets())};
   }
 
+  struct BVIntSetCursorRuntimeView
+  {
+    std::uint32_t lane00; // +0x00
+    BVIntSet* set;        // +0x04
+    unsigned int value;   // +0x08
+  };
+  static_assert(offsetof(BVIntSetCursorRuntimeView, set) == 0x04, "BVIntSetCursorRuntimeView::set offset must be 0x04");
+  static_assert(
+    offsetof(BVIntSetCursorRuntimeView, value) == 0x08,
+    "BVIntSetCursorRuntimeView::value offset must be 0x08"
+  );
+  static_assert(sizeof(BVIntSetCursorRuntimeView) == 0x0C, "BVIntSetCursorRuntimeView size must be 0x0C");
+
+  struct BVIntSetEmbeddedOwnerRuntimeView
+  {
+    std::uint32_t lane00; // +0x00
+    std::uint32_t lane04; // +0x04
+    BVIntSet set;         // +0x08
+  };
+  static_assert(
+    offsetof(BVIntSetEmbeddedOwnerRuntimeView, set) == 0x08,
+    "BVIntSetEmbeddedOwnerRuntimeView::set offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x006D1940 (FUN_006D1940)
+   *
+   * What it does:
+   * Removes all bits from one embedded `BVIntSet` lane using another owner's
+   * embedded set, then returns the source owner lane.
+   */
+  [[maybe_unused]] [[nodiscard]] BVIntSetEmbeddedOwnerRuntimeView* RemoveAllFromEmbeddedBVIntSetAdapter(
+    BVIntSetEmbeddedOwnerRuntimeView* const destinationOwner,
+    BVIntSetEmbeddedOwnerRuntimeView* const sourceOwner
+  )
+  {
+    destinationOwner->set.RemoveAllFrom(&sourceOwner->set);
+    return sourceOwner;
+  }
+
+  /**
+   * Address: 0x00534940 (FUN_00534940)
+   *
+   * What it does:
+   * Advances one `{set,value}` cursor by replacing `value` with
+   * `set->GetNext(value)` and returns the same cursor object.
+   */
+  [[maybe_unused]] BVIntSetCursorRuntimeView* AdvanceBVIntSetCursorRuntimeView(
+    BVIntSetCursorRuntimeView* const cursor
+  ) noexcept
+  {
+    cursor->value = cursor->set->GetNext(cursor->value);
+    return cursor;
+  }
+
+  class BVIntSetCursorDispatchRuntimeInterface
+  {
+  public:
+    virtual void Slot00() = 0;
+    virtual void Slot04() = 0;
+    virtual void Slot08() = 0;
+    virtual void Slot0C() = 0;
+    virtual unsigned int DispatchValue(unsigned int value) = 0;
+  };
+
+  struct BVIntSetCursorDispatchRuntimeView
+  {
+    BVIntSetCursorDispatchRuntimeInterface* owner = nullptr; // +0x00
+    std::uint32_t lane04 = 0u;                               // +0x04
+    unsigned int value = 0u;                                 // +0x08
+  };
+  static_assert(
+    offsetof(BVIntSetCursorDispatchRuntimeView, value) == 0x08,
+    "BVIntSetCursorDispatchRuntimeView::value offset must be 0x08"
+  );
+
+  /**
+   * Address: 0x00534960 (FUN_00534960)
+   *
+   * What it does:
+   * Dispatches one cursor-value update through owner virtual slot `+0x14`,
+   * passing the embedded value lane.
+   */
+  [[maybe_unused]] [[nodiscard]] unsigned int AdvanceCursorValueViaDispatch(
+    const BVIntSetCursorDispatchRuntimeView* const cursor
+  ) noexcept
+  {
+    return cursor->owner->DispatchValue(cursor->value);
+  }
+
+  /**
+   * Address: 0x00534970 (FUN_00534970)
+   *
+   * What it does:
+   * Returns whether two cursor dispatch payloads differ in their value lane.
+   */
+  [[maybe_unused]] [[nodiscard]] bool BVIntSetCursorValueNotEqualDispatch(
+    const BVIntSetCursorDispatchRuntimeView& lhs,
+    const BVIntSetCursorDispatchRuntimeView& rhs
+  ) noexcept
+  {
+    return lhs.value != rhs.value;
+  }
+
+  /**
+   * Address: 0x006D3080 (FUN_006D3080)
+   *
+   * What it does:
+   * Returns true when two `{owner, value}` index lanes carry the same value.
+   */
+  [[maybe_unused]] [[nodiscard]] bool BVIntSetIndexValueEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept
+  {
+    return lhs.mValue == rhs.mValue;
+  }
+
+  /**
+   * Address: 0x006E7A30 (FUN_006E7A30)
+   *
+   * What it does:
+   * Returns the bit-count for one BVIntSet embedded at offset `+0x08` in an
+   * owning runtime view.
+   */
+  [[maybe_unused]] unsigned int CountEmbeddedBVIntSetLane(
+    BVIntSetEmbeddedOwnerRuntimeView* const owner
+  ) noexcept
+  {
+    return owner->set.Count();
+  }
+
+  /**
+   * Address: 0x006E7A40 (FUN_006E7A40)
+   *
+   * What it does:
+   * Secondary cursor-advance adapter that forwards to
+   * `AdvanceBVIntSetCursorRuntimeView`.
+   */
+  [[maybe_unused]] BVIntSetCursorRuntimeView* AdvanceBVIntSetCursorRuntimeViewSecondary(
+    BVIntSetCursorRuntimeView* const cursor
+  ) noexcept
+  {
+    return AdvanceBVIntSetCursorRuntimeView(cursor);
+  }
+
   template <typename WordOp>
   BVIntSet* CopyAndApplyOverlap(
     const BVIntSet& lhs,
@@ -632,6 +775,7 @@ bool BVIntSet::Equals(const BVIntSet* other) const
 
 /**
  * Address: 0x00401CA0 (FUN_00401CA0)
+ * Address: 0x006D3220 (FUN_006D3220)
  *
  * What it does:
  * Returns whether two sets differ.
@@ -750,6 +894,23 @@ BVIntSetAddResult BVIntSet::Add(const unsigned int val)
 
   const bool wasInserted = ((previousWord >> shift) & 1u) == 0u;
   return BVIntSetAddResult{{this, val}, wasInserted};
+}
+
+/**
+ * Address: 0x008AA7F0 (FUN_008AA7F0)
+ *
+ * What it does:
+ * Adapts one register-shape add thunk by writing `BVIntSet::Add(val)` into
+ * caller-provided result storage and returning that result pointer.
+ */
+[[maybe_unused]] BVIntSetAddResult* BVIntSetAddThunkWithOutResult(
+  BVIntSet* const set,
+  const unsigned int val,
+  BVIntSetAddResult* const outResult
+)
+{
+  *outResult = set->Add(val);
+  return outResult;
 }
 
 /**

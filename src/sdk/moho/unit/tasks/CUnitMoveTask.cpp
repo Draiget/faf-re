@@ -1,7 +1,13 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
@@ -17,6 +23,83 @@
 
 namespace
 {
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSNavGoalType()
+  {
+    gpg::RType* type = moho::SNavGoal::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SNavGoal));
+      moho::SNavGoal::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrCUnitCommandType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::CUnitCommand>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::CUnitCommand>));
+      moho::WeakPtr<moho::CUnitCommand>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCUnitMoveTaskType()
+  {
+    gpg::RType* type = moho::CUnitMoveTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitMoveTask));
+      moho::CUnitMoveTask::sType = type;
+    }
+    return type;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
+
+  void ReadBoolIntoByteLane(gpg::ReadArchive* const archive, std::uint8_t& laneValue)
+  {
+    bool value = false;
+    archive->ReadBool(&value);
+    laneValue = value ? 1u : 0u;
+  }
+
   [[nodiscard]] moho::Unit* ResolveAssignedTransportUnit(moho::Unit* const unit) noexcept
   {
     if (!unit) {
@@ -51,6 +134,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CUnitMoveTask::sType = nullptr;
+
   /**
    * Address: 0x00618C30 (FUN_00618C30, nullsub_54)
    *
@@ -141,6 +226,104 @@ namespace moho
   {}
 
   /**
+   * Address: 0x0061A750 (FUN_0061A750)
+   *
+   * What it does:
+   * Deserializes move-task runtime state in binary read order: base command
+   * task payload, dispatch pointer, move goal, command weak link, and
+   * command-lane state bytes read as booleans.
+   */
+  void CUnitMoveTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    gpg::RRef dispatchTaskRef{};
+    archive->ReadPointer_CCommandTask(&mDispatchTask, &dispatchTaskRef);
+
+    const gpg::RRef moveGoalOwnerRef{};
+    archive->Read(CachedSNavGoalType(), &mMoveGoal, moveGoalOwnerRef);
+
+    const gpg::RRef commandOwnerRef{};
+    archive->Read(CachedWeakPtrCUnitCommandType(), &mCommandRef, commandOwnerRef);
+
+    ReadBoolIntoByteLane(archive, mNextCmdIsInstant);
+    ReadBoolIntoByteLane(archive, mRequiresTransportCategoryCheck);
+    ReadBoolIntoByteLane(archive, mIsOccupying);
+    ReadBoolIntoByteLane(archive, mTransportDispatchIssued);
+    ReadBoolIntoByteLane(archive, mMoveVariant);
+    ReadBoolIntoByteLane(archive, mHasPreparedDynamicGoal);
+  }
+
+  /**
+   * Address: 0x0061A880 (FUN_0061A880)
+   *
+   * What it does:
+   * Serializes move-task runtime state in binary write order: base command
+   * task payload, dispatch pointer, move goal, command weak link, and
+   * command-lane state bytes emitted as booleans.
+   */
+  void CUnitMoveTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+
+    gpg::RRef dispatchTaskRef{};
+    (void)gpg::RRef_CCommandTask(&dispatchTaskRef, mDispatchTask);
+    gpg::WriteRawPointer(archive, dispatchTaskRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedSNavGoalType(), &mMoveGoal, ownerRef);
+    archive->Write(CachedWeakPtrCUnitCommandType(), &mCommandRef, ownerRef);
+
+    archive->WriteBool(mNextCmdIsInstant != 0u);
+    archive->WriteBool(mRequiresTransportCategoryCheck != 0u);
+    archive->WriteBool(mIsOccupying != 0u);
+    archive->WriteBool(mTransportDispatchIssued != 0u);
+    archive->WriteBool(mMoveVariant != 0u);
+    archive->WriteBool(mHasPreparedDynamicGoal != 0u);
+  }
+
+  /**
+   * Address: 0x0061A1A0 (FUN_0061A1A0)
+   *
+   * What it does:
+   * Serializer-save thunk lane forwarding one `(task, archive)` pair into
+   * `CUnitMoveTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitMoveTaskMemberSerializeThunk(
+    const CUnitMoveTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (task != nullptr) {
+      task->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0061A3C0 (FUN_0061A3C0)
+   *
+   * What it does:
+   * Thin alias lane that forwards one `(task, archive)` pair into
+   * `CUnitMoveTask::MemberSerialize`.
+   */
+  void CUnitMoveTaskMemberSerializeAlias(
+    const CUnitMoveTask* const task,
+    gpg::WriteArchive* const archive
+  )
+  {
+    task->MemberSerialize(archive);
+  }
+
+  /**
    * Address: 0x00618A00 (FUN_00618A00, sub_618A00)
    *
    * What it does:
@@ -178,6 +361,56 @@ namespace moho
     }
 
     return commandQueue->GetNextCommand() == nullptr;
+  }
+
+  /**
+   * Address: 0x00618BB0 (FUN_00618BB0)
+   *
+   * What it does:
+   * Applies navigator-event result transitions, clears instant-command lane,
+   * and resumes owner-thread execution immediately.
+   */
+  void CUnitMoveTask::HandleNavigatorEvent(
+    const EAiNavigatorEvent event
+  )
+  {
+    switch (event) {
+      case AINAVEVENT_Failed:
+      case AINAVEVENT_Aborted:
+        if (mDispatchResult != nullptr) {
+          *mDispatchResult = static_cast<EAiResult>(2);
+        }
+        break;
+
+      case AINAVEVENT_Succeeded:
+        if (mDispatchResult != nullptr) {
+          *mDispatchResult = static_cast<EAiResult>(1);
+        }
+        break;
+
+      case AINAVEVENT_ResumeTask:
+        if (mTransportDispatchIssued == 0u) {
+          return;
+        }
+        if (mDispatchResult != nullptr) {
+          *mDispatchResult = static_cast<EAiResult>(1);
+        }
+        break;
+
+      default:
+        break;
+    }
+
+    mNextCmdIsInstant = 0u;
+
+    if (mOwnerThread == nullptr) {
+      return;
+    }
+
+    mOwnerThread->mPendingFrames = 0;
+    if (mOwnerThread->mStaged) {
+      mOwnerThread->Unstage();
+    }
   }
 
   /**
@@ -350,3 +583,72 @@ namespace moho
       CUnitMoveTask(dispatchTask, goal, requiresTransportCategoryCheck, sourceCommand, moveVariant);
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0061A3F0 (FUN_0061A3F0, gpg::RRef_CUnitMoveTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitMoveTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitMoveTask(gpg::RRef* const outRef, moho::CUnitMoveTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeDerivedRef(value, CachedCUnitMoveTaskType());
+    return outRef;
+  }
+
+  /**
+   * Address: 0x0061A350 (FUN_0061A350)
+   *
+   * What it does:
+   * Wrapper lane that materializes one temporary `RRef_CUnitMoveTask` and
+   * copies object/type fields into the destination reference record.
+   */
+  gpg::RRef* AssignCUnitMoveTaskRef(gpg::RRef* const outRef, moho::CUnitMoveTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RRef temporaryRef{};
+    (void)RRef_CUnitMoveTask(&temporaryRef, value);
+    outRef->mObj = temporaryRef.mObj;
+    outRef->mType = temporaryRef.mType;
+    return outRef;
+  }
+} // namespace gpg
+
+namespace
+{
+  gpg::SerSaveLoadHelperListRuntime gCUnitMoveTaskSerializer{};
+
+  /**
+   * Address: 0x00619040 (FUN_00619040)
+   *
+   * What it does:
+   * Unlinks `CUnitMoveTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMoveTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitMoveTaskSerializer);
+  }
+
+  /**
+   * Address: 0x00619070 (FUN_00619070)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link sequence for
+   * `CUnitMoveTaskSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMoveTaskSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitMoveTaskSerializer);
+  }
+} // namespace

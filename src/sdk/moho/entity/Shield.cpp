@@ -1,17 +1,32 @@
 #include "Shield.h"
 
+#include <Windows.h>
+
 #include <cstring>
+#include <new>
 #include <string>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 namespace
 {
@@ -22,6 +37,30 @@ namespace
   constexpr std::uint32_t kShieldCollisionBucketFlags = 0x800u;
   constexpr std::uint32_t kShieldFamilyMaskSourceBits = 0x400u;
   constexpr std::uint32_t kInvalidArmySourceIndex = 0xFFu;
+  gpg::SerSaveLoadHelperListRuntime gShieldSerializerHelper{};
+
+  /**
+   * Address: 0x007769C0 (FUN_007769C0, SerSaveLoadHelper<Shield>::unlink lane A)
+   *
+   * What it does:
+   * Unlinks `ShieldSerializer` helper node from the intrusive helper list and
+   * restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkShieldSerializerNodeVariantA() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gShieldSerializerHelper);
+  }
+
+  /**
+   * Address: 0x007769F0 (FUN_007769F0, SerSaveLoadHelper<Shield>::unlink lane B)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for the `ShieldSerializer` helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkShieldSerializerNodeVariantB() noexcept
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gShieldSerializerHelper);
+  }
 
   gpg::RType* CachedShieldType()
   {
@@ -39,6 +78,14 @@ namespace
       sEntityType = gpg::LookupRType(typeid(moho::Entity));
     }
     return sEntityType;
+  }
+
+  void AdjustShieldInstanceStat(const long delta)
+  {
+    moho::StatItem* const statItem = moho::InstanceCounter<moho::Shield>::GetStatItem();
+    if (statItem != nullptr) {
+      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+    }
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -75,6 +122,22 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
+  /**
+   * Address: 0x00776FC0 (FUN_00776FC0)
+   *
+   * What it does:
+   * Deletes one `Shield` object when the pointer lane is non-null.
+   */
+  [[maybe_unused]] void DeleteShieldIfPresent(void* const object)
+  {
+    auto* const shield = static_cast<moho::Shield*>(object);
+    if (!shield) {
+      return;
+    }
+
+    delete shield;
+  }
+
   void UnlinkShieldFromSimList(moho::Shield* const shield)
   {
     if (!shield || !shield->SimulationRef) {
@@ -96,6 +159,19 @@ namespace
 namespace moho
 {
   gpg::RType* Shield::sPointerType = nullptr;
+
+  /**
+   * Address: 0x00776340 (FUN_00776340, preregister_ShieldTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::Shield`.
+   */
+  [[nodiscard]] gpg::RType* preregister_ShieldTypeInfo()
+  {
+    static ShieldTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(Shield), &typeInfo);
+    return &typeInfo;
+  }
 
   /**
    * Address: 0x00776E90 (FUN_00776E90, Moho::InstanceCounter<Moho::Shield>::GetStatItem)
@@ -128,7 +204,7 @@ namespace moho
   Shield::Shield(Sim* const sim)
     : Entity(sim, kShieldCollisionBucketFlags)
   {
-    ++InstanceCounter<Shield>::s_count;
+    AdjustShieldInstanceStat(1L);
   }
 
   /**
@@ -148,11 +224,61 @@ namespace moho
                              : BuildShieldFamilySourceBits(kInvalidArmySourceIndex) | 1u)
       )
   {
-    ++InstanceCounter<Shield>::s_count;
+    AdjustShieldInstanceStat(1L);
 
     if (SimulationRef != nullptr) {
       SimulationRef->mShields.push_back(this);
     }
+  }
+
+  /**
+   * Address: 0x00776860 (FUN_00776860)
+   *
+   * What it does:
+   * Reads one owning `Sim*` lane from archive, constructs one `Shield`, and
+   * returns it through serializer construct-result output.
+   */
+  void ConstructShieldForSerializerFromArchive(gpg::ReadArchive* const archive, gpg::SerConstructResult* const result)
+  {
+    if (archive == nullptr || result == nullptr) {
+      return;
+    }
+
+    Sim* ownerSim = nullptr;
+    const gpg::RRef nullOwner{};
+    (void)archive->ReadPointer_Sim(&ownerSim, &nullOwner);
+
+    Shield* object = nullptr;
+    void* const storage = ::operator new(sizeof(Shield), std::nothrow);
+    if (storage != nullptr) {
+      try {
+        object = new (storage) Shield(ownerSim);
+      } catch (...) {
+        ::operator delete(storage);
+        throw;
+      }
+    }
+
+    gpg::RRef objectRef{};
+    gpg::RRef_Shield(&objectRef, object);
+    result->SetUnowned(objectRef, 0u);
+  }
+
+  /**
+   * Address: 0x00776840 (FUN_00776840)
+   *
+   * What it does:
+   * Serializer construct-callback thunk that forwards to
+   * `ConstructShieldForSerializerFromArchive`.
+   */
+  void ConstructShieldSerializerThunk(
+    gpg::ReadArchive* const archive,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    ConstructShieldForSerializerFromArchive(archive, result);
   }
 
   /**
@@ -200,16 +326,17 @@ namespace moho
   }
 
   /**
-   * Address: 0x00776570 (FUN_00776570)
+   * Address: 0x00776570 (FUN_00776570, deleting dtor thunk)
+   * Address: 0x00776600 (FUN_00776600, non-deleting dtor core)
    *
    * What it does:
-   * Unlinks this shield from Sim shield-list and decrements shield instance
-   * counter before base entity teardown.
+   * Unlinks this shield from Sim shield-list and decrements the shield
+   * instance-stat lane before base entity teardown.
    */
   Shield::~Shield()
   {
     UnlinkShieldFromSimList(this);
-    --InstanceCounter<Shield>::s_count;
+    AdjustShieldInstanceStat(-1L);
   }
 
   /**

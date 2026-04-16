@@ -1,5 +1,7 @@
 #include "moho/effects/rendering/IEffectTypeInfo.h"
 
+#include <typeinfo>
+
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/script/CScriptObject.h"
 
@@ -39,6 +41,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x00771090 (FUN_00771090, preregister_IEffectTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `moho::IEffect`.
+   */
+  [[nodiscard]] gpg::RType* preregister_IEffectTypeInfo()
+  {
+    static IEffectTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(IEffect), &typeInfo);
+    return &typeInfo;
+  }
+
+  /**
    * Address: 0x00771340 (FUN_00771340, Moho::IEffectTypeInfo::AddBase_CScriptObject)
    *
    * IDA signature:
@@ -56,4 +71,3 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
-

@@ -24,6 +24,24 @@ namespace moho
    */
   struct CProjectileAttributes
   {
+    /**
+     * Address: 0x0069A4A0 (FUN_0069A4A0, Moho::CProjectileAttributes::CProjectileAttributes)
+     *
+     * What it does:
+     * Initializes projectile zig-zag/detonation override lanes to unset
+     * sentinel values and clears blueprint pointer ownership.
+     */
+    CProjectileAttributes() noexcept;
+
+    /**
+     * Address: 0x0069A4D0 (FUN_0069A4D0, Moho::CProjectileAttributes::CProjectileAttributes)
+     *
+     * What it does:
+     * Initializes one projectile-attributes payload from a blueprint pointer
+     * while keeping zig-zag/detonation override lanes unset.
+     */
+    explicit CProjectileAttributes(RProjectileBlueprint* blueprint) noexcept;
+
     RProjectileBlueprint* mBlueprint; // +0x00
     float mMaxZigZag;                 // +0x04
     float mZigZagFrequency;           // +0x08
@@ -52,6 +70,14 @@ namespace moho
   class CProjectileAttributesTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0069A850 (FUN_0069A850, Moho::CProjectileAttributesTypeInfo::CProjectileAttributesTypeInfo)
+     *
+     * What it does:
+     * Preregisters `CProjectileAttributes` reflection metadata at startup.
+     */
+    CProjectileAttributesTypeInfo();
+
     /**
      * Address: 0x0069A8E0 (FUN_0069A8E0, Moho::CProjectileAttributesTypeInfo::dtr)
      */

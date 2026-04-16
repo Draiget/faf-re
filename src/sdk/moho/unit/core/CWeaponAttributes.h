@@ -47,6 +47,14 @@ namespace moho
     explicit CWeaponAttributes(RUnitBlueprintWeapon* blueprint);
 
     /**
+     * Address: 0x006D32D0 (FUN_006D32D0)
+     *
+     * What it does:
+     * Stores one firing-tolerance float lane.
+     */
+    void SetFiringTolerance(float firingTolerance);
+
+    /**
      * Address: 0x006D3340 (FUN_006D3340, Moho::CWeaponAttributes::SetType)
      *
      * What it does:
@@ -62,6 +70,96 @@ namespace moho
      * the backing blueprint damage-type string.
      */
     [[nodiscard]] msvc8::string GetName() const;
+
+    /**
+     * Address: 0x006D32E0 (FUN_006D32E0)
+     *
+     * What it does:
+     * Sets the local rate-of-fire override lane.
+     */
+    CWeaponAttributes* SetRateOfFire(float value);
+
+    /**
+     * Address: 0x006D32F0 (FUN_006D32F0)
+     *
+     * What it does:
+     * Sets minimum radius and updates its cached squared lane.
+     */
+    CWeaponAttributes* SetMinRadius(float value);
+
+    /**
+     * Address: 0x006D3310 (FUN_006D3310)
+     *
+     * What it does:
+     * Sets maximum radius and updates its cached squared lane.
+     */
+    CWeaponAttributes* SetMaxRadius(float value);
+
+    /**
+     * Address: 0x006D3330 (FUN_006D3330)
+     *
+     * What it does:
+     * Sets maximum height-difference override lane.
+     */
+    CWeaponAttributes* SetMaxHeightDiff(float value);
+
+    /**
+     * Address: 0x006D33A0 (FUN_006D33A0)
+     *
+     * What it does:
+     * Sets damage radius override lane.
+     */
+    CWeaponAttributes* SetDamageRadius(float value);
+
+    /**
+     * Address: 0x006D33B0 (FUN_006D33B0)
+     *
+     * What it does:
+     * Sets damage override lane.
+     */
+    CWeaponAttributes* SetDamage(float value);
+
+    /**
+     * Address: 0x006D33C0 (FUN_006D33C0)
+     *
+     * What it does:
+     * Returns effective rate-of-fire (`local` override or blueprint default).
+     */
+    [[nodiscard]] float GetRateOfFire() const;
+
+    /**
+     * Address: 0x006D33E0 (FUN_006D33E0)
+     *
+     * What it does:
+     * Returns minimum-radius squared lane, lazily deriving from blueprint
+     * radius when local cache is unset.
+     */
+    [[nodiscard]] float GetMinRadiusSq();
+
+    /**
+     * Address: 0x006D3410 (FUN_006D3410)
+     *
+     * What it does:
+     * Returns effective max-height-difference (`local` override or blueprint
+     * default).
+     */
+    [[nodiscard]] float GetMaxHeightDiff() const;
+
+    /**
+     * Address: 0x006D3470 (FUN_006D3470)
+     *
+     * What it does:
+     * Returns effective damage-radius (`local` override or blueprint default).
+     */
+    [[nodiscard]] float GetDamageRadius() const;
+
+    /**
+     * Address: 0x006D3490 (FUN_006D3490)
+     *
+     * What it does:
+     * Returns effective damage (`local` override or blueprint default).
+     */
+    [[nodiscard]] float GetDamage() const;
   };
 
   static_assert(

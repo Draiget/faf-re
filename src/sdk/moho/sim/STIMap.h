@@ -798,6 +798,16 @@ namespace moho
     bool IsPlayable(const Wm3::Vec3f& position) const;
 
     /**
+     * Address: 0x0050ACE0 (FUN_0050ACE0)
+     *
+     * What it does:
+     * Samples terrain elevation at world `(x,z)` and applies map water-floor
+     * clamping when water is enabled.
+     */
+    [[nodiscard]]
+    float GetSurface(float x, float z) const;
+
+    /**
      * Address: 0x00541A30 (FUN_00541A30), 0x1012F3B0 (FUN_1012F3B0)
      *
      * Wm3::Vector3<float> const &
@@ -849,6 +859,34 @@ namespace moho
     [[nodiscard]] float GetElevation(std::int32_t x, std::int32_t z) const;
     [[nodiscard]] bool IsWaterEnabled() const noexcept;
     [[nodiscard]] float GetWaterElevation() const noexcept;
+    /**
+     * Address: 0x0089E5C0 (FUN_0089E5C0)
+     *
+     * What it does:
+     * Stores one raw water-enabled byte flag into lane `+0x1534`.
+     */
+    STIMap* SetWaterEnabledRaw(std::uint8_t enabled) noexcept;
+    /**
+     * Address: 0x0089E5D0 (FUN_0089E5D0)
+     *
+     * What it does:
+     * Stores one water-elevation float lane at offset `+0x1538`.
+     */
+    STIMap* SetWaterElevation(float elevation) noexcept;
+    /**
+     * Address: 0x0089E5E0 (FUN_0089E5E0)
+     *
+     * What it does:
+     * Stores one deep-water elevation float lane at offset `+0x153C`.
+     */
+    STIMap* SetWaterElevationDeep(float elevation) noexcept;
+    /**
+     * Address: 0x0089E5F0 (FUN_0089E5F0)
+     *
+     * What it does:
+     * Stores one abyss-water elevation float lane at offset `+0x1540`.
+     */
+    STIMap* SetWaterElevationAbyss(float elevation) noexcept;
 
   public:
     boost::shared_ptr<CHeightField> mHeightField; // +0x0000

@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/script/CScriptObject.h"
@@ -20,11 +21,16 @@ namespace gpg
 {
   class RRef;
   class RType;
+  class SerConstructResult;
 } // namespace gpg
 
 namespace moho
 {
+  template <class T>
+  struct WeakPtr;
+
   class CArmyImpl;
+  class CUnitCommand;
   class CScrLuaInitForm;
   class CSquad;
   class Entity;
@@ -52,6 +58,15 @@ namespace moho
     static CPlatoon* Create(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
 
     /**
+     * Address: 0x00724BA0 (FUN_00724BA0, Moho::CPlatoon::CPlatoon)
+     *
+     * What it does:
+     * Constructs one serializer-facing platoon object with zeroed runtime
+     * lanes and no `OnCreate` script dispatch.
+     */
+    CPlatoon();
+
+    /**
      * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
      *
      * What it does:
@@ -59,6 +74,15 @@ namespace moho
      * lanes, and dispatches script `OnCreate(plan)`.
      */
     CPlatoon(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
+
+    /**
+     * Address: 0x0072A0D0 (FUN_0072A0D0, sub_72A0D0)
+     *
+     * What it does:
+     * Allocates one default platoon object and publishes it through serializer
+     * construct-result lanes as an unowned reflected reference.
+     */
+    static void ConstructForSerializer(gpg::SerConstructResult* result);
 
     /**
      * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
@@ -107,6 +131,25 @@ namespace moho
     ESquadClass GetSquadClass(const Unit* unit) const;
 
     /**
+     * Address: 0x00725280 (FUN_00725280, sub_725280)
+     *
+     * What it does:
+     * Finds the first squad lane matching `squadClass` and appends all units
+     * from `units` into that squad's unit set, then invalidates cached Lua
+     * unit-list state.
+     */
+    void AppendUnitsToSquad(ESquadClass squadClass, const SEntitySetTemplateUnit& units);
+
+    /**
+     * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
+     *
+     * What it does:
+     * Builds a one-unit temporary set for `unit`, appends it into the first
+     * matching `squadClass` lane, and invalidates cached Lua unit-list state.
+     */
+    void AppendUnitToSquad(ESquadClass squadClass, Unit* unit);
+
+    /**
      * Address: 0x00725630 (FUN_00725630, Moho::CPlatoon::GetSquad)
      *
      * What it does:
@@ -131,6 +174,14 @@ namespace moho
      * that lane match `categorySet`.
      */
     [[nodiscard]] int CountUnassignedUnitsInCategory(const EntityCategorySet* categorySet);
+
+    /**
+     * Address: 0x00725840 (FUN_00725840, sub_725840)
+     *
+     * What it does:
+     * Returns the total unit-slot count across all squad lanes.
+     */
+    [[nodiscard]] int CountAllSquadUnitSlots() const;
 
     /**
      * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
@@ -163,6 +214,16 @@ namespace moho
     void Stop(ESquadClass squadClass);
 
     /**
+     * Address: 0x00728A70 (FUN_00728A70, Moho::CPlatoon::LoadUnits)
+     *
+     * What it does:
+     * Builds transport/load candidate sets from assigned squads, dispatches
+     * `UNITCOMMAND_TransportLoadUnits` per transport, and returns issued
+     * command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> LoadUnits(const EntityCategorySet* categorySet);
+
+    /**
      * Address: 0x00729FE0 (FUN_00729FE0, Moho::CPlatoon::SquadsHaveOrders)
      *
      * What it does:
@@ -179,6 +240,78 @@ namespace moho
      * `OnDestroy/OnCreate` script callbacks when the plan actually changes.
      */
     void SwitchAIPlan(const char* planName);
+
+    /**
+     * Address: 0x0072B720 (FUN_0072B720, Moho::CPlatoon::GetArmy)
+     *
+     * What it does:
+     * Returns this platoon's owning army lane.
+     */
+    [[nodiscard]] IArmy* GetArmy() const;
+
+    /**
+     * Address: 0x0072B7A0 (FUN_0072B7A0, Moho::CPlatoon::GetLifetimeStat1)
+     *
+     * What it does:
+     * Returns the first integer lifetime-stat lane.
+     */
+    [[nodiscard]] std::int32_t GetLifetimeStat1() const;
+
+    /**
+     * Address: 0x0072B7B0 (FUN_0072B7B0, Moho::CPlatoon::GetLifetimeStat2)
+     *
+     * What it does:
+     * Returns the second integer lifetime-stat lane.
+     */
+    [[nodiscard]] std::int32_t GetLifetimeStat2() const;
+
+    /**
+     * Address: 0x0072B790 (FUN_0072B790, sub_72B790)
+     *
+     * What it does:
+     * Sets the disband-on-idle lane and returns this platoon.
+     */
+    CPlatoon* MarkDisbandOnIdle();
+
+    /**
+     * Address: 0x0072B7C0 (FUN_0072B7C0, sub_72B7C0)
+     *
+     * What it does:
+     * Returns the third floating lifetime-stat lane.
+     */
+    [[nodiscard]] float GetLifetimeStat3() const;
+
+    /**
+     * Address: 0x0072B7D0 (FUN_0072B7D0, sub_72B7D0)
+     *
+     * What it does:
+     * Returns the fourth floating lifetime-stat lane.
+     */
+    [[nodiscard]] float GetLifetimeStat4() const;
+
+    /**
+     * Address: 0x0072B7F0 (FUN_0072B7F0, sub_72B7F0)
+     *
+     * What it does:
+     * Returns whether the cached Lua unit-list lane is present.
+     */
+    [[nodiscard]] bool HasLuaUnitList() const;
+
+    /**
+     * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
+     *
+     * What it does:
+     * Adds one delta to the third floating lifetime-stat lane.
+     */
+    CPlatoon* AddLifetimeStat3(float delta);
+
+    /**
+     * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
+     *
+     * What it does:
+     * Adds one delta to the fourth floating lifetime-stat lane.
+     */
+    CPlatoon* AddLifetimeStat4(float delta);
 
     /**
      * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
@@ -966,6 +1099,15 @@ namespace moho
    * Publishes the `CPlatoon:LoadUnits()` Lua binder form.
    */
   CScrLuaInitForm* func_CPlatoonLoadUnits_LuaFuncDef();
+
+  /**
+   * Address: 0x00730970 (FUN_00730970, cfunc_CPlatoonLoadUnitsL)
+   *
+   * What it does:
+   * Resolves `(platoon, category)`, issues `CPlatoon::LoadUnits`, and returns
+   * a Lua table of command objects.
+   */
+  int cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00730B10 (FUN_00730B10, cfunc_CPlatoonUnloadUnitsAtLocation)

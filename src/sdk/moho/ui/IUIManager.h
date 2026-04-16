@@ -157,6 +157,22 @@ namespace moho
      * Default-constructs command-mode name and payload Lua-object lanes.
      */
     UICommandModeData();
+
+    /**
+     * Address: 0x0083DF60 (FUN_0083DF60, ??0UICommandModeData@Moho@@QAE@ABU01@@Z)
+     *
+     * What it does:
+     * Copy-constructs command-mode name and payload Lua-object lanes.
+     */
+    UICommandModeData(const UICommandModeData& other);
+
+    /**
+     * Address: 0x0081F700 (FUN_0081F700, ??1UICommandModeData@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases one payload Lua object and one command-mode text lane.
+     */
+    ~UICommandModeData();
   };
 
   static_assert(sizeof(UICommandModeData) == 0x30, "moho::UICommandModeData size must be 0x30");
@@ -178,6 +194,30 @@ namespace moho
    * Address context: global accessor for DAT_010A6450 (`UI_Manager`).
    */
   [[nodiscard]] IUIManager* UI_GetManager();
+
+  /**
+   * Address: 0x0084C680 (FUN_0084C680)
+   *
+   * What it does:
+   * Returns the global UI-manager singleton lane.
+   */
+  [[nodiscard]] CUIManager* GetUiManagerGlobalLaneA() noexcept;
+
+  /**
+   * Address: 0x0084C960 (FUN_0084C960)
+   *
+   * What it does:
+   * Secondary lane returning the global UI-manager singleton pointer.
+   */
+  [[nodiscard]] CUIManager* GetUiManagerGlobalLaneB() noexcept;
+
+  /**
+   * Address: 0x0083CE10 (FUN_0083CE10)
+   *
+   * What it does:
+   * Forces UI state to lobby-mode.
+   */
+  void ForceUiStateLobbyMode();
 
   /**
    * Address: 0x0083D140 (FUN_0083D140, ?UI_StartFrontEnd@Moho@@YA_NXZ)

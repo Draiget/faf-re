@@ -23,6 +23,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059BFA0 (FUN_0059BFA0)
+     *
+     * What it does:
+     * Initializes formation-DB runtime lanes, binds the concrete vtable, and
+     * seeds inline storage for the formation-instance fastvector.
+     */
+    CAiFormationDBImpl() noexcept;
+
+    /**
      * Address: 0x0059BFE0 (FUN_0059BFE0, non-deleting dtor body)
      * Address: 0x0059C340 (FUN_0059C340)
      *

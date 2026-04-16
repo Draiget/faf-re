@@ -19,6 +19,13 @@ namespace moho
   class CSimConVarBase : public CSimConCommand
   {
   public:
+    /**
+     * Address: 0x00579760 (FUN_00579760, Moho::CSimConVarBase::CSimConVarBase)
+     *
+     * What it does:
+     * Initializes one convar definition lane, assigns a unique global convar
+     * index, and binds the `CSimConVarBase` vftable.
+     */
     CSimConVarBase(bool requiresCheat, const char* name);
 
     /**
@@ -67,7 +74,6 @@ namespace moho
       : CSimConVarBase(requiresCheat, name)
       , mDefaultValue(defaultValue)
     {
-      mIndex = AllocateSimConVarIndex();
     }
 
     CSimConVarInstanceBase* CreateInstance() override
@@ -94,6 +100,16 @@ namespace moho
    */
   template <>
   CSimConVarInstanceBase* TSimConVar<bool>::CreateInstance();
+
+  /**
+   * Address: 0x0057DEA0 (FUN_0057DEA0, Moho::TSimConVar_bool::TSimConVar_bool)
+   *
+   * What it does:
+   * Initializes one bool convar definition, assigning convar index and default
+   * bool payload lane.
+   */
+  template <>
+  TSimConVar<bool>::TSimConVar(bool requiresCheat, const char* name, const bool& defaultValue);
 
   /**
    * Address: 0x005D3CE0 (FUN_005D3CE0, Moho::TSimConVar_float::NewInstance)

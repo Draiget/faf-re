@@ -52,14 +52,14 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
-    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
-      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
-      serializer.mHelperPrev->mNext = serializer.mHelperNext;
-    }
-
-    InitializeSerializerNode(serializer);
+    serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+    serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
   }
 
   [[nodiscard]] gpg::RType* CachedSSiloBuildInfoType()
@@ -83,39 +83,92 @@ namespace
   }
 
   /**
+   * Address: 0x005CECD0 (FUN_005CECD0, SSiloBuildInfoSerializer cleanup helper variant)
+   *
+   * What it does:
+   * Unlinks `SSiloBuildInfoSerializer` from the intrusive helper list, resets
+   * its links to self, and returns the helper node.
+   */
+  [[maybe_unused, nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer_primary()
+  {
+    SSiloBuildInfoSerializer* const serializer = reinterpret_cast<SSiloBuildInfoSerializer*>(gSSiloBuildInfoSerializerStorage);
+    return UnlinkSerializerNode(*serializer);
+  }
+
+  /**
+   * Address: 0x005CED00 (FUN_005CED00, SSiloBuildInfoSerializer cleanup helper variant)
+   *
+   * What it does:
+   * Secondary cleanup variant that unlinks `SSiloBuildInfoSerializer` from the
+   * intrusive helper list, resets self-links, and returns the helper node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer_secondary()
+  {
+    SSiloBuildInfoSerializer* const serializer = reinterpret_cast<SSiloBuildInfoSerializer*>(gSSiloBuildInfoSerializerStorage);
+    return UnlinkSerializerNode(*serializer);
+  }
+
+  /**
    * Address: 0x00BF7EA0 (FUN_00BF7EA0, cleanup_SSiloBuildInfoSerializer)
    *
    * What it does:
-   * Unlinks the static serializer helper node and tears down local storage.
+   * Startup teardown hook that performs the serializer helper unlink/reset and
+   * returns the helper node.
    */
-  void cleanup_SSiloBuildInfoSerializer()
+  [[nodiscard]] gpg::SerHelperBase* cleanup_SSiloBuildInfoSerializer()
   {
-    if (!gSSiloBuildInfoSerializerConstructed) {
-      return;
-    }
+    return cleanup_SSiloBuildInfoSerializer_secondary();
+  }
 
-    SSiloBuildInfoSerializer* const serializer = AcquireSSiloBuildInfoSerializer();
-    UnlinkSerializerNode(*serializer);
-    serializer->~SSiloBuildInfoSerializer();
-    gSSiloBuildInfoSerializerConstructed = false;
+  void cleanup_SSiloBuildInfoSerializer_atexit()
+  {
+    (void)cleanup_SSiloBuildInfoSerializer();
+  }
+
+  /**
+   * Address: 0x005CF920 (FUN_005CF920, CAiSiloBuildImplSerializer cleanup helper variant)
+   *
+   * What it does:
+   * Unlinks `CAiSiloBuildImplSerializer` from the intrusive helper list,
+   * resets self-links, and returns the helper node.
+   */
+  [[maybe_unused, nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer_primary()
+  {
+    CAiSiloBuildImplSerializer* const serializer =
+      reinterpret_cast<CAiSiloBuildImplSerializer*>(gCAiSiloBuildImplSerializerStorage);
+    return UnlinkSerializerNode(*serializer);
+  }
+
+  /**
+   * Address: 0x005CF950 (FUN_005CF950, CAiSiloBuildImplSerializer cleanup helper variant)
+   *
+   * What it does:
+   * Secondary cleanup variant that unlinks
+   * `CAiSiloBuildImplSerializer` from the intrusive helper list, resets
+   * self-links, and returns the helper node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer_secondary()
+  {
+    CAiSiloBuildImplSerializer* const serializer =
+      reinterpret_cast<CAiSiloBuildImplSerializer*>(gCAiSiloBuildImplSerializerStorage);
+    return UnlinkSerializerNode(*serializer);
   }
 
   /**
    * Address: 0x00BF7F60 (FUN_00BF7F60, cleanup_CAiSiloBuildImplSerializer)
    *
    * What it does:
-   * Unlinks the static serializer helper node and tears down local storage.
+   * Startup teardown hook that performs the serializer helper unlink/reset and
+   * returns the helper node.
    */
-  void cleanup_CAiSiloBuildImplSerializer()
+  [[nodiscard]] gpg::SerHelperBase* cleanup_CAiSiloBuildImplSerializer()
   {
-    if (!gCAiSiloBuildImplSerializerConstructed) {
-      return;
-    }
+    return cleanup_CAiSiloBuildImplSerializer_secondary();
+  }
 
-    CAiSiloBuildImplSerializer* const serializer = AcquireCAiSiloBuildImplSerializer();
-    UnlinkSerializerNode(*serializer);
-    serializer->~CAiSiloBuildImplSerializer();
-    gCAiSiloBuildImplSerializerConstructed = false;
+  void cleanup_CAiSiloBuildImplSerializer_atexit()
+  {
+    (void)cleanup_CAiSiloBuildImplSerializer();
   }
 } // namespace
 
@@ -166,8 +219,7 @@ int moho::register_SSiloBuildInfoSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &SSiloBuildInfoSerializer::Deserialize;
   serializer->mSaveCallback = &SSiloBuildInfoSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
-  return std::atexit(&cleanup_SSiloBuildInfoSerializer);
+  return std::atexit(&cleanup_SSiloBuildInfoSerializer_atexit);
 }
 
 /**
@@ -209,8 +261,7 @@ int moho::register_CAiSiloBuildImplSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiSiloBuildImplSerializer::Deserialize;
   serializer->mSaveCallback = &CAiSiloBuildImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
-  return std::atexit(&cleanup_CAiSiloBuildImplSerializer);
+  return std::atexit(&cleanup_CAiSiloBuildImplSerializer_atexit);
 }
 
 /**

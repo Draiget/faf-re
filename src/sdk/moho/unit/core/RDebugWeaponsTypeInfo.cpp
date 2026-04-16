@@ -3,12 +3,39 @@
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 #include "moho/unit/core/RDebugWeapons.h"
 
+namespace
+{
+  /**
+   * Address: 0x00652DF0 (FUN_00652DF0)
+   *
+   * What it does:
+   * Registers one debug-overlay descriptor pair for weapon-range rendering.
+   */
+  void RegisterRDebugWeaponsOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  {
+    typeInfo->RegisterOverlayClass("Display weapon ranges", "Weapons");
+  }
+} // namespace
+
 namespace moho
 {
   /**
    * Address: 0x00652DC0 (FUN_00652DC0, Moho::RDebugWeaponsTypeInfo::dtr)
    */
   RDebugWeaponsTypeInfo::~RDebugWeaponsTypeInfo() = default;
+
+  /**
+   * Address: 0x00652DE0 (FUN_00652DE0)
+   *
+   * What it does:
+   * Deleting-destructor thunk lane that forwards into
+   * `RDebugOverlayClass` non-deleting destructor body.
+   */
+  [[maybe_unused]] RDebugOverlayClass* DestroyRDebugWeaponsTypeInfoThunk(RDebugOverlayClass* const object)
+  {
+    object->~RDebugOverlayClass();
+    return object;
+  }
 
   /**
    * Address: 0x00652DB0 (FUN_00652DB0, Moho::RDebugWeaponsTypeInfo::GetName)
@@ -27,13 +54,16 @@ namespace moho
   void RDebugWeaponsTypeInfo::Init()
   {
     size_ = sizeof(RDebugWeapons);
-    newRefFunc_ = &RDebugWeaponsTypeInfo::NewRef;
-    ctorRefFunc_ = &RDebugWeaponsTypeInfo::CtrRef;
-    deleteFunc_ = &RDebugWeaponsTypeInfo::Delete;
-    dtrFunc_ = &RDebugWeaponsTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &RDebugWeaponsTypeInfo::NewRef,
+      &RDebugWeaponsTypeInfo::CtrRef,
+      &RDebugWeaponsTypeInfo::Delete,
+      &RDebugWeaponsTypeInfo::Destruct
+    );
     AddBase_RDebugOverlay(this);
     gpg::RType::Init();
-    RegisterOverlayClass("Display weapon ranges", "Weapons");
+    RegisterRDebugWeaponsOverlayClass(this);
     Finish();
   }
 

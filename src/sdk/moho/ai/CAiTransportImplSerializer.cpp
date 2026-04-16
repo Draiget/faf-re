@@ -83,6 +83,35 @@ namespace
     InitializeSerializerNode(serializer);
   }
 
+  /**
+   * Address: 0x005E85E0 (FUN_005E85E0)
+   *
+   * What it does:
+   * Splices this serializer helper node out of its intrusive lane when linked,
+   * then resets helper links to self and returns the self node pointer.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplSerializerHelperNodeVariantA(
+    CAiTransportImplSerializer& serializer
+  ) noexcept
+  {
+    UnlinkSerializerNode(serializer);
+    return SerializerSelfNode(serializer);
+  }
+
+  /**
+   * Address: 0x005E8610 (FUN_005E8610)
+   *
+   * What it does:
+   * Secondary helper-node unlink/reset variant that preserves the same
+   * intrusive unlink semantics and returns the helper self node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCAiTransportImplSerializerHelperNodeVariantB(
+    CAiTransportImplSerializer& serializer
+  ) noexcept
+  {
+    return UnlinkCAiTransportImplSerializerHelperNodeVariantA(serializer);
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiTransportImplType()
   {
     gpg::RType* type = CAiTransportImpl::sType;
@@ -93,6 +122,22 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x005E85B0 (FUN_005E85B0)
+   *
+   * What it does:
+   * Initializes callback lanes for global `CAiTransportImplSerializer` helper
+   * storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] CAiTransportImplSerializer* InitializeCAiTransportImplSerializerStartupThunk()
+  {
+    CAiTransportImplSerializer* const serializer = AcquireCAiTransportImplSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mLoadCallback = &CAiTransportImplSerializer::Deserialize;
+    serializer->mSaveCallback = &CAiTransportImplSerializer::Serialize;
+    return serializer;
+  }
+
   void cleanup_CAiTransportImplSerializer()
   {
     if (!gCAiTransportImplSerializerConstructed) {
@@ -100,7 +145,7 @@ namespace
     }
 
     CAiTransportImplSerializer* const serializer = AcquireCAiTransportImplSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkCAiTransportImplSerializerHelperNodeVariantA(*serializer);
     serializer->~CAiTransportImplSerializer();
     gCAiTransportImplSerializerConstructed = false;
   }
@@ -152,7 +197,6 @@ void moho::register_CAiTransportImplSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiTransportImplSerializer::Deserialize;
   serializer->mSaveCallback = &CAiTransportImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiTransportImplSerializer);
 }
 

@@ -34,6 +34,26 @@ namespace
   }
 
   /**
+   * Address: 0x005A7D90 (FUN_005A7D90)
+   *
+   * What it does:
+   * Adds the reflected `CAiNavigatorImpl` base entry to the land navigator
+   * RTTI node.
+   */
+  void AddCAiNavigatorImplBase(gpg::RType& typeInfo)
+  {
+    gpg::RType* const baseType = CachedCAiNavigatorImplType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo.AddBase(baseField);
+  }
+
+  /**
    * Address: 0x00BF6E20 (FUN_00BF6E20)
    *
    * What it does:
@@ -82,13 +102,7 @@ void CAiNavigatorLandTypeInfo::Init()
   size_ = sizeof(CAiNavigatorLand);
   gpg::RType::Init();
 
-  gpg::RField baseField{};
-  baseField.mName = CachedCAiNavigatorImplType()->GetName();
-  baseField.mType = CachedCAiNavigatorImplType();
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
+  AddCAiNavigatorImplBase(*this);
 
   Finish();
 }

@@ -78,5 +78,13 @@ namespace gpg
     sizeof(RSharedPointerType<moho::CAniPose>) == 0x68,
     "RSharedPointerType<moho::CAniPose> size must be 0x68"
   );
-} // namespace gpg
 
+  /**
+   * Address: 0x0055EA20 (FUN_0055EA20, preregister_SharedPtrCAniPoseTypeStartup)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for
+   * `boost::shared_ptr<moho::CAniPose>`.
+   */
+  [[nodiscard]] gpg::RType* preregister_SharedPtrCAniPoseTypeStartup();
+} // namespace gpg

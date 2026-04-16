@@ -11,6 +11,15 @@ namespace gal {
     class DepthStencilTarget {
     public:
       /**
+       * Address: 0x008E7E90 (FUN_008E7E90)
+       * Address: 0x008E7EA0 (FUN_008E7EA0)
+       *
+       * What it does:
+       * Initializes one abstract depth-stencil target base lane.
+       */
+      DepthStencilTarget();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

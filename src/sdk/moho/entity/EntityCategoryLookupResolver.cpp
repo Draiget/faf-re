@@ -156,6 +156,105 @@ namespace
     );
   }
 
+  struct CategoryMapWithDefaultRuntimeView
+  {
+    CategoryNameMapView mMap;              // +0x00
+    moho::CategoryWordRangeView mDefault;  // +0x10
+  };
+
+  static_assert(
+    offsetof(CategoryMapWithDefaultRuntimeView, mMap) == 0x00,
+    "CategoryMapWithDefaultRuntimeView::mMap offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CategoryMapWithDefaultRuntimeView, mDefault) == 0x10,
+    "CategoryMapWithDefaultRuntimeView::mDefault offset must be 0x10"
+  );
+
+  /**
+   * Address: 0x00555290 (FUN_00555290)
+   *
+   * What it does:
+   * Returns the mapped category range for `key`, or `nullptr` when the key is
+   * absent.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CategoryWordRangeView* FindCategoryValueOrNull(
+    CategoryMapWithDefaultRuntimeView* const mapRuntime,
+    const msvc8::string& key
+  ) noexcept
+  {
+    if (!mapRuntime) {
+      return nullptr;
+    }
+
+    const CategoryNameMapNodeView* const node = FindCategoryNodeOrHead(mapRuntime->mMap, key);
+    if (!node || node == mapRuntime->mMap.head) {
+      return nullptr;
+    }
+
+    return const_cast<moho::CategoryWordRangeView*>(&node->value);
+  }
+
+  /**
+   * Address: 0x005552C0 (FUN_005552C0)
+   *
+   * What it does:
+   * Returns the mapped category range for `key`, or the runtime default range
+   * when the key is absent.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CategoryWordRangeView* FindCategoryValueOrDefault(
+    CategoryMapWithDefaultRuntimeView* const mapRuntime,
+    const msvc8::string& key
+  ) noexcept
+  {
+    if (!mapRuntime) {
+      return nullptr;
+    }
+
+    const CategoryNameMapNodeView* const node = FindCategoryNodeOrHead(mapRuntime->mMap, key);
+    if (!node || node == mapRuntime->mMap.head) {
+      return &mapRuntime->mDefault;
+    }
+
+    return const_cast<moho::CategoryWordRangeView*>(&node->value);
+  }
+
+  /**
+   * Address: 0x0052CC30 (FUN_0052CC30)
+   *
+   * What it does:
+   * Advances one category-name map node pointer to its in-order successor
+   * using the map's legacy sentinel-node layout.
+   */
+  [[maybe_unused]] void AdvanceCategoryNameMapNodeSuccessor(CategoryNameMapNodeView** const cursor) noexcept
+  {
+    CategoryNameMapNodeView* node = *cursor;
+    if (node->isNil != 0u) {
+      return;
+    }
+
+    CategoryNameMapNodeView* right = node->right;
+    if (right->isNil != 0u) {
+      CategoryNameMapNodeView* parent = node->parent;
+      while (parent->isNil == 0u) {
+        if (*cursor != parent->right) {
+          break;
+        }
+        *cursor = parent;
+        parent = parent->parent;
+      }
+      *cursor = parent;
+      return;
+    }
+
+    CategoryNameMapNodeView* left = right->left;
+    while (left->isNil == 0u) {
+      right = left;
+      left = left->left;
+    }
+    *cursor = right;
+  }
+
   [[nodiscard]] bool
   NextSegmentToken(const char*& cursor, const char delimiter, const char*& tokenStart, const char*& tokenEnd) noexcept
   {

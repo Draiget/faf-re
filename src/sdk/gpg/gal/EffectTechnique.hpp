@@ -11,6 +11,16 @@ namespace gal {
     class EffectTechnique {
     public:
       /**
+       * Address: 0x008F3810 (FUN_008F3810)
+       * Address: 0x008F3820 (FUN_008F3820)
+       *
+       * What it does:
+       * Initializes one base `EffectTechnique` lane by installing the class
+       * vtable.
+       */
+      EffectTechnique();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

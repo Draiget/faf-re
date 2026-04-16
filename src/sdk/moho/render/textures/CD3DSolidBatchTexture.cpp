@@ -92,6 +92,7 @@ namespace moho
 
     /**
      * Address: 0x0044DD80 (FUN_0044DD80)
+     * Address: 0x00581500 (FUN_00581500)
      *
      * What it does:
      * Advances one solid-texture iterator to the next in-order entry. End

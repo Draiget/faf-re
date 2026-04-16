@@ -7,6 +7,8 @@
 
 namespace moho
 {
+  enum EFormationdStatus : std::int32_t;
+
   /**
    * Legacy intrusive listener base used by broadcaster-style event lists.
    *
@@ -18,6 +20,20 @@ namespace moho
   class Listener
   {
   public:
+    /**
+     * Address: 0x005F2960 (FUN_005F2960, Listener<EAiAttackerEvent> ctor lane)
+     * Address: 0x005F2970 (FUN_005F2970, Listener<ECommandEvent> ctor lane)
+     * Address: 0x00618E40 (FUN_00618E40, Listener<EAiNavigatorEvent> ctor lane)
+     * Address: 0x00618E50 (FUN_00618E50, Listener<EFormationdStatus> ctor lane)
+     * Address: 0x00869A40 (FUN_00869A40, Listener<SPauseEvent> ctor lane)
+     *
+     * What it does:
+     * Initializes one listener lane with a self-linked broadcaster node.
+     */
+    Listener()
+      : mListenerLink()
+    {}
+
     virtual void OnEvent(TEvent event) = 0;
 
   public:
@@ -26,5 +42,6 @@ namespace moho
 
   static_assert(offsetof(Listener<std::int32_t>, mListenerLink) == 0x04, "Listener<T>::mListenerLink offset must be 0x04");
   static_assert(sizeof(Listener<std::int32_t>) == 0x0C, "Listener<T> size must be 0x0C");
-} // namespace moho
 
+  using Listener_EFormationdStatus = Listener<EFormationdStatus>;
+} // namespace moho

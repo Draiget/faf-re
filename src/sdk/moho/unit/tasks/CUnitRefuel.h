@@ -26,6 +26,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x00620F30 (FUN_00620F30, ??0CUnitRefuel@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Builds one default refuel-task lane with null target and cleared
+     * reservation/carrier flags.
+     */
+    CUnitRefuel();
+
+    /**
      * Address: 0x00620F50 (FUN_00620F50, ??0CUnitRefuel@Moho@@QAE@@Z)
      *
      * What it does:

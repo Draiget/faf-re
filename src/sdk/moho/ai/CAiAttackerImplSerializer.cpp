@@ -90,6 +90,34 @@ namespace
     return reinterpret_cast<CAiAttackerImplSerializer*>(gCAiAttackerImplSerializerStorage);
   }
 
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  template <typename TSerializer>
+  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+    return self;
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
   {
     static gpg::RType* cached = nullptr;
@@ -149,6 +177,30 @@ namespace
   }
 
   /**
+   * Address: 0x005D8480 (FUN_005D8480)
+   *
+   * What it does:
+   * Unlinks the global `CAiAttackerImplSerializer` helper node from the
+   * intrusive serializer chain and restores it to a self-linked node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplSerializerStartupThunkA()
+  {
+    return UnlinkSerializerNode(*AcquireCAiAttackerImplSerializer());
+  }
+
+  /**
+   * Address: 0x005D84B0 (FUN_005D84B0)
+   *
+   * What it does:
+   * Secondary unlink/reset thunk for the global
+   * `CAiAttackerImplSerializer` helper node.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_CAiAttackerImplSerializerStartupThunkB()
+  {
+    return UnlinkSerializerNode(*AcquireCAiAttackerImplSerializer());
+  }
+
+  /**
    * Address: 0x00BF8430 (FUN_00BF8430, cleanup thunk)
    *
    * What it does:
@@ -161,10 +213,7 @@ namespace
     }
 
     CAiAttackerImplSerializer* const serializer = AcquireCAiAttackerImplSerializer();
-    if (serializer->mHelperNext && serializer->mHelperPrev) {
-      serializer->mHelperNext->mPrev = serializer->mHelperPrev;
-      serializer->mHelperPrev->mNext = serializer->mHelperNext;
-    }
+    (void)cleanup_CAiAttackerImplSerializerStartupThunkA();
 
     serializer->~CAiAttackerImplSerializer();
     gCAiAttackerImplSerializerConstructed = false;
@@ -347,6 +396,51 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
 }
 
 /**
+ * Address: 0x005DEBB0 (FUN_005DEBB0)
+ *
+ * What it does:
+ * Tail-thunk alias that forwards attacker-load callback lanes into
+ * `CAiAttackerImpl::MemberDeserialize`.
+ */
+[[maybe_unused]] void DeserializeCAiAttackerImplMemberThunkA(
+  CAiAttackerImpl* const object,
+  gpg::ReadArchive* const archive
+)
+{
+  CAiAttackerImpl::MemberDeserialize(object, archive);
+}
+
+/**
+ * Address: 0x005DEBC0 (FUN_005DEBC0)
+ *
+ * What it does:
+ * Tail-thunk alias that forwards attacker-save callback lanes into
+ * `CAiAttackerImpl::MemberSerialize`.
+ */
+[[maybe_unused]] void SerializeCAiAttackerImplMemberThunkA(
+  const CAiAttackerImpl* const object,
+  gpg::WriteArchive* const archive
+)
+{
+  CAiAttackerImpl::MemberSerialize(object, archive);
+}
+
+/**
+ * Address: 0x005E04B0 (FUN_005E04B0)
+ *
+ * What it does:
+ * Secondary tail-thunk alias that forwards attacker-load callback lanes into
+ * `CAiAttackerImpl::MemberDeserialize`.
+ */
+[[maybe_unused]] void DeserializeCAiAttackerImplMemberThunkB(
+  CAiAttackerImpl* const object,
+  gpg::ReadArchive* const archive
+)
+{
+  CAiAttackerImpl::MemberDeserialize(object, archive);
+}
+
+/**
  * Address: 0x005D8430 (FUN_005D8430, Moho::CAiAttackerImplSerializer::Deserialize)
  *
  * What it does:
@@ -405,10 +499,8 @@ void CAiAttackerImplSerializer::RegisterSerializeFunctions()
 void moho::register_CAiAttackerImplSerializer()
 {
   CAiAttackerImplSerializer* const serializer = AcquireCAiAttackerImplSerializer();
-  serializer->mHelperNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-  serializer->mHelperPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
+  InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &CAiAttackerImplSerializer::Deserialize;
   serializer->mSaveCallback = &CAiAttackerImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiAttackerImplSerializer);
 }

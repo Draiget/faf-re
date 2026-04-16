@@ -1,5 +1,6 @@
 #include "moho/sim/ESTITargetTypeTypeInfo.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -77,6 +78,44 @@ void ESTITargetTypeTypeInfo::AddEnums(gpg::REnumType* const enumType)
   enumType->AddEnum(enumType->StripPrefix("STITARGET_None"), 0);
   enumType->AddEnum(enumType->StripPrefix("STITARGET_Entity"), 1);
   enumType->AddEnum(enumType->StripPrefix("STITARGET_Position"), 2);
+}
+
+/**
+ * Address: 0x0055B310 (FUN_0055B310, PrimitiveSerHelper<ESTITargetType>::Deserialize)
+ */
+void ESTITargetTypePrimitiveSerializer::Deserialize(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef*
+)
+{
+  int value = 0;
+  archive->ReadInt(&value);
+  *reinterpret_cast<ESTITargetType*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<ESTITargetType>(value);
+}
+
+/**
+ * Address: 0x0055B330 (FUN_0055B330, PrimitiveSerHelper<ESTITargetType>::Serialize)
+ */
+void ESTITargetTypePrimitiveSerializer::Serialize(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef*
+)
+{
+  const auto value = *reinterpret_cast<const ESTITargetType*>(static_cast<std::uintptr_t>(objectPtr));
+  archive->WriteInt(static_cast<int>(value));
+}
+
+void ESTITargetTypePrimitiveSerializer::RegisterSerializeFunctions()
+{
+  gpg::RType* const type = gpg::LookupRType(typeid(ESTITargetType));
+  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
+  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+  type->serLoadFunc_ = mDeserialize;
+  type->serSaveFunc_ = mSerialize;
 }
 
 void moho::register_ESTITargetTypeTypeInfoStartup()

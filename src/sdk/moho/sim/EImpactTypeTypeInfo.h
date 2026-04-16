@@ -144,15 +144,6 @@ namespace moho
   static_assert(sizeof(EImpactTypePrimitiveSerializer) == 0x14, "EImpactTypePrimitiveSerializer size must be 0x14");
 
   /**
-   * Address: 0x00509ED0 (FUN_00509ED0, preregister_EImpactTypeTypeInfo)
-   *
-   * What it does:
-   * Constructs/preregisters startup-owned RTTI descriptor storage for
-   * `EImpactType`.
-   */
-  [[nodiscard]] gpg::REnumType* preregister_EImpactTypeTypeInfo();
-
-  /**
    * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
    *
    * What it does:

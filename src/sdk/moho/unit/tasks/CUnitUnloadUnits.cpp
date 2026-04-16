@@ -4,7 +4,10 @@
 #include <cstdint>
 #include <limits>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IAiNavigator.h"
@@ -24,13 +27,6 @@
 
 namespace moho
 {
-  /**
-   * Address: 0x0062B780 (FUN_0062B780, Moho::PrepareMove)
-   *
-   * What it does:
-   * Coerces one world-space move destination into a valid passable location for
-   * one unit.
-   */
   [[nodiscard]]
   bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);
 } // namespace moho
@@ -51,6 +47,126 @@ namespace
   {
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(unit);
     return raw != 0u && raw != kEntitySetInvalidEntry;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSNavGoalType()
+  {
+    gpg::RType* type = moho::SNavGoal::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SNavGoal));
+      moho::SNavGoal::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitEntitySetType()
+  {
+    gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
+      moho::EntitySetTemplate<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x00626280 (FUN_00626280)
+   *
+   * What it does:
+   * Forwards one unload-units serializer load thunk lane to
+   * `CUnitUnloadUnits::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunk(
+    gpg::ReadArchive* const archive,
+    moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00628880 (FUN_00628880)
+   *
+   * What it does:
+   * Jump-thunk mirror for one unload-units serializer load lane into
+   * `CUnitUnloadUnits::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunkB(
+    gpg::ReadArchive* const archive,
+    moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00628070 (FUN_00628070, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one unload-units serializer-load thunk alias into
+   * `CUnitUnloadUnits::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberDeserializeThunkJumpAlias(
+    gpg::ReadArchive* const archive,
+    moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00628080 (FUN_00628080, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one unload-units serializer-save thunk alias into
+   * `CUnitUnloadUnits::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunkJumpAlias(
+    gpg::WriteArchive* const archive,
+    const moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00626290 (FUN_00626290)
+   *
+   * What it does:
+   * Forwards one unload-units serializer-save callback lane into
+   * `CUnitUnloadUnits::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunk(
+    gpg::WriteArchive* const archive,
+    const moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00628890 (FUN_00628890)
+   *
+   * What it does:
+   * Jump-thunk mirror for one unload-units serializer-save lane into
+   * `CUnitUnloadUnits::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitUnloadUnitsMemberSerializeThunkB(
+    gpg::WriteArchive* const archive,
+    const moho::CUnitUnloadUnits* const task
+  )
+  {
+    task->MemberSerialize(archive);
   }
 
   [[nodiscard]]
@@ -103,6 +219,48 @@ namespace moho
     }
 
     mOwnerCommandLinkLane.UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Address: 0x00629880 (FUN_00629880, Moho::CUnitUnloadUnits::MemberDeserialize)
+   *
+   * What it does:
+   * Reads base command-task state, unload-goal payload, task-state booleans,
+   * and loaded-unit entity-set lanes from archive storage.
+   */
+  void CUnitUnloadUnits::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(CachedSNavGoalType(), &mUnloadGoal, ownerRef);
+    archive->ReadBool(&mIsStagingPlatform);
+    archive->ReadBool(&mHasEligibleLoadedUnits);
+    archive->Read(CachedUnitEntitySetType(), &mLoadedUnits, ownerRef);
+  }
+
+  /**
+   * Address: 0x00629950 (FUN_00629950, Moho::CUnitUnloadUnits::MemberSerialize)
+   *
+   * What it does:
+   * Writes base command-task state, unload-goal payload, task-state booleans,
+   * and loaded-unit entity-set lanes into archive storage.
+   */
+  void CUnitUnloadUnits::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(CachedSNavGoalType(), &mUnloadGoal, ownerRef);
+    archive->WriteBool(mIsStagingPlatform);
+    archive->WriteBool(mHasEligibleLoadedUnits);
+    archive->Write(CachedUnitEntitySetType(), &mLoadedUnits, ownerRef);
   }
 
   /**

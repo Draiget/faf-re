@@ -83,6 +83,30 @@ namespace moho
     Projectile* IsProjectile() override;
 
     /**
+     * Address: 0x0069A5D0 (FUN_0069A5D0)
+     *
+     * What it does:
+     * Returns this projectile's owning army pointer lane.
+     */
+    [[nodiscard]] CArmyImpl* GetArmyOwner() const;
+
+    /**
+     * Address: 0x0069A5E0 (FUN_0069A5E0)
+     *
+     * What it does:
+     * Returns the resolved launcher entity from this projectile weak-launcher lane.
+     */
+    [[nodiscard]] Entity* GetLauncherEntity() const;
+
+    /**
+     * Address: 0x0069DE80 (FUN_0069DE80, Moho::Projectile::SetLifetime)
+     *
+     * What it does:
+     * Sets the projectile expiration tick to `mCurTick + int(seconds * 10.0f)`.
+     */
+    void SetLifetime(float lifetimeSeconds);
+
+    /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
      */
     static void MemberConstruct(gpg::ReadArchive* archive, gpg::SerConstructResult* result);

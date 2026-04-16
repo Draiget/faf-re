@@ -258,7 +258,6 @@ namespace moho
     InitializeSerializerNode(*serializer);
     serializer->mDeserialize = &EUnitCommandTypePrimitiveSerializer::Deserialize;
     serializer->mSerialize = &EUnitCommandTypePrimitiveSerializer::Serialize;
-    serializer->RegisterSerializeFunctions();
     return std::atexit(&cleanup_EUnitCommandTypePrimitiveSerializer);
   }
 } // namespace moho

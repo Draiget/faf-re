@@ -1,6 +1,7 @@
 #include "moho/ai/SPointVector.h"
 
 #include <cstdlib>
+#include <cstdint>
 #include <new>
 #include <typeinfo>
 
@@ -47,6 +48,11 @@ namespace
     return *reinterpret_cast<SPointVectorSerializer*>(gSPointVectorSerializerStorage);
   }
 
+  [[nodiscard]] SPointVectorSerializer& SPointVectorSerializerStorageRef() noexcept
+  {
+    return *reinterpret_cast<SPointVectorSerializer*>(gSPointVectorSerializerStorage);
+  }
+
   [[nodiscard]] SPointVectorVectorType& AcquireSPointVectorVectorType()
   {
     if (!gSPointVectorVectorTypeConstructed) {
@@ -81,14 +87,17 @@ namespace
   }
 
   template <typename TSerializer>
-  void UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
       serializer.mHelperPrev->mNext = serializer.mHelperNext;
     }
 
-    InitializeSerializerNode(serializer);
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
   }
 
   [[nodiscard]] gpg::RType* CachedVector3fType()
@@ -101,11 +110,18 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x0050CB10 (FUN_0050CB10)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `SPointVector`.
+   */
   [[nodiscard]] gpg::RType* CachedSPointVectorType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = moho::SPointVector::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(SPointVector));
+      moho::SPointVector::sType = cached;
     }
 
     return cached;
@@ -115,6 +131,145 @@ namespace
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
     return moho::SPointVector{zero, zero};
+  }
+
+  /**
+   * Address: 0x00584CC0 (FUN_00584CC0)
+   * Address: 0x00581E00 (FUN_00581E00)
+   *
+   * What it does:
+   * Copies one contiguous `SPointVector` range `[sourceBegin, sourceEnd)`
+   * into destination storage and returns one-past the copied destination lane.
+   */
+  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullable(
+    moho::SPointVector* destination,
+    const moho::SPointVector* const sourceBegin,
+    const moho::SPointVector* const sourceEnd
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+    for (const moho::SPointVector* source = sourceBegin; source != sourceEnd; ++source) {
+      if (destinationAddress != 0u) {
+        auto* const out = reinterpret_cast<moho::SPointVector*>(destinationAddress);
+        out->point = source->point;
+        out->vector = source->vector;
+      }
+      destinationAddress += sizeof(moho::SPointVector);
+    }
+
+    return reinterpret_cast<moho::SPointVector*>(destinationAddress);
+  }
+
+  /**
+   * Address: 0x005841D0 (FUN_005841D0)
+   *
+   * What it does:
+   * Register-shape adapter that forwards one `SPointVector` range copy lane
+   * into the canonical nullable range-copy helper.
+   */
+  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableRegisterAdapterA(
+    moho::SPointVector* const destination,
+    const moho::SPointVector* const sourceBegin,
+    const moho::SPointVector* const sourceEnd
+  ) noexcept
+  {
+    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005848C0 (FUN_005848C0)
+   *
+   * What it does:
+   * Secondary register-shape adapter for nullable `SPointVector` range-copy
+   * dispatch.
+   */
+  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableRegisterAdapterB(
+    moho::SPointVector* const destination,
+    const moho::SPointVector* const sourceBegin,
+    const moho::SPointVector* const sourceEnd
+  ) noexcept
+  {
+    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00582140 (FUN_00582140)
+   * Address: 0x00583670 (FUN_00583670)
+   *
+   * What it does:
+   * Source-first register adapter that forwards one nullable `SPointVector`
+   * range-copy lane to the canonical helper.
+   */
+  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableSourceFirstAdapter(
+    const moho::SPointVector* const sourceBegin,
+    const moho::SPointVector* const sourceEnd,
+    moho::SPointVector* const destination
+  ) noexcept
+  {
+    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00580080 (FUN_00580080)
+   *
+   * What it does:
+   * Resizes one `vector<SPointVector>` payload to `targetCount`, preserving
+   * existing prefix elements and using the zero point/vector payload on
+   * growth lanes.
+   */
+  [[nodiscard]] unsigned int ResizeSPointVectorStorageToCount(
+    SPointVectorVector& storage,
+    const unsigned int targetCount
+  )
+  {
+    const std::size_t targetSize = static_cast<std::size_t>(targetCount);
+    if (storage.size() < targetSize) {
+      storage.resize(targetSize, ZeroSPointVector());
+    } else if (targetSize < storage.size()) {
+      storage.resize(targetSize);
+    }
+
+    return static_cast<unsigned int>(storage.size());
+  }
+
+  /**
+   * Address: 0x0050C3B0 (FUN_0050C3B0)
+   *
+   * What it does:
+   * Unlinks the `SPointVectorSerializer` helper node and resets both links to
+   * the serializer self-node.
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupSPointVectorSerializerVariant1() noexcept
+  {
+    return UnlinkSerializerNode(SPointVectorSerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050C3E0 (FUN_0050C3E0)
+   *
+   * What it does:
+   * Duplicate lane of `SPointVectorSerializer` helper-node unlink/reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupSPointVectorSerializerVariant2() noexcept
+  {
+    return UnlinkSerializerNode(SPointVectorSerializerStorageRef());
+  }
+
+  /**
+   * Address: 0x0050C310 (FUN_0050C310)
+   *
+   * What it does:
+   * Executes one non-deleting `gpg::RType` base-teardown lane for
+   * `SPointVectorTypeInfo`.
+   */
+  [[maybe_unused]] void cleanup_SPointVectorTypeInfoRTypeBase(SPointVectorTypeInfo* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
+    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
   void cleanup_SPointVectorTypeInfo()
@@ -133,8 +288,8 @@ namespace
       return;
     }
 
-    SPointVectorSerializer& serializer = AcquireSPointVectorSerializer();
-    UnlinkSerializerNode(serializer);
+    (void)CleanupSPointVectorSerializerVariant1();
+    SPointVectorSerializer& serializer = SPointVectorSerializerStorageRef();
     serializer.~SPointVectorSerializer();
     gSPointVectorSerializerConstructed = false;
   }
@@ -168,6 +323,8 @@ namespace
     gSPointVectorVectorTypeConstructed = false;
   }
 } // namespace
+
+gpg::RType* moho::SPointVector::sType = nullptr;
 
 /**
  * Address: 0x0050C220 (FUN_0050C220, Moho::SPointVectorTypeInfo::SPointVectorTypeInfo)
@@ -281,6 +438,32 @@ void SPointVectorSerializer::Deserialize(gpg::ReadArchive* const archive, SPoint
 void SPointVectorSerializer::Serialize(gpg::WriteArchive* const archive, SPointVector* const value)
 {
   value->MemberSerialize(archive);
+}
+
+/**
+ * Address: 0x0050C380 (FUN_0050C380)
+ *
+ * What it does:
+ * Initializes `SPointVectorSerializer` helper links and callback lanes.
+ */
+[[nodiscard]] moho::SPointVectorSerializer* InitializeSPointVectorSerializerVariant1()
+{
+  moho::SPointVectorSerializer& serializer = AcquireSPointVectorSerializer();
+  InitializeSerializerNode(serializer);
+  serializer.mLoadCallback = reinterpret_cast<gpg::RType::load_func_t>(&moho::SPointVectorSerializer::Deserialize);
+  serializer.mSaveCallback = reinterpret_cast<gpg::RType::save_func_t>(&moho::SPointVectorSerializer::Serialize);
+  return &serializer;
+}
+
+/**
+ * Address: 0x0050C8E0 (FUN_0050C8E0)
+ *
+ * What it does:
+ * Duplicate lane of `SPointVectorSerializer` callback initialization.
+ */
+[[maybe_unused]] [[nodiscard]] moho::SPointVectorSerializer* InitializeSPointVectorSerializerVariant2()
+{
+  return InitializeSPointVectorSerializerVariant1();
 }
 
 /**
@@ -474,8 +657,7 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
     return;
   }
 
-  const moho::SPointVector fill = ZeroSPointVector();
-  storage->resize(static_cast<std::size_t>(count), fill);
+  (void)ResizeSPointVectorStorageToCount(*storage, static_cast<unsigned int>(count));
 }
 
 /**
@@ -487,10 +669,7 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
  */
 void moho::register_SPointVectorSerializer()
 {
-  SPointVectorSerializer& serializer = AcquireSPointVectorSerializer();
-  InitializeSerializerNode(serializer);
-  serializer.mLoadCallback = reinterpret_cast<gpg::RType::load_func_t>(&SPointVectorSerializer::Deserialize);
-  serializer.mSaveCallback = reinterpret_cast<gpg::RType::save_func_t>(&SPointVectorSerializer::Serialize);
+  (void)InitializeSPointVectorSerializerVariant1();
   (void)std::atexit(&cleanup_SPointVectorSerializer);
 }
 

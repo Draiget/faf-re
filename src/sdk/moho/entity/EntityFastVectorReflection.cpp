@@ -278,7 +278,71 @@ namespace
   }
 
   /**
-   * Address: 0x00694380 family (serializer save lane)
+   * Address: 0x00694020 (FUN_00694020)
+   *
+   * What it does:
+   * Reads one `fastvector<Entity*>` payload: deserializes count, resizes the
+   * runtime lane with null-fill, and loads each `Entity*` through
+   * `ReadArchive::ReadPointer_Entity`.
+   */
+  void LoadFastVectorEntityPointerLane1(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (!archive || objectPtr == 0) {
+      return;
+    }
+
+    auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<void*>(objectPtr));
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    moho::Entity* fill = nullptr;
+    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+
+    const gpg::RRef emptyOwner{};
+    const gpg::RRef* const effectiveOwner = ownerRef ? ownerRef : &emptyOwner;
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->ReadPointer_Entity(&view.begin[i], effectiveOwner);
+    }
+  }
+
+  /**
+   * Address: 0x00694080 (FUN_00694080)
+   *
+   * What it does:
+   * Writes one `fastvector<Entity*>` payload: emits count and serializes each
+   * lane as one unowned tracked pointer built by `RRef_Entity`.
+   */
+  void SaveFastVectorEntityPointerLane1(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    (void)ownerRef;
+    if (!archive || objectPtr == 0) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<const void*>(objectPtr));
+    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    archive->WriteUInt(count);
+
+    for (unsigned int i = 0; i < count; ++i) {
+      gpg::RRef objectRef{};
+      (void)gpg::RRef_Entity(&objectRef, view.begin[i]);
+      gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    }
+  }
+
+  /**
+    * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Serializes tracked `Entity*` pointer lanes from `fastvector<Entity*>` storage.
@@ -345,6 +409,23 @@ namespace
     gEntityPtrFastVectorTypeNameCleanupRegistered = false;
   }
 
+  /**
+   * Address: 0x00694340 (FUN_00694340, RFastVectorType_EntityP non-deleting cleanup body)
+   *
+   * What it does:
+   * Clears reflected base/field vector lanes for one `fastvector<Entity*>`
+   * type-info object while preserving outer storage ownership.
+   */
+  [[maybe_unused]] void DestroyEntityPtrFastVectorTypeBody(EntityPtrFastVectorType* const typeInfo) noexcept
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
   struct EntityFastVectorReflectionBootstrap
   {
     EntityFastVectorReflectionBootstrap()
@@ -361,7 +442,7 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x0067CD30 (FUN_0067CD30, Moho::RWeakPtrType_Entity::SerLoad)
+    * Alias of FUN_0067CD30 (non-canonical helper lane).
    */
   void WeakPtr_Entity::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -369,7 +450,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067CD60 (FUN_0067CD60, Moho::RWeakPtrType_Entity::SerSave)
+    * Alias of FUN_0067CD60 (non-canonical helper lane).
    */
   void WeakPtr_Entity::Serialize(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -628,7 +709,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 family (gpg::RFastVectorType_Entity_P::IsIndexed)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    */
   const gpg::RIndexed* RFastVectorType<moho::Entity*>::IsIndexed() const
   {
@@ -636,7 +717,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 (FUN_00694380, gpg::RFastVectorType_Entity_P::Init)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    */
   void RFastVectorType<moho::Entity*>::Init()
   {
@@ -647,7 +728,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 family (gpg::RFastVectorType_Entity_P::SubscriptIndex)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    */
   gpg::RRef RFastVectorType<moho::Entity*>::SubscriptIndex(void* obj, const int ind) const
   {
@@ -666,7 +747,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 family (gpg::RFastVectorType_Entity_P::GetCount)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    */
   size_t RFastVectorType<moho::Entity*>::GetCount(void* obj) const
   {
@@ -683,7 +764,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 family (gpg::RFastVectorType_Entity_P::SetCount)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    */
   void RFastVectorType<moho::Entity*>::SetCount(void* obj, const int count) const
   {
@@ -743,7 +824,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00694380 (FUN_00694380, register_FastVectorEntityPtrType_00)
+    * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Constructs and preregisters RTTI for `fastvector<Entity*>`.
@@ -756,7 +837,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCEA0 (FUN_00BFCEA0, cleanup_FastVectorEntityPtrType)
+    * Alias of FUN_00BFCEA0 (non-canonical helper lane).
    *
    * What it does:
    * Tears down startup-owned `fastvector<Entity*>` reflection storage.
@@ -767,7 +848,9 @@ namespace moho
       return;
     }
 
-    AcquireEntityPtrFastVectorType()->~EntityPtrFastVectorType();
+    EntityPtrFastVectorType* const typeInfo = AcquireEntityPtrFastVectorType();
+    DestroyEntityPtrFastVectorTypeBody(typeInfo);
+    typeInfo->~EntityPtrFastVectorType();
     gEntityPtrFastVectorTypeConstructed = false;
   }
 

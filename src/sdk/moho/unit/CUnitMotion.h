@@ -171,6 +171,17 @@ namespace moho
     void AddRecoilImpulse(const Wm3::Vector3f& impulse);
 
     /**
+     * Address: 0x006B8AC0 (FUN_006B8AC0, ?AddImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@_N@Z)
+     * Mangled: ?AddImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@_N@Z
+     *
+     * What it does:
+     * Applies impulse against owner motion runtime; air units forward directly
+     * into body velocity, while non-air units blend motion lanes and can force
+     * ballistic transition + pending transform update when requested.
+     */
+    void AddImpulse(const Wm3::Vector3f& impulse, bool transitionToBallistic);
+
+    /**
      * Address: 0x006B9460 (FUN_006B9460, ?SetImmediateVelocity@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@ABV?$Quaternion@M@4@@Z)
      *
      * What it does:
@@ -226,6 +237,14 @@ namespace moho
      * waypoint presence for non-air paths.
      */
     [[nodiscard]] bool IsMoving() const;
+
+    /**
+     * Address: 0x006A4C40 (FUN_006A4C40)
+     *
+     * What it does:
+     * Copies current velocity into caller-provided output storage.
+     */
+    Wm3::Vector3f* GetVelocity(Wm3::Vector3f* outVelocity) const;
 
     /**
      * Address: 0x006C1610 (FUN_006C1610, ?SnapToGround@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z)
@@ -369,6 +388,33 @@ namespace moho
      * endpoints and advances transition progress tick state.
      */
     void TransitionBetweenLayers(VTransform& transform);
+
+    /**
+     * Address: 0x006C1E20 (FUN_006C1E20, ?CalcMoveCommon@CUnitMotion@Moho@@AAE_NAAVVTransform@2@PAM@Z)
+     *
+     * What it does:
+     * Shared land/water move integrator lane; computes one movement step into
+     * `transform` and reports integration output through `outMoveDistance`.
+     */
+    [[nodiscard]] bool CalcMoveCommon(VTransform& transform, float* outMoveDistance);
+
+    /**
+     * Address: 0x006C3180 (FUN_006C3180, ?CalcMoveLand@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
+     *
+     * What it does:
+     * Runs one land move step through `CalcMoveCommon`, conditionally snaps to
+     * terrain/raised-platform state, and updates common motion events.
+     */
+    void CalcMoveLand(VTransform& transform, float* outMoveDistance);
+
+    /**
+     * Address: 0x006C3480 (FUN_006C3480, ?CalcMoveWater@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+     *
+     * What it does:
+     * Runs one water move step through `CalcMoveCommon`, applies dive/surface
+     * transitions and water snap, and updates common horizontal motion events.
+     */
+    void CalcMoveWater(VTransform& transform);
 
     /**
      * Address: 0x006C2A40 (FUN_006C2A40, ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z)

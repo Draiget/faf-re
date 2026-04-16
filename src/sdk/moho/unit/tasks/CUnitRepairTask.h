@@ -9,6 +9,12 @@
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CBuildTaskHelper.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class IAiCommandDispatchImpl;
@@ -32,6 +38,24 @@ namespace moho
   class CUnitRepairTask : public CCommandTask, public CUnitRepairTaskListenerPad, public Listener<ECommandEvent>
   {
   public:
+    /**
+     * Address: 0x005FED70 (FUN_005FED70, Moho::CUnitRepairTask::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes repair-task runtime state in binary lane order: command-task
+     * base, helper lane, command pointer lane, weak target lanes, then flags.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005FEEC0 (FUN_005FEEC0)
+     *
+     * What it does:
+     * Serializes repair-task runtime state (base command-task lane, build
+     * helper, bound command pointer, weak target lanes, and state flags).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     /**
      * Address: 0x005F8C80 (??0CUnitRepairTask@Moho@@QAE@@Z)
      *

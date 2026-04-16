@@ -35,6 +35,12 @@ namespace
     return reinterpret_cast<moho::ESiloTypePrimitiveSerializer*>(gESiloTypePrimitiveSerializerStorage);
   }
 
+  /**
+   * Address: 0x0050ABB0 (FUN_0050ABB0)
+   *
+   * What it does:
+   * Lazily resolves and caches RTTI metadata for `ESiloType`.
+   */
   [[nodiscard]] gpg::RType* ResolveESiloType()
   {
     static gpg::RType* cached = nullptr;
@@ -69,6 +75,40 @@ namespace
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
     serializer.mHelperPrev = self;
+  }
+
+  /**
+   * Address: 0x0050A7E0 (FUN_0050A7E0)
+   *
+   * What it does:
+   * Initializes callback lanes for startup-owned `ESiloType` primitive
+   * serializer helper storage and returns that helper object.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ESiloTypePrimitiveSerializer*
+  InitializeESiloTypePrimitiveSerializerStartupThunkPrimary()
+  {
+    auto* const serializer = AcquireESiloTypePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::ESiloTypePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::ESiloTypePrimitiveSerializer::Serialize;
+    return serializer;
+  }
+
+  /**
+   * Address: 0x0050AAB0 (FUN_0050AAB0)
+   *
+   * What it does:
+   * Secondary startup-init entry for the `ESiloType` primitive serializer
+   * helper storage that mirrors the primary callback initialization.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ESiloTypePrimitiveSerializer*
+  InitializeESiloTypePrimitiveSerializerStartupThunkSecondary()
+  {
+    auto* const serializer = AcquireESiloTypePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &moho::ESiloTypePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &moho::ESiloTypePrimitiveSerializer::Serialize;
+    return serializer;
   }
 
   /**
@@ -200,11 +240,7 @@ namespace moho
    */
   int register_ESiloTypePrimitiveSerializer()
   {
-    auto* const serializer = AcquireESiloTypePrimitiveSerializer();
-    InitializeSerializerNode(*serializer);
-    serializer->mDeserialize = &ESiloTypePrimitiveSerializer::Deserialize;
-    serializer->mSerialize = &ESiloTypePrimitiveSerializer::Serialize;
-
+    (void)InitializeESiloTypePrimitiveSerializerStartupThunkPrimary();
     return std::atexit(&cleanup_ESiloTypePrimitiveSerializer);
   }
 } // namespace moho

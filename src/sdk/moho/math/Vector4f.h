@@ -2,6 +2,7 @@
 
 #include "Angle.h"
 #include "platform/Platform.h"
+#include "legacy/containers/String.h"
 #include <cstdint>
 #include <cmath>
 
@@ -135,4 +136,12 @@ namespace moho
 
   static_assert(sizeof(Vector4f) == 0x10, "Vector4f size must be 0x10");
   static_assert(alignof(Vector4f) == 0x4, "Vector4f alignment must be 4");
+
+  /**
+   * Address: 0x004ECED0 (FUN_004ECED0, Moho::ToString)
+   *
+   * What it does:
+   * Formats one `Vector4f` lane set as `x=%f,y=%f,z=%f,w=%f`.
+   */
+  [[nodiscard]] msvc8::string ToString(const Vector4f& value);
 } // namespace moho

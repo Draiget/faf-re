@@ -5,6 +5,17 @@
 namespace moho
 {
   /**
+   * Address: 0x005657B0 (FUN_005657B0)
+   *
+   * What it does:
+   * Returns true when both `x` and `y` lanes are not NaN.
+   */
+  bool IsValidVector2f(const Wm3::Vector2f& value) noexcept
+  {
+    return !std::isnan(value.x) && !std::isnan(value.y);
+  }
+
+  /**
    * Address: 0x004CC930 (FUN_004CC930)
    *
    * What it does:

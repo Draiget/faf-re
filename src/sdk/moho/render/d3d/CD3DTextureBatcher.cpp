@@ -71,6 +71,24 @@ namespace moho
     {
       return valueLane != nullptr && *valueLane == 0u;
     }
+
+    /**
+     * Address: 0x007FC170 (FUN_007FC170)
+     *
+     * What it does:
+     * Disposes one `sp_counted_impl_p<CD3DTextureBatcher>` payload by running
+     * non-deleting `CD3DTextureBatcher` teardown and releasing owned storage.
+     */
+    void DisposeCountedTextureBatcherStorage(
+      boost::SpCountedImplStorage<CD3DTextureBatcher>* const countedStorage
+    )
+    {
+      CD3DTextureBatcher* const ownedBatcher = countedStorage->px;
+      if (ownedBatcher != nullptr) {
+        ownedBatcher->~CD3DTextureBatcher();
+        ::operator delete(static_cast<void*>(ownedBatcher));
+      }
+    }
   } // namespace
 
   /**

@@ -193,6 +193,15 @@ namespace moho
       static Handle* Init(Handle* self, std::uintptr_t pooledNodePtr, std::uintptr_t ownerPtr);
 
     private:
+      /**
+       * Address: 0x0081AE60 (FUN_0081AE60)
+       *
+       * What it does:
+       * Runs the non-deleting handle teardown lane: unlinks this handle's
+       * pooled node from the owner chain and returns it to the VisionDB pool.
+       */
+      void ReleasePooledNodeToOwnerPool();
+
       struct OwnerChainView
       {
         void* mOwnerCookie;     // +0x00
@@ -233,6 +242,13 @@ namespace moho
     MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mDB) == 0x04, "VisionDB::Handle::mDB offset must be 0x04");
     MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mNode) == 0x08, "VisionDB::Handle::mNode offset must be 0x08");
 
+    /**
+     * Address: 0x0081AE90 (FUN_0081AE90, sub_81AE90)
+     *
+     * What it does:
+     * Initializes one `VisionDB` object: seeds the pool subobject and clears
+     * the root node pointer lane.
+     */
     VisionDB();
 
     /**

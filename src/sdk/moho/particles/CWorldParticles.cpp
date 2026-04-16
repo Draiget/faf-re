@@ -6861,6 +6861,7 @@ namespace
 
   /**
    * Address: 0x004A0310 (FUN_004A0310, sub_4A0310)
+   * Address: 0x0084B8B0 (FUN_0084B8B0)
    *
    * What it does:
    * Calling-convention bridge thunk for trail-runtime range copy-construction.
@@ -6891,6 +6892,7 @@ namespace
 
   /**
    * Address: 0x004A0360 (FUN_004A0360, sub_4A0360)
+   * Address: 0x00536EE0 (FUN_00536EE0)
    *
    * What it does:
    * Calling-convention bridge thunk for world-beam range copy-construction

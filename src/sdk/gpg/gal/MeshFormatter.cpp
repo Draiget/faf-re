@@ -4,6 +4,34 @@
 
 namespace gpg::gal
 {
+	namespace
+	{
+		/**
+		 * Address: 0x00944FF0 (FUN_00944FF0)
+		 *
+		 * What it does:
+		 * Models one base `MeshFormatter` vtable-restore lane used by unwind tails.
+		 */
+		[[maybe_unused]] void RestoreMeshFormatterBaseVtableLane(MeshFormatter* const formatter) noexcept
+		{
+			// In lifted C++, base-vtable restoration is owned by constructor/destructor codegen.
+			(void)formatter;
+		}
+
+		/**
+		 * Address: 0x00945000 (FUN_00945000)
+		 *
+		 * What it does:
+		 * Models the return-`this` form of the base `MeshFormatter` vtable-restore lane.
+		 */
+		[[maybe_unused]] MeshFormatter* RestoreMeshFormatterBaseVtableAndReturn(
+			MeshFormatter* const formatter) noexcept
+		{
+			RestoreMeshFormatterBaseVtableLane(formatter);
+			return formatter;
+		}
+	}
+
 	/**
 	 * Address: 0x00A82547 (_purecall in MeshFormatter slot 0)
 	 *

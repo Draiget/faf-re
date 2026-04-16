@@ -38,9 +38,50 @@ namespace
     return self;
   }
 
+  /**
+   * Address: 0x0076FCB0 (FUN_0076FCB0)
+   *
+   * What it does:
+   * Invokes `CIntelCounterHandle::Destroy(1)` for one runtime object when the
+   * pointer lane is non-null.
+   */
+  [[maybe_unused]] void DeleteIntelCounterHandleViaDestroyIfPresent(void* const object)
+  {
+    auto* const handle = static_cast<moho::CIntelCounterHandle*>(object);
+    if (!handle) {
+      return;
+    }
+
+    handle->Destroy(1);
+  }
+
   void cleanup_CIntelCounterHandleSerializer_atexit()
   {
     (void)moho::cleanup_CIntelCounterHandleSerializer();
+  }
+
+  /**
+   * Address: 0x0076F9F0 (FUN_0076F9F0)
+   *
+   * What it does:
+   * Unlinks startup `CIntelCounterHandleSerializer` helper links and rewires
+   * the node into one self-linked sentinel lane.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelCounterHandleSerializerNodeVariantA() noexcept
+  {
+    return UnlinkSerializerNode(gCIntelCounterHandleSerializer);
+  }
+
+  /**
+   * Address: 0x0076FA20 (FUN_0076FA20)
+   *
+   * What it does:
+   * Duplicate unlink/reset lane for startup `CIntelCounterHandleSerializer`
+   * helper links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkCIntelCounterHandleSerializerNodeVariantB() noexcept
+  {
+    return UnlinkSerializerNode(gCIntelCounterHandleSerializer);
   }
 } // namespace
 
@@ -128,4 +169,3 @@ namespace
 
   [[maybe_unused]] CIntelCounterHandleSerializerBootstrap gCIntelCounterHandleSerializerBootstrap;
 } // namespace
-

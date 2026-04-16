@@ -112,7 +112,7 @@ namespace
   }
 
   /**
-   * Address: 0x00409A40 (FUN_00409A40, func_CreateCTaskThread)
+    * Alias of FUN_00409A40 (non-canonical helper lane).
    *
    * What it does:
    * Allocates one CTaskThread and links `dispatch` as task-top while preserving

@@ -55,10 +55,15 @@ namespace
 
   struct IFormationInstanceSerializationRuntimeView
   {
-    std::uint8_t reserved00[0x8];
+    std::uint8_t reserved00_03[0x4];
+    std::uint32_t mBaseRuntimeWord;
     moho::BroadcasterEventTag<moho::EFormationdStatus> broadcaster;
   };
 
+  static_assert(
+    offsetof(IFormationInstanceSerializationRuntimeView, mBaseRuntimeWord) == 0x4,
+    "IFormationInstanceSerializationRuntimeView::mBaseRuntimeWord offset must be 0x4"
+  );
   static_assert(
     offsetof(IFormationInstanceSerializationRuntimeView, broadcaster) == 0x8,
     "IFormationInstanceSerializationRuntimeView::broadcaster offset must be 0x8"
@@ -71,6 +76,38 @@ namespace
       cached = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EFormationdStatus>));
     }
     return cached;
+  }
+
+  /**
+   * Address: 0x00570F10 (FUN_00570F10)
+   *
+   * What it does:
+   * Resolves `IFormationInstance::sType` on demand and appends it as a base
+   * field at offset `0` for one owner runtime type.
+   */
+  [[maybe_unused]] void AddIFormationInstanceBaseField(gpg::RType* const ownerType)
+  {
+    if (ownerType == nullptr) {
+      return;
+    }
+
+    gpg::RType* baseType = moho::IFormationInstance::sType;
+    if (baseType == nullptr) {
+      baseType = gpg::LookupRType(typeid(moho::IFormationInstance));
+      moho::IFormationInstance::sType = baseType;
+    }
+
+    if (baseType == nullptr) {
+      return;
+    }
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    ownerType->AddBase(baseField);
   }
 
   void EnsureIFormationInstanceTypeCacheInitialized(IFormationInstanceTypeCache& cache)
@@ -261,6 +298,20 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Address: 0x00569450 (FUN_00569450, Moho::IFormationInstance::IFormationInstance)
+   *
+   * What it does:
+   * Initializes the base runtime word at `+0x04` and resets the embedded
+   * broadcaster node at `+0x08` to singleton links.
+   */
+  IFormationInstance::IFormationInstance()
+  {
+    auto& view = *reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(this);
+    view.mBaseRuntimeWord = 0u;
+    view.broadcaster.ListResetLinks();
+  }
+
   /**
    * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
    *

@@ -49,6 +49,17 @@ namespace
     InitializeSerializerNode(serializer);
   }
 
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSAttachPointSerializerHelperNode()
+  {
+    if (!gSAttachPointSerializerConstructed) {
+      return nullptr;
+    }
+
+    SAttachPointSerializer* const serializer = AcquireSAttachPointSerializer();
+    UnlinkSerializerNode(*serializer);
+    return SerializerSelfNode(*serializer);
+  }
+
   [[nodiscard]] gpg::RType* CachedSAttachPointType()
   {
     static gpg::RType* cached = nullptr;
@@ -67,6 +78,54 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x005EB980 (FUN_005EB980)
+   *
+   * What it does:
+   * Deserializes one `SAttachPoint` payload lane (`index`, `localPos`,
+   * `distSq`) from the archive.
+   */
+  int ReadSAttachPointPayload(SAttachPoint* const point, gpg::ReadArchive* const archive)
+  {
+    if (point == nullptr || archive == nullptr) {
+      return 0;
+    }
+
+    archive->ReadUInt(&point->index);
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    archive->Read(vectorType, &point->localPos, ownerRef);
+
+    archive->ReadFloat(&point->distSq);
+    return 1;
+  }
+
+  /**
+   * Address: 0x005EB9E0 (FUN_005EB9E0)
+   *
+   * What it does:
+   * Serializes one `SAttachPoint` payload lane (`index`, `localPos`,
+   * `distSq`) into the archive.
+   */
+  int WriteSAttachPointPayload(const SAttachPoint* const point, gpg::WriteArchive* const archive)
+  {
+    if (point == nullptr || archive == nullptr) {
+      return 0;
+    }
+
+    archive->WriteUInt(point->index);
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    archive->Write(vectorType, &point->localPos, ownerRef);
+
+    archive->WriteFloat(point->distSq);
+    return 1;
+  }
+
   void cleanup_SAttachPointSerializer()
   {
     if (!gSAttachPointSerializerConstructed) {
@@ -74,9 +133,33 @@ namespace
     }
 
     SAttachPointSerializer* const serializer = AcquireSAttachPointSerializer();
-    UnlinkSerializerNode(*serializer);
+    (void)UnlinkSAttachPointSerializerHelperNode();
     serializer->~SAttachPointSerializer();
     gSAttachPointSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x005E4340 (FUN_005E4340)
+   *
+   * What it does:
+   * Alias startup-lane thunk that unlinks recovered `SAttachPointSerializer`
+   * helper links and restores self-links.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAttachPointSerializerStartupThunkA()
+  {
+    return UnlinkSAttachPointSerializerHelperNode();
+  }
+
+  /**
+   * Address: 0x005E4370 (FUN_005E4370)
+   *
+   * What it does:
+   * Secondary alias startup-lane thunk for the same
+   * `SAttachPointSerializer` helper unlink/reset path.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* cleanup_SAttachPointSerializerStartupThunkB()
+  {
+    return UnlinkSAttachPointSerializerHelperNode();
   }
 } // namespace
 
@@ -90,14 +173,7 @@ void SAttachPointSerializer::Deserialize(gpg::ReadArchive* const archive, const 
   }
 
   auto* const point = reinterpret_cast<SAttachPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->ReadUInt(&point->index);
-
-  const gpg::RRef ownerRef{};
-  gpg::RType* const vectorType = CachedVector3fType();
-  GPG_ASSERT(vectorType != nullptr);
-  archive->Read(vectorType, &point->localPos, ownerRef);
-
-  archive->ReadFloat(&point->distSq);
+  (void)ReadSAttachPointPayload(point, archive);
 }
 
 /**
@@ -110,14 +186,7 @@ void SAttachPointSerializer::Serialize(gpg::WriteArchive* const archive, const i
   }
 
   auto* const point = reinterpret_cast<const SAttachPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteUInt(point->index);
-
-  const gpg::RRef ownerRef{};
-  gpg::RType* const vectorType = CachedVector3fType();
-  GPG_ASSERT(vectorType != nullptr);
-  archive->Write(vectorType, &point->localPos, ownerRef);
-
-  archive->WriteFloat(point->distSq);
+  (void)WriteSAttachPointPayload(point, archive);
 }
 
 void SAttachPointSerializer::RegisterSerializeFunctions()
@@ -143,7 +212,5 @@ int moho::register_SAttachPointSerializer()
   InitializeSerializerNode(*serializer);
   serializer->mLoadCallback = &SAttachPointSerializer::Deserialize;
   serializer->mSaveCallback = &SAttachPointSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   return std::atexit(&cleanup_SAttachPointSerializer);
 }
-

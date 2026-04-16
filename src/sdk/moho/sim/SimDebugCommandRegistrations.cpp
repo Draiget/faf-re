@@ -1735,7 +1735,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE370 (FUN_00BFE370, sub_BFE370)
+    * Alias of FUN_00BFE370 (non-canonical helper lane).
    *
    * What it does:
    * Tears down `DebugAIStatesOff` alias registration and frees startup-owned

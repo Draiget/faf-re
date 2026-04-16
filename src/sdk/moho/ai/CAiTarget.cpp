@@ -25,6 +25,28 @@ namespace
 {
   constexpr std::uint32_t kMissingTargetEntityId = 0xF0000000u;
 
+  /**
+   * Address: 0x005A6DE0 (FUN_005A6DE0)
+   *
+   * What it does:
+   * Unlinks one weak-entity node from its owner-chain intrusive slot by
+   * replacing the node reference with the stored `nextInOwner` lane.
+   */
+  [[maybe_unused]] WeakPtr<Entity>** UnlinkWeakEntityNodeFromOwnerChain(
+    WeakPtr<Entity>* const node
+  ) noexcept
+  {
+    WeakPtr<Entity>** cursor = reinterpret_cast<WeakPtr<Entity>**>(node->ownerLinkSlot);
+    if (cursor != nullptr) {
+      while (*cursor != node) {
+        cursor = &(*cursor)->nextInOwner;
+      }
+      *cursor = node->nextInOwner;
+    }
+
+    return cursor;
+  }
+
   [[nodiscard]] Entity* FindEntityById(CEntityDb* entityDb, const EntId entityId)
   {
     if (!entityDb) {
@@ -137,7 +159,7 @@ CAiTarget::CAiTarget(const CAiTarget& source)
 }
 
 /**
- * Address: 0x005D5670 (FUN_005D5670)
+  * Alias of FUN_005D5670 (non-canonical helper lane).
  *
  * What it does:
  * Assigns payload/link state from another target object.
@@ -164,7 +186,7 @@ CAiTarget::~CAiTarget()
 }
 
 /**
- * Address: 0x005D5670 (FUN_005D5670)
+  * Alias of FUN_005D5670 (non-canonical helper lane).
  *
  * What it does:
  * Core link/payload copier used by copy-ctor and assignment.
@@ -181,7 +203,7 @@ void CAiTarget::CopyFromLinkedTarget(const CAiTarget& source)
 }
 
 /**
- * Address: 0x005D57E0 (FUN_005D57E0)
+  * Alias of FUN_005D57E0 (non-canonical helper lane).
  *
  * What it does:
  * Unlinks this target from owner weak-link slot chain.
@@ -251,6 +273,8 @@ void DeserializeCAiTargetThunkVariantA(gpg::ReadArchive* archive, int objectPtr,
 
 /**
  * Address: 0x005E3650 (FUN_005E3650, serializer save thunk alias)
+ * Address: 0x006354D0 (FUN_006354D0)
+ * Address: 0x00649BF0 (FUN_00649BF0)
  *
  * What it does:
  * Tail-forwards one CAiTarget serializer-save thunk alias into
@@ -274,6 +298,18 @@ void SerializeCAiTargetThunkVariantB(gpg::WriteArchive* archive, int objectPtr, 
 }
 
 /**
+ * Address: 0x005E3860 (FUN_005E3860, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards an additional CAiTarget serializer-load thunk alias into
+ * `CAiTarget::DeserializeFromArchive`.
+ */
+void DeserializeCAiTargetThunkVariantB(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
+{
+  CAiTarget::DeserializeFromArchive(archive, objectPtr, version, ownerRef);
+}
+
+/**
  * Address: 0x005D55B0 (FUN_005D55B0)
  *
  * What it does:
@@ -291,6 +327,60 @@ CAiTarget* CAiTarget::UpdateTarget(Entity* const entity)
   }
 
   PickTargetPoint();
+  return this;
+}
+
+/**
+ * Address: 0x006EEF60 (FUN_006EEF60, Moho::CAiTarget::SetTarget)
+ *
+ * What it does:
+ * Accepts one Lua target payload and maps it to entity/ground/none target
+ * lanes; non-entity payloads must be one `{x,y,z}` table.
+ */
+CAiTarget* CAiTarget::SetTarget(
+  LuaPlus::LuaState* const state,
+  const char* const contextName,
+  const LuaPlus::LuaStackObject targetObject
+)
+{
+  lua_State* const rawState = targetObject.m_state != nullptr ? targetObject.m_state->m_state : nullptr;
+  const int targetLuaType = rawState != nullptr ? lua_type(rawState, targetObject.m_stackIndex) : LUA_TNIL;
+
+  if (targetLuaType != LUA_TNIL) {
+    const LuaPlus::LuaObject objectValue(targetObject);
+    if (Entity* const entity = moho::SCR_FromLuaNoError_Entity(objectValue); entity != nullptr) {
+      (void)UpdateTarget(entity);
+      return this;
+    }
+
+    if (targetLuaType != LUA_TTABLE || lua_getn(rawState, targetObject.m_stackIndex) != 3) {
+      const char* const typeName = objectValue.TypeName();
+      LuaPlus::LuaState::Error(
+        state,
+        "Invalid target set in %s; expected an entity or a Vec3 but got a %s",
+        contextName,
+        typeName != nullptr ? typeName : "<null>"
+      );
+    }
+
+    lua_rawgeti(rawState, targetObject.m_stackIndex, 3);
+    const LuaPlus::LuaStackObject zComponent(targetObject.m_state, lua_gettop(rawState));
+    lua_rawgeti(rawState, targetObject.m_stackIndex, 2);
+    const LuaPlus::LuaStackObject yComponent(targetObject.m_state, lua_gettop(rawState));
+    lua_rawgeti(rawState, targetObject.m_stackIndex, 1);
+    const LuaPlus::LuaStackObject xComponent(targetObject.m_state, lua_gettop(rawState));
+
+    targetType = EAiTargetType::AITARGET_Ground;
+    position.x = static_cast<float>(xComponent.ToNumber());
+    position.y = static_cast<float>(yComponent.ToNumber());
+    position.z = static_cast<float>(zComponent.ToNumber());
+  } else {
+    targetType = EAiTargetType::AITARGET_None;
+  }
+
+  targetEntity.ClearLinkState();
+  targetIsMobile = false;
+  targetPoint = -1;
   return this;
 }
 
@@ -396,6 +486,19 @@ bool CAiTarget::NoTarget() const
 
   Entity* const entity = GetEntity();
   return entity == nullptr || entity->Dead != 0u;
+}
+
+/**
+ * Address: 0x005E2DE0 (FUN_005E2DE0)
+ *
+ * What it does:
+ * Returns whether this target currently resolves to a live entity in
+ * `LAYER_Air`.
+ */
+[[maybe_unused]] bool CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
+{
+  Entity* const entity = target.GetEntity();
+  return entity != nullptr && entity->mCurrentLayer == LAYER_Air;
 }
 
 /**

@@ -4,8 +4,8 @@
 
 #include "CMessageStream.h"
 #include "ELobbyMsg.h"
-#include "INetConnection.h"
 #include "gpg/core/utils/Logging.h"
+#include "INetConnection.h"
 #include "lua/LuaObject.h"
 
 namespace moho
@@ -69,7 +69,10 @@ namespace moho
    * What it does:
    * Builds the Lua peer descriptor including command-link/ping metadata.
    */
-  LuaPlus::LuaObject SPeer::ToLua(LuaPlus::LuaState* state, const SPeer* peer)
+  LuaPlus::LuaObject SPeer::ToLua(
+    LuaPlus::LuaState* state,
+    const SPeer* peer
+  )
   {
     LuaPlus::LuaObject out;
     out.AssignNewTable(state, 0, 0);
@@ -106,7 +109,9 @@ namespace moho
    * What it does:
    * Serializes this peer as `LOBMSG_NewPeer` and writes it to `connection`.
    */
-  void SPeer::SendInfoTo(INetConnection* connection) const
+  void SPeer::SendInfoTo(
+    INetConnection* connection
+  ) const
   {
     const auto connectionStr = connection->ToString();
     const auto peerStr = ToString();
@@ -119,5 +124,21 @@ namespace moho
     stream.Write(port);
     stream.Write(uid);
     connection->Write(stream);
+  }
+
+  /**
+   * Address: 0x007C1320 (FUN_007C1320)
+   *
+   * What it does:
+   * Runs `SPeer` destruction for one heap object and releases the same
+   * storage via global `operator delete`.
+   */
+  SPeer* DestroyAndDeletePeer(
+    SPeer* const peer
+  )
+  {
+    peer->~SPeer();
+    ::operator delete(peer);
+    return peer;
   }
 } // namespace moho

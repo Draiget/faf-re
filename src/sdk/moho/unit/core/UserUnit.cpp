@@ -11,13 +11,16 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"
+#include "moho/math/Vector3f.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -63,6 +66,8 @@ namespace moho
 
 namespace
 {
+  void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
+
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kUserUnitCanAttackTargetName = "CanAttackTarget";
@@ -465,15 +470,33 @@ namespace
 
   struct FactoryQueueDisplayItemRuntime
   {
+    FactoryQueueDisplayItemRuntime() noexcept;
+    FactoryQueueDisplayItemRuntime(const msvc8::string& sourceBlueprintId, std::int32_t sourceCount);
+    ~FactoryQueueDisplayItemRuntime() noexcept;
+
     msvc8::string blueprintId;         // +0x00
     std::int32_t count;                // +0x1C
     CmdId commandId;                   // +0x20
-    std::uint8_t pad_0024_0030[0x0C]{}; // +0x24
+    std::uint8_t* auxBufferBegin;      // +0x24
+    std::uint8_t* auxBufferEnd;        // +0x28
+    std::uint8_t* auxBufferCapacity;   // +0x2C
   };
   static_assert(offsetof(FactoryQueueDisplayItemRuntime, count) == 0x1C, "FactoryQueueDisplayItemRuntime::count offset must be 0x1C");
   static_assert(
     offsetof(FactoryQueueDisplayItemRuntime, commandId) == 0x20,
     "FactoryQueueDisplayItemRuntime::commandId offset must be 0x20"
+  );
+  static_assert(
+    offsetof(FactoryQueueDisplayItemRuntime, auxBufferBegin) == 0x24,
+    "FactoryQueueDisplayItemRuntime::auxBufferBegin offset must be 0x24"
+  );
+  static_assert(
+    offsetof(FactoryQueueDisplayItemRuntime, auxBufferEnd) == 0x28,
+    "FactoryQueueDisplayItemRuntime::auxBufferEnd offset must be 0x28"
+  );
+  static_assert(
+    offsetof(FactoryQueueDisplayItemRuntime, auxBufferCapacity) == 0x2C,
+    "FactoryQueueDisplayItemRuntime::auxBufferCapacity offset must be 0x2C"
   );
   static_assert(sizeof(FactoryQueueDisplayItemRuntime) == 0x30, "FactoryQueueDisplayItemRuntime size must be 0x30");
 
@@ -542,6 +565,166 @@ namespace
     "UserCommandManagerRuntimeView::resolvedRangeDirty offset must be 0x60"
   );
 
+  struct UserCommandIssueWeakSetRuntimeView
+  {
+    void* allocatorProxy;            // +0x00
+    SSelectionNodeUserEntity* head;  // +0x04
+    std::uint32_t size;              // +0x08
+  };
+  static_assert(
+    offsetof(UserCommandIssueWeakSetRuntimeView, head) == 0x04,
+    "UserCommandIssueWeakSetRuntimeView::head offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserCommandIssueWeakSetRuntimeView, size) == 0x08,
+    "UserCommandIssueWeakSetRuntimeView::size offset must be 0x08"
+  );
+  static_assert(sizeof(UserCommandIssueWeakSetRuntimeView) == 0x0C, "UserCommandIssueWeakSetRuntimeView size must be 0x0C");
+
+  struct UserCommandIssueCellVectorRuntimeView
+  {
+    void* begin;        // +0x00
+    void* end;          // +0x04
+    void* capacityEnd;  // +0x08
+    void** inlineBase;  // +0x0C
+    std::uint8_t pad_0010_0018[0x08];
+  };
+  static_assert(offsetof(UserCommandIssueCellVectorRuntimeView, begin) == 0x00, "UserCommandIssueCellVectorRuntimeView::begin offset must be 0x00");
+  static_assert(offsetof(UserCommandIssueCellVectorRuntimeView, end) == 0x04, "UserCommandIssueCellVectorRuntimeView::end offset must be 0x04");
+  static_assert(
+    offsetof(UserCommandIssueCellVectorRuntimeView, capacityEnd) == 0x08,
+    "UserCommandIssueCellVectorRuntimeView::capacityEnd offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCellVectorRuntimeView, inlineBase) == 0x0C,
+    "UserCommandIssueCellVectorRuntimeView::inlineBase offset must be 0x0C"
+  );
+  static_assert(sizeof(UserCommandIssueCellVectorRuntimeView) == 0x18, "UserCommandIssueCellVectorRuntimeView size must be 0x18");
+
+  struct UserCommandIssueLocalEventRuntimeView
+  {
+    CmdId commandId;                                // +0x00
+    std::uint32_t eventType;                        // +0x04
+    UserCommandIssueWeakSetRuntimeView entitySet;   // +0x08
+    std::int32_t countDelta;                        // +0x14
+    std::uint8_t pad_0018_001C[0x04];
+    SSelectionWeakRefUserEntity targetEntityWeak;   // +0x1C
+    std::uint8_t pad_0024_0038[0x14];
+    UserCommandIssueCellVectorRuntimeView cells;    // +0x38
+  };
+  static_assert(
+    offsetof(UserCommandIssueLocalEventRuntimeView, entitySet) == 0x08,
+    "UserCommandIssueLocalEventRuntimeView::entitySet offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEventRuntimeView, countDelta) == 0x14,
+    "UserCommandIssueLocalEventRuntimeView::countDelta offset must be 0x14"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEventRuntimeView, targetEntityWeak) == 0x1C,
+    "UserCommandIssueLocalEventRuntimeView::targetEntityWeak offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEventRuntimeView, cells) == 0x38,
+    "UserCommandIssueLocalEventRuntimeView::cells offset must be 0x38"
+  );
+  static_assert(sizeof(UserCommandIssueLocalEventRuntimeView) == 0x50, "UserCommandIssueLocalEventRuntimeView size must be 0x50");
+
+  struct UserCommandIssueLocalQueueRuntimeView
+  {
+    std::uint32_t allocatorProxy;                        // +0x00
+    UserCommandIssueLocalEventRuntimeView** slots;       // +0x04
+    std::uint32_t capacity;                              // +0x08
+    std::uint32_t readIndex;                             // +0x0C
+    std::uint32_t count;                                 // +0x10
+  };
+  static_assert(
+    offsetof(UserCommandIssueLocalQueueRuntimeView, slots) == 0x04,
+    "UserCommandIssueLocalQueueRuntimeView::slots offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalQueueRuntimeView, capacity) == 0x08,
+    "UserCommandIssueLocalQueueRuntimeView::capacity offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalQueueRuntimeView, readIndex) == 0x0C,
+    "UserCommandIssueLocalQueueRuntimeView::readIndex offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalQueueRuntimeView, count) == 0x10,
+    "UserCommandIssueLocalQueueRuntimeView::count offset must be 0x10"
+  );
+  static_assert(sizeof(UserCommandIssueLocalQueueRuntimeView) == 0x14, "UserCommandIssueLocalQueueRuntimeView size must be 0x14");
+
+  struct UserCommandIssueEventEntitySetRuntimeView
+  {
+    std::uint8_t pad_0000_0004[0x04];
+    std::uint32_t eventType;                          // +0x04
+    UserCommandIssueWeakSetRuntimeView entitySet;     // +0x08
+    std::int32_t countDelta;                          // +0x14
+    std::uint8_t pad_0018_0034[0x1C];
+  };
+  static_assert(
+    offsetof(UserCommandIssueEventEntitySetRuntimeView, eventType) == 0x04,
+    "UserCommandIssueEventEntitySetRuntimeView::eventType offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserCommandIssueEventEntitySetRuntimeView, entitySet) == 0x08,
+    "UserCommandIssueEventEntitySetRuntimeView::entitySet offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandIssueEventEntitySetRuntimeView, countDelta) == 0x14,
+    "UserCommandIssueEventEntitySetRuntimeView::countDelta offset must be 0x14"
+  );
+  static_assert(sizeof(UserCommandIssueEventEntitySetRuntimeView) == 0x34, "UserCommandIssueEventEntitySetRuntimeView size must be 0x34");
+
+  struct UserCommandIssueCursorEntityCacheRuntimeView
+  {
+    std::uint8_t pad_0000_0040[0x40];
+    EntId* cursorEntityIdsBegin;                                  // +0x40
+    EntId* cursorEntityIdsEnd;                                    // +0x44
+    std::uint8_t pad_0048_00B2[0x6A];
+    std::uint8_t cursorEntityCacheDirty;                          // +0xB2
+    std::uint8_t pad_00B3_00BC[0x09];
+    UserCommandIssueEventEntitySetRuntimeView** eventSlots;       // +0xBC
+    std::uint32_t eventWrapBase;                                  // +0xC0
+    std::uint32_t eventStart;                                     // +0xC4
+    std::uint32_t eventCount;                                     // +0xC8
+    UserCommandIssueWeakSetRuntimeView cursorEntitySet;           // +0xCC
+  };
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityIdsBegin) == 0x40,
+    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityIdsBegin offset must be 0x40"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityIdsEnd) == 0x44,
+    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityIdsEnd offset must be 0x44"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityCacheDirty) == 0xB2,
+    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityCacheDirty offset must be 0xB2"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventSlots) == 0xBC,
+    "UserCommandIssueCursorEntityCacheRuntimeView::eventSlots offset must be 0xBC"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventWrapBase) == 0xC0,
+    "UserCommandIssueCursorEntityCacheRuntimeView::eventWrapBase offset must be 0xC0"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventStart) == 0xC4,
+    "UserCommandIssueCursorEntityCacheRuntimeView::eventStart offset must be 0xC4"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventCount) == 0xC8,
+    "UserCommandIssueCursorEntityCacheRuntimeView::eventCount offset must be 0xC8"
+  );
+  static_assert(
+    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntitySet) == 0xCC,
+    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntitySet offset must be 0xCC"
+  );
+
   struct UserManagerHelperEntry
   {
     std::int32_t commandType;     // +0x00
@@ -605,6 +788,54 @@ namespace
   );
   static_assert(sizeof(UserUnitManagerRuntimeView) == 0x68, "UserUnitManagerRuntimeView size must be 0x68");
 
+  struct SessionCommandIssueMapNodeView
+  {
+    SessionCommandIssueMapNodeView* left;   // +0x00
+    SessionCommandIssueMapNodeView* parent; // +0x04
+    SessionCommandIssueMapNodeView* right;  // +0x08
+    std::uint32_t key;                      // +0x0C
+    UserCommandIssueHelperRuntimeView* value; // +0x10
+    std::uint8_t color;                     // +0x14
+    std::uint8_t isNil;                     // +0x15
+    std::uint8_t pad_16_18[2];              // +0x16
+  };
+  static_assert(sizeof(SessionCommandIssueMapNodeView) == 0x18, "SessionCommandIssueMapNodeView size must be 0x18");
+  static_assert(
+    offsetof(SessionCommandIssueMapNodeView, key) == 0x0C,
+    "SessionCommandIssueMapNodeView::key offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SessionCommandIssueMapNodeView, value) == 0x10,
+    "SessionCommandIssueMapNodeView::value offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SessionCommandIssueMapNodeView, isNil) == 0x15,
+    "SessionCommandIssueMapNodeView::isNil offset must be 0x15"
+  );
+
+  struct SessionCommandIssueMapView
+  {
+    void* allocatorProxy;                   // +0x00
+    SessionCommandIssueMapNodeView* head;   // +0x04
+    std::uint32_t size;                     // +0x08
+  };
+  static_assert(sizeof(SessionCommandIssueMapView) == 0x0C, "SessionCommandIssueMapView size must be 0x0C");
+  static_assert(
+    offsetof(SessionCommandIssueMapView, head) == 0x04,
+    "SessionCommandIssueMapView::head offset must be 0x04"
+  );
+
+  struct SessionCommandManagerRuntimeView
+  {
+    std::uint8_t pad_0000_0CB4[0xCB4];
+    SessionCommandIssueMapView commandIssueMap; // +0xCB4
+  };
+  static_assert(
+    offsetof(SessionCommandManagerRuntimeView, commandIssueMap) == 0xCB4,
+    "SessionCommandManagerRuntimeView::commandIssueMap offset must be 0xCB4"
+  );
+  static_assert(sizeof(SessionCommandManagerRuntimeView) == 0xCC0, "SessionCommandManagerRuntimeView size must be 0xCC0");
+
   struct UserUnitVisionRuntimeView
   {
     std::uint8_t pad_0000_0018[0x18];
@@ -650,6 +881,33 @@ namespace
     offsetof(UserUnitIUnitStateBridgeView, unitStates) == 0x268,
     "UserUnitIUnitStateBridgeView::unitStates offset must be 0x268"
   );
+
+  struct IUnitBridgeLuaObjectRuntimeView
+  {
+    std::uint8_t pad_0000_0028[0x28];
+    LuaPlus::LuaObject luaObject; // +0x28
+  };
+  static_assert(
+    offsetof(IUnitBridgeLuaObjectRuntimeView, luaObject) == 0x28,
+    "IUnitBridgeLuaObjectRuntimeView::luaObject offset must be 0x28"
+  );
+
+  /**
+   * Address: 0x008BEF60 (FUN_008BEF60, Moho::IUnit_UserUnit::GetLuaObject)
+   *
+   * What it does:
+   * Copy-constructs one Lua object result lane from the UserUnit IUnit-bridge
+   * Lua-object payload at `+0x28`.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* IUnitBridgeCopyLuaObjectToOut(
+    const IUnit* const bridge,
+    LuaPlus::LuaObject* const outLuaObject
+  ) noexcept
+  {
+    const auto* const bridgeView = reinterpret_cast<const IUnitBridgeLuaObjectRuntimeView*>(bridge);
+    new (outLuaObject) LuaPlus::LuaObject(bridgeView->luaObject);
+    return outLuaObject;
+  }
 
   /**
    * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
@@ -739,14 +997,17 @@ namespace
     return reinterpret_cast<UserCommandManagerRuntimeView*>(managerAddress);
   }
 
+  [[nodiscard]] UserCommandQueueLinkVectorView* RebuildAndGetUserUnitManagerQueue(UserUnitManager* managerPtr) noexcept;
+
   [[nodiscard]] const UserCommandQueueRangeView* ResolveUserCommandQueueRange(const std::int32_t managerHandle) noexcept
   {
-    const UserCommandManagerRuntimeView* const manager = DecodeUserCommandManagerHandle(managerHandle);
+    UserUnitManager* const manager = reinterpret_cast<UserUnitManager*>(DecodeUserCommandManagerHandle(managerHandle));
     if (manager == nullptr) {
       return nullptr;
     }
 
-    return (manager->pendingIssueCount == 0u) ? &manager->primaryRange : &manager->resolvedRange;
+    const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    return reinterpret_cast<const UserCommandQueueRangeView*>(queueVector);
   }
 
   [[nodiscard]] VisionDB::Handle*& GetUserUnitVisionHandle(UserUnit* const self) noexcept
@@ -834,6 +1095,225 @@ namespace
 
     weakRef.mOwnerLinkSlot = nullptr;
     weakRef.mNextOwner = nullptr;
+  }
+
+  [[nodiscard]] SSelectionSetUserEntity BuildSelectionAdapterFromIssueWeakSet(
+    const UserCommandIssueWeakSetRuntimeView& set
+  ) noexcept
+  {
+    SSelectionSetUserEntity adapter{};
+    adapter.mAllocProxy = set.allocatorProxy;
+    adapter.mHead = set.head;
+    adapter.mSize = set.size;
+    adapter.mSizeMirrorOrUnused = set.size;
+    return adapter;
+  }
+
+  void CommitSelectionAdapterToIssueWeakSet(
+    const SSelectionSetUserEntity& adapter,
+    UserCommandIssueWeakSetRuntimeView& set
+  ) noexcept
+  {
+    set.allocatorProxy = adapter.mAllocProxy;
+    set.head = adapter.mHead;
+    set.size = adapter.mSize;
+  }
+
+  [[nodiscard]] UserEntity* DecodeSelectionWeakOwnerUserEntity(
+    const SSelectionWeakRefUserEntity& weakRef
+  ) noexcept
+  {
+    const std::uintptr_t ownerLinkSlot = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+    if (ownerLinkSlot <= kUserEntityWeakOwnerOffset) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<UserEntity*>(ownerLinkSlot - kUserEntityWeakOwnerOffset);
+  }
+
+  void ClearIssueWeakSetKeepHead(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  {
+    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
+    if (adapter.mHead != nullptr) {
+      SSelectionNodeUserEntity* eraseCursor = adapter.mHead->mLeft;
+      (void)adapter.EraseRange(&eraseCursor, adapter.mHead->mLeft, adapter.mHead);
+      adapter.mSizeMirrorOrUnused = adapter.mSize;
+    }
+    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+  }
+
+  void PruneIssueWeakSetTombstones(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  {
+    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
+    if (adapter.mHead == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* cursor = adapter.mHead->mLeft;
+    cursor = *adapter.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != adapter.mHead) {
+      SSelectionSetUserEntity::Iterator_inc(&cursor);
+      cursor = SSelectionSetUserEntity::find(&adapter, cursor, &cursor);
+    }
+
+    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+  }
+
+  void AddIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
+  {
+    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
+    if (entity != nullptr && adapter.mHead != nullptr) {
+      SSelectionSetUserEntity::AddResult addResult{};
+      (void)SSelectionSetUserEntity::Add(&addResult, &adapter, entity);
+      adapter.mSizeMirrorOrUnused = adapter.mSize;
+    }
+    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+  }
+
+  void EraseIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
+  {
+    if (entity == nullptr) {
+      return;
+    }
+
+    SSelectionSetUserEntity adapter = BuildSelectionAdapterFromIssueWeakSet(set);
+    if (adapter.mHead == nullptr) {
+      return;
+    }
+
+    while (true) {
+      SSelectionSetUserEntity::FindResult found{};
+      (void)SSelectionSetUserEntity::Find(&found, &adapter, entity);
+      if (found.mRes == adapter.mHead) {
+        break;
+      }
+
+      SSelectionNodeUserEntity* next = found.mRes;
+      SSelectionSetUserEntity::Iterator_inc(&next);
+      next = SSelectionSetUserEntity::find(&adapter, next, &next);
+
+      SSelectionNodeUserEntity* eraseCursor = found.mRes;
+      (void)adapter.EraseRange(&eraseCursor, found.mRes, next);
+      adapter.mSizeMirrorOrUnused = adapter.mSize;
+    }
+
+    CommitSelectionAdapterToIssueWeakSet(adapter, set);
+  }
+
+  void MergeIssueWeakSetEntities(
+    UserCommandIssueWeakSetRuntimeView& destination,
+    UserCommandIssueWeakSetRuntimeView& source
+  ) noexcept
+  {
+    SSelectionSetUserEntity sourceAdapter = BuildSelectionAdapterFromIssueWeakSet(source);
+    if (sourceAdapter.mHead == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* cursor = sourceAdapter.mHead->mLeft;
+    cursor = *sourceAdapter.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != sourceAdapter.mHead) {
+      if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
+        AddIssueWeakSetEntity(destination, entity);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&cursor);
+      cursor = SSelectionSetUserEntity::find(&sourceAdapter, cursor, &cursor);
+    }
+
+    CommitSelectionAdapterToIssueWeakSet(sourceAdapter, source);
+  }
+
+  void EraseIssueWeakSetEntities(
+    UserCommandIssueWeakSetRuntimeView& destination,
+    UserCommandIssueWeakSetRuntimeView& source
+  ) noexcept
+  {
+    SSelectionSetUserEntity sourceAdapter = BuildSelectionAdapterFromIssueWeakSet(source);
+    if (sourceAdapter.mHead == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* cursor = sourceAdapter.mHead->mLeft;
+    cursor = *sourceAdapter.PruneTombstonesAndFindLive(&cursor, cursor);
+    while (cursor != sourceAdapter.mHead) {
+      if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
+        EraseIssueWeakSetEntity(destination, entity);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&cursor);
+      cursor = SSelectionSetUserEntity::find(&sourceAdapter, cursor, &cursor);
+    }
+
+    CommitSelectionAdapterToIssueWeakSet(sourceAdapter, source);
+  }
+
+  void DestroyCommandIssueWeakSetNodes(
+    SSelectionNodeUserEntity* const node,
+    SSelectionNodeUserEntity* const head
+  ) noexcept
+  {
+    if (node == nullptr || node == head || node->mIsSentinel != 0u) {
+      return;
+    }
+
+    DestroyCommandIssueWeakSetNodes(node->mLeft, head);
+    DestroyCommandIssueWeakSetNodes(node->mRight, head);
+    UnlinkWeakEntityOwner(node->mEnt);
+    ::operator delete(node);
+  }
+
+  void DestroyCommandIssueWeakSet(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  {
+    SSelectionNodeUserEntity* const head = set.head;
+    if (head == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* const root = head->mParent;
+    if (root != nullptr && root != head && root->mIsSentinel == 0u) {
+      DestroyCommandIssueWeakSetNodes(root, head);
+    }
+
+    ::operator delete(head);
+    set.head = nullptr;
+    set.size = 0u;
+  }
+
+  void UnlinkCommandIssueTargetWeakOwnerNoReset(SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+    if (ownerLinkSlot == nullptr) {
+      return;
+    }
+
+    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
+      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
+    }
+
+    if (*ownerLinkSlot == &weakRef) {
+      *ownerLinkSlot = weakRef.mNextOwner;
+    }
+  }
+
+  /**
+   * Address: 0x008B4800 (FUN_008B4800)
+   *
+   * What it does:
+   * Releases dynamic command-cell storage back to inline capacity, detaches
+   * target weak-owner linkage, and destroys the local weak-entity set lane.
+   */
+  void DestroyCommandIssueLocalEvent(UserCommandIssueLocalEventRuntimeView& event) noexcept
+  {
+    if (event.cells.begin != event.cells.inlineBase) {
+      ::operator delete[](event.cells.begin);
+      event.cells.begin = event.cells.inlineBase;
+      event.cells.capacityEnd = (event.cells.inlineBase != nullptr) ? *event.cells.inlineBase : nullptr;
+    }
+    event.cells.end = event.cells.begin;
+
+    UnlinkCommandIssueTargetWeakOwnerNoReset(event.targetEntityWeak);
+    DestroyCommandIssueWeakSet(event.entitySet);
   }
 
   [[nodiscard]] SSelectionNodeUserEntity*
@@ -1224,6 +1704,44 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x008B2520 (FUN_008B2520, idle engineer weak-set insert helper)
+   *
+   * What it does:
+   * Inserts one `UserUnit` into the owning army idle-engineer weak set.
+   */
+  [[nodiscard]] bool InsertIdleEngineerWeakSetEntry(UserUnit* const unit, UserArmy* const army) noexcept
+  {
+    if (unit == nullptr || army == nullptr) {
+      return false;
+    }
+
+    auto& idleSets = GetUserArmyIdleSetView(army);
+    return InsertWeakEntitySet(idleSets.engineers, reinterpret_cast<UserEntity*>(unit));
+  }
+
+  /**
+   * Address: 0x008B2590 (FUN_008B2590, idle factory weak-set insert helper)
+   *
+   * What it does:
+   * Inserts one `UserUnit` into the owning army idle-factory weak set.
+   */
+  [[nodiscard]] bool InsertIdleFactoryWeakSetEntry(UserUnit* const unit, UserArmy* const army) noexcept
+  {
+    if (unit == nullptr || army == nullptr) {
+      return false;
+    }
+
+    auto& idleSets = GetUserArmyIdleSetView(army);
+    return InsertWeakEntitySet(idleSets.factories, reinterpret_cast<UserEntity*>(unit));
+  }
+
+  /**
+   * Address: 0x008B72F0 (FUN_008B72F0, struct_UserUnitManager::Get empty-check helper)
+   *
+   * What it does:
+   * Resolves one command-manager active range and returns whether it is empty.
+   */
   [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserUnitManager* const manager) noexcept
   {
     const UserCommandQueueRangeView* const queueRange =
@@ -1231,23 +1749,640 @@ namespace
     return queueRange == nullptr || queueRange->begin == queueRange->end;
   }
 
+  /**
+   * Address: 0x008B7320 (FUN_008B7320, struct_UserUnitManager::Get)
+   *
+   * What it does:
+   * Resolves one command-manager queue view and returns the most recent
+   * non-null helper entry, scanning backward from the logical tail.
+   */
+  [[maybe_unused]] [[nodiscard]] UserCommandIssueHelperRuntimeView* GetLastQueuedUserCommandHelper(
+    UserUnitManager* const managerPtr
+  ) noexcept
+  {
+    UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
+    UserCommandQueueEntryView* const begin = queueVector->begin;
+
+    std::ptrdiff_t index = static_cast<std::ptrdiff_t>(queueVector->end - begin) - 1;
+    if (index < 0) {
+      return nullptr;
+    }
+
+    UserCommandQueueEntryView* cursor = begin + index;
+    while (cursor->helper == nullptr) {
+      --index;
+      --cursor;
+      if (index < 0) {
+        return nullptr;
+      }
+    }
+
+    return begin[index].helper;
+  }
+
+  /**
+   * Address: 0x008C0D00 (FUN_008C0D00, cfunc_IssueDockCommandL idle candidate helper)
+   *
+   * What it does:
+   * Returns whether one `UserUnit` is currently idle enough for dock-target
+   * candidate selection (not busy and no pending command queue entries).
+   */
+  [[maybe_unused]] [[nodiscard]] bool IsDockTargetQueueIdle(const UserUnit* const unit) noexcept
+  {
+    if (unit == nullptr || GetLuaRuntimeView(unit).isBusy != 0u) {
+      return false;
+    }
+
+    const UserCommandQueueRangeView* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue2());
+    return queueRange != nullptr && queueRange->begin == queueRange->end;
+  }
+
+  /**
+   * Address: 0x008B5210 (FUN_008B5210)
+   *
+   * What it does:
+   * Destroys every live local command-issue event from one helper ring queue,
+   * releases per-slot event storage, then frees queue slot-map storage and
+   * clears queue slot-capacity lanes.
+   */
+  [[maybe_unused]] void DestroyCommandIssueLocalQueue(UserCommandIssueLocalQueueRuntimeView* const queuePtr) noexcept
+  {
+    auto& queue = *queuePtr;
+    while (queue.count != 0u) {
+      std::uint32_t slot = queue.count + queue.readIndex - 1u;
+      if (queue.capacity <= slot) {
+        slot -= queue.capacity;
+      }
+
+      UserCommandIssueLocalEventRuntimeView* const event = queue.slots[slot];
+      if (event != nullptr) {
+        DestroyCommandIssueLocalEvent(*event);
+      }
+
+      queue.count -= 1u;
+      if (queue.count == 0u) {
+        queue.readIndex = 0u;
+      }
+    }
+
+    for (std::uint32_t slot = queue.capacity; slot != 0u; --slot) {
+      if (queue.slots == nullptr) {
+        break;
+      }
+
+      UserCommandIssueLocalEventRuntimeView* const event = queue.slots[slot - 1u];
+      if (event != nullptr) {
+        ::operator delete(event);
+      }
+    }
+
+    if (queue.slots != nullptr) {
+      ::operator delete(queue.slots);
+    }
+    queue.slots = nullptr;
+    queue.capacity = 0u;
+  }
+
+  /**
+   * Address: 0x008B79A0 (FUN_008B79A0)
+   *
+   * What it does:
+   * Unlinks each resolved-queue entry from its helper-owned intrusive owner
+   * chain across one half-open `[begin,end)` range.
+   */
+  /**
+   * Address: 0x0082BA90 (FUN_0082BA90)
+   *
+   * What it does:
+   * Unlinks one command-queue entry from its helper-owned intrusive owner
+   * chain and returns the final owner-link cursor slot.
+   */
+  [[nodiscard]] UserCommandQueueEntryView** UnlinkCommandQueueOwnerEntry(
+    UserCommandQueueEntryView* const entry
+  ) noexcept
+  {
+    auto* ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(entry != nullptr ? entry->helper : nullptr);
+    if (ownerLink == nullptr) {
+      return ownerLink;
+    }
+
+    while (*ownerLink != nullptr && *ownerLink != entry) {
+      ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(&(*ownerLink)->link);
+    }
+
+    if (*ownerLink == entry) {
+      *ownerLink = reinterpret_cast<UserCommandQueueEntryView*>(entry->link);
+    }
+
+    return ownerLink;
+  }
+
   void UnlinkResolvedQueueOwnerLinks(
     UserCommandQueueEntryView* const begin, UserCommandQueueEntryView* const end
   ) noexcept
   {
     for (UserCommandQueueEntryView* cursor = begin; cursor != end; ++cursor) {
-      auto* ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(cursor->helper);
-      if (ownerLink == nullptr) {
+      (void)UnlinkCommandQueueOwnerEntry(cursor);
+    }
+  }
+
+  [[nodiscard]] inline WeakPtr<void>* AsWeakLane(
+    UserCommandQueueEntryView* const lane
+  ) noexcept
+  {
+    return reinterpret_cast<WeakPtr<void>*>(lane);
+  }
+
+  [[nodiscard]] inline const WeakPtr<void>* AsWeakLane(
+    const UserCommandQueueEntryView* const lane
+  ) noexcept
+  {
+    return reinterpret_cast<const WeakPtr<void>*>(lane);
+  }
+
+  [[nodiscard]] UserCommandQueueEntryView* CopyQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntryView* const destination,
+    const UserCommandQueueEntryView* const sourceBegin,
+    const UserCommandQueueEntryView* const sourceEnd
+  ) noexcept
+  {
+    return reinterpret_cast<UserCommandQueueEntryView*>(
+      CopyWeakPtrRangeStdOrder(
+        AsWeakLane(destination),
+        AsWeakLane(sourceBegin),
+        AsWeakLane(sourceEnd)
+      )
+    );
+  }
+
+  [[nodiscard]] UserCommandQueueEntryView* AssignQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntryView* const destination,
+    const UserCommandQueueEntryView* const sourceBegin,
+    const UserCommandQueueEntryView* const sourceEnd
+  ) noexcept
+  {
+    return reinterpret_cast<UserCommandQueueEntryView*>(
+      AssignWeakPtrRangeForward(
+        AsWeakLane(destination),
+        AsWeakLane(sourceBegin),
+        AsWeakLane(sourceEnd)
+      )
+    );
+  }
+
+  [[nodiscard]] UserCommandQueueEntryView* AssignQueueLinkRangeBackwardWithOwnerRelink(
+    UserCommandQueueEntryView* const destinationEnd,
+    const UserCommandQueueEntryView* const sourceBegin,
+    const UserCommandQueueEntryView* const sourceEnd
+  ) noexcept
+  {
+    return reinterpret_cast<UserCommandQueueEntryView*>(
+      AssignWeakPtrRangeBackward(
+        AsWeakLane(destinationEnd),
+        AsWeakLane(sourceBegin),
+        AsWeakLane(sourceEnd)
+      )
+    );
+  }
+
+  /**
+   * Address: 0x008B74A0 (FUN_008B74A0)
+   *
+   * What it does:
+   * Unlinks one queue-link vector range, then restores inline storage ownership
+   * when the active storage pointer differs from the inline lane.
+   */
+  [[maybe_unused]] UserCommandQueueEntryView* ResetQueueLinkVectorToInlineStorage(
+    UserCommandQueueLinkVectorView* const linkVector
+  ) noexcept
+  {
+    UnlinkResolvedQueueOwnerLinks(linkVector->begin, linkVector->end);
+
+    UserCommandQueueEntryView* result = linkVector->begin;
+    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase))
+    {
+      linkVector->end = result;
+      return result;
+    }
+
+    ::operator delete[](linkVector->begin);
+    linkVector->begin = reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase);
+    result = (linkVector->inlineBase != nullptr) ? *linkVector->inlineBase : nullptr;
+    linkVector->capacityEnd = result;
+    linkVector->end = linkVector->begin;
+    return result;
+  }
+
+  /**
+   * Address: 0x008B7540 (FUN_008B7540)
+   *
+   * What it does:
+   * Erases one queue-link entry by shift-assigning `[erase+1,end)` over the
+   * erased slot, then unlinks the trailing stale owner-link lane.
+   */
+  [[maybe_unused]] UserCommandQueueEntryView* EraseQueueLinkEntryAndShrinkRange(
+    UserCommandQueueEntryView* const eraseAt,
+    UserCommandQueueLinkVectorView* const linkVector
+  ) noexcept
+  {
+    UserCommandQueueEntryView* const oldEnd = linkVector->end;
+    if (eraseAt != oldEnd)
+    {
+      UserCommandQueueEntryView* const newEnd = AssignQueueLinkRangeWithOwnerRelink(
+        eraseAt,
+        eraseAt + 1,
+        oldEnd
+      );
+      UnlinkResolvedQueueOwnerLinks(newEnd, oldEnd);
+      linkVector->end = newEnd;
+    }
+
+    return eraseAt;
+  }
+
+  /**
+   * Address: 0x008B7CC0 (FUN_008B7CC0)
+   *
+   * What it does:
+   * Reallocates one queue-link vector to `targetElementCapacity` lanes, copies
+   * `{prefix,insertRange,suffix}` in order, unlinks old owner links, then swaps
+   * storage and updates `{begin,end,capacity}` lanes.
+   */
+  [[maybe_unused]] UserCommandQueueEntryView* GrowQueueLinkVectorAndInsertRange(
+    UserCommandQueueLinkVectorView* const linkVector,
+    const std::uint32_t targetElementCapacity,
+    UserCommandQueueEntryView* const insertionPoint,
+    const UserCommandQueueEntryView* const sourceBegin,
+    const UserCommandQueueEntryView* const sourceEnd
+  )
+  {
+    const std::size_t byteCount =
+      static_cast<std::size_t>(targetElementCapacity) * sizeof(UserCommandQueueEntryView);
+    auto* const newStorage = static_cast<UserCommandQueueEntryView*>(::operator new(byteCount));
+
+    UserCommandQueueEntryView* writeCursor = CopyQueueLinkRangeWithOwnerRelink(
+      newStorage,
+      linkVector->begin,
+      insertionPoint
+    );
+    writeCursor = CopyQueueLinkRangeWithOwnerRelink(
+      writeCursor,
+      sourceBegin,
+      sourceEnd
+    );
+    UserCommandQueueEntryView* const newEnd = CopyQueueLinkRangeWithOwnerRelink(
+      writeCursor,
+      insertionPoint,
+      linkVector->end
+    );
+
+    UnlinkResolvedQueueOwnerLinks(linkVector->begin, linkVector->end);
+    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase))
+    {
+      if (linkVector->inlineBase != nullptr)
+      {
+        *linkVector->inlineBase = linkVector->capacityEnd;
+      }
+    }
+    else
+    {
+      ::operator delete[](linkVector->begin);
+    }
+
+    linkVector->begin = newStorage;
+    linkVector->end = newEnd;
+    linkVector->capacityEnd = newStorage + targetElementCapacity;
+    return linkVector->capacityEnd;
+  }
+
+  /**
+   * Address: 0x008B77D0 (FUN_008B77D0)
+   *
+   * What it does:
+   * Inserts one queue-link range at `insertionPoint` with in-place move/copy
+   * when capacity is sufficient, otherwise grows storage through `FUN_008B7CC0`.
+   * Preserves intrusive weak-owner relink semantics for all shifted/copied lanes.
+   */
+  [[maybe_unused]] UserCommandQueueEntryView* InsertQueueLinkRangeWithGrowth(
+    UserCommandQueueLinkVectorView* const linkVector,
+    UserCommandQueueEntryView* const insertionPoint,
+    const UserCommandQueueEntryView* const sourceBegin,
+    const UserCommandQueueEntryView* const sourceEnd
+  )
+  {
+    const std::ptrdiff_t insertCount = sourceEnd - sourceBegin;
+    const std::ptrdiff_t size = linkVector->end - linkVector->begin;
+    const std::ptrdiff_t capacity = linkVector->capacityEnd - linkVector->begin;
+    const std::ptrdiff_t requestedSize = size + insertCount;
+
+    if (requestedSize > capacity)
+    {
+      std::uint32_t targetCapacity = static_cast<std::uint32_t>(requestedSize);
+      const std::uint32_t doubledCapacity = static_cast<std::uint32_t>(capacity * 2);
+      if (targetCapacity < doubledCapacity)
+      {
+        targetCapacity = doubledCapacity;
+      }
+
+      return GrowQueueLinkVectorAndInsertRange(
+        linkVector,
+        targetCapacity,
+        insertionPoint,
+        sourceBegin,
+        sourceEnd
+      );
+    }
+
+    UserCommandQueueEntryView* const oldEnd = linkVector->end;
+    UserCommandQueueEntryView* const insertionEnd = insertionPoint + insertCount;
+
+    if (insertionEnd > oldEnd)
+    {
+      const std::ptrdiff_t tailCount = oldEnd - insertionPoint;
+      const UserCommandQueueEntryView* const sourceMiddle = sourceBegin + tailCount;
+
+      linkVector->end = CopyQueueLinkRangeWithOwnerRelink(
+        oldEnd,
+        sourceMiddle,
+        sourceEnd
+      );
+      linkVector->end = CopyQueueLinkRangeWithOwnerRelink(
+        linkVector->end,
+        insertionPoint,
+        oldEnd
+      );
+      return AssignQueueLinkRangeBackwardWithOwnerRelink(
+        oldEnd,
+        sourceBegin,
+        sourceMiddle
+      );
+    }
+
+    UserCommandQueueEntryView* const tailStart = oldEnd - insertCount;
+    linkVector->end = CopyQueueLinkRangeWithOwnerRelink(
+      oldEnd,
+      tailStart,
+      oldEnd
+    );
+    (void)AssignQueueLinkRangeBackwardWithOwnerRelink(
+      oldEnd,
+      insertionPoint,
+      tailStart
+    );
+    return AssignQueueLinkRangeBackwardWithOwnerRelink(
+      insertionEnd,
+      sourceBegin,
+      sourceEnd
+    );
+  }
+
+  [[nodiscard]] SessionCommandIssueMapNodeView*
+  FindSessionCommandIssueNode(SessionCommandIssueMapView& map, const CmdId commandId) noexcept
+  {
+    SessionCommandIssueMapNodeView* const head = map.head;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    const std::uint32_t key = static_cast<std::uint32_t>(commandId);
+    SessionCommandIssueMapNodeView* result = head;
+    SessionCommandIssueMapNodeView* node = head->parent;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      if (node->key >= key) {
+        result = node;
+        node = node->left;
+      } else {
+        node = node->right;
+      }
+    }
+
+    if (result == head || key < result->key) {
+      return head;
+    }
+
+    return result;
+  }
+
+  [[nodiscard]] UserCommandIssueHelperRuntimeView*
+  FindSessionCommandIssueHelperById(CWldSession* const session, const CmdId commandId) noexcept
+  {
+    if (session == nullptr || session->mSessionRes1 == nullptr) {
+      return nullptr;
+    }
+
+    auto* const commandManager =
+      reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+    SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
+    SessionCommandIssueMapNodeView* const node = FindSessionCommandIssueNode(issueMap, commandId);
+    if (node == nullptr || node == issueMap.head) {
+      return nullptr;
+    }
+
+    return node->value;
+  }
+
+  [[nodiscard]] SessionCommandIssueMapNodeView* NextSessionCommandIssueNode(
+    SessionCommandIssueMapNodeView* node,
+    SessionCommandIssueMapNodeView* const head
+  ) noexcept
+  {
+    if (node == nullptr || head == nullptr || node == head) {
+      return head;
+    }
+
+    if (node->right != nullptr && node->right != head && node->right->isNil == 0u) {
+      node = node->right;
+      while (node->left != nullptr && node->left != head && node->left->isNil == 0u) {
+        node = node->left;
+      }
+      return node;
+    }
+
+    SessionCommandIssueMapNodeView* parent = node->parent;
+    while (parent != nullptr && parent != head && node == parent->right) {
+      node = parent;
+      parent = parent->parent;
+    }
+
+    return (parent != nullptr) ? parent : head;
+  }
+
+  void AppendQueueLinkStagedEntry(
+    UserCommandQueueLinkVectorView* const linkVector,
+    UserCommandQueueEntryView* const stagedEntry
+  )
+  {
+    UserCommandQueueEntryView* const appendAt = linkVector->end;
+    if (appendAt == linkVector->capacityEnd) {
+      (void)InsertQueueLinkRangeWithGrowth(linkVector, appendAt, stagedEntry, stagedEntry + 1);
+      return;
+    }
+
+    if (appendAt != nullptr) {
+      appendAt->helper = stagedEntry->helper;
+      if (stagedEntry->helper != nullptr) {
+        appendAt->link = stagedEntry->link;
+        *reinterpret_cast<UserCommandQueueEntryView**>(stagedEntry->helper) = appendAt;
+      } else {
+        appendAt->link = nullptr;
+      }
+    }
+    linkVector->end += 1;
+  }
+
+  /**
+   * Address: 0x008B6F60 (FUN_008B6F60, struct_UserUnitManager::Get)
+   *
+   * What it does:
+   * Rebuilds one resolved command queue from the primary queue and pending
+   * issue operations when the resolved view is dirty, then returns the active
+   * queue vector (`primary` when no pending issues, otherwise `resolved`).
+   */
+  [[nodiscard]] UserCommandQueueLinkVectorView* RebuildAndGetUserUnitManagerQueue(
+    UserUnitManager* const managerPtr
+  ) noexcept
+  {
+    if (managerPtr == nullptr) {
+      return nullptr;
+    }
+
+    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    if (manager.issueQueue.size == 0u) {
+      return &manager.primaryLinks;
+    }
+
+    if (manager.resolvedLinksDirty == 0u) {
+      return &manager.resolvedLinks;
+    }
+
+    manager.resolvedLinksDirty = 0u;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
+
+    for (UserCommandQueueEntryView* entry = manager.primaryLinks.begin;
+         entry != manager.primaryLinks.end;
+         ++entry) {
+      UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+      if (helper == nullptr) {
         continue;
       }
 
-      while (*ownerLink != nullptr && *ownerLink != cursor) {
-        ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(&(*ownerLink)->link);
-      }
-      if (*ownerLink == cursor) {
-        *ownerLink = reinterpret_cast<UserCommandQueueEntryView*>(cursor->link);
-      }
+      UserCommandQueueEntryView staged{};
+      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helper);
+      staged.helper = helper;
+      staged.link = *ownerHead;
+      *ownerHead = &staged;
+
+      AppendQueueLinkStagedEntry(&manager.resolvedLinks, &staged);
+      (void)UnlinkCommandQueueOwnerEntry(&staged);
     }
+
+    if (manager.issueQueue.blockCount == 0u || manager.issueQueue.blocks == nullptr) {
+      return &manager.resolvedLinks;
+    }
+
+    const std::uint32_t queueSize = manager.issueQueue.size;
+    for (std::uint32_t ordinal = 0; ordinal < queueSize; ++ordinal) {
+      std::uint32_t slot = manager.issueQueue.startOffset + ordinal;
+      if (slot >= manager.issueQueue.blockCount) {
+        slot -= manager.issueQueue.blockCount;
+      }
+
+      UserManagerHelperEntry* const pending = manager.issueQueue.blocks[slot];
+      if (pending == nullptr) {
+        continue;
+      }
+
+      if (pending->commandType == 1) {
+        (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
+        continue;
+      }
+
+      if (pending->commandType == 2) {
+        UserCommandIssueHelperRuntimeView* const helperToRemove =
+          reinterpret_cast<UserCommandIssueHelperRuntimeView*>(pending->subject);
+        if (helperToRemove == nullptr) {
+          continue;
+        }
+
+        UserCommandQueueEntryView* found = manager.resolvedLinks.begin;
+        while (found != manager.resolvedLinks.end && found->helper != helperToRemove) {
+          ++found;
+        }
+        if (found != manager.resolvedLinks.end) {
+          (void)EraseQueueLinkEntryAndShrinkRange(found, &manager.resolvedLinks);
+        }
+        continue;
+      }
+
+      if (pending->commandType != 0 || pending->subject == nullptr) {
+        continue;
+      }
+
+      const std::uint32_t encodedCommandId = static_cast<std::uint32_t>(pending->sequenceOrCount);
+      if ((encodedCommandId & 0xFF000000u) != 0xFF000000u) {
+        CWldSession* const activeSession = WLD_GetActiveSession();
+        UserCommandIssueHelperRuntimeView* const helperToInsert =
+          FindSessionCommandIssueHelperById(activeSession, static_cast<CmdId>(pending->sequenceOrCount));
+        if (helperToInsert == nullptr) {
+          continue;
+        }
+
+        UserCommandQueueEntryView* insertionPoint = manager.resolvedLinks.begin;
+        while (insertionPoint != manager.resolvedLinks.end && insertionPoint->helper != helperToInsert) {
+          ++insertionPoint;
+        }
+        if (insertionPoint == nullptr) {
+          continue;
+        }
+
+        UserCommandQueueEntryView staged{};
+        auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helperToInsert);
+        staged.helper = helperToInsert;
+        staged.link = *ownerHead;
+        *ownerHead = &staged;
+
+        (void)InsertQueueLinkRangeWithGrowth(
+          &manager.resolvedLinks,
+          insertionPoint,
+          &staged,
+          &staged + 1
+        );
+        (void)UnlinkCommandQueueOwnerEntry(&staged);
+        continue;
+      }
+
+      UserCommandIssueHelperRuntimeView* const helperToAppend =
+        reinterpret_cast<UserCommandIssueHelperRuntimeView*>(pending->subject);
+      if (helperToAppend == nullptr) {
+        continue;
+      }
+
+      UserCommandQueueEntryView staged{};
+      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helperToAppend);
+      staged.helper = helperToAppend;
+      staged.link = *ownerHead;
+      *ownerHead = &staged;
+
+      AppendQueueLinkStagedEntry(&manager.resolvedLinks, &staged);
+      (void)UnlinkCommandQueueOwnerEntry(&staged);
+    }
+
+    return &manager.resolvedLinks;
+  }
+
+  /**
+   * Address: 0x0081D030 (FUN_0081D030)
+   *
+   * What it does:
+   * Returns the active user-command queue length (element count) by rebuilding
+   * and resolving the current queue vector, then computing `(end - begin)`.
+   */
+  [[maybe_unused]] [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(
+    UserUnitManager* const managerPtr
+  ) noexcept
+  {
+    const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
+    return static_cast<std::int32_t>(queueVector->end - queueVector->begin);
   }
 
   [[nodiscard]] UserManagerHelperEntry* AllocateUserManagerHelperSlots(const std::uint32_t count)
@@ -1352,6 +2487,42 @@ namespace
     queue.size += 1u;
   }
 
+  void DestroyUserUnitManagerState(UserUnitManager* managerPtr) noexcept;
+
+  /**
+   * Address: 0x008C5D00 (FUN_008C5D00)
+   *
+   * What it does:
+   * Runs one deleting teardown path for `UserUnitManager` and returns the
+   * original pointer lane.
+   */
+  [[maybe_unused]] UserUnitManager* DeleteUserUnitManagerAndReturn(UserUnitManager* const managerPtr) noexcept
+  {
+    DestroyUserUnitManagerState(managerPtr);
+    ::operator delete(managerPtr);
+    return managerPtr;
+  }
+
+  /**
+   * Address: 0x008C5AF0 (FUN_008C5AF0)
+   *
+   * What it does:
+   * Replaces one `UserUnitManager*` owner slot and deletes the previous manager
+   * when it is distinct from the replacement pointer.
+   */
+  [[maybe_unused]] void ReplaceOwnedUserUnitManager(
+    UserUnitManager** const slot,
+    UserUnitManager* const replacement
+  ) noexcept
+  {
+    UserUnitManager* const previous = *slot;
+    if (previous != nullptr && previous != replacement) {
+      DestroyUserUnitManagerState(previous);
+      ::operator delete(previous);
+    }
+    *slot = replacement;
+  }
+
   /**
    * Address: 0x008B6BE0 (FUN_008B6BE0, struct_UserUnitManager::~struct_UserUnitManager)
    *
@@ -1367,23 +2538,11 @@ namespace
 
     auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
 
-    UnlinkResolvedQueueOwnerLinks(manager.resolvedLinks.begin, manager.resolvedLinks.end);
-    if (manager.resolvedLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase)) {
-      ::operator delete[](manager.resolvedLinks.begin);
-      manager.resolvedLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase);
-      manager.resolvedLinks.capacityEnd = manager.resolvedLinks.inlineBase != nullptr ? *manager.resolvedLinks.inlineBase : nullptr;
-    }
-    manager.resolvedLinks.end = manager.resolvedLinks.begin;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
 
     ClearUserManagerIssueQueue(manager.issueQueue);
 
-    UnlinkResolvedQueueOwnerLinks(manager.primaryLinks.begin, manager.primaryLinks.end);
-    if (manager.primaryLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.primaryLinks.inlineBase)) {
-      ::operator delete[](manager.primaryLinks.begin);
-      manager.primaryLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.primaryLinks.inlineBase);
-      manager.primaryLinks.capacityEnd = manager.primaryLinks.inlineBase != nullptr ? *manager.primaryLinks.inlineBase : nullptr;
-    }
-    manager.primaryLinks.end = manager.primaryLinks.begin;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager.primaryLinks);
   }
 
   /**
@@ -1410,22 +2569,20 @@ namespace
     PushUserManagerIssue(manager.issueQueue, resetHelper);
 
     manager.resolvedLinksDirty = 1u;
-
-    UnlinkResolvedQueueOwnerLinks(manager.resolvedLinks.begin, manager.resolvedLinks.end);
-    if (manager.resolvedLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase)) {
-      ::operator delete[](manager.resolvedLinks.begin);
-      manager.resolvedLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase);
-      manager.resolvedLinks.capacityEnd = manager.resolvedLinks.inlineBase != nullptr ? *manager.resolvedLinks.inlineBase : nullptr;
-    }
-    manager.resolvedLinks.end = manager.resolvedLinks.begin;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
   }
 
+  /**
+   * Address: 0x008B7350 (FUN_008B7350)
+   *
+   * What it does:
+   * Consumes pending command-issue slots whose due sequence is <= `seqNo`,
+   * marks resolved links dirty, then rebuilds resolved-link storage back to
+   * inline mode when any slot was consumed.
+   */
   void AdvanceUserCommandManagerBySeq(UserUnitManager* const managerPtr, const std::int32_t seqNo) noexcept
   {
     auto* const manager = reinterpret_cast<UserCommandManagerRuntimeView*>(managerPtr);
-    if (manager == nullptr) {
-      return;
-    }
 
     while (manager->pendingIssueCount != 0u) {
       std::uint32_t queueIndex = manager->pendingCursor;
@@ -1475,14 +2632,39 @@ namespace
     return reinterpret_cast<UserEntity*>(rawOwnerSlot - kUserEntityWeakOwnerOffset);
   }
 
+  /**
+   * Address: 0x008BEE30 (FUN_008BEE30)
+   *
+   * What it does:
+   * Resolves one command-target entity owner when target type is `Entity`
+   * (`1`) and the weak-owner slot is non-null; returns null otherwise.
+   */
+  [[maybe_unused]] [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(
+    const UserCommandTargetView* const target
+  ) noexcept
+  {
+    if (target->targetType == UserTargetType::Entity && target->targetEntity.ownerLinkSlot != 0u) {
+      return reinterpret_cast<UserEntity*>(target->targetEntity.ownerLinkSlot - kUserEntityWeakOwnerOffset);
+    }
+
+    return nullptr;
+  }
+
   [[nodiscard]] Wm3::Vector3<float> InvalidCommandQueuePosition() noexcept
   {
-    const float quietNan = std::numeric_limits<float>::quiet_NaN();
-    return Wm3::Vector3<float>(quietNan, quietNan, quietNan);
+    return Invalid<Wm3::Vector3<float>>();
   }
 
   [[nodiscard]] UserEntity* FindSessionEntityById(CWldSession* session, std::int32_t entityId) noexcept;
 
+  /**
+   * Address: 0x008BED50 (FUN_008BED50, sub_8BED50)
+   *
+   * What it does:
+   * Resolves one command-target world position: returns entity position when
+   * target type is `Entity` and weak owner resolves, returns inline target
+   * position for `Position`, otherwise returns `Invalid<Wm3::Vector3f>()`.
+   */
   [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserCommandTargetView& target) noexcept
   {
     if (target.targetType == UserTargetType::Position) {
@@ -1540,6 +2722,14 @@ namespace
     return nullptr;
   }
 
+  /**
+   * Address: 0x008B4140 (FUN_008B4140)
+   *
+   * What it does:
+   * Scans command-issue events from newest to oldest and returns the most
+   * recent explicit command-type override; otherwise returns helper baseline
+   * command type.
+   */
   [[nodiscard]] EUnitCommandType ResolveHelperCommandType(const UserCommandIssueHelperRuntimeView& helper) noexcept
   {
     if (const UserCommandIssueEventRuntimeView* const event = FindLatestIssueEvent(helper, kCommandIssueEventSetType);
@@ -1548,6 +2738,57 @@ namespace
     }
 
     return helper.commandType;
+  }
+
+  /**
+   * Address: 0x008B43F0 (FUN_008B43F0, func_GetEntitiesUnderCursor)
+   *
+   * What it does:
+   * Rebuilds one cached command-issue cursor entity weak-set when dirty:
+   * seeds from stored cursor entity-id lanes, then replays queued issue events
+   * (`type 0` merge, `type 3` erase) into the cache and returns that set.
+   */
+  [[maybe_unused]] [[nodiscard]] UserCommandIssueWeakSetRuntimeView* GetEntitiesUnderCursor(
+    UserCommandIssueCursorEntityCacheRuntimeView* const helper
+  ) noexcept
+  {
+    if (helper == nullptr) {
+      return nullptr;
+    }
+
+    if (helper->cursorEntityCacheDirty != 0u) {
+      helper->cursorEntityCacheDirty = 0u;
+      ClearIssueWeakSetKeepHead(helper->cursorEntitySet);
+
+      for (EntId* entityIdCursor = helper->cursorEntityIdsBegin; entityIdCursor != helper->cursorEntityIdsEnd;
+           ++entityIdCursor) {
+        UserEntity* const entity = FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(*entityIdCursor));
+        AddIssueWeakSetEntity(helper->cursorEntitySet, entity);
+      }
+
+      const std::uint32_t eventEnd = helper->eventStart + helper->eventCount;
+      for (std::uint32_t eventCursor = helper->eventStart; eventCursor != eventEnd; ++eventCursor) {
+        std::uint32_t eventSlot = eventCursor;
+        if (helper->eventWrapBase <= eventCursor) {
+          eventSlot = eventCursor - helper->eventWrapBase;
+        }
+
+        UserCommandIssueEventEntitySetRuntimeView* const event =
+          (helper->eventSlots != nullptr) ? helper->eventSlots[eventSlot] : nullptr;
+        if (event == nullptr) {
+          continue;
+        }
+
+        if (event->eventType == 3u) {
+          EraseIssueWeakSetEntities(helper->cursorEntitySet, event->entitySet);
+        } else if (event->eventType == 0u) {
+          PruneIssueWeakSetTombstones(helper->cursorEntitySet);
+          MergeIssueWeakSetEntities(helper->cursorEntitySet, event->entitySet);
+        }
+      }
+    }
+
+    return &helper->cursorEntitySet;
   }
 
   [[nodiscard]] Wm3::Vector3<float>
@@ -1568,6 +2809,13 @@ namespace
       || commandType == EUnitCommandType::UNITCOMMAND_Upgrade;
   }
 
+  /**
+   * Address: 0x008B4220 (FUN_008B4220)
+   *
+   * What it does:
+   * Resolves one effective queued-build count from helper baseline count and
+   * queued increase/decrease issue events.
+   */
   [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelperRuntimeView& helper) noexcept
   {
     std::int32_t count = helper.baseCount;
@@ -1608,6 +2856,74 @@ namespace
     return count;
   }
 
+  FactoryQueueDisplayItemRuntime::FactoryQueueDisplayItemRuntime() noexcept
+    : blueprintId()
+    , count(0)
+    , commandId{}
+    , auxBufferBegin(nullptr)
+    , auxBufferEnd(nullptr)
+    , auxBufferCapacity(nullptr)
+  {
+  }
+
+  /**
+   * Address: 0x00835D50 (FUN_00835D50)
+   *
+   * What it does:
+   * Builds one queue-display item from blueprint-id and count lanes, zeroing
+   * trailing auxiliary storage pointers.
+   */
+  FactoryQueueDisplayItemRuntime::FactoryQueueDisplayItemRuntime(
+    const msvc8::string& sourceBlueprintId,
+    const std::int32_t sourceCount
+  )
+    : blueprintId(sourceBlueprintId)
+    , count(sourceCount)
+    , commandId{}
+    , auxBufferBegin(nullptr)
+    , auxBufferEnd(nullptr)
+    , auxBufferCapacity(nullptr)
+  {
+  }
+
+  /**
+   * Address: 0x00836040 (FUN_00836040)
+   *
+   * What it does:
+   * Releases one queue-display item's auxiliary buffer lane and clears pointer
+   * bounds before string teardown.
+   */
+  FactoryQueueDisplayItemRuntime::~FactoryQueueDisplayItemRuntime() noexcept
+  {
+    if (auxBufferBegin != nullptr) {
+      operator delete[](auxBufferBegin);
+    }
+    auxBufferBegin = nullptr;
+    auxBufferEnd = nullptr;
+    auxBufferCapacity = nullptr;
+  }
+
+  /**
+   * Address: 0x00836EF0 (FUN_00836EF0)
+   *
+   * What it does:
+   * Appends one queue-display item to the global factory queue snapshot.
+   */
+  void AppendFactoryQueueDisplayItem(
+    msvc8::vector<FactoryQueueDisplayItemRuntime>& queueItems,
+    const FactoryQueueDisplayItemRuntime& item
+  )
+  {
+    queueItems.push_back(item);
+  }
+
+  /**
+   * Address: 0x00835DF0 (FUN_00835DF0)
+   *
+   * What it does:
+   * Rebuilds the current factory queue-display snapshot from a unit's command
+   * queue, coalescing adjacent blueprint ids and updating count/cmd-id lanes.
+   */
   void RebuildCurrentFactoryBuildQueue(UserUnit* const userUnit)
   {
     sCurrentFactoryBuildQueue.clear();
@@ -1651,11 +2967,9 @@ namespace
         continue;
       }
 
-      FactoryQueueDisplayItemRuntime item{};
-      item.blueprintId = blueprint->mBlueprintId;
-      item.count = commandCount;
+      FactoryQueueDisplayItemRuntime item(blueprint->mBlueprintId, commandCount);
       item.commandId = helper->commandId;
-      sCurrentFactoryBuildQueue.push_back(item);
+      AppendFactoryQueueDisplayItem(sCurrentFactoryBuildQueue, item);
     }
   }
 
@@ -1803,6 +3117,98 @@ namespace
     const float dx = to.x - from.x;
     const float dz = to.z - from.z;
     return std::sqrt((dx * dx) + (dz * dz));
+  }
+
+  /**
+   * Address: 0x008528B0 (FUN_008528B0)
+   *
+   * What it does:
+   * Copies one contiguous `Vector3<float>` range `[sourceBegin, sourceEnd)`
+   * into destination storage and returns one-past the copied destination lane.
+   */
+  [[maybe_unused]] Wm3::Vector3<float>* CopyVector3RangeNullable(
+    Wm3::Vector3<float>* destination,
+    const Wm3::Vector3<float>* const sourceBegin,
+    const Wm3::Vector3<float>* const sourceEnd
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+    for (const Wm3::Vector3<float>* source = sourceBegin; source != sourceEnd; ++source) {
+      if (destinationAddress != 0u) {
+        auto* const out = reinterpret_cast<Wm3::Vector3<float>*>(destinationAddress);
+        out->x = source->x;
+        out->y = source->y;
+        out->z = source->z;
+      }
+      destinationAddress += sizeof(Wm3::Vector3<float>);
+    }
+
+    return reinterpret_cast<Wm3::Vector3<float>*>(destinationAddress);
+  }
+
+  /**
+   * Address: 0x008526A0 (FUN_008526A0)
+   *
+   * What it does:
+   * Stdcall adapter lane that forwards one `Vector3<float>` range copy as
+   * `(sourceBegin, sourceEnd, destination)`.
+   */
+  [[maybe_unused]] Wm3::Vector3<float>* __stdcall CopyVector3RangeNullableStdcallAdapterA(
+    const Wm3::Vector3<float>* const sourceBegin,
+    const Wm3::Vector3<float>* const sourceEnd,
+    Wm3::Vector3<float>* const destination
+  ) noexcept
+  {
+    return CopyVector3RangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00852750 (FUN_00852750)
+   *
+   * What it does:
+   * Cdecl adapter lane that forwards one `Vector3<float>` range copy as
+   * `(sourceBegin, sourceEnd, destination)`.
+   */
+  [[maybe_unused]] Wm3::Vector3<float>* CopyVector3RangeNullableCdeclAdapterA(
+    const Wm3::Vector3<float>* const sourceBegin,
+    const Wm3::Vector3<float>* const sourceEnd,
+    Wm3::Vector3<float>* const destination
+  ) noexcept
+  {
+    return CopyVector3RangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00852800 (FUN_00852800)
+   *
+   * What it does:
+   * Secondary cdecl compatibility lane that forwards one `Vector3<float>` range
+   * copy into `CopyVector3RangeNullable(...)`.
+   */
+  [[maybe_unused]] Wm3::Vector3<float>* CopyVector3RangeNullableCdeclAdapterB(
+    const Wm3::Vector3<float>* const sourceBegin,
+    const Wm3::Vector3<float>* const sourceEnd,
+    Wm3::Vector3<float>* const destination
+  ) noexcept
+  {
+    return CopyVector3RangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x00852850 (FUN_00852850)
+   * Address: 0x0085FF50 (FUN_0085FF50)
+   *
+   * What it does:
+   * Third cdecl compatibility lane that forwards one `Vector3<float>` range
+   * copy into `CopyVector3RangeNullable(...)`.
+   */
+  [[maybe_unused]] Wm3::Vector3<float>* CopyVector3RangeNullableCdeclAdapterC(
+    const Wm3::Vector3<float>* const sourceBegin,
+    const Wm3::Vector3<float>* const sourceEnd,
+    Wm3::Vector3<float>* const destination
+  ) noexcept
+  {
+    return CopyVector3RangeNullable(destination, sourceBegin, sourceEnd);
   }
 
   [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
@@ -1985,6 +3391,18 @@ namespace
     static CScrLuaInitFormSet fallbackSet("user");
     return fallbackSet;
   }
+
+  /**
+   * Address: 0x008C1410 (FUN_008C1410)
+   *
+   * What it does:
+   * Emits one fixed warning when the focus-army-damaged Lua callback throws.
+   */
+  void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept
+  {
+    const char* const message = exception.what() != nullptr ? exception.what() : "";
+    gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnFocusArmyUnitDamaged': %s", message);
+  }
 } // namespace
 
 CScrLuaMetatableFactory<UserUnit> CScrLuaMetatableFactory<UserUnit>::sInstance{};
@@ -1997,6 +3415,43 @@ CScrLuaMetatableFactory<UserUnit>& CScrLuaMetatableFactory<UserUnit>::Instance()
 {
   return sInstance;
 }
+
+/**
+ * Address: 0x008C63B0 (FUN_008C63B0)
+ *
+ * What it does:
+ * Rebinds the startup metatable-factory index lane for
+ * `CScrLuaMetatableFactory<UserUnit>` and returns that singleton.
+ */
+namespace moho
+{
+  /**
+   * Address: 0x008C60F0 (FUN_008C60F0)
+   *
+   * What it does:
+   * Returns cached `UserUnit` metatable object from Lua object-factory
+   * storage.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* func_GetUserUnitFactory(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<UserUnit>::Instance().Get(state);
+    return object;
+  }
+
+  CScrLuaMetatableFactory<UserUnit>* startup_CScrLuaMetatableFactory_UserUnit_Index()
+  {
+    auto& instance = CScrLuaMetatableFactory<UserUnit>::Instance();
+    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
+    return &instance;
+  }
+} // namespace moho
 
 /**
  * Address: 0x008C5CD0 (FUN_008C5CD0, Moho::CScrLuaMetatableFactory<Moho::UserUnit>::Create)
@@ -2177,14 +3632,14 @@ void UserUnit::Tick(const std::int32_t seqNo)
       auto& idleSets = GetUserArmyIdleSetView(army);
       if (mIsEngineer) {
         if (isQueueEmpty) {
-          (void)InsertWeakEntitySet(idleSets.engineers, entityView);
+          (void)InsertIdleEngineerWeakSetEntry(this, army);
         } else {
           (void)EraseWeakEntitySet(idleSets.engineers, entityView);
         }
       }
       if (mIsFactory) {
         if (isQueueEmpty) {
-          (void)InsertWeakEntitySet(idleSets.factories, entityView);
+          (void)InsertIdleFactoryWeakSetEntry(this, army);
         } else {
           (void)EraseWeakEntitySet(idleSets.factories, entityView);
         }
@@ -2239,7 +3694,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
 }
 
 /**
- * Address: 0x008B8EB0 (FUN_008B8EB0, ?UpdateEntityData@UserEntity@Moho@@UAEXABUSSTIEntityVariableData@2@@Z)
+  * Alias of FUN_008B8EB0 (non-canonical helper lane).
  *
  * What it does:
  * For UserUnit instances, forwards replicated variable-data updates to the
@@ -2331,7 +3786,7 @@ std::int32_t UserUnit::GetFactoryCommandQueue2() const
 }
 
 /**
- * Address: 0x008B8530 (FUN_008B8530)
+  * Alias of FUN_008B8530 (non-canonical helper lane).
  *
  * What it does:
  * Returns replicated UI-dirty state from UserEntity variable-data bytes.
@@ -2414,7 +3869,50 @@ void UserUnit::NotifyFocusArmyUnitDamaged()
 
   IUnit* const iunitBridge = GetIUnitBridge(this);
   const LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
-  callback.Call_Object(unitObject);
+  try {
+    callback.Call_Object(unitObject);
+  } catch (const std::exception& exception) {
+    WarnFocusArmyUnitDamagedCallbackError(exception);
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnFocusArmyUnitDamaged': unknown exception");
+  }
+}
+
+/**
+ * Address: 0x0083EEC0 (FUN_0083EEC0, moho::UserUnit::DoOnDetectAdjacencyBonusFor)
+ *
+ * What it does:
+ * Invokes `/lua/ui/game/gamemain.lua:OnDetectAdjacencyBonus(unitObject, blueprintObject)`
+ * and returns the callback boolean result.
+ */
+bool UserUnit::DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* const blueprint)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || blueprint == nullptr) {
+    return false;
+  }
+
+  LuaPlus::LuaObject gameMainModule = SCR_Import(session->mState, "/lua/ui/game/gamemain.lua");
+  LuaPlus::LuaObject onDetectAdjacencyBonus = gameMainModule["OnDetectAdjacencyBonus"];
+  LuaPlus::LuaFunction callback(onDetectAdjacencyBonus);
+
+  const LuaPlus::LuaObject blueprintObject = blueprint->GetLuaBlueprint(session->mState);
+  IUnit* const iunitBridge = GetIUnitBridge(this);
+  const LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
+
+  try {
+    const LuaPlus::LuaObject callbackResult = callback.Call_Obj2_Obj(unitObject, blueprintObject);
+    return callbackResult.GetBoolean();
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/game/gamemain.lua:OnDetectAdjacencyBonus': %s",
+      exception.what() != nullptr ? exception.what() : "<unknown>"
+    );
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnDetectAdjacencyBonus': %s", "<unknown>");
+  }
+
+  return false;
 }
 
 /**
@@ -2843,6 +4341,143 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
 }
 
 /**
+ * Address: 0x008C1880 (FUN_008C1880, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
+ *
+ * What it does:
+ * Runs world-space placement validation, then rejects placements that overlap
+ * visible static/dead unit skirts or queued mobile-build command skirts.
+ */
+bool moho::USERUNIT_CanBeBuiltAt(
+  CWldSession& session,
+  const RUnitBlueprint* const buildBlueprint,
+  const SCoordsVec2& buildPosition,
+  const bool allowCommandOverlap,
+  SOccupationResult* const buildInfo,
+  const UserCommand* const ignoredCommand
+)
+{
+  (void)allowCommandOverlap;
+
+  auto* const map = reinterpret_cast<STIMap*>(session.mWldMap->mTerrainRes->mPlayableRectSource);
+  auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.px);
+  if (!OCCUPY_Check(*map, *buildBlueprint, buildPosition, *resources, *buildInfo)) {
+    return false;
+  }
+
+  const SCoordsVec2 candidatePosition{buildInfo->pos.x, buildInfo->pos.z};
+  const gpg::Rect2f candidateSkirt = buildBlueprint->GetSkirtRect(candidatePosition);
+  const gpg::Rect2i& playableRect = map->mPlayableRect;
+  if (static_cast<float>(playableRect.x0 + 2) >= candidateSkirt.x0
+      || static_cast<float>(playableRect.z0 + 2) >= candidateSkirt.z0
+      || candidateSkirt.x1 >= static_cast<float>(playableRect.x1 - 2)
+      || candidateSkirt.z1 >= static_cast<float>(playableRect.z1 - 2)) {
+    return false;
+  }
+
+  Wm3::AxisAlignedBox3f overlapQuery{};
+  overlapQuery.Min.x = candidateSkirt.x0 - 8.0f;
+  overlapQuery.Min.y = -std::numeric_limits<float>::max();
+  overlapQuery.Min.z = candidateSkirt.z0 - 8.0f;
+  overlapQuery.Max.x = candidateSkirt.x1 + 8.0f;
+  overlapQuery.Max.y = std::numeric_limits<float>::max();
+  overlapQuery.Max.z = candidateSkirt.z1 + 8.0f;
+
+  constexpr std::uint32_t kIntelVisibleMask = 0x08u;
+  gpg::fastvector_n<UserEntity*, 100> nearbyUnits{};
+  auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
+  spatialStorage->CollectInBox(nearbyUnits, overlapQuery);
+
+  for (UserEntity* const nearbyEntity : nearbyUnits) {
+    UserUnit* const nearbyUnit = nearbyEntity != nullptr ? nearbyEntity->IsUserUnit() : nullptr;
+    if (nearbyUnit == nullptr || (nearbyUnit->mIntelStateFlags & kIntelVisibleMask) == 0u) {
+      continue;
+    }
+
+    const IUnit* const iunitBridge = GetIUnitBridge(nearbyUnit);
+    const RUnitBlueprint* const nearbyBlueprint = iunitBridge->GetBlueprint();
+    if (!nearbyBlueprint->IsMobile() || iunitBridge->IsDead()) {
+      gpg::Rect2f nearbySkirt{};
+      if (nearbyUnit->GetSkirt(&nearbySkirt)->Overlaps(candidateSkirt)) {
+        return false;
+      }
+    }
+  }
+
+  auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session.mSessionRes1);
+  if (commandManager == nullptr || commandManager->commandIssueMap.head == nullptr) {
+    return true;
+  }
+
+  SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
+  SessionCommandIssueMapNodeView* const mapHead = issueMap.head;
+  for (SessionCommandIssueMapNodeView* node = mapHead->left;
+       node != nullptr && node != mapHead;
+       node = NextSessionCommandIssueNode(node, mapHead)) {
+    UserCommandIssueHelperRuntimeView* const helper = node->value;
+    if (helper == nullptr || ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+      continue;
+    }
+
+    if (ignoredCommand != nullptr && reinterpret_cast<const UserCommand*>(helper) == ignoredCommand) {
+      continue;
+    }
+
+    gpg::RRef buildBlueprintRef{};
+    (void)gpg::RRef_REntityBlueprint(
+      &buildBlueprintRef,
+      reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
+    );
+    const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::GetPointerType());
+    const auto* const queuedBuildBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
+    if (queuedBuildBlueprint == nullptr) {
+      continue;
+    }
+
+    const Wm3::Vector3<float> queuedTarget = ResolveHelperTargetPosition(*helper, &session);
+    const SCoordsVec2 queuedPosition{queuedTarget.x, queuedTarget.z};
+    const gpg::Rect2f queuedSkirt = queuedBuildBlueprint->GetSkirtRect(queuedPosition);
+    if (queuedSkirt.Overlaps(candidateSkirt)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Address: 0x008C1BC0 (FUN_008C1BC0, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSOCellPos@1@_NPAUSBuildInfo@1@@Z)
+ *
+ * What it does:
+ * Converts one cell-origin placement probe into world-space center
+ * coordinates and forwards to the world-space buildability path.
+ */
+bool moho::USERUNIT_CanBeBuiltAt(
+  CWldSession& session,
+  const RUnitBlueprint* const buildBlueprint,
+  const SOCellPos& cellPosition,
+  const bool allowCommandOverlap,
+  SOccupationResult* const buildInfo
+)
+{
+  const float halfSizeX = static_cast<float>(buildBlueprint->mFootprint.mSizeX) * 0.5f;
+  const float halfSizeZ = static_cast<float>(buildBlueprint->mFootprint.mSizeZ) * 0.5f;
+
+  const SCoordsVec2 buildPosition{
+    static_cast<float>(cellPosition.x) + halfSizeX,
+    static_cast<float>(cellPosition.z) + halfSizeZ,
+  };
+
+  return USERUNIT_CanBeBuiltAt(
+    session,
+    buildBlueprint,
+    buildPosition,
+    allowCommandOverlap,
+    buildInfo,
+    nullptr
+  );
+}
+
+/**
  * Address: 0x008C1430 (FUN_008C1430, ?USERUNIT_CanOccupy@Moho@@YA_NAAVCWldSession@1@ABUSFootprint@1@AAUSOCellPos@1@@Z)
  *
  * What it does:
@@ -2958,6 +4593,49 @@ bool moho::USERUNIT_WithinBuildDistance(
   }
 
   return true;
+}
+
+/**
+ * Address: 0x008C1C30 (FUN_008C1C30, ?USERUNIT_GetBounds@Moho@@YA?AV?$AxisAlignedBox3@M@Wm3@@PBVRUnitBlueprint@1@ABV?$Vector3@M@3@@Z)
+ *
+ * What it does:
+ * Builds one world-space unit bounds AABB from collision offsets/sizes for
+ * mobile blueprints, and from skirt-rectangle extents for non-mobile
+ * blueprints.
+ */
+Wm3::AxisAlignedBox3f moho::USERUNIT_GetBounds(
+  const RUnitBlueprint* const unitBlueprint,
+  const Wm3::Vector3f& worldPosition
+)
+{
+  Wm3::AxisAlignedBox3f bounds{};
+
+  if (unitBlueprint->IsMobile()) {
+    const float minX =
+      (worldPosition.x + unitBlueprint->mCollisionOffsetX) - (unitBlueprint->mSizeX * 0.5f);
+    const float minY = worldPosition.y + unitBlueprint->mCollisionOffsetY;
+    const float minZ =
+      (worldPosition.z + unitBlueprint->mCollisionOffsetZ) - (unitBlueprint->mSizeZ * 0.5f);
+
+    bounds.Min.x = minX;
+    bounds.Min.y = minY;
+    bounds.Min.z = minZ;
+    bounds.Max.x = minX + unitBlueprint->mSizeX;
+    bounds.Max.y = minY + unitBlueprint->mSizeY;
+    bounds.Max.z = minZ + unitBlueprint->mSizeZ;
+    return bounds;
+  }
+
+  const SCoordsVec2 footprintPosition{worldPosition.x, worldPosition.z};
+  const gpg::Rect2f skirtRect = unitBlueprint->GetSkirtRect(footprintPosition);
+
+  bounds.Min.x = skirtRect.x0;
+  bounds.Min.y = worldPosition.y;
+  bounds.Min.z = skirtRect.z0;
+  bounds.Max.x = skirtRect.x1;
+  bounds.Max.y = worldPosition.y + unitBlueprint->mSizeY;
+  bounds.Max.z = skirtRect.z1;
+  return bounds;
 }
 
 /**

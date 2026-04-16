@@ -7,10 +7,14 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
+#include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
@@ -20,6 +24,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/task/CCommandTask.h"
@@ -30,6 +35,7 @@
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 
 namespace moho
 {
@@ -141,6 +147,45 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CUnitMeleeAttackTargetTask));
       moho::CUnitMeleeAttackTargetTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAiTargetType()
+  {
+    gpg::RType* type = moho::CAiTarget::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CAiTarget));
+      moho::CAiTarget::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSOCellPosType()
+  {
+    gpg::RType* type = moho::SOCellPos::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SOCellPos));
+      moho::SOCellPos::sType = type;
     }
     return type;
   }
@@ -970,6 +1015,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x005F42C0 (FUN_005F42C0, CUnitMeleeAttackTargetTask::RelinkAiAttackerListener)
+   *
+   * What it does:
+   * Unlinks this task's attacker-listener node from its current intrusive
+   * list and relinks it before `attackerListenerHead`.
+   */
+  void CUnitMeleeAttackTargetTask::RelinkAiAttackerListener(Broadcaster* const attackerListenerHead)
+  {
+    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
+    runtime->mAiAttackerListenerLink.ListUnlink();
+    runtime->mAiAttackerListenerLink.ListLinkBefore(attackerListenerHead);
+  }
+
+  /**
    * Address: 0x00615CA0 (FUN_00615CA0)
    *
    * What it does:
@@ -1364,10 +1423,7 @@ namespace moho
 
       case TASKSTATE_Starting:
         if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-          if (Broadcaster* const attackerListenerHead = AiAttackerListenerHead(attacker); attackerListenerHead != nullptr)
-          {
-            runtime->mAiAttackerListenerLink.ListLinkBefore(attackerListenerHead);
-          }
+          RelinkAiAttackerListener(AiAttackerListenerHead(attacker));
         }
         RefreshMeleeNavigationGoal();
         commandTask->mTaskState = TASKSTATE_Processing;
@@ -1475,6 +1531,135 @@ namespace moho
   }
 
   /**
+   * Address: 0x00617D00 (FUN_00617D00)
+   *
+   * What it does:
+   * Deserializes base command-task state, melee-task pointer lanes, target
+   * payload, navigation flags, destination cell, and planted-state lane.
+   */
+  void CUnitMeleeAttackTargetTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
+    CCommandTask* const commandTask = AsCommandTask(runtime);
+    const gpg::RRef ownerRef{};
+
+    archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
+    archive->ReadPointer_CCommandTask(&runtime->mDispatchTask, &ownerRef);
+    archive->ReadPointer_CUnitCommand(&runtime->mCommand, &ownerRef);
+
+    IFormationInstance* formationBase = static_cast<IFormationInstance*>(runtime->mFormation);
+    archive->ReadPointer_IFormationInstance(&formationBase, &ownerRef);
+    runtime->mFormation = static_cast<CAiFormationInstance*>(formationBase);
+
+    archive->Read(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
+    archive->Read(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
+
+    bool hasMobileTarget = runtime->mHasMobileTarget;
+    archive->ReadBool(&hasMobileTarget);
+    runtime->mHasMobileTarget = hasMobileTarget;
+
+    bool ignoreFormationUpdates = runtime->mIgnoreFormationUpdates;
+    archive->ReadBool(&ignoreFormationUpdates);
+    runtime->mIgnoreFormationUpdates = ignoreFormationUpdates;
+
+    bool needsNavigatorGoalUpdate = runtime->mNeedsNavigatorGoalUpdate;
+    archive->ReadBool(&needsNavigatorGoalUpdate);
+    runtime->mNeedsNavigatorGoalUpdate = needsNavigatorGoalUpdate;
+
+    archive->Read(CachedSOCellPosType(), &runtime->mDestination, ownerRef);
+
+    bool planted = runtime->mPlanted;
+    archive->ReadBool(&planted);
+    runtime->mPlanted = planted;
+  }
+
+  /**
+   * Address: 0x00617E70 (FUN_00617E70)
+   *
+   * What it does:
+   * Serializes base command-task state, melee-task pointer lanes, target
+   * payload, navigation flags, destination cell, and planted-state lane.
+   */
+  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
+    CCommandTask* const commandTask = AsCommandTask(runtime);
+    const gpg::RRef ownerRef{};
+
+    archive->Write(CachedCCommandTaskType(), commandTask, ownerRef);
+
+    gpg::RRef pointerRef{};
+    (void)gpg::RRef_CCommandTask(&pointerRef, runtime->mDispatchTask);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    (void)gpg::RRef_CUnitCommand(&pointerRef, runtime->mCommand);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(runtime->mFormation));
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
+    archive->Write(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
+    archive->WriteBool(runtime->mHasMobileTarget);
+    archive->WriteBool(runtime->mIgnoreFormationUpdates);
+    archive->WriteBool(runtime->mNeedsNavigatorGoalUpdate);
+    archive->Write(CachedSOCellPosType(), &runtime->mDestination, ownerRef);
+    archive->WriteBool(runtime->mPlanted);
+  }
+
+  /**
+   * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)
+   *
+   * What it does:
+   * Load-callback thunk that forwards one melee-task serializer lane into
+   * `CUnitMeleeAttackTargetTask::MemberDeserialize`.
+   */
+  void CUnitMeleeAttackTargetTaskSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const task =
+      reinterpret_cast<CUnitMeleeAttackTargetTask*>(static_cast<std::uintptr_t>(objectPtr));
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00615400 (FUN_00615400, Moho::CUnitMeleeAttackTargetTaskSerializer::Serialize)
+   *
+   * What it does:
+   * Save-callback thunk that forwards one melee-task serializer lane into
+   * `CUnitMeleeAttackTargetTask::MemberSerialize`.
+   */
+  void CUnitMeleeAttackTargetTaskSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    auto* const task =
+      reinterpret_cast<CUnitMeleeAttackTargetTask*>(static_cast<std::uintptr_t>(objectPtr));
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
+  }
+
+  /**
    * Address: 0x006177B0 (FUN_006177B0)
    *
    * What it does:
@@ -1499,6 +1684,24 @@ namespace moho
 namespace gpg
 {
   /**
+   * Address: 0x00617B00 (FUN_00617B00, reflection pair-pack thunk alias)
+   *
+   * What it does:
+   * Builds one `CUnitMeleeAttackTargetTask` reflection reference then writes
+   * the pair into caller-provided `RRef` storage.
+   */
+  [[maybe_unused]] gpg::RRef* PackCUnitMeleeAttackTargetTaskRefPair(
+    moho::CUnitMeleeAttackTargetTask* const value,
+    gpg::RRef* const outPair
+  )
+  {
+    gpg::RRef typedRef{};
+    (void)gpg::RRef_CUnitMeleeAttackTargetTask(&typedRef, value);
+    *outPair = typedRef;
+    return outPair;
+  }
+
+  /**
    * Address: 0x00617B50 (FUN_00617B50, gpg::RRef_CUnitMeleeAttackTargetTask)
    *
    * What it does:
@@ -1519,3 +1722,60 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace
+{
+  moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime&
+  AsSerSaveLoadHelperListRuntime(moho::CUnitMeleeAttackTargetTaskSerializer& serializer) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&serializer);
+  }
+
+  /**
+   * Address: 0x00615420 (FUN_00615420)
+   *
+   * What it does:
+   * Initializes startup helper links plus callback lanes for global
+   * `CUnitMeleeAttackTargetTaskSerializer` storage and returns the helper.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::CUnitMeleeAttackTargetTaskSerializer* InitializeCUnitMeleeAttackTargetTaskSerializerStartupThunk()
+  {
+    gpg::SerHelperBase* const self =
+      reinterpret_cast<gpg::SerHelperBase*>(&gCUnitMeleeAttackTargetTaskSerializer.mHelperNext);
+    gCUnitMeleeAttackTargetTaskSerializer.mHelperPrev = self;
+    gCUnitMeleeAttackTargetTaskSerializer.mHelperNext = self;
+    gCUnitMeleeAttackTargetTaskSerializer.mDeserialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize;
+    gCUnitMeleeAttackTargetTaskSerializer.mSerialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Serialize;
+    return &gCUnitMeleeAttackTargetTaskSerializer;
+  }
+
+  /**
+   * Address: 0x00615450 (FUN_00615450)
+   *
+   * What it does:
+   * Unlinks `CUnitMeleeAttackTargetTaskSerializer` helper node from the
+   * intrusive serializer-helper list and restores self-links.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(
+      AsSerSaveLoadHelperListRuntime(gCUnitMeleeAttackTargetTaskSerializer)
+    );
+  }
+
+  /**
+   * Address: 0x00615480 (FUN_00615480)
+   *
+   * What it does:
+   * Performs the same intrusive-list unlink/self-link lane rewrite for
+   * `CUnitMeleeAttackTargetTaskSerializer` helper storage.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMeleeAttackTargetTaskSerializerNodeSecondary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(
+      AsSerSaveLoadHelperListRuntime(gCUnitMeleeAttackTargetTaskSerializer)
+    );
+  }
+} // namespace

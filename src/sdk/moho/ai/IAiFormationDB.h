@@ -25,6 +25,7 @@ namespace moho
   {
     Surface = 0,
     Air = 1,
+    Mixed = 2,
   };
 
   /**
@@ -89,6 +90,14 @@ namespace moho
   class IAiFormationDB
   {
   public:
+    /**
+     * Address: 0x0059C360 (FUN_0059C360)
+     *
+     * What it does:
+     * Initializes one IAiFormationDB interface subobject vtable lane.
+     */
+    IAiFormationDB();
+
     /**
      * Address: 0x0059A3D0 (FUN_0059A3D0)
      *

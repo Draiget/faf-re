@@ -71,7 +71,7 @@ namespace moho
     void OnDiskWatchEvent(const SDiskWatchEvent& event) override;
 
     /**
-     * Address: 0x004AA090 (FUN_004AA090)
+       * Address: 0x004AA090 (FUN_004AA090)
      *
      * What it does:
      * Marks factory bootstrap as active and drains pending startup hooks.
@@ -233,7 +233,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x004AA090 (FUN_004AA090)
+    * Alias of FUN_004AA090 (non-canonical helper lane).
    *
    * What it does:
    * Executes the startup pending-factory activation phase on the singleton.

@@ -10,8 +10,12 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
+#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
@@ -166,6 +170,46 @@ namespace
 
   static_assert(offsetof(UnitLayerTokenView, layerToken) == 0x120, "UnitLayerTokenView::layerToken offset must be 0x120");
 
+  /**
+   * Address: 0x005AD0D0 (FUN_005AD0D0)
+   *
+   * What it does:
+   * Writes one `(x, z)` word pair into a packed path-cell payload.
+   */
+  [[maybe_unused]] [[nodiscard]] HPathCell* WritePackedPathCellWordPair(
+    HPathCell* const outCell,
+    const std::uint16_t x,
+    const std::uint16_t z
+  ) noexcept
+  {
+    if (!outCell) {
+      return nullptr;
+    }
+
+    outCell->x = x;
+    outCell->z = z;
+    return outCell;
+  }
+
+  /**
+   * Address: 0x005AD190 (FUN_005AD190)
+   *
+   * What it does:
+   * Stores one alt-footprint mode flag byte on a unit/entity object.
+   */
+  [[maybe_unused]] [[nodiscard]] Unit* WriteUnitAltFootprintFlag(
+    Unit* const unit,
+    const std::uint8_t enabled
+  ) noexcept
+  {
+    if (!unit) {
+      return nullptr;
+    }
+
+    unit->mUseAltFootprint = enabled;
+    return unit;
+  }
+
   [[nodiscard]] bool HasVectorValue(const Wm3::Vector3f& vec) noexcept
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
@@ -228,6 +272,18 @@ namespace
     return packed;
   }
 
+  /**
+   * Address: 0x005B0880 (FUN_005B0880)
+   *
+   * What it does:
+   * Compares one pair of heading-delta lanes and returns true when the lane
+   * vectors differ.
+   */
+  [[nodiscard]] bool HeadingDeltaMismatch(const std::int32_t lhs[2], const std::int32_t rhs[2]) noexcept
+  {
+    return lhs[0] != rhs[0] || lhs[1] != rhs[1];
+  }
+
   [[nodiscard]] Broadcaster* NavigatorListenerNode(CAiPathNavigator& navigator) noexcept
   {
     return &navigator.mListenerLink;
@@ -266,6 +322,25 @@ namespace
   [[nodiscard]] Unit* GetOwningUnit(const CAiPathNavigator& navigator) noexcept
   {
     return navigator.mPathFinder ? navigator.mPathFinder->mUnit : nullptr;
+  }
+
+  [[nodiscard]] const COGrid* GetPathingGrid(const CAiPathNavigator& navigator) noexcept
+  {
+    const auto* const pathFinder = navigator.mPathFinder;
+    if (pathFinder && pathFinder->mOGrid) {
+      return pathFinder->mOGrid;
+    }
+
+    return navigator.mSim ? navigator.mSim->mOGrid : nullptr;
+  }
+
+  [[nodiscard]] const Sim* GetPathingSim(const CAiPathNavigator& navigator) noexcept
+  {
+    const auto* const pathFinder = navigator.mPathFinder;
+    if (pathFinder && pathFinder->mSim) {
+      return pathFinder->mSim;
+    }
+    return navigator.mSim;
   }
 
   [[nodiscard]] const SFootprint* GetActiveFootprint(const CAiPathNavigator& navigator) noexcept
@@ -310,6 +385,26 @@ namespace
     unit->UnitStateMask |= bits;
   }
 
+  /**
+   * Address: 0x005AD130 (FUN_005AD130)
+   *
+   * What it does:
+   * Resets one nav-path span to empty content while preserving allocated
+   * storage and base pointer ownership.
+   */
+  void ResetPathContent(SNavPath& path) noexcept
+  {
+    if (path.start != nullptr && path.finish != path.start) {
+      path.finish = path.start;
+    }
+  }
+
+  /**
+   * Address: 0x005AD370 (FUN_005AD370)
+   *
+   * What it does:
+   * Computes Euclidean cell-space distance between two packed path cells.
+   */
   [[nodiscard]] float CellDistance(const SOCellPos a, const SOCellPos b) noexcept
   {
     const float dx = static_cast<float>(static_cast<std::int32_t>(a.x) - static_cast<std::int32_t>(b.x));
@@ -324,29 +419,201 @@ namespace
     return dx + dz;
   }
 
-  [[nodiscard]] bool CanPathCellTransition(const CAiPathNavigator& navigator, const SOCellPos, const SOCellPos toCell)
+  /**
+   * Address: 0x005A9CF0 (FUN_005A9CF0)
+   *
+   * What it does:
+   * Returns active path-cell count when path storage is allocated; otherwise
+   * returns zero.
+   */
+  [[maybe_unused]] [[nodiscard]] std::int32_t CountPathCellsIfAllocated(const SNavPath& path) noexcept
   {
-    if (!navigator.mPathFinder) {
-      return false;
+    if (path.start == nullptr) {
+      return 0;
     }
-    return navigator.mPathFinder->CanTraverseCell(toCell);
+    return static_cast<std::int32_t>(path.finish - path.start);
   }
 
-  [[nodiscard]] bool CanReachCellFromCurrent(const CAiPathNavigator& navigator, const SOCellPos targetCell)
+  /**
+   * Address: 0x005AE170 (FUN_005AE170)
+   *
+   * What it does:
+   * Builds one cell projection from `toCell` toward `fromCell` by `distance`
+   * units using truncating scalar conversion semantics.
+   */
+  [[maybe_unused]]
+  [[nodiscard]] SOCellPos ProjectCellToward(const SOCellPos fromCell, const SOCellPos toCell, const float distance)
+  {
+    float deltaX = static_cast<float>(static_cast<std::int32_t>(fromCell.x) - static_cast<std::int32_t>(toCell.x));
+    float deltaZ = static_cast<float>(static_cast<std::int32_t>(fromCell.z) - static_cast<std::int32_t>(toCell.z));
+    const float lengthSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
+
+    if (lengthSquared != 0.0f) {
+      const float scale = distance / std::sqrt(lengthSquared);
+      deltaX *= scale;
+      deltaZ *= scale;
+    }
+
+    SOCellPos out{};
+    out.x = static_cast<std::int16_t>(static_cast<std::int32_t>(toCell.x) + static_cast<std::int32_t>(deltaX));
+    out.z = static_cast<std::int16_t>(static_cast<std::int32_t>(toCell.z) + static_cast<std::int32_t>(deltaZ));
+    return out;
+  }
+
+  /**
+   * Address: 0x005AD830 (FUN_005AD830)
+   *
+   * What it does:
+   * Removes one consumed prefix from the active path span and updates node-index
+   * tracking with the same clamp semantics as the binary.
+   */
+  std::int32_t ConsumePathPrefix(CAiPathNavigator& navigator, std::int32_t requestedCount)
+  {
+    SOCellPos* const pathBegin = navigator.mPath.start;
+    std::int32_t pathCount = 0;
+    if (pathBegin) {
+      pathCount = static_cast<std::int32_t>(navigator.mPath.finish - pathBegin);
+    }
+
+    std::int32_t consumeCount = requestedCount;
+    if (consumeCount >= pathCount) {
+      consumeCount = pathCount;
+    }
+    if (consumeCount < 0) {
+      consumeCount = 0;
+    }
+
+    SOCellPos* readCursor = pathBegin ? (pathBegin + consumeCount) : nullptr;
+    if (pathBegin && readCursor && readCursor != pathBegin) {
+      SOCellPos* writeCursor = pathBegin;
+      while (readCursor != navigator.mPath.finish) {
+        *writeCursor = *readCursor;
+        ++writeCursor;
+        ++readCursor;
+      }
+      navigator.mPath.finish = writeCursor;
+    }
+
+    if (!navigator.mPath.start || navigator.mPath.finish == navigator.mPath.start) {
+      navigator.mPathRetryDelayFrames = 0;
+    }
+
+    const std::int32_t updatedIndex = navigator.mLastPathNodeIndex - consumeCount;
+    navigator.mLastPathNodeIndex = (updatedIndex <= -1) ? -1 : updatedIndex;
+    return updatedIndex;
+  }
+
+  /**
+   * Address: 0x005AFEC0 (FUN_005AFEC0)
+   *
+   * What it does:
+   * Appends one cell payload to a nav-path span, using the direct-capacity lane
+   * when storage is available.
+   */
+  void AppendPathCellFast(SNavPath& path, const SOCellPos& cell)
+  {
+    if (!path.start || path.finish >= path.capacity) {
+      path.AppendCell(cell);
+      return;
+    }
+
+    *path.finish = cell;
+    ++path.finish;
+  }
+
+  /**
+   * Address: 0x005AF4E0 (FUN_005AF4E0)
+   *
+   * What it does:
+   * Tests whether the navigator footprint can occupy `toCell` under current
+   * occupancy caps/path-layer rules, with the binary's long-step fallback gate.
+   */
+  [[nodiscard]] bool CanOccupyTargetCell(
+    const CAiPathNavigator& navigator, const SOCellPos fromCell, const SOCellPos toCell
+  )
+  {
+    const auto* const pathFinder = navigator.mPathFinder;
+    if (!pathFinder || !pathFinder->mUnit) {
+      return false;
+    }
+
+    if (ManhattanDistance(fromCell, toCell) > 1) {
+      return pathFinder->CanTraverseCell(toCell);
+    }
+
+    const auto* const grid = GetPathingGrid(navigator);
+    const auto* const sim = GetPathingSim(navigator);
+    if (!grid || !sim || !sim->mMapData) {
+      return false;
+    }
+
+    const SFootprint& footprint = pathFinder->mUnit->GetFootprint();
+    EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *sim->mMapData, toCell);
+    if (pathFinder->mPathLayerSelector == 8) {
+      const std::uint8_t masked = static_cast<std::uint8_t>(occupancyCaps) &
+        ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+      occupancyCaps = static_cast<EOccupancyCaps>(masked);
+    }
+
+    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*grid, toCell, footprint, occupancyCaps)) != 0u;
+  }
+
+  /**
+   * Address: 0x005AF670 (FUN_005AF670)
+   *
+   * What it does:
+   * Evaluates one start->end cell transition with the same mode gate lane used
+   * by the navigator direct-transition checks.
+   */
+  [[nodiscard]] bool CanPathCellTransition(
+    const CAiPathNavigator& navigator, const SOCellPos fromCell, const SOCellPos toCell
+  )
   {
     if (!navigator.mPathFinder) {
       return false;
     }
 
-    if (!CanPathCellTransition(navigator, navigator.mCurrentPos, targetCell)) {
+    const std::int32_t transitionMode = (navigator.mUseExtendedPathProbe != 0u) ? 2 : 1;
+    (void)transitionMode;
+    return CanOccupyTargetCell(navigator, fromCell, toCell);
+  }
+
+  /**
+   * Address: 0x005AF5B0 (FUN_005AF5B0)
+   *
+   * What it does:
+   * Projects one target cell into world-space, applies the long-step traversal
+   * gate, then validates occupancy at that target.
+   */
+  [[nodiscard]] bool CanReachCellFromCurrent(const CAiPathNavigator& navigator, const SOCellPos targetCell)
+  {
+    const auto* const pathFinder = navigator.mPathFinder;
+    if (!pathFinder || !pathFinder->mUnit) {
       return false;
     }
 
-    if (ManhattanDistance(navigator.mCurrentPos, targetCell) <= 1) {
-      return true;
+    const auto* const sim = GetPathingSim(navigator);
+    if (!sim || !sim->mMapData) {
+      return false;
     }
 
-    return navigator.mPathFinder->CanTraverseCell(targetCell);
+    const SFootprint& footprint = pathFinder->mUnit->GetFootprint();
+    const Wm3::Vector3f targetWorldPos = COORDS_ToWorldPos(
+      sim->mMapData,
+      targetCell,
+      static_cast<ELayer>(footprint.mOccupancyCaps),
+      footprint.mSizeX,
+      footprint.mSizeZ
+    );
+    const Wm3::Vector3f& unitWorldPos = pathFinder->mUnit->GetPosition();
+    const bool hasSegment = Wm3::Vector3f::Compare(&unitWorldPos, &targetWorldPos);
+
+    if (hasSegment && ManhattanDistance(navigator.mCurrentPos, targetCell) > 1 &&
+        !pathFinder->CanTraverseCell(targetCell)) {
+      return false;
+    }
+
+    return CanPathCellTransition(navigator, targetCell, targetCell);
   }
 
   [[nodiscard]] bool UpdateForwardProbeFlag(CAiPathNavigator& navigator)
@@ -356,12 +623,107 @@ namespace
       return false;
     }
 
-    const bool canOccupyCurrent = navigator.mPathFinder->CanTraverseCell(navigator.mCurrentPos);
+    const bool canOccupyCurrent = CanOccupyTargetCell(navigator, navigator.mCurrentPos, navigator.mCurrentPos);
     const bool canReachForward = CanReachCellFromCurrent(navigator, navigator.mCurrentPos);
     navigator.mHasForwardProbe = (canOccupyCurrent && canReachForward) ? 1u : 0u;
     return navigator.mHasForwardProbe != 0u;
   }
 
+  [[nodiscard]] bool IsUnderwaterRouteCellForUnit(const STIMap& map, const Unit& unit, const SOCellPos& targetCell)
+  {
+    const Wm3::Vector3f worldPos = COORDS_ToWorldPos(&map, targetCell, unit.GetFootprint());
+    return !map.AboveWater(worldPos);
+  }
+
+  /**
+   * Address: 0x005ADC70 (FUN_005ADC70)
+   *
+   * What it does:
+   * Selects alternate-footprint pathing for FAVORSWATER units when current and
+   * queued command destinations remain underwater for the coordinating group.
+   */
+  void UpdateWaterFavorAltFootprintMode(CAiPathNavigator& navigator)
+  {
+    constexpr const char* kWaterFavorCategory = "FAVORSWATER";
+
+    CAiPathFinder* const pathFinder = navigator.mPathFinder;
+    Unit* const ownerUnit = pathFinder ? pathFinder->mUnit : nullptr;
+    if (!ownerUnit || !ownerUnit->IsInCategory(kWaterFavorCategory)) {
+      return;
+    }
+
+    (void)WriteUnitAltFootprintFlag(ownerUnit, 0u);
+
+    const Sim* const sim = GetPathingSim(navigator);
+    const STIMap* const map = sim ? sim->mMapData : nullptr;
+    if (!map) {
+      return;
+    }
+
+    CUnitCommand* const currentCommand =
+      (ownerUnit->CommandQueue != nullptr) ? ownerUnit->CommandQueue->GetCurrentCommand() : nullptr;
+
+    if (!currentCommand) {
+      if (!map->AboveWater(ownerUnit->GetPosition())) {
+        const SOCellPos goalAnchorCell = GoalAnchorCell(navigator.mGoal);
+        if (IsUnderwaterRouteCellForUnit(*map, *ownerUnit, goalAnchorCell)) {
+          (void)WriteUnitAltFootprintFlag(ownerUnit, 1u);
+        }
+      }
+      return;
+    }
+
+    bool hasSurfaceTransitionUnit = false;
+    for (CScriptObject* const entry : currentCommand->mUnitSet.mVec) {
+      if (!SCommandUnitSet::IsUsableEntry(entry)) {
+        continue;
+      }
+
+      Unit* const candidateUnit = SCommandUnitSet::UnitFromEntry(entry);
+      if (!candidateUnit || candidateUnit->IsDead() || candidateUnit->DestroyQueued()) {
+        continue;
+      }
+
+      if (!candidateUnit->IsInCategory(kWaterFavorCategory)) {
+        continue;
+      }
+
+      SOCellPos currentCommandCell{};
+      (void)CUnitCommand::GetPosition(currentCommand, candidateUnit, &currentCommandCell);
+
+      const bool unitIsUnderwaterNow = !map->AboveWater(candidateUnit->GetPosition());
+      const bool commandCellUnderwater = IsUnderwaterRouteCellForUnit(*map, *candidateUnit, currentCommandCell);
+
+      if (unitIsUnderwaterNow && commandCellUnderwater) {
+        CUnitCommand* const nextCommand =
+          (candidateUnit->CommandQueue != nullptr) ? candidateUnit->CommandQueue->GetCurrentCommand() : nullptr;
+        if (!nextCommand || nextCommand == currentCommand) {
+          continue;
+        }
+
+        SOCellPos nextCommandCell{};
+        (void)CUnitCommand::GetPosition(nextCommand, candidateUnit, &nextCommandCell);
+        if (IsUnderwaterRouteCellForUnit(*map, *candidateUnit, nextCommandCell)) {
+          continue;
+        }
+      }
+
+      hasSurfaceTransitionUnit = true;
+      break;
+    }
+
+    if (!hasSurfaceTransitionUnit) {
+      (void)WriteUnitAltFootprintFlag(ownerUnit, 1u);
+    }
+  }
+
+  /**
+   * Address: 0x005AF360 (FUN_005AF360)
+   *
+   * What it does:
+   * Returns the longest direct-reachable prefix index that preserves heading
+   * continuity from the current cell into the active path span.
+   */
   [[nodiscard]] std::int32_t ComputeDirectPrefixSpan(CAiPathNavigator& navigator)
   {
     if (navigator.mPath.CountInt() <= 0) {
@@ -369,7 +731,7 @@ namespace
     }
 
     if (PackCell(navigator.mCurrentPos) == PackCell(navigator.mPath.start[0]) && navigator.mPath.CountInt() > 1) {
-      navigator.mPath.EraseFrontCells(1);
+      (void)ConsumePathPrefix(navigator, 1);
     }
 
     const std::int32_t pathSize = navigator.mPath.CountInt();
@@ -380,30 +742,34 @@ namespace
     const SOCellPos firstCell = navigator.mPath.start[0];
     if (std::abs(static_cast<std::int32_t>(firstCell.x) - static_cast<std::int32_t>(navigator.mCurrentPos.x)) > 1 ||
         std::abs(static_cast<std::int32_t>(firstCell.z) - static_cast<std::int32_t>(navigator.mCurrentPos.z)) > 1 ||
-        !CanPathCellTransition(navigator, navigator.mCurrentPos, firstCell) || !CanReachCellFromCurrent(navigator, firstCell)) {
+        !CanOccupyTargetCell(navigator, navigator.mCurrentPos, firstCell) ||
+        !CanReachCellFromCurrent(navigator, firstCell)) {
       return 0;
     }
 
     std::int32_t bestIndex = 0;
-    std::int32_t directionX = static_cast<std::int32_t>(firstCell.x) - static_cast<std::int32_t>(navigator.mCurrentPos.x);
-    std::int32_t directionZ = static_cast<std::int32_t>(firstCell.z) - static_cast<std::int32_t>(navigator.mCurrentPos.z);
+    const std::int32_t headingDelta[2] = {
+      static_cast<std::int32_t>(firstCell.x) - static_cast<std::int32_t>(navigator.mCurrentPos.x),
+      static_cast<std::int32_t>(firstCell.z) - static_cast<std::int32_t>(navigator.mCurrentPos.z),
+    };
 
     for (std::int32_t idx = 1; idx < pathSize; ++idx) {
       const SOCellPos prev = navigator.mPath.start[idx - 1];
       const SOCellPos cell = navigator.mPath.start[idx];
-      const std::int32_t nextDirectionX = static_cast<std::int32_t>(cell.x) - static_cast<std::int32_t>(prev.x);
-      const std::int32_t nextDirectionZ = static_cast<std::int32_t>(cell.z) - static_cast<std::int32_t>(prev.z);
-      if (nextDirectionX != directionX || nextDirectionZ != directionZ) {
+      const std::int32_t nextDelta[2] = {
+        static_cast<std::int32_t>(cell.x) - static_cast<std::int32_t>(prev.x),
+        static_cast<std::int32_t>(cell.z) - static_cast<std::int32_t>(prev.z),
+      };
+
+      if (HeadingDeltaMismatch(nextDelta, headingDelta)) {
         break;
       }
 
-      if (!CanPathCellTransition(navigator, navigator.mCurrentPos, cell) || !CanReachCellFromCurrent(navigator, cell)) {
+      if (!CanOccupyTargetCell(navigator, navigator.mCurrentPos, cell) || !CanReachCellFromCurrent(navigator, cell)) {
         break;
       }
 
       bestIndex = idx;
-      directionX = nextDirectionX;
-      directionZ = nextDirectionZ;
     }
 
     return bestIndex;
@@ -434,6 +800,25 @@ CAiPathNavigator* CAiPathNavigator::FromListenerLink(Broadcaster* const link) no
 const CAiPathNavigator* CAiPathNavigator::FromListenerLink(const Broadcaster* const link) noexcept
 {
   return Broadcaster::owner_from_member<CAiPathNavigator, Broadcaster, &CAiPathNavigator::mListenerLink>(link);
+}
+
+/**
+ * Address: 0x005AD5A0 (FUN_005AD5A0)
+ *
+ * What it does:
+ * Initializes one detached listener-link lane on `CAiPathNavigator`
+ * construction storage.
+ */
+[[maybe_unused]] CAiPathNavigator* InitializePathNavigatorListenerLane(
+  CAiPathNavigator* const navigatorStorage
+) noexcept
+{
+  if (navigatorStorage == nullptr) {
+    return nullptr;
+  }
+
+  navigatorStorage->mListenerLink.ListResetLinks();
+  return navigatorStorage;
 }
 
 /**
@@ -578,7 +963,7 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
       SetUnitPathBits(unit, kUnitPathFlag);
       const SOCellPos centerCell = GoalCenterCell(mGoal);
       if (CanPathCellTransition(*this, centerCell, centerCell)) {
-        mPath.AppendCell(centerCell);
+        AppendPathCellFast(mPath, centerCell);
       }
     }
 
@@ -710,9 +1095,7 @@ void CAiPathNavigator::ConfigureGoal(const SAiNavigatorGoal& goal, const bool ig
 void CAiPathNavigator::ResetPathState()
 {
   mTargetPos = mCurrentPos;
-  if (mPath.start) {
-    mPath.finish = mPath.start;
-  }
+  ResetPathContent(mPath);
 
   DetachListenerNode(*this);
 
@@ -777,8 +1160,13 @@ void CAiPathNavigator::RequestPath(const std::int32_t requestMode)
     return;
   }
 
-  mPathFinder->mAnchorCell.x = static_cast<std::uint16_t>(mCurrentPos.x);
-  mPathFinder->mAnchorCell.z = static_cast<std::uint16_t>(mCurrentPos.z);
+  UpdateWaterFavorAltFootprintMode(*this);
+
+  (void)WritePackedPathCellWordPair(
+    &mPathFinder->mAnchorCell,
+    static_cast<std::uint16_t>(mCurrentPos.x),
+    static_cast<std::uint16_t>(mCurrentPos.z)
+  );
   mPathFinder->SetGoal(mGoal);
   mPathFinder->mSearchType = AsSearchType(requestMode);
 
@@ -789,7 +1177,7 @@ void CAiPathNavigator::RequestPath(const std::int32_t requestMode)
     mState = AIPATHNAVSTATE_PathEvent3;
     AttachListenerNodeToPathFinder(*this);
   } else {
-    mPath.AppendCell(GoalAnchorCell(mGoal));
+    AppendPathCellFast(mPath, GoalAnchorCell(mGoal));
     mState = AIPATHNAVSTATE_FollowingLeader;
   }
 
@@ -808,7 +1196,7 @@ void CAiPathNavigator::RequestContinuationPath(std::int32_t requestMode)
   }
 
   if (PackCell(mPath.start[0]) == PackCell(mCurrentPos)) {
-    mPath.EraseFrontCells(1);
+    (void)ConsumePathPrefix(*this, 1);
     if (mPath.CountInt() <= 0) {
       ResetPathState();
       return;
@@ -821,7 +1209,7 @@ void CAiPathNavigator::RequestContinuationPath(std::int32_t requestMode)
     if (!canTraverseFirst || ManhattanDistance(firstCell, mCurrentPos) > 1) {
       break;
     }
-    mPath.EraseFrontCells(1);
+    (void)ConsumePathPrefix(*this, 1);
   }
 
   (void)UpdateForwardProbeFlag(*this);
@@ -842,8 +1230,11 @@ void CAiPathNavigator::RequestContinuationPath(std::int32_t requestMode)
   }
 
   mPathFinder->mSearchType = AsSearchType(requestMode);
-  mPathFinder->mAnchorCell.x = static_cast<std::uint16_t>(mCurrentPos.x);
-  mPathFinder->mAnchorCell.z = static_cast<std::uint16_t>(mCurrentPos.z);
+  (void)WritePackedPathCellWordPair(
+    &mPathFinder->mAnchorCell,
+    static_cast<std::uint16_t>(mCurrentPos.x),
+    static_cast<std::uint16_t>(mCurrentPos.z)
+  );
   mPathFinder->SetGoal(BuildSingleCellGoal(mPath.start[0]));
   mPathFinder->QueueSearch();
 
@@ -870,7 +1261,7 @@ void CAiPathNavigator::SetCurrentPosition(const Wm3::Vector3f& position)
  */
 void CAiPathNavigator::SetTargetPoint(const std::int32_t targetIndex)
 {
-  mPath.EraseFrontCells(targetIndex);
+  (void)ConsumePathPrefix(*this, targetIndex);
   if (mPath.CountInt() <= 0) {
     return;
   }
@@ -925,14 +1316,14 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
     }
 
     if (firstReachableIndex > 0) {
-      mPath.EraseFrontCells(firstReachableIndex - 1);
+      (void)ConsumePathPrefix(*this, firstReachableIndex - 1);
     }
     return false;
   }
 
   if (selectedIndex == 0 && furthestCandidateIndex > firstReachableIndex && mPath.CountInt() > 1 &&
       !CanPathCellTransition(*this, mPath.start[0], mPath.start[1]) && CellDistance(mCurrentPos, mTargetPos) < 10.0f) {
-    mPath.EraseFrontCells(1);
+    (void)ConsumePathPrefix(*this, 1);
     return false;
   }
 
@@ -977,7 +1368,7 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     if (CellDistance(mCurrentPos, first) < CellDistance(mCurrentPos, second) || !CanReachCellFromCurrent(*this, second)) {
       break;
     }
-    mPath.EraseFrontCells(1);
+    (void)ConsumePathPrefix(*this, 1);
   }
 
   if (mState != AIPATHNAVSTATE_HasPath && mState != AIPATHNAVSTATE_FollowingLeader) {
@@ -994,6 +1385,7 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
 
   const SOCellPos pathTail = mPath.finish[-1];
   if (PackCell(mCurrentPos) == PackCell(pathTail)) {
+    ResetPathContent(mPath);
     mState = AIPATHNAVSTATE_Idle;
     mPathRetryDelayFrames = 0;
     mTargetPos = mCurrentPos;
@@ -1037,6 +1429,7 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     }
 
     if (mNoProgressTickCount > 30) {
+      ResetPathContent(mPath);
       mState = AIPATHNAVSTATE_Idle;
       mPathRetryDelayFrames = 0;
       mTargetPos = mCurrentPos;

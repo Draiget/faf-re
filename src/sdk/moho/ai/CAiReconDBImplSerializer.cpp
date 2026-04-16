@@ -49,6 +49,26 @@ namespace
     return slot;
   }
 
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mNext != nullptr && serializer.mPrev != nullptr) {
+      serializer.mNext->mPrev = serializer.mPrev;
+      serializer.mPrev->mNext = serializer.mNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mNext = self;
+    serializer.mPrev = self;
+    return self;
+  }
+
   [[nodiscard]] SReconKeySerializer* AcquireSReconKeySerializer()
   {
     if (!gSReconKeySerializerConstructed) {
@@ -449,6 +469,36 @@ namespace
   }
 
   /**
+   * Address: 0x005C98D0 (FUN_005C98D0)
+   *
+   * What it does:
+   * Tail-thunk alias that forwards recon-db save lanes into
+   * `SerializeCAiReconDBImplMembers`.
+   */
+  [[maybe_unused]] void SerializeCAiReconDBImplMembersThunkA(
+    const CAiReconDBImpl* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCAiReconDBImplMembers(object, archive);
+  }
+
+  /**
+   * Address: 0x005CB6C0 (FUN_005CB6C0)
+   *
+   * What it does:
+   * Secondary tail-thunk alias that forwards recon-db save lanes into
+   * `SerializeCAiReconDBImplMembers`.
+   */
+  [[maybe_unused]] void SerializeCAiReconDBImplMembersThunkB(
+    const CAiReconDBImpl* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCAiReconDBImplMembers(object, archive);
+  }
+
+  /**
    * Address: 0x00BF7960 (FUN_00BF7960, cleanup_SReconKeyTypeInfo)
    *
    * What it does:
@@ -472,14 +522,35 @@ namespace
       return;
     }
 
-    SReconKeySerializer* const serializer = AcquireSReconKeySerializer();
-    if (serializer->mNext && serializer->mPrev) {
-      serializer->mNext->mPrev = serializer->mPrev;
-      serializer->mPrev->mNext = serializer->mNext;
+    (void)UnlinkSerializerNode(*AcquireSReconKeySerializer());
+  }
+
+  /**
+   * Address: 0x005BFF20 (FUN_005BFF20)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk for `SReconKeySerializer` that unlinks the
+   * intrusive node and returns the helper self node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SReconKeySerializerStartupThunkA()
+  {
+    if (!gSReconKeySerializerConstructed) {
+      return nullptr;
     }
 
-    serializer->mNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-    serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
+    return UnlinkSerializerNode(*AcquireSReconKeySerializer());
+  }
+
+  /**
+   * Address: 0x005BFF50 (FUN_005BFF50)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk for `SReconKeySerializer` with
+   * identical unlink/self-link behavior.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_SReconKeySerializerStartupThunkB()
+  {
+    return cleanup_SReconKeySerializerStartupThunkA();
   }
 
   /**
@@ -495,14 +566,35 @@ namespace
       return;
     }
 
-    CAiReconDBImplSerializer* const serializer = AcquireCAiReconDBImplSerializer();
-    if (serializer->mNext && serializer->mPrev) {
-      serializer->mNext->mPrev = serializer->mPrev;
-      serializer->mPrev->mNext = serializer->mNext;
+    (void)UnlinkSerializerNode(*AcquireCAiReconDBImplSerializer());
+  }
+
+  /**
+   * Address: 0x005C2960 (FUN_005C2960)
+   *
+   * What it does:
+   * Startup helper-cleanup thunk for `CAiReconDBImplSerializer` that unlinks
+   * the intrusive node and returns the helper self node.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiReconDBImplSerializerStartupThunkA()
+  {
+    if (!gCAiReconDBImplSerializerConstructed) {
+      return nullptr;
     }
 
-    serializer->mNext = reinterpret_cast<gpg::SerHelperBase*>(serializer);
-    serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
+    return UnlinkSerializerNode(*AcquireCAiReconDBImplSerializer());
+  }
+
+  /**
+   * Address: 0x005C2990 (FUN_005C2990)
+   *
+   * What it does:
+   * Secondary startup helper-cleanup thunk for `CAiReconDBImplSerializer` with
+   * identical unlink/self-link behavior.
+   */
+  [[maybe_unused]] gpg::SerHelperBase* cleanup_CAiReconDBImplSerializerStartupThunkB()
+  {
+    return cleanup_CAiReconDBImplSerializerStartupThunkA();
   }
 
   struct CAiReconDBSerializerBootstrap
@@ -655,7 +747,6 @@ void moho::register_SReconKeySerializer()
   serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
   serializer->mSerLoadFunc = &SReconKeySerializer::Deserialize;
   serializer->mSerSaveFunc = &SReconKeySerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_SReconKeySerializer);
 }
 
@@ -712,6 +803,5 @@ void moho::register_CAiReconDBImplSerializer()
   serializer->mPrev = reinterpret_cast<gpg::SerHelperBase*>(serializer);
   serializer->mSerLoadFunc = &CAiReconDBImplSerializer::Deserialize;
   serializer->mSerSaveFunc = &CAiReconDBImplSerializer::Serialize;
-  serializer->RegisterSerializeFunctions();
   (void)std::atexit(&cleanup_CAiReconDBImplSerializer);
 }

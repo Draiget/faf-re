@@ -374,8 +374,8 @@ namespace moho
   void register_CLuaTaskSerializer();
 
   /**
-   * Address: 0x004C9CA0 (FUN_004C9CA0, serializer cleanup alias A)
-   * Address: 0x004C9CD0 (FUN_004C9CD0, serializer cleanup alias B)
+     * Address: 0x004C9CA0 (FUN_004C9CA0)
+     * Address: 0x004C9CD0 (FUN_004C9CD0)
    *
    * What it does:
    * Unlinks static serializer helper node from the intrusive helper list and

@@ -27,6 +27,40 @@ namespace
   gpg::RType* gEmitterBlueprintType = nullptr;
   moho::REmitterBlueprintConstruct gEmitterBlueprintConstruct;
 
+  [[nodiscard]] gpg::SerHelperBase* ResetEmitterBlueprintConstructHelperLinks() noexcept
+  {
+    gEmitterBlueprintConstruct.mHelperNext->mPrev = gEmitterBlueprintConstruct.mHelperPrev;
+    gEmitterBlueprintConstruct.mHelperPrev->mNext = gEmitterBlueprintConstruct.mHelperNext;
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gEmitterBlueprintConstruct.mHelperNext);
+    gEmitterBlueprintConstruct.mHelperPrev = self;
+    gEmitterBlueprintConstruct.mHelperNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x0050FDE0 (FUN_0050FDE0)
+   *
+   * What it does:
+   * Unlinks `REmitterBlueprintConstruct` helper node from the global helper
+   * intrusive list and restores it as a self-linked sentinel.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodePrimary() noexcept
+  {
+    return ResetEmitterBlueprintConstructHelperLinks();
+  }
+
+  /**
+   * Address: 0x0050FE10 (FUN_0050FE10)
+   *
+   * What it does:
+   * Secondary entrypoint for `REmitterBlueprintConstruct` helper-node unlink
+   * and self-link reset.
+   */
+  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodeSecondary() noexcept
+  {
+    return ResetEmitterBlueprintConstructHelperLinks();
+  }
+
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -46,7 +80,7 @@ namespace
 
   void CleanupEmitterBlueprintConstructAtexit()
   {
-    (void)moho::blueprint_ser::UnlinkHelperNode(gEmitterBlueprintConstruct);
+    (void)CleanupEmitterBlueprintConstructHelperNodePrimary();
   }
 } // namespace
 

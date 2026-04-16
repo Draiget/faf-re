@@ -79,10 +79,13 @@ namespace moho
   void CEfxEmitterTypeInfo::Init()
   {
     size_ = 0x6F8;  // sizeof(CEfxEmitter)
-    newRefFunc_ = &CEfxEmitterTypeInfo::NewRef;
-    ctorRefFunc_ = &CEfxEmitterTypeInfo::CtrRef;
-    deleteFunc_ = &CEfxEmitterTypeInfo::Delete;
-    dtrFunc_ = &CEfxEmitterTypeInfo::Destruct;
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CEfxEmitterTypeInfo::NewRef,
+      &CEfxEmitterTypeInfo::CtrRef,
+      &CEfxEmitterTypeInfo::Delete,
+      &CEfxEmitterTypeInfo::Destruct
+    );
     gpg::RType::Init();
     AddBase_CEffectImpl(this);
     Finish();
@@ -108,7 +111,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065DFE0 (FUN_0065DFE0, register_CEfxEmitterTypeInfo_00)
+    * Alias of FUN_0065DFE0 (non-canonical helper lane).
    *
    * What it does:
    * Constructs/preregisters startup RTTI metadata for `moho::CEfxEmitter`.

@@ -30,6 +30,11 @@ namespace moho
 
     /**
      * Shared frame-active probe used by CScApp::HasFrame gate.
+     *
+     * Address: 0x008CE050 (FUN_008CE050)
+     *
+     * What it does:
+     * Returns the WM_ACTIVATEAPP-derived active-bit lane from one SupCom frame.
      */
     static bool IsSupComFrameWindowActive(const WSupComFrame* frame);
   };

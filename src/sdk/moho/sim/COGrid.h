@@ -6,7 +6,9 @@
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/sim/SFootprint.h"
+#include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
 
 namespace moho
@@ -172,7 +174,7 @@ namespace moho
     void OccupyRect(const gpg::Rect2i& rect);
 
     /**
-     * Address: 0x00721A90 (FUN_00721A90, Moho::COGrid::ExecuteOccupy)
+      * Alias of FUN_00721A90 (non-canonical helper lane).
      *
      * What it does:
      * Marks the requested bits set in the terrain and/or water occupancy
@@ -205,6 +207,34 @@ namespace moho
       EntityLineCollisionVector& outCollisions,
       const Wm3::Vec3f& lineStart,
       const Wm3::Vec3f& lineEnd
+    );
+
+    /**
+     * Address: 0x00721DC0 (FUN_00721DC0, Moho::COGrid::CollectEntitiesInBox)
+     *
+     * What it does:
+     * Gathers unmarked entities matching `flags` within the query box's
+     * axis-aligned cell span, then appends box-collision hits into
+     * `outCollisions`.
+     */
+    void CollectEntitiesInBox(
+      CollisionResultFastVectorN10& outCollisions,
+      EEntityType flags,
+      const Wm3::Box3f& box
+    );
+
+    /**
+     * Address: 0x00721FB0 (FUN_00721FB0, Moho::COGrid::ForAllEntitiesIterator)
+     *
+     * What it does:
+     * Gathers unmarked entities in one sphere AABB lane, then appends
+     * per-entity sphere collision results. For larger spheres, first applies a
+     * cheap containment pre-check against each entity cached collision bounds.
+     */
+    void ForAllEntitiesIterator(
+      CollisionResultFastVectorN10& outCollisions,
+      EEntityType flags,
+      const Wm3::Sphere3f& sphere
     );
   };
 

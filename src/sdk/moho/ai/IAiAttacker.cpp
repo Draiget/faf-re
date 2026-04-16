@@ -286,6 +286,49 @@ namespace
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
 
+  /**
+   * Address: 0x005DC810 (FUN_005DC810)
+   *
+   * What it does:
+   * Sets `vector<UnitWeapon*>` length to `requestedCount`, preserving existing
+   * pointer lanes on shrink and appending null pointer lanes on growth.
+   */
+  [[nodiscard]] std::uintptr_t ResizeUnitWeaponPointerVectorAndReturnBegin(
+    UnitWeaponPtrVector& storage,
+    const unsigned int requestedCount
+  )
+  {
+    const std::size_t currentCount = storage.size();
+    if (requestedCount < currentCount) {
+      storage.resize(static_cast<std::size_t>(requestedCount));
+    } else if (requestedCount > currentCount) {
+      storage.resize(static_cast<std::size_t>(requestedCount), nullptr);
+    }
+
+    return reinterpret_cast<std::uintptr_t>(storage.data());
+  }
+
+  /**
+   * Address: 0x005DC9B0 (FUN_005DC9B0)
+   *
+   * What it does:
+   * Sets `vector<CAcquireTargetTask*>` length to `requestedCount`,
+   * preserving existing lanes on shrink and appending null pointer lanes on
+   * growth.
+   */
+  void ResizeCAcquireTargetTaskPointerVector(CAcquireTargetTaskPtrVector& storage, const unsigned int requestedCount)
+  {
+    const std::size_t currentCount = storage.size();
+    if (requestedCount < currentCount) {
+      storage.resize(static_cast<std::size_t>(requestedCount));
+      return;
+    }
+
+    if (requestedCount > currentCount) {
+      storage.resize(static_cast<std::size_t>(requestedCount), nullptr);
+    }
+  }
+
   void cleanup_RBroadcasterRType_EAiAttackerEvent()
   {
     if (!gBroadcasterAttackerTypeConstructed) {
@@ -554,7 +597,7 @@ void gpg::RVectorType_UnitWeaponPtr::SetCount(void* const obj, const int count) 
     return;
   }
 
-  storage->resize(static_cast<std::size_t>(count), nullptr);
+  (void)ResizeUnitWeaponPointerVectorAndReturnBegin(*storage, static_cast<unsigned int>(count));
 }
 
 /**
@@ -698,7 +741,23 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int
     return;
   }
 
-  storage->resize(static_cast<std::size_t>(count), nullptr);
+  ResizeCAcquireTargetTaskPointerVector(*storage, static_cast<unsigned int>(count));
+}
+
+/**
+ * Address: 0x005D56D0 (FUN_005D56D0)
+ * Address: 0x005D6A80 (FUN_005D6A80)
+ *
+ * What it does:
+ * Initializes IAiAttacker base lanes and re-seeds the embedded broadcaster
+ * list to self-linked sentinel links; the second constructor lane is an
+ * equivalent alias.
+ */
+IAiAttacker::IAiAttacker()
+  : mListeners()
+{
+  mListeners.mNext = &mListeners;
+  mListeners.mPrev = &mListeners;
 }
 
 /**
@@ -711,6 +770,19 @@ IAiAttacker::~IAiAttacker()
 }
 
 /**
+ * Address: 0x005DF860 (FUN_005DF860, preregister_RBroadcasterRType_EAiAttackerEvent)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `Broadcaster<EAiAttackerEvent>`.
+ */
+gpg::RType* moho::preregister_RBroadcasterRType_EAiAttackerEvent()
+{
+  auto* const type = AcquireBroadcasterAttackerType();
+  gpg::PreRegisterRType(typeid(moho::Broadcaster_EAiAttackerEvent), type);
+  return type;
+}
+
+/**
  * Address: 0x00BCEAA0 (FUN_00BCEAA0, sub_BCEAA0)
  *
  * What it does:
@@ -719,8 +791,7 @@ IAiAttacker::~IAiAttacker()
  */
 int moho::register_RBroadcasterRType_EAiAttackerEvent()
 {
-  auto* const type = AcquireBroadcasterAttackerType();
-  gpg::PreRegisterRType(typeid(moho::Broadcaster_EAiAttackerEvent), type);
+  (void)preregister_RBroadcasterRType_EAiAttackerEvent();
   return std::atexit(&cleanup_RBroadcasterRType_EAiAttackerEvent);
 }
 
@@ -738,6 +809,34 @@ int moho::register_RListenerRType_EAiAttackerEvent()
 }
 
 /**
+ * Address: 0x005DF920 (FUN_005DF920, preregister_RVectorType_UnitWeaponPtr)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `msvc8::vector<moho::UnitWeapon*>`.
+ */
+gpg::RType* moho::preregister_RVectorType_UnitWeaponPtr()
+{
+  auto* const type = AcquireUnitWeaponPtrVectorType();
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::UnitWeapon*>), type);
+  return type;
+}
+
+/**
+ * Address: 0x005DF990 (FUN_005DF990, preregister_RVectorType_CAcquireTargetTaskPtr)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `msvc8::vector<moho::CAcquireTargetTask*>`.
+ */
+gpg::RType* moho::preregister_RVectorType_CAcquireTargetTaskPtr()
+{
+  auto* const type = AcquireCAcquireTargetTaskPtrVectorType();
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::CAcquireTargetTask*>), type);
+  return type;
+}
+
+/**
  * Address: 0x00BCEAE0 (FUN_00BCEAE0, sub_BCEAE0)
  *
  * What it does:
@@ -746,8 +845,7 @@ int moho::register_RListenerRType_EAiAttackerEvent()
  */
 int moho::register_RVectorType_UnitWeaponPtr()
 {
-  auto* const type = AcquireUnitWeaponPtrVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::UnitWeapon*>), type);
+  (void)preregister_RVectorType_UnitWeaponPtr();
   return std::atexit(&cleanup_RVectorType_UnitWeaponPtr);
 }
 
@@ -760,8 +858,7 @@ int moho::register_RVectorType_UnitWeaponPtr()
  */
 int moho::register_RVectorType_CAcquireTargetTaskPtr()
 {
-  auto* const type = AcquireCAcquireTargetTaskPtrVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::CAcquireTargetTask*>), type);
+  (void)preregister_RVectorType_CAcquireTargetTaskPtr();
   return std::atexit(&cleanup_RVectorType_CAcquireTargetTaskPtr);
 }
 

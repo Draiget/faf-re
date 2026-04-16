@@ -1,16 +1,46 @@
 #include "moho/unit/core/IUnitWeakPtrReflection.h"
 
 #include <cstdlib>
+#include <cstddef>
 #include <cstdint>
+#include <new>
 #include <stdexcept>
 #include <typeinfo>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 
 namespace
 {
+  class IUnitTypeInfo final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "IUnit";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(moho::IUnit);
+      gpg::RType::Init();
+      Finish();
+    }
+  };
+
+  using WeakPtrIUnitType = moho::RWeakPtrType<moho::IUnit>;
+  using FastVectorWeakPtrIUnitType = gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>;
+
+  alignas(IUnitTypeInfo) unsigned char gIUnitTypeInfoStorage[sizeof(IUnitTypeInfo)]{};
+  bool gIUnitTypeInfoConstructed = false;
+  alignas(WeakPtrIUnitType) unsigned char gWeakPtrIUnitTypeStorage[sizeof(WeakPtrIUnitType)]{};
+  bool gWeakPtrIUnitTypeConstructed = false;
+  alignas(FastVectorWeakPtrIUnitType) unsigned char
+    gFastVectorWeakPtrIUnitTypeStorage[sizeof(FastVectorWeakPtrIUnitType)]{};
+  bool gFastVectorWeakPtrIUnitTypeConstructed = false;
+
   constexpr const char kReflectWeakPtrHeaderPath[] = "c:\\work\\rts\\main\\code\\src\\core/ReflectWeakPtr.h";
 
   msvc8::string gWeakPtrIUnitTypeName;
@@ -34,6 +64,9 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::IUnit));
+      if (!cached) {
+        cached = moho::preregister_IUnitTypeInfoStartup();
+      }
     }
     return cached;
   }
@@ -43,8 +76,21 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::IUnit>));
+      if (!cached) {
+        cached = moho::preregister_WeakPtrIUnitTypeStartup();
+      }
     }
     return cached;
+  }
+
+  [[nodiscard]] FastVectorWeakPtrIUnitType* AcquireFastVectorWeakPtrIUnitType()
+  {
+    if (!gFastVectorWeakPtrIUnitTypeConstructed) {
+      ::new (static_cast<void*>(gFastVectorWeakPtrIUnitTypeStorage)) FastVectorWeakPtrIUnitType();
+      gFastVectorWeakPtrIUnitTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorWeakPtrIUnitType*>(gFastVectorWeakPtrIUnitTypeStorage);
   }
 
   [[nodiscard]] gpg::RRef MakeIUnitRefFromRawObject(void* rawObject)
@@ -82,6 +128,29 @@ namespace
   [[nodiscard]] gpg::RRef MakeIUnitRefFromWeakPtr(const moho::WeakPtr<moho::IUnit>& weak)
   {
     return MakeIUnitRefFromRawObject(weak.GetObjectPtr());
+  }
+
+  struct RuntimeBoundThiscallInvoker
+  {
+    using InvokeFn = int(__thiscall*)(void* boundObject);
+
+    InvokeFn invoke;     // +0x00
+    void* boundObject;   // +0x04
+  };
+  static_assert(sizeof(RuntimeBoundThiscallInvoker) == 0x08, "RuntimeBoundThiscallInvoker size must be 0x08");
+
+  /**
+   * Address: 0x00541290 (FUN_00541290)
+   *
+   * What it does:
+   * Invokes one stored thiscall callback lane with the bound object lane at
+   * offset `+0x04`.
+   */
+  [[maybe_unused]] int InvokeBoundThiscallCallback(
+    RuntimeBoundThiscallInvoker* const invoker
+  )
+  {
+    return invoker->invoke(invoker->boundObject);
   }
 
   /**
@@ -225,6 +294,77 @@ namespace
     for (unsigned int i = 0; i < count; ++i) {
       weakPtrType->serSaveFunc_(archive, reinterpret_cast<int>(&storage->begin[i]), 0, ownerRef);
     }
+  }
+
+  /**
+   * Address: 0x0056EFA0 (FUN_0056EFA0)
+   *
+   * What it does:
+   * Copy-assigns one `WeakPtr<IUnit>` vector storage lane from `source` into
+   * `destination`, preserving intrusive owner-chain relink semantics and
+   * resizing capacity when required.
+   */
+  [[maybe_unused]] moho::WeakPtrVectorStorage<moho::IUnit>* AssignWeakPtrIUnitVectorStorage(
+    moho::WeakPtrVectorStorage<moho::IUnit>* const destination,
+    const moho::WeakPtrVectorStorage<moho::IUnit>* const source
+  )
+  {
+    if (destination == nullptr || source == nullptr || destination == source) {
+      return destination;
+    }
+
+    const std::size_t destinationSize =
+      (destination->begin != nullptr) ? static_cast<std::size_t>(destination->end - destination->begin) : 0u;
+    const std::size_t sourceSize = (source->begin != nullptr) ? static_cast<std::size_t>(source->end - source->begin) : 0u;
+    const std::size_t destinationCapacity = (destination->begin != nullptr)
+      ? static_cast<std::size_t>(destination->capacityEnd - destination->begin)
+      : 0u;
+
+    if (sourceSize > destinationCapacity) {
+      std::size_t grownCapacity = (destinationCapacity != 0u) ? destinationCapacity : 4u;
+      while (grownCapacity < sourceSize) {
+        grownCapacity *= 2u;
+      }
+
+      auto* const grownBegin =
+        static_cast<moho::WeakPtr<moho::IUnit>*>(::operator new(sizeof(moho::WeakPtr<moho::IUnit>) * grownCapacity));
+      for (std::size_t i = 0; i < grownCapacity; ++i) {
+        grownBegin[i].ownerLinkSlot = nullptr;
+        grownBegin[i].nextInOwner = nullptr;
+      }
+
+      for (std::size_t i = 0; i < destinationSize; ++i) {
+        grownBegin[i].ResetFromOwnerLinkSlot(destination->begin[i].ownerLinkSlot);
+        destination->begin[i].ResetFromObject(nullptr);
+      }
+
+      ::operator delete(destination->begin);
+      destination->begin = grownBegin;
+      destination->end = grownBegin + destinationSize;
+      destination->capacityEnd = grownBegin + grownCapacity;
+    }
+
+    if (destination->begin != nullptr && sourceSize > destinationSize) {
+      for (std::size_t i = destinationSize; i < sourceSize; ++i) {
+        destination->begin[i].ownerLinkSlot = nullptr;
+        destination->begin[i].nextInOwner = nullptr;
+      }
+    }
+
+    if (sourceSize != 0u) {
+      auto* const destinationBeginWeak = reinterpret_cast<moho::WeakPtr<void>*>(destination->begin);
+      auto* const sourceBeginWeak = reinterpret_cast<const moho::WeakPtr<void>*>(source->begin);
+      (void)moho::AssignWeakPtrRangeForward(destinationBeginWeak, sourceBeginWeak, sourceBeginWeak + sourceSize);
+    }
+
+    if (destinationSize > sourceSize && destination->begin != nullptr) {
+      for (std::size_t i = sourceSize; i < destinationSize; ++i) {
+        destination->begin[i].ResetFromObject(nullptr);
+      }
+    }
+
+    destination->end = (destination->begin != nullptr) ? (destination->begin + sourceSize) : nullptr;
+    return destination;
   }
 } // namespace
 
@@ -405,4 +545,54 @@ void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(void* obj, const
   }
 
   ResizeWeakPtrVector(*storage, static_cast<std::size_t>(count));
+}
+
+/**
+ * Address: 0x00541400 (FUN_00541400, preregister_IUnitTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `IUnit`.
+ */
+gpg::RType* moho::preregister_IUnitTypeInfoStartup()
+{
+  if (!gIUnitTypeInfoConstructed) {
+    ::new (static_cast<void*>(gIUnitTypeInfoStorage)) IUnitTypeInfo();
+    gIUnitTypeInfoConstructed = true;
+  }
+
+  auto* const typeInfo = reinterpret_cast<IUnitTypeInfo*>(gIUnitTypeInfoStorage);
+  gpg::PreRegisterRType(typeid(moho::IUnit), typeInfo);
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00541B40 (FUN_00541B40, preregister_WeakPtrIUnitTypeStartup)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for `WeakPtr<IUnit>`.
+ */
+gpg::RType* moho::preregister_WeakPtrIUnitTypeStartup()
+{
+  if (!gWeakPtrIUnitTypeConstructed) {
+    ::new (static_cast<void*>(gWeakPtrIUnitTypeStorage)) WeakPtrIUnitType();
+    gWeakPtrIUnitTypeConstructed = true;
+  }
+
+  auto* const typeInfo = reinterpret_cast<WeakPtrIUnitType*>(gWeakPtrIUnitTypeStorage);
+  gpg::PreRegisterRType(typeid(moho::WeakPtr<moho::IUnit>), typeInfo);
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00571B90 (FUN_00571B90, preregister_FastVectorWeakPtrIUnitTypeStartup)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI metadata for
+ * `gpg::fastvector<moho::WeakPtr<moho::IUnit>>`.
+ */
+gpg::RType* gpg::preregister_FastVectorWeakPtrIUnitTypeStartup()
+{
+  auto* const typeInfo = AcquireFastVectorWeakPtrIUnitType();
+  gpg::PreRegisterRType(typeid(gpg::fastvector<moho::WeakPtr<moho::IUnit>>), typeInfo);
+  return typeInfo;
 }

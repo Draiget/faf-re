@@ -1,9 +1,22 @@
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 namespace moho
 {
+  /**
+   * Address: 0x00566090 (FUN_00566090, Moho::EFormationdStatusTypeInfo::EFormationdStatusTypeInfo)
+   *
+   * What it does:
+   * Preregisters the enum type descriptor for `EFormationdStatus` with the reflection registry.
+   */
+  EFormationdStatusTypeInfo::EFormationdStatusTypeInfo()
+    : gpg::REnumType()
+  {
+    gpg::PreRegisterRType(typeid(EFormationdStatus), this);
+  }
+
   /**
    * Address: 0x00566150 (FUN_00566150, Moho::EFormationdStatusTypeInfo::dtr)
    */
@@ -39,4 +52,3 @@ namespace moho
     AddEnum(StripPrefix("FORMATIONSTATUS_FormationAtGoal"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationAtGoal));
   }
 } // namespace moho
-

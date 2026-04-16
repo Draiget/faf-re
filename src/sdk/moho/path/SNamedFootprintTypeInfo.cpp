@@ -1,9 +1,11 @@
 #include "moho/path/SNamedFootprint.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <list>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -62,6 +64,97 @@ namespace
     owner->fields_.push_back(field);
   }
 
+  struct SFootprintScalarRuntimeView
+  {
+    std::uint32_t packedFootprintHeader; // +0x00 (size/caps/flags lane)
+    std::uint32_t maxSlopeBits; // +0x04
+    std::uint32_t minWaterDepthBits; // +0x08
+    std::uint32_t maxWaterDepthBits; // +0x0C
+  };
+  static_assert(
+    offsetof(SFootprintScalarRuntimeView, maxSlopeBits) == 0x4,
+    "SFootprintScalarRuntimeView::maxSlopeBits offset must be 0x4"
+  );
+  static_assert(
+    offsetof(SFootprintScalarRuntimeView, minWaterDepthBits) == 0x8,
+    "SFootprintScalarRuntimeView::minWaterDepthBits offset must be 0x8"
+  );
+  static_assert(
+    offsetof(SFootprintScalarRuntimeView, maxWaterDepthBits) == 0xC,
+    "SFootprintScalarRuntimeView::maxWaterDepthBits offset must be 0xC"
+  );
+  static_assert(sizeof(SFootprintScalarRuntimeView) == 0x10, "SFootprintScalarRuntimeView size must be 0x10");
+
+  /**
+   * Address: 0x005133E0 (FUN_005133E0)
+   *
+   * What it does:
+   * Swaps the three trailing 32-bit scalar lanes (`+0x04/+0x08/+0x0C`) between
+   * two footprint runtime views, leaving the packed header lane unchanged.
+   */
+  [[maybe_unused]] [[nodiscard]] SFootprintScalarRuntimeView* SwapFootprintScalarTailWordsA(
+    SFootprintScalarRuntimeView* const left,
+    SFootprintScalarRuntimeView* const right
+  )
+  {
+    const std::uint32_t maxSlopeBits = right->maxSlopeBits;
+    right->maxSlopeBits = left->maxSlopeBits;
+    left->maxSlopeBits = maxSlopeBits;
+
+    const std::uint32_t minWaterDepthBits = right->minWaterDepthBits;
+    right->minWaterDepthBits = left->minWaterDepthBits;
+    left->minWaterDepthBits = minWaterDepthBits;
+
+    const std::uint32_t maxWaterDepthBits = right->maxWaterDepthBits;
+    right->maxWaterDepthBits = left->maxWaterDepthBits;
+    left->maxWaterDepthBits = maxWaterDepthBits;
+    return left;
+  }
+
+  /**
+   * Address: 0x00513480 (FUN_00513480)
+   *
+   * What it does:
+   * Alternate call-shape lane for swapping the same footprint trailing
+   * `+0x04/+0x08/+0x0C` scalar words.
+   */
+  [[maybe_unused]] [[nodiscard]] SFootprintScalarRuntimeView* SwapFootprintScalarTailWordsB(
+    SFootprintScalarRuntimeView* const left,
+    SFootprintScalarRuntimeView* const right
+  )
+  {
+    const std::uint32_t maxSlopeBits = right->maxSlopeBits;
+    right->maxSlopeBits = left->maxSlopeBits;
+    left->maxSlopeBits = maxSlopeBits;
+
+    const std::uint32_t minWaterDepthBits = right->minWaterDepthBits;
+    right->minWaterDepthBits = left->minWaterDepthBits;
+    left->minWaterDepthBits = minWaterDepthBits;
+
+    const std::uint32_t maxWaterDepthBits = right->maxWaterDepthBits;
+    right->maxWaterDepthBits = left->maxWaterDepthBits;
+    left->maxWaterDepthBits = maxWaterDepthBits;
+    return left;
+  }
+
+  /**
+   * Address: 0x00513940 (FUN_00513940)
+   *
+   * What it does:
+   * Swaps the packed footprint header word at offset `+0x00` between two
+   * runtime views and returns the first operand.
+   */
+  [[maybe_unused]] [[nodiscard]] SFootprintScalarRuntimeView* SwapFootprintPackedHeaderWord(
+    SFootprintScalarRuntimeView* const left,
+    SFootprintScalarRuntimeView* const right
+  )
+  {
+    const std::uint32_t packedHeader = right->packedFootprintHeader;
+    right->packedFootprintHeader = left->packedFootprintHeader;
+    left->packedFootprintHeader = packedHeader;
+    return left;
+  }
+
   /**
    * Address: 0x00514870 (FUN_00514870)
    *
@@ -89,6 +182,41 @@ namespace
   [[nodiscard]] moho::SRuleFootprintNode* AllocateSingleSRuleFootprintNode()
   {
     return AllocateSRuleFootprintNodeBlock(1u);
+  }
+
+  /**
+   * Address: 0x0052CB30 (FUN_0052CB30)
+   *
+   * What it does:
+   * Allocates one intrusive rule-footprint list sentinel node and wires both
+   * link lanes to point back to that same node.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::SRuleFootprintNode* AllocateSelfLinkedSRuleFootprintSentinelNode()
+  {
+    moho::SRuleFootprintNode* const node = AllocateSingleSRuleFootprintNode();
+    if (node != nullptr) {
+      node->next = node;
+    }
+    if (reinterpret_cast<std::intptr_t>(node) != -4 && node != nullptr) {
+      node->prev = node;
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x00529550 (FUN_00529550)
+   *
+   * What it does:
+   * Initializes one `SRuleFootprintsBlueprint` list runtime lane by allocating
+   * a self-linked sentinel node and resetting element count to zero.
+   */
+  [[maybe_unused]] moho::SRuleFootprintsBlueprint* InitializeSRuleFootprintsBlueprintList(
+    moho::SRuleFootprintsBlueprint* const footprintList
+  )
+  {
+    footprintList->mHead = AllocateSelfLinkedSRuleFootprintSentinelNode();
+    footprintList->mSize = 0u;
+    return footprintList;
   }
 
   /**
@@ -197,6 +325,187 @@ namespace
     node->prev = prev;
     (void)CopySNamedFootprintValue(source, &node->value);
     return node;
+  }
+
+  struct SNamedFootprintListNodeRuntime
+  {
+    SNamedFootprintListNodeRuntime* next; // +0x00
+    SNamedFootprintListNodeRuntime* prev; // +0x04
+    moho::SNamedFootprint value; // +0x08
+  };
+  static_assert(
+    offsetof(SNamedFootprintListNodeRuntime, value) == 0x8,
+    "SNamedFootprintListNodeRuntime::value offset must be 0x8"
+  );
+
+  struct SNamedFootprintListRuntimeView
+  {
+    std::uint32_t allocatorProxy; // +0x00
+    SNamedFootprintListNodeRuntime* sentinel; // +0x04
+    std::uint32_t count; // +0x08
+  };
+  static_assert(
+    offsetof(SNamedFootprintListRuntimeView, sentinel) == 0x4,
+    "SNamedFootprintListRuntimeView::sentinel offset must be 0x4"
+  );
+  static_assert(
+    offsetof(SNamedFootprintListRuntimeView, count) == 0x8,
+    "SNamedFootprintListRuntimeView::count offset must be 0x8"
+  );
+
+  /**
+   * Address: 0x005142F0 (FUN_005142F0)
+   *
+   * What it does:
+   * Stores the current list-begin node pointer (`sentinel->next`) into the
+   * caller-provided node cursor slot.
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** StoreSNamedFootprintListBeginCursor(
+    SNamedFootprintListNodeRuntime** const outCursor,
+    const SNamedFootprintListRuntimeView* const listRuntime
+  )
+  {
+    *outCursor = listRuntime->sentinel->next;
+    return outCursor;
+  }
+
+  /**
+   * Address: 0x00514300 (FUN_00514300)
+   *
+   * What it does:
+   * Stores the sentinel node pointer from a list runtime view into the
+   * caller-provided cursor slot (lane A).
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** StoreSNamedFootprintListSentinelCursorA(
+    SNamedFootprintListNodeRuntime** const outCursor,
+    const SNamedFootprintListRuntimeView* const listRuntime
+  )
+  {
+    *outCursor = listRuntime->sentinel;
+    return outCursor;
+  }
+
+  /**
+   * Address: 0x005143B0 (FUN_005143B0)
+   *
+   * What it does:
+   * Advances one in-place list node cursor to its `next` link.
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** AdvanceSNamedFootprintNodeCursor(
+    SNamedFootprintListNodeRuntime** const cursor
+  )
+  {
+    *cursor = (*cursor)->next;
+    return cursor;
+  }
+
+  /**
+   * Address: 0x00514400 (FUN_00514400)
+   *
+   * What it does:
+   * Stores the sentinel node pointer from a list runtime view into the
+   * caller-provided cursor slot (lane B).
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** StoreSNamedFootprintListSentinelCursorB(
+    SNamedFootprintListNodeRuntime** const outCursor,
+    const SNamedFootprintListRuntimeView* const listRuntime
+  )
+  {
+    *outCursor = listRuntime->sentinel;
+    return outCursor;
+  }
+
+  /**
+   * Address: 0x00514480 (FUN_00514480)
+   *
+   * What it does:
+   * Writes a node pointer directly into a caller-provided cursor slot (lane A).
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** StoreSNamedFootprintNodeCursorA(
+    SNamedFootprintListNodeRuntime** const outCursor,
+    SNamedFootprintListNodeRuntime* const node
+  )
+  {
+    *outCursor = node;
+    return outCursor;
+  }
+
+  /**
+   * Address: 0x005145D0 (FUN_005145D0)
+   *
+   * What it does:
+   * Writes a node pointer directly into a caller-provided cursor slot (lane B).
+   */
+  [[maybe_unused]] [[nodiscard]] SNamedFootprintListNodeRuntime** StoreSNamedFootprintNodeCursorB(
+    SNamedFootprintListNodeRuntime** const outCursor,
+    SNamedFootprintListNodeRuntime* const node
+  )
+  {
+    *outCursor = node;
+    return outCursor;
+  }
+
+  [[nodiscard]] std::uint32_t IncrementSNamedFootprintListCountOrThrow(
+    SNamedFootprintListRuntimeView* const listRuntime
+  )
+  {
+    constexpr std::uint32_t kLegacyListMaxCount = 0x05555555u;
+    if (listRuntime->count == kLegacyListMaxCount) {
+      throw std::length_error("list<T> too long");
+    }
+
+    ++listRuntime->count;
+    return listRuntime->count;
+  }
+
+  /**
+   * Address: 0x00514410 (FUN_00514410)
+   *
+   * What it does:
+   * Allocates one rule-footprint node from `source`, links it before the list
+   * sentinel, and increments the owning list count with legacy overflow checks.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t InsertRuleFootprintBeforeSentinel(
+    const moho::SNamedFootprint* const source,
+    SNamedFootprintListRuntimeView* const listRuntime,
+    moho::SRuleFootprintNode* const sentinel
+  )
+  {
+    moho::SRuleFootprintNode* const node = CreateSRuleFootprintNode(sentinel, sentinel->prev, source);
+    const std::uint32_t count = IncrementSNamedFootprintListCountOrThrow(listRuntime);
+    sentinel->prev = node;
+    node->prev->next = node;
+    return count;
+  }
+
+  /**
+   * Address: 0x00514340 (FUN_00514340)
+   *
+   * What it does:
+   * Detaches one intrusive `list<SNamedFootprint>` node ring from its
+   * sentinel, destroys each node's owned name string payload, deletes each
+   * detached node, and resets the list element count to zero.
+   */
+  [[maybe_unused]] void ClearSNamedFootprintListNodeRing(
+    SNamedFootprintListRuntimeView* const listRuntime
+  ) noexcept
+  {
+    if (listRuntime == nullptr || listRuntime->sentinel == nullptr) {
+      return;
+    }
+
+    SNamedFootprintListNodeRuntime* const sentinel = listRuntime->sentinel;
+    SNamedFootprintListNodeRuntime* node = sentinel->next;
+    sentinel->next = sentinel;
+    sentinel->prev = sentinel;
+    listRuntime->count = 0u;
+
+    while (node != sentinel) {
+      SNamedFootprintListNodeRuntime* const nextNode = node->next;
+      node->value.mName.tidy(true, 0u);
+      ::operator delete(static_cast<void*>(node));
+      node = nextNode;
+    }
   }
 
   [[nodiscard]] std::size_t CountSNamedFootprintList(const void* const obj) noexcept
