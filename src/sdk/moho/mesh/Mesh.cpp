@@ -5264,6 +5264,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x007DE7A0 (FUN_007DE7A0,
+   * ?ComputeDebugPose@MeshInstance@Moho@@QAE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+   * Mangled: ?ComputeDebugPose@MeshInstance@Moho@@QAE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ
+   *
+   * IDA signature:
+   * boost::shared_ptr_CAniPose* __userpurge Moho::MeshInstance::ComputeDebugPose@<eax>(
+   *   Moho::MeshInstance* a1@<eax>, boost::shared_ptr_CAniPose* a2);
+   *
+   * What it does:
+   * Refreshes the skeleton-debug pose and returns it as an additional
+   * shared reference. For static-pose, unlocked meshes: fetches the
+   * backing mesh's LOD-0 `RScmResource`, calls
+   * `CAniPose::InterpolatePose(currInterpolant, startPose, endPose,
+   * resource.mFile.mBoneCount)` on `curPose`, then returns one shared
+   * handle to `curPose` to the caller. For non-static or locked meshes
+   * returns an empty shared handle so skeleton-debug callers can render
+   * nothing. The binary path bypasses any `shared_ptr` swap by hand and
+   * inlines the control-block `use_count` bump; the typed return here
+   * preserves the same semantics.
+   */
+  boost::shared_ptr<CAniPose> MeshInstance::ComputeDebugPose()
+  {
+    if (isStaticPose == 0u || isLocked != 0u) {
+      return boost::shared_ptr<CAniPose>{};
+    }
+
+    const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
+    const std::int32_t boneCount = static_cast<std::int32_t>(resource->mFile->mBoneCount);
+
+    curPose->InterpolatePose(currInterpolant, startPose.get(), endPose.get(), boneCount);
+    return curPose;
+  }
+
+  /**
    * Address: 0x007DEFC0 (FUN_007DEFC0,
    * ?GetSweptAlignedBox@MeshInstance@Moho@@QBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
    *
@@ -5608,7 +5642,13 @@ namespace moho
    * Address: 0x007E2290 (FUN_007E2290, Moho::MeshRenderer::RenderSkeleton)
    *
    * What it does:
-   * Draws one mesh instance skeleton-debug overlay.
+   * Draws one mesh instance skeleton-debug overlay. The recovered entry
+   * calls `MeshInstance::ComputeDebugPose` at the head of the function
+   * (address 0x007DE7A0) to refresh the interpolated pose used for the
+   * bone-debug pass; remaining CD3D-prim-batcher draw-call mechanics are
+   * still under recovery, so this TU keeps the typed pose-refresh step
+   * and drops the draw-call emission until its typed dependencies are
+   * wired.
    */
   void MeshRenderer::RenderSkeleton(
     CD3DPrimBatcher* const debugBatcher,
@@ -5619,8 +5659,21 @@ namespace moho
   {
     (void)debugBatcher;
     (void)debugCanvas;
-    (void)meshInstance;
     (void)showBoneNames;
+
+    if (meshInstance == nullptr) {
+      return;
+    }
+
+    const boost::shared_ptr<CAniPose> activePose = meshInstance->ComputeDebugPose();
+    if (!activePose) {
+      return;
+    }
+
+    // Draw-call emission (CD3DPrimBatcher bind + bone-line quad batch)
+    // stays blocked on typed CD3DPrimBatcher surface recovery; the pose
+    // refresh above produces the same observable side effect as the
+    // binary's skeleton-overlay entry before it enters draw-call code.
   }
 
   /**

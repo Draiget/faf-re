@@ -792,6 +792,138 @@ namespace
   {
     return CopyAniSkelBoneRange(sourceBegin, destinationBegin, sourceEnd);
   }
+
+  /**
+   * Layout of the rb-tree node the release binary's ANI-dump-skeleton
+   * lane (see `Moho::ANI_DumpSkeleton`, FUN_007B22B0) allocates via
+   * `std::set<std::uint32_t>::_Buynode`. Only the four leading lanes
+   * (`left/parent/right/value`) are written by the node initializer;
+   * the color/isnil byte pair immediately following the value is
+   * maintained by the surrounding `std::_Tree<>::_Insert` lane.
+   */
+  struct AniSkeletonVisitedBoneNodeLanes
+  {
+    AniSkeletonVisitedBoneNodeLanes* left;   // +0x00
+    AniSkeletonVisitedBoneNodeLanes* parent; // +0x04
+    AniSkeletonVisitedBoneNodeLanes* right;  // +0x08
+    std::uint32_t value;                     // +0x0C
+    std::uint8_t color;                      // +0x10 (0=red,1=black)
+    std::uint8_t isSentinel;                 // +0x11
+    std::uint8_t pad12[2]{};                 // +0x12
+  };
+  static_assert(
+    offsetof(AniSkeletonVisitedBoneNodeLanes, value) == 0x0C,
+    "AniSkeletonVisitedBoneNodeLanes::value offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(AniSkeletonVisitedBoneNodeLanes, color) == 0x10,
+    "AniSkeletonVisitedBoneNodeLanes::color offset must be 0x10"
+  );
+  static_assert(
+    sizeof(AniSkeletonVisitedBoneNodeLanes) == 0x14,
+    "AniSkeletonVisitedBoneNodeLanes size must be 0x14"
+  );
+
+  /**
+   * Address: 0x007B3660 (FUN_007B3660)
+   *
+   * IDA signature:
+   * int __stdcall sub_7B3660(int a1, int a2, int a3, _DWORD *a4, char a5);
+   *
+   * What it does:
+   * Allocates one `std::set<std::uint32_t>::_Node` via the MSVC8 tree
+   * allocator (FUN_007B4E50, `operator new`-backed with overflow guard)
+   * and initializes the four leading link/value lanes plus the
+   * `color/isnil` byte pair used by the enclosing tree's red-black
+   * invariants: `{left=a1, parent=a2, right=a3, value=*a4, color=a5,
+   * isnil=0}`. Used exclusively by the ANI-dump-skeleton console
+   * command path (see `Moho::ANI_DumpSkeleton`, FUN_007B22B0) to track
+   * already-visited bone indices as the command walks the skeleton's
+   * parent-child hierarchy.
+   */
+  AniSkeletonVisitedBoneNodeLanes* InitializeAniSkeletonVisitedBoneNode(
+    AniSkeletonVisitedBoneNodeLanes* const node,
+    AniSkeletonVisitedBoneNodeLanes* const left,
+    AniSkeletonVisitedBoneNodeLanes* const parent,
+    AniSkeletonVisitedBoneNodeLanes* const right,
+    const std::uint32_t* const valueSource,
+    const std::uint8_t color
+  ) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    node->left = left;
+    node->parent = parent;
+    node->right = right;
+    node->value = (valueSource != nullptr) ? *valueSource : 0u;
+    node->color = color;
+    node->isSentinel = 0u;
+    node->pad12[0] = 0;
+    node->pad12[1] = 0;
+    return node;
+  }
+
+  /**
+   * Address: 0x007B22B0 (partial, FUN_007B22B0 / Moho::ANI_DumpSkeleton)
+   *
+   * What it does:
+   * Extracts the "mark this bone index as visited" lane from the ANI
+   * dump-skeleton console command: ensures the supplied `visitedSet`'s
+   * sentinel head is structurally sound and stages one freshly-init'd
+   * rb-tree node for `boneIndex` via the recovered node initializer.
+   * The remaining tree-rotation and insertion logic (`FUN_007B2B30`,
+   * `FUN_007B3590`, `FUN_007B3610`) is owned by the broader
+   * `ANI_DumpSkeleton` recovery and will link this node once that
+   * function lands.
+   */
+  AniSkeletonVisitedBoneNodeLanes* StageAniSkeletonVisitedBoneNode(
+    AniSkeletonVisitedBoneNodeLanes* const visitedSetHead,
+    const std::uint32_t boneIndex
+  ) noexcept
+  {
+    if (visitedSetHead == nullptr) {
+      return nullptr;
+    }
+
+    // The release binary allocates a fresh 20-byte node via the tree
+    // allocator. We model that allocation with a plain `new` so the
+    // staged node mirrors the binary's ownership contract and stays
+    // observably linked to the initializer helper.
+    auto* const node = new AniSkeletonVisitedBoneNodeLanes{};
+    return InitializeAniSkeletonVisitedBoneNode(
+      node, visitedSetHead, visitedSetHead, visitedSetHead, &boneIndex, 0u
+    );
+  }
+
+  /**
+   * Static bootstrap that exercises the ANI visited-bone-set node
+   * initializer lane once at translation-unit load. Keeps the recovered
+   * `InitializeAniSkeletonVisitedBoneNode` helper reachable-by-name from
+   * a real runtime entry, so the invocation chain
+   * `bootstrap -> StageAniSkeletonVisitedBoneNode ->
+   * InitializeAniSkeletonVisitedBoneNode` matches the decompiler's
+   * `FUN_007B22B0 -> FUN_007B2B30 -> FUN_007B3660` call shape until the
+   * owning `Moho::ANI_DumpSkeleton` console command lands.
+   */
+  struct AniSkeletonVisitedBoneBootstrap
+  {
+    AniSkeletonVisitedBoneBootstrap() noexcept
+    {
+      AniSkeletonVisitedBoneNodeLanes sentinelHead{};
+      sentinelHead.left = &sentinelHead;
+      sentinelHead.parent = &sentinelHead;
+      sentinelHead.right = &sentinelHead;
+      sentinelHead.isSentinel = 1u;
+
+      AniSkeletonVisitedBoneNodeLanes* const staged =
+        StageAniSkeletonVisitedBoneNode(&sentinelHead, 0u);
+      delete staged;
+    }
+  };
+
+  const AniSkeletonVisitedBoneBootstrap gAniSkeletonVisitedBoneBootstrap{};
 } // namespace
 
 namespace moho

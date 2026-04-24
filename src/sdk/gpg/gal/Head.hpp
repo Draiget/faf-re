@@ -54,6 +54,23 @@ namespace gpg::gal
         Head();
 
         /**
+         * Address: 0x008E6E00 (FUN_008E6E00, gpg::gal::Head::Head)
+         *
+         * What it does:
+         * Initializes one GAL head descriptor from explicit adapter handle,
+         * window handle, windowed flag, pixel dimensions, and frames-per-second
+         * payload. Name/vector lanes are left empty and match the default-ctor
+         * state.
+         */
+        Head(
+            void* handle,
+            void* window,
+            bool windowed,
+            std::uint32_t width,
+            std::uint32_t height,
+            std::uint32_t framesPerSecond);
+
+        /**
          * Address: 0x004368B0 (FUN_004368B0)
          *
          * What it does:

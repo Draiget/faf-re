@@ -5589,6 +5589,27 @@ namespace gpg::gal
   }
 
   /**
+   * Address: 0x00940560 (FUN_00940560)
+   *
+   * IDA signature:
+   * int __thiscall sub_940560(int this);
+   *
+   * What it does:
+   * Initializes one `gpg::gal::Error` payload with canonical "<unknown>"
+   * source/file lane and "<undefined>" message lane, used as the default
+   * allocation-failure exception body in GAL backend paths. The decompiled
+   * form directly built the embedded `msvc8::string` SSO lanes with literal
+   * constants; this is the typed 1:1 equivalent.
+   */
+  Error::Error()
+    : std::exception()
+    , runtimeMessage_("<unknown>")
+    , line_(0)
+    , message_("<undefined>")
+  {
+  }
+
+  /**
    * Address: 0x009404D0 (FUN_009404D0)
    * Mangled: ??0Error@gal@gpg@@QAE@@Z
    *
@@ -5655,6 +5676,41 @@ namespace gpg::gal
    * lanes.
    */
   Head::Head() = default;
+
+  /**
+   * Address: 0x008E6E00 (FUN_008E6E00, gpg::gal::Head::Head)
+   *
+   * IDA signature:
+   * gpg::gal::Head *__thiscall gpg::gal::Head::Head(
+   *     gpg::gal::Head *this@<ecx>,
+   *     void *handle, void *window, char windowed,
+   *     unsigned int width, unsigned int height,
+   *     unsigned int fps);
+   *
+   * What it does:
+   * Initializes one GAL head descriptor with caller-provided adapter handle,
+   * window handle, windowed flag, pixel dimensions, and frames-per-second,
+   * while zeroing antialiasing lanes and default-initializing the name and
+   * all nested vector lanes (sample options, adapter modes, valid-format
+   * arrays).
+   */
+  Head::Head(
+    void* const handle,
+    void* const window,
+    const bool windowed,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t framesPerSecondValue)
+  {
+    mHandle = handle;
+    mWindow = window;
+    mWindowed = windowed;
+    mWidth = width;
+    mHeight = height;
+    framesPerSecond = framesPerSecondValue;
+    antialiasingHigh = 0U;
+    antialiasingLow = 0U;
+  }
 
   /**
    * Address: 0x004368B0 (FUN_004368B0)

@@ -42,6 +42,10 @@ namespace gpg::core::legacy
    * What it does:
    * Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination`
    * and returns the advanced destination lane.
+   *
+   * Note: The 28-byte `GrowInsert28ByteLane` helper at 0x0080AB00 has an
+   * additional binary-sibling alias emitted at 0x005B5170
+   * (`CPathPoint` grow/insert lane) that funnels into the same body.
    */
   [[nodiscard]] std::byte* CopyForward28ByteLane(
     std::byte* destination,
@@ -72,6 +76,8 @@ namespace gpg::core::legacy
 
   /**
    * Address: 0x0080AB00 (FUN_0080AB00)
+   * Address: 0x00561460 (FUN_00561460, SSyncData 28-byte grow/insert lane)
+   * Address: 0x005B5170 (FUN_005B5170, CPathPoint 28-byte grow/insert lane)
    *
    * What it does:
    * Allocates replacement storage for one 28-byte fastvector lane and
@@ -607,6 +613,9 @@ namespace gpg::core::legacy
    * Address: 0x00702D70 (FUN_00702D70)
    * Address: 0x0072AA60 (FUN_0072AA60)
    * Address: 0x00774190 (FUN_00774190)
+   * Address: 0x00553B90 (FUN_00553B90, SSyncData uint dword grow/insert lane)
+   * Address: 0x00559190 (FUN_00559190, SSTIEntityAttachInfo dword grow/insert lane)
+   * Address: 0x00657F60 (FUN_00657F60, fastvector<float> dword grow/insert lane)
    *
    * What it does:
    * Allocates replacement storage for one 4-byte fastvector lane and

@@ -90,17 +90,49 @@ namespace
   }
 
   /**
+   * Address: 0x007EC050 (FUN_007EC050)
+   *
+   * IDA signature:
+   * Moho::MeshThumbnail *__cdecl sub_7EC050(Moho::MeshThumbnail *a1);
+   *
+   * What it does:
+   * Guarded copy-construct wrapper the release binary used when a queue
+   * node had just been allocated: when the destination slot is non-null,
+   * invokes `MeshThumbnail::MeshThumbnail(const MeshThumbnail&)` on the
+   * supplied `source`; otherwise returns the slot pointer untouched. The
+   * SEH frame in the raw listing is the compiler-emitted stack unwinder
+   * for the copy constructor; no additional engine-level guard is
+   * needed here because `MeshThumbnail`'s copy constructor is
+   * exception-safe and releases its own partial state on failure.
+   */
+  moho::MeshThumbnail* ConstructMeshThumbnailInAllocatedSlot(
+    moho::MeshThumbnail* const destination, const moho::MeshThumbnail& source
+  )
+  {
+    if (destination == nullptr) {
+      return destination;
+    }
+
+    return ::new (destination) moho::MeshThumbnail(source);
+  }
+
+  /**
    * Address: 0x007EBD50 (FUN_007EBD50)
    *
    * What it does:
-   * Allocates one node and inserts it before `position`.
+   * Allocates one node and inserts it before `position`. The freshly
+   * allocated node is value-initialized, then its `value` slot receives
+   * the incoming thumbnail via the recovered copy-construct helper
+   * (`ConstructMeshThumbnailInAllocatedSlot`) so the observable
+   * allocation-then-copy sequence matches the release binary.
    */
   void InsertBefore(
     moho::MeshThumbnailQueue& queue, moho::MeshThumbnailNode* const position, const moho::MeshThumbnail& value
   )
   {
     moho::MeshThumbnailNode* const node = new moho::MeshThumbnailNode{};
-    node->value = value;
+    node->value.~MeshThumbnail();
+    (void)ConstructMeshThumbnailInAllocatedSlot(&node->value, value);
 
     node->next = position;
     node->prev = position->prev;

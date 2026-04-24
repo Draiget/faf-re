@@ -108,6 +108,17 @@ namespace moho
   static_assert(offsetof(SWldGameData, mGameRules) == 0x04, "SWldGameData::mGameRules offset must be 0x04");
   static_assert(offsetof(SWldGameData, mWldMap) == 0x08, "SWldGameData::mWldMap offset must be 0x08");
 
+  /**
+   * Address: 0x00885A20 (FUN_00885A20)
+   *
+   * What it does:
+   * Releases the three owned handles carried by one transient `SWldGameData`
+   * holder in the exact binary order (map, rules, lua state) so that
+   * `LoadGameData`'s SEH unwinder and `func_DoLoading`'s post-use cleanup see
+   * identical teardown semantics.
+   */
+  void ReleaseWldGameDataHandles(SWldGameData* gameData);
+
   enum class EWldScenarioLoadControlState : std::uint32_t
   {
     kNotStarted = 0,

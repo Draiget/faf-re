@@ -40,6 +40,19 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x00940560 (FUN_00940560)
+         *
+         * IDA signature:
+         * int __thiscall sub_940560(int this);
+         *
+         * What it does:
+         * Initializes one `gpg::gal::Error` payload with canonical "<unknown>"
+         * source/file lane and "<undefined>" message lane, used as the default
+         * allocation-failure exception body in GAL backend paths.
+         */
+        Error();
+
+        /**
          * Address: 0x009404D0 (FUN_009404D0)
          *
          * What it does:

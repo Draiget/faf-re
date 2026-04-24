@@ -5115,11 +5115,43 @@ namespace
 	 * Address: 0x00917100 (FUN_00917100, sub_917100)
 	 *
 	 * What it does:
-	 * Builds one reflected `gpg::RRef` lane for a WrapFile runtime payload.
+	 * Pack entry: builds one temporary `gpg::RRef` by routing through
+	 * `gpg::RRef_WrapFile` and copies the `(mObj, mType)` pair into
+	 * caller-provided storage. The canonical reflection-reference body lives
+	 * in `gpg::RRef_WrapFile` at 0x00916E60 (non-polymorphic WrapFile ⇒ the
+	 * derived-type cache branch is dead and the effective behavior is the
+	 * direct field assignment below).
 	 */
 	[[maybe_unused]] gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFileRuntimeView* const wrapFile)
 	{
 		out->mObj = wrapFile;
+		out->mType = CachedType<WrapFile>(gWrapFileType);
+		return out;
+	}
+
+	/**
+	 * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
+	 *
+	 * IDA signature:
+	 * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
+	 *
+	 * What it does:
+	 * Builds a reflected reference for a `WrapFile` payload using the cached
+	 * RTTI lookup and a 3-slot TLS derived-type normalization helper,
+	 * matching the binary's TLS-cached `IsDerivedFrom` adjustment chain.
+	 * `WrapFile` is a non-polymorphic struct so the runtime-type
+	 * compare-equal fast path always fires and the derived-type TLS-cache
+	 * lanes are dead code in this instantiation; the effective behavior is
+	 * the same `(out->mObj = object; out->mType = CachedType<WrapFile>())`
+	 * assignment as the caller-pack entry at 0x00917100.
+	 */
+	gpg::RRef* RRefWrapFileImpl(gpg::RRef* const out, WrapFileRuntimeView* const object)
+	{
+		if (out == nullptr) {
+			return nullptr;
+		}
+
+		out->mObj = object;
 		out->mType = CachedType<WrapFile>(gWrapFileType);
 		return out;
 	}
@@ -9184,15 +9216,74 @@ namespace
 
 	struct LuaCallFrameRuntimeView
 	{
-		LuaState* state = nullptr;              // +0x00
-		std::uint8_t reserved04[0x14] = {};    // +0x04
-		int argumentCount = 0;                 // +0x18
-		int nextTopIndex = 0;                  // +0x1C
+		LuaState* state = nullptr;              // +0x00 (root-main-thread LuaState*)
+		LuaObject function{};                   // +0x04 (callable LuaObject, tracked on list)
+		int argumentCount = 0;                  // +0x18
+		int nextTopIndex = 0;                   // +0x1C
 	};
 	static_assert(offsetof(LuaCallFrameRuntimeView, state) == 0x00, "LuaCallFrameRuntimeView::state offset must be 0x00");
+	static_assert(offsetof(LuaCallFrameRuntimeView, function) == 0x04, "LuaCallFrameRuntimeView::function offset must be 0x04");
 	static_assert(offsetof(LuaCallFrameRuntimeView, argumentCount) == 0x18, "LuaCallFrameRuntimeView::argumentCount offset must be 0x18");
 	static_assert(offsetof(LuaCallFrameRuntimeView, nextTopIndex) == 0x1C, "LuaCallFrameRuntimeView::nextTopIndex offset must be 0x1C");
 	static_assert(sizeof(LuaCallFrameRuntimeView) == 0x20, "LuaCallFrameRuntimeView size must be 0x20");
+
+	/**
+	 * Address: 0x00909A00 (FUN_00909A00)
+	 *
+	 * IDA signature:
+	 * int __thiscall sub_909A00(LuaCallFrameRuntimeView *this@<ecx>, const LuaObject *functionObject);
+	 *
+	 * What it does:
+	 * Constructs one Lua call-frame view from a caller-supplied function
+	 * `LuaObject`: default-initializes the embedded function lane, links it
+	 * onto the source object's root-state live-object intrusive list with the
+	 * same tagged value via `AddToUsedObjectList`, captures the root
+	 * main-thread `LuaPlus::LuaState*` wrapper into `state`, asserts the
+	 * function slot is bound (`m_state` non-null), raises a Lua type error
+	 * when the payload is not callable (`tt | 1 != 7` ⇒ not `LUA_TFUNCTION`),
+	 * and records the current root stack top `+ 1` as `nextTopIndex` while
+	 * pushing the function onto that stack as the first call-frame slot.
+	 */
+	LuaCallFrameRuntimeView* ConstructLuaCallFrame(
+		LuaCallFrameRuntimeView* const frame,
+		LuaObject* const functionObject
+	)
+	{
+		frame->function.m_next = nullptr;
+		frame->function.m_prev = nullptr;
+		frame->function.m_state = nullptr;
+		frame->function.m_object.tt = 0;
+		frame->function.m_object.value.p = nullptr;
+
+		LuaState* const sourceState = functionObject->m_state;
+		if (sourceState != nullptr) {
+			frame->function.AddToUsedObjectList(sourceState, &functionObject->m_object);
+		}
+
+		frame->argumentCount = 0;
+		LuaState* const boundState = frame->function.m_state;
+		frame->state = boundState->m_state->l_G->mainthread->stateUserData;
+
+		if (frame->function.m_state == nullptr) {
+			throw LuaAssertion("m_state");
+		}
+
+		constexpr std::uint32_t kFunctionTagMask = 1u;
+		if ((static_cast<std::uint32_t>(frame->function.m_object.tt) | kFunctionTagMask) != 7u) {
+			luaG_typeerror(
+				frame->function.m_state->m_state->l_G->mainthread,
+				&frame->function.m_object,
+				"call"
+			);
+		}
+
+		lua_State* const rootLuaState = frame->state->m_state;
+		const int currentTop = lua_gettop(rootLuaState);
+		frame->nextTopIndex = currentTop + 1;
+
+		(void)frame->function.PushStack(frame->state);
+		return frame;
+	}
 
 	/**
 	 * Address: 0x00907270 (FUN_00907270)
@@ -9201,7 +9292,7 @@ namespace
 	 * Runs one prepared Lua call frame using retained argument-count lanes, then
 	 * materializes one stack-object view for the top result slot.
 	 */
-	[[maybe_unused]] LuaStackObject* InvokeLuaCallFrame(
+	LuaStackObject* InvokeLuaCallFrame(
 		LuaCallFrameRuntimeView* const frame,
 		LuaStackObject* const outResult,
 		const int* const resultCount
@@ -9239,7 +9330,7 @@ namespace
 	 * Pushes one LuaObject argument onto a prepared Lua call frame and bumps the
 	 * retained argument-count lane.
 	 */
-	[[maybe_unused]] LuaCallFrameRuntimeView* PushLuaObjectArgumentToCallFrame(
+	LuaCallFrameRuntimeView* PushLuaObjectArgumentToCallFrame(
 		LuaCallFrameRuntimeView* const frame,
 		LuaObject* const argument
 	)
@@ -12730,12 +12821,55 @@ LuaObject LuaObject::CreateTable(
 	return out;
 }
 
+// Reopen the same unnamed namespace that houses LuaCallFrameRuntimeView and the
+// three recovered frame primitives so we can build a typed `table.method()`
+// driver on top of them without duplicating their layout.
+namespace
+{
+	// Intent-first typed frame wrapper used by LuaObject::Insert / Remove / Sort.
+	// Delegates to the recovered 2007 primitives from earlier in this TU:
+	//   ConstructLuaCallFrame            (0x00909A00, FUN_00909A00)
+	//   InvokeLuaCallFrame               (0x00907270, FUN_00907270)
+	//   PushLuaObjectArgumentToCallFrame (0x00908940, FUN_00908940)
+	void RunLuaTableMethodCallFrame(
+		LuaState* const activeState,
+		LuaObject& methodFunction,
+		LuaObject* const arg0 = nullptr,
+		const bool pushNumericArg = false,
+		const lua_Number numericArg = 0.0,
+		LuaObject* const arg2 = nullptr
+	)
+	{
+		LuaCallFrameRuntimeView frame{};
+		(void)ConstructLuaCallFrame(&frame, &methodFunction);
+
+		if (arg0 != nullptr) {
+			(void)PushLuaObjectArgumentToCallFrame(&frame, arg0);
+		}
+
+		if (pushNumericArg) {
+			lua_pushnumber(activeState->m_state, numericArg);
+			++frame.argumentCount;
+		}
+
+		if (arg2 != nullptr) {
+			(void)PushLuaObjectArgumentToCallFrame(&frame, arg2);
+		}
+
+		LuaStackObject result(activeState, 0);
+		const int multret = LUA_MULTRET;
+		(void)InvokeLuaCallFrame(&frame, &result, &multret);
+	}
+} // namespace
+
 /**
  * Address: 0x00909CE0 (FUN_00909CE0, LuaPlus::LuaObject::Insert)
  *
  * What it does:
- * Calls `table.insert(this, key, obj)` in the active Lua state and restores
- * the original stack top after the call.
+ * Runs `table.insert(this, key, obj)` by constructing one Lua call-frame
+ * view (FUN_00909A00) over the resolved `table.insert` function, pushing
+ * `this`, the numeric key, and the value `obj` as arguments onto it,
+ * invoking the frame, and restoring the original Lua stack top.
  */
 void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
 {
@@ -12750,12 +12884,17 @@ void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
 	{
 		LuaObject tableObject = activeState->GetGlobal("table");
 		LuaObject insertFunction = tableObject["insert"];
-		insertFunction.PushStack(activeState);
 
-		const_cast<LuaObject*>(this)->PushStack(activeState);
-		lua_pushnumber(lstate, static_cast<lua_Number>(key));
-		const_cast<LuaObject&>(obj).PushStack(activeState);
-		lua_call(lstate, 3, LUA_MULTRET);
+		LuaObject thisCopy(*this);
+		LuaObject objCopy(obj);
+		RunLuaTableMethodCallFrame(
+			activeState,
+			insertFunction,
+			&thisCopy,
+			true,
+			static_cast<lua_Number>(key),
+			&objCopy
+		);
 	}
 
 	lua_settop(lstate, oldTop);
@@ -12765,8 +12904,10 @@ void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
  * Address: 0x00909EB0 (FUN_00909EB0, LuaPlus::LuaObject::Remove)
  *
  * What it does:
- * Calls `table.remove(this, index)` in the active Lua state and restores the
- * original stack top after the call.
+ * Runs `table.remove(this, index)` by constructing one Lua call-frame view
+ * (FUN_00909A00) over `table.remove`, pushing `this` and the numeric index
+ * as arguments, invoking the frame, and restoring the original Lua stack
+ * top.
  */
 void LuaObject::Remove(const int32_t index) const
 {
@@ -12777,11 +12918,16 @@ void LuaObject::Remove(const int32_t index) const
 	{
 		LuaObject tableObject = activeState->GetGlobal("table");
 		LuaObject removeFunction = tableObject["remove"];
-		removeFunction.PushStack(activeState);
 
-		const_cast<LuaObject*>(this)->PushStack(activeState);
-		lua_pushnumber(lstate, static_cast<lua_Number>(index));
-		lua_call(lstate, 2, LUA_MULTRET);
+		LuaObject thisCopy(*this);
+		RunLuaTableMethodCallFrame(
+			activeState,
+			removeFunction,
+			&thisCopy,
+			true,
+			static_cast<lua_Number>(index),
+			nullptr
+		);
 	}
 
 	lua_settop(lstate, oldTop);
@@ -12791,8 +12937,9 @@ void LuaObject::Remove(const int32_t index) const
  * Address: 0x0090A020 (FUN_0090A020, LuaPlus::LuaObject::Sort)
  *
  * What it does:
- * Calls `table.sort(this)` in the active Lua state and restores the original
- * stack top after the call.
+ * Runs `table.sort(this)` by constructing one Lua call-frame view
+ * (FUN_00909A00) over `table.sort`, pushing `this` as the single argument,
+ * invoking the frame, and restoring the original Lua stack top.
  */
 void LuaObject::Sort() const
 {
@@ -12803,10 +12950,16 @@ void LuaObject::Sort() const
 	{
 		LuaObject tableObject = activeState->GetGlobal("table");
 		LuaObject sortFunction = tableObject["sort"];
-		sortFunction.PushStack(activeState);
 
-		const_cast<LuaObject*>(this)->PushStack(activeState);
-		lua_call(lstate, 1, LUA_MULTRET);
+		LuaObject thisCopy(*this);
+		RunLuaTableMethodCallFrame(
+			activeState,
+			sortFunction,
+			&thisCopy,
+			false,
+			0.0,
+			nullptr
+		);
 	}
 
 	lua_settop(lstate, oldTop);
@@ -13781,5 +13934,28 @@ namespace LuaPlus
 		}
 
 		gpg::FastVectorRuntimeResetToInline(view);
+	}
+}
+
+namespace gpg
+{
+	/**
+	 * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
+	 *
+	 * IDA signature:
+	 * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
+	 *
+	 * What it does:
+	 * Builds a reflected reference for one `WrapFile` payload (internal
+	 * LuaObject.cpp userdata type) using the cached RTTI lookup and the
+	 * 3-slot TLS derived-type normalization helper. `WrapFile` is a
+	 * non-polymorphic struct so the runtime-type compare-equal fast path
+	 * always fires and the derived-type TLS-cache lanes are dead code in
+	 * this instantiation; the effective behavior is
+	 * `(out->mObj = object; out->mType = CachedType<WrapFile>())`.
+	 */
+	gpg::RRef* RRef_WrapFile(gpg::RRef* const out, void* const object)
+	{
+		return RRefWrapFileImpl(out, static_cast<WrapFileRuntimeView*>(object));
 	}
 }

@@ -404,16 +404,50 @@ namespace
   }
 
   /**
-   * Address: 0x00635520 (FUN_00635520, gpg::RRef_CBoneEntityManipulator wrapper lane)
+   * Address: 0x00635520 (FUN_00635520, gpg::RRef_CBoneEntityManipulator)
+   * Mangled: ?RRef_CBoneEntityManipulator@gpg@@YAPAVRRef@1@PAV01@PAVCBoneEntityManipulator@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CBoneEntityManipulator(gpg::RRef *outRef, Moho::CBoneEntityManipulator *value);
    *
    * What it does:
-   * Builds one reflected reference for a `CBoneEntityManipulator` instance.
+   * Builds one reflected reference for a `CBoneEntityManipulator` instance,
+   * preserving derived runtime type and base-adjusted object lane when the
+   * actual RTTI type descriptor differs from `CBoneEntityManipulator::sType`.
    */
   [[nodiscard]] gpg::RRef BuildBoneEntityManipulatorRef(moho::CBoneEntityManipulator* const object)
   {
+    static gpg::RType* sStaticType = nullptr;
+    if (sStaticType == nullptr) {
+      sStaticType = gpg::LookupRType(typeid(moho::CBoneEntityManipulator));
+    }
+
     gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = sStaticType;
+    if (object == nullptr) {
+      return out;
+    }
+
+    gpg::RType* runtimeType = sStaticType;
+    try {
+      runtimeType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      runtimeType = sStaticType;
+    }
+
+    int baseOffset = 0;
+    if (runtimeType != nullptr && sStaticType != nullptr
+        && runtimeType->IsDerivedFrom(sStaticType, &baseOffset)) {
+      out.mObj = reinterpret_cast<void*>(
+        reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset)
+      );
+      out.mType = runtimeType;
+      return out;
+    }
+
     out.mObj = object;
-    out.mType = gpg::LookupRType(typeid(moho::CBoneEntityManipulator));
+    out.mType = runtimeType != nullptr ? runtimeType : sStaticType;
     return out;
   }
 

@@ -138,21 +138,121 @@ namespace
     delete shield;
   }
 
+  /**
+   * Intrusive-list node layout emitted by MSVC8 `std::list<Shield*>` and the
+   * binary-shape helpers that read/write it (`sub_739F90`, `sub_73A940`, and
+   * `sub_776C30`). The node is the canonical `{prev, next, value}` triplet
+   * used by MSVC8-era STL `list`.
+   */
+  struct ShieldListNode
+  {
+    ShieldListNode* next;  // +0x00
+    ShieldListNode* prev;  // +0x04
+    moho::Shield* value;   // +0x08
+  };
+  static_assert(sizeof(ShieldListNode) == 0x0C, "ShieldListNode size must be 0x0C");
+
+  struct ShieldListView
+  {
+    std::uint32_t iteratorProxy; // +0x00
+    ShieldListNode* head;        // +0x04
+    std::uint32_t size;          // +0x08
+  };
+  static_assert(offsetof(ShieldListView, head) == 0x04, "ShieldListView::head offset must be 0x04");
+  static_assert(offsetof(ShieldListView, size) == 0x08, "ShieldListView::size offset must be 0x08");
+
+  /**
+   * Address: 0x00739F90 (FUN_00739F90)
+   *
+   * IDA signature:
+   * int *__stdcall sub_739F90(int prev, int next, int *valuePtr);
+   *
+   * What it does:
+   * Allocates one `std::list<Shield*>` node (12 bytes via MSVC8-era
+   * `_Buynode` pool at FUN_0073A940 called with count = 1) and initializes
+   * its three words in order `{next=prev-arg, prev=next-arg, value=*value}`.
+   * In MSVC8's `std::list::_Buynode(_Nextarg, _Prevarg, _Valarg)` the first
+   * two stored words are `_Next` and `_Prev` in that layout order, matching
+   * the binary stores `[result]=a1`, `[result+4]=a2`, `[result+8]=*a3`.
+   *
+   * Used by `Shield(Sim*, LuaObject, sourceIdx)` (binary lane at
+   * 0x00776535) as the list-node allocator for `sim->mShields.push_back`.
+   */
+  [[nodiscard]] ShieldListNode* AllocateShieldListNode(
+    ShieldListNode* const nextLink,
+    ShieldListNode* const prevLink,
+    moho::Shield* const* const valueSource
+  )
+  {
+    if (0xFFFFFFFFu / 1u < 0x0Cu) {
+      throw std::bad_alloc();
+    }
+
+    auto* const node = static_cast<ShieldListNode*>(::operator new(sizeof(ShieldListNode)));
+    node->next = nextLink;
+    node->prev = prevLink;
+    node->value = valueSource != nullptr ? *valueSource : nullptr;
+    return node;
+  }
+
+  /**
+   * Address: 0x00776C30 (FUN_00776C30)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_776C30@<eax>(int *shieldRef@<eax>, int listView@<esi>);
+   *
+   * What it does:
+   * Walks the intrusive `std::list<Shield*>` node ring starting at the
+   * head sentinel's first node and unlinks every node whose `value` word
+   * matches the target shield. For each match: detaches it from its
+   * neighbors (`prev->next = n.next; n.next->prev = n.prev`), deletes the
+   * node, and decrements the list size counter. Head sentinel itself is
+   * skipped so the list remains valid.
+   *
+   * Used by `Shield::~Shield` (via non-deleting dtor core at 0x00776600)
+   * to purge the destroyed shield from `Sim::mShields`.
+   */
+  void UnlinkShieldListNodesByValue(
+    ShieldListView& listView,
+    moho::Shield* const targetShield
+  ) noexcept
+  {
+    ShieldListNode* const headSentinel = listView.head;
+    if (headSentinel == nullptr) {
+      return;
+    }
+
+    ShieldListNode* cursor = headSentinel->next;
+    while (cursor != headSentinel) {
+      ShieldListNode* const nextCursor = cursor->next;
+      if (cursor->value == targetShield) {
+        // Rewire neighbor links before deleting the node (binary writes
+        // `cursor->prev->next = cursor->next` then
+        // `cursor->next->prev = cursor->prev`, both derived from the
+        // intrusive list layout).
+        cursor->prev->next = cursor->next;
+        cursor->next->prev = cursor->prev;
+        ::operator delete(cursor);
+        if (listView.size != 0u) {
+          --listView.size;
+        }
+      }
+      cursor = nextCursor;
+    }
+  }
+
   void UnlinkShieldFromSimList(moho::Shield* const shield)
   {
     if (!shield || !shield->SimulationRef) {
       return;
     }
 
-    auto& shields = shield->SimulationRef->mShields;
-    for (auto it = shields.begin(); it != shields.end();) {
-      if (*it == shield) {
-        it = shields.erase(it);
-        continue;
-      }
-
-      ++it;
-    }
+    // `Sim::mShields` is `std::list<Shield*>`. Reinterpret as the typed
+    // binary-layout view so we can apply the exact FUN_00776C30 unlink path
+    // that the original binary used during `Shield::~Shield`.
+    auto& shieldList = shield->SimulationRef->mShields;
+    auto* const listView = reinterpret_cast<ShieldListView*>(&shieldList);
+    UnlinkShieldListNodesByValue(*listView, shield);
   }
 } // namespace
 
@@ -227,7 +327,28 @@ namespace moho
     AdjustShieldInstanceStat(1L);
 
     if (SimulationRef != nullptr) {
-      SimulationRef->mShields.push_back(this);
+      // Match the binary `Shield::Shield` tail lane (0x00776535..0x0077654D):
+      // allocate one `{next=tail, prev=tail->prev, value=this}` node via the
+      // MSVC8 `_Buynode` helper (FUN_00739F90) and splice it at the list tail
+      // so iteration order is stable. `push_back` in msvc8::list uses the
+      // same node layout and the same helper in the original binary.
+      auto* const listView = reinterpret_cast<ShieldListView*>(&SimulationRef->mShields);
+      ShieldListNode* const headSentinel = listView->head;
+      if (headSentinel != nullptr) {
+        moho::Shield* const valueSource = this;
+        ShieldListNode* const newNode = AllocateShieldListNode(
+          headSentinel,
+          headSentinel->prev,
+          &valueSource
+        );
+        headSentinel->prev->next = newNode;
+        headSentinel->prev = newNode;
+        ++listView->size;
+      } else {
+        // Head sentinel absent: fall back to the STL push_back path so the
+        // list is never left in a partially-initialized state.
+        SimulationRef->mShields.push_back(this);
+      }
     }
   }
 

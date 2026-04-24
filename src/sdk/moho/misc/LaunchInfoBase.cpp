@@ -1,5 +1,6 @@
 #include "moho/misc/LaunchInfoBase.h"
 
+#include <array>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -1185,7 +1186,7 @@ namespace
    * What it does:
    * Backward-copy adapter lane for one contiguous ArmyLaunchInfo range.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterA(
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterA(
     moho::ArmyLaunchInfo* const destinationEnd,
     const moho::ArmyLaunchInfo* const sourceEnd,
     const moho::ArmyLaunchInfo* const sourceBegin
@@ -1195,19 +1196,54 @@ namespace
   }
 
   /**
-   * Address: 0x00545100 (FUN_00545100)
+   * Address: 0x00545100 (FUN_00545100, ArmyLaunchInfo backward-copy adapter lane B)
+   *
+   * IDA signature:
+   * int __usercall sub_5455B0@<eax>(int result@<eax>, int a2@<ecx>, int a3);
    *
    * What it does:
    * Alternate backward-copy adapter lane for one contiguous ArmyLaunchInfo
-   * range.
+   * range. Both adapter lanes A/B share the same core; keeping one named
+   * lane per binary address preserves the 2-caller xref shape.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterB(
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardAdapterB(
     moho::ArmyLaunchInfo* const destinationEnd,
     const moho::ArmyLaunchInfo* const sourceEnd,
     const moho::ArmyLaunchInfo* const sourceBegin
   )
   {
     return CopyArmyLaunchInfoRangeBackwardCore(destinationEnd, sourceEnd, sourceBegin);
+  }
+
+  using ArmyLaunchInfoBackwardCopyAdapter = moho::ArmyLaunchInfo* (*)(
+    moho::ArmyLaunchInfo*, const moho::ArmyLaunchInfo*, const moho::ArmyLaunchInfo*
+  );
+
+  // Publishes both recovered backward-copy adapter lanes so neither tokenized
+  // entry at 0x00544740 / 0x00545100 becomes dead code. The table mirrors the
+  // original binary's two-lane shape: one lane per caller site.
+  constexpr std::array<ArmyLaunchInfoBackwardCopyAdapter, 2> kArmyLaunchInfoBackwardCopyAdapters = {
+    &CopyArmyLaunchInfoRangeBackwardAdapterA,
+    &CopyArmyLaunchInfoRangeBackwardAdapterB,
+  };
+
+  /**
+   * What it does:
+   * Dispatch wrapper that selects one of the two binary-visible backward-copy
+   * adapter lanes by index (0 = 0x00544740, 1 = 0x00545100) and forwards the
+   * range arguments.
+   */
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackward(
+    const std::size_t adapterIndex,
+    moho::ArmyLaunchInfo* const destinationEnd,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    const moho::ArmyLaunchInfo* const sourceBegin
+  )
+  {
+    const std::size_t boundedIndex = (adapterIndex < kArmyLaunchInfoBackwardCopyAdapters.size())
+      ? adapterIndex
+      : 0u;
+    return kArmyLaunchInfoBackwardCopyAdapters[boundedIndex](destinationEnd, sourceEnd, sourceBegin);
   }
 
   /**

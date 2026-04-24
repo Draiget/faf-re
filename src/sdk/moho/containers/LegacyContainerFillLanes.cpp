@@ -5,6 +5,10 @@
 #include <cstdint>
 #include <stdexcept>
 
+#include <boost/function/function_fwd.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/throw_exception.hpp>
+
 namespace
 {
   [[nodiscard]] std::uint32_t* FillDwordSpanByCount(
@@ -321,6 +325,18 @@ namespace
   );
 #endif
 
+  /**
+   * Address: 0x0054DBE0 (FUN_0054DBE0, SmallBufferArray reset + owner release)
+   *
+   * IDA signature:
+   * void *__usercall sub_54DBE0@<eax>(_DWORD *self@<eax>);
+   *
+   * What it does:
+   * Rebinds the heap storage of a small-buffer array back to its inline
+   * cursor (releasing heap with `operator delete[]`), zeroes the cursor, and
+   * then decrements the shared owner control block's refcount, invoking the
+   * owner's scalar-deleting destructor if it reaches zero.
+   */
   [[nodiscard]] std::intptr_t ResetSmallBufferArrayAndReleaseOwner(SmallBufferArrayRuntimeView& array) noexcept
   {
     if (array.begin != static_cast<void*>(array.inlineStorageCursor)) {
@@ -27507,6 +27523,89 @@ namespace
   {
     *outValue = source->begin;
     return outValue;
+  }
+
+  /**
+   * Layout image for one `boost::function1`-style runtime callable. The ABI
+   * assumes a front-loaded invoker-table pointer followed by engine-owned
+   * small-buffer-optimized functor storage. Dispatch reads the invoke slot
+   * from the invoker table; a null invoker table signals an unbound functor
+   * and must raise `boost::bad_function_call`.
+   */
+  struct BoostFunction1RuntimeView
+  {
+    const void* invokerTable;      // +0x00: invoker vtable pointer
+    std::byte functorPayload[1];   // +0x08: SBO payload (binary uses +8 offset)
+  };
+  static_assert(
+    offsetof(BoostFunction1RuntimeView, functorPayload) == sizeof(void*),
+    "BoostFunction1RuntimeView::functorPayload must follow invokerTable pointer"
+  );
+
+  /**
+   * Address: 0x00937290 (FUN_00937290, boost::function1<R, A>::operator()
+   *                      one-argument dispatch)
+   *
+   * IDA signature:
+   * int __thiscall sub_937290(char *this@<ecx>, int a2);
+   *
+   * What it does:
+   * Dispatches one `boost::function1` one-argument invocation. Reads the
+   * invoker-table pointer from `this + 0x00`; when null, raises
+   * `boost::bad_function_call` via `boost::throw_exception`. Otherwise
+   * invokes `invokerTable[1](functorPayload, arg)` — the second vtable slot
+   * is the invoke thunk, and the functor payload begins at `this + 0x08`
+   * (the manager slot at +0x04 is left untouched during dispatch).
+   */
+  [[nodiscard]] std::uint32_t InvokeBoostFunction1(
+    BoostFunction1RuntimeView* const self,
+    const std::uint32_t arg
+  )
+  {
+    if (self == nullptr || self->invokerTable == nullptr) {
+      boost::bad_function_call badCall{};
+      boost::throw_exception(badCall);
+    }
+
+    using InvokeFn = std::uint32_t(__cdecl*)(void*, std::uint32_t);
+    const auto* const vtableWords = reinterpret_cast<const void* const*>(self->invokerTable);
+    const auto invoke = reinterpret_cast<InvokeFn>(const_cast<void*>(vtableWords[1]));
+    return invoke(self->functorPayload, arg);
+  }
+
+  /**
+   * Address: 0x00937360 (FUN_00937360, `boost::function1::operator()` tail
+   *                      thunk — `jmp sub_937290`)
+   *
+   * What it does:
+   * Single-instruction tail-thunk entry. In the binary this is the
+   * compiler-emitted `__thiscall` bridge that drops directly into
+   * `InvokeBoostFunction1` with `(this, arg)` passed through unchanged.
+   */
+  [[nodiscard]] std::uint32_t InvokeBoostFunction1TailThunk(
+    BoostFunction1RuntimeView* const self,
+    const std::uint32_t arg
+  )
+  {
+    return InvokeBoostFunction1(self, arg);
+  }
+
+  /**
+   * Address: 0x00937490 (FUN_00937490, `boost::function1::operator()`
+   *                      pointer-indirected adapter)
+   *
+   * What it does:
+   * Adapter entry invoked with an indirect `BoostFunction1RuntimeView**`
+   * handle (e.g., a member slot holding a pointer to the runtime object).
+   * Dereferences one level of indirection and forwards to
+   * `InvokeBoostFunction1`.
+   */
+  [[nodiscard]] std::uint32_t InvokeBoostFunction1IndirectAdapter(
+    BoostFunction1RuntimeView** const selfSlot,
+    const std::uint32_t arg
+  )
+  {
+    return InvokeBoostFunction1(selfSlot ? *selfSlot : nullptr, arg);
   }
 } // namespace
 

@@ -56,6 +56,19 @@ namespace moho
     );
 
     /**
+     * Address: 0x00742360 (FUN_00742360, Moho::SDecalInfo::~SDecalInfo)
+     *
+     * What it does:
+     * Destroys one decal-info payload. Compiler-synthesized body destroys
+     * trailing string `mType` (deallocating when capacity exceeds the SSO
+     * limit of 0x10), then runs the eh-vector destructor lane over the
+     * two texture-name strings (count=2, stride=sizeof(msvc8::string))
+     * to tear down `mTexName2` and `mTexName1` in reverse declaration
+     * order. Aligned `Wm3::Vec3f` lanes are trivial and need no teardown.
+     */
+    ~SDecalInfo();
+
+    /**
      * Address: 0x0077D470 (FUN_0077D470, Moho::SDecalInfo::MemberDeserialize)
      *
      * What it does:

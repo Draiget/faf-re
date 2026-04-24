@@ -1678,6 +1678,68 @@ namespace Wm3
     return outScaled;
   }
 
+  /**
+   * Address: 0x00A45570 (FUN_00A45570, ??0Intersector3f@Wm3@@QAE@@Z)
+   * Mangled: ??0Intersector3f@Wm3@@QAE@@Z
+   *
+   * What it does:
+   * Shared base-class initializer for every `Wm3::IntrSegment3*` / `Wm3::IntrBox3*`
+   * intersector variant: clears the contact-time lane, installs the
+   * `Intersector<float, Vector3<float>>` vftable tag, and resets intersection-type
+   * to 0 (none).
+   */
+  class Intersector3f
+  {
+  public:
+    Intersector3f() noexcept = default;
+    virtual ~Intersector3f() = default;
+
+    [[nodiscard]] float GetContactTime() const noexcept { return mContactTime; }
+    [[nodiscard]] std::int32_t GetIntersectionType() const noexcept { return mIntersectionType; }
+
+  protected:
+    float mContactTime = 0.0f;          // +0x04 (vftable occupies +0x00)
+    std::int32_t mIntersectionType = 0; // +0x08
+  };
+  static_assert(offsetof(Intersector3f, mContactTime) == 0x04, "Intersector3f::mContactTime offset must be 0x04");
+  static_assert(offsetof(Intersector3f, mIntersectionType) == 0x08, "Intersector3f::mIntersectionType offset must be 0x08");
+  static_assert(sizeof(Intersector3f) == 0x0C, "Intersector3f size must be 0x0C");
+
+  /**
+   * Address: 0x00A6BE80 (FUN_00A6BE80, ??0?$IntrSegment3Capsule3@M@Wm3@@QAE@ABV?$Segment3@M@1@ABV?$Capsule3@M@1@@Z)
+   *
+   * IDA signature:
+   * int __thiscall sub_A6BE80(IntrSegment3Capsule3<float> *this, const Segment3<float>* rkSegment,
+   *                           const Capsule3<float>* rkCapsule);
+   *
+   * What it does:
+   * Builds one segment/capsule intersector object: runs the shared Intersector3f
+   * base initializer, stores non-owning pointers to the input segment (+0x0C)
+   * and capsule (+0x10), and installs the IntrSegment3Capsule3<float> vftable.
+   * Callers then invoke Test/Find/StaticTest/StaticFind virtuals on the object.
+   */
+  class IntrSegment3Capsule3f : public Intersector3f
+  {
+  public:
+    IntrSegment3Capsule3f(
+      const Segment3<float>& segment,
+      const Capsule3<float>& capsule
+    ) noexcept
+      : Intersector3f()
+      , mSegment(&segment)
+      , mCapsule(&capsule)
+    {
+    }
+
+    [[nodiscard]] const Segment3<float>& GetSegment() const noexcept { return *mSegment; }
+    [[nodiscard]] const Capsule3<float>& GetCapsule() const noexcept { return *mCapsule; }
+
+  private:
+    const Segment3<float>* mSegment = nullptr; // +0x0C
+    const Capsule3<float>* mCapsule = nullptr; // +0x10
+  };
+  static_assert(sizeof(IntrSegment3Capsule3f) == 0x14, "IntrSegment3Capsule3f size must be 0x14");
+
   struct IntrSegment3Capsule3fRootsRuntimeView
   {
     std::uint8_t reserved00_2F[0x30]{};
@@ -4124,10 +4186,12 @@ namespace Wm3
     capsule.Segment = segment;
     capsule.Radius = sphere.Radius;
 
+    const IntrSegment3Capsule3f intersector(sweepSegment, capsule);
     float roots[2]{};
-    const int rootCount = LineCapsuleIntersectionRoots(sweepSegment.Origin, sweepSegment.Direction, capsule, roots);
+    const int rootCount = LineCapsuleIntersectionRoots(
+      intersector.GetSegment().Origin, intersector.GetSegment().Direction, intersector.GetCapsule(), roots);
     float clipped[2]{};
-    return ClipRootsToPathExtent(roots, rootCount, sweepSegment.Extent, clipped) > 0;
+    return ClipRootsToPathExtent(roots, rootCount, intersector.GetSegment().Extent, clipped) > 0;
   }
 
   /**
@@ -4183,10 +4247,12 @@ namespace Wm3
     capsule.Segment = segment;
     capsule.Radius = sphere.Radius;
 
+    const IntrSegment3Capsule3f intersector(sweepSegment, capsule);
     float roots[2]{};
-    const int rootCount = LineCapsuleIntersectionRoots(sweepSegment.Origin, sweepSegment.Direction, capsule, roots);
+    const int rootCount = LineCapsuleIntersectionRoots(
+      intersector.GetSegment().Origin, intersector.GetSegment().Direction, intersector.GetCapsule(), roots);
     float clipped[2]{};
-    const int clippedCount = ClipRootsToPathExtent(roots, rootCount, sweepSegment.Extent, clipped);
+    const int clippedCount = ClipRootsToPathExtent(roots, rootCount, intersector.GetSegment().Extent, clipped);
     if (clippedCount <= 0) {
       if (intrType) {
         *intrType = 0;

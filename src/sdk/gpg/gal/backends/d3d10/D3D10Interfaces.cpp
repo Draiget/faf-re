@@ -2788,6 +2788,26 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F7230 (FUN_008F7230, sub_8F7230)
+     *
+     * IDA signature:
+     * int __thiscall sub_8F7230(_DWORD *this, int a2);
+     *
+     * What it does:
+     * Appends one `DXGI_MODE_DESC` into the inner mode-descriptor vector of
+     * an `AdapterModeD3D10` entry. When spare capacity already exists in the
+     * vector's triplet the helper writes the incoming record in-place via the
+     * recovered byte-copy lane (`FUN_008F65B0`) and advances the `end`
+     * pointer; otherwise it delegates to the reallocate-and-insert lane
+     * (`FUN_008F6FB0`) so the vector grows by the MSVC8 legacy growth policy.
+     * Matches the per-element push loop emitted by `AdapterD3D10::ProbeOutputsAndModes`.
+     */
+    void AppendDisplayModeToAdapterModeEntry(AdapterModeD3D10& entry, const DXGI_MODE_DESC& mode)
+    {
+      entry.modes_.push_back(mode);
+    }
+
+    /**
      * Address: 0x008F6230 (FUN_008F6230)
      *
      * What it does:
@@ -3812,6 +3832,22 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008CB6B0 (FUN_008CB6B0)
+     *
+     * IDA signature:
+     * void __noreturn sub_8CB6B0();
+     *
+     * What it does:
+     * Throws the legacy MSVC `std::out_of_range("invalid vector<T> subscript")`
+     * used by bounds-checked `operator[]` instantiations for the D3D device
+     * caps / adapter-mode / antialiasing-option vectors.
+     */
+    [[noreturn]] void ThrowVectorSubscriptOutOfRange()
+    {
+      throw std::out_of_range("invalid vector<T> subscript");
+    }
+
+    /**
      * Address: 0x008F8CA0 (FUN_008F8CA0)
      *
      * What it does:
@@ -4105,10 +4141,14 @@ namespace gpg::gal
 
     /**
      * Address: 0x0093FB80 (FUN_0093FB80)
-     * Address: 0x00937360 (FUN_00937360)
      *
      * What it does:
      * Dispatch bridge into the `EffectMacro` copy-assignment range helper.
+     *
+     * Note: 0x00937360 was previously listed here; that address is actually a
+     * `jmp sub_937290` tail-thunk into the `boost::function1` dispatch helper
+     * (see `moho/containers/LegacyContainerFillLanes.cpp`), not an
+     * `EffectMacro` copy-range dispatch.
      */
     [[maybe_unused]] EffectMacro* CopyAssignEffectMacroRangeDispatchA(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
@@ -4656,6 +4696,41 @@ namespace gpg::gal
   {}
 
   /**
+   * Address: 0x008FF520 (FUN_008FF520)
+   *
+   * IDA signature:
+   * void __cdecl __noreturn sub_8FF520(int srcBegin, int srcEnd, void *dst);
+   *
+   * What it does:
+   * Legacy uninitialized `AdapterD3D10` array copy-construct lane used by
+   * vector growth/reserve paths. Copy-constructs `[srcBegin, srcEnd)` into
+   * `dst` forward, and if any element copy-ctor throws, walks the
+   * already-constructed prefix forward destroying each element via its virtual
+   * non-deleting destructor and rethrows the original exception.
+   *
+   * The caller supplies raw byte pointers because the heap allocation comes
+   * from `AllocateStride13CArray` (raw `operator new`) before any element has
+   * been constructed.
+   */
+  [[maybe_unused]] void CopyConstructAdapterD3D10ArrayOrUnwind(
+    const AdapterD3D10* const srcBegin,
+    const AdapterD3D10* const srcEnd,
+    AdapterD3D10* const dst)
+  {
+    AdapterD3D10* cursor = dst;
+    try {
+      for (const AdapterD3D10* src = srcBegin; src != srcEnd; ++src, ++cursor) {
+        ::new (static_cast<void*>(cursor)) AdapterD3D10(*src);
+      }
+    } catch (...) {
+      for (AdapterD3D10* already = dst; already != cursor; ++already) {
+        already->~AdapterD3D10();
+      }
+      throw;
+    }
+  }
+
+  /**
    * Address: 0x008FF2F0 (FUN_008FF2F0)
    *
    * What it does:
@@ -4707,14 +4782,20 @@ namespace gpg::gal
         modeEntry.outputDescPad_ = 0U;
 
         if ((countResult >= 0) && (modeCount != 0U)) {
-          modeEntry.modes_.resize(modeCount);
-          DXGI_MODE_DESC* const modeList = modeEntry.modes_.begin();
-          const HRESULT fillResult = output->GetDisplayModeList(format, 0U, &modeCount, modeList);
-          if (fillResult < 0) {
-            modeEntry.modes_.clear();
-          } else if (modeEntry.modes_.size() > modeCount) {
-            modeEntry.modes_.resize(modeCount);
+          // Mirror the binary's scratch-buffer-then-per-element-push path:
+          // DXGI fills a caller-owned scratch array via `GetDisplayModeList`
+          // and each entry is appended through the recovered per-element
+          // push lane (`AppendDisplayModeToAdapterModeEntry`). The scratch
+          // buffer is released before the next format probe.
+          auto* const scratch =
+            static_cast<DXGI_MODE_DESC*>(::operator new(static_cast<std::size_t>(modeCount) * sizeof(DXGI_MODE_DESC)));
+          const HRESULT fillResult = output->GetDisplayModeList(format, 0U, &modeCount, scratch);
+          if (fillResult >= 0) {
+            for (UINT modeIndex = 0U; modeIndex < modeCount; ++modeIndex) {
+              AppendDisplayModeToAdapterModeEntry(modeEntry, scratch[modeIndex]);
+            }
           }
+          ::operator delete[](scratch);
         }
 
         AppendAdapterModeEntry(modes_, modeEntry);
@@ -5402,6 +5483,22 @@ namespace gpg::gal
     }
 
     return shaderResourceView_;
+  }
+
+  /**
+   * Address: 0x008F7F30 (FUN_008F7F30)
+   *
+   * IDA signature:
+   * char *__thiscall CubeRenderTargetD3D10::CubeRenderTargetD3D10(CubeRenderTargetD3D10 *this@<ecx>);
+   *
+   * What it does:
+   * Default-initializes one `CubeRenderTargetD3D10` wrapper: applies its
+   * vftable at `this+0x00` and default-constructs the embedded
+   * `CubeRenderTargetContext` at `this+0x04`.
+   */
+  CubeRenderTargetD3D10::CubeRenderTargetD3D10()
+    : context_()
+  {
   }
 
   /**

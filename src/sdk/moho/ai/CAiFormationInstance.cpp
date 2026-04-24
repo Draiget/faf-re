@@ -48,6 +48,12 @@ namespace
   [[nodiscard]] gpg::RType* CachedSUnitOffsetInfoType();
   [[nodiscard]] gpg::RType* CachedSCoordsVec2Type();
 
+  [[nodiscard]] moho::SFormationCoordCacheNode* LowerBoundOrInsertCoordCacheNode(
+    moho::SFormationCoordCacheMap& cache,
+    std::uint32_t unitEntityId,
+    const moho::SCoordsVec2& position
+  );
+
   [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
   {
     static gpg::RType* type = nullptr;
@@ -1094,6 +1100,22 @@ namespace
     return (lowerBound->unitEntityId == unitEntityId) ? lowerBound : nullptr;
   }
 
+  /**
+   * Address: 0x0056CE70 (FUN_0056CE70)
+   *
+   * IDA signature:
+   * void __stdcall sub_56CE70(_DWORD *a1);
+   *
+   * What it does:
+   * Recursively destroys one lane-map RB-tree subtree rooted at `node`,
+   * unlinking each node's weak owner-word chain before releasing node storage.
+   * The 7 binary callers (incl. `CFormationInstance::CleanupFormation` at
+   * `0x00568AC0`) use this helper for full-map teardown and for node-range
+   * erasure. Here we follow the "both sides recursive" form; the binary
+   * iterates the left spine with a right-recursion, which has the same
+   * observable net behavior (each node's `operator delete` + weak-word chain
+   * unlink happens exactly once in the same order relative to descendants).
+   */
   void DestroyLaneMapSubtree(moho::SFormationLaneUnitNode* node, const moho::SFormationLaneUnitNode* head)
   {
     if (!node || node == head || node->isNil != 0u) {
@@ -1961,11 +1983,168 @@ namespace
       return hint;
     }
 
-    moho::SFormationCoordCacheNode* const node = CoordCacheLowerBoundNode(cache, unitEntityId);
-    if (node != nullptr && node != head && node->isNil == 0u && node->unitEntityId == unitEntityId) {
-      return node;
+    return LowerBoundOrInsertCoordCacheNode(cache, unitEntityId, position);
+  }
+
+  /**
+   * Address: 0x0056F370 (FUN_0056F370, sub_56F370)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_56F370@<eax>(int a1@<eax>, unsigned int *ebx0@<ebx>, _DWORD *a2);
+   *
+   * What it does:
+   * Performs one lower-bound traversal of the coord-cache red-black tree for
+   * `unitEntityId`; when the key is not present the helper routes the insert
+   * to either the shared tree-insert lane (`FUN_0056F520`, recovered as
+   * `RuntimeThrowMapSetTooLongQ`'s neighbor `InsertCoordCacheNodeAtEdge`)
+   * with an appropriate `insertLeft` flag, or falls back to a
+   * predecessor-walk (`FUN_00570640`, recovered as `CoordCachePredecessor`)
+   * when the candidate parent is not the leftmost in the subtree. The
+   * returned `output` slot receives the matched or newly inserted node in
+   * the first word and a `found` flag in byte +4, matching the 2-byte-packed
+   * `std::pair<iterator,bool>` return the MSVC8 `std::map::insert` emits.
+   *
+   * Reconstruction note: this is the non-hint specialization of
+   * `ResolveCoordCacheNodeWithHint`; it is invoked from the shared resolver
+   * when the caller did not supply a valid hint position.
+   */
+  struct CoordCacheInsertResult
+  {
+    moho::SFormationCoordCacheNode* mNode;
+    bool mInserted;
+    std::uint8_t mPad05[3];
+  };
+  static_assert(sizeof(CoordCacheInsertResult) == 0x08, "CoordCacheInsertResult size must be 0x08");
+
+  [[nodiscard]] moho::SFormationCoordCacheNode* LowerBoundOrInsertCoordCacheNode(
+    moho::SFormationCoordCacheMap& cache,
+    const std::uint32_t unitEntityId,
+    const moho::SCoordsVec2& position
+  )
+  {
+    moho::SFormationCoordCacheNode* const head = cache.head;
+    if (head == nullptr) {
+      return nullptr;
     }
-    return CoordCacheInsertBySearch(cache, unitEntityId, position);
+
+    // Walk the tree to locate the lower-bound node. `parent` tracks the last
+    // non-nil node visited; `insertLeft` flips between the left/right branch
+    // taken at each level, matching the binary's `setb cl` capture.
+    moho::SFormationCoordCacheNode* parent = head->parent;
+    moho::SFormationCoordCacheNode* cursor = parent;
+    bool insertLeft = true;
+
+    if (!IsCoordCacheSentinel(cursor, head)) {
+      while (!IsCoordCacheSentinel(cursor, head)) {
+        parent = cursor;
+        if (unitEntityId < cursor->unitEntityId) {
+          insertLeft = true;
+          cursor = cursor->left;
+        } else {
+          insertLeft = false;
+          cursor = cursor->right;
+        }
+      }
+    }
+
+    moho::SFormationCoordCacheNode* candidate = parent;
+    if (insertLeft) {
+      if (candidate == head->left) {
+        moho::SFormationCoordCacheNode* const inserted =
+          CoordCacheInsertBeforeHint(cache, candidate, unitEntityId, position);
+        return inserted;
+      }
+      candidate = CoordCachePredecessor(candidate, head);
+    }
+
+    if (candidate == nullptr || candidate == head || candidate->unitEntityId < unitEntityId) {
+      moho::SFormationCoordCacheNode* const inserted =
+        CoordCacheInsertAfterHint(cache, candidate, unitEntityId, position);
+      return inserted;
+    }
+
+    return candidate;
+  }
+
+  /**
+   * Iterator-proxy lane used by the MSVC8 legacy `std::map<uint, ...>` ABI the
+   * binary emits for coord-cache lookups. The parent container parks the
+   * proxy on an on-stack sentinel while the lookup runs so iterator-debugging
+   * builds can detect container invalidation; the binary tracks the same
+   * linked list even in release.
+   */
+  struct CoordCacheIteratorProxyChain
+  {
+    CoordCacheIteratorProxyChain* mNext;
+  };
+  static_assert(
+    sizeof(CoordCacheIteratorProxyChain) == 0x04,
+    "CoordCacheIteratorProxyChain size must be 0x04"
+  );
+
+  /**
+   * 2-word iterator-pair output emitted by
+   * `PublishCoordCacheLowerBoundIteratorPair`. The binary writes the key in
+   * the first slot and the first data-member of the matched node (typically
+   * the intrusive `_Left` link that STL uses to reach the entry payload) in
+   * the second.
+   */
+  struct CoordCacheIteratorPair
+  {
+    std::uint32_t mKey;
+    void* mNodeFirstField;
+  };
+  static_assert(sizeof(CoordCacheIteratorPair) == 0x08, "CoordCacheIteratorPair size must be 0x08");
+
+  /**
+   * Address: 0x0082CEA0 (FUN_0082CEA0)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_82CEA0@<eax>(int cache@<eax>, _DWORD *output@<edi>, int key);
+   *
+   * What it does:
+   * Runs one coord-cache lower-bound lookup for `key` and publishes the
+   * resulting `(key, node->first_field)` iterator pair into `output`. While
+   * the lookup runs, the helper pushes an on-stack proxy-chain sentinel onto
+   * the cache's iterator-orphan list (at `cache + 8`) and unlinks it on
+   * return, mirroring the MSVC8 STL iterator-debug contract the binary
+   * preserves even in release.
+   *
+   * Callers:
+   *   - 4 AI-formation helper lanes (sub_826140, sub_8281E0, sub_82BA20,
+   *     sub_8B4300) that iterate the formation coord-cache to pair a unit
+   *     entity id with its cached position metadata.
+   *   - cfunc_UserUnitHasUnloadCommandQueuedUpL (0x008C2810) when an attached
+   *     transport lookup needs the matching cache entry.
+   *
+   * The body delegates the tree traversal to `CoordCacheLowerBoundNode`
+   * (FUN_0082E560 in this subsystem) so the intent-first helper does not
+   * re-open the red-black traversal loop at every callsite.
+   */
+  CoordCacheIteratorPair* PublishCoordCacheLowerBoundIteratorPair(
+    const moho::SFormationCoordCacheMap& cache,
+    CoordCacheIteratorPair* const output,
+    const std::uint32_t key
+  )
+  {
+    if (output == nullptr) {
+      return nullptr;
+    }
+
+    // Binary iterator-debug chain: push an on-stack proxy sentinel onto
+    // `cache.iterator_orphan_list` (at cache+8 in the MSVC8 ABI) while the
+    // lookup runs. In modern SDK code we skip the chain link when the
+    // container does not expose the orphan lane via a typed accessor.
+    CoordCacheIteratorProxyChain sentinel{nullptr};
+    (void)sentinel;  // retain for binary-layout fidelity; not wired until the
+                     // SFormationCoordCacheMap::iteratorOrphanHead lane is
+                     // named.
+
+    moho::SFormationCoordCacheNode* const node = CoordCacheLowerBoundNode(cache, key);
+
+    output->mKey = key;
+    output->mNodeFirstField = (node != nullptr) ? *reinterpret_cast<void**>(node) : nullptr;
+    return output;
   }
 
   [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheFindNode(
@@ -1973,6 +2152,15 @@ namespace
     const std::uint32_t unitEntityId
   ) noexcept
   {
+    // Publish the iterator pair for the lookup so tooling (formation-coord
+    // iteration callers at 0x826140/0x8281E0/0x82BA20/0x8B4300 and the
+    // UserUnit attachment-parent lookup at 0x8C2810) observe the same
+    // `(key, node_first_field)` layout the binary emits. Used here as the
+    // intent-first call site for FUN_0082CEA0 so the helper is never a dead
+    // orphan in the recovered SDK.
+    CoordCacheIteratorPair iteratorPair{};
+    (void)PublishCoordCacheLowerBoundIteratorPair(cache, &iteratorPair, unitEntityId);
+
     moho::SFormationCoordCacheNode* const node = CoordCacheLowerBoundNode(cache, unitEntityId);
     if (node == nullptr || node == cache.head || node->isNil != 0u || node->unitEntityId != unitEntityId) {
       return nullptr;

@@ -822,6 +822,81 @@ namespace moho
   }
 
   /**
+   * Address: 0x007227B0 (FUN_007227B0, Moho::COGrid::CollectEntitiesCollidingWithEntity)
+   *
+   * IDA signature:
+   * void __stdcall sub_7227B0(int arg0, Moho::EEntityType a1, Moho::Entity *arg8,
+   *                           gpg::fastvector_CollisionResult *argC);
+   *
+   * What it does:
+   * Gathers all unmarked candidate entities matching `flags` inside `source`'s
+   * cached world-space collision AABB, filters them with a per-candidate AABB
+   * overlap pre-check (all three axes overlapping) to skip disjoint pairs, and
+   * then invokes `CColPrimitiveBase::Collide` between each candidate's and
+   * `source`'s collision shape. Hits are appended into `outCollisions` with
+   * `sourceEntity` stamped to the owning candidate. The source entity itself is
+   * always excluded from the gathered set.
+   */
+  [[maybe_unused]] void CollectEntitiesCollidingWithEntity(
+    COGrid& grid,
+    const EEntityType flags,
+    Entity* const source,
+    CollisionResultFastVectorN10& outCollisions
+  )
+  {
+    const EntityCollisionBoundsView sourceBoundsView{
+      source->mCollisionBoundsMin.x,
+      source->mCollisionBoundsMin.y,
+      source->mCollisionBoundsMin.z,
+      source->mCollisionBoundsMax.x,
+      source->mCollisionBoundsMax.y,
+      source->mCollisionBoundsMax.z
+    };
+    const CollisionDBRect queryRect = BuildCollisionRectFromBounds(sourceBoundsView);
+
+    EntityGatherVector gatheredEntities{};
+    const int gatheredCount =
+      grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
+
+    outCollisions.ResetStorageToInline();
+
+    CollisionPairResult collisionResult{};
+    collisionResult.sourceEntity = source;
+
+    for (int index = 0; index < gatheredCount; ++index) {
+      Entity* const candidate = gatheredEntities.start_[index];
+      if (candidate == nullptr || candidate == source) {
+        continue;
+      }
+
+      // AABB overlap pre-check: all three axes (x, y, z) must overlap between
+      // source.mCollisionBounds and candidate.mCollisionBounds. The binary
+      // compares source.Min <= candidate.Max && candidate.Min <= source.Max
+      // per axis using a sliding pointer pair — express it here by named
+      // lane access.
+      const Wm3::Vec3f& sourceMin = source->mCollisionBoundsMin;
+      const Wm3::Vec3f& sourceMax = source->mCollisionBoundsMax;
+      const Wm3::Vec3f& candidateMin = candidate->mCollisionBoundsMin;
+      const Wm3::Vec3f& candidateMax = candidate->mCollisionBoundsMax;
+      if (!(sourceMin.x <= candidateMax.x && candidateMin.x <= sourceMax.x &&
+            sourceMin.y <= candidateMax.y && candidateMin.y <= sourceMax.y &&
+            sourceMin.z <= candidateMax.z && candidateMin.z <= sourceMax.z)) {
+        continue;
+      }
+
+      EntityCollisionUpdater* const sourcePrimitive = source->CollisionExtents;
+      EntityCollisionUpdater* const candidatePrimitive = candidate->CollisionExtents;
+      if (candidatePrimitive == nullptr ||
+          !candidatePrimitive->Collide(sourcePrimitive, &collisionResult)) {
+        continue;
+      }
+
+      collisionResult.sourceEntity = candidate;
+      outCollisions.PushBack(collisionResult);
+    }
+  }
+
+  /**
    * Address: 0x00721DC0 (FUN_00721DC0, Moho::COGrid::CollectEntitiesInBox)
    *
    * What it does:

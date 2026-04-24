@@ -1589,15 +1589,47 @@ namespace moho
       return slot;
     }
 
-    void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
+    /**
+     * Address: 0x0052A390 (FUN_0052A390)
+     *
+     * IDA signature:
+     * int __usercall sub_52A390@<eax>(int binding@<eax>);
+     *
+     * What it does:
+     * Runs the in-place dtor lane for one `RRuleGameRulesLuaExportBinding`
+     * entry: clears every pending Lua task from the sentinel-anchored task
+     * list (`mTaskListSentinel->next..sentinel` via FUN_0052D9C0 which
+     * behaves like `std::list::erase(first, last)` on the intrusive task
+     * chain), releases the sentinel itself with `operator delete`, then
+     * nulls out `mTaskListSentinel` and zeroes `mTaskListSize` so the slot
+     * is safe to either compact away or re-use.
+     *
+     * The binary references this function both from
+     * `RRuleGameRulesImpl::ExportToLuaState`'s SEH unwind table (to roll
+     * back a partially-initialized binding slot on `new`/OOM) and from the
+     * vector-erase compaction lane at 0x0052DBE0 where a live binding is
+     * being dropped. Both use-sites converge on the same
+     * sentinel+task-list teardown, so the recovery lifts it into one
+     * named helper and callers invoke it by name.
+     */
+    void DestroyLuaExportBindingTaskList(RRuleGameRulesLuaExportBinding* const binding)
     {
-      if (!binding || !rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd) {
+      if (binding == nullptr) {
         return;
       }
 
       DestroyLuaTaskListSentinel(static_cast<LuaTaskListNode*>(binding->mTaskListSentinel));
       binding->mTaskListSentinel = nullptr;
       binding->mTaskListSize = 0u;
+    }
+
+    void EraseExportBinding(RRuleGameRulesImpl& rules, RRuleGameRulesLuaExportBinding* const binding)
+    {
+      if (!binding || !rules.mLuaExports.mBegin || !rules.mLuaExports.mEnd) {
+        return;
+      }
+
+      DestroyLuaExportBindingTaskList(binding);
 
       for (auto* it = binding; (it + 1) < rules.mLuaExports.mEnd; ++it) {
         *it = *(it + 1);

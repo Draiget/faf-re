@@ -10,6 +10,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -252,6 +253,43 @@ namespace
     node->next = node;
     node->prev = node;
     node->rect = {};
+    return node;
+  }
+
+  /**
+   * Address: 0x005AB710 (FUN_005AB710)
+   *
+   * IDA signature:
+   * int *__userpurge sub_5AB710@<eax>(gpg::Rect2i *a1@<esi>, int a2, int a3);
+   *
+   * What it does:
+   * Allocates one `std::list<gpg::Rect2i>`-style intrusive history node via the
+   * canonical checked 24-byte allocator lane and initializes
+   * `{next=a2, prev=a3, rect=*a1}` in that order. The original binary also
+   * contains MSVC8 null-pointer-optimization guards (`result != -4` /
+   * `result != -8`) on the second and third field writes; those compare an
+   * allocator result against impossible truncated-pointer sentinels and are
+   * preserved here as `node != nullptr` runtime gates so behavior matches
+   * exactly when the checked allocator returns a valid block.
+   */
+  [[nodiscard]] RectHistoryNode* AllocateRectHistoryNode(
+    RectHistoryNode* const next,
+    RectHistoryNode* const prev,
+    const gpg::Rect2i& rect
+  )
+  {
+    auto* const node = static_cast<RectHistoryNode*>(
+      gpg::core::legacy::AllocateChecked24ByteLane(1u)
+    );
+    if (node != nullptr) {
+      node->next = next;
+    }
+    if (node != nullptr) {
+      node->prev = prev;
+    }
+    if (node != nullptr) {
+      node->rect = rect;
+    }
     return node;
   }
 
@@ -1170,10 +1208,7 @@ void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
     --mRecentSearchRects.mSize;
   }
 
-  auto* const node = static_cast<RectHistoryNode*>(::operator new(sizeof(RectHistoryNode)));
-  node->rect = rect;
-  node->next = head->next;
-  node->prev = head;
+  auto* const node = AllocateRectHistoryNode(head->next, head, rect);
   head->next->prev = node;
   head->next = node;
   ++mRecentSearchRects.mSize;

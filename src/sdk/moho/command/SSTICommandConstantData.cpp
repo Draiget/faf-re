@@ -248,6 +248,60 @@ namespace
   }
 
   /**
+   * Address: 0x006ED750 (FUN_006ED750, SSTICommandConstantData uninit-copy range)
+   *
+   * IDA signature:
+   * void __thiscall __noreturn sub_6ED750(char *this, char *a2, int a3);
+   *
+   * What it does:
+   * Uninitialized copy-construct of a half-open
+   * `SSTICommandConstantData[sourceBegin, sourceEnd)` range into raw destination
+   * storage starting at `destinationBegin`. For each destination slot the
+   * helper:
+   *   1) default-primes the trailing `unk2` string lane (`_Myres=15`,
+   *      `_Bx._Buf[0]=0`, `_Mysize=0`)
+   *   2) byte-copies the fixed-size prefix (cmd/unk0/origin/unk1/blueprint)
+   *   3) calls `std::string::assign(src.unk2, 0, npos)` to clone the string
+   *
+   * On exception, destroys the already-constructed destination prefix (via
+   * the element destructor `FUN_006ECB50`) before rethrowing. Provides the
+   * legacy STL uninitialized-copy-with-rollback contract used by
+   * `vector<SSTICommandConstantData>` growth paths.
+   */
+  [[maybe_unused]] moho::SSTICommandConstantData* UninitializedCopySSTICommandConstantDataRange(
+    const moho::SSTICommandConstantData* sourceBegin,
+    const moho::SSTICommandConstantData* const sourceEnd,
+    moho::SSTICommandConstantData* destinationBegin
+  )
+  {
+    moho::SSTICommandConstantData* destination = destinationBegin;
+    try {
+      for (; sourceBegin != sourceEnd; ++sourceBegin, ++destination) {
+        // Default-prime the trailing string lane before the byte copy so the
+        // subsequent `assign` sees a valid empty SSO-mode string.
+        ::new (&destination->unk2) msvc8::string{};
+
+        destination->cmd = sourceBegin->cmd;
+        destination->unk0 = sourceBegin->unk0;
+        destination->origin = sourceBegin->origin;
+        destination->unk1 = sourceBegin->unk1;
+        destination->blueprint = sourceBegin->blueprint;
+
+        destination->unk2.assign(sourceBegin->unk2, 0, msvc8::string::npos);
+      }
+    } catch (...) {
+      // Rollback: destroy every already-constructed destination slot and
+      // rethrow so the outer allocator lane can release the raw buffer.
+      for (moho::SSTICommandConstantData* cursor = destinationBegin; cursor != destination; ++cursor) {
+        cursor->unk2.tidy(true, 0U);
+      }
+      throw;
+    }
+
+    return destination;
+  }
+
+  /**
    * Address: 0x006EC980 (FUN_006EC980)
    * Address: 0x006EB490 (FUN_006EB490)
    * Address: 0x006EBC40 (FUN_006EBC40)

@@ -219,6 +219,51 @@ namespace
     return outIterator;
   }
 
+  /**
+   * Address: 0x006273B0 (FUN_006273B0, Moho::CUnitLoadUnits::ErasePickUpInfoRange)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_6273B0@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
+   *
+   * What it does:
+   * Erases the half-open range `[rangeBegin, rangeEnd)` from the
+   * `mPickupQueue` lane by copying the live tail `[rangeEnd, end)` down to
+   * `rangeBegin` with weak-link-aware element copy, unlinking the now-dead
+   * tail window `[newEnd, end)` from each unit's owner weak-list, and
+   * shrinking the active end cursor lane to `newEnd`. The resulting iterator
+   * `rangeBegin` is written to `*outIterator` and returned, matching the
+   * MSVC8 `std::vector<SPickUpInfo>::erase` range-overload instantiation.
+   */
+  [[nodiscard]] moho::SPickUpInfo** ErasePickUpInfoRange(
+    msvc8::vector<moho::SPickUpInfo>& storage,
+    moho::SPickUpInfo** const outIterator,
+    moho::SPickUpInfo* const rangeBegin,
+    moho::SPickUpInfo* const rangeEnd
+  ) noexcept
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (rangeBegin != rangeEnd && view.end != nullptr) {
+      // Shift `[rangeEnd, view.end)` down to `rangeBegin`. The helper
+      // preserves each SPickUpInfo's intrusive weak-unit owner-chain link
+      // as it relocates the entry.
+      moho::SPickUpInfo* const newEnd = CopyPickUpInfoWeakUnitRange(rangeBegin, rangeEnd, view.end);
+
+      // Unlink the now-vacated tail `[newEnd, view.end)` from each unit's
+      // owner weak-list so the erased slots release their weak-pointer
+      // subscriptions without touching vector capacity.
+      UnlinkPickUpInfoWeakUnitRange(newEnd, view.end);
+
+      // Shrink the active end cursor; capacity lane `view.capacityEnd`
+      // remains untouched, matching binary behavior for erase-in-place.
+      view.end = newEnd;
+    }
+
+    if (outIterator != nullptr) {
+      *outIterator = rangeBegin;
+    }
+    return outIterator;
+  }
+
   [[nodiscard]] bool AllocatePickUpInfoStorage(
     msvc8::vector<moho::SPickUpInfo>& storage,
     const std::size_t elementCount
@@ -578,7 +623,9 @@ namespace moho
     for (std::size_t index = 0; index < mPickupQueue.size();) {
       Unit* const candidate = mPickupQueue[index].GetUnit();
       if (!IsUsableUnitSlot(candidate) || candidate->IsDead()) {
-        mPickupQueue.erase(mPickupQueue.begin() + static_cast<std::ptrdiff_t>(index));
+        moho::SPickUpInfo* const erasePos = mPickupQueue.data() + index;
+        moho::SPickUpInfo* eraseResult = nullptr;
+        (void)ErasePickUpInfoRange(mPickupQueue, &eraseResult, erasePos, erasePos + 1);
         continue;
       }
 
@@ -598,7 +645,9 @@ namespace moho
 
         ++index;
       } else {
-        mPickupQueue.erase(mPickupQueue.begin() + static_cast<std::ptrdiff_t>(index));
+        moho::SPickUpInfo* const erasePos = mPickupQueue.data() + index;
+        moho::SPickUpInfo* eraseResult = nullptr;
+        (void)ErasePickUpInfoRange(mPickupQueue, &eraseResult, erasePos, erasePos + 1);
         rejectedByCapacity = true;
       }
     }

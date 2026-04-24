@@ -1900,9 +1900,21 @@ namespace msvc8
          * Address: 0x00445DC0 (FUN_00445DC0)
          * Address: 0x00445E80 (FUN_00445E80)
          * Address: 0x004C65E0 (FUN_004C65E0)
+         * Address: 0x005DF3F0 (FUN_005DF3F0)
+         * Address: 0x005DF520 (FUN_005DF520)
+         * Address: 0x0067F7F0 (FUN_0067F7F0)
+         * Address: 0x00704530 (FUN_00704530)
+         *
+         * IDA signature:
+         * void *__fastcall sub_xxxx(unsigned int a1);
          *
          * What it does:
          * Allocates one raw 4-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * element types whose `sizeof(T) == 4` (typically `T*` pointer element).
+         * On `count > 0x3FFFFFFF`, constructs a `std::bad_alloc` by invoking
+         * `std::exception(const char *&)` then overwriting the vtable with
+         * `std::bad_alloc::`vftable'`, then routes through `_CxxThrowException`.
          */
         [[nodiscard]] static void* allocate_dword_slots_checked(const std::size_t count)
         {
@@ -1911,6 +1923,29 @@ namespace msvc8
             }
 
             return ::operator new(sizeof(std::uint32_t) * count);
+        }
+
+        /**
+         * Address: 0x005A1D60 (FUN_005A1D60)
+         *
+         * IDA signature:
+         * Moho::WeakPtr_CUnitCommand *__fastcall sub_5A1D60(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 8-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * `moho::WeakPtr<moho::CUnitCommand>` (owner-link + next-in-chain, 8B).
+         * On `count > 0x1FFFFFFF`, constructs a `std::bad_alloc` via the same
+         * VC8 exception-then-vtable-swap lane routed through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_qword_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 8u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
         }
 
         /**
@@ -1924,6 +1959,29 @@ namespace msvc8
         [[nodiscard]] static void* allocate_struct64_slots_checked(const std::size_t count)
         {
             constexpr std::size_t kElementSize = 64u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
+         * Address: 0x00526080 (FUN_00526080)
+         *
+         * IDA signature:
+         * void *__fastcall sub_526080(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 388-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * `moho::RUnitBlueprintWeapon` (`sizeof = 0x184`). On
+         * `count > 0xFFFFFFFF / 0x184 == 0x00AF7314`, constructs `std::bad_alloc`
+         * and routes through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_unit_blueprint_weapon_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 0x184u;
             if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
                 throw std::bad_alloc();
             }
@@ -1969,7 +2027,22 @@ namespace msvc8
          */
         void reallocate_to(std::size_t newCap) {
             assert(newCap >= size());
-            T* newBuf = static_cast<T*>(::operator new(sizeof(T) * newCap));
+            // Route element-size-matched allocators through the VC8 legacy
+            // `std::_Allocate` lanes so recovered decompiler addresses bind by
+            // name from their original vector<T> call sites.
+            void* rawBuf;
+            if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
+                rawBuf = allocate_dword_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 8u) {
+                rawBuf = allocate_qword_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 64u) {
+                rawBuf = allocate_struct64_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 0x184u) {
+                rawBuf = allocate_unit_blueprint_weapon_slots_checked(newCap);
+            } else {
+                rawBuf = ::operator new(sizeof(T) * newCap);
+            }
+            T* newBuf = static_cast<T*>(rawBuf);
             T* newFirst = newBuf;
             T* newLast;
             const std::size_t n = size();

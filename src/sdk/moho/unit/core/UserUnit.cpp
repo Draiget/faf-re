@@ -1737,6 +1737,171 @@ namespace
   }
 
   /**
+   * Typed placeholder for the `UserArmy` high-priority selection registry
+   * tail that lives just past `mSession` at `+0x1EC..+0x210`. Each active
+   * record is a two-dword pair `(backref_handle, backref_next_slot)` laid
+   * out as a contiguous buffer; removing a record requires restoring the
+   * original caller's intrusive-chain link through `*(hook - 8)` just as the
+   * binary does at `sub_8B2470`. The exact ownership of the intrusive back
+   * link is still being traced; until then the fields are kept untyped by
+   * byte span and accessed by name through the view helper below.
+   */
+  struct UserArmyPrioritySelectionRegistryView
+  {
+    std::uint8_t pad_0000_01EC[0x1EC];  //   0..0x1EB: base UserArmy header
+    /**
+     * +0x1EC: begin pointer of the priority-selection registry record run.
+     * Each record is 8 bytes; the first dword points to an intrusive hook
+     * inside the registered UserUnit and the second dword is the next-link
+     * slot used by the unit's CScriptObject/UserUnit-Manager chain.
+     */
+    std::uint32_t* mRegistryBegin;  // +0x1EC
+    std::uint32_t* mRegistryEnd;    // +0x1F0
+  };
+
+  static_assert(
+    offsetof(UserArmyPrioritySelectionRegistryView, mRegistryBegin) == 0x1EC,
+    "UserArmyPrioritySelectionRegistryView::mRegistryBegin offset must be 0x1EC"
+  );
+  static_assert(
+    offsetof(UserArmyPrioritySelectionRegistryView, mRegistryEnd) == 0x1F0,
+    "UserArmyPrioritySelectionRegistryView::mRegistryEnd offset must be 0x1F0"
+  );
+
+  [[nodiscard]] UserArmyPrioritySelectionRegistryView& GetUserArmyPrioritySelectionRegistryView(
+    UserArmy* const army
+  ) noexcept
+  {
+    return *reinterpret_cast<UserArmyPrioritySelectionRegistryView*>(army);
+  }
+
+  /**
+   * Address: 0x008B3870 (FUN_008B3870, detach_user_unit_priority_record_tail)
+   *
+   * IDA signature:
+   * int __usercall sub_8B3870@<eax>(int result@<eax>, _DWORD **a2@<edx>,
+   *                                  _DWORD **a3@<esi>);
+   *
+   * What it does:
+   * Drains the half-open priority-registry record run starting at `result`
+   * against the update stream `[a2, a3)`. For each record that still points
+   * at its source hook, the helper unchains the record through its intrusive
+   * next-link slot (`*hook -> ... -> record`) and reseats the new target so
+   * the registry stays linked to live hooks while one element is being
+   * retired. The helper is shared with other `UserArmy` unit-registry lanes
+   * (`sub_8B2820`, `sub_8B2A70`, `sub_8B35F0`), and the pair advances
+   * 8 bytes at a time in lock-step with `a2`.
+   */
+  void PatchUserArmyPriorityRegistryRecordTail(
+    std::uint32_t* record,
+    std::uint32_t* const replacementBegin,
+    std::uint32_t* const replacementEnd
+  )
+  {
+    std::uint32_t* cursor = replacementBegin;
+    while (cursor != replacementEnd) {
+      std::uint32_t* const currentHook = reinterpret_cast<std::uint32_t*>(record[0]);
+      if (reinterpret_cast<std::uint32_t*>(cursor[0]) != currentHook) {
+        if (currentHook != nullptr) {
+          std::uint32_t* chainSlot = currentHook;
+          while (*chainSlot != reinterpret_cast<std::uintptr_t>(record)) {
+            chainSlot = reinterpret_cast<std::uint32_t*>(*chainSlot);
+            chainSlot += 1;
+          }
+          *chainSlot = record[1];
+        }
+
+        std::uint32_t* const replacementHook = reinterpret_cast<std::uint32_t*>(cursor[0]);
+        record[0] = reinterpret_cast<std::uintptr_t>(replacementHook);
+        if (replacementHook == nullptr) {
+          record[1] = 0u;
+        } else {
+          record[1] = *replacementHook;
+          *replacementHook = reinterpret_cast<std::uintptr_t>(record);
+        }
+      }
+
+      cursor += 2;
+      record += 2;
+    }
+  }
+
+  /**
+   * Address: 0x008B2470 (FUN_008B2470, UserArmy::UnregisterPrioritySelectionSlot)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_8B2470@<eax>(Moho::UserUnit *unit@<eax>,
+   *                                      Moho::UserArmy *army@<edi>);
+   *
+   * What it does:
+   * Removes `unit` from the `UserArmy` high-priority selection registry run
+   * that lives at UserArmy `[+0x1EC, +0x1F0)`. The loop scans the run for
+   * the record whose first dword dereferences back to `unit` (via the
+   * `*(hook) - 8` decoding shared with other unit registry lanes), then (1)
+   * calls the shared tail-patching helper to re-chain every record past the
+   * removed slot via `PatchUserArmyPriorityRegistryRecordTail`, (2) drains
+   * each pair's intrusive back-link slot, and (3) compacts the run end by
+   * one 8-byte record.
+   *
+   * Called from `UserUnit::DestroyUserUnit` (FUN_008BF9B0) when the unit's
+   * blueprint `QuickSelectPriority` is positive, and from `UserUnit::Tick`
+   * (FUN_008C0A30) during the dead-unit cleanup sweep.
+   */
+  void UnregisterUserArmyPrioritySelectionSlot(UserUnit* const unit, UserArmy* const army) noexcept
+  {
+    if (army == nullptr || unit == nullptr) {
+      return;
+    }
+
+    auto& registry = GetUserArmyPrioritySelectionRegistryView(army);
+    std::uint32_t* const runEnd = registry.mRegistryEnd;
+    std::uint32_t* cursor = registry.mRegistryBegin;
+    if (cursor == runEnd) {
+      return;
+    }
+
+    while (cursor != runEnd) {
+      const std::uintptr_t hook = cursor[0];
+      UserUnit* const recordOwner = (hook != 0u)
+        ? reinterpret_cast<UserUnit*>(hook - 8u)
+        : nullptr;
+      if (recordOwner == unit) {
+        break;
+      }
+      cursor += 2;
+    }
+
+    if (cursor == runEnd) {
+      return;
+    }
+
+    // Apply the shared tail-patch walk over everything strictly after the
+    // matched record so each remaining priority record's intrusive chain is
+    // re-seated in lock-step.
+    std::uint32_t* const tailBegin = cursor + 2;
+    PatchUserArmyPriorityRegistryRecordTail(cursor, tailBegin, runEnd);
+
+    // Walk the [cursor+2, runEnd) records one more time to retire their
+    // per-record intrusive back-link entries -- this matches the second loop
+    // in FUN_008B2470 which drains the old chain slot for each sliding pair.
+    std::uint32_t* drainCursor = cursor + 2;
+    while (drainCursor != runEnd) {
+      std::uint32_t* const hook = reinterpret_cast<std::uint32_t*>(drainCursor[0]);
+      if (hook != nullptr) {
+        std::uint32_t* chainSlot = hook;
+        while (*chainSlot != reinterpret_cast<std::uintptr_t>(drainCursor)) {
+          chainSlot = reinterpret_cast<std::uint32_t*>(*chainSlot);
+          chainSlot += 1;
+        }
+        *chainSlot = drainCursor[1];
+      }
+      drainCursor += 2;
+    }
+
+    registry.mRegistryEnd -= 2;
+  }
+
+  /**
    * Address: 0x008B72F0 (FUN_008B72F0, struct_UserUnitManager::Get empty-check helper)
    *
    * What it does:
@@ -3480,20 +3645,21 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
   const IUnit* const iunitBridge = GetIUnitBridge(this);
 
   if (army != nullptr && iunitBridge != nullptr) {
-    auto& idleSets = GetUserArmyIdleSetView(army);
     const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
-    if (blueprint != nullptr && blueprint->General.QuickSelectPriority <= 0) {
-      if (mQueueEmptyCached) {
-        if (mIsFactory) {
-          (void)EraseWeakEntitySet(idleSets.factories, entityView);
-        }
-        if (mIsEngineer) {
-          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
-        }
+    if (blueprint != nullptr && blueprint->General.QuickSelectPriority > 0) {
+      // Binary lane at 0x008BFA0B: `QuickSelectPriority > 0` units are
+      // tracked in the UserArmy high-priority selection registry (not in
+      // the idle weak-sets), and must be unregistered from that run via
+      // FUN_008B2470.
+      UnregisterUserArmyPrioritySelectionSlot(this, army);
+    } else if (mQueueEmptyCached) {
+      auto& idleSets = GetUserArmyIdleSetView(army);
+      if (mIsFactory) {
+        (void)EraseWeakEntitySet(idleSets.factories, entityView);
       }
-    } else {
-      (void)EraseWeakEntitySet(idleSets.factories, entityView);
-      (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+      if (mIsEngineer) {
+        (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+      }
     }
   }
 
@@ -3602,20 +3768,19 @@ void UserUnit::Tick(const std::int32_t seqNo)
   UserArmy* const army = GetLuaRuntimeView(this).army;
   if (iunitBridge->IsDead()) {
     if (army != nullptr) {
-      auto& idleSets = GetUserArmyIdleSetView(army);
       const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
-      if (blueprint != nullptr && blueprint->General.QuickSelectPriority <= 0) {
-        if (mQueueEmptyCached) {
-          if (mIsFactory) {
-            (void)EraseWeakEntitySet(idleSets.factories, entityView);
-          }
-          if (mIsEngineer) {
-            (void)EraseWeakEntitySet(idleSets.engineers, entityView);
-          }
+      if (blueprint != nullptr && blueprint->General.QuickSelectPriority > 0) {
+        // Matches FUN_008C0A30 @ 0x008C0AA8: priority units leave the
+        // high-priority selection registry instead of the idle weak-sets.
+        UnregisterUserArmyPrioritySelectionSlot(this, army);
+      } else if (mQueueEmptyCached) {
+        auto& idleSets = GetUserArmyIdleSetView(army);
+        if (mIsFactory) {
+          (void)EraseWeakEntitySet(idleSets.factories, entityView);
         }
-      } else {
-        (void)EraseWeakEntitySet(idleSets.factories, entityView);
-        (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+        if (mIsEngineer) {
+          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+        }
       }
     }
 

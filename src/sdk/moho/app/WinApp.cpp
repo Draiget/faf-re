@@ -169,6 +169,42 @@ namespace
   }
 
   /**
+   * Address: 0x004E81C0 (FUN_004E81C0)
+   *
+   * IDA signature:
+   * int __usercall sub_4E81C0@<eax>(_DWORD *source@<edx>, _DWORD *destination);
+   *
+   * What it does:
+   * Copies one legacy callback payload lane into an already-allocated
+   * destination buffer. First clears `destination->lifecycleAdapter`, then
+   * when the source's adapter is non-null, copies the adapter pointer and
+   * invokes it with `action = 0` (kCopy) so the adapter moves its heap-owned
+   * payload bytes from source into destination. Returns the same destination
+   * pointer (or the passed-in lane when destination is null).
+   *
+   * This is the in-place per-lane copy used by `CloneLegacyCallbackPayloadLaneToHeap`
+   * (FUN_004E7F70) and its neighbors; it is the non-allocating counterpart
+   * that existing recovered clone paths invoke by name.
+   */
+  LegacyCallbackPayloadLane* CopyLegacyCallbackPayloadLaneIntoExisting(
+    LegacyCallbackPayloadLane* const sourceLane,
+    LegacyCallbackPayloadLane* const destinationLane
+  )
+  {
+    if (destinationLane == nullptr) {
+      return destinationLane;
+    }
+
+    destinationLane->lifecycleAdapter = nullptr;
+    if (sourceLane != nullptr && sourceLane->lifecycleAdapter != nullptr) {
+      destinationLane->lifecycleAdapter = sourceLane->lifecycleAdapter;
+      destinationLane->lifecycleAdapter(sourceLane->payload, destinationLane->payload, 0);
+    }
+
+    return destinationLane;
+  }
+
+  /**
    * Address: 0x004E7F70 (FUN_004E7F70)
    *
    * What it does:
@@ -181,12 +217,11 @@ namespace
   )
   {
     auto* const destinationLane = static_cast<LegacyCallbackPayloadLane*>(::operator new(sizeof(LegacyCallbackPayloadLane)));
-    destinationLane->lifecycleAdapter = nullptr;
 
-    if (sourceLane != nullptr && sourceLane->lifecycleAdapter != nullptr) {
-      destinationLane->lifecycleAdapter = sourceLane->lifecycleAdapter;
-      destinationLane->lifecycleAdapter(sourceLane->payload, destinationLane->payload, 0);
-    }
+    // Copy lifecycle adapter + payload bytes via the in-place lane copy
+    // helper (FUN_004E81C0). This is the exact subroutine the binary calls
+    // from 0x004E7F9F inside this function.
+    (void)CopyLegacyCallbackPayloadLaneIntoExisting(sourceLane, destinationLane);
 
     *destinationHeapLane = destinationLane;
 

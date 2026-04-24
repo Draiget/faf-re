@@ -147,6 +147,16 @@ namespace moho
      */
     [[nodiscard]] std::uint16_t AddRect(const Rect16& rect);
 
+    /**
+     * Address: 0x0080D2F0 (FUN_0080D2F0)
+     *
+     * What it does:
+     * Appends three 16-bit collision-triangle indices to `mCollisionRectLut`
+     * in one shared helper; used by `EmitCollisionQuad` to publish the two
+     * triangles of a quad winding.
+     */
+    void AppendCollisionTriangleIndices(std::uint16_t i0, std::uint16_t i1, std::uint16_t i2);
+
     CHeightField* mField;               // +0x04
     GeomCamera3* mCam;                  // +0x08
     std::uint32_t mWorkFlags;           // +0x0C

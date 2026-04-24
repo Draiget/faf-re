@@ -1023,6 +1023,21 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x007AE580 (FUN_007AE580, CameraTargetListClear)
+   *
+   * IDA signature:
+   * int __usercall sub_7AE580@<eax>(int a1@<edi>);  // a1 = &CameraImpl::mTargetEntities
+   *
+   * What it does:
+   * Clears one camera-target intrusive weak-ref list: resets the head sentinel
+   * to point at itself, zeros `mSize`, and walks every previously-live node,
+   * unlinking its `SSelectionWeakRefUserEntity` from the owning entity's
+   * weak-ref chain before releasing the node through `::operator delete`.
+   * Called from `CameraImpl::~CameraImpl`, `CameraImpl::TargetEntities`, and
+   * `CameraImpl::TargetNoseCam` to wipe the prior target set before building
+   * the new one.
+   */
   void CameraTargetListClear(CameraTargetEntityList& list)
   {
     EnsureCameraTargetListInitialized(list);

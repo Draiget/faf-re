@@ -305,11 +305,47 @@ namespace
   }
 
   /**
+   * Address: 0x00519D40 (FUN_00519D40)
+   *
+   * IDA signature:
+   * _DWORD *__stdcall sub_519D40(int a1, _DWORD *a2, int a3, int a4);
+   *
+   * What it does:
+   * Destroys the trailing `[eraseFirst, eraseLast)` range of a
+   * `msvc8::vector<RMeshBlueprintLOD>` in-place (invoking
+   * `RuntimeResetSevenPrefixedLegacyStringLanes` / `FUN_00519800` per element
+   * to release each LOD's seven legacy string lanes), rewinds the vector's
+   * logical end pointer to `eraseFirst`, and stores `eraseFirst` into `*out`.
+   * This is the emitted specialization of
+   * `std::vector<RMeshBlueprintLOD>::erase(iter, iter)` that the binary uses
+   * for erase-to-end (`resize(newSize < oldSize)`) operations.
+   */
+  moho::RMeshBlueprintLOD** EraseTrailingLodRange(
+    LODVector* const storage,
+    moho::RMeshBlueprintLOD** const out,
+    moho::RMeshBlueprintLOD* const eraseFirst,
+    moho::RMeshBlueprintLOD* const eraseLast
+  )
+  {
+    if (eraseFirst != eraseLast) {
+      const auto newSize = static_cast<std::size_t>(eraseFirst - storage->begin());
+      // `resize(newSize)` with newSize < current size destroys the tail range
+      // in-place and rewinds the logical end pointer, matching the binary's
+      // per-element destroy loop + `last_` rewind shape.
+      storage->resize(newSize);
+    }
+    *out = eraseFirst;
+    return out;
+  }
+
+  /**
    * Address: 0x00519A10 (FUN_00519A10)
    *
    * What it does:
    * Adjusts one `vector<RMeshBlueprintLOD>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth.
+   * uses one caller-provided fill lane for growth. The shrink path erases the
+   * tail range via the canonical `EraseTrailingLodRange` lane
+   * (`FUN_00519D40`).
    */
   [[nodiscard]] std::size_t ResizeMeshBlueprintLodVectorWithFill(
     LODVector& storage,
@@ -324,7 +360,10 @@ namespace
     }
 
     if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
+      moho::RMeshBlueprintLOD* const eraseFirst = storage.begin() + static_cast<std::ptrdiff_t>(requestedCount);
+      moho::RMeshBlueprintLOD* const eraseLast = storage.end();
+      moho::RMeshBlueprintLOD* sink = nullptr;
+      (void)EraseTrailingLodRange(&storage, &sink, eraseFirst, eraseLast);
     }
 
     return requestedCount;
@@ -409,6 +448,36 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005195B0 (FUN_005195B0)
+   *
+   * IDA signature:
+   * void __usercall sub_5195B0(int a1@<ebx>);
+   *
+   * What it does:
+   * Releases a `msvc8::vector<RMeshBlueprintLOD>` instance's backing storage:
+   * destroys each live element (invoking `FUN_00519800` per LOD to tear down
+   * the seven legacy string lanes), calls `operator delete` on the shared
+   * storage block, then zeroes `first_/last_/end_` on the container lanes.
+   * The binary corresponds to the emitted specialization of
+   * `std::vector<RMeshBlueprintLOD>::_Tidy()` invoked by
+   * `RMeshBlueprint::~RMeshBlueprint()` (`FUN_00528410`) and by the
+   * `RMeshBlueprintConstruct` deletion lane.
+   */
+  void ClearAndFreeMeshBlueprintLodVectorStorage(msvc8::vector<RMeshBlueprintLOD>* const storage)
+  {
+    if (storage == nullptr) {
+      return;
+    }
+    // `msvc8::vector<T>::~vector()` destroys each element in-place via each
+    // `RMeshBlueprintLOD::~RMeshBlueprintLOD()` (= `FUN_00519800` shape) then
+    // releases the retained heap block. Re-placement-new reinstates the
+    // container's cleared invariant (all three pointer lanes null) so the
+    // caller's implicit destructor chain stays correct.
+    storage->~vector();
+    ::new (storage) msvc8::vector<RMeshBlueprintLOD>();
+  }
+
   /**
    * Address: 0x00518460 (FUN_00518460, Moho::RMeshBlueprintLODTypeInfo::RMeshBlueprintLODTypeInfo)
    *

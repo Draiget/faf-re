@@ -227,6 +227,13 @@ namespace moho
    */
   SWldGameData* CWldSessionLoaderImpl::LoadGameData(SWldGameData* const outData)
   {
+    // When no scenario has populated the game data yet, release any handles the
+    // caller was already carrying in `outData` before zeroing the slot. The
+    // binary SEH path (address 0x00885A20) performs the same teardown order.
+    if (mGameData == nullptr && outData != nullptr) {
+      ReleaseWldGameDataHandles(outData);
+    }
+
     SWldGameData* const result = MoveGameData(mGameData, outData);
     if (mGameData) {
       mGameData->ResetAndUnlink();

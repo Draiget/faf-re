@@ -17,6 +17,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/streams/Stream.h"
+#include "gpg/gal/Error.hpp"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Tree.h"
@@ -1054,6 +1055,94 @@ namespace
       node = IncrementTerrainEnvironmentNode(node, head);
       delete eraseNode;
     }
+  }
+
+  /**
+   * Address: 0x008A8D40 (FUN_008A8D40, sub_8A8D40)
+   *
+   * IDA signature:
+   * int *__userpurge sub_8A8D40@<eax>(int a1@<edi>, int *a2, int a4, int arg8);
+   *
+   * What it does:
+   * Erases the half-open node range `[eraseFirst, eraseLast)` from one
+   * `TerrainEnvironmentLookup` red-black tree. When the range covers the
+   * entire tree (matches `[head->left, head]`), the fast path clears the
+   * whole tree in one `DeleteTerrainEnvironmentSubtreePostOrder` sweep,
+   * rebinds the sentinel to an empty state, and writes the zero-size
+   * iterator pair back into `*outIter`. The slow path steps from
+   * `eraseFirst` toward `eraseLast`, resolving each predecessor/successor
+   * via in-order walk and destroying one node per iteration through
+   * `EraseTerrainEnvironmentNode` (FUN_008A7DE0). The final cursor is
+   * published into `outIter` for the caller's iterator chain.
+   */
+  TerrainEnvironmentLookupNodeRuntimeView** EraseTerrainEnvironmentNodeRange(
+    TerrainEnvironmentLookupMapRuntimeView& map,
+    TerrainEnvironmentLookupNodeRuntimeView** const outIter,
+    TerrainEnvironmentLookupNodeRuntimeView* eraseFirst,
+    TerrainEnvironmentLookupNodeRuntimeView* const eraseLast
+  )
+  {
+    TerrainEnvironmentLookupNodeRuntimeView* const head = map.mHead;
+    if (head == nullptr) {
+      *outIter = nullptr;
+      return outIter;
+    }
+
+    // Fast path: whole-tree clear when `eraseFirst == head->left` (leftmost
+    // in-order node) and `eraseLast == head` (end sentinel).
+    if (eraseFirst == head->left && eraseLast == head) {
+      DeleteTerrainEnvironmentSubtreePostOrder(head->parent);
+      head->left = head;
+      map.mSize = 0u;
+      head->parent = head;
+      head->right = head;
+      *outIter = head->left;
+      return outIter;
+    }
+
+    // Slow path: step through the range, destroying one node per iteration.
+    // Walk toward the successor using the same in-order traversal the binary
+    // emits inline (successor if a right subtree exists, otherwise climb
+    // parents until we leave a right-branch ancestor).
+    while (eraseFirst != eraseLast) {
+      TerrainEnvironmentLookupNodeRuntimeView* cursor = eraseFirst;
+      if (!IsTerrainEnvironmentLookupNil(cursor)) {
+        TerrainEnvironmentLookupNodeRuntimeView* const rightChild = cursor->right;
+        if (!IsTerrainEnvironmentLookupNil(rightChild)) {
+          TerrainEnvironmentLookupNodeRuntimeView* leftmost = cursor->left;
+          if (IsTerrainEnvironmentLookupNil(leftmost)) {
+            // Walk left children from the right subtree looking for next.
+            for (leftmost = cursor->right;
+                 !IsTerrainEnvironmentLookupNil(leftmost) && leftmost != cursor->right;
+                 leftmost = leftmost->left) {
+              cursor = leftmost;
+            }
+            cursor = leftmost;
+          } else {
+            // Traverse predecessors until we leave a right-branch ancestor.
+            TerrainEnvironmentLookupNodeRuntimeView* predecessor = leftmost;
+            while (!IsTerrainEnvironmentLookupNil(predecessor)) {
+              TerrainEnvironmentLookupNodeRuntimeView* const parentLink = predecessor->right;
+              if (IsTerrainEnvironmentLookupNil(parentLink)) {
+                break;
+              }
+              if (cursor != parentLink->left) {
+                break;
+              }
+              cursor = predecessor;
+              predecessor = predecessor->right;
+            }
+            cursor = predecessor;
+          }
+        }
+      }
+
+      (void)EraseTerrainEnvironmentNode(map, eraseFirst);
+      eraseFirst = cursor;
+    }
+
+    *outIter = eraseFirst;
+    return outIter;
   }
 
   /**
@@ -3574,7 +3663,9 @@ namespace moho
 
       normalView->mNormalMap.mBegin[i] = texture;
       if (normalView->mNormalMap.mBegin[i].get() == nullptr) {
-        throw std::runtime_error("CWldTerrainRes::InitNormalMap failed to allocate normal-map tile");
+        // Original binary at 0x008A5715 constructs one default-shaped
+        // gpg::gal::Error via the 0x00940560 ctor then `_CxxThrowException`s it.
+        throw gpg::gal::Error{};
       }
     }
 

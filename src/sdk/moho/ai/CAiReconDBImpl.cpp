@@ -654,11 +654,36 @@ namespace
   }
 
   /**
+   * Address: 0x005C5BE0 (FUN_005C5BE0)
+   *
+   * IDA signature:
+   * void __stdcall sub_5C5BE0(_DWORD *a1);
+   *
+   * What it does:
+   * Recursively destroys one recon-map RB-tree subtree rooted at `node`,
+   * unlinking each node's `SReconKey::sourceUnit` weak-owner chain before
+   * releasing node storage. Walks the right branch via self-recursion and
+   * iterates left spine, matching the binary's `while (!isNil) { recurse(right);
+   * unlink_chain; node = left; delete node; }` shape.
+   */
+  void DestroyReconMapSubtree(ReconMapNodeView* node)
+  {
+    while (node != nullptr && node->isNil == 0u) {
+      ReconMapNodeView* const current = node;
+      DestroyReconMapSubtree(current->right);
+      node = current->left;
+      UnlinkKeyFromSourceChain(current->key);
+      delete current;
+    }
+  }
+
+  /**
    * Address: 0x005C4860 (FUN_005C4860)
    *
    * What it does:
    * Clears one node range from the recon map; when used with
-   * `[MapBegin(owner), MapEnd(owner))`, this performs a full map clear.
+   * `[MapBegin(owner), MapEnd(owner))`, this performs a full map clear via the
+   * recursive subtree destruct lane (`DestroyReconMapSubtree`).
    */
   void ClearMap(CAiReconDBImpl* const owner)
   {
@@ -667,9 +692,9 @@ namespace
       return;
     }
 
-    for (ReconMapNodeView* node = MapBegin(owner); node != head;) {
-      node = EraseMapNode(owner, node);
-    }
+    // Fast path used by the binary's full-range erase: recursively destroy the
+    // whole tree rooted at `head->parent` and reset the sentinel links.
+    DestroyReconMapSubtree(head->parent);
 
     owner->mBlipMap.mSize = 0u;
     head->parent = head;

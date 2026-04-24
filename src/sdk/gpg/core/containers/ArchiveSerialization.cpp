@@ -565,6 +565,17 @@ namespace
 
 namespace gpg
 {
+  /**
+   * Address: 0x005504C0 (FUN_005504C0, gpg::RRef_CAniSkel)
+   * Mangled: ?RRef_CAniSkel@gpg@@YAPAVRRef@1@PAV01@PAVCAniSkel@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CAniSkel(gpg::RRef *outRef, Moho::CAniSkel *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::CAniSkel`, preserving derived
+   * runtime type and base-adjusted object lane when needed.
+   */
   gpg::RRef* RRef_CAniSkel(gpg::RRef* const outRef, moho::CAniSkel* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CAniSkel>());
@@ -608,12 +619,34 @@ namespace gpg
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTaskStage>());
   }
 
+  /**
+   * Address: 0x006431E0 (FUN_006431E0, gpg::RRef_RScaResource)
+   * Mangled: ?RRef_RScaResource@gpg@@YAPAVRRef@1@PAV01@PAVRScaResource@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_RScaResource(gpg::RRef *outRef, Moho::RScaResource *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::RScaResource`, preserving derived
+   * runtime type and base-adjusted object lane when needed.
+   */
   gpg::RRef* RRef_RScaResource(gpg::RRef* const outRef, moho::RScaResource* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::RScaResource>());
   }
 
-  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value)
+  /**
+   * Address: 0x006B5BC0 (FUN_006B5BC0, gpg::RRef_CEconStorage)
+   * Mangled: ?RRef_CEconStorage@gpg@@YAPAVRRef@1@PAV01@PAVCEconStorage@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CEconStorage(gpg::RRef *outRef, Moho::CEconStorage *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::CEconStorage`, preserving derived
+   * runtime type and base-adjusted object lane when needed.
+   */
+  gpg::RRef* RRef_CEconStorage(gpg::RRef* const outRef, moho::CEconStorage* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CEconStorage>());
   }
@@ -630,6 +663,17 @@ namespace gpg
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CEconomy>());
   }
 
+  /**
+   * Address: 0x00683600 (FUN_00683600, gpg::RRef_CTextureScroller)
+   * Mangled: ?RRef_CTextureScroller@gpg@@YAPAVRRef@1@PAV01@PAVCTextureScroller@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CTextureScroller(gpg::RRef *outRef, Moho::CTextureScroller *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::CTextureScroller`, preserving
+   * derived runtime type and base-adjusted object lane when needed.
+   */
   gpg::RRef* RRef_CTextureScroller(gpg::RRef* const outRef, moho::CTextureScroller* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTextureScroller>());
@@ -698,6 +742,17 @@ namespace gpg
     return outRef;
   }
 
+  /**
+   * Address: 0x0072AF00 (FUN_0072AF00, gpg::RRef_CSquad)
+   * Mangled: ?RRef_CSquad@gpg@@YAPAVRRef@1@PAV01@PAVCSquad@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CSquad(gpg::RRef *outRef, Moho::CSquad *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::CSquad`, preserving derived
+   * runtime type and base-adjusted object lane when needed.
+   */
   gpg::RRef* RRef_CSquad(gpg::RRef* const outRef, moho::CSquad* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CSquad>());
@@ -2422,123 +2477,30 @@ namespace
     moho::CEconStorage** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
   )
   {
-    if (outValue == nullptr) {
-      return archive;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
-    if (tracked.object == nullptr) {
-      *outValue = nullptr;
-      return archive;
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Unowned) {
-      ThrowSerializationError("Ownership conflict while loading archive");
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    gpg::RType* const expectedType = CachedCompatRType<moho::CEconStorage>();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    *outValue = static_cast<moho::CEconStorage*>(upcast.mObj);
-    if (*outValue == nullptr) {
-      const char* const expectedName = SafeTypeName(expectedType);
-      const char* const actualName = source.GetTypeName();
-      ThrowSerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        expectedName ? expectedName : "CEconStorage",
-        actualName ? actualName : "null"
-      ));
-    }
-
-    tracked.state = gpg::TrackedPointerState::Owned;
-    return archive;
+    // Delegate to the canonical gpg::ReadArchive method recovered from
+    // FUN_006B4F70 so all CEconStorage owned-pointer reads funnel through one
+    // typed implementation.
+    return archive ? archive->ReadPointerOwned_CEconStorage(outValue, ownerRef) : archive;
   }
 
   [[nodiscard]] gpg::ReadArchive* ReadPointerOwned_CTextureScrollerCompat(
     moho::CTextureScroller** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
   )
   {
-    if (outValue == nullptr) {
-      return archive;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
-    if (tracked.object == nullptr) {
-      *outValue = nullptr;
-      return archive;
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Unowned) {
-      ThrowSerializationError("Ownership conflict while loading archive");
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    gpg::RType* const expectedType = CachedCompatRType<moho::CTextureScroller>();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    *outValue = static_cast<moho::CTextureScroller*>(upcast.mObj);
-    if (*outValue == nullptr) {
-      const char* const expectedName = SafeTypeName(expectedType);
-      const char* const actualName = source.GetTypeName();
-      ThrowSerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        expectedName ? expectedName : "CTextureScroller",
-        actualName ? actualName : "null"
-      ));
-    }
-
-    tracked.state = gpg::TrackedPointerState::Owned;
-    return archive;
+    // Delegate to the canonical gpg::ReadArchive method recovered from
+    // FUN_00682DB0 so all CTextureScroller owned-pointer reads funnel
+    // through one typed implementation.
+    return archive ? archive->ReadPointerOwned_CTextureScroller(outValue, ownerRef) : archive;
   }
 
   [[nodiscard]] gpg::ReadArchive* ReadPointerOwned_PathQueueCompat(
     moho::PathQueue** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
   )
   {
-    if (outValue == nullptr) {
-      return archive;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
-    if (tracked.object == nullptr) {
-      *outValue = nullptr;
-      return archive;
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Unowned) {
-      ThrowSerializationError("Ownership conflict while loading archive");
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    gpg::RType* const expectedType = CachedCompatRType<moho::PathQueue>();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    *outValue = static_cast<moho::PathQueue*>(upcast.mObj);
-    if (*outValue == nullptr) {
-      const char* const expectedName = SafeTypeName(expectedType);
-      const char* const actualName = source.GetTypeName();
-      ThrowSerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        expectedName ? expectedName : "PathQueue",
-        actualName ? actualName : "null"
-      ));
-    }
-
-    tracked.state = gpg::TrackedPointerState::Owned;
-    return archive;
+    // Delegate to the canonical gpg::ReadArchive method recovered from
+    // FUN_00707460 so all PathQueue owned-pointer reads funnel through one
+    // typed implementation.
+    return archive ? archive->ReadPointerOwned_PathQueue(outValue, ownerRef) : archive;
   }
 
   [[nodiscard]] gpg::RType* ResolveRect2iArchiveAdapterType()

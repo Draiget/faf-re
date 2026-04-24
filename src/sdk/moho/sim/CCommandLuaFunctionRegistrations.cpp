@@ -339,6 +339,48 @@ namespace
   }
 
   /**
+   * Address: 0x006EEDB0 (FUN_006EEDB0, func_Filter_FactoryUnitsByCommandCap)
+   *
+   * IDA signature:
+   * BOOL __usercall sub_6EEDB0@<eax>(int edi0@<edi>, Moho::EntitySetTemplate_Unit *a1, int a3);
+   *
+   * What it does:
+   * Walks every live `Unit*` in `sourceUnits`, keeps only units whose blueprint
+   * command-caps intersect `requiredCaps` AND whose `AiBuilder` reports
+   * `BuilderIsFactory()`, and appends each survivor to `outFactoryUnits`.
+   * Returns true when the destination set ends up non-empty.
+   *
+   * Used by `cfunc_IssueFactoryRallyPointL` (mask=`RULEUCC_Move`) and
+   * `cfunc_IssueFactoryAssistL` (mask=`RULEUCC_Guard`) to pick only the
+   * factories from the script-supplied unit list.
+   */
+  [[nodiscard]] bool FilterFactoryUnitsByCommandCap(
+    const moho::UnitSet& sourceUnits,
+    moho::SEntitySetTemplateUnit& outFactoryUnits,
+    const std::uint32_t requiredCaps
+  )
+  {
+    for (moho::Unit* const unit : sourceUnits) {
+      if (unit == nullptr) {
+        continue;
+      }
+
+      if ((unit->GetAttributes().commandCapsMask & requiredCaps) == 0u) {
+        continue;
+      }
+
+      moho::IAiBuilder* const builder = unit->AiBuilder;
+      if (builder == nullptr || !builder->BuilderIsFactory()) {
+        continue;
+      }
+
+      (void)outFactoryUnits.AddUnit(unit);
+    }
+
+    return !outFactoryUnits.Empty();
+  }
+
+  /**
    * Address: 0x006EECF0 (FUN_006EECF0, func_Validate_IssueCommand)
    *
    * What it does:
@@ -3219,8 +3261,9 @@ namespace moho
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueFactoryRallyPointHelpText);
 
-    UnitSet filteredUnits{};
-    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Move)) {
+    SEntitySetTemplateUnit selectedFactories{};
+    if (!FilterFactoryUnitsByCommandCap(
+          sourceUnits, selectedFactories, static_cast<std::uint32_t>(RULEUCC_Move))) {
       return 0;
     }
 
@@ -3230,13 +3273,11 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
-
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
 
-    CUnitCommand* const issuedCommand = IssueFactoryCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    CUnitCommand* const issuedCommand =
+      IssueFactoryCommandToSelectedUnits(sim, selectedFactories, commandIssueData, false);
     if (issuedCommand == nullptr) {
       return 0;
     }

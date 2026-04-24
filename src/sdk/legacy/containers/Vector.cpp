@@ -4520,6 +4520,15 @@ struct HeapEntryDoublePayloadLane
 };
 static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloadLane size must be 0x10");
 
+/**
+ * Address: 0x00A72360 (FUN_00A72360)
+ *
+ * What it does:
+ * Sifts one `{float key, dword payload}` heap lane upward between
+ * `heapFloorIndex` and `insertIndex` then writes `(key, payload)` at the
+ * resulting slot. Returns the raw float-bits of `key` in the `eax` return
+ * slot to mirror the original VC8 code-gen shape.
+ */
 [[nodiscard]] std::uint32_t SiftUpHeapEntryFloatPayloadLaneLocal(
   HeapEntryFloatPayloadLane* const heapEntries,
   int insertIndex,
@@ -4546,6 +4555,18 @@ static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloa
   return keyBits;
 }
 
+/**
+ * Address: 0x00A72840 (FUN_00A72840)
+ *
+ * IDA signature:
+ * int __cdecl sub_A72840(int a1, int a2, int a3, float a4, int a5);
+ *
+ * What it does:
+ * Sifts one `{float key, dword payload}` heap hole downward from
+ * `rootIndex` until `tailIndex`, selecting the larger child at each step,
+ * then forwards to `SiftUpHeapEntryFloatPayloadLaneLocal` to reinsert the
+ * pending `(key, payload)` and preserve max-heap ordering.
+ */
 [[nodiscard]] int SiftDownThenSiftUpHeapEntryFloatPayloadLaneLocal(
   HeapEntryFloatPayloadLane* const heapEntries,
   const int rootIndex,

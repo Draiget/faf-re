@@ -1418,22 +1418,24 @@ namespace moho
     result->SetUnowned(objectRef, 0u);
   }
 
-  int ConstructCSquadForSerializerThunk(const int, const int, const int, gpg::SerConstructResult* const result)
+  /**
+   * Address: 0x0072AB70 (FUN_0072AB70)
+   *
+   * What it does:
+   * Single-argument serializer-construct adapter that forwards directly to
+   * `ConstructCSquadForSerializer` (FUN_00724920).  Used by the 4-arg
+   * reflection-construct thunk below and by RType construct-callback slots
+   * that supply only the `SerConstructResult` pointer.
+   */
+  int ConstructCSquadForSerializerAlias(gpg::SerConstructResult* const result)
   {
     ConstructCSquadForSerializer(nullptr, 0, 0, result);
     return 0;
   }
 
-  /**
-   * Address: 0x0072AB70 (FUN_0072AB70)
-   *
-   * What it does:
-   * Serializer construct adapter that forwards to the CSquad construct helper.
-   */
-  [[maybe_unused]] int ConstructCSquadForSerializerAlias(gpg::SerConstructResult* const result)
+  int ConstructCSquadForSerializerThunk(const int, const int, const int, gpg::SerConstructResult* const result)
   {
-    ConstructCSquadForSerializer(nullptr, 0, 0, result);
-    return 0;
+    return ConstructCSquadForSerializerAlias(result);
   }
 
   /**

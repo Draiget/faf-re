@@ -816,29 +816,29 @@ extern "C" void png_read_end(png_structp png_ptr, png_infop info_ptr)
       png_error(png_ptr, "Invalid chunk length.");
     }
 
-    if (Memcmp4(chunk, "IHDR") == 0) {
+    if (png_memcmp(chunk, "IHDR", 4u) == 0) {
       png_handle_IHDR(png_ptr, info_ptr, length);
       continue;
     }
-    if (Memcmp4(chunk, "IEND") == 0) {
+    if (png_memcmp(chunk, "IEND", 4u) == 0) {
       png_handle_IEND(png_ptr, info_ptr, length);
       continue;
     }
 
     if (png_handle_as_unknown(png_ptr, chunk) != 0) {
-      if (Memcmp4(chunk, "IDAT") != 0) {
+      if (png_memcmp(chunk, "IDAT", 4u) != 0) {
         Mode(png_ptr) |= kPngAfterIdat;
       } else if (length != 0 || (Mode(png_ptr) & kPngAfterIdat) != 0) {
         png_error(png_ptr, "Too many IDAT's found");
       }
       png_handle_unknown(png_ptr, info_ptr, length);
-      if (Memcmp4(chunk, "PLTE") == 0) {
+      if (png_memcmp(chunk, "PLTE", 4u) == 0) {
         Mode(png_ptr) |= kPngHavePlte;
       }
       continue;
     }
 
-    if (Memcmp4(chunk, "IDAT") == 0) {
+    if (png_memcmp(chunk, "IDAT", 4u) == 0) {
       if (length != 0 || (Mode(png_ptr) & kPngAfterIdat) != 0) {
         png_error(png_ptr, "Too many IDAT's found");
       }
@@ -846,23 +846,23 @@ extern "C" void png_read_end(png_structp png_ptr, png_infop info_ptr)
       continue;
     }
 
-    if (Memcmp4(chunk, "PLTE") == 0) { png_handle_PLTE(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "bKGD") == 0) { png_handle_bKGD(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "cHRM") == 0) { png_handle_cHRM(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "gAMA") == 0) { png_handle_gAMA(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "hIST") == 0) { png_handle_hIST(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "oFFs") == 0) { png_handle_oFFs(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "pCAL") == 0) { png_handle_pCAL(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "sCAL") == 0) { png_handle_sCAL(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "pHYs") == 0) { png_handle_pHYs(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "sBIT") == 0) { png_handle_sBIT(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "sRGB") == 0) { png_handle_sRGB(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "iCCP") == 0) { png_handle_iCCP(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "sPLT") == 0) { png_handle_sPLT(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "tEXt") == 0) { png_handle_tEXt(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "tIME") == 0) { png_handle_tIME(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "tRNS") == 0) { png_handle_tRNS(png_ptr, info_ptr, length); continue; }
-    if (Memcmp4(chunk, "zTXt") == 0) { png_handle_zTXt(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "PLTE", 4u) == 0) { png_handle_PLTE(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "bKGD", 4u) == 0) { png_handle_bKGD(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "cHRM", 4u) == 0) { png_handle_cHRM(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "gAMA", 4u) == 0) { png_handle_gAMA(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "hIST", 4u) == 0) { png_handle_hIST(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "oFFs", 4u) == 0) { png_handle_oFFs(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "pCAL", 4u) == 0) { png_handle_pCAL(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "sCAL", 4u) == 0) { png_handle_sCAL(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "pHYs", 4u) == 0) { png_handle_pHYs(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "sBIT", 4u) == 0) { png_handle_sBIT(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "sRGB", 4u) == 0) { png_handle_sRGB(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "iCCP", 4u) == 0) { png_handle_iCCP(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "sPLT", 4u) == 0) { png_handle_sPLT(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "tEXt", 4u) == 0) { png_handle_tEXt(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "tIME", 4u) == 0) { png_handle_tIME(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "tRNS", 4u) == 0) { png_handle_tRNS(png_ptr, info_ptr, length); continue; }
+    if (png_memcmp(chunk, "zTXt", 4u) == 0) { png_handle_zTXt(png_ptr, info_ptr, length); continue; }
     png_handle_unknown(png_ptr, info_ptr, length);
   } while ((Mode(png_ptr) & kPngHaveIend) == 0);
 }

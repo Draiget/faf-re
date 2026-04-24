@@ -1736,28 +1736,61 @@ namespace moho
   }
 
   /**
-   * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
+   * Address: 0x00702BB0 (FUN_00702BB0, std::list<shared_ptr<STrigger>>::clear inlined helper)
+   *
+   * IDA signature:
+   * void __usercall sub_702BB0(int a1@<ebx>);
    *
    * What it does:
-   * Destroys all trigger-list nodes, frees the sentinel head, and resets the
-   * auxiliary trigger runtime lane.
+   * Clears one sentinel-headed trigger-node list in-place: resets the sentinel
+   * head's next/prev to itself, zeroes the size lane, then walks each former
+   * payload node, releases its intrusive `boost::shared_ptr<STrigger>` control
+   * block (matched add_ref/release pair at +0x0C), and frees the node storage.
+   *
+   * This is the MSVC8 std::list<boost::shared_ptr<STrigger>>::clear expansion
+   * used by both the auxiliary `mAuxHead` lane on CArmyStats and by
+   * reflection-driven SerLoad helpers that reuse the same node ABI.
    */
-  void CArmyStats::DestroyAuxList()
+  void CArmyStats::ClearTriggerList()
   {
     ArmyTriggerNode* const head = mAuxHead;
     if (head == nullptr) {
       return;
     }
 
+    // Detach the circular list from its payload: sentinel head becomes empty
+    // (next = prev = head), size lane is reset, matching FUN_00702BB0's prologue
+    // exactly so re-entrancy during node destruction cannot observe stale links.
     ArmyTriggerNode* node = head->next;
+    head->next = head;
+    head->prev = head;
+    mAuxSize = 0;
+
     while (node != head) {
       ArmyTriggerNode* const next = node->next;
+      // ArmyTriggerNode's `boost::shared_ptr<STrigger>` member destructor runs
+      // here and performs the interlocked shared_count/weak_count release pair
+      // (ref_count::release + ref_count::weak_release) that the decompiler
+      // rendered as inlined lock-xadd sequences at +0x0C/+0x10.
       delete node;
       node = next;
     }
+  }
 
-    delete head;
-    mAuxHead = nullptr;
-    mAuxSize = 0;
+  /**
+   * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
+   *
+   * What it does:
+   * Destroys all trigger-list nodes via `ClearTriggerList`, frees the sentinel
+   * head allocation, and clears the auxiliary-list runtime pointer lane.
+   */
+  void CArmyStats::DestroyAuxList()
+  {
+    ClearTriggerList();
+
+    if (ArmyTriggerNode* const head = mAuxHead) {
+      delete head;
+      mAuxHead = nullptr;
+    }
   }
 } // namespace moho

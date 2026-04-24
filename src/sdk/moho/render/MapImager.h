@@ -75,6 +75,23 @@ namespace moho
      */
     void AddBorder(const msvc8::string& meshBlueprintPath);
 
+    /**
+     * Address: 0x007D9DD0 (FUN_007D9DD0, ?UpdateMeshStances@MapImager@Moho@@QAEXXZ)
+     * Mangled: ?UpdateMeshStances@MapImager@Moho@@QAEXXZ
+     *
+     * IDA signature:
+     * void __stdcall Moho::MapImager::UpdateMeshStances(Moho::MapImager *this);
+     *
+     * What it does:
+     * Each frame, re-centers every border mesh over the active terrain: queries
+     * the full terrain-field tier box, averages the X/Z min-max to build a
+     * ground-plane center, sets the Y lane to `(min.y + max.y)/2 +
+     * GetImagerElevationOffset()`, and applies that identity-rotation
+     * transform (zero imag/real-1 quaternion) as both start and end stance
+     * for every tracked `MeshInstance`.
+     */
+    void UpdateMeshStances();
+
   public:
     msvc8::vector<MeshInstance*> mMeshInstances;          // +0x04
   };

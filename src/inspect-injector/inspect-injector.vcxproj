@@ -152,6 +152,14 @@
   <ItemGroup>
     <ClInclude Include="vs_attach.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\inspect\inspect.vcxproj">
+      <Project>{6AAF2C66-9CF4-4213-B376-D29E5EEFF586}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

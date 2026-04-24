@@ -102,11 +102,49 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x00637360 (FUN_00637360, gpg::RRef_CBuilderArmManipulator)
+   * Mangled: ?RRef_CBuilderArmManipulator@gpg@@YAPAVRRef@1@PAV01@PAVCBuilderArmManipulator@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CBuilderArmManipulator(gpg::RRef *outRef, Moho::CBuilderArmManipulator *value);
+   *
+   * What it does:
+   * Builds one reflected reference for `moho::CBuilderArmManipulator`,
+   * preserving the derived runtime type via `typeid(*object)` lookup and
+   * adjusting the object pointer by the reflected base-subobject offset
+   * returned by `gpg::RType::IsDerivedFrom`.
+   */
   [[nodiscard]] gpg::RRef MakeBuilderArmManipulatorRef(moho::CBuilderArmManipulator* const object)
   {
+    gpg::RType* const staticType = CachedCBuilderArmManipulatorType();
+
     gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (object == nullptr) {
+      return out;
+    }
+
+    gpg::RType* runtimeType = staticType;
+    try {
+      runtimeType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      runtimeType = staticType;
+    }
+
+    int baseOffset = 0;
+    if (runtimeType != nullptr && staticType != nullptr
+        && runtimeType->IsDerivedFrom(staticType, &baseOffset)) {
+      out.mObj = reinterpret_cast<void*>(
+        reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset)
+      );
+      out.mType = runtimeType;
+      return out;
+    }
+
     out.mObj = object;
-    out.mType = CachedCBuilderArmManipulatorType();
+    out.mType = runtimeType != nullptr ? runtimeType : staticType;
     return out;
   }
 

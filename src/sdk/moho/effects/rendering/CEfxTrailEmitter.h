@@ -30,6 +30,17 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
+     *
+     * What it does:
+     * Default-constructs one trail-emitter instance: chains to
+     * `CEffectImpl::CEffectImpl()`, binds the `CEfxTrailEmitter` vtable, and
+     * zero-initializes trail-specific fields (blueprint pointer, length,
+     * timing lanes, vector payload, flags, last-update tick).
+     */
+    CEfxTrailEmitter();
+
+    /**
      * Address: 0x00671420 (FUN_00671420, Moho::CEfxTrailEmitter::Invalidate1)
      *
      * What it does:

@@ -726,6 +726,23 @@ namespace moho
     [[nodiscard]] std::int32_t GetDebugBoneCount() const;
 
     /**
+     * Address: 0x007DE7A0 (FUN_007DE7A0,
+     * ?ComputeDebugPose@MeshInstance@Moho@@QAE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+     * Mangled: ?ComputeDebugPose@MeshInstance@Moho@@QAE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ
+     *
+     * What it does:
+     * Recomputes the interpolated pose lane used by skeleton-debug rendering.
+     * When the instance is static-pose and not locked, it refreshes the
+     * current pose by interpolating `start/end` pose lanes at the stored
+     * `currInterpolant` into `curPose`, driving the interpolation across
+     * the bone count published by the backing `SScmFile`. The live
+     * `curPose` is then returned by value as an additional shared
+     * reference. Otherwise (non-static or locked) returns an empty
+     * shared handle.
+     */
+    [[nodiscard]] boost::shared_ptr<CAniPose> ComputeDebugPose();
+
+    /**
      * Address: 0x007DEFC0 (FUN_007DEFC0,
      * ?GetSweptAlignedBox@MeshInstance@Moho@@QBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
      *

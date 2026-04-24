@@ -532,6 +532,8 @@ namespace gpg::core::legacy
 
   /**
    * Address: 0x0080AB00 (FUN_0080AB00)
+   * Address: 0x00561460 (FUN_00561460, SSyncData 28-byte grow/insert lane)
+   * Address: 0x005B5170 (FUN_005B5170, CPathPoint 28-byte grow/insert lane)
    *
    * What it does:
    * Allocates replacement storage for one 28-byte fastvector lane and
@@ -1794,10 +1796,16 @@ namespace gpg::core::legacy
 
   /**
    * Address: 0x0081BBC0 (FUN_0081BBC0)
+   * Address: 0x005165A0 (FUN_005165A0, Vector3f fastvector grow-insert inline clone)
    *
    * What it does:
    * Allocates replacement storage for one 12-byte fastvector lane and
-   * materializes prefix/insert/suffix slices into the new storage.
+   * materializes prefix/insert/suffix slices into the new storage. The
+   * 0x005165A0 entry is a separate compiler-emitted inline clone used by
+   * `RFastVectorType_Vector3f::SetCount`, the matching `AppendRange12ByteLane`
+   * caller, the in-place assign lane, and a stubbed shim; both addresses
+   * share identical semantics and feed every 12-byte fastvector grow path
+   * through this single function.
    */
   std::byte* GrowInsert12ByteLane(
     FastVectorInsertRuntimeView& vectorView,
@@ -1820,6 +1828,7 @@ namespace gpg::core::legacy
 
   /**
    * Address: 0x0081B830 (FUN_0081B830)
+   * Address: 0x00515E30 (FUN_00515E30, 12-byte append-range lane for Unit/decal clipping callers)
    *
    * What it does:
    * Inserts one 12-byte range before `insertPosition`, growing storage when
@@ -2362,6 +2371,9 @@ namespace gpg::core::legacy
    * Address: 0x00702D70 (FUN_00702D70)
    * Address: 0x0072AA60 (FUN_0072AA60)
    * Address: 0x00774190 (FUN_00774190)
+   * Address: 0x00553B90 (FUN_00553B90, SSyncData uint dword grow/insert lane)
+   * Address: 0x00559190 (FUN_00559190, SSTIEntityAttachInfo dword grow/insert lane)
+   * Address: 0x00657F60 (FUN_00657F60, fastvector<float> dword grow/insert lane)
    *
    * What it does:
    * Allocates replacement storage for one 4-byte fastvector lane and

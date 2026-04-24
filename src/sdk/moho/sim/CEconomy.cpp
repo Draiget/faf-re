@@ -562,19 +562,10 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     archive->Read(CachedSEconValueType(), &mPendingResources, nullOwner);
     archive->Read(CachedSEconTotalsType(), &mTotals, nullOwner);
 
+    // Canonical owned-pointer read (recovered from FUN_006B4F70): enforces
+    // UNOWNED->OWNED transition and raises SerializationError on type mismatch.
     CEconStorage* loadedExtraStorage = nullptr;
-    {
-      gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, nullOwner);
-      if (tracked.object != nullptr) {
-        gpg::RRef source{};
-        source.mObj = tracked.object;
-        source.mType = tracked.type;
-
-        const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconStorageType());
-        loadedExtraStorage = static_cast<CEconStorage*>(upcast.mObj);
-        tracked.state = gpg::TrackedPointerState::Owned;
-      }
-    }
+    (void)archive->ReadPointerOwned_CEconStorage(&loadedExtraStorage, &nullOwner);
 
     CEconStorage* const previousExtraStorage = mExtraStorage;
     mExtraStorage = loadedExtraStorage;

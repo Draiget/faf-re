@@ -2864,6 +2864,13 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   {
     return CopyInputCaptureWeakRangeAssign(destination, sourceBegin, sourceEnd);
   }
+  // Forward declaration for FUN_007A58C0 (defined below).
+  moho::WeakPtr<moho::CMauiControl>** EraseInputCaptureRangeCompacting(
+    moho::WeakPtr<moho::CMauiControl>** outIterator,
+    moho::WeakPtr<moho::CMauiControl>* eraseBegin,
+    moho::WeakPtr<moho::CMauiControl>* eraseEnd
+  ) noexcept;
+
   void RemoveInputCaptureAt(const std::size_t index) noexcept
   {
     auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
@@ -2873,15 +2880,66 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     }
 
     view.begin[index].ResetFromObject(nullptr);
-    moho::WeakPtr<moho::CMauiControl>* const oldEnd = view.end;
-    (void)CopyInputCaptureWeakRangeAssign(&view.begin[index], &view.begin[index + 1u], oldEnd);
 
-    moho::WeakPtr<moho::CMauiControl>* const newEnd = oldEnd - 1;
-    newEnd->ResetFromObject(nullptr);
-    view.end = newEnd;
+    // Erase one weak-capture slot by delegating to the general range-erase
+    // helper (FUN_007A58C0). It shifts `[index+1, end)` down onto `[index,
+    // end-1)` with intrusive-chain relinking, unlinks the vacated tail, and
+    // updates `_Mylast`.
+    (void)EraseInputCaptureRangeCompacting(
+      nullptr,
+      &view.begin[index],
+      &view.begin[index + 1u]
+    );
   }
 
   /**
+   * Address: 0x007A58C0 (FUN_007A58C0)
+   *
+   * IDA signature:
+   * int *__userpurge sub_7A58C0@<eax>(int *outIterator@<ebx>,
+   *                                    WeakPtr<CMauiControl> *eraseBegin,
+   *                                    WeakPtr<CMauiControl> *eraseEnd);
+   *
+   * What it does:
+   * Erases the contiguous range `[eraseBegin, eraseEnd)` inside the global
+   * `sInputCapture` weak-capture vector by shifting the live tail
+   * `[eraseEnd, _Mylast)` down onto `eraseBegin` using intrusive weak-owner
+   * chain relinking (via `CopyInputCaptureWeakRangeAssign`), then unlinks the
+   * now-vacant slots, and updates `_Mylast` to the compacted end. Finally
+   * stores `eraseBegin` (the returned iterator-after-erase) into
+   * `*outIterator`. This is the pattern MSVC emits for
+   * `std::vector::erase(first, last)` on the capture stack.
+   *
+   * Binary-fidelity note: when `eraseBegin == eraseEnd` the shift is a no-op
+   * but `*outIterator = eraseBegin` is still performed unconditionally.
+   */
+  moho::WeakPtr<moho::CMauiControl>** EraseInputCaptureRangeCompacting(
+    moho::WeakPtr<moho::CMauiControl>** const outIterator,
+    moho::WeakPtr<moho::CMauiControl>* const eraseBegin,
+    moho::WeakPtr<moho::CMauiControl>* const eraseEnd
+  ) noexcept
+  {
+    if (eraseBegin != eraseEnd) {
+      auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
+      moho::WeakPtr<moho::CMauiControl>* const oldEnd = view.end;
+
+      // Shift the live tail [eraseEnd, oldEnd) down onto eraseBegin while
+      // preserving intrusive weak-owner chain slots for every moved entry.
+      moho::WeakPtr<moho::CMauiControl>* const compactedEnd =
+        CopyInputCaptureWeakRangeAssign(eraseBegin, eraseEnd, oldEnd);
+
+      // Unlink the now-vacant trailing slots from their weak owner chains.
+      UnlinkInputCaptureWeakPtrRange(compactedEnd, oldEnd);
+      view.end = compactedEnd;
+    }
+
+    if (outIterator != nullptr) {
+      *outIterator = eraseBegin;
+    }
+    return outIterator;
+  }
+
+/**
    * Address: 0x007A5870 (FUN_007A5870)
    *
    * What it does:
@@ -12158,23 +12216,34 @@ int moho::cfunc_CMauiItemListSetNewColorsL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiItemListSetNewColorsHelpText, 7, argumentCount);
   }
 
-  LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
+  auto itemListObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
+  auto* const itemListView = reinterpret_cast<CMauiItemListRuntimeView*>(itemList);
 
-  const auto decodeColorIfPresent = [state](const int index, std::uint32_t& destination) {
-    if (lua_type(state->m_state, index) != LUA_TNIL) {
-      LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, index));
-      destination = SCR_DecodeColor(state, colorObject);
-    }
-  };
-
-  decodeColorIfPresent(2, itemListView->mForegroundColor);
-  decodeColorIfPresent(3, itemListView->mBackgroundColor);
-  decodeColorIfPresent(4, itemListView->mSelectedForegroundColor);
-  decodeColorIfPresent(5, itemListView->mSelectedBackgroundColor);
-  decodeColorIfPresent(6, itemListView->mHighlightForegroundColor);
-  decodeColorIfPresent(7, itemListView->mHighlightBackgroundColor);
+  if (lua_type(state->m_state, 2) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2));
+    itemListView->mForegroundColor = SCR_DecodeColor(state, colorObject);
+  }
+  if (lua_type(state->m_state, 3) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 3));
+    itemListView->mBackgroundColor = SCR_DecodeColor(state, colorObject);
+  }
+  if (lua_type(state->m_state, 4) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 4));
+    itemListView->mSelectedForegroundColor = SCR_DecodeColor(state, colorObject);
+  }
+  if (lua_type(state->m_state, 5) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 5));
+    itemListView->mSelectedBackgroundColor = SCR_DecodeColor(state, colorObject);
+  }
+  if (lua_type(state->m_state, 6) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 6));
+    itemListView->mHighlightForegroundColor = SCR_DecodeColor(state, colorObject);
+  }
+  if (lua_type(state->m_state, 7) != LUA_TNIL) {
+    auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 7));
+    itemListView->mHighlightBackgroundColor = SCR_DecodeColor(state, colorObject);
+  }
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -13699,6 +13768,43 @@ moho::CMauiMovie::CMauiMovie(LuaPlus::LuaObject* const luaObject, CMauiControl* 
 }
 
 /**
+ * Address: 0x0079EF30 (FUN_0079EF30, Moho::CMauiMovie::~CMauiMovie non-deleting body)
+ *
+ * IDA signature:
+ * _DWORD *__stdcall sub_79EF30(Moho::CMauiMovie *this);
+ *
+ * What it does:
+ * Tears down one movie control in-place in reverse construction order:
+ * destroys `mMovieHeightLV` (+0x154), destroys `mMovieWidthLV` (+0x140),
+ * releases `mSubtitleCache` string storage (+0x124), deletes the
+ * `CMoviePlaybackInterface* mMovie` (+0x11C) via its virtual deleting
+ * destructor when non-null, and then chains into `CMauiControl::~CMauiControl`
+ * through the compiler-emitted base-class teardown.
+ *
+ * The CMauiMovie class in the SDK currently carries its payload fields
+ * only through `CMauiMovieRuntimeView` (reinterpret-cast view), so this
+ * destructor explicitly tears down each lane; without that, the compiler
+ * would only destroy the base `CMauiControl` and leak the lazy-var and
+ * subtitle-string storage.
+ */
+moho::CMauiMovie::~CMauiMovie()
+{
+  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
+
+  // Lazy-var lanes carry a LuaObject payload in their opaque storage; the
+  // type's own defaulted destructor does not run the LuaObject teardown, so
+  // we do it explicitly, matching the binary's destroy-in-reverse sequence.
+  reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieHeightLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieWidthLV)->~LuaObject();
+  movieView->mSubtitleCache.~basic_string();
+
+  if (movieView->mMovie != nullptr) {
+    delete movieView->mMovie;
+    movieView->mMovie = nullptr;
+  }
+}
+
+/**
  * Address: 0x0079F1C0 (FUN_0079F1C0, Moho::CMauiMovie::OnFrame)
  *
  * What it does:
@@ -14597,34 +14703,72 @@ int moho::cfunc_CMauiScrollbarSetNewTexturesL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCMauiScrollbarSetNewTexturesHelpText, 5, argumentCount);
   }
 
-  LuaPlus::LuaObject scrollbarObject(LuaPlus::LuaStackObject(state, 1));
+  auto scrollbarObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  const auto loadOptionalTexture = [state](const int index, const char* const laneName) -> boost::shared_ptr<CD3DBatchTexture> {
-    if (lua_type(state->m_state, index) == LUA_TNIL) {
-      return {};
-    }
-
-    LuaPlus::LuaStackObject textureArg(state, index);
-    const char* texturePath = lua_tostring(state->m_state, index);
+  boost::shared_ptr<CD3DBatchTexture> backgroundTexture{};
+  if (lua_type(state->m_state, 2) != LUA_TNIL) {
+    LuaPlus::LuaStackObject textureArg(state, 2);
+    const char* texturePath = lua_tostring(state->m_state, 2);
     if (texturePath == nullptr) {
       LuaPlus::LuaStackObject::TypeError(&textureArg, "string");
       texturePath = "";
     }
 
-    boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(texturePath, 1u);
-    if (texture.get() == nullptr) {
-      gpg::Warnf("Scrollbar:SetTextures couldn't load %s: %s", laneName, texturePath);
-      texture = CD3DBatchTexture::FromSolidColor(0xFFAAAA00u);
+    backgroundTexture = CD3DBatchTexture::FromFile(texturePath, 1u);
+    if (!backgroundTexture) {
+      gpg::Warnf("Scrollbar:SetTextures couldn't load background: %s", texturePath);
+      backgroundTexture = CD3DBatchTexture::FromSolidColor(0xFFAAAA00u);
+    }
+  }
+
+  boost::shared_ptr<CD3DBatchTexture> thumbMiddleTexture{};
+  if (lua_type(state->m_state, 3) != LUA_TNIL) {
+    LuaPlus::LuaStackObject textureArg(state, 3);
+    const char* texturePath = lua_tostring(state->m_state, 3);
+    if (texturePath == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&textureArg, "string");
+      texturePath = "";
     }
 
-    return texture;
-  };
+    thumbMiddleTexture = CD3DBatchTexture::FromFile(texturePath, 1u);
+    if (!thumbMiddleTexture) {
+      gpg::Warnf("Scrollbar:SetTextures couldn't load thumbMiddle: %s", texturePath);
+      thumbMiddleTexture = CD3DBatchTexture::FromSolidColor(0xFFAAAA00u);
+    }
+  }
 
-  const boost::shared_ptr<CD3DBatchTexture> backgroundTexture = loadOptionalTexture(2, "background");
-  const boost::shared_ptr<CD3DBatchTexture> thumbMiddleTexture = loadOptionalTexture(3, "thumbMiddle");
-  const boost::shared_ptr<CD3DBatchTexture> thumbTopTexture = loadOptionalTexture(4, "thumbTop");
-  const boost::shared_ptr<CD3DBatchTexture> thumbBottomTexture = loadOptionalTexture(5, "thumbBottom");
+  boost::shared_ptr<CD3DBatchTexture> thumbTopTexture{};
+  if (lua_type(state->m_state, 4) != LUA_TNIL) {
+    LuaPlus::LuaStackObject textureArg(state, 4);
+    const char* texturePath = lua_tostring(state->m_state, 4);
+    if (texturePath == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&textureArg, "string");
+      texturePath = "";
+    }
+
+    thumbTopTexture = CD3DBatchTexture::FromFile(texturePath, 1u);
+    if (!thumbTopTexture) {
+      gpg::Warnf("Scrollbar:SetTextures couldn't load thumbTop: %s", texturePath);
+      thumbTopTexture = CD3DBatchTexture::FromSolidColor(0xFFAAAA00u);
+    }
+  }
+
+  boost::shared_ptr<CD3DBatchTexture> thumbBottomTexture{};
+  if (lua_type(state->m_state, 5) != LUA_TNIL) {
+    LuaPlus::LuaStackObject textureArg(state, 5);
+    const char* texturePath = lua_tostring(state->m_state, 5);
+    if (texturePath == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&textureArg, "string");
+      texturePath = "";
+    }
+
+    thumbBottomTexture = CD3DBatchTexture::FromFile(texturePath, 1u);
+    if (!thumbBottomTexture) {
+      gpg::Warnf("Scrollbar:SetTextures couldn't load thumbBottom: %s", texturePath);
+      thumbBottomTexture = CD3DBatchTexture::FromSolidColor(0xFFAAAA00u);
+    }
+  }
 
   scrollbar->SetTextures(backgroundTexture, thumbMiddleTexture, thumbTopTexture, thumbBottomTexture);
   lua_settop(state->m_state, 1);
@@ -20630,7 +20774,7 @@ void moho::CMauiBitmap::Dump()
 
   const int textureCount = static_cast<int>(bitmapView->mTextureBatches.size());
 
-  // The binary fetches height first then width on the FPU stack — preserve order.
+  // The binary fetches height first then width on the FPU stack ï¿½ preserve order.
   const float bitmapHeight = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapHeightLV);
   const float bitmapWidth = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapWidthLV);
   gpg::Logf("Num Textures = %d Width = %.3f Height = %.3f", textureCount, bitmapWidth, bitmapHeight);

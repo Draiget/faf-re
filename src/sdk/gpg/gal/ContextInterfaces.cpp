@@ -994,6 +994,32 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E78C0 (FUN_008E78C0)
+     *
+     * CubeTargetHandle,int face,TextureHandle
+     *
+     * IDA signature:
+     * gpg::gal::OutputContext *__userpurge OutputContext::OutputContext@<eax>(
+     *     gpg::gal::OutputContext *this@<ecx>,
+     *     boost::shared_ptr_CubeTarget cubeTarget,
+     *     int face,
+     *     boost::shared_ptr_Texture texture);
+     *
+     * What it does:
+     * Initializes one output-context payload with caller-provided cube-target
+     * shared handle, face index selector, and texture shared handle. Retains
+     * ownership of both cube-target and texture counts while the 2D surface
+     * handle is left empty.
+     */
+    OutputContext::OutputContext(CubeTargetHandle cubeTargetHandle, std::int32_t face, TextureHandle textureHandle)
+        : cubeTarget(cubeTargetHandle),
+          face(face),
+          surface(),
+          texture(textureHandle)
+    {
+    }
+
+    /**
      * Address: 0x00430160 (FUN_00430160)
      *
      * OutputContext const &

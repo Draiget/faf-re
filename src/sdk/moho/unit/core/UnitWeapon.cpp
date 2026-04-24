@@ -1,5 +1,6 @@
 #include "moho/unit/core/UnitWeapon.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cmath>
 #include <cstring>
@@ -3096,16 +3097,68 @@ namespace moho
   }
 
   /**
+   * Address: 0x006DBB50 (FUN_006DBB50, std::vector<EntityCategorySet>::erase range lane)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_6DBB50@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
+   *
+   * What it does:
+   * Erases the half-open range `[rangeBegin, rangeEnd)` from the weapon's
+   * targeting-priorities vector lane by copying the surviving tail entries
+   * down over the erased window, unlinking any weak-link state held by the
+   * displaced entries, then shrinking the active end cursor. The result
+   * iterator is written to `*outIterator` and returned, matching the
+   * binary's tail-call shape used by the MSVC8 `std::vector::erase` range
+   * overload instantiation for `EntityCategorySet`.
+   */
+  EntityCategorySet* EraseTargetPrioritiesRange(
+    UnitWeapon& weapon,
+    EntityCategorySet** const outIterator,
+    EntityCategorySet* const rangeBegin,
+    EntityCategorySet* const rangeEnd
+  )
+  {
+    auto& priorities = weapon.mTargetPriorities;
+    if (rangeBegin != rangeEnd) {
+      EntityCategorySet* const liveEnd = priorities.data() + priorities.size();
+      // Shift `[rangeEnd, liveEnd)` down to `rangeBegin` using the MSVC8
+      // move-copy helper (`std::copy` on trivially-copyable lane). The
+      // resulting `newEnd` is the new logical end of the vector after the
+      // range has been erased.
+      EntityCategorySet* const newEnd = std::copy(rangeEnd, liveEnd, rangeBegin);
+
+      // Shrink the active size lane to the new end. `msvc8::vector::resize`
+      // runs `~EntityCategorySet` on every slot in `[newEnd, liveEnd)`,
+      // mirroring the MSVC8 destructor dispatch that FUN_006DBB50 delegated
+      // to `sub_6DEB80`.
+      priorities.resize(static_cast<std::size_t>(newEnd - priorities.data()));
+    }
+
+    if (outIterator != nullptr) {
+      *outIterator = rangeBegin;
+    }
+    return rangeBegin;
+  }
+
+  /**
    * Address: 0x006D4A90 (FUN_006D4A90, Moho::UnitWeapon::~UnitWeapon)
    *
    * What it does:
-   * Releases the owned fire-task lane before member/base teardown.
+   * Releases the owned fire-task lane and clears the target-priorities
+   * vector lane via the recovered range-erase helper before member/base
+   * teardown finishes the remaining containers.
    */
   UnitWeapon::~UnitWeapon()
   {
     if (mFireWeaponTask != nullptr) {
       delete mFireWeaponTask;
       mFireWeaponTask = nullptr;
+    }
+
+    if (!mTargetPriorities.empty()) {
+      EntityCategorySet* eraseResult = nullptr;
+      (void)EraseTargetPrioritiesRange(
+        *this, &eraseResult, mTargetPriorities.data(), mTargetPriorities.data() + mTargetPriorities.size());
     }
   }
 

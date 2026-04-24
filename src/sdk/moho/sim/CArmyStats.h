@@ -353,6 +353,16 @@ namespace moho
     void DestroyNameIndexTree();
 
     /**
+     * Address: 0x00702BB0 (FUN_00702BB0, std::list<shared_ptr<STrigger>>::clear inlined helper)
+     *
+     * What it does:
+     * Clears every node from the sentinel-headed trigger list in place without
+     * freeing the sentinel head, matching the binary layout used by the
+     * auxiliary `mAuxHead` lane and by reflection-driven SerLoad helpers.
+     */
+    void ClearTriggerList();
+
+    /**
      * Address: 0x007015C0 (FUN_007015C0, CArmyStats auxiliary trigger-list cleanup)
      *
      * What it does:

@@ -9,8 +9,10 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class RRef;
   class RType;
+  class WriteArchive;
 }
 
 namespace moho
@@ -60,6 +62,38 @@ namespace moho
       const SNavGoal& moveGoal,
       Unit* ferryUnit
     );
+
+    /**
+     * Address: 0x00610D30 (FUN_00610D30, Moho::CUnitWaitForFerryTaskSerializer::Serialize body)
+     *
+     * IDA signature:
+     * void __usercall sub_610D30(Moho::CUnitWaitForFerryTask *a1@<eax>, BinaryWriteArchive *a2@<edi>);
+     *
+     * What it does:
+     * Writes wait-for-ferry task state to an archive in binary lane order:
+     *   1. base `CCommandTask` subobject (by reflected type).
+     *   2. raw `CCommandTask* mDispatch` as `unowned` tracked-pointer.
+     *   3. `WeakPtr<Unit> mFerryUnit` slot (by reflected type).
+     *   4. `SNavGoal mMoveGoal` slot (by reflected type).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00610C60 (FUN_00610C60, Moho::CUnitWaitForFerryTask::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall sub_610C60(
+     *   Moho::CCommandTask **obj@<ecx>, gpg::ReadArchive *a2@<eax>);
+     *
+     * What it does:
+     * Loads wait-for-ferry task state from an archive in binary lane order:
+     *   1. base `CCommandTask` subobject (by reflected type).
+     *   2. raw `CCommandTask* mDispatch` as `unowned` tracked-pointer via
+     *      `ReadArchive::ReadPointer_CCommandTask`.
+     *   3. `WeakPtr<Unit> mFerryUnit` slot (by reflected type).
+     *   4. `SNavGoal mMoveGoal` slot (by reflected type).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
   public:
     IAiCommandDispatchImpl* mDispatch; // 0x30
