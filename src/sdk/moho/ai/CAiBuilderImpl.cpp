@@ -10,6 +10,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -338,10 +339,18 @@ namespace
    *
    * What it does:
    * Allocates and initializes one rebuild-map RB-tree node lane.
+   *
+   * Note: original binary allocates the 24-byte node through
+   * `FUN_005A1DF0`/`Create2LinkedListN`, which is one address slot of the
+   * canonical checked 24-byte allocator lane
+   * (`gpg::core::legacy::AllocateChecked24ByteLane`).
    */
   [[nodiscard]] SBuilderRebuildNode* CreateRebuildMapNode() noexcept
   {
-    auto* const node = static_cast<SBuilderRebuildNode*>(::operator new(sizeof(SBuilderRebuildNode), std::nothrow));
+    static_assert(sizeof(SBuilderRebuildNode) == 24, "SBuilderRebuildNode must be 24 bytes");
+    auto* const node = static_cast<SBuilderRebuildNode*>(
+      gpg::core::legacy::AllocateChecked24ByteLane(1u)
+    );
     if (node == nullptr) {
       return nullptr;
     }

@@ -515,10 +515,16 @@ namespace
 
   /**
    * Address: 0x0077F3A0 (FUN_0077F3A0)
+   * Address: 0x0077E8E0 (FUN_0077E8E0, inlined stride-0x90 forward-assign lane)
    *
    * What it does:
    * Assign-copies one `SDecalInfo` forward range and returns one-past the last
-   * assigned destination lane.
+   * assigned destination lane. The binary emits an additional specialized
+   * forward-assign lane at `0x0077E8E0` for the `AssignSDecalInfoVector`
+   * reuse path where the fastcall/register-assignment shape inlines the
+   * stride-`sizeof(SDecalInfo)=0x90` loop over a pre-sized destination
+   * range; semantically identical to this canonical helper, so this single
+   * typed definition services every callsite in the TU.
    */
   [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
     moho::SDecalInfo* destinationBegin,
@@ -922,6 +928,27 @@ namespace moho
   {
     return CopyConstructSDecalInfoIfPresent(destination, source);
   }
+
+  /**
+   * Address: 0x00742360 (FUN_00742360, Moho::SDecalInfo::~SDecalInfo)
+   *
+   * What it does:
+   * Releases one decal-info payload. The compiler-synthesized teardown
+   * first destroys the trailing string `mType` (deallocating when its
+   * capacity slot at `+0x80` exceeds the SSO threshold of 0x10) and then
+   * runs the eh-vector destructor lane for the two texture-name strings
+   * at `+0x24`/`+0x40` (count=2, stride=0x1C) which destroys `mTexName2`
+   * followed by `mTexName1` in reverse declaration order. Aligned
+   * `Wm3::Vec3f` lanes are trivially destructible and need no teardown.
+   *
+   * The explicit definition reifies the compiler-synthesized destructor
+   * that lives at `0x00742360` in the shipped binary so that every typed
+   * `~SDecalInfo()` callsite in this TU (e.g. `DestroySDecalInfoRange`,
+   * `AssignSDecalInfoVector`, and the inline `msvc8::vector<SDecalInfo>`
+   * teardown path) binds to a named, address-annotated symbol rather
+   * than an implicit lane.
+   */
+  SDecalInfo::~SDecalInfo() = default;
 
   /**
    * Address: 0x00778B60 (FUN_00778B60, SDecalInfo::SDecalInfo)

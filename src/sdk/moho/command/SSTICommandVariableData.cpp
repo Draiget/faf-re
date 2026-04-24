@@ -548,6 +548,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x00560430 (FUN_00560430, Moho::SSTICommandVariableData copy-construct TU-local lane)
+   *
+   * IDA signature:
+   * int __userpurge sub_560430@<eax>(int a1@<ecx>, int a2@<edi>, int a3);
+   *
+   * What it does:
+   * Secondary emit of the `SSTICommandVariableData` copy-constructor body, as
+   * materialized out-of-line in a different caller TU. Initializes
+   * `destination.mEntIds` via the vector copy-construct helper (`FUN_00560BE0`)
+   * and then field-copies every POD/typed lane from `source`, finishing with
+   * `mCells` via the `gpg::fastvector<SOCellPos>::cpy` helper lane.
+   *
+   * Semantically identical to the primary copy-ctor at 0x006ECAD0 — the two
+   * emits share source-level behavior but live at distinct code addresses. The
+   * binary preserves the implementation detail where `mEntIds` and `mCells`
+   * vectors are copy-constructed via typed helpers while the embedded target
+   * / integral lanes are copied field-by-field.
+   */
+  SSTICommandVariableData* CopyConstructSSTICommandVariableDataSecondaryLane(
+    SSTICommandVariableData* const destination,
+    const SSTICommandVariableData* const source
+  )
+  {
+    ::new (destination) SSTICommandVariableData(*source);
+    return destination;
+  }
+
+  /**
    * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)
    *
    * What it does:

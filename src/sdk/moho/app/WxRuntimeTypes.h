@@ -2328,6 +2328,28 @@ struct wxStringRuntime
    */
   wxStringRuntime* PadInPlace(std::size_t padCount, wchar_t padChar, bool appendToRight);
 
+  /**
+   * Address: 0x00960090 (FUN_00960090, wxString::ToULong)
+   *
+   * What it does:
+   * Parses this wide-string text as an unsigned long using the active CRT
+   * locale, writing the parsed value into `*outValue` and returning `true`
+   * only when the full string was consumed (no trailing garbage) and the
+   * string was non-empty.
+   */
+  [[nodiscard]] bool ToULong(unsigned long* outValue, std::int32_t base) const noexcept;
+
+  /**
+   * Address: 0x00961E70 (FUN_00961E70, wxString::BeforeLast)
+   *
+   * What it does:
+   * Writes into `outPrefix` the prefix of this string up to (but not
+   * including) the last occurrence of `separator`. If `separator` is not
+   * found, or is at index `0`, `outPrefix` is cleared to empty. Returns
+   * `outPrefix` (the result sink) so callers can chain.
+   */
+  wxStringRuntime* BeforeLast(wxStringRuntime* outPrefix, wchar_t separator) const noexcept;
+
   [[nodiscard]] static wxStringRuntime Borrow(const wchar_t* text) noexcept;
 };
 
@@ -3867,6 +3889,16 @@ struct wxListItemAttrRuntime
    * colour, background colour, and font member lanes.
    */
   wxListItemAttrRuntime();
+
+  /**
+   * Address: 0x00987E70 (FUN_00987E70)
+   *
+   * What it does:
+   * Copy-constructs one `wxListItemAttrRuntime` by invoking the subobject copy
+   * constructors for the two `wxColour` lanes and the `wxFont` lane in source
+   * order; SEH unwind guards tear down already-built lanes on exception.
+   */
+  wxListItemAttrRuntime(const wxListItemAttrRuntime& other);
 
   wxColourRuntime mTextColour{};
   wxColourRuntime mBackgroundColour{};
@@ -6037,6 +6069,19 @@ namespace moho
      * configures color writes for FX, then renders world-particle effects.
      */
     void RenderEffects(bool renderWaterSurface);
+
+    /**
+     * Address: 0x007F8600 (FUN_007F8600, ?RenderRefractingEffects@WRenViewport@Moho@@AAEXXZ)
+     * Mangled: ?RenderRefractingEffects@WRenViewport@Moho@@AAEXXZ
+     *
+     * What it does:
+     * When FX are enabled and graphics fidelity is medium or higher, copies the
+     * active writer-lock into the refraction slot, rebinds the active head's
+     * render target and local viewport, configures color-only writes, then
+     * forwards the retained refraction background texture pointer to
+     * `CWorldParticles::RenderRefractingEffects` for the current frame.
+     */
+    void RenderRefractingEffects();
 
     /**
      * Address: 0x007F86F0 (FUN_007F86F0, ?RenderWater@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)

@@ -32,6 +32,8 @@
 #include <mutex>
 #include <new>
 #include <streambuf>
+#include <sstream>
+#include <cstdarg>
 #include <stdexcept>
 #include <string>
 #include <sys/timeb.h>
@@ -6871,6 +6873,12 @@ extern "C" void __cdecl _freefls(void* ptd);
 extern "C" int __cdecl _flsbuf(int character, std::FILE* stream);
 extern "C" void __cdecl _getbuf(std::FILE* stream);
 extern "C" int __cdecl _isctype_l(int character, int mask, _locale_t localeInfo);
+extern "C" int __cdecl _isleadbyte_l(int character, _locale_t localeInfo);
+extern "C" RuntimeLocaleCodePageView* __cdecl _updatetlocinfoEx_nolock(
+  RuntimeLocaleCodePageView** threadLocale,
+  RuntimeLocaleCodePageView* processLocale);
+extern "C" int __cdecl _stbuf(std::FILE* stream);
+extern "C" void __cdecl _ftbuf(int scratchAllocated, std::FILE* stream);
 extern "C" int __cdecl _setmbcp(int codePageMode);
 extern "C" void __cdecl _invalid_parameter(
   const wchar_t* expression,
@@ -7958,6 +7966,53 @@ namespace
     return result;
   }
 
+  /**
+   * Shared implementation for `_isctype_l`. See the extern-C entry point at
+   * address 0x00A984BB for the address annotation and caller context.
+   *
+   * What it does:
+   * Locale-aware CRT `_isctype` classifier. Updates the effective locale via
+   * `RuntimeResolveLocaleLocInfo` (the `_LocaleUpdate` construction lane),
+   * then classifies `character` against `mask`:
+   *   * single-byte fast path `(character + 1) <= 0x100`: returns
+   *     `locale.pctype[character] & mask`
+   *   * DBCS path: tests leadbyte state of `character >> 8` via
+   *     `_isleadbyte_l` and combines with `pctype[character & 0xFF]`
+   * Always pairs with `RuntimeReleaseLocaleUpdate` to release any
+   * thread-local locale ref acquired by the resolve lane.
+   */
+  [[nodiscard]] int RuntimeIsCtypeLocale(
+    const int character,
+    const int mask,
+    _locale_t const localeInfo
+  )
+  {
+    RuntimeTidDataLocaleView* threadData = nullptr;
+    bool updated = false;
+    const auto* const localeView = reinterpret_cast<const RuntimeLocaleClassificationView*>(
+      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated)
+    );
+
+    int result = 0;
+    if (localeView != nullptr && localeView->pctype != nullptr) {
+      if (static_cast<unsigned int>(character) + 1u <= 0x100u) {
+        result = static_cast<int>(localeView->pctype[character]) & mask;
+      } else {
+        const int highByte = (character >> 8) & 0xFF;
+        const int lowByte = character & 0xFF;
+        const int leadByteFlag = _isleadbyte_l(highByte, localeInfo);
+        if (leadByteFlag != 0) {
+          result = static_cast<int>(localeView->pctype[lowByte]) & mask;
+        } else {
+          result = static_cast<int>(localeView->pctype[highByte]) & mask;
+        }
+      }
+    }
+
+    RuntimeReleaseLocaleUpdate(threadData, updated);
+    return result;
+  }
+
   [[nodiscard]] int RuntimeClassifyInitialOrLocaleChanged(
     const int character,
     const unsigned int initialMask,
@@ -8119,6 +8174,19 @@ namespace
     RuntimeReleaseLocaleUpdate(threadData, updated);
     return result;
   }
+}
+
+/**
+ * Address: 0x00A984BB (FUN_00A984BB, _isctype_l)
+ *
+ * See the anonymous namespace implementation `RuntimeIsCtypeLocale` for the
+ * full behavior description. This `extern "C"` entry point is the stable
+ * CRT-facing symbol that other recovered ctype helpers (`_isalpha_l`,
+ * `_isdigit_l`, etc.) dispatch into for the DBCS slow path.
+ */
+extern "C" int __cdecl _isctype_l(const int character, const int mask, _locale_t const localeInfo)
+{
+  return RuntimeIsCtypeLocale(character, mask, localeInfo);
 }
 
 /**
@@ -8634,6 +8702,31 @@ extern "C" long __cdecl RuntimeWcstolLocaleForward(
 )
 {
   return ::_wcstol_l(text, endPointer, radix, localeInfo);
+}
+
+/**
+ * Address: 0x00A8F427 (FUN_00A8F427, wcstol)
+ *
+ * What it does:
+ * MSVC CRT `wcstol(nptr, endptr, base)` implementation. Picks either the
+ * locale-changed global table (null pointer triggers the CRT fast path that
+ * queries the thread-local locale) or the C-locale initial table depending on
+ * the `_locale_changed` flag, then forwards to the low-level `wcstoxl`
+ * long-parsing helper with the unsigned-result lane cleared.
+ *
+ * IDA signature:
+ * unsigned int __cdecl wcstol(unsigned __int16 *nptr, unsigned __int16 **endptr, unsigned int ibase);
+ */
+extern "C" long __cdecl RuntimeWcstolFromLocale(
+  const wchar_t* const text,
+  wchar_t** const endPointer,
+  const int radix
+)
+{
+  // `::wcstol` performs the identical locale dispatch (`_locale_changed` check,
+  // thread-local lookup for modified locales, `_initiallocalestructinfo` fast
+  // path for the C locale) and invokes the same `wcstoxl` underneath.
+  return ::wcstol(text, endPointer, radix);
 }
 
 /**
@@ -10047,6 +10140,47 @@ extern "C" int __cdecl _get_timezone(long* const outTimezone)
   *_errno() = EINVAL;
   _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
   return EINVAL;
+}
+
+/**
+ * Address: 0x00A8C50B (FUN_00A8C50B, __updatetlocinfo)
+ *
+ * IDA signature:
+ * threadlocinfo *__usercall __updatetlocinfo@<eax>();
+ *
+ * What it does:
+ * Refreshes the per-thread locale pointer `_tiddata::ptlocinfo` so that it
+ * reflects the current process locale:
+ *   * If the thread owns its own locale (`globallocalestatus & ownlocale`
+ *     non-zero) AND `ptlocinfo` is already set, return the current
+ *     `ptlocinfo` without re-acquiring it.
+ *   * Otherwise acquire `_SETLOCALE_LOCK`, call
+ *     `_updatetlocinfoEx_nolock(&ptd->ptlocinfo, _ptlocinfo)` to copy the
+ *     process locale into the thread slot with refcount bookkeeping,
+ *     release the lock, and return the resulting pointer.
+ *   * If the result is null, call `_amsg_exit(32)` (CRT runtime failure
+ *     abort code for "locale init failure") and never return.
+ */
+extern "C" RuntimeLocaleCodePageView* __cdecl __updatetlocinfo()
+{
+  constexpr int kSetLocaleLock = 19;             // _SETLOCALE_LOCK in MSVC8 CRT
+  constexpr int kCrtLocaleInitFailureCode = 32;  // _amsg_exit code R6032 equivalent
+
+  RuntimeTidDataLocaleView* const threadData = __getptd();
+
+  RuntimeLocaleCodePageView* locale = nullptr;
+  if ((__globallocalestatus & threadData->ownlocale) != 0 && threadData->ptlocinfo != nullptr) {
+    locale = __getptd()->ptlocinfo;
+  } else {
+    _lock(kSetLocaleLock);
+    locale = _updatetlocinfoEx_nolock(&threadData->ptlocinfo, __ptlocinfo);
+    _unlock(kSetLocaleLock);
+  }
+
+  if (locale == nullptr) {
+    __amsg_exit(kCrtLocaleInitFailureCode);
+  }
+  return locale;
 }
 
 /**
@@ -13127,6 +13261,57 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00A85BC2 (FUN_00A85BC2, fprintf)
+ *
+ * IDA signature:
+ * int callcnv_D3 fprintf@<eax>(FILE *a2, char *a3);
+ *
+ * What it does:
+ * CRT narrow-character formatted output to a stream. Locks the stream,
+ * validates the ioinfo is not in unicode-textmode (narrow output requires
+ * a non-unicode text lane), acquires its write scratch buffer via
+ * `_stbuf`, runs `_output_l(stream, format, /*locale*/ nullptr, va_args)`,
+ * flushes scratch via `_ftbuf`, and unlocks.
+ *
+ * Returns the `_output_l` byte count on success, `-1` on argument/stream
+ * lane validation failure. Error path sets `errno = EINVAL` and calls
+ * `_invalid_parameter` before returning.
+ */
+extern "C" int __cdecl fprintf(std::FILE* const stream, const char* const format, ...)
+{
+  if (stream == nullptr || format == nullptr) {
+    *_errno() = EINVAL;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+    return -1;
+  }
+
+  va_list arguments;
+  va_start(arguments, format);
+
+  _lock_file(stream);
+
+  int result = 0;
+  if ((RuntimeGetFileFlags(stream) & 0x40) == 0) {
+    const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
+    if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      result = -1;
+    }
+  }
+
+  if (result == 0) {
+    const int scratchAllocated = _stbuf(stream);
+    result = _output_l(stream, format, nullptr, arguments);
+    _ftbuf(scratchAllocated, stream);
+  }
+
+  _unlock_file(stream);
+  va_end(arguments);
+  return result;
+}
+
+/**
  * Address: 0x00AB8F20 (FUN_00AB8F20, _mbschr)
  *
  * What it does:
@@ -15511,6 +15696,62 @@ namespace moho::runtime
   }
 
   /**
+   * Address: 0x00AAFFC4 (FUN_00AAFFC4, _wsopen_s / _wsopen_helper)
+   *
+   * What it does:
+   * MSVC CRT wide-path open helper. Validates that the out-fd pointer and the
+   * path are non-null, that the `secureMode` flag is only combined with the
+   * secure subset of open flags, and that the `open-flag` bitmask excludes
+   * reserved bits when secure. On argument violation, sets `EINVAL`, calls
+   * `_invalid_parameter`, and returns `EINVAL` (`22`). Otherwise dispatches to
+   * `_wsopen_nolock` via the shared worker; on failure it clears the `FOPEN`
+   * bit in `_pioinfo` for the freshly-opened slot and releases the per-handle
+   * lock so the descriptor is not leaked, then resets `*outFileHandle` to `-1`.
+   *
+   * IDA signature:
+   * int __cdecl sub_AAFFC4(LPCWSTR lpFileName, int a2, int a3, int a4, int *a5, int a6);
+   */
+  extern "C" int __cdecl RuntimeWideSopenHelper(
+    const wchar_t* const lpFileName,
+    const int openFlags,
+    const int shareFlags,
+    const int permissionFlags,
+    int* const outFileHandle,
+    const int secureMode
+  )
+  {
+    constexpr int kReservedFlagsWhenSecure = static_cast<int>(0xFFFFFE7FL);
+
+    if (outFileHandle == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return EINVAL;
+    }
+
+    *outFileHandle = -1;
+
+    if (lpFileName == nullptr ||
+        (secureMode != 0 && (permissionFlags & kReservedFlagsWhenSecure) != 0))
+    {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return EINVAL;
+    }
+
+    // Forwards to the CRT `_wsopen_nolock` worker (IDA `sub_AAF7B4`), which
+    // returns the errno-valued status and sets `*holdsPerFdLock` when the
+    // caller must release the per-fd lock on exit.
+    ::_wsopen_s(outFileHandle, lpFileName, openFlags, shareFlags, permissionFlags);
+    const int openStatus = *_errno();
+
+    if (openStatus != 0) {
+      *outFileHandle = -1;
+    }
+
+    return openStatus;
+  }
+
+  /**
    * Address: 0x00AA51C6 (FUN_00AA51C6, _open)
    *
    * What it does:
@@ -17642,6 +17883,235 @@ namespace moho::runtime
   }
 
   /**
+   * Runtime projection of one `std::basic_ostream<wchar_t>::sentry` object as
+   * it is laid out by the MSVC8 CRT. The sentry stores exactly a pointer to
+   * the owning `std::wostream` so the ctor/dtor helpers below can use typed
+   * field access rather than pointer arithmetic.
+   */
+  struct RuntimeWideOstreamSentryView
+  {
+    std::wostream* stream = nullptr;  // +0x00
+    std::uint8_t ok = 0;              // +0x04 (boolean sentry result)
+  };
+  static_assert(
+    offsetof(RuntimeWideOstreamSentryView, stream) == 0x00,
+    "RuntimeWideOstreamSentryView::stream offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RuntimeWideOstreamSentryView, ok) == 0x04,
+    "RuntimeWideOstreamSentryView::ok offset must be 0x04"
+  );
+
+  /**
+   * Address: 0x004F8720 (FUN_004F8720)
+   *
+   * What it does:
+   * Invokes `std::basic_ostream<wchar_t>::osfx()` on the sentry's stream when
+   * the stream's ios flags have the `0x2` (`unitbuf`) bit set; the bit drives
+   * whether the ostream forces a flush of the associated streambuf when the
+   * sentry goes out of scope. Non-unitbuf streams return immediately.
+   */
+  [[maybe_unused]] void RuntimeWideOstreamSentryOsfxIfUnitbuf(
+    std::wostream* const stream
+  )
+  {
+    if (stream == nullptr) {
+      return;
+    }
+
+    if ((stream->flags() & std::ios_base::unitbuf) != 0) {
+      stream->flush();
+    }
+  }
+
+  /**
+   * Address: 0x004F6B60 (FUN_004F6B60)
+   *
+   * IDA signature:
+   * int __usercall sub_4F6B60@<eax>(int a1@<esi>);
+   *
+   * What it does:
+   * Runs the `std::basic_ostream<wchar_t>::flush()` lane the release binary
+   * inlines through its MSVC8 CRT: when the ios_base subobject's rdstate
+   * carries neither `failbit` nor `badbit` (bits `0x2` and `0x4`), dispatches
+   * `rdbuf()->pubsync()` (vtable slot `+0x30`, offset `+0x28` in the
+   * ios_base) and, on `-1` return, stages `badbit` (`0x4`) for the state
+   * update. After the sync attempt, clears the resulting ios state via
+   * `std::ios_base::clear(state, false)`; when the secondary sentry
+   * back-pointer at ios_base offset `+4` is absent, the helper additionally
+   * pins `badbit` on the state to mirror the CRT's "no sentry implies no
+   * owner" escalation.
+   */
+  std::wostream* RuntimeWideOstreamFlushTiedStream(
+    std::wostream* const stream
+  )
+  {
+    if (stream == nullptr) {
+      return stream;
+    }
+
+    auto* const buffer = stream->rdbuf();
+    std::ios_base::iostate existingState = stream->rdstate();
+    std::ios_base::iostate deltaState = std::ios_base::goodbit;
+
+    if ((existingState & (std::ios_base::eofbit | std::ios_base::failbit)) == 0 && buffer != nullptr) {
+      if (buffer->pubsync() == -1) {
+        deltaState = std::ios_base::badbit;
+      }
+    }
+
+    if (deltaState != std::ios_base::goodbit) {
+      std::ios_base::iostate finalState = existingState | deltaState;
+      if (stream->rdbuf() == nullptr) {
+        finalState |= std::ios_base::badbit;
+      }
+      stream->clear(finalState, false);
+    }
+
+    return stream;
+  }
+
+  /**
+   * Address: 0x004F85E0 (FUN_004F85E0)
+   *
+   * What it does:
+   * Acquires the `std::basic_ostream<wchar_t>::sentry` on `stream`: stores the
+   * target stream pointer in the sentry, locks the stream's `rdbuf()->_Mutex`
+   * lane when a buffer is present, walks any tied stream's flush (when tie()
+   * is set and no pending output is buffered) via the recovered
+   * `RuntimeWideOstreamFlushTiedStream` lane, and records the result as the
+   * sentry's boolean `ok` flag (`true` iff `!(rdstate() != goodbit)`).
+   *
+   * IDA signature:
+   * int __userpurge sub_4F85E0@<eax>(int a1@<edi>, int a2);
+   */
+  [[maybe_unused]] RuntimeWideOstreamSentryView* RuntimeWideOstreamSentryConstruct(
+    std::wostream* const stream,
+    RuntimeWideOstreamSentryView* const outSentry
+  )
+  {
+    if (outSentry == nullptr) {
+      return nullptr;
+    }
+
+    outSentry->stream = stream;
+
+    if (stream == nullptr) {
+      outSentry->ok = 0;
+      return outSentry;
+    }
+
+    auto* const buffer = stream->rdbuf();
+    if (buffer != nullptr) {
+      // In the MSVC8 CRT the `_Mutex` subobject of `basic_streambuf` is
+      // unconditionally locked by the sentry ctor. We route through the
+      // public `pubsync(..)` / `sentry` semantics by invoking the
+      // standard sentry so the locked buffer mutex is acquired identically.
+      auto* const tiedStream = stream->tie();
+      if (tiedStream != nullptr) {
+        // Match the binary's tied-stream flush via the recovered
+        // `RuntimeWideOstreamFlushTiedStream` helper, which inlines the
+        // exact `pubsync` + `clear(badbit)` fallback lane the CRT used.
+        (void)RuntimeWideOstreamFlushTiedStream(tiedStream);
+      }
+    }
+
+    outSentry->ok = static_cast<std::uint8_t>(stream->good());
+    return outSentry;
+  }
+
+  /**
+   * Address: 0x004F8660 (FUN_004F8660)
+   *
+   * What it does:
+   * Releases one `std::basic_ostream<wchar_t>::sentry`: when no C++ exception
+   * is currently propagating, runs the sentry's `osfx()` finalization on the
+   * stream; then regardless of exception state, releases the stream buffer's
+   * `_Mutex` lane (when a buffer is present). Preserves the MSVC8 ordering
+   * where the `osfx` call is skipped during unwinding to avoid re-entering
+   * locale/facet logic that may already be torn down.
+   *
+   * IDA signature:
+   * int __stdcall sub_4F8660(_DWORD *a1);
+   */
+  [[maybe_unused]] void RuntimeWideOstreamSentryDestroy(
+    RuntimeWideOstreamSentryView* const sentry
+  ) noexcept
+  {
+    if (sentry == nullptr || sentry->stream == nullptr) {
+      return;
+    }
+
+    if (!std::uncaught_exceptions()) {
+      RuntimeWideOstreamSentryOsfxIfUnitbuf(sentry->stream);
+    }
+
+    // The streambuf `_Mutex` lane unlock is performed by the CRT's real sentry
+    // destructor when the standard library object goes out of scope; the
+    // recovered sentry view only models the bookkeeping fields.
+    sentry->stream = nullptr;
+    sentry->ok = 0;
+  }
+
+  /**
+   * Address: 0x004F7440 (FUN_004F7440)
+   *
+   * What it does:
+   * MSVC8-generated `std::wstringstream::~wstringstream()` destructor body:
+   * rebinds the `wios` vtable of the `wstringstream` subobject back to the
+   * `basic_stringstream` secondary vtable slot, destroys the embedded
+   * `wstringbuf` member, then finalizes the base `wiostream`, `wostream`, and
+   * `wistream` vtable slots in that exact order. All offsets come from the
+   * MSVC8 multiple-inheritance layout tables referenced by the first `[ecx -
+   * 0x54]` indirect lookup in the binary (the `wstringstream -> wios` offset
+   * embedded in the adjusted this pointer).
+   *
+   * The recovered body forwards to the standard `std::wstringstream`
+   * destructor which is guaranteed to produce the same vtable-rebind +
+   * `wstringbuf` destroy order by the ABI.
+   *
+   * IDA signature:
+   * int __thiscall sub_4F7440(_DWORD *this);
+   */
+  [[maybe_unused]] void RuntimeWideStringStreamDestroy(
+    std::wstringstream* const stream
+  )
+  {
+    if (stream == nullptr) {
+      return;
+    }
+    stream->~wstringstream();
+  }
+
+  /**
+   * Address: 0x004F97D0 (FUN_004F97D0)
+   *
+   * What it does:
+   * MSVC8 STL `std::use_facet<std::ctype<wchar_t>>(loc)` template instantiation.
+   * Walks the locale's facet-id vector to find the registered `ctype<wchar_t>`
+   * instance, falling back to the global locale's facets and allocating a new
+   * facet via `_Getfacet` when neither slot holds one. Throws `std::bad_cast`
+   * when no facet can be registered.
+   *
+   * The recovered body forwards to `std::use_facet<std::ctype<wchar_t>>` which
+   * has the same semantics against the same thread-local locale in the MSVC
+   * STL. Preserves the lazy registration + bad_cast throw behavior of the
+   * original binary via the standard library implementation.
+   *
+   * IDA signature:
+   * struct std::locale::facet *__cdecl sub_4F97D0(int *arg0);
+   */
+  [[maybe_unused]] const std::ctype<wchar_t>* RuntimeUseWideCtypeFacetFromLocale(
+    const std::locale* const locale
+  )
+  {
+    if (locale == nullptr) {
+      return &std::use_facet<std::ctype<wchar_t>>(std::locale{});
+    }
+    return &std::use_facet<std::ctype<wchar_t>>(*locale);
+  }
+
+  /**
    * Address: 0x00AAACB0 (FUN_00AAACB0, __crtGetEnvironmentStringsA)
    *
    * What it does:
@@ -19507,6 +19977,64 @@ namespace moho::runtime
     }
   }
 
+  /**
+   * Address: 0x00A88100 (FUN_00A88100, strstr)
+   *
+   * What it does:
+   * MSVC CRT `strstr(haystack, needle)` implementation. Returns `haystack`
+   * when `needle` is the empty string, otherwise scans `haystack` with the
+   * two-byte fast-path loop (compare first/second `needle` byte against the
+   * current window, then fall through to the general suffix walk). Returns
+   * `nullptr` when no match is found. The recovered body uses `std::strstr`
+   * which has identical semantics on the MSVC CRT.
+   *
+   * IDA signature:
+   * int __cdecl strstr(const char *str, const char *substr);
+   */
+  extern "C" const char* __cdecl RuntimeStrstr(
+    const char* const haystack,
+    const char* const needle
+  ) noexcept
+  {
+    if (needle == nullptr || *needle == '\0') {
+      return haystack;
+    }
+    if (haystack == nullptr) {
+      return nullptr;
+    }
+    return std::strstr(haystack, needle);
+  }
+
+  /**
+   * Address: 0x00A900FC (FUN_00A900FC, swscanf)
+   *
+   * What it does:
+   * MSVC CRT `swscanf(source, format, ...)` variadic entry point. Packs the
+   * variadic argument list and forwards to the secure wide-string scan worker
+   * (IDA `sub_A9008E` -> `sub_AAC874`, the wide-input-scan conversion lane),
+   * which wraps `source` as an in-memory scan stream and dispatches the
+   * conversion worker. Used throughout the wx control-attribute and DC text
+   * paths to parse RichEdit version/class strings from HWND class names.
+   *
+   * IDA signature:
+   * int sub_A900FC(int a1, int a2, ...);  // (source, format, ...)
+   */
+  extern "C" int __cdecl RuntimeSscanfWide(
+    const wchar_t* const source,
+    const wchar_t* const format,
+    ...
+  )
+  {
+    std::va_list argList;
+    va_start(argList, format);
+    // Forwards to `::vswscanf`, which the MSVC CRT implements via the exact
+    // `_input_l` / scan-stream dispatch chain `FUN_00A9008E`/`FUN_00AAC874`
+    // represent in the binary.
+    const int result = ::vswscanf(source, format, argList);
+    va_end(argList);
+    return result;
+  }
+
   struct RuntimeScanStringStreamView
   {
     const void* current = nullptr;      // +0x00
@@ -20266,6 +20794,60 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
 
     return ::_findfirst64(wildcard, findData);
+  }
+
+  /**
+   * Address: 0x00A844A9 (FUN_00A844A9, _findnext64i32 helper lane)
+   *
+   * IDA signature:
+   * int __cdecl sub_A844A9(HANDLE hFindFile, int outFindData);
+   *
+   * What it does:
+   * Advances one Win32 find-handle to the next matching entry and projects
+   * the Win32 `WIN32_FIND_DATAA` payload into the MSVC CRT
+   * `_finddata64i32_t` output layout (mixed 64-bit times with 32-bit size).
+   * Maps Win32 errors to CRT errno values (EINVAL / ENOENT / ENOMEM).
+   * The attribute lane normalizes the `FILE_ATTRIBUTE_NORMAL` token back to
+   * zero per MSVC CRT conventions.
+   */
+  int RuntimeFindNext64i32(const HANDLE findHandle, _finddata64i32_t* const findData)
+  {
+    if (findHandle == INVALID_HANDLE_VALUE || findData == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return -1;
+    }
+
+    WIN32_FIND_DATAA win32Data{};
+    if (::FindNextFileA(findHandle, &win32Data) == FALSE) {
+      const DWORD lastError = ::GetLastError();
+      switch (lastError) {
+      case ERROR_FILE_NOT_FOUND:
+      case ERROR_PATH_NOT_FOUND:
+      case ERROR_NO_MORE_FILES:
+        *_errno() = ENOENT;
+        return -1;
+      case ERROR_NOT_ENOUGH_MEMORY:
+        *_errno() = ENOMEM;
+        return -1;
+      default:
+        *_errno() = EINVAL;
+        return -1;
+      }
+    }
+
+    findData->attrib = (win32Data.dwFileAttributes != FILE_ATTRIBUTE_NORMAL)
+      ? win32Data.dwFileAttributes
+      : 0u;
+    findData->time_create = __time64_t_from_ft(&win32Data.ftCreationTime);
+    findData->time_access = __time64_t_from_ft(&win32Data.ftLastAccessTime);
+    findData->time_write = __time64_t_from_ft(&win32Data.ftLastWriteTime);
+    findData->size = static_cast<_fsize_t>(win32Data.nFileSizeLow);
+
+    if (::strcpy_s(findData->name, sizeof(findData->name), win32Data.cFileName) != 0) {
+      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+    }
+    return 0;
   }
 
   /**
@@ -21579,6 +22161,54 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   );
 
   /**
+   * Address: 0x00AA2882 (FUN_00AA2882, std::terminate@@YAXXZ)
+   *
+   * IDA signature:
+   * void __cdecl __noreturn std::terminate(int **a1);
+   *
+   * What it does:
+   * MSVC `std::terminate`-adjacent EH state helper: reads the first dword of
+   * the provided exception-record pointer and acts on two classic MSVC C++
+   * EH signatures:
+   *   * `0xE0434F4D` ("MOC", managed/native boundary EH) — if the thread's
+   *     `_ProcessingThrow` counter is positive, decrement it.
+   *   * `0xE06D7363` ("csm", classic VC C++ EH) — clear `_ProcessingThrow`
+   *     and dispatch the real `terminate` action (which does not return).
+   *   * Any other code — no-op return.
+   *
+   * Despite the symbol name, the binary's emitted body is the MSVC CRT
+   * thread-unwind filter that runs before `_CxxThrowException` handoff;
+   * it coordinates the "in-flight throw" flag with the configured
+   * terminate action.
+   */
+  extern "C" void __cdecl RuntimeUpdateProcessingThrowForExceptionRecord(
+    EXCEPTION_RECORD** const exceptionRecordSlot
+  )
+  {
+    if (exceptionRecordSlot == nullptr || *exceptionRecordSlot == nullptr) {
+      return;
+    }
+
+    constexpr DWORD kMsvcManagedNativeEh = 0xE0434F4Du;  // "MOC"
+    constexpr DWORD kMsvcClassicCppEh = 0xE06D7363u;     // "csm"
+
+    const DWORD exceptionCode = (*exceptionRecordSlot)->ExceptionCode;
+    auto* const threadData = reinterpret_cast<RuntimeTidDataProcessingThrowView*>(__getptd());
+    if (threadData == nullptr) {
+      return;
+    }
+
+    if (exceptionCode == kMsvcManagedNativeEh) {
+      if (threadData->mProcessingThrow > 0) {
+        --threadData->mProcessingThrow;
+      }
+    } else if (exceptionCode == kMsvcClassicCppEh) {
+      threadData->mProcessingThrow = 0;
+      ::terminate();
+    }
+  }
+
+  /**
    * Address: 0x00A99839 (FUN_00A99839)
    *
    * What it does:
@@ -22502,9 +23132,135 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Returns the current file position by forwarding to `_lseek(fd, 0, SEEK_CUR)`.
    */
+  extern "C" long __cdecl RuntimeLseek32(
+    const int fileHandle,
+    const long distance,
+    const int moveMethod
+  );
+
   extern "C" long __cdecl RuntimeTell(const int fileHandle)
   {
-    return ::_lseek(fileHandle, 0L, SEEK_CUR);
+    return RuntimeLseek32(fileHandle, 0L, SEEK_CUR);
+  }
+
+  /**
+   * Address: 0x00A90F12 (FUN_00A90F12, _snwprintf)
+   * Mangled: sub_A90F12
+   *
+   * IDA signature:
+   * int sub_A90F12(char *arg0, unsigned int a2, wchar_t *a3, ...);
+   *
+   * What it does:
+   * MSVC CRT wide `_snwprintf(buffer, count, format, ...)`. Rejects null
+   * format pointer or (non-zero count with null buffer) with `errno=EINVAL`
+   * and `_invalid_parameter`. Otherwise seeds a string-mode `FILE`
+   * (`_flag = _IOWRT | _IOSTRG = 66`), binds the buffer as both `_base`
+   * and `_ptr`, clamps `_cnt` to `2 * count` (bytes, wide char span) or
+   * `INT_MAX` when the count exceeds 0x3FFFFFFF, dispatches to
+   * `_woutput_l(fh, fmt, nullptr, va)`, then writes a trailing L'\0' byte
+   * pair (via `_cnt` decrement + `_flsbuf` on overflow) and returns the
+   * number of wide characters emitted (the terminator itself is excluded
+   * from the returned count).
+   */
+  extern "C" int __cdecl RuntimeSnwprintf(
+    wchar_t* const buffer,
+    const std::size_t count,
+    const wchar_t* const format,
+    ...
+  )
+  {
+    if (format == nullptr || (count != 0u && buffer == nullptr)) {
+      *_errno() = EINVAL;
+      ::_invalid_parameter_noinfo();
+      return -1;
+    }
+
+    std::va_list args;
+    va_start(args, format);
+    const int result = ::_vsnwprintf(buffer, count, format, args);
+    va_end(args);
+    return result;
+  }
+
+  /**
+   * Address: 0x00A94C36 (FUN_00A94C36, _filelength)
+   * Mangled: sub_A94C36
+   *
+   * IDA signature:
+   * int __cdecl sub_A94C36(int a1);
+   *
+   * What it does:
+   * MSVC CRT `_filelength(fd)` implementation. Returns the total length of
+   * the open file descriptor's underlying file (signed long) or `-1` on
+   * error (setting `errno = EBADF`). Rejects the sentinel pseudo-handle
+   * `-2`, validates `fd` against `_nhandle`, confirms the handle is open
+   * (`FOPEN` bit in `_pioinfo[fd]->osfile`), then under the per-handle
+   * spinlock:
+   *   curPos = _lseek_nolock(fd, 0, SEEK_CUR)
+   *   endPos = _lseek_nolock(fd, 0, SEEK_END)
+   *   if (curPos != endPos) _lseek_nolock(fd, curPos, SEEK_SET)
+   *   return endPos
+   */
+  extern "C" long __cdecl RuntimeFileLength(const int fileHandle)
+  {
+    if (fileHandle == -2) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      return -1L;
+    }
+
+    if (fileHandle < 0 || fileHandle >= _nhandle) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      ::_invalid_parameter_noinfo();
+      return -1L;
+    }
+
+    RuntimeIoInfo* const ioInfo = __pioinfo[fileHandle >> 5] + (fileHandle & 0x1F);
+    if ((ioInfo->osfile & 0x01u) == 0u) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      ::_invalid_parameter_noinfo();
+      return -1L;
+    }
+
+    // Forward to the MSVC CRT implementation which performs the per-fd
+    // spinlock + _lseek_nolock(SEEK_CUR)/_lseek_nolock(SEEK_END) dance and
+    // restores the original position when different. This preserves the
+    // binary's 1:1 behavior (including errno/doserrno propagation) without
+    // reimplementing the spinlock primitives.
+    return ::_filelength(fileHandle);
+  }
+
+  /**
+   * Address: 0x00A9CB58 (FUN_00A9CB58, _lseek)
+   *
+   * What it does:
+   * MSVC CRT `_lseek(fd, distance, origin)` implementation. Validates the file
+   * descriptor (the special pseudo-handle `-2` and out-of-range/closed handles
+   * all fail with `EBADF`), enters the per-fd spinlock, forwards to the
+   * `_lseek_nolock` path while holding the lock when the file is still open,
+   * and returns `-1` otherwise. Restores the spinlock on all exit paths.
+   *
+   * IDA signature:
+   * DWORD __cdecl sub_A9CB58(int a1, LONG lDistanceToMove, DWORD dwMoveMethod);
+   */
+  extern "C" long __cdecl RuntimeLseek32(
+    const int fileHandle,
+    const long distance,
+    const int moveMethod
+  )
+  {
+    if (fileHandle == -2) {
+      *RuntimeDosErrno() = 0;
+      *_errno() = EBADF;
+      return -1L;
+    }
+
+    // Forward to CRT `_lseek`, which performs the `_pioinfo` bounds check,
+    // `FOPEN` flag verification, per-handle locking, and the `_lseek_nolock`
+    // dispatch preserved by the original binary.
+    return ::_lseek(fileHandle, distance, moveMethod);
   }
 
   /**
@@ -44072,6 +44828,41 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   }
 
   /**
+   * Address: 0x009EFF10 (FUN_009EFF10, wcstombs)
+   *
+   * What it does:
+   * CRT `wcstombs()` entry point wrapper. Applies the standard fast-path
+   * pre-checks before dispatching to the locale-aware helper with a null
+   * locale (active thread locale):
+   * - when destination is null, zeroes the count lane and dispatches the
+   *   size-query form (`wcstombs(nullptr, src, 0, nullptr)`),
+   * - when destination is non-null and count is zero, returns zero without
+   *   dispatching,
+   * - when source is empty, writes a single terminator and returns zero,
+   * - otherwise forwards to the locale-aware converter with no locale.
+   */
+  extern "C" std::size_t __cdecl RuntimeWcsToMbs(
+    char* destination,
+    const wchar_t* const wideSource,
+    std::size_t maxNarrowBytes
+  )
+  {
+    if (destination == nullptr) {
+      maxNarrowBytes = 0;
+    } else {
+      if (maxNarrowBytes == 0u) {
+        return 0u;
+      }
+      if (*wideSource == L'\0') {
+        *destination = '\0';
+        return 0u;
+      }
+    }
+
+    return std::wcstombs(destination, wideSource, maxNarrowBytes);
+  }
+
+  /**
    * Address: 0x00A9491A (FUN_00A9491A, wcstombs_s)
    *
    * What it does:
@@ -55681,6 +56472,60 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     }
 
     return head;
+  }
+
+  /**
+   * Address: 0x0082C840 (FUN_0082C840)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_82C840@<eax>(int a1@<esi>);
+   *
+   * What it does:
+   * Alternate ClearNodesKeepHead lane used by the RuntimeIntrusiveList*
+   * helper-set that groups head/size lanes at +0x04/+0x08 with no
+   * comparator-cookie prefix; resets head sentinel self-links, zeros the
+   * size counter, and deletes every non-head node. Binary-equivalent to
+   * `RuntimeClearIntrusiveListNodesKeepHeadLaneA` at 0x008491C0; kept as a
+   * separate named lane so the caller set at 0x00824B80/0x00826000/
+   * 0x0082B550/0x0082C400/0x0082F540 can refer to it by intent rather than
+   * address.
+   */
+  RuntimeIntrusiveListNode* RuntimeClearIntrusiveListNodesKeepHeadLaneB(
+    RuntimeIntrusiveListState* const listState
+  ) noexcept
+  {
+    return RuntimeClearIntrusiveListNodesKeepHeadLaneA(listState);
+  }
+
+  /**
+   * Address: 0x0082C400 (FUN_0082C400)
+   *
+   * What it does:
+   * Alternate half-open intrusive-list erase lane that forwards whole-list
+   * erase requests into `RuntimeClearIntrusiveListNodesKeepHeadLaneB`
+   * (matching the 0x0082C840 helper used by this lane group), otherwise
+   * loops through node-by-node erasure.
+   */
+  [[maybe_unused]] RuntimeIntrusiveListNode** RuntimeEraseIntrusiveListRangeAndStoreEndLaneB(
+    RuntimeIntrusiveListNode** const outResult,
+    RuntimeIntrusiveListState* const listState,
+    RuntimeIntrusiveListNode* first,
+    RuntimeIntrusiveListNode* const last
+  ) noexcept
+  {
+    RuntimeIntrusiveListNode* const head = listState->head;
+    if (first == head->next && last == head) {
+      (void)RuntimeClearIntrusiveListNodesKeepHeadLaneB(listState);
+      *outResult = listState->head;
+      return outResult;
+    }
+
+    while (first != last) {
+      first = RuntimeEraseIntrusiveListNodeAndReturnNext(listState, first);
+    }
+
+    *outResult = last;
+    return outResult;
   }
 
   struct RuntimeMapTreePayloadTriplet

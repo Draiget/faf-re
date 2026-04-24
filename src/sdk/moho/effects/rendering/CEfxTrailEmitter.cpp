@@ -99,6 +99,30 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00671200 (FUN_00671200, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
+   *
+   * What it does:
+   * Default-constructs one trail-emitter: chains to `CEffectImpl::CEffectImpl()`
+   * (which publishes the base vtable) and then zero-initializes the trail
+   * payload lanes. In the shipped binary the derived vtable is patched in
+   * after the base ctor returns; the implicit `CEfxTrailEmitter` vtable binding
+   * performed by the compiler reproduces that sequence.
+   */
+  CEfxTrailEmitter::CEfxTrailEmitter()
+    : CEffectImpl()
+    , mTrailBlueprint(nullptr)
+    , mTrailLength(0)
+    , mTotalTicks(0.0f)
+    , mLife(0.0f)
+    , mLength(0.0f)
+    , mSerializedTrailPosition()
+    , mCreated(false)
+    , mVisible(false)
+    , mPad1B2{0, 0}
+    , mLastUpdate(0u)
+  {}
+
+  /**
    * Address: 0x00671420 (FUN_00671420, Moho::CEfxTrailEmitter::Invalidate1)
    *
    * What it does:

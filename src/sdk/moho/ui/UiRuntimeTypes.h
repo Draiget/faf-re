@@ -2075,7 +2075,18 @@ namespace moho
      * Logs this movie label and current playback state (`true`/`false`).
      */
     void Dump() override;
-    virtual ~CMauiMovie() = default;
+
+    /**
+     * Address: 0x0079EF30 (FUN_0079EF30, Moho::CMauiMovie::~CMauiMovie)
+     *
+     * What it does:
+     * Tears down one movie control in-place: destroys the two lazy-var lanes
+     * (`mMovieHeightLV`, `mMovieWidthLV`), releases the subtitle-cache string
+     * storage, deletes the movie-playback interface through its virtual
+     * deleting destructor, then delegates to the `CMauiControl` base
+     * teardown.
+     */
+    ~CMauiMovie() override;
   };
 
   class CMauiScrollbar : public CMauiControl, public IMauiDragger

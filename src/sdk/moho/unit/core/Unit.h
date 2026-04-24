@@ -398,6 +398,20 @@ namespace moho
     ~UnitWeaponInfo();
 
     /**
+     * Address: 0x0055D6F0 (FUN_0055D6F0, ??0UnitWeaponInfo@Moho@@QAE@ABU01@@Z)
+     *
+     * IDA signature:
+     * int __userpurge sub_55D6F0@<eax>(int source@<edi>, int destination);
+     *
+     * What it does:
+     * Copy-constructs one `UnitWeaponInfo` from `other`: clones both
+     * `EntityCategorySet` lanes (mUniverse + mFirstWordIndex header + fastvector
+     * words), copies scalar layer/radius lanes, and assigns both UI range
+     * visual-id strings into freshly-initialized inline storage.
+     */
+    UnitWeaponInfo(const UnitWeaponInfo& other);
+
+    /**
      * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
      *
      * What it does:

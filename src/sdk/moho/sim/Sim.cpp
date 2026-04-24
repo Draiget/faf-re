@@ -10896,6 +10896,13 @@ namespace
    * What it does:
    * Sorts one contiguous `DumpUnitsCountEntry` range by descending population
    * count using the binary lane's non-stable ordering contract.
+   *
+   * Absorbs FUN_00760590 (the MSVC8 `_Push_heap`/`_Adjust_heap` inner lane that
+   * the binary's hand-rolled introsort variant invokes recursively on each
+   * partition). `std::sort` in modern C++20 encapsulates the same heapify +
+   * partition + insertion-sort machinery with identical worst-case order,
+   * so the explicit heapify helper disappears at the intent-first source
+   * level while preserving binary-equivalent ordering for finite inputs.
    */
   void SortDumpUnitsCountEntries(
     DumpUnitsCountEntry* const begin,
@@ -21461,13 +21468,20 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  gpg::Rect2f queryRect{};
-  if (!ParseRectFromLuaArguments(state, kGetEntitiesInRectHelpText, queryRect)) {
-    return 0;
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 4) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kGetEntitiesInRectHelpText,
+      1,
+      4,
+      argumentCount
+    );
   }
 
-  lua_State* const rawState = state->m_state;
-  Sim* const sim = ResolveGlobalSim(rawState);
+  Sim* const sim = lua_getglobaluserdata(rawState);
   COGrid* const oGrid = sim ? sim->mOGrid : nullptr;
   if (oGrid == nullptr) {
     lua_pushnil(rawState);
@@ -21475,16 +21489,45 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  constexpr EEntityType kEntityMask = static_cast<EEntityType>(
-    ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity
-  );
+  gpg::Rect2f queryRect{};
+  if (lua_gettop(rawState) == 1) {
+    auto rectObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
+    queryRect = SCR_FromLuaCopy<gpg::Rect2f>(rectObject);
+  } else {
+    LuaPlus::LuaStackObject x0Arg(state, 1);
+    if (lua_type(rawState, 1) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x0Arg, "number");
+    }
+    queryRect.x0 = static_cast<float>(lua_tonumber(rawState, 1));
+
+    LuaPlus::LuaStackObject z0Arg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z0Arg, "number");
+    }
+    queryRect.z0 = static_cast<float>(lua_tonumber(rawState, 2));
+
+    LuaPlus::LuaStackObject x1Arg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x1Arg, "number");
+    }
+    queryRect.x1 = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject z1Arg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z1Arg, "number");
+    }
+    queryRect.z1 = static_cast<float>(lua_tonumber(rawState, 4));
+  }
 
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  EntityGatherVector entitiesInRect{};
-  const int gatheredCount = oGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-    entitiesInRect,
+  CollisionSpanVector gatheredSpans{};
+  constexpr EEntityType kEntityMask = static_cast<EEntityType>(
+    ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity
+  );
+  const int gatheredCount = oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(
+    gatheredSpans,
     collisionRect,
     kEntityMask
   );
@@ -21494,11 +21537,13 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  LuaPlus::LuaObject resultTable{};
+  auto resultTable = LuaPlus::LuaObject();
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
-  for (Entity* const entity : entitiesInRect) {
-    const LuaPlus::LuaObject entityObject = entity->mLuaObj;
+  for (int index = 0; index < gatheredCount; ++index) {
+    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
+    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
   }
@@ -21550,45 +21595,89 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  gpg::Rect2f queryRect{};
-  if (!ParseRectFromLuaArguments(state, kGetUnitsInRectHelpText, queryRect)) {
-    return 0;
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 4) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kGetUnitsInRectHelpText,
+      1,
+      4,
+      argumentCount
+    );
   }
 
-  lua_State* const rawState = state->m_state;
-  Sim* const sim = ResolveGlobalSim(rawState);
-  CEntityDb* const entityDb = sim ? sim->mEntityDB : nullptr;
-  if (entityDb == nullptr) {
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  COGrid* const oGrid = sim ? sim->mOGrid : nullptr;
+  if (oGrid == nullptr) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
-  std::vector<Unit*> unitsInRect{};
-  for (Entity* const entity : entityDb->Entities()) {
-    if (entity == nullptr || !IsEntityPositionInsideRect(entity, queryRect)) {
+  gpg::Rect2f queryRect{};
+  if (lua_gettop(rawState) == 1) {
+    auto rectObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
+    queryRect = SCR_FromLuaCopy<gpg::Rect2f>(rectObject);
+  } else {
+    LuaPlus::LuaStackObject x0Arg(state, 1);
+    if (lua_type(rawState, 1) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x0Arg, "number");
+    }
+    queryRect.x0 = static_cast<float>(lua_tonumber(rawState, 1));
+
+    LuaPlus::LuaStackObject z0Arg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z0Arg, "number");
+    }
+    queryRect.z0 = static_cast<float>(lua_tonumber(rawState, 2));
+
+    LuaPlus::LuaStackObject x1Arg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x1Arg, "number");
+    }
+    queryRect.x1 = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject z1Arg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z1Arg, "number");
+    }
+    queryRect.z1 = static_cast<float>(lua_tonumber(rawState, 4));
+  }
+
+  CollisionDBRect collisionRect{};
+  (void)func_Rect2fToInt16(&collisionRect, queryRect);
+
+  CollisionSpanVector gatheredSpans{};
+  const int gatheredCount =
+    oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, collisionRect, ENTITYTYPE_Unit);
+  if (gatheredCount <= 0) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  auto resultTable = LuaPlus::LuaObject();
+  resultTable.AssignNewTable(state, gatheredCount, 0);
+  int luaIndex = 1;
+  for (int index = 0; index < gatheredCount; ++index) {
+    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
+    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    Unit* const unit = entity != nullptr ? entity->IsUnit() : nullptr;
+    if (unit == nullptr) {
       continue;
     }
 
-    Unit* const unit = entity->IsUnit();
-    if (unit != nullptr) {
-      unitsInRect.push_back(unit);
-    }
+    const auto unitObject = LuaPlus::LuaObject(unit->GetLuaObject());
+    resultTable.SetObject(luaIndex, unitObject);
+    ++luaIndex;
   }
 
-  if (unitsInRect.empty()) {
+  if (luaIndex <= 1) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
-  }
-
-  LuaPlus::LuaObject resultTable{};
-  resultTable.AssignNewTable(state, static_cast<int>(unitsInRect.size()), 0);
-  int luaIndex = 1;
-  for (Unit* const unit : unitsInRect) {
-    const LuaPlus::LuaObject unitObject = unit->GetLuaObject();
-    resultTable.SetObject(luaIndex, unitObject);
-    ++luaIndex;
   }
 
   resultTable.PushStack(state);
@@ -21639,46 +21728,88 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  gpg::Rect2f queryRect{};
-  if (!ParseRectFromLuaArguments(state, kGetReclaimablesInRectHelpText, queryRect)) {
-    return 0;
-  }
-
   lua_State* const rawState = state->m_state;
-  Sim* const sim = ResolveGlobalSim(rawState);
-  CEntityDb* const entityDb = sim ? sim->mEntityDB : nullptr;
-  if (entityDb == nullptr) {
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 4) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kGetReclaimablesInRectHelpText,
+      1,
+      4,
+      argumentCount
+    );
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  COGrid* const oGrid = sim ? sim->mOGrid : nullptr;
+  if (oGrid == nullptr) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
-  std::vector<Entity*> reclaimablesInRect{};
-  for (Entity* const entity : entityDb->Entities()) {
-    if (entity == nullptr || !IsEntityPositionInsideRect(entity, queryRect)) {
-      continue;
+  gpg::Rect2f queryRect{};
+  if (lua_gettop(rawState) == 1) {
+    auto rectObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
+    queryRect = SCR_FromLuaCopy<gpg::Rect2f>(rectObject);
+  } else {
+    LuaPlus::LuaStackObject x0Arg(state, 1);
+    if (lua_type(rawState, 1) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x0Arg, "number");
     }
+    queryRect.x0 = static_cast<float>(lua_tonumber(rawState, 1));
 
-    if (entity->IsUnit() == nullptr && entity->IsProp() == nullptr) {
-      continue;
+    LuaPlus::LuaStackObject z0Arg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z0Arg, "number");
     }
+    queryRect.z0 = static_cast<float>(lua_tonumber(rawState, 2));
 
-    reclaimablesInRect.push_back(entity);
+    LuaPlus::LuaStackObject x1Arg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&x1Arg, "number");
+    }
+    queryRect.x1 = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject z1Arg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&z1Arg, "number");
+    }
+    queryRect.z1 = static_cast<float>(lua_tonumber(rawState, 4));
   }
 
-  if (reclaimablesInRect.empty()) {
+  CollisionDBRect collisionRect{};
+  (void)func_Rect2fToInt16(&collisionRect, queryRect);
+
+  CollisionSpanVector gatheredSpans{};
+  constexpr EEntityType kReclaimableMask = static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop);
+  const int gatheredCount = oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(
+    gatheredSpans,
+    collisionRect,
+    kReclaimableMask
+  );
+  if (gatheredCount <= 0) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
-  LuaPlus::LuaObject resultTable{};
-  resultTable.AssignNewTable(state, static_cast<int>(reclaimablesInRect.size()), 0);
+  auto resultTable = LuaPlus::LuaObject();
+  resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
-  for (Entity* const entity : reclaimablesInRect) {
-    const LuaPlus::LuaObject entityObject = entity->mLuaObj;
+  for (int index = 0; index < gatheredCount; ++index) {
+    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
+    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
+  }
+
+  if (luaIndex <= 1) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
   }
 
   resultTable.PushStack(state);

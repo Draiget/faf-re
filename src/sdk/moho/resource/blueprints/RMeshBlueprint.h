@@ -51,6 +51,21 @@ namespace moho
     RMeshBlueprintLOD(const RMeshBlueprintLOD& other);
 
     /**
+     * Address: 0x0051B080 (FUN_0051B080)
+     * Mangled: ??4RMeshBlueprintLOD@Moho@@QAEAAV01@ABV01@@Z
+     *
+     * IDA signature:
+     * int __usercall sub_51B080@<eax>(int a1@<edi>, int a2@<esi>);
+     *
+     * What it does:
+     * Copy-assigns every LOD field in-place: 7 `msvc8::string` lanes via
+     * `std::string::assign(src, 0, npos)`, the `mLodCutoff` float, and the
+     * three `{mScrolling, mOcclude, mSilhouette}` byte flags. Returns `this`
+     * as the call result to match the VC8 operator= ABI.
+     */
+    RMeshBlueprintLOD& operator=(const RMeshBlueprintLOD& other);
+
+    /**
      * Address: 0x00518870 (FUN_00518870)
      * Mangled: ?Init@RMeshBlueprintLOD@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z
      *

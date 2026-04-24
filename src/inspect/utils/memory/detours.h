@@ -162,6 +162,9 @@ namespace detours {
             auto* entry = static_cast<std::uint8_t*>(target_);
             // 1) Decide stolen count so we fully cover SEH prologue
             const auto need = asm_utils::compute_stolen_len_covering_seh(entry);
+            if (need < asm_utils::kOpJmpRel32Size) {
+                return false;
+            }
             patch_len_ = need;
 
             // 2) Save original bytes for disable()

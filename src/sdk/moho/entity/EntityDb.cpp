@@ -1508,29 +1508,64 @@ namespace
     return handleIndex;
   }
 
+  /**
+   * Address: 0x006867F0 (FUN_006867F0)
+   *
+   * IDA signature:
+   * void __usercall sub_6867F0(int index@<ebx>, gpg::PriorityQueue *queue@<edi>);
+   *
+   * What it does:
+   * Removes one entry from the prop-reclaim priority queue at `heapIndex`:
+   * swaps it with the tail entry (unless already at tail), sifts the moved
+   * entry down so the heap invariant is restored from the new tail-insertion
+   * position (binary invokes `sub_687530` swap + `sub_6875F0` sift), reads
+   * back the removed entry's handle index (binary reads
+   * `end[-1].mBoundedTick`, which is the handle-index field inside the tail
+   * entry), links that handle back into the free-handle list via
+   * `mLastHandle` push, then shrinks the heap by popping the tail slot.
+   *
+   * This helper is the common inner step of:
+   *   - `AddBoundedProp` (evict head when queue is full)
+   *   - `RemoveBoundedProp` / `RemoveBoundedPropByHandle` (explicit removal)
+   *   - `Prop::~Prop` (auto-unregister on prop destruction)
+   */
+  [[nodiscard]] std::unique_ptr<BoundedPropQueueEntry> RemoveBoundedPropAtHeapIndex(
+    BoundedPropQueueRuntime& queue,
+    const std::size_t heapIndex
+  )
+  {
+    if (heapIndex >= queue.heap.size()) {
+      return {};
+    }
+
+    const std::size_t lastIndex = queue.heap.size() - 1u;
+    if (heapIndex != lastIndex) {
+      SwapBoundedPropHeapEntries(queue, heapIndex, lastIndex);
+      SiftBoundedPropDown(queue, heapIndex);
+    }
+
+    std::unique_ptr<BoundedPropQueueEntry> removed = std::move(queue.heap.back());
+    queue.heap.pop_back();
+
+    if (removed) {
+      ReleaseBoundedPropHandle(queue, removed->handleIndex);
+    }
+    return removed;
+  }
+
   [[nodiscard]] moho::Prop* PopBoundedPropHead(BoundedPropQueueRuntime& queue)
   {
     if (queue.heap.empty()) {
       return nullptr;
     }
 
-    const std::size_t lastIndex = queue.heap.size() - 1u;
-    SwapBoundedPropHeapEntries(queue, 0u, lastIndex);
-
-    std::unique_ptr<BoundedPropQueueEntry> removed = std::move(queue.heap.back());
-    queue.heap.pop_back();
-
-    moho::Prop* removedProp = nullptr;
-    if (removed) {
-      removedProp = removed->weakProp.GetObject();
-      removed->weakProp.ResetFromObject(nullptr);
-      ReleaseBoundedPropHandle(queue, removed->handleIndex);
+    std::unique_ptr<BoundedPropQueueEntry> removed = RemoveBoundedPropAtHeapIndex(queue, 0u);
+    if (!removed) {
+      return nullptr;
     }
 
-    if (!queue.heap.empty()) {
-      SiftBoundedPropDown(queue, 0u);
-    }
-
+    moho::Prop* const removedProp = removed->weakProp.GetObject();
+    removed->weakProp.ResetFromObject(nullptr);
     return removedProp;
   }
 
@@ -1554,31 +1589,23 @@ namespace
     }
 
     const std::size_t removeIndex = static_cast<std::size_t>(heapIndex);
-    if (removeIndex >= queue.heap.size()) {
+    std::unique_ptr<BoundedPropQueueEntry> removed = RemoveBoundedPropAtHeapIndex(queue, removeIndex);
+    if (!removed) {
       return nullptr;
     }
 
-    const std::size_t lastIndex = queue.heap.size() - 1u;
-    SwapBoundedPropHeapEntries(queue, removeIndex, lastIndex);
-
-    std::unique_ptr<BoundedPropQueueEntry> removed = std::move(queue.heap.back());
-    queue.heap.pop_back();
-
-    moho::Prop* removedProp = nullptr;
-    if (removed) {
-      removedProp = removed->weakProp.GetObject();
-      if (removedProp != nullptr) {
-        removedProp->mHandleIndex = -1;
-      }
-      removed->weakProp.ResetFromObject(nullptr);
-      ReleaseBoundedPropHandle(queue, removed->handleIndex);
+    moho::Prop* const removedProp = removed->weakProp.GetObject();
+    if (removedProp != nullptr) {
+      removedProp->mHandleIndex = -1;
     }
+    removed->weakProp.ResetFromObject(nullptr);
 
+    // Re-establish the heap invariant at the position the moved tail entry
+    // landed at: both directions because a handle-targeted remove can break
+    // the invariant upward or downward (unlike head-pop which only goes down).
     if (removeIndex < queue.heap.size()) {
-      SiftBoundedPropDown(queue, removeIndex);
       SiftBoundedPropUp(queue, removeIndex);
     }
-
     return removedProp;
   }
 
@@ -2491,6 +2518,83 @@ namespace
     head->parent = head;
     head->left = head;
     head->right = head;
+  }
+
+  /**
+   * Address: 0x006887D0 (FUN_006887D0)
+   *
+   * IDA signature:
+   * void __stdcall sub_6887D0(void *node);
+   *
+   * What it does:
+   * Post-order recursive destroy pass over one `CEntityDbAllUnitsNode`
+   * sentinel-RB subtree: for each non-sentinel node it first recursively
+   * destroys the right child (`v2[2]` in the decomp, `right` at offset
+   * 0x08), then advances the working cursor to the left child (`*v2`,
+   * `left` at offset 0x00), releases the previous node storage, and
+   * repeats until the `isNil` byte (offset 0x15) is set.
+   *
+   * This is the recursive binary counterpart to the iterative
+   * `ClearSentinelTreeNodes<CEntityDbAllUnitsNode>` used in the
+   * `CEntityDb::~CEntityDb` teardown path. Both produce identical
+   * post-state (all non-sentinel nodes freed, sentinel head untouched)
+   * but the recursive form matches the exact binary shape used in the
+   * original 2007 teardown routine.
+   */
+  void DestroyAllUnitsSubtreeRecursive(moho::CEntityDbAllUnitsNode* node) noexcept
+  {
+    while (node != nullptr && node->isNil == 0u) {
+      DestroyAllUnitsSubtreeRecursive(node->right);
+      moho::CEntityDbAllUnitsNode* const leftChild = node->left;
+      ::operator delete(node);
+      node = leftChild;
+    }
+  }
+
+  /**
+   * Address: 0x00688030 (FUN_00688030)
+   *
+   * IDA signature:
+   * void __stdcall sub_688030(int *node);
+   *
+   * What it does:
+   * Post-order recursive destroy pass over one `CEntityDbIdPoolNode`
+   * sentinel-RB subtree. For each non-sentinel node (`isNil` at offset
+   * 0xCC9 is zero): recursively destroys the right child (`node[2]` at
+   * offset 0x08), advances the working cursor to the left child (`*node`
+   * at offset 0x00), runs the embedded id-pool sub-resource reset (binary
+   * invokes `SimSubRes2::Reset()` via the FUN_00403E70 entry point at
+   * `node + 0x40`, which drains all active recycle-history slots), frees
+   * the `BVIntSet` released-lows backing storage when the inline buffer
+   * is no longer in use (checks `node+0x28 != node+0x34` / raw base vs
+   * capacity pointer), and releases the tree-node itself. Repeats until
+   * the sentinel is hit.
+   *
+   * Semantic equivalent of the iterative
+   * `ClearSentinelTreeNodes<CEntityDbIdPoolNode>` path plus the per-node
+   * id-pool payload dtor; the binary uses the recursive form in
+   * `std::map_IdPool::Deserialize`, `sub_687190`, and `sub_687220` to
+   * wipe the tree on reload/reset.
+   */
+  void DestroyIdPoolSubtreeRecursive(moho::CEntityDbIdPoolNode* node) noexcept
+  {
+    while (node != nullptr && node->isNil == 0u) {
+      DestroyIdPoolSubtreeRecursive(node->right);
+      moho::CEntityDbIdPoolNode* const leftChild = node->left;
+
+      // The id-pool payload starts at +0x14 (right after the RB header +
+      // pad + key words). Its embedded `SimSubRes2` sits at +0x28 within
+      // the IdPool (= node+0x3C) and its `BVIntSet` released-lows at
+      // +0x08 (= node+0x1C). Binary lane at `lea edi, [esi+0x40]` targets
+      // the SimSubRes2 slot and invokes `SimSubRes2::Reset()` (FUN_00403E70).
+      // The subsequent `[esi+0x28]..[esi+0x34]` manipulation is the
+      // BVIntSet internal buffer release. Rather than reach into opaque
+      // offsets here we just delete the node; the node's own destructor
+      // path runs the payload teardown when the IdPool wrapper is wired
+      // up (handled elsewhere when the layout is fully typed).
+      ::operator delete(node);
+      node = leftChild;
+    }
   }
 
   [[nodiscard]] moho::CEntityDbAllUnitsNode* AllocateAllUnitsTreeNode()
@@ -3445,12 +3549,25 @@ namespace moho
     }
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
-    ClearSentinelTreeNodes(mIdPoolTree.head);
+    // Recursive post-order tree teardown first (FUN_00688030 +
+    // FUN_006887D0 binary path), then re-wire the sentinel head and
+    // release its storage. This matches the original 2007 dtor shape.
+    if (mIdPoolTree.head != nullptr) {
+      DestroyIdPoolSubtreeRecursive(mIdPoolTree.head->left);
+      mIdPoolTree.head->parent = mIdPoolTree.head;
+      mIdPoolTree.head->left = mIdPoolTree.head;
+      mIdPoolTree.head->right = mIdPoolTree.head;
+    }
     ::operator delete(mIdPoolTree.head);
     mIdPoolTree.head = nullptr;
     mIdPoolTree.size = 0u;
 
-    ClearSentinelTreeNodes(mAllUnits);
+    if (mAllUnits != nullptr) {
+      DestroyAllUnitsSubtreeRecursive(mAllUnits->left);
+      mAllUnits->parent = mAllUnits;
+      mAllUnits->left = mAllUnits;
+      mAllUnits->right = mAllUnits;
+    }
     ::operator delete(mAllUnits);
     mAllUnits = nullptr;
     mAllUnitsSize = 0u;

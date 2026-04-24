@@ -3,6 +3,8 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -18,6 +20,35 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CUnitWaitForFerryTask));
       moho::CUnitWaitForFerryTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskTypeForFerrySerializer()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitTypeForFerrySerializer()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSNavGoalTypeForFerrySerializer()
+  {
+    gpg::RType* type = moho::SNavGoal::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SNavGoal));
+      moho::SNavGoal::sType = type;
     }
     return type;
   }
@@ -132,6 +163,81 @@ namespace moho
       throw;
     }
   }
+
+  /**
+   * Address: 0x00610D30 (FUN_00610D30, Moho::CUnitWaitForFerryTaskSerializer::Serialize body)
+   *
+   * IDA signature:
+   * void __usercall sub_610D30(Moho::CUnitWaitForFerryTask *a1@<eax>, BinaryWriteArchive *a2@<edi>);
+   *
+   * What it does:
+   * Writes wait-for-ferry task state to an archive in binary lane order:
+   *   1. base `CCommandTask` subobject (by reflected type).
+   *   2. raw `CCommandTask* mDispatch` as `unowned` tracked-pointer.
+   *   3. `WeakPtr<Unit> mFerryUnit` slot (by reflected type).
+   *   4. `SNavGoal mMoveGoal` slot (by reflected type).
+   */
+  void CUnitWaitForFerryTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(
+      CachedCCommandTaskTypeForFerrySerializer(),
+      static_cast<const CCommandTask*>(this),
+      ownerRef
+    );
+
+    gpg::RRef dispatchRef{};
+    (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
+    gpg::WriteRawPointer(archive, dispatchRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedWeakPtrUnitTypeForFerrySerializer(), &mFerryUnit, ownerRef);
+    archive->Write(CachedSNavGoalTypeForFerrySerializer(), &mMoveGoal, ownerRef);
+  }
+
+  /**
+   * Address: 0x00610C60 (FUN_00610C60, Moho::CUnitWaitForFerryTask::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall sub_610C60(
+   *   Moho::CCommandTask **obj@<ecx>, gpg::ReadArchive *a2@<eax>);
+   *
+   * What it does:
+   * Loads wait-for-ferry task state from an archive in binary lane order:
+   *   1. base `CCommandTask` subobject (by reflected type).
+   *   2. raw `CCommandTask* mDispatch` via `ReadPointer_CCommandTask`.
+   *   3. `WeakPtr<Unit> mFerryUnit` slot (by reflected type).
+   *   4. `SNavGoal mMoveGoal` slot (by reflected type).
+   */
+  void CUnitWaitForFerryTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(
+      CachedCCommandTaskTypeForFerrySerializer(),
+      static_cast<CCommandTask*>(this),
+      ownerRef
+    );
+
+    // Dispatch back-pointer arrives as an unowned tracked pointer. Because
+    // `IAiCommandDispatchImpl` has `CCommandTask` as its first base, the
+    // storage at `&mDispatch` aliases the `CCommandTask*` slot the binary
+    // writes into (same address, identity conversion).
+    static_assert(
+      offsetof(CUnitWaitForFerryTask, mDispatch) == 0x30,
+      "CUnitWaitForFerryTask::mDispatch offset must be 0x30"
+    );
+    archive->ReadPointer_CCommandTask(reinterpret_cast<CCommandTask**>(&mDispatch), &ownerRef);
+
+    archive->Read(CachedWeakPtrUnitTypeForFerrySerializer(), &mFerryUnit, ownerRef);
+    archive->Read(CachedSNavGoalTypeForFerrySerializer(), &mMoveGoal, ownerRef);
+  }
 } // namespace moho
 
 namespace
@@ -161,6 +267,67 @@ namespace
   {
     return gpg::UnlinkSerSaveLoadHelperNode(gCUnitWaitForFerryTaskSerializer);
   }
+
+  /**
+   * Address: 0x0060F9A0 (FUN_0060F9A0, Moho::CUnitWaitForFerryTaskSerializer::Serialize)
+   * Address: 0x006105A0 (FUN_006105A0, COMDAT/jmp alias)
+   * Address: 0x00610640 (FUN_00610640, COMDAT/jmp alias)
+   *
+   * What it does:
+   * Serializer-save callback registered with the reflected
+   * `Moho::CUnitWaitForFerryTask` type. Forwards one `(task, archive)` pair
+   * into `CUnitWaitForFerryTask::MemberSerialize` (FUN_00610D30 body).
+   */
+  void CUnitWaitForFerryTaskSerializerSave(
+    gpg::WriteArchive* const archive,
+    const moho::CUnitWaitForFerryTask* const task
+  )
+  {
+    if (task != nullptr) {
+      task->MemberSerialize(archive);
+    }
+  }
+
+  using CUnitWaitForFerryTaskSerializerSaveFn =
+    void (*)(gpg::WriteArchive*, const moho::CUnitWaitForFerryTask*);
+
+  // ODR-used function-pointer anchor. Its volatile-store ensures the
+  // serializer-save callback participates in link-time symbol resolution
+  // and cannot be stripped. The original binary wires this exact callback
+  // pointer into the reflected serializer helper chain through
+  // `Moho::CUnitWaitForFerryTaskSerializer::Serialize` (FUN_0060F9A0).
+  CUnitWaitForFerryTaskSerializerSaveFn volatile gCUnitWaitForFerryTaskSerializerSaveCallback =
+    &CUnitWaitForFerryTaskSerializerSave;
+
+  /**
+   * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
+   * Address: 0x00610590 (FUN_00610590, COMDAT/jmp alias)
+   * Address: 0x00610630 (FUN_00610630, COMDAT/jmp alias)
+   *
+   * What it does:
+   * Serializer-load callback registered with the reflected
+   * `Moho::CUnitWaitForFerryTask` type. Forwards one `(task, archive)` pair
+   * into `CUnitWaitForFerryTask::MemberDeserialize` (FUN_00610C60 body).
+   */
+  void CUnitWaitForFerryTaskSerializerLoad(
+    gpg::ReadArchive* const archive,
+    moho::CUnitWaitForFerryTask* const task
+  )
+  {
+    if (task != nullptr) {
+      task->MemberDeserialize(archive);
+    }
+  }
+
+  using CUnitWaitForFerryTaskSerializerLoadFn =
+    void (*)(gpg::ReadArchive*, moho::CUnitWaitForFerryTask*);
+
+  // ODR-used function-pointer anchor for the deserialize callback so link
+  // resolution preserves the symbol. The original binary wires this exact
+  // callback into the reflected serializer helper chain through
+  // `Moho::CUnitWaitForFerryTaskSerializer::Deserialize` (FUN_0060F990).
+  CUnitWaitForFerryTaskSerializerLoadFn volatile gCUnitWaitForFerryTaskSerializerLoadCallback =
+    &CUnitWaitForFerryTaskSerializerLoad;
 } // namespace
 
 namespace gpg

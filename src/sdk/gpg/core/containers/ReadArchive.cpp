@@ -45,6 +45,7 @@
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
+#include "moho/entity/CTextureScroller.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/misc/CEconomyEvent.h"
@@ -55,6 +56,7 @@
 #include "moho/render/CDecalBuffer.h"
 #include "moho/render/CDecalHandle.h"
 #include "moho/sim/CArmyStats.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CInfluenceMap.h"
@@ -231,6 +233,23 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RType* CachedCEconStorageType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      constexpr const char* kTypeNames[] = {
+        "Moho::CEconStorage", "CEconStorage", "class Moho::CEconStorage"
+      };
+      for (const char* const typeName : kTypeNames) {
+        cached = gpg::REF_FindTypeNamed(typeName);
+        if (cached) {
+          break;
+        }
+      }
+    }
+    return cached;
+  }
+
   [[nodiscard]] gpg::RType* CachedSTIMapType()
   {
     static gpg::RType* cached = nullptr;
@@ -238,6 +257,16 @@ namespace
       cached = gpg::LookupRType(typeid(moho::STIMap));
     }
     return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCTextureScrollerType()
+  {
+    gpg::RType* type = moho::CTextureScroller::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CTextureScroller));
+      moho::CTextureScroller::sType = type;
+    }
+    return type;
   }
 
   [[nodiscard]] gpg::RType* CachedREntityBlueprintType()
@@ -3583,6 +3612,157 @@ ReadArchive* ReadArchive::ReadPointer_PathQueue(moho::PathQueue** const outValue
     expectedName ? expectedName : "PathQueue",
     actualName ? actualName : "null"
   ));
+  return this;
+}
+
+/**
+ * Address: 0x00707460 (FUN_00707460, gpg::ReadArchive::ReadPointerOwned_PathQueue)
+ *
+ * What it does:
+ * Reads one tracked pointer lane from the archive, enforces the
+ * `UNOWNED -> OWNED` ownership transition, and upcasts the referenced object
+ * to `moho::PathQueue`. On type mismatch, raises `SerializationError` with
+ * the expected and actual type names.
+ */
+ReadArchive* ReadArchive::ReadPointerOwned_PathQueue(moho::PathQueue** const outValue, const RRef* const ownerRef)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+  if (!tracked.object) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  if (tracked.state != TrackedPointerState::Unowned) {
+    ThrowSerializationError("Ownership conflict while loading archive");
+  }
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueType());
+  *outValue = static_cast<moho::PathQueue*>(upcast.mObj);
+  if (!*outValue) {
+    const char* const expectedName = SafeTypeName(CachedPathQueueType());
+    const char* const actualName = source.GetTypeName();
+    ThrowSerializationError(STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expectedName ? expectedName : "PathQueue",
+      actualName ? actualName : "null"
+    ));
+  }
+
+  tracked.state = TrackedPointerState::Owned;
+  return this;
+}
+
+/**
+ * Address: 0x006B4F70 (FUN_006B4F70, gpg::ReadArchive::ReadPointerOwned_CEconStorage)
+ *
+ * What it does:
+ * Reads one tracked pointer lane from the archive, enforces the
+ * `UNOWNED -> OWNED` ownership transition, and upcasts the referenced object
+ * to `moho::CEconStorage`. On type mismatch, raises `SerializationError` with
+ * the expected and actual type names.
+ */
+ReadArchive* ReadArchive::ReadPointerOwned_CEconStorage(
+  moho::CEconStorage** const outValue, const RRef* const ownerRef
+)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+  if (!tracked.object) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  if (tracked.state != TrackedPointerState::Unowned) {
+    ThrowSerializationError("Ownership conflict while loading archive");
+  }
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconStorageType());
+  *outValue = static_cast<moho::CEconStorage*>(upcast.mObj);
+  if (!*outValue) {
+    const char* const expectedName = SafeTypeName(CachedCEconStorageType());
+    const char* const actualName = source.GetTypeName();
+    ThrowSerializationError(STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expectedName ? expectedName : "CEconStorage",
+      actualName ? actualName : "null"
+    ));
+  }
+
+  tracked.state = TrackedPointerState::Owned;
+  return this;
+}
+
+/**
+ * Address: 0x00682DB0 (FUN_00682DB0, gpg::ReadArchive::ReadPointerOwned_CTextureScroller)
+ *
+ * IDA signature:
+ * gpg::ReadArchive *__userpurge ReadPointerOwned_CTextureScroller@<eax>(
+ *   Moho::CTextureScroller **a1@<ecx>,
+ *   gpg::ReadArchive *a2@<ebx>,
+ *   struct gpg::RRef *a3);
+ *
+ * What it does:
+ * Reads one tracked pointer lane from the archive, enforces the
+ * `UNOWNED -> OWNED` ownership transition, and upcasts the referenced object
+ * to `moho::CTextureScroller`. On type mismatch, raises `SerializationError`
+ * with the expected and actual type names.
+ */
+ReadArchive* ReadArchive::ReadPointerOwned_CTextureScroller(
+  moho::CTextureScroller** const outValue, const RRef* const ownerRef
+)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+  if (!tracked.object) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  if (tracked.state != TrackedPointerState::Unowned) {
+    ThrowSerializationError("Ownership conflict while loading archive");
+  }
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTextureScrollerType());
+  *outValue = static_cast<moho::CTextureScroller*>(upcast.mObj);
+  if (!*outValue) {
+    const char* const expectedName = SafeTypeName(CachedCTextureScrollerType());
+    const char* const actualName = source.GetTypeName();
+    ThrowSerializationError(STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expectedName ? expectedName : "CTextureScroller",
+      actualName ? actualName : "null"
+    ));
+  }
+
+  tracked.state = TrackedPointerState::Owned;
   return this;
 }
 

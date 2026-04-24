@@ -215,6 +215,42 @@ namespace
   }
 
   /**
+   * Address: 0x007F01D0 (FUN_007F01D0)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_7F01D0@<eax>(std::string *a1@<eax>, _DWORD *a2@<esi>);
+   *
+   * What it does:
+   * Runs `std::map<std::string, std::unique_ptr<RangeExtractor>>::find`
+   * for `extractorName` against `sBlueprintExtractors`: walks to the
+   * lower-bound node, then when the pivot is not the end sentinel tests
+   * `extractorName < pivot.key`; if that comparison succeeds the lookup
+   * returns the end sentinel, otherwise it returns the pivot iterator.
+   * The output slot `outIterator` receives either the resolved node or
+   * the end sentinel, matching the release binary's `{pivot, isEnd}`
+   * triplet used by callers in the range-extractor render and ranges
+   * paths.
+   */
+  BlueprintExtractorRegistry::iterator* FindBlueprintExtractorRegistryEntry(
+    BlueprintExtractorRegistry& registry,
+    const std::string& extractorName,
+    BlueprintExtractorRegistry::iterator* const outIterator
+  )
+  {
+    if (outIterator == nullptr) {
+      return nullptr;
+    }
+
+    const auto pivot = FindBlueprintExtractorLowerBound(registry, extractorName);
+    if (pivot == registry.end() || extractorName < pivot->first) {
+      *outIterator = registry.end();
+    } else {
+      *outIterator = pivot;
+    }
+    return outIterator;
+  }
+
+  /**
    * Address: 0x007F1880 (FUN_007F1880)
    *
    * What it does:
@@ -783,11 +819,16 @@ namespace moho
 
     BlueprintExtractorRegistry& registry = GetBlueprintExtractorRegistry();
     const std::string rangeKey(extractorName.data(), extractorName.size());
-    const auto lowerBound = FindBlueprintExtractorLowerBound(registry, rangeKey);
-    if (lowerBound == registry.end() || lowerBound->first != rangeKey) {
+
+    // Mirror the release binary's `map::find` lane through the recovered
+    // helper so the lower-bound + "strictly less than" check sequence
+    // observed in FUN_007F01D0 stays invocable by name.
+    BlueprintExtractorRegistry::iterator foundEntry{};
+    (void)FindBlueprintExtractorRegistryEntry(registry, rangeKey, &foundEntry);
+    if (foundEntry == registry.end()) {
       return nullptr;
     }
 
-    return lowerBound->second.get();
+    return foundEntry->second.get();
   }
 } // namespace moho

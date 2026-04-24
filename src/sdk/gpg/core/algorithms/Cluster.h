@@ -39,12 +39,47 @@ namespace gpg::HaStar
     class Cluster
     {
     public:
+        /**
+         * Cluster node coordinate: one `(x, z)` cell pair packed into two
+         * bytes. Trailing storage in `Data` is laid out as
+         * `Node[nodeCount]` followed by `Edge[nodeCount*(nodeCount-1)/2]`.
+         */
+        struct Node
+        {
+            std::uint8_t x;
+            std::uint8_t z;
+        };
+        static_assert(sizeof(Node) == 0x02, "Cluster::Node size must be 0x02");
+
+        /**
+         * Cluster edge bucket: one quantized `QuantizeEdgeCost` bucket value
+         * packed into a single byte. Stored as a triangular matrix indexed via
+         * `lhs + (rhs*(rhs-1))/2` (`TriangularEdgePairIndex`).
+         */
+        struct Edge
+        {
+            std::int8_t cost;
+        };
+        static_assert(sizeof(Edge) == 0x01, "Cluster::Edge size must be 0x01");
+
+        /**
+         * Refcounted cluster payload. Header layout:
+         *   +0x00 mRefs          intrusive refcount
+         *   +0x04 mReleaseObject  dispose-callback object (nullable)
+         *   +0x08 mReleaseArg    dispose-callback argument
+         *   +0x0C mNodeCount     trailing-array element count
+         *   +0x0D mNodes[]       followed by edges (allocated inline)
+         */
         struct Data
         {
-            std::int32_t mRefs;
-            void* mReleaseObject;
-            std::uint32_t mReleaseArg;
+            std::int32_t mRefs;        // +0x00
+            void* mReleaseObject;      // +0x04
+            std::uint32_t mReleaseArg; // +0x08
+            std::uint8_t mNodeCount;   // +0x0C
+            Node mNodes[1];            // +0x0D flexible tail
         };
+        static_assert(offsetof(Data, mNodeCount) == 0x0C, "Cluster::Data::mNodeCount offset must be 0x0C");
+        static_assert(offsetof(Data, mNodes) == 0x0D, "Cluster::Data::mNodes offset must be 0x0D");
 
         Data* mData{};
 
@@ -82,6 +117,25 @@ namespace gpg::HaStar
          * `ceil(ln(a / b) * 6)`.
          */
         [[nodiscard]] static float QuantizeEdgeCost(float a, float b);
+
+        /**
+         * Address: 0x00954110 (FUN_00954110,
+         * ?SetData@Cluster@HaStar@gpg@@QAEXPBUNode@123@PBUEdge@123@I@Z)
+         *
+         * IDA signature:
+         * void __thiscall SetData(
+         *   gpg::HaStar::Cluster *this@<ecx>,
+         *   const Node *nodes, const Edge *edges, unsigned int nodeCount);
+         *
+         * What it does:
+         * Replaces the cluster's shared payload. When the current payload has
+         * a different node count or is aliased, allocates a fresh
+         * `Data + Node[n] + Edge[n*(n-1)/2]` block and drops the previous
+         * reference (invoking its dispose-callback when refcount hits zero).
+         * Then copies `nodeCount` nodes and `nodeCount*(nodeCount-1)/2` edge
+         * buckets into the trailing storage. Asserts `nodeCount < 256`.
+         */
+        void SetData(const Node* nodes, const Edge* edges, unsigned int nodeCount);
     };
 
     struct SubclusterData

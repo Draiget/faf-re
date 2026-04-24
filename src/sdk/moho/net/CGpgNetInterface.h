@@ -42,6 +42,20 @@ namespace moho
       , mNum{num}
     {}
 
+    /**
+     * Address: 0x007B6540 (FUN_007B6540)
+     *
+     * IDA signature:
+     * SNetCommandArg *__userpurge sub_7B6540@<eax>(SNetCommandArg *this@<esi>,
+     *                                              const std::string *source);
+     *
+     * What it does:
+     * Initializes one command argument as a string payload: sets `mType =
+     * NETARG_String`, zeroes `mNum`, default-inits `mStr` into SSO state
+     * (`_Myres = 15`, `_Mysize = 0`, empty-inline), then calls
+     * `std::string::assign(source, 0, 0xFFFFFFFF)` to deep-copy the source
+     * text into the arg payload.
+     */
     explicit SNetCommandArg(
       const msvc8::string& str
     )

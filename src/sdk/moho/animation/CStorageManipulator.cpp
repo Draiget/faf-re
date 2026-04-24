@@ -1,3 +1,5 @@
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
 #include "moho/animation/CAniActor.h"
@@ -537,6 +539,56 @@ namespace moho
     AddBaseIAniManipulatorToCStorageManipulatorTypeInfo(typeInfo);
     typeInfo->gpg::RType::Init();
     typeInfo->Finish();
+  }
+
+  /**
+   * Address: 0x00649EF0 (FUN_00649EF0, Moho::CStorageManipulator::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall sub_649EF0(
+   *     Moho::CStorageManipulator *a1@<eax>, BinaryWriteArchive *a2@<edi>);
+   *
+   * What it does:
+   * Serializes a `CStorageManipulator` runtime lane into a binary write archive:
+   *   1) writes the base `IAniManipulator` subobject payload;
+   *   2) writes the owning `Moho::Unit` as an unowned raw-pointer RRef;
+   *   3) writes `mMax`, `mMin`, `mCur` as `Wm3::Vector3f` values;
+   *   4) writes `mResourceType` as an `EEconResource` enum value.
+   *
+   * All reflected type lookups go through cached `sType` singletons (lazy
+   * `LookupRType` via RTTI descriptor) matching the binary's idiom.
+   */
+  [[maybe_unused]] void SerializeCStorageManipulatorRuntime(
+    CStorageManipulatorRuntimeView* const runtime,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (runtime == nullptr || archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const aniManipulatorType = CachedIAniManipulatorTypeForStorageManipulatorTypeInfo();
+    archive->Write(aniManipulatorType, runtime, ownerRef);
+
+    gpg::RRef unitRef{};
+    (void)gpg::RRef_Unit(&unitRef, runtime->mUnit);
+    gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    gpg::RType* const vector3Type = gpg::LookupRType(typeid(Wm3::Vector3f));
+
+    const Wm3::Vector3f maxValue = ToStorageVector(runtime->mMax);
+    archive->Write(vector3Type, &maxValue, ownerRef);
+
+    const Wm3::Vector3f minValue = ToStorageVector(runtime->mMin);
+    archive->Write(vector3Type, &minValue, ownerRef);
+
+    const Wm3::Vector3f curValue = ToStorageVector(runtime->mCur);
+    archive->Write(vector3Type, &curValue, ownerRef);
+
+    gpg::RType* const resourceType = gpg::LookupRType(typeid(moho::EEconResource));
+    archive->Write(resourceType, &runtime->mResourceType, ownerRef);
   }
 
   /**

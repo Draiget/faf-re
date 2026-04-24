@@ -494,6 +494,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x0080D2F0 (FUN_0080D2F0)
+   *
+   * IDA signature:
+   * void __userpurge sub_80D2F0(Moho::CTesselator *this@<eax>, int i0, int i1, int i2);
+   *
+   * What it does:
+   * Appends three 16-bit collision-triangle indices `{i0, i1, i2}` to the
+   * tesselator's `mCollisionRectLut` FastVectorN lane in a single helper.
+   * The binary inlines three copies of the `gpg::FastVectorN<u16, 25>::push_back`
+   * tail: when `end == capacity`, grow via the shared move-words helper;
+   * otherwise store `index` at `end` and advance `end` by two bytes.
+   *
+   * Placed alongside `EmitCollisionQuad` because both callsites push triangle
+   * windings into the same collision index lane; `EmitCollisionQuad` invokes
+   * this helper twice to publish its six-index quad winding.
+   */
+  void CTesselator::AppendCollisionTriangleIndices(
+    const std::uint16_t i0,
+    const std::uint16_t i1,
+    const std::uint16_t i2
+  )
+  {
+    mCollisionRectLut.PushBack(i0);
+    mCollisionRectLut.PushBack(i1);
+    mCollisionRectLut.PushBack(i2);
+  }
+
+  /**
    * Address: 0x0080C120 (FUN_0080C120, Moho::CTesselator::Func9)
    *
    * What it does:
@@ -526,22 +554,12 @@ namespace moho
     *outIndexCount = 6u;
     *outLastRectIndex = cornerIndices[3];
 
-    std::uint16_t* result = nullptr;
-    const std::uint16_t windingOrder[6] = {
-      cornerIndices[2],
-      cornerIndices[1],
-      cornerIndices[0],
-      cornerIndices[1],
-      cornerIndices[2],
-      cornerIndices[3],
-    };
+    // Publish the two-triangle winding `{c2, c1, c0}` + `{c1, c2, c3}` via the
+    // shared triple-append helper recovered from 0x0080D2F0.
+    AppendCollisionTriangleIndices(cornerIndices[2], cornerIndices[1], cornerIndices[0]);
+    AppendCollisionTriangleIndices(cornerIndices[1], cornerIndices[2], cornerIndices[3]);
 
-    for (const std::uint16_t index : windingOrder) {
-      mCollisionRectLut.PushBack(index);
-      result = mCollisionRectLut.end_ - 1;
-    }
-
-    return result;
+    return (mCollisionRectLut.end_ != nullptr) ? (mCollisionRectLut.end_ - 1) : nullptr;
   }
 
   /**

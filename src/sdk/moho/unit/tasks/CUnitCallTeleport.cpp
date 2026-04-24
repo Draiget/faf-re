@@ -6,6 +6,9 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -118,6 +121,25 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAiTargetType()
+  {
+    gpg::RType* type = moho::CAiTarget::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CAiTarget));
+      moho::CAiTarget::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedQuaternionfType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
     }
     return cached;
   }
@@ -480,6 +502,58 @@ namespace moho
   }
 
   /**
+   * Address: 0x0060D270 (FUN_0060D270, Moho::CUnitTeleportTask::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall sub_60D270(int a1@<eax>, gpg::ReadArchive *a2@<edi>);
+   *
+   * What it does:
+   * Loads teleport-execution task state from an archive in binary lane order:
+   *   1. base `CCommandTask` subobject (by reflected type).
+   *   2. `CAiTarget mTarget` slot at +0x30 (by reflected type).
+   *   3. `WeakPtr<Unit> mTeleportBeaconUnit` slot at +0x50 (by reflected type).
+   *   4. `Wm3::Quaternionf mOrientation` slot at +0x58 (by reflected type).
+   */
+  void CUnitTeleportTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Read(CachedWeakPtrUnitType(), &mTeleportBeaconUnit, ownerRef);
+    archive->Read(CachedQuaternionfType(), &mOrientation, ownerRef);
+  }
+
+  /**
+   * Address: 0x0060D350 (FUN_0060D350, Moho::CUnitTeleportTask::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall sub_60D350(int a1@<eax>, gpg::WriteArchive *a2@<edi>);
+   *
+   * What it does:
+   * Writes teleport-execution task state to an archive in binary lane order:
+   *   1. base `CCommandTask` subobject (by reflected type).
+   *   2. `CAiTarget mTarget` slot at +0x30 (by reflected type).
+   *   3. `WeakPtr<Unit> mTeleportBeaconUnit` slot at +0x50 (by reflected type).
+   *   4. `Wm3::Quaternionf mOrientation` slot at +0x58 (by reflected type).
+   */
+  void CUnitTeleportTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Write(CachedWeakPtrUnitType(), &mTeleportBeaconUnit, ownerRef);
+    archive->Write(CachedQuaternionfType(), &mOrientation, ownerRef);
+  }
+
+  /**
    * Address: 0x00603CD0 (FUN_00603CD0)
    *
    * What it does:
@@ -596,6 +670,58 @@ namespace moho
   {
     CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
   }
+
+  /**
+   * Address: 0x0060AA10 (FUN_0060AA10, COMDAT/thunk into FUN_0060D270)
+   * Address: 0x0060C570 (FUN_0060C570, COMDAT/jmp alias)
+   * Address: 0x0060C990 (FUN_0060C990, COMDAT/jmp alias)
+   *
+   * What it does:
+   * Serializer-load callback forwarding into
+   * `CUnitTeleportTask::MemberDeserialize` (FUN_0060D270 body).
+   */
+  void CUnitTeleportTaskSerializerLoad(
+    gpg::ReadArchive* const archive,
+    CUnitTeleportTask* const task
+  )
+  {
+    if (task != nullptr) {
+      task->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0060AA20 (FUN_0060AA20, COMDAT/thunk into FUN_0060D350)
+   * Address: 0x0060C580 (FUN_0060C580, COMDAT/jmp alias)
+   * Address: 0x0060C9A0 (FUN_0060C9A0, COMDAT/jmp alias)
+   *
+   * What it does:
+   * Serializer-save callback forwarding into
+   * `CUnitTeleportTask::MemberSerialize` (FUN_0060D350 body).
+   */
+  void CUnitTeleportTaskSerializerSave(
+    gpg::WriteArchive* const archive,
+    const CUnitTeleportTask* const task
+  )
+  {
+    if (task != nullptr) {
+      task->MemberSerialize(archive);
+    }
+  }
+
+  using CUnitTeleportTaskSerializerLoadFn =
+    void (*)(gpg::ReadArchive*, CUnitTeleportTask*);
+  using CUnitTeleportTaskSerializerSaveFn =
+    void (*)(gpg::WriteArchive*, const CUnitTeleportTask*);
+
+  // ODR-used function-pointer anchors for the teleport-task serializer
+  // callbacks so link resolution preserves the symbols. The original binary
+  // registers these callbacks via the reflected `Moho::CUnitTeleportTask`
+  // serializer helper chain.
+  CUnitTeleportTaskSerializerLoadFn volatile gCUnitTeleportTaskSerializerLoadCallback =
+    &CUnitTeleportTaskSerializerLoad;
+  CUnitTeleportTaskSerializerSaveFn volatile gCUnitTeleportTaskSerializerSaveCallback =
+    &CUnitTeleportTaskSerializerSave;
 } // namespace moho
 
 namespace gpg

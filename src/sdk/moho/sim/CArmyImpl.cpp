@@ -1455,7 +1455,14 @@ namespace moho
     ReplaceDeleteOwnedPointer(
       InfluenceMap, ReadPointerTyped<CInfluenceMap>(archive, owner, ResolveCInfluenceMapType(), true)
     );
-    ReplacePathFinderOwnedPointer(PathFinder, ReadPointerTyped<void>(archive, owner, ResolvePathQueueType(), true));
+    {
+      // Canonical PathQueue owned-pointer read (recovered from FUN_00707460);
+      // binary stores the pointer as `void*` on CArmyImpl but the archive lane
+      // is typed PathQueue and the upcast/ownership transition must match.
+      moho::PathQueue* loadedPathQueue = nullptr;
+      (void)archive->ReadPointerOwned_PathQueue(&loadedPathQueue, &owner);
+      ReplacePathFinderOwnedPointer(PathFinder, static_cast<void*>(loadedPathQueue));
+    }
 
     gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
     GPG_ASSERT(categoryVectorType != nullptr);

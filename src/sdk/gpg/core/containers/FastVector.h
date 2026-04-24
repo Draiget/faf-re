@@ -798,6 +798,7 @@ namespace gpg::core
     /**
      * Address: 0x0047C910 (FUN_0047C910, gpg::fastvector_n64_char::GrowInsert)
      * Address: 0x004C7FD0 (FUN_004C7FD0, gpg::fastvector_n<LuaPlus::LuaObject>::GrowInsert lane)
+     * Address: 0x005811A0 (FUN_005811A0, gpg::fastvector_Entity::GrowInsert)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes
@@ -1411,10 +1412,21 @@ namespace gpg
 
   /**
    * Address: 0x004029B0 (FUN_004029B0, func_VecResize)
+   * Address: 0x00562350 (FUN_00562350, fastvector<WeakPtr<CUnitCommand>> instantiation)
+   * Address: 0x0056D2B0 (FUN_0056D2B0, fastvector<IUnitWeakPtr pair> instantiation)
+   * Address: 0x0067E190 (FUN_0067E190, fastvector<Wm3::Sphere3f> instantiation)
    *
    * What it does:
    * Reallocates runtime-view storage to `newCapacity` and inserts
    * [sourceBegin, sourceEnd) at `insertPos`.
+   *
+   * The secondary addresses above are distinct MSVC8 template instantiations
+   * of this same helper for different element types (`WeakPtr<CUnitCommand>`
+   * @ size 4, IUnitWeakPtr intrusive-pair @ size 8, `Wm3::Sphere3f` @ size
+   * 16). The instantiated bodies are binary-equivalent to the template
+   * expansion below once the element-size constant folds into the pointer
+   * arithmetic; the address lines are kept here so the binary-to-source
+   * map stays one-to-one for each FUN_ token.
    */
   template <class T>
   inline std::size_t FastVectorRuntimeReallocateInsert(
@@ -1692,9 +1704,17 @@ namespace gpg
 
   /**
    * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
+   * Address: 0x0059CE20 (FUN_0059CE20, pointer-element inline clone used by
+   * `RFastVectorType_IFormationInstance_P::SetCount` and its internal
+   * reflect/resize shim)
    *
    * What it does:
    * Resizes runtime-view storage and fills appended values with `*fillValue`.
+   * The 0x0059CE20 address is a separate compiler-emitted inline clone of
+   * this template specialized for 4-byte pointer elements; both entries
+   * share identical behavior (shrink-to-size, preserve-on-equal, ensure
+   * capacity and fill on grow). All pointer-fastvector resize callers route
+   * through this single template body.
    */
   template <class T>
   inline void

@@ -508,6 +508,111 @@ namespace
     return parent;
   }
 
+  [[nodiscard]] SBuilderRebuildNode* RebuildMapRightmostNode(SBuilderRebuildNode* node, SBuilderRebuildNode* const head)
+  {
+    while (node && node != head && node->isNil == 0u && node->right && node->right != head && node->right->isNil == 0u) {
+      node = node->right;
+    }
+    return node;
+  }
+
+  [[nodiscard]] SBuilderRebuildNode* RebuildMapPredecessor(SBuilderRebuildNode* node, SBuilderRebuildNode* const head)
+  {
+    if (!node || !head) {
+      return head;
+    }
+    if (node == head) {
+      return head->right;
+    }
+    if (node->left && node->left != head && node->left->isNil == 0u) {
+      return RebuildMapRightmostNode(node->left, head);
+    }
+
+    SBuilderRebuildNode* parent = node->parent;
+    while (parent && parent != head && node == parent->left) {
+      node = parent;
+      parent = parent->parent;
+    }
+    return parent ? parent : head;
+  }
+
+  /**
+   * Address: 0x005A0EA0 (FUN_005A0EA0, sub_5A0EA0)
+   *
+   * IDA signature:
+   * int **__userpurge sub_5A0EA0@<eax>(int a1@<eax>, int *a2@<ebx>, int **a3);
+   *
+   * What it does:
+   * Performs one lower-bound traversal of the rebuild-map red-black tree for
+   * `key` and, when the key is missing, inserts a fresh node via the shared
+   * `InsertRebuildMapEntry` lane at the appropriate edge. The `output` slot
+   * receives the matched or newly inserted node pointer in the first word and
+   * a `found` flag in byte +4, matching the 2-byte-packed
+   * `std::pair<iterator,bool>` return the MSVC8 `std::map::insert` emits.
+   *
+   * This is the CAiBuilder-specialized sibling of
+   * `LowerBoundOrInsertCoordCacheNode` in the AI-formation subsystem; both
+   * lanes are per-value-type instantiations of `_Tree::_Insert_node` that the
+   * release binary emits separately because the map value types differ.
+   */
+  [[nodiscard]] SBuilderRebuildNode* LowerBoundOrInsertRebuildMapNode(
+    SBuilderRebuildMap* const map,
+    const std::uint32_t key,
+    const RUnitBlueprint* const blueprint
+  )
+  {
+    if (!map || !map->mHead) {
+      return nullptr;
+    }
+
+    SBuilderRebuildNode* const head = map->mHead;
+    SBuilderRebuildNode* parent = head;
+    SBuilderRebuildNode* cursor = head->parent;
+    bool insertLeft = true;
+
+    while (cursor && cursor != head && cursor->isNil == 0u) {
+      parent = cursor;
+      if (key < cursor->key) {
+        insertLeft = true;
+        cursor = cursor->left;
+      } else if (cursor->key < key) {
+        insertLeft = false;
+        cursor = cursor->right;
+      } else {
+        // Found: binary returns the matched node without touching storage.
+        return cursor;
+      }
+    }
+
+    // Key is absent. Pick the correct edge to insert at by consulting the
+    // immediate predecessor when the walk ended on a left branch.
+    if (insertLeft) {
+      if (parent == head->left) {
+        InsertRebuildMapEntry(map, key, blueprint);
+        return head->left;
+      }
+      parent = RebuildMapPredecessor(parent, head);
+    }
+
+    if (!parent || parent == head || parent->key < key) {
+      const unsigned int priorSize = map->mSize;
+      InsertRebuildMapEntry(map, key, blueprint);
+      if (map->mSize == priorSize) {
+        return nullptr;
+      }
+      // The caller sees the newly inserted node via a subsequent lookup; the
+      // binary stores it in the hint slot but the AI-builder deserializer
+      // path does not reuse the iterator.
+      SBuilderRebuildNode* candidate = parent;
+      if (!candidate || candidate == head) {
+        candidate = head->left;
+      }
+      return candidate;
+    }
+
+    return parent;
+  }
+
   /**
    * Address: 0x005A0C60 (FUN_005A0C60)
    *
@@ -539,7 +644,11 @@ namespace
       unsigned int key = 0u;
       archive->ReadUInt(&key);
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-      InsertRebuildMapEntry(map, key, DecodeTrackedBlueprintPointer(tracked));
+      // Mirror the binary's per-entry `_Tree::insert` lane (recovered as
+      // `LowerBoundOrInsertRebuildMapNode`): returns the existing node when
+      // the key already lives in the tree, otherwise routes through the
+      // shared `InsertRebuildMapEntry` edge lane.
+      (void)LowerBoundOrInsertRebuildMapNode(map, key, DecodeTrackedBlueprintPointer(tracked));
     }
   }
 

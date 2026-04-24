@@ -41,6 +41,19 @@ namespace gpg::gal
         OutputContext(SurfaceHandle surfaceHandle, TextureHandle textureHandle);
 
         /**
+         * Address: 0x008E78C0 (FUN_008E78C0)
+         *
+         * CubeTargetHandle,int face,TextureHandle
+         *
+         * What it does:
+         * Initializes one output-context payload with a caller-provided
+         * cube-render-target handle, face selector, and texture handle while
+         * leaving the 2D surface handle empty. Retains shared ownership for
+         * both cube-target and texture lanes.
+         */
+        OutputContext(CubeTargetHandle cubeTargetHandle, std::int32_t face, TextureHandle textureHandle);
+
+        /**
          * Address: 0x00430160 (FUN_00430160)
          *
          * OutputContext const &

@@ -746,9 +746,23 @@ namespace
 
   /**
    * Address: 0x006E9360 (FUN_006E9360)
+   * Address: 0x006EC380 (FUN_006EC380, inlined uninitialized-fill-with-rollback lane)
    *
    * What it does:
    * Appends one command descriptor record into sync publication output.
+   *
+   * The binary emits one additional helper at `0x006EC380` which drives
+   * the grow path of `msvc8::vector<SSTICommandConstantData>::push_back`
+   * / `insert_n`: it runs one uninitialized-fill lane (stride
+   * `sizeof(SSTICommandConstantData)=0x3C`) that copy-constructs each
+   * descriptor by blitting the first `0x20` trivial bytes (cmd/unk0/
+   * origin/unk1/blueprint), placement-constructs an empty `msvc8::string`
+   * at `+0x20`, and copy-assigns `unk2` from the source. On partial-fill
+   * failure (e.g. string allocation throw), its SEH funclet runs the
+   * per-lane string-reset helper (`ResetSSTICommandConstantDataStringLane`
+   * at `0x006ECB50`) over the already-constructed prefix before
+   * re-raising. The same semantic is preserved here via the typed
+   * `msvc8::vector::push_back` call.
    */
   void AppendPublishedCommandDescriptor(
     msvc8::vector<SSTICommandConstantData>& descriptors,

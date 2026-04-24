@@ -9,6 +9,12 @@
 #include "moho/task/CCommandTask.h"
 #include "Wm3Quaternion.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class Unit;
@@ -148,6 +154,24 @@ namespace moho
      * payloads for teleport application.
      */
     int Execute() override;
+
+    /**
+     * Address: 0x0060D270 (FUN_0060D270, Moho::CUnitTeleportTask::MemberDeserialize)
+     *
+     * What it does:
+     * Loads base `CCommandTask` state plus teleport target, beacon weak-link,
+     * and source-orientation lanes from archive data.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0060D350 (FUN_0060D350, Moho::CUnitTeleportTask::MemberSerialize)
+     *
+     * What it does:
+     * Writes base `CCommandTask` state plus teleport target, beacon weak-link,
+     * and source-orientation lanes to archive data.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     CAiTarget mTarget;              // 0x30

@@ -172,6 +172,68 @@ void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
 }
 
 /**
+ * Address: 0x007D9DD0 (FUN_007D9DD0, ?UpdateMeshStances@MapImager@Moho@@QAEXXZ)
+ * Mangled: ?UpdateMeshStances@MapImager@Moho@@QAEXXZ
+ *
+ * IDA signature:
+ * void __stdcall Moho::MapImager::UpdateMeshStances(Moho::MapImager *this);
+ *
+ * What it does:
+ * Each frame, rebuilds the border mesh ground-plane transform from the active
+ * terrain's tier-0 bounds:
+ *   xMid = (Min.x + Max.x)/2
+ *   zMid = (Min.z + Max.z)/2
+ *   yMid = (Min.y + Max.y)/2 + CWldTerrainRes::GetImagerElevationOffset()
+ * then applies `{pos = (xMid, yMid, zMid), orient = identity}` as both the
+ * start and end stance for every tracked MeshInstance.
+ */
+void MapImager::UpdateMeshStances()
+{
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || session->mWldMap == nullptr) {
+    return;
+  }
+
+  IWldTerrainRes* const terrainRes = session->mWldMap->mTerrainRes;
+  if (terrainRes == nullptr) {
+    return;
+  }
+
+  const auto* const terrainResView = reinterpret_cast<const CWldTerrainResRuntimeView*>(terrainRes);
+  STIMap* const terrainMap = terrainResView->mMap;
+  if (terrainMap == nullptr) {
+    return;
+  }
+
+  CHeightField* const heightField = terrainMap->mHeightField.get();
+  if (heightField == nullptr) {
+    return;
+  }
+
+  const CHeightFieldTier* const firstTier = heightField->mGrids.begin();
+  const std::int32_t tierCount = firstTier != nullptr
+                                   ? static_cast<std::int32_t>(heightField->mGrids.end() - firstTier)
+                                   : 0;
+
+  const Wm3::AxisAlignedBox3f terrainBounds = heightField->GetTierBox(0, 0, tierCount);
+  const float elevationOffset = terrainRes->GetImagerElevationOffset();
+
+  const Wm3::Vec3f groundPlaneCenter{
+    (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
+    ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
+    (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
+  };
+
+  VTransform groundStance{};
+  groundStance.pos_ = groundPlaneCenter;
+  groundStance.orient_ = Wm3::Quatf::Identity();
+
+  for (MeshInstance* const instance : mMeshInstances) {
+    instance->SetStance(groundStance, groundStance);
+  }
+}
+
+/**
   * Alias of FUN_007F6530 (non-canonical helper lane).
  *
  * What it does:

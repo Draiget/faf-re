@@ -1,9 +1,24 @@
 #pragma once
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Vector.h"
 
 namespace moho
 {
+  struct RMeshBlueprintLOD;
+
+  /**
+   * Address: 0x005195B0 (FUN_005195B0)
+   *
+   * What it does:
+   * Releases a `msvc8::vector<RMeshBlueprintLOD>`'s backing storage: destroys
+   * each live LOD element (tearing down its seven legacy string lanes via
+   * `FUN_00519800`), frees the storage block, and nulls the container
+   * pointer lanes. Used by `RMeshBlueprint::~RMeshBlueprint()`
+   * (`FUN_00528410`) and the blueprint construct deletion lane.
+   */
+  void ClearAndFreeMeshBlueprintLodVectorStorage(msvc8::vector<RMeshBlueprintLOD>* storage);
+
   /**
    * VFTABLE: 0x00E0FE1C
    * COL: 0x00E692FC

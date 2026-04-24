@@ -9,6 +9,17 @@ PLATFORM=$(Platform)
 CONFIGURATION=$(Configuration)
 HOOK_PROJECT=inspect
 HOOK_NAME=inspect.dll
+INSPECT_DLL_PATH=G:\projects\faf-main\output\inspect\Win32\Release\inspect.dll
+INSPECT_TARGET_EXE="C:\ProgramData\FAForever\bin\ForgedAlliance.exe"
+INSPECT_TARGET_ARGS="/init init.lua /name UserA /country NL /nobugreport /gpgnet 127.0.0.1:21000 /numgames 11"
+INSPECT_INJECTOR_NO_WAIT=1
+INSPECT_INJECTOR_LAUNCH=1
+INSPECT_DISCOVERY_ROTATE_ONESHOT=0
+INSPECT_DISCOVERY_ROTATE_REFILL_SCAN_BUDGET=4
+INSPECT_DISCOVERY_PAUSE_ALL_THREADS_DURING_INSTALL=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_ENABLE=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_DISABLE=1
+INSPECT_DISCOVERY_MAX_HOOKS=90000
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -18,6 +29,17 @@ PLATFORM=$(Platform)
 CONFIGURATION=$(Configuration)
 HOOK_PROJECT=inspect
 HOOK_NAME=inspect.dll
+INSPECT_DLL_PATH=G:\projects\faf-main\output\inspect\Win32\Release\inspect.dll
+INSPECT_TARGET_EXE="C:\ProgramData\FAForever\bin\ForgedAlliance.exe"
+INSPECT_TARGET_ARGS="/init init.lua /name UserA /country NL /nobugreport /gpgnet 127.0.0.1:21000 /numgames 11"
+INSPECT_INJECTOR_NO_WAIT=1
+INSPECT_INJECTOR_LAUNCH=1
+INSPECT_DISCOVERY_ROTATE_ONESHOT=0
+INSPECT_DISCOVERY_ROTATE_REFILL_SCAN_BUDGET=4
+INSPECT_DISCOVERY_PAUSE_ALL_THREADS_DURING_INSTALL=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_ENABLE=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_DISABLE=1
+INSPECT_DISCOVERY_MAX_HOOKS=90000
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -27,6 +49,17 @@ PLATFORM=$(Platform)
 CONFIGURATION=$(Configuration)
 HOOK_PROJECT=inspect
 HOOK_NAME=inspect.dll
+INSPECT_DLL_PATH=G:\projects\faf-main\output\inspect\x64\Debug\inspect.dll
+INSPECT_TARGET_EXE="C:\ProgramData\FAForever\bin\ForgedAlliance.exe"
+INSPECT_TARGET_ARGS="/init init.lua /name UserA /country NL /nobugreport /gpgnet 127.0.0.1:21000 /numgames 11"
+INSPECT_INJECTOR_NO_WAIT=1
+INSPECT_INJECTOR_LAUNCH=1
+INSPECT_DISCOVERY_ROTATE_ONESHOT=0
+INSPECT_DISCOVERY_ROTATE_REFILL_SCAN_BUDGET=4
+INSPECT_DISCOVERY_PAUSE_ALL_THREADS_DURING_INSTALL=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_ENABLE=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_DISABLE=1
+INSPECT_DISCOVERY_MAX_HOOKS=90000
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -36,6 +69,17 @@ PLATFORM=$(Platform)
 CONFIGURATION=$(Configuration)
 HOOK_PROJECT=inspect
 HOOK_NAME=inspect.dll
+INSPECT_DLL_PATH=G:\projects\faf-main\output\inspect\x64\Release\inspect.dll
+INSPECT_TARGET_EXE="C:\ProgramData\FAForever\bin\ForgedAlliance.exe"
+INSPECT_TARGET_ARGS="/init init.lua /name UserA /country NL /nobugreport /gpgnet 127.0.0.1:21000 /numgames 11"
+INSPECT_INJECTOR_NO_WAIT=1
+INSPECT_INJECTOR_LAUNCH=1
+INSPECT_DISCOVERY_ROTATE_ONESHOT=0
+INSPECT_DISCOVERY_ROTATE_REFILL_SCAN_BUDGET=4
+INSPECT_DISCOVERY_PAUSE_ALL_THREADS_DURING_INSTALL=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_ENABLE=1
+INSPECT_DISCOVERY_SUSPEND_THREADS_ON_DISABLE=1
+INSPECT_DISCOVERY_MAX_HOOKS=90000
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>

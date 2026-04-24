@@ -488,9 +488,55 @@ SCreateUnitParams* moho::QueueCreateUnitParams(SSyncData* const syncData, const 
   return &syncData->mNewUnits.back();
 }
 
+/**
+ * Address: 0x0073B940 (FUN_0073B940, ??1SSyncDataQueue@Moho@@QAE@XZ)
+ *
+ * IDA signature:
+ * void __stdcall sub_73B940(int a1);
+ *
+ * What it does:
+ * Drains every live sync-data payload currently in the ring-buffer range
+ * `[head, head + size)` via `DrainLiveRingBufferRange`, then releases the
+ * backing map allocation and resets bookkeeping lanes via
+ * `ReleaseOwnedSlotsAndReset`. Wrapped by an SEH frame so a throw from
+ * any payload destructor still unwinds cleanly to the two-phase teardown
+ * exit lane shared with `CSimDriver::~CSimDriver`.
+ */
 SSyncDataQueue::~SSyncDataQueue()
 {
+  DrainLiveRingBufferRange();
   ReleaseOwnedSlotsAndReset();
+}
+
+/**
+ * Address: 0x007407F0 (FUN_007407F0, SSyncDataQueue drain-live helper)
+ *
+ * IDA signature:
+ * int __usercall sub_7407F0@<eax>(int a1@<eax>);
+ *
+ * What it does:
+ * Dispatches the inclusive destroy-range helper `sub_741980(this, head,
+ * this, head + size)` that walks every live ring-buffer slot in
+ * `[head, head + size)`, destroys the pointed-to `SSyncData` payload, and
+ * clears the slot. Called as the first phase of both the destructor and
+ * the ctor SEH unwind path via FUN_0073B940.
+ */
+void SSyncDataQueue::DrainLiveRingBufferRange() noexcept
+{
+  if (map == nullptr || size == 0u || mapSize == 0u) {
+    return;
+  }
+
+  const std::uint32_t liveCount = size;
+  const std::uint32_t startSlot = head;
+  for (std::uint32_t index = 0u; index < liveCount; ++index) {
+    const std::uint32_t slot = (startSlot + index) % mapSize;
+    SSyncData* const payload = map[slot];
+    if (payload != nullptr) {
+      delete payload;
+      map[slot] = nullptr;
+    }
+  }
 }
 
 bool SSyncDataQueue::Empty() const

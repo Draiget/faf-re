@@ -198,6 +198,10 @@ std::uint32_t asm_utils::decode_count_bytes(std::uint8_t* src, const std::uint32
 std::uint32_t asm_utils::compute_stolen_len_covering_seh(const std::uint8_t* entry) {
     // Minimal 5 bytes for E9 rel32
     std::uint32_t need = decode_count_bytes(const_cast<std::uint8_t*>(entry), kOpJmpRel32Size);
+    if (need < kOpJmpRel32Size) {
+        // Failed to decode a safe rel32 patch window at function entry.
+        return 0;
+    }
 
     // Pattern: FS:[0] SEH prologue + stack allocation
     //   64 A1 00..00    mov eax, fs:[0]
@@ -217,7 +221,11 @@ std::uint32_t asm_utils::compute_stolen_len_covering_seh(const std::uint8_t* ent
                 (j + 1);
 
             while (need < after) {
+                const std::uint32_t prev = need;
                 need = decode_count_bytes(const_cast<std::uint8_t*>(entry), need + 1);
+                if (need <= prev) {
+                    return 0;
+                }
             }
             return need;
         }
@@ -225,7 +233,11 @@ std::uint32_t asm_utils::compute_stolen_len_covering_seh(const std::uint8_t* ent
 
     // Fallback: avoid cutting 'push imm32' (0x68 imm32) — steal at least 10 bytes.
     while (need < 10) {
+        const std::uint32_t prev = need;
         need = decode_count_bytes(const_cast<std::uint8_t*>(entry), need + 1);
+        if (need <= prev) {
+            return 0;
+        }
     }
     return need;
 }

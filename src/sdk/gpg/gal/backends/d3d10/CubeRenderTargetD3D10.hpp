@@ -15,6 +15,16 @@ namespace gal {
     class CubeRenderTargetD3D10 {
     public:
       /**
+       * Address: 0x008F7F30 (FUN_008F7F30)
+       *
+       * What it does:
+       * Default-initializes one D3D10 cube-render-target wrapper and
+       * default-constructs the embedded cube-render-target context lane
+       * (dimension and format both zeroed).
+       */
+      CubeRenderTargetD3D10();
+
+      /**
        * Address: 0x008F7F80 (FUN_008F7F80)
        *
        * CubeRenderTargetContext const *

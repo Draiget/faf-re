@@ -648,6 +648,7 @@
     <ClCompile Include="moho\render\CWldTerrainDecalTYPETypeInfo.cpp" />
     <ClCompile Include="moho\render\CDecalHandle.cpp" />
     <ClCompile Include="moho\render\CDecalTypes.cpp" />
+    <ClCompile Include="moho\render\Silhouette.cpp" />
     <ClCompile Include="moho\render\CDecalHandleSerializer.cpp" />
     <ClCompile Include="moho\render\CDecalHandleTypeInfo.cpp" />
     <ClCompile Include="moho\render\BoundaryRenderer.cpp" />
@@ -1512,6 +1513,7 @@
     <ClInclude Include="moho\render\CRenFrame.h" />
     <ClInclude Include="moho\render\RCamManager.h" />
     <ClInclude Include="moho\render\CDecalTypes.h" />
+    <ClInclude Include="moho\render\Silhouette.h" />
     <ClInclude Include="moho\render\RangeRenderer.h" />
     <ClInclude Include="moho\render\SelectionBracketParams.h" />
     <ClInclude Include="moho\render\RenderGeometryBuffers.h" />

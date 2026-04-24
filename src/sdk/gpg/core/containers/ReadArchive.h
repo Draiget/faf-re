@@ -79,6 +79,8 @@ namespace moho
   class CInfluenceMap;
   class STIMap;
   class PathQueue;
+  class CEconStorage;
+  class CTextureScroller;
   class CAiBrain;
   class CAiPathFinder;
   class CAiPathNavigator;
@@ -640,6 +642,36 @@ namespace gpg
      * throwing `SerializationError` on pointee-type mismatch.
      */
     ReadArchive* ReadPointer_PathQueue(moho::PathQueue** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00707460 (FUN_00707460, gpg::ReadArchive::ReadPointerOwned_PathQueue)
+     *
+     * What it does:
+     * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
+     * transition, and upcasts the pointee to `moho::PathQueue`.
+     */
+    ReadArchive* ReadPointerOwned_PathQueue(moho::PathQueue** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006B4F70 (FUN_006B4F70, gpg::ReadArchive::ReadPointerOwned_CEconStorage)
+     *
+     * What it does:
+     * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
+     * transition, and upcasts the pointee to `moho::CEconStorage`.
+     */
+    ReadArchive* ReadPointerOwned_CEconStorage(moho::CEconStorage** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00682DB0 (FUN_00682DB0, gpg::ReadArchive::ReadPointerOwned_CTextureScroller)
+     *
+     * What it does:
+     * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
+     * transition, and upcasts the pointee to `moho::CTextureScroller`.
+     */
+    ReadArchive* ReadPointerOwned_CTextureScroller(
+      moho::CTextureScroller** outValue,
+      const gpg::RRef* ownerRef
+    );
 
     /**
      * Address: 0x005096E0 (FUN_005096E0, gpg::ReadArchive::ReadPointer_STIMap)

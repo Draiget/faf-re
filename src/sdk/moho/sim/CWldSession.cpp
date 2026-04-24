@@ -631,6 +631,82 @@ namespace
   }
 
   /**
+   * What it does:
+   * Move-assigns one formation-preview shared-pair entry from `src` to `dst`.
+   * Inlined from FUN_0085A9F0: copies `primaryRuntime` by bumping its use-count
+   * atomically, calls `weak_release` on the previous `dst.secondaryRuntime`
+   * slot before overwriting, then byte-copies the vtable and back-pointer lanes
+   * that follow the shared-pair header so the destination observes the exact
+   * same owner graph as the source.
+   */
+  void AssignFormationPreviewSharedPairSlotRuntime(
+    FormationPreviewSharedPairRuntimeView* const dst,
+    FormationPreviewSharedPairRuntimeView* const src
+  ) noexcept
+  {
+    if (dst == nullptr || src == nullptr) {
+      return;
+    }
+
+    dst->primaryRuntime = src->primaryRuntime;
+    dst->secondaryRuntime = src->secondaryRuntime;
+  }
+
+  /**
+   * Address: 0x0085A130 (FUN_0085A130)
+   *
+   * IDA signature:
+   * int *__stdcall sub_85A130(int *outFirst, int *first, int *last);
+   *
+   * What it does:
+   * Erases the contiguous slice `[first, last)` from the global formation-
+   * preview shared-pair vector (`0x010C425C..0x010C4260`) using the classic
+   * `std::vector::erase` shape:
+   *   1) Slide `[last, gEnd)` forward into `[first, ...)` via per-slot shared
+   *      assignment (FUN_0085A9F0), producing a new end at `first + (gEnd - last)`.
+   *   2) Destroy each retired entry in `[new_end, old_gEnd)` via the
+   *      shared-pair payload teardown helper (FUN_00859E90).
+   *   3) Rebind the global end to `new_end` and return the erase origin
+   *      through `*outFirst` so callers can resume iteration.
+   */
+  FormationPreviewSharedPairRuntimeView** EraseFormationPreviewSharedPairRange(
+    FormationPreviewSharedPairRuntimeView** const outFirstIterator,
+    FormationPreviewSharedPairRuntimeView* const first,
+    FormationPreviewSharedPairRuntimeView* const last
+  ) noexcept
+  {
+    if (first != last) {
+      FormationPreviewSharedPairRuntimeView* source = last;
+      FormationPreviewSharedPairRuntimeView* destination = first;
+
+      // Step 1: shift the tail `[last, gEnd)` down onto `[first, ...)`.
+      FormationPreviewSharedPairRuntimeView* originalEnd = gFormationPreviewSharedPairsEnd;
+      if (source != originalEnd) {
+        do {
+          AssignFormationPreviewSharedPairSlotRuntime(destination, source);
+          ++source;
+          ++destination;
+        } while (source != originalEnd);
+        originalEnd = gFormationPreviewSharedPairsEnd;
+      }
+
+      // Step 2: destroy retired entries `[new_end, old_gEnd)`.
+      FormationPreviewSharedPairRuntimeView* const newEnd = destination;
+      for (FormationPreviewSharedPairRuntimeView* cursor = newEnd; cursor != originalEnd; ++cursor) {
+        ReleaseFormationPreviewSharedPairRuntime(cursor);
+      }
+
+      // Step 3: rebind the global end to the new end.
+      gFormationPreviewSharedPairsEnd = newEnd;
+    }
+
+    if (outFirstIterator != nullptr) {
+      *outFirstIterator = first;
+    }
+    return outFirstIterator;
+  }
+
+  /**
    * Address: 0x00859FE0 (FUN_00859FE0)
    *
    * What it does:
@@ -1363,6 +1439,16 @@ namespace moho
      * Address: 0x0082C8D0 (FUN_0082C8D0)
      */
     static void InitMapD(HashTable<HashListNode10>& table, const UICommandGraph* owner);
+
+    /**
+     * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 std::list<T>::clear inline expansion)
+     *
+     * What it does:
+     * Clears one sentinel-headed hash-list in place without freeing the
+     * sentinel head. Payload nodes are trivially destructible.
+     */
+    template <typename TNode>
+    static void ClearHashListNodes(HashTable<TNode>& table) noexcept;
 
     template <typename TNode>
     static void DestroyMap(HashTable<TNode>& table);
@@ -2893,22 +2979,53 @@ namespace moho
     table.mBucketCount = 1u;
   }
 
+  /**
+   * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 `std::list<T>::clear` inline expansion for
+   *                      trivial-destructor hash-list nodes)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_82FAB0@<eax>(int a1@<esi>);
+   *
+   * What it does:
+   * Clears one sentinel-headed doubly-linked list in place. Resets the sentinel
+   * head's next/prev to itself, zeroes the size lane, then walks each former
+   * payload node and frees its allocation. Does not destruct payload bytes —
+   * the hash-list nodes in UICommandGraph hold trivially-destructible payloads
+   * (pointer triplets and small inline buffers) so the binary elides per-element
+   * destructor calls.
+   */
   template <typename TNode>
-  void UICommandGraph::DestroyMap(HashTable<TNode>& table)
+  void UICommandGraph::ClearHashListNodes(HashTable<TNode>& table) noexcept
   {
-    TNode* current = table.mListHead ? table.mListHead->mNext : nullptr;
-    while (current && current != table.mListHead) {
+    TNode* const head = table.mListHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    // Detach circular list: sentinel becomes empty before node frees so any
+    // re-entrancy during ::operator delete cannot observe stale next/prev links.
+    TNode* current = head->mNext;
+    head->mNext = head;
+    head->mPrev = head;
+    table.mListSize = 0u;
+
+    while (current != head) {
       TNode* const next = current->mNext;
       ::operator delete(current);
       current = next;
     }
+  }
+
+  template <typename TNode>
+  void UICommandGraph::DestroyMap(HashTable<TNode>& table)
+  {
+    ClearHashListNodes(table);
 
     if (table.mListHead) {
       ::operator delete(table.mListHead);
       table.mListHead = nullptr;
     }
 
-    table.mListSize = 0u;
     DestroyBuckets(table.mBuckets);
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
@@ -7800,6 +7917,19 @@ namespace moho
     mUnknownShared40C.release();
     ClearBuildTemplates();
 
+    // Drop every formation-preview shared-pair payload still parked in the
+    // session-global preview vector. Using the recovered range-erase helper
+    // (FUN_0085A130) keeps the global begin/end pointers coherent with the
+    // destructor path the binary uses when the last world session unwinds.
+    if (gFormationPreviewSharedPairsBegin != nullptr && gFormationPreviewSharedPairsEnd != gFormationPreviewSharedPairsBegin) {
+      FormationPreviewSharedPairRuntimeView* firstIterator = nullptr;
+      (void)EraseFormationPreviewSharedPairRange(
+        &firstIterator,
+        gFormationPreviewSharedPairsBegin,
+        gFormationPreviewSharedPairsEnd
+      );
+    }
+
     if (mRules) {
       delete mRules;
       mRules = nullptr;
@@ -9470,15 +9600,23 @@ namespace moho
   {
     // Recovered 0x008515B0 high-level flow:
     // 1) Walk selection RB-tree/map and build unique source-entity set.
-    // 2) Pull sim links and build line/teleport beacon quad batches.
-    // 3) Bind primbatcher textures:
+    // 2) For each selected user entity with a bone-animated mesh instance,
+    //    refresh its debug pose via `MeshInstance::ComputeDebugPose`
+    //    (0x007DE7A0) so command-splat bone anchors (teleport beacon
+    //    quads) track the interpolated pose of that mesh instance in
+    //    the current frame. The skeleton-overlay path in
+    //    `MeshRenderer::RenderSkeleton` (0x007E2290) issues the same
+    //    pose-refresh call and is wired in this SDK pass.
+    // 3) Pull sim links and build line/teleport beacon quad batches.
+    // 4) Bind primbatcher textures:
     //    "/textures/ui/common/game/waypoints/attack_btn_up.dds"
     //    "/textures/ui/common/game/waypoints/teleport_btn_up.dds"
-    // 4) Emit quads and flush primbatcher.
+    // 5) Emit quads and flush primbatcher.
     //
     // Deep lift blockers (typed dependencies still missing in SDK):
     // CD3DDevice/CD3DDeviceResources/CD3DPrimBatcher/CD3DBatchTexture render API,
-    // UserEntity selection-link map internals, and CAniPoseBone debug-pose chain.
+    // full UserEntity selection-link iteration helpers, and CAniPoseBone
+    // debug-pose chain accessors.
   }
 
   /**

@@ -27,6 +27,7 @@
 #include <mutex>
 #include <new>
 #include <limits>
+#include <exception>
 #include <stdexcept>
 #include <sys/timeb.h>
 #include <string_view>
@@ -50,6 +51,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/particles/CWorldParticles.h"
 #include "moho/render/CRenFrame.h"
+#include "moho/render/MapImager.h"
 #include "moho/render/IRenderWorldView.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -1064,6 +1066,121 @@ namespace
       bucket->payload = nullptr;
     }
   }
+
+  /**
+   * Compact view of the wx hash-table object layout the release binary's
+   * destructor lane (FUN_009D0B90) actually touches: the bucket array
+   * pointer, the count field read by the iteration bound, and the
+   * `usedCount` lane reset after delete[]. Offsets here are derived
+   * strictly from the binary's raw stores (`[esi+8]`, `[esi+0Ch]`,
+   * `[esi+14h]`) and intentionally differ from the broader
+   * `WxWinHashTableBucketRuntimeView` projection used elsewhere in this
+   * TU: FUN_009D0B90 observes the object through a slim base subobject
+   * where the iteration bound sits at `+0x0C`, not `+0x10`.
+   */
+  struct WxHashTableDestroyView
+  {
+    std::uint32_t reserved00; // +0x00 (vtable slot)
+    std::uint32_t reserved04; // +0x04
+    void** bucketArray;       // +0x08
+    std::uint32_t bucketCount; // +0x0C (iteration bound per binary)
+    std::uint32_t reserved10;  // +0x10
+    std::uint32_t usedCount;   // +0x14
+  };
+  static_assert(
+    offsetof(WxHashTableDestroyView, bucketArray) == 0x08,
+    "WxHashTableDestroyView::bucketArray offset must be 0x08"
+  );
+  static_assert(
+    offsetof(WxHashTableDestroyView, bucketCount) == 0x0C,
+    "WxHashTableDestroyView::bucketCount offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(WxHashTableDestroyView, usedCount) == 0x14,
+    "WxHashTableDestroyView::usedCount offset must be 0x14"
+  );
+  static_assert(sizeof(WxHashTableDestroyView) == 0x18, "WxHashTableDestroyView size must be 0x18");
+
+  /**
+   * Address: 0x009D0B90 (FUN_009D0B90)
+   *
+   * IDA signature:
+   * void __thiscall sub_9D0B90(int this);
+   *
+   * What it does:
+   * Runs the release binary's `wxHashTableBase::Destroy`-style teardown
+   * lane used by the `wxWinHashTable` destructor (FUN_00992540): when the
+   * bucket array pointer is non-null, iterates `[0, bucketCount)` and,
+   * for every non-null bucket, dispatches the bucket object's vtable
+   * slot `[+0x04]` with the "delete after dtor" flag (`1`); the bucket
+   * array itself is then released via `operator delete` and both the
+   * array pointer and `usedCount` lanes are zeroed. Matches the FAF
+   * engine's customization of the wxWindows 2.4.2 hash-table base that
+   * only manages a single primary-bucket vector (the secondary lane is
+   * managed by a separate helper).
+   */
+  void WxHashTableBaseDestroyRuntime(
+    WxHashTableDestroyView* const table
+  )
+  {
+    if (table == nullptr || table->bucketArray == nullptr) {
+      return;
+    }
+
+    for (std::uint32_t index = 0; index < table->bucketCount; ++index) {
+      void* const bucket = table->bucketArray[index];
+      if (bucket == nullptr) {
+        continue;
+      }
+
+      void** const vtable = *reinterpret_cast<void***>(bucket);
+      if (vtable != nullptr && vtable[1] != nullptr) {
+        const auto deleteWithFlag = reinterpret_cast<WxDeleteObjectWithFlagFn>(vtable[1]);
+        deleteWithFlag(bucket, 1);
+      }
+    }
+
+    ::operator delete(table->bucketArray);
+    table->bucketArray = nullptr;
+    table->usedCount = 0u;
+  }
+
+  /**
+   * Address: 0x00992540 (FUN_00992540)
+   *
+   * IDA signature:
+   * void __thiscall sub_992540(wxObject *this);
+   *
+   * What it does:
+   * Implements the FAF binary's `wxWinHashTable::~wxWinHashTable()` lane:
+   * swaps the object's vtable to the derived `wxWinHashTable` slot, runs
+   * the recovered `WxHashTableBaseDestroyRuntime` teardown, restores the
+   * `wxObject` base vtable, and finally delegates to `wxEvent::UnRef` for
+   * the wxObject-base reference-count release. We express the vtable
+   * swaps as opaque pointer stores because the recovered `wxObject`
+   * vftable symbols live in a generated runtime-classinfo TU that is
+   * referenced elsewhere in the engine.
+   */
+  void WxWinHashTableDestructorRuntime(
+    WxHashTableDestroyView* const table,
+    void* const derivedVftable,
+    void* const baseVftable,
+    void (*wxEventUnRef)(void* self)
+  ) noexcept
+  {
+    if (table == nullptr) {
+      return;
+    }
+
+    auto* const vtableSlot = reinterpret_cast<void**>(table);
+    *vtableSlot = derivedVftable;
+    WxHashTableBaseDestroyRuntime(table);
+    *vtableSlot = baseVftable;
+
+    if (wxEventUnRef != nullptr) {
+      wxEventUnRef(table);
+    }
+  }
 }
 
 /**
@@ -1162,6 +1279,18 @@ void wxWinHashTableDestroyBucketArraysRuntime(
   ::operator delete(table->secondaryBuckets);
   table->bucketCount = 0;
   table->usedCount = 0;
+
+  // After the broad two-array teardown completes, route one empty
+  // recovered `wxHashTableBase::Destroy` pass (FUN_009D0B90) through the
+  // slim destroy-view projection. The helper short-circuits on a null
+  // `bucketArray`, so this is a named invocation that encodes the
+  // release binary's follow-up destroy lane without re-entering the
+  // per-bucket delete loop we already executed.
+  WxHashTableDestroyView destroyView{};
+  destroyView.bucketArray = nullptr;
+  destroyView.bucketCount = 0u;
+  destroyView.usedCount = 0u;
+  WxHashTableBaseDestroyRuntime(&destroyView);
 }
 
 /**
@@ -1973,6 +2102,7 @@ namespace
   extern std::uint8_t gWxScrollBarRuntimeVTableTag;
   extern std::uint8_t gWxStaticBitmapRuntimeVTableTag;
   extern std::uint8_t gWxSpinButtonRuntimeVTableTag;
+  extern std::uint8_t gWxSlider95RuntimeVTableTag;
   extern std::uint8_t gWxMdiClientWindowRuntimeVTableTag;
   extern std::uint8_t gWxStaticLineRuntimeVTableTag;
   extern std::uint8_t gWxResourceCacheListRuntimeVTableTag;
@@ -2051,6 +2181,21 @@ namespace
   class WxImageRefDataRuntime final
   {
   public:
+    /**
+     * Address: 0x009703B0 (FUN_009703B0)
+     * Mangled: sub_9703B0
+     *
+     * IDA signature:
+     * char *__thiscall sub_9703B0(char *this);
+     *
+     * What it does:
+     * Zero-initializes all image ref-data lanes, installs the image-refdata
+     * vtable, seeds `mRefCount = 1`, default-constructs the embedded
+     * `wxPalette` at +0x1C and the two `wxArrayString` tables
+     * (`mOptionKeys` at +0x28, `mOptionValues` at +0x38). The
+     * in-class member initializers plus implicit sub-object construction
+     * give the same zero-fill + refcount-1 state as the original body.
+     */
     WxImageRefDataRuntime() = default;
 
     virtual ~WxImageRefDataRuntime()
@@ -8574,6 +8719,56 @@ namespace
 
     const wchar_t wideCharacter = static_cast<wchar_t>(static_cast<std::uint8_t>(characterCode));
     AssignOwnedWxString(outValue, std::wstring(1u, wideCharacter));
+    return outValue;
+  }
+
+  /**
+   * Address: 0x009C8520 (FUN_009C8520)
+   *
+   * What it does:
+   * Reads the Win32 window class name for `hWnd` into `outValue`. Starts with a
+   * 256-wchar scratch buffer; when the returned length saturates the buffer it
+   * grows by powers of two until the returned length is strictly less than the
+   * current capacity. A null `hWnd` yields the shared empty-string lane.
+   *
+   * IDA signature:
+   * wxString* __cdecl sub_9C8520(wxString* a1, HWND hWnd);
+   */
+  [[maybe_unused]] wxStringRuntime* wxCopyClassNameFromHwndRuntime(
+    wxStringRuntime* const outValue,
+    const HWND hWnd
+  )
+  {
+    if (outValue == nullptr) {
+      return nullptr;
+    }
+
+    outValue->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+    if (hWnd == nullptr) {
+      return outValue;
+    }
+
+    std::size_t bufferLength = 256u;
+    std::vector<wchar_t> scratchBuffer(bufferLength + 1u);
+
+    int writtenLength =
+      ::GetClassNameW(hWnd, scratchBuffer.data(), static_cast<int>(bufferLength));
+
+    while (static_cast<std::size_t>(writtenLength) == bufferLength) {
+      bufferLength *= 2u;
+      scratchBuffer.assign(bufferLength + 1u, L'\0');
+      writtenLength =
+        ::GetClassNameW(hWnd, scratchBuffer.data(), static_cast<int>(bufferLength));
+    }
+
+    if (writtenLength > 0) {
+      AssignOwnedWxString(
+        outValue,
+        std::wstring(scratchBuffer.data(), static_cast<std::size_t>(writtenLength))
+      );
+    }
+
     return outValue;
   }
 
@@ -18431,33 +18626,17 @@ long wxHandleMdiChildWindowProc(
 {
   bool handled = false;
   long result = 0;
+  auto* const frame = static_cast<wxFrame*>(mdiChildRuntime);
 
-  if (message <= 0x46u) {
-    if (message == 0x46u) {
-      handled = wxHandleMdiChildWindowPosChanging(mdiChildRuntime, reinterpret_cast<void*>(lParam));
-    } else if (message == WM_MOVE || message == WM_SIZE) {
-      (void)CallRuntimeDefaultWindowProc(mdiChildRuntime, message, wParam, lParam);
-    } else if (message == WM_GETMINMAXINFO) {
-      handled = wxHandleMdiChildGetMinMaxInfo(mdiChildRuntime, reinterpret_cast<void*>(lParam));
-    } else {
-      return CallWxFrameWindowProcBase(mdiChildRuntime, message, wParam, lParam);
-    }
-  } else {
-    if (message == WM_COMMAND) {
-      unsigned short commandId = 0;
-      unsigned short notificationCode = 0;
-      unsigned int controlHandle = 0;
-      (void)wxWindowMswRuntime::UnpackCommand(
-        wParam,
-        static_cast<int>(lParam),
-        &commandId,
-        &controlHandle,
-        &notificationCode
-      );
-      handled = wxHandleFrameMenuCommand(mdiChildRuntime, commandId, notificationCode, static_cast<int>(controlHandle));
-    } else if (message == WM_SYSCOMMAND) {
-      return CallRuntimeDefaultWindowProc(mdiChildRuntime, WM_SYSCOMMAND, wParam, lParam);
-    } else if (message == WM_MDIACTIVATE) {
+  if (message > 0x46u) {
+    if (message != WM_COMMAND) {
+      if (message == WM_SYSCOMMAND) {
+        return frame->wxFrame::MSWWindowProc(WM_SYSCOMMAND, wParam, lParam);
+      }
+      if (message != WM_MDIACTIVATE) {
+        return frame->wxFrame::MSWWindowProc(message, wParam, lParam);
+      }
+
       unsigned short activationState = 0;
       unsigned int activatedNativeHandle = 0;
       unsigned int deactivatedNativeHandle = 0;
@@ -18474,14 +18653,34 @@ long wxHandleMdiChildWindowProc(
         activatedNativeHandle,
         deactivatedNativeHandle
       );
-      (void)CallRuntimeDefaultWindowProc(mdiChildRuntime, message, wParam, lParam);
+      (void)frame->wxFrame::MSWWindowProc(message, wParam, lParam);
     } else {
-      return CallWxFrameWindowProcBase(mdiChildRuntime, message, wParam, lParam);
+      unsigned short commandId = 0;
+      unsigned short notificationCode = 0;
+      unsigned int controlHandle = 0;
+      (void)wxWindowMswRuntime::UnpackCommand(
+        wParam,
+        static_cast<int>(lParam),
+        &commandId,
+        &controlHandle,
+        &notificationCode
+      );
+      handled = wxHandleFrameMenuCommand(mdiChildRuntime, commandId, notificationCode, static_cast<int>(controlHandle));
+    }
+  } else {
+    if (message == 0x46u) {
+      handled = wxHandleMdiChildWindowPosChanging(mdiChildRuntime, reinterpret_cast<void*>(lParam));
+    } else if (message == WM_MOVE || message == WM_SIZE) {
+      (void)frame->wxFrame::MSWWindowProc(message, wParam, lParam);
+    } else if (message == WM_GETMINMAXINFO) {
+      handled = wxHandleMdiChildGetMinMaxInfo(mdiChildRuntime, reinterpret_cast<void*>(lParam));
+    } else {
+      return frame->wxFrame::MSWWindowProc(message, wParam, lParam);
     }
   }
 
   if (!handled) {
-    return CallWxFrameWindowProcBase(mdiChildRuntime, message, wParam, lParam);
+    return frame->wxFrame::MSWWindowProc(message, wParam, lParam);
   }
 
   return result;
@@ -19177,12 +19376,21 @@ namespace
 {
   struct WxSlider95RuntimeFieldView
   {
-    std::uint8_t reserved00_13B[0x13C]{};
+    void* vftable = nullptr;                // +0x00 (wxSlider95 vtable)
+    std::uint8_t reserved04_12F[0x12C]{};
+    std::int32_t laneAt130 = 0;             // +0x130 (reset to 0 by ctor)
+    std::int32_t laneAt134 = 0;             // +0x134 (reset to 0 by ctor)
+    std::int32_t laneAt138 = 0;             // +0x138 (reset to 0 by ctor)
     std::int32_t minimumValue = 0;          // +0x13C
     std::int32_t maximumValue = 0;          // +0x140
-    std::uint8_t reserved144_14B[0x08]{};
+    std::int32_t pageStep = 0;              // +0x144 (initialized to 1 by ctor)
+    std::int32_t lineStep = 0;              // +0x148 (initialized to 1 by ctor)
     std::int32_t incrementValue = 0;        // +0x14C
   };
+  static_assert(
+    offsetof(WxSlider95RuntimeFieldView, laneAt130) == 0x130,
+    "WxSlider95RuntimeFieldView::laneAt130 offset must be 0x130"
+  );
   static_assert(
     offsetof(WxSlider95RuntimeFieldView, minimumValue) == 0x13C,
     "WxSlider95RuntimeFieldView::minimumValue offset must be 0x13C"
@@ -19190,6 +19398,14 @@ namespace
   static_assert(
     offsetof(WxSlider95RuntimeFieldView, maximumValue) == 0x140,
     "WxSlider95RuntimeFieldView::maximumValue offset must be 0x140"
+  );
+  static_assert(
+    offsetof(WxSlider95RuntimeFieldView, pageStep) == 0x144,
+    "WxSlider95RuntimeFieldView::pageStep offset must be 0x144"
+  );
+  static_assert(
+    offsetof(WxSlider95RuntimeFieldView, lineStep) == 0x148,
+    "WxSlider95RuntimeFieldView::lineStep offset must be 0x148"
   );
   static_assert(
     offsetof(WxSlider95RuntimeFieldView, incrementValue) == 0x14C,
@@ -19344,6 +19560,110 @@ namespace
     offsetof(WxEmitterCurveUpdateRuntimeView, curveRangeMax) == 0x188,
     "WxEmitterCurveUpdateRuntimeView::curveRangeMax offset must be 0x188"
   );
+}
+
+namespace
+{
+  extern std::uint8_t gWxSlider95RuntimeVTableTag;
+  extern std::uint8_t gWxListBoxRuntimeVTableTag;
+  extern std::uint8_t gWxListBoxItemContainerRuntimeVTableTag;
+
+  struct WxListBoxCtorPtrArrayLane
+  {
+    std::uint32_t capacity = 0; // +0x00
+    std::uint32_t size = 0;     // +0x04
+    void** items = nullptr;     // +0x08
+  };
+  static_assert(sizeof(WxListBoxCtorPtrArrayLane) == 0x0C, "WxListBoxCtorPtrArrayLane size must be 0x0C");
+
+  struct WxListBoxCtorRuntimeView
+  {
+    void* vtable = nullptr;                 // +0x00 (wxListBox)
+    std::uint8_t reserved04_12F[0x12C]{};
+    void* itemContainerSubobjectVTable = nullptr; // +0x130
+    std::int32_t itemContainerLane134 = 0;  // +0x134
+    std::int32_t laneAt138 = 0;             // +0x138 (post-array init)
+    std::int32_t laneAt13C = 0;             // +0x13C
+    WxListBoxCtorPtrArrayLane items{};      // +0x140 (wxArrayPtrVoid subobject)
+  };
+  static_assert(
+    offsetof(WxListBoxCtorRuntimeView, itemContainerSubobjectVTable) == 0x130,
+    "WxListBoxCtorRuntimeView::itemContainerSubobjectVTable offset must be 0x130"
+  );
+  static_assert(
+    offsetof(WxListBoxCtorRuntimeView, itemContainerLane134) == 0x134,
+    "WxListBoxCtorRuntimeView::itemContainerLane134 offset must be 0x134"
+  );
+  static_assert(
+    offsetof(WxListBoxCtorRuntimeView, laneAt138) == 0x138,
+    "WxListBoxCtorRuntimeView::laneAt138 offset must be 0x138"
+  );
+  static_assert(
+    offsetof(WxListBoxCtorRuntimeView, items) == 0x140,
+    "WxListBoxCtorRuntimeView::items offset must be 0x140"
+  );
+}
+
+/**
+ * Address: 0x009EE7E0 (FUN_009EE7E0, wxListBox::wxListBox)
+ *
+ * What it does:
+ * Constructs one wxListBox runtime payload on top of an already-allocated
+ * control. Chains the wxControl ctor, installs the wxItemContainer
+ * subobject vtable then overwrites the primary and subobject vtable lanes
+ * with the wxListBox slots, constructs the inline `wxArrayPtrVoid` items
+ * lane at `+0x140`, and zeroes the two auxiliary lanes at
+ * `+0x138`/`+0x13C` (they are set after the array ctor to match binary
+ * shape — the `wxArrayPtrVoid` ctor touches `+0x140..+0x14B` and can
+ * leave untouched data in `+0x138/+0x13C`).
+ */
+[[maybe_unused]] void* wxListBoxConstructRuntime(
+  void* const listBoxRuntime
+) noexcept
+{
+  wxInitializeControlRuntimeBaseState(listBoxRuntime);
+
+  auto* const runtime = static_cast<WxListBoxCtorRuntimeView*>(listBoxRuntime);
+
+  runtime->itemContainerSubobjectVTable = &gWxListBoxItemContainerRuntimeVTableTag;
+  runtime->itemContainerLane134 = 0;
+  runtime->vtable = &gWxListBoxRuntimeVTableTag;
+  runtime->itemContainerSubobjectVTable = &gWxListBoxItemContainerRuntimeVTableTag;
+
+  // wxArrayPtrVoid::wxArrayPtrVoid — reset capacity/count/items to empty.
+  runtime->items.capacity = 0u;
+  runtime->items.size = 0u;
+  runtime->items.items = nullptr;
+  runtime->laneAt138 = 0;
+  runtime->laneAt13C = 0;
+  return runtime;
+}
+
+/**
+ * Address: 0x009AFE00 (FUN_009AFE00)
+ *
+ * What it does:
+ * Chains wxControl-subobject initialization, zeroes the slider range/increment
+ * cache lanes and the three auxiliary lanes at `+0x130/+0x134/+0x138`, seeds
+ * `pageStep`/`lineStep` to `1`, and binds the wxSlider95 vtable lane.
+ */
+[[maybe_unused]] void* wxSlider95ConstructRuntime(
+  void* const sliderRuntime
+) noexcept
+{
+  wxInitializeControlRuntimeBaseState(sliderRuntime);
+
+  auto* const runtime = static_cast<WxSlider95RuntimeFieldView*>(sliderRuntime);
+  runtime->laneAt130 = 0;
+  runtime->laneAt134 = 0;
+  runtime->laneAt138 = 0;
+  runtime->minimumValue = 0;
+  runtime->maximumValue = 0;
+  runtime->incrementValue = 0;
+  runtime->pageStep = 1;
+  runtime->lineStep = 1;
+  runtime->vftable = &gWxSlider95RuntimeVTableTag;
+  return runtime;
 }
 
 /**
@@ -23592,7 +23912,8 @@ namespace
 
   const wchar_t* const systemMessage = wxResolveSystemErrorMessageRuntime(messageId);
   std::array<wchar_t, kWxLogFormatBufferCount> suffixBuffer{};
-  (void)_snwprintf(
+  extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, const wchar_t* format, ...);
+  (void)RuntimeSnwprintf(
     suffixBuffer.data(),
     suffixBuffer.size(),
     suffixFormat,
@@ -24567,6 +24888,34 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
 
   *outWriteEnd = outputWrite;
   return outWriteEnd;
+}
+
+/**
+ * Address: 0x009A7B80 (FUN_009A7B80)
+ *
+ * What it does:
+ * Classic `wxSortedArray::Index` adapter. Uses the insertion-index helper
+ * to locate the candidate slot for `key`, then verifies the slot actually
+ * matches: returns `-1` if the computed index is beyond `size` or the
+ * element at that slot does not compare equal to `key`; otherwise returns
+ * the matching index.
+ */
+[[maybe_unused]] std::int32_t WxDwordArrayFindExactMatchIndexRuntime(
+  const WxDwordArrayRuntimeView* const array,
+  const int key,
+  const WxDwordArrayCompareProc compare
+) noexcept
+{
+  const std::uint32_t candidateIndex = WxFindDwordArrayInsertionIndexWithComparator(array, key, compare);
+  if (candidateIndex >= array->size) {
+    return -1;
+  }
+
+  if (compare(key, static_cast<std::uint32_t>(array->data[candidateIndex])) != 0) {
+    return -1;
+  }
+
+  return static_cast<std::int32_t>(candidateIndex);
 }
 
 /**
@@ -27992,6 +28341,88 @@ bool wxRegistryKeyGetFirstSubKeyRuntime(
 }
 
 /**
+ * Address: 0x00A365F0 (FUN_00A365F0)
+ * Mangled: sub_A365F0
+ *
+ * IDA signature:
+ * char __thiscall sub_A365F0(int this, LPCWSTR lpValueName, int *a3, LPCWSTR a4);
+ *
+ * What it does:
+ * Reads a REG_SZ / REG_EXPAND_SZ registry value into `outValue` (wx-string).
+ * Opens the key on demand, calls `RegQueryValueExW` once to learn the size,
+ * allocates write-buffer on the wx-string for the requested byte count,
+ * issues a second `RegQueryValueExW` to fill the buffer, and releases the
+ * write-buffer handle. When the value type is `REG_EXPAND_SZ` and
+ * `suppressExpand` is false, expands environment variables via
+ * `ExpandEnvironmentStringsW` into a temporary wx-string and swaps it in.
+ * Empty values yield `wxString::Empty(0)`.
+ *
+ * On any failure (open, Win32 query, or size-0 early path) emits a
+ * localized "Can't read value of '%s'" system-error log entry scoped to
+ * the full registry-key path, and returns false. Otherwise returns true.
+ */
+[[maybe_unused]] bool wxRegistryKeyQueryStringValueRuntime(
+  WxRegistryKeyRuntimeView* const key,
+  const wchar_t* const valueName,
+  wxStringRuntime* const outValue,
+  const bool suppressExpansion
+)
+{
+  if (wxRegistryKeyOpenRuntime(key)) {
+    DWORD valueType = 0;
+    DWORD byteCount = 0;
+    key->lastStatus = ::RegQueryValueExW(key->openedKey, valueName, nullptr, &valueType, nullptr, &byteCount);
+    if (key->lastStatus == ERROR_SUCCESS) {
+      if (byteCount != 0u) {
+        std::vector<std::uint8_t> scratch(byteCount);
+        key->lastStatus = ::RegQueryValueExW(
+          key->openedKey, valueName, nullptr, &valueType, scratch.data(), &byteCount
+        );
+        if (key->lastStatus == ERROR_SUCCESS) {
+          // Install the raw UTF-16 value as the wx-string's backing bytes.
+          const std::size_t wcharCount = byteCount / sizeof(wchar_t);
+          std::wstring rawValue(
+            reinterpret_cast<const wchar_t*>(scratch.data()),
+            wcharCount
+          );
+          // Strip a single embedded terminator if present (RegQueryValueExW
+          // counts it in byteCount for string types).
+          if (!rawValue.empty() && rawValue.back() == L'\0') {
+            rawValue.pop_back();
+          }
+          AssignOwnedWxString(outValue, rawValue);
+
+          if (valueType == REG_EXPAND_SZ && !suppressExpansion) {
+            const DWORD expandedSize = ::ExpandEnvironmentStringsW(outValue->c_str(), nullptr, 0);
+            if (expandedSize != 0u) {
+              std::vector<wchar_t> expandedBuffer(expandedSize);
+              ::ExpandEnvironmentStringsW(outValue->c_str(), expandedBuffer.data(), expandedSize);
+              AssignOwnedWxString(outValue, std::wstring(expandedBuffer.data()));
+            }
+          }
+        }
+      } else {
+        AssignOwnedWxString(outValue, std::wstring());
+      }
+
+      if (key->lastStatus == ERROR_SUCCESS) {
+        return true;
+      }
+    }
+  }
+
+  const wchar_t* errorFormat = L"Can't read value of '%s'";
+  if (wxLocale* const locale = wxGetLocale(); locale != nullptr) {
+    errorFormat = locale->GetString(L"Can't read value of '%s'", 0);
+  }
+  const wchar_t* const keyPath = wxRegistryKeyComposePathWithSubKeyRuntime(key, nullptr);
+  (void)wxLogSystemErrorWithMessageIdRuntime(
+    static_cast<DWORD>(key->lastStatus), errorFormat, keyPath
+  );
+  return false;
+}
+
+/**
  * Address: 0x00A36840 (FUN_00A36840, sub_A36840)
  *
  * What it does:
@@ -28899,17 +29330,47 @@ namespace
 
 struct WxElapsedClockRuntimeView
 {
-  std::int32_t startMillis = 0;        // +0x00
-  std::uint8_t lane04_07[0x04]{};
+  union {
+    std::int64_t startEpochMillis;         // +0x00 (64-bit wall clock seed)
+    struct {
+      std::int32_t startMillis;            // +0x00 (low 32 bits, used for deltas)
+      std::int32_t startMillisHigh;        // +0x04
+    };
+  };
   std::int32_t cachedMillis = 0;       // +0x08
   std::int32_t hasCachedMillis = 0;    // +0x0C
+
+  WxElapsedClockRuntimeView() noexcept : startEpochMillis(0) {}
 };
 static_assert(offsetof(WxElapsedClockRuntimeView, startMillis) == 0x00, "WxElapsedClockRuntimeView::startMillis offset must be 0x00");
+static_assert(offsetof(WxElapsedClockRuntimeView, startEpochMillis) == 0x00, "WxElapsedClockRuntimeView::startEpochMillis offset must be 0x00");
 static_assert(offsetof(WxElapsedClockRuntimeView, cachedMillis) == 0x08, "WxElapsedClockRuntimeView::cachedMillis offset must be 0x08");
 static_assert(
   offsetof(WxElapsedClockRuntimeView, hasCachedMillis) == 0x0C,
   "WxElapsedClockRuntimeView::hasCachedMillis offset must be 0x0C"
 );
+static_assert(sizeof(WxElapsedClockRuntimeView) == 0x10, "WxElapsedClockRuntimeView size must be 0x10");
+
+/**
+ * Address: 0x009F2930 (FUN_009F2930)
+ *
+ * What it does:
+ * Seeds an elapsed-clock runtime view by sampling the current 64-bit
+ * wall-clock millisecond lane and subtracting the supplied `alreadyElapsed`
+ * offset (so that later `ComputeMillis` samples report the elapsed time
+ * including the prior interval). Also clears the cached-millis lanes.
+ */
+[[maybe_unused]] void wxElapsedClockInitWithPriorElapsedMillis(
+  WxElapsedClockRuntimeView* const clockRuntime,
+  const std::int32_t alreadyElapsedMillis
+) noexcept
+{
+  std::int64_t nowMillis = 0;
+  (void)wxGetEpochMillisRuntime(&nowMillis);
+  clockRuntime->startEpochMillis = nowMillis - static_cast<std::int64_t>(alreadyElapsedMillis);
+  clockRuntime->cachedMillis = 0;
+  clockRuntime->hasCachedMillis = 0;
+}
 
 /**
  * Address: 0x009F2970 (FUN_009F2970)
@@ -36525,9 +36986,11 @@ bool wxFile::Flush()
  * Resolves one descriptor length via CRT `_filelength()` and logs a localized
  * system error on failure.
  */
+extern "C" long __cdecl RuntimeFileLength(int fileHandle);
+
 long wxFile::Length() const
 {
-  const long fileLength = _filelength(m_fd);
+  const long fileLength = RuntimeFileLength(m_fd);
   if (fileLength == -1) {
     WxLogSysErrorLocalized(L"can't find length of file on file descriptor %d", m_fd);
     return -1;
@@ -36679,7 +37142,8 @@ bool wxFile::Open(
   const std::size_t narrowCapacity = wideLength + 1u;
 
   auto* const narrowPath = static_cast<char*>(::operator new(narrowCapacity));
-  if (std::wcstombs(narrowPath, safeWideName, narrowCapacity) == static_cast<std::size_t>(-1)) {
+  extern "C" std::size_t __cdecl RuntimeWcsToMbs(char*, const wchar_t*, std::size_t);
+  if (RuntimeWcsToMbs(narrowPath, safeWideName, narrowCapacity) == static_cast<std::size_t>(-1)) {
     narrowPath[0] = '\0';
   }
 
@@ -42755,23 +43219,64 @@ void wxSocketDestroyFramePayloadRuntime(
 
 struct WxSocketBaseRuntimeView
 {
-  void* vtable = nullptr;                        // +0x00
-  void* refData = nullptr;                       // +0x04
-  WxSocketRuntimeView* socketRuntime = nullptr;  // +0x08
-  std::uint8_t lane0C_13[0x8]{};                // +0x0C
-  std::uint8_t socketOkFlag = 0;                // +0x14
-  std::uint8_t socketConnectedFlag = 0;         // +0x15
-  std::uint8_t lane16_43[0x2E]{};               // +0x16
-  std::uint8_t socketClosedFlag = 0;            // +0x44
-  std::uint8_t pendingDeleteFlag = 0;           // +0x45
-  std::uint8_t lane46_47[0x2]{};                // +0x46
-  void* auxiliaryBuffer = nullptr;              // +0x48
+  void* vtable = nullptr;                          // +0x00
+  void* refData = nullptr;                         // +0x04
+  WxSocketRuntimeView* socketRuntime = nullptr;    // +0x08
+  std::uint32_t socketType = 0;                    // +0x0C
+  std::uint32_t socketFlags = 0;                   // +0x10
+  std::uint8_t socketOkFlag = 0;                   // +0x14
+  std::uint8_t socketConnectedFlag = 0;            // +0x15
+  std::uint8_t socketEstablishingFlag = 0;         // +0x16
+  std::uint8_t socketReadingFlag = 0;              // +0x17
+  std::uint8_t socketWritingFlag = 0;              // +0x18
+  std::uint8_t lane19_1F[0x07]{};                  // +0x19
+  std::uint32_t socketLastIoCount = 0;             // +0x20
+  std::uint32_t socketTimeoutSeconds = 600;        // +0x24
+  std::uint8_t statesListLane[0x1C]{};             // +0x28 (embedded wxList sublane)
+  std::uint8_t socketClosedFlag = 0;               // +0x44
+  std::uint8_t pendingDeleteFlag = 0;              // +0x45
+  std::uint8_t lane46_47[0x2]{};                   // +0x46
+  void* auxiliaryBuffer = nullptr;                 // +0x48 (wx `m_unread` lane)
+  std::uint32_t auxiliaryBufferSize = 0;           // +0x4C
+  std::uint32_t auxiliaryBufferCursor = 0;         // +0x50
+  std::int32_t socketHandlerId = -1;               // +0x54 (default wxID_ANY)
+  void* socketEventHandler = nullptr;              // +0x58
+  void* socketClientData = nullptr;                // +0x5C
+  std::uint8_t socketClientDataOwnsFlag = 0;       // +0x60
+  std::uint8_t lane61_63[0x3]{};                   // +0x61
+  void* socketUserCallbackData = nullptr;          // +0x64
 };
 static_assert(offsetof(WxSocketBaseRuntimeView, socketRuntime) == 0x08, "WxSocketBaseRuntimeView::socketRuntime offset must be 0x08");
+static_assert(offsetof(WxSocketBaseRuntimeView, socketType) == 0x0C, "WxSocketBaseRuntimeView::socketType offset must be 0x0C");
+static_assert(offsetof(WxSocketBaseRuntimeView, socketFlags) == 0x10, "WxSocketBaseRuntimeView::socketFlags offset must be 0x10");
 static_assert(offsetof(WxSocketBaseRuntimeView, socketOkFlag) == 0x14, "WxSocketBaseRuntimeView::socketOkFlag offset must be 0x14");
 static_assert(
   offsetof(WxSocketBaseRuntimeView, socketConnectedFlag) == 0x15,
   "WxSocketBaseRuntimeView::socketConnectedFlag offset must be 0x15"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketEstablishingFlag) == 0x16,
+  "WxSocketBaseRuntimeView::socketEstablishingFlag offset must be 0x16"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketReadingFlag) == 0x17,
+  "WxSocketBaseRuntimeView::socketReadingFlag offset must be 0x17"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketWritingFlag) == 0x18,
+  "WxSocketBaseRuntimeView::socketWritingFlag offset must be 0x18"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketLastIoCount) == 0x20,
+  "WxSocketBaseRuntimeView::socketLastIoCount offset must be 0x20"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketTimeoutSeconds) == 0x24,
+  "WxSocketBaseRuntimeView::socketTimeoutSeconds offset must be 0x24"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, statesListLane) == 0x28,
+  "WxSocketBaseRuntimeView::statesListLane offset must be 0x28"
 );
 static_assert(
   offsetof(WxSocketBaseRuntimeView, socketClosedFlag) == 0x44,
@@ -42785,6 +43290,218 @@ static_assert(
   offsetof(WxSocketBaseRuntimeView, auxiliaryBuffer) == 0x48,
   "WxSocketBaseRuntimeView::auxiliaryBuffer offset must be 0x48"
 );
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, auxiliaryBufferSize) == 0x4C,
+  "WxSocketBaseRuntimeView::auxiliaryBufferSize offset must be 0x4C"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, auxiliaryBufferCursor) == 0x50,
+  "WxSocketBaseRuntimeView::auxiliaryBufferCursor offset must be 0x50"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketHandlerId) == 0x54,
+  "WxSocketBaseRuntimeView::socketHandlerId offset must be 0x54"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketEventHandler) == 0x58,
+  "WxSocketBaseRuntimeView::socketEventHandler offset must be 0x58"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketClientData) == 0x5C,
+  "WxSocketBaseRuntimeView::socketClientData offset must be 0x5C"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketClientDataOwnsFlag) == 0x60,
+  "WxSocketBaseRuntimeView::socketClientDataOwnsFlag offset must be 0x60"
+);
+static_assert(
+  offsetof(WxSocketBaseRuntimeView, socketUserCallbackData) == 0x64,
+  "WxSocketBaseRuntimeView::socketUserCallbackData offset must be 0x64"
+);
+static_assert(sizeof(WxSocketBaseRuntimeView) == 0x68, "WxSocketBaseRuntimeView size must be 0x68");
+
+/**
+ * Address: 0x00A2E070 (FUN_00A2E070)
+ *
+ * IDA signature:
+ * char __thiscall sub_A2E070(int this);
+ *
+ * What it does:
+ * Runs one `wxSocketBase::Init` lane by resetting live runtime lanes to their
+ * default-constructed state (no owned socket, zero flags/type, default 600s
+ * timeout, invalid handler id), then inlines the socket-runtime refcount
+ * bootstrap: if the runtime is already initialized returns `TRUE`; otherwise
+ * increments the init refcount and runs `wxSocketRuntimeInitialize`, rolling
+ * the refcount back on first-call failure.
+ */
+BOOL wxSocketBaseInitializeRuntime(
+  WxSocketBaseRuntimeView* const socketBase
+) noexcept
+{
+  socketBase->socketRuntime = nullptr;
+  socketBase->socketType = 0u;
+  socketBase->socketFlags = 0u;
+  socketBase->socketOkFlag = 0u;
+  socketBase->socketConnectedFlag = 0u;
+  socketBase->socketEstablishingFlag = 0u;
+  socketBase->socketReadingFlag = 0u;
+  socketBase->socketWritingFlag = 0u;
+  socketBase->socketLastIoCount = 0u;
+  socketBase->socketTimeoutSeconds = 600u;
+  socketBase->pendingDeleteFlag = 0u;
+  socketBase->auxiliaryBuffer = nullptr;
+  socketBase->auxiliaryBufferSize = 0u;
+  socketBase->auxiliaryBufferCursor = 0u;
+  socketBase->socketHandlerId = -1;
+  socketBase->socketEventHandler = nullptr;
+  socketBase->socketClientData = nullptr;
+  socketBase->socketClientDataOwnsFlag = 0u;
+  socketBase->socketUserCallbackData = nullptr;
+
+  if (wxIsSocketRuntimeInitialized() != FALSE) {
+    return TRUE;
+  }
+
+  ++gWxSocketRuntimeInitRefCount;
+  if (wxSocketRuntimeInitialize() != FALSE) {
+    return TRUE;
+  }
+
+  --gWxSocketRuntimeInitRefCount;
+  return FALSE;
+}
+
+namespace
+{
+  std::uint8_t gWxSocketBaseRuntimeVTableTag = 0;
+  std::uint8_t gWxSocketBaseEmbeddedListVTableTag = 0;
+
+  /**
+   * Seeds the wxObject base lanes, zeroes `refData`, then constructs the
+   * embedded wxList subobject at `+0x28` by zero-initializing its storage and
+   * binding its internal vtable slot to the shared tag. Matches the
+   * `wxListBase::wxListBase` + vtable-rebind shape used by both wxSocketBase
+   * ctors.
+   */
+  void wxSocketBaseSeedBaseLanes(WxSocketBaseRuntimeView* const socketBase) noexcept
+  {
+    socketBase->vtable = &gWxSocketBaseRuntimeVTableTag;
+    socketBase->refData = nullptr;
+
+    std::fill(std::begin(socketBase->statesListLane), std::end(socketBase->statesListLane), std::uint8_t{0});
+    *reinterpret_cast<void**>(&socketBase->statesListLane[0]) = &gWxSocketBaseEmbeddedListVTableTag;
+  }
+}
+
+/**
+ * Address: 0x00A2E0D0 (FUN_00A2E0D0)
+ *
+ * IDA signature:
+ * char* __thiscall sub_A2E0D0(char* this);
+ *
+ * What it does:
+ * Runs the default `wxSocketBase::wxSocketBase()` ctor lane: seeds the
+ * wxObject base (vtable + null refData), constructs the embedded wxList
+ * subobject at `+0x28`, rebinds it to the wxList vtable, then runs the shared
+ * `wxSocketBase::Init` lane so flags, type, timeout and callback storage
+ * match the default-constructed contract.
+ */
+WxSocketBaseRuntimeView* wxSocketBaseConstructDefaultRuntime(
+  WxSocketBaseRuntimeView* const socketBase
+) noexcept
+{
+  wxSocketBaseSeedBaseLanes(socketBase);
+  (void)wxSocketBaseInitializeRuntime(socketBase);
+  return socketBase;
+}
+
+/**
+ * Address: 0x00A2E150 (FUN_00A2E150)
+ *
+ * IDA signature:
+ * char* __thiscall sub_A2E150(char* this, int flags, int type);
+ *
+ * What it does:
+ * Runs the flagged `wxSocketBase::wxSocketBase(flags, type)` ctor lane: seeds
+ * the wxObject base and embedded wxList subobject exactly like the default
+ * ctor, runs the shared `wxSocketBase::Init` lane, then stamps the requested
+ * `flags` and `type` into their fixed runtime slots.
+ */
+WxSocketBaseRuntimeView* wxSocketBaseConstructRuntime(
+  WxSocketBaseRuntimeView* const socketBase,
+  const std::uint32_t flags,
+  const std::uint32_t type
+) noexcept
+{
+  wxSocketBaseSeedBaseLanes(socketBase);
+  (void)wxSocketBaseInitializeRuntime(socketBase);
+  socketBase->socketFlags = flags;
+  socketBase->socketType = type;
+  return socketBase;
+}
+
+/**
+ * Address: 0x00A2F0F0 (FUN_00A2F0F0)
+ *
+ * IDA signature:
+ * _DWORD* __thiscall sub_A2F0F0(_DWORD* this, int flags);
+ *
+ * What it does:
+ * Runs the `wxSocketClient::wxSocketClient(wxSocketFlags)` ctor lane: chains
+ * to the flagged `wxSocketBase::wxSocketBase` ctor with `type=1` (kClient),
+ * then stamps the derived `wxSocketClient` vtable into the object's first
+ * slot so dispatch transitions from the base class vtable (installed by the
+ * base ctor at 0x00A2E150) to the wxSocketClient vtable.
+ *
+ * Called by `wxProtocolConstructRuntime` (FUN_00A2F550) to initialize the
+ * wxSocketClient base subobject of `wxProtocol`, and by the wxSocketClient
+ * allocation path at 0x00A10B70 when user code constructs a standalone
+ * client socket.
+ */
+WxSocketBaseRuntimeView* wxSocketClientConstructRuntime(
+  WxSocketBaseRuntimeView* const socketClient,
+  const std::uint32_t flags,
+  void* const wxSocketClientVTable
+) noexcept
+{
+  static constexpr std::uint32_t kWxSocketTypeClient = 1u;
+  (void)wxSocketBaseConstructRuntime(socketClient, flags, kWxSocketTypeClient);
+
+  // Derived vtable stamp: overrides the base vtable the parent ctor installed.
+  if (socketClient != nullptr && wxSocketClientVTable != nullptr) {
+    *reinterpret_cast<void**>(socketClient) = wxSocketClientVTable;
+  }
+  return socketClient;
+}
+
+/**
+ * Address: 0x00A2F550 (FUN_00A2F550)
+ *
+ * IDA signature:
+ * _DWORD* __thiscall sub_A2F550(_DWORD* this);
+ *
+ * What it does:
+ * Runs the `wxProtocol::wxProtocol()` ctor lane: chains to
+ * `wxSocketClient::wxSocketClient(flags=0)` (FUN_00A2F0F0) to initialize the
+ * wxSocketClient base subobject, then stamps the `wxProtocol` vtable over
+ * the `wxSocketClient` vtable installed by the base ctor.
+ *
+ * This mirrors the standard wxWidgets-2.4 protocol class which derives from
+ * wxSocketClient; the binary emits the two-phase vtable stamp the compiler
+ * generates for the base-then-derived constructor chain.
+ */
+WxSocketBaseRuntimeView* wxProtocolConstructRuntime(
+  WxSocketBaseRuntimeView* const protocolAsSocketClient,
+  void* const wxSocketClientVTable,
+  void* const wxProtocolVTable
+) noexcept
+{
+  (void)wxSocketClientConstructRuntime(protocolAsSocketClient, 0u, wxSocketClientVTable);
+  if (protocolAsSocketClient != nullptr && wxProtocolVTable != nullptr) {
+    *reinterpret_cast<void**>(protocolAsSocketClient) = wxProtocolVTable;
+  }
+  return protocolAsSocketClient;
+}
 
 /**
  * What it does:
@@ -43680,7 +44397,7 @@ namespace
     "WxFtpSocketIoRuntimeView::abortCommandFlag offset must be 0x78"
   );
 
-  [[nodiscard]] std::int32_t ReadEpochMillisLow32Runtime() noexcept
+  [[nodiscard, maybe_unused]] std::int32_t ReadEpochMillisLow32Runtime() noexcept
   {
     std::int64_t nowMillis = 0;
     (void)wxGetEpochMillisRuntime(&nowMillis);
@@ -43716,9 +44433,7 @@ namespace
     : (waitMillisRemainder + waitSeconds * 1000);
 
   WxElapsedClockRuntimeView elapsedClock{};
-  elapsedClock.startMillis = ReadEpochMillisLow32Runtime();
-  elapsedClock.cachedMillis = 0;
-  elapsedClock.hasCachedMillis = 0;
+  wxElapsedClockInitWithPriorElapsedMillis(&elapsedClock, 0);
 
   const std::int32_t maskWithTimeout = static_cast<std::int32_t>(requestedMask | 0x08u);
   for (;;) {
@@ -44341,7 +45056,8 @@ namespace
     runtime->mSelectedObjectBackup = nullptr;
   }
 
-  HGDIOBJ result = reinterpret_cast<HGDIOBJ>(wxObjectCopySharedRefDataRuntime(&runtime->mBrushObject, clone));
+  (void)wxBrushAssignBySharedRefDataOrRefRuntime(&runtime->mBrushObject, clone);
+  HGDIOBJ result = nullptr;
   if (runtime->mBrushObject.refData == nullptr) {
     if (runtime->mSelectedObjectBackup != nullptr) {
       result = ::SelectObject(runtime->mDeviceContext, runtime->mSelectedObjectBackup);
@@ -48557,6 +49273,76 @@ wxStringRuntime* wxStringRuntime::PadInPlace(
   return this;
 }
 
+/**
+ * Address: 0x00961E70 (FUN_00961E70, wxString::BeforeLast)
+ *
+ * What it does:
+ * Writes the prefix-before-last-separator slice into `outPrefix`. If
+ * `separator` is not present, or is at index `0`, leaves `outPrefix` as
+ * `wxEmptyString`. Matches the binary control flow:
+ *
+ * 1. Overwrite `outPrefix->m_pchData` with `wxEmptyString` (the caller
+ *    passes in an uninitialized/fresh wxString — the binary does not
+ *    release any prior payload).
+ * 2. `FindCharacterIndex(separator, findFromRight=true)`.
+ * 3. If found at index > 0: construct a temporary wxString covering
+ *    `[0, idx)`, shared-retain it into `outPrefix`, release the
+ *    temporary.
+ */
+wxStringRuntime* wxStringRuntime::BeforeLast(
+  wxStringRuntime* const outPrefix,
+  const wchar_t separator
+) const noexcept
+{
+  if (outPrefix == nullptr) {
+    return nullptr;
+  }
+
+  // Mirror the binary: clear the sink pointer, then seed with the shared
+  // `wxEmptyString` lane. No prior-payload release: the binary assumes
+  // `outPrefix` is a fresh (uninitialized) wxString.
+  outPrefix->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+  const std::int32_t lastIndex = FindCharacterIndex(separator, true);
+  if (lastIndex == -1 || lastIndex == 0) {
+    return outPrefix;
+  }
+
+  wxStringRuntime temporary{};
+  temporary.m_pchData = nullptr;
+  wxString::InitWith(&temporary, m_pchData, 0, lastIndex);
+
+  // wxString::operator=(outPrefix, temp): shared-retain from temp.
+  RetainWxStringRuntime(outPrefix, &temporary);
+
+  ReleaseWxStringSharedPayload(temporary);
+  return outPrefix;
+}
+
+/**
+ * Address: 0x00960090 (FUN_00960090, wxString::ToULong)
+ *
+ * What it does:
+ * Parses this wide string as an unsigned long using `wcstoul` with the
+ * active CRT locale, writing the parsed value and returning true only when
+ * the full string consumed without trailing characters and the string was
+ * non-empty.
+ */
+bool wxStringRuntime::ToULong(
+  unsigned long* const outValue,
+  const std::int32_t base
+) const noexcept
+{
+  if (outValue == nullptr) {
+    return false;
+  }
+
+  const wchar_t* const start = m_pchData;
+  wchar_t* parseEnd = nullptr;
+  *outValue = std::wcstoul(start, &parseEnd, base);
+  return parseEnd != nullptr && *parseEnd == L'\0' && parseEnd != start;
+}
+
 namespace
 {
   /**
@@ -52047,6 +52833,102 @@ namespace
   }
 
   /**
+   * Address: 0x004FB680 (FUN_004FB680)
+   *
+   * What it does:
+   * SEH unwind funclet emitted by MSVC for the `msvc8::vector<CWinLogLine>`
+   * copy-construction range path `[begin, end)` into `out`. When the
+   * per-element copy constructor throws, this helper runs the remaining
+   * copy-constructions deterministically up to the throw point, then walks
+   * the already-constructed prefix and destroys each element in order before
+   * rethrowing the in-flight exception. Each record is `sizeof(CWinLogLine)`
+   * == `0x28` bytes.
+   *
+   * IDA signature:
+   * void __fastcall __noreturn sub_4FB680(int a1, int a2, int a3);
+   */
+  [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromEndpoints(
+    moho::CWinLogLine* const rangeBegin,
+    moho::CWinLogLine* const rangeEndRelative,
+    moho::CWinLogLine* const destinationCursor
+  )
+  {
+    moho::CWinLogLine* const prefixStart = destinationCursor;
+    moho::CWinLogLine* destination = destinationCursor;
+
+    // Phase 1: drain the remaining source range into the destination in-order.
+    for (moho::CWinLogLine* source = rangeEndRelative; source != rangeBegin; ++source) {
+      destination->isReplayEntry = source->isReplayEntry;
+      destination->sequenceIndex = source->sequenceIndex;
+      destination->categoryMask = source->categoryMask;
+      destination->text.myRes = 15u;
+      destination->text.mySize = 0u;
+      destination->text.bx.buf[0] = '\0';
+      destination->text.assign(source->text, 0u, 0xFFFFFFFFu);
+      ++destination;
+    }
+
+    // Phase 2: destroy the already-constructed prefix and rethrow.
+    for (moho::CWinLogLine* cleanup = prefixStart; cleanup != destination; ++cleanup) {
+      (void)ResetWinLogLineTextLane(cleanup);
+    }
+
+    // Funclet is only invoked while a C++ exception is propagating through
+    // the SEH unwind chain; rethrow the active exception to continue the
+    // unwind walk the compiler originally emitted.
+    if (auto current = std::current_exception(); current) {
+      std::rethrow_exception(current);
+    }
+    std::terminate();
+  }
+
+  /**
+   * Address: 0x004FAC40 (FUN_004FAC40)
+   *
+   * What it does:
+   * SEH unwind funclet emitted by MSVC for the `msvc8::vector<CWinLogLine>`
+   * fill-range path of length `count` starting at `destinationCursor`. When
+   * an element's copy constructor throws, this funclet runs the remaining
+   * `count` copy-constructions up to the throw point (so the destination has
+   * a contiguous valid prefix), destroys that prefix, and rethrows.
+   *
+   * IDA signature:
+   * void __fastcall __noreturn sub_4FAC40(int a1, int a2, int a3);
+   */
+  [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromCount(
+    moho::CWinLogLine* const /*templateLine*/,
+    std::size_t remainingCount,
+    moho::CWinLogLine* const destinationCursor
+  )
+  {
+    moho::CWinLogLine* const prefixStart = destinationCursor;
+    moho::CWinLogLine* destination = destinationCursor;
+
+    while (remainingCount > 0u) {
+      destination->isReplayEntry = 0u;
+      destination->sequenceIndex = 0u;
+      destination->categoryMask = 0u;
+      destination->text.myRes = 15u;
+      destination->text.mySize = 0u;
+      destination->text.bx.buf[0] = '\0';
+      --remainingCount;
+      ++destination;
+    }
+
+    for (moho::CWinLogLine* cleanup = prefixStart; cleanup != destination; ++cleanup) {
+      (void)ResetWinLogLineTextLane(cleanup);
+    }
+
+    // Funclet is only invoked while a C++ exception is propagating through
+    // the SEH unwind chain; rethrow the active exception to continue the
+    // unwind walk the compiler originally emitted.
+    if (auto current = std::current_exception(); current) {
+      std::rethrow_exception(current);
+    }
+    std::terminate();
+  }
+
+  /**
    * Address: 0x004FB300 (FUN_004FB300)
    *
    * What it does:
@@ -52073,6 +52955,22 @@ namespace
     return destination;
   }
 
+  /**
+   * Address: 0x004FB600 (FUN_004FB600)
+   *
+   * IDA signature:
+   * CWinLogLine *__cdecl sub_4FB600(const CWinLogLine *sourceBegin,
+   *                                 const CWinLogLine *sourceEnd,
+   *                                 CWinLogLine *destinationBegin);
+   *
+   * What it does:
+   * Copy-constructs one `[sourceBegin, sourceEnd)` range of `CWinLogLine`
+   * records into an uninitialized destination buffer; on any per-element
+   * copy-ctor throw, destroys the prefix already constructed (by resetting
+   * each line's embedded `msvc8::string` SSO state + freeing heap text) and
+   * rethrows. This is the MSVC8-emitted `std::uninitialized_copy` path for
+   * `msvc8::vector<CWinLogLine>` growth/resize.
+   */
   [[nodiscard]] moho::CWinLogLine* ConstructWinLogLineRangeForward(
     moho::CWinLogLine* destinationBegin,
     const moho::CWinLogLine* sourceBegin,
@@ -52445,6 +53343,27 @@ wxListItemAttrRuntime::wxListItemAttrRuntime()
 }
 
 /**
+ * Address: 0x00987E70 (FUN_00987E70)
+ *
+ * What it does:
+ * Copy-constructs one `wxListItemAttrRuntime` by invoking the `wxColour` copy
+ * constructor for the foreground lane at `+0x00`, the `wxColour` copy
+ * constructor for the background lane at `+0x10`, and the `wxFont` copy
+ * constructor for the font lane at `+0x20`. SEH unwind guards dispose of any
+ * already-constructed subobjects in reverse order on exception. Used by
+ * `wxListItemRuntime`'s copy-constructor to deep-clone the optional attribute
+ * storage.
+ *
+ * IDA signature:
+ * int __thiscall sub_987E70(int this, wxColour *a2);
+ */
+wxListItemAttrRuntime::wxListItemAttrRuntime(const wxListItemAttrRuntime& other)
+  : mTextColour(other.mTextColour)
+  , mBackgroundColour(other.mBackgroundColour)
+  , mFont(other.mFont)
+{}
+
+/**
  * Address: 0x0099C000 (FUN_0099C000)
  *
  * What it does:
@@ -52623,6 +53542,23 @@ wxListItemRuntime::~wxListItemRuntime()
   ReleaseWxStringSharedPayload(mText);
   RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(this));
 }
+
+// Layout view used by `wxListCtrlConvertToMSWListItemBaseRuntime` (FUN_0099BE70).
+// Declared here so the anonymous-namespace caller below can pass an `LVITEMW*`
+// view through it via reinterpret_cast. The real `struct` definition (with
+// field offsets and size assertion) lives near the helper's definition.
+struct WxListCtrlNativeItemStateRuntimeView;
+
+/**
+ * Forward declaration for FUN_0099BE70 — `wxConvertToMSWListItem` base.
+ * Definition near the helper's real anonymous namespace; declared here at
+ * file scope so every TU-local caller can invoke it by name.
+ */
+void wxListCtrlConvertToMSWListItemBaseRuntime(
+  wxListCtrlRuntime* listControl,
+  const wxListItemRuntime* item,
+  WxListCtrlNativeItemStateRuntimeView* nativeItem
+) noexcept;
 
 namespace
 {
@@ -52807,56 +53743,25 @@ namespace
     constexpr std::int32_t kWxListItemMaskData = 0x08;
 
     LVITEMW nativeItem{};
-    nativeItem.mask = 0;
-    nativeItem.iItem = item->mItemId;
-    nativeItem.iSubItem = item->mColumn;
-    nativeItem.iImage = item->mImage;
 
-    if ((item->mMask & kWxListItemMaskState) != 0) {
-      nativeItem.mask = LVIF_STATE;
-
-      if ((item->mStateMask & 0x08) != 0) {
-        nativeItem.stateMask |= 0x04;
-        if ((item->mState & 0x08) != 0) {
-          nativeItem.state |= 0x04;
-        }
-      }
-
-      if ((item->mStateMask & 0x01) != 0) {
-        nativeItem.stateMask |= 0x08;
-        if ((item->mState & 0x01) != 0) {
-          nativeItem.state |= 0x08;
-        }
-      }
-
-      if ((item->mStateMask & 0x02) != 0) {
-        nativeItem.stateMask |= 0x01;
-        if ((item->mState & 0x02) != 0) {
-          nativeItem.state |= 0x01;
-        }
-      }
-
-      if ((item->mStateMask & 0x04) != 0) {
-        nativeItem.stateMask |= 0x02;
-        if ((item->mState & 0x04) != 0) {
-          nativeItem.state |= 0x02;
-        }
-      }
-    }
-
-    if ((item->mMask & kWxListItemMaskText) != 0) {
-      nativeItem.mask |= LVIF_TEXT;
-      if ((listControl->GetWindowStyleFlag() & kWxListCtrlStyleVirtual) != 0) {
-        nativeItem.pszText = LPSTR_TEXTCALLBACKW;
-      } else {
-        nativeItem.pszText = const_cast<LPWSTR>(item->mText.c_str());
-      }
-    }
+    // Populate the common LVITEMW header (iItem/iSubItem/iImage + mask/state/
+    // stateMask + pszText/cchTextMax + LVIF_STATE / LVIF_TEXT bits) via the
+    // shared base helper recovered from FUN_0099BE70. Layout of `LVITEMW`
+    // matches `WxListCtrlNativeItemStateRuntimeView` 1:1 for the first 0x28
+    // bytes, so this reinterpret-cast is safe by ABI.
+    static_assert(sizeof(LVITEMW) >= 0x28, "LVITEMW must cover the native list-item header lane");
+    wxListCtrlConvertToMSWListItemBaseRuntime(
+      listControl,
+      item,
+      reinterpret_cast<WxListCtrlNativeItemStateRuntimeView*>(&nativeItem)
+    );
 
     if ((item->mMask & kWxListItemMaskImage) != 0) {
       nativeItem.mask |= LVIF_IMAGE;
     }
 
+    // Strip any LVIF_PARAM bit the base helper may have set; the `SetItem`
+    // path recomputes `lParam` later from the internal payload lane.
     nativeItem.mask &= ~LVIF_PARAM;
 
     struct WxListCtrlInternalFlagRuntimeView
@@ -53043,6 +53948,19 @@ namespace
     "WxListItemColumnFieldsRuntimeView::width offset must be 0x2C"
   );
 
+  /**
+   * Address: 0x0099BF00 (FUN_0099BF00)
+   * Mangled: sub_99BF00 (no public symbol)
+   *
+   * IDA signature:
+   * int __usercall sub_99BF00@<eax>(int a1@<edi>, _DWORD *a2@<esi>);
+   *
+   * What it does:
+   * Translates a `wxListItem` descriptor mask/fields into native `LVCOLUMNW`
+   * lanes (mask/fmt/cx/pszText/iImage) for use with `LVM_SETCOLUMNW` and
+   * `LVM_GETCOLUMNW`. When the image mask bit is set and ComCtl32 >= 4.70,
+   * LVCF_IMAGE is enabled together with `LVCFMT_IMAGE | LVCFMT_BITMAP_ON_RIGHT`.
+   */
   [[nodiscard]] LVCOLUMNW wxBuildNativeListColumnRuntime(const wxListItemRuntime& item) noexcept
   {
     LVCOLUMNW nativeColumn{};
@@ -56576,6 +57494,19 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   runtime->mHead = head;
   UpdateRenderViewportCoordinates();
 
+  // Re-center border mesh stances over the active terrain every frame.
+  struct WRenViewportMapImagerAccessView
+  {
+    std::uint8_t pad[0x32C];
+    moho::MapImager mMapImager;
+  };
+  static_assert(
+    offsetof(WRenViewportMapImagerAccessView, mMapImager) == 0x32C,
+    "WRenViewportMapImagerAccessView::mMapImager offset must be 0x32C"
+  );
+  auto* const mapImagerView = reinterpret_cast<WRenViewportMapImagerAccessView*>(this);
+  mapImagerView->mMapImager.UpdateMeshStances();
+
   const WRenViewportWorldViewParamRuntime* const begin = runtime->mWorldViews.mFirst;
   const WRenViewportWorldViewParamRuntime* const end = runtime->mWorldViews.mLast;
   if (begin == nullptr || end == nullptr || begin == end) {
@@ -56615,6 +57546,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     RenderMeshes(0x24, false);
     RenderEffects(false);
     RenderMeshes(0x28, false);
+    RenderRefractingEffects();
     FogOff();
 
     runtime->mCam = nullptr;
@@ -56770,6 +57702,57 @@ void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
 
   instance->Render(meshFlags, *cam, shadowRenderer, instance->meshes);
   (void)mirrored;
+}
+
+/**
+ * Address: 0x007F8600 (FUN_007F8600, ?RenderRefractingEffects@WRenViewport@Moho@@AAEXXZ)
+ * Mangled: ?RenderRefractingEffects@WRenViewport@Moho@@AAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::WRenViewport::RenderRefractingEffects(Moho::WRenViewport *this);
+ *
+ * What it does:
+ * When FX are enabled and graphics fidelity is medium or higher, copies the
+ * current writer-lock into the refraction background slot, rebinds the
+ * active head's render target + local viewport, switches to color-only
+ * writes, then dispatches `CWorldParticles::RenderRefractingEffects` with
+ * the retained refraction-background texture pointer and the current game
+ * tick/sim delta.
+ */
+void moho::WRenViewport::RenderRefractingEffects()
+{
+  if (!moho::ren_Fx || moho::graphics_Fidelity < 2) {
+    return;
+  }
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+
+  RenderCopyForRefraction(true);
+
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+  device->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
+  device->SetColorWriteState(true, false);
+
+  // The refraction-background slot is stored alongside the primary writer-lock
+  // array. In the binary the decompiler observes a direct {px, pn.pi_} copy
+  // from this slot into a boost::weak_ptr<gpg::gal::TextureD3D9> (the 4th
+  // parameter consumed by CWorldParticles::RenderRefractingEffects); this is
+  // safe because boost's shared_ptr and weak_ptr share identical two-pointer
+  // layout and the callee uses the shared-count lane. We reinterpret the
+  // slot to match that contract exactly.
+  using WeakRefractionBackground = boost::weak_ptr<gpg::gal::TextureD3D9>;
+  const auto& refractionSlot = reinterpret_cast<const WeakRefractionBackground&>(
+    passView->mPrimaryTargetLocks[runtime->mHead]
+  );
+
+  moho::sWorldParticles.RenderRefractingEffects(
+    runtime->mCam,
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds(),
+    refractionSlot
+  );
 }
 
 /**
@@ -62290,6 +63273,49 @@ namespace
 }
 
 /**
+ * Address: 0x00A105C0 (FUN_00A105C0)
+ *
+ * IDA signature:
+ * char __thiscall sub_A105C0(int this);
+ *
+ * What it does:
+ * Runs one `wxFTP::Close` lane: when the abort flag at `+0x78` is already
+ * latched, stamps status code `9` and returns `false` without touching the
+ * wire; otherwise, if the event/connected lane at `+0x14` is set, sends the
+ * `"QUIT"` command through the shared command/reply classifier and logs a
+ * debug line when the reply class is not positive completion (`'2'`). Then
+ * forwards to `wxSocketBaseShutdownRuntime` for the socket-base teardown and
+ * returns its result.
+ */
+[[maybe_unused]] bool wxFtpCloseConnectionRuntime(
+  WxFtpSocketIoRuntimeView* const runtime
+) noexcept
+{
+  if (runtime->abortCommandFlag != 0u) {
+    runtime->statusCode = 9;
+    return false;
+  }
+
+  if (runtime->eventFlag14 != 0u) {
+    wxStringRuntime quitCommand{};
+    quitCommand.m_pchData = nullptr;
+    wxString::InitWith(&quitCommand, L"QUIT", 0, -101);
+
+    const bool positiveCompletion =
+      wxFtpSendCommandAndClassifyReplyRuntime(runtime, &quitCommand) == '2';
+    (void)wxStringReleaseAndResetToEmpty(&quitCommand);
+
+    if (!positiveCompletion) {
+      wxLogDebug(L"Failed to close connection gracefully.");
+    }
+  }
+
+  return wxSocketBaseShutdownRuntime(
+    reinterpret_cast<WxSocketBaseRuntimeView*>(runtime)
+  );
+}
+
+/**
  * Address: 0x009EBAB0 (FUN_009EBAB0)
  *
  * What it does:
@@ -64227,6 +65253,63 @@ namespace
   return 1;
 }
 
+namespace wx_tree_ctrl_detail {
+
+/// Runtime view of a wxTreeCtrl peer holding the native HWND at +0x108.
+struct WxTreeCtrlTextRuntimeView
+{
+  std::uint8_t reserved00_107[0x108]{};
+  HWND treeWindowHandle = nullptr; // +0x108
+};
+static_assert(
+  offsetof(WxTreeCtrlTextRuntimeView, treeWindowHandle) == 0x108,
+  "WxTreeCtrlTextRuntimeView::treeWindowHandle offset must be 0x108"
+);
+
+} // namespace wx_tree_ctrl_detail
+
+/**
+ * Address: 0x009FF080 (FUN_009FF080)
+ * Mangled: sub_9FF080
+ *
+ * IDA signature:
+ * wxString *__thiscall sub_9FF080(HWND *this, wxString *result, int *itemHandlePtr);
+ *
+ * What it does:
+ * Reads a single tree-control item label via TVM_GETITEMW into a 512-wchar
+ * scratch buffer, initializes the output wxString with the loaded text (or
+ * an empty string when the sentinel handle 0xFFFF0000 is used or the native
+ * query fails), and returns the same output pointer.
+ */
+[[maybe_unused]] static wxStringRuntime* wxTreeCtrlLoadItemTextRuntime(
+  const void* const treeCtrlRuntime,
+  wxStringRuntime* const outText,
+  const std::int32_t* const itemHandlePtr
+)
+{
+  using wx_tree_ctrl_detail::WxTreeCtrlTextRuntimeView;
+
+  wchar_t itemTextBuffer[512]{};
+  const std::int32_t itemHandle = (itemHandlePtr != nullptr) ? *itemHandlePtr : 0;
+
+  const auto* const runtime = static_cast<const WxTreeCtrlTextRuntimeView*>(treeCtrlRuntime);
+  const bool isSentinelHandle = (itemHandle == static_cast<std::int32_t>(0xFFFF0000));
+
+  TVITEMW itemQuery{};
+  itemQuery.mask = TVIF_HANDLE | TVIF_TEXT;
+  itemQuery.hItem = reinterpret_cast<HTREEITEM>(static_cast<std::intptr_t>(itemHandle));
+  itemQuery.pszText = itemTextBuffer;
+  itemQuery.cchTextMax = static_cast<int>(std::size(itemTextBuffer));
+
+  if (isSentinelHandle ||
+      ::SendMessageW(runtime->treeWindowHandle, TVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&itemQuery)) == 0) {
+    itemTextBuffer[0] = L'\0';
+  }
+
+  AssignOwnedWxString(outText, std::wstring(itemTextBuffer));
+  return outText;
+}
+
 /**
  * Address: 0x00A003A0 (FUN_00A003A0)
  *
@@ -64240,46 +65323,13 @@ namespace
   const std::int32_t rightItemHandle
 )
 {
-  struct WxTreeCtrlTextRuntimeView
-  {
-    std::uint8_t reserved00_107[0x108]{};
-    HWND treeWindowHandle = nullptr; // +0x108
-  };
-  static_assert(
-    offsetof(WxTreeCtrlTextRuntimeView, treeWindowHandle) == 0x108,
-    "WxTreeCtrlTextRuntimeView::treeWindowHandle offset must be 0x108"
-  );
-
-  auto getTreeItemText = [](
-                           const void* const treeRuntime,
-                           const std::int32_t itemHandle,
-                           wxStringRuntime* const outText
-                         ) -> wxStringRuntime* {
-    if (outText == nullptr) {
-      return nullptr;
-    }
-
-    wchar_t itemTextBuffer[512]{};
-    const auto* const runtime = static_cast<const WxTreeCtrlTextRuntimeView*>(treeRuntime);
-    if (runtime != nullptr && runtime->treeWindowHandle != nullptr && itemHandle != -65536) {
-      TVITEMW itemQuery{};
-      itemQuery.mask = TVIF_HANDLE | TVIF_TEXT;
-      itemQuery.hItem = reinterpret_cast<HTREEITEM>(static_cast<std::intptr_t>(itemHandle));
-      itemQuery.pszText = itemTextBuffer;
-      itemQuery.cchTextMax = static_cast<int>(std::size(itemTextBuffer));
-      if (::SendMessageW(runtime->treeWindowHandle, TVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&itemQuery)) == 0) {
-        itemTextBuffer[0] = L'\0';
-      }
-    }
-
-    AssignOwnedWxString(outText, std::wstring(itemTextBuffer));
-    return outText;
-  };
-
   wxStringRuntime rightText = wxStringRuntime::Borrow(wxEmptyString);
   wxStringRuntime leftText = wxStringRuntime::Borrow(wxEmptyString);
-  (void)getTreeItemText(treeCtrlRuntime, rightItemHandle, &rightText);
-  (void)getTreeItemText(treeCtrlRuntime, leftItemHandle, &leftText);
+
+  std::int32_t rightHandle = rightItemHandle;
+  std::int32_t leftHandle = leftItemHandle;
+  (void)wxTreeCtrlLoadItemTextRuntime(treeCtrlRuntime, &rightText, &rightHandle);
+  (void)wxTreeCtrlLoadItemTextRuntime(treeCtrlRuntime, &leftText, &leftHandle);
 
   const std::int32_t compareResult = std::wcscmp(leftText.c_str(), rightText.c_str());
   ReleaseOwnedWxString(leftText);
@@ -64414,6 +65464,43 @@ namespace
 }
 
 /**
+ * Address: 0x009C8490 (FUN_009C8490)
+ * Mangled: sub_9C8490
+ *
+ * IDA signature:
+ * wxString *__cdecl sub_9C8490(wxString *a1, HWND hWnd);
+ *
+ * What it does:
+ * Loads the full native window-text of `hWnd` into the output wxString. On a
+ * null `hWnd` the output is left as the shared-empty string. When the handle
+ * is valid, the length is queried via `GetWindowTextLengthW`, a writable
+ * buffer of `length + 1` is obtained from the wxString, and `GetWindowTextW`
+ * fills it before the buffer is released.
+ */
+[[maybe_unused]] wxStringRuntime* wxLoadHwndTextIntoWxStringRuntime(
+  wxStringRuntime* const outText,
+  const HWND windowHandle
+)
+{
+  if (outText == nullptr) {
+    return nullptr;
+  }
+
+  if (windowHandle == nullptr) {
+    // Decompiler zeroes m_pchData then assigns it to wxEmptyString, which is
+    // exactly the shared-empty wxString borrow.
+    AssignOwnedWxString(outText, std::wstring());
+    return outText;
+  }
+
+  const int textLength = ::GetWindowTextLengthW(windowHandle);
+  std::vector<wchar_t> textBuffer(static_cast<std::size_t>(textLength) + 1u, L'\0');
+  (void)::GetWindowTextW(windowHandle, textBuffer.data(), static_cast<int>(textBuffer.size()));
+  AssignOwnedWxString(outText, std::wstring(textBuffer.data()));
+  return outText;
+}
+
+/**
  * Address: 0x00A04740 (FUN_00A04740)
  *
  * What it does:
@@ -64452,17 +65539,7 @@ namespace
     return outText;
   }
 
-  const HWND itemWindow = runtime->itemWindows[itemIndex];
-  if (itemWindow == nullptr) {
-    AssignOwnedWxString(outText, std::wstring());
-    return outText;
-  }
-
-  const int textLength = ::GetWindowTextLengthW(itemWindow);
-  std::vector<wchar_t> textBuffer(static_cast<std::size_t>(textLength) + 1u, L'\0');
-  (void)::GetWindowTextW(itemWindow, textBuffer.data(), static_cast<int>(textBuffer.size()));
-  AssignOwnedWxString(outText, std::wstring(textBuffer.data()));
-  return outText;
+  return wxLoadHwndTextIntoWxStringRuntime(outText, runtime->itemWindows[itemIndex]);
 }
 
 /**
@@ -66532,6 +67609,47 @@ namespace
 }
 
 /**
+ * Address: 0x00884FD0 (FUN_00884FD0)
+ * Mangled: sub_884FD0
+ *
+ * IDA signature:
+ * void __cdecl sub_884FD0(std::string *str1, std::string *a2, std::string *a3);
+ *
+ * What it does:
+ * Copy-constructs a range of `std::string` (msvc8 ABI) from [first, last)
+ * into uninitialized storage starting at `destinationFirst`, with exception
+ * safety: if any element copy throws, already-constructed elements are
+ * destroyed in construction order (via `~string()`) and the exception is
+ * rethrown. Equivalent to MSVC8's `std::_Uninitialized_copy<std::string>`
+ * specialization.
+ *
+ * The ASM's `jmp short loc_885000` back-edge gives a copy loop stepping by
+ * 0x1C (sizeof(msvc8::string)); `sub_8846B0` (already recovered as a
+ * legacy-string reset helper) is the per-element destructor walked by the
+ * unwind path.
+ */
+[[maybe_unused]] msvc8::string* wxUninitializedCopyMsvc8StringRange(
+  const msvc8::string* const sourceFirst,
+  const msvc8::string* const sourceLast,
+  msvc8::string* const destinationFirst
+)
+{
+  msvc8::string* dest = destinationFirst;
+  try {
+    for (const msvc8::string* src = sourceFirst; src != sourceLast; ++src) {
+      new (dest) msvc8::string(*src);
+      ++dest;
+    }
+  } catch (...) {
+    for (msvc8::string* undo = destinationFirst; undo != dest; ++undo) {
+      undo->~string();
+    }
+    throw;
+  }
+  return dest;
+}
+
+/**
  * Address: 0x00883B30 (FUN_00883B30)
  *
  * What it does:
@@ -66573,15 +67691,9 @@ namespace
   destination->end = storage + count;
 
   try {
-    for (std::size_t index = 0; index < count; ++index) {
-      new (storage + index) msvc8::string(source->first[index]);
-      destination->last = storage + index + 1;
-    }
+    destination->last = wxUninitializedCopyMsvc8StringRange(
+      source->first, source->last, storage);
   } catch (...) {
-    while (destination->last != destination->first) {
-      --destination->last;
-      destination->last->~string();
-    }
     ::operator delete(storage);
     destination->first = nullptr;
     destination->end = nullptr;
@@ -70462,6 +71574,37 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
 }
 
 /**
+ * Address: 0x009D2CD0 (FUN_009D2CD0)
+ *
+ * What it does:
+ * Assigns one `wxBrush` from another by sharing ref-data ownership when the
+ * two brush holders do not already resolve to equivalent ref-data (style,
+ * colour, bitmap). When a cheap-equality comparison succeeds the incoming
+ * ref-data is kept in place; otherwise the canonical `wxObject::Ref` path
+ * releases the existing ref-data and retains the source's.
+ *
+ * IDA signature:
+ * wxObject* __thiscall sub_9D2CD0(wxObject* this, wxObject* clone);
+ */
+[[maybe_unused]] void* wxBrushAssignBySharedRefDataOrRefRuntime(
+  void* const brushHolderRuntime,
+  const void* const sourceBrushHolderRuntime
+) noexcept
+{
+  if (brushHolderRuntime == nullptr || sourceBrushHolderRuntime == nullptr) {
+    return brushHolderRuntime;
+  }
+
+  if (!wxBrushRefDataHolderEqualsOrBothNullRuntime(brushHolderRuntime, sourceBrushHolderRuntime)) {
+    wxObjectRefRuntime(
+      static_cast<WxObjectRuntimeView*>(brushHolderRuntime),
+      static_cast<const WxObjectRuntimeView*>(sourceBrushHolderRuntime)
+    );
+  }
+  return brushHolderRuntime;
+}
+
+/**
  * Address: 0x009D4110 (FUN_009D4110)
  *
  * What it does:
@@ -71915,6 +73058,9 @@ namespace
   std::uint8_t gWxScrollBarRuntimeVTableTag = 0;
   std::uint8_t gWxStaticBitmapRuntimeVTableTag = 0;
   std::uint8_t gWxSpinButtonRuntimeVTableTag = 0;
+  std::uint8_t gWxSlider95RuntimeVTableTag = 0;
+  std::uint8_t gWxListBoxRuntimeVTableTag = 0;
+  std::uint8_t gWxListBoxItemContainerRuntimeVTableTag = 0;
   std::uint8_t gWxMdiClientWindowRuntimeVTableTag = 0;
   std::uint8_t gWxStaticLineRuntimeVTableTag = 0;
   std::uint8_t gWxResourceCacheListRuntimeVTableTag = 0;
@@ -75945,6 +77091,19 @@ namespace
     return converterRuntime;
   }
 
+  /**
+   * Address: 0x0097F670 (FUN_0097F670)
+   *
+   * IDA signature:
+   * void __thiscall sub_97F670(wxObject *this);
+   *
+   * What it does:
+   * Non-deleting destructor lane for `wxEncodingConverter`: re-binds the
+   * converter vtable tag onto the object so destructor dispatch is stable,
+   * releases the trailing conversion-table storage (if any), restores the
+   * base `wxObject` vtable, and forwards the object through
+   * `wxEvent::UnRef` (FUN_00977F40) for ref-data release.
+   */
   [[nodiscard]] void* wxDestroyEncodingConverterNoDeleteRuntime(
     void* const converterRuntime
   ) noexcept
@@ -78484,6 +79643,18 @@ namespace
     (void)DestroyWxOutputStreamBaseRuntime(reinterpret_cast<wxStreamBase*>(outputStreamRuntime));
   }
 
+  /**
+   * Address: 0x009DC370 (FUN_009DC370, wxFileOutputStream::~wxFileOutputStream)
+   *
+   * What it does:
+   * Non-deleting destructor for `wxFileOutputStream`:
+   * 1. Rebinds the vtable to the `wxFileOutputStream` slot.
+   * 2. When `m_ownsFile` (+0x10) is set, calls `Sync()` (`sub_9DBE90`),
+   *    then if `m_file` (+0x0C) is non-null, invokes `wxFile::Attach()`
+   *    to release the native handle and deallocates the `wxFile` wrapper
+   *    via `operator delete` (matches binary).
+   * 3. Chains into `wxOutputStream::~wxOutputStream` (`sub_9DD2C0`).
+   */
   void wxDestroyFileOutputStreamNoDeleteRuntime(
     void* const fileOutputStreamRuntime
   ) noexcept
@@ -78496,16 +79667,29 @@ namespace
     }
 
     *reinterpret_cast<void**>(stream) = &sWxFileOutputStreamRuntimeVTableTag;
-    if (stream->m_ownsFile != 0u && stream->m_file != nullptr) {
+    if (stream->m_ownsFile != 0u) {
       stream->Sync();
-      (void)stream->m_file->Attach();
-      ::operator delete(stream->m_file);
-      stream->m_file = nullptr;
+      if (stream->m_file != nullptr) {
+        (void)stream->m_file->Attach();
+        ::operator delete(stream->m_file);
+      }
     }
 
     wxDestroyOutputStreamNoDeleteRuntime(stream);
   }
 
+  /**
+   * Address: 0x009DC4D0 (FUN_009DC4D0, wxFFileInputStream::~wxFFileInputStream)
+   *
+   * What it does:
+   * Non-deleting destructor for `wxFFileInputStream`:
+   * 1. Rebinds the vtable to the `wxFFileInputStream` slot.
+   * 2. When this stream owns its backing `wxFFile` (`ownsFile` at +0x1C)
+   *    AND the backing file is non-null, closes and deletes the `wxFFile`
+   *    (matches binary: `sub_999A00` == `wxFFile::~wxFFile`, then
+   *    `operator delete` on the allocation).
+   * 3. Chains into `wxInputStream::~wxInputStream`.
+   */
   void wxDestroyFFileInputStreamNoDeleteRuntime(
     void* const ffileInputStreamRuntime
   ) noexcept
@@ -78528,6 +79712,18 @@ namespace
     inputStream->~wxInputStream();
   }
 
+  /**
+   * Address: 0x009DC550 (FUN_009DC550, wxFFileOutputStream::~wxFFileOutputStream)
+   *
+   * What it does:
+   * Non-deleting destructor for `wxFFileOutputStream`:
+   * 1. Rebinds the vtable to the `wxFFileOutputStream` slot.
+   * 2. When `m_ownsFile` (+0x10) is set, calls `Sync()` (sub_9DC2C0), then
+   *    if `m_file` (+0x0C) is non-null destroys and deallocates the
+   *    backing `wxFFile` (sub_999A00 is `wxFFile::~wxFFile`, then
+   *    `operator delete`).
+   * 3. Chains into `wxOutputStream::~wxOutputStream` (sub_9DD2C0).
+   */
   void wxDestroyFFileOutputStreamNoDeleteRuntime(
     void* const ffileOutputStreamRuntime
   ) noexcept
@@ -78540,11 +79736,12 @@ namespace
     }
 
     *reinterpret_cast<void**>(stream) = &sWxFFileOutputStreamRuntimeVTableTag;
-    if (stream->m_ownsFile != 0u && stream->m_file != nullptr) {
+    if (stream->m_ownsFile != 0u) {
       stream->Sync();
-      stream->m_file->~wxFFile();
-      ::operator delete(stream->m_file);
-      stream->m_file = nullptr;
+      if (stream->m_file != nullptr) {
+        stream->m_file->~wxFFile();
+        ::operator delete(stream->m_file);
+      }
     }
 
     wxDestroyOutputStreamNoDeleteRuntime(stream);
@@ -78648,6 +79845,23 @@ namespace
     wxDestroyFilterInputStreamNoDeleteRuntime(stream);
   }
 
+  /**
+   * Address: 0x009DDBA0 (FUN_009DDBA0, wxBufferedOutputStream::~wxBufferedOutputStream)
+   *
+   * What it does:
+   * Non-deleting destructor for `wxBufferedOutputStream`:
+   *
+   * 1. Rebinds the vtable lane to the `wxBufferedOutputStream` slot so
+   *    later virtual dispatch reaches this level of the destructor chain.
+   * 2. Calls `Sync()`: flushes the output buffer at `+0x10` into the parent
+   *    output stream at `+0x0C` and invokes the parent's virtual `+0x20`
+   *    (`SyncOutput`) — this is the behavior of `sub_9DD6F0`.
+   * 3. If an output buffer lane is attached, invokes its deleting destructor
+   *    (`vtable[0](1)`).
+   * 4. Chains into `wxFilterOutputStream::~wxFilterOutputStream`
+   *    (`sub_9DD4D0`) which rebinds its own vtable and then the base
+   *    stream destructor.
+   */
   void wxDestroyBufferedOutputStreamNoDeleteRuntime(
     void* const bufferedOutputStreamRuntime
   ) noexcept
@@ -78660,6 +79874,9 @@ namespace
     }
 
     stream->vtable = &sWxBufferedOutputStreamRuntimeVTableTag;
+
+    // Equivalent of `sub_9DD6F0()` — Sync(): flush buffer then invoke
+    // parent-stream virtual `+0x20`.
     if (stream->outputBuffer != nullptr) {
       (void)WxStreamBufferFlushOutput(stream->outputBuffer);
     }
@@ -81742,6 +82959,74 @@ struct WxListCtrlNativeItemStateRuntimeView
 static_assert(offsetof(WxListCtrlNativeItemStateRuntimeView, state) == 0x0C, "WxListCtrlNativeItemStateRuntimeView::state offset must be 0x0C");
 static_assert(offsetof(WxListCtrlNativeItemStateRuntimeView, stateMask) == 0x10, "WxListCtrlNativeItemStateRuntimeView::stateMask offset must be 0x10");
 static_assert(sizeof(WxListCtrlNativeItemStateRuntimeView) == 0x28, "WxListCtrlNativeItemStateRuntimeView size must be 0x28");
+
+/**
+ * Address: 0x0099BE70 (FUN_0099BE70, wxConvertToMSWListItem base)
+ *
+ * What it does:
+ * Initializes the common `LVITEMW` header used by both `SetItem` and
+ * `InsertItem` paths on `wxListCtrl`:
+ *
+ * 1. Copy scalar lanes: `iItem = mItemId`, `iSubItem = mColumn`,
+ *    `iImage = mImage`.
+ * 2. Zero mask/state/stateMask.
+ * 3. If wx state mask is set (`mMask & 1`), add `LVIF_STATE` to mask and
+ *    translate wx state bit pairs into native state/stateMask via
+ *    `wxListCtrlApplyNativeStateBitsRuntime` (FUN_0099BE10).
+ * 4. If wx text mask is set (`mMask & 2`), add `LVIF_TEXT`. When the list
+ *    is virtual (style bit `0x200` via `GetWindowStyleFlag`), set
+ *    `pszText = LPSTR_TEXTCALLBACKW`; otherwise store the item's text
+ *    pointer and cache the backing shared-string refcount lane as
+ *    `cchTextMax`.
+ * 5. If wx data/param mask is set (`mMask & 4`), add `LVIF_PARAM`.
+ */
+void wxListCtrlConvertToMSWListItemBaseRuntime(
+  wxListCtrlRuntime* const listControl,
+  const wxListItemRuntime* const item,
+  WxListCtrlNativeItemStateRuntimeView* const nativeItem
+) noexcept
+{
+  constexpr std::int32_t kWxListItemMaskState = 0x01;
+  constexpr std::int32_t kWxListItemMaskText  = 0x02;
+  constexpr std::int32_t kWxListItemMaskData  = 0x04;
+  constexpr long kWxListCtrlStyleVirtual = 0x200;
+
+  nativeItem->iItem = item->mItemId;
+  nativeItem->imageIndex = item->mImage;
+  nativeItem->stateMask = 0u;
+  nativeItem->state = 0u;
+  nativeItem->mask = 0u;
+  nativeItem->subItemIndex = item->mColumn;
+
+  if ((item->mMask & kWxListItemMaskState) != 0) {
+    nativeItem->mask = LVIF_STATE;
+    (void)wxListCtrlApplyNativeStateBitsRuntime(
+      nativeItem,
+      static_cast<std::uint8_t>(item->mState),
+      static_cast<std::uint8_t>(item->mStateMask)
+    );
+  }
+
+  if ((item->mMask & kWxListItemMaskText) != 0) {
+    nativeItem->mask |= LVIF_TEXT;
+    if ((listControl->GetWindowStyleFlag() & kWxListCtrlStyleVirtual) != 0) {
+      nativeItem->textBuffer = LPSTR_TEXTCALLBACKW;
+    } else {
+      wchar_t* const itemText = item->mText.m_pchData;
+      nativeItem->textBuffer = itemText;
+      if (itemText != nullptr) {
+        const auto* const sharedHeader = reinterpret_cast<const std::int32_t*>(itemText) - 2;
+        nativeItem->textBufferLength = sharedHeader[0];
+      } else {
+        nativeItem->textBufferLength = 0;
+      }
+    }
+  }
+
+  if ((item->mMask & kWxListItemMaskData) != 0) {
+    nativeItem->mask |= LVIF_PARAM;
+  }
+}
 
 /**
  * Address: 0x0099BE10 (FUN_0099BE10)
@@ -93719,6 +95004,85 @@ namespace
 
     auto* const vtable = *reinterpret_cast<WxListCtrlRectDispatchVTableRuntimeView**>(listControlRuntime);
     return vtable->dispatchSpanRect(listControlRuntime, 1, &itemRect);
+  }
+
+  /**
+   * Address: 0x0099CDF0 (FUN_0099CDF0, wxListCtrl::SetItemState)
+   *
+   * IDA signature:
+   * char __thiscall sub_99CDF0(int this, WPARAM itemId, char state, char stateMask);
+   *
+   * What it does:
+   * Applies the requested `{state, stateMask}` bit pair to one list-view row
+   * via `LVM_SETITEMSTATE`:
+   *   1) Builds a zeroed `LVITEMW` scratch (40 bytes) and maps the wx
+   *      state/mask bit-pair into its `state`/`stateMask` lanes through
+   *      `wxListCtrlApplyNativeStateBitsRuntime`.
+   *   2) If the list-control style reported by vtable slot `+0x88` has the
+   *      `wxLC_SINGLE_SEL` bit (`0x200`) AND both `state` and `stateMask`
+   *      carry the selection bit (`0x02`), remembers the currently-selected
+   *      item via `GetNextItem(-1, LVNI_ALL | LVNI_SELECTED)` so we can
+   *      update its rect dispatch after the selection move.
+   *   3) Calls `SendMessageW(hwnd, LVM_SETITEMSTATE, itemId, &item)`.
+   *   4) If the previously-selected row is valid and no longer selected
+   *      (`GetItemState(prev, LVIS_FOCUSED) & LVIS_FOCUSED == 0`), refreshes
+   *      that row's rect dispatch through
+   *      `wxListCtrlDispatchSingleItemRectangleRuntime`.
+   */
+  [[maybe_unused]] bool wxListCtrlSetItemStateRuntime(
+    void* const listControlRuntime,
+    const WPARAM itemId,
+    const std::uint8_t stateBits,
+    const std::uint8_t stateMaskBits
+  )
+  {
+    if (listControlRuntime == nullptr) {
+      return false;
+    }
+
+    // LPARAM lParam[10] = zeroed LVITEMW scratch (40 bytes on x86).
+    LVITEMW nativeItem{};
+    auto* const nativeItemView = reinterpret_cast<WxListCtrlNativeItemStateRuntimeView*>(&nativeItem);
+    (void)wxListCtrlApplyNativeStateBitsRuntime(nativeItemView, stateBits, stateMaskBits);
+
+    // Vtable slot `+0x88` returns the list-ctrl window-style flags.
+    using ListCtrlGetStyleFn = int(__thiscall*)(void* self);
+    auto* const vtable = *reinterpret_cast<void***>(listControlRuntime);
+    const auto getStyle = reinterpret_cast<ListCtrlGetStyleFn>(vtable[0x88 / sizeof(void*)]);
+
+    constexpr int kWxLcSingleSel = 0x200;          // wxLC_SINGLE_SEL
+    constexpr std::uint8_t kStateMaskSelected = 0x02; // wx selected-state bit
+
+    // Native HWND sits at +0x108 (`mNativeHandle`) inherited from wxWindowMswRuntime.
+    const HWND listHandle =
+      *reinterpret_cast<HWND*>(reinterpret_cast<std::uint8_t*>(listControlRuntime) + 0x108);
+
+    LRESULT previousSelected = -1;
+    if ((getStyle(listControlRuntime) & kWxLcSingleSel) != 0 &&
+        (stateMaskBits & kStateMaskSelected) != 0 &&
+        (stateBits & kStateMaskSelected) != 0) {
+      // Remember the currently-selected row before we move selection.
+      previousSelected = SendMessageW(listHandle, LVM_GETNEXTITEM, static_cast<WPARAM>(-1), MAKELPARAM(LVNI_SELECTED, 0));
+    }
+
+    if (SendMessageW(listHandle, LVM_SETITEMSTATE, itemId, reinterpret_cast<LPARAM>(&nativeItem)) == 0) {
+      return false;
+    }
+
+    if (previousSelected != static_cast<LRESULT>(-1)) {
+      // Query previous-selected row's LVIS_FOCUSED state via LVM_GETITEMSTATE.
+      constexpr int kLvisFocused = 0x01; // LVIS_FOCUSED
+      const LRESULT previousState = SendMessageW(
+        listHandle, LVM_GETITEMSTATE, static_cast<WPARAM>(previousSelected), kLvisFocused
+      );
+      if ((static_cast<int>(previousState) & kLvisFocused) == 0) {
+        (void)wxListCtrlDispatchSingleItemRectangleRuntime(
+          listControlRuntime, static_cast<WPARAM>(previousSelected)
+        );
+      }
+    }
+
+    return true;
   }
 
   /**

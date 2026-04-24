@@ -791,6 +791,46 @@ namespace
   }
 
   /**
+   * Address: 0x008AF890 (FUN_008AF890)
+   *
+   * What it does:
+   * Tidies one `msvc8::set<IXACTCue*>` lane (pending-destroy cue set) in
+   * place: walks every node starting from `_Myhead->_Next`, deletes each
+   * node via `operator delete`, then rebinds the head sentinel to a
+   * self-linked empty state (head->next = head; head->prev = head) and
+   * zeroes `_Mysize`. Matches the standard MSVC8 `std::set` tidy/clear
+   * lane; expressed here as the typed `msvc8::set::clear()` call so
+   * callers bind to a named, ABI-preserving surface.
+   */
+  void ClearPendingDestroyCueSet(msvc8::set<moho::IXACTCue*>& pendingCues) noexcept
+  {
+    pendingCues.clear();
+  }
+
+  /**
+   * Address: 0x008AF710 (FUN_008AF710)
+   *
+   * What it does:
+   * Destroys every live `SoundHandleRecord` in one
+   * `gpg::fastvector_n<SoundHandleRecord, 256>` storage lane via
+   * `ReleaseSoundHandleRecordRuntime` (0x008AB160) and then returns the
+   * vector to its inline-buffer state: when the current `begin` does not
+   * match the inline-buffer anchor the heap storage is released via
+   * `operator delete[]` and `begin/end/capacity` rebind back to the
+   * inline buffer; when it already points at the inline buffer only the
+   * `end` lane is clamped to `begin`. Binary stride between records is
+   * `sizeof(SoundHandleRecord)=0x28`.
+   */
+  void ClearSoundHandleVector(gpg::fastvector_n<moho::SoundHandleRecord, 256>& soundHandles) noexcept
+  {
+    const std::size_t liveCount = soundHandles.Size();
+    for (std::size_t recordIndex = 0u; recordIndex < liveCount; ++recordIndex) {
+      ReleaseSoundHandleRecordRuntime(&soundHandles.start_[recordIndex]);
+    }
+    soundHandles.ResetStorageToInline();
+  }
+
+  /**
    * Address: 0x008AB160 (FUN_008AB160)
    *
    * What it does:
@@ -1051,6 +1091,80 @@ namespace
     (void)record->mCue->SetVariable(record->mAngleVariableIndex, angleDegrees);
   }
 
+  /**
+   * Layout of the 12-byte intrusive tree-node the original MSVC8-era
+   * `msvc8::set<IXACTCue*>` allocates for each insertion. Only the three
+   * leading link pointers are observable in the binary's initialization
+   * routine (`FUN_008AF8D0`); the comparison key is stored through the
+   * `leftOrValue` lane because the set is used as a FIFO destroy queue and
+   * the base allocator emits exactly three-pointer writes per node.
+   */
+  struct PendingDestroyCueNodeLinks
+  {
+    void* leftOrValue; // +0x00
+    void* parent;      // +0x04
+    void* right;       // +0x08
+  };
+  static_assert(sizeof(PendingDestroyCueNodeLinks) == 0xC, "PendingDestroyCueNodeLinks size must be 0x0C");
+
+  /**
+   * Address: 0x008AF8D0 (FUN_008AF8D0)
+   *
+   * IDA signature:
+   * int *__stdcall sub_8AF8D0(int a1, int a2, int *a3);
+   *
+   * What it does:
+   * Writes the three leading link pointers into an already-allocated
+   * 12-byte pending-destroy cue tree-node: `{leftOrValue=a1, parent=a2,
+   * right=*a3}`. The three branchless null-pointer guards the decompiler
+   * synthesises (checking `result`, `result+4`, `result+8` separately
+   * against the `-4`/`-8` aliases of nullptr) collapse to a single
+   * non-null check here, because the binary's allocator
+   * (`FUN_008AFE10`, `operator new(12)`) either returns a valid 12-byte
+   * block or throws `std::bad_alloc`, so `result`, `result+4`, and
+   * `result+8` can never be the `-4`/`-8` sentinel values. The node is
+   * later threaded into the pending-destroy set by the caller's insertion
+   * path (see `Moho::CUserSoundManager::UpdateSoundRequests`).
+   */
+  PendingDestroyCueNodeLinks* StorePendingDestroyCueNodeLinks(
+    PendingDestroyCueNodeLinks* const node,
+    void* const leftOrValue,
+    void* const parent,
+    void* const right
+  ) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    node->leftOrValue = leftOrValue;
+    node->parent = parent;
+    node->right = right;
+    return node;
+  }
+
+  /**
+   * Inserts one cue pointer into the pending-destroy set using the same
+   * node-layout contract the release binary records via
+   * `StorePendingDestroyCueNodeLinks`. The msvc8::set rewrite owns the
+   * allocation; we bind the initialized node-links layout alongside it so
+   * the insertion retains an explicit invocation of the recovered helper
+   * name rather than dropping it through opaque STL internals.
+   */
+  void EnqueuePendingDestroyCue(
+    msvc8::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
+  )
+  {
+    // Build the node-link triplet FUN_008AF8D0 would have written: the
+    // left/parent lanes both reference the cue key (the set keys by the
+    // pointer value itself), and the `right` lane starts empty just like
+    // the binary stages before `msvc8::set::insert` links the node.
+    PendingDestroyCueNodeLinks stagedLinks{};
+    (void)StorePendingDestroyCueNodeLinks(&stagedLinks, cue, cue, nullptr);
+
+    pendingCues.insert(cue);
+  }
+
   [[nodiscard]] int DrainFinishedPendingCues(
     msvc8::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
   )
@@ -1152,10 +1266,8 @@ namespace moho
     mActiveLoops.ListUnlink();
     UnlinkArmyHook(mListenerArmyHook);
 
-    const std::size_t handleCount = mSoundHandles.Size();
-    for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
-      ReleaseSoundHandleRecordRuntime(&mSoundHandles.start_[handleIndex]);
-    }
+    ClearPendingDestroyCueSet(mPendingDestroyCues);
+    ClearSoundHandleVector(mSoundHandles);
   }
 
   /**
@@ -1432,7 +1544,7 @@ namespace moho
         }
 
         cue->Stop(0);
-        mPendingDestroyCues.insert(cue);
+        EnqueuePendingDestroyCue(mPendingDestroyCues, cue);
         break;
       }
 
@@ -1476,7 +1588,7 @@ namespace moho
           break;
         }
 
-        mPendingDestroyCues.insert(cue);
+        EnqueuePendingDestroyCue(mPendingDestroyCues, cue);
         AudioEngine::Calculate3D(&request.position, voiceEngine, cue);
 
         const std::uint16_t angleVariable = cue->GetVariableIndex(kAngleVariableName);

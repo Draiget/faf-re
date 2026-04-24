@@ -1976,6 +1976,162 @@ namespace
   }
 
   /**
+   * Address: 0x0071C1F0 (FUN_0071C1F0, Moho::InfluenceGrid::CopyConstructEntries)
+   *
+   * IDA signature:
+   * Moho::InfluenceGrid *__stdcall sub_71C1F0(Moho::InfluenceGrid *a1, Moho::InfluenceGrid *a2);
+   *
+   * What it does:
+   * Initializes `destination.entries` as an empty legacy ordered set and then
+   * copies every `InfluenceMapEntry` node from `source.entries` into it.
+   * Used by `InfluenceGrid::Cpy` to rebuild the entries tree on a newly-
+   * allocated destination before the threat vector and aggregate lanes are
+   * populated.
+   */
+  InfluenceGrid* CopyConstructInfluenceGridEntries(
+    InfluenceGrid* const destination,
+    const InfluenceGrid* const source
+  )
+  {
+    // Build a clean sentinel-only set header in destination.entries, then
+    // copy each node over. Placement-new on an ordered set produces the same
+    // sentinel layout the binary constructs inline at +0x00/+0x04/+0x08/+0x0C.
+    ::new (&destination->entries) decltype(destination->entries)();
+    CopyInfluenceEntryTreeStorage(destination->entries, source->entries);
+    return destination;
+  }
+
+  /**
+   * Address: 0x0071C350 (FUN_0071C350, vector_SThreat::Cpy)
+   *
+   * IDA signature:
+   * std::vector_SThreat *__thiscall vector_SThreat::Cpy(std::vector_SThreat *this, std::vector_SThreat *a2);
+   *
+   * What it does:
+   * Initializes `destination` as an empty `msvc8::vector<SThreat>` lane and,
+   * when `source` holds a non-empty range, allocates a matching contiguous
+   * SThreat array, points `{begin,end,cap}` at it, then copies the source
+   * range in via `CopySThreatRangeNullable`. Throws on `size()` overflow
+   * beyond the legacy `max_size()` bound.
+   *
+   * The binary treats `this` as source and `a2` as destination (copy-construct
+   * convention); mirrored here with modern names.
+   */
+  [[maybe_unused]] SThreatVector* CopyConstructSThreatVector(
+    SThreatVector* const destination,
+    const SThreatVector* const source
+  )
+  {
+    // Initialize destination as an empty vector (proxy/range lanes zeroed).
+    ::new (destination) SThreatVector();
+
+    const SThreat* const srcBegin = source->begin();
+    const SThreat* const srcEnd = source->end();
+    const std::size_t elementCount = (srcBegin != nullptr) ? static_cast<std::size_t>(srcEnd - srcBegin) : 0u;
+    if (elementCount == 0u) {
+      return destination;
+    }
+
+    // msvc8 legacy vector overflow guard: `(0x7FFFFFFF / sizeof(SThreat)) == 0x4924924`.
+    constexpr std::size_t kSThreatMaxCount = 0x4924924u;
+    if (elementCount > kSThreatMaxCount) {
+      throw std::length_error("vector<SThreat> too long");
+    }
+
+    destination->reserve(elementCount);
+    for (const SThreat* it = srcBegin; it != srcEnd; ++it) {
+      destination->push_back(*it);
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x0071DDC0 (FUN_0071DDC0, msvc8::vector<SThreat>::operator=)
+   *
+   * IDA signature:
+   * int __userpurge sub_71DDC0@<eax>(int result@<eax>, int a2);
+   *
+   * What it does:
+   * Copy-assigns one `msvc8::vector<SThreat>` lane: self-assign short-circuit;
+   * when `source` is empty, delegates to `sub_71C430` (empty-source rebind);
+   * otherwise branches on size/capacity relationship:
+   *   * `srcSize > dstCapacity` — free old storage, allocate fresh, copy;
+   *   * `srcSize > dstSize` (but fits capacity) — copy-assign existing slots,
+   *     then uninitialized-copy tail past current end;
+   *   * `srcSize <= dstSize` — copy-assign up to srcSize then truncate end.
+   *
+   * `56` = `sizeof(SThreat)` (0x38). `0x4924924` is the msvc8 legacy vector
+   * max-size bound for this element size.
+   */
+  [[maybe_unused]] SThreatVector& AssignSThreatVector(
+    SThreatVector& destination,
+    const SThreatVector& source
+  )
+  {
+    if (&destination == &source) {
+      return destination;
+    }
+
+    const std::size_t srcSize = source.size();
+    if (srcSize == 0u) {
+      // Empty source: delegate to the vector range-assign helper which
+      // handles the proxy/range reset path.
+      destination.assign(source.begin(), 0u);
+      return destination;
+    }
+
+    const std::size_t dstSize = destination.size();
+    const std::size_t dstCapacity =
+      destination.begin() ? static_cast<std::size_t>(destination.capacity()) : 0u;
+
+    if (srcSize <= dstSize) {
+      // Shrinking assign: copy first srcSize slots, truncate to srcSize.
+      destination.assign(source.begin(), srcSize);
+      return destination;
+    }
+
+    if (srcSize > dstCapacity) {
+      // Reallocation required: free old storage and build fresh allocation.
+      destination.assign(source.begin(), srcSize);
+      return destination;
+    }
+
+    // Fits capacity: copy-assign the first dstSize slots, then
+    // uninitialized-copy the tail `[dstSize .. srcSize)` past `end`.
+    destination.assign(source.begin(), srcSize);
+    return destination;
+  }
+
+  /**
+   * Address: 0x0071C150 (FUN_0071C150, Moho::InfluenceGrid::Cpy)
+   *
+   * IDA signature:
+   * Moho::InfluenceGrid *__stdcall Moho::InfluenceGrid::Cpy(
+   *     Moho::InfluenceGrid *a1, Moho::InfluenceGrid *a2);
+   *
+   * What it does:
+   * In-place copy-constructs `destination` (`a1`) from `source` (`a2`):
+   *   1) rebuild `destination.entries` via `CopyConstructInfluenceGridEntries`
+   *   2) copy `source.threats` into `destination.threats` via
+   *      `CopyConstructSThreatVector`
+   *   3) byte-copy aggregate `threat` and `decay` SThreat lanes from source.
+   *
+   * Used by `msvc8::vector<InfluenceGrid>` growth paths when the
+   * per-cell grid needs to be duplicated, and by serializer scratch copies.
+   */
+  [[maybe_unused]] InfluenceGrid* CopyConstructInfluenceGrid(
+    InfluenceGrid* const destination,
+    InfluenceGrid* const source
+  )
+  {
+    (void)CopyConstructInfluenceGridEntries(destination, source);
+    (void)CopyConstructSThreatVector(&destination->threats, &source->threats);
+    destination->threat = source->threat;
+    destination->decay = source->decay;
+    return destination;
+  }
+
+  /**
    * Address: 0x007181A0 (FUN_007181A0, sub_7181A0)
    *
    * What it does:

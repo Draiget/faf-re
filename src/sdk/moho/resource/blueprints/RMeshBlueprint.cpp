@@ -398,6 +398,41 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051B080 (FUN_0051B080)
+   * Mangled: ??4RMeshBlueprintLOD@Moho@@QAEAAV01@ABV01@@Z
+   *
+   * IDA signature:
+   * int __usercall sub_51B080@<eax>(int a1@<edi>, int a2@<esi>);
+   *
+   * What it does:
+   * Copy-assigns every field in-place via `std::string::assign(src, 0, npos)`
+   * for each of the 7 path lanes followed by direct scalar copies for the
+   * cutoff float and the three boolean flags. Preserves the pad byte without
+   * touching it so the 0xCC-byte record layout is stable.
+   */
+  RMeshBlueprintLOD& RMeshBlueprintLOD::operator=(const RMeshBlueprintLOD& other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+
+    constexpr std::size_t kNoCount = static_cast<std::size_t>(-1);
+    mMeshName.assign(other.mMeshName, 0u, kNoCount);
+    mAlbedoName.assign(other.mAlbedoName, 0u, kNoCount);
+    mNormalsName.assign(other.mNormalsName, 0u, kNoCount);
+    mSpecularName.assign(other.mSpecularName, 0u, kNoCount);
+    mLookupName.assign(other.mLookupName, 0u, kNoCount);
+    mSecondaryName.assign(other.mSecondaryName, 0u, kNoCount);
+    mShaderName.assign(other.mShaderName, 0u, kNoCount);
+
+    mLodCutoff = other.mLodCutoff;
+    mScrolling = other.mScrolling;
+    mOcclude = other.mOcclude;
+    mSilhouette = other.mSilhouette;
+    return *this;
+  }
+
+  /**
    * Address: 0x00518870 (FUN_00518870)
    * Mangled: ?Init@RMeshBlueprintLOD@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z
    *

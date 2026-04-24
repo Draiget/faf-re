@@ -4877,6 +4877,11 @@ void PreRegisterRType(const std::type_info& typeInfo, RType* type)
  */
 void REF_RegisterAllTypes()
 {
+  // The `std::basic_stringstream<char>` destructor used to tear down `errs`
+  // below compiles to the shared CRT body at `0x008D49F0` (FUN_008D49F0):
+  // it reseats the ios/iostream/ostream/istream vtable lanes back to their
+  // base-class vtables, then destroys the embedded `std::stringbuf` member
+  // via `std::stringbuf::~stringbuf` (FUN_0047AC80). Binary-only wiring.
   std::stringstream errs;
 
   for (TypeInfoMap::const_iterator it = GetRTypePreregisteredMap().begin(); it != GetRTypePreregisteredMap().end();
@@ -4890,6 +4895,10 @@ void REF_RegisterAllTypes()
 
   const std::string aggregated = errs.str();
   if (!aggregated.empty()) {
+    // The `std::runtime_error(const std::string&)` constructor the compiler
+    // inlines here is at `0x008D4A80` (FUN_008D4A80): it stores the message
+    // into the exception's `std::string` member via the runtime string-copy
+    // helper at `0x0047B610` (FUN_0047B610). Binary-only wiring.
     throw std::runtime_error(aggregated);
   }
 }
@@ -6534,6 +6543,21 @@ gpg::RRef* RRef_CUnitCaptureTask(RRef* const out, moho::CUnitCaptureTask* const 
   );
 }
 
+/**
+ * Address: 0x0060CAB0 (FUN_0060CAB0, gpg::RRef_CUnitGetBuiltTask)
+ * Mangled: ?RRef_CUnitGetBuiltTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitGetBuiltTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitGetBuiltTask(gpg::RRef *out, Moho::CUnitGetBuiltTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitGetBuiltTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment. Caches
+ * `typeid` -> `RType*` resolution in a TLS 3-slot MRU table to avoid
+ * re-entering `gpg::LookupRType` for each call. Asserts
+ * `IsDerivedFrom(runtime, declared)` when the caller's value is polymorphically
+ * derived.
+ */
 gpg::RRef* RRef_CUnitGetBuiltTask(RRef* const out, moho::CUnitGetBuiltTask* const value)
 {
   return BuildTypedRefWithCache<moho::CUnitGetBuiltTask>(

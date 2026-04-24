@@ -57,6 +57,7 @@ namespace gpg::core::legacy
    * Address: 0x00A53A20 (FUN_00A53A20, sub_A53A20)
    * Address: 0x00A53CB0 (FUN_00A53CB0, sub_A53CB0)
    * Address: 0x00A53D30 (FUN_00A53D30, sub_A53D30)
+   * Address: 0x005CA040 (FUN_005CA040)
    *
    * What it does:
    * Allocates a contiguous lane of 4-byte elements and applies the legacy
@@ -90,6 +91,8 @@ namespace gpg::core::legacy
    * Address: 0x00946B40 (FUN_00946B40, sub_946B40)
    * Address: 0x0094F340 (FUN_0094F340, sub_94F340)
    * Address: 0x00A3A530 (FUN_00A3A530, sub_A3A530)
+   * Address: 0x005A1DF0 (FUN_005A1DF0, func_Create2LinkedListN)
+   * Address: 0x005ABB00 (FUN_005ABB00)
    *
    * What it does:
    * Allocates a contiguous lane of 24-byte elements and applies the legacy

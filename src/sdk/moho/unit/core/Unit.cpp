@@ -11298,10 +11298,11 @@ namespace
    *
    * What it does:
    * Copy-constructs one half-open `UnitWeaponInfo` range into destination
-   * storage and destroys already-constructed entries before rethrowing if a
-   * copy step throws.
+   * storage using the engine `UnitWeaponInfo(const UnitWeaponInfo&)` copy
+   * constructor (`FUN_0055D6F0`), destroying already-constructed entries
+   * before rethrowing if a copy step throws.
    */
-  [[maybe_unused]] UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
+  UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
     const UnitWeaponInfo* const sourceBegin,
     const UnitWeaponInfo* const sourceEnd,
     UnitWeaponInfo* const destinationBegin
@@ -11320,15 +11321,7 @@ namespace
       for (const UnitWeaponInfo* sourceCursor = sourceBegin;
            sourceCursor != sourceEnd;
            ++sourceCursor, ++destinationCursor) {
-        ::new (destinationCursor) UnitWeaponInfo();
-        destinationCursor->mCat1 = sourceCursor->mCat1;
-        destinationCursor->mCat2 = sourceCursor->mCat2;
-        destinationCursor->mLayer = sourceCursor->mLayer;
-        destinationCursor->mMinRadius = sourceCursor->mMinRadius;
-        destinationCursor->mMaxRadius = sourceCursor->mMaxRadius;
-        destinationCursor->mEffectiveRadius = sourceCursor->mEffectiveRadius;
-        destinationCursor->mUIMinRangeVisualId = sourceCursor->mUIMinRangeVisualId;
-        destinationCursor->mUIMaxRangeVisualId = sourceCursor->mUIMaxRangeVisualId;
+        ::new (destinationCursor) UnitWeaponInfo(*sourceCursor);
       }
       return destinationCursor;
     } catch (...) {
@@ -11632,6 +11625,52 @@ UnitWeaponInfo::~UnitWeaponInfo()
 }
 
 /**
+ * Address: 0x0055D6F0 (FUN_0055D6F0, ??0UnitWeaponInfo@Moho@@QAE@ABU01@@Z)
+ * Mangled: ??0UnitWeaponInfo@Moho@@QAE@ABU01@@Z
+ *
+ * IDA signature:
+ * int __userpurge sub_55D6F0@<eax>(int source@<edi>, int destination);
+ *
+ * What it does:
+ * Copy-constructs one `UnitWeaponInfo` from `other`. Each `EntityCategorySet`
+ * lane is cloned field-wise (mUniverse + mBits.mFirstWordIndex header, then
+ * the variable word list via `FastVectorN2RebindAndCopy`). Scalar layer/radius
+ * lanes use plain assignment. Both UI range visual-id strings are brought up
+ * to inline storage defaults (size 0, capacity 15) and then assigned from the
+ * source strings.
+ */
+UnitWeaponInfo::UnitWeaponInfo(const UnitWeaponInfo& other)
+  : mCat1()
+  , mCat2()
+  , mLayer(other.mLayer)
+  , mMinRadius(other.mMinRadius)
+  , mMaxRadius(other.mMaxRadius)
+  , mEffectiveRadius(other.mEffectiveRadius)
+  , mUIMinRangeVisualId()
+  , mUIMaxRangeVisualId()
+{
+  // --- mCat1: BVSet copy (mUniverse + mBits.mFirstWordIndex + mBits.mWords) ---
+  mCat1.mUniverse = other.mCat1.mUniverse;
+  mCat1.mBits.mFirstWordIndex = other.mCat1.mBits.mFirstWordIndex;
+  (void)gpg::FastVectorN2RebindAndCopy<unsigned int>(
+    &mCat1.mBits.mWords, &other.mCat1.mBits.mWords
+  );
+
+  // --- mCat2: BVSet copy (mUniverse + mBits.mFirstWordIndex + mBits.mWords) ---
+  mCat2.mUniverse = other.mCat2.mUniverse;
+  mCat2.mBits.mFirstWordIndex = other.mCat2.mBits.mFirstWordIndex;
+  (void)gpg::FastVectorN2RebindAndCopy<unsigned int>(
+    &mCat2.mBits.mWords, &other.mCat2.mBits.mWords
+  );
+
+  // --- UI range visual-id strings: inline-default then assign from source. ---
+  mUIMinRangeVisualId.tidy(false, 0U);
+  mUIMinRangeVisualId.assign(other.mUIMinRangeVisualId, 0U, ~0U);
+  mUIMaxRangeVisualId.tidy(false, 0U);
+  mUIMaxRangeVisualId.assign(other.mUIMaxRangeVisualId, 0U, ~0U);
+}
+
+/**
  * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
  *
  * What it does:
@@ -11774,13 +11813,64 @@ SSTIUnitVariableData::SSTIUnitVariableData()
 }
 
 /**
+ * Address: 0x00561D40 (FUN_00561D40, FastVectorN<UnitWeaponInfo,1>::ClearAndRebindToInline)
+ *
+ * IDA signature:
+ * Moho::UnitWeaponInfo *__usercall sub_561D40@<eax>(int a1@<ebx>);
+ *
+ * What it does:
+ * Destructs every active `UnitWeaponInfo` element in the weapon-info fast
+ * vector lane (range [start_, end_)), then, if storage is heap-backed, frees
+ * the heap buffer and rebinds all three lane pointers back onto the inline
+ * buffer header stored at `originalVec_` (+0x0C in the FastVectorN layout),
+ * producing the post-rebind invariant `start_ == end_ == originalVec_` and
+ * `capacity_ = originalVec_ + N`. When already using inline storage the lane
+ * simply collapses `end_ = start_` without freeing inline bytes.
+ *
+ * Two aliasing JMP thunks (at 0x00560CB0 and 0x00561430) forward here as part
+ * of compiler-synthesized copy-assign prologues; the CALL from
+ * `~SSTIUnitVariableData` at 0x00560561 runs the same teardown for the
+ * destructor case. Recovered as an intent-named method on the fastvector
+ * lane and invoked explicitly from `~SSTIUnitVariableData` below.
+ */
+static void ClearWeaponInfoVectorAndRebindInline(moho::SSTIUnitWeaponInfoVector& vec) noexcept
+{
+  // Run UnitWeaponInfo destructors for every live element so the shared
+  // texture / blueprint references each weapon snapshot holds are released
+  // before the backing storage is freed. The stride is sizeof(UnitWeaponInfo)
+  // = 0x98 exactly as the binary's `add edi, 98h` cursor.
+  for (moho::UnitWeaponInfo* cursor = vec.start_; cursor != vec.end_; ++cursor) {
+    cursor->~UnitWeaponInfo();
+  }
+
+  // If lanes currently reference heap storage (start_ differs from the
+  // inline-buffer header stored in originalVec_), release that heap block and
+  // restore pointer lanes to the inline buffer using the saved capacity
+  // header that was written into the first slot of inline storage at the
+  // most recent grow/init event.
+  if (vec.start_ != vec.originalVec_) {
+    ::operator delete[](vec.start_);
+    vec.start_ = vec.originalVec_;
+    vec.capacity_ = *reinterpret_cast<moho::UnitWeaponInfo**>(vec.start_);
+    vec.end_ = vec.start_;
+  } else {
+    vec.end_ = vec.start_;
+  }
+}
+
+/**
  * Address: 0x00560500 (FUN_00560500, ??1SSTIUnitVariableData@Moho@@QAE@XZ)
  *
  * What it does:
  * Releases dynamic sync lanes through member dtors (`string`, `shared_ptr`,
- * and fastvector_n payloads).
+ * and fastvector_n payloads) and explicitly clears the weapon-info
+ * fastvector lane back to inline storage so every `UnitWeaponInfo` element
+ * destructor actually runs (`~FastVectorN` alone only frees heap bytes).
  */
-SSTIUnitVariableData::~SSTIUnitVariableData() = default;
+SSTIUnitVariableData::~SSTIUnitVariableData()
+{
+  ClearWeaponInfoVectorAndRebindInline(mWeaponInfo);
+}
 
 SSTIUnitVariableData::SSTIUnitVariableData(const SSTIUnitVariableData& other)
   : SSTIUnitVariableData()

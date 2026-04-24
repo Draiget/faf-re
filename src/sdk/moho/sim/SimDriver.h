@@ -194,6 +194,15 @@ namespace moho
     SSyncData* PopFront();
 
     /**
+     * Address: 0x007407F0 (FUN_007407F0)
+     *
+     * What it does:
+     * Destroys every live payload in the active ring-buffer range
+     * `[head, head + size)` without touching the map allocation.
+     */
+    void DrainLiveRingBufferRange() noexcept;
+
+    /**
      * Address: 0x007411A0 (FUN_007411A0)
      *
      * What it does:

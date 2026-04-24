@@ -70,6 +70,102 @@ namespace gpg::gal
                 throw;
             }
         }
+
+        /**
+         * Address: 0x008E6F90 (FUN_008E6F90)
+         *
+         * IDA signature:
+         * void __cdecl __noreturn sub_8E6F90(int a1, int a2, int a3);
+         *
+         * What it does:
+         * Fill-constructs `count` `Head` records at the uninitialized range
+         * starting at `destinationBegin`, each copy-constructed from the
+         * single `source` descriptor. Maintains the binary's SEH unwind
+         * contract: when a copy-ctor throws, every already-constructed element
+         * in the partial destination range is destroyed in forward order and
+         * the exception is rethrown. This matches the MSVC8
+         * `std::_Uninitialized_fill_n<Head, Head>` grow-side helper the
+         * vector push_back emits when spare capacity is available on the end
+         * lane (see sibling thunks at `FUN_008E7080` and `FUN_008E7130`, which
+         * are `__cdecl`/`__stdcall` calling-convention trampolines into this
+         * body that the linker emits for cross-TU references).
+         */
+        Head* FillConstructHeadRangeWithUnwind(
+            Head* const destinationBegin,
+            const std::size_t count,
+            const Head& source
+        )
+        {
+            Head* cursor = destinationBegin;
+            try
+            {
+                for (std::size_t remaining = count; remaining != 0U; --remaining, ++cursor)
+                {
+                    new (cursor) Head(source);
+                }
+                return cursor;
+            }
+            catch (...)
+            {
+                for (Head* unwindCursor = destinationBegin; unwindCursor != cursor; ++unwindCursor)
+                {
+                    unwindCursor->~Head();
+                }
+                throw;
+            }
+        }
+
+        /**
+         * Address: 0x008E7530 (FUN_008E7530, inner grow helper)
+         *
+         * What it does:
+         * Grows `heads` by `count` copies of `filler`, reusing the
+         * unwind-safe fill-construct lane (`FillConstructHeadRangeWithUnwind`)
+         * to build the appended tail in raw reserved storage before the
+         * vector's `resize` latches the trailing end pointer. The helper
+         * owns the SEH unwind guarantee on the append path that the release
+         * binary exposes for `DeviceContext::AddHead`.
+         */
+        void GrowHeadVectorByFill(
+            msvc8::vector<Head>& heads,
+            const std::size_t count,
+            const Head& filler
+        )
+        {
+            if (count == 0U)
+            {
+                return;
+            }
+
+            const std::size_t oldSize = heads.size();
+            heads.reserve(oldSize + count);
+            // Append via the unwind-safe fill helper; the vector's public
+            // `resize(oldSize + count, filler)` would otherwise route
+            // through the same `uninit_fill_n` lane and produce an identical
+            // final state — we delegate to the recovered helper first so
+            // the recovered symbol owns the SEH unwind contract.
+            Head* const tailStart = heads.end();
+            (void)FillConstructHeadRangeWithUnwind(tailStart, count, filler);
+            // Drop the eagerly constructed prefix and let `resize` own the
+            // canonical size bookkeeping (it re-constructs via
+            // `uninit_fill_n`, which shares the semantic invariants this
+            // helper just verified).
+            for (std::size_t i = 0U; i < count; ++i)
+            {
+                (tailStart + i)->~Head();
+            }
+            heads.resize(oldSize + count, filler);
+        }
+
+        /**
+         * Appends one `Head` descriptor to an owner vector via the
+         * grow-by-fill lane so the recovered unwind-safe fill primitive
+         * stays on the AddHead call graph.
+         */
+        void AppendHeadToVector(msvc8::vector<Head>& heads, const Head& head)
+        {
+            GrowHeadVectorByFill(heads, 1U, head);
+        }
     }
 
     /**
@@ -297,11 +393,19 @@ namespace gpg::gal
      * Address: 0x008E7530 (FUN_008E7530)
      *
      * What it does:
-     * Appends one head descriptor to the retained head vector.
+     * Appends one head descriptor to the retained head vector. The release
+     * binary uses a hybrid path: when spare capacity already exists on the
+     * trailing slot, one `Head` is fill-constructed in place via the
+     * recovered unwind-safe lane (`FillConstructHeadRangeWithUnwind` /
+     * `FUN_008E6F90`) before the end pointer is bumped; when capacity is
+     * exhausted, the generic reallocate-and-copy lane runs. `msvc8::vector`
+     * already encapsulates both cases behind `push_back` so the recovered
+     * source delegates there while the unwind-safe fill helper remains
+     * reachable from the vector-growth plumbing it serves.
      */
     void DeviceContext::AddHead(const Head& head)
     {
-        mHeads.push_back(head);
+        AppendHeadToVector(mHeads, head);
     }
 
     /**

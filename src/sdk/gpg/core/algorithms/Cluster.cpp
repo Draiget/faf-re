@@ -284,6 +284,15 @@ namespace
          * nine sentinel-token bucket entries, and default mask/max values.
          */
         SubclusterCacheVectorState(bool* cacheEnabledFlag, int stackAnchorHint);
+
+        /**
+         * What it does:
+         * Releases the subcluster ring-list backing storage and bucket
+         * vector when the container is destroyed. Mirrors the binary
+         * teardown path that runs FUN_00933380 before freeing
+         * `mVec.mFirst` storage.
+         */
+        ~SubclusterCacheVectorState();
     };
 
     static_assert(sizeof(SubclusterTreeHeader) == 0x0C, "SubclusterTreeHeader size must be 0x0C");
@@ -444,6 +453,11 @@ namespace
         if (count == 0u) {
             return;
         }
+        // Binary codegen at `FUN_00931CE0` (0x00931CE0) combines the
+        // `count > UINT_MAX/4 -> throw std::bad_alloc()` guard and the
+        // `operator new(4 * count)` call into a single allocator helper
+        // (`std::_Allocate<unsigned>` specialization for 4-byte elements);
+        // this source expresses the same two-step behavior explicitly.
         if (count > 0x3FFFFFFFu) {
             throw std::bad_alloc();
         }
@@ -472,6 +486,130 @@ namespace
 
         mMask = 1u;
         mMaxIndex = 1u;
+    }
+
+    void ClearSubclusterCacheRingList(SubclusterTreeHeader* header) noexcept;
+
+    SubclusterCacheVectorState::~SubclusterCacheVectorState()
+    {
+        // Walk the subcluster ring and run the per-handle `~Cluster`
+        // release path on every buffered 16-cluster node before freeing
+        // the head sentinel itself. This is the FUN_00933380 lane the
+        // binary runs from every container-teardown path.
+        ClearSubclusterCacheRingList(&mList);
+        ::operator delete(mList.mHead);
+        mList.mHead = nullptr;
+
+        if (mVec.mFirst != nullptr) {
+            ::operator delete(mVec.mFirst);
+            mVec.mFirst = nullptr;
+            mVec.mLast = nullptr;
+            mVec.mEnd = nullptr;
+        }
+    }
+
+    /**
+     * Intrusive ring-list node used by `SubclusterCacheVectorState::mList`.
+     * Each non-sentinel node carries a trailing fixed-count array of 16
+     * `Cluster` handles that must be destroyed via the per-handle `~Cluster`
+     * release path before the node storage is freed.
+     */
+    struct SubclusterTreeNode
+    {
+        SubclusterTreeNode* mNext;                // +0x00
+        SubclusterTreeNode* mPrev;                // +0x04
+        gpg::HaStar::Cluster mClusters[16];       // +0x08
+        // Trailing 8 bytes (+0x48..+0x4F) observed in the binary allocator
+        // (`AllocateSubclusterTreeHead` at FUN_009327E0 allocates 0x50 bytes)
+        // but not touched by the destroy pass; keep padding to preserve the
+        // node footprint so allocations stay binary-shape-equivalent.
+        std::uint8_t mTail48[0x08]{};             // +0x48
+    };
+    static_assert(offsetof(SubclusterTreeNode, mNext) == 0x00, "SubclusterTreeNode::mNext offset must be 0x00");
+    static_assert(offsetof(SubclusterTreeNode, mPrev) == 0x04, "SubclusterTreeNode::mPrev offset must be 0x04");
+    static_assert(offsetof(SubclusterTreeNode, mClusters) == 0x08, "SubclusterTreeNode::mClusters offset must be 0x08");
+    static_assert(sizeof(SubclusterTreeNode) == 0x50, "SubclusterTreeNode size must be 0x50");
+
+    /**
+     * Address: 0x00933380 (FUN_00933380)
+     *
+     * IDA signature:
+     * void __thiscall sub_933380(_DWORD *this);
+     *
+     * What it does:
+     * Clears one subcluster-cache ring-list in place: snapshots the head
+     * sentinel's `next` pointer, relinks the sentinel's `next`/`prev` to
+     * self, zeros the size counter, then walks the snapshot chain
+     * destroying each non-sentinel node. Each node's trailing
+     * `Cluster[16]` array is run through the per-element `~Cluster`
+     * destructor (binary uses `eh vector destructor iterator` with
+     * element count 16 and element size 4) before the node storage is
+     * released.
+     *
+     * The `this` parameter is a `SubclusterTreeHeader*`; its `mHead`
+     * field (at +0x04) holds the sentinel node pointer. Invoked from the
+     * subcluster-cache teardown lanes (binary callers 0x009335E3,
+     * 0x009338D0, 0x009343B4, 0x00934500, 0x00934B60, 0x00934F07,
+     * 0x009352E0).
+     */
+    void ClearSubclusterCacheRingList(SubclusterTreeHeader* const header) noexcept
+    {
+        if (header == nullptr || header->mHead == nullptr) {
+            return;
+        }
+
+        auto* const sentinel = static_cast<SubclusterTreeNode*>(header->mHead);
+        SubclusterTreeNode* cursor = sentinel->mNext;
+        sentinel->mNext = sentinel;
+        sentinel->mPrev = sentinel;
+        header->mSize = 0u;
+
+        while (cursor != sentinel) {
+            SubclusterTreeNode* const nextNode = cursor->mNext;
+            // Per-handle `Cluster` release (binary invokes
+            // `eh vector destructor iterator` with n=16 over `cursor+0x08`).
+            for (auto& clusterHandle : cursor->mClusters) {
+                clusterHandle.~Cluster();
+            }
+            ::operator delete(cursor);
+            cursor = nextNode;
+        }
+    }
+
+    // Process-wide registry keyed by `ClusterCache::mCacheTree` base that
+    // tracks any active subcluster ring-lists built against the cache. The
+    // binary keeps these lists as `SubclusterCacheVectorState::mList` values
+    // linked into the cache's lookup-bucket lane; when the outer cache is
+    // released, each attached ring must be drained via FUN_00933380.
+    using SubclusterRingRegistry = std::unordered_map<void*, std::vector<SubclusterTreeHeader*>>;
+    [[nodiscard]] SubclusterRingRegistry& SubclusterRingsByCacheBase()
+    {
+        static SubclusterRingRegistry sRegistry;
+        return sRegistry;
+    }
+
+    void DrainSubclusterRingsAttachedToCacheBase(void* const cacheTreeBase) noexcept
+    {
+        auto& registry = SubclusterRingsByCacheBase();
+        const auto it = registry.find(cacheTreeBase);
+        if (it == registry.end()) {
+            return;
+        }
+
+        for (SubclusterTreeHeader* const header : it->second) {
+            ClearSubclusterCacheRingList(header);
+        }
+        registry.erase(it);
+    }
+
+    [[maybe_unused]] void AttachSubclusterRingToCacheBase(
+        void* const cacheTreeBase, SubclusterTreeHeader* const header
+    )
+    {
+        if (cacheTreeBase == nullptr || header == nullptr) {
+            return;
+        }
+        SubclusterRingsByCacheBase()[cacheTreeBase].push_back(header);
     }
 
     struct TripleWordValueRuntime
@@ -4211,25 +4349,109 @@ float Cluster::QuantizeEdgeCost(const float a, const float b)
 }
 
 /**
+ * Address: 0x00954110 (FUN_00954110,
+ * ?SetData@Cluster@HaStar@gpg@@QAEXPBUNode@123@PBUEdge@123@I@Z)
+ *
+ * IDA signature:
+ * void __thiscall gpg::HaStar::Cluster::SetData(
+ *   gpg::HaStar::Cluster *this@<ecx>,
+ *   const Node *nodes, const Edge *edges, unsigned int nodeCount);
+ *
+ * What it does:
+ * If the current payload is null, has a different node count, or is shared
+ * (refcount != 1), allocates a fresh payload sized for the requested node
+ * count (`header + nodeCount*2 + nodeCount*(nodeCount-1)/2`) and releases
+ * the prior payload (invoking its dispose-callback when refcount hits zero).
+ * Then copies `nodeCount` `Node` entries (2 bytes each) and
+ * `nodeCount*(nodeCount-1)/2` `Edge` buckets (1 byte each) into the trailing
+ * storage. Asserts `nodeCount < 256`.
+ */
+void Cluster::SetData(
+    const Cluster::Node* const nodes,
+    const Cluster::Edge* const edges,
+    const unsigned int nodeCount
+)
+{
+    if (nodeCount >= 0x100u) {
+        gpg::HandleAssertFailure(
+            "nnodes < 256",
+            58,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
+        );
+    }
+
+    constexpr std::size_t kHeaderBytes = 0x0Du; // offsetof(Data, mNodes)
+    const std::size_t nodeBytes = static_cast<std::size_t>(nodeCount) * sizeof(Node);
+    const std::size_t edgeBytes = static_cast<std::size_t>(nodeCount) * (nodeCount - 1u) / 2u;
+
+    Cluster::Data* payload = mData;
+    const bool reuseInPlace = (payload != nullptr)
+        && (static_cast<unsigned int>(payload->mNodeCount) == nodeCount)
+        && (payload->mRefs == 1);
+
+    if (!reuseInPlace) {
+        const std::size_t totalBytes = kHeaderBytes + nodeBytes + edgeBytes;
+        auto* const replacement = static_cast<Cluster::Data*>(::operator new[](totalBytes));
+        replacement->mRefs = 1;
+        replacement->mReleaseObject = nullptr;
+        replacement->mReleaseArg = 0u;
+        replacement->mNodeCount = static_cast<std::uint8_t>(nodeCount);
+
+        if (mData != nullptr) {
+            --mData->mRefs;
+            Cluster::Data* const prior = mData;
+            if (prior->mRefs == 0) {
+                if (prior->mReleaseObject != nullptr) {
+                    using ReleaseFn = void(__thiscall*)(void*, std::uint32_t);
+                    auto** const vtable = *reinterpret_cast<void***>(prior->mReleaseObject);
+                    auto* const releaseFn = reinterpret_cast<ReleaseFn>(vtable[0]);
+                    releaseFn(prior->mReleaseObject, prior->mReleaseArg);
+                }
+                ::operator delete[](prior);
+            }
+        }
+
+        mData = replacement;
+        payload = replacement;
+    }
+
+    // Node array begins at `mNodes` (offset 0x0D); edges follow it.
+    auto* const nodeBase = reinterpret_cast<std::byte*>(&payload->mNodes[0]);
+    if (nodes != nullptr && nodeBytes != 0u) {
+        std::memcpy(nodeBase, nodes, nodeBytes);
+    }
+    if (edges != nullptr && edgeBytes != 0u) {
+        std::memcpy(nodeBase + nodeBytes, edges, edgeBytes);
+    }
+}
+
+/**
  * Address: 0x009552D0 (FUN_009552D0,
  * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUOccupationData@12@@Z)
+ *
+ * Notes:
+ * Full occupancy-cell-to-cluster extraction is still being recovered; this
+ * stub preserves the binary's allocation + `SetData` wiring so the payload is
+ * a valid refcounted empty cluster until the edge-extraction lane is finished.
  */
 Cluster ClusterBuild(const OccupationData& occupationData)
 {
     (void)occupationData;
 
     Cluster cluster{};
-    auto* const data = static_cast<Cluster::Data*>(operator new[](sizeof(Cluster::Data)));
-    data->mRefs = 1;
-    data->mReleaseObject = nullptr;
-    data->mReleaseArg = 0u;
-    cluster.mData = data;
+    cluster.SetData(nullptr, nullptr, 0u);
     return cluster;
 }
 
 /**
  * Address: 0x009310E0 (FUN_009310E0,
  * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUSubclusterData@12@@Z)
+ *
+ * Notes:
+ * Full 4x4 subcluster-merge lane is still being recovered; this stub
+ * preserves the binary's `SetData` wiring (empty payload) and scratch-pad
+ * reset so the payload is a valid refcounted empty cluster until the child
+ * merging lane is finished.
  */
 Cluster ClusterBuild(const SubclusterData& subclusterData)
 {
@@ -4238,11 +4460,7 @@ Cluster ClusterBuild(const SubclusterData& subclusterData)
     (void)subclusterData;
 
     Cluster cluster{};
-    auto* const data = static_cast<Cluster::Data*>(operator new[](sizeof(Cluster::Data)));
-    data->mRefs = 1;
-    data->mReleaseObject = nullptr;
-    data->mReleaseArg = 0u;
-    cluster.mData = data;
+    cluster.SetData(nullptr, nullptr, 0u);
     return cluster;
 }
 
@@ -4256,7 +4474,14 @@ ClusterCache::~ClusterCache()
 {
     const bool releasedLast = ReleaseSharedCount(mCacheRefs);
     if (!mCacheRefs || releasedLast) {
+        // Drain any ring-list-style subcluster cache buckets that were
+        // attached to this cache base (binary runs FUN_00933380 over the
+        // ring head before freeing the bucket vector storage).
+        // `DrainSubclusterRingsAttachedToCacheBase` lives in the
+        // anonymous namespace at the top of this TU (resolved via the
+        // same unqualified-lookup rule used for `ReleaseRuntimeClusterCacheStore`).
         ReleaseRuntimeClusterCacheStore(mCacheTree);
+        DrainSubclusterRingsAttachedToCacheBase(mCacheTree);
     }
     mCacheRefs = nullptr;
     mCacheTree = nullptr;

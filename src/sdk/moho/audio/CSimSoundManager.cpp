@@ -16,6 +16,20 @@ namespace
     return LoopList::owner_from_member_node<moho::HSound, &moho::HSound::mSimLoopLink>(node);
   }
 
+  /**
+   * Address: 0x00761860 (FUN_00761860, inlined push-back lane)
+   *
+   * What it does:
+   * Appends one `SAudioRequest` into the owner request queue. The binary
+   * emits this append sequence as a partially-inlined helper at
+   * `0x00761860` for each call site (`AddEntitySound`, `AddLoop`,
+   * `StopLoop`). When the active-end lane equals the capacity lane it
+   * forwards to the grow-and-emplace helper at `0x00761F80`; otherwise
+   * it copies the request payload into the next slot and bumps the
+   * active-end pointer. Expressed here as a direct `fastvector::PushBack`
+   * call which inlines to the same control flow at
+   * `sizeof(SAudioRequest)=0x1C` stride.
+   */
   void QueueRequest(moho::CSimSoundManager& manager, const moho::SAudioRequest& request)
   {
     manager.mRequests.PushBack(request);

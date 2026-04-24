@@ -95,6 +95,48 @@ namespace moho
   }
 
   /**
+   * Address: 0x00885A20 (FUN_00885A20)
+   *
+   * IDA signature:
+   * void __thiscall sub_885A20(Moho::CWldMap *this, struct_GameData *a2);
+   *
+   * What it does:
+   * Teardown helper for a transient `SWldGameData` holder. Releases the owned
+   * `CWldMap` (scalar deleting destructor + `operator delete`), releases the
+   * `RRuleGameRules` through its virtual deleting destructor, and finally
+   * releases the owned `LuaPlus::LuaState` (destroy + `operator delete`).
+   *
+   * Binary evidence order:
+   *   - delete mWldMap    (a2 + 0x08)
+   *   - delete mGameRules (a2 + 0x04, virtual dtor slot)
+   *   - delete mState     (a2 + 0x00)
+   *
+   * Both call sites (LoadGameData SEH unwind and func_DoLoading cleanup) rely
+   * on this exact ordering for crash-safe destruction.
+   */
+  void ReleaseWldGameDataHandles(SWldGameData* const gameData)
+  {
+    if (gameData == nullptr) {
+      return;
+    }
+
+    if (CWldMap* const ownedMap = gameData->mWldMap; ownedMap != nullptr) {
+      delete ownedMap;
+      gameData->mWldMap = nullptr;
+    }
+
+    if (RRuleGameRules* const ownedRules = gameData->mGameRules; ownedRules != nullptr) {
+      delete ownedRules;
+      gameData->mGameRules = nullptr;
+    }
+
+    if (LuaPlus::LuaState* const ownedState = gameData->mState; ownedState != nullptr) {
+      delete ownedState;
+      gameData->mState = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x00412DC0 (FUN_00412DC0)
    *
    * What it does:

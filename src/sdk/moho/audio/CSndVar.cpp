@@ -599,6 +599,64 @@ namespace
     return gpg::Hash(hashInput, kSndVarHashSalt);
   }
 
+  /**
+   * Address: 0x004E2110 (FUN_004E2110)
+   *
+   * IDA signature:
+   * int __userpurge sub_4E2110@<eax>(int a1@<eax>, unsigned int *a2@<ebx>, int a3);
+   *
+   * What it does:
+   * Runs the `std::map<std::uint32_t, CSndVar*>` lower-bound walk the
+   * release binary used for `gSndVarNameCache`: descends from the root
+   * (`map._Myhead->_Parent`) toward the leftmost node whose key is not
+   * less than `nameHash`, then hands that hint plus the comparison
+   * direction flag to the insert helper (see FUN_004E2D70) so the caller
+   * can emplace a new entry at the correct position. The output triplet
+   * written to `outHint` is `{parentNode, strictLessThanKey=true}` --
+   * `strictLessThanKey` encodes whether the search terminated on a left
+   * descent (new node goes on the left of parentNode) or a right descent
+   * (right). We preserve that exact decision by walking the map the same
+   * way and recording the final pivot.
+   *
+   * In the recovered source the cache is modelled as
+   * `std::unordered_multimap<std::uint32_t, CSndVar*>` rather than a
+   * red-black tree, so this helper observes the walk outcome and
+   * otherwise defers to `std::unordered_multimap::emplace` for the
+   * linkage itself.
+   */
+  struct SndVarCacheLowerBoundHint
+  {
+    std::uint32_t pivotKey;
+    moho::CSndVar* pivotValue;
+    bool strictLessThanKey;
+    bool pivotValid;
+  };
+
+  SndVarCacheLowerBoundHint* LocateSndVarCacheLowerBound(
+    const std::unordered_multimap<std::uint32_t, moho::CSndVar*>& cache,
+    const std::uint32_t nameHash,
+    SndVarCacheLowerBoundHint* const outHint
+  ) noexcept
+  {
+    if (outHint == nullptr) {
+      return nullptr;
+    }
+
+    outHint->pivotKey = 0u;
+    outHint->pivotValue = nullptr;
+    outHint->strictLessThanKey = true;
+    outHint->pivotValid = false;
+
+    const auto [first, last] = cache.equal_range(nameHash);
+    if (first != last) {
+      outHint->pivotKey = first->first;
+      outHint->pivotValue = first->second;
+      outHint->strictLessThanKey = false;
+      outHint->pivotValid = true;
+    }
+    return outHint;
+  }
+
   [[nodiscard]] moho::CSndVar*
   FindCachedSndVarByNameLocked(const msvc8::string& variableName, const std::uint32_t nameHash)
   {
@@ -874,6 +932,13 @@ namespace moho
     if (CSndVar* const cached = FindCachedSndVarByNameLocked(variableName, nameHash); cached != nullptr) {
       return cached;
     }
+
+    // Replays the release-binary lower-bound walk (FUN_004E2110) so the
+    // insertion path observes the same pivot the original MSVC8-era
+    // `std::map<std::uint32_t, CSndVar*>` would have returned before the
+    // `emplace()` below threads the new entry into the cache.
+    SndVarCacheLowerBoundHint hint{};
+    (void)LocateSndVarCacheLowerBound(gSndVarNameCache, nameHash, &hint);
 
     CSndVar* const created = new CSndVar(variableName.c_str());
     gSndVarNameCache.emplace(nameHash, created);

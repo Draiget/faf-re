@@ -2029,10 +2029,20 @@ namespace
   );
 
   /**
-   * Address: 0x00679B80 (inlined with FUN_0067DE00/FUN_0067DE40)
+   * Address: 0x00679B80 (Moho::Entity::OnDestroy destroy-queue lane)
+   * Address: 0x0067DE00 (FUN_0067DE00, MSVC8 `std::list<Entity*>::_Buynode`
+   *                      allocator+init — allocates one 12-byte `{prev, next,
+   *                      value}` list node and initializes all three words)
+   * Address: 0x0067DE40 (deleting-destructor twin of FUN_0067DE00)
    *
    * What it does:
-   * Inserts entity into command-db destroy queue linked-list and increments queue size.
+   * Inserts one entity into the command-db destroy queue intrusive list and
+   * increments the queue size. The node allocation path is the one emitted
+   * by the MSVC8 STL for `std::list<Entity*>::push_back` / `::insert`, and is
+   * reused by `Moho::Entity::OnDestroy`, the entity-pool deleting lanes, and
+   * `EntityDbEntityListTypeInfo::SerLoad` (which uses a real
+   * `std::list<Entity*>::push_back` call whose backing allocator is this
+   * same helper in the original binary).
    */
   void QueueEntityForDestroy(moho::Entity* entity)
   {

@@ -1,8 +1,10 @@
 #include "moho/sim/ManipulatorStartupRegistrations.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <stdexcept>
 #include <vector>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -278,11 +280,165 @@ namespace
   }
 
   /**
+   * Packed bit-iterator cursor shape matching the legacy
+   * `std::vector<bool>::iterator` tuple `(word_ptr, bit_offset_within_word)`.
+   * Callers compute the cursor from a bit index via
+   * `base + 4*(bitIndex >> 5)` and `bitIndex & 31`; the cursor is stable
+   * across payload resizes only when re-derived from the `(bitIndex, baseWord)`
+   * pair after each storage growth.
+   */
+  struct VectorBoolBitCursor
+  {
+    std::uint32_t* wordPtr;   // +0x00
+    std::uint32_t bitOffset;  // +0x04 (0..31)
+  };
+
+  /**
+   * Address: 0x006421C0 (FUN_006421C0, gpg::RVectorType_bool::reserve_word_capacity)
+   *
+   * IDA signature:
+   * unsigned int __thiscall sub_6421C0(int storage, unsigned int wordCount);
+   *
+   * What it does:
+   * Ensures the packed-bit word array backing `VectorBoolStorage` has at least
+   * `wordCount` words of capacity. If the requested capacity exceeds the
+   * half-machine-word limit (`0x3FFFFFFF`), the legacy length-error throw
+   * helper `sub_444270` is invoked. When the current word capacity already
+   * satisfies the request, the call is a no-op and returns the current word
+   * count. Otherwise a fresh word array is allocated via `sub_445B80`
+   * (allocator stub), the current `[mWords, mWordsEnd)` run is move-copied via
+   * the engine's per-word helper (`sub_642F30`), the old storage is released,
+   * and the `mWords / mWordsEnd / mWordsCapacityEnd` triplet is re-seated.
+   * Returns the new capacity word count on success, or the prior element
+   * count if no reallocation was necessary.
+   */
+  std::uint32_t VectorBoolReserveWordCapacity(VectorBoolStorage& storage, const std::uint32_t wordCount)
+  {
+    // Length-check: matches the legacy `sub_444270` overflow throw at 0x6421EE.
+    if (wordCount > 0x3FFFFFFFu) {
+      // Legacy binary calls `std::_Xlen_string()` / length-error emitter here;
+      // in recovered code the normal STL length_error path serves the same role.
+      throw std::length_error("VectorBoolReserveWordCapacity: wordCount overflows word-span limit");
+    }
+
+    std::uint32_t* const oldWords = storage.mWords;
+    std::uint32_t* const oldWordsEnd = storage.mWordsEnd;
+    std::uint32_t* const oldCapacityEnd = storage.mWordsCapacityEnd;
+
+    const std::uint32_t currentCapacity = (oldWords != nullptr && oldCapacityEnd != nullptr)
+      ? static_cast<std::uint32_t>(oldCapacityEnd - oldWords)
+      : 0u;
+    if (currentCapacity >= wordCount) {
+      return currentCapacity;
+    }
+
+    auto* const grown = static_cast<std::uint32_t*>(::operator new(sizeof(std::uint32_t) * wordCount));
+
+    // Move current live words into the new backing (match `sub_642F30` shape):
+    // zero-fill the new slab so tail words beyond the live run are predictable.
+    std::uint32_t copyWords = 0u;
+    if (oldWords != nullptr) {
+      copyWords = static_cast<std::uint32_t>(oldWordsEnd - oldWords);
+      for (std::uint32_t i = 0u; i < copyWords; ++i) {
+        grown[i] = oldWords[i];
+      }
+    }
+    for (std::uint32_t i = copyWords; i < wordCount; ++i) {
+      grown[i] = 0u;
+    }
+
+    if (oldWords != nullptr) {
+      ::operator delete(oldWords);
+    }
+
+    storage.mWords = grown;
+    storage.mWordsEnd = grown + copyWords;
+    storage.mWordsCapacityEnd = grown + wordCount;
+    return wordCount;
+  }
+
+  /**
+   * Address: 0x0057FB30 (FUN_0057FB30)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_57FB30@<eax>(int a1@<edi>, _DWORD *a2@<esi>,
+   *                                      char a3, int a4, int a5);
+   *
+   * What it does:
+   * Inserts one boolean bit into the `vector<bool>`-style bit storage at the
+   * iterator cursor `(baseWord, bitOffset)` and returns the post-insert cursor.
+   * The original binary grows backing storage via the
+   * `vector<bool>::_Insert_n(1, value, iter)` helper at `sub_443D90` and then
+   * translates the stale iterator by advancing it by
+   * `32 * ((newBase - oldBase) / 4)` bits so the returned cursor refers to the
+   * same logical position in the grown storage.
+   */
+  VectorBoolBitCursor VectorBoolInsertOneBit(
+    VectorBoolStorage& storage,
+    const bool value,
+    std::uint32_t* const iterBaseWord,
+    const std::uint32_t iterBitOffset
+  )
+  {
+    const std::uint32_t oldBitCount = storage.mBitCount;
+    const std::uint32_t oldCapacity = (storage.mWords != nullptr && storage.mWordsCapacityEnd != nullptr)
+      ? static_cast<std::uint32_t>(storage.mWordsCapacityEnd - storage.mWords)
+      : 0u;
+    const std::uint32_t requiredWords = ((oldBitCount + 1u) + 31u) >> 5u;
+
+    std::uint32_t* const oldWordsBase = storage.mWords;
+
+    // Grow capacity first if the current word window can't hold one more bit.
+    if (requiredWords > oldCapacity) {
+      const std::uint32_t newCapacity = std::max<std::uint32_t>(requiredWords, oldCapacity * 2u);
+      auto* const grown = static_cast<std::uint32_t*>(::operator new(sizeof(std::uint32_t) * newCapacity));
+      const std::uint32_t copyWords = (oldBitCount + 31u) >> 5u;
+      for (std::uint32_t i = 0; i < copyWords; ++i) {
+        grown[i] = oldWordsBase[i];
+      }
+      for (std::uint32_t i = copyWords; i < newCapacity; ++i) {
+        grown[i] = 0u;
+      }
+      if (oldWordsBase != nullptr) {
+        ::operator delete(oldWordsBase);
+      }
+      storage.mWords = grown;
+      storage.mWordsCapacityEnd = grown + newCapacity;
+    }
+
+    storage.mBitCount = oldBitCount + 1u;
+    storage.mWordsEnd = storage.mWords + requiredWords;
+
+    // Translate the caller-supplied iterator cursor across the potential
+    // reallocation using the same dword-stride math as the binary:
+    //   new_word_ptr = iterBaseWord + (newBase - oldBase)
+    //   new_bit = iterBitOffset
+    const std::intptr_t wordDelta = (oldWordsBase != nullptr)
+      ? (storage.mWords - oldWordsBase)
+      : (storage.mWords - iterBaseWord);
+    std::uint32_t* const translatedWord = iterBaseWord + wordDelta;
+
+    VectorBoolBitCursor cursor{translatedWord, iterBitOffset};
+    if (cursor.wordPtr != nullptr) {
+      const std::uint32_t mask = 1u << cursor.bitOffset;
+      if (value) {
+        *cursor.wordPtr |= mask;
+      } else {
+        *cursor.wordPtr &= ~mask;
+      }
+    }
+
+    return cursor;
+  }
+
+  /**
    * Address: 0x00641F70 (FUN_00641F70, gpg::RVectorType_bool::SerLoad)
    *
    * What it does:
    * Reads packed boolean bit-count/value lanes from archive payload and
-   * replaces destination `SBitStorage32` storage in one transfer.
+   * replaces destination `SBitStorage32` storage in one transfer, driving the
+   * insert via the canonical per-bit `VectorBoolInsertOneBit` lane to match
+   * the original binary loop shape.
    */
   void RVectorTypeBool::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
   {
@@ -297,11 +453,28 @@ namespace
     archive->ReadUInt(&bitCount);
 
     VectorBoolStorage loaded{};
-    loaded.Resize(bitCount, false);
+    // Reserve final word capacity up-front via the engine's canonical helper
+    // at FUN_006421C0, matching the binary's `sub_6421C0((v8 + 31) >> 5)`
+    // prologue in FUN_00641F70.
+    if (bitCount != 0u) {
+      const std::uint32_t requiredWordCount = (bitCount + 31u) >> 5u;
+      (void)VectorBoolReserveWordCapacity(loaded, requiredWordCount);
+    }
+
     for (unsigned int bitIndex = 0; bitIndex < bitCount; ++bitIndex) {
       bool value = false;
       archive->ReadBool(&value);
-      loaded.SetBit(bitIndex, value);
+
+      // Compute per-iteration cursor from current (baseWord, bitCount) pair,
+      // matching `v5 = v12 + 4*(v11>>5); v6 = v11 & 0x1F;` in FUN_00641F70.
+      std::uint32_t* const baseWord = loaded.mWords;
+      const std::uint32_t liveBitCount = loaded.mBitCount;
+      std::uint32_t* const cursorWord = (baseWord != nullptr)
+        ? (baseWord + (liveBitCount >> 5u))
+        : nullptr;
+      const std::uint32_t cursorBit = liveBitCount & 31u;
+
+      (void)VectorBoolInsertOneBit(loaded, value, cursorWord, cursorBit);
     }
 
     std::uint32_t* const oldWords = storage->mWords;

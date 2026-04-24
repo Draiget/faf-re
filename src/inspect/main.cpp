@@ -49,7 +49,7 @@ static DWORD EntryThread_Impl(LPVOID) {
     // opts.emit_template_stubs = true;
 	// DumpAllRtti("G:\\projects\\faf-main\\rtti_dump_all.hpp", opts);
 
-    InstallDetours();
+    //InstallDetours();
     inspect::discovery::Start(g_InspectModule);
 
     OutputDebugStringW(L"[inspect] init done\n");
@@ -108,10 +108,9 @@ int __stdcall EntityCreateUnit_Hook(int a1, int** a2)
 
     auto casted = reinterpret_cast<moho::Unit*>(unit);
 
-    DebugPrintf("[inspect] Entity::CreateUnit[{:p}, id={}, name={}]\n",
+    DebugPrintf("[inspect] Entity::CreateUnit[{:p}, id={}]\n",
         reinterpret_cast<void*>(unit),
-        casted->id_,
-        casted->GetCustomName().c_str());
+        casted->id_);
 
     // Post-process, wrap, track, etc.
     return unit;
