@@ -60,7 +60,6 @@ void CollisionBeamEntity::CheckCollision() {}
 void SMassInfo::MemberDeserialize(gpg::ReadArchive*) {}
 void SMassInfo::MemberSerialize(gpg::WriteArchive*) const {}
 void SkyDome::CreateTextures() {}
-bool CUnitMotion::CalcMoveCommon(VTransform&, float*) { return false; }
 
 // ===== Virtual destructors =====
 CAiAttackerImpl::~CAiAttackerImpl() {}

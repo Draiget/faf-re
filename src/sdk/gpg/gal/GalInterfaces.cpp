@@ -5405,6 +5405,39 @@ namespace gpg::gal
       runtime.end = nullptr;
       runtime.capacityEnd = nullptr;
     }
+
+    /**
+     * Address: 0x008E70B0 (FUN_008E70B0)
+     *
+     * IDA signature:
+     * int __cdecl sub_8E70B0(int a1, int a2, int a3);
+     *
+     * What it does:
+     * Copy-assigns each `Head` element in the half-open destination range
+     * `[begin, end)` from a single `source` template, advancing the cursor in
+     * `sizeof(Head) == 0x80` byte strides. Acts as the `std::fill` lane for
+     * `msvc8::vector<Head>` resize-with-fill paths emitted by MSVC8 on the
+     * `gpg::gal::DeviceContext::AddHead` insertion path; the only callers in
+     * the binary are `FUN_008E71D0` (release vector resize+insert), which
+     * invokes this helper twice across the spare-tail copy-assignment lane.
+     *
+     * Confidence: high — body matches the recovered `Head::operator=` lane
+     * (`FUN_008D7310`) directly, and the stride exactly equals the recovered
+     * `sizeof(Head)` size assertion.
+     */
+    Head* FillAssignHeadRange(
+      Head* const destinationBegin,
+      Head* const destinationEnd,
+      const Head& source
+    )
+    {
+      Head* lastAssigned = destinationBegin;
+      for (Head* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
+        *cursor = source;
+        lastAssigned = cursor;
+      }
+      return lastAssigned;
+    }
   } // namespace
 
   /**

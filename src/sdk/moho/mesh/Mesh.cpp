@@ -458,6 +458,40 @@ namespace moho
     void CollectInVolumeFromData(gpg::fastvector<UserEntity*>& destination, EEntityType type, CGeomSolid3* volume);
 
     /**
+     * Address: 0x00503D40 (FUN_00503D40, Moho::SpatialShardData::CollectInSphere)
+     *
+     * What it does:
+     * Recursively collects selected entities that intersect one bounding
+     * sphere — walks the 4x4 child shard array, recursing into non-leaf
+     * children and dispatching to the per-leaf `CollectInSphereFromData`
+     * helper at the bottom level.
+     */
+    [[nodiscard]] static bool CollectInSphere(
+      SpatialShard* shard,
+      EEntityType type,
+      const SphereBoundsProbe& probe,
+      gpg::fastvector<UserEntity*>& destination
+    );
+
+    /**
+     * Address: 0x005030C0 (FUN_005030C0, Moho::SpatialShardData::CollectInSphereFromData)
+     *
+     * What it does:
+     * Collects entities from this leaf shard-data lane that intersect one
+     * bounding sphere. Skips the lane when the shard reports no entities of
+     * the requested type or when the sphere does not touch the lane's AABB.
+     * Refreshes the cached bounds if their staleness counter is over the
+     * limit, then for each enabled entity-type bucket walks the associated
+     * tree appending owners whose node-box either intersects the sphere or
+     * is fully contained by it.
+     */
+    [[nodiscard]] bool CollectInSphereFromData(
+      EEntityType type,
+      const SphereBoundsProbe& probe,
+      gpg::fastvector<UserEntity*>& destination
+    );
+
+    /**
      * Address: 0x00502340 (FUN_00502340, Moho::SpatialShardData::RemoveNode)
      *
      * What it does:
@@ -616,42 +650,77 @@ namespace
     return true;
   }
 
-  struct SphereBoundsProbe
-  {
-    Wm3::Vector3f center;
-    float radius;
-  };
-
-  struct SegmentEndpointPair
-  {
-    Wm3::Vector3f begin;
-    Wm3::Vector3f end;
-  };
-
+  using moho::SphereBoundsProbe;
   static_assert(sizeof(SphereBoundsProbe) == 0x10, "SphereBoundsProbe size must be 0x10");
-  static_assert(sizeof(SegmentEndpointPair) == 0x18, "SegmentEndpointPair size must be 0x18");
+
+  /**
+   * Address: 0x00500C50 (FUN_00500C50)
+   *
+   * What it does:
+   * Returns true when the sphere defined by `probe.center` / `probe.radius`
+   * intersects (or fully contains) the axis-aligned box `bounds`. Implements
+   * the classic "closest-point-on-AABB to sphere center, then compare to
+   * radius squared" test — the binary computes per-axis distance via two
+   * `max(min - p, p - max, 0)` reductions then sums their squares.
+   *
+   * IDA signature:
+   *   BOOL sub_500C50(float *bounds@<eax>, float *sphere@<ecx>);
+   * where `bounds = {minX, minY, minZ, maxX, maxY, maxZ}` and
+   *       `sphere = {x, y, z, radius}`.
+   */
+  [[nodiscard]] bool SphereIntersectsAabb(
+    const Wm3::AxisAlignedBox3f& bounds,
+    const SphereBoundsProbe& probe
+  ) noexcept
+  {
+    const auto axisDistance = [](const float minLane, const float maxLane, const float centerLane) noexcept {
+      float gap = centerLane - maxLane;
+      const float belowLane = minLane - centerLane;
+      if (belowLane > gap) {
+        gap = belowLane;
+      }
+      return gap < 0.0f ? 0.0f : gap;
+    };
+
+    const float dx = axisDistance(bounds.Min.x, bounds.Max.x, probe.center.x);
+    const float dy = axisDistance(bounds.Min.y, bounds.Max.y, probe.center.y);
+    const float dz = axisDistance(bounds.Min.z, bounds.Max.z, probe.center.z);
+
+    return (probe.radius * probe.radius) >= ((dx * dx) + (dy * dy) + (dz * dz));
+  }
 
   /**
    * Address: 0x00500D00 (FUN_00500D00)
    *
    * What it does:
-   * Returns true only when both segment endpoints lie within the sphere
-   * defined by `probe.center` and `probe.radius`.
+   * Returns true when both the minimum-corner and the maximum-corner of
+   * `bounds` lie strictly within the sphere. For an axis-aligned box the two
+   * opposite corners are the furthest pair of vertices, so this serves as a
+   * conservative "sphere contains AABB" test used by the spatial-shard sphere
+   * collect leaf path to short-circuit per-entity intersection checks: when
+   * it returns true the entire shard-data lane is inside the sphere and
+   * every node owner is accepted unconditionally.
+   *
+   * IDA signature:
+   *   bool sub_500D00(float *sphere@<edi>, float *bounds@<esi>);
    */
-  [[maybe_unused]] [[nodiscard]] bool AreSegmentEndpointsWithinSphereBounds(
+  [[nodiscard]] bool SphereContainsAabbDiagonal(
     const SphereBoundsProbe& probe,
-    const SegmentEndpointPair& endpoints
+    const Wm3::AxisAlignedBox3f& bounds
   ) noexcept
   {
-    const auto distanceSquaredTo = [&probe](const Wm3::Vector3f& point) noexcept {
-      const float dx = point.x - probe.center.x;
-      const float dy = point.y - probe.center.y;
-      const float dz = point.z - probe.center.z;
+    const auto distanceSquaredTo = [&probe](const float x, const float y, const float z) noexcept {
+      const float dx = std::fabs(x - probe.center.x);
+      const float dy = std::fabs(y - probe.center.y);
+      const float dz = std::fabs(z - probe.center.z);
       return (dx * dx) + (dy * dy) + (dz * dz);
     };
 
     const float radiusSquared = probe.radius * probe.radius;
-    return distanceSquaredTo(endpoints.begin) <= radiusSquared && distanceSquaredTo(endpoints.end) <= radiusSquared;
+    if (distanceSquaredTo(bounds.Min.x, bounds.Min.y, bounds.Min.z) > radiusSquared) {
+      return false;
+    }
+    return distanceSquaredTo(bounds.Max.x, bounds.Max.y, bounds.Max.z) <= radiusSquared;
   }
 
   /**
@@ -1146,54 +1215,282 @@ namespace
   }
 
   /**
+   * Length-error throw helpers for the SpatialShard pointer vectors. The
+   * binary inlines two distinct copies of the standard MSVC8 "vector<T> too
+   * long" throw at FUN_00505750 (shard lane) and FUN_00505A70 (shard-data
+   * lane); both are recovered as `RuntimeThrowContainerTooLong` lanes in
+   * `CrtRuntimeHelpers.cpp`. We forward to `std::length_error` here.
+   */
+  [[noreturn]] void ThrowSpatialShardVectorTooLong()
+  {
+    throw std::length_error("vector<T> too long");
+  }
+
+  /**
+   * Address: 0x00505530 (FUN_00505530, msvc8::vector<Moho::SpatialShard*>::_Insert_n)
+   *
+   * IDA signature:
+   * int *__userpurge sub_505530@<eax>(
+   *     int *valueRef@<eax>, vector<SpatialShard*>* this@<ecx>,
+   *     SpatialShard** insertPos, unsigned int count);
+   *
+   * What it does:
+   * MSVC8 typed slow-path for `vector<Moho::SpatialShard*>::_Insert_n(pos,
+   * count, &value)`. Either fills `count` lanes in-place at `insertPos`
+   * (shifting the tail down then filling) when capacity allows, or allocates
+   * a fresh `oldSize + count` block, bulk-rebuilds `[head..pos)`,
+   * `[pos..pos+count)`, `[pos+count..pos+count+tail)`, and frees the old
+   * block. Returns the post-insert capacity in element units. This per-T
+   * named free helper preserves the binary's 1:1 symbol shape for the
+   * `T = moho::SpatialShard*` instantiation.
+   */
+  [[nodiscard]] std::size_t InsertNullSpatialShardSlots(
+    moho::SpatialShardArray<moho::SpatialShard>& shards,
+    moho::SpatialShard** const insertPos,
+    const std::size_t count,
+    moho::SpatialShard* const valueToFill)
+  {
+    moho::SpatialShard** const oldBegin = shards.mBegin;
+    moho::SpatialShard** const oldEnd = shards.mEnd;
+    moho::SpatialShard** const oldCapEnd = shards.mCapacity;
+
+    const std::size_t oldCapacity = (oldBegin == nullptr) ? 0u :
+      static_cast<std::size_t>(oldCapEnd - oldBegin);
+    if (count == 0u) {
+      return oldCapacity;
+    }
+
+    const std::size_t oldSize = (oldBegin == nullptr) ? 0u :
+      static_cast<std::size_t>(oldEnd - oldBegin);
+
+    constexpr std::size_t kMaxElements = 0x3FFFFFFFu;
+    if (kMaxElements - oldSize < count) {
+      ThrowSpatialShardVectorTooLong();
+    }
+
+    if (oldCapacity >= oldSize + count) {
+      moho::SpatialShard** const tail = oldEnd;
+      const std::size_t shiftCount = static_cast<std::size_t>(tail - insertPos);
+      if (shiftCount < count) {
+        if (shiftCount > 0u) {
+          (void)std::memmove(insertPos + count, insertPos, shiftCount * sizeof(moho::SpatialShard*));
+        }
+        const std::size_t gapAfterTail = count - shiftCount;
+        if (gapAfterTail > 0u) {
+          std::fill_n(oldEnd, gapAfterTail, valueToFill);
+        }
+        shards.mEnd = insertPos + count + shiftCount;
+        std::fill(insertPos, oldEnd, valueToFill);
+      } else {
+        moho::SpatialShard** const newTailEnd = oldEnd + count;
+        (void)std::memmove(oldEnd, oldEnd - count, count * sizeof(moho::SpatialShard*));
+        std::fill(insertPos, insertPos + count, valueToFill);
+        shards.mEnd = newTailEnd;
+      }
+      return oldCapacity;
+    }
+
+    std::size_t newCapacity = 0u;
+    if (kMaxElements - (oldCapacity >> 1) >= oldCapacity) {
+      newCapacity = oldCapacity + (oldCapacity >> 1);
+    }
+    if (newCapacity < oldSize + count) {
+      newCapacity = oldSize + count;
+    }
+
+    moho::SpatialShard** const newBegin = (newCapacity == 0u)
+      ? static_cast<moho::SpatialShard**>(::operator new(0))
+      : new moho::SpatialShard*[newCapacity];
+
+    const std::size_t headCount = static_cast<std::size_t>(insertPos - oldBegin);
+    if (headCount > 0u) {
+      (void)std::memmove(newBegin, oldBegin, headCount * sizeof(moho::SpatialShard*));
+    }
+    if (count > 0u) {
+      std::fill_n(newBegin + headCount, count, valueToFill);
+    }
+    const std::size_t tailCount = static_cast<std::size_t>(oldEnd - insertPos);
+    if (tailCount > 0u) {
+      (void)std::memmove(newBegin + headCount + count, insertPos,
+        tailCount * sizeof(moho::SpatialShard*));
+    }
+
+    const std::size_t newSize = oldSize + count;
+    if (oldBegin != nullptr) {
+      ::operator delete(oldBegin);
+    }
+
+    shards.mCapacity = newBegin + newCapacity;
+    shards.mEnd = newBegin + newSize;
+    shards.mBegin = newBegin;
+    return newCapacity;
+  }
+
+  /**
+   * Address: 0x00505850 (FUN_00505850, msvc8::vector<Moho::SpatialShardData*>::_Insert_n)
+   *
+   * IDA signature:
+   * int *__userpurge sub_505850@<eax>(
+   *     int *valueRef@<eax>, vector<SpatialShardData*>* this@<ecx>,
+   *     SpatialShardData** insertPos, unsigned int count);
+   *
+   * What it does:
+   * Sibling template emission of `InsertNullSpatialShardSlots` instantiated
+   * for `T = moho::SpatialShardData*`. Same semantics on the leaf-lane
+   * element type. Separate symbol because MSVC8 emits one template body per
+   * `T`.
+   */
+  [[nodiscard]] std::size_t InsertNullSpatialShardDataSlots(
+    moho::SpatialShardArray<moho::SpatialShardData>& dataArray,
+    moho::SpatialShardData** const insertPos,
+    const std::size_t count,
+    moho::SpatialShardData* const valueToFill)
+  {
+    moho::SpatialShardData** const oldBegin = dataArray.mBegin;
+    moho::SpatialShardData** const oldEnd = dataArray.mEnd;
+    moho::SpatialShardData** const oldCapEnd = dataArray.mCapacity;
+
+    const std::size_t oldCapacity = (oldBegin == nullptr) ? 0u :
+      static_cast<std::size_t>(oldCapEnd - oldBegin);
+    if (count == 0u) {
+      return oldCapacity;
+    }
+
+    const std::size_t oldSize = (oldBegin == nullptr) ? 0u :
+      static_cast<std::size_t>(oldEnd - oldBegin);
+
+    constexpr std::size_t kMaxElements = 0x3FFFFFFFu;
+    if (kMaxElements - oldSize < count) {
+      ThrowSpatialShardVectorTooLong();
+    }
+
+    if (oldCapacity >= oldSize + count) {
+      moho::SpatialShardData** const tail = oldEnd;
+      const std::size_t shiftCount = static_cast<std::size_t>(tail - insertPos);
+      if (shiftCount < count) {
+        if (shiftCount > 0u) {
+          (void)std::memmove(insertPos + count, insertPos, shiftCount * sizeof(moho::SpatialShardData*));
+        }
+        const std::size_t gapAfterTail = count - shiftCount;
+        if (gapAfterTail > 0u) {
+          std::fill_n(oldEnd, gapAfterTail, valueToFill);
+        }
+        dataArray.mEnd = insertPos + count + shiftCount;
+        std::fill(insertPos, oldEnd, valueToFill);
+      } else {
+        moho::SpatialShardData** const newTailEnd = oldEnd + count;
+        (void)std::memmove(oldEnd, oldEnd - count, count * sizeof(moho::SpatialShardData*));
+        std::fill(insertPos, insertPos + count, valueToFill);
+        dataArray.mEnd = newTailEnd;
+      }
+      return oldCapacity;
+    }
+
+    std::size_t newCapacity = 0u;
+    if (kMaxElements - (oldCapacity >> 1) >= oldCapacity) {
+      newCapacity = oldCapacity + (oldCapacity >> 1);
+    }
+    if (newCapacity < oldSize + count) {
+      newCapacity = oldSize + count;
+    }
+
+    moho::SpatialShardData** const newBegin = (newCapacity == 0u)
+      ? static_cast<moho::SpatialShardData**>(::operator new(0))
+      : new moho::SpatialShardData*[newCapacity];
+
+    const std::size_t headCount = static_cast<std::size_t>(insertPos - oldBegin);
+    if (headCount > 0u) {
+      (void)std::memmove(newBegin, oldBegin, headCount * sizeof(moho::SpatialShardData*));
+    }
+    if (count > 0u) {
+      std::fill_n(newBegin + headCount, count, valueToFill);
+    }
+    const std::size_t tailCount = static_cast<std::size_t>(oldEnd - insertPos);
+    if (tailCount > 0u) {
+      (void)std::memmove(newBegin + headCount + count, insertPos,
+        tailCount * sizeof(moho::SpatialShardData*));
+    }
+
+    const std::size_t newSize = oldSize + count;
+    if (oldBegin != nullptr) {
+      ::operator delete(oldBegin);
+    }
+
+    dataArray.mCapacity = newBegin + newCapacity;
+    dataArray.mEnd = newBegin + newSize;
+    dataArray.mBegin = newBegin;
+    return newCapacity;
+  }
+
+  /**
    * Address: 0x00504D70 (FUN_00504D70, sub_504D70)
    *
    * What it does:
-   * Ensures one shard-pointer array has exactly 16 active lanes.
+   * Ensures one shard-pointer array has exactly 16 active lanes. The binary
+   * implementation forwards to the typed `_Insert_n` slow-path
+   * (`InsertNullSpatialShardSlots`) when capacity must grow, or to the
+   * `RelocateVectorVoidSegment` erase-tail helper at FUN_00504DE0 when size
+   * exceeds the cap; we follow that exact dispatch shape.
    */
   [[nodiscard]] std::size_t EnsureSpatialShardSlots16(moho::SpatialShardArray<moho::SpatialShard>& shards)
   {
     moho::SpatialShard** const begin = shards.mBegin;
-    std::size_t size = 0u;
-    if (begin != nullptr && shards.mEnd != nullptr && shards.mEnd >= begin) {
-      size = static_cast<std::size_t>(shards.mEnd - begin);
-    }
-
     if (begin == nullptr) {
-      AllocateSpatialShardArray(shards, kSpatialShardSlotCount);
+      moho::SpatialShard* nullValue = nullptr;
+      (void)InsertNullSpatialShardSlots(shards, shards.mEnd,
+        static_cast<std::size_t>(kSpatialShardSlotCount), nullValue);
       return shards.mBegin == nullptr ? 0u : static_cast<std::size_t>(kSpatialShardSlotCount);
     }
 
+    const std::size_t size = static_cast<std::size_t>(shards.mEnd - begin);
     if (size < static_cast<std::size_t>(kSpatialShardSlotCount)) {
-      std::size_t capacity = 0u;
-      if (shards.mCapacity != nullptr && shards.mCapacity >= begin) {
-        capacity = static_cast<std::size_t>(shards.mCapacity - begin);
-      }
-
-      if (capacity >= static_cast<std::size_t>(kSpatialShardSlotCount)) {
-        std::fill(begin + size, begin + kSpatialShardSlotCount, nullptr);
-        shards.mEnd = begin + kSpatialShardSlotCount;
-        return static_cast<std::size_t>(kSpatialShardSlotCount);
-      }
-
-      moho::SpatialShard** const expanded = new (std::nothrow) moho::SpatialShard*[kSpatialShardSlotCount];
-      if (expanded == nullptr) {
-        return size;
-      }
-      std::fill_n(expanded, kSpatialShardSlotCount, nullptr);
-      if (size > 0u) {
-        std::copy_n(begin, size, expanded);
-      }
-
-      delete[] begin;
-      shards.mBegin = expanded;
-      shards.mEnd = expanded + kSpatialShardSlotCount;
-      shards.mCapacity = expanded + kSpatialShardSlotCount;
+      moho::SpatialShard* nullValue = nullptr;
+      const std::size_t needed = static_cast<std::size_t>(kSpatialShardSlotCount) - size;
+      (void)InsertNullSpatialShardSlots(shards, shards.mEnd, needed, nullValue);
       return static_cast<std::size_t>(kSpatialShardSlotCount);
     }
 
     if (size > static_cast<std::size_t>(kSpatialShardSlotCount)) {
       shards.mEnd = begin + kSpatialShardSlotCount;
+      return static_cast<std::size_t>(kSpatialShardSlotCount);
+    }
+
+    return size;
+  }
+
+  /**
+   * Address: 0x00504EE0 (FUN_00504EE0, sub_504EE0)
+   *
+   * IDA signature:
+   * unsigned int __thiscall sub_504EE0(std::vector_SpatialShardData *this);
+   *
+   * What it does:
+   * Sibling of `EnsureSpatialShardSlots16` instantiated for the leaf-data
+   * pointer vector. Called from `SpatialShard::SpatialShard` when
+   * `mLevel <= 0` to right-size the 16 leaf-lane pointer slots, forwarding
+   * to `InsertNullSpatialShardDataSlots` (slow-path grow) or the
+   * `RelocateVectorVoidSegment` erase-tail helper at FUN_00504F50.
+   */
+  [[nodiscard]] std::size_t EnsureSpatialShardDataSlots16(moho::SpatialShardArray<moho::SpatialShardData>& dataArray)
+  {
+    moho::SpatialShardData** const begin = dataArray.mBegin;
+    if (begin == nullptr) {
+      moho::SpatialShardData* nullValue = nullptr;
+      (void)InsertNullSpatialShardDataSlots(dataArray, dataArray.mEnd,
+        static_cast<std::size_t>(kSpatialShardSlotCount), nullValue);
+      return dataArray.mBegin == nullptr ? 0u : static_cast<std::size_t>(kSpatialShardSlotCount);
+    }
+
+    const std::size_t size = static_cast<std::size_t>(dataArray.mEnd - begin);
+    if (size < static_cast<std::size_t>(kSpatialShardSlotCount)) {
+      moho::SpatialShardData* nullValue = nullptr;
+      const std::size_t needed = static_cast<std::size_t>(kSpatialShardSlotCount) - size;
+      (void)InsertNullSpatialShardDataSlots(dataArray, dataArray.mEnd, needed, nullValue);
+      return static_cast<std::size_t>(kSpatialShardSlotCount);
+    }
+
+    if (size > static_cast<std::size_t>(kSpatialShardSlotCount)) {
+      dataArray.mEnd = begin + kSpatialShardSlotCount;
       return static_cast<std::size_t>(kSpatialShardSlotCount);
     }
 
@@ -3236,7 +3533,10 @@ namespace moho
     mData.mCapacity = nullptr;
 
     if (mLevel <= 0) {
-      AllocateSpatialShardArray(mData, 16);
+      // Binary at 0x005011D4 calls FUN_00504EE0 (EnsureSpatialShardDataSlots16)
+      // to allocate/resize the 16 leaf-lane pointer slots. This wires the
+      // typed sibling of `EnsureSpatialShardSlots16` for the leaf-data lane.
+      EnsureSpatialShardDataSlots16(mData);
       if (mData.mBegin == nullptr) {
         return;
       }
@@ -3677,6 +3977,98 @@ namespace moho
   }
 
   /**
+   * Address: 0x005030C0 (FUN_005030C0, Moho::SpatialShardData::CollectInSphereFromData)
+   *
+   * What it does:
+   * Sphere-collect leaf variant. Mirrors `CollectInVolumeFromData` but uses a
+   * bounding sphere as the culling primitive. Returns `true` when the shard
+   * had no entities of the requested type (the early-out path that mirrors
+   * the recursive walker's reuse of the per-shard `CountType` reject), which
+   * the recursive caller treats as a hint to short-circuit.
+   */
+  bool SpatialShardData::CollectInSphereFromData(
+    const EEntityType type,
+    const SphereBoundsProbe& probe,
+    gpg::fastvector<UserEntity*>& destination
+  )
+  {
+    if (SpatialShardDataHasNoRequestedType(*this, type)) {
+      return true;
+    }
+
+    if (!SphereIntersectsAabb(mBounds, probe)) {
+      return false;
+    }
+
+    if (mTimeSinceRecalc > 500) {
+      RecalculateBounds();
+    }
+
+    const bool dataBoundsContained = SphereContainsAabbDiagonal(probe, mBounds);
+    const std::uint32_t typeBits = EntityTypeBits(type);
+
+    const auto includeIfRelevant = [&probe, dataBoundsContained](
+      const Wm3::AxisAlignedBox3f& nodeBox
+    ) {
+      return dataBoundsContained || SphereIntersectsAabb(nodeBox, probe);
+    };
+
+    if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
+      CollectTreeNodes(mMapUnits, destination, includeIfRelevant);
+    }
+
+    if ((typeBits & kSpatialEntityTypeProjectile) != 0u) {
+      CollectTreeNodes(mMapProjectiles, destination, includeIfRelevant);
+    }
+
+    if ((typeBits & kSpatialEntityTypeProp) != 0u) {
+      CollectTreeNodes(mMapProps, destination, includeIfRelevant);
+    }
+
+    if ((typeBits & kSpatialEntityTypeEntity) != 0u) {
+      CollectTreeNodes(mMapEntities, destination, includeIfRelevant);
+    }
+
+    return dataBoundsContained;
+  }
+
+  /**
+   * Address: 0x00503D40 (FUN_00503D40, Moho::SpatialShardData::CollectInSphere)
+   *
+   * What it does:
+   * Sphere variant of the recursive `CollectInBox` / `CollectInVolume`
+   * walker. Early-outs when the shard has no entities of the requested type
+   * or when the sphere does not touch the shard's bounds, otherwise descends
+   * each of the 16 child slots — recursing on non-leaf children and
+   * delegating to the per-leaf `CollectInSphereFromData` at level 0.
+   */
+  bool SpatialShardData::CollectInSphere(
+    SpatialShard* const shard,
+    const EEntityType type,
+    const SphereBoundsProbe& probe,
+    gpg::fastvector<UserEntity*>& destination
+  )
+  {
+    if (SpatialShardHasNoRequestedType(*shard, type)) {
+      return true;
+    }
+
+    if (!SphereIntersectsAabb(shard->mBounds, probe)) {
+      return false;
+    }
+
+    bool result = false;
+    for (std::int32_t index = 0; index < 16; ++index) {
+      if (shard->mLevel <= 0) {
+        result = shard->mData.mBegin[index]->CollectInSphereFromData(type, probe, destination);
+      } else {
+        result = CollectInSphere(shard->mShards.mBegin[index], type, probe, destination);
+      }
+    }
+    return result;
+  }
+
+  /**
    * Address: 0x00503730 (FUN_00503730, Moho::SpatialShardData::FindInVolumeFromData)
    *
    * What it does:
@@ -4034,13 +4426,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x005040E0 (FUN_005040E0)
+   * Helper lane (no canonical address — inlined into
+   * `SpatialDB_MeshInstance::CollectInVolume` at FUN_00504130 in the
+   * binary). The previous recovery mis-attributed this helper to FUN_005040E0
+   * which is in fact the bounding-sphere collect variant, recovered below.
    *
    * What it does:
    * Walks all shard lanes in one mesh-instance view, collects node owners that
    * intersect `volume`, then appends matches from inline root shard data.
    */
-  [[maybe_unused]] std::int32_t CollectShardsInVolumeIntoDestination(
+  [[nodiscard]] std::int32_t CollectShardsInVolumeIntoDestination(
     CGeomSolid3* const volume,
     gpg::fastvector<UserEntity*>& destination,
     SpatialDbMeshCollectView& spatialView,
@@ -4054,6 +4449,31 @@ namespace moho
     }
 
     spatialView.shardData.CollectInVolumeFromData(destination, type, volume);
+    return static_cast<std::int32_t>(destination.size());
+  }
+
+  /**
+   * Helper lane shared by `SpatialDB_MeshInstance::CollectInSphere` (the
+   * canonical FUN_005040E0 body). Walks all child shards in one
+   * mesh-instance view, sphere-collecting node owners that touch the
+   * bounding sphere into `destination`, then runs one sphere collect over
+   * the inline root shard-data lane. Returns the count of destination
+   * entries appended so far.
+   */
+  std::int32_t CollectShardsInSphereIntoDestination(
+    const SphereBoundsProbe& probe,
+    gpg::fastvector<UserEntity*>& destination,
+    SpatialDbMeshCollectView& spatialView,
+    const EEntityType type
+  )
+  {
+    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+      if (*shard != nullptr) {
+        SpatialShardData::CollectInSphere(*shard, type, probe, destination);
+      }
+    }
+
+    spatialView.shardData.CollectInSphereFromData(type, probe, destination);
     return static_cast<std::int32_t>(destination.size());
   }
 
@@ -4129,6 +4549,24 @@ namespace moho
     SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
     constexpr EEntityType kUnitType = static_cast<EEntityType>(kSpatialEntityTypeUnit);
     return CollectShardsInBoxIntoDestination(bounds, destination, spatialView, kUnitType);
+  }
+
+  /**
+   * Address: 0x005040E0 (FUN_005040E0, Moho::SpatialDB_MeshInstance::CollectInSphere)
+   *
+   * What it does:
+   * Walks all child shard pointers, sphere-collecting matching entity owners
+   * that touch the bounding sphere into `destination`, then collects from
+   * the inline root shard-data lane.
+   */
+  std::int32_t SpatialDB_MeshInstance::CollectInSphere(
+    gpg::fastvector<UserEntity*>& destination,
+    const EEntityType type,
+    const SphereBoundsProbe& probe
+  )
+  {
+    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    return CollectShardsInSphereIntoDestination(probe, destination, spatialView, type);
   }
 
   /**

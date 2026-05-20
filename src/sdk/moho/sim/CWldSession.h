@@ -45,7 +45,28 @@ namespace moho
   struct SSTICommandIssueData;
   class STIMap;
   class IWldUIProvider;
-  struct SBuildTemplateInfo;
+  struct SBuildTemplateInfo
+  {
+    SBuildTemplateInfo() = default;
+
+    Wm3::Vector3f mPos;         // +0x00
+    std::int32_t mBuildOrder;   // +0x0C
+    msvc8::string mBlueprintId; // +0x10
+
+    /**
+     * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
+     *
+     * What it does:
+     * Copy-constructs one build-template entry (position, heading, blueprint
+     * id).
+     */
+    SBuildTemplateInfo(const SBuildTemplateInfo& other);
+  };
+  static_assert(sizeof(SBuildTemplateInfo) == 0x2C, "SBuildTemplateInfo size must be 0x2C");
+  static_assert(offsetof(SBuildTemplateInfo, mBuildOrder) == 0x0C, "SBuildTemplateInfo::mBuildOrder offset must be 0x0C");
+  static_assert(
+    offsetof(SBuildTemplateInfo, mBlueprintId) == 0x10, "SBuildTemplateInfo::mBlueprintId offset must be 0x10"
+  );
   struct GeomCamera3;
 
   struct SBuildTemplateBuffer
@@ -69,6 +90,30 @@ namespace moho
   static_assert(
     offsetof(SBuildTemplateBuffer, mInlineStorage) == 0x10, "SBuildTemplateBuffer::mInlineStorage offset must be 0x10"
   );
+
+  /**
+   * Address: 0x00899790 (FUN_00899790,
+   *   gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator=)
+   *
+   * IDA signature:
+   * void __userpurge sub_899790(
+   *     gpg::fastvector_n16_SBuildTemplateInfo *result@<eax>,
+   *     gpg::fastvector_n16_SBuildTemplateInfo *a2);
+   *
+   * What it does:
+   * Per-T named helper for the engine-instantiated assignment-operator body
+   * of `gpg::fastvector_n<SBuildTemplateInfo, 16>` (inline-buffer variant
+   * with stride 0x2C). Performs self-assignment guard, then either copies
+   * the existing elements into the destination's pre-allocated tail and
+   * grows when the source size exceeds destination capacity, falling back
+   * to the per-element copy/destroy split path otherwise.
+   *
+   * Caller: `Moho::CWldSession::SetActiveBuildTemplate` (FUN_00896A70) —
+   * the single binary call site that replaces the build-template buffer
+   * before the placement preview is re-anchored.
+   */
+  void AssignBuildTemplateBuffer(SBuildTemplateBuffer& destination, const SBuildTemplateBuffer& source);
+
 
   struct MouseInfo
   {
@@ -934,6 +979,16 @@ namespace moho
 
   public:
     /**
+     * Address: 0x00896A40 (FUN_00896A40, ?GetActiveBuildTemplate@CWldSession@Moho@@QBE?AV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@AAH0@Z)
+     *
+     * What it does:
+     * Copies the active build-template buffer into one caller-owned inline
+     * fastvector lane and returns the current template X/Z extents.
+     */
+    SBuildTemplateBuffer*
+    GetActiveBuildTemplate(float* outTemplateSpanZ, float* outTemplateSpanX, SBuildTemplateBuffer* result) const;
+
+    /**
      * Address: 0x00896AA0 (FUN_00896AA0, ?GenerateBuildTemplates@CWldSession@Moho@@QAEXXZ)
      *
      * What it does:
@@ -953,6 +1008,25 @@ namespace moho
     void ClearBuildTemplates();
 
     /**
+     * Address: 0x00896A70 (FUN_00896A70,
+     *   ?SetActiveBuildTemplate@CWldSession@Moho@@QAEXABV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@HH@Z)
+     *
+     * What it does:
+     * Replaces the active build-template fastvector buffer with `templates`
+     * and records the placement preview anchor as (`templateSpanX`,
+     * `templateSpanZ`) for the build-cursor overlay.
+     *
+     * The actual buffer copy is routed through the per-type named helper
+     * `moho::AssignBuildTemplateBuffer` (FUN_00899790) so the linker keeps
+     * the engine-emitted assignment symbol bound.
+     */
+    void SetActiveBuildTemplate(
+      const SBuildTemplateBuffer& templates,
+      float templateSpanX,
+      float templateSpanZ
+    );
+
+    /**
      * Address: 0x00895F70 (FUN_00895F70, ?DirtyCommandGraph@CWldSession@Moho@@QAEXXZ)
      *
      * What it does:
@@ -970,6 +1044,15 @@ namespace moho
      * Locks/returns cached command-graph weak handle and optionally creates it.
      */
     [[nodiscard]] boost::SharedPtrRaw<UICommandGraph> GetCommandGraph(bool allowCreate);
+
+    /**
+     * Address: 0x008958B0 (FUN_008958B0, ?ApplyPendingSaveData@CWldSession@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Applies pending save-data selection-set labels to live user units and
+     * calls UI selection reset with a table grouped by set name.
+     */
+    void ApplyPendingSaveData();
 
     /**
      * Address: 0x00895DC0 (FUN_00895DC0, ?HandleFogEdge@CWldSession@Moho@@AAEXABV?$Rect2@H@gpg@@HH@Z)
@@ -1059,13 +1142,15 @@ namespace moho
     int32_t HighlightCommandId;                             // 0x04C8
     Wm3::Vector2f CursorScreenPos;                          // 0x04CC
     bool IsCheatsEnabled;                                   // 0x04D4
-    char pad_04D5[3];                                       // 0x04D5
+    bool mShowInvalidBuildPlacementPreview;                 // 0x04D5
+    char pad_04D6[2];                                       // 0x04D6
     msvc8::vector<msvc8::string> mOverlayFilters;           // 0x04D8
     bool DisplayEconomyOverlay;                             // 0x04E8
     bool mTeamColorMode;                                    // 0x04E9
     char pad_04EA[2];                                       // 0x04EA
     gpg::MemBuffer<char> mEdgeFog;                          // 0x04EC
-    char pad_04FC[12];                                      // 0x04FC
+    boost::shared_ptr<SSessionSaveData> mPendingSaveData;   // 0x04FC
+    char pad_0504[4];                                       // 0x0504
   };
 
   static_assert(
@@ -1110,9 +1195,17 @@ namespace moho
   static_assert(offsetof(CWldSession, CursorWorldPos) == 0x4B4, "CWldSession::CursorWorldPos offset must be 0x4B4");
   static_assert(offsetof(CWldSession, CursorScreenPos) == 0x4CC, "CWldSession::CursorScreenPos offset must be 0x4CC");
   static_assert(
+    offsetof(CWldSession, mShowInvalidBuildPlacementPreview) == 0x4D5,
+    "CWldSession::mShowInvalidBuildPlacementPreview offset must be 0x4D5"
+  );
+  static_assert(
     offsetof(CWldSession, mOverlayFilters) == 0x4D8, "CWldSession::mOverlayFilters offset must be 0x4D8"
   );
   static_assert(offsetof(CWldSession, mEdgeFog) == 0x4EC, "CWldSession::mEdgeFog offset must be 0x4EC");
+  static_assert(
+    offsetof(CWldSession, mPendingSaveData) == 0x4FC,
+    "CWldSession::mPendingSaveData offset must be 0x4FC"
+  );
 
   enum class EWldFrameAction : std::int32_t
   {

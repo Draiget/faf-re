@@ -45,6 +45,14 @@ namespace gpg::gal
          * Copy-constructs one `Head` range into uninitialized destination
          * storage and, on exception, destroys the partially constructed prefix
          * before rethrowing.
+         *
+         * The release binary additionally exposes four linker-emitted
+         * calling-convention trampolines that forward unmodified to this body
+         * (`FUN_008D6E00`, `FUN_008E7110`, `FUN_008E7170`, `FUN_008E71A0`)
+         * for cross-TU references with `__cdecl` and `__stdcall` callsites.
+         * No separate source code is emitted for those trampolines; the
+         * compiler/linker re-synthesizes them automatically when this single
+         * recovered body is referenced from differently-conventioned callers.
          */
         [[nodiscard]] Head* CopyConstructHeadRangeIntoUninitializedStorageOrRethrow(
             const Head* const sourceBegin,

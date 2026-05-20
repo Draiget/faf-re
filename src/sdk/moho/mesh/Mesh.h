@@ -44,6 +44,18 @@ namespace moho
   struct GeomCamera3;
 
   /**
+   * Bounding-sphere probe used by spatial-shard sphere collect lanes
+   * (`SpatialDB_MeshInstance::CollectInSphere` / `SpatialShardData::CollectInSphere`).
+   * Layout matches the four-`float` packet the binary passes by pointer
+   * (`{center.x, center.y, center.z, radius}`).
+   */
+  struct SphereBoundsProbe
+  {
+    Wm3::Vector3f center;
+    float radius;
+  };
+
+  /**
    * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
    *
    * What it does:
@@ -184,6 +196,19 @@ namespace moho
      * inline root data, then returns destination count.
      */
     std::int32_t CollectInBox(gpg::fastvector<UserEntity*>& dest, const Wm3::AxisAlignedBox3f& bounds);
+
+    /**
+     * Address: 0x005040E0 (FUN_005040E0, Moho::SpatialDB_MeshInstance::CollectInSphere)
+     *
+     * What it does:
+     * Collects matching entities from all shard lanes and inline root data that
+     * touch the supplied bounding sphere, then returns destination count.
+     */
+    std::int32_t CollectInSphere(
+      gpg::fastvector<UserEntity*>& dest,
+      EEntityType type,
+      const SphereBoundsProbe& probe
+    );
 
     /**
      * Address: 0x00504130 (FUN_00504130, Moho::SpatialDB_MeshInstance::CollectInVolume)

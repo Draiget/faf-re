@@ -10,8 +10,10 @@
 #include <fstream>
 #include <ios>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <new>
+#include <vector>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -5602,6 +5604,35 @@ msvc8::string moho::USER_GetScreenshotDir()
   return outDir;
 }
 
+namespace
+{
+  /**
+   * Address: 0x008CB600 (FUN_008CB600)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_8CB600@<eax>(std::string *key@<ecx>, std::map *map@<ebx>);
+   *
+   * What it does:
+   * Out-of-line specialization of
+   * `std::map<std::string, std::vector<std::string>>::operator[]`. Calls
+   * `_Tree::lower_bound` on the key; when the lookup either returns the
+   * sentinel head or a node whose key compares greater than the requested key,
+   * it allocates a new node (default-constructed value), splices it into the
+   * tree, then returns a reference to the value slot at node offset +0x28.
+   *
+   * Wired here so the linker preserves the binary's per-type
+   * `vector_string::operator[]` symbol shape; the natural `map[key]` idiom
+   * the compiler would inline does not guarantee the out-of-line emission.
+   */
+  std::vector<std::string>& SubscriptStringToStringVectorMap(
+    std::map<std::string, std::vector<std::string>>& map,
+    const std::string& key
+  )
+  {
+    return map[key];
+  }
+} // namespace
+
 /**
  * Address: 0x008CA650 (FUN_008CA650, USER_GetSpecialFiles)
  *
@@ -5672,7 +5703,7 @@ void moho::USER_GetSpecialFiles(
 
     do {
       const std::string fileName = gpg::STR_WideToUtf8(fileFindData.cFileName).to_std();
-      outFilesByProfile[profileName].push_back(fileName);
+      SubscriptStringToStringVectorMap(outFilesByProfile, profileName).push_back(fileName);
     } while (::FindNextFileW(fileFindHandle, &fileFindData) != FALSE);
 
     if (::GetLastError() != ERROR_NO_MORE_FILES) {

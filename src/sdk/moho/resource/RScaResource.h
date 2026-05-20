@@ -115,6 +115,24 @@ namespace moho
      */
     RScaResource() noexcept = default;
 
+    /**
+     * Address: 0x0053A440 (FUN_0053A440)
+     *
+     * IDA signature:
+     * void __stdcall sub_53A440(int a1);
+     *
+     * What it does:
+     * Compiler-emitted defaulted destructor body. Releases the held
+     * `MemBuffer<char>` shared-count control lane at +0x20 and tears down
+     * the embedded `msvc8::string mFilename` (freeing the heap buffer
+     * when the string is not in SSO mode and zeroing the SSO marker).
+     * The trailing `mStart`/`mEnd` raw pointers do not need destruction.
+     * Invoked from `boost::detail::sp_counted_impl_p<RScaResource>::dispose`
+     * (`FUN_0053B3D0`) via `delete countedImpl->px` in
+     * `DisposeSpCountedImplPointee<moho::RScaResource>`.
+     */
+    ~RScaResource() noexcept = default;
+
   public:
     msvc8::string mFilename{};          // +0x00
     gpg::MemBuffer<char> mMem{};        // +0x1C

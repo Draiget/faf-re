@@ -231,6 +231,10 @@ namespace
    *
    * What it does:
    * Loads a `vector<EntityCategorySet>` payload and replaces destination storage.
+   * Uses `UninitializedCopyEntityCategorySetRange` to materialize the destination
+   * slots from a single empty BVSet template before per-element archive reads,
+   * matching the binary's reserve-then-read pattern where each grown slot is
+   * copy-constructed from a default-initialized prototype.
    */
   void LoadEntityCategorySetVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -245,7 +249,23 @@ namespace
     archive->ReadUInt(&count);
 
     EntityCategorySetVector loaded{};
-    loaded.resize(static_cast<std::size_t>(count));
+    const std::size_t targetCount = static_cast<std::size_t>(count);
+    if (targetCount > 0u) {
+      // Pre-grow the destination so each slot exists as a constructed
+      // EntityCategorySet before archive deserialization writes into it. We
+      // use the uninitialized-copy helper to clone a single empty prototype
+      // into each new slot, mirroring the binary's reserve-and-uninit-copy
+      // path for vector<EntityCategorySet> growth.
+      loaded.reserve(targetCount);
+      const moho::EntityCategorySet emptyPrototype{};
+      auto& view = msvc8::AsVectorRuntimeView(loaded);
+      moho::EntityCategorySet* const slotsBegin = view.end;
+      for (std::size_t i = 0u; i < targetCount; ++i) {
+        moho::EntityCategorySet* const slot = slotsBegin + i;
+        (void)moho::UninitializedCopyEntityCategorySetRange(&emptyPrototype, &emptyPrototype + 1, slot);
+      }
+      view.end = slotsBegin + targetCount;
+    }
 
     gpg::RType* const elementType = ResolveEntityCategorySetType();
     if (!elementType) {
@@ -469,4 +489,79 @@ int moho::register_EntityCategorySetVectorType_AtExit()
 {
   (void)register_EntityCategorySetVectorType();
   return std::atexit(&cleanup_EntityCategorySetVectorType);
+}
+
+namespace
+{
+  /**
+   * Tears down a partially-constructed `EntityCategorySet` range during
+   * exception unwind from `UninitializedCopyEntityCategorySetRange`. Mirrors
+   * the destruction lane of `ResetEntityCategorySetWordStorageRange` (the
+   * fastvector resets to inline storage, freeing any heap-backed words).
+   */
+  void DestroyConstructedEntityCategorySetRange(
+    moho::EntityCategorySet* const begin,
+    moho::EntityCategorySet* const end
+  ) noexcept
+  {
+    if (begin == nullptr || end == nullptr || end <= begin) {
+      return;
+    }
+
+    for (moho::EntityCategorySet* cursor = begin; cursor != end; ++cursor) {
+      gpg::core::legacy::ResetStorageToInline(cursor->mBits.mWords);
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x006E0400 (FUN_006E0400)
+ *
+ * IDA signature:
+ * void __cdecl __noreturn sub_6E0400(int sourceBegin, int sourceEnd, int destinationBegin);
+ *
+ * What it does:
+ * Copy-constructs each `EntityCategorySet` from `[sourceBegin, sourceEnd)`
+ * into the uninitialized destination buffer at `destinationBegin` by writing
+ * the universe handle (`mUniverse`) and bit-set first-word index
+ * (`mBits.mFirstWordIndex`) directly, rebinding the embedded
+ * `fastvector_n<unsigned int, 2>` (`mBits.mWords`) to its inline storage,
+ * and copying the source words via `gpg::core::legacy::CopyFrom`. Returns
+ * the advanced destination cursor for chained writes.
+ *
+ * On exception during a partially-constructed range, the in-flight slots are
+ * rebound back to inline storage so any heap-backed word storage allocated by
+ * the copy helper is released before the exception propagates out, matching
+ * the binary's EH-unwind behavior.
+ */
+moho::EntityCategorySet* moho::UninitializedCopyEntityCategorySetRange(
+  const moho::EntityCategorySet* const sourceBegin,
+  const moho::EntityCategorySet* const sourceEnd,
+  moho::EntityCategorySet* const destinationBegin
+)
+{
+  moho::EntityCategorySet* destinationCursor = destinationBegin;
+  try {
+    for (const moho::EntityCategorySet* source = sourceBegin; source != sourceEnd; ++source) {
+      moho::EntityCategorySet* const slot = destinationCursor;
+      slot->mUniverse = source->mUniverse;
+      slot->mBits.mFirstWordIndex = source->mBits.mFirstWordIndex;
+      auto& destinationWords = slot->mBits.mWords;
+      destinationWords.start_ = destinationWords.inlineVec_;
+      destinationWords.end_ = destinationWords.inlineVec_;
+      destinationWords.capacity_ = destinationWords.inlineVec_ + 2u;
+      destinationWords.originalVec_ = destinationWords.inlineVec_;
+      (void)gpg::core::legacy::CopyFrom(
+        destinationWords,
+        source->mBits.mWords,
+        destinationWords.originalVec_
+      );
+      ++destinationCursor;
+    }
+  } catch (...) {
+    DestroyConstructedEntityCategorySetRange(destinationBegin, destinationCursor);
+    throw;
+  }
+
+  return destinationCursor;
 }

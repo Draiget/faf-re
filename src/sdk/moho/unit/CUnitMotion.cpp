@@ -13,9 +13,12 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
-#include "moho/ai/IAiTransport.h"
+#include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IAiTransport.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/ai/CAiPathSpline.h"
 #include "moho/entity/Entity.h"
@@ -28,6 +31,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/UnitWeapon.h"
 
 namespace gpg
 {
@@ -55,6 +59,13 @@ namespace moho
     constexpr float kWaterSnapSurfaceBias = 0.25f;
     constexpr float kNoWaterElevation = -10000.0f;
     constexpr float kCommonMoveNearStopSpeedScale = 0.080000006f;
+    constexpr float kCommonMoveSlavedArcEnterRadians = 0.017453292f;
+    constexpr float kCommonMoveSlavedArcExitRadians = 0.0087266462f;
+    constexpr float kCommonMoveHeadingAlignedDot = 0.99989998f;
+    constexpr float kCommonMoveVelocityStopThresholdSq = 0.000001f;
+    constexpr float kCommonMoveVelocityDamping = 0.80000001f;
+    constexpr float kCommonMoveTickScale = 0.0099999998f;
+    constexpr float kCommonMoveCollisionImpulseScale = 0.010000001f;
     constexpr float kLayerTransitionTickScale = 10.0f;
     constexpr float kHeightWordScale = 0.0078125f;
     constexpr float kAirTargetMinimumElevationScale = 0.5f;
@@ -333,6 +344,89 @@ namespace moho
     {
       static constexpr Wm3::Vector3f kZeroVector{};
       return std::memcmp(&value, &kZeroVector, sizeof(Wm3::Vector3f)) == 0;
+    }
+
+    [[nodiscard]] Wm3::Vector3f ForwardVectorFromQuaternion(const Wm3::Quaternionf& orientation) noexcept
+    {
+      Wm3::Vector3f out{};
+      out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
+      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
+      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      return out;
+    }
+
+    [[nodiscard]] bool IsCommonMoveSteeringAligned(const SteeringParams& params) noexcept
+    {
+      float targetX = std::numeric_limits<float>::max();
+      float targetZ = std::numeric_limits<float>::max();
+      if (params.mDistance != 0.0f) {
+        const float invDistance = 1.0f / params.mDistance;
+        targetX = params.mDeltaX * invDistance;
+        targetZ = params.mDeltaZ * invDistance;
+      }
+
+      const float alignment =
+        (params.mForwardXZ.y * targetZ) + (params.mForwardXZ.x * targetX);
+      return alignment >= kCommonMoveHeadingAlignedDot;
+    }
+
+    [[nodiscard]] bool RotateCommonMoveTransformTowardDestination(
+      Unit* const unit,
+      VTransform& transform,
+      const Wm3::Vector3f& destination,
+      const bool useFacingTurnRate
+    ) noexcept
+    {
+      const SteeringParams params = BuildSteeringParamsFromTransform(unit, transform, destination);
+      if (IsCommonMoveSteeringAligned(params)) {
+        return false;
+      }
+
+      Wm3::Vector2f direction{};
+      const float turnRate = useFacingTurnRate ? params.mTurnFacingRate : params.mTurnRate;
+      (void)RotateDirectionTowardTargetLimited(
+        &direction,
+        turnRate,
+        params.mForwardXZ.x,
+        params.mForwardXZ.y,
+        params.mDeltaX,
+        params.mDeltaZ
+      );
+      (void)BuildHeadingQuaternionFromDirection2D(&direction, &transform.orient_);
+      return true;
+    }
+
+    [[nodiscard]] Wm3::Vector3f ApplyCommonMoveAttackAngle(
+      Unit* const unit,
+      const Wm3::Vector3f& targetPosition,
+      const float attackAngleDegrees
+    ) noexcept
+    {
+      const Wm3::Vector3f unitPosition = unit->GetPosition();
+      Wm3::Vector3f toTarget{
+        targetPosition.x - unitPosition.x,
+        targetPosition.y - unitPosition.y,
+        targetPosition.z - unitPosition.z,
+      };
+      Wm3::Vector3f normalizedTarget = toTarget;
+      (void)Wm3::Vector3f::Normalize(&normalizedTarget);
+
+      const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
+      const float signedRadians =
+        ((normalizedTarget.z * forward.x) - (forward.z * normalizedTarget.x)) <= 0.0f
+          ? attackAngleDegrees * -kCommonMoveSlavedArcEnterRadians
+          : attackAngleDegrees * kCommonMoveSlavedArcEnterRadians;
+
+      const Wm3::Vector3f yawAxis{0.0f, 1.0f, 0.0f};
+      Wm3::Quaternionf rotation{};
+      (void)EulerRollToQuat(&yawAxis, &rotation, signedRadians);
+      Wm3::Vector3f rotated{};
+      Wm3::MultiplyQuaternionVector(&rotated, normalizedTarget, rotation);
+      return Wm3::Vector3f{
+        unitPosition.x + rotated.x,
+        unitPosition.y + rotated.y,
+        unitPosition.z + rotated.z,
+      };
     }
 
     [[nodiscard]] bool HasQueuedHeadCommand(const CUnitCommandQueue* const commandQueue) noexcept
@@ -1931,6 +2025,214 @@ namespace moho
     if (mUnknownFloat11C >= transitionDurationTicks) {
       mUnknownFloat11C = 0.0f;
     }
+  }
+
+  /**
+   * Address: 0x006C1E20 (FUN_006C1E20, ?CalcMoveCommon@CUnitMotion@Moho@@AAE_NAAVVTransform@2@PAM@Z)
+   * Mangled: ?CalcMoveCommon@CUnitMotion@Moho@@AAE_NAAVVTransform@2@PAM@Z
+   *
+   * What it does:
+   * Integrates one shared surface-move tick for land/water/hover motion,
+   * including slaved-target facing, braking, waypoint snap, and collision rollback.
+   */
+  bool CUnitMotion::CalcMoveCommon(VTransform& transform, float* const outMoveDistance)
+  {
+    (void)outMoveDistance;
+
+    Unit* const unit = mUnit;
+    if (unit->IsBeingBuilt()) {
+      return false;
+    }
+
+    if (mUnknownFloat11C != 0.0f) {
+      TransitionBetweenLayers(transform);
+      return false;
+    }
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    const RUnitBlueprintPhysics& physics = blueprint->Physics;
+    const RUnitBlueprintAI& aiBlueprint = blueprint->AI;
+    Wm3::Vector3f desiredTarget{};
+
+    UnitWeapon* slavedWeapon = nullptr;
+    CAiTarget* const slavedTarget =
+      (unit->AiAttacker != nullptr) ? unit->AiAttacker->HasSlavedTarget(&slavedWeapon) : nullptr;
+    if (slavedTarget != nullptr && slavedTarget->HasTarget() && slavedWeapon != nullptr) {
+      if (aiBlueprint.AttackAngle > 0.0f) {
+        desiredTarget = slavedTarget->GetTargetPosGun(false);
+      } else if (
+        slavedWeapon->mWeaponBlueprint != nullptr &&
+        slavedWeapon->mWeaponBlueprint->SlavedToBodyArcRange < 180.0f
+      ) {
+        const Wm3::Vector3f unitPosition = unit->GetPosition();
+        const Wm3::Vector3f targetPosition = slavedTarget->GetTargetPosGun(false);
+        const float targetHeading =
+          std::atan2(targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z);
+        const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
+        const float unitHeading = std::atan2(forward.x, forward.z);
+        const float headingDelta = NormalizeAngleSignedRadians(targetHeading - unitHeading);
+        const float absHeadingDelta = std::fabs(headingDelta);
+        const float slavedArcRange = slavedWeapon->mWeaponBlueprint->SlavedToBodyArcRange;
+
+        if (mUnknownBool91) {
+          if ((slavedArcRange * kCommonMoveSlavedArcExitRadians) > absHeadingDelta) {
+            mUnknownBool91 = false;
+          }
+        } else if (absHeadingDelta > (slavedArcRange * kCommonMoveSlavedArcEnterRadians)) {
+          mUnknownBool91 = true;
+        }
+
+        if (mUnknownBool91 || (physics.MotionType == RULEUMT_Hover && mNextWaypoint != nullptr)) {
+          desiredTarget = targetPosition;
+        } else {
+          desiredTarget = Wm3::Vector3f{
+            unitPosition.x + forward.x,
+            unitPosition.y + forward.y,
+            unitPosition.z + forward.z,
+          };
+        }
+      }
+    } else {
+      mUnknownBool91 = false;
+    }
+
+    if (!IsOnValidLayer()) {
+      const float damage = -(static_cast<Entity*>(unit)->MaxHealth * kCommonMoveTickScale);
+      unit->AdjustHealth(nullptr, damage);
+      if (static_cast<Entity*>(unit)->Health <= 0.0f) {
+        unit->Kill(nullptr, "", 0.0f);
+      }
+      return false;
+    }
+
+    const Wm3::Vector3f originalPosition = transform.pos_;
+    const bool initiallyFits = !UnitWontFitAt(originalPosition, unit);
+
+    if (mNextWaypoint == nullptr || mIsBeingPushed) {
+      bool rotated = false;
+      if (!IsVector3fBinaryZero(desiredTarget)) {
+        Wm3::Vector3f steeringTarget = desiredTarget;
+        if (aiBlueprint.AttackAngle > 0.0f) {
+          steeringTarget = ApplyCommonMoveAttackAngle(unit, steeringTarget, aiBlueprint.AttackAngle);
+        }
+
+        rotated = RotateCommonMoveTransformTowardDestination(
+          unit,
+          transform,
+          steeringTarget,
+          physics.MotionType == RULEUMT_Hover
+        );
+      } else {
+        IAiNavigator* const navigator = unit->AiNavigator;
+        if (navigator != nullptr && navigator->GetStatus() == AINAVSTATUS_Idle) {
+          Wm3::Vector3f formationVector = unit->GetFormationVector();
+          if (IsVector3fBinaryZero(formationVector)) {
+            formationVector = mFormationVec;
+          }
+
+          if (!IsVector3fBinaryZero(formationVector)) {
+            const Wm3::Vector3f formationDestination{
+              originalPosition.x + formationVector.x,
+              originalPosition.y + formationVector.y,
+              originalPosition.z + formationVector.z,
+            };
+            rotated = RotateCommonMoveTransformTowardDestination(
+              unit,
+              transform,
+              formationDestination,
+              physics.MotionType == RULEUMT_Hover
+            );
+          }
+        }
+      }
+
+      mVector44 = {};
+      Wm3::Vector3f currentVelocity = unit->GetVelocity();
+      const float currentSpeedSq =
+        (currentVelocity.x * currentVelocity.x) +
+        (currentVelocity.y * currentVelocity.y) +
+        (currentVelocity.z * currentVelocity.z);
+      if (!rotated && currentSpeedSq < kCommonMoveVelocityStopThresholdSq) {
+        mPos = transform.pos_;
+        mVelocity = {};
+        return false;
+      }
+
+      const UnitAttributes& attributes = unit->GetAttributes();
+      float brake = physics.MaxBrake;
+      if (brake <= 0.0f) {
+        brake = physics.MaxAcceleration;
+      }
+      brake *= attributes.accelerationMult * kCommonMoveTickScale;
+
+      const Wm3::Vector3f dampedVelocity{
+        currentVelocity.x * kCommonMoveVelocityDamping,
+        currentVelocity.y * kCommonMoveVelocityDamping,
+        currentVelocity.z * kCommonMoveVelocityDamping,
+      };
+      currentVelocity.x = -currentVelocity.x;
+      currentVelocity.y = -currentVelocity.y;
+      currentVelocity.z = -currentVelocity.z;
+      currentVelocity.LimitLengthTo(brake);
+
+      mVelocity = Wm3::Vector3f{
+        currentVelocity.x + dampedVelocity.x,
+        currentVelocity.y + dampedVelocity.y,
+        currentVelocity.z + dampedVelocity.z,
+      };
+      transform.pos_.x += mVelocity.x;
+      transform.pos_.y += mVelocity.y;
+      transform.pos_.z += mVelocity.z;
+      mPos = transform.pos_;
+    } else {
+      const CPathPoint* const waypoint = mNextWaypoint;
+      transform.pos_ = waypoint->mPosition;
+      if (physics.MotionType == RULEUMT_Hover) {
+        Wm3::Vector3f steeringTarget = desiredTarget;
+        if (IsVector3fBinaryZero(steeringTarget)) {
+          steeringTarget = Wm3::Vector3f{
+            waypoint->mPosition.x + waypoint->mDirection.x,
+            waypoint->mPosition.y + waypoint->mDirection.y,
+            waypoint->mPosition.z + waypoint->mDirection.z,
+          };
+        }
+        (void)RotateCommonMoveTransformTowardDestination(unit, transform, steeringTarget, true);
+      } else {
+        transform.orient_ = COORDS_Orient(waypoint->mDirection);
+      }
+
+      const Wm3::Vector3f delta{
+        transform.pos_.x - mPos.x,
+        transform.pos_.y - mPos.y,
+        transform.pos_.z - mPos.z,
+      };
+      mVector44 = Wm3::Vector3f{
+        delta.x - mVelocity.x,
+        delta.y - mVelocity.y,
+        delta.z - mVelocity.z,
+      };
+      mVelocity = delta;
+      mPos = waypoint->mPosition;
+    }
+
+    if (initiallyFits && UnitWontFitAt(transform.pos_, unit)) {
+      mVector44 = {};
+      mVelocity = {};
+      if (!mIsBeingPushed) {
+        Wm3::Vector3f impulse{
+          originalPosition.x - transform.pos_.x,
+          0.0f,
+          originalPosition.z - transform.pos_.z,
+        };
+        (void)VecSetLength(&impulse, unit->mInfoCache.mFormationTopSpeed * kCommonMoveCollisionImpulseScale);
+        AddImpulse(impulse, false);
+      }
+
+      transform.pos_ = originalPosition;
+      mPos = transform.pos_;
+    }
+
+    return true;
   }
 
   /**

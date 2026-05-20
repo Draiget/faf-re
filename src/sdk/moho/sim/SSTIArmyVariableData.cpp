@@ -9,6 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/misc/EngineVectorHelpers.h"
 
 namespace
 {
@@ -777,6 +778,7 @@ namespace moho
     , mArmyType(other.mArmyType)
     , mFaction(other.mFaction)
     , mUseWholeMap(other.mUseWholeMap)
+    , mRuntimeWordVectorWithMeta(other.mRuntimeWordVectorWithMeta)
     , mShowScore(other.mShowScore)
     , mCategoryFilterSet(other.mCategoryFilterSet)
     , mIsOutOfGame(other.mIsOutOfGame)
@@ -793,9 +795,6 @@ namespace moho
     std::memcpy(mRuntimePad_0109_0110, other.mRuntimePad_0109_0110, sizeof(mRuntimePad_0109_0110));
     std::memcpy(mPad_0139_013C, other.mPad_0139_013C, sizeof(mPad_0139_013C));
     std::memcpy(mPad_015C_0160, other.mPad_015C_0160, sizeof(mPad_015C_0160));
-
-    mRuntimeWordVectorWithMeta.CopyWordPayloadFrom(other.mRuntimeWordVectorWithMeta);
-    mRuntimeWordVectorWithMeta.mMetaWord = other.mRuntimeWordVectorWithMeta.mMetaWord;
   }
 
   /**
@@ -835,6 +834,22 @@ namespace moho
 
     mWords.resize(source.mWords.size());
     (void)CopyWordRangeForward(mWords.data(), source.mWords.data(), source.mWords.data() + source.mWords.size());
+  }
+
+  /**
+   * Member-wise copy-ctor for `SArmyVectorWithMeta`.
+   *
+   * The engine emitted the underlying `msvc8::vector<uint32_t>` copy operation
+   * at 0x00560A90 because the original 2007 source default-initialized this
+   * struct member-wise. Default-construct `mWords` then route the inner-vector
+   * deep copy through the named per-T helper so the linker keeps that
+   * out-of-line symbol bound from this source-level call site.
+   */
+  SArmyVectorWithMeta::SArmyVectorWithMeta(const SArmyVectorWithMeta& other)
+    : mWords()
+    , mMetaWord(other.mMetaWord)
+  {
+    moho::AssignCopyVectorUint32(mWords, other.mWords);
   }
 
   /**

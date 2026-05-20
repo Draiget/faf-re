@@ -27,6 +27,22 @@ namespace moho
     msvc8::vector<std::uint32_t> mWords; // +0x00
     std::uint32_t mMetaWord;             // +0x10
 
+    SArmyVectorWithMeta() = default;
+
+    /**
+     * Member-wise copy-ctor. Performs the engine-emitted out-of-line
+     * `msvc8::vector<uint32_t>` copy-construction via the per-type named
+     * helper `moho::CopyConstructVectorUint32` so the linker keeps the
+     * FUN_00560A90 symbol shape; trailing scalar `mMetaWord` is copied
+     * directly.
+     */
+    SArmyVectorWithMeta(const SArmyVectorWithMeta& other);
+
+    SArmyVectorWithMeta& operator=(const SArmyVectorWithMeta&) = default;
+    SArmyVectorWithMeta(SArmyVectorWithMeta&&) = default;
+    SArmyVectorWithMeta& operator=(SArmyVectorWithMeta&&) = default;
+    ~SArmyVectorWithMeta() = default;
+
     /**
      * Address: 0x007011C0 (FUN_007011C0)
      *

@@ -51,6 +51,41 @@ void BinaryReader::Read(char* buf, const size_t size) const
 }
 
 /**
+ * Address: 0x006E57C0 (FUN_006E57C0)
+ *
+ * IDA signature:
+ * _DWORD * __callcnv_F3 sub_6E57C0@<eax>(int a1@<eax>, _DWORD *a2@<ecx>);
+ *
+ * What it does:
+ * Specialized 16-byte BinaryReader read: takes the inline fast path when the
+ * stream's read window already buffers 16 bytes (copy 4 dwords + advance
+ * head by 16); otherwise falls back to the stream's virtual `VirtRead` slot
+ * and throws `PrematureEOF` on a short read.
+ */
+std::uint32_t* BinaryReader::ReadBytes16(std::uint32_t* const outBytes) const
+{
+    Stream* const stream = mStream;
+    const char* const readHead = stream->mReadHead;
+    const auto available = static_cast<std::size_t>(stream->mReadEnd - readHead);
+
+    if (available < 16u) {
+        const std::size_t got = stream->VirtRead(reinterpret_cast<char*>(outBytes), 16u);
+        if (got != 16u) {
+            throw PrematureEOF();
+        }
+        return outBytes;
+    }
+
+    const auto* const src = reinterpret_cast<const std::uint32_t*>(readHead);
+    outBytes[0] = src[0];
+    outBytes[1] = src[1];
+    outBytes[2] = src[2];
+    outBytes[3] = src[3];
+    stream->mReadHead = const_cast<char*>(readHead) + 16;
+    return outBytes;
+}
+
+/**
  * Address: 0x006E58A0 (FUN_006E58A0)
  *
  * What it does:

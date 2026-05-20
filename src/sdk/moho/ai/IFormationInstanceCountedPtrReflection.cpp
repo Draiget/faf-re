@@ -327,15 +327,62 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    /**
+     * Static `RPointerType<IFormationInstance>` descriptor that the binary
+     * exposes as `Moho::IFormationInstance::PointerType`. Default static-init
+     * runs the RPointerTypeBase → RType → RObject ctor chain and installs the
+     * most-derived vftable lane.
+     */
+    gpg::RPointerType<moho::IFormationInstance> sIFormationInstancePointerTypeStorage{};
+
+    /**
+     * Address: 0x0059D5B0 (FUN_0059D5B0)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<IFormationInstance>` descriptor
+     * under the `IFormationInstance*` type-info key so subsequent `LookupRType`
+     * queries from the lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterIFormationInstancePointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::IFormationInstance*), &sIFormationInstancePointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BF68F0 (FUN_00BF68F0)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<IFormationInstance>` descriptor at
+     * process exit: frees heap-backed `bases_`/`fields_` vector storage and
+     * resets the RType vftable lane to the `RObject` base. Registered via
+     * `atexit` from `GetPointerType`'s once-init path.
+     */
+    void CleanupIFormationInstancePointerType()
+    {
+      sIFormationInstancePointerTypeStorage.~RPointerType<moho::IFormationInstance>();
+    }
+  } // namespace
+
   /**
    * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
    *
    * What it does:
-   * Lazily resolves and caches the reflection descriptor for
-   * `IFormationInstance*`.
+   * On first call, pre-registers the static `RPointerType<IFormationInstance>`
+   * descriptor and installs the matching atexit teardown. After that, lazily
+   * caches the `LookupRType(typeid(IFormationInstance*))` result in
+   * `sPointerType` and returns it.
    */
   gpg::RType* IFormationInstance::GetPointerType()
   {
+    static const bool sOnceInit = []() {
+      PreregisterIFormationInstancePointerType();
+      (void)std::atexit(&CleanupIFormationInstancePointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
     if (!sType) {
       sType = gpg::LookupRType(typeid(moho::IFormationInstance));
     }

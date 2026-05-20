@@ -333,14 +333,61 @@ namespace moho
    */
   void RBlueprint::OnInitBlueprint() {}
 
+  namespace
+  {
+    /**
+     * Static `RPointerType<RBlueprint>` descriptor that the binary exposes as
+     * `Moho::RBlueprint::PointerType`. Default static-init runs the
+     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
+     * derived vftable lane.
+     */
+    gpg::RPointerType<moho::RBlueprint> sRBlueprintPointerTypeStorage{};
+
+    /**
+     * Address: 0x00556FF0 (FUN_00556FF0)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<RBlueprint>` descriptor under the
+     * `RBlueprint*` type-info key so subsequent `LookupRType` queries from the
+     * lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterRBlueprintPointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::RBlueprint*), &sRBlueprintPointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BF4CA0 (FUN_00BF4CA0)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<RBlueprint>` descriptor at process
+     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
+     * RType vftable lane to the `RObject` base. Registered via `atexit` from
+     * `GetPointerType`'s once-init path.
+     */
+    void CleanupRBlueprintPointerType()
+    {
+      sRBlueprintPointerTypeStorage.~RPointerType<moho::RBlueprint>();
+    }
+  } // namespace
+
   /**
    * Address: 0x00556CE0 (FUN_00556CE0, Moho::RBlueprint::GetPointerType)
    *
    * What it does:
-   * Lazily resolves and caches the reflection descriptor for `RBlueprint*`.
+   * On first call, pre-registers the static `RPointerType<RBlueprint>` descriptor
+   * and installs the matching atexit teardown. After that, lazily caches the
+   * `LookupRType(typeid(RBlueprint*))` result in `sPointerType` and returns it.
    */
   gpg::RType* RBlueprint::GetPointerType()
   {
+    static const bool sOnceInit = []() {
+      PreregisterRBlueprintPointerType();
+      (void)std::atexit(&CleanupRBlueprintPointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
     gpg::RType* cached = sPointerType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(RBlueprint*));

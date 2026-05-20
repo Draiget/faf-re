@@ -85,6 +85,29 @@ namespace moho
   ) noexcept;
 
   /**
+   * Address: 0x006E0400 (FUN_006E0400)
+   *
+   * What it does:
+   * Copy-constructs each `EntityCategorySet` from `[sourceBegin, sourceEnd)`
+   * into the uninitialized destination buffer starting at `destinationBegin`.
+   * Each destination slot's universe handle and first-word index are written
+   * directly, the embedded bit-word fastvector is rebound to its own inline
+   * storage, and the source words are copied via the legacy fastvector copy
+   * helper. On a partially completed range, in-flight slots are torn down and
+   * the original exception is rethrown so the caller's reserve/grow path
+   * remains exception-safe.
+   *
+   * Used by `msvc8::vector<EntityCategorySet>` reserve/grow paths and by
+   * archive-load helpers that pre-construct a destination range before
+   * deserializing per-element payloads.
+   */
+  EntityCategorySet* UninitializedCopyEntityCategorySetRange(
+    const EntityCategorySet* sourceBegin,
+    const EntityCategorySet* sourceEnd,
+    EntityCategorySet* destinationBegin
+  );
+
+  /**
    * Address: 0x006DDF00 (FUN_006DDF00, sub_6DDF00)
    *
    * What it does:

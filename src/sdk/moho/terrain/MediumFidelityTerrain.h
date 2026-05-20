@@ -3,9 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/weak_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
+
+namespace gpg::gal
+{
+  class TextureD3D9;
+}
 
 namespace moho
 {
@@ -84,6 +90,16 @@ namespace moho
     bool Init();
 
     /**
+     * Address: 0x00804DF0 (FUN_00804DF0, Moho::MediumFidelityTerrain::LoadShaderVars)
+     *
+     * What it does:
+     * Binds terrain shader texture lanes, writes terrain scale + viewport
+     * normalization constants, and forwards the optional terrain-normal texture
+     * weak handle into the active terrain effect.
+     */
+    void LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture);
+
+    /**
      * Address: 0x00807410 (FUN_00807410, Moho::MediumFidelityTerrain::DrawWaterLine)
      *
      * What it does:
@@ -103,7 +119,12 @@ namespace moho
     virtual void DrawTerrainSkirt();
 
     TerrainWaterResourceView* mTerrainResource;                        // +0x0C
-    std::uint8_t mReserved10_27[0x18];                                // +0x10
+    std::int32_t mViewportOriginX;                                     // +0x10
+    std::int32_t mViewportOriginY;                                     // +0x14
+    std::int32_t mViewportWidth;                                       // +0x18
+    std::int32_t mViewportHeight;                                      // +0x1C
+    std::int32_t mViewportRenderWidth;                                 // +0x20
+    std::int32_t mViewportRenderHeight;                                // +0x24
     GeomCamera3* mCamera;                                              // +0x28
     std::uint32_t mSkirtStartIndex = 0u;                              // +0x2C
     std::uint32_t mUnknown30 = 0u;                                    // +0x30
@@ -130,6 +151,30 @@ namespace moho
   static_assert(
     offsetof(MediumFidelityTerrain, mTerrainResource) == 0x0C,
     "MediumFidelityTerrain::mTerrainResource offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportOriginX) == 0x10,
+    "MediumFidelityTerrain::mViewportOriginX offset must be 0x10"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportOriginY) == 0x14,
+    "MediumFidelityTerrain::mViewportOriginY offset must be 0x14"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportWidth) == 0x18,
+    "MediumFidelityTerrain::mViewportWidth offset must be 0x18"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportHeight) == 0x1C,
+    "MediumFidelityTerrain::mViewportHeight offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportRenderWidth) == 0x20,
+    "MediumFidelityTerrain::mViewportRenderWidth offset must be 0x20"
+  );
+  static_assert(
+    offsetof(MediumFidelityTerrain, mViewportRenderHeight) == 0x24,
+    "MediumFidelityTerrain::mViewportRenderHeight offset must be 0x24"
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mPrimaryPatchIndices) == 0x40,

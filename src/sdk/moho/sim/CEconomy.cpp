@@ -308,6 +308,11 @@ namespace
 
 namespace moho
 {
+  extern float ai_InitialEnergyCurrency;
+  extern float ai_InitialMassCurrency;
+  extern float ai_InitialEnergyCurrencyMax;
+  extern float ai_InitialMassCurrencyMax;
+
   /**
    * Address: 0x00563B10 (FUN_00563B10, preregister_SEconValueTypeInfo)
    *
@@ -336,6 +341,42 @@ namespace moho
   }
 
   gpg::RType* CEconomy::sType = nullptr;
+
+  /**
+   * Address: 0x00771880 (FUN_00771880, struct_EconomyData::struct_EconomyData)
+   * Mangled: ??0struct_EconomyData@@QAE@@Z
+   *
+   * CEconomy(Sim* sim, std::int32_t armyIndex)
+   *
+   * IDA signature:
+   * Moho::CEconomy *__thiscall struct_EconomyData::struct_EconomyData(
+   *   int index, Moho::CEconomy *this, Moho::Sim *sim);
+   *
+   * What it does:
+   * Initializes one army economy state, creates its max-storage lane, and
+   * seeds stored energy/mass from the initial economy convars.
+   */
+  CEconomy::CEconomy(Sim* const sim, const std::int32_t armyIndex)
+  {
+    mSim = sim;
+    mIndex = armyIndex;
+    mResources = {};
+    mPendingResources = {};
+    mTotals = {};
+    mExtraStorage = nullptr;
+    mResourceSharing = 1u;
+    mConsumptionData.mPrev = &mConsumptionData;
+    mConsumptionData.mNext = &mConsumptionData;
+
+    const SEconValue zeroStorage{};
+    mExtraStorage = new CEconStorage(zeroStorage, this);
+
+    const SEconValue initialMaxStorage{ai_InitialEnergyCurrencyMax, ai_InitialMassCurrencyMax};
+    (void)mExtraStorage->ChangeAmt(initialMaxStorage);
+
+    mTotals.mStored.ENERGY = ai_InitialEnergyCurrency;
+    mTotals.mStored.MASS = ai_InitialMassCurrency;
+  }
 
   /**
    * Address: 0x00772FC0 (FUN_00772FC0)

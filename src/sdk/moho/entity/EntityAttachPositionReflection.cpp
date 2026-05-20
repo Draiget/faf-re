@@ -826,6 +826,14 @@ namespace
     return history;
   }
 
+  /**
+   * Address: 0x0067DEE0 (FUN_0067DEE0)
+   *
+   * What it does:
+   * Heap-allocates one `PositionHistory`, runs `InitializePositionHistory` to
+   * default-construct each `VTransform` lane, and returns a typed `gpg::RRef`
+   * payload. Installed as `newRefFunc_` on `PositionHistoryTypeInfo`.
+   */
   [[nodiscard]] gpg::RRef NewPositionHistoryRef()
   {
     moho::PositionHistory* const history = new (std::nothrow) moho::PositionHistory();
@@ -838,6 +846,15 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0067DF70 (FUN_0067DF70)
+   *
+   * What it does:
+   * Heap-allocates one `PositionHistory`, copies each `VTransform` lane and
+   * the `mCurrent` cursor from the source-RRef payload, and returns a typed
+   * reflection reference. Installed as `cpyRefFunc_` on
+   * `PositionHistoryTypeInfo`.
+   */
   [[nodiscard]] gpg::RRef CopyPositionHistoryRef(gpg::RRef* const sourceRef)
   {
     GPG_ASSERT(sourceRef != nullptr);
@@ -855,6 +872,15 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0067E0B0 (FUN_0067E0B0)
+   *
+   * What it does:
+   * Constructs one `PositionHistory` over caller-provided storage. When
+   * `sourceRef` is supplied, copy-constructs from the upcast source payload;
+   * otherwise default-initializes. Returns a typed `gpg::RRef` to the storage.
+   * Installed as `movRefFunc_` on `PositionHistoryTypeInfo`.
+   */
   [[nodiscard]] gpg::RRef ConstructPositionHistoryRefFromSource(
     void* const objectStorage,
     gpg::RRef* const sourceRef

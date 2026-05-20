@@ -535,6 +535,15 @@ namespace moho
   int cfunc_SetOverlayFilterL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x008472F0 (FUN_008472F0, cfunc_GetActiveBuildTemplateL)
+   *
+   * What it does:
+   * Publishes the active world-session build-template payload as one Lua array
+   * `{xSpan, zSpan, {bpId, buildOrder, x, z}...}`.
+   */
+  int cfunc_GetActiveBuildTemplateL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00847270 (FUN_00847270, cfunc_GetActiveBuildTemplate)
    *
    * What it does:

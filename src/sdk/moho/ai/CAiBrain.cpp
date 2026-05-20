@@ -28,6 +28,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/misc/EngineVectorHelpers.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/RResId.h"
@@ -2305,11 +2306,22 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
  * army) that is live, idle, fully built, and capable of building the unit
  * blueprint identified by `blueprintId`. Returns null when the blueprint
  * cannot be resolved or no matching builder exists.
+ *
+ * The candidate-list parameter arrives as a `gpg::fastvector<Unit*>`; the
+ * 2007 source first eagerly copied it to a local `std::vector<Unit*>` via
+ * `moho::CopyFastvectorUnitToStdVector` (FUN_0057E550) so the iteration
+ * loop could iterate the standard container.
  */
 moho::Unit* moho::FindAvailableFactory(
   gpg::core::FastVector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
 )
 {
+  // Eagerly snapshot the fastvector candidates into a std::vector<Unit*>
+  // following the 2007 layout. The per-T named copy helper preserves the
+  // engine-emitted FUN_0057E550 symbol shape.
+  std::vector<Unit*> stdCandidates;
+  moho::CopyFastvectorUnitToStdVector(candidateList, stdCandidates);
+
   // Resolve target blueprint once (by normalized filename).
   RResId blueprintResId{};
   (void)gpg::STR_InitFilename(&blueprintResId.name, blueprintId);
@@ -2324,8 +2336,8 @@ moho::Unit* moho::FindAvailableFactory(
   }
 
   // If caller didn't pre-populate `candidateList`, harvest all static
-  // factories owned by this brain's army.
-  if (candidateList.start_ == candidateList.end_) {
+  // factories owned by this brain's army into the local std::vector copy.
+  if (stdCandidates.empty()) {
     const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
     const CategoryWordRangeView* const factoryCategory = rules->GetEntityCategory("FACTORY");
 
@@ -2343,14 +2355,13 @@ moho::Unit* moho::FindAvailableFactory(
     for (Entity* const* slot = foundFactories.mVec.begin(); slot != foundFactories.mVec.end(); ++slot) {
       Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
       if (unit != nullptr) {
-        candidateList.PushBack(unit);
+        stdCandidates.push_back(unit);
       }
     }
   }
 
   // Linear walk for the first builder that passes every buildability gate.
-  for (Unit* const* it = candidateList.start_; it != candidateList.end_; ++it) {
-    Unit* const candidate = *it;
+  for (Unit* const candidate : stdCandidates) {
     if (candidate == nullptr) {
       continue;
     }

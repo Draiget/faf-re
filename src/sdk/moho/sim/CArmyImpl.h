@@ -12,6 +12,11 @@
 #include "STIMap.h"
 #include "Wm3Vector2.h"
 
+namespace LuaPlus
+{
+  class LuaObject;
+}
+
 namespace moho
 {
   class Entity;
@@ -25,6 +30,7 @@ namespace moho
   class CIntelGrid;
   class UserArmy;
   class Unit;
+  struct ArmyLaunchInfo;
 
   struct ArmyPool
   {
@@ -71,6 +77,23 @@ namespace moho
      * pool header storage.
      */
     CArmyImpl();
+
+    /**
+     * Address: 0x006FE690 (FUN_006FE690, Moho::CArmyImpl::CArmyImpl)
+     *
+     * What it does:
+     * Builds one scenario-launched army from Lua setup data, command-source
+     * launch state, and scenario options, then creates the per-army runtime
+     * economy, brain, recon, influence-map, platoon-pool, and path queue lanes.
+     */
+    CArmyImpl(
+      Sim* sim,
+      std::int32_t armyIndex,
+      const ArmyLaunchInfo& launchInfo,
+      const LuaPlus::LuaObject& armySetup,
+      const LuaPlus::LuaObject& scenarioInfoOptions,
+      bool isFocusArmy
+    );
 
     /**
      * Address: 0x006FE670 (FUN_006FE670)
@@ -394,6 +417,22 @@ namespace moho
   );
   static_assert(offsetof(CArmyImpl, IgnoreUnitCapFlag) == 0x274, "CArmyImpl::IgnoreUnitCapFlag offset must be 0x274");
   static_assert(sizeof(CArmyImpl) == 0x288, "CArmyImpl size must be 0x288");
+
+  /**
+   * Address: 0x006FE530 (FUN_006FE530, func_SimArmyAlloc)
+   *
+   * What it does:
+   * Allocates one scenario army object and forwards the typed launch, Lua army
+   * setup, and scenario option payloads into the full CArmyImpl constructor.
+   */
+  [[nodiscard]] CArmyImpl* AllocateScenarioArmy(
+    Sim* sim,
+    std::int32_t armyIndex,
+    const ArmyLaunchInfo& launchInfo,
+    const LuaPlus::LuaObject& armySetup,
+    const LuaPlus::LuaObject& scenarioInfoOptions,
+    bool isFocusArmy
+  );
 
   /**
    * Address: 0x005A2C20 (FUN_005A2C20, Moho::AI_Tick)

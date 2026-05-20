@@ -230,6 +230,26 @@ namespace moho
      * Emitter cast hook for effect-blueprint unions. Returns `this`.
      */
     [[nodiscard]] REmitterBlueprint* IsEmitter() override;
+
+    /**
+     * Address: 0x0050EB10 (FUN_0050EB10, ??1REmitterBlueprint@Moho@@UAE@XZ)
+     * Mangled: ??1REmitterBlueprint@Moho@@UAE@XZ
+     *
+     * IDA signature:
+     * void __stdcall Moho::REmitterBlueprint::~REmitterBlueprint(Moho::REmitterBlueprint *this);
+     *
+     * What it does:
+     * Emitter blueprint destructor body. Releases the two emitter texture-name
+     * strings (`RampTextureName` at +0x268 then `TextureName` at +0x24C),
+     * destroys the 21 `REmitterBlueprintCurve` subobjects in reverse
+     * declaration order (highest field offset first: `RampSelectionCurve`
+     * +0x208 down to `SizeCurve` +0x28), and finally releases the inherited
+     * `BlueprintId` (`RResId`) at +0x08 before chaining to the base
+     * `~REffectBlueprint` (which writes `gpg::RObject`'s vftable). Invoked
+     * by `FUN_0050EAF0` (scalar deleting destructor thunk) and by
+     * `DestroyEmitterBlueprintObject` in `REmitterBlueprintTypeInfo.cpp`.
+     */
+    ~REmitterBlueprint() override;
   };
 
   static_assert(sizeof(REmitterCurveKey) == 0x10, "REmitterCurveKey size must be 0x10");

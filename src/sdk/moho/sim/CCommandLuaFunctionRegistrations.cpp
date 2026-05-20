@@ -2101,6 +2101,61 @@ namespace moho
   }
 
   /**
+   * Address: 0x008472F0 (FUN_008472F0, cfunc_GetActiveBuildTemplateL)
+   *
+   * What it does:
+   * Publishes the active world-session build-template payload as one Lua array
+   * `{xSpan, zSpan, {bpId, buildOrder, x, z}...}`.
+   */
+  int cfunc_GetActiveBuildTemplateL(LuaPlus::LuaState* const state)
+  {
+    CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr) {
+      return 0;
+    }
+
+    LuaPlus::LuaObject resultTable;
+    resultTable.AssignNewTable(state, 0, 0);
+
+    float templateSpanZ = 0.0f;
+    float templateSpanX = 0.0f;
+    SBuildTemplateBuffer activeTemplate{};
+    session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
+
+    if (activeTemplate.mStart != activeTemplate.mFinish) {
+      resultTable.SetNumber(1, templateSpanX);
+      resultTable.SetNumber(2, templateSpanZ);
+
+      std::int32_t nextResultIndex = 3;
+      for (const SBuildTemplateInfo* entry = activeTemplate.mStart; entry != activeTemplate.mFinish; ++entry) {
+        LuaPlus::LuaObject entryTable;
+        entryTable.AssignNewTable(state, 0, 0);
+        entryTable.SetString(1, entry->mBlueprintId.c_str());
+        entryTable.SetInteger(2, entry->mBuildOrder);
+        entryTable.SetNumber(3, entry->mPos.x);
+        entryTable.SetNumber(4, entry->mPos.z);
+        resultTable.SetObject(nextResultIndex, entryTable);
+        ++nextResultIndex;
+      }
+    }
+
+    resultTable.PushStack(state);
+
+    for (SBuildTemplateInfo* entry = activeTemplate.mStart; entry != activeTemplate.mFinish; ++entry) {
+      entry->~SBuildTemplateInfo();
+    }
+    if (activeTemplate.mStart != nullptr && activeTemplate.mStart != activeTemplate.mOriginalStart) {
+      ::operator delete[](activeTemplate.mStart);
+      activeTemplate.mStart = activeTemplate.mOriginalStart;
+      activeTemplate.mCapacity =
+        reinterpret_cast<SBuildTemplateInfo*>(activeTemplate.mInlineStorage + sizeof(activeTemplate.mInlineStorage));
+    }
+    activeTemplate.mFinish = activeTemplate.mStart;
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00847270 (FUN_00847270, cfunc_GetActiveBuildTemplate)
    *
    * What it does:

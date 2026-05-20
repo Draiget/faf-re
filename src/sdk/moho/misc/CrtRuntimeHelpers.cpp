@@ -553,6 +553,24 @@ static_assert(offsetof(RuntimeTreeHeadNodeBare, right) == 0x08, "RuntimeTreeHead
 static_assert(offsetof(RuntimeTreeHeadNodeBare, color) == 0x10, "RuntimeTreeHeadNodeBare::color offset must be 0x10");
 static_assert(offsetof(RuntimeTreeHeadNodeBare, isNil) == 0x11, "RuntimeTreeHeadNodeBare::isNil offset must be 0x11");
 
+struct RuntimeTreeNodeNil15
+{
+  RuntimeTreeNodeNil15* left;
+  RuntimeTreeNodeNil15* parent;
+  RuntimeTreeNodeNil15* right;
+  std::uint32_t payloadWords[2];
+  std::uint8_t color;
+  std::uint8_t isNil;
+  std::uint8_t reserved16;
+  std::uint8_t reserved17;
+};
+static_assert(sizeof(RuntimeTreeNodeNil15) == 0x18, "RuntimeTreeNodeNil15 size must be 0x18");
+static_assert(offsetof(RuntimeTreeNodeNil15, left) == 0x00, "RuntimeTreeNodeNil15::left offset must be 0x00");
+static_assert(offsetof(RuntimeTreeNodeNil15, parent) == 0x04, "RuntimeTreeNodeNil15::parent offset must be 0x04");
+static_assert(offsetof(RuntimeTreeNodeNil15, right) == 0x08, "RuntimeTreeNodeNil15::right offset must be 0x08");
+static_assert(offsetof(RuntimeTreeNodeNil15, color) == 0x14, "RuntimeTreeNodeNil15::color offset must be 0x14");
+static_assert(offsetof(RuntimeTreeNodeNil15, isNil) == 0x15, "RuntimeTreeNodeNil15::isNil offset must be 0x15");
+
 struct RuntimeTreeNodeNil45
 {
   RuntimeTreeNodeNil45* left;
@@ -1615,6 +1633,15 @@ static_assert(sizeof(RuntimeTreeIteratorNil21View) == 0x08, "RuntimeTreeIterator
 static_assert(offsetof(RuntimeTreeIteratorNil21View, owner) == 0x00, "RuntimeTreeIteratorNil21View::owner offset must be 0x00");
 static_assert(offsetof(RuntimeTreeIteratorNil21View, node) == 0x04, "RuntimeTreeIteratorNil21View::node offset must be 0x04");
 
+struct RuntimeTreeIteratorNil15View
+{
+  void* owner = nullptr;                  // +0x00
+  RuntimeTreeNodeNil15* node = nullptr;   // +0x04
+};
+static_assert(sizeof(RuntimeTreeIteratorNil15View) == 0x08, "RuntimeTreeIteratorNil15View size must be 0x08");
+static_assert(offsetof(RuntimeTreeIteratorNil15View, owner) == 0x00, "RuntimeTreeIteratorNil15View::owner offset must be 0x00");
+static_assert(offsetof(RuntimeTreeIteratorNil15View, node) == 0x04, "RuntimeTreeIteratorNil15View::node offset must be 0x04");
+
 struct RuntimeOwnedPointerBucketIteratorView
 {
   std::uint32_t reserved00 = 0;             // +0x00
@@ -1753,6 +1780,133 @@ inline void RuntimeReportInvalidParameterLane() noexcept
   }
   iterator->node = cursor;
   return left;
+}
+
+/**
+ * Address: 0x00A526D0 (FUN_00A526D0, sub_A526D0)
+ * Address: 0x00A528A0 (FUN_00A528A0, sub_A528A0)
+ *
+ * IDA signature:
+ * int __thiscall sub_A526D0(_DWORD *this);
+ *
+ * What it does:
+ * Tree-iterator predecessor (`operator--`) for the `Nil11` node shape
+ * (`isNil` byte at `+0x11`, total node size `0x14`). Implements the standard
+ * red-black tree decrement walk:
+ *   * Throws via `_invalid_parameter` when the iterator's owner pointer is
+ *     null.
+ *   * From the past-end sentinel (`isNil` set), descends `right` to land on
+ *     the rightmost element and returns it; throws when the tree is empty.
+ *   * Otherwise, when the current node has a non-nil left subtree, walks
+ *     right from `left` to find its rightmost descendant and parks the
+ *     iterator there.
+ *   * When the left subtree is nil, walks up via `parent` while the cursor
+ *     is still a `parent->left` child, stopping (and parking the iterator)
+ *     at the first ancestor we reached as a `parent->right` child.
+ *
+ * Both `0x00A526D0` and `0x00A528A0` are separate compiler emissions of the
+ * same template instantiation with identical bodies.
+ */
+[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeRecedeTreeIteratorNil11CheckedCommon(
+  RuntimeTreeIteratorNil11View* const iterator
+) noexcept
+{
+  if (iterator->owner == nullptr) {
+    RuntimeReportInvalidParameterLane();
+  }
+
+  RuntimeTreeHeadNodeBare* const current = iterator->node;
+  if (current->isNil != 0u) {
+    RuntimeTreeHeadNodeBare* const rightmost = current->right;
+    iterator->node = rightmost;
+    if (rightmost->isNil != 0u) {
+      RuntimeReportInvalidParameterLane();
+    }
+    return rightmost;
+  }
+
+  RuntimeTreeHeadNodeBare* const left = current->left;
+  if (left->isNil != 0u) {
+    RuntimeTreeHeadNodeBare* parent = current->parent;
+    while (parent->isNil == 0u) {
+      if (iterator->node != parent->left) {
+        break;
+      }
+      iterator->node = parent;
+      parent = parent->parent;
+    }
+    if (iterator->node->isNil != 0u) {
+      RuntimeReportInvalidParameterLane();
+    }
+    iterator->node = parent;
+    return parent;
+  }
+
+  RuntimeTreeHeadNodeBare* cursor = left;
+  RuntimeTreeHeadNodeBare* descendant = cursor->right;
+  while (descendant->isNil == 0u) {
+    cursor = descendant;
+    descendant = cursor->right;
+  }
+  iterator->node = cursor;
+  return descendant;
+}
+
+/**
+ * Address: 0x00A3AA30 (FUN_00A3AA30, sub_A3AA30)
+ *
+ * IDA signature:
+ * int __thiscall sub_A3AA30(_DWORD *this);
+ *
+ * What it does:
+ * Tree-iterator predecessor (`operator--`) for the `Nil15` node shape
+ * (`isNil` byte at `+0x15`, total node size `0x18`, two-dword payload at
+ * `+0x0C`). Behavior is identical to `RuntimeRecedeTreeIteratorNil11CheckedCommon`
+ * but operates on the wider `RuntimeTreeNodeNil15` node type.
+ */
+[[nodiscard]] RuntimeTreeNodeNil15* RuntimeRecedeTreeIteratorNil15CheckedCommon(
+  RuntimeTreeIteratorNil15View* const iterator
+) noexcept
+{
+  if (iterator->owner == nullptr) {
+    RuntimeReportInvalidParameterLane();
+  }
+
+  RuntimeTreeNodeNil15* const current = iterator->node;
+  if (current->isNil != 0u) {
+    RuntimeTreeNodeNil15* const rightmost = current->right;
+    iterator->node = rightmost;
+    if (rightmost->isNil != 0u) {
+      RuntimeReportInvalidParameterLane();
+    }
+    return rightmost;
+  }
+
+  RuntimeTreeNodeNil15* const left = current->left;
+  if (left->isNil != 0u) {
+    RuntimeTreeNodeNil15* parent = current->parent;
+    while (parent->isNil == 0u) {
+      if (iterator->node != parent->left) {
+        break;
+      }
+      iterator->node = parent;
+      parent = parent->parent;
+    }
+    if (iterator->node->isNil != 0u) {
+      RuntimeReportInvalidParameterLane();
+    }
+    iterator->node = parent;
+    return parent;
+  }
+
+  RuntimeTreeNodeNil15* cursor = left;
+  RuntimeTreeNodeNil15* descendant = cursor->right;
+  while (descendant->isNil == 0u) {
+    cursor = descendant;
+    descendant = cursor->right;
+  }
+  iterator->node = cursor;
+  return descendant;
 }
 
 void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
@@ -21264,6 +21418,52 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   }
 
   /**
+   * Address: 0x009EFF70 (FUN_009EFF70, sub_9EFF70)
+   *
+   * IDA signature:
+   * _WORD *__cdecl sub_9EFF70(int a1, int a2, int *a3);
+   *
+   * What it does:
+   * Wide-character `wcstok`-style tokenizer. Walks `text` (or the saved
+   * cursor in `*savedState` when `text` is null) past leading delimiters via
+   * `RuntimeWideSpanOfAcceptedChars` (FUN_00A8F63A), then locates the next
+   * delimiter via `RuntimeFindFirstWideCharFromSet` (FUN_00A8F5FB). When a
+   * terminator is found, NUL-writes it in place and parks `*savedState` on
+   * the following character so the next call can resume scanning. Returns
+   * the start of the produced token, or null when the input is exhausted.
+   */
+  wchar_t* RuntimeWideTokenize(
+    wchar_t* const text,
+    const wchar_t* const delimiters,
+    wchar_t** const savedState
+  ) noexcept
+  {
+    wchar_t* cursor = text;
+    if (cursor == nullptr) {
+      cursor = *savedState;
+      if (cursor == nullptr) {
+        return nullptr;
+      }
+    }
+
+    cursor += RuntimeWideSpanOfAcceptedChars(cursor, delimiters);
+    if (*cursor == L'\0') {
+      *savedState = nullptr;
+      return nullptr;
+    }
+
+    wchar_t* const tokenStart = cursor;
+    wchar_t* const tokenEnd = RuntimeFindFirstWideCharFromSet(cursor, delimiters);
+    if (tokenEnd != nullptr) {
+      *tokenEnd = L'\0';
+      *savedState = tokenEnd + 1;
+    } else {
+      *savedState = nullptr;
+    }
+    return tokenStart;
+  }
+
+  /**
    * Address: 0x0095FAC0 (FUN_0095FAC0, j_func_wstrFindFirst)
    *
    * What it does:
@@ -23579,6 +23779,76 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       destination += 8;
       --blockCount;
     } while (blockCount != 0u);
+  }
+
+  /**
+   * Address: 0x00A9B251 (FUN_00A9B251, sub_A9B251)
+   *
+   * IDA signature:
+   * int __cdecl sub_A9B251(int a1, int a2, unsigned int a3);
+   *
+   * Callsite evidence:
+   * Three xrefs, including jmp tails from `memmov` (0x00A84A60 → 0x00A84AA2)
+   * and `memcpy` (0x00A89190 → 0x00A891D2) plus self-recursion
+   * (0x00A9B300 → 0x00A9B251). Both CRT entry points dispatch through this
+   * helper (Rule 1 evidence).
+   *
+   * What it does:
+   * SSE-aware aligned `memmove` core. When either `destination` or `source`
+   * is not 16-byte aligned the helper takes the slow path:
+   *   * if both lanes share the same modulo-16 misalignment, the leading
+   *     `(16 - srcAlign)` bytes are copied byte-wise via `std::memmove` and
+   *     the routine recurses on the now 16-byte-aligned tail,
+   *   * otherwise the entire range is copied byte-wise via `std::memmove`.
+   * When both lanes are 16-byte aligned, the bulk
+   * `[byteCount - tailBytes)` portion is copied through
+   * `RuntimeCopyAligned128ByteBlocksSse` (FUN_00A9B1CA) in `0x80`-byte SSE
+   * blocks; the residual `tailBytes = byteCount & 0x7F` bytes are finished
+   * with `std::memmove`. Returns `destination` in all paths.
+   */
+  [[maybe_unused]] void* RuntimeAlignedMemmoveDispatch(
+    void* const destination,
+    const void* const source,
+    const std::size_t byteCount
+  ) noexcept
+  {
+    const auto destAddress = reinterpret_cast<std::uintptr_t>(destination);
+    const auto srcAddress = reinterpret_cast<std::uintptr_t>(source);
+    const unsigned int destAlign = static_cast<unsigned int>(destAddress & 0xFu);
+    const unsigned int srcAlign = static_cast<unsigned int>(srcAddress & 0xFu);
+
+    if ((destAlign | srcAlign) != 0u) {
+      if (destAlign == srcAlign) {
+        const std::size_t leadingBytes = 16u - srcAlign;
+        std::memmove(destination, source, leadingBytes);
+        (void)RuntimeAlignedMemmoveDispatch(
+          static_cast<char*>(destination) + leadingBytes,
+          static_cast<const char*>(source) + leadingBytes,
+          byteCount - leadingBytes
+        );
+      } else {
+        std::memmove(destination, source, byteCount);
+      }
+      return destination;
+    }
+
+    const std::size_t tailBytes = byteCount & 0x7Fu;
+    if (byteCount != tailBytes) {
+      RuntimeCopyAligned128ByteBlocksSse(
+        static_cast<__m128i*>(destination),
+        static_cast<const __m128i*>(source),
+        static_cast<unsigned int>(byteCount - tailBytes)
+      );
+    }
+    if (tailBytes != 0u) {
+      const std::size_t consumedBytes = byteCount - tailBytes;
+      std::memmove(
+        static_cast<char*>(destination) + consumedBytes,
+        static_cast<const char*>(source) + consumedBytes,
+        tailBytes
+      );
+    }
+    return destination;
   }
 
   /**
@@ -45553,6 +45823,18 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeSearchSubobjectKey104View::key offset must be 0x68"
   );
 
+  // Placeholder typed view for insertion-sort lanes whose pointed-to objects
+  // expose a 32-bit ascending key at byte offset +0x14.
+  struct RuntimePointerSortKeyAtOffset20View
+  {
+    std::uint8_t pad00_13[0x14]{};
+    std::uint32_t key = 0; // +0x14
+  };
+  static_assert(
+    offsetof(RuntimePointerSortKeyAtOffset20View, key) == 0x14,
+    "RuntimePointerSortKeyAtOffset20View::key offset must be 0x14"
+  );
+
   struct RuntimeSearchOwnerKey112View
   {
     std::uint8_t pad00_07[0x08]{};
@@ -45962,6 +46244,59 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     newEnd = RuntimeCopyBacklinkedPairRangeCommon(newEnd, insertPosition, end);
     vector->end = newEnd;
     return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(end, splitSource, sourceBegin);
+  }
+
+  /**
+   * Address: 0x007AE710 (FUN_007AE710)
+   *
+   * IDA signature:
+   * int __usercall sub_7AE710@<eax>(int result@<eax>, _DWORD **a2@<edx>);
+   * (a2 is a pointer to one source `RuntimeBacklinkedPairCopyLane`.)
+   *
+   * What it does:
+   * Push-backs a single `RuntimeBacklinkedPairCopyLane` onto the vector at
+   * `vector->end`. When the vector is full (`end == capacity`), tail-calls
+   * the canonical insert-range lane `RuntimeInsertBacklinkedPairVectorRangeLaneA`
+   * (FUN_007AF0B0) over the half-open range `[source, source+1)` to grow
+   * storage and insert. When the vector still has room, splices the new
+   * lane into the external owner chain pointed at by `source->ownerSlot`:
+   *   * If `source->ownerSlot` is non-null, the new slot inherits the
+   *     previous chain head into its `previousOwner` field, and
+   *     `*source->ownerSlot` is rewritten to the new slot's address.
+   *   * If `source->ownerSlot` is null, the new slot's `previousOwner` is
+   *     zeroed.
+   * In either non-grow path, `vector->end` is bumped by one lane. Returns
+   * `EAX` from the call site: in the grow path, that is the lane pointer
+   * returned by FUN_007AF0B0; in the in-place paths, that is the original
+   * vector pointer left in EAX by the binary (this function does not
+   * synthesize a return value of its own outside the grow path).
+   */
+  [[maybe_unused]] void* PushBackBacklinkedPairLaneSingleWithChainSplice(
+    RuntimeBacklinkedPairVectorStorageView* const vector,
+    RuntimeBacklinkedPairCopyLane* const source
+  ) noexcept
+  {
+    RuntimeBacklinkedPairCopyLane* const insertion = vector->end;
+    if (insertion == vector->capacity) {
+      return RuntimeInsertBacklinkedPairVectorRangeLaneA(vector, insertion, source, source + 1);
+    }
+
+    if (insertion != nullptr) {
+      std::uintptr_t* const ownerSlot = source->ownerSlot;
+      insertion->ownerSlot = ownerSlot;
+
+      if (ownerSlot != nullptr) {
+        insertion->previousOwner = *ownerSlot;
+        *ownerSlot = reinterpret_cast<std::uintptr_t>(insertion);
+        vector->end = insertion + 1;
+        return vector;
+      }
+
+      insertion->previousOwner = 0;
+    }
+
+    vector->end = insertion + 1;
+    return vector;
   }
 
   /**
@@ -48686,6 +49021,57 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   }
 
   /**
+   * Address: 0x007602A0 (FUN_007602A0, sub_7602A0)
+   *
+   * IDA signature:
+   * void __cdecl sub_7602A0(int a1, int a2);
+   *
+   * What it does:
+   * Insertion sorts the half-open `[first, last)` range of 8-byte lanes
+   * (each lane = `{ value, key }` pair-words) into descending order by the
+   * key word stored at lane offset `+0x4`. For each element after the head
+   * the helper finds its correct position in the already-sorted prefix and
+   * uses `RuntimeRotatePairWordRangeByMiddle` (FUN_007608E0) to rotate the
+   * lane into place. The head element's `>=` test acts as a fast skip when
+   * the new element belongs at or behind the current head, otherwise the
+   * walk-back loop reduces probing to the first ascending boundary before
+   * issuing the in-place rotate.
+   */
+  [[maybe_unused]] void InsertionSortPairWordRangeByKeyDescending(
+    std::uint32_t* const first,
+    std::uint32_t* const last
+  ) noexcept
+  {
+    if (first == last) {
+      return;
+    }
+
+    constexpr std::ptrdiff_t kLaneStride = 2;          // 2 dwords = 8 bytes
+    constexpr std::ptrdiff_t kKeyOffset = 1;           // key dword at lane[+1]
+
+    for (std::uint32_t* current = first + kLaneStride; current != last; current += kLaneStride) {
+      const std::uint32_t key = current[kKeyOffset];
+
+      if (first[kKeyOffset] >= key) {
+        std::uint32_t* probe = current - kLaneStride;
+        if (probe[kKeyOffset] < key) {
+          std::uint32_t* boundary = probe;
+          do {
+            boundary = probe;
+            probe -= kLaneStride;
+          } while (probe[kKeyOffset] < key);
+
+          if (boundary != current) {
+            (void)RuntimeRotatePairWordRangeByMiddle(boundary, current, current + kLaneStride);
+          }
+        }
+      } else if (first != current) {
+        (void)RuntimeRotatePairWordRangeByMiddle(first, current, current + kLaneStride);
+      }
+    }
+  }
+
+  /**
    * Address: 0x00595FF0 (FUN_00595FF0)
    * Address: 0x0084C330 (FUN_0084C330)
    *
@@ -48750,6 +49136,91 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   ) noexcept
   {
     return RuntimeRotateDwordRangeByMiddle(first, middle, last);
+  }
+
+  /**
+   * Address: 0x0087DF80 (FUN_0087DF80, sub_87DF80)
+   *
+   * IDA signature:
+   * int *__usercall sub_87DF80@<eax>(int *a1@<ebx>, int *a2);
+   *
+   * What it does:
+   * Insertion-sort over a contiguous range of pointers `[first, last)`
+   * sorted ascending by an unsigned 32-bit key field stored at offset
+   * `+0x14` of each pointed-to object. For each element after `first`:
+   *   * when `(*current).key >= (*first).key` and the immediate predecessor
+   *     would be out of order, walks the sorted prefix backward to locate
+   *     the first position whose key is `<=` the candidate, then rotates
+   *     `[boundary, current+1)` around `current` via
+   *     `RuntimeRotateDwordRangeByMiddle` (FUN_0087EAA0) so the candidate
+   *     lands at `boundary`;
+   *   * when `(*current).key < (*first).key`, rotates the entire prefix
+   *     `[first, current+1)` around `current`, publishing the candidate
+   *     at `first`.
+   * Returns a `void*` matching the binary's `EAX` post-condition (which
+   * the caller does not consume): the rotate helper's return value when a
+   * rotation was performed, or the candidate pointer / cursor otherwise.
+   */
+  [[maybe_unused]] void* InsertionSortPointersByRemoteKeyAtOffset20AscendingRuntime(
+    RuntimePointerSortKeyAtOffset20View** const first,
+    RuntimePointerSortKeyAtOffset20View** const last
+  ) noexcept
+  {
+    void* result = last;
+    if (first == last) {
+      return result;
+    }
+
+    RuntimePointerSortKeyAtOffset20View** current = first + 1;
+    if (current == last) {
+      return result;
+    }
+
+    RuntimePointerSortKeyAtOffset20View** afterCurrent = first + 2;
+    do {
+      RuntimePointerSortKeyAtOffset20View* const candidatePtr = *current;
+      const std::uint32_t candidateKey = candidatePtr->key;
+      result = candidatePtr;
+
+      if (candidateKey >= (*first)->key) {
+        result = current;
+
+        RuntimePointerSortKeyAtOffset20View** const immediatePredecessor = current - 1;
+        if (candidateKey < (*immediatePredecessor)->key) {
+          RuntimePointerSortKeyAtOffset20View** boundary = current;
+          RuntimePointerSortKeyAtOffset20View** probe = current;
+          while (true) {
+            RuntimePointerSortKeyAtOffset20View* const predecessorPtr = *(probe - 1);
+            boundary = probe;
+            --probe;
+            if (candidateKey >= predecessorPtr->key) {
+              break;
+            }
+          }
+
+          if (boundary != current && current != afterCurrent) {
+            const std::int32_t rotateResult = RuntimeRotateDwordRangeByMiddle(
+              reinterpret_cast<std::uint32_t*>(boundary),
+              reinterpret_cast<std::uint32_t*>(current),
+              reinterpret_cast<std::uint32_t*>(afterCurrent)
+            );
+            result = reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rotateResult)));
+          }
+        }
+      } else if (first != current && current != afterCurrent) {
+        const std::int32_t rotateResult = RuntimeRotateDwordRangeByMiddle(
+          reinterpret_cast<std::uint32_t*>(first),
+          reinterpret_cast<std::uint32_t*>(current),
+          reinterpret_cast<std::uint32_t*>(afterCurrent)
+        );
+        result = reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rotateResult)));
+      }
+
+      ++current;
+      ++afterCurrent;
+    } while (current != last);
+
+    return result;
   }
 
   /**
@@ -50742,69 +51213,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
       | (static_cast<std::uint32_t>(c1) << 8)
       | (static_cast<std::uint32_t>(c2) << 16)
       | (static_cast<std::uint32_t>(c3) << 24);
-  }
-
-  struct RuntimeNineFloatUploadSink
-  {
-    virtual ~RuntimeNineFloatUploadSink() = default;
-    virtual float* Acquire(std::uint32_t lane0, std::uint32_t lane1, std::uint32_t lane2) = 0;
-    virtual void Commit() = 0;
-  };
-
-  struct RuntimeNineFloatListNode
-  {
-    RuntimeNineFloatListNode* next = nullptr; // +0x00
-    std::uint32_t lane04 = 0; // +0x04
-    std::uint32_t lane08 = 0; // +0x08
-    float values[9]{}; // +0x0C
-  };
-  static_assert(sizeof(RuntimeNineFloatListNode) == 0x30, "RuntimeNineFloatListNode size must be 0x30");
-
-  struct RuntimeNineFloatUploadOwnerView
-  {
-    std::uint8_t pad0000_0053[0x54]{}; // +0x00
-    RuntimeNineFloatUploadSink* sink = nullptr; // +0x54
-    std::uint8_t pad0058_0063[0x0C]{}; // +0x58
-    std::uint8_t dirty = 0; // +0x64
-    std::uint8_t pad0065_006B[0x07]{}; // +0x65
-    RuntimeNineFloatListNode* listHead = nullptr; // +0x6C
-  };
-  static_assert(offsetof(RuntimeNineFloatUploadOwnerView, sink) == 0x54, "RuntimeNineFloatUploadOwnerView::sink offset must be 0x54");
-  static_assert(
-    offsetof(RuntimeNineFloatUploadOwnerView, dirty) == 0x64,
-    "RuntimeNineFloatUploadOwnerView::dirty offset must be 0x64"
-  );
-  static_assert(
-    offsetof(RuntimeNineFloatUploadOwnerView, listHead) == 0x6C,
-    "RuntimeNineFloatUploadOwnerView::listHead offset must be 0x6C"
-  );
-
-  /**
-   * Address: 0x007D5AD0 (FUN_007D5AD0)
-   *
-   * What it does:
-   * Uploads one intrusive list of 9-float lanes into the owner sink when dirty,
-   * commits the sink upload, and clears the dirty flag.
-   */
-  void RuntimeUploadNineFloatListIfDirty(RuntimeNineFloatUploadOwnerView* const owner)
-  {
-    if (owner == nullptr || owner->dirty == 0u || owner->sink == nullptr) {
-      return;
-    }
-
-    float* writeCursor = owner->sink->Acquire(0u, 0u, 0u);
-    RuntimeNineFloatListNode* const head = owner->listHead;
-    if (writeCursor != nullptr && head != nullptr) {
-      for (RuntimeNineFloatListNode* node = head->next; node != nullptr && node != head; node = node->next) {
-        for (std::int32_t i = 0; i < 9; ++i) {
-          writeCursor[i] = node->values[i];
-        }
-        writeCursor += 9;
-      }
-    }
-
-    owner->sink->Commit();
-    owner->dirty = 0u;
   }
 
   /**

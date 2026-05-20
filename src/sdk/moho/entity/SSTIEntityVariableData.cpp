@@ -7,8 +7,12 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/audio/CSndParams.h"
 #include "moho/entity/EntityId.h"
@@ -146,8 +150,7 @@ namespace
       return;
     }
 
-    // Load callback body is still being reconstructed; keep object alive and
-    // leave fields at their current/default state for now.
+    object->MemberDeserialize(archive, 2);
   }
 
   void SerializeSSTIEntityVariableDataSerializerCallback(
@@ -325,6 +328,28 @@ namespace
     ref.mObj = object;
     ref.mType = type;
     return ref;
+  }
+
+  void ReadBoolByte(gpg::ReadArchive* const archive, std::uint8_t& value)
+  {
+    bool loaded = false;
+    archive->ReadBool(&loaded);
+    value = loaded ? 1u : 0u;
+  }
+
+  void ReadSharedRScmResourcePointer(
+    boost::shared_ptr<moho::RScmResource>& outPointer,
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
+  {
+    static_assert(
+      sizeof(boost::shared_ptr<moho::RScmResource>) == sizeof(boost::SharedPtrRaw<moho::RScmResource>),
+      "boost::shared_ptr<RScmResource> must match legacy raw shared-pointer layout"
+    );
+
+    auto& rawPointer = *reinterpret_cast<boost::SharedPtrRaw<moho::RScmResource>*>(&outPointer);
+    gpg::ReadPointerShared_RScmResource(rawPointer, archive, ownerRef);
   }
 
   struct SSTIEntityVariableDataSlotRuntime
@@ -807,6 +832,76 @@ namespace moho
     destination->mUnderlayTexture = mUnderlayTexture;
     destination->mIntelAttributes = mIntelAttributes;
     return destination;
+  }
+
+  /**
+   * Address: 0x00559B00 (FUN_00559B00, Moho::SSTIEntityVariableData::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes the version-2 reflected payload in the same field order used
+   * by `MemberSerialize` and rejects older serializer versions.
+   */
+  void SSTIEntityVariableData::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
+  {
+    if (version < 2) {
+      throw gpg::SerializationError("Unsupported version.");
+    }
+
+    const gpg::RRef ownerRef{};
+
+    ReadSharedRScmResourcePointer(mScmResource, archive, ownerRef);
+
+    RMeshBlueprint* meshBlueprint = const_cast<RMeshBlueprint*>(mMeshBlueprint);
+    (void)archive->ReadPointer_RMeshBlueprint(&meshBlueprint, &ownerRef);
+    mMeshBlueprint = meshBlueprint;
+
+    gpg::RType* const vector3Type = ResolveVector3fType();
+    GPG_ASSERT(vector3Type != nullptr);
+    archive->Read(vector3Type, &mScale, ownerRef);
+    archive->ReadFloat(&mHealth);
+    archive->ReadFloat(&mMaxHealth);
+    ReadBoolByte(archive, mIsBeingBuilt);
+    ReadBoolByte(archive, mIsDead);
+    ReadBoolByte(archive, mRequestRefreshUI);
+
+    gpg::RType* const transformType = ResolveVTransformType();
+    GPG_ASSERT(transformType != nullptr);
+    archive->Read(transformType, &mCurTransform, ownerRef);
+    archive->Read(transformType, &mLastTransform, ownerRef);
+    archive->ReadFloat(&mCurImpactValue);
+    archive->ReadFloat(&mFractionComplete);
+
+    gpg::RType* const entIdType = ResolveEntIdType();
+    GPG_ASSERT(entIdType != nullptr);
+    archive->Read(entIdType, &mAttachmentParentRef, ownerRef);
+
+    gpg::RType* const attachInfoType = ResolveAttachInfoVectorType();
+    GPG_ASSERT(attachInfoType != nullptr);
+    archive->Read(attachInfoType, &mAuxValueVector, ownerRef);
+
+    archive->ReadFloat(&mScroll0U);
+    archive->ReadFloat(&mScroll0V);
+    archive->ReadFloat(&mScroll1U);
+    archive->ReadFloat(&mScroll1V);
+
+    (void)archive->ReadPointer_CSndParams2(&mAmbientSound, &ownerRef);
+    (void)archive->ReadPointer_CSndParams2(&mRumbleSound, &ownerRef);
+
+    ReadBoolByte(archive, mVisibilityHidden);
+
+    gpg::RType* const visibilityModeType = ResolveVisibilityModeType();
+    GPG_ASSERT(visibilityModeType != nullptr);
+    archive->Read(visibilityModeType, &mVisibilityMode, ownerRef);
+
+    gpg::RType* const layerType = ResolveLayerType();
+    GPG_ASSERT(layerType != nullptr);
+    archive->Read(layerType, &mLayerMask, ownerRef);
+
+    ReadBoolByte(archive, mUsingAltFootprint);
+
+    gpg::RType* const attributesType = ResolveEntityAttributesType();
+    GPG_ASSERT(attributesType != nullptr);
+    archive->Read(attributesType, &mIntelAttributes, ownerRef);
   }
 
   /**

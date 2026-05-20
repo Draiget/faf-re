@@ -167,21 +167,50 @@ namespace
     gCamManagerInitialized = false;
   }
 
+  /**
+   * Address: 0x00BEF640 (FUN_00BEF640, Moho::TConVar_cam_HighLOD::~TConVar_cam_HighLOD)
+   *
+   * What it does:
+   * Tears down the static `cam_HighLOD` console-variable registration: restores
+   * the base `CConCommand` vftable and reregisters the slot when a name lane is
+   * still set. Registered via `atexit` from the convar startup path.
+   */
   void CleanupTConVar_cam_HighLOD() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_cam_HighLOD);
   }
 
+  /**
+   * Address: 0x00BEF670 (FUN_00BEF670, Moho::TConVar_cam_MediumLOD::~TConVar_cam_MediumLOD)
+   *
+   * What it does:
+   * Tears down the static `cam_MediumLOD` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper.
+   */
   void CleanupTConVar_cam_MediumLOD() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_cam_MediumLOD);
   }
 
+  /**
+   * Address: 0x00BEF6A0 (FUN_00BEF6A0, Moho::TConVar_cam_LowLOD::~TConVar_cam_LowLOD)
+   *
+   * What it does:
+   * Tears down the static `cam_LowLOD` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper.
+   */
   void CleanupTConVar_cam_LowLOD() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_cam_LowLOD);
   }
 
+  /**
+   * Address: 0x00BEF6D0 (FUN_00BEF6D0, Moho::TConVar_cam_DefaultLOD::~TConVar_cam_DefaultLOD)
+   *
+   * What it does:
+   * Tears down the static `cam_DefaultLOD` console-variable registration via
+   * the shared `TeardownConCommandRegistration` helper.
+   */
   void CleanupTConVar_cam_DefaultLOD() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_cam_DefaultLOD);

@@ -681,7 +681,7 @@ namespace
    * recovered squad into the platoon's squad storage until the archive returns
    * a null pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadPlatoonSquadsFromArchive(
+  [[nodiscard]] gpg::ReadArchive* ReadPlatoonSquadsFromArchive(
     gpg::ReadArchive* const archive,
     moho::CPlatoon* const platoon
   )
@@ -690,15 +690,15 @@ namespace
       return archive;
     }
 
-    moho::Entity* loadedEntity = nullptr;
+    moho::CSquad* loadedSquad = nullptr;
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_Entity(&loadedEntity, &ownerRef);
-    while (loadedEntity != nullptr) {
-      platoon->mSquadList.PushBack(reinterpret_cast<moho::CSquad*>(loadedEntity));
+    archive->ReadPointerOwned_CSquad(&loadedSquad, &ownerRef);
+    while (loadedSquad != nullptr) {
+      platoon->mSquadList.PushBack(loadedSquad);
 
-      loadedEntity = nullptr;
+      loadedSquad = nullptr;
       ownerRef = {};
-      archive->ReadPointerOwned_Entity(&loadedEntity, &ownerRef);
+      archive->ReadPointerOwned_CSquad(&loadedSquad, &ownerRef);
     }
 
     return archive;
@@ -1228,6 +1228,45 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725060 (FUN_00725060, func_LoadPlatoon)
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject* __thiscall func_LoadPlatoon(
+   *     LuaPlus::LuaState* state, LuaPlus::LuaObject* outObject);
+   *
+   * What it does:
+   * Imports `/lua/platoon.lua` and stores its `Platoon` field into the
+   * caller-provided `outObject`. When the module/class is missing, logs the
+   * fallback diagnostic and writes the `CPlatoon` metatable factory into
+   * `outObject` so `CPlatoon` can still bind into Lua.
+   *
+   * Callsite evidence (per CLAUDE.md callsite verification rule):
+   *  - code xref from Moho::CPlatoon::CPlatoon ctor (FUN_00724CC0) at 0x00724D24
+   */
+  LuaPlus::LuaObject* func_LoadPlatoon(
+    LuaPlus::LuaState* const state,
+    LuaPlus::LuaObject* const outObject
+  )
+  {
+    *outObject = LuaPlus::LuaObject{};
+
+    LuaPlus::LuaObject platoonModule = SCR_Import(state, "/lua/platoon.lua");
+    if (!platoonModule.IsNil()) {
+      LuaPlus::LuaObject platoonClass = platoonModule.GetByName("Platoon");
+      *outObject = platoonClass;
+    }
+
+    if (outObject->IsNil()) {
+      gpg::Logf(" can't find Platoon, using CPlatoon directly");
+      LuaPlus::LuaObject fallbackFactory;
+      (void)func_GetCPlatoonFactory(&fallbackFactory, state);
+      *outObject = fallbackFactory;
+    }
+
+    return outObject;
+  }
+
+  /**
    * Address: 0x0072B1D0 (FUN_0072B1D0)
    *
    * What it does:
@@ -1313,12 +1352,22 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    [[nodiscard]] LuaPlus::LuaObject ResolvePlatoonLuaClassForCtor(LuaPlus::LuaState* const state)
+    {
+      LuaPlus::LuaObject platoonClass{};
+      (void)func_LoadPlatoon(state, &platoonClass);
+      return platoonClass;
+    }
+  }
+
   /**
    * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
    */
   CPlatoon::CPlatoon(Sim* const sim, CArmyImpl* const army, const char* const platoonName, const char* const aiPlan)
     : CScriptObject(
-      CScrLuaMetatableFactory<CPlatoon>::Instance().Get(sim ? sim->mLuaState : nullptr),
+      ResolvePlatoonLuaClassForCtor(sim ? sim->mLuaState : nullptr),
       LuaPlus::LuaObject{},
       LuaPlus::LuaObject{},
       LuaPlus::LuaObject{}
@@ -1867,6 +1916,82 @@ namespace moho
   [[nodiscard]] SerializerConstructHelperRuntime* InitializeCPlatoonGenericConstructHelper()
   {
     return InitializeCPlatoonConstructHelper();
+  }
+
+  /**
+   * Address: 0x0072A570 (FUN_0072A570, CSquadConstruct::RegisterConstructFunction)
+   *
+   * IDA signature:
+   * void __thiscall sub_72A570(SerializerConstructHelperRuntime *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the `CSquadConstruct` helper vtable.
+   * Lazily resolves the `CSquad` reflection descriptor, asserts the construct
+   * callback slot is empty, and publishes this helper's construct/delete
+   * callbacks to the descriptor.
+   *
+   * Notes:
+   * Mirrors the binary's single `!type->mSerConstructFunc` assert (no separate
+   * delete-slot assert) so it diverges from the shared
+   * `RegisterConstructCallbacks` helper.
+   */
+  [[maybe_unused]] void CSquadConstructRegisterConstructFunction(
+    SerializerConstructHelperRuntime* const helper
+  )
+  {
+    constexpr const char* kSquadConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSquadSerializationConstructLine = 231;
+    constexpr const char* kSquadSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = CachedCSquadType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSquadConstructAssertText,
+        kSquadSerializationConstructLine,
+        kSquadSerializationSourcePath
+      );
+    }
+    type->serConstructFunc_ = helper->mConstructCallback;
+    type->deleteFunc_ = helper->mDeleteCallback;
+  }
+
+  /**
+   * Address: 0x0072A690 (FUN_0072A690, CPlatoonConstruct::RegisterConstructFunction)
+   *
+   * IDA signature:
+   * void __thiscall sub_72A690(SerializerConstructHelperRuntime *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the `CPlatoonConstruct` helper vtable.
+   * Lazily resolves the `CPlatoon` reflection descriptor, asserts the
+   * construct callback slot is empty, and publishes this helper's
+   * construct/delete callbacks to the descriptor.
+   *
+   * Notes:
+   * Mirrors the binary's single `!type->mSerConstructFunc` assert (no separate
+   * delete-slot assert) so it diverges from the shared
+   * `RegisterConstructCallbacks` helper.
+   */
+  [[maybe_unused]] void CPlatoonConstructRegisterConstructFunction(
+    SerializerConstructHelperRuntime* const helper
+  )
+  {
+    constexpr const char* kPlatoonConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kPlatoonSerializationConstructLine = 231;
+    constexpr const char* kPlatoonSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = CachedCPlatoonType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kPlatoonConstructAssertText,
+        kPlatoonSerializationConstructLine,
+        kPlatoonSerializationSourcePath
+      );
+    }
+    type->serConstructFunc_ = helper->mConstructCallback;
+    type->deleteFunc_ = helper->mDeleteCallback;
   }
 
   /**

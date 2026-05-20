@@ -171,14 +171,33 @@ namespace
   constexpr std::uint32_t kLineQueryEntitySpanTypeMask = 0x0D00u;
   constexpr float kWorldToOccupancyCellScale = 0.25f;
 
-  std::int32_t GatherUnmarkedEntitiesInLine(
+  /**
+   * Address: 0x004FD200 (FUN_004FD200)
+   *
+   * What it does:
+   * Walks the occupancy grid along a 2-D line between (lineEnd.x, lineStart.z)
+   * and (lineStart.x, lineEnd.z), gathering each unmarked
+   * `EntityCollisionCellSpan*` it visits into `outSpans`. The entity-bucket
+   * sweep filters by `kLineQueryEntitySpanTypeMask`; the unit-bucket sweep
+   * accepts everything not already marked. After the march, each freshly
+   * gathered span has its mark cleared. The output vector stores
+   * `EntityCollisionCellSpan*` reinterpreted as the bucket payload — callers
+   * may convert to `Entity*` via `EntityFromCollisionSpan` (see
+   * `GatherUnmarkedEntitiesInLine` at 0x00722E30).
+   *
+   * IDA signature:
+   *   sub_4FD200(Wm3::Vector3f *p2, Wm3::Vector3f *p1,
+   *              gpg::fastvector_CollisionShapeBase *a3,
+   *              Moho::EntityOccupationManager *a4)
+   */
+  std::int32_t MarchLineAndGatherCollisionSpans(
     moho::EntityOccupationManager& manager,
-    moho::EntityGatherVector& outEntities,
+    moho::CollisionSpanVector& outSpans,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
   {
-    outEntities.ResetStorageToInline();
+    outSpans.ResetStorageToInline();
 
     GridTraversalLine line{};
     InitGridTraversalLine(
@@ -210,7 +229,7 @@ namespace
           }
 
           SetSpanMarked(span, true);
-          outEntities.PushBack(EntityFromCollisionSpan(span));
+          outSpans.PushBack(span);
         }
       }
 
@@ -222,19 +241,51 @@ namespace
           }
 
           SetSpanMarked(span, true);
-          outEntities.PushBack(EntityFromCollisionSpan(span));
+          outSpans.PushBack(span);
         }
       }
 
       AdvanceGridTraversalEdge(line);
     }
 
-    const std::int32_t count = static_cast<std::int32_t>(outEntities.end_ - outEntities.start_);
+    const std::int32_t count = static_cast<std::int32_t>(outSpans.end_ - outSpans.start_);
     for (std::int32_t index = 0; index < count; ++index) {
-      moho::Entity* const entity = outEntities.start_[index];
-      if (entity != nullptr) {
-        SetSpanMarked(&entity->mCollisionCellSpan, false);
+      moho::EntityCollisionCellSpan* const span = outSpans.start_[index];
+      if (span != nullptr) {
+        SetSpanMarked(span, false);
       }
+    }
+    return count;
+  }
+
+  /**
+   * Address: 0x00722E30 (FUN_00722E30)
+   *
+   * What it does:
+   * Thin typed wrapper around `MarchLineAndGatherCollisionSpans` (0x004FD200)
+   * that converts each gathered `EntityCollisionCellSpan*` to the enclosing
+   * `Entity*` via the `mCollisionCellSpan` subobject offset (0x4C). In the
+   * binary the inner function fills the vector with `CollisionShapeBase*`
+   * and this wrapper subtracts 76 bytes from each entry; the modern
+   * recovery expresses that as a typed `EntityFromCollisionSpan` rebase.
+   */
+  std::int32_t GatherUnmarkedEntitiesInLine(
+    moho::EntityOccupationManager& manager,
+    moho::EntityGatherVector& outEntities,
+    const Wm3::Vec3f& lineStart,
+    const Wm3::Vec3f& lineEnd
+  )
+  {
+    // The inner march stores `EntityCollisionCellSpan*` (the bucket payload)
+    // in its own typed vector; this layout is identical to
+    // `EntityGatherVector` (both are `FastVectorN<pointer, 20>`).
+    auto& spanVec = reinterpret_cast<moho::CollisionSpanVector&>(outEntities);
+
+    const std::int32_t count = MarchLineAndGatherCollisionSpans(manager, spanVec, lineStart, lineEnd);
+
+    for (std::int32_t index = 0; index < count; ++index) {
+      moho::EntityCollisionCellSpan* const span = spanVec.start_[index];
+      outEntities.start_[index] = EntityFromCollisionSpan(span);
     }
     return count;
   }

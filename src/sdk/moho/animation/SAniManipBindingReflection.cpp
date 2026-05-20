@@ -8,8 +8,10 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/animation/CAniPose.h"
 
 namespace moho
 {
@@ -263,6 +265,18 @@ namespace
     gFastVectorSAniManipBindingTypeNameCleanupRegistered = false;
   }
 
+  /**
+   * Address: 0x0063CCA0 (FUN_0063CCA0, sub_63CCA0)
+   *
+   * IDA signature:
+   * int __usercall sub_63CCA0@<eax>(int a1@<eax>, gpg::ReadArchive *a2@<ecx>, int a3);
+   *
+   * What it does:
+   * Deserializes one `SAniManipBinding` payload (one `int` bone index plus a
+   * pair of `ushort`/`short` halves combined into the 32-bit flag word). When
+   * loading a pre-version-2 archive, also drains and discards a legacy
+   * `CAniPose*` pointer slot that older snapshots wrote ahead of the fields.
+   */
   void DeserializeSAniManipBindingFields(
     moho::SAniManipBinding* const binding,
     gpg::ReadArchive* const archive,
@@ -270,8 +284,9 @@ namespace
   )
   {
     if (version < 2) {
+      moho::CAniPose* discardedAniPose = nullptr;
       const gpg::RRef nullOwner{};
-      (void)gpg::ReadRawPointer(archive, nullOwner);
+      archive->ReadPointer_CAniPose(&discardedAniPose, &nullOwner);
     }
 
     archive->ReadInt(&binding->mBoneIndex);

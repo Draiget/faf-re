@@ -354,6 +354,19 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x00647250 (FUN_00647250)
+   *
+   * IDA signature:
+   * BOOL __usercall sub_647250@<eax>(float *a1@<esi>);
+   *
+   * What it does:
+   * Predicate that computes the current manipulator-to-goal distance and
+   * the kinematic braking distance from the deceleration rate and current
+   * speed. Returns true when the braking distance would overshoot the
+   * remaining distance, meaning the slide should start decelerating now.
+   * Called once per `ManipulatorUpdate` step at 0x00647300.
+   */
   [[nodiscard]] bool ShouldDecelerateBeforeGoal(const moho::CSlideManipulator& manipulator)
   {
     const Wm3::Vector3f delta{

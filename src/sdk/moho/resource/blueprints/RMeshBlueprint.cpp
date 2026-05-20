@@ -260,6 +260,67 @@ namespace moho
       return sourceCursor;
     }
 
+    /**
+     * Address: 0x0051A5E0 (FUN_0051A5E0)
+     *
+     * IDA signature:
+     * int __usercall sub_51A5E0@<eax>(int a1@<ecx>, int a2@<ebx>);
+     * (additional `RMeshBlueprintLOD* source` arrives in EAX, saved into EDI
+     * for the inner `__usercall` operator= contract.)
+     *
+     * What it does:
+     * Fill-assigns the half-open range
+     * `[destinationFirst, destinationLast)` with copies of `*source` by
+     * stepping the destination cursor in 0xCC-byte strides and dispatching
+     * each slot through `RMeshBlueprintLOD::operator=`. Returns the address
+     * of the last destination slot that was assigned, or the original source
+     * pointer when the range is empty (matching the binary's EAX
+     * post-condition).
+     */
+    [[maybe_unused]] RMeshBlueprintLOD* FillRMeshBlueprintLODRangeWithCopyAssign(
+      RMeshBlueprintLOD* destinationFirst,
+      RMeshBlueprintLOD* destinationLast,
+      RMeshBlueprintLOD* source
+    ) noexcept
+    {
+      RMeshBlueprintLOD* lastTouched = source;
+      for (RMeshBlueprintLOD* cursor = destinationFirst; cursor != destinationLast; ++cursor) {
+        *cursor = *source;
+        lastTouched = cursor;
+      }
+      return lastTouched;
+    }
+
+    /**
+     * Address: 0x0051A610 (FUN_0051A610)
+     *
+     * IDA signature:
+     * int __usercall sub_51A610@<eax>(int a1@<eax>, int a2@<ecx>, int a3@<ebx>);
+     * (a1 = source one-past-end, a2 = destination one-past-end,
+     *  a3 = source begin sentinel; returns final destination begin)
+     *
+     * What it does:
+     * Copies the source range `[sourceFirst, sourceLast)` of
+     * `RMeshBlueprintLOD` slots backward into the destination range ending at
+     * `destinationLast`, dispatching each slot through
+     * `RMeshBlueprintLOD::operator=`. Returns the address of the final
+     * destination begin (the lowest destination address written), matching
+     * the binary's `mov eax, esi` exit.
+     */
+    [[maybe_unused]] RMeshBlueprintLOD* CopyBackwardRMeshBlueprintLODRange(
+      RMeshBlueprintLOD* sourceLast,
+      RMeshBlueprintLOD* destinationLast,
+      RMeshBlueprintLOD* sourceFirst
+    ) noexcept
+    {
+      while (sourceLast != sourceFirst) {
+        --sourceLast;
+        --destinationLast;
+        *destinationLast = *sourceLast;
+      }
+      return destinationLast;
+    }
+
     [[nodiscard]] std::string ExtractMeshFamilyPrefix(const std::string_view sourcePath)
     {
       const std::size_t markerPos = sourcePath.rfind('_');

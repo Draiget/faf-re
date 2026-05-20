@@ -64,6 +64,7 @@ namespace moho
   class CAiAttackerImpl;
   class CTask;
   class CTaskThread;
+  class CSquad;
   struct STaskEventLinkage;
   class StatItem;
   class CEconomy;
@@ -495,6 +496,15 @@ namespace gpg
      * transition, and upcasts the pointee to `moho::CTaskThread`.
      */
     ReadArchive* ReadPointerOwned_CTaskThread(moho::CTaskThread** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0072ACD0 (FUN_0072ACD0, gpg::ReadArchive::ReadPointerOwned_CSquad)
+     *
+     * What it does:
+     * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
+     * transition, and upcasts the pointee to `moho::CSquad`.
+     */
+    ReadArchive* ReadPointerOwned_CSquad(moho::CSquad** outValue, const gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0040C4A0 (FUN_0040C4A0, gpg::ReadArchive::ReadPointer_CTaskThread)

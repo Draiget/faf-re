@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <new>
 #include <string>
@@ -710,6 +711,44 @@ gpg::RType* SPerArmyReconInfo::sType = nullptr;
 gpg::RType* ReconBlip::sType = nullptr;
 gpg::RType* ReconBlip::sPointerType = nullptr;
 
+namespace
+{
+  /**
+   * Storage for the static `RPointerType<ReconBlip>` descriptor that the binary
+   * exposes as `Moho::ReconBlip::PRType`. Default static-init runs the
+   * RPointerTypeBase → RType → RObject ctor chain and installs the most-derived
+   * vftable lane.
+   */
+  gpg::RPointerType<moho::ReconBlip> sReconBlipPointerTypeStorage{};
+
+  /**
+   * Address: 0x005C8170 (FUN_005C8170)
+   *
+   * What it does:
+   * Pre-registers the static `RPointerType<ReconBlip>` descriptor under the
+   * `ReconBlip*` type-info key so that subsequent `LookupRType` queries from
+   * the lazy `GetPointerType` lane resolve to this descriptor.
+   */
+  void PreregisterReconBlipPointerType()
+  {
+    gpg::PreRegisterRType(typeid(moho::ReconBlip*), &sReconBlipPointerTypeStorage);
+  }
+
+  /**
+   * Address: 0x00BF7BD0 (FUN_00BF7BD0)
+   *
+   * What it does:
+   * Tears down the static `RPointerType<ReconBlip>` descriptor at process
+   * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
+   * RType vftable lane to the `RObject` base. Registered via `atexit` from
+   * `GetPointerType`'s once-init path.
+   */
+  void CleanupReconBlipPointerType()
+  {
+    sReconBlipPointerTypeStorage.~RPointerType<moho::ReconBlip>();
+  }
+} // namespace
+
 /**
  * Address: 0x005C5390 (FUN_005C5390, Moho::InstanceCounter<Moho::ReconBlip>::GetStatItem)
  *
@@ -743,16 +782,23 @@ gpg::RType* ReconBlip::StaticGetClass()
  * Address: 0x005C6470 (FUN_005C6470, Moho::ReconBlip::GetPointerType)
  *
  * What it does:
- * Lazily resolves and caches the reflection descriptor for `ReconBlip*`.
+ * On first call, pre-registers the static `RPointerType<ReconBlip>` descriptor
+ * and installs the matching atexit teardown. After that, lazily caches the
+ * `LookupRType(typeid(ReconBlip*))` result in `sPointerType` and returns it.
  */
 gpg::RType* ReconBlip::GetPointerType()
 {
-  gpg::RType* cached = sPointerType;
-  if (!cached) {
-    cached = gpg::LookupRType(typeid(ReconBlip*));
-    sPointerType = cached;
+  static const bool sOnceInit = []() {
+    PreregisterReconBlipPointerType();
+    (void)std::atexit(&CleanupReconBlipPointerType);
+    return true;
+  }();
+  (void)sOnceInit;
+
+  if (!sPointerType) {
+    sPointerType = gpg::LookupRType(typeid(ReconBlip*));
   }
-  return cached;
+  return sPointerType;
 }
 
 /**

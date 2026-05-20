@@ -111,7 +111,7 @@ namespace moho
     msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
     std::uint8_t pad_01C8_0250[0x88]{};                     // +0x1C8
     int32_t mPausedBy = -1;                                 // +0x250
-    std::uint8_t pad_0254_0270[0x1C]{};                     // +0x254
+    msvc8::string mSubmitArmyStats;                         // +0x254
     bool mGameOver = false;                                 // +0x270
     std::uint8_t pad_0271_02B8[0x47]{};                     // +0x271
 
@@ -123,6 +123,16 @@ namespace moho
      * legacy vector containers.
      */
     SSyncData();
+
+    /**
+     * Address: 0x0073FC70 (FUN_0073FC70, ??1SSyncData@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases every owned sync-packet lane, including hidden publication
+     * vectors, shared debug/terrain handles, the inline audio request queue,
+     * and the owned stream pointer.
+     */
+    ~SSyncData();
 
     void QueuePendingCommandEventRemoval(CmdId commandId);
   };
@@ -152,6 +162,10 @@ namespace moho
     "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mSubmitArmyStats) == 0x254,
+    "SSyncData::mSubmitArmyStats offset must be 0x254"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 

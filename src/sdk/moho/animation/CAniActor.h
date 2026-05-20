@@ -100,6 +100,21 @@ namespace moho
     boost::shared_ptr<CAniPose> GetPriorPoseShared() const;
 
     /**
+     * Address: 0x0063AA20 (FUN_0063AA20)
+     *
+     * What it does:
+     * Replaces both `mPose` and `mPriorPose` raw shared-ptr lanes in one call,
+     * retaining new control blocks and releasing prior ones. Out-of-line
+     * helper emitted for callers (e.g. `Unit::SetPoses`) that assign both
+     * pose lanes together; preserves VC8 ordering (use_count_++ before
+     * release() on the swapped-out partner).
+     */
+    void AssignPoses(
+      const boost::SharedPtrRaw<CAniPose>& pose,
+      const boost::SharedPtrRaw<CAniPose>& priorPose
+    ) noexcept;
+
+    /**
      * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)
      *
      * What it does:

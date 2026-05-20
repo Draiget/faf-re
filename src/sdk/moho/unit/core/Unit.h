@@ -30,6 +30,7 @@ namespace moho
   enum EUnitState : std::int32_t;
   struct CEconRequest;
   struct SEconValue;
+  class CEconStorage;
   class CIntel;
   struct RUnitBlueprint;
   class ReconBlip;
@@ -271,7 +272,10 @@ namespace moho
    * - func_hasArmorType (0x006ADD30) reads key lane via node+0x10 and value at
    *   node+0x28.
    * - sub_6B0200 (0x006B0200) initializes RB-tree color/isNil bytes at
-   *   node+0x2C/node+0x2D.
+   *   node+0x2C/node+0x2D for inserted nodes (color=red, isNil=0).
+   * - sub_6B01C0 (0x006B01C0) allocates one 48-byte node via the legacy
+   *   48-byte lane and seeds the head sentinel pre-state (color=black,
+   *   isNil=0) before the caller flips isNil and self-links the triplet.
    */
   struct SArmorMultiplierMapNode
   {
@@ -616,6 +620,15 @@ namespace moho
     [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
+     * Address: 0x006A6BF0 (FUN_006A6BF0, ??1Unit@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Releases unit-owned AI, command, guard, economy, occupancy, recon, and
+     * weak-link runtime lanes before base/member teardown.
+     */
+    ~Unit() override;
+
+    /**
      * Address: 0x006AD3C0 (FUN_006AD3C0, Moho::Unit::MemberConstruct)
      *
      * What it does:
@@ -807,6 +820,17 @@ namespace moho
      * forwards to the base entity destroy-dispatch path.
      */
     void OnDestroy() override;
+
+    /**
+     * Address: 0x006A9B50 (FUN_006A9B50, Moho::Unit::UpdateTerrainType)
+     * Mangled: ?UpdateTerrainType@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+     *
+     * What it does:
+     * Samples terrain type under this unit's footprint-centered cell, updates
+     * `CurrentTerrainType`, and dispatches terrain-change script data when it
+     * changes.
+     */
+    void UpdateTerrainType(const Wm3::Vector3f& position);
 
     /**
      * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
@@ -1455,6 +1479,21 @@ namespace moho
     [[nodiscard]] VTransform GetBoneLocalTransform(int boneIndex) const override;
 
     /**
+     * Address: 0x006AB9C0 (FUN_006AB9C0, ?SetMesh@Unit@Moho@@UAEXABVRResId@2@PAVRMeshBlueprint@2@_N@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::Unit::SetMesh(Moho::Unit *this, const Moho::RResId &meshResId,
+     *   Moho::RMeshBlueprint *meshBlueprint, char rebuildAniActor);
+     *
+     * What it does:
+     * Forwards to `Entity::SetMesh` with the provided mesh id/blueprint and
+     * always-true placeholder fallback. When `rebuildAniActor` is set, also
+     * recreates the unit's `CAniPose`/`CAniActor` chain from the resolved
+     * skeleton so the visible animation matches the new mesh.
+     */
+    void SetMesh(const RResId& meshResId, RMeshBlueprint* meshBlueprint, bool rebuildAniActor) override;
+
+    /**
      * Address: 0x006ABB90 (FUN_006ABB90, ?SetPoses@Unit@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
      *
      * What it does:
@@ -1763,7 +1802,9 @@ namespace moho
     char pad_0514[12];                                   // 0x0514
     IFormationInstance* GuardFormation;                  // 0x0520
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
-    char pad_0525[0x0B];               // 0x0525
+    char pad_0525[0x03];               // 0x0525
+    std::int32_t mCreationTick;        // 0x0528: serialized runtime creation tick lane
+    CEconStorage* mExtraStorage;       // 0x052C: owned max-storage contribution lane
     std::int32_t PriorityBoost;        // 0x0530
     CEconRequest* mConsumptionData;    // 0x0534
     bool ConsumptionActive;            // 0x0538
@@ -1817,6 +1858,8 @@ namespace moho
   };
 
   static_assert(offsetof(Unit, GuardedByList) == 0x04F8, "Unit::GuardedByList offset must be 0x04F8");
+  static_assert(offsetof(Unit, mCreationTick) == 0x0528, "Unit::mCreationTick offset must be 0x0528");
+  static_assert(offsetof(Unit, mExtraStorage) == 0x052C, "Unit::mExtraStorage offset must be 0x052C");
   static_assert(offsetof(Unit, PriorityBoost) == 0x0530, "Unit::PriorityBoost offset must be 0x0530");
   static_assert(offsetof(Unit, mConsumptionData) == 0x0534, "Unit::mConsumptionData offset must be 0x0534");
   static_assert(

@@ -310,6 +310,46 @@ namespace moho
   }
 
   /**
+   * Address: 0x0065FED0 (FUN_0065FED0, sub_65FED0)
+   *
+   * IDA signature:
+   * float *__usercall sub_65FED0@<eax>(float *result@<eax>, float *a2@<ecx>, float *a3@<ebx>);
+   *
+   * What it does:
+   * Copy-assigns the half-open `SEfxCurve` range `[sourceBegin, sourceEnd)`
+   * into destination storage starting at `destinationBegin`. Iterates with a
+   * stride of `sizeof(SEfxCurve) == 0x38` and, for each slot, inlines the
+   * full `SEfxCurve::operator=` body: direct float-by-float copy of
+   * `mBoundsMin`/`mBoundsMax` followed by `mKeys.ResetFrom(other.mKeys)`
+   * (the binary's call to `Assign12ByteVectorRange` (FUN_0065F240) on the
+   * embedded `fastvector_n<Wm3::Vector3f, 2>` lane). Returns the
+   * post-iteration destination cursor (`destination + count`), matching the
+   * binary's `EAX` return.
+   */
+  [[maybe_unused]] SEfxCurve* CopyAssignSEfxCurveRangeRuntime(
+    SEfxCurve* const destinationBegin,
+    SEfxCurve* const sourceBegin,
+    SEfxCurve* const sourceEnd
+  ) noexcept
+  {
+    SEfxCurve* destinationCursor = destinationBegin;
+    SEfxCurve* sourceCursor = sourceBegin;
+    if (sourceCursor == sourceEnd) {
+      return destinationCursor;
+    }
+
+    do {
+      destinationCursor->mBoundsMin = sourceCursor->mBoundsMin;
+      destinationCursor->mBoundsMax = sourceCursor->mBoundsMax;
+      destinationCursor->mKeys.ResetFrom(sourceCursor->mKeys);
+      ++destinationCursor;
+      ++sourceCursor;
+    } while (sourceCursor != sourceEnd);
+
+    return destinationCursor;
+  }
+
+  /**
    * Address: 0x00514E50 (FUN_00514E50, Moho::SEfxCurve::GetValue)
    *
    * What it does:

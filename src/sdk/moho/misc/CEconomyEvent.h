@@ -173,6 +173,15 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
+
+    /**
+     * Address: 0x006B2450 (FUN_006B2450, Moho::CEconomyEvent::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for `CEconomyEvent*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     TDatListItem<void, void> mUnitEventNode; // +0x48
     Unit* mUnit;                             // +0x50

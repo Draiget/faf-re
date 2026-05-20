@@ -1134,6 +1134,54 @@ namespace boost
   }
 
   /**
+   * Address: 0x008555E0 (FUN_008555E0)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_8555E0@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
+   *
+   * What it does:
+   * Out-of-line emission of `vector<boost::shared_ptr<T>>::erase(first, last)`.
+   * Move-assigns the surviving tail `[eraseLast, *pLast)` forward into the
+   * erased slots, releases the now-orphan trailing pairs, and rewinds `*pLast`
+   * to the new live end. Returns `eraseFirst` so callers preserve the
+   * MSVC-style iterator-after-erase contract.
+   */
+  SharedCountPair* EraseSharedPairVectorRange(
+    SharedCountPair** const pLast,
+    SharedCountPair* const eraseFirst,
+    SharedCountPair* const eraseLast
+  ) noexcept
+  {
+    if (eraseFirst != eraseLast) {
+      SharedCountPair* writeCursor = eraseFirst;
+      SharedCountPair* readCursor = eraseLast;
+      SharedCountPair* const liveEnd = *pLast;
+
+      while (readCursor != liveEnd) {
+        // Move-assign one shared-pair lane: retain incoming control, release
+        // the prior occupant when its identity differs, then overwrite both
+        // pointer halves of the destination slot.
+        writeCursor->px = readCursor->px;
+        const auto incomingControl = readCursor->pi;
+        if (incomingControl != writeCursor->pi) {
+          if (incomingControl != nullptr) {
+            incomingControl->add_ref_copy();
+          }
+          ReleaseSharedCount(writeCursor->pi);
+          writeCursor->pi = incomingControl;
+        }
+        ++readCursor;
+        ++writeCursor;
+      }
+
+      (void)ReleaseSharedCountRange(writeCursor, liveEnd);
+      *pLast = writeCursor;
+    }
+
+    return eraseFirst;
+  }
+
+  /**
    * Address: 0x007832B0 (FUN_007832B0)
    * Address: 0x00783DE0 (FUN_00783DE0)
    *
@@ -1372,6 +1420,22 @@ namespace boost
     }
 
     return destination;
+  }
+
+  /**
+   * Address: 0x00783E00 (FUN_00783E00)
+   *
+   * What it does:
+   * Copies one shared-pair tail range `[sourceBegin, sourceEnd)` into the
+   * uninitialized slots beginning at `sourceEnd`, retaining each copied
+   * control block.
+   */
+  SharedCountPair* UninitializedCopySharedPairTailRangeRetain(
+    const SharedCountPair* const sourceBegin,
+    SharedCountPair* const sourceEnd
+  ) noexcept
+  {
+    return UninitializedCopySharedPairRangeRetain(sourceEnd, sourceBegin, sourceEnd);
   }
 
   /**

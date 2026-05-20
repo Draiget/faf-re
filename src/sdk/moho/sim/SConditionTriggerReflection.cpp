@@ -1375,17 +1375,49 @@ namespace
   }
 
   /**
+   * Address: 0x0070FAD0 (FUN_0070FAD0, gpg::fastvector_SCondition::insert_range)
+   *
+   * IDA signature:
+   * void __stdcall sub_70FAD0(_DWORD *a1, int a2, int a3, int a4);
+   *
+   * What it does:
+   * Per-T named helper for the engine-instantiated
+   * `gpg::fastvector<moho::SCondition>::insert_range` emission (stride 56).
+   * Inserts the source range `[sourceBegin, sourceEnd)` into `view` at
+   * `insertPos`, growing storage when the active size would exceed capacity.
+   *
+   * The body forwards to the templated `gpg::FastVectorRuntimeInsertRange`
+   * specialized for `moho::SCondition`; the named per-T wrapper preserves
+   * the out-of-line symbol that the linker would otherwise drop when the
+   * caller-side `FastVectorRuntimeInsertRange<SCondition>(...)` call is
+   * inlined by modern compilers.
+   *
+   * Caller: `FastVectorSConditionPushBack` (FUN_0070E8F0) — the grow-path
+   * branch of the `gpg::fastvector<SCondition>::push_back` body.
+   */
+  void FastVectorSConditionInsertRange(
+    gpg::fastvector_runtime_view<moho::SCondition>& view,
+    moho::SCondition* const insertPos,
+    const moho::SCondition* const sourceBegin,
+    const moho::SCondition* const sourceEnd
+  )
+  {
+    (void)gpg::FastVectorRuntimeInsertRange(view, insertPos, sourceBegin, sourceEnd);
+  }
+
+  /**
    * Address: 0x0070E8F0 (FUN_0070E8F0, gpg::fastvector_SCondition::push_back)
    *
    * What it does:
    * Appends one `SCondition` to the legacy fastvector lane. When the lane is
-   * full it grows through the shared runtime insert helper; otherwise it copies
-   * into the current end slot and advances `end`.
+   * full it grows through the per-T named insert-range helper (which keeps
+   * the FUN_0070FAD0 symbol bound); otherwise it copies into the current
+   * end slot and advances `end`.
    */
   void FastVectorSConditionPushBack(gpg::fastvector_runtime_view<moho::SCondition>& vector, const moho::SCondition& value)
   {
     if (vector.end == vector.capacityEnd) {
-      (void)gpg::FastVectorRuntimeInsertRange(vector, vector.end, &value, &value + 1);
+      FastVectorSConditionInsertRange(vector, vector.end, &value, &value + 1);
       return;
     }
 

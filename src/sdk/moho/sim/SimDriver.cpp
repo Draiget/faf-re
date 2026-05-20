@@ -8,6 +8,7 @@
 
 #include "boost/function.hpp"
 #include "moho/app/WxAppRuntime.h"
+#include "moho/audio/SAudioRequest.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -17,6 +18,7 @@
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/unit/core/Unit.h"
 #include "Sim.h"
 
 using namespace moho;
@@ -26,6 +28,94 @@ namespace
   bool gSimInterlocked = false;
   ISTIDriver* gActiveSimDriver = nullptr;
   StatItem* gEngineStatSimSync = nullptr;
+
+  template <class T>
+  struct LegacyVectorSlot
+  {
+    std::uint32_t mProxyLane; // +0x00
+    T* mFirst;               // +0x04
+    T* mLast;                // +0x08
+    T* mEnd;                 // +0x0C
+  };
+  static_assert(sizeof(LegacyVectorSlot<std::byte>) == 0x10, "LegacyVectorSlot size must be 0x10");
+  static_assert(offsetof(LegacyVectorSlot<std::byte>, mFirst) == 0x04, "LegacyVectorSlot::mFirst offset must be 0x04");
+  static_assert(offsetof(LegacyVectorSlot<std::byte>, mLast) == 0x08, "LegacyVectorSlot::mLast offset must be 0x08");
+  static_assert(offsetof(LegacyVectorSlot<std::byte>, mEnd) == 0x0C, "LegacyVectorSlot::mEnd offset must be 0x0C");
+
+  struct SyncAudioRequestQueueRuntimeView
+  {
+    SAudioRequest* mFirst;       // +0x00
+    SAudioRequest* mLast;        // +0x04
+    SAudioRequest* mEnd;         // +0x08
+    SAudioRequest* mInlineFirst; // +0x0C
+    alignas(SAudioRequest) std::byte mInlineStorage[sizeof(SAudioRequest) * 8u]; // +0x10
+
+    [[nodiscard]] SAudioRequest* InlineStorageBegin() noexcept
+    {
+      return reinterpret_cast<SAudioRequest*>(mInlineStorage);
+    }
+
+    [[nodiscard]] SAudioRequest* InlineStorageEnd() noexcept
+    {
+      return reinterpret_cast<SAudioRequest*>(mInlineStorage + sizeof(mInlineStorage));
+    }
+
+    void InitializeInlineStorage() noexcept
+    {
+      mFirst = InlineStorageBegin();
+      mLast = InlineStorageBegin();
+      mEnd = InlineStorageEnd();
+      mInlineFirst = InlineStorageBegin();
+      *reinterpret_cast<SAudioRequest**>(mInlineStorage) = InlineStorageEnd();
+    }
+
+    void ReleaseHeapAndResetInline() noexcept
+    {
+      if (mFirst != mInlineFirst) {
+        ::operator delete[](mFirst);
+        mFirst = mInlineFirst;
+        mEnd = *reinterpret_cast<SAudioRequest**>(mInlineFirst);
+      }
+      mLast = mFirst;
+    }
+  };
+  static_assert(sizeof(SyncAudioRequestQueueRuntimeView) == 0xF0, "SyncAudioRequestQueueRuntimeView size must be 0xF0");
+  static_assert(
+    offsetof(SyncAudioRequestQueueRuntimeView, mInlineStorage) == 0x10,
+    "SyncAudioRequestQueueRuntimeView::mInlineStorage offset must be 0x10"
+  );
+
+  struct SyncInlineVectorRuntimeView
+  {
+    void* mFirst;       // +0x00
+    void* mLast;        // +0x04
+    void* mEnd;         // +0x08
+    void* mInlineFirst; // +0x0C
+    std::byte mInlineStorage[0x10]; // +0x10
+
+    void ReleaseHeapAndResetInline() noexcept
+    {
+      if (mFirst != mInlineFirst) {
+        ::operator delete[](mFirst);
+        mFirst = mInlineFirst;
+        mEnd = *reinterpret_cast<void**>(mInlineFirst);
+      }
+      mLast = mFirst;
+    }
+  };
+  static_assert(sizeof(SyncInlineVectorRuntimeView) == 0x20, "SyncInlineVectorRuntimeView size must be 0x20");
+  static_assert(
+    offsetof(SyncInlineVectorRuntimeView, mInlineStorage) == 0x10,
+    "SyncInlineVectorRuntimeView::mInlineStorage offset must be 0x10"
+  );
+
+  struct SyncPoseUpdateRuntimeView
+  {
+    std::uint32_t mKindOrEntity;    // +0x00
+    boost::shared_ptr<void> mPose;  // +0x04
+  };
+  static_assert(sizeof(SyncPoseUpdateRuntimeView) == 0x0C, "SyncPoseUpdateRuntimeView size must be 0x0C");
+  static_assert(offsetof(SyncPoseUpdateRuntimeView, mPose) == 0x04, "SyncPoseUpdateRuntimeView::mPose offset must be 0x04");
 
   /**
    * Address: 0x0088E9F0 (FUN_0088E9F0)
@@ -104,6 +194,103 @@ namespace
     "LegacySyncEntityVariableVectorSlot::mEnd offset must be 0x0C"
   );
 
+  struct LegacySyncUnitVariableEntry
+  {
+    EntId mEntityId;                         // +0x000
+    std::uint32_t mReserved04;               // +0x004
+    SSTIUnitVariableData mVariableData;      // +0x008
+    std::uint8_t mReservedTail[0x08]{};      // +0x230
+  };
+  static_assert(sizeof(LegacySyncUnitVariableEntry) == 0x238, "LegacySyncUnitVariableEntry size must be 0x238");
+  static_assert(
+    offsetof(LegacySyncUnitVariableEntry, mVariableData) == 0x08,
+    "LegacySyncUnitVariableEntry::mVariableData offset must be 0x08"
+  );
+
+  struct SSyncDataTeardownRuntimeView
+  {
+    std::int32_t mCurBeat;                                                   // +0x000
+    std::uint8_t mPad0004_0010[0x0C];                                        // +0x004
+    gpg::Stream* mStream;                                                    // +0x010
+    std::uint8_t mPad0014_0018[0x04];                                        // +0x014
+    SyncAudioRequestQueueRuntimeView mAudioRequests;                         // +0x018
+    LegacyVectorSlot<SSTIArmyConstantData> mNewGrids;                        // +0x108
+    LegacyVectorSlot<SSTIArmyVariableData> mArmyUpdates;                     // +0x118
+    LegacyVectorSlot<std::byte> mNewEntities;                                // +0x128
+    LegacyVectorSlot<SCreateUnitParams> mNewUnits;                           // +0x138
+    LegacyVectorSlot<LegacySyncEntityVariableEntry> mEntityUpdates;           // +0x148
+    LegacyVectorSlot<LegacySyncUnitVariableEntry> mUnitUpdates;               // +0x158
+    LegacyVectorSlot<EntId> mDeleteIds;                                      // +0x168
+    LegacyVectorSlot<EntId> mEraseIds;                                       // +0x178
+    LegacyVectorSlot<SSTICommandConstantData> mNewCommands;                  // +0x188
+    LegacyVectorSlot<SSyncPublishedCommandPacket> mCommandUpdates;            // +0x198
+    LegacyVectorSlot<CmdId> mPendingCommandEventRemovals;                    // +0x1A8
+    LegacyVectorSlot<CmdId> mPendingReleasedCommandIds;                      // +0x1B8
+    boost::shared_ptr<void> mParticleBuffer;                                 // +0x1C8
+    LegacyVectorSlot<SDecalInfo> mAddDecals;                                 // +0x1D0
+    LegacyVectorSlot<std::byte> mRemoveDecals;                               // +0x1E0
+    LegacyVectorSlot<std::byte> mCamShakeParams;                             // +0x1F0
+    LegacyVectorSlot<std::byte> mFollowCameras;                              // +0x200
+    LegacyVectorSlot<std::byte> mAuxiliaryVector17;                          // +0x210
+    LegacyVectorSlot<SyncPoseUpdateRuntimeView> mPoseUpdates;                // +0x220
+    LegacyVectorSlot<std::byte> mPlayableRectUpdates;                        // +0x230
+    LegacyVectorSlot<std::byte> mDesyncs;                                    // +0x240
+    std::int32_t mPausedBy;                                                   // +0x250
+    msvc8::string mSubmitArmyStats;                                          // +0x254
+    bool mGameOver;                                                          // +0x270
+    std::uint8_t mPad0271_0274[0x03];                                        // +0x271
+    boost::shared_ptr<void> mTerrainUpdate;                                  // +0x274
+    boost::shared_ptr<void> mSimResources;                                   // +0x27C
+    LegacyVectorSlot<msvc8::string> mPrintField;                             // +0x284
+    LegacyVectorSlot<SyncInlineVectorRuntimeView> mInlineScratchVectors;      // +0x294
+    boost::shared_ptr<void> mTickDebugCanvas;                                // +0x2A4
+    boost::shared_ptr<void> mBeatDebugCanvas;                                // +0x2AC
+    std::uint8_t mPad02B4_02B8[0x04];                                        // +0x2B4
+  };
+  static_assert(sizeof(SSyncDataTeardownRuntimeView) == 0x2B8, "SSyncDataTeardownRuntimeView size must be 0x2B8");
+  static_assert(offsetof(SSyncDataTeardownRuntimeView, mStream) == 0x10, "SSyncData::mStream offset must be 0x10");
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mAudioRequests) == 0x18,
+    "SSyncData::mAudioRequests offset must be 0x18"
+  );
+  static_assert(offsetof(SSyncDataTeardownRuntimeView, mNewGrids) == 0x108, "SSyncData::mNewGrids offset must be 0x108");
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mNewUnits) == 0x138,
+    "SSyncData::mNewUnits offset must be 0x138"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mEntityUpdates) == 0x148,
+    "SSyncData::mEntityUpdates offset must be 0x148"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mUnitUpdates) == 0x158,
+    "SSyncData::mUnitUpdates offset must be 0x158"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mNewCommands) == 0x188,
+    "SSyncData::mNewCommands offset must be 0x188"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mCommandUpdates) == 0x198,
+    "SSyncData::mCommandUpdates offset must be 0x198"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mSubmitArmyStats) == 0x254,
+    "SSyncData::mSubmitArmyStats offset must be 0x254"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mGameOver) == 0x270,
+    "SSyncData::mGameOver offset must be 0x270"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mPrintField) == 0x284,
+    "SSyncData::mPrintField offset must be 0x284"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mBeatDebugCanvas) == 0x2AC,
+    "SSyncData::mBeatDebugCanvas offset must be 0x2AC"
+  );
+
   struct LegacyArmyConstantDataVectorSlot
   {
     std::uint32_t mProxyLane;        // +0x00
@@ -145,6 +332,83 @@ namespace
     offsetof(LegacyArmyVariableDataVectorSlot, mEnd) == 0x0C,
     "LegacyArmyVariableDataVectorSlot::mEnd offset must be 0x0C"
   );
+
+  template <class T>
+  void ResetLegacyVectorSlot(LegacyVectorSlot<T>& slot) noexcept
+  {
+    slot.mFirst = nullptr;
+    slot.mLast = nullptr;
+    slot.mEnd = nullptr;
+  }
+
+  template <class T>
+  void ReleaseLegacyVectorStorage(LegacyVectorSlot<T>& slot) noexcept
+  {
+    if (slot.mFirst != nullptr) {
+      ::operator delete(static_cast<void*>(slot.mFirst));
+    }
+    ResetLegacyVectorSlot(slot);
+  }
+
+  template <class T, class TDestroyElement>
+  void DestroyLegacyVectorElementsAndRelease(LegacyVectorSlot<T>& slot, TDestroyElement destroyElement)
+  {
+    if (slot.mFirst != nullptr) {
+      for (T* cursor = slot.mFirst; cursor != slot.mLast; ++cursor) {
+        destroyElement(*cursor);
+      }
+      ::operator delete(static_cast<void*>(slot.mFirst));
+    }
+    ResetLegacyVectorSlot(slot);
+  }
+
+  template <class T>
+  void DestroyLegacyVectorElementsAndRelease(LegacyVectorSlot<T>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](T& element) { element.~T(); });
+  }
+
+  void DestroyLegacyCommandConstantRange(LegacyVectorSlot<SSTICommandConstantData>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](SSTICommandConstantData& command) {
+      command.unk2.tidy(true, 0u);
+    });
+  }
+
+  void DestroyLegacyStringVectorSlot(LegacyVectorSlot<msvc8::string>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](msvc8::string& value) {
+      value.tidy(true, 0u);
+    });
+  }
+
+  void DestroyLegacySyncEntityVariableVector(LegacyVectorSlot<LegacySyncEntityVariableEntry>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](LegacySyncEntityVariableEntry& entry) {
+      entry.mVariableData.~SSTIEntityVariableData();
+    });
+  }
+
+  void DestroyLegacySyncUnitVariableVector(LegacyVectorSlot<LegacySyncUnitVariableEntry>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](LegacySyncUnitVariableEntry& entry) {
+      entry.mVariableData.~SSTIUnitVariableData();
+    });
+  }
+
+  void DestroyLegacyPoseUpdateVector(LegacyVectorSlot<SyncPoseUpdateRuntimeView>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](SyncPoseUpdateRuntimeView& update) {
+      update.mPose.reset();
+    });
+  }
+
+  void DestroyLegacyInlineScratchVectorRange(LegacyVectorSlot<SyncInlineVectorRuntimeView>& slot)
+  {
+    DestroyLegacyVectorElementsAndRelease(slot, [](SyncInlineVectorRuntimeView& scratch) {
+      scratch.ReleaseHeapAndResetInline();
+    });
+  }
 
   /**
    * Address: 0x00740C00 (FUN_00740C00, ??1fastvector_struct_SSTIEntitytVariableData@gpg@@QAE@@Z)
@@ -457,10 +721,68 @@ SSyncData::SSyncData()
   , mPendingReleasedCommandIds()
   , pad_01C8_0250{}
   , mPausedBy(-1)
-  , pad_0254_0270{}
+  , mSubmitArmyStats()
   , mGameOver(false)
   , pad_0271_02B8{}
-{}
+{
+  auto& runtimeView = reinterpret_cast<SSyncDataTeardownRuntimeView&>(*this);
+  runtimeView.mAudioRequests.InitializeInlineStorage();
+}
+
+/**
+ * Address: 0x0073FC70 (FUN_0073FC70, ??1SSyncData@Moho@@QAE@XZ)
+ *
+ * IDA signature:
+ * void __stdcall Moho::SSyncData::~SSyncData(Moho::SSyncData *a1);
+ *
+ * What it does:
+ * Tears down the sync publication packet in reverse field order, releasing
+ * hidden publication vectors, shared debug/resource handles, the inline audio
+ * request queue, and the owned stream pointer.
+ */
+SSyncData::~SSyncData()
+{
+  auto& runtimeView = reinterpret_cast<SSyncDataTeardownRuntimeView&>(*this);
+
+  runtimeView.mBeatDebugCanvas.reset();
+  runtimeView.mTickDebugCanvas.reset();
+  DestroyLegacyInlineScratchVectorRange(runtimeView.mInlineScratchVectors);
+  DestroyLegacyStringVectorSlot(runtimeView.mPrintField);
+  runtimeView.mSimResources.reset();
+  runtimeView.mTerrainUpdate.reset();
+
+  runtimeView.mSubmitArmyStats.tidy(true, 0u);
+  ReleaseLegacyVectorStorage(runtimeView.mDesyncs);
+  ReleaseLegacyVectorStorage(runtimeView.mPlayableRectUpdates);
+  DestroyLegacyPoseUpdateVector(runtimeView.mPoseUpdates);
+  ReleaseLegacyVectorStorage(runtimeView.mAuxiliaryVector17);
+  ReleaseLegacyVectorStorage(runtimeView.mFollowCameras);
+  ReleaseLegacyVectorStorage(runtimeView.mCamShakeParams);
+  ReleaseLegacyVectorStorage(runtimeView.mRemoveDecals);
+  if (runtimeView.mAddDecals.mFirst != nullptr) {
+    DestroyLegacyDecalInfoRangeForSyncPayload(runtimeView.mAddDecals.mFirst, runtimeView.mAddDecals.mLast);
+    ::operator delete(static_cast<void*>(runtimeView.mAddDecals.mFirst));
+  }
+  ResetLegacyVectorSlot(runtimeView.mAddDecals);
+  runtimeView.mParticleBuffer.reset();
+
+  ReleaseLegacyVectorStorage(runtimeView.mPendingReleasedCommandIds);
+  ReleaseLegacyVectorStorage(runtimeView.mPendingCommandEventRemovals);
+  DestroyLegacyVectorElementsAndRelease(runtimeView.mCommandUpdates);
+  DestroyLegacyCommandConstantRange(runtimeView.mNewCommands);
+  ReleaseLegacyVectorStorage(runtimeView.mEraseIds);
+  ReleaseLegacyVectorStorage(runtimeView.mDeleteIds);
+  DestroyLegacySyncUnitVariableVector(runtimeView.mUnitUpdates);
+  DestroyLegacySyncEntityVariableVector(runtimeView.mEntityUpdates);
+  DestroyLegacyVectorElementsAndRelease(runtimeView.mNewUnits);
+  ReleaseLegacyVectorStorage(runtimeView.mNewEntities);
+  DestroyLegacyVectorElementsAndRelease(runtimeView.mArmyUpdates);
+  DestroyLegacyVectorElementsAndRelease(runtimeView.mNewGrids);
+
+  runtimeView.mAudioRequests.ReleaseHeapAndResetInline();
+  delete runtimeView.mStream;
+  runtimeView.mStream = nullptr;
+}
 
 void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
 {

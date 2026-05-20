@@ -2392,6 +2392,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x00891330 (FUN_00891330,
+   * ?WLD_LoadMapPreview@Moho@@YA?AV?$auto_ptr@VCWldMap@Moho@@@std@@VStrArg@gpg@@@Z)
+   *
+   * IDA signature:
+   * std::auto_ptr<Moho::CWldMap> __thiscall Moho::WLD_LoadMapPreview(gpg::StrArg);
+   *
+   * What it does:
+   * Heap-allocates one value-initialized `CWldMap` (zero-init of the three
+   * owned pointer lanes), runs `MapLoad` in preview-only mode, and returns
+   * the auto_ptr. When the load did not populate `mMapPreviewChunk` the map
+   * is destroyed and the returned auto_ptr is empty.
+   *
+   * Callsite evidence (per CLAUDE.md callsite verification rule):
+   *  - code xref from Moho::CUIMapPreview::SetTextureFromMap (FUN_008509A0) at 0x00850A25
+   */
+  msvc8::auto_ptr<CWldMap> WLD_LoadMapPreview(gpg::StrArg mapPath)
+  {
+    msvc8::auto_ptr<CWldMap> map(new CWldMap());
+
+    CBackgroundTaskControl loadControl{};
+    (void)map->MapLoad(mapPath, nullptr, true, loadControl);
+
+    if (map->mMapPreviewChunk == nullptr) {
+      map.reset();
+    }
+
+    return map;
+  }
+
+  /**
    * Address: 0x008918E0 (FUN_008918E0,
    * ?Load@CWldProps@Moho@@QAE_NAAVBinaryReader@gpg@@AAVCBackgroundTaskControl@2@@Z)
    *

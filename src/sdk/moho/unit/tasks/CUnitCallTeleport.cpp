@@ -513,6 +513,10 @@ namespace moho
    *   2. `CAiTarget mTarget` slot at +0x30 (by reflected type).
    *   3. `WeakPtr<Unit> mTeleportBeaconUnit` slot at +0x50 (by reflected type).
    *   4. `Wm3::Quaternionf mOrientation` slot at +0x58 (by reflected type).
+   *
+   * The release binary additionally exposes linker-emitted calling-convention
+   * trampolines (`FUN_0060C570`, `FUN_0060AA10`) that forward unmodified to
+   * this body for cross-TU references; no separate source is emitted.
    */
   void CUnitTeleportTask::MemberDeserialize(gpg::ReadArchive* const archive)
   {
@@ -539,6 +543,10 @@ namespace moho
    *   2. `CAiTarget mTarget` slot at +0x30 (by reflected type).
    *   3. `WeakPtr<Unit> mTeleportBeaconUnit` slot at +0x50 (by reflected type).
    *   4. `Wm3::Quaternionf mOrientation` slot at +0x58 (by reflected type).
+   *
+   * The release binary additionally exposes linker-emitted calling-convention
+   * trampolines (`FUN_0060C9A0`, `FUN_0060AA20`) that forward unmodified to
+   * this body for cross-TU references; no separate source is emitted.
    */
   void CUnitTeleportTask::MemberSerialize(gpg::WriteArchive* const archive) const
   {

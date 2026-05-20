@@ -81,23 +81,6 @@ namespace
   }
 
   /**
-   * Address: 0x0051A530 (FUN_0051A530)
-   *
-   * What it does:
-   * Allocates `count * 0xCC` bytes for contiguous `RMeshBlueprintLOD` lanes.
-   * Raises `std::bad_alloc` on 32-bit overflow.
-   */
-  [[nodiscard]] void* AllocateMeshBlueprintLodArrayOrThrow(const unsigned int count)
-  {
-    constexpr unsigned int kElementSize = static_cast<unsigned int>(sizeof(moho::RMeshBlueprintLOD));
-    GPG_ASSERT(count != 0u);
-    if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kElementSize) {
-      throw std::bad_alloc{};
-    }
-    return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(kElementSize));
-  }
-
-  /**
    * Address: 0x0051A400 (FUN_0051A400)
    *
    * What it does:
@@ -339,13 +322,55 @@ namespace
   }
 
   /**
+   * Address: 0x00519D90 (FUN_00519D90, msvc8::vector<moho::RMeshBlueprintLOD>::_Insert_n)
+   *
+   * IDA signature:
+   * void __thiscall __noreturn sub_519D90(
+   *     Moho::RMeshBlueprintLOD *a2, _DWORD *arg0, int arg4, unsigned int a4);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<RMeshBlueprintLOD>::_Insert_n`,
+   * the slow-path insert-N-copies lane backing `vector::resize(n, value)`
+   * growth. Constructs a default-initialized `RMeshBlueprintLOD` on the stack
+   * (`Moho::RMeshBlueprintLOD::RMeshBlueprintLOD`, FUN_005183D0), then either
+   * extends the live range in place when spare capacity is sufficient
+   * (geometric-grown copy of the suffix via `FUN_0051A5B0` /
+   * `CopyMeshBlueprintLodRange`) or allocates a fresh storage block via
+   * `AllocateMeshBlueprintLodArrayOrThrow` (`FUN_0051A530`) and rebuilds the
+   * triplet via `FUN_0051B3D0`. The `__noreturn` decoration in the
+   * decompiler output reflects the SEH unwind tail; the body returns through
+   * the normal exit path.
+   *
+   * Per-T named free helper preserves the MSVC8 out-of-line symbol shape for
+   * `vector<RMeshBlueprintLOD>::_Insert_n`. Callers route growth through this
+   * name instead of `storage.resize(n, value)` so the compiler emits a real
+   * call site that resolves to this body.
+   */
+  void InsertNCopiesMeshBlueprintLodVector(
+    LODVector& storage,
+    moho::RMeshBlueprintLOD* const insertPosition,
+    const unsigned int insertCount,
+    const moho::RMeshBlueprintLOD& fillValue
+  )
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
    * Address: 0x00519A10 (FUN_00519A10)
    *
    * What it does:
    * Adjusts one `vector<RMeshBlueprintLOD>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth. The shrink path erases the
-   * tail range via the canonical `EraseTrailingLodRange` lane
-   * (`FUN_00519D40`).
+   * uses one caller-provided fill lane for growth. Routes growth through the
+   * canonical `vector<RMeshBlueprintLOD>::_Insert_n` lane (`FUN_00519D90`,
+   * `InsertNCopiesMeshBlueprintLodVector`) to preserve the MSVC8 per-T symbol
+   * shape; the shrink path erases the tail range via the canonical
+   * `EraseTrailingLodRange` lane (`FUN_00519D40`).
    */
   [[nodiscard]] std::size_t ResizeMeshBlueprintLodVectorWithFill(
     LODVector& storage,
@@ -355,7 +380,8 @@ namespace
   {
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
-      storage.resize(requestedCount, fillValue);
+      const auto growBy = static_cast<unsigned int>(requestedCount - currentCount);
+      InsertNCopiesMeshBlueprintLodVector(storage, storage.end(), growBy, fillValue);
       return requestedCount;
     }
 
@@ -476,6 +502,30 @@ namespace moho
     // caller's implicit destructor chain stays correct.
     storage->~vector();
     ::new (storage) msvc8::vector<RMeshBlueprintLOD>();
+  }
+
+  /**
+   * Address: 0x0051A530 (FUN_0051A530)
+   *
+   * IDA signature:
+   * void * __usercall sub_51A530@<eax>(unsigned int count@<ecx>);
+   *
+   * What it does:
+   * Allocates one contiguous block of `count * sizeof(RMeshBlueprintLOD)` bytes
+   * (`0xCC` per element) for a `msvc8::vector<RMeshBlueprintLOD>` storage lane,
+   * raising `std::bad_alloc` on the legacy VC8 32-bit overflow guard. The
+   * binary corresponds to the typed `_Allocate(count, RMeshBlueprintLOD*)`
+   * specialization emitted for the LOD vector instantiation; the ECX-only
+   * register convention keeps this a leaf helper of `_Buy`.
+   */
+  void* AllocateMeshBlueprintLodArrayOrThrow(const unsigned int count)
+  {
+    constexpr unsigned int kElementSize = static_cast<unsigned int>(sizeof(RMeshBlueprintLOD));
+    GPG_ASSERT(count != 0u);
+    if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kElementSize) {
+      throw std::bad_alloc{};
+    }
+    return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(kElementSize));
   }
 
   /**

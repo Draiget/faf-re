@@ -88,7 +88,6 @@ namespace moho
   int cfunc_CPlatoonUseFerryBeaconL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonUseTeleporterL(LuaPlus::LuaState*) { return 0; }
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_GetActiveBuildTemplateL(LuaPlus::LuaState*) { return 0; }
   int cfunc_GetRolloverInfoL(LuaPlus::LuaState*) { return 0; }
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState*) { return 0; }
   int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState*) { return 0; }

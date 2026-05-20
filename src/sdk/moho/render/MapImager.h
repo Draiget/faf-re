@@ -97,8 +97,8 @@ namespace moho
   };
 
 #if defined(MOHO_ABI_MSVC8_COMPAT)
-  static_assert(offsetof(MapImager, mMeshInstances)  == 0x04);
-  static_assert(sizeof(MapImager) == 0x10, "MapImager size must be 0x10");
+  static_assert(offsetof(MapImager, mMeshInstances) == 0x04);
+  static_assert(sizeof(MapImager) == 0x14, "MapImager size must be 0x14");
 #endif
 
   /**

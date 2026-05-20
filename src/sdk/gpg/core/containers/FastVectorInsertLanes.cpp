@@ -815,6 +815,7 @@ namespace gpg::core::legacy
    * Address: 0x0080B080 (FUN_0080B080)
    * Address: 0x0080B1E0 (FUN_0080B1E0)
    * Address: 0x0080B310 (FUN_0080B310)
+   * Address: 0x004E7670 (FUN_004E7670)
    *
    * What it does:
    * Allocates replacement storage for one 24-byte fastvector lane and
@@ -1013,6 +1014,13 @@ namespace gpg::core::legacy
       return CopyForwardStride(destination, sourceEnd, sourceBegin, kTwentyStride);
     }
 
+    /**
+     * Address: 0x00548390 (FUN_00548390)
+     *
+     * What it does:
+     * Allocates replacement storage for one 20-byte fastvector lane and
+     * materializes prefix/insert/suffix slices into the new storage.
+     */
     [[nodiscard]] std::byte* GrowInsert20ByteLane(
       FastVectorInsertRuntimeView& vectorView,
       const std::size_t requestedCapacity,
@@ -1500,6 +1508,7 @@ namespace gpg::core::legacy
 
   /**
    * Address: 0x0080F390 (FUN_0080F390)
+   * Address: 0x007A2600 (FUN_007A2600)
    *
    * What it does:
    * Allocates replacement storage for one 8-byte fastvector lane and
@@ -1895,6 +1904,23 @@ namespace gpg::core::legacy
       return CopyForwardStride(destination, sourceEnd, sourceBegin, kSixteenStride);
     }
 
+    /**
+     * Address: 0x006C0F70 (FUN_006C0F70)
+     *
+     * IDA signature:
+     * int __fastcall sub_6C0F70(byte *splitPosition, unsigned int newCapacity,
+     *   fastvector_runtime *vec, const byte *insertSrcBegin,
+     *   const byte *insertSrcEnd);
+     *
+     * What it does:
+     * 16-byte-stride specialization of the fastvector `_Insert_n_grow`
+     * reallocation path. Allocates `requestedCapacity * 16` bytes, copies the
+     * existing prefix `[vec.start, splitPosition)`, then the insert source
+     * range `[insertSrcBegin, insertSrcEnd)`, then the suffix
+     * `[splitPosition, vec.end)`, releases the old buffer (unless it was the
+     * inline empty-vector sentinel) and updates the vector triple
+     * `(start, finish, capacity_end)`.
+     */
     [[nodiscard]] std::byte* GrowInsert16ByteLane(
       FastVectorInsertRuntimeView& vectorView,
       const std::size_t requestedCapacity,

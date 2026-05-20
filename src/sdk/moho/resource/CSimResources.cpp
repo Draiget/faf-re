@@ -4,6 +4,8 @@
 #include <limits>
 #include <new>
 
+#include "moho/misc/EngineVectorHelpers.h"
+
 namespace
 {
   [[nodiscard]] gpg::Rect2i BuildRectFromPointAndSize(const Wm3::Vec3f& point, const Wm3::Vec2i& size) noexcept
@@ -86,7 +88,7 @@ namespace moho
     ResourceDeposit deposit{};
     deposit.footprintRect = *pos;
     deposit.depositType = type;
-    deposits_.push_back(deposit);
+    moho::PushBackVector(deposits_, deposit);
   }
 
   /**

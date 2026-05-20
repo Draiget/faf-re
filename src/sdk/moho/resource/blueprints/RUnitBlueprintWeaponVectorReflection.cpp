@@ -72,13 +72,43 @@ namespace
   }
 
   /**
+   * Address: 0x00527680 (FUN_00527680, Moho::RUnitBlueprintWeapon::operator=)
+   *
+   * IDA signature:
+   * int __usercall sub_527680@<eax>(int a1@<eax>, int a2@<esi>);
+   *
+   * What it does:
+   * Per-field copy-assignment body for one 0x184-byte
+   * `Moho::RUnitBlueprintWeapon` element. Copies the owner pointer and weapon
+   * index, then string-assigns each of the five embedded `msvc8::string`
+   * lanes (`Label`, `DisplayName`, `DamageType`, `TargetRestrictOnlyAllow`,
+   * `TargetRestrictDisallow`, `UIMinRangeVisualId`, `UIMaxRangeVisualId`) and
+   * mirrors the scalar/flag/float gameplay-field block.
+   *
+   * Per-T named free helper: the canonical bind site for the engine-instantiated
+   * `RUnitBlueprintWeapon::operator=` body. Callers must invoke this helper by
+   * explicit name (not inline `*dst = *src` syntax) so the linker keeps the
+   * out-of-line symbol matching the binary address.
+   */
+  moho::RUnitBlueprintWeapon& CopyAssignRUnitBlueprintWeapon(
+    moho::RUnitBlueprintWeapon& destination,
+    const moho::RUnitBlueprintWeapon& source
+  )
+  {
+    destination = source;
+    return destination;
+  }
+
+  /**
    * Address: 0x00526170 (FUN_00526170)
    *
    * What it does:
    * Copy-assigns one contiguous `RUnitBlueprintWeapon` destination range from
-   * source lanes and returns the advanced source cursor.
+   * source lanes and returns the advanced source cursor. Routes each per-element
+   * copy through `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) by name so the
+   * out-of-line copy-assignment symbol stays bound.
    */
-  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
+  const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
     moho::RUnitBlueprintWeapon* destinationBegin,
     moho::RUnitBlueprintWeapon* destinationEnd,
     const moho::RUnitBlueprintWeapon* sourceBegin
@@ -88,12 +118,78 @@ namespace
     const moho::RUnitBlueprintWeapon* sourceCursor = sourceBegin;
 
     while (destinationCursor != destinationEnd) {
-      *destinationCursor = *sourceCursor;
+      (void)CopyAssignRUnitBlueprintWeapon(*destinationCursor, *sourceCursor);
       ++destinationCursor;
       ++sourceCursor;
     }
 
     return sourceCursor;
+  }
+
+  /**
+   * Address: 0x005261D0 (FUN_005261D0)
+   *
+   * IDA signature:
+   * int __usercall sub_5261D0@<eax>(int result@<eax>, int a2@<edi>);
+   *
+   * What it does:
+   * Broadcast-fills one half-open weapon-blueprint destination range
+   * `[destinationBegin, destinationEnd)` with one shared source value (in
+   * `ebx` at the binary call site). Each slot is copy-assigned through
+   * `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) from the same source
+   * pointer. Returns the destination cursor at the end of the fill, matching
+   * the binary's `eax` return semantics.
+   *
+   * The 2007 source instantiated this as the typed `std::fill` body for
+   * `vector<RUnitBlueprintWeapon>` (one shared source value broadcast across
+   * a destination range). It is the bind site for the typed fill emission
+   * used by the `_Insert_n` in-place fast path (FUN_00524AD0).
+   */
+  [[nodiscard]] moho::RUnitBlueprintWeapon* FillUnitBlueprintWeaponRange(
+    moho::RUnitBlueprintWeapon* const destinationBegin,
+    moho::RUnitBlueprintWeapon* const destinationEnd,
+    const moho::RUnitBlueprintWeapon& fillValue
+  )
+  {
+    moho::RUnitBlueprintWeapon* destinationCursor = destinationBegin;
+    while (destinationCursor != destinationEnd) {
+      (void)CopyAssignRUnitBlueprintWeapon(*destinationCursor, fillValue);
+      ++destinationCursor;
+    }
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x005261F0 (FUN_005261F0)
+   *
+   * IDA signature:
+   * int __usercall sub_5261F0@<eax>(int a1@<eax>, int a2@<ecx>, int a3@<ebx>);
+   *
+   * What it does:
+   * Backward-iterates two half-open weapon-blueprint ranges in lockstep —
+   * source `[sourceLowerBound, sourceEnd)` and destination ending at
+   * `destinationEnd` — copy-assigning each slot through
+   * `CopyAssignRUnitBlueprintWeapon` (FUN_00527680). Returns the moved-back
+   * destination cursor, matching the binary's `eax = destinationEnd - count *
+   * stride` return.
+   *
+   * Used by the `_Insert_n` slow path (FUN_00524AD0) to shift the tail
+   * `[insertAt, end)` forward by `count` slots without trampling overlapping
+   * memory ranges (range copy in reverse direction so writes always trail
+   * reads).
+   */
+  [[nodiscard]] moho::RUnitBlueprintWeapon* CopyBackwardUnitBlueprintWeaponRange(
+    const moho::RUnitBlueprintWeapon* sourceEnd,
+    moho::RUnitBlueprintWeapon* destinationEnd,
+    const moho::RUnitBlueprintWeapon* const sourceLowerBound
+  )
+  {
+    while (sourceEnd != sourceLowerBound) {
+      --sourceEnd;
+      --destinationEnd;
+      (void)CopyAssignRUnitBlueprintWeapon(*destinationEnd, *sourceEnd);
+    }
+    return destinationEnd;
   }
 
   /**
@@ -141,21 +237,101 @@ namespace
   }
 
   /**
+   * Address: 0x00524AD0 (FUN_00524AD0)
+   *
+   * IDA signature:
+   * void __stdcall __noreturn sub_524AD0(_DWORD *a1, int a2, unsigned int a3);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<RUnitBlueprintWeapon>::_Insert_n`
+   * (insert N default-constructed elements at `insertAt`). The binary:
+   *   - Default-constructs one `RUnitBlueprintWeapon` template value on the
+   *     stack (FUN_00524E50 copy-ctor is also dispatched from here for the
+   *     copy lane); the function does NOT use a caller-supplied fill.
+   *   - If `newSize > capacity`: geometrically grows storage (1.5x default,
+   *     falling back to exact-fit when overflow). Allocates fresh storage,
+   *     copies prefix → fills gap with the default temp → copies suffix,
+   *     replaces the live triplet, frees the old buffer.
+   *   - Else (room in current allocation): shifts tail `[insertAt, end)`
+   *     forward by `count` slots through the backward-iterating range copy
+   *     (FUN_005261F0), then forward-fills the gap `[insertAt, insertAt+count)`
+   *     from the default temp via the forward-iterating range copy
+   *     (FUN_005261D0).
+   *
+   * Recovered as a typed helper that mirrors the in-place fast-path: the
+   * shift uses `CopyBackwardUnitBlueprintWeaponRange` (FUN_005261F0) and the
+   * fill uses `FillUnitBlueprintWeaponRange` (FUN_005261D0). The slow
+   * reallocation path is delegated to `WeaponVector::insert` for fidelity to
+   * the STL allocator semantics on growth, which matches the binary's
+   * `sub_527DD0` ranged-copy lane and `operator delete`+`operator new` pair.
+   */
+  void InsertDefaultRUnitBlueprintWeapons(
+    WeaponVector& storage,
+    moho::RUnitBlueprintWeapon* const insertAt,
+    const std::size_t count
+  )
+  {
+    if (count == 0u) {
+      return;
+    }
+
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    const std::size_t currentSize =
+      (view.begin && view.end) ? static_cast<std::size_t>(view.end - view.begin) : 0u;
+    const std::size_t currentCapacity =
+      (view.begin && view.capacityEnd) ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
+    const std::size_t spareSlots = currentCapacity - currentSize;
+
+    moho::RUnitBlueprintWeapon temp{};
+
+    if (count <= spareSlots) {
+      // In-place fast path: shift the tail backward, then broadcast-fill the gap.
+      moho::RUnitBlueprintWeapon* const liveEnd = view.end;
+      moho::RUnitBlueprintWeapon* const newEnd = liveEnd + count;
+
+      // Shift `[insertAt, liveEnd)` forward by `count` slots through the per-T
+      // backward range-copy helper bound to FUN_005261F0.
+      (void)CopyBackwardUnitBlueprintWeaponRange(liveEnd, newEnd, insertAt);
+
+      // Broadcast-fill the gap `[insertAt, insertAt+count)` with the default
+      // temp through the per-T fill helper bound to FUN_005261D0.
+      (void)FillUnitBlueprintWeaponRange(insertAt, insertAt + count, temp);
+
+      view.end = newEnd;
+      return;
+    }
+
+    // Slow path: STL allocator-controlled grow + range copies.
+    storage.insert(insertAt, count, temp);
+  }
+
+  /**
    * Address: 0x005244A0 (FUN_005244A0)
    *
    * What it does:
-   * Adjusts one `vector<RUnitBlueprintWeapon>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth.
+   * Adjusts one `vector<RUnitBlueprintWeapon>` length to `requestedCount`.
+   * Growth routes through `InsertDefaultRUnitBlueprintWeapons` (FUN_00524AD0)
+   * which inserts `(requestedCount - currentCount)` default-constructed
+   * elements at the live end — note the binary ignores the caller-supplied
+   * `fillValue` for growth; the inserted slots are always default-initialized.
+   * Shrinking destroys the tail through
+   * `DestroyUnitBlueprintWeaponTailAndReturnIterator` (FUN_00524A80).
+   *
+   * The unused `fillValue` parameter is retained to match the binary's
+   * 3-argument calling convention (the temp is constructed by the caller
+   * frame and destroyed on return).
    */
   [[nodiscard]] std::size_t ResizeUnitBlueprintWeaponVectorWithFill(
     WeaponVector& storage,
     const std::size_t requestedCount,
-    const moho::RUnitBlueprintWeapon& fillValue
+    [[maybe_unused]] const moho::RUnitBlueprintWeapon& fillValue
   )
   {
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
-      storage.resize(requestedCount, fillValue);
+      auto& growView = msvc8::AsVectorRuntimeView(storage);
+      InsertDefaultRUnitBlueprintWeapons(
+        storage, growView.end, requestedCount - currentCount);
       return requestedCount;
     }
 
@@ -170,6 +346,7 @@ namespace
 
     return requestedCount;
   }
+
 } // namespace
 
 /**

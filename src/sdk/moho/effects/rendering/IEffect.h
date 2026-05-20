@@ -19,6 +19,7 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
 
     /**
       * Alias of FUN_00654220 (non-canonical helper lane).
@@ -28,6 +29,15 @@ namespace moho
      */
     [[nodiscard]]
     static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0066C980 (FUN_0066C980, Moho::IEffect::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for `IEffect*`.
+     */
+    [[nodiscard]]
+    static gpg::RType* GetPointerType();
 
     /**
       * Alias of FUN_00654220 (non-canonical helper lane).

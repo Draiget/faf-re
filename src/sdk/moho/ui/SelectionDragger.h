@@ -10,6 +10,7 @@ namespace moho
   class CameraImpl;
   class CGeomSolid3;
   class CWldSession;
+  struct SSelectionSetUserEntity;
 
   struct SelectionDraggerLink
   {
@@ -48,6 +49,10 @@ namespace moho
      * `deleteFlags` is set.
      */
     SelectionDragger* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
+
+    [[nodiscard]] virtual CGeomSolid3 BuildSelectionSolid() const = 0;
+
+    [[nodiscard]] virtual bool HasActiveSelectionDrag() const = 0;
 
   public:
     SelectionDraggerLink* mSelectionListHead; // +0x04
@@ -95,7 +100,16 @@ namespace moho
      * screen coordinates into a canonical rectangle and unprojecting it through
      * the active camera view.
      */
-    [[nodiscard]] virtual CGeomSolid3 BuildSelectionSolid() const;
+    [[nodiscard]] CGeomSolid3 BuildSelectionSolid() const override;
+
+    /**
+     * Address: 0x00864DA0 (FUN_00864DA0, Moho::SelectionDragger2D::Func6)
+     *
+     * What it does:
+     * Returns whether the drag stretched far enough to produce a selection
+     * volume.
+     */
+    [[nodiscard]] bool HasActiveSelectionDrag() const override;
 
   public:
     std::uint8_t mStretch;   // +0x24
@@ -112,4 +126,13 @@ namespace moho
                 "SelectionDragger2D::mY1 offset must be 0x2C");
   static_assert(sizeof(SelectionDragger2D) == 0x30,
                 "SelectionDragger2D size must be 0x30");
+
+  /**
+   * Address: 0x00863F10 (FUN_00863F10)
+   *
+   * What it does:
+   * Builds the selectable user-entity weak-set currently covered by one active
+   * selection dragger.
+   */
+  void CollectSelectionDraggerEntities(SSelectionSetUserEntity& outSelection, SelectionDragger& dragger);
 } // namespace moho

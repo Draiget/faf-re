@@ -3,25 +3,31 @@
 #include <algorithm>
 #include <bit>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
 #include <type_traits>
 #include <typeinfo>
 
+#include "CArmyLuaFunctionRegistrations.h"
 #include "CArmyStats.h"
 #include "CPlatoon.h"
+#include "CSquad.h"
+#include "CEconomy.h"
 #include "CInfluenceMap.h"
 #include "CSimArmyEconomyInfo.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "lua/LuaObject.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "moho/path/PathTables.h"
 #include "moho/sim/ArmyUnitSetVectorReflection.h"
 #include "moho/sim/CEconStorage.h"
@@ -1049,6 +1055,286 @@ namespace
     army.IsResourceSharingEnabled = economyInfo->isResourceSharingEnabled;
   }
 
+  [[nodiscard]] LuaPlus::LuaObject LuaField(const LuaPlus::LuaObject& table, const char* const key)
+  {
+    return table[key];
+  }
+
+  [[nodiscard]] const char*
+  GetLuaStringField(const LuaPlus::LuaObject& table, const char* const key, const char* const fallback = "")
+  {
+    LuaPlus::LuaObject value = LuaField(table, key);
+    if (value.IsNil()) {
+      return fallback;
+    }
+
+    const char* const result = value.GetString();
+    return result != nullptr ? result : fallback;
+  }
+
+  [[nodiscard]] int GetLuaIntegerField(const LuaPlus::LuaObject& table, const char* const key, const int fallback = 0)
+  {
+    LuaPlus::LuaObject value = LuaField(table, key);
+    return value.IsNil() ? fallback : value.GetInteger();
+  }
+
+  [[nodiscard]] bool
+  GetLuaBooleanField(const LuaPlus::LuaObject& table, const char* const key, const bool fallback = false)
+  {
+    LuaPlus::LuaObject value = LuaField(table, key);
+    return value.IsNil() ? fallback : value.GetBoolean();
+  }
+
+  [[nodiscard]] LuaPlus::LuaObject LookupScenarioGlobal(moho::Sim* const sim, const char* const path)
+  {
+    if (sim == nullptr || sim->mLuaState == nullptr || path == nullptr) {
+      return LuaPlus::LuaObject{};
+    }
+
+    LuaPlus::LuaObject globals = sim->mLuaState->GetGlobals();
+    return globals.Lookup(path);
+  }
+
+  [[nodiscard]] float ReadScenarioGlobalNumber(
+    moho::Sim* const sim,
+    const char* const path,
+    const float fallback,
+    bool* const wasPresent = nullptr
+  )
+  {
+    LuaPlus::LuaObject value = LookupScenarioGlobal(sim, path);
+    const bool present = !value.IsNil();
+    if (wasPresent != nullptr) {
+      *wasPresent = present;
+    }
+    return present ? static_cast<float>(value.GetNumber()) : fallback;
+  }
+
+  [[nodiscard]] int ReadScenarioGlobalInt(moho::Sim* const sim, const char* const path, const int fallback)
+  {
+    bool present = false;
+    const float value = ReadScenarioGlobalNumber(sim, path, static_cast<float>(fallback), &present);
+    return present ? static_cast<int>(value) : fallback;
+  }
+
+  [[nodiscard]] int ResolveMapMaxExtent(const moho::Sim* const sim) noexcept
+  {
+    const moho::CHeightField* const field =
+      (sim != nullptr && sim->mMapData != nullptr) ? sim->mMapData->mHeightField.get() : nullptr;
+    if (field == nullptr) {
+      return 0;
+    }
+
+    const int widthExtent = field->width > 0 ? field->width - 1 : 0;
+    const int heightExtent = field->height > 0 ? field->height - 1 : 0;
+    return std::max(widthExtent, heightExtent);
+  }
+
+  [[nodiscard]] int ResolveInfluenceMapGridSize(const int mapMaxExtent) noexcept
+  {
+    return std::max(32, mapMaxExtent / 16);
+  }
+
+  [[nodiscard]] int ResolveDefaultPathCapacity(const int mapMaxExtent) noexcept
+  {
+    if (mapMaxExtent < 512) {
+      return 500;
+    }
+    if (mapMaxExtent < 1024) {
+      return 1000;
+    }
+    if (mapMaxExtent < 2048) {
+      return 2000;
+    }
+    if (mapMaxExtent < 4096) {
+      return 10000;
+    }
+    return 20000;
+  }
+
+  [[nodiscard]] int ResolveUnitCap(const LuaPlus::LuaObject& scenarioInfoOptions)
+  {
+    LuaPlus::LuaObject unitCap = LuaField(scenarioInfoOptions, "UnitCap");
+    if (!unitCap.IsString()) {
+      return 500;
+    }
+
+    const int parsed = std::atoi(unitCap.GetString());
+    return parsed != 0 ? parsed : 500;
+  }
+
+  [[nodiscard]] int ResolveNoRushTicks(const char* const noRushOption) noexcept
+  {
+    if (noRushOption == nullptr || std::strcmp(noRushOption, "Off") == 0) {
+      return 0;
+    }
+    if (std::strcmp(noRushOption, "5") == 0) {
+      return 3000;
+    }
+    if (std::strcmp(noRushOption, "10") == 0) {
+      return 6000;
+    }
+    if (std::strcmp(noRushOption, "20") == 0) {
+      return 12000;
+    }
+    return 0;
+  }
+
+  void ApplyNoRushScenarioOptions(
+    moho::CArmyImpl& army,
+    moho::Sim* const sim,
+    const LuaPlus::LuaObject& scenarioInfoOptions
+  )
+  {
+    LuaPlus::LuaObject noRushObject = LuaField(scenarioInfoOptions, "NoRushOption");
+    if (noRushObject.IsNil()) {
+      return;
+    }
+
+    army.NoRushTicks = ResolveNoRushTicks(noRushObject.GetString());
+    army.NoRushRadius = ReadScenarioGlobalNumber(sim, "ScenarioInfo.norushradius", 100.0f);
+
+    const char* const armyName = army.ArmyName.data();
+    char offsetXPath[128] = {};
+    char offsetYPath[128] = {};
+    std::snprintf(offsetXPath, sizeof(offsetXPath), "ScenarioInfo.norushoffsetX_%s", armyName);
+    std::snprintf(offsetYPath, sizeof(offsetYPath), "ScenarioInfo.norushoffsetY_%s", armyName);
+
+    bool hasOffsetX = false;
+    bool hasOffsetY = false;
+    const float offsetX = ReadScenarioGlobalNumber(sim, offsetXPath, 0.0f, &hasOffsetX);
+    const float offsetY = ReadScenarioGlobalNumber(sim, offsetYPath, 0.0f, &hasOffsetY);
+    if (!hasOffsetX || !hasOffsetY) {
+      army.NoRushOffsetX = 0.0f;
+      army.NoRushOffsetY = 0.0f;
+      return;
+    }
+
+    army.NoRushOffsetX = offsetX;
+    army.NoRushOffsetY = offsetY;
+  }
+
+  void ApplyPathCapacityScenarioOptions(moho::CArmyImpl& army, moho::Sim* const sim, const int mapMaxExtent)
+  {
+    const int defaultPathCapacity = ResolveDefaultPathCapacity(mapMaxExtent);
+    army.PathCapacityLand = defaultPathCapacity;
+    army.PathCapacitySea = defaultPathCapacity;
+    army.PathCapacityBoth = defaultPathCapacity;
+
+    army.PathCapacityLand = ReadScenarioGlobalInt(sim, "ScenarioInfo.pathcap_land", army.PathCapacityLand);
+    army.PathCapacitySea = ReadScenarioGlobalInt(sim, "ScenarioInfo.pathcap_sea", army.PathCapacitySea);
+    army.PathCapacityBoth = ReadScenarioGlobalInt(sim, "ScenarioInfo.pathcap_both", army.PathCapacityBoth);
+  }
+
+  void AssignRetainedReconGrid(
+    boost::shared_ptr<moho::CIntelGrid>& destination,
+    boost::SharedPtrRaw<moho::CIntelGrid> source
+  ) noexcept
+  {
+    static_assert(
+      sizeof(boost::shared_ptr<moho::CIntelGrid>) == sizeof(boost::SharedPtrRaw<moho::CIntelGrid>),
+      "boost::shared_ptr<CIntelGrid> layout must match SharedPtrRaw<CIntelGrid>"
+    );
+
+    auto& destinationRaw = reinterpret_cast<boost::SharedPtrRaw<moho::CIntelGrid>&>(destination);
+    destinationRaw.assign_retain(source);
+    source.release();
+  }
+
+  void CopyReconGridsFromDatabase(moho::CArmyImpl& army)
+  {
+    moho::CAiReconDBImpl* const reconDb = army.AiReconDb;
+    if (reconDb == nullptr) {
+      return;
+    }
+
+    AssignRetainedReconGrid(army.RadarReconGrid, reconDb->ReconGetRadarGrid());
+    AssignRetainedReconGrid(army.SonarReconGrid, reconDb->ReconGetSonarGrid());
+    AssignRetainedReconGrid(army.ExploredReconGrid, reconDb->ReconGetVisionGrid());
+    AssignRetainedReconGrid(army.WaterReconGrid, reconDb->ReconGetWaterGrid());
+    AssignRetainedReconGrid(army.OmniReconGrid, reconDb->ReconGetOmniGrid());
+    AssignRetainedReconGrid(army.RciReconGrid, reconDb->ReconGetRCIGrid());
+    AssignRetainedReconGrid(army.SciReconGrid, reconDb->ReconGetSCIGrid());
+    AssignRetainedReconGrid(army.FogReconGrid, reconDb->ReconGetVCIGrid());
+  }
+
+  void VisitUnitBlueprintNodes(
+    moho::RRuleGameRulesBlueprintNode* const node,
+    const moho::RRuleGameRulesBlueprintNode* const sentinel,
+    std::uint32_t& minCategoryBit,
+    std::uint32_t& maxCategoryBit
+  )
+  {
+    if (node == nullptr || node == sentinel || node->mIsSentinel != 0u) {
+      return;
+    }
+
+    VisitUnitBlueprintNodes(node->left, sentinel, minCategoryBit, maxCategoryBit);
+
+    if (auto* const blueprint = static_cast<moho::RUnitBlueprint*>(node->mBlueprint); blueprint != nullptr) {
+      minCategoryBit = std::min(minCategoryBit, blueprint->mCategoryBitIndex);
+      maxCategoryBit = std::max(maxCategoryBit, blueprint->mCategoryBitIndex);
+    }
+
+    VisitUnitBlueprintNodes(node->right, sentinel, minCategoryBit, maxCategoryBit);
+  }
+
+  void InitializeArmyUnitCategorySets(moho::CArmyImpl& army)
+  {
+    army.UnitCategoryBaseIndex = std::numeric_limits<std::uint32_t>::max();
+    army.UnitCategoryMaxIndex = 0u;
+
+    if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
+      return;
+    }
+
+    const moho::RRuleGameRulesBlueprintMap& unitBlueprints = army.Simulation->mRules->GetUnitBlueprints();
+    moho::RRuleGameRulesBlueprintNode* const sentinel = unitBlueprints.mHead;
+    if (sentinel == nullptr || unitBlueprints.mSize == 0u) {
+      return;
+    }
+
+    std::uint32_t minCategoryBit = std::numeric_limits<std::uint32_t>::max();
+    std::uint32_t maxCategoryBit = 0u;
+    VisitUnitBlueprintNodes(sentinel->left, sentinel, minCategoryBit, maxCategoryBit);
+    if (minCategoryBit == std::numeric_limits<std::uint32_t>::max() || maxCategoryBit < minCategoryBit) {
+      return;
+    }
+
+    const std::size_t categorySetCount = static_cast<std::size_t>(maxCategoryBit - minCategoryBit) + 1u;
+    auto* const storage =
+      static_cast<moho::SEntitySetTemplateUnit*>(::operator new(sizeof(moho::SEntitySetTemplateUnit) * categorySetCount));
+    moho::SEntitySetTemplateUnit* constructed = storage;
+    for (std::size_t index = 0; index < categorySetCount; ++index, ++constructed) {
+      ::new (constructed) moho::SEntitySetTemplateUnit();
+    }
+
+    army.UnitCategorySetsBegin = storage;
+    army.UnitCategorySetsEnd = storage + categorySetCount;
+    army.UnitCategorySetsCapacityEnd = army.UnitCategorySetsEnd;
+    army.UnitCategoryBaseIndex = minCategoryBit;
+    army.UnitCategoryMaxIndex = maxCategoryBit;
+  }
+
+  void AssignAllUnitsCategoryFilter(moho::CArmyImpl& army)
+  {
+    moho::CategoryWordRangeView& target = ArmyBuildCategoryFilterWords(army);
+    if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
+      target.ResetToEmpty(0u);
+      return;
+    }
+
+    if (const moho::CategoryWordRangeView* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
+        allUnits != nullptr) {
+      target = *allUnits;
+    }
+  }
+
+  [[nodiscard]] int PathQueueOwnerLane(const moho::Sim* const sim) noexcept
+  {
+    return static_cast<int>(reinterpret_cast<std::intptr_t>(sim != nullptr ? sim->mPathTables : nullptr));
+  }
+
   struct CSquadRuntimeUnitsView
   {
     std::uint8_t pad_0000_0010[0x10];
@@ -1268,6 +1554,113 @@ namespace moho
     PlatoonPool.platoons.end_ = PlatoonPool.platoons.inlineVec_;
     PlatoonPool.platoons.capacity_ = PlatoonPool.platoons.inlineVec_ + 8;
     PlatoonPool.platoons.originalVec_ = PlatoonPool.platoons.inlineVec_;
+  }
+
+  /**
+   * Address: 0x006FE690 (FUN_006FE690, Moho::CArmyImpl::CArmyImpl)
+   *
+   * What it does:
+   * Constructs a full scenario-launched army from launch data and Lua setup,
+   * then creates the owned economy, AI, recon, influence-map, army-pool,
+   * unit-category, and path queue runtime lanes.
+   */
+  CArmyImpl::CArmyImpl(
+    Sim* const sim,
+    const std::int32_t armyIndex,
+    const ArmyLaunchInfo& launchInfo,
+    const LuaPlus::LuaObject& armySetup,
+    const LuaPlus::LuaObject& scenarioInfoOptions,
+    const bool isFocusArmy
+  )
+    : CArmyImpl()
+  {
+    Simulation = sim;
+    EconomyInfo = reinterpret_cast<CSimArmyEconomyInfo*>(new CEconomy(sim, armyIndex));
+
+    UnitCategoryBaseIndex = std::numeric_limits<std::uint32_t>::max();
+    UnitCategoryMaxIndex = 0u;
+    UnitCapacity = 1.0f;
+    IgnoreUnitCapFlag = 0u;
+    PathCapacityLand = 2000;
+    PathCapacitySea = 2000;
+    PathCapacityBoth = 2000;
+
+    GenerateArmyStart();
+
+    ArmyId = armyIndex;
+    ArmyName.assign_owned(GetLuaStringField(armySetup, "ArmyName"));
+    PlayerName.assign_owned(GetLuaStringField(armySetup, "PlayerName"));
+    IsCivilian = static_cast<std::uint8_t>(GetLuaBooleanField(armySetup, "Civilian") ? 1u : 0u);
+
+    const bool isHuman = GetLuaBooleanField(armySetup, "Human");
+    ArmyTypeText.assign_owned(isHuman ? "Human" : GetLuaStringField(armySetup, "AIPersonality"));
+
+    if (IsCivilian != 0u) {
+      const std::uint32_t civilianColor = GetCivilianArmyColor();
+      ArmyColorBgra = civilianColor;
+      PlayerColorBgra = civilianColor;
+    } else {
+      ArmyColorBgra = GetArmyColor(GetLuaIntegerField(armySetup, "ArmyColor") - 1);
+      PlayerColorBgra = GetPlayerColor(GetLuaIntegerField(armySetup, "PlayerColor") - 1);
+    }
+
+    FactionIndex = GetLuaIntegerField(armySetup, "Faction") - 1;
+    ProcessArmyEconomyTick(*this);
+
+    IsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
+    (void)AsBVIntSet(Allies).Add(static_cast<std::uint32_t>(armyIndex));
+    AsBVIntSet(MohoSetValidCommandSources) = launchInfo.mUnitSources;
+    AssignAllUnitsCategoryFilter(*this);
+
+    const int mapMaxExtent = ResolveMapMaxExtent(sim);
+    ReplaceDeleteOwnedPointer(InfluenceMap, new CInfluenceMap(ResolveInfluenceMapGridSize(mapMaxExtent), sim, this));
+    ReplaceDeletingDtorOwnedPointer<2>(AiBrain, new CAiBrain(this));
+
+    const char* const fogOfWar = GetLuaStringField(scenarioInfoOptions, "FogOfWar", "none");
+    ReplaceDeletingDtorOwnedPointer<0>(AiReconDb, CAiReconDBImpl::Create(this, std::strcmp(fogOfWar, "none") != 0));
+    CopyReconGridsFromDatabase(*this);
+
+    if (CPlatoon* const pool = MakePlatoon("Pool", "PoolAI"); pool != nullptr) {
+      (void)CSquad::AllocateOnPlatoon(pool, ESquadClass::Unassigned, nullptr);
+      pool->mUniqueName.assign_owned("ArmyPool");
+    }
+
+    ReplaceDeleteOwnedPointer(Stats, new CArmyStats(AiBrain));
+    ReplacePathFinderOwnedPointer(PathFinder, new PathQueue(PathQueueOwnerLane(sim)));
+    InitializeArmyUnitCategorySets(*this);
+
+    UnitCapacity = static_cast<float>(ResolveUnitCap(scenarioInfoOptions));
+    ApplyNoRushScenarioOptions(*this, sim, scenarioInfoOptions);
+    ApplyPathCapacityScenarioOptions(*this, sim, mapMaxExtent);
+  }
+
+  /**
+   * Address: 0x006FE530 (FUN_006FE530, func_SimArmyAlloc)
+   *
+   * What it does:
+   * Allocates one scenario army object and forwards the typed launch, Lua army
+   * setup, and scenario option payloads into the full CArmyImpl constructor.
+   */
+  CArmyImpl* AllocateScenarioArmy(
+    Sim* const sim,
+    const std::int32_t armyIndex,
+    const ArmyLaunchInfo& launchInfo,
+    const LuaPlus::LuaObject& armySetup,
+    const LuaPlus::LuaObject& scenarioInfoOptions,
+    const bool isFocusArmy
+  )
+  {
+    void* const storage = ::operator new(sizeof(CArmyImpl), std::nothrow);
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    try {
+      return ::new (storage) CArmyImpl(sim, armyIndex, launchInfo, armySetup, scenarioInfoOptions, isFocusArmy);
+    } catch (...) {
+      ::operator delete(storage);
+      throw;
+    }
   }
 
   /**
@@ -2330,6 +2723,13 @@ namespace moho
 
   /**
    * Address: 0x006FE090 (FUN_006FE090, Moho::CArmyImpl::GetAlliedArmies)
+   *
+   * What it does:
+   * Walks the allied bitset, looks up each remote `CArmyImpl*` by army index,
+   * and appends it to `outArmyList` using the binary's inline fast-path
+   * `push_back` followed by the OOL slow-path `_Insert_n` slow body when
+   * capacity is exhausted. The slow body is the recovered helper
+   * `msvc8::detail::LegacyVectorDwordInsertN` (FUN_007027A0).
    */
   msvc8::vector<CArmyImpl*>* CArmyImpl::GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList)
   {
@@ -2337,7 +2737,15 @@ namespace moho
       return nullptr;
     }
 
-    outArmyList->clear();
+    // The binary blasts the pointer triad to zero rather than calling clear().
+    // It assumes the caller passes a freshly-stack-constructed vector whose
+    // storage is not yet owned; matching this preserves observable behavior
+    // and matches the IDA shape `*(a2+4)=0; *(a2+8)=0; *(a2+12)=0` exactly.
+    auto& outStorage = msvc8::AsVectorRuntimeView(*outArmyList);
+    outStorage.begin       = nullptr;
+    outStorage.end         = nullptr;
+    outStorage.capacityEnd = nullptr;
+    auto& dwordView = reinterpret_cast<msvc8::vector_runtime_view<std::uint32_t>&>(outStorage);
 
     if (Allies.items_begin == nullptr || Allies.items_end == nullptr) {
       return outArmyList;
@@ -2370,7 +2778,29 @@ namespace moho
         if (Simulation != nullptr && armyIndex < Simulation->mArmiesList.size()) {
           allyArmy = Simulation->mArmiesList[armyIndex];
         }
-        outArmyList->push_back(allyArmy);
+
+        // Match the binary's inline fast / OOL slow split exactly. The
+        // recovered helper preserves binary fidelity for the slow path and
+        // keeps `LegacyVectorDwordInsertN` linker-reachable.
+        const std::uint32_t valueWord = reinterpret_cast<std::uint32_t>(allyArmy);
+        const std::uint32_t currentSize =
+          (outStorage.begin == nullptr)
+            ? 0u
+            : static_cast<std::uint32_t>(outStorage.end - outStorage.begin);
+        const std::uint32_t currentCap =
+          (outStorage.begin == nullptr)
+            ? 0u
+            : static_cast<std::uint32_t>(outStorage.capacityEnd - outStorage.begin);
+        if (outStorage.begin != nullptr && currentSize < currentCap) {
+          *outStorage.end = allyArmy;
+          ++outStorage.end;
+        } else {
+          msvc8::detail::LegacyVectorDwordInsertN(
+            dwordView,
+            reinterpret_cast<std::uint32_t*>(outStorage.end),
+            1u,
+            &valueWord);
+        }
       }
     }
 

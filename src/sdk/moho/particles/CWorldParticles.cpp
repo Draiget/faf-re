@@ -150,6 +150,14 @@ namespace
     &moho::efx_ParticleWaterSurface
   );
 
+  /**
+   * Address: 0x00BF0060 (FUN_00BF0060, Moho::TConVar_efx_ParticleWaterSurface::~TConVar_efx_ParticleWaterSurface)
+   *
+   * What it does:
+   * Tears down the static `efx_ParticleWaterSurface` console-variable
+   * registration via the shared `TeardownConCommandRegistration` helper.
+   * Registered via `atexit` from the convar startup path.
+   */
   void CleanupTConVar_efx_ParticleWaterSurface() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_efx_ParticleWaterSurface);

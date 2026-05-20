@@ -21,9 +21,11 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
 #include "moho/audio/AudioEngine.h"
+#include "moho/console/CConCommand.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/audio/SofdecRuntime.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/ScrDebugHooks.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
@@ -340,6 +342,18 @@ namespace
   void InitializeSessionFromCommandLine()
   {
     msvc8::vector<msvc8::string> args;
+
+    if (moho::CFG_GetArgOption("/debug", 0, nullptr)) {
+      moho::SCR_CreateDebugWindow();
+      LuaPlus::LuaState* const luaState = moho::USER_GetLuaState();
+      if (moho::SCR_IsDebugWindowActive() && luaState != nullptr && luaState->m_state != nullptr) {
+        lua_sethook(luaState->m_state, moho::DebugLuaHook, LUA_MASKLINE, 0);
+      }
+    }
+
+    if (moho::CFG_GetArgOption("/showlog", 0, nullptr)) {
+      moho::CON_Execute("WIN_ShowLogDialog true");
+    }
 
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
       if (!args.empty()) {

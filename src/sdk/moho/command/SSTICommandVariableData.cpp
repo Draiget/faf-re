@@ -9,6 +9,16 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/command/SSTICommandIssueData.h"
 
+namespace moho
+{
+  // Forward declaration for the TU-local lane helper defined later in this
+  // file (FUN_00560430). Anonymous-namespace helpers above need to reach it.
+  SSTICommandVariableData* CopyConstructSSTICommandVariableDataSecondaryLane(
+    SSTICommandVariableData* destination,
+    const SSTICommandVariableData* source
+  );
+} // namespace moho
+
 namespace
 {
   class SSTICommandVariableDataTypeInfo final : public gpg::RType
@@ -488,6 +498,41 @@ namespace
     destination->mHeaderWord0 = source->mHeaderWord0;
     ::new (&destination->mVariableData) moho::SSTICommandVariableData(source->mVariableData);
     return destination;
+  }
+
+  /**
+   * Address: 0x00563890 (FUN_00563890, sub_563890)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl sub_563890(_DWORD *a1);   // ECX = source slot, a1 = destination slot
+   *
+   * What it does:
+   * Single-emit lane that copy-constructs one
+   * `SSTICommandVariableDataSlotRuntime` from `*source` (received via ECX)
+   * into `*destination` (stack arg). Returns null when destination is null;
+   * otherwise copies `mHeaderWord0` and delegates the embedded
+   * `SSTICommandVariableData` copy-construction to
+   * `moho::CopyConstructSSTICommandVariableDataSecondaryLane` (FUN_00560430).
+   *
+   * The wrapper returns the address of the embedded payload
+   * (`&destination->mVariableData`) on success — this matches the binary,
+   * where the inner helper's `eax = a3 = dest+8` propagates straight through
+   * the wrapper's epilogue. `mHeaderWord1` is left untouched, mirroring the
+   * binary which only writes the first slot header word.
+   */
+  [[maybe_unused]] moho::SSTICommandVariableData* CopySSTICommandVariableDataSlotLaneDelegating(
+    SSTICommandVariableDataSlotRuntime* const destination,
+    const SSTICommandVariableDataSlotRuntime* const source
+  ) noexcept
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    destination->mHeaderWord0 = source->mHeaderWord0;
+    return moho::CopyConstructSSTICommandVariableDataSecondaryLane(
+      &destination->mVariableData, &source->mVariableData
+    );
   }
 
   void register_SSTICommandVariableDataSerializer()

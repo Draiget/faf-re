@@ -57,7 +57,8 @@ namespace moho
   void SaveBroadcasterListenerChainEUnitCommandQueueStatus(class gpg::WriteArchive *,int) {}
   void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(class gpg::WriteArchive *,int) {}
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(class gpg::WriteArchive *,unsigned int *) {}
-  void CON_WxInputBox(void *) {}
+  // CON_WxInputBox now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
+  // (FUN_004FC900). Replaces the no-op stub.
   void SIM_Damage(class moho::Sim *,class moho::CDamage const &) {}
 }
 
