@@ -565,3 +565,24 @@ moho::EntityCategorySet* moho::UninitializedCopyEntityCategorySetRange(
 
   return destinationCursor;
 }
+
+/**
+ * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)
+ *
+ * What it does:
+ * Per-T canonical-template-helper binding for the engine-instantiated
+ * `msvc8::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
+ * body (40-byte element stride). Forwards to the templated push_back so
+ * the compiler emits the per-T out-of-line body that the linker keeps
+ * bound from explicit-name call sites.
+ *
+ * Callers (after wire-up):
+ *  - `UnitWeapon::cfunc_UnitWeaponSetTargetingPrioritiesL` (FUN_006DA560)
+ *  - `CPlatoon::cfunc_CPlatoonSetPrioritizedTargetListL` (FUN_0072E940)
+ */
+void moho::PushBackEntityCategorySetVector(
+  msvc8::vector<moho::EntityCategorySet>& destination,
+  const moho::EntityCategorySet& value)
+{
+  destination.push_back(value);
+}

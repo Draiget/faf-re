@@ -1929,7 +1929,10 @@ namespace moho
         LuaPlus::LuaState::Error(state, "Passed in an invalid table to priority categories");
         return 0;
       }
-      weapon->mTargetPriorities.push_back(*categorySet);
+      // Route per-T push_back through the canonical helper (FUN_006DB010)
+      // so the MSVC8 vector<EntityCategorySet>::push_back template emission
+      // symbol shape is preserved.
+      moho::PushBackEntityCategorySetVector(weapon->mTargetPriorities, *categorySet);
     }
 
     return 0;

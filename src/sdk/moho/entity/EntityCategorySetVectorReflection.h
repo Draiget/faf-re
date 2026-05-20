@@ -123,4 +123,18 @@ namespace moho
    * process-exit teardown via `atexit`.
    */
   int register_EntityCategorySetVectorType_AtExit();
+
+  /**
+   * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `msvc8::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
+   * body (40-byte element stride). Used to preserve the MSVC8 per-T
+   * template emission symbol when callers (`UnitWeapon::Set...Priorities`,
+   * `CPlatoon::SetPrioritizedTargetList`) push category-set entries.
+   */
+  void PushBackEntityCategorySetVector(
+    msvc8::vector<EntityCategorySet>& destination,
+    const EntityCategorySet& value);
 } // namespace moho
