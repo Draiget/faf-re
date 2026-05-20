@@ -12,6 +12,25 @@ namespace
 {
   using WeaponVector = msvc8::vector<moho::RUnitBlueprintWeapon>;
 
+  /**
+   * Address: 0x00524590 (FUN_00524590, msvc8::vector<RUnitBlueprintWeapon>::push_back)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `msvc8::vector<RUnitBlueprintWeapon>::push_back(const&)` fast/slow-path
+   * body (388-byte element stride: sizeof(RUnitBlueprintWeapon) == 0x184).
+   * Rewires the inline `loaded.push_back(element);` site in
+   * `RVectorType_RUnitBlueprintWeapon::SerLoad` (FUN_00523D50) through an
+   * explicit-name invocation so the MSVC8 per-T template emission symbol
+   * shape is preserved.
+   */
+  void PushBackRUnitBlueprintWeaponVector(
+    WeaponVector& destination,
+    const moho::RUnitBlueprintWeapon& value)
+  {
+    destination.push_back(value);
+  }
+
   alignas(gpg::RVectorType_RUnitBlueprintWeapon) unsigned char
     gRUnitBlueprintWeaponVectorTypeStorage[sizeof(gpg::RVectorType_RUnitBlueprintWeapon)];
   bool gRUnitBlueprintWeaponVectorTypeConstructed = false;
@@ -437,7 +456,10 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
     moho::RUnitBlueprintWeapon element{};
     gpg::RRef owner{};
     archive->Read(elementType, &element, owner);
-    loaded.push_back(element);
+    // Route per-T push_back through the canonical helper (FUN_00524590)
+    // so the MSVC8 vector<RUnitBlueprintWeapon>::push_back template
+    // emission symbol shape is preserved.
+    PushBackRUnitBlueprintWeaponVector(loaded, element);
   }
 
   *storage = loaded;
