@@ -27,6 +27,8 @@ namespace moho
 {
   // Forward decl for the unit type used in the fastvector→std::vector helper.
   class Unit;
+  class CameraImpl;
+  struct SNetCommandArg;
 
 
   /**
@@ -93,4 +95,40 @@ namespace moho
    */
   void CopyFastvectorUnitToStdVector(const gpg::fastvector<Unit*>& source,
                                      std::vector<Unit*>& destination);
+
+  /**
+   * Address: 0x007AE840 (FUN_007AE840, msvc8::vector<Moho::CameraImpl*>::vector(const vector&))
+   *
+   * What it does:
+   * Engine-instantiated copy-construction body for
+   * `msvc8::vector<Moho::CameraImpl*>`. Default-zeros the destination triplet
+   * then, if the source has any elements, allocates fresh dword storage,
+   * copies the pointer range `[src._Myfirst, src._Mylast)` into the
+   * destination, and updates `_Mylast`/`_Myend`.
+   *
+   * Bound to `Moho::RCamManager::GetAllCameras` (FUN_007AAB60) which returns
+   * the camera vector by value. NRVO may elide the natural `return mCams;`
+   * copy-ctor — wiring through this per-T named helper preserves the MSVC8
+   * 1:1 symbol shape.
+   */
+  void CopyConstructVectorOfCameraImplPtr(msvc8::vector<CameraImpl*>& destination,
+                                          const msvc8::vector<CameraImpl*>& source);
+
+  /**
+   * Address: 0x007BAFE0 (FUN_007BAFE0, msvc8::vector<Moho::SNetCommandArg>::vector(const vector&))
+   *
+   * What it does:
+   * Engine-instantiated copy-construction body for
+   * `msvc8::vector<Moho::SNetCommandArg>`. Default-zeros the destination
+   * triplet then, if the source has any elements, allocates fresh storage,
+   * copy-constructs each `SNetCommandArg` element into the destination, and
+   * updates `_Mylast`/`_Myend`.
+   *
+   * Bound to `Moho::SNetCommand::SNetCommand(const SNetCommand&)`
+   * (FUN_007BCE70) which copies the queued-command argument vector. Wiring
+   * through this per-T named helper preserves the MSVC8 1:1 symbol shape
+   * even when the compiler elides the inline copy-ctor body.
+   */
+  void CopyConstructVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& destination,
+                                           const msvc8::vector<SNetCommandArg>& source);
 } // namespace moho

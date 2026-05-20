@@ -6,6 +6,7 @@
 #include <new>
 
 #include "moho/console/CConCommand.h"
+#include "moho/misc/EngineVectorHelpers.h"
 #include "moho/render/camera/CameraImpl.h"
 
 namespace moho
@@ -307,10 +308,18 @@ namespace moho
 
   /**
    * Address: 0x007AAB60 (FUN_007AAB60, ?GetAllCameras@RCamManager@Moho@@QAE?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
+   *
+   * Returns the camera vector by value. The deep copy is routed through the
+   * per-T named helper `CopyConstructVectorOfCameraImplPtr` (FUN_007AE840) so
+   * the MSVC8 `vector<CameraImpl*>::vector(const vector&)` symbol shape is
+   * preserved — a bare `return mCams;` would let the compiler NRVO the
+   * out-of-line copy-ctor away.
    */
   msvc8::vector<CameraImpl*> RCamManager::GetAllCameras()
   {
-    return mCams;
+    msvc8::vector<CameraImpl*> result;
+    moho::CopyConstructVectorOfCameraImplPtr(result, mCams);
+    return result;
   }
 
   /**
