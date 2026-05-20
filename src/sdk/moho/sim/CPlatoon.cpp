@@ -21,6 +21,7 @@
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityCategorySetVectorReflection.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -3999,7 +4000,10 @@ namespace moho
       for (int categoryIndex = 1; categoryIndex <= categoryCount; ++categoryIndex) {
         const LuaPlus::LuaObject categoryObject = categoryTable[categoryIndex];
         if (EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); categorySet != nullptr) {
-          prioritizedCategories.push_back(*categorySet);
+          // Route per-T push_back through the canonical helper (FUN_006DB010)
+          // so the MSVC8 vector<EntityCategorySet>::push_back template
+          // emission symbol shape is preserved.
+          moho::PushBackEntityCategorySetVector(prioritizedCategories, *categorySet);
         }
       }
 
