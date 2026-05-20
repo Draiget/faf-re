@@ -444,6 +444,20 @@ namespace moho
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
 
   /**
+   * Address: 0x007BB4E0 (FUN_007BB4E0, boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `boost::weak_ptr<INetNATTraversalHandler>::weak_ptr(const shared_ptr&)`
+   * conversion-ctor body. Forwards to `destination = source;` so the MSVC8
+   * per-T template emission symbol is preserved even when the modern
+   * compiler would inline the natural weak/shared interconversion.
+   */
+  void AssignWeakNATHandlerFromShared(
+    boost::weak_ptr<INetNATTraversalHandler>& destination,
+    const boost::shared_ptr<INetNATTraversalHandler>& source);
+
+  /**
    * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)
    *
    * What it does:

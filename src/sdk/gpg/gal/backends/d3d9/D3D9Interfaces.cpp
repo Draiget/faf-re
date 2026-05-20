@@ -3241,11 +3241,32 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x009411D0 (FUN_009411D0, msvc8::vector<AdapterModeD3D9>::push_back)
+         *
+         * What it does:
+         * Per-T named helper binding the engine-instantiated
+         * `msvc8::vector<gpg::gal::AdapterModeD3D9>::push_back` slow-path body.
+         * Rewriting the inline `modes.push_back(...)` call site in
+         * `CollectAllAdaptersForSetup` through this helper preserves the
+         * MSVC8 1:1 symbol shape for the per-T template emission even when
+         * the modern compiler would otherwise inline the natural form.
+         */
+        void PushBackAdapterModeD3D9(
+            msvc8::vector<AdapterModeD3D9>& modes,
+            const AdapterModeD3D9& mode)
+        {
+            modes.push_back(mode);
+        }
+
+        /**
          * Address: 0x008F1CB0 (FUN_008F1CB0, func_CollectAllAdapters)
          *
          * What it does:
          * Enumerates all Direct3D adapters, captures identity/mode lists, and
-         * appends them to the backend adapter storage.
+         * appends them to the backend adapter storage. Routes each
+         * `adapter.modes.push_back(...)` through the per-T named helper
+         * `PushBackAdapterModeD3D9` (FUN_009411D0) to preserve the MSVC8
+         * `vector<AdapterModeD3D9>::push_back` symbol shape.
          */
         void CollectAllAdaptersForSetup(DeviceD3D9& device)
         {
@@ -3296,7 +3317,8 @@ namespace gpg::gal
                         ThrowGalError("DeviceD3D9.cpp", 1212, "unable to enumerate adapters");
                     }
 
-                    adapter.modes.push_back(
+                    PushBackAdapterModeD3D9(
+                        adapter.modes,
                         AdapterModeD3D9(displayMode.Width, displayMode.Height, displayMode.RefreshRate)
                     );
                 }
