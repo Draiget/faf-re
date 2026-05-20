@@ -4436,6 +4436,18 @@ namespace gpg::gal
       return destinationCursor;
     }
 
+    /**
+     * Address: 0x008FF330 (FUN_008FF330, std::copy_backward<AdapterD3D10*, AdapterD3D10*>)
+     *
+     * What it does:
+     * Compiler-emitted `std::copy_backward<AdapterD3D10*>` inner helper used
+     * by `msvc8::vector<AdapterD3D10>::insert/push_back` slow paths. Copies
+     * the range `[sourceFirst, sourceLast)` backwards into `[..., destinationLast)`
+     * using `AdapterD3D10::operator=` per slot (316-byte stride).
+     *
+     * Implicitly re-emitted by the recovered `AppendBackendAdapter` ->
+     * `vector<AdapterD3D10>::push_back` template chain.
+     */
     AdapterD3D10* CopyAssignAdapterRangeBackwardCore(
       const AdapterD3D10* const sourceFirst,
       const AdapterD3D10* sourceLast,
@@ -4451,6 +4463,19 @@ namespace gpg::gal
       return destinationLast;
     }
 
+    /**
+     * Address: 0x008FF3E0 (FUN_008FF3E0, std::fill<AdapterD3D10*, AdapterD3D10>)
+     *
+     * What it does:
+     * Compiler-emitted `std::fill<AdapterD3D10*, AdapterD3D10>` inner helper
+     * used by `msvc8::vector<AdapterD3D10>::insert(pos, n, value)` and
+     * `push_back` slow paths. Assigns `source` into every slot of
+     * `[destinationFirst, destinationLast)` using `AdapterD3D10::operator=`
+     * per slot (316-byte stride).
+     *
+     * Implicitly re-emitted by the recovered `AppendBackendAdapter` ->
+     * `vector<AdapterD3D10>::push_back` template chain.
+     */
     void FillAssignAdapterRangeCore(
       AdapterD3D10* destinationFirst,
       AdapterD3D10* const destinationLast,
