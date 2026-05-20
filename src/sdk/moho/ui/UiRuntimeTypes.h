@@ -8206,4 +8206,18 @@ namespace moho
   [[nodiscard]] bool WX_GetCursorPosition(std::int32_t& outX, std::int32_t& outY);
 
   [[nodiscard]] const VMatrix4& UI_IdentityMatrix();
+
+  /**
+   * Address: 0x00855040 (FUN_00855040, msvc8::vector<boost::shared_ptr<MeshInstance>>::push_back)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `vector<shared_ptr<MeshInstance>>::push_back(const&)` fast/slow-path
+   * body (8-byte element stride: shared_ptr `(px, pi)` pair). Used by
+   * `CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh` to preserve
+   * the MSVC8 per-T template emission symbol shape.
+   */
+  void PushBackMeshInstanceSharedPtrVector(
+    msvc8::vector<boost::shared_ptr<MeshInstance>>& destination,
+    const boost::shared_ptr<MeshInstance>& value);
 } // namespace moho
