@@ -8920,16 +8920,39 @@ moho::CUIWorldViewBuildDragRuntimeView::CreateBuildPreviewMeshInstance(moho::RUn
 }
 
 /**
+ * Address: 0x00855040 (FUN_00855040, msvc8::vector<boost::shared_ptr<MeshInstance>>::push_back)
+ *
+ * What it does:
+ * Per-T canonical-template-helper binding for the engine-instantiated
+ * `msvc8::vector<boost::shared_ptr<MeshInstance>>::push_back(const&)`
+ * fast/slow-path body (8-byte element stride: shared_ptr `(px, pi)` pair).
+ *
+ * Wires `AppendBuildPreviewMesh` from the inline
+ * `mMeshes.push_back(meshInstance);` form to an explicit-name invocation
+ * so the MSVC8 per-T template emission symbol shape is preserved even
+ * when the modern compiler would inline the natural push_back call.
+ */
+void moho::PushBackMeshInstanceSharedPtrVector(
+  msvc8::vector<boost::shared_ptr<moho::MeshInstance>>& destination,
+  const boost::shared_ptr<moho::MeshInstance>& value)
+{
+  destination.push_back(value);
+}
+
+/**
  * Address: 0x00854130 (FUN_00854130, sub_854130)
  *
  * What it does:
  * Creates one `UnitPlace` build-preview mesh instance for a unit blueprint and
- * appends it to the preview mesh/blueprint caches.
+ * appends it to the preview mesh/blueprint caches. The shared-ptr mesh
+ * push is routed through the per-T named helper
+ * `PushBackMeshInstanceSharedPtrVector` (FUN_00855040) to preserve the
+ * MSVC8 `vector<shared_ptr<MeshInstance>>::push_back` symbol shape.
  */
 void moho::CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh(moho::RUnitBlueprint* const blueprint)
 {
   boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
-  mMeshes.push_back(meshInstance);
+  moho::PushBackMeshInstanceSharedPtrVector(mMeshes, meshInstance);
   mBlueprints.push_back(blueprint);
 }
 
