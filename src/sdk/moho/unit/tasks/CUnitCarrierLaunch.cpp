@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitCarrierLaunch.h"
 
+#include <cstring>
 #include <new>
 #include <type_traits>
 #include <typeinfo>
@@ -7,10 +8,16 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/math/Vector3f.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitCarrierRetrieve.h"
 
 namespace
 {
@@ -145,6 +152,165 @@ namespace moho
     } catch (...) {
       ::operator delete(storage);
       throw;
+    }
+  }
+
+  /**
+   * Address: 0x00607000 (FUN_00607000, Moho::CUnitCarrierLaunch::TaskTick)
+   *
+   * IDA signature:
+   * int __thiscall sub_607000(Moho::CUnitCarrierLaunch *this);
+   *
+   * What it does:
+   * Drives the carrier-launch state machine across four cases:
+   *
+   *   TASKSTATE_Preparing: either confirms the ctor already populated the
+   *     carried-unit set (mHasCarrierTransportedUnit + non-empty
+   *     mCarriedUnits) or pulls stored units from the transport on first
+   *     entry, then spawns a sibling CUnitCarrierRetrieve task to handle
+   *     the unload phase and advances state. Returns 1 to keep the task
+   *     queue running; returns -1 directly when mCarriedUnits is empty.
+   *
+   *   TASKSTATE_Waiting: converts the launch-goal cell into a world
+   *     position via the unit's footprint, issues a Ground "Guard"
+   *     command to the carried-unit set centered on that position with
+   *     identity orientation (scale=1.0), resets the transport
+   *     reservation, advances state. Returns 0.
+   *
+   *   TASKSTATE_Starting: pops the first carried unit, removes it from
+   *     transport storage (capturing the unloaded transform), pushes the
+   *     unloaded transform onto the unit and advances its coordinates
+   *     twice to settle the change, then seeds CUnitMotion with an
+   *     immediate velocity derived from the unloaded orientation scaled
+   *     by the blueprint's maximum-speed field. Transitions to Processing
+   *     when the carried-unit set is empty. Returns 3.
+   *
+   *   TASKSTATE_Processing (and the empty-carry shortcut): returns -1 to
+   *     signal task completion to the dispatcher.
+   *
+   *   default: returns 1.
+   */
+  int CUnitCarrierLaunch::Execute()
+  {
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        if (mHasCarrierTransportedUnit) {
+          // Carried set was seeded by the ctor from the command's units.
+          // An empty set here means there is nothing to launch.
+          if (mCarriedUnits.mVec.start_ == mCarriedUnits.mVec.end_) {
+            return -1; // matches the binary's LABEL_4 / TASKSTATE_Processing exit
+          }
+        } else {
+          // First entry: pull every unit currently stored inside the
+          // transport into the carried set so subsequent ticks can
+          // unload them one at a time. The binary calls the raw
+          // `fastvector_Entity::AddAll`; the modern equivalent that
+          // preserves element ordering and type safety is the
+          // typed `AddUnits(const EntitySetTemplate<Unit>&)` helper.
+          const EntitySetTemplate<Unit> stored = mUnit->AiTransport->TransportGetStoredUnits();
+          mCarriedUnits.AddUnits(stored);
+        }
+
+        // Spawn the sibling retrieve task that drives the unload-and-
+        // wait flow on the receiving side. The retrieve task is created
+        // with an empty tracked-unit set; the Starting case populates
+        // the binary's tracked set lazily as units are released.
+        SEntitySetTemplateUnit emptyTracked{};
+        (void)CUnitCarrierRetrieve::Create(this, emptyTracked);
+
+        mTaskState = TASKSTATE_Waiting;
+        return 1;
+      }
+
+      case TASKSTATE_Waiting: {
+        // Convert the launch goal cell (mPos1.x0, mPos1.z0) into a world
+        // position centered on the unit's footprint, then issue a Ground
+        // "Guard" command to the carried-unit set at that position.
+        SOCellPos launchCell{};
+        launchCell.x = static_cast<std::int16_t>(mLaunchGoal.mPos1.x0);
+        launchCell.z = static_cast<std::int16_t>(mLaunchGoal.mPos1.z0);
+
+        const SFootprint& footprint = mUnit->GetFootprint();
+        const Wm3::Vector3f worldPos = COORDS_ToWorldPos(
+          mUnit->SimulationRef->mMapData,
+          launchCell,
+          footprint
+        );
+
+        SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Guard);
+        command.mTarget.mType = EAiTargetType::AITARGET_Ground;
+        command.mTarget.mEnt = 0xF0000000u;
+        command.mTarget.mPos.x = worldPos.x;
+        command.mTarget.mPos.y = worldPos.y;
+        command.mTarget.mPos.z = worldPos.z;
+        command.unk38 = 0;
+        command.mOri = Zeroed<Wm3::Quaternionf>();
+        command.unk4C = 1.0f;
+
+        (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, mCarriedUnits, command, true);
+
+        mTaskState = TASKSTATE_Starting;
+        mUnit->AiTransport->TransportResetReservation();
+        return 0;
+      }
+
+      case TASKSTATE_Starting: {
+        Entity** const start = mCarriedUnits.mVec.start_;
+        Entity** const end = mCarriedUnits.mVec.end_;
+        if (start == end) {
+          // No more units to launch; transition to the terminal state.
+          mTaskState = TASKSTATE_Processing;
+          return 3;
+        }
+
+        Unit* const next = (*start != nullptr) ? SEntitySetTemplateUnit::UnitFromEntry(*start) : nullptr;
+
+        // Pop the first unit into a one-element tracked set (matches the
+        // binary's transient v25/searchSlot pair).
+        SEntitySetTemplateUnit firstUnit{};
+        (void)firstUnit.AddUnit(next);
+
+        // Capture the transform produced by removing the unit from the
+        // transport so we can re-settle the unit at that pose. The binary
+        // initializes the orient quaternion to identity (1,0,0,0) before
+        // calling the transport, then overwrites with the result.
+        VTransform unloadTransform{};
+        unloadTransform.orient_.w = 1.0f;
+        unloadTransform.orient_.x = 0.0f;
+        unloadTransform.orient_.y = 0.0f;
+        unloadTransform.orient_.z = 0.0f;
+        unloadTransform.pos_ = Wm3::Vector3f{};
+        mUnit->AiTransport->TransportRemoveFromStorage(next, unloadTransform);
+
+        next->SetPendingTransform(unloadTransform, 1.0f);
+        next->AdvanceCoords();
+        next->AdvanceCoords();
+        (void)mCarriedUnits.ContainsUnit(next); // matches the binary's containment probe
+
+        // Compute initial velocity: (1 - 2*(qx*qx + qz*qz)) * blueprint.maxSpeed
+        // along (qx, qy, qz). The quaternion encodes the spawn-facing
+        // direction; this projects the "forward" axis onto world space.
+        const float qx = unloadTransform.orient_.x;
+        const float qz = unloadTransform.orient_.z;
+        const float scale = 1.0f - ((qx * qx) + (qz * qz)) * 2.0f;
+        const RUnitBlueprint* const blueprint = next->GetBlueprint();
+        const float maxSpeed =
+          *reinterpret_cast<const float*>(reinterpret_cast<const char*>(blueprint) + 880);
+
+        Wm3::Vector3f velocity{};
+        velocity.x = scale * maxSpeed;
+        velocity.y = scale * maxSpeed;
+        velocity.z = scale * maxSpeed;
+        next->UnitMotion->SetImmediateVelocity(velocity, unloadTransform.orient_);
+
+        return 3;
+      }
+
+      case TASKSTATE_Processing:
+        return -1;
+
+      default:
+        return 1;
     }
   }
 
