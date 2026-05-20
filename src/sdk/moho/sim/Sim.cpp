@@ -7786,6 +7786,23 @@ namespace
     return nullptr;
   }
 
+  /**
+   * Address: 0x00652060 (FUN_00652060, std::vector<const RDebugOverlayClass*>::push_back)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `std::vector<const RDebugOverlayClass*>::push_back(const&)` fast/slow-path
+   * body (4-byte element stride: raw pointer). Rewiring the inline
+   * `outMatches.push_back(overlayClass);` site through this helper preserves
+   * the MSVC8 per-T template emission symbol shape.
+   */
+  void PushBackDebugOverlayClassPtrVector(
+    std::vector<const RDebugOverlayClass*>& destination,
+    const RDebugOverlayClass* const value)
+  {
+    destination.push_back(value);
+  }
+
   void CollectPrefixDebugOverlayTypes(
     const std::string& requestedName,
     std::vector<const RDebugOverlayClass*>& outMatches
@@ -7804,7 +7821,7 @@ namespace
 
       const char* const overlayName = overlayClass->mOverlayToken.c_str();
       if (overlayName != nullptr && gpg::STR_StartsWithNoCase(overlayName, requestedName.c_str())) {
-        outMatches.push_back(overlayClass);
+        PushBackDebugOverlayClassPtrVector(outMatches, overlayClass);
       }
     }
   }
