@@ -53,6 +53,112 @@ namespace
   }
 
   SerSaveLoadHelperNodeRuntime gRPropBlueprintConstructHelper{};
+
+  struct SerConstructHelperView
+  {
+    void* mVftable;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
+    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
+    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
+  );
+
+  struct SerSaveConstructHelperView
+  {
+    void* mVftable;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+  };
+  static_assert(
+    offsetof(SerSaveConstructHelperView, mSaveConstructArgsCallback) == 0x0C,
+    "SerSaveConstructHelperView::mSaveConstructArgsCallback offset must be 0x0C"
+  );
+
+  [[nodiscard]] gpg::RType* ResolveRPropBlueprintTypeCached() noexcept
+  {
+    gpg::RType* type = moho::RPropBlueprint::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::RPropBlueprint));
+      moho::RPropBlueprint::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x0051DE50 (FUN_0051DE50, gpg::SerConstructHelper<Moho::RPropBlueprint>::Init)
+   *
+   * IDA signature:
+   * void(__cdecl *) __thiscall sub_51DE50(SerConstructHelperView *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the
+   * `Moho::RPropBlueprintConstruct` and
+   * `gpg::SerConstructHelper<Moho::RPropBlueprint>` vtables. Lazily resolves
+   * the `RPropBlueprint` reflection descriptor, asserts the construct callback
+   * slot is empty, and publishes this helper's construct/delete callbacks to
+   * the descriptor.
+   */
+  [[maybe_unused]] gpg::RType::construct_func_t InitRPropBlueprintConstructHelper(
+    const SerConstructHelperView& helper
+  )
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = ResolveRPropBlueprintTypeCached();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = helper.mConstructCallback;
+    type->deleteFunc_ = helper.mDeleteCallback;
+    return helper.mConstructCallback;
+  }
+
+  /**
+   * Address: 0x0051DDD0 (FUN_0051DDD0, gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::Init)
+   *
+   * IDA signature:
+   * gpg::RType *__thiscall sub_51DDD0(SerSaveConstructHelperView *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the
+   * `Moho::RPropBlueprintSaveConstruct` and
+   * `gpg::SerSaveConstructHelper<Moho::RPropBlueprint>` vtables. Lazily
+   * resolves the `RPropBlueprint` reflection descriptor, asserts the
+   * save-construct-args callback slot is empty, and publishes this helper's
+   * save-construct-args callback to the descriptor.
+   */
+  [[maybe_unused]] gpg::RType* InitRPropBlueprintSaveConstructHelper(
+    const SerSaveConstructHelperView& helper
+  )
+  {
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = ResolveRPropBlueprintTypeCached();
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = helper.mSaveConstructArgsCallback;
+    return type;
+  }
 } // namespace
 
 namespace moho

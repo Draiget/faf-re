@@ -20,6 +20,16 @@ namespace moho
   void ClearAndFreeMeshBlueprintLodVectorStorage(msvc8::vector<RMeshBlueprintLOD>* storage);
 
   /**
+   * Address: 0x0051A530 (FUN_0051A530)
+   *
+   * What it does:
+   * Allocates a contiguous block of `count * sizeof(RMeshBlueprintLOD)` bytes
+   * for a `msvc8::vector<RMeshBlueprintLOD>` storage lane. Raises
+   * `std::bad_alloc` on the legacy 32-bit overflow check.
+   */
+  [[nodiscard]] void* AllocateMeshBlueprintLodArrayOrThrow(unsigned int count);
+
+  /**
    * VFTABLE: 0x00E0FE1C
    * COL: 0x00E692FC
    */

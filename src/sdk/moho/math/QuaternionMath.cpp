@@ -634,4 +634,111 @@ namespace moho
     quat->z = axisAngle.z * sinHalfAngle;
     return quat;
   }
+
+  /**
+   * Address: 0x004EB830 (FUN_004EB830)
+   *
+   * IDA signature:
+   * float *__usercall sub_4EB830@<eax>(
+   *   float *currentOrientation@<ebx>, float *outOrientation@<edi>,
+   *   float *targetOrientation, float turnStepRadians, char *outNoStep);
+   *
+   * What it does:
+   * Computes the relative
+   *   `delta = currentOrientation * conjugate(targetOrientation)`,
+   * clamps `delta` to a maximum half-rotation of `turnStepRadians` via
+   * `RotateQuatByAngle`, and writes
+   *   `outOrientation = targetOrientation * clampedDelta`.
+   * If `RotateQuatByAngle` rejects the input (half-angle exceeds pi/2 or the
+   * axis lanes are too short to scale), copies `currentOrientation` into
+   * `outOrientation` and sets `*outNoStep = true`; otherwise sets
+   * `*outNoStep = false`. Reproduces the binary's `[w,x,y,z]` Hamilton-product
+   * lane order exactly. Shared by `CSlaveManipulator::ManipulatorUpdate` and
+   * `CThrustManipulator::MoveManipulator` for max-rate-limited reorientation.
+   */
+  Wm3::Quaternionf* BlendOrientationDeltaByMaxAngle(
+    const Wm3::Quaternionf& currentOrientation,
+    const Wm3::Quaternionf& targetOrientation,
+    const float turnStepRadians,
+    bool* const outNoStep,
+    Wm3::Quaternionf* const outOrientation
+  ) noexcept
+  {
+    if (outOrientation == nullptr) {
+      return nullptr;
+    }
+
+    // Lane copies in binary order: [0]=x, [1]=y, [2]=z, [3]=w.
+    const float current[4] = {
+      currentOrientation.x, currentOrientation.y, currentOrientation.z, currentOrientation.w,
+    };
+    const float targetConjugate[4] = {
+      targetOrientation.x,
+      -targetOrientation.y,
+      -targetOrientation.z,
+      -targetOrientation.w,
+    };
+
+    // delta = current * conjugate(target) — Hamilton product (binary lane order).
+    float delta[4]{};
+    delta[0] = (((current[0] * targetConjugate[0]) - (current[1] * targetConjugate[1])) -
+                (current[2] * targetConjugate[2])) -
+               (current[3] * targetConjugate[3]);
+    delta[1] = (((current[3] * targetConjugate[2]) + (current[1] * targetConjugate[0])) +
+                (current[0] * targetConjugate[1])) -
+               (current[2] * targetConjugate[3]);
+    delta[2] = (((current[2] * targetConjugate[0]) + (current[1] * targetConjugate[3])) +
+                (current[0] * targetConjugate[2])) -
+               (current[3] * targetConjugate[1]);
+    delta[3] = (((current[3] * targetConjugate[0]) + (current[1] * targetConjugate[2])) +
+                (current[0] * targetConjugate[3])) -
+               (current[2] * targetConjugate[1]);
+
+    Wm3::Quaternionf deltaQuat{};
+    deltaQuat.x = delta[0];
+    deltaQuat.y = delta[1];
+    deltaQuat.z = delta[2];
+    deltaQuat.w = delta[3];
+
+    if (!moho::RotateQuatByAngle(&deltaQuat, turnStepRadians)) {
+      // Clamp rejected — snap to current and signal "no step taken".
+      outOrientation->x = currentOrientation.x;
+      outOrientation->y = currentOrientation.y;
+      outOrientation->z = currentOrientation.z;
+      outOrientation->w = currentOrientation.w;
+      if (outNoStep != nullptr) {
+        *outNoStep = true;
+      }
+      return outOrientation;
+    }
+
+    const float target[4] = {
+      targetOrientation.x, targetOrientation.y, targetOrientation.z, targetOrientation.w,
+    };
+    const float deltaLanes[4] = {deltaQuat.x, deltaQuat.y, deltaQuat.z, deltaQuat.w};
+
+    // out = target * clampedDelta — Hamilton product (binary lane order).
+    float result[4]{};
+    result[0] = (((target[0] * deltaLanes[0]) - (target[1] * deltaLanes[1])) -
+                 (target[2] * deltaLanes[2])) -
+                (target[3] * deltaLanes[3]);
+    result[1] = (((target[2] * deltaLanes[3]) + (target[1] * deltaLanes[0])) +
+                 (target[0] * deltaLanes[1])) -
+                (target[3] * deltaLanes[2]);
+    result[2] = (((target[3] * deltaLanes[1]) + (target[2] * deltaLanes[0])) +
+                 (target[0] * deltaLanes[2])) -
+                (target[1] * deltaLanes[3]);
+    result[3] = (((target[3] * deltaLanes[0]) + (target[1] * deltaLanes[2])) +
+                 (target[0] * deltaLanes[3])) -
+                (target[2] * deltaLanes[1]);
+
+    outOrientation->x = result[0];
+    outOrientation->y = result[1];
+    outOrientation->z = result[2];
+    outOrientation->w = result[3];
+    if (outNoStep != nullptr) {
+      *outNoStep = false;
+    }
+    return outOrientation;
+  }
 } // namespace moho

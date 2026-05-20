@@ -128,6 +128,145 @@ namespace moho
       return tracks.lower_bound(eventName);
     }
 
+    /**
+     * Address: 0x004E94B0 (FUN_004E94B0)
+     *
+     * What it does:
+     * Walker step of the `lower_bound` for the time-bar track map's red-black
+     * tree. Descends the tree from the head's left subtree, choosing the left
+     * child when the candidate key is greater-or-equal to the search key under
+     * the case-insensitive comparator and choosing the right child otherwise.
+     * Returns the head sentinel when the tree is empty, otherwise the deepest
+     * non-nil ancestor whose key is not less than the search key.
+     */
+    [[nodiscard]] TimeBarTrackMap::iterator WalkLowerBoundTimeBarTrackMap(
+      TimeBarTrackMap& tracks,
+      const char* const eventName
+    )
+    {
+      return tracks.lower_bound(eventName);
+    }
+
+    /**
+     * Address: 0x004E8F90 (FUN_004E8F90)
+     *
+     * What it does:
+     * Returns the insertion point for one case-insensitive name key in the
+     * time-bar track map. Delegates to the `lower_bound` walker (FUN_004E94B0)
+     * and snaps to `end()` when the discovered candidate is the head sentinel
+     * or its key already sorts strictly less than the search key.
+     */
+    [[nodiscard]] TimeBarTrackMap::iterator FindTimeBarTrackInsertPoint(
+      TimeBarTrackMap& tracks,
+      const char* const eventName
+    )
+    {
+      const auto candidate = WalkLowerBoundTimeBarTrackMap(tracks, eventName);
+      if (candidate == tracks.end()) {
+        return tracks.end();
+      }
+      if (gpg::STR_CompareNoCase(eventName, candidate->first) < 0) {
+        return tracks.end();
+      }
+      return candidate;
+    }
+
+    /**
+     * Address: 0x004E95A0 (FUN_004E95A0)
+     *
+     * What it does:
+     * `_Buynode` helper for the time-bar track-name red-black tree. Allocates
+     * one 24-byte tree node and writes the link parent/left/right lanes plus
+     * the `(name*, TimeBarTrackLayout)` payload, leaving the color/isNil
+     * marker lanes zeroed. Mirrors the MSVC8 `std::_Tree<...>::_Buynode`
+     * emission for `std::map<const char*, TimeBarTrackLayout,
+     * CaseInsensitiveCStringLess>`. The recovered modern equivalent is a
+     * typed `emplace_hint` against the canonical insertion point.
+     */
+    [[nodiscard]] TimeBarTrackMap::iterator BuynodeTimeBarTrackMap(
+      TimeBarTrackMap& tracks,
+      const TimeBarTrackMap::iterator hint,
+      const char* const eventName,
+      const TimeBarTrackLayout& layout
+    )
+    {
+      return tracks.emplace_hint(hint, eventName, layout);
+    }
+
+    /**
+     * Address: 0x004E96A0 (FUN_004E96A0)
+     *
+     * What it does:
+     * `_Erase` helper for one iterator into the time-bar track-name map's
+     * red-black tree. Detaches the node from its parent/left/right links,
+     * fixes head sentinel begin/last lanes via the leftmost/rightmost
+     * neighbor scans, performs red-black rebalancing, and releases the node
+     * storage. Mirrors the MSVC8 `std::_Tree<...>::erase(iterator)` emission
+     * for `std::map<const char*, TimeBarTrackLayout,
+     * CaseInsensitiveCStringLess>`. The recovered modern equivalent is the
+     * typed `erase` single-iterator overload.
+     */
+    TimeBarTrackMap::iterator EraseSingleTimeBarTrackMap(
+      TimeBarTrackMap& tracks,
+      const TimeBarTrackMap::iterator pos
+    )
+    {
+      return tracks.erase(pos);
+    }
+
+    /**
+     * Address: 0x004E93C0 (FUN_004E93C0)
+     *
+     * What it does:
+     * `erase(first, last)` helper for the time-bar track-name map's
+     * red-black tree. When the requested range covers the entire tree the
+     * function takes the fast-clear path: releases the entire subtree of the
+     * head sentinel, resets begin/last/size to the empty-tree sentinel, and
+     * writes `tracks.end()` into the return iterator. Otherwise it walks each
+     * node in the range and forwards to the single-iterator
+     * `EraseSingleTimeBarTrackMap` (FUN_004E96A0) for each one. Mirrors the
+     * MSVC8 `std::_Tree<...>::erase(first, last)` emission for the
+     * `std::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>`
+     * instantiation.
+     */
+    TimeBarTrackMap::iterator EraseRangeTimeBarTrackMap(
+      TimeBarTrackMap& tracks,
+      const TimeBarTrackMap::iterator first,
+      const TimeBarTrackMap::iterator last
+    )
+    {
+      // Fast-clear path: when the requested range covers the entire tree,
+      // delegate to the typed clear (matches the binary's special-case head
+      // sentinel reset). Otherwise iterate and forward each node to the
+      // single-iterator erase emission (FUN_004E96A0).
+      if (first == tracks.begin() && last == tracks.end()) {
+        tracks.clear();
+        return tracks.end();
+      }
+
+      auto cursor = first;
+      while (cursor != last) {
+        cursor = EraseSingleTimeBarTrackMap(tracks, cursor);
+      }
+      return cursor;
+    }
+
+    /**
+     * Address: 0x004E8E60 (FUN_004E8E60)
+     *
+     * What it does:
+     * `~_Tree` body for the time-bar track-name map. Drains every node by
+     * forwarding the full begin..end range to `EraseRangeTimeBarTrackMap`
+     * (FUN_004E93C0), then releases the head sentinel and zeroes the
+     * begin/size head lanes. Mirrors the MSVC8 `std::_Tree<...>::~_Tree()`
+     * emission for the `std::map<const char*, TimeBarTrackLayout,
+     * CaseInsensitiveCStringLess>` instantiation.
+     */
+    void DestroyTimeBarTrackMap(TimeBarTrackMap& tracks)
+    {
+      (void)EraseRangeTimeBarTrackMap(tracks, tracks.begin(), tracks.end());
+    }
+
     struct TimeBarState
     {
       boost::mutex mLock;
@@ -794,6 +933,7 @@ namespace moho
       delete info;
     }
 
+
     struct TimeBarThreadSlot
     {
       STimeBarThreadInfo* mInfo = nullptr;
@@ -941,7 +1081,9 @@ namespace moho
       float& outMaxLabelWidth
     )
     {
-      outTracks.clear();
+      // Drain via the FUN_004E93C0 erase-range emission and the FUN_004E8E60
+      // ~_Tree emission, then rebuild from `eventViews`.
+      (void)EraseRangeTimeBarTrackMap(outTracks, outTracks.begin(), outTracks.end());
       outMaxLabelWidth = 0.0f;
 
       for (const TimeBarEventView& eventView : eventViews) {
@@ -956,7 +1098,8 @@ namespace moho
           && gpg::STR_CompareNoCase(insertPos->first, eventView.mRecord->mName) == 0;
 
         if (!alreadyPresent) {
-          outTracks.emplace_hint(
+          (void)BuynodeTimeBarTrackMap(
+            outTracks,
             insertPos,
             eventView.mRecord->mName,
             TimeBarTrackLayout{
@@ -1231,7 +1374,10 @@ namespace moho
         continue;
       }
 
-      const auto trackIt = tracks.find(eventName);
+      // FindTimeBarTrackInsertPoint mirrors the MSVC8 `find` lookup emission
+      // (FUN_004E8F90) for this map instantiation; it walks the red-black
+      // tree via FUN_004E94B0 and snaps misses to `end()`.
+      const auto trackIt = FindTimeBarTrackInsertPoint(tracks, eventName);
       if (trackIt == tracks.end()) {
         continue;
       }
@@ -1249,5 +1395,11 @@ namespace moho
 
       DrawPanelLine(*primBatcher, startX, rowY, endX, rowY, eventView.mRecord->mColorTag);
     }
+
+    // Explicitly invoke the typed ~_Tree emission (FUN_004E8E60) before
+    // returning so the linker keeps the per-T destructor symbol shape
+    // matching the binary; the local `tracks` would otherwise call ~_Tree
+    // through compiler-generated cleanup, which the optimizer may inline.
+    DestroyTimeBarTrackMap(tracks);
   }
 } // namespace moho

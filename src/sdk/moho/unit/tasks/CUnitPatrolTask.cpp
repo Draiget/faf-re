@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitPatrolTask.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -204,5 +205,59 @@ namespace
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitPatrolTaskSerializerNodeSecondary()
   {
     return gpg::UnlinkSerSaveLoadHelperNode(gCUnitPatrolTaskSerializer);
+  }
+
+  struct SerConstructHelperView
+  {
+    void* mVftable;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
+    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
+    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
+  );
+
+  /**
+   * Address: 0x0061C660 (FUN_0061C660, gpg::SerConstructHelper<Moho::CUnitPatrolTask>::Init)
+   *
+   * IDA signature:
+   * void __thiscall sub_61C660(SerConstructHelperView *this);
+   *
+   * What it does:
+   * Virtual-method body installed in both the
+   * `Moho::CUnitPatrolTaskConstruct` and
+   * `gpg::SerConstructHelper<Moho::CUnitPatrolTask>` vtables. Lazily resolves
+   * the `CUnitPatrolTask` reflection descriptor, asserts the construct
+   * callback slot is empty, and publishes this helper's construct/delete
+   * callbacks to the descriptor.
+   *
+   * Notes:
+   * Mirrors the binary's single `!type->mSerConstructFunc` assert (no separate
+   * delete-slot assert); intentionally diverges from the broader
+   * `RegisterConstructCallbacks` helper used in other subsystems.
+   */
+  [[maybe_unused]] gpg::RType::construct_func_t InitCUnitPatrolTaskConstructHelper(
+    const SerConstructHelperView& helper
+  )
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = CachedCUnitPatrolTaskType();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = helper.mConstructCallback;
+    type->deleteFunc_ = helper.mDeleteCallback;
+    return helper.mConstructCallback;
   }
 } // namespace

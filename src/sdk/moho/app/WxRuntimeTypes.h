@@ -431,6 +431,18 @@ void* wxDeleteManagedFrameRuntimeWithFlag(void* managedFrameRuntime, std::uint8_
 void* wxDestroyObjectRefDataNoDelete(void* objectRefDataRuntime) noexcept;
 
 /**
+ * Address: 0x004F1580 (FUN_004F1580)
+ *
+ * What it does:
+ * Scalar deleting-dtor slot stored in `wxObjectRefData::vftable`. Rebinds the
+ * payload to the base `wxObjectRefData` vtable lane (no virtual chained
+ * teardown — wxObjectRefData adds no destructible state on its own) and, when
+ * the low bit of `deleteFlags` is set, releases the object storage via
+ * `operator delete`. Returns the same payload pointer.
+ */
+void* wxDeleteObjectRefDataBaseScalarRuntime(void* objectRefDataRuntime, std::uint8_t deleteFlags) noexcept;
+
+/**
  * Address: 0x004F1630 (FUN_004F1630)
  *
  * What it does:
@@ -3017,9 +3029,42 @@ static_assert(offsetof(wxFFileOutputStream, m_file) == 0x0C, "wxFFileOutputStrea
 static_assert(offsetof(wxFFileOutputStream, m_ownsFile) == 0x10, "wxFFileOutputStream::m_ownsFile offset must be 0x10");
 static_assert(sizeof(wxFFileOutputStream) == 0x14, "wxFFileOutputStream size must be 0x14");
 
+class wxArrayString
+{
+public:
+  /**
+   * Address: 0x00961420 (FUN_00961420, wxArrayString::Clear)
+   *
+   * What it does:
+   * Releases all shared string payloads, resets size/count lanes to zero, and
+   * deletes the backing item-pointer storage when present.
+   */
+  void Clear();
+
+public:
+  std::uint32_t mSize = 0;         // +0x00
+  std::uint32_t mCount = 0;        // +0x04
+  wchar_t** mItems = nullptr;      // +0x08
+};
+
+static_assert(offsetof(wxArrayString, mSize) == 0x00, "wxArrayString::mSize offset must be 0x00");
+static_assert(offsetof(wxArrayString, mCount) == 0x04, "wxArrayString::mCount offset must be 0x04");
+static_assert(offsetof(wxArrayString, mItems) == 0x08, "wxArrayString::mItems offset must be 0x08");
+static_assert(sizeof(wxArrayString) == 0x0C, "wxArrayString size must be 0x0C");
+
 class wxFileName
 {
 public:
+  /**
+   * Address: 0x009F3A00 (FUN_009F3A00, wxFileName::Clear)
+   *
+   * What it does:
+   * Clears the path-component array, resets both cached auxiliary string
+   * lanes to empty, copies that empty value into the primary string lane, and
+   * restores case-sensitive comparisons.
+   */
+  wxStringRuntime* Clear();
+
   static void SplitPath(
     const wxStringRuntime& input,
     wxStringRuntime* volume,
@@ -3044,7 +3089,24 @@ public:
     wxStringRuntime* ext,
     const wchar_t* formatHint
   );
+
+public:
+  wxStringRuntime mPrimaryText{};      // +0x00
+  wxArrayString mComponents{};         // +0x04
+  std::uint32_t mFormatOrFlags = 0;    // +0x10
+  wxStringRuntime mSecondaryText{};    // +0x14
+  wxStringRuntime mTertiaryText{};     // +0x18
+  std::uint8_t mCaseSensitive = 1;     // +0x1C
+  std::uint8_t mReserved1D_1F[0x3]{};  // +0x1D
 };
+
+static_assert(offsetof(wxFileName, mPrimaryText) == 0x00, "wxFileName::mPrimaryText offset must be 0x00");
+static_assert(offsetof(wxFileName, mComponents) == 0x04, "wxFileName::mComponents offset must be 0x04");
+static_assert(offsetof(wxFileName, mFormatOrFlags) == 0x10, "wxFileName::mFormatOrFlags offset must be 0x10");
+static_assert(offsetof(wxFileName, mSecondaryText) == 0x14, "wxFileName::mSecondaryText offset must be 0x14");
+static_assert(offsetof(wxFileName, mTertiaryText) == 0x18, "wxFileName::mTertiaryText offset must be 0x18");
+static_assert(offsetof(wxFileName, mCaseSensitive) == 0x1C, "wxFileName::mCaseSensitive offset must be 0x1C");
+static_assert(sizeof(wxFileName) == 0x20, "wxFileName size must be 0x20");
 
 /**
  * Address: 0x009F46E0 (FUN_009F46E0)
@@ -5868,6 +5930,18 @@ namespace moho
     std::uint8_t mIsChecked = 0; // +0x168
 
     /**
+     * Address: 0x004FBE30 (FUN_004FBE30, ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z)
+     * Mangled: ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z
+     *
+     * What it does:
+     * Constructs one bitmap-check-box control by delegating to
+     * `wxBitmapButton`'s constructor with the default button-name string,
+     * rebinds the vtable lane to `??_7WBitmapCheckBox@Moho@@6B@`, and clears
+     * the checked-state byte.
+     */
+    WBitmapCheckBox(wxWindowBase* parentWindow, int controlId, const wxBitmap& bitmap);
+
+    /**
      * Address: 0x004FBE20 (FUN_004FBE20, ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ)
      * Mangled: ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ
      *
@@ -5886,6 +5960,17 @@ namespace moho
      */
     [[nodiscard]] bool IsChecked();
 
+    /**
+     * Address: 0x004FBF20 (FUN_004FBF20, ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z)
+     * Mangled: ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z
+     *
+     * What it does:
+     * Updates the checked-state byte; when it actually flips, refreshes the
+     * stored bitmap-button bitmap via the wx vtable slot at +0x228, then
+     * re-evaluates the parent bitmap-button repaint slot at +0xF0.
+     */
+    void SetChecked(bool checked);
+
     static void* sm_eventTable[1];
   };
 
@@ -5893,6 +5978,97 @@ namespace moho
     offsetof(WBitmapCheckBox, mIsChecked) == 0x168,
     "moho::WBitmapCheckBox::mIsChecked offset must be 0x168"
   );
+
+  class wxTextCtrl;
+
+  /**
+   * Recovered modal input-box dialog runtime used by the `WxInputBox`
+   * console helper. Inherits the wx dialog runtime and adds a result-string
+   * pointer plus the in-dialog text-control pointer; the OnOK virtual
+   * override copies the text-control contents into the caller-owned result
+   * buffer.
+   *
+   * Evidence:
+   * - ctor `FUN_004FC040` writes vtable lane, stores caller-supplied result
+   *   string at +0x170, and the constructed `wxTextCtrl*` at +0x174.
+   * - OnOK virtual override `FUN_004FC7B0` sits at vtable slot +0xDC of
+   *   `??_7WWxInputBox@Moho@@6B@` and reads the control's current value
+   *   via the wx text-control vtable slot at +0x218.
+   */
+  struct WWxInputBox : wxTopLevelWindowRuntime
+  {
+    std::uint8_t mUnknown04To16F[0x170 - 0x04]{};
+    msvc8::string* mResultString = nullptr; // +0x170
+    wxTextCtrl* mTextCtrl = nullptr;        // +0x174
+
+    /**
+     * Address: 0x004FC040 (FUN_004FC040, ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z)
+     *
+     * What it does:
+     * Builds the modal input-box dialog: creates the wxDialog frame with
+     * the caller-supplied title, then arranges a static-text label, a
+     * text-control seeded with the default value, and OK/Cancel buttons
+     * inside vertical/horizontal box sizers. Stores the caller's result
+     * string pointer so the OnOK override can write the final value.
+     */
+    WWxInputBox(
+      const char* dialogTitle,
+      const char* defaultValue,
+      const char* labelText,
+      msvc8::string* resultString
+    );
+
+    /**
+     * Address: 0x004FC7B0 (FUN_004FC7B0,
+     *   `WWxInputBox` vtable slot +0xDC override — modal-OK transfer hook).
+     *
+     * What it does:
+     * Wx OnOK-style override: reads the text-control's current wide-string
+     * value, UTF-8 encodes it into the caller-supplied result string, and
+     * returns `true` so the modal dialog closes with ID_OK.
+     */
+    [[nodiscard]] bool TransferDataFromTextControl();
+
+    static void* sm_eventTable[1];
+  };
+
+  static_assert(
+    offsetof(WWxInputBox, mResultString) == 0x170,
+    "moho::WWxInputBox::mResultString offset must be 0x170"
+  );
+  static_assert(
+    offsetof(WWxInputBox, mTextCtrl) == 0x174,
+    "moho::WWxInputBox::mTextCtrl offset must be 0x174"
+  );
+
+  /**
+   * Address: 0x004FC870 (FUN_004FC870, ?WxInputBox@Moho@@YA_NPBD0PAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@@Z)
+   *
+   * What it does:
+   * Helper that allocates one heap-resident `WWxInputBox`, runs the modal
+   * loop via the dialog's `ShowModal` virtual (slot +0x04 of the dialog
+   * vtable, returns `wxID_OK = 5100` on accept), copies the entered text
+   * into `resultString` via the OnOK override above, then destroys the
+   * dialog. Returns `true` when the user accepted (wxID_OK) and `false`
+   * for cancel / window-close.
+   */
+  [[nodiscard]] bool WxInputBox(
+    const char* dialogTitle,
+    const char* defaultValue,
+    const char* labelText,
+    msvc8::string* resultString
+  );
+
+  /**
+   * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
+   *
+   * What it does:
+   * Console-command callback that opens an interactive `WxInputBox` with
+   * fixed test prompts and prints either the entered text or a "Canceled"
+   * message. Registered as the `WxInputBox` startup console command by
+   * `register_CConFunc_WxInputBox`.
+   */
+  void CON_WxInputBox(void* commandArgs);
 
   // Main owner window used by WinMain lifecycle paths (`WIN_OkBox`,
   // crash handling, and startup viewport bootstrap).
@@ -6532,11 +6708,50 @@ namespace moho
     [[nodiscard]] std::wstring BuildReplayFlushText(std::size_t startIndex) const;
     [[nodiscard]] std::wstring BuildFormattedCommittedLineText(const CWinLogLine& line) const;
 
+    /**
+     * Address: 0x004F5590 (FUN_004F5590)
+     *
+     * What it does:
+     * Rebuilds the visible-line view from controls (filter + category checkbox
+     * state) and then persists the new category checkbox states + filter text
+     * back into user preferences. Bound into the WWinLogWindow wxEventTable as
+     * a category/filter command handler.
+     */
+    void OnFilterOrCategoryControlsChanged();
+
+    /**
+     * Address: 0x004F6640 (FUN_004F6640)
+     *
+     * What it does:
+     * Forwards to the standard wx top-level resize-single-child layout, then,
+     * once initial control setup is complete, persists the current window
+     * width/height into the `Windows.Log.{width,height}` preferences. Bound
+     * into the WWinLogWindow wxEventTable as the wxEVT_SIZE handler.
+     */
+    void OnSizePersistGeometry(wxEventRuntime& event);
+
+    /**
+     * What it does:
+     * Synthetic invocation entry that fires `OnFilterOrCategoryControlsChanged`
+     * via the static wxEventTable binding block. Used by host code that needs
+     * to re-fire the handler after programmatic control changes.
+     */
+    void FireFilterOrCategoryChangedFromBindings();
+
+    /**
+     * What it does:
+     * Synthetic invocation entry that fires `OnSizePersistGeometry` via the
+     * static wxEventTable binding block. Used by host code that needs to
+     * re-fire the size handler after a programmatic geometry change.
+     */
+    void FireSizePersistGeometryFromBindings(wxEventRuntime& event);
+
   private:
     void InitializeFromUserPreferences();
     void RestoreCategoryStateFromPreferences(IUserPrefs* preferences);
     void RestoreFilterFromPreferences(IUserPrefs* preferences);
     void RestoreGeometryFromPreferences(IUserPrefs* preferences);
+    void PersistCategoryStateAndFilterToPreferences(IUserPrefs* preferences);
   };
 
   static_assert(

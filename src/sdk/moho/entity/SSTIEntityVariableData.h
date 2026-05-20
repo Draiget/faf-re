@@ -122,6 +122,15 @@ namespace moho
     SSTIEntityVariableData* cpy(SSTIEntityVariableData* destination) const;
 
     /**
+     * Address: 0x00559B00 (FUN_00559B00, Moho::SSTIEntityVariableData::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes replicated variable payload lanes using reflection RTTI.
+     * Rejects serializer versions older than 2.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
+
+    /**
      * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
      *
      * What it does:

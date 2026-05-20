@@ -28,6 +28,7 @@ namespace moho
     offsetof(ArmyBlueprintNameView, mBlueprintOrdinal) == 0x5C,
     "ArmyBlueprintNameView::mBlueprintOrdinal offset must be 0x5C"
   );
+  static_assert(sizeof(ArmyBlueprintNameView) == 0x60, "ArmyBlueprintNameView size must be 0x60");
 
   struct ArmyBlueprintStatNode
   {
@@ -207,6 +208,16 @@ namespace moho
      * creates/caches missing items through token-table traversal.
      */
     [[nodiscard]] CArmyStatItem* GetItem(const char* statPath);
+
+    /**
+     * Address: 0x0070CC40 (FUN_0070CC40, Moho::CArmyStats::ArmyXmlStatsNode)
+     * Mangled: ?ArmyXmlStatsNode@CArmyStats@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@@Z
+     *
+     * What it does:
+     * Builds one indented `<Army>` XML subtree containing per-blueprint unit,
+     * category summary, and economy summary stats for sync submission.
+     */
+    [[nodiscard]] msvc8::string ArmyXmlStatsNode(const msvc8::string& indent);
 
     /**
      * Address: 0x0070B820 (FUN_0070B820)

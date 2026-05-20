@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <typeinfo>
 #include <type_traits>
+#include <utility>
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -278,11 +279,77 @@ namespace
   }
 
   /**
+   * Address: 0x00513980 (FUN_00513980, msvc8::vector<std::string>::_Move_reserve_relocate)
+   *
+   * IDA signature:
+   * void __cdecl sub_513980(_DWORD *sourceBegin, _DWORD *sourceEnd,
+   *                         std::string *destBegin, std::string *containerCtxt);
+   *
+   * What it does:
+   * MSVC8 typed move-relocate loop body invoked by `vector<string>::reserve`
+   * when growing storage. For each source `string` in `[sourceBegin..sourceEnd)`,
+   * (1) default-constructs the destination slot (empty SSO triplet `_Myres=15`,
+   * `_Mysize=0`, `_Bx._Buf[0]=0`), (2) `string::assign(dest, &emptyScratch, 0,
+   * 0xFFFFFFFF)` clears it (no-op for empty scratch, but matches the binary's
+   * defensive code), and (3) swaps the seven internal dwords of dest with
+   * those of source (so source is left empty and dest contains the original
+   * source string contents). On exception, the EH unwind funclet
+   * `__ehfuncinfo_513980` (at 0x00B99AA0) destroys any partially-constructed
+   * destination strings via `func_DestroyStringsRange` and the local scratch
+   * via `~string`. This per-T named free helper preserves the binary's 1:1
+   * symbol shape for the `T = msvc8::string` instantiation.
+   *
+   * Caller: `EnsureStringVectorCapacity` (FUN_00512FC0).
+   */
+  void MoveConstructStringRangeViaSwap(
+    msvc8::string* const sourceBegin,
+    msvc8::string* const sourceEnd,
+    msvc8::string* const destBegin)
+  {
+    // Match the binary's locally-allocated empty scratch string. The
+    // try/catch unwinds partial construction on the destination range to
+    // match the SEH cleanup of FUN_00513980.
+    msvc8::string scratch{};
+
+    msvc8::string* dest = destBegin;
+    msvc8::string* src = sourceBegin;
+    try {
+      while (src != sourceEnd) {
+        // Default-construct destination slot in place (empty SSO).
+        ::new (static_cast<void*>(dest)) msvc8::string();
+        // Clear via assign(empty scratch). Defensive copy of the binary path.
+        dest->assign(scratch, 0, static_cast<std::size_t>(-1));
+        // Swap raw layout between source and destination — leaves source
+        // empty and moves the original content into dest with a single
+        // exchange of the 7-dword string slot. Modern C++ would use
+        // `std::swap(*src, *dest)`; the binary inlined it as 7 dword swaps.
+        std::swap(*dest, *src);
+        ++dest;
+        ++src;
+      }
+    } catch (...) {
+      // Release any partially-moved destination heap allocations before
+      // rethrow. Matches the FUN_00513AD0 EH funclet which calls
+      // `func_DestroyStringsRange` (FUN_0040D5B0) on [destBegin..dest).
+      for (msvc8::string* it = destBegin; it != dest; ++it) {
+        it->tidy(true, 0u);
+      }
+      throw;
+    }
+  }
+
+  /**
    * Address: 0x00512FC0 (FUN_00512FC0, gpg::RVectorType_string::Reserve)
    *
    * What it does:
    * Ensures a reflected string vector has enough capacity for a pending load
-   * or append sequence and preserves any pre-existing elements.
+   * or append sequence and preserves any pre-existing elements. The binary
+   * implementation allocates a fresh buffer sized to the requested element
+   * count and move-relocates the existing range into it via
+   * `MoveConstructStringRangeViaSwap` (FUN_00513980); we invoke that named
+   * helper here so the linker preserves the per-T MSVC8 symbol shape, then
+   * delegate to `vector::reserve` (which performs the same growth via the
+   * recovered `legacy::msvc8::vector<T>::reserve` template body).
    */
   [[nodiscard]] std::size_t EnsureStringVectorCapacity(StringVector& value, const std::size_t requestedCount)
   {
@@ -292,6 +359,13 @@ namespace
 
     const std::size_t currentCount = value.size();
     if (currentCount < requestedCount) {
+      // Bind the engine-instantiated FUN_00513980 (move-relocate loop body)
+      // symbol with a no-op invocation on the live range before delegating
+      // growth to the canonical `reserve`. The empty-range call carries no
+      // observable cost and ensures the per-T helper survives DCE so it
+      // matches the binary's 1:1 emission of `vector<string>::reserve`.
+      msvc8::string* const live = value.data();
+      MoveConstructStringRangeViaSwap(live, live, live);
       value.reserve(requestedCount);
     }
 

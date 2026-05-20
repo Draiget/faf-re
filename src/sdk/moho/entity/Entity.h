@@ -676,6 +676,7 @@ namespace moho
     // Primary vftable (38 entries)
   public:
     inline static gpg::RType* sType = nullptr;
+    inline static gpg::RType* sPointerType = nullptr;
 
     /**
      * Address: 0x00676C40

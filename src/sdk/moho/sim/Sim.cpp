@@ -51,6 +51,7 @@
 #include "moho/audio/HSound.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CCommandDb.h"
+#include "moho/command/CommandIssueHelper.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
@@ -5199,6 +5200,96 @@ namespace
     InsertCommandNodeFixup(map, node);
   }
 
+  [[nodiscard]] UserCommandIssueHelper* CommandIssueHelperFromCommandNode(CommandDbMapNodeView* const node) noexcept
+  {
+    return node != nullptr ? reinterpret_cast<UserCommandIssueHelper*>(node->value) : nullptr;
+  }
+
+  [[nodiscard]] CUnitCommand* CommandIssueHelperAsCommandNodeValue(UserCommandIssueHelper* const helper) noexcept
+  {
+    return reinterpret_cast<CUnitCommand*>(helper);
+  }
+
+  /**
+   * Address: 0x008B5A70 (FUN_008B5A70, struct_CommandManager::FindDataFor)
+   *
+   * What it does:
+   * Finds an existing helper for one command id or constructs and inserts a
+   * new command-issue helper, then marks reused helper variable data dirty.
+   */
+  [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindOrCreateCommandIssueHelper(
+    SessionCommandManagerRuntimeView& commandManager,
+    const SSTICommandConstantData& constantData,
+    const std::uint8_t deleteWhenDue,
+    const std::int32_t dueSeqNo
+  )
+  {
+    const CmdId commandId = static_cast<CmdId>(constantData.cmd);
+    CommandDbMapNodeView* const node = FindCommandNode(commandManager.commandIssueMap, commandId);
+    if (node == nullptr || node == commandManager.commandIssueMap.head) {
+      auto* const helper = new UserCommandIssueHelper(constantData, deleteWhenDue, dueSeqNo);
+      InsertCommandNode(commandManager.commandIssueMap, commandId, CommandIssueHelperAsCommandNodeValue(helper));
+      return helper;
+    }
+
+    UserCommandIssueHelper* const helper = CommandIssueHelperFromCommandNode(node);
+    helper->mVariableDataDirty = 1u;
+    helper->mDeleteWhenDue = 0u;
+    return helper;
+  }
+
+  /**
+   * Address: 0x008B5C20 (FUN_008B5C20, struct_CommandManager::DeleteCommands)
+   *
+   * What it does:
+   * Deletes command-issue helpers for each supplied command id and recycles
+   * ids that belong to the manager's active source byte.
+   */
+  [[maybe_unused]] void DeleteCommandIssueHelpers(
+    SessionCommandManagerRuntimeView& commandManager,
+    const msvc8::vector<CmdId>& commandIds
+  ) noexcept
+  {
+    for (const CmdId* cursor = commandIds.begin(); cursor != commandIds.end(); ++cursor) {
+      const CmdId commandId = *cursor;
+      CommandDbMapNodeView* const node = FindCommandNode(commandManager.commandIssueMap, commandId);
+      if (node != nullptr && node != commandManager.commandIssueMap.head) {
+        delete CommandIssueHelperFromCommandNode(node);
+      }
+
+      const std::uint32_t rawCommandId = static_cast<std::uint32_t>(commandId);
+      if (static_cast<std::uint8_t>(rawCommandId >> 24u) == commandManager.sourceId) {
+        commandManager.idPool.QueueReleasedLowId(rawCommandId & 0x00FFFFFFu);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x008B5CF0 (FUN_008B5CF0)
+   *
+   * What it does:
+   * Advances every command-issue helper to the current beat and then ticks
+   * the manager id-pool recycle history.
+   */
+  [[maybe_unused]] void AdvanceCommandIssueHelpersToBeat(
+    SessionCommandManagerRuntimeView& commandManager,
+    const std::int32_t beat
+  ) noexcept
+  {
+    CommandDbMapNodeView* const head = commandManager.commandIssueMap.head;
+    if (head != nullptr) {
+      CommandDbMapNodeView* node = head->left;
+      while (node != head) {
+        CommandDbMapNodeView* next = node;
+        AdvanceCommandDbIteratorNode(next);
+        CommandIssueHelperFromCommandNode(node)->AdvanceLocalEventsToBeat(beat);
+        node = next;
+      }
+    }
+
+    commandManager.idPool.Update();
+  }
+
   [[nodiscard]] CUnitCommand* AddIssueDataToCommandDb(
     CCommandDb* const commandDb,
     const SSTICommandIssueData& issueData
@@ -8396,6 +8487,11 @@ namespace
     outCounts.mUnitData = CountFastVectorLaneElements(lanes.mUnitUpdates, 0x238u);
     outCounts.mCommandData = CountFastVectorLaneElements(lanes.mCommandUpdates, 0x78u);
   }
+
+  void AppendLegacyStringToStd(std::string& out, const msvc8::string& value)
+  {
+    out.append(value.c_str(), value.size());
+  }
 } // namespace
 
 /**
@@ -8419,6 +8515,26 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     *outSyncData,
     *reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts)
   );
+
+  if (mRequestXMLArmyStatsSubmit) {
+    mRequestXMLArmyStatsSubmit = false;
+
+    std::string armyStatsXml;
+    armyStatsXml.append("<?xml version=\"1.0\" ?>\n");
+    armyStatsXml.append(
+      "<GameStats xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
+    );
+
+    const msvc8::string armyIndent("  ");
+    for (auto it = mArmiesList.begin(); it != mArmiesList.end(); ++it) {
+      CArmyImpl* const army = *it;
+      CArmyStats* const armyStats = army->GetArmyStats();
+      AppendLegacyStringToStd(armyStatsXml, armyStats->ArmyXmlStatsNode(armyIndent));
+    }
+    armyStatsXml.append("</GameStats>\n");
+
+    outSyncData->mSubmitArmyStats.assign_owned(std::string_view(armyStatsXml.data(), armyStatsXml.size()));
+  }
 
   // +0x08FC latch: cleared by Sync after one beat is fully published.
   mDidProcess = false;

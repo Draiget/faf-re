@@ -177,8 +177,8 @@ extern "C" {
   void* sfxcnv_ExecCnvFrmByCbFunc() { return nullptr; }
   void* sfxcnv_ExecFullAlphaByCbFunc() { return nullptr; }
   void* sfxcnv_MakeZTbl() { return nullptr; }
-  void* sub_AFAE50() { return nullptr; }
-  void* sub_AFD7C0() { return nullptr; }
+  void* mpvhdec_ReadKernelIntraDefault() { return nullptr; }
+  void* mpvhdec_ReadKernelPredictedDefault() { return nullptr; }
   void* sub_C0E1B0() { return nullptr; }
   void* sub_C0E2E0() { return nullptr; }
 

@@ -264,6 +264,13 @@ namespace
     return outDelta;
   }
 
+  /**
+   * Address: 0x004EB830 (FUN_004EB830)
+   *
+   * What it does:
+   * Thin local alias that forwards thrust-manipulator orientation blending to
+   * the canonical `moho::BlendOrientationDeltaByMaxAngle` helper.
+   */
   [[nodiscard]] Wm3::Quaternionf* BlendThrustOrientationDelta(
     const Wm3::Quaternionf& currentOrientation,
     const Wm3::Quaternionf& targetOrientation,
@@ -272,62 +279,13 @@ namespace
     Wm3::Quaternionf* const outOrientation
   ) noexcept
   {
-    if (outOrientation == nullptr) {
-      return nullptr;
-    }
-
-    float current[4]{};
-    float target[4]{};
-    std::memcpy(current, &currentOrientation, sizeof(current));
-    std::memcpy(target, &targetOrientation, sizeof(target));
-
-    const float targetConjugate[4] = {
-      target[0],
-      -target[1],
-      -target[2],
-      -target[3],
-    };
-
-    float delta[4]{};
-    delta[0] =
-      (((current[0] * targetConjugate[0]) - (current[1] * targetConjugate[1])) -
-       (current[2] * targetConjugate[2])) -
-      (current[3] * targetConjugate[3]);
-    delta[1] =
-      (((current[3] * targetConjugate[2]) + (current[1] * targetConjugate[0])) +
-       (current[0] * targetConjugate[1])) -
-      (current[2] * targetConjugate[3]);
-    delta[2] =
-      (((current[2] * targetConjugate[0]) + (current[1] * targetConjugate[3])) +
-       (current[0] * targetConjugate[2])) -
-      (current[3] * targetConjugate[1]);
-    delta[3] =
-      (((current[3] * targetConjugate[0]) + (current[2] * targetConjugate[1])) +
-       (current[0] * targetConjugate[3])) -
-      (current[1] * targetConjugate[2]);
-
-    Wm3::Quaternionf deltaQuat{};
-    std::memcpy(&deltaQuat, delta, sizeof(delta));
-    if (!moho::RotateQuatByAngle(&deltaQuat, turnStepRadians)) {
-      if (outNoStep != nullptr) {
-        *outNoStep = true;
-      }
-      std::memcpy(outOrientation, current, sizeof(current));
-      return outOrientation;
-    }
-
-    std::memcpy(delta, &deltaQuat, sizeof(delta));
-    float output[4]{};
-    output[0] = (((target[0] * delta[0]) - (target[1] * delta[1])) - (target[2] * delta[2])) - (target[3] * delta[3]);
-    output[1] = (((target[2] * delta[3]) + (target[1] * delta[0])) + (target[0] * delta[1])) - (target[3] * delta[2]);
-    output[2] = (((target[3] * delta[1]) + (target[2] * delta[0])) + (target[0] * delta[2])) - (target[1] * delta[3]);
-    output[3] = (((target[3] * delta[0]) + (target[1] * delta[2])) + (target[0] * delta[3])) - (target[2] * delta[1]);
-
-    if (outNoStep != nullptr) {
-      *outNoStep = false;
-    }
-    std::memcpy(outOrientation, output, sizeof(output));
-    return outOrientation;
+    return moho::BlendOrientationDeltaByMaxAngle(
+      currentOrientation,
+      targetOrientation,
+      turnStepRadians,
+      outNoStep,
+      outOrientation
+    );
   }
 
   /**

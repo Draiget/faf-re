@@ -10,6 +10,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -1159,6 +1160,69 @@ namespace
 namespace moho
 {
   gpg::RType* IAniManipulator::sType = nullptr;
+  gpg::RType* IAniManipulator::sPointerType = nullptr;
+
+  namespace
+  {
+    /**
+     * Static `RPointerType<IAniManipulator>` descriptor that the binary exposes
+     * as `Moho::IAniManipulator::PointerType`. Default static-init runs the
+     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
+     * derived vftable lane.
+     */
+    gpg::RPointerType<moho::IAniManipulator> sIAniManipulatorPointerTypeStorage{};
+
+    /**
+     * Address: 0x0063DC30 (FUN_0063DC30)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<IAniManipulator>` descriptor under
+     * the `IAniManipulator*` type-info key so subsequent `LookupRType` queries
+     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterIAniManipulatorPointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &sIAniManipulatorPointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BFAEE0 (FUN_00BFAEE0)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<IAniManipulator>` descriptor at
+     * process exit: frees heap-backed `bases_`/`fields_` vector storage and
+     * resets the RType vftable lane to the `RObject` base. Registered via
+     * `atexit` from `GetPointerType`'s once-init path.
+     */
+    void CleanupIAniManipulatorPointerType()
+    {
+      sIAniManipulatorPointerTypeStorage.~RPointerType<moho::IAniManipulator>();
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0063DA40 (FUN_0063DA40, Moho::IAniManipulator::GetPointerType)
+   *
+   * What it does:
+   * On first call, pre-registers the static `RPointerType<IAniManipulator>`
+   * descriptor and installs the matching atexit teardown. After that, lazily
+   * caches the `LookupRType(typeid(IAniManipulator*))` result in `sPointerType`
+   * and returns it.
+   */
+  gpg::RType* IAniManipulator::GetPointerType()
+  {
+    static const bool sOnceInit = []() {
+      PreregisterIAniManipulatorPointerType();
+      (void)std::atexit(&CleanupIAniManipulatorPointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
+    if (!sPointerType) {
+      sPointerType = gpg::LookupRType(typeid(IAniManipulator*));
+    }
+    return sPointerType;
+  }
 
   /**
    * Address: 0x0063B5D0 (FUN_0063B5D0, ??0IAniManipulator@Moho@@QAE@XZ)

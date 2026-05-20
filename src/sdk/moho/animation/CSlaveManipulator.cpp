@@ -14,6 +14,7 @@
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
@@ -502,7 +503,11 @@ moho::CSlaveManipulator::CSlaveManipulator(
  *
  * What it does:
  * Updates the destination bone orientation from the configured source bone and
- * marks task-event completion when no smoothing step remains.
+ * marks task-event completion when no smoothing step remains. When `mMaxRate`
+ * is non-negative, the new orientation is interpolated toward the target by at
+ * most `mMaxRate` radians using `BlendOrientationDeltaByMaxAngle`
+ * (the FUN_004EB830 axis-angle clamped-step helper); otherwise it snaps
+ * directly to the target.
  */
 bool moho::CSlaveManipulator::ManipulatorUpdate()
 {
@@ -520,16 +525,17 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
   const Wm3::Quaternionf targetRotation = sourceBone->mLocalTransform.orient_;
   bool reachedTarget = true;
   if (mMaxRate >= 0.0f) {
-    const float absDot = std::fabs(Wm3::Quaternionf::Dot(mCurrentRotation, targetRotation));
-    const float clampedDot = absDot > 1.0f ? 1.0f : absDot;
-    const float angularDistance = 2.0f * std::acos(clampedDot);
-    if (angularDistance > mMaxRate && angularDistance > 1e-6f) {
-      const float stepFraction = mMaxRate / angularDistance;
-      mCurrentRotation = Wm3::Quaternionf::Slerp(mCurrentRotation, targetRotation, stepFraction);
-      reachedTarget = false;
-    } else {
-      mCurrentRotation = targetRotation;
-    }
+    bool noStep = false;
+    Wm3::Quaternionf steppedRotation{};
+    (void)moho::BlendOrientationDeltaByMaxAngle(
+      mCurrentRotation,
+      targetRotation,
+      mMaxRate,
+      &noStep,
+      &steppedRotation
+    );
+    mCurrentRotation = steppedRotation;
+    reachedTarget = noStep;
   } else {
     mCurrentRotation = targetRotation;
   }

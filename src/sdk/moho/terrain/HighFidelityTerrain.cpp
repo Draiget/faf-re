@@ -2,13 +2,11 @@
 
 #include <cstdint>
 
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
-#include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
@@ -19,6 +17,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
+#include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -27,8 +26,6 @@ namespace
 {
   using TextureSheetHandle = boost::shared_ptr<moho::CD3DDynamicTextureSheet>;
   using TextureResourceHandle = boost::shared_ptr<moho::RD3DTextureResource>;
-  using GenericTextureSheetHandle = boost::shared_ptr<moho::ID3DTextureSheet>;
-  using TextureWeakHandle = boost::weak_ptr<gpg::gal::TextureD3D9>;
 
   moho::WaterSurface* sHighFidelityWaterSurface = nullptr;
   TextureSheetHandle sHighFidelityNoiseFillTexture{};
@@ -89,147 +86,6 @@ namespace
     }
 
     indexSheet->Unlock();
-  }
-
-  struct TerrainShaderVarSet
-  {
-    moho::ShaderVar skirtTexture;
-    moho::ShaderVar utilityTextureA;
-    moho::ShaderVar utilityTextureB;
-    moho::ShaderVar utilityTextureC;
-
-    moho::ShaderVar lowerAlbedoTexture;
-    moho::ShaderVar stratum0AlbedoTexture;
-    moho::ShaderVar stratum1AlbedoTexture;
-    moho::ShaderVar stratum2AlbedoTexture;
-    moho::ShaderVar stratum3AlbedoTexture;
-    moho::ShaderVar stratum4AlbedoTexture;
-    moho::ShaderVar stratum5AlbedoTexture;
-    moho::ShaderVar stratum6AlbedoTexture;
-    moho::ShaderVar stratum7AlbedoTexture;
-    moho::ShaderVar upperAlbedoTexture;
-
-    moho::ShaderVar lowerNormalTexture;
-    moho::ShaderVar stratum0NormalTexture;
-    moho::ShaderVar stratum1NormalTexture;
-    moho::ShaderVar stratum2NormalTexture;
-    moho::ShaderVar stratum3NormalTexture;
-    moho::ShaderVar stratum4NormalTexture;
-    moho::ShaderVar stratum5NormalTexture;
-    moho::ShaderVar stratum6NormalTexture;
-    moho::ShaderVar stratum7NormalTexture;
-
-    moho::ShaderVar lowerAlbedoTile;
-    moho::ShaderVar stratum0AlbedoTile;
-    moho::ShaderVar stratum1AlbedoTile;
-    moho::ShaderVar stratum2AlbedoTile;
-    moho::ShaderVar stratum3AlbedoTile;
-    moho::ShaderVar stratum4AlbedoTile;
-    moho::ShaderVar stratum5AlbedoTile;
-    moho::ShaderVar stratum6AlbedoTile;
-    moho::ShaderVar stratum7AlbedoTile;
-    moho::ShaderVar upperAlbedoTile;
-
-    moho::ShaderVar lowerNormalTile;
-    moho::ShaderVar stratum0NormalTile;
-    moho::ShaderVar stratum1NormalTile;
-    moho::ShaderVar stratum2NormalTile;
-    moho::ShaderVar stratum3NormalTile;
-    moho::ShaderVar stratum4NormalTile;
-    moho::ShaderVar stratum5NormalTile;
-    moho::ShaderVar stratum6NormalTile;
-    moho::ShaderVar stratum7NormalTile;
-
-    moho::ShaderVar normalTexture;
-    moho::ShaderVar terrainScale;
-    moho::ShaderVar viewportScale;
-    moho::ShaderVar viewportOffset;
-
-    TerrainShaderVarSet()
-    {
-      moho::RegisterShaderVar("SkirtTexture", &skirtTexture, "terrain");
-      moho::RegisterShaderVar("UtilityTextureA", &utilityTextureA, "terrain");
-      moho::RegisterShaderVar("UtilityTextureB", &utilityTextureB, "terrain");
-      moho::RegisterShaderVar("UtilityTextureC", &utilityTextureC, "terrain");
-
-      moho::RegisterShaderVar("LowerAlbedoTexture", &lowerAlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum0AlbedoTexture", &stratum0AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum1AlbedoTexture", &stratum1AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum2AlbedoTexture", &stratum2AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum3AlbedoTexture", &stratum3AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum4AlbedoTexture", &stratum4AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum5AlbedoTexture", &stratum5AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum6AlbedoTexture", &stratum6AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("Stratum7AlbedoTexture", &stratum7AlbedoTexture, "terrain");
-      moho::RegisterShaderVar("UpperAlbedoTexture", &upperAlbedoTexture, "terrain");
-
-      moho::RegisterShaderVar("LowerNormalTexture", &lowerNormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum0NormalTexture", &stratum0NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum1NormalTexture", &stratum1NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum2NormalTexture", &stratum2NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum3NormalTexture", &stratum3NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum4NormalTexture", &stratum4NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum5NormalTexture", &stratum5NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum6NormalTexture", &stratum6NormalTexture, "terrain");
-      moho::RegisterShaderVar("Stratum7NormalTexture", &stratum7NormalTexture, "terrain");
-
-      moho::RegisterShaderVar("LowerAlbedoTile", &lowerAlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum0AlbedoTile", &stratum0AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum1AlbedoTile", &stratum1AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum2AlbedoTile", &stratum2AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum3AlbedoTile", &stratum3AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum4AlbedoTile", &stratum4AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum5AlbedoTile", &stratum5AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum6AlbedoTile", &stratum6AlbedoTile, "terrain");
-      moho::RegisterShaderVar("Stratum7AlbedoTile", &stratum7AlbedoTile, "terrain");
-      moho::RegisterShaderVar("UpperAlbedoTile", &upperAlbedoTile, "terrain");
-
-      moho::RegisterShaderVar("LowerNormalTile", &lowerNormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum0NormalTile", &stratum0NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum1NormalTile", &stratum1NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum2NormalTile", &stratum2NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum3NormalTile", &stratum3NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum4NormalTile", &stratum4NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum5NormalTile", &stratum5NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum6NormalTile", &stratum6NormalTile, "terrain");
-      moho::RegisterShaderVar("Stratum7NormalTile", &stratum7NormalTile, "terrain");
-
-      moho::RegisterShaderVar("NormalTexture", &normalTexture, "terrain");
-      moho::RegisterShaderVar("TerrainScale", &terrainScale, "terrain");
-      moho::RegisterShaderVar("ViewportScale", &viewportScale, "terrain");
-      moho::RegisterShaderVar("ViewportOffset", &viewportOffset, "terrain");
-    }
-  };
-
-  [[nodiscard]] TerrainShaderVarSet& GetTerrainShaderVars()
-  {
-    static TerrainShaderVarSet shaderVars{};
-    return shaderVars;
-  }
-
-  void BindTextureShaderVar(moho::ShaderVar& shaderVar, const GenericTextureSheetHandle& textureSheet)
-  {
-    moho::ID3DTextureSheet::TextureHandle textureHandle{};
-    if (textureSheet != nullptr) {
-      textureSheet->GetTexture(textureHandle);
-    }
-    shaderVar.GetTexture(TextureWeakHandle(textureHandle));
-  }
-
-  void BindTextureShaderVar(
-    moho::ShaderVar& shaderVar,
-    const boost::SharedPtrRaw<moho::RD3DTextureResource>& textureResource
-  )
-  {
-    const boost::shared_ptr<moho::RD3DTextureResource> retainedTexture = boost::SharedPtrFromRawRetained(textureResource);
-    BindTextureShaderVar(shaderVar, boost::static_pointer_cast<moho::ID3DTextureSheet>(retainedTexture));
-  }
-
-  void SetShaderVarMem(moho::ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
-  {
-    if (shaderVar.Exists()) {
-      shaderVar.mEffectVariable->SetMem(floatCount, values);
-    }
   }
 } // namespace
 

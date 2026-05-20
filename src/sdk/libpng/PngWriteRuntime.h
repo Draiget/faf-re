@@ -224,6 +224,23 @@ extern "C" void png_write_cHRM(
 );
 
 /**
+ * Address: 0x00A24EBD (FUN_00A24EBD)
+ * Mangled: png_write_gAMA
+ *
+ * IDA signature:
+ * void __cdecl png_write_gAMA(png_structp, double);
+ *
+ * What it does:
+ * Encodes one PNG `gAMA` (image gamma) chunk payload by quantizing the input
+ * gamma to fixed-point 1e5 with a +0.5 round-bias and emitting it via
+ * `png_write_chunk`.
+ */
+extern "C" void png_write_gAMA(
+  png_structp png_ptr,
+  double file_gamma
+);
+
+/**
  * Address: 0x00A24F1E (FUN_00A24F1E)
  * Mangled: png_write_sRGB
  *

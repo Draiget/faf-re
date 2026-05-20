@@ -7,11 +7,14 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/BoostWrappers.h"
+#include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
 #include "Wm3Quaternion.h"
 
@@ -48,9 +51,12 @@ namespace moho
   class CUIWorldView;
   class CLuaWldUIProvider;
   class CUIWorldMesh;
+  class CWldTerrainDecal;
   class RD3DTextureResource;
   class PrefetchData;
   class ID3DTextureSheet;
+  class MeshInstance;
+  class MeshMaterial;
   class CMauiCursor;
   class CMauiBitmap;
   class CMauiControl;
@@ -73,6 +79,7 @@ namespace moho
   class UserUnit;
   class CWldSession;
   struct RMeshBlueprint;
+  struct RUnitBlueprint;
   struct SClientBottleneckInfo;
 
   class IWldUIProvider
@@ -424,12 +431,140 @@ namespace moho
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IMauiDragger) == 0x4, "moho::IMauiDragger size must be 0x4");
 
+  struct CUIWorldViewBuildPreviewTreeNode
+  {
+    CUIWorldViewBuildPreviewTreeNode* mLeft = nullptr;   // +0x00
+    CUIWorldViewBuildPreviewTreeNode* mParent = nullptr; // +0x04
+    CUIWorldViewBuildPreviewTreeNode* mRight = nullptr;  // +0x08
+    std::uint32_t mSortKey = 0;                          // +0x0C
+    boost::SharedPtrRaw<void> mPreviewPayload{};          // +0x10
+    std::uint8_t mColor = 0;                              // +0x18
+    std::uint8_t mIsNil = 0;                              // +0x19
+    std::uint8_t mPad1A[0x02]{};
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildPreviewTreeNode, mPreviewPayload) == 0x10,
+    "moho::CUIWorldViewBuildPreviewTreeNode::mPreviewPayload offset must be 0x10"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildPreviewTreeNode, mIsNil) == 0x19,
+    "moho::CUIWorldViewBuildPreviewTreeNode::mIsNil offset must be 0x19"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(CUIWorldViewBuildPreviewTreeNode) == 0x1C,
+    "moho::CUIWorldViewBuildPreviewTreeNode size must be 0x1C"
+  );
+
+  struct CUIWorldViewBuildPreviewTree
+  {
+    std::uintptr_t mAllocatorCookie = 0;               // +0x00
+    CUIWorldViewBuildPreviewTreeNode* mHead = nullptr; // +0x04
+    std::uint32_t mSize = 0;                           // +0x08
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(CUIWorldViewBuildPreviewTree) == 0x0C,
+    "moho::CUIWorldViewBuildPreviewTree size must be 0x0C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildPreviewTree, mHead) == 0x04,
+    "moho::CUIWorldViewBuildPreviewTree::mHead offset must be 0x04"
+  );
+
   struct CUIWorldViewBuildDragRuntimeView
   {
-    std::uint8_t mUnknown00To43[0x44]{};
-    Wm3::Vector3f mStart{}; // +0x44
-    Wm3::Vector3f mEnd{};   // +0x50
+    /**
+     * Address: 0x008529C0 (FUN_008529C0, struct_WorldView_object::struct_WorldView_object)
+     *
+     * What it does:
+     * Initializes the world-view build-preview cache, invalid start/end
+     * vectors, and empty preview mesh/material/decal state.
+     */
+    CUIWorldViewBuildDragRuntimeView();
+
+    /**
+     * Address: 0x00852B20 (FUN_00852B20, struct_WorldView_object::~struct_WorldView_object)
+     *
+     * What it does:
+     * Clears preview meshes, releases the preview material, and destroys the
+     * position tree sentinel/storage.
+     */
+    ~CUIWorldViewBuildDragRuntimeView();
+
+    /**
+     * Address: 0x008549B0 (FUN_008549B0, struct_WorldView_object::Destroy)
+     *
+     * What it does:
+     * Clears active build-preview mesh/blueprint caches and destroys the
+     * terrain decal used by the preview lane.
+     */
+    void ClearBuildPreviewCache();
+
+    [[nodiscard]] boost::shared_ptr<MeshInstance> CreateBuildPreviewMeshInstance(RUnitBlueprint* blueprint);
+
+    /**
+     * Address: 0x00854130 (FUN_00854130, sub_854130)
+     *
+     * What it does:
+     * Creates one `UnitPlace` build-preview mesh instance for a unit blueprint
+     * and appends it to the preview mesh/blueprint caches.
+     */
+    void AppendBuildPreviewMesh(RUnitBlueprint* blueprint);
+
+    /**
+     * Address: 0x008544B0 (FUN_008544B0, sub_8544B0)
+     *
+     * What it does:
+     * Replaces one cached build-preview mesh/blueprint slot with a freshly
+     * created `UnitPlace` mesh instance for the provided unit blueprint.
+     */
+    void ReplaceBuildPreviewMesh(std::size_t index, RUnitBlueprint* blueprint);
+
+    CWldSession* mSession = nullptr;                       // +0x00
+    RUnitBlueprint* mActiveBuildBlueprint = nullptr;        // +0x04
+    msvc8::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
+    msvc8::vector<RUnitBlueprint*> mBlueprints;             // +0x18
+    CUIWorldViewBuildPreviewTree mPreviewPositions;         // +0x28
+    boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;     // +0x34
+    CWldTerrainDecal* mDecal = nullptr;                     // +0x3C
+    ERuleBPUnitCommandCaps mCommandCaps = RULEUCC_None;     // +0x40
+    Wm3::Vector3f mStart{};                                 // +0x44
+    Wm3::Vector3f mEnd{};                                   // +0x50
+    bool mPreviewInvalid = false;                           // +0x5C
+    bool mUnknown5D = false;                                // +0x5D
+    std::uint8_t mPad5E[0x02]{};
   };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mSession) == 0x00,
+    "moho::CUIWorldViewBuildDragRuntimeView::mSession offset must be 0x00"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveBuildBlueprint) == 0x04,
+    "moho::CUIWorldViewBuildDragRuntimeView::mActiveBuildBlueprint offset must be 0x04"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mMeshes) == 0x08,
+    "moho::CUIWorldViewBuildDragRuntimeView::mMeshes offset must be 0x08"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mBlueprints) == 0x18,
+    "moho::CUIWorldViewBuildDragRuntimeView::mBlueprints offset must be 0x18"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mPreviewPositions) == 0x28,
+    "moho::CUIWorldViewBuildDragRuntimeView::mPreviewPositions offset must be 0x28"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mUnitPlaceMaterial) == 0x34,
+    "moho::CUIWorldViewBuildDragRuntimeView::mUnitPlaceMaterial offset must be 0x34"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mDecal) == 0x3C,
+    "moho::CUIWorldViewBuildDragRuntimeView::mDecal offset must be 0x3C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mCommandCaps) == 0x40,
+    "moho::CUIWorldViewBuildDragRuntimeView::mCommandCaps offset must be 0x40"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CUIWorldViewBuildDragRuntimeView, mStart) == 0x44,
     "moho::CUIWorldViewBuildDragRuntimeView::mStart offset must be 0x44"
@@ -437,6 +572,14 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CUIWorldViewBuildDragRuntimeView, mEnd) == 0x50,
     "moho::CUIWorldViewBuildDragRuntimeView::mEnd offset must be 0x50"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mPreviewInvalid) == 0x5C,
+    "moho::CUIWorldViewBuildDragRuntimeView::mPreviewInvalid offset must be 0x5C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(CUIWorldViewBuildDragRuntimeView) == 0x60,
+    "moho::CUIWorldViewBuildDragRuntimeView size must be 0x60"
   );
 
   class UIBuildDragger : public IMauiDragger
@@ -1246,6 +1389,15 @@ namespace moho
     void Frame(float deltaSeconds) override;
 
     /**
+     * Address: 0x0078F820 (FUN_0078F820, Moho::CMauiEdit::DoRender)
+     *
+     * What it does:
+     * Draws edit background, clipped text runs, selection highlight, drop
+     * shadow, and caret geometry.
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
      * Address: 0x00790470 (FUN_00790470, Moho::CMauiEdit::HandleEvent)
      *
      * What it does:
@@ -1563,6 +1715,22 @@ namespace moho
      * visible-pass-matching children while frame visibility allows.
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
+     * Address: 0x007965A0 (FUN_007965A0, Moho::CMauiFrame::Frame)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CMauiFrame::Frame(Moho::CMauiFrame *this, float deltaSeconds);
+     *
+     * What it does:
+     * Pins this frame via a weak-to-shared upgrade through `mSelfWeak`, walks
+     * each descendant control depth-first, dispatches the per-control `Frame`
+     * virtual on every visible control that has `mNeedsFrameUpdate` set, then
+     * purges any controls queued for deletion by this frame this cycle. The
+     * pinning lock keeps the frame and its subtree alive across re-entrant
+     * `Frame` callbacks that may add or remove controls.
+     */
+    void Frame(float deltaSeconds) override;
 
     /**
      * Address: 0x00796740 (FUN_00796740, Moho::CMauiFrame::DumpControlsUnder)
@@ -2114,6 +2282,15 @@ namespace moho
       const boost::shared_ptr<CD3DBatchTexture>& thumbTop,
       const boost::shared_ptr<CD3DBatchTexture>& thumbBottom
     );
+
+    /**
+     * Address: 0x007A0840 (FUN_007A0840, Moho::CMauiScrollbar::Draw)
+     *
+     * What it does:
+     * Draws the scrollbar background and textured thumb from the attached
+     * scrollable control range.
+     */
+    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
 
     /**
      * Address: 0x007A11C0 (FUN_007A11C0, Moho::CMauiScrollbar::HandleEvent)
@@ -7671,6 +7848,14 @@ namespace moho
    * runtime-owned class in this translation unit.
    */
   void UIWorldViewDraw(CUIWorldView* worldView, CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+
+  /**
+   * Address: 0x0086F090 (FUN_0086F090)
+   *
+   * What it does:
+   * Publishes world-camera/minimap cursor telemetry into engine stats.
+   */
+  void UIWorldViewUpdateCursorEngineStats(CUIWorldView* worldView, const Wm3::Vec3f& cursorWorldPosition);
 
   /**
    * Address: 0x00872830 (FUN_00872830, cfunc_CUIWorldViewGetScreenPos)

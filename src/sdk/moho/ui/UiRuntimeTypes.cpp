@@ -3,9 +3,11 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <bit>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <cstdlib>
 #include <cstdint>
 #include <exception>
@@ -22,6 +24,7 @@
 #include "legacy/containers/Vector.h"
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -35,6 +38,7 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/ScrDebugHooks.h"
+#include "moho/misc/StatItem.h"
 #include "moho/app/WinApp.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/resource/RResId.h"
@@ -57,9 +61,11 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/task/ScrDiskWatcherTask.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
@@ -2198,6 +2204,14 @@ namespace
   {
     void* vftable = nullptr;
 
+    [[nodiscard]] const char* CameraName() const
+    {
+      using CameraNameFn = const char*(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<CameraNameFn>(table[1]);
+      return fn(this);
+    }
+
     void SetViewRect(const Wm3::Vector2f& minPoint, const Wm3::Vector2f& maxPoint)
     {
       using SetViewRectFn = void(__thiscall*)(
@@ -2208,6 +2222,30 @@ namespace
       auto** const table = reinterpret_cast<void**>(vftable);
       auto* const fn = reinterpret_cast<SetViewRectFn>(table[3]);
       fn(this, &minPoint, &maxPoint);
+    }
+
+    [[nodiscard]] const Wm3::Vec3f& CameraGetOffset() const
+    {
+      using CameraGetOffsetFn = const Wm3::Vec3f&(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<CameraGetOffsetFn>(table[18]);
+      return fn(this);
+    }
+
+    [[nodiscard]] float CameraGetTargetZoom() const
+    {
+      using CameraGetTargetZoomFn = float(__thiscall*)(const CRenderWorldViewViewportRuntimeView*);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<CameraGetTargetZoomFn>(table[19]);
+      return fn(this);
+    }
+
+    [[nodiscard]] float LODMetric(const Wm3::Vec3f& cursorWorldPosition) const
+    {
+      using LODMetricFn = float(__thiscall*)(const CRenderWorldViewViewportRuntimeView*, const Wm3::Vec3f&);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<LODMetricFn>(table[35]);
+      return fn(this, cursorWorldPosition);
     }
   };
 
@@ -2268,7 +2306,9 @@ namespace
     std::uint8_t mEnableResourceRendering = 0; // +0x136
     std::uint8_t mUnknown137 = 0;
     std::int32_t mInputLocks = 0; // +0x138
-    std::uint8_t mUnknown13CTo273[0x138]{};
+    std::uint8_t mUnknown13CTo207[0xCC]{};
+    moho::CWldSession* mSession = nullptr; // +0x208
+    std::uint8_t mUnknown20CTo273[0x68]{};
     std::uint8_t mShowConvertToPatrolCursor = 0; // +0x274
     std::uint8_t mUnknown275To29B[0x27]{};
     std::uint32_t mOverlayDrawToken = 0; // +0x29C
@@ -2323,6 +2363,7 @@ namespace
     "CUIWorldViewRuntimeView::mShowConvertToPatrolCursor offset must be 0x274"
   );
   static_assert(offsetof(CUIWorldViewRuntimeView, mInputLocks) == 0x138, "CUIWorldViewRuntimeView::mInputLocks offset must be 0x138");
+  static_assert(offsetof(CUIWorldViewRuntimeView, mSession) == 0x208, "CUIWorldViewRuntimeView::mSession offset must be 0x208");
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mEnableResourceRendering) == 0x136,
     "CUIWorldViewRuntimeView::mEnableResourceRendering offset must be 0x136"
@@ -2351,6 +2392,71 @@ namespace
     offsetof(CUIWorldViewLuaObjectRuntimeView, mLuaObject) == 0x20,
     "CUIWorldViewLuaObjectRuntimeView::mLuaObject offset must be 0x20"
   );
+
+  moho::StatItem* gCameraCursorPositionStat = nullptr;
+  moho::StatItem* gCameraCursorElevationStat = nullptr;
+  moho::StatItem* gCameraCursorOCellStat = nullptr;
+  moho::StatItem* gCameraCursorLodMetricStat = nullptr;
+  moho::StatItem* gCameraFocusDistanceStat = nullptr;
+  moho::StatItem* gMinimapCursorLodMetricStat = nullptr;
+  moho::StatItem* gMinimapFocusDistanceStat = nullptr;
+
+  [[nodiscard]] moho::StatItem* EnsureEngineStringStat(moho::StatItem*& slot, const char* const statPath)
+  {
+    if (slot == nullptr) {
+      slot = moho::GetEngineStats()->GetItem_0(statPath);
+      (void)slot->Release(0);
+    }
+    return slot;
+  }
+
+  [[nodiscard]] moho::StatItem* EnsureEngineFloatStat(moho::StatItem*& slot, const char* const statPath)
+  {
+    if (slot == nullptr) {
+      slot = moho::GetEngineStats()->GetItem3(statPath);
+      (void)slot->Release(0);
+    }
+    return slot;
+  }
+
+  void StoreEngineFloatStat(moho::StatItem*& slot, const char* const statPath, const float value)
+  {
+    moho::StatItem* const item = EnsureEngineFloatStat(slot, statPath);
+    volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
+    const long nextBits = std::bit_cast<long>(value);
+    long observed = 0;
+    do {
+      observed = ::InterlockedCompareExchange(counter, 0, 0);
+    } while (::InterlockedCompareExchange(counter, nextBits, observed) != observed);
+  }
+
+  [[nodiscard]] float SampleCursorTerrainElevation(
+    const CUIWorldViewRuntimeView& worldViewView,
+    const Wm3::Vec3f& cursorWorldPosition
+  )
+  {
+    const auto* const map = reinterpret_cast<const moho::STIMap*>(
+      worldViewView.mSession->mWldMap->mTerrainRes->mPlayableRectSource
+    );
+    return map->mHeightField->GetElevation(cursorWorldPosition.x, cursorWorldPosition.z);
+  }
+
+  void StoreCursorLodAndFocusStats(
+    CRenderWorldViewViewportRuntimeView& viewport,
+    const Wm3::Vec3f& cursorWorldPosition,
+    moho::StatItem*& lodStat,
+    const char* const lodStatPath,
+    moho::StatItem*& focusStat,
+    const char* const focusStatPath
+  )
+  {
+    StoreEngineFloatStat(lodStat, lodStatPath, viewport.LODMetric(cursorWorldPosition));
+
+    const float targetZoom = viewport.CameraGetTargetZoom();
+    const Wm3::Vec3f& offsetBefore = viewport.CameraGetOffset();
+    const float focusDistance = std::fabs((offsetBefore.y + targetZoom) - viewport.CameraGetOffset().y);
+    StoreEngineFloatStat(focusStat, focusStatPath, focusDistance);
+  }
 
   struct CWldSessionCursorRuntimeView
   {
@@ -4127,6 +4233,123 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     vertex.mU = u;
     vertex.mV = v;
     return vertex;
+  }
+
+  struct ScrollbarQuadUvs
+  {
+    float mTopLeftU = 0.0f;
+    float mTopLeftV = 0.0f;
+    float mTopRightU = 1.0f;
+    float mTopRightV = 0.0f;
+    float mBottomRightU = 1.0f;
+    float mBottomRightV = 1.0f;
+    float mBottomLeftU = 0.0f;
+    float mBottomLeftV = 1.0f;
+  };
+
+  [[nodiscard]] ScrollbarQuadUvs MakeScrollbarQuadUvs(const bool vertical) noexcept
+  {
+    if (vertical) {
+      return {};
+    }
+
+    return ScrollbarQuadUvs{
+      0.0f,
+      1.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      0.0f,
+      1.0f,
+      1.0f,
+    };
+  }
+
+  void DrawScrollbarQuad(
+    moho::CD3DPrimBatcher* const primBatcher,
+    const boost::shared_ptr<moho::CD3DBatchTexture>& texture,
+    const float left,
+    const float top,
+    const float right,
+    const float bottom,
+    const std::uint32_t color,
+    const ScrollbarQuadUvs& uvs
+  )
+  {
+    primBatcher->SetTexture(texture);
+
+    const moho::CD3DPrimBatcher::Vertex topLeft =
+      MakeBorderVertex(left, top, color, uvs.mTopLeftU, uvs.mTopLeftV);
+    const moho::CD3DPrimBatcher::Vertex topRight =
+      MakeBorderVertex(right, top, color, uvs.mTopRightU, uvs.mTopRightV);
+    const moho::CD3DPrimBatcher::Vertex bottomRight =
+      MakeBorderVertex(right, bottom, color, uvs.mBottomRightU, uvs.mBottomRightV);
+    const moho::CD3DPrimBatcher::Vertex bottomLeft =
+      MakeBorderVertex(left, bottom, color, uvs.mBottomLeftU, uvs.mBottomLeftV);
+    primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+  }
+
+  void DrawSolidColorQuad(
+    moho::CD3DPrimBatcher* const primBatcher,
+    const std::uint32_t textureColor,
+    const float left,
+    const float top,
+    const float right,
+    const float bottom,
+    const std::uint32_t vertexColor
+  )
+  {
+    const boost::shared_ptr<moho::CD3DBatchTexture> texture = moho::CD3DBatchTexture::FromSolidColor(textureColor);
+    primBatcher->SetTexture(texture);
+
+    const moho::CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
+    const moho::CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, top, vertexColor, 1.0f, 0.0f);
+    const moho::CD3DPrimBatcher::Vertex bottomRight = MakeBorderVertex(right, bottom, vertexColor, 1.0f, 1.0f);
+    const moho::CD3DPrimBatcher::Vertex bottomLeft = MakeBorderVertex(left, bottom, vertexColor, 0.0f, 1.0f);
+    primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+  }
+
+  void RenderEditTextAt(
+    moho::CMauiEdit* const edit,
+    const CMauiEditRuntimeView* const editView,
+    moho::CD3DPrimBatcher* const primBatcher,
+    const msvc8::string& text,
+    const float x,
+    const float y,
+    const std::uint32_t color
+  )
+  {
+    const Wm3::Vector3f origin{x, y, 0.0f};
+    const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
+    const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
+    (void)editView->mFont->Render(
+      text.c_str(),
+      primBatcher,
+      origin,
+      xAxis,
+      yAxis,
+      edit->AdjustARGBAlpha(color),
+      1.0f,
+      std::numeric_limits<float>::quiet_NaN()
+    );
+  }
+
+  float RenderEditTextRun(
+    moho::CMauiEdit* const edit,
+    const CMauiEditRuntimeView* const editView,
+    moho::CD3DPrimBatcher* const primBatcher,
+    const msvc8::string& text,
+    const float x,
+    const float baselineY,
+    const std::uint32_t color
+  )
+  {
+    const float advance = editView->mFont->GetAdvance(text.c_str(), 0);
+    if (editView->mDropShadow) {
+      RenderEditTextAt(edit, editView, primBatcher, text, x + 1.0f, baselineY + 1.0f, color & 0xFF000000u);
+    }
+    RenderEditTextAt(edit, editView, primBatcher, text, x, baselineY, color);
+    return advance;
   }
 
   void ApplyCursorDefaultTexture(moho::CMauiCursor* const cursor, const char* const texturePath)
@@ -8509,6 +8732,222 @@ moho::UIBuildDragger::UIBuildDragger(
     mWldView->mStart = mStart;
     mWldView->mEnd = mEnd;
   }
+}
+
+namespace
+{
+  constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);
+
+  /**
+   * Address: 0x00856D60 (FUN_00856D60)
+   *
+   * IDA signature:
+   * int sub_856D60()
+   *
+   * What it does:
+   * Allocates one fresh build-preview red-black tree node and returns it
+   * pre-initialized as a non-nil leaf in the canonical "red link, no
+   * children, no parent" shape. This is the bare allocator that every
+   * tree mutator routes through; sentinel promotion (`mIsNil=1`, self
+   * links, `_Mysize=0`) and proper red-black insertion bookkeeping happen
+   * in the caller after the bare node is in hand.
+   */
+  [[nodiscard]] moho::CUIWorldViewBuildPreviewTreeNode* AllocateBuildPreviewTreeNode()
+  {
+    auto* const node = new moho::CUIWorldViewBuildPreviewTreeNode();
+    node->mLeft = nullptr;
+    node->mParent = nullptr;
+    node->mRight = nullptr;
+    node->mColor = 1;
+    node->mIsNil = 0;
+    return node;
+  }
+
+  [[nodiscard]] moho::CUIWorldViewBuildPreviewTreeNode* NewBuildPreviewPositionTreeSentinel()
+  {
+    // The binary first calls AllocateBuildPreviewTreeNode (FUN_00856D60) to
+    // get a non-nil red leaf, then promotes that leaf to a self-linked
+    // sentinel with mIsNil=1. Keep the two phases separate so the linker
+    // emits the bare allocator out-of-line.
+    moho::CUIWorldViewBuildPreviewTreeNode* const node = AllocateBuildPreviewTreeNode();
+    node->mIsNil = 1;
+    node->mLeft = node;
+    node->mParent = node;
+    node->mRight = node;
+    return node;
+  }
+
+  void DestroyBuildPreviewPositionTreeNodes(moho::CUIWorldViewBuildPreviewTreeNode* const node) noexcept
+  {
+    if (node == nullptr || node->mIsNil != 0) {
+      return;
+    }
+
+    DestroyBuildPreviewPositionTreeNodes(node->mRight);
+    moho::CUIWorldViewBuildPreviewTreeNode* const left = node->mLeft;
+    node->mPreviewPayload.release();
+    delete node;
+    DestroyBuildPreviewPositionTreeNodes(left);
+  }
+
+  void DestroyBuildPreviewPositionTree(moho::CUIWorldViewBuildPreviewTree& tree) noexcept
+  {
+    moho::CUIWorldViewBuildPreviewTreeNode* const head = tree.mHead;
+    if (head == nullptr) {
+      tree.mSize = 0;
+      return;
+    }
+
+    DestroyBuildPreviewPositionTreeNodes(head->mParent);
+    delete head;
+    tree.mHead = nullptr;
+    tree.mSize = 0;
+  }
+
+  void EnsureBuildPreviewPositionTreeSentinel(moho::CUIWorldViewBuildPreviewTree& tree)
+  {
+    moho::CUIWorldViewBuildPreviewTreeNode* const head = NewBuildPreviewPositionTreeSentinel();
+    tree.mHead = head;
+    tree.mSize = 0;
+  }
+} // namespace
+
+/**
+ * Address: 0x008529C0 (FUN_008529C0, struct_WorldView_object::struct_WorldView_object)
+ *
+ * What it does:
+ * Initializes the world-view build-preview cache, invalid start/end vectors,
+ * and empty preview mesh/material/decal state.
+ */
+moho::CUIWorldViewBuildDragRuntimeView::CUIWorldViewBuildDragRuntimeView()
+  : mSession(moho::WLD_GetActiveSession())
+  , mActiveBuildBlueprint(nullptr)
+  , mMeshes()
+  , mBlueprints()
+  , mPreviewPositions()
+  , mUnitPlaceMaterial()
+  , mDecal(nullptr)
+  , mCommandCaps(moho::RULEUCC_None)
+  , mStart(
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN()
+    )
+  , mEnd(mStart)
+  , mPreviewInvalid(false)
+  , mUnknown5D(false)
+  , mPad5E{}
+{
+  EnsureBuildPreviewPositionTreeSentinel(mPreviewPositions);
+}
+
+/**
+ * Address: 0x00852B20 (FUN_00852B20, struct_WorldView_object::~struct_WorldView_object)
+ *
+ * What it does:
+ * Clears preview meshes, releases the preview material, and destroys the
+ * position tree sentinel/storage.
+ */
+moho::CUIWorldViewBuildDragRuntimeView::~CUIWorldViewBuildDragRuntimeView()
+{
+  ClearBuildPreviewCache();
+  mUnitPlaceMaterial.reset();
+  DestroyBuildPreviewPositionTree(mPreviewPositions);
+}
+
+/**
+ * Address: 0x008549B0 (FUN_008549B0, struct_WorldView_object::Destroy)
+ *
+ * What it does:
+ * Clears active build-preview mesh/blueprint caches and destroys the terrain
+ * decal used by the preview lane.
+ */
+void moho::CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache()
+{
+  // Drain mMeshes via the shared-pair vector erase helper so the linker keeps
+  // the out-of-line `vector<shared_ptr<MeshInstance>>::erase(first, last)`
+  // emission referenced from this site (FUN_008555E0).
+  {
+    auto& meshesView = msvc8::AsVectorRuntimeView(mMeshes);
+    auto* const firstPair = reinterpret_cast<boost::SharedCountPair*>(meshesView.begin);
+    auto* const lastPair = reinterpret_cast<boost::SharedCountPair*>(meshesView.end);
+    auto** const liveTailSlot = reinterpret_cast<boost::SharedCountPair**>(&meshesView.end);
+    (void)boost::EraseSharedPairVectorRange(liveTailSlot, firstPair, lastPair);
+  }
+
+  // mBlueprints holds trivially-destructible raw pointers, so the binary
+  // collapses the live range with a single `_Mylast = _Myfirst` store.
+  mBlueprints.clear();
+
+  if (mDecal != nullptr) {
+    auto* const session = moho::WLD_GetActiveSession();
+    auto* const decalManager = static_cast<moho::CDecalManager*>(session->mWldMap->mTerrainRes->GetDecalManager());
+    decalManager->DestroyDecal(mDecal);
+    mDecal = nullptr;
+  }
+}
+
+boost::shared_ptr<moho::MeshInstance>
+moho::CUIWorldViewBuildDragRuntimeView::CreateBuildPreviewMeshInstance(moho::RUnitBlueprint* const blueprint)
+{
+  if (!mUnitPlaceMaterial) {
+    const msvc8::string shaderName("UnitPlace");
+    const msvc8::string emptyTextureName;
+    mUnitPlaceMaterial = moho::MeshMaterial::Create(
+      shaderName,
+      emptyTextureName,
+      emptyTextureName,
+      emptyTextureName,
+      emptyTextureName,
+      emptyTextureName,
+      nullptr
+    );
+  }
+
+  moho::RMeshBlueprint* const meshBlueprint = mSession->mRules->GetMeshBlueprint(blueprint->Display.MeshBlueprint);
+  const float uniformScale = blueprint->Display.UniformScale;
+  const Wm3::Vector3f previewScale(uniformScale, uniformScale, uniformScale);
+
+  moho::MeshInstance* const meshInstance = moho::MeshRenderer::GetInstance()->CreateMeshInstance(
+    moho::WLD_GetActiveSession()->mGameTick,
+    kBuildPreviewMeshColor,
+    meshBlueprint,
+    previewScale,
+    false,
+    mUnitPlaceMaterial
+  );
+  return boost::shared_ptr<moho::MeshInstance>(meshInstance);
+}
+
+/**
+ * Address: 0x00854130 (FUN_00854130, sub_854130)
+ *
+ * What it does:
+ * Creates one `UnitPlace` build-preview mesh instance for a unit blueprint and
+ * appends it to the preview mesh/blueprint caches.
+ */
+void moho::CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh(moho::RUnitBlueprint* const blueprint)
+{
+  boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
+  mMeshes.push_back(meshInstance);
+  mBlueprints.push_back(blueprint);
+}
+
+/**
+ * Address: 0x008544B0 (FUN_008544B0, sub_8544B0)
+ *
+ * What it does:
+ * Replaces one cached build-preview mesh/blueprint slot with a freshly created
+ * `UnitPlace` mesh instance for the provided unit blueprint.
+ */
+void moho::CUIWorldViewBuildDragRuntimeView::ReplaceBuildPreviewMesh(
+  const std::size_t index,
+  moho::RUnitBlueprint* const blueprint
+)
+{
+  boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
+  mMeshes[index] = meshInstance;
+  mBlueprints[index] = blueprint;
 }
 
 struct BuildDragStepStateRuntimeView
@@ -13796,7 +14235,7 @@ moho::CMauiMovie::~CMauiMovie()
   // we do it explicitly, matching the binary's destroy-in-reverse sequence.
   reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieHeightLV)->~LuaObject();
   reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieWidthLV)->~LuaObject();
-  movieView->mSubtitleCache.~basic_string();
+  movieView->mSubtitleCache.tidy(true, 0U);
 
   if (movieView->mMovie != nullptr) {
     delete movieView->mMovie;
@@ -14468,6 +14907,112 @@ void moho::CMauiScrollbar::SetTextures(
   }
   if (thumbBottom.get() != nullptr) {
     scrollbarView->mThumbBottom = thumbBottom;
+  }
+}
+
+/**
+ * Address: 0x007A0840 (FUN_007A0840, Moho::CMauiScrollbar::Draw)
+ *
+ * What it does:
+ * Draws the scrollbar background and textured thumb from the attached
+ * scrollable control range.
+ */
+void moho::CMauiScrollbar::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+{
+  (void)drawMask;
+  if (primBatcher == nullptr) {
+    return;
+  }
+
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+  const CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
+  const CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
+  const bool vertical = scrollbarView->mAxis == MSA_Vert;
+
+  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+
+  float minRange = 0.0f;
+  float maxRange = 0.0f;
+  float minVisible = 0.0f;
+  float maxVisible = 0.0f;
+  if (CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl(); scrollableControl != nullptr) {
+    const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(scrollbarView->mAxis);
+    minRange = scrollValues.mMinRange;
+    maxRange = scrollValues.mMaxRange;
+    minVisible = scrollValues.mMinVisible;
+    maxVisible = scrollValues.mMaxVisible;
+  }
+
+  const float trackStart = vertical ? top : left;
+  const float trackEnd = vertical ? bottom : right;
+  float thumbStart = trackStart;
+  float thumbEnd = trackEnd;
+  if (maxRange > minRange) {
+    const float trackSpan = trackEnd - trackStart;
+    const float rangeSpan = maxRange - minRange;
+    thumbStart = (trackSpan * ((minVisible - minRange) / rangeSpan)) + trackStart;
+    thumbEnd = (trackSpan * ((maxVisible - minRange) / rangeSpan)) + trackStart;
+  }
+
+  thumbStart = static_cast<float>(FloorFrndintAdjustDown(thumbStart));
+  thumbEnd = static_cast<float>(FloorFrndintAdjustDown(thumbEnd));
+
+  const ScrollbarQuadUvs uvs = MakeScrollbarQuadUvs(vertical);
+  const std::uint32_t color = extendedView->mVertexAlpha;
+
+  if (scrollbarView->mBackground) {
+    DrawScrollbarQuad(primBatcher, scrollbarView->mBackground, left, top, right, bottom, color, uvs);
+  }
+
+  if (!scrollbarView->mThumbTop || !scrollbarView->mThumbBottom || !scrollbarView->mThumbMiddle) {
+    return;
+  }
+
+  const float topCapLength = static_cast<float>(scrollbarView->mThumbTop->mHeight);
+  const float bottomCapLength = static_cast<float>(scrollbarView->mThumbBottom->mHeight);
+  const float capLength = topCapLength + bottomCapLength;
+  if (capLength >= (thumbEnd - thumbStart)) {
+    const float thumbCenter = thumbEnd - ((thumbEnd - thumbStart) * 0.5f);
+    thumbStart = thumbCenter - topCapLength;
+    thumbEnd = thumbCenter + bottomCapLength;
+  }
+
+  if (vertical) {
+    DrawScrollbarQuad(primBatcher, scrollbarView->mThumbTop, left, thumbStart, right, thumbStart + topCapLength, color, uvs);
+    DrawScrollbarQuad(primBatcher, scrollbarView->mThumbBottom, left, thumbEnd - bottomCapLength, right, thumbEnd, color, uvs);
+
+    if (std::fabs(thumbEnd - thumbStart) > capLength) {
+      DrawScrollbarQuad(
+        primBatcher,
+        scrollbarView->mThumbMiddle,
+        left,
+        (thumbStart + topCapLength) - 1.0f,
+        right,
+        thumbEnd - bottomCapLength,
+        color,
+        uvs
+      );
+    }
+    return;
+  }
+
+  DrawScrollbarQuad(primBatcher, scrollbarView->mThumbTop, thumbStart - topCapLength, top, thumbStart, bottom, color, uvs);
+  DrawScrollbarQuad(primBatcher, scrollbarView->mThumbBottom, thumbEnd, top, thumbEnd + bottomCapLength, bottom, color, uvs);
+
+  if (std::fabs(thumbEnd - thumbStart) > capLength) {
+    DrawScrollbarQuad(
+      primBatcher,
+      scrollbarView->mThumbMiddle,
+      thumbStart - topCapLength,
+      top,
+      thumbEnd + bottomCapLength,
+      bottom,
+      color,
+      uvs
+    );
   }
 }
 
@@ -15901,7 +16446,8 @@ bool moho::CUIMapPreview::SetTexture(const char* const texturePath)
  *
  * What it does:
  * Clears existing preview texture ownership, loads one map in preview-only
- * mode, and binds the resulting preview texture sheet when present.
+ * mode through `WLD_LoadMapPreview`, and binds the resulting preview texture
+ * sheet when the load produced a preview chunk.
  */
 bool moho::CUIMapPreview::SetTextureFromMap(const char* const mapPath)
 {
@@ -15912,10 +16458,9 @@ bool moho::CUIMapPreview::SetTextureFromMap(const char* const mapPath)
     return false;
   }
 
-  CWldMap loadedMap{};
-  CBackgroundTaskControl loadControl{};
-  if (loadedMap.MapLoad(mapPath, nullptr, true, loadControl) && loadedMap.mMapPreviewChunk != nullptr) {
-    mapPreviewView->mTexture = loadedMap.mMapPreviewChunk->mPreviewTexture;
+  msvc8::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
+  if (loadedMap.get() != nullptr && loadedMap->mMapPreviewChunk != nullptr) {
+    mapPreviewView->mTexture = loadedMap->mMapPreviewChunk->mPreviewTexture;
   }
 
   return mapPreviewView->mTexture.get() != nullptr;
@@ -18296,6 +18841,64 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* const stat
   LuaPlus::LuaObject interpolatedScrollObject = SCR_ToLua<Wm3::Vector2f>(state, interpolatedScroll);
   interpolatedScrollObject.PushStack(state);
   return 1;
+  }
+
+/**
+ * Address: 0x0086F090 (FUN_0086F090)
+ *
+ * What it does:
+ * Publishes world-camera/minimap cursor telemetry into engine stats: cursor
+ * position text, terrain elevation, occupancy-cell text, camera LOD metric,
+ * and focus distance.
+ */
+void moho::UIWorldViewUpdateCursorEngineStats(
+  CUIWorldView* const worldView,
+  const Wm3::Vec3f& cursorWorldPosition
+)
+{
+  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
+  CRenderWorldViewViewportRuntimeView* const viewport = worldViewView->mViewportCallback;
+
+  if (_stricmp(viewport->CameraName(), "WorldCamera") == 0) {
+    const msvc8::string positionText = gpg::STR_Printf(
+      "x=%.2f,y=%.2f,z=%.2f",
+      cursorWorldPosition.x,
+      cursorWorldPosition.y,
+      cursorWorldPosition.z
+    );
+    EnsureEngineStringStat(gCameraCursorPositionStat, "Camera_Cursor_Position")->SetValue(positionText);
+
+    StoreEngineFloatStat(
+      gCameraCursorElevationStat,
+      "Camera_Cursor_Elevation",
+      SampleCursorTerrainElevation(*worldViewView, cursorWorldPosition)
+    );
+
+    const auto cellX = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.x - 0.5f));
+    const auto cellZ = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.z - 0.5f));
+    const msvc8::string cellText = gpg::STR_Printf("x=%i,z=%i", cellX, cellZ);
+    EnsureEngineStringStat(gCameraCursorOCellStat, "Camera_Cursor_OCell")->SetValue(cellText);
+
+    StoreCursorLodAndFocusStats(
+      *viewport,
+      cursorWorldPosition,
+      gCameraCursorLodMetricStat,
+      "Camera_Cursor_LODMetric",
+      gCameraFocusDistanceStat,
+      "Camera_FocusDistance"
+    );
+  }
+
+  if (_stricmp(viewport->CameraName(), "MiniMap") == 0) {
+    StoreCursorLodAndFocusStats(
+      *viewport,
+      cursorWorldPosition,
+      gMinimapCursorLodMetricStat,
+      "Minimap_Cursor_LODMetric",
+      gMinimapFocusDistanceStat,
+      "Minimap_FocusDistance"
+    );
+  }
 }
 
 /**
@@ -19974,6 +20577,106 @@ void moho::CMauiEdit::Frame(const float deltaSeconds)
 }
 
 /**
+ * Address: 0x0078F820 (FUN_0078F820, Moho::CMauiEdit::DoRender)
+ *
+ * What it does:
+ * Draws edit background, clipped text runs, selection highlight, drop shadow,
+ * and caret geometry.
+ */
+void moho::CMauiEdit::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+{
+  (void)drawMask;
+  if (primBatcher == nullptr) {
+    return;
+  }
+
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  CD3DFont* const font = editView->mFont;
+  if (font == nullptr) {
+    return;
+  }
+
+  const CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
+  const float left = CScriptLazyVar_float::GetValue(&editView->mLeftLV);
+  const float right = CScriptLazyVar_float::GetValue(&editView->mRightLV);
+  const float top = CScriptLazyVar_float::GetValue(&editView->mTopLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&editView->mBottomLV);
+
+  if (editView->mBackgroundVisible) {
+    DrawSolidColorQuad(primBatcher, editView->mBackgroundColor, left, top, right, bottom, extendedView->mVertexAlpha);
+  }
+
+  const int clipStart = editView->mClipOffset;
+  const int clipEnd = clipStart + editView->mClipLength;
+  const float baselineY = top + font->mAscent;
+
+  float penX = left;
+  int firstRunEnd = editView->mSelectionStart;
+  if (firstRunEnd >= clipEnd) {
+    firstRunEnd = clipEnd;
+  }
+
+  if (firstRunEnd > clipStart) {
+    const msvc8::string runText = gpg::STR_Utf8SubString(editView->mText.c_str(), clipStart, firstRunEnd - clipStart);
+    penX += RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mForegroundColor);
+  }
+
+  int selectedStart = editView->mSelectionStart;
+  if (selectedStart < clipStart) {
+    selectedStart = clipStart;
+  }
+
+  int selectedEnd = editView->mSelectionEnd;
+  if (selectedEnd >= clipEnd) {
+    selectedEnd = clipEnd;
+  }
+
+  if (selectedEnd > selectedStart) {
+    const msvc8::string runText = gpg::STR_Utf8SubString(editView->mText.c_str(), selectedStart, selectedEnd - selectedStart);
+    const float runAdvance = font->GetAdvance(runText.c_str(), 0);
+
+    if (editView->mBackgroundVisible) {
+      DrawSolidColorQuad(
+        primBatcher,
+        editView->mHighlightBackgroundColor,
+        penX,
+        top,
+        penX + runAdvance,
+        bottom,
+        extendedView->mVertexAlpha
+      );
+    }
+
+    penX += RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mHighlightForegroundColor);
+  }
+
+  int suffixStart = editView->mSelectionEnd;
+  if (suffixStart < clipStart) {
+    suffixStart = clipStart;
+  }
+
+  if (clipEnd > suffixStart) {
+    const msvc8::string runText = gpg::STR_Utf8SubString(editView->mText.c_str(), suffixStart, clipEnd - suffixStart);
+    (void)RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mForegroundColor);
+  }
+
+  if (!editView->mCaretVisible) {
+    return;
+  }
+
+  const int caretPosition = editView->mCaretPosition;
+  if (caretPosition < clipStart || caretPosition > clipEnd) {
+    return;
+  }
+
+  const msvc8::string caretPrefix = gpg::STR_Utf8SubString(editView->mText.c_str(), clipStart, caretPosition - clipStart);
+  const float caretX = left + font->GetAdvance(caretPrefix.c_str(), 0);
+  const float caretBottom = top + font->mAscent + font->mDescent;
+  const std::uint32_t caretColor = editView->mCaretColor | (editView->mCaretCycleCurrentAlpha << 24u);
+  DrawSolidColorQuad(primBatcher, editView->mForegroundColor, caretX, top, caretX + 1.0f, caretBottom, caretColor);
+}
+
+/**
  * Address: 0x00790470 (FUN_00790470, Moho::CMauiEdit::HandleEvent)
  *
  * What it does:
@@ -21014,6 +21717,43 @@ void moho::CMauiFrame::SetBounds(const int width, const int height)
   CScriptLazyVar_float::SetValue(&frameView->mTopLV, 0.0f);
   CScriptLazyVar_float::SetValue(&frameView->mWidthLV, static_cast<float>(width));
   CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
+}
+
+/**
+ * Address: 0x007965A0 (FUN_007965A0, Moho::CMauiFrame::Frame)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CMauiFrame::Frame(Moho::CMauiFrame *this, float deltaSeconds);
+ *
+ * What it does:
+ * Pins this frame as a shared owner by upgrading `mSelfWeak` to a temporary
+ * `shared_ptr` so the frame and its subtree survive re-entrant per-control
+ * `Frame` callbacks. Walks descendants depth-first; for each visible control
+ * whose `mNeedsFrameUpdate` is set, dispatches its virtual `Frame(deltaSeconds)`
+ * override. Once the subtree finishes ticking, purges any controls queued for
+ * deletion during this cycle (`PurgeDeleted`). Finally drops the pinning lock.
+ */
+void moho::CMauiFrame::Frame(const float deltaSeconds)
+{
+  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
+
+  // Pin this frame's shared owner for the duration of the tick so descendants
+  // cannot tear down the root while they're still iterating.
+  boost::shared_ptr<CMauiFrame> selfLock(frameView->mSelfWeak);
+
+  CMauiControl* nextControl = DepthFirstSuccessor(this);
+  while (nextControl != nullptr) {
+    CMauiControl* const currentControl = nextControl;
+    nextControl = currentControl->DepthFirstSuccessor(this);
+
+    auto* const controlView = reinterpret_cast<CMauiControlExtendedRuntimeView*>(currentControl);
+    if (!controlView->mInvisible && controlView->mNeedsFrameUpdate) {
+      currentControl->Frame(deltaSeconds);
+    }
+  }
+
+  PurgeDeleted();
+  // selfLock dtor releases the pin here.
 }
 
 /**

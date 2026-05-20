@@ -92,11 +92,28 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x005B52F0 (FUN_005B52F0)
+   *
+   * What it does:
+   * Destroys one heap-owned `CAiPathSpline` and frees its storage. Installed
+   * as `deleteFunc_` by the lifecycle-callbacks helper. The compiler-generated
+   * `delete` lowering chains through `~CAiPathSpline()` to release the inline
+   * fastvector lanes before `operator delete`.
+   */
   void DeleteAiPathSplineOwned(void* object)
   {
     delete static_cast<CAiPathSpline*>(object);
   }
 
+  /**
+   * Address: 0x005B5350 (FUN_005B5350)
+   *
+   * What it does:
+   * Placement-constructs one `CAiPathSpline` over caller-provided storage and
+   * wraps it in a typed `gpg::RRef` lane. Installed as `ctorRefFunc_` by the
+   * lifecycle-callbacks helper.
+   */
   [[nodiscard]] gpg::RRef ConstructAiPathSplineRefInPlace(void* objectStorage)
   {
     auto* const spline = static_cast<CAiPathSpline*>(objectStorage);
@@ -106,6 +123,15 @@ namespace
     return MakeTypedRef(spline, CachedCAiPathSplineType());
   }
 
+  /**
+   * Address: 0x005B5390 (FUN_005B5390)
+   *
+   * What it does:
+   * Runs the `CAiPathSpline` destructor in place over caller-provided storage
+   * without freeing it. Installed as `dtrFunc_` by the lifecycle-callbacks
+   * helper. The compiler-generated destructor body releases inline fastvector
+   * lanes (matching the binary's manual cleanup of the embedded vectors).
+   */
   void DestroyAiPathSplineInPlace(void* object)
   {
     auto* const spline = static_cast<CAiPathSpline*>(object);

@@ -541,6 +541,7 @@ namespace gpg::core
      * Address: 0x004C7EB0 (FUN_004C7EB0, gpg::fastvector_n<LuaPlus::LuaObject>::InsertAt lane)
      * Address: 0x0057FE30 (FUN_0057FE30, gpg::fastvector_Entity::InsertAt)
      * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
+     * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -799,6 +800,7 @@ namespace gpg::core
      * Address: 0x0047C910 (FUN_0047C910, gpg::fastvector_n64_char::GrowInsert)
      * Address: 0x004C7FD0 (FUN_004C7FD0, gpg::fastvector_n<LuaPlus::LuaObject>::GrowInsert lane)
      * Address: 0x005811A0 (FUN_005811A0, gpg::fastvector_Entity::GrowInsert)
+     * Address: 0x00505BA0 (FUN_00505BA0, gpg::fastvector_UserEntity::GrowInsert)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes

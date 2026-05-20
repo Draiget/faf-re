@@ -76,6 +76,101 @@ namespace
     return resourceType;
   }
 
+  struct SerConstructHelperView
+  {
+    void* mVftable;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
+  };
+  static_assert(
+    offsetof(SerConstructHelperView, mConstructCallback) == 0x0C,
+    "SerConstructHelperView::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SerConstructHelperView, mDeleteCallback) == 0x10,
+    "SerConstructHelperView::mDeleteCallback offset must be 0x10"
+  );
+
+  struct SerSaveConstructHelperView
+  {
+    void* mVftable;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
+    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
+  };
+  static_assert(
+    offsetof(SerSaveConstructHelperView, mSaveConstructArgsCallback) == 0x0C,
+    "SerSaveConstructHelperView::mSaveConstructArgsCallback offset must be 0x0C"
+  );
+
+  /**
+   * Address: 0x005396A0 (FUN_005396A0, gpg::SerConstructHelper<Moho::RScmResource>::Init)
+   *
+   * IDA signature:
+   * void(__cdecl *) __thiscall sub_5396A0(SerConstructHelperView *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the `Moho::RScmResourceConstruct` and
+   * `gpg::SerConstructHelper<Moho::RScmResource>` vtables. Lazily resolves
+   * the `RScmResource` reflection descriptor, asserts the construct callback
+   * slot is empty, and publishes this helper's construct/delete callbacks to
+   * the descriptor.
+   */
+  [[maybe_unused]] gpg::RType::construct_func_t InitRScmResourceConstructHelper(
+    const SerConstructHelperView& helper
+  )
+  {
+    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+    constexpr int kSerializationConstructLine = 231;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = ResolveRScmResourceTypeCached();
+    if (type->serConstructFunc_ != nullptr) {
+      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
+    }
+    type->serConstructFunc_ = helper.mConstructCallback;
+    type->deleteFunc_ = helper.mDeleteCallback;
+    return helper.mConstructCallback;
+  }
+
+  /**
+   * Address: 0x00539620 (FUN_00539620, gpg::SerSaveConstructHelper<Moho::RScmResource>::Init)
+   *
+   * IDA signature:
+   * gpg::RType *__thiscall sub_539620(SerSaveConstructHelperView *this);
+   *
+   * What it does:
+   * Virtual-method body installed in the
+   * `Moho::RScmResourceSaveConstruct` and
+   * `gpg::SerSaveConstructHelper<Moho::RScmResource>` vtables. Lazily
+   * resolves the `RScmResource` reflection descriptor, asserts the
+   * save-construct-args callback slot is empty, and publishes this helper's
+   * save-construct-args callback to the descriptor.
+   */
+  [[maybe_unused]] gpg::RType* InitRScmResourceSaveConstructHelper(
+    const SerSaveConstructHelperView& helper
+  )
+  {
+    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
+    constexpr int kSerializationSaveConstructLine = 189;
+    constexpr const char* kSerializationSourcePath =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+
+    gpg::RType* const type = ResolveRScmResourceTypeCached();
+    if (type->serSaveConstructArgsFunc_ != nullptr) {
+      gpg::HandleAssertFailure(
+        kSaveConstructAssertText,
+        kSerializationSaveConstructLine,
+        kSerializationSourcePath
+      );
+    }
+    type->serSaveConstructArgsFunc_ = helper.mSaveConstructArgsCallback;
+    return type;
+  }
+
   [[nodiscard]] boost::shared_ptr<moho::RScmResource> GetModelResourceByPath(
     const char* const path,
     moho::CResourceWatcher* const resourceWatcher

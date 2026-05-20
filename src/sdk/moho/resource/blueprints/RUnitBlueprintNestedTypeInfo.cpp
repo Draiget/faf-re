@@ -2,7 +2,9 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -27,6 +29,20 @@ namespace
   using WeaponTypeInfo = moho::RUnitBlueprintWeaponTypeInfo;
   using VectorFloatType = msvc8::vector<float>;
   void EnsureVectorFloatLoadCapacity(VectorFloatType& storage, std::size_t requiredCount);
+
+  /**
+   * Address: 0x00524780 (FUN_00524780)
+   *
+   * Forward declaration; defined after the reflection class body. Inserts
+   * `insertCount` copies of `*fillValue` at `insertPosition` into `storage`,
+   * growing the underlying buffer geometrically when capacity is exhausted.
+   * Returns the (possibly relocated) `start_` pointer of `storage`.
+   */
+  float* InsertFillFloatVector(
+    const float* fillValue,
+    unsigned int insertCount,
+    VectorFloatType& storage,
+    float* insertPosition);
 
   /**
    * Address: 0x00527EE0 (FUN_00527EE0)
@@ -157,17 +173,34 @@ namespace
       return "vector<float>";
     }
 
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
-    {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
-    }
+    /**
+     * Address: 0x00523380 (FUN_00523380, gpg::RVectorType_float::GetLexical)
+     *
+     * IDA signature:
+     * std::string *__thiscall gpg::RVectorType_float::GetLexical(
+     *     gpg::RType *this, std::string *dest, _DWORD *a3);
+     *
+     * What it does:
+     * Vtable slot override for `gpg::RVectorType<float>::GetLexical`. Returns
+     * base lexical text from the parent `gpg::RType::GetLexical` lane plus the
+     * reflected vector size formatted as ", size=%d". Mirrors the binary's
+     * `??_7?$RVectorType@M@gpg@@6B@` slot at `+0x04`.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override
     {
       return this;
     }
 
+    /**
+     * Address: 0x00523360 (FUN_00523360, gpg::RVectorType_float::Init)
+     *
+     * What it does:
+     * Sets reflected `vector<float>` metadata and installs typed archive
+     * callbacks. The `&SerLoad` address-take at line below is the FRAMEWORK
+     * DISPATCH bind site for FUN_00523C00 (`gpg::RVectorType_float::SerLoad`).
+     */
     void Init() override
     {
       size_ = sizeof(VectorFloatType);
@@ -215,6 +248,26 @@ namespace
     }
 
   private:
+    /**
+     * Address: 0x00523C00 (FUN_00523C00, gpg::RVectorType_float::SerLoad)
+     *
+     * IDA signature:
+     * void __cdecl gpg::RVectorType_float::SerLoad(int a1, _DWORD *a2);
+     *
+     * What it does:
+     * Reflected `SerLoad` callback for `msvc8::vector<float>`: reads the
+     * incoming element count from the archive, clears the destination, and
+     * loads each float through the fast direct-write path (when spare
+     * capacity remains) or through `InsertFillFloatVector` (FUN_00524780)
+     * when capacity is exhausted — matching the binary's emission that
+     * either appends in-place or routes a fill-insert through the geometric
+     * grow lane.
+     *
+     * Bound at runtime by `gpg::RVectorType_float::Init` (FUN_00523360) which
+     * installs `&SerLoad` into the reflection vtable slot at offset +0x1C
+     * (caller address 0x52336E in the binary). The address-take is the
+     * source-level invocation that keeps the per-T body in the final binary.
+     */
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
     {
       if (!archive || objectPtr == 0) {
@@ -227,10 +280,22 @@ namespace
 
       storage->clear();
       EnsureVectorFloatLoadCapacity(*storage, static_cast<std::size_t>(count));
+
+      // Per-element load uses a fast direct-write path while spare capacity
+      // remains, falling back to `InsertFillFloatVector` (FUN_00524780) when
+      // the live capacity is exhausted. This mirrors the binary's SerLoad
+      // emission shape (FUN_00523C00) where each archive read either appends
+      // in-place or routes one fill-insert through the geometric grow lane.
+      auto& view = msvc8::AsVectorRuntimeView(*storage);
       for (unsigned int i = 0u; i < count; ++i) {
         float value = 0.0f;
         archive->ReadFloat(&value);
-        storage->push_back(value);
+        if (view.begin != nullptr && view.end < view.capacityEnd) {
+          *view.end = value;
+          ++view.end;
+          continue;
+        }
+        (void)InsertFillFloatVector(&value, 1u, *storage, view.end);
       }
     }
 
@@ -252,6 +317,20 @@ namespace
       }
     }
   };
+
+  /**
+   * Address: 0x00523380 (FUN_00523380, gpg::RVectorType_float::GetLexical)
+   *
+   * What it does:
+   * Vtable slot override that combines parent `gpg::RType::GetLexical` text
+   * with the reflected vector size as ", size=%d". Out-of-line definition
+   * binds the binary symbol to the `??_7?$RVectorType@M@gpg@@6B@ +0x04` slot.
+   */
+  msvc8::string VectorFloatReflectionType::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+  }
 
   /**
    * Address: 0x005238B0 (FUN_005238B0)
@@ -290,6 +369,150 @@ namespace
     }
 
     storage.reserve(requiredCount);
+  }
+
+  /**
+   * Address: 0x00524780 (FUN_00524780)
+   *
+   * IDA signature:
+   * int __userpurge sub_524780@<eax>(int *fillValue@<eax>, unsigned int insertCount@<ecx>, int *vector, int *insertPosition);
+   *
+   * What it does:
+   * Inserts `insertCount` copies of `*fillValue` at `insertPosition` into the
+   * raw three-pointer `msvc8::vector<float>` storage triplet, mirroring the
+   * binary's `vector<float>::_Insert_n` lane. The function picks one of three
+   * code paths depending on capacity and overlap:
+   *
+   *  - In-place tail copy when the live spare capacity already covers the
+   *    insert (`(view.end - view.begin) - position < insertCount`):
+   *    moves the existing tail forward by `insertCount` words and fills
+   *    `[insertPosition, insertPosition+insertCount)` with the value.
+   *  - In-place split copy when the in-place path needs to overwrite live
+   *    elements: shifts the trailing block forward to free room, then
+   *    fills the vacated slots with the value.
+   *  - Geometric reallocation lane (`(capacity*3)/2` rounded down) when no
+   *    spare capacity exists: allocates a fresh buffer, prefix-copies the
+   *    existing elements before `insertPosition`, fills `insertCount` slots
+   *    with the value, suffix-copies the remaining tail, and frees the old
+   *    storage.
+   *
+   * Returns the (possibly relocated) start of the active storage window so
+   * the caller can refresh any cached cursor pointers, mirroring the binary
+   * `eax` return.
+   */
+  float* InsertFillFloatVector(
+    const float* const fillValue,
+    const unsigned int insertCount,
+    VectorFloatType& storage,
+    float* const insertPosition)
+  {
+    constexpr std::size_t kMaxFloatCount = 0x3FFFFFFFu;
+
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    if (insertCount == 0u) {
+      return view.begin;
+    }
+
+    const float fill = (fillValue != nullptr) ? *fillValue : 0.0f;
+    const std::size_t currentSize =
+      (view.begin != nullptr) ? static_cast<std::size_t>(view.end - view.begin) : 0u;
+    const std::size_t currentCapacity =
+      (view.begin != nullptr) ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
+
+    if (kMaxFloatCount - currentSize < insertCount) {
+      throw std::length_error{"vector<T> too long"};
+    }
+
+    const std::size_t requiredCount = currentSize + static_cast<std::size_t>(insertCount);
+
+    // Fits in current capacity: either tail-shift in place or split copy.
+    if (currentCapacity >= requiredCount) {
+      const std::size_t tailCount = static_cast<std::size_t>(view.end - insertPosition);
+      if (tailCount >= insertCount) {
+        // Tail is large enough that we can copy a prefix forward into the
+        // newly added slots, then memmove the rest in place.
+        float* const oldEnd = view.end;
+        float* const tailCopySource = oldEnd - static_cast<std::ptrdiff_t>(insertCount);
+        // Copy [tailCopySource, oldEnd) forward into [oldEnd, oldEnd+insertCount).
+        if (tailCopySource != oldEnd) {
+          std::memmove(oldEnd, tailCopySource, static_cast<std::size_t>(insertCount) * sizeof(float));
+        }
+        view.end = oldEnd + static_cast<std::ptrdiff_t>(insertCount);
+        // Move the displaced middle block backward by insertCount.
+        const std::ptrdiff_t middleCount = tailCopySource - insertPosition;
+        if (middleCount > 0) {
+          std::memmove(
+            insertPosition + static_cast<std::ptrdiff_t>(insertCount),
+            insertPosition,
+            static_cast<std::size_t>(middleCount) * sizeof(float));
+        }
+        // Fill insertCount slots starting at insertPosition with the value.
+        for (unsigned int i = 0u; i < insertCount; ++i) {
+          insertPosition[i] = fill;
+        }
+        return view.begin;
+      }
+
+      // Tail is too small to provide a full window — copy the whole tail to
+      // its new shifted position, then fill the gap.
+      float* const oldEnd = view.end;
+      float* const newTailEnd = oldEnd + static_cast<std::ptrdiff_t>(insertCount);
+      if (tailCount > 0u) {
+        std::memmove(
+          insertPosition + static_cast<std::ptrdiff_t>(insertCount),
+          insertPosition,
+          tailCount * sizeof(float));
+      }
+      view.end = newTailEnd;
+      for (unsigned int i = 0u; i < insertCount; ++i) {
+        insertPosition[i] = fill;
+      }
+      return view.begin;
+    }
+
+    // Need to grow: pick newCapacity = max(requiredCount, currentCapacity + currentCapacity/2).
+    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1u);
+    if (kMaxFloatCount - (currentCapacity >> 1u) < currentCapacity) {
+      newCapacity = 0u;
+    }
+    if (newCapacity < requiredCount) {
+      newCapacity = requiredCount;
+    }
+
+    float* const newBuffer = (newCapacity > 0u)
+      ? static_cast<float*>(::operator new(newCapacity * sizeof(float)))
+      : static_cast<float*>(::operator new(0u));
+
+    const std::size_t prefixCount =
+      (view.begin != nullptr)
+        ? static_cast<std::size_t>(insertPosition - view.begin)
+        : 0u;
+    if (prefixCount > 0u) {
+      std::memmove(newBuffer, view.begin, prefixCount * sizeof(float));
+    }
+    float* const insertedBase = newBuffer + prefixCount;
+    for (unsigned int i = 0u; i < insertCount; ++i) {
+      insertedBase[i] = fill;
+    }
+    const std::size_t suffixCount =
+      (view.begin != nullptr)
+        ? static_cast<std::size_t>(view.end - insertPosition)
+        : 0u;
+    if (suffixCount > 0u) {
+      std::memmove(
+        insertedBase + insertCount,
+        insertPosition,
+        suffixCount * sizeof(float));
+    }
+
+    if (view.begin != nullptr) {
+      ::operator delete(view.begin);
+    }
+
+    view.begin = newBuffer;
+    view.end = newBuffer + prefixCount + insertCount + suffixCount;
+    view.capacityEnd = newBuffer + newCapacity;
+    return newBuffer;
   }
 
   static_assert(sizeof(VectorFloatReflectionType) == 0x68, "VectorFloatReflectionType size must be 0x68");

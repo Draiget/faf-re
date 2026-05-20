@@ -321,7 +321,10 @@ namespace
    *
    * What it does:
    * Checks whether one manipulator has at least one watched bone whose
-   * skeleton bone name wildcard-matches `bonePattern`.
+   * pose-bone name wildcard-matches `bonePattern`. The lookup traverses the
+   * actor's currently-active pose (`mOwnerActor->mPose->mBones`) and routes
+   * the bone-name fetch through `CAniPoseBone::GetBoneName()` so the linker
+   * keeps the FUN_0063A660 out-of-line emission bound from this call site.
    */
   [[nodiscard]] bool
   ManipulatorHasWatchBonePattern(const moho::IAniManipulator* const manipulator, const char* const bonePattern)
@@ -335,15 +338,25 @@ namespace
       return false;
     }
 
-    const boost::shared_ptr<const moho::CAniSkel> skeleton = ownerActor->GetSkeleton();
-    if (!skeleton) {
+    const moho::CAniPose* const pose = ownerActor->mPose.px;
+    if (pose == nullptr) {
       return false;
     }
 
+    const moho::CAniPoseBone* const poseBonesBegin = pose->mBones.mBegin;
+    const moho::CAniPoseBone* const poseBonesEnd = pose->mBones.mEnd;
+    const std::size_t poseBoneCount = (poseBonesBegin != nullptr && poseBonesEnd >= poseBonesBegin)
+      ? static_cast<std::size_t>(poseBonesEnd - poseBonesBegin)
+      : 0u;
+
     for (const moho::SAniManipBinding* binding = manipulator->mWatchBones.mBegin; binding != manipulator->mWatchBones.mEnd;
          ++binding) {
-      const moho::SAniSkelBone* const bone = skeleton->GetBone(static_cast<std::uint32_t>(binding->mBoneIndex));
-      const char* const candidateBoneName = (bone != nullptr) ? bone->mBoneName : nullptr;
+      const std::uint32_t boneIndex = static_cast<std::uint32_t>(binding->mBoneIndex);
+      if (boneIndex >= poseBoneCount) {
+        continue;
+      }
+      const moho::CAniPoseBone& poseBone = poseBonesBegin[boneIndex];
+      const char* const candidateBoneName = poseBone.GetBoneName();
       if (candidateBoneName != nullptr && gpg::STR_MatchWildcard(candidateBoneName, bonePattern)) {
         return true;
       }
@@ -739,6 +752,31 @@ namespace moho
   boost::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
   {
     return boost::SharedPtrFromRawRetained(mPriorPose);
+  }
+
+  /**
+   * Address: 0x0063AA20 (FUN_0063AA20)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_63AA20@<eax>(_DWORD *result@<eax>, _DWORD *a2@<ebx>, _DWORD *a3@<esi>);
+   *
+   * What it does:
+   * Out-of-line pair-assign emitted for `Unit::SetPoses` and similar callers.
+   * Re-binds both `mPose` and `mPriorPose` raw shared-ptr lanes against new
+   * borrowed sources while preserving VC8-era assign ordering: copy `px`,
+   * compare control blocks, retain the incoming `pi` before releasing the
+   * outgoing one. The binary mismatch where IDA reports `weak_release` is
+   * the unified VC8 `sp_counted_base::release()` body at 0x004229B0 —
+   * `--use_count_; dispose; --weak_count_; destroy` — i.e. ordinary shared
+   * release semantics, not weak-only.
+   */
+  void CAniActor::AssignPoses(
+    const boost::SharedPtrRaw<CAniPose>& pose,
+    const boost::SharedPtrRaw<CAniPose>& priorPose
+  ) noexcept
+  {
+    mPose.assign_retain(pose);
+    mPriorPose.assign_retain(priorPose);
   }
 
   /**

@@ -179,6 +179,20 @@ namespace moho
   void DebugLuaHook(lua_State* state, lua_Debug* debugFrame);
 
   /**
+   * Address: 0x004B4800 (FUN_004B4800, ?SCR_CreateDebugWindow@Moho@@YAXXZ)
+   *
+   * IDA signature:
+   * void __cdecl Moho::SCR_CreateDebugWindow(void)
+   *
+   * What it does:
+   * Creates and shows the script-debug window when no instance is active:
+   * captures the current thread id as runtime owner, loads persisted
+   * breakpoints, constructs one `ScrDebugWindow`, registers it with the debug
+   * runtime, and shows the window. No-op when an instance is already active.
+   */
+  void SCR_CreateDebugWindow();
+
+  /**
    * Address: 0x004B4890 (FUN_004B4890, ?SCR_DestroyDebugWindow@Moho@@YAXXZ)
    *
    * IDA signature:

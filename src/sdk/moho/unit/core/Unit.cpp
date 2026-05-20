@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
@@ -48,12 +49,14 @@
 #include "moho/misc/Stats.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/RResId.h"
+#include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/path/PathTables.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CPlatoon.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/COGrid.h"
@@ -1852,6 +1855,52 @@ namespace
     return lhs < rhs.view();
   }
 
+  /**
+   * Inlined block from FUN_006AEF60 (MSVC8 map tree erase helper).
+   *
+   * What it does:
+   * Erases armor-multiplier map nodes in the same right/current/left order
+   * used by the recovered map teardown lane.
+   */
+  void DestroyArmorMultiplierMapSubtree(
+    SArmorMultiplierMapNode* node,
+    const SArmorMultiplierMapNode* const head
+  ) noexcept
+  {
+    while (!IsArmorMapSentinel(node) && node != head) {
+      DestroyArmorMultiplierMapSubtree(node->right, head);
+      SArmorMultiplierMapNode* const left = node->left;
+      node->damageTypeName.tidy(true, 0u);
+      ::operator delete(node);
+      node = left;
+    }
+  }
+
+  /**
+   * Address: 0x006A5380 (FUN_006A5380, armor-multiplier map teardown)
+   *
+   * IDA signature:
+   * int __usercall sub_6A5380@<eax>(std::map_string_float *a1@<eax>);
+   *
+   * What it does:
+   * Destroys the `Unit::ArmorMultipliers` tree, releases its sentinel head
+   * node, then clears the map head/count lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] std::int32_t DestroyArmorMultiplierMapStorage(
+    SArmorMultiplierMap& armorMap
+  ) noexcept
+  {
+    SArmorMultiplierMapNode* const head = armorMap.head;
+    if (head != nullptr) {
+      DestroyArmorMultiplierMapSubtree(head->parent, head);
+      ::operator delete(head);
+    }
+
+    armorMap.head = nullptr;
+    armorMap.size = 0u;
+    return 0;
+  }
+
   [[nodiscard]] const SArmorMultiplierMapNode*
   FindArmorLowerBoundNode(const SArmorMultiplierMap& armorMap, const std::string_view damageTypeName) noexcept
   {
@@ -1979,6 +2028,36 @@ namespace
       }
     }
     head->parent->color = kArmorMapColorBlack;
+  }
+
+  /**
+   * Address: 0x006B01C0 (FUN_006B01C0)
+   *
+   * IDA signature:
+   * struct_13 *__cdecl sub_6B01C0();
+   *
+   * What it does:
+   * Allocates one 48-byte armor-multiplier map node through the legacy
+   * 48-byte allocation lane, zeroes the RB-tree link triplet, and seeds
+   * `color = black`, `isNil = 0`. Callers (`Unit::Unit`, `Unit::Unit(Sim*)`,
+   * and the per-instance map sub-init lane) finish converting it into a
+   * sentinel head by setting `isNil = 1` and self-linking the triplet.
+   * Matches the MSVC8 `std::map<std::string,float>::_Buynode()` allocator
+   * shape: only the binary-touched fields are written; the embedded string
+   * key region is left uninitialized to mirror the binary, paired with
+   * `::operator delete` teardown in `DestroyArmorMultiplierMapStorage`.
+   */
+  [[nodiscard]] SArmorMultiplierMapNode* AllocateArmorMultiplierMapNodeRaw() noexcept
+  {
+    auto* const node = static_cast<SArmorMultiplierMapNode*>(
+      gpg::core::legacy::AllocateChecked48ByteLane(1u)
+    );
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->color = kArmorMapColorBlack;
+    node->isNil = 0u;
+    return node;
   }
 
   [[nodiscard]] SArmorMultiplierMapNode* CreateArmorMultiplierMapNode(
@@ -11987,6 +12066,198 @@ gpg::RRef Unit::GetDerivedObjectRef()
   return ref;
 }
 
+namespace
+{
+  template <class T>
+  void DeleteAndNull(T*& object) noexcept
+  {
+    T* const oldObject = object;
+    object = nullptr;
+    delete oldObject;
+  }
+
+  void DestroyUnitEconomyRequest(CEconRequest*& request) noexcept
+  {
+    CEconRequest* const oldRequest = request;
+    request = nullptr;
+    if (oldRequest == nullptr) {
+      return;
+    }
+
+    oldRequest->mNode.ListUnlink();
+    delete oldRequest;
+  }
+
+  void DestroyUnitExtraStorage(CEconStorage*& storage) noexcept
+  {
+    CEconStorage* const oldStorage = storage;
+    storage = nullptr;
+    if (oldStorage == nullptr) {
+      return;
+    }
+
+    if (oldStorage->mEconomy != nullptr) {
+      (void)oldStorage->Chng(-1);
+    }
+    delete oldStorage;
+  }
+
+  void DestroyUnitEconomyEvents(Unit& unit) noexcept
+  {
+    TDatListItem<void, void>* const head = &unit.mEconomyEventListHead;
+    while (head->mNext != head) {
+      CEconomyEvent* const event = EconomyEventFromNode(head->mNext);
+      delete event;
+    }
+    head->ListResetLinks();
+  }
+
+  void ClearWeakObjectChain(WeakObject& weakObject) noexcept
+  {
+    auto* cursor = reinterpret_cast<WeakObject::WeakLinkNodeView**>(weakObject.WeakLinkHeadSlot());
+    while (cursor != nullptr && *cursor != nullptr) {
+      WeakObject::WeakLinkNodeView* const node = *cursor;
+      *cursor = node->nextInOwner;
+      node->ownerLinkSlot = nullptr;
+      node->nextInOwner = nullptr;
+    }
+  }
+
+  void ClearUnitWeakReferences(Unit& unit) noexcept
+  {
+    unit.CreatorRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    unit.TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    unit.AssignedTransportRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    unit.FocusEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    unit.TargetBlipEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    unit.GuardedUnitRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    unit.mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+
+    for (SWeakRefSlot& slot : unit.mBlipsInRange) {
+      slot.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    }
+    unit.mBlipsInRange.ResetStorageToInline();
+  }
+
+  void ClearGuardedByOwners(Unit& unit)
+  {
+    std::vector<Unit*> guardedByUnits;
+    if (unit.GuardedByList.mSlots.begin != nullptr && unit.GuardedByList.mSlots.end != nullptr) {
+      guardedByUnits.reserve(gpg::FastVectorRuntimeCount(unit.GuardedByList.mSlots));
+
+      for (const SGuardedByWeakOwnerSlot* slot = unit.GuardedByList.mSlots.begin;
+           slot != unit.GuardedByList.mSlots.end;
+           ++slot) {
+        auto* const guardedByUnit = reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(*slot));
+        if (guardedByUnit != nullptr) {
+          guardedByUnits.push_back(guardedByUnit);
+        }
+      }
+    }
+
+    for (Unit* const guardedByUnit : guardedByUnits) {
+      guardedByUnit->SetGuardedUnit(nullptr);
+    }
+
+    gpg::FastVectorRuntimeResetToInline(unit.GuardedByList.mSlots);
+    unit.GuardedByList.mOwnerNode.ListUnlinkSelf();
+    unit.SetGuardedUnit(nullptr);
+  }
+
+  void DecrementUnitArmyLifetimeStats(Unit& unit)
+  {
+    CArmyImpl* const army = unit.ArmyRef;
+    if (army == nullptr) {
+      return;
+    }
+
+    const RUnitBlueprint* const blueprint = unit.GetBlueprint();
+    if (blueprint == nullptr) {
+      return;
+    }
+
+    CArmyStats* const armyStats = army->GetArmyStats();
+    if (armyStats == nullptr) {
+      return;
+    }
+
+    if (unit.IsBeingBuilt()) {
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", blueprint, -1.0f);
+      return;
+    }
+
+    if (blueprint->General.CapCost > 0.0f) {
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", blueprint, -1.0f);
+      const std::int32_t delta = -1;
+      (void)armyStats->UpdateUnitStat("Units_Active", &delta);
+    }
+  }
+
+  void DetachAndDestroyUnitTransport(Unit& unit)
+  {
+    if (unit.AiTransport == nullptr) {
+      return;
+    }
+
+    EntitySetTemplate<Unit> detachedUnits = unit.AiTransport->TransportDetachAllUnits(true);
+    (void)detachedUnits;
+    DeleteAndNull(unit.AiTransport);
+  }
+
+  void ClearUnitOwnedSidecars(Unit& unit)
+  {
+    DeleteAndNull(unit.AiCommandDispatch);
+
+    if (unit.CommandQueue != nullptr) {
+      unit.CommandQueue->ClearCommandQueue();
+    }
+
+    DeleteAndNull(unit.AiAttacker);
+    DetachAndDestroyUnitTransport(unit);
+    DeleteAndNull(unit.AiNavigator);
+    DeleteAndNull(unit.AiSteering);
+    DeleteAndNull(unit.UnitMotion);
+    DeleteAndNull(unit.AiBuilder);
+    DeleteAndNull(unit.AiSiloBuild);
+    DeleteAndNull(unit.CommandQueue);
+    DeleteAndNull(unit.AniActor);
+  }
+} // namespace
+
+/**
+ * Address: 0x006A6BF0 (FUN_006A6BF0, ??1Unit@Moho@@UAE@XZ)
+ *
+ * What it does:
+ * Releases unit-owned AI, command, guard, economy, occupancy, recon, and
+ * weak-link runtime lanes before base/member teardown.
+ */
+Unit::~Unit()
+{
+  if (ArmyRef != nullptr) {
+    (void)ArmyRef->ConsumeUnitFromCategorySet(this);
+  }
+
+  ClearUnitOwnedSidecars(*this);
+  (void)DestroyArmorMultiplierMapStorage(ArmorMultipliers);
+  ClearGuardFormation(this);
+  DestroyUnitEconomyEvents(*this);
+  ReleaseOccupyGround();
+  DecrementUnitArmyLifetimeStats(*this);
+  ClearGuardedByOwners(*this);
+
+  if (ArmyRef != nullptr) {
+    ArmyRef->RemoveFromPlatoon(this);
+  }
+
+  mReconBlips.ResetStorageToInline();
+  ClearUnitWeakReferences(*this);
+  mEconomyEventListHead.ListUnlinkSelf();
+  DestroyUnitEconomyRequest(mConsumptionData);
+  DestroyUnitExtraStorage(mExtraStorage);
+
+  ClearWeakObjectChain(static_cast<WeakObject&>(static_cast<IUnit&>(*this)));
+}
+
 /**
  * Address: 0x006A4BC0 (FUN_006A4BC0)
  *
@@ -12355,6 +12626,57 @@ VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
 }
 
 /**
+ * Address: 0x006AB9C0 (FUN_006AB9C0, ?SetMesh@Unit@Moho@@UAEXABVRResId@2@PAVRMeshBlueprint@2@_N@Z)
+ *
+ * IDA signature:
+ * void __thiscall Moho::Unit::SetMesh(Moho::Unit *this, const Moho::RResId &meshResId,
+ *   Moho::RMeshBlueprint *meshBlueprint, char rebuildAniActor);
+ *
+ * What it does:
+ * Forwards to `Entity::SetMesh` with `allowExplicitPlaceholder=true`, then
+ * (when `rebuildAniActor` is set) recreates the unit's `CAniPose` and
+ * `CAniActor` runtime chain so the visible animation tracks the new mesh's
+ * skeleton.
+ */
+void Unit::SetMesh(const RResId& meshResId, RMeshBlueprint* const meshBlueprint, const bool rebuildAniActor)
+{
+  Entity::SetMesh(meshResId, meshBlueprint, true);
+  if (!rebuildAniActor) {
+    return;
+  }
+
+  boost::shared_ptr<const CAniSkel> skeleton;
+  if (auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj); scmResource != nullptr) {
+    skeleton = scmResource->GetSkeleton();
+  }
+
+  CAniPose* newPose = nullptr;
+  if (void* const poseStorage = ::operator new(sizeof(CAniPose)); poseStorage != nullptr) {
+    const float scale = GetUniformScale();
+    newPose = ::new (poseStorage) CAniPose(skeleton, scale);
+  }
+
+  SSTIUnitVariableData& varDat = VarDat();
+  varDat.mSharedPose.reset(newPose);
+  varDat.mSharedPose->SetWorldTransform(GetTransformWm3());
+  varDat.mPriorSharedPose = varDat.mSharedPose;
+
+  CAniActor* newActor = nullptr;
+  if (void* const actorStorage = ::operator new(sizeof(CAniActor)); actorStorage != nullptr) {
+    const boost::SharedPtrRaw<CAniPose> priorRaw = boost::SharedPtrRawFromSharedBorrow(varDat.mPriorSharedPose);
+    const boost::SharedPtrRaw<CAniPose> currentRaw = boost::SharedPtrRawFromSharedBorrow(varDat.mSharedPose);
+    newActor = ::new (actorStorage) CAniActor(priorRaw, currentRaw);
+  }
+
+  CAniActor* const oldActor = AniActor;
+  AniActor = newActor;
+  if (oldActor != nullptr) {
+    oldActor->~CAniActor();
+    ::operator delete(oldActor);
+  }
+}
+
+/**
  * Address: 0x006ABB90 (FUN_006ABB90, ?SetPoses@Unit@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
  *
  * What it does:
@@ -12372,8 +12694,9 @@ void Unit::SetPoses(
 
   const boost::SharedPtrRaw<CAniPose> sharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(sharedPose);
   const boost::SharedPtrRaw<CAniPose> priorSharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(priorSharedPose);
-  AniActor->mPose.assign_retain(sharedPoseRaw);
-  AniActor->mPriorPose.assign_retain(priorSharedPoseRaw);
+  // Routes through the out-of-line pair-assign helper emitted at 0x0063AA20
+  // so the linker preserves that body's symbol against this caller.
+  AniActor->AssignPoses(sharedPoseRaw, priorSharedPoseRaw);
 }
 
 /**
@@ -12665,6 +12988,49 @@ Wm3::Vec3f Unit::GetVelocity() const
 void Unit::AdjustHealth(Entity* const instigator, const float delta)
 {
   Entity::AdjustHealth(instigator, delta);
+}
+
+/**
+ * Address: 0x006A9B50 (FUN_006A9B50, Moho::Unit::UpdateTerrainType)
+ * Mangled: ?UpdateTerrainType@Unit@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+ *
+ * What it does:
+ * Samples terrain type under this unit's footprint-centered cell, updates
+ * `CurrentTerrainType`, and dispatches terrain-change script data when it
+ * changes.
+ */
+void Unit::UpdateTerrainType(const Wm3::Vector3f& position)
+{
+  STIMap* const mapData = SimulationRef->mMapData;
+  const SFootprint& footprint = GetFootprint();
+
+  const auto sampleX = static_cast<std::int16_t>(
+    static_cast<std::int32_t>(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f))
+  );
+  const auto sampleZ = static_cast<std::int16_t>(
+    static_cast<std::int32_t>(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))
+  );
+
+  const std::uint8_t previousTerrainType = CurrentTerrainType;
+  std::uint8_t nextTerrainType = 1u;
+
+  const CHeightField* const heightField = mapData->mHeightField.get();
+  if (static_cast<std::uint32_t>(sampleX) < static_cast<std::uint32_t>(heightField->width - 1)
+      && static_cast<std::uint32_t>(sampleZ) < static_cast<std::uint32_t>(heightField->height - 1)) {
+    const std::size_t index =
+      static_cast<std::size_t>(sampleZ) * static_cast<std::size_t>(mapData->mTerrainType.width)
+      + static_cast<std::size_t>(sampleX);
+    nextTerrainType = mapData->mTerrainType.data[index];
+  }
+
+  CurrentTerrainType = nextTerrainType;
+  if (nextTerrainType == previousTerrainType) {
+    return;
+  }
+
+  LuaPlus::LuaObject previousTerrain = mapData->GetTerrainType(previousTerrainType);
+  LuaPlus::LuaObject currentTerrain = mapData->GetTerrainType(CurrentTerrainType);
+  RunScriptOnTerrainTypeChange(currentTerrain, previousTerrain);
 }
 
 /**

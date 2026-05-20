@@ -969,13 +969,37 @@ namespace
   }
 
   /**
+   * Address: 0x0076C130 (FUN_0076C130)
+   *
+   * IDA signature:
+   * void callcnv_E3 sub_76C130(unsigned int newSize@<ecx>,
+   *   std::vector_IOccupationSource *vec@<edi>, OccupySourceBinding fillValue);
+   *
+   * What it does:
+   * Out-of-line specialization of
+   * `msvc8::vector<OccupySourceBinding>::resize(size_type, const OccupySourceBinding&)`.
+   * When `newSize <= current size`, calls the range-erase helper (FUN_0076C430) on
+   * the tail. When `newSize > current size`, forwards to the `_Insert_n` grow path
+   * (FUN_0076C490) with the prefilled binding. Each binding is 16 bytes.
+   */
+  void ResizeOccupySourceBindingVectorWithFill(
+    LegacyVectorStorage<moho::OccupySourceBinding>& storage,
+    const std::size_t newSize,
+    const moho::OccupySourceBinding& fillValue
+  )
+  {
+    (void)ResizeLegacyVectorStorage(storage, newSize, fillValue);
+  }
+
+  /**
    * Address: 0x0076BFA0 (FUN_0076BFA0, sub_76BFA0)
    *
    * What it does:
    * Builds one default `OccupySourceBinding` payload (`{nullptr,nullptr}`) and
-   * forwards to the generic legacy-vector resize helper for source bindings.
+   * forwards to the typed binding-vector resize helper (FUN_0076C130) so the
+   * linker preserves the binary's per-type resize-with-fill symbol shape.
    */
-  [[maybe_unused]] void ResizeOccupySourceStorageWithDefaultBinding(
+  void ResizeOccupySourceStorageWithDefaultBinding(
     LegacyVectorStorage<moho::OccupySourceBinding>* const storage,
     const std::uint32_t count
   )
@@ -985,7 +1009,7 @@ namespace
     }
 
     const moho::OccupySourceBinding defaultBinding{};
-    (void)ResizeLegacyVectorStorage(*storage, static_cast<std::size_t>(count), defaultBinding);
+    ResizeOccupySourceBindingVectorWithFill(*storage, static_cast<std::size_t>(count), defaultBinding);
   }
 
   bool ResizeLegacyPointerStorage(LegacyVectorStorage<moho::ClusterMap*>& storage, const std::size_t count)
@@ -1341,8 +1365,11 @@ namespace moho
 
     const std::size_t footprintCount = static_cast<std::size_t>(footprints.mSize);
     const OccupySourceBinding defaultSource{};
-    if (!ResizeLegacyVectorStorage(mImpl->mSources, footprintCount, defaultSource)
-      || !ResizeLegacyPointerStorage(mImpl->mMaps, footprintCount)) {
+    ResizeOccupySourceBindingVectorWithFill(mImpl->mSources, footprintCount, defaultSource);
+    if (!ResizeLegacyPointerStorage(mImpl->mMaps, footprintCount)) {
+      return;
+    }
+    if (mImpl->mSources.mFirst == nullptr && footprintCount != 0u) {
       return;
     }
 

@@ -164,6 +164,26 @@ namespace moho
   REmitterBlueprint::REmitterBlueprint() = default;
 
   /**
+   * Address: 0x0050EB10 (FUN_0050EB10, ??1REmitterBlueprint@Moho@@UAE@XZ)
+   * Mangled: ??1REmitterBlueprint@Moho@@UAE@XZ
+   *
+   * IDA signature:
+   * void __stdcall Moho::REmitterBlueprint::~REmitterBlueprint(Moho::REmitterBlueprint *this);
+   *
+   * What it does:
+   * Compiler-emitted member-destruction body for `REmitterBlueprint`. The MSVC8
+   * codegen tears down `RampTextureName` (+0x268), `TextureName` (+0x24C), the
+   * 21 `REmitterBlueprintCurve` subobjects in reverse declaration order
+   * (`RampSelectionCurve` +0x208 ... `SizeCurve` +0x28), and the inherited
+   * `BlueprintId` (`RResId`) at +0x08, then chains into
+   * `~REffectBlueprint` (which rewrites the vftable to `gpg::RObject`). This
+   * `= default` request preserves the binary's exact destruction order because
+   * the field declaration order in `REmitterBlueprint.h` mirrors the binary's
+   * offset layout.
+   */
+  REmitterBlueprint::~REmitterBlueprint() = default;
+
+  /**
    * Address: 0x0050E710 (FUN_0050E710)
    * Mangled: ?GetClass@REmitterBlueprint@Moho@@UBEPAVRType@gpg@@XZ
    *

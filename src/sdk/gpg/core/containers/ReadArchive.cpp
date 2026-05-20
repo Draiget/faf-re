@@ -58,6 +58,7 @@
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CPlatoon.h"
+#include "moho/sim/CSquad.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/sim/CRandomStream.h"
@@ -380,6 +381,16 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CTaskThread));
       moho::CTaskThread::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCSquadType()
+  {
+    gpg::RType* type = moho::CSquad::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CSquad));
+      moho::CSquad::sType = type;
     }
     return type;
   }
@@ -1968,6 +1979,59 @@ void ReadArchive::Read(const RType* const type, void* const object, const RRef& 
       "Error detected in archive: data for object of type \"%s\" did not terminate properly.", SafeTypeName(type)
     ));
   }
+}
+
+/**
+ * Address: 0x0072ACD0 (FUN_0072ACD0, gpg::ReadArchive::ReadPointerOwned_CSquad)
+ *
+ * IDA signature:
+ * gpg::ReadArchive* __userpurge ReadPointerOwned_CSquad@<eax>(
+ *     moho::CSquad** outValue@<ecx>, gpg::ReadArchive* this@<ebx>, const gpg::RRef* ownerRef);
+ *
+ * What it does:
+ * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
+ * transition, and upcasts the pointee to `moho::CSquad`.
+ *
+ * Callsite evidence (per CLAUDE.md callsite verification rule):
+ *  - code xref from sub_72A210 (FUN_0072A210) at 0x0072A22B (in src/sdk/moho/sim/CPlatoon.cpp)
+ *  - code xref from sub_72A210 (FUN_0072A210) at 0x0072A276
+ */
+ReadArchive* ReadArchive::ReadPointerOwned_CSquad(moho::CSquad** const outValue, const RRef* const ownerRef)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+  if (!tracked.object) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  if (tracked.state != TrackedPointerState::Unowned) {
+    ThrowSerializationError("Ownership conflict while loading archive");
+  }
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCSquadType());
+  *outValue = static_cast<moho::CSquad*>(upcast.mObj);
+  if (!*outValue) {
+    const char* const expectedName = SafeTypeName(CachedCSquadType());
+    const char* const actualName = source.GetTypeName();
+    ThrowSerializationError(STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expectedName ? expectedName : "CSquad",
+      actualName ? actualName : "null"
+    ));
+  }
+
+  tracked.state = TrackedPointerState::Owned;
+  return this;
 }
 
 /**

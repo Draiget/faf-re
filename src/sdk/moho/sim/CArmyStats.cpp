@@ -4,6 +4,8 @@
 #include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <typeinfo>
 
 #if defined(_MSC_VER)
@@ -13,9 +15,15 @@
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Set.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiBrain.h"
+#include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SConditionTriggerTypes.h"
+#include "moho/sim/Sim.h"
 
 namespace
 {
@@ -240,6 +248,88 @@ namespace
       return 1;
     }
     return 0;
+  }
+
+  void AppendMsvcString(std::string& out, const msvc8::string& text)
+  {
+    out.append(text.c_str(), text.size());
+  }
+
+  [[nodiscard]] const moho::RBlueprint* AsBlueprint(const moho::ArmyBlueprintNameView* const view) noexcept
+  {
+    return reinterpret_cast<const moho::RBlueprint*>(view);
+  }
+
+  [[nodiscard]] const moho::RUnitBlueprint* AsUnitBlueprint(const moho::ArmyBlueprintNameView* const view) noexcept
+  {
+    return reinterpret_cast<const moho::RUnitBlueprint*>(view);
+  }
+
+  [[nodiscard]] const moho::EntityCategorySet*
+  ResolveStatsCategory(const moho::RRuleGameRules* const rules, const char* const categoryName)
+  {
+    return rules->GetEntityCategory(categoryName);
+  }
+
+  [[nodiscard]] float SumStatCategory(
+    const moho::CArmyStatItem* const item,
+    const moho::EntityCategorySet* const category
+  )
+  {
+    return item->SumCategory(category);
+  }
+
+  [[nodiscard]] int SumStatCategoryInt(
+    const moho::CArmyStatItem* const item,
+    const moho::EntityCategorySet* const category
+  )
+  {
+    return static_cast<int>(SumStatCategory(item, category));
+  }
+
+  void CollectBlueprintStatKeys(
+    msvc8::set<const moho::ArmyBlueprintNameView*>& outKeys,
+    const moho::CArmyStatItem* const item
+  )
+  {
+    if (item->mBlueprintStats.head == nullptr) {
+      return;
+    }
+
+    const moho::ArmyBlueprintStatNode* const head = item->mBlueprintStats.head;
+    for (const moho::ArmyBlueprintStatNode* node = head->left; node != nullptr && node != head;
+         node = NextBlueprintNode(node, head)) {
+      if (node->blueprintName != nullptr) {
+        outKeys.insert(node->blueprintName);
+      }
+    }
+  }
+
+  void AppendCategoryStatsXml(
+    std::string& outXml,
+    const char* const indent,
+    const moho::RRuleGameRules* const rules,
+    const char* const categoryName,
+    const moho::CArmyStatItem* const unitsActive,
+    const moho::CArmyStatItem* const enemiesKilled
+  )
+  {
+    const moho::EntityCategorySet* const category = ResolveStatsCategory(rules, categoryName);
+    AppendMsvcString(
+      outXml,
+      gpg::STR_Printf(
+        "%s      <Category type=\"%s\" built=\"%d\" killed=\"%d\"/>\n",
+        indent,
+        categoryName,
+        SumStatCategoryInt(unitsActive, category),
+        SumStatCategoryInt(enemiesKilled, category)
+      )
+    );
+  }
+
+  [[nodiscard]] float ReadRequiredFloatStat(moho::CArmyStats& stats, const char* const statPath)
+  {
+    return stats.GetStat(statPath)->GetFloat(false);
   }
 
   [[nodiscard]] bool IsBlueprintNodeNil(const moho::ArmyBlueprintStatNode* const node)
@@ -948,14 +1038,62 @@ namespace moho
     return sType;
   }
 
+  namespace
+  {
+    /**
+     * Static `RPointerType<CArmyStatItem>` descriptor that the binary exposes
+     * as `Moho::CArmyStatItem::PointerType`. Default static-init runs the
+     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
+     * derived vftable lane.
+     */
+    gpg::RPointerType<moho::CArmyStatItem> sCArmyStatItemPointerTypeStorage{};
+
+    /**
+     * Address: 0x007116C0 (FUN_007116C0)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<CArmyStatItem>` descriptor under
+     * the `CArmyStatItem*` type-info key so subsequent `LookupRType` queries
+     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterCArmyStatItemPointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::CArmyStatItem*), &sCArmyStatItemPointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BFF9A0 (FUN_00BFF9A0)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<CArmyStatItem>` descriptor at process
+     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
+     * RType vftable lane to the `RObject` base. Registered via `atexit` from
+     * `GetPointerType`'s once-init path.
+     */
+    void CleanupCArmyStatItemPointerType()
+    {
+      sCArmyStatItemPointerTypeStorage.~RPointerType<moho::CArmyStatItem>();
+    }
+  } // namespace
+
   /**
    * Address: 0x007107E0 (FUN_007107E0, Moho::CArmyStatItem::GetPointerType)
    *
    * What it does:
-   * Lazily resolves and caches reflected RTTI for `CArmyStatItem*`.
+   * On first call, pre-registers the static `RPointerType<CArmyStatItem>`
+   * descriptor and installs the matching atexit teardown. After that, lazily
+   * caches the `LookupRType(typeid(CArmyStatItem*))` result in `sPointerType`
+   * and returns it.
    */
   gpg::RType* CArmyStatItem::GetPointerType()
   {
+    static const bool sOnceInit = []() {
+      PreregisterCArmyStatItemPointerType();
+      (void)std::atexit(&CleanupCArmyStatItemPointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
     (void)StaticGetClass();
 
     gpg::RType* cached = sPointerType;
@@ -1394,6 +1532,111 @@ namespace moho
     item->Release(0);
     InsertOrAssignNameIndexNode(&mNameIndex, key, item);
     return item;
+  }
+
+  /**
+   * Address: 0x0070CC40 (FUN_0070CC40, Moho::CArmyStats::ArmyXmlStatsNode)
+   * Mangled: ?ArmyXmlStatsNode@CArmyStats@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@@Z
+   */
+  msvc8::string CArmyStats::ArmyXmlStatsNode(const msvc8::string& indent)
+  {
+    CAiBrain* const brain = mOwnerArmy;
+    CArmyImpl* const army = brain->mArmy;
+    RRuleGameRules* const rules = brain->mSim->mRules;
+
+    const char* const indentText = indent.c_str();
+    std::string xml;
+    AppendMsvcString(
+      xml,
+      gpg::STR_Printf("%s<Army index=\"%d\" name=\"%s\">\n", indentText, army->ArmyId, army->PlayerName.c_str())
+    );
+
+    CArmyStatItem* const unitsActive = GetItem("Units_Active");
+    CArmyStatItem* const unitsLost = GetItem("Units_Killed");
+    CArmyStatItem* const enemiesKilled = GetItem("Enemies_Killed");
+    CArmyStatItem* const damageDealt = GetItem("Units_TotalDamageDealt");
+    CArmyStatItem* const damageReceived = GetItem("Units_TotalDamageReceive");
+
+    msvc8::set<const ArmyBlueprintNameView*> blueprintKeys;
+    CollectBlueprintStatKeys(blueprintKeys, unitsActive);
+    CollectBlueprintStatKeys(blueprintKeys, enemiesKilled);
+
+    AppendMsvcString(xml, gpg::STR_Printf("%s    <UnitStats>\n", indentText));
+    for (const ArmyBlueprintNameView* const key : blueprintKeys) {
+      const RBlueprint* const blueprint = AsBlueprint(key);
+      const RUnitBlueprint* const unitBlueprint = AsUnitBlueprint(key);
+      const EntityCategorySet* const unitCategory = ResolveStatsCategory(rules, blueprint->mBlueprintId.c_str());
+
+      AppendMsvcString(
+        xml,
+        gpg::STR_Printf(
+          "%s      <Unit id=\"%s\" type=\"%s\" built=\"%d\" lost=\"%d\" killed=\"%d\" damagedealt=\"%.2f\" damagereceived=\"%.2f\" masscost=\"%.2f\" energycost=\"%.2f\" buildtime=\"%.2f\"/>\n",
+          indentText,
+          blueprint->mBlueprintId.c_str(),
+          blueprint->mDescription.c_str(),
+          SumStatCategoryInt(unitsActive, unitCategory),
+          SumStatCategoryInt(unitsLost, unitCategory),
+          SumStatCategoryInt(enemiesKilled, unitCategory),
+          SumStatCategory(damageDealt, unitCategory),
+          SumStatCategory(damageReceived, unitCategory),
+          unitBlueprint->Economy.BuildCostMass,
+          unitBlueprint->Economy.BuildCostEnergy,
+          unitBlueprint->Economy.BuildTime
+        )
+      );
+    }
+    AppendMsvcString(xml, gpg::STR_Printf("%s    </UnitStats>\n", indentText));
+
+    AppendMsvcString(xml, gpg::STR_Printf("%s    <SummaryStats>\n", indentText));
+    constexpr const char* kSummaryCategories[] = {
+      "AIR",
+      "LAND",
+      "NAVAL",
+      "ENGINEER",
+      "ARTILLERY",
+      "ANTIAIR",
+      "TRANSPORTATION",
+      "STRUCTURE",
+      "FACTORY",
+      "ENERGYPRODUCTION",
+      "MASSPRODUCTION",
+      "DEFENSE",
+      "TECH1",
+      "TECH2",
+      "TECH3",
+    };
+    for (const char* const categoryName : kSummaryCategories) {
+      AppendCategoryStatsXml(xml, indentText, rules, categoryName, unitsActive, enemiesKilled);
+    }
+    AppendMsvcString(xml, gpg::STR_Printf("%s    </SummaryStats>\n", indentText));
+
+    AppendMsvcString(xml, gpg::STR_Printf("%s    <EconomyStats>\n", indentText));
+    AppendMsvcString(
+      xml,
+      gpg::STR_Printf(
+        "%s      <Energy produced=\"%.2f\" consumed=\"%.2f\" storage=\"%.2f\"/>\n",
+        indentText,
+        ReadRequiredFloatStat(*this, "Economy_TotalProduced_Energy"),
+        ReadRequiredFloatStat(*this, "Economy_TotalConsumed_Energy"),
+        ReadRequiredFloatStat(*this, "Economy_MaxStorage_Energy")
+      )
+    );
+    AppendMsvcString(
+      xml,
+      gpg::STR_Printf(
+        "%s      <Mass produced=\"%.2f\" consumed=\"%.2f\" storage=\"%.2f\"/>\n",
+        indentText,
+        ReadRequiredFloatStat(*this, "Economy_TotalProduced_Mass"),
+        ReadRequiredFloatStat(*this, "Economy_TotalConsumed_Mass"),
+        ReadRequiredFloatStat(*this, "Economy_MaxStorage_Mass")
+      )
+    );
+    AppendMsvcString(xml, gpg::STR_Printf("%s    </EconomyStats>\n", indentText));
+    AppendMsvcString(xml, gpg::STR_Printf("%s</Army>\n", indentText));
+
+    msvc8::string result;
+    result.assign_owned(std::string_view(xml.data(), xml.size()));
+    return result;
   }
 
   /**

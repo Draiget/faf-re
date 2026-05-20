@@ -366,7 +366,9 @@ namespace moho
   {
     gpg::MD5Digest digest{};
     CSeqNo beat = 0;
-    reader.ReadExact(digest);
+    // Routes through the 16-byte specialized helper so the linker preserves
+    // the compiler-emitted body at FUN_006E57C0 (see BinaryReader::ReadBytes16).
+    (void)reader.ReadBytes16(digest.vals);
     reader.ReadExact(beat);
     mSink->VerifyChecksum(digest, beat);
   }

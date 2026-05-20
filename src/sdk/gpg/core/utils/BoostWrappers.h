@@ -3677,6 +3677,19 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x00783E00 (FUN_00783E00)
+     *
+     * What it does:
+     * Copies one shared-pair tail range `[sourceBegin, sourceEnd)` into the
+     * uninitialized slots beginning at `sourceEnd`, retaining each copied
+     * control block.
+     */
+    [[nodiscard]] SharedCountPair* UninitializedCopySharedPairTailRangeRetain(
+        const SharedCountPair* sourceBegin,
+        SharedCountPair* sourceEnd
+    ) noexcept;
+
+    /**
      * Address: 0x0075FF10 (FUN_0075FF10)
      * Address: 0x00760310 (FUN_00760310)
      * Address: 0x007568D0 (FUN_007568D0)
@@ -3756,6 +3769,24 @@ namespace boost
     [[nodiscard]] SharedCountPair* ReleaseSharedCountRange(
         SharedCountPair* begin,
         SharedCountPair* end
+    ) noexcept;
+
+    /**
+     * Address: 0x008555E0 (FUN_008555E0)
+     *
+     * What it does:
+     * Erases the half-open range `[eraseFirst, eraseLast)` from a vector of
+     * shared-pair lanes whose live tail ends at `*pLast`. Surviving entries in
+     * `[eraseLast, *pLast)` are move-assigned forward into `[eraseFirst, ...)`
+     * with retain-then-release control-block bookkeeping; the now-orphan tail
+     * pairs are released, and `*pLast` is rewound to the new live end. Returns
+     * the iterator pointing at the first erased slot (`eraseFirst`), matching
+     * `std::vector<T>::erase(first, last)` semantics.
+     */
+    SharedCountPair* EraseSharedPairVectorRange(
+        SharedCountPair** pLast,
+        SharedCountPair* eraseFirst,
+        SharedCountPair* eraseLast
     ) noexcept;
 
     template <class T>

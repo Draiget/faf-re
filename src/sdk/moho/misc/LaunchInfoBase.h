@@ -511,6 +511,41 @@ namespace moho
     "LaunchInfoBaseSerializer::mSerSaveFunc offset must be 0x10"
   );
   static_assert(sizeof(LaunchInfoBaseSerializer) == 0x14, "LaunchInfoBaseSerializer size must be 0x14");
+
+  /**
+   * Address: 0x005439E0 (FUN_005439E0)
+   *
+   * IDA signature:
+   * void __usercall sub_5439E0(Moho::BVIntSet *a1@<ecx>, std::vector_BVIntSet *a2@<esi>);
+   *
+   * What it does:
+   * Appends one `ArmyLaunchInfo` entry to the launch-info army-vector lane.
+   * Wraps the compiler-emitted out-of-line specialization of
+   * `msvc8::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)` so that
+   * the inline-fast-path (capacity available -> in-place copy-construct via
+   * `BVIntSet`'s copy ctor) and the slow grow-path (`_Insert_n` reallocation)
+   * are both reachable from typed call sites. The entry is copied; the source
+   * value remains valid after the call.
+   */
+  void AppendArmyLaunchInfo(
+    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+    const ArmyLaunchInfo& entry
+  );
+
+  /**
+   * Address: 0x00543910 (FUN_00543910)
+   *
+   * What it does:
+   * Resizes `msvc8::vector<ArmyLaunchInfo>` to `newSize`, fill-constructing new
+   * trailing entries from `fillValue` when growing and forwarding to the
+   * inner range-erase helper when shrinking. Out-of-line specialization of
+   * `vector<ArmyLaunchInfo>::resize(size_type, const ArmyLaunchInfo&)`.
+   */
+  void ResizeArmyLaunchInfoVectorWithFill(
+    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+    std::size_t newSize,
+    const ArmyLaunchInfo& fillValue
+  );
 } // namespace moho
 
 namespace gpg

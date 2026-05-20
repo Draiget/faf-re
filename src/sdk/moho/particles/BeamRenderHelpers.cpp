@@ -40,6 +40,14 @@ namespace
   constexpr int kParticleSelectTechniqueAssertLine = 1359;
   constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
 
+  /**
+   * Address: 0x00BF0030 (FUN_00BF0030, Moho::TConVar_ren_Beams::~TConVar_ren_Beams)
+   *
+   * What it does:
+   * Tears down the static `ren_Beams` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper. Registered via `atexit`
+   * from the convar startup path.
+   */
   void CleanupTConVar_ren_Beams() noexcept
   {
     moho::TeardownConCommandRegistration(gTConVar_ren_Beams);

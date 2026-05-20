@@ -5,6 +5,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
+#include "moho/command/CmdDefs.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
 #include "Wm3AxisAlignedBox3.h"
@@ -23,7 +24,9 @@ namespace LuaPlus
 namespace moho
 {
   struct SSTIEntityVariableData;
+  enum class EUnitCommandType : std::int32_t;
   class UserEntity;
+  struct UserCommandIssueHelper;
   struct UserUnitManager;
   struct UserCommand;
   class UserUnitWeapon;
@@ -671,6 +674,24 @@ namespace moho
    * COL:  0x00E9E8D8
    */
   using UserUnitGetCommandQueue_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x008B73E0 (FUN_008B73E0)
+   *
+   * What it does:
+   * Rebuilds/resolves one user-unit command queue and returns whether it
+   * currently contains the supplied command-issue helper.
+   */
+  [[nodiscard]] bool UserUnitManagerContainsCommandIssueHelper(
+    UserUnitManager* manager,
+    const UserCommandIssueHelper* helper
+  ) noexcept;
+
+  [[nodiscard]] UserCommandIssueHelper*
+    FindCommandIssueHelperInSession(CWldSession* session, CmdId commandId) noexcept;
+
+  [[nodiscard]] EUnitCommandType
+    ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept;
 
   /**
    * VFTABLE: 0x00E4DB6C

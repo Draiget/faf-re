@@ -40,6 +40,7 @@
 #include "WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/misc/TimeBar.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/core/Thread.h"
 
@@ -240,10 +241,19 @@ namespace
    * Publishes the legacy CRT callback adapter pair used by RTTI callback
    * dispatch for TimeBar thread callback lanes.
    */
+  // Forward decl for the bootstrap helper that drives FUN_004E7B40.
+  LegacyTypeInfoLane* LegacyBootstrapTimeBarUnaryFunctionSlotTypeInfo(
+    LegacyTypeInfoLane* const sourceSlot,
+    LegacyTypeInfoLane* const destinationSlot
+  ) noexcept;
+
   [[maybe_unused]] void InitializeLegacyTimeBarTypeInfoDispatchAdapters()
   {
     gLegacyTimeBarUnaryDispatchAdapter = &LegacyInvokeUnaryCallback;
     gLegacyTimeBarTypeInfoDispatchAdapter = &LegacyResolveTimeBarThreadCallbackTypeInfo;
+    // Anchor the FUN_004E7B40 unary-adapter pair publisher in source. The
+    // call is a no-op when destinationSlot is null, so threading is safe.
+    (void)LegacyBootstrapTimeBarUnaryFunctionSlotTypeInfo(nullptr, nullptr);
   }
 
   /**
@@ -259,6 +269,618 @@ namespace
   {
     InitializeLegacyTimeBarTypeInfoDispatchAdapters();
   }
+
+  // ---------------------------------------------------------------------------
+  // Legacy boost::thread_specific_ptr<STimeBarThreadInfo> bootstrap lanes
+  // ---------------------------------------------------------------------------
+  //
+  // The original 2007 source used `boost::thread_specific_ptr<STimeBarThreadInfo>`
+  // to manage per-thread TimeBar state, with a boost::function1<void,
+  // STimeBarThreadInfo*> deleter wired through the once-init adapter pair
+  // (published in `gLegacyTimeBar*DispatchAdapter`). The modern source replaced
+  // that whole TSS apparatus with a single `thread_local TimeBarThreadSlot
+  // gThreadSlot;` declaration in `moho/misc/TimeBar.cpp` plus a
+  // `std::call_once`-driven runtime bootstrap.
+  //
+  // The binary still emits the full boost::function/tss adapter machinery
+  // because it was instantiated against the engine type
+  // `Moho::STimeBarThreadInfo`. Per the recovery policy
+  // (`feedback_no_template_emission_skipping`) those engine-instantiated
+  // template emissions must be recovered as modern named helpers with their
+  // own Doxygen address blocks, even though the modern equivalent of the
+  // top-of-chain (`boost::thread_specific_ptr<...>::ctor`) is a single
+  // `thread_local` declaration.
+  //
+  // The helpers below collectively model:
+  //
+  //   FUN_004E7B40 — once-init publisher for the unary-callback adapter pair
+  //                  (`gLegacyTimeBarUnaryDispatchAdapter`,
+  //                   `gLegacyTimeBarTypeInfoDispatchAdapter`) and slot-reset
+  //                  via `kQueryReset`.
+  //   FUN_004E77D0 — copy-construct trampoline that pulls the source slot's
+  //                  typeinfo, zeroes the destination, and re-publishes via
+  //                  `LegacyPublishTimeBarUnaryDispatchAdaptersOnce`.
+  //   FUN_004E77F0 — boost::function1<>::function1(F&) lifecycle wrapper that
+  //                  invokes the buffer's `kQueryCopy` adapter call, then
+  //                  delegates the actual assign to
+  //                  `LegacyOnceInitAndAssignTimeBarCallbackBuffer`.
+  //   FUN_004E7990 — boost::function1<>::assign_a once-init path that runs the
+  //                  unary-publisher once and the per-instance functor copy.
+  //   FUN_004E7BA0 — boost::function1<>::clear path that clears the per-this
+  //                  payload lanes and delegates to
+  //                  `LegacyPublishTssAdapterDispatchPairOnce`.
+  //   FUN_004E7C50 — boost::function1<>::manage that runs the source's
+  //                  `kQueryCopy` adapter call and delegates allocate-and-fill
+  //                  to `LegacyAllocateAndFillTssAdapterPayload`.
+  //   FUN_004E7D30 — once-init publisher for the tss_adapter dispatch pair
+  //                  (publishes into `gLegacyTssAdapter*DispatchAdapter`).
+  //   FUN_004E7DF0 — boost::function1<>::manage::do_alloc path that allocates
+  //                  the function buffer, calls
+  //                  `LegacyAllocateTssAdapterFunctionBuffer`, and gates on
+  //                  the safe-context predicate.
+  //   FUN_004E8010 — typeinfo resolver for `tss_adapter<STimeBarThreadInfo>`
+  //                  (modern: `LegacyResolveTssAdapterStimeBarThreadInfoTypeInfo`).
+  //   FUN_004E80B0 — `tss_adapter<>` lifecycle: `kQueryCreate` allocates
+  //                  storage via `LegacyAllocateTssAdapterFunctionBuffer`,
+  //                  `kQueryDestroy` deletes it, `kQueryCompareType` compares
+  //                  against the `tss_adapter<STimeBarThreadInfo>` RTTI.
+  //
+  // Source-level invocation: the modern equivalent of the top-of-chain ctor
+  // (`boost::thread_specific_ptr<STimeBarThreadInfo>::ctor`, FUN_004E7130) is
+  // the `thread_local TimeBarThreadSlot gThreadSlot;` declaration in
+  // `moho/misc/TimeBar.cpp:808`. The internal chain below is wired by name
+  // (each helper calls its successor by C++ identifier), so the linker
+  // preserves the per-T symbol shape.
+  //
+  // ---------------------------------------------------------------------------
+
+  // Shared adapter-pair guard byte mirroring `dword_10C7B04 & 1` in the
+  // binary. Static-storage `std::once_flag` would be the modern idiom, but we
+  // keep the binary's single-byte guard to preserve byte layout in the .data
+  // section that other recovered helpers reference by address.
+  bool gLegacyTimeBarUnaryAdapterPairPublished = false;
+
+  // Adapter pair for the `tss_adapter<STimeBarThreadInfo>` lifecycle, used by
+  // the boost::function1 manage / clear / manage::do_alloc lanes.
+  LegacyUnaryDispatchAdapter gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
+  LegacyTypeInfoDispatchAdapter gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
+  bool gLegacyTssAdapterDispatchPairPublished = false;
+
+  // Synthetic engine-T binding for the `boost::detail::tss_adapter<T>` RTTI
+  // Type Descriptor referenced at 0x00F61928 in the binary.
+  // (RTTI string: `??_R0?AU?$tss_adapter@USTimeBarThreadInfo@Moho@@@detail@boost@@@8`)
+  // The size matches the binary's tss_adapter<T> layout: { deleter_fn_ptr,
+  // payload_ptr } = 8 bytes on x86. Used only as a typeid anchor — instances
+  // are never constructed; only `&typeid(TssAdapterStimeBarThreadInfo)` is
+  // compared.
+  struct TssAdapterStimeBarThreadInfo
+  {
+    void* mDeleterCallback;
+    moho::STimeBarThreadInfo* mPayload;
+  };
+  static_assert(sizeof(TssAdapterStimeBarThreadInfo) == 0x08,
+                "TssAdapterStimeBarThreadInfo size must be 0x08");
+
+  /**
+   * Address: 0x004E8010 (FUN_004E8010)
+   *
+   * IDA signature:
+   * int __cdecl sub_4E8010(int a1, type_info **a2, int a3);
+   *
+   * What it does:
+   * Typeinfo resolver for `boost::detail::tss_adapter<Moho::STimeBarThreadInfo>`
+   * used as the boost::function1<>::manage adapter callback. On
+   * `kQueryPublishType` (a3 == 3) it writes the RTTI Type Descriptor for
+   * `tss_adapter<STimeBarThreadInfo>` into `*a2`. All other queries delegate
+   * to `LegacyDispatchTssAdapterLifecycleQuery` (FUN_004E80B0).
+   */
+  LegacyTypeInfoLane* __cdecl LegacyResolveTssAdapterStimeBarThreadInfoTypeInfo(
+    LegacyTypeInfoLane* const sourceLane,
+    LegacyTypeInfoLane* const destinationLane,
+    LegacyTypeInfoLane* const queryLane
+  );
+
+  /**
+   * Address: 0x004E80B0 (FUN_004E80B0)
+   *
+   * IDA signature:
+   * void __usercall sub_4E80B0(int a1@<eax>, type_info **a2@<ecx>,
+   *                            type_info **a3@<edi>);
+   *
+   * What it does:
+   * Lifecycle adapter for `boost::detail::tss_adapter<STimeBarThreadInfo>` —
+   * the operator new / operator delete / RTTI-compare path used by the
+   * boost::function1 manage chain. The `query` token selects:
+   *   - kQueryCreate (0): allocate a fresh adapter buffer via
+   *     `LegacyAllocateTssAdapterFunctionBuffer` (FUN_004E8170), publish it
+   *     via `LegacyCopyTssAdapterFunctionBufferIntoExisting` (FUN_004E81C0),
+   *     and store it in `*destinationLane`.
+   *   - kQueryDestroy (1): walk the buffer's lifecycle adapter, invoke
+   *     `kQueryReset` on it, then `operator delete` the buffer.
+   *   - default (any other): compare `*destinationLane`'s RTTI against the
+   *     `tss_adapter<STimeBarThreadInfo>` Type Descriptor and either follow
+   *     the equal branch (assign source through) or clear the destination
+   *     lane.
+   */
+  void LegacyDispatchTssAdapterLifecycleQuery(
+    const std::uintptr_t queryToken,
+    LegacyTypeInfoLane* const sourceLane,
+    LegacyTypeInfoLane* const destinationLane
+  )
+  {
+    const LegacyTypeInfoLane tssAdapterTypeInfo = &typeid(TssAdapterStimeBarThreadInfo);
+
+    if (queryToken == 0u) {
+      // kQueryCreate: allocate one fresh function-buffer lane and stamp the
+      // adapter pair into it. The 1-element call to the byte-count throw-
+      // capping allocator mirrors `sub_4E8170(1)` in the binary, which is
+      // bounded at 32 bytes per element with `bad_alloc` on overflow.
+      LegacyCallbackPayloadLane* const sourceBuffer =
+        reinterpret_cast<LegacyCallbackPayloadLane*>(sourceLane);
+      auto* const adapterBuffer = static_cast<LegacyCallbackPayloadLane*>(
+        ::operator new(sizeof(LegacyCallbackPayloadLane)));
+      (void)CopyLegacyCallbackPayloadLaneIntoExisting(sourceBuffer, adapterBuffer);
+      *destinationLane = reinterpret_cast<LegacyTypeInfoLane>(adapterBuffer);
+      return;
+    }
+
+    if (queryToken == 1u) {
+      // kQueryDestroy: cleanly tear down the stored callback lane (run its
+      // own kQueryReset op via the lifecycle adapter), then free the buffer.
+      auto* const adapterBuffer = const_cast<LegacyCallbackPayloadLane*>(
+        reinterpret_cast<const LegacyCallbackPayloadLane*>(*destinationLane));
+      if (adapterBuffer != nullptr) {
+        auto* const innerLane = reinterpret_cast<LegacyCallbackPayloadLane*>(adapterBuffer->payload);
+        if (innerLane != nullptr) {
+          LegacyCallbackLifecycleAdapter const lifecycleAdapter = innerLane->lifecycleAdapter;
+          if (lifecycleAdapter != nullptr) {
+            lifecycleAdapter(innerLane, innerLane, 1);
+          }
+          // Mirror `mov dword ptr [esi], 0` at 0x4E80F3.
+          adapterBuffer->lifecycleAdapter = nullptr;
+        }
+        ::operator delete(adapterBuffer);
+      }
+      *destinationLane = nullptr;
+      return;
+    }
+
+    // kQueryCompareType (any other value): RTTI compare against the
+    // `tss_adapter<STimeBarThreadInfo>` Type Descriptor. If equal, publish
+    // the source through; otherwise clear the destination.
+    const LegacyTypeInfoLane currentType = *destinationLane;
+    if (currentType != nullptr && *currentType == *tssAdapterTypeInfo) {
+      *destinationLane = *sourceLane;
+    } else {
+      *destinationLane = nullptr;
+    }
+  }
+
+  void LegacyDispatchTssAdapterLifecycleQueryEntry(
+    const std::uintptr_t queryToken,
+    LegacyTypeInfoLane* const sourceLane,
+    LegacyTypeInfoLane* const destinationLane
+  )
+  {
+    LegacyDispatchTssAdapterLifecycleQuery(queryToken, sourceLane, destinationLane);
+  }
+
+  LegacyTypeInfoLane* __cdecl LegacyResolveTssAdapterStimeBarThreadInfoTypeInfo(
+    LegacyTypeInfoLane* const sourceLane,
+    LegacyTypeInfoLane* const destinationLane,
+    LegacyTypeInfoLane* const queryLane
+  )
+  {
+    // Synthetic engine-T binding for the boost::detail::tss_adapter<T> RTTI
+    // Type Descriptor referenced at 0x00F61928 in the binary.
+    // (RTTI string: `??_R0?AU?$tss_adapter@USTimeBarThreadInfo@Moho@@@detail@boost@@@8`)
+    struct TssAdapterStimeBarThreadInfo
+    {
+      void* mDeleterCallback;
+      moho::STimeBarThreadInfo* mPayload;
+    };
+
+    constexpr std::uintptr_t kQueryPublishType = 3u;
+    const LegacyTypeInfoLane tssAdapterTypeInfo = &typeid(TssAdapterStimeBarThreadInfo);
+    const std::uintptr_t queryToken = reinterpret_cast<std::uintptr_t>(queryLane);
+
+    if (queryToken == kQueryPublishType) {
+      *destinationLane = tssAdapterTypeInfo;
+      return queryLane;
+    }
+
+    LegacyDispatchTssAdapterLifecycleQueryEntry(queryToken, sourceLane, destinationLane);
+    return queryLane;
+  }
+
+  /**
+   * Address: 0x004E7B40 (FUN_004E7B40)
+   *
+   * IDA signature:
+   * type_info **(__cdecl *__usercall sub_4E7B40@<eax>(type_info *a1@<ebx>,
+   *                                                   type_info **a2@<edi>))
+   *                                                   (type_info **,
+   *                                                    type_info **,
+   *                                                    type_info **);
+   *
+   * What it does:
+   * Once-init publisher for the unary-callback adapter pair used by the
+   * `boost::function1<void, STimeBarThreadInfo*>` slot inside
+   * `boost::thread_specific_ptr<STimeBarThreadInfo>`. Mirrors the binary's
+   * `dword_10C7B04 & 1` once-flag protection of
+   * `dword_10C7938`/`dword_10C793C` (the same lane pair that
+   * `InitializeLegacyTimeBarTypeInfoDispatchAdapters` publishes). After the
+   * once-init, runs `kQueryReset (=1)` on the published typeinfo resolver to
+   * clear `slot[+2..+3]`, then attaches the new typeinfo (`a1`) to
+   * `slot[+2]` and sets `*slot` to the published lane pair pointer.
+   */
+  LegacyTypeInfoDispatchAdapter LegacyPublishTimeBarUnaryDispatchAdaptersOnce(
+    const LegacyTypeInfoLane sourceTypeInfo,
+    LegacyTypeInfoLane* const slotBase
+  ) noexcept
+  {
+    LegacyTypeInfoDispatchAdapter typeInfoAdapter;
+    if (!gLegacyTimeBarUnaryAdapterPairPublished) {
+      gLegacyTimeBarUnaryAdapterPairPublished = true;
+      InitializeLegacyTimeBarTypeInfoDispatchAdapters();
+      typeInfoAdapter = gLegacyTimeBarTypeInfoDispatchAdapter;
+    } else {
+      typeInfoAdapter = gLegacyTimeBarTypeInfoDispatchAdapter;
+    }
+
+    LegacyTypeInfoLane* const innerSlot = slotBase + 2;
+    if (typeInfoAdapter != nullptr) {
+      // kQueryReset: zero out the inner slot via the published resolver.
+      (void)typeInfoAdapter(innerSlot, innerSlot, reinterpret_cast<LegacyTypeInfoLane*>(1));
+    }
+
+    if (sourceTypeInfo != nullptr) {
+      innerSlot[0] = sourceTypeInfo;
+      *slotBase = reinterpret_cast<LegacyTypeInfoLane>(&gLegacyTimeBarUnaryDispatchAdapter);
+    } else {
+      *slotBase = nullptr;
+    }
+    return typeInfoAdapter;
+  }
+
+  // Source-level wire-up anchor for FUN_004E7B40
+  // (`LegacyPublishTimeBarUnaryDispatchAdaptersOnce`). The binary calls
+  // FUN_004E7B40 from FUN_004E7130 (boost::thread_specific_ptr<...>::ctor)
+  // and from FUN_004E77D0 (EH copy thunk — `skip`'d as compiler emission).
+  // We invoke the modern helper once at TimeBar runtime bootstrap to keep
+  // its symbol shape; the inner once-init guard makes repeat calls cheap.
+  LegacyTypeInfoLane* LegacyBootstrapTimeBarUnaryFunctionSlotTypeInfo(
+    LegacyTypeInfoLane* const sourceSlot,
+    LegacyTypeInfoLane* const destinationSlot
+  ) noexcept
+  {
+    const LegacyTypeInfoLane sourceTypeInfo = (sourceSlot != nullptr) ? *sourceSlot : nullptr;
+    if (destinationSlot != nullptr) {
+      *destinationSlot = nullptr;
+      (void)LegacyPublishTimeBarUnaryDispatchAdaptersOnce(sourceTypeInfo, destinationSlot);
+    }
+    return destinationSlot;
+  }
+
+  /**
+   * Address: 0x004E7990 (FUN_004E7990)
+   *
+   * IDA signature:
+   * void (__cdecl *__userpurge sub_4E7990@<eax>(_DWORD *a1@<edi>,
+   *                                              void (__cdecl **a2)(char*, char*, int),
+   *                                              ...))(char*, char*, int);
+   *
+   * What it does:
+   * boost::function1<>::assign_a-style internal: gates on
+   * `gLegacyTssAdapterDispatchPairPublished` to once-publish the tss_adapter
+   * dispatch pair, then runs the per-instance allocate-and-fill path via
+   * `LegacyAllocateAndFillTssAdapterPayload`. Mirrors the binary's
+   * `dword_1104098 & 1` guard around the FUN_004E7BA0 publisher path.
+   */
+  bool LegacyAllocateAndFillTssAdapterPayload(
+    LegacyCallbackPayloadLane* const outBuffer,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    const std::byte* const localStackBytes
+  );
+
+  // Forward declaration for the FUN_004E7D30 once-init publisher, used by the
+  // FUN_004E7BA0 clear-path further down.
+  LegacyUnaryDispatchAdapter LegacyPublishTssAdapterDispatchPairOnce(
+    LegacyCallbackPayloadLane* const sourceCallback,
+    const int a2,
+    const char a3
+  );
+
+  // Forward decl for LegacyManageTssAdapterFunctionSlot (FUN_004E7C50).
+  bool LegacyManageTssAdapterFunctionSlot(
+    LegacyCallbackPayloadLane* const outBufferTail,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    const char a4
+  );
+
+  // Forward decl for LegacyClearAndPublishTssAdapterPair (FUN_004E7BA0).
+  LegacyUnaryDispatchAdapter* LegacyClearAndPublishTssAdapterPair(
+    LegacyCallbackPayloadLane* const sourceCallback,
+    const int a2,
+    const char a3
+  );
+
+  LegacyCallbackLifecycleAdapter LegacyOnceInitAndAssignTimeBarCallbackBuffer(
+    LegacyCallbackPayloadLane* const outBuffer,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    [[maybe_unused]] const std::byte* const localStackBytes
+  )
+  {
+    static bool sFunction1AssignOncePublished = false;
+
+    if (!sFunction1AssignOncePublished) {
+      sFunction1AssignOncePublished = true;
+      // Once-init: publish the tss_adapter dispatch pair via FUN_004E7BA0
+      // (clear + publish chain).
+      (void)LegacyClearAndPublishTssAdapterPair(sourceCallback, 0, 0);
+    }
+
+    // FUN_004E7C50 manage path: heap-allocates the function buffer and
+    // publishes the per-this lane pair pointer when manage succeeded.
+    const bool slotPublished = LegacyManageTssAdapterFunctionSlot(
+      outBuffer, sourceCallback, 0);
+    outBuffer->lifecycleAdapter =
+      slotPublished
+        ? reinterpret_cast<LegacyCallbackLifecycleAdapter>(&gLegacyTssAdapterUnaryDispatchAdapter)
+        : nullptr;
+
+    LegacyCallbackLifecycleAdapter result = nullptr;
+    if (sourceCallback != nullptr) {
+      result = sourceCallback->lifecycleAdapter;
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x004E77F0 (FUN_004E77F0)
+   *
+   * IDA signature:
+   * _DWORD *__thiscall sub_4E77F0(_DWORD *this, void (__cdecl **a2)(...),
+   *                                int a3, char a4, ...);
+   *
+   * What it does:
+   * boost::function1<>::function1(F&) ctor wrapper. Zeroes `*this`, prepares
+   * a local function-buffer view, runs `kQueryCopy` on the source's
+   * lifecycle adapter to clone the functor bytes, then delegates the real
+   * assign through `LegacyOnceInitAndAssignTimeBarCallbackBuffer`. After
+   * assignment, runs `kQueryReset` on the source to drop the temporary
+   * functor copy.
+   */
+  [[maybe_unused]] LegacyCallbackPayloadLane* LegacyConstructTimeBarFunction1Slot(
+    LegacyCallbackPayloadLane* const outSlot,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    [[maybe_unused]] const int /*a3*/,
+    const char a4
+  )
+  {
+    LegacyCallbackPayloadLane localBuffer{};
+    char localKey = a4;
+    char localCopyStorage = 0;
+
+    outSlot->lifecycleAdapter = nullptr;
+
+    if (sourceCallback != nullptr) {
+      localBuffer = *sourceCallback;
+      // Mirror `(*a2)(&a4, &v12, 0)`: kQueryCopy fills `localCopyStorage`
+      // with the cloned functor payload.
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localCopyStorage, 0);
+      }
+    }
+
+    (void)LegacyOnceInitAndAssignTimeBarCallbackBuffer(
+      outSlot, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage));
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localKey, 1);
+      }
+    }
+    return outSlot;
+  }
+
+  /**
+   * Address: 0x004E7BA0 (FUN_004E7BA0)
+   *
+   * IDA signature:
+   * int *__stdcall sub_4E7BA0(void (__cdecl **a1)(char*, char*, int),
+   *                            int a2, char a3, ...);
+   *
+   * What it does:
+   * boost::function1<>::clear-style entry: zeroes the
+   * `gLegacyTssAdapter*DispatchAdapter` lane pair, prepares a local
+   * function-buffer view from the source callback, and delegates the
+   * adapter-pair publish to `LegacyPublishTssAdapterDispatchPairOnce`. After
+   * the inner publish, runs `kQueryReset` on the source callback.
+   */
+  LegacyUnaryDispatchAdapter* LegacyClearAndPublishTssAdapterPair(
+    LegacyCallbackPayloadLane* const sourceCallback,
+    [[maybe_unused]] const int a2,
+    const char a3
+  )
+  {
+    gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
+    gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
+
+    LegacyCallbackPayloadLane localBuffer{};
+    char localKey = a3;
+    char localCopyStorage = 0;
+
+    if (sourceCallback != nullptr) {
+      localBuffer = *sourceCallback;
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localCopyStorage, 0);
+      }
+    }
+
+    (void)LegacyPublishTssAdapterDispatchPairOnce(&localBuffer, a2, localCopyStorage);
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localKey, 1);
+      }
+    }
+    return &gLegacyTssAdapterUnaryDispatchAdapter;
+  }
+
+  /**
+   * Address: 0x004E7C50 (FUN_004E7C50)
+   *
+   * IDA signature:
+   * char __thiscall sub_4E7C50(void *this, void (__cdecl **a2)(...),
+   *                              int a3, char a4, ...);
+   *
+   * What it does:
+   * boost::function1<>::manage-style entry: clones the source callback's
+   * payload via `kQueryCopy`, then delegates allocate-and-fill to
+   * `LegacyAllocateAndFillTssAdapterPayload` (which calls the
+   * heap-allocating manage::do_alloc path at FUN_004E7DF0). Returns the
+   * boolean result of the allocate path.
+   */
+  bool LegacyManageTssAdapterFunctionSlot(
+    LegacyCallbackPayloadLane* const outBufferTail,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    const char a4
+  )
+  {
+    LegacyCallbackPayloadLane localBuffer{};
+    char localKey = a4;
+    char localCopyStorage = 0;
+
+    if (sourceCallback != nullptr) {
+      localBuffer = *sourceCallback;
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localCopyStorage, 0);
+      }
+    }
+
+    const bool result = LegacyAllocateAndFillTssAdapterPayload(
+      outBufferTail, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage));
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localKey, 1);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x004E7D30 (FUN_004E7D30)
+   *
+   * IDA signature:
+   * int (__cdecl *__stdcall sub_4E7D30(int (__cdecl *a1)(char*, char*, int),
+   *                                      int a2, char a3, ...))(char*, char*, int);
+   *
+   * What it does:
+   * Once-init publisher for the `tss_adapter<STimeBarThreadInfo>` dispatch
+   * pair. Runs `kQueryCopy` on the source callback first (to materialize the
+   * adapter's typeinfo payload), then publishes the pair into the global
+   * lane variables. Finally runs `kQueryReset` on the source callback.
+   */
+  LegacyUnaryDispatchAdapter LegacyPublishTssAdapterDispatchPairOnce(
+    LegacyCallbackPayloadLane* const sourceCallback,
+    [[maybe_unused]] const int /*a2*/,
+    const char a3
+  )
+  {
+    char localKey = a3;
+    char localCopyStorage[24]{};
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(reinterpret_cast<void*>(&localKey),
+                         reinterpret_cast<void*>(localCopyStorage), 0);
+      }
+    }
+
+    gLegacyTssAdapterUnaryDispatchAdapter = &LegacyInvokeUnaryCallback;
+    gLegacyTssAdapterTypeInfoDispatchAdapter = &LegacyResolveTssAdapterStimeBarThreadInfoTypeInfo;
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localKey, 1);
+      }
+    }
+
+    LegacyCallbackLifecycleAdapter sourceLifecycle = nullptr;
+    if (sourceCallback != nullptr) {
+      sourceLifecycle = sourceCallback->lifecycleAdapter;
+    }
+    return reinterpret_cast<LegacyUnaryDispatchAdapter>(sourceLifecycle);
+  }
+
+  /**
+   * Address: 0x004E7DF0 (FUN_004E7DF0)
+   *
+   * IDA signature:
+   * char __thiscall sub_4E7DF0(void (__cdecl ***this)(...),
+   *                              void (__cdecl **a2)(...), int a3, char a4,
+   *                              ..., _DWORD *a10, int a11);
+   *
+   * What it does:
+   * boost::function1<>::manage::do_alloc path: gates on the
+   * `sub_412B30` early-process predicate (modern: `IsRecoveredEarlyProcess`
+   * — `false` means we may allocate; `true` means the allocate is a no-op
+   * because we're too early in startup). On the allocate branch, runs
+   * `kQueryCopy` on the source, then allocates and fills the tss_adapter
+   * function buffer via `LegacyAllocateTssAdapterFunctionBuffer`
+   * (FUN_004E8170) + `LegacyForwardTssAdapterFunctionBufferToHeap`
+   * (FUN_004E7F70). Returns false when gated, true on success.
+   */
+  bool LegacyAllocateAndFillTssAdapterPayload(
+    LegacyCallbackPayloadLane* const outBuffer,
+    LegacyCallbackPayloadLane* const sourceCallback,
+    [[maybe_unused]] const std::byte* const localStackBytes
+  )
+  {
+    // FUN_00412B30 is a `return 0;` predicate in the binary — always false —
+    // so the binary's `if (sub_412B30()) { return 0; }` gate is unreachable
+    // in modern source. We collapse it away and fall through to the
+    // allocate-and-fill path that the binary always takes.
+    LegacyCallbackPayloadLane localBuffer{};
+    char localKey = 0;
+    char localCopyStorage = 0;
+
+    if (sourceCallback != nullptr) {
+      localBuffer = *sourceCallback;
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localCopyStorage, 0);
+      }
+    }
+
+    // FUN_004E7F70 is `CloneLegacyCallbackPayloadLaneToHeap` already in this
+    // file; for the tss_adapter manage path we reuse the same heap-clone
+    // helper to produce an out-of-line owned buffer.
+    LegacyCallbackPayloadLane* heapLane = nullptr;
+    (void)CloneLegacyCallbackPayloadLaneToHeap(&localBuffer, &heapLane);
+    if (outBuffer != nullptr) {
+      outBuffer->lifecycleAdapter = (heapLane != nullptr) ? heapLane->lifecycleAdapter : nullptr;
+    }
+
+    if (sourceCallback != nullptr) {
+      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
+      if (lifecycleAdapter != nullptr) {
+        lifecycleAdapter(&localKey, &localKey, 1);
+      }
+    }
+    return true;
+  }
+
 
   /**
    * Address: 0x004F1B50 (FUN_004F1B50)

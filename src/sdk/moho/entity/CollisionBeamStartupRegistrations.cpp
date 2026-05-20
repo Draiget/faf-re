@@ -212,6 +212,14 @@ namespace
     return conVar;
   }
 
+  /**
+   * Address: 0x00BFC2A0 (FUN_00BFC2A0, Moho::TConVar_dbg_CollisionBeam::~TConVar_dbg_CollisionBeam)
+   *
+   * What it does:
+   * Tears down the static `dbg_CollisionBeam` console-variable registration via
+   * the shared `TeardownConCommandRegistration` helper. Registered via
+   * `atexit` from the convar startup path.
+   */
   void cleanup_TConVar_dbg_CollisionBeam_atexit()
   {
     moho::TeardownConCommandRegistration(GetDbgCollisionBeamConVar());

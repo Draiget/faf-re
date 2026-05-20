@@ -827,6 +827,72 @@ namespace
   );
 
   /**
+   * Address: 0x00516310 (FUN_00516310, msvc8::vector<moho::REmitterCurveKey>::reserve)
+   *
+   * IDA signature:
+   * unsigned int __thiscall sub_516310(int *this, unsigned int a2);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<REmitterCurveKey>::reserve`.
+   * If `requestedCapacity` exceeds the current capacity, allocates a fresh
+   * storage block via the legacy `_Allocate` lane (`FUN_005111C0`), copies the
+   * live `[_Myfirst, _Mylast)` range into it via `FUN_00518370`
+   * (`CopyEmitterCurveKeyRange`-shape), then releases the previous block. The
+   * SEH guard frame at `FUN_00BA0B60` rolls back the partial copy if the
+   * element copy chain throws. No-op when `requestedCapacity <= capacity()`.
+   *
+   * This per-T named free helper preserves the MSVC8 out-of-line symbol
+   * for `vector<REmitterCurveKey>::reserve` — the inline `storage.reserve(n)`
+   * spelling is elided by the optimizer, so callers route through this name.
+   */
+  [[nodiscard]] unsigned int ReserveEmitterCurveKeyVector(
+    CurveKeyVector& storage,
+    const unsigned int requestedCapacity
+  )
+  {
+    const unsigned int previousCapacity = static_cast<unsigned int>(storage.capacity());
+    if (previousCapacity < requestedCapacity) {
+      storage.reserve(static_cast<std::size_t>(requestedCapacity));
+    }
+    return previousCapacity;
+  }
+
+  /**
+   * Address: 0x00516970 (FUN_00516970, msvc8::vector<moho::REmitterCurveKey>::_Insert_n)
+   *
+   * IDA signature:
+   * int __stdcall sub_516970(int *a1, int a2, unsigned int a3, _DWORD *a4);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<REmitterCurveKey>::_Insert_n`.
+   * Inserts `insertCount` copies of `*fillValue` at `insertPosition`. When the
+   * vector's spare capacity is sufficient and the insert tail fits in place,
+   * the body shifts the suffix in place via `FUN_00517240`
+   * (`CopyEmitterCurveKeyRangeRegisterAdapterLaneA`) and fills the gap with
+   * the source key. Otherwise it allocates a new geometrically-grown block
+   * (`previousSize + previousSize/2`, clamped to 0x0FFFFFFF), copy-constructs
+   * the prefix range, fills the insert window with `insertCount` copies of
+   * the source key (`FUN_00517FA0`), and copy-constructs the suffix before
+   * freeing the previous block. The MSVC8 `_Insert_n` body backs both
+   * `vector::resize(n, value)` growth and `vector::push_back(x)` slow-path
+   * append.
+   */
+  void InsertNCopiesEmitterCurveKeyVector(
+    CurveKeyVector& storage,
+    moho::REmitterCurveKey* const insertPosition,
+    const unsigned int insertCount,
+    const moho::REmitterCurveKey& fillValue
+  )
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
    * Address: 0x00516100 (FUN_00516100, gpg::RVectorType_REmitterCurveKey::SerLoad)
    *
    * What it does:
@@ -846,7 +912,7 @@ namespace
     archive->ReadUInt(&count);
 
     CurveKeyVector loaded;
-    loaded.reserve(static_cast<std::size_t>(count));
+    (void)ReserveEmitterCurveKeyVector(loaded, count);
 
     gpg::RType* const elementType = CachedEmitterCurveKeyType();
     for (unsigned int index = 0u; index < count; ++index) {
@@ -864,14 +930,22 @@ namespace
    *
    * What it does:
    * Appends one deserialized `REmitterCurveKey` element into the destination
-   * vector, preserving the legacy append-and-grow lane used by `SerLoad`.
+   * vector, preserving the legacy append-and-grow lane used by `SerLoad`. The
+   * push reaches the canonical `vector<REmitterCurveKey>::_Insert_n` slow-path
+   * (`FUN_00516970`, `InsertNCopiesEmitterCurveKeyVector`) when the vector's
+   * spare capacity is exhausted and a single-element copy is appended at the
+   * tail — the MSVC8 emission shape mirrored by the binary.
    */
   void AppendLoadedEmitterCurveKey(
     CurveKeyVector& storage,
     const moho::REmitterCurveKey& element
   )
   {
-    storage.push_back(element);
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesEmitterCurveKeyVector(storage, storage.end(), 1u, element);
+    } else {
+      storage.push_back(element);
+    }
   }
 
   /**
@@ -931,7 +1005,10 @@ namespace
    *
    * What it does:
    * Adjusts one `vector<REmitterCurveKey>` length to `requestedCount` and
-   * uses one caller-provided fill lane for growth.
+   * uses one caller-provided fill lane for growth. Routes growth through the
+   * canonical `vector<REmitterCurveKey>::_Insert_n` lane (`FUN_00516970`,
+   * `InsertNCopiesEmitterCurveKeyVector`) to preserve the MSVC8 per-T symbol
+   * shape; shrink remains an inline tail erase.
    */
   [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithFill(
     CurveKeyVector& storage,
@@ -941,7 +1018,8 @@ namespace
   {
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
-      storage.resize(requestedCount, fillValue);
+      const auto growBy = static_cast<unsigned int>(requestedCount - currentCount);
+      InsertNCopiesEmitterCurveKeyVector(storage, storage.end(), growBy, fillValue);
       return requestedCount;
     }
 

@@ -92,6 +92,25 @@ namespace moho
     [[nodiscard]] const SAniSkelBone* ResolveSkeletonBone() const;
 
     /**
+     * Address: 0x0063A660 (FUN_0063A660, sub_63A660)
+     *
+     * IDA signature:
+     * const char *__usercall sub_63A660@<eax>(int a1@<eax>);
+     *
+     * What it does:
+     * Returns the skeleton-bone name string for this pose bone. Reads the
+     * owning `mPose`, fetches the skeleton via `CAniPose::GetSkeleton`
+     * (which yields a ref-counted `shared_ptr<const CAniSkel>`), indexes
+     * `skel->mBones._Myfirst` at `mIdx`, and returns the bone's `name`
+     * field. Returns null when `mIdx` is out of the skeleton's bone range.
+     *
+     * Implements the read of bone name through the shared-skeleton pointer
+     * with the proper ref-count release on exit (matching the FUN_0063A660
+     * out-of-line MSVC8 emission).
+     */
+    [[nodiscard]] const char* GetBoneName() const;
+
+    /**
      * Address: 0x0054F630 (FUN_0054F630, Moho::CAniPoseBone::MemberSerialize)
      *
      * What it does:

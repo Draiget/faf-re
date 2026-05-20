@@ -2,28 +2,59 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`21/04/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`20/05/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`91.51%`**
+- Progress coverage:  **`96.40%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `61,465`*
+  - *Total amount of completed tokens: `64,748`*
 
 Progress DB status breakdown:
 
-- `recovered`: `51,962` (84.54%)
-- `skip`: `5,681` (9.24%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
-- `external_dependency`: `3,822` (6.22%) — third-party libs
-  - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
-- `needs_evidence`: `1,648` (2.45%)
-- **`blocked`: `4,117` (6.13%)**
+- `recovered`: `52,860` (81.64%)
+- `skip`: `6,105` (9.43%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
+- `external_dependency`: `5,783` (8.93%) — third-party libs
+  - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
+- `needs_evidence`: `3` (0.00%)
+- `in_progress`: `110` (0.16%)
+- **`blocked`: `2,370` (3.53%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `5,765`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `5,765`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,373`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,373`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
+
+## Caller-Wiring Health
+
+Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
+
+### Recovered (52,860 functions) — wiring health
+
+| Bucket | Count | % of recovered |
+|---|---:|---:|
+| **Confirmed caller** (recovered binary caller wired by name) | `14,694` | 27.80% |
+| Vtable-anchored (virtual override of a recovered class) | `5,791` | 10.96% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,493` | 10.39% |
+| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,933` | 5.55% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,730` | 44.89% |
+| Unclassified data xref (manual review) | `215` | 0.41% |
+| RTTI-only | `4` | 0.01% |
+
+### Not-yet-recovered (2,373 blocked + needs_evidence) — backlog readiness
+
+| Bucket | Count | % of backlog |
+|---|---:|---:|
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `533` | 22.46% |
+| Vtable-anchored (recover with the owning class) | `239` | 10.07% |
+| Framework dispatch (wx/EH/Lua/reflection) | `36` | 1.52% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,111` | 46.82% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `452` | 19.05% |
+| Unclassified data xref (manual review) | `1` | 0.04% |
+| RTTI-only | `1` | 0.04% |
+
+*Set `FAF_README_SKIP_VERDICTS=1` to skip this block during tight worker loops.*
 
 ## Build Quickstart + Patches
 

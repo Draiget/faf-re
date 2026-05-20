@@ -522,6 +522,61 @@ namespace moho
   }
 
   /**
+   * Address: 0x0080DE00 (FUN_0080DE00, sub_80DE00)
+   *
+   * IDA signature:
+   * int __userpurge sub_80DE00@<eax>(
+   *   int ebx0@<ebx>, int *a2@<esi>,
+   *   Moho::CTesselator *a1, char a4
+   * );
+   *
+   * What it does:
+   * Emits one collision-triangle fan from a polyline of vertex indices
+   * `[indexRange.begin(), indexRange.end())` rooted at `baseIndex`. For each
+   * adjacent pair `(prev, curr)` in the polyline (starting at index 1), the
+   * helper publishes a triangle through
+   * `CTesselator::AppendCollisionTriangleIndices` (FUN_0080D2F0):
+   *   * forward winding (`forwardWinding != 0`): triangle
+   *     `{baseIndex, indexRange[i], indexRange[i - 1]}`
+   *   * reverse winding (`forwardWinding == 0`): triangle
+   *     `{baseIndex, indexRange[i - 1], indexRange[i]}`
+   * Skips any work for ranges with fewer than two indices. The binary
+   * conservatively reloads the polyline begin pointer each iteration; the
+   * source vector is never modified by `AppendCollisionTriangleIndices`
+   * (which targets `mCollisionRectLut`), so the modern lift performs the
+   * load once.
+   */
+  [[maybe_unused]] std::uint16_t* EmitCollisionTriangleFanFromIndexRange(
+    CTesselator* const tesselator,
+    const std::uint16_t baseIndex,
+    gpg::core::FastVector<std::uint16_t>* const indexRange,
+    const bool forwardWinding
+  )
+  {
+    if (tesselator == nullptr || indexRange == nullptr) {
+      return nullptr;
+    }
+
+    std::uint16_t* const begin = indexRange->begin();
+    const std::size_t indexCount = static_cast<std::size_t>(indexRange->end() - begin);
+    if (indexCount <= 1u) {
+      return begin;
+    }
+
+    if (forwardWinding) {
+      for (std::size_t i = 1u; i < indexCount; ++i) {
+        tesselator->AppendCollisionTriangleIndices(baseIndex, begin[i], begin[i - 1u]);
+      }
+    } else {
+      for (std::size_t i = 1u; i < indexCount; ++i) {
+        tesselator->AppendCollisionTriangleIndices(baseIndex, begin[i - 1u], begin[i]);
+      }
+    }
+
+    return begin;
+  }
+
+  /**
    * Address: 0x0080C120 (FUN_0080C120, Moho::CTesselator::Func9)
    *
    * What it does:

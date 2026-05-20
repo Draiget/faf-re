@@ -17,6 +17,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/mesh/Mesh.h"
@@ -29,6 +30,7 @@
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/resource/RResId.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -37,6 +39,7 @@
 #include "moho/sim/CFormation.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/ESTITargetTypeTypeInfo.h"
 #include "moho/sim/UserArmy.h"
@@ -2064,28 +2067,6 @@ namespace moho
     }
   } // namespace
 
-  struct SBuildTemplateInfo
-  {
-    SBuildTemplateInfo() = default;
-
-    Wm3::Vector3f mPos;         // +0x00
-    std::int32_t mBuildOrder;   // +0x0C
-    msvc8::string mBlueprintId; // +0x10
-
-    /**
-     * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
-     *
-     * What it does:
-     * Copy-constructs one build-template entry (position, heading, blueprint id).
-     */
-    SBuildTemplateInfo(const SBuildTemplateInfo& other);
-  };
-
-  static_assert(sizeof(SBuildTemplateInfo) == 0x2C, "SBuildTemplateInfo size must be 0x2C");
-  static_assert(
-    offsetof(SBuildTemplateInfo, mBlueprintId) == 0x10, "SBuildTemplateInfo::mBlueprintId offset must be 0x10"
-  );
-
   /**
    * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
    *
@@ -2635,6 +2616,99 @@ namespace moho
         return 0u;
       }
       return *(reinterpret_cast<const std::uint32_t*>(value) + 1);
+    }
+
+    constexpr std::uint32_t kBuildPreviewValidColor = 0xD800D800u;
+    constexpr std::uint32_t kBuildPreviewInvalidColor = 0xD8D80000u;
+
+    [[nodiscard]] SCoordsVec2 BuildPreviewCoordsFromWorldPosition(const Wm3::Vector3f& worldPosition) noexcept
+    {
+      return SCoordsVec2{worldPosition.x, worldPosition.z};
+    }
+
+    [[nodiscard]] std::uint32_t SelectBuildPreviewColor(
+      const CWldSession& session,
+      const bool placementAccepted
+    ) noexcept
+    {
+      if (placementAccepted || !session.mShowInvalidBuildPlacementPreview) {
+        return kBuildPreviewValidColor;
+      }
+
+      return kBuildPreviewInvalidColor;
+    }
+
+    void CopyOccupationPositionToPreviewTransform(
+      const SOccupationResult& occupation,
+      VTransform& previewTransform
+    ) noexcept
+    {
+      previewTransform.pos_ = occupation.pos;
+    }
+
+    /**
+     * Address: 0x00854930 (FUN_00854930, sub_854930)
+     *
+     * Wm3::Vector3f const &, Moho::RUnitBlueprint const *, Moho::VTransform &, Moho::CWldSession &, std::uint32_t &
+     *
+     * IDA signature:
+     * int __userpurge sub_854930@<eax>(float *a1@<eax>, Moho::RUnitBlueprint *a2@<edx>, float *a3@<edi>, int esi0@<esi>, int *a5);
+     *
+     * What it does:
+     * Evaluates build placement for one template-entry preview position, writes
+     * the preview color, and snaps the preview transform to the occupation result.
+     */
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ApplyBuildTemplatePlacementPreviewStatus(
+      const Wm3::Vector3f& worldPosition,
+      const RUnitBlueprint* const buildBlueprint,
+      VTransform& previewTransform,
+      CWldSession& session,
+      std::uint32_t& outPreviewColor
+    )
+    {
+      SOccupationResult occupation{};
+      const SCoordsVec2 buildPosition = BuildPreviewCoordsFromWorldPosition(worldPosition);
+      const bool canBuild = USERUNIT_CanBeBuiltAt(session, buildBlueprint, buildPosition, false, &occupation, nullptr);
+
+      outPreviewColor = SelectBuildPreviewColor(session, canBuild);
+      CopyOccupationPositionToPreviewTransform(occupation, previewTransform);
+      return outPreviewColor;
+    }
+
+    /**
+     * Address: 0x00854860 (FUN_00854860, sub_854860)
+     *
+     * Moho::CommandModeData const &, Wm3::Vector3f const &, Moho::CWldSession &, Moho::VTransform &, std::uint32_t &
+     *
+     * IDA signature:
+     * float *__userpurge sub_854860@<eax>(_DWORD *a1@<edi>, float *a2@<esi>, int a3, float *arg4, int *a5);
+     *
+     * What it does:
+     * Evaluates single-blueprint build preview placement, including anchored
+     * build-distance validation, then writes preview color and snapped transform.
+     */
+    [[maybe_unused]] [[nodiscard]] VTransform* ApplyCommandModeBuildPlacementPreviewStatus(
+      const CommandModeData& commandMode,
+      const Wm3::Vector3f& worldPosition,
+      CWldSession& session,
+      VTransform& previewTransform,
+      std::uint32_t& outPreviewColor
+    )
+    {
+      const auto* const buildBlueprint = static_cast<const RUnitBlueprint*>(commandMode.mBlueprint);
+      const SCoordsVec2 buildPosition = BuildPreviewCoordsFromWorldPosition(worldPosition);
+
+      bool withinBuildDistance = true;
+      if (commandMode.mMode == COMMOD_BuildAnchored) {
+        withinBuildDistance = USERUNIT_WithinBuildDistance(session, buildBlueprint, buildPosition);
+      }
+
+      SOccupationResult occupation{};
+      const bool canBuild = USERUNIT_CanBeBuiltAt(session, buildBlueprint, buildPosition, false, &occupation, nullptr);
+
+      outPreviewColor = SelectBuildPreviewColor(session, withinBuildDistance && canBuild);
+      CopyOccupationPositionToPreviewTransform(occupation, previewTransform);
+      return &previewTransform;
     }
 
     struct StrategicIconAuxView
@@ -3546,6 +3620,84 @@ namespace moho
         }
         outEntities.push_back(entity);
       }
+    }
+
+    /**
+     * Address: 0x0081D160 (FUN_0081D160)
+     *
+     * What it does:
+     * Returns true when at least one live entity in the current selection is in
+     * the `TELEPORTATION` category.
+     */
+    [[maybe_unused]] [[nodiscard]] bool SelectionContainsTeleportationUnit(SSelectionSetUserEntity& selection)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return false;
+      }
+
+      msvc8::string teleportationCategory("TELEPORTATION");
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        if (entity != nullptr && entity->IsInCategory(teleportationCategory)) {
+          return true;
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      return false;
+    }
+
+    /**
+     * Address: 0x0081DB40 (FUN_0081DB40, func_CoordinatedAttack)
+     *
+     * What it does:
+     * Returns true when the dragged command is an attack/form-attack command
+     * and no live selected user-unit already has that command helper queued.
+     */
+    [[maybe_unused]] [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
+    {
+      UserCommandIssueHelper* const helper = FindCommandIssueHelperInSession(&session, commandId);
+      if (helper == nullptr) {
+        return false;
+      }
+
+      const EUnitCommandType commandType = ResolveCommandIssueHelperCommandType(*helper);
+      if (commandType != EUnitCommandType::UNITCOMMAND_Attack &&
+          commandType != EUnitCommandType::UNITCOMMAND_FormAttack) {
+        return false;
+      }
+
+      SSelectionSetUserEntity& selection = session.mSelection;
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return true;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+        IUnit* const iunit = ResolveIUnitBridge(userUnit);
+        if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
+          auto* const manager = reinterpret_cast<UserUnitManager*>(
+            static_cast<std::uintptr_t>(static_cast<std::uint32_t>(userUnit->GetCommandQueue2()))
+          );
+          if (UserUnitManagerContainsCommandIssueHelper(manager, helper)) {
+            return false;
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      return true;
     }
 
     [[nodiscard]] bool
@@ -7897,6 +8049,7 @@ namespace moho
     HighlightCommandId = -1;
 
     IsCheatsEnabled = false;
+    mShowInvalidBuildPlacementPreview = false;
     DisplayEconomyOverlay = false;
     mTeamColorMode = false;
 
@@ -8565,6 +8718,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00896A40 (FUN_00896A40, ?GetActiveBuildTemplate@CWldSession@Moho@@QBE?AV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@AAH0@Z)
+   *
+   * What it does:
+   * Copies the active build-template buffer into one caller-owned inline
+   * fastvector lane and returns the current template X/Z extents.
+   */
+  SBuildTemplateBuffer* CWldSession::GetActiveBuildTemplate(
+    float* const outTemplateSpanZ,
+    float* const outTemplateSpanX,
+    SBuildTemplateBuffer* const result
+  ) const
+  {
+    *outTemplateSpanX = mBuildTemplateArg1;
+    *outTemplateSpanZ = mBuildTemplateArg2;
+    return RebindAndCopyBuildTemplateBufferInline(result, mBuildTemplates);
+  }
+
+  /**
    * Address: 0x00896AA0 (FUN_00896AA0, ?GenerateBuildTemplates@CWldSession@Moho@@QAEXXZ)
    */
   void CWldSession::GenerateBuildTemplates()
@@ -8669,6 +8840,70 @@ namespace moho
   }
 
   /**
+   * Address: 0x00899790 (FUN_00899790,
+   *   gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator=)
+   *
+   * What it does:
+   * Per-T named helper that drives the engine-emitted assignment-operator
+   * body of `gpg::fastvector_n<SBuildTemplateInfo, 16>`. Performs the
+   * self-assignment guard, then either copies into the existing tail when
+   * destination has spare capacity, grows storage and copies otherwise, or
+   * truncates+copies when destination already has more elements than source.
+   *
+   * The body is expressed in terms of the recovered build-template helpers
+   * (`DestroyBuildTemplateRange`, `RebindAndCopyBuildTemplateBufferInline`)
+   * so we preserve the existing source-level invocation graph; the linker
+   * keeps the FUN_00899790 symbol bound because the call from
+   * `CWldSession::SetActiveBuildTemplate` invokes this named entry directly.
+   */
+  void AssignBuildTemplateBuffer(SBuildTemplateBuffer& destination, const SBuildTemplateBuffer& source)
+  {
+    if (&destination == &source) {
+      return;
+    }
+
+    SBuildTemplateInfo* const oldStart = destination.mStart;
+    SBuildTemplateInfo* const oldFinish = destination.mFinish;
+    if (oldStart && oldFinish && oldStart <= oldFinish) {
+      DestroyBuildTemplateRange(oldStart, oldFinish);
+    }
+
+    SBuildTemplateInfo* const inlineStart = reinterpret_cast<SBuildTemplateInfo*>(&destination.mInlineStorage[0]);
+    if (oldStart && oldStart != inlineStart && oldStart != destination.mOriginalStart) {
+      ::operator delete[](oldStart);
+    }
+
+    destination.mStart = inlineStart;
+    destination.mFinish = inlineStart;
+    destination.mCapacity = inlineStart + 16u;
+    destination.mOriginalStart = inlineStart;
+
+    (void)RebindAndCopyBuildTemplateBufferInline(&destination, source);
+  }
+
+  /**
+   * Address: 0x00896A70 (FUN_00896A70,
+   *   ?SetActiveBuildTemplate@CWldSession@Moho@@QAEXABV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@HH@Z)
+   *
+   * What it does:
+   * Replaces the active build-template fastvector buffer with `templates`
+   * and records the placement preview anchor as (`templateSpanX`,
+   * `templateSpanZ`). The buffer copy is delegated to the per-T named
+   * assignment helper `moho::AssignBuildTemplateBuffer` (FUN_00899790) so
+   * the linker keeps the engine-emitted assignment symbol bound.
+   */
+  void CWldSession::SetActiveBuildTemplate(
+    const SBuildTemplateBuffer& templates,
+    const float templateSpanX,
+    const float templateSpanZ
+  )
+  {
+    AssignBuildTemplateBuffer(mBuildTemplates, templates);
+    mBuildTemplateArg1 = templateSpanX;
+    mBuildTemplateArg2 = templateSpanZ;
+  }
+
+  /**
    * Address: 0x00895EB0 (FUN_00895EB0,
    * ?GetCommandGraph@CWldSession@Moho@@QAE?AV?$shared_ptr@VUICommandGraph@Moho@@@boost@@_N@Z)
    */
@@ -8743,6 +8978,61 @@ namespace moho
       graph.px->MarkDirty();
     }
     graph.release();
+  }
+
+  /**
+   * Address: 0x008958B0 (FUN_008958B0, ?ApplyPendingSaveData@CWldSession@Moho@@AAEXXZ)
+   *
+   * What it does:
+   * Replays save-data selection-set labels onto live user units, groups those
+   * units by selection-set name in Lua, calls
+   * `/lua/ui/game/selection.lua:ResetSelectionSets`, then releases the pending
+   * save-data shared pointer.
+   */
+  void CWldSession::ApplyPendingSaveData()
+  {
+    LuaPlus::LuaObject selectionSetsByName;
+    selectionSetsByName.AssignNewTable(mState, 0, 0);
+
+    SSessionSaveData& saveData = *mPendingSaveData;
+    SSessionSaveNodeMapNode* const head = saveData.mNodeMap.mHead;
+    for (SSessionSaveNodeMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
+      UserEntity* const entity = LookupEntityId(static_cast<EntId>(node->mLabel.mCommandSourceId));
+      if (entity == nullptr) {
+        continue;
+      }
+
+      UserUnit* const unit = entity->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      const char* const selectionSetName = node->mLabel.mSaveNodeName.c_str();
+      unit->AddSelectionSet(selectionSetName);
+
+      LuaPlus::LuaObject setUnits = selectionSetsByName[selectionSetName];
+      if (setUnits.IsNil()) {
+        setUnits.AssignNewTable(mState, 0, 0);
+        selectionSetsByName.SetObject(selectionSetName, setUnits);
+      }
+
+      IUnit* const iunitBridge = ResolveIUnitBridge(unit);
+      LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
+      setUnits.Insert(setUnits.GetN() + 1, unitObject);
+    }
+
+    try {
+      LuaPlus::LuaObject selectionModule = SCR_Import(mState, "/lua/ui/game/selection.lua");
+      LuaPlus::LuaFunction<> resetSelectionSets(selectionModule["ResetSelectionSets"]);
+      resetSelectionSets.Call_Object(selectionSetsByName);
+    } catch (const std::exception& exception) {
+      gpg::Warnf(
+        "Unable to reset selection sets: %s",
+        exception.what() != nullptr ? exception.what() : ""
+      );
+    }
+
+    mPendingSaveData.reset();
   }
 
   /**

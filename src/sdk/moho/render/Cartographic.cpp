@@ -1,22 +1,38 @@
 #include "moho/render/Cartographic.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstring>
 #include <limits>
 #include <new>
 #include <stdexcept>
 
 #include "gpg/core/streams/BinaryWriter.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
+#include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/VertexBufferContext.hpp"
 #include "legacy/containers/String.h"
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
+#include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 
 namespace
 {
   constexpr std::size_t kCartographicNodeStorageSize = 0x7C;
+  constexpr std::size_t kCartographicDecalNodeStorageSize = 0x30;
 
   /**
    * Address: 0x007D4000 (FUN_007D4000, sub_7D4000)
@@ -56,8 +72,8 @@ namespace
   [[nodiscard]] moho::CartographicListNode* CreateCartographicListSentinel()
   {
     auto* const sentinel = static_cast<moho::CartographicListNode*>(AllocateCartographicNodeStorage(1u));
-    sentinel->mPrev = sentinel;
     sentinel->mNext = sentinel;
+    sentinel->mPrev = sentinel;
     return sentinel;
   }
 
@@ -102,110 +118,39 @@ namespace
     boost::shared_ptr<gpg::gal::EffectD3D9> owner;
   };
 
-  struct CartographicDecalPayloadView final
-  {
-    std::uint32_t mUnknown00; // +0x00
-    std::uint32_t mRange04[2]; // +0x04
-    std::uint32_t mLayer0C; // +0x0C
-    std::uint32_t mRange10[2]; // +0x10
-    std::uint32_t mRange18[2]; // +0x18
-    std::uint32_t mRange20[2]; // +0x20
+  constexpr std::array<float, 8> kCartographicQuadVertices{
+    -1.0f, 1.0f,
+    -1.0f, -1.0f,
+    1.0f, 1.0f,
+    1.0f, -1.0f,
   };
 
-  static_assert(sizeof(CartographicDecalPayloadView) == 0x28, "CartographicDecalPayloadView size must be 0x28");
-
-  struct CartographicDecalNodeView final
-  {
-    CartographicDecalNodeView* mPrev; // +0x00
-    CartographicDecalNodeView* mNext; // +0x04
-    CartographicDecalPayloadView mPayload; // +0x08
+  constexpr std::array<std::uint32_t, 3> kCartographicQuadIndexWords{
+    0x00010000u,
+    0x00030002u,
+    0x00010002u,
   };
 
-  static_assert(offsetof(CartographicDecalNodeView, mPayload) == 0x08, "CartographicDecalNodeView::mPayload offset must be 0x08");
-  static_assert(sizeof(CartographicDecalNodeView) == 0x30, "CartographicDecalNodeView size must be 0x30");
+  constexpr std::uint32_t kCartographicVertexFormatToken = 22U;
+  constexpr std::uint32_t kCartographicTopologyTriangleList = 4U;
+  constexpr std::uint32_t kCartographicQuadVertexCount = 4U;
+  constexpr std::uint32_t kCartographicQuadPrimitiveCountInput = 6U;
+  constexpr std::uint32_t kCartographicMaxDecalInstances = 1024U;
+  constexpr std::uint32_t kCartographicInstanceFloatCount = 9U;
 
-  struct CartographicDecalListRuntimeView final
+  /**
+   * Address: 0x007D5B50 (FUN_007D5B50, sub_7D5B50)
+   *
+   * What it does:
+   * Resolves the `"cartographic"` effect from device resources and returns its
+   * base D3D9 GAL effect handle.
+   */
+  [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> GetCartographicBaseEffectD3D9()
   {
-    void* mAllocatorCookie; // +0x00
-    CartographicDecalNodeView* mDecalSentinel; // +0x04
-    std::int32_t mDecalCount; // +0x08
-  };
-
-  static_assert(
-    offsetof(CartographicDecalListRuntimeView, mDecalSentinel) == 0x04,
-    "CartographicDecalListRuntimeView::mDecalSentinel offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CartographicDecalListRuntimeView, mDecalCount) == 0x08,
-    "CartographicDecalListRuntimeView::mDecalCount offset must be 0x08"
-  );
-  static_assert(sizeof(CartographicDecalListRuntimeView) == 0x0C, "CartographicDecalListRuntimeView size must be 0x0C");
-
-  struct CartographicDecalBatchRuntimeView final
-  {
-    void* mVtable; // +0x00
-    msvc8::string mNameLane04; // +0x04
-    msvc8::string mNameLane20; // +0x20
-    boost::shared_ptr<void> mHandleLane3C; // +0x3C
-    boost::shared_ptr<void> mHandleLane44; // +0x44
-    boost::shared_ptr<void> mHandleLane4C; // +0x4C
-    boost::shared_ptr<void> mHandleLane54; // +0x54
-    boost::shared_ptr<void> mHandleLane5C; // +0x5C
-    bool mIsShutdown; // +0x64
-    std::uint8_t mPad65_67[3]; // +0x65
-    CartographicDecalListRuntimeView mDecals; // +0x68
-  };
-
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mNameLane04) == 0x04,
-    "CartographicDecalBatchRuntimeView::mNameLane04 offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mNameLane20) == 0x20,
-    "CartographicDecalBatchRuntimeView::mNameLane20 offset must be 0x20"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mHandleLane3C) == 0x3C,
-    "CartographicDecalBatchRuntimeView::mHandleLane3C offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mHandleLane44) == 0x44,
-    "CartographicDecalBatchRuntimeView::mHandleLane44 offset must be 0x44"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mHandleLane4C) == 0x4C,
-    "CartographicDecalBatchRuntimeView::mHandleLane4C offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mHandleLane54) == 0x54,
-    "CartographicDecalBatchRuntimeView::mHandleLane54 offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mHandleLane5C) == 0x5C,
-    "CartographicDecalBatchRuntimeView::mHandleLane5C offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mIsShutdown) == 0x64,
-    "CartographicDecalBatchRuntimeView::mIsShutdown offset must be 0x64"
-  );
-  static_assert(
-    offsetof(CartographicDecalBatchRuntimeView, mDecals) == 0x68,
-    "CartographicDecalBatchRuntimeView::mDecals offset must be 0x68"
-  );
-  static_assert(sizeof(CartographicDecalBatchRuntimeView) == 0x74, "CartographicDecalBatchRuntimeView size must be 0x74");
-
-  [[nodiscard]] CartographicDecalBatchRuntimeView* AsCartographicDecalBatchRuntimeView(
-    moho::CartographicDecalBatch* const batch
-  ) noexcept
-  {
-    return reinterpret_cast<CartographicDecalBatchRuntimeView*>(batch);
-  }
-
-  [[nodiscard]] const CartographicDecalBatchRuntimeView* AsCartographicDecalBatchRuntimeView(
-    const moho::CartographicDecalBatch* const batch
-  ) noexcept
-  {
-    return reinterpret_cast<const CartographicDecalBatchRuntimeView*>(batch);
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    moho::ID3DDeviceResources* const resources = device->GetResources();
+    moho::CD3DEffect* const effect = resources->FindEffect("cartographic");
+    return effect->GetBaseEffect();
   }
 
   /**
@@ -215,24 +160,154 @@ namespace
    * Clears one cartographic decal intrusive-list payload lane, relinks the
    * sentinel to itself, and deletes all detached nodes.
    */
-  void ClearCartographicDecalList(CartographicDecalListRuntimeView* const list) noexcept
+  void ClearCartographicDecalList(moho::CartographicDecalList* const list) noexcept
   {
     if (list == nullptr || list->mDecalSentinel == nullptr) {
       return;
     }
 
-    CartographicDecalNodeView* const sentinel = list->mDecalSentinel;
-    CartographicDecalNodeView* node = sentinel->mNext;
+    moho::CartographicDecalNode* const sentinel = list->mDecalSentinel;
+    moho::CartographicDecalNode* node = sentinel->mNext;
 
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
     list->mDecalCount = 0;
 
     while (node != nullptr && node != sentinel) {
-      CartographicDecalNodeView* const next = node->mNext;
+      moho::CartographicDecalNode* const next = node->mNext;
+      node->mDecal.~CartographicDecal();
       ::operator delete(node);
       node = next;
     }
+  }
+
+  [[nodiscard]] void* AllocateCartographicDecalNodeStorage(const std::uint32_t count)
+  {
+    if (count != 0u && (std::numeric_limits<std::uint32_t>::max() / count) < kCartographicDecalNodeStorageSize) {
+      throw std::bad_alloc();
+    }
+
+    return ::operator new(static_cast<std::size_t>(count) * kCartographicDecalNodeStorageSize);
+  }
+
+  [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalSentinelNode()
+  {
+    auto* const sentinel = static_cast<moho::CartographicDecalNode*>(AllocateCartographicDecalNodeStorage(1u));
+    sentinel->mNext = sentinel;
+    sentinel->mPrev = sentinel;
+    return sentinel;
+  }
+
+  [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalNodeBefore(
+    moho::CartographicDecalNode* const next,
+    moho::CartographicDecalNode* const prev,
+    const moho::CartographicDecal& decal
+  )
+  {
+    auto* const node = static_cast<moho::CartographicDecalNode*>(AllocateCartographicDecalNodeStorage(1u));
+    node->mNext = next;
+    node->mPrev = prev;
+    try {
+      ::new (static_cast<void*>(&node->mDecal)) moho::CartographicDecal(decal);
+    } catch (...) {
+      ::operator delete(node);
+      throw;
+    }
+
+    return node;
+  }
+
+  /**
+   * Address: 0x007D4230 (FUN_007D4230, sub_7D4230)
+   *
+   * What it does:
+   * Initializes a destination cartographic decal list with a fresh sentinel
+   * and deep-copies every source decal node in list order.
+   */
+  void CopyCartographicDecalList(
+    moho::CartographicDecalList& destination,
+    const moho::CartographicDecalList& source
+  )
+  {
+    destination.mAllocatorCookie = nullptr;
+    destination.mDecalSentinel = CreateCartographicDecalSentinelNode();
+    destination.mDecalCount = 0;
+
+    try {
+      const moho::CartographicDecalNode* const sourceSentinel = source.mDecalSentinel;
+      if (sourceSentinel != nullptr) {
+        for (const moho::CartographicDecalNode* sourceNode = sourceSentinel->mNext;
+             sourceNode != sourceSentinel;
+             sourceNode = sourceNode->mNext) {
+          moho::CartographicDecalNode* const sentinel = destination.mDecalSentinel;
+          moho::CartographicDecalNode* const node =
+            CreateCartographicDecalNodeBefore(sentinel, sentinel->mPrev, sourceNode->mDecal);
+          sentinel->mPrev = node;
+          node->mPrev->mNext = node;
+          ++destination.mDecalCount;
+        }
+      }
+    } catch (...) {
+      ClearCartographicDecalList(&destination);
+      ::operator delete(destination.mDecalSentinel);
+      destination.mDecalSentinel = nullptr;
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x007D3BC0 (FUN_007D3BC0, sub_7D3BC0)
+   *
+   * What it does:
+   * Clears the cartographic decal-batch intrusive list, relinks the sentinel
+   * to itself, destroys every batch node, and resets the owner count.
+   */
+  void ClearCartographicBatchList(moho::Cartographic& owner) noexcept
+  {
+    moho::CartographicListNode* const sentinel = owner.mListSentinel;
+    if (sentinel == nullptr) {
+      owner.mRuntimeLane60 = 0;
+      return;
+    }
+
+    moho::CartographicListNode* node = sentinel->mNext;
+    sentinel->mNext = sentinel;
+    sentinel->mPrev = sentinel;
+    owner.mRuntimeLane60 = 0;
+
+    while (node != nullptr && node != sentinel) {
+      moho::CartographicListNode* const next = node->mNext;
+      node->mBatch.~CartographicDecalBatch();
+      ::operator delete(node);
+      node = next;
+    }
+  }
+
+  /**
+   * Address: 0x007D3D70 (FUN_007D3D70, sub_7D3D70)
+   *
+   * What it does:
+   * Allocates one cartographic batch-list node, installs caller-provided
+   * intrusive links, and copy-constructs the embedded decal batch.
+   */
+  [[nodiscard]] moho::CartographicListNode* CreateCartographicBatchNode(
+    moho::CartographicListNode* const next,
+    moho::CartographicListNode* const prev,
+    const moho::CartographicDecalBatch& sourceBatch
+  )
+  {
+    auto* const node = static_cast<moho::CartographicListNode*>(AllocateCartographicNodeStorage(1u));
+    node->mNext = next;
+    node->mPrev = prev;
+
+    try {
+      ::new (static_cast<void*>(&node->mBatch)) moho::CartographicDecalBatch(sourceBatch);
+    } catch (...) {
+      ::operator delete(node);
+      throw;
+    }
+
+    return node;
   }
 
   /**
@@ -244,18 +319,12 @@ namespace
    */
   void WriteCartographicDecalPayload(
     gpg::BinaryWriter& writer,
-    const CartographicDecalPayloadView& payload
+    const moho::CartographicDecal& decal
   )
   {
-    writer.Write(payload.mRange04[0]);
-    writer.Write(payload.mRange04[1]);
-    writer.Write(payload.mLayer0C);
-    writer.Write(payload.mRange10[0]);
-    writer.Write(payload.mRange10[1]);
-    writer.Write(payload.mRange18[0]);
-    writer.Write(payload.mRange18[1]);
-    writer.Write(payload.mRange20[0]);
-    writer.Write(payload.mRange20[1]);
+    for (const float value : decal.mVertexData) {
+      writer.Write(value);
+    }
   }
 
   struct HeightFieldKernelSampleRuntimeView
@@ -331,26 +400,52 @@ namespace moho
   CartographicDecal::CartographicDecal() = default;
 
   /**
+   * Address: 0x007D40E0 (FUN_007D40E0, ??0CartographicDecalBatch@Moho@@QAE@@Z)
+   *
+   * IDA signature:
+   * int __thiscall Moho::CartographicDecalBatch::CartographicDecalBatch(int source, int destination);
+   *
+   * What it does:
+   * Copy-constructs one cartographic decal batch, retaining shared render
+   * handles and deep-copying the intrusive decal payload list.
+   */
+  CartographicDecalBatch::CartographicDecalBatch(const CartographicDecalBatch& other)
+    : mTechniqueName(),
+      mTexturePath(),
+      mDecalTexture(other.mDecalTexture),
+      mVertexFormat(other.mVertexFormat),
+      mQuadVertexBuffer(other.mQuadVertexBuffer),
+      mInstanceVertexBuffer(other.mInstanceVertexBuffer),
+      mIndexBuffer(other.mIndexBuffer),
+      mNeedsVertexUpload(other.mNeedsVertexUpload),
+      mPadding65_67{},
+      mDecals{}
+  {
+    mTechniqueName.reset_and_assign(other.mTechniqueName);
+    mTexturePath.reset_and_assign(other.mTexturePath);
+    CopyCartographicDecalList(mDecals, other.mDecals);
+  }
+
+  /**
    * Address: 0x007D4E60 (FUN_007D4E60, ?Shutdown@CartographicDecalBatch@Moho@@QAEXXZ)
    *
    * What it does:
    * Clears both batch name/string lanes, releases retained shared resource
-   * handles, clears intrusive decal nodes, and marks this batch as shut down.
+   * handles, clears intrusive decal nodes, and marks the vertex upload lane dirty.
    */
   void CartographicDecalBatch::Shutdown()
   {
-    auto* const batch = AsCartographicDecalBatchRuntimeView(this);
-    batch->mNameLane04.clear();
-    batch->mNameLane20.clear();
+    mTechniqueName.clear();
+    mTexturePath.clear();
 
-    batch->mHandleLane3C.reset();
-    batch->mHandleLane44.reset();
-    batch->mHandleLane4C.reset();
-    batch->mHandleLane54.reset();
-    batch->mHandleLane5C.reset();
+    mDecalTexture.reset();
+    mVertexFormat.reset();
+    mQuadVertexBuffer.reset();
+    mInstanceVertexBuffer.reset();
+    mIndexBuffer.reset();
 
-    ClearCartographicDecalList(&batch->mDecals);
-    batch->mIsShutdown = true;
+    ClearCartographicDecalList(&mDecals);
+    mNeedsVertexUpload = true;
   }
 
   /**
@@ -362,23 +457,22 @@ namespace moho
    */
   CartographicDecalBatch::~CartographicDecalBatch()
   {
-    auto* const batch = AsCartographicDecalBatchRuntimeView(this);
     Shutdown();
-    ClearCartographicDecalList(&batch->mDecals);
+    ClearCartographicDecalList(&mDecals);
 
-    if (batch->mDecals.mDecalSentinel != nullptr) {
-      ::operator delete(batch->mDecals.mDecalSentinel);
-      batch->mDecals.mDecalSentinel = nullptr;
+    if (mDecals.mDecalSentinel != nullptr) {
+      ::operator delete(mDecals.mDecalSentinel);
+      mDecals.mDecalSentinel = nullptr;
     }
 
-    batch->mHandleLane5C.reset();
-    batch->mHandleLane54.reset();
-    batch->mHandleLane4C.reset();
-    batch->mHandleLane44.reset();
-    batch->mHandleLane3C.reset();
+    mIndexBuffer.reset();
+    mInstanceVertexBuffer.reset();
+    mQuadVertexBuffer.reset();
+    mVertexFormat.reset();
+    mDecalTexture.reset();
 
-    batch->mNameLane20.tidy(true, 0U);
-    batch->mNameLane04.tidy(true, 0U);
+    mTexturePath.tidy(true, 0U);
+    mTechniqueName.tidy(true, 0U);
   }
 
   /**
@@ -415,6 +509,48 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D11B0 (FUN_007D11B0, ??1Cartographic@Moho@@UAE@XZ)
+   *
+   * IDA signature:
+   * void __thiscall Moho::Cartographic::~Cartographic(Moho::Cartographic* this);
+   *
+   * What it does:
+   * Shuts down all cartographic render resources, releases retained handles,
+   * clears decal-batch storage, and deletes the list sentinel.
+   */
+  Cartographic::~Cartographic()
+  {
+    Shutdown();
+    ClearCartographicBatchList(*this);
+    ::operator delete(mListSentinel);
+    mListSentinel = nullptr;
+  }
+
+  /**
+   * Address: 0x007D14B0 (FUN_007D14B0, ?Shutdown@Cartographic@Moho@@QAEXXZ)
+   *
+   * IDA signature:
+   * void __stdcall Moho::Cartographic::Shutdown(Moho::Cartographic* this);
+   *
+   * What it does:
+   * Clears cartographic decal batches, releases render/runtime handles, resets
+   * projection state, and marks the runtime uninitialized.
+   */
+  void Cartographic::Shutdown()
+  {
+    ClearCartographicBatchList(*this);
+
+    for (boost::shared_ptr<void>& handle : mRuntimeHandles) {
+      handle.reset();
+    }
+
+    mProjectionScaleX = 0.0f;
+    mProjectionScaleY = 0.0f;
+    mProjectionScaleZ = 0.0f;
+    mInitialized = false;
+  }
+
+  /**
    * Address: 0x007D1700 (FUN_007D1700, ?IsInitialized@Cartographic@Moho@@QBE_NXZ)
    *
    * What it does:
@@ -435,21 +571,20 @@ namespace moho
   std::int32_t InsertCartographicDecalBatchCopy(const CartographicDecalBatch& sourceBatch, Cartographic& owner)
   {
     CartographicListNode* const sentinel = owner.mListSentinel;
-    auto* const node = static_cast<CartographicListNode*>(AllocateCartographicNodeStorage(1u));
-    node->mPrev = sentinel;
-    node->mNext = sentinel->mNext;
-    ::new (static_cast<void*>(&node->mBatch)) CartographicDecalBatch(sourceBatch);
+    CartographicListNode* const node = CreateCartographicBatchNode(sentinel, sentinel->mPrev, sourceBatch);
 
     constexpr std::int32_t kMaxNodeCountBeforeOverflow = 0x0234F72C;
     if (owner.mRuntimeLane60 == kMaxNodeCountBeforeOverflow) {
+      node->mBatch.~CartographicDecalBatch();
+      ::operator delete(node);
       throw std::length_error("list<T> too long");
     }
 
     const std::int32_t newCount = owner.mRuntimeLane60 + 1;
     owner.mRuntimeLane60 = newCount;
 
-    sentinel->mNext = node;
-    node->mNext->mPrev = node;
+    sentinel->mPrev = node;
+    node->mPrev->mNext = node;
     return newCount;
   }
 
@@ -458,20 +593,20 @@ namespace moho
    *
    * What it does:
    * Unlinks and destroys one non-sentinel decal-batch node and returns the
-   * predecessor node used by the legacy iterator-erase lane.
+   * successor node used by the legacy iterator-erase lane.
    */
   CartographicListNode* EraseCartographicDecalBatchNode(Cartographic& owner, CartographicListNode* const node)
   {
-    CartographicListNode* const predecessor = node->mPrev;
+    CartographicListNode* const successor = node->mNext;
     if (node != owner.mListSentinel) {
-      node->mNext->mPrev = predecessor;
-      predecessor->mNext = node->mNext;
+      node->mPrev->mNext = successor;
+      successor->mPrev = node->mPrev;
       node->mBatch.~CartographicDecalBatch();
       ::operator delete(node);
       --owner.mRuntimeLane60;
     }
 
-    return predecessor;
+    return successor;
   }
 
   /**
@@ -502,15 +637,172 @@ namespace moho
   */
   void CartographicDecalBatch::Write(gpg::BinaryWriter& writer)
   {
-    const auto* const batch = AsCartographicDecalBatchRuntimeView(this);
-    writer.Write(reinterpret_cast<const char*>(&batch->mNameLane04), sizeof(batch->mNameLane04));
-    writer.Write(reinterpret_cast<const char*>(&batch->mNameLane20), sizeof(batch->mNameLane20));
-    writer.Write(batch->mDecals.mDecalCount);
+    writer.Write(reinterpret_cast<const char*>(&mTechniqueName), sizeof(mTechniqueName));
+    writer.Write(reinterpret_cast<const char*>(&mTexturePath), sizeof(mTexturePath));
+    writer.Write(mDecals.mDecalCount);
 
-    const CartographicDecalNodeView* const sentinel = batch->mDecals.mDecalSentinel;
-    for (const CartographicDecalNodeView* node = sentinel->mNext; node != sentinel; node = node->mNext) {
-      WriteCartographicDecalPayload(writer, node->mPayload);
+    const CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
+    for (const CartographicDecalNode* node = sentinel->mNext; node != sentinel; node = node->mNext) {
+      WriteCartographicDecalPayload(writer, node->mDecal);
     }
+  }
+
+  /**
+   * Address: 0x007D56C0 (FUN_007D56C0, sub_7D56C0)
+   *
+   * What it does:
+   * Lazily creates the cartographic decal vertex declaration, quad vertex
+   * buffer, dynamic decal-instance buffer, and quad index buffer.
+   */
+  void CartographicDecalBatch::InitializeRenderResources()
+  {
+    if (mVertexFormat) {
+      return;
+    }
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+
+    boost::shared_ptr<gpg::gal::VertexFormatD3D9> vertexFormat;
+    device->CreateVertexFormat(&vertexFormat, kCartographicVertexFormatToken);
+    mVertexFormat = vertexFormat;
+
+    gpg::gal::VertexBufferContext quadVertexContext{};
+    quadVertexContext.type_ = 2U;
+    quadVertexContext.usage_ = 1U;
+    quadVertexContext.width_ = kCartographicQuadVertexCount;
+    quadVertexContext.height_ = static_cast<std::uint32_t>(sizeof(float) * 2U);
+
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> quadVertexBuffer;
+    device->CreateVertexBuffer(&quadVertexBuffer, &quadVertexContext);
+    mQuadVertexBuffer = quadVertexBuffer;
+
+    void* const quadVertexData = mQuadVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
+    std::memcpy(quadVertexData, kCartographicQuadVertices.data(), sizeof(kCartographicQuadVertices));
+    (void)mQuadVertexBuffer->Unlock();
+
+    gpg::gal::VertexBufferContext instanceVertexContext{};
+    instanceVertexContext.type_ = 3U;
+    instanceVertexContext.usage_ = 2U;
+    instanceVertexContext.width_ = kCartographicMaxDecalInstances;
+    instanceVertexContext.height_ = static_cast<std::uint32_t>(sizeof(float) * kCartographicInstanceFloatCount);
+
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceVertexBuffer;
+    device->CreateVertexBuffer(&instanceVertexBuffer, &instanceVertexContext);
+    mInstanceVertexBuffer = instanceVertexBuffer;
+
+    gpg::gal::IndexBufferContext indexContext{};
+    indexContext.type_ = 1U;
+    indexContext.format_ = 1U;
+    indexContext.size_ = kCartographicQuadPrimitiveCountInput;
+
+    boost::shared_ptr<gpg::gal::IndexBufferD3D9> indexBuffer;
+    device->CreateIndexBuffer(&indexBuffer, &indexContext);
+    mIndexBuffer = indexBuffer;
+
+    auto* const indexWords = reinterpret_cast<std::uint32_t*>(
+      mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None)
+    );
+    std::memcpy(indexWords, kCartographicQuadIndexWords.data(), sizeof(kCartographicQuadIndexWords));
+    (void)mIndexBuffer->Unlock();
+  }
+
+  /**
+   * Address: 0x007D59C0 (FUN_007D59C0, sub_7D59C0)
+   *
+   * What it does:
+   * Lazily resolves the decal texture resource named by the texture-path
+   * string lane and retains its base GAL texture handle.
+   */
+  void CartographicDecalBatch::ResolveDecalTexture()
+  {
+    if (mDecalTexture) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+
+    ID3DDeviceResources::TextureResourceHandle textureResource;
+    resources->GetTexture(textureResource, mTexturePath.c_str(), 0, true);
+    if (textureResource) {
+      textureResource->GetTexture(mDecalTexture);
+    }
+  }
+
+  /**
+   * Address: 0x007D5AD0 (FUN_007D5AD0, sub_7D5AD0)
+   *
+   * What it does:
+   * Uploads each decal node's nine-float instance payload into the dynamic
+   * decal vertex buffer when the dirty flag is set.
+   */
+  void CartographicDecalBatch::UploadDecalVerticesIfDirty()
+  {
+    if (!mNeedsVertexUpload) {
+      return;
+    }
+
+    float* writeCursor = static_cast<float*>(mInstanceVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None));
+    CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
+    for (CartographicDecalNode* node = sentinel->mNext; node != sentinel; node = node->mNext) {
+      std::memcpy(writeCursor, node->mDecal.mVertexData, sizeof(node->mDecal.mVertexData));
+      writeCursor += kCartographicInstanceFloatCount;
+    }
+
+    (void)mInstanceVertexBuffer->Unlock();
+    mNeedsVertexUpload = false;
+  }
+
+  /**
+   * Address: 0x007D50D0 (FUN_007D50D0, sub_7D50D0)
+   *
+   * What it does:
+   * Ensures cartographic decal GPU resources and texture state exist, uploads
+   * dirty decal instance vertices, binds the cartographic effect, and draws
+   * one instanced quad pass for each technique pass.
+   */
+  void CartographicDecalBatch::Render(const bool enabled, const std::int32_t tick, const GeomCamera3& camera)
+  {
+    (void)enabled;
+    (void)tick;
+
+    InitializeRenderResources();
+    const std::int32_t decalCount = mDecals.mDecalCount;
+    ResolveDecalTexture();
+
+    if (decalCount == 0 || !mDecalTexture) {
+      return;
+    }
+
+    UploadDecalVerticesIfDirty();
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = GetCartographicBaseEffectD3D9();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique(mTechniqueName.c_str());
+
+    device->SetVertexDeclaration(mVertexFormat);
+    device->SetVertexBuffer(0U, mQuadVertexBuffer, decalCount, 0);
+    device->SetVertexBuffer(1U, mInstanceVertexBuffer, 1, 0);
+    device->SetBufferIndices(mIndexBuffer);
+
+    effect->SetMatrix("viewMatrix")->SetMatrix4x4(&camera.view);
+    effect->SetMatrix("projMatrix")->SetMatrix4x4(&camera.projection);
+    effect->SetMatrix("decalTexture")->SetTexture(mDecalTexture);
+
+    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::DrawIndexedContext drawContext(
+        static_cast<int>(kCartographicTopologyTriangleList),
+        static_cast<int>(kCartographicQuadVertexCount),
+        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        0,
+        0
+      );
+      (void)device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
   }
 
   /**
@@ -522,10 +814,7 @@ namespace moho
    */
   boost::shared_ptr<gpg::gal::Effect> Cartographic::GetEffect()
   {
-    CD3DDevice* const device = D3D_GetDevice();
-    ID3DDeviceResources* const resources = device->GetResources();
-    CD3DEffect* const effect = resources->FindEffect("cartographic");
-    boost::shared_ptr<gpg::gal::EffectD3D9> baseEffect = effect->GetBaseEffect();
+    boost::shared_ptr<gpg::gal::EffectD3D9> baseEffect = GetCartographicBaseEffectD3D9();
     return boost::shared_ptr<gpg::gal::Effect>(
       reinterpret_cast<gpg::gal::Effect*>(baseEffect.get()),
       CartographicEffectAliasDeleter(baseEffect)

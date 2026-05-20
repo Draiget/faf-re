@@ -34,6 +34,17 @@ namespace gpg::gal
     std::mutex gStateManagerCacheMutex;
     std::unordered_map<const StateManagerD3D9*, StateManagerRuntimeCache> gStateManagerCaches;
 
+    /**
+     * Address: 0x00949C80 (FUN_00949C80) — render-state cache instantiation
+     * Address: 0x00949CE0 (FUN_00949CE0) — sampler-state cache instantiation
+     * Address: 0x00949D40 (FUN_00949D40) — texture-stage cache instantiation
+     *
+     * What it does:
+     * Find-or-insert helper that returns `false` only when the existing cache
+     * entry already maps `key` to `value`. The binary emits one specialization
+     * per state-table flavor; modern C++ template instantiation collapses them
+     * back into a single source helper.
+     */
     template <typename MapT, typename KeyT, typename ValueT>
     bool CacheValue(MapT& map, const KeyT key, const ValueT value)
     {

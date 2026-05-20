@@ -404,7 +404,7 @@ namespace moho
     replayReader.ReadExact(armyCount);
 
     launchInfo->mArmyLaunchInfo.clear();
-    launchInfo->mArmyLaunchInfo.resize(armyCount);
+    moho::ResizeArmyLaunchInfoVectorWithFill(launchInfo->mArmyLaunchInfo, armyCount, moho::ArmyLaunchInfo{});
     launchInfo->mStrVec.clear();
     launchInfo->mStrVec.reserve(armyCount);
 
@@ -471,7 +471,7 @@ namespace moho
       LuaPlus::LuaObject teamInfo = launchData["teamInfo"];
       LuaPlus::LuaTableIterator teamIterator(&teamInfo, 1);
       while (!teamIterator.m_isDone) {
-        launchInfo->mArmyLaunchInfo.push_back(ArmyLaunchInfo{});
+        moho::AppendArmyLaunchInfo(launchInfo->mArmyLaunchInfo, ArmyLaunchInfo{});
         launchInfo->mStrVec.push_back(SCR_ToString(teamIterator.GetValue()));
         teamIterator.Next();
       }
@@ -1041,7 +1041,7 @@ namespace moho
     for (std::size_t armyIndex = 0; armyIndex < mHeader.mArmyInfo.size(); ++armyIndex) {
       ArmyLaunchInfo armySourceInfo{};
       (void)armySourceInfo.mUnitSources.Add(0);
-      launchInfo->mArmyLaunchInfo.push_back(armySourceInfo);
+      moho::AppendArmyLaunchInfo(launchInfo->mArmyLaunchInfo, armySourceInfo);
     }
 
     launchInfo->mCommandSources.mOriginalSource = mHeader.mFocusArmy;

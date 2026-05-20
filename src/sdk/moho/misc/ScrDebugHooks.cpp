@@ -809,6 +809,37 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
 }
 
 /**
+ * Address: 0x004B4800 (FUN_004B4800, ?SCR_CreateDebugWindow@Moho@@YAXXZ)
+ *
+ * IDA signature:
+ * void __cdecl Moho::SCR_CreateDebugWindow(void)
+ *
+ * What it does:
+ * No-op when a script-debug window is already active. Otherwise captures the
+ * current thread id as the debug runtime owner, loads persisted breakpoints,
+ * allocates one `ScrDebugWindow` instance, publishes it to the runtime, and
+ * shows the window via the wx top-level virtual `Show(true)`. Matches the
+ * binary's `if (!sSrcDebugWindow) { cur_thread_id = GetCurrentThreadId();
+ * SCR_LoadBreakpoints(); window = new ScrDebugWindow(); sSrcDebugWindow =
+ * window; window->Show(1); }` shape, including the SEH-protected
+ * "delete on Show throw" cleanup path.
+ */
+void moho::SCR_CreateDebugWindow()
+{
+  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  if (runtime.debugWindow != nullptr) {
+    return;
+  }
+
+  runtime.debugWindowOwnerThreadId = ::GetCurrentThreadId();
+  SCR_LoadBreakpoints();
+
+  auto* const window = new ScrDebugWindow();
+  runtime.debugWindow = window;
+  (void)window->Show(true);
+}
+
+/**
  * Address: 0x004B4890 (FUN_004B4890, ?SCR_DestroyDebugWindow@Moho@@YAXXZ)
  *
  * IDA signature:

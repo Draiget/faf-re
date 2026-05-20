@@ -252,8 +252,8 @@ namespace
     std::int32_t* MPV_SetUsrSj(int handleAddress, int streamIndex, int streamObject, int streamCallback, int streamContext);
     std::int32_t* MPV_SetPicUsrBuf(int handleAddress, int userBufferAddress, int userContextAddress);
     std::uint8_t mpvhdec_ReadKernelIntraIdcPrec3(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
-    std::uint8_t sub_AFAE50(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
-    std::uint8_t sub_AFD7C0(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
+    std::uint8_t mpvhdec_ReadKernelIntraDefault(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
+    std::uint8_t mpvhdec_ReadKernelPredictedDefault(moho::movie::MPVDecoderScanContext* decoderContext, void* decodeState);
     /**
      * Address: 0x00AF60F0 (FUN_00AF60F0, _MPVUMC_Finish)
      *
@@ -1847,8 +1847,8 @@ extern "C" int mpvlib_InitHn(const int handleAddress)
   handle->sequenceStcCodeSecondary = 0;
   handle->sequenceStcCodeTertiary = 0;
   handle->sequenceUserDataIdcPrecisionMode = 0;
-  handle->decodeReadKernelIntra = &sub_AFAE50;
-  handle->decodeReadKernelPredicted = &sub_AFD7C0;
+  handle->decodeReadKernelIntra = &mpvhdec_ReadKernelIntraDefault;
+  handle->decodeReadKernelPredicted = &mpvhdec_ReadKernelPredictedDefault;
   handle->serviceCountdown = handle->serviceReloadInterval;
 
   for (int streamIndex = 0; streamIndex < 4; ++streamIndex) {
@@ -2846,7 +2846,7 @@ extern "C" int mpvhdec_DecSeqUdsc(std::int32_t* const handleWords, const std::ui
   }
 
   const bool useIdcPrecisionKernel = (handle->sequenceUserDataIdcPrecisionMode != 0);
-  handle->decodeReadKernelIntra = useIdcPrecisionKernel ? &mpvhdec_ReadKernelIntraIdcPrec3 : &sub_AFAE50;
+  handle->decodeReadKernelIntra = useIdcPrecisionKernel ? &mpvhdec_ReadKernelIntraIdcPrec3 : &mpvhdec_ReadKernelIntraDefault;
   handle->decodeTablePrimary = useIdcPrecisionKernel ? mpvvlc2_y_dcsiz : mpvvlc_y_dcsiz;
   handle->decodeTableSecondary = useIdcPrecisionKernel ? mpvvlc2_c_dcsiz : mpvvlc_c_dcsiz;
 
@@ -2854,7 +2854,7 @@ extern "C" int mpvhdec_DecSeqUdsc(std::int32_t* const handleWords, const std::ui
     return -1;
   }
 
-  handle->decodeReadKernelPredicted = &sub_AFD7C0;
+  handle->decodeReadKernelPredicted = &mpvhdec_ReadKernelPredictedDefault;
   return 0;
 }
 

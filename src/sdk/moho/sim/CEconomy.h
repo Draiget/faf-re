@@ -26,6 +26,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00771880 (FUN_00771880, struct_EconomyData::struct_EconomyData)
+     * Mangled: ??0struct_EconomyData@@QAE@@Z
+     *
+     * CEconomy(Sim* sim, std::int32_t armyIndex)
+     *
+     * IDA signature:
+     * Moho::CEconomy *__thiscall struct_EconomyData::struct_EconomyData(
+     *   int index, Moho::CEconomy *this, Moho::Sim *sim);
+     *
+     * What it does:
+     * Initializes one army economy state, creates its max-storage lane, and
+     * seeds stored energy/mass from the initial economy convars.
+     */
+    CEconomy(Sim* sim, std::int32_t armyIndex);
+
+    /**
      * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
      *
      * What it does:

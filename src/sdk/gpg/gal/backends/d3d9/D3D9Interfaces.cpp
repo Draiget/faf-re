@@ -31,6 +31,7 @@
 
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
+#include "gpg/core/utils/BoostWrappers.h"
 
 #include <bit>
 #include <cstddef>
@@ -1774,11 +1775,30 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x008E93C0 (FUN_008E93C0)
+         *
+         * What it does:
+         * Placement-new constructs one `boost::detail::shared_count` lane
+         * over an uninitialized slot from one raw `CubeRenderTargetD3D9*`
+         * pointee (16-byte alloc + `sp_counted_impl_p<CubeRenderTargetD3D9>`
+         * vftable + refcount/weakcount=1 + raw ptr at +0xC). Engine-
+         * instantiated boost templated ctor emission, kept as a recoverable
+         * engine helper.
+         */
+        boost::detail::shared_count* ConstructSharedCountCubeRenderTargetD3D9FromRaw(
+            boost::detail::shared_count* const outCount,
+            CubeRenderTargetD3D9* const cubeRenderTarget
+        )
+        {
+            return boost::ConstructSharedCountFromRaw(outCount, cubeRenderTarget);
+        }
+
+        /**
          * Address: 0x008E9D50 (FUN_008E9D50, boost::shared_ptr_CubeRenderTargetD3D9::shared_ptr_CubeRenderTargetD3D9)
          *
          * What it does:
-         * Constructs one `shared_ptr<CubeRenderTargetD3D9>` from one raw
-         * pointer lane.
+         * Placement-new constructs one `shared_ptr<CubeRenderTargetD3D9>`
+         * over an uninitialized output slot from one raw pointer.
          */
         boost::shared_ptr<CubeRenderTargetD3D9>* ConstructSharedCubeRenderTargetD3D9FromRaw(
             boost::shared_ptr<CubeRenderTargetD3D9>* const outCubeRenderTarget,
@@ -2173,6 +2193,28 @@ namespace gpg::gal
         )
         {
             return ::new (outVariable) boost::shared_ptr<EffectVariableD3D9>(variable);
+        }
+
+        /**
+         * Address: 0x008E9F20 (FUN_008E9F20)
+         *
+         * IDA signature:
+         * boost::shared_ptr<EffectD3D9>* __thiscall ??4shared_ptr_EffectD3D9@boost@@QAE@@Z(
+         *     boost::shared_ptr<EffectD3D9>* this, EffectD3D9* a2);
+         *
+         * What it does:
+         * Placement-new constructs one `shared_ptr<EffectD3D9>` over an
+         * uninitialized output slot from one raw effect pointer (binds
+         * `enable_shared_from_this`-style ownership through
+         * `EffectD3D9::selfWeak_`). Engine-instantiated boost templated ctor
+         * emission, kept as a recoverable engine helper.
+         */
+        boost::shared_ptr<EffectD3D9>* ConstructSharedEffectD3D9FromRaw(
+            boost::shared_ptr<EffectD3D9>* const outEffect,
+            EffectD3D9* const effect
+        )
+        {
+            return ::new (outEffect) boost::shared_ptr<EffectD3D9>(effect);
         }
 
         /**
@@ -3487,11 +3529,14 @@ namespace gpg::gal
             void* const handle
         )
         {
-            boost::shared_ptr<EffectTechniqueD3D9> technique(new EffectTechniqueD3D9());
-            technique->name_.assign_owned(name != nullptr ? name : "");
-            technique->effect_ = CreateWeakEffectReference(effect);
-            technique->handle_ = handle;
-            technique->beginEndActive_ = false;
+            auto* const rawTechnique = new EffectTechniqueD3D9();
+            rawTechnique->name_.assign_owned(name != nullptr ? name : "");
+            rawTechnique->effect_ = CreateWeakEffectReference(effect);
+            rawTechnique->handle_ = handle;
+            rawTechnique->beginEndActive_ = false;
+
+            boost::shared_ptr<EffectTechniqueD3D9> technique;
+            (void)ConstructSharedEffectTechniqueD3D9FromRaw(&technique, rawTechnique);
             return technique;
         }
 
@@ -3501,9 +3546,10 @@ namespace gpg::gal
             void* const handle
         )
         {
-            return boost::shared_ptr<EffectVariableD3D9>(
-                new EffectVariableD3D9(name, CreateWeakEffectReference(effect), handle)
-            );
+            auto* const rawVariable = new EffectVariableD3D9(name, CreateWeakEffectReference(effect), handle);
+            boost::shared_ptr<EffectVariableD3D9> variable;
+            (void)ConstructSharedEffectVariableD3D9FromRaw(&variable, rawVariable);
+            return variable;
         }
 
         unsigned int ToIndexBufferLockFlags(const MohoD3DLockFlags flags)
@@ -4724,7 +4770,7 @@ namespace gpg::gal
                 compiledCache.close();
             }
 
-            outEffect->reset(new EffectD3D9(context, nativeEffect.release()));
+            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, nativeEffect.release()));
             return outEffect;
         }
 
@@ -4834,7 +4880,7 @@ namespace gpg::gal
                 );
             }
 
-            outEffect->reset(new EffectD3D9(context, nativeEffect.release()));
+            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, nativeEffect.release()));
             return outEffect;
         }
 
@@ -6894,7 +6940,7 @@ namespace gpg::gal
         }
 
         RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(context, renderTexture);
-        outRenderTarget->reset(renderTarget);
+        (void)ConstructSharedRenderTargetD3D9FromRaw(outRenderTarget, renderTarget);
         return outRenderTarget;
     }
 
@@ -6930,7 +6976,7 @@ namespace gpg::gal
 
         CubeRenderTargetD3D9* const cubeRenderTarget = new CubeRenderTargetD3D9(context, cubeTexture);
 
-        outCubeRenderTarget->reset(cubeRenderTarget);
+        (void)ConstructSharedCubeRenderTargetD3D9FromRaw(outCubeRenderTarget, cubeRenderTarget);
         return outCubeRenderTarget;
     }
 
@@ -6965,7 +7011,7 @@ namespace gpg::gal
         }
 
         DepthStencilTargetD3D9* const depthStencilTarget = new DepthStencilTargetD3D9(context, depthStencilSurface);
-        outDepthStencilTarget->reset(depthStencilTarget);
+        (void)ConstructSharedDepthStencilTargetD3D9FromRaw(outDepthStencilTarget, depthStencilTarget);
         return outDepthStencilTarget;
     }
 
@@ -6997,7 +7043,7 @@ namespace gpg::gal
         }
 
         VertexFormatD3D9* const vertexFormat = new VertexFormatD3D9(formatCode, vertexDeclaration);
-        outVertexFormat->reset(vertexFormat);
+        (void)ConstructSharedVertexFormatD3D9FromRaw(outVertexFormat, vertexFormat);
         return outVertexFormat;
     }
 
@@ -7029,7 +7075,7 @@ namespace gpg::gal
         }
 
         VertexBufferD3D9* const vertexBuffer = new VertexBufferD3D9(context, nativeVertexBuffer);
-        outVertexBuffer->reset(vertexBuffer);
+        (void)ConstructSharedVertexBufferD3D9FromRaw(outVertexBuffer, vertexBuffer);
         return outVertexBuffer;
     }
 
@@ -7069,7 +7115,7 @@ namespace gpg::gal
         }
 
         IndexBufferD3D9* const indexBuffer = new IndexBufferD3D9(context, nativeIndexBuffer);
-        outIndexBuffer->reset(indexBuffer);
+        (void)ConstructSharedIndexBufferD3D9FromRaw(outIndexBuffer, indexBuffer);
         return outIndexBuffer;
     }
 

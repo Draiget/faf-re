@@ -452,6 +452,30 @@ extern "C" void png_write_cHRM(
 }
 
 /**
+ * Address: 0x00A24EBD (FUN_00A24EBD)
+ * Mangled: png_write_gAMA
+ *
+ * What it does:
+ * Encodes one PNG `gAMA` (image gamma) chunk payload by quantizing the input
+ * gamma to fixed-point 1e5 with a +0.5 round-bias and emitting it via
+ * `png_write_chunk`.
+ */
+extern "C" void png_write_gAMA(
+  png_structp const png_ptr,
+  const double file_gamma
+)
+{
+  std::uint8_t chunk_data[4]{};
+  png_save_uint_32(
+    chunk_data,
+    static_cast<std::uint32_t>(file_gamma * kPngChrmScale + kPngRoundBias)
+  );
+
+  std::uint8_t chunk_name[4]{'g', 'A', 'M', 'A'};
+  png_write_chunk(png_ptr, chunk_name, chunk_data, 4u);
+}
+
+/**
  * Address: 0x00A24F1E (FUN_00A24F1E)
  * Mangled: png_write_sRGB
  *

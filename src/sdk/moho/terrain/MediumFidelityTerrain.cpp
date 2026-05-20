@@ -3,14 +3,20 @@
 #include <cstdint>
 
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
+#include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/WaterFactory.h"
 
 namespace
@@ -216,6 +222,107 @@ namespace moho
     }
 
     return true;
+  }
+
+  /**
+   * Address: 0x00804DF0 (FUN_00804DF0, Moho::MediumFidelityTerrain::LoadShaderVars)
+   *
+   * What it does:
+   * Binds terrain shader texture lanes from world stratum material + water map,
+   * updates terrain-scale and viewport normalization constants, and forwards
+   * the optional terrain-normal map texture handle for terrain normal passes.
+   */
+  void MediumFidelityTerrain::LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture)
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    StratumMaterial& strata = terrainRes->GetStratumMaterial();
+    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+
+    BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture));
+    BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
+    BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
+    BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
+
+    BindTextureShaderVar(shaderVars.lowerAlbedoTexture, strata.mLowerAlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum0AlbedoTexture, strata.mStratum0AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum1AlbedoTexture, strata.mStratum1AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum2AlbedoTexture, strata.mStratum2AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum3AlbedoTexture, strata.mStratum3AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum4AlbedoTexture, strata.mStratum4AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum5AlbedoTexture, strata.mStratum5AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum6AlbedoTexture, strata.mStratum6AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum7AlbedoTexture, strata.mStratum7AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.upperAlbedoTexture, strata.mUpperAlbedoTexture.mTextureSheet);
+
+    BindTextureShaderVar(shaderVars.lowerNormalTexture, strata.mLowerNormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum0NormalTexture, strata.mStratum0NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum1NormalTexture, strata.mStratum1NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum2NormalTexture, strata.mStratum2NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum3NormalTexture, strata.mStratum3NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum4NormalTexture, strata.mStratum4NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum5NormalTexture, strata.mStratum5NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum6NormalTexture, strata.mStratum6NormalTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum7NormalTexture, strata.mStratum7NormalTexture.mTextureSheet);
+
+    SetShaderVarMem(shaderVars.lowerAlbedoTile, 4U, &strata.mLowerAlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum0AlbedoTile, 4U, &strata.mStratum0AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum1AlbedoTile, 4U, &strata.mStratum1AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum2AlbedoTile, 4U, &strata.mStratum2AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum3AlbedoTile, 4U, &strata.mStratum3AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum4AlbedoTile, 4U, &strata.mStratum4AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum5AlbedoTile, 4U, &strata.mStratum5AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum6AlbedoTile, 4U, &strata.mStratum6AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum7AlbedoTile, 4U, &strata.mStratum7AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.upperAlbedoTile, 4U, &strata.mUpperAlbedoTexture.mScaleX);
+
+    SetShaderVarMem(shaderVars.lowerNormalTile, 4U, &strata.mLowerNormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum0NormalTile, 4U, &strata.mStratum0NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum1NormalTile, 4U, &strata.mStratum1NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum2NormalTile, 4U, &strata.mStratum2NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum3NormalTile, 4U, &strata.mStratum3NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum4NormalTile, 4U, &strata.mStratum4NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum5NormalTile, 4U, &strata.mStratum5NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
+
+    shaderVars.normalTexture.GetTexture(terrainNormalTexture);
+
+    const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
+    const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);
+    const TerrainHeightFieldRuntimeView* const heightField = activeTerrainView->mMap->mHeightFieldObject;
+
+    const float terrainScale[4] = {
+      1.0f / static_cast<float>(heightField->width - 1),
+      1.0f / static_cast<float>(heightField->height - 1),
+      0.0f,
+      1.0f
+    };
+    SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
+
+    CD3DDevice* const device = D3D_GetDevice();
+    (void)device->GetHeadWidth(0U);
+    (void)device->GetHeadHeight(0U);
+
+    const float inverseViewportWidth = 1.0f / static_cast<float>(mViewportRenderWidth);
+    const float inverseViewportHeight = 1.0f / static_cast<float>(mViewportRenderHeight);
+    const float viewportWidthNdc = static_cast<float>(mViewportWidth) * inverseViewportWidth;
+    const float viewportHeightNdc = static_cast<float>(mViewportHeight) * inverseViewportHeight;
+
+    const float viewportScale[2] = {
+      viewportWidthNdc * 0.5f,
+      viewportHeightNdc * -0.5f
+    };
+
+    const float viewportOffset[2] = {
+      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) + (inverseViewportWidth * 0.5f),
+      (inverseViewportHeight * 0.5f)
+        + ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
+    };
+
+    SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
+    SetShaderVarMem(shaderVars.viewportOffset, 2U, viewportOffset);
   }
 
   /**

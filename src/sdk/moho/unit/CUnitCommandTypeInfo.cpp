@@ -74,8 +74,62 @@ namespace moho
     return sType;
   }
 
+  namespace
+  {
+    /**
+     * Static `RPointerType<CUnitCommand>` descriptor that the binary exposes as
+     * `Moho::CUnitCommand::PointerType`. Default static-init runs the
+     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
+     * derived vftable lane.
+     */
+    gpg::RPointerType<moho::CUnitCommand> sCUnitCommandPointerTypeStorage{};
+
+    /**
+     * Address: 0x006E37A0 (FUN_006E37A0)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<CUnitCommand>` descriptor under
+     * the `CUnitCommand*` type-info key so subsequent `LookupRType` queries
+     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterCUnitCommandPointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::CUnitCommand*), &sCUnitCommandPointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BFEA30 (FUN_00BFEA30)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<CUnitCommand>` descriptor at process
+     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
+     * RType vftable lane to the `RObject` base. Registered via `atexit` from
+     * `GetPointerType`'s once-init path.
+     */
+    void CleanupCUnitCommandPointerType()
+    {
+      sCUnitCommandPointerTypeStorage.~RPointerType<moho::CUnitCommand>();
+    }
+  } // namespace
+
+  /**
+   * Address: 0x006E35F0 (FUN_006E35F0, Moho::CUnitCommand::GetPointerType)
+   *
+   * What it does:
+   * On first call, pre-registers the static `RPointerType<CUnitCommand>`
+   * descriptor and installs the matching atexit teardown. After that, lazily
+   * caches the `LookupRType(typeid(CUnitCommand*))` result in `sPointerType`
+   * and returns it.
+   */
   gpg::RType* CUnitCommand::GetPointerType()
   {
+    static const bool sOnceInit = []() {
+      PreregisterCUnitCommandPointerType();
+      (void)std::atexit(&CleanupCUnitCommandPointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
     if (!sType) {
       sType = gpg::LookupRType(typeid(CUnitCommand));
     }

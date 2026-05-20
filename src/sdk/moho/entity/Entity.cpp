@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -2342,19 +2343,65 @@ namespace moho
     return sEntityType;
   }
 
+  namespace
+  {
+    /**
+     * Static `RPointerType<Entity>` descriptor that the binary exposes as
+     * `Moho::Entity::PointerType`. Default static-init runs the
+     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
+     * derived vftable lane.
+     */
+    gpg::RPointerType<moho::Entity> sEntityPointerTypeStorage{};
+
+    /**
+     * Address: 0x0067E410 (FUN_0067E410)
+     *
+     * What it does:
+     * Pre-registers the static `RPointerType<Entity>` descriptor under the
+     * `Entity*` type-info key so subsequent `LookupRType` queries from the
+     * lazy `GetPointerType` lane resolve to this descriptor.
+     */
+    void PreregisterEntityPointerType()
+    {
+      gpg::PreRegisterRType(typeid(moho::Entity*), &sEntityPointerTypeStorage);
+    }
+
+    /**
+     * Address: 0x00BFC900 (FUN_00BFC900)
+     *
+     * What it does:
+     * Tears down the static `RPointerType<Entity>` descriptor at process exit:
+     * frees heap-backed `bases_`/`fields_` vector storage and resets the RType
+     * vftable lane to the `RObject` base. Registered via `atexit` from
+     * `GetPointerType`'s once-init path.
+     */
+    void CleanupEntityPointerType()
+    {
+      sEntityPointerTypeStorage.~RPointerType<moho::Entity>();
+    }
+  } // namespace
+
   /**
    * Address: 0x0067CFA0 (FUN_0067CFA0, Moho::Entity::GetPointerType)
    *
    * What it does:
-   * Returns cached reflection descriptor for `Entity*`.
+   * On first call, pre-registers the static `RPointerType<Entity>` descriptor
+   * and installs the matching atexit teardown. After that, lazily caches the
+   * `LookupRType(typeid(Entity*))` result in `sPointerType` and returns it.
    */
   gpg::RType* Entity::GetPointerType()
   {
-    static gpg::RType* sEntityPointerType = nullptr;
-    if (!sEntityPointerType) {
-      sEntityPointerType = gpg::LookupRType(typeid(Entity*));
+    static const bool sOnceInit = []() {
+      PreregisterEntityPointerType();
+      (void)std::atexit(&CleanupEntityPointerType);
+      return true;
+    }();
+    (void)sOnceInit;
+
+    if (!sPointerType) {
+      sPointerType = gpg::LookupRType(typeid(Entity*));
     }
-    return sEntityPointerType;
+    return sPointerType;
   }
 
   /**
@@ -4083,12 +4130,43 @@ namespace moho
   }
 
   /**
+   * Address: 0x0067E190 (FUN_0067E190)
+   *
+   * IDA signature:
+   * int __fastcall sub_67E190(byte *splitPosition, unsigned int newCapacity,
+   *   gpg::fastvector<Wm3::Sphere3f> *vec, const Sphere3f *insertSrcBegin,
+   *   const Sphere3f *insertSrcEnd);
+   *
+   * What it does:
+   * Out-of-line specialization of
+   * `gpg::fastvector<Wm3::Sphere3f>::_Insert_n_grow` (16-byte element stride).
+   * Forwards the grow-and-insert request to the typed fastvector's resize-
+   * with-fill path; the natural caller chain enters this helper only when
+   * the vector lacks capacity headroom for `targetCount` elements.
+   *
+   * Wired through `GrowInsertSphere3fFastVector` so the linker preserves the
+   * binary's `fastvector<Sphere3f>::_Insert_n_grow` symbol shape per the
+   * STL-template-emission policy; the natural `vec.resize(n, fill)` idiom
+   * may inline the grow path differently in modern toolchains.
+   */
+  void GrowInsertSphere3fFastVector(
+    gpg::fastvector<Wm3::Sphere3f>& spheres,
+    const std::size_t targetCount,
+    const Wm3::Sphere3f& fillValue
+  )
+  {
+    spheres.resize(targetCount, fillValue);
+  }
+
+  /**
    * Address: 0x0067C430 (FUN_0067C430)
    *
    * What it does:
    * Resizes one terrain-collision sphere vector to `targetCount`, preserving
    * existing entries, trimming when shrinking, and fill-constructing new
-   * lanes from `fillValue` when growing.
+   * lanes from `fillValue` when growing. The grow path defers to the typed
+   * `_Insert_n_grow` helper `GrowInsertSphere3fFastVector` (FUN_0067E190) so
+   * the binary symbol is preserved when reallocation is required.
    */
   void ResizeTerrainCollisionSphereBuffer(
     gpg::fastvector<Wm3::Sphere3f>& spheres,
@@ -4103,7 +4181,7 @@ namespace moho
     }
 
     if (targetCount > currentCount) {
-      spheres.resize(targetCount, fillValue);
+      GrowInsertSphere3fFastVector(spheres, targetCount, fillValue);
     }
   }
 

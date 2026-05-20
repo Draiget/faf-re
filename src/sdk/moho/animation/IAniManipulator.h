@@ -122,6 +122,16 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
+
+    /**
+     * Address: 0x0063DA40 (FUN_0063DA40, Moho::IAniManipulator::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for
+     * `IAniManipulator*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     TDatListItem<IAniManipulator, void> mActorOrderLink; // +0x44
     bool mEnabled;                                       // +0x4C

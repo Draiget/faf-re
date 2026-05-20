@@ -501,21 +501,50 @@ namespace
     return conVar;
   }
 
+  /**
+   * Address: 0x00BFBCB0 (FUN_00BFBCB0, Moho::TConVar_efx_WaterOffset::~TConVar_efx_WaterOffset)
+   *
+   * What it does:
+   * Tears down the static `efx_WaterOffset` console-variable registration via
+   * the shared `TeardownConCommandRegistration` helper. Registered via
+   * `atexit` from the convar startup path.
+   */
   void cleanup_TConVar_efx_WaterOffset_atexit()
   {
     moho::TeardownConCommandRegistration(GetEfxWaterOffsetConVar());
   }
 
+  /**
+   * Address: 0x00BFBCE0 (FUN_00BFBCE0, Moho::TConVar_dbg_Emitter::~TConVar_dbg_Emitter)
+   *
+   * What it does:
+   * Tears down the static `dbg_Emitter` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper.
+   */
   void cleanup_TConVar_dbg_Emitter_atexit()
   {
     moho::TeardownConCommandRegistration(GetDbgEmitterConVar());
   }
 
+  /**
+   * Address: 0x00BFC1C0 (FUN_00BFC1C0, Moho::TConVar_dbg_Trail::~TConVar_dbg_Trail)
+   *
+   * What it does:
+   * Tears down the static `dbg_Trail` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper.
+   */
   void cleanup_TConVar_dbg_Trail_atexit()
   {
     moho::TeardownConCommandRegistration(GetDbgTrailConVar());
   }
 
+  /**
+   * Address: 0x00BFB880 (FUN_00BFB880, Moho::TConVar_dbg_EfxBeams::~TConVar_dbg_EfxBeams)
+   *
+   * What it does:
+   * Tears down the static `dbg_EfxBeams` console-variable registration via the
+   * shared `TeardownConCommandRegistration` helper.
+   */
   void cleanup_TConVar_dbg_EfxBeams_atexit()
   {
     moho::TeardownConCommandRegistration(GetDbgEfxBeamsConVar());
