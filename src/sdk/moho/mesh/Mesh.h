@@ -1168,4 +1168,23 @@ namespace moho
   static_assert(offsetof(MeshRenderer, meshes) == 0xA0, "MeshRenderer::meshes offset must be 0xA0");
   static_assert(offsetof(MeshRenderer, meshSpatialDb) == 0xAC, "MeshRenderer::meshSpatialDb offset must be 0xAC");
   static_assert(sizeof(MeshRenderer) == 0xB4, "MeshRenderer size must be 0xB4");
+
+  /**
+   * Address: 0x007E6650 (FUN_007E6650, boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*)`
+   * ctor body. Allocates the `sp_counted_impl_p<RMeshBlueprintLOD>`
+   * reference-count block (size 0x10) with use_count=1 / weak_count=1, sets
+   * the `sp_counted_impl_p<RMeshBlueprintLOD>` vtable, and binds the owned
+   * raw pointer.
+   *
+   * Wired into `MeshLOD::Load` (line ~4915, the
+   * `lodBlueprintCopy.reset(new RMeshBlueprintLOD(blueprintLod));` site) to
+   * preserve the MSVC8 per-T template emission symbol shape.
+   */
+  void ConstructSharedMeshBlueprintLODFromRaw(
+    boost::shared_ptr<RMeshBlueprintLOD>& out,
+    RMeshBlueprintLOD* raw);
 } // namespace moho
