@@ -314,6 +314,28 @@ namespace
   }
 
   /**
+   * Address: 0x005EAFF0 (FUN_005EAFF0, msvc8::vector<SAiReservedTransportBone>::push_back)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `msvc8::vector<SAiReservedTransportBone>::push_back(const T&)` body
+   * (32-byte element stride). Forwards to the compiler-emitted push_back
+   * which performs the canonical capacity check and either an in-place
+   * copy-construct at `_Mylast` or a slow-path `_Insert(_Mylast, 1, value)`.
+   *
+   * Used by `RVectorType_SAiReservedTransportBone::SerLoad` to bind one
+   * deserialized element into the loaded payload; routing through the
+   * named helper preserves the MSVC8 per-T template emission symbol
+   * shape even when the modern compiler would inline `vec.push_back(e)`.
+   */
+  void PushBackReservedTransportBoneVector(
+    ReservedTransportBoneVector& destination,
+    const moho::SAiReservedTransportBone& value)
+  {
+    destination.push_back(value);
+  }
+
+  /**
    * Address: 0x005EACC0 (FUN_005EACC0)
    *
    * What it does:
@@ -1036,7 +1058,7 @@ void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
   for (unsigned int i = 0; i < count; ++i) {
     moho::SAiReservedTransportBone entry{};
     archive->Read(elementType, &entry, elementOwner);
-    loaded.push_back(entry);
+    PushBackReservedTransportBoneVector(loaded, entry);
   }
 
   // Route the per-T copy-assignment through the canonical helper
