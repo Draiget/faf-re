@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "boost/shared_ptr.h"
+#include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/List.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -34,6 +35,7 @@ namespace moho
   class CWaterShaderProperties;
   class CD3DDynamicTextureSheet;
   class CDecalManager;
+  class CWldMap;
   class CWldTerrainRes;
   struct GeomCamera3;
   class IDecalManager;
@@ -91,6 +93,18 @@ namespace moho
    * Allocates one `CWldProps` object and clears entry-storage pointer lanes.
    */
   [[nodiscard]] CWldProps* WLD_CreateProps();
+
+  /**
+   * Address: 0x00891330 (FUN_00891330,
+   * ?WLD_LoadMapPreview@Moho@@YA?AV?$auto_ptr@VCWldMap@Moho@@@std@@VStrArg@gpg@@@Z)
+   *
+   * What it does:
+   * Heap-allocates one `CWldMap`, loads it in preview-only mode via `MapLoad`,
+   * and returns the auto_ptr; if the load did not produce a preview chunk
+   * (`mMapPreviewChunk == nullptr`), tears the map down and returns an empty
+   * auto_ptr.
+   */
+  [[nodiscard]] msvc8::auto_ptr<CWldMap> WLD_LoadMapPreview(gpg::StrArg mapPath);
 
   /**
    * Address: 0x008A7B90 (FUN_008A7B90, ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)

@@ -807,6 +807,13 @@ namespace
     pendingCues.clear();
   }
 
+  // Forward declaration: `ReleaseSoundHandleRecordRuntime` is defined just
+  // below `ClearSoundHandleVector` for source ordering / readability, but
+  // `ClearSoundHandleVector` calls it inside its loop, so the compiler needs
+  // to see the declaration first. Both functions live in the same anonymous
+  // namespace and call no external code.
+  void ReleaseSoundHandleRecordRuntime(moho::SoundHandleRecord* record);
+
   /**
    * Address: 0x008AF710 (FUN_008AF710)
    *

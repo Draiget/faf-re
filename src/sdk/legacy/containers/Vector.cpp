@@ -4,6 +4,7 @@
 #include "moho/ai/SAiReservedTransportBone.h"
 #include "moho/ai/SPointVector.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprintLODTypeInfo.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/ui/SDebugScreenText.h"
@@ -12,6 +13,7 @@
 #include <intrin.h>
 #include <limits>
 #include <new>
+#include <stdexcept>
 
 extern "C" void __cdecl _invalid_parameter(
   const wchar_t* expression,
@@ -4145,6 +4147,105 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
 }
 
 /**
+ * Address: 0x0054F990 (FUN_0054F990, sub_54F990)
+ *
+ * IDA signature:
+ * int __cdecl sub_54F990(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Floyd's `make_heap` over the string/int lane range `[first, last)`. Walks
+ * each internal node from `count / 2 - 1` down to `0` and sift-downs the
+ * node's contents through the heap rooted at `first` via
+ * `SiftDownThenInsertStringIntHeapLane` (FUN_0054FD90). The third argument
+ * `userTagArg` is propagated to the helper as its unused `a4` lane,
+ * matching the binary call shape (the helper itself ignores it). Returns
+ * the last sift-down's `displacedKey` result (the wrapper merely forwards
+ * the inner helper's `EAX`).
+ */
+[[maybe_unused]] const char* MakeHeapOverStringIntHeapLaneRange(
+  StringIntHeapLane* const first,
+  StringIntHeapLane* const last,
+  const int userTagArg
+) noexcept
+{
+  const std::ptrdiff_t signedCount = last - first;
+  const std::int32_t totalCount = static_cast<std::int32_t>(signedCount);
+  const std::int32_t internalCount = totalCount / 2;
+  if (internalCount <= 0) {
+    return nullptr;
+  }
+
+  StringIntHeapLane* cursor = first + internalCount;
+  std::int32_t internalIndex = internalCount;
+  const char* result = nullptr;
+
+  do {
+    --cursor;
+    --internalIndex;
+    const char* const savedKey = cursor->key;
+    const std::int32_t savedValue = cursor->value;
+    result = SiftDownThenInsertStringIntHeapLane(
+      first, internalIndex, totalCount, savedKey, savedValue
+    );
+    (void)userTagArg;
+  } while (internalIndex > 0);
+
+  return result;
+}
+
+/**
+ * Address: 0x0054F9E0 (FUN_0054F9E0, sub_54F9E0)
+ *
+ * IDA signature:
+ * int __cdecl sub_54F9E0(_DWORD *a1, int a2, int a3);
+ *
+ * What it does:
+ * `sort_heap`-style repeated `pop_heap` over the string/int lane range
+ * `[first, last)`. While the heap has more than one element:
+ *   * saves the trailing lane,
+ *   * moves the heap root (current maximum) into that trailing slot,
+ *   * sift-downs the saved value through the now-shrunk heap rooted at
+ *     `first` via `SiftDownThenInsertStringIntHeapLane`,
+ *   * shrinks the active range by one element from the back.
+ * The third argument `userTagArg` is propagated through to the helper as
+ * its unused `a4` lane, matching the binary call shape. Returns the final
+ * heap-element count (i.e. `1`) computed by the loop's terminating
+ * shift-right.
+ */
+[[maybe_unused]] std::int32_t SortHeapStringIntHeapLaneRange(
+  StringIntHeapLane* const first,
+  StringIntHeapLane* const last,
+  const int userTagArg
+) noexcept
+{
+  std::ptrdiff_t spanBytes = reinterpret_cast<const char*>(last) - reinterpret_cast<const char*>(first);
+  std::int32_t remainingCount = static_cast<std::int32_t>(spanBytes / static_cast<std::ptrdiff_t>(sizeof(StringIntHeapLane)));
+
+  if (remainingCount <= 1) {
+    return remainingCount;
+  }
+
+  do {
+    StringIntHeapLane* const trailingSlot = reinterpret_cast<StringIntHeapLane*>(
+      reinterpret_cast<char*>(first) + (spanBytes - static_cast<std::ptrdiff_t>(sizeof(StringIntHeapLane)))
+    );
+    const char* const savedKey = trailingSlot->key;
+    const std::int32_t savedValue = trailingSlot->value;
+    *trailingSlot = *first;
+
+    spanBytes -= static_cast<std::ptrdiff_t>(sizeof(StringIntHeapLane));
+    const std::int32_t shrunkCount = static_cast<std::int32_t>(
+      spanBytes / static_cast<std::ptrdiff_t>(sizeof(StringIntHeapLane))
+    );
+    (void)SiftDownThenInsertStringIntHeapLane(first, 0, shrunkCount, savedKey, savedValue);
+    (void)userTagArg;
+    remainingCount = shrunkCount;
+  } while (remainingCount > 1);
+
+  return remainingCount;
+}
+
+/**
  * Address: 0x005502C0 (FUN_005502C0)
  *
  * What it does:
@@ -4205,6 +4306,70 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
 ) noexcept
 {
   return RotateStringIntHeapRangeByGcdCycles(begin, middle, end);
+}
+
+/**
+ * Address: 0x0054F290 (FUN_0054F290, sub_54F290)
+ *
+ * IDA signature:
+ * char __cdecl sub_54F290(int a1, int a2);
+ *
+ * What it does:
+ * Insertion-sort over `StringIntHeapLane` (`{const char* key, int32 value}`)
+ * range `[first, last)` ascending by lex order — primary `strcmp(key)`
+ * with `value` as the tie-breaker. For each element after `first`:
+ *   * when the candidate is strictly less than the current `first` (the
+ *     accumulated minimum), the prefix `[first, current+1)` is rotated
+ *     left around `current` via `RotateStringIntHeapRangeByGcdCycles`
+ *     (FUN_005502C0), publishing the candidate at `first`;
+ *   * otherwise the helper walks the sorted prefix backward and locates
+ *     the insertion boundary where `predecessor <= candidate`, then
+ *     rotates `[boundary, current+1)` to slot the candidate into place.
+ * Returns the binary's last comparison-byte (`EAX` low byte) — kept here
+ * as a faithful pass-through of the legacy return shape; the value is
+ * not consumed by callers.
+ */
+[[maybe_unused]] char InsertionSortStringIntHeapLaneRangeAscending(
+  StringIntHeapLane* const first,
+  StringIntHeapLane* const last
+) noexcept
+{
+  const auto isLess = [](const StringIntHeapLane& a, const StringIntHeapLane& b) noexcept {
+    const int keyCompare = std::strcmp(a.key ? a.key : "", b.key ? b.key : "");
+    if (keyCompare != 0) {
+      return keyCompare < 0;
+    }
+    return a.value < b.value;
+  };
+
+  char result = static_cast<char>(reinterpret_cast<std::uintptr_t>(last) & 0xFFu);
+  if (first == last) {
+    return result;
+  }
+
+  for (StringIntHeapLane* current = first + 1; current != last; ++current) {
+    if (isLess(*current, *first)) {
+      if (first != current) {
+        (void)RotateStringIntHeapRangeByGcdCycles(first, current, current + 1);
+      }
+      result = 1;
+    } else {
+      StringIntHeapLane* boundary = current;
+      while (boundary != first) {
+        StringIntHeapLane* const predecessor = boundary - 1;
+        if (!isLess(*current, *predecessor)) {
+          break;
+        }
+        boundary = predecessor;
+      }
+      if (boundary != current) {
+        (void)RotateStringIntHeapRangeByGcdCycles(boundary, current, current + 1);
+      }
+      result = 0;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -6197,13 +6362,14 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
 }
 
 /**
+ * Address: 0x00523940 (FUN_00523940)
  * Address: 0x0074D580 (FUN_0074D580)
  *
  * What it does:
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 4-byte element vector
  * lane with legacy max-count guard `0x3FFFFFFF`.
  */
-[[maybe_unused]] bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x3FFFFFFFu, 4u, &AllocateChecked4ByteElements);
 }
@@ -6272,6 +6438,82 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
 [[maybe_unused]] bool BuyVectorStorage16ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x0FFFFFFFu, 16u, &AllocateChecked16ByteElements);
+}
+
+/**
+ * Address: 0x00519570 (FUN_00519570)
+ *
+ * IDA signature:
+ * char __usercall sub_519570@<al>(unsigned int count@<eax>, _DWORD *storage@<edi>);
+ *
+ * What it does:
+ * Acquires `_Myfirst/_Mylast/_Myend` storage for one
+ * `msvc8::vector<moho::RMeshBlueprintLOD>` lane (stride `0xCC` = 204 bytes)
+ * via the typed VC8 `_Buy(count)` specialization. Throws
+ * `std::length_error("vector<T> too long")` when `count` exceeds
+ * `0x1414141 == UINT32_MAX / 204`, otherwise routes through the typed
+ * `RMeshBlueprintLOD` allocator (`AllocateMeshBlueprintLodArrayOrThrow`).
+ * Always returns `true`. Caller is responsible for the prior `proxy` lane.
+ */
+[[nodiscard]] bool BuyVectorStorageRMeshBlueprintLOD(VectorVoidStorageView& storage, const std::uint32_t count)
+{
+  // The 32-bit overflow ceiling matches the binary's `cmp esi, 1414141h`
+  // immediate — it is precisely `UINT32_MAX / sizeof(RMeshBlueprintLOD)`,
+  // i.e. `0xFFFFFFFFu / 204u == 0x1414141u`.
+  constexpr std::uint32_t kRMeshBlueprintLodMaxCount = 0x01414141u;
+  constexpr std::uint32_t kRMeshBlueprintLodElementSize = 204u;
+  return BuyVectorStorageGuardedByMaxCount(
+    storage,
+    count,
+    kRMeshBlueprintLodMaxCount,
+    kRMeshBlueprintLodElementSize,
+    &moho::AllocateMeshBlueprintLodArrayOrThrow
+  );
+}
+
+namespace
+{
+// Bridges the canonical typed `RUnitBlueprintWeapon` allocator
+// (`msvc8::vector<T>::allocate_unit_blueprint_weapon_slots_checked`,
+// `FUN_00526080`) into the `CheckedElementAllocatorFn` signature used
+// by `BuyVectorStorageGuardedByMaxCount`. Not itself a binary symbol —
+// the canonical address block lives on the static member.
+[[nodiscard]] void* AllocateUnitBlueprintWeaponElementBlock(const std::uint32_t count)
+{
+  return msvc8::vector<moho::RUnitBlueprintWeapon>::
+    allocate_unit_blueprint_weapon_slots_checked(static_cast<std::size_t>(count));
+}
+} // namespace
+
+/**
+ * Address: 0x00523A00 (FUN_00523A00)
+ *
+ * IDA signature:
+ * char __usercall sub_523A00@<al>(unsigned int count@<eax>, _DWORD *storage@<edi>);
+ *
+ * What it does:
+ * Acquires `_Myfirst/_Mylast/_Myend` storage for one
+ * `msvc8::vector<moho::RUnitBlueprintWeapon>` lane (stride `0x184` = 388 bytes)
+ * via the typed VC8 `_Buy(count)` specialization. Throws
+ * `std::length_error("vector<T> too long")` when `count` exceeds
+ * `0xA8E83F == UINT32_MAX / 388`, otherwise routes through the typed
+ * `RUnitBlueprintWeapon` allocator (canonical body at `FUN_00526080`).
+ * Always returns `true`. Caller is responsible for the prior `proxy` lane.
+ */
+[[nodiscard]] bool BuyVectorStorageRUnitBlueprintWeapon(VectorVoidStorageView& storage, const std::uint32_t count)
+{
+  // The 32-bit overflow ceiling matches the binary's `cmp esi, 0A8E83Fh`
+  // immediate — `UINT32_MAX / sizeof(RUnitBlueprintWeapon)`, i.e.
+  // `0xFFFFFFFFu / 388u == 0x00A8E83Fu`.
+  constexpr std::uint32_t kRUnitBlueprintWeaponMaxCount = 0x00A8E83Fu;
+  constexpr std::uint32_t kRUnitBlueprintWeaponElementSize = 388u;
+  return BuyVectorStorageGuardedByMaxCount(
+    storage,
+    count,
+    kRUnitBlueprintWeaponMaxCount,
+    kRUnitBlueprintWeaponElementSize,
+    &AllocateUnitBlueprintWeaponElementBlock
+  );
 }
 
 namespace
@@ -6386,6 +6628,12 @@ void CopyAssignReservedTransportBoneLane(
  * Copy-constructs one half-open `SAiReservedTransportBone` range and, on
  * failure, destroys the already-constructed destination prefix before
  * rethrowing.
+ *
+ * The release binary additionally exposes linker-emitted calling-convention
+ * trampolines that forward unmodified to this body for cross-TU references
+ * (`FUN_005EE3C0`, `FUN_005EF6C0`, `FUN_005EF840`). No separate source is
+ * emitted; the toolchain re-synthesises them when this body is referenced
+ * from differently-conventioned callsites.
  */
 [[nodiscard]] moho::SAiReservedTransportBone* UninitializedCopyReservedTransportBoneRange(
   moho::SAiReservedTransportBone* destination,
@@ -6791,7 +7039,7 @@ void ReleaseRefcountedLaneRange(
     destination.first = nullptr;
     destination.last = nullptr;
     destination.end = nullptr;
-    if (BuyVectorStorageByElementWidth(destination, sourceCount, 204u)) {
+    if (BuyVectorStorageRMeshBlueprintLOD(destination, sourceCount)) {
       destinationBegin = reinterpret_cast<moho::RMeshBlueprintLOD*>(destination.first);
       destinationEnd = CopyConstructRMeshBlueprintLodRange(destinationBegin, sourceBegin, sourceEnd);
       destination.last = reinterpret_cast<void**>(destinationEnd);
@@ -6855,7 +7103,7 @@ void ReleaseRefcountedLaneRange(
     destination.first = nullptr;
     destination.last = nullptr;
     destination.end = nullptr;
-    if (BuyVectorStorageByElementWidth(destination, sourceCount, 388u)) {
+    if (BuyVectorStorageRUnitBlueprintWeapon(destination, sourceCount)) {
       destinationBegin = reinterpret_cast<moho::RUnitBlueprintWeapon*>(destination.first);
       destinationEnd = CopyConstructRUnitBlueprintWeaponRange(destinationBegin, sourceBegin, sourceEnd);
       destination.last = reinterpret_cast<void**>(destinationEnd);
@@ -7413,7 +7661,11 @@ void ReleaseRefcountedLaneRange(
   destination.first = nullptr;
   destination.last = nullptr;
   destination.end = nullptr;
-  if (sourceCount != 0u && BuyVectorStorage4Byte(destination, sourceCount)) {
+  // 1:1 with binary at 0x00526870: the realloc path uses the legacy 4-byte
+  // guarded `_Buy` variant (max-count 0x3FFFFFFF) rather than the unguarded
+  // helper. Calling the guarded sibling by name keeps both FUN_00523940 and
+  // FUN_0074D580 (sharing one canonical body) source-reachable.
+  if (sourceCount != 0u && BuyVectorStorage4ByteGuardedVariant(destination, sourceCount)) {
     destinationBegin = reinterpret_cast<std::uint32_t*>(destination.first);
     destination.last = reinterpret_cast<void**>(MoveDwordRangeAndReturnEnd(sourceEnd, destinationBegin, sourceBegin));
   }
@@ -7546,5 +7798,217 @@ void ReleaseRefcountedLaneRange(
 [[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyVectorStorageGuard568ByteValue() noexcept
 {
   return kLegacyVectorStorageGuard568Byte;
+}
+
+// Maximum legal element count for an MSVC8 std::vector<T> with sizeof(T) == 4.
+// Mirrors the binary's `0x3FFFFFFF` length-overflow guard at 0x007027E0.
+constexpr std::uint32_t kLegacyVectorDwordMaxCount = 0x3FFFFFFFu;
+
+} // namespace msvc8::detail
+
+namespace moho::runtime
+{
+  /**
+   * Address: 0x007029C0 (FUN_007029C0)
+   *
+   * What it does:
+   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
+   * Body lives here (rather than in `moho/misc/CrtRuntimeHelpers.cpp`) while
+   * that wider CRT-helper TU is `<ExcludedFromBuild>`; the legacy MSVC8
+   * vector slow-path helpers below jump to this when the requested logical
+   * length would overflow `kLegacyVectorDwordMaxCount`.
+   */
+  [[noreturn]] void RuntimeThrowVectorTooLongBW()
+  {
+    throw std::length_error("vector<T> too long");
+  }
+}
+
+namespace msvc8::detail
+{
+namespace
+{
+  /**
+   * Inline helper mirroring the MSVC8 emission for `(_Mylast - _Myfirst)`:
+   * returns the logical length of a dword-element vector slot, treating an
+   * uninitialized first lane (`first == nullptr`) as length 0.
+   */
+  [[nodiscard]] std::uint32_t LegacyVectorDwordSize(
+    const vector_runtime_view<std::uint32_t>& storage) noexcept
+  {
+    if (storage.begin == nullptr) {
+      return 0u;
+    }
+
+    return static_cast<std::uint32_t>(storage.end - storage.begin);
+  }
+
+  /**
+   * Companion to `LegacyVectorDwordSize` returning the capacity slot count.
+   * Mirrors the IDA shape `(a3[3] - a3[1]) >> 2` with the binary's nullptr
+   * shortcut intact.
+   */
+  [[nodiscard]] std::uint32_t LegacyVectorDwordCapacity(
+    const vector_runtime_view<std::uint32_t>& storage) noexcept
+  {
+    if (storage.begin == nullptr) {
+      return 0u;
+    }
+
+    return static_cast<std::uint32_t>(storage.capacityEnd - storage.begin);
+  }
+} // anonymous namespace
+
+/**
+ * Address: 0x007027A0 (FUN_007027A0)
+ *
+ * IDA signature:
+ *   int __userpurge sub_7027A0@<eax>(int *a1@<eax>,
+ *                                    unsigned int a2@<ecx>,
+ *                                    int *a3,
+ *                                    _DWORD *Source);
+ *
+ * What it does:
+ * Slow-path body the legacy MSVC8 STL emitted for
+ * `std::vector<T,A>::_Insert_n` when `sizeof(T) == sizeof(void*)`. Inserts
+ * `count` copies of `*valuePtr` into the dword-element vector referenced by
+ * `vectorStorage`, at logical position `insertPosition`. Mirrors the binary's
+ * three-arm dispatch:
+ *
+ *   - throws `vector<T> too long` when remaining headroom is insufficient,
+ *   - tail-shifts in place when current capacity covers the new size,
+ *   - reallocates with growth = max(current * 1.5, current + count) and
+ *     splices the inserted run into the new buffer.
+ *
+ * The helper preserves the original behavior exactly (including the second
+ * `(_Myend - _Myfirst)` recompute and the `operator new(0)` empty-buffer
+ * branch), so every binary call site keeps its observable side effects.
+ */
+void LegacyVectorDwordInsertN(
+  vector_runtime_view<std::uint32_t>& vectorStorage,
+  std::uint32_t* const insertPosition,
+  const std::uint32_t count,
+  const std::uint32_t* const valuePtr) noexcept
+{
+  // Cache `*valuePtr` once: the original IDA load is `mov ecx, [eax]` before
+  // any later allocation can invalidate the source slot when it aliases the
+  // soon-to-be-freed storage. The binary issues this load before the
+  // `test esi, esi` count guard, so an empty `count == 0` call still observes
+  // the same observable read.
+  const std::uint32_t cachedValue = *valuePtr;
+
+  if (count == 0u) {
+    return;
+  }
+
+  if ((kLegacyVectorDwordMaxCount - LegacyVectorDwordSize(vectorStorage)) < count) {
+    moho::runtime::RuntimeThrowVectorTooLongBW();
+  }
+
+  const std::uint32_t currentCapacity = LegacyVectorDwordCapacity(vectorStorage);
+  const std::uint32_t requiredSize    = count + LegacyVectorDwordSize(vectorStorage);
+
+  if (currentCapacity >= requiredSize) {
+    // In-place arm: enough capacity, just tail-shift and fill.
+    std::uint32_t* const oldEnd       = vectorStorage.end;
+    std::uint32_t* const writePosBase = insertPosition;
+    const std::uint32_t  tailWordCount =
+      static_cast<std::uint32_t>(oldEnd - writePosBase);
+
+    if (tailWordCount < count) {
+      // Tail is shorter than the insert run: shift the existing tail right
+      // by `count`, then stamp the freshly-extended end region and the
+      // formerly-tail prefix with `cachedValue`.
+      (void)MoveDwordRangeAndReturnEnd(oldEnd, &writePosBase[count], writePosBase);
+      // Inline equivalent of `FillDwordSpanCountedLaneJ(&cachedValue, oldEnd, gap)`
+      // — the legacy MSVC8 "fill N copies of *src into dst" body the binary
+      // emits as a sibling helper for vector growth.
+      {
+        std::uint32_t*       gapWrite      = oldEnd;
+        const std::uint32_t  gapWordCount  = count - tailWordCount;
+        for (std::uint32_t i = 0; i < gapWordCount; ++i) {
+          *gapWrite = cachedValue;
+          ++gapWrite;
+        }
+      }
+      vectorStorage.end = oldEnd + count;
+
+      std::uint32_t*       writePos = writePosBase;
+      std::uint32_t* const stampEnd = vectorStorage.end - count;
+      while (writePos != stampEnd) {
+        *writePos = cachedValue;
+        ++writePos;
+      }
+    } else {
+      // Tail is at least `count` long: append a copy of the trailing run
+      // first, then back-shift the middle, then fill the seam.
+      (void)MoveDwordRangeAndReturnEnd(oldEnd, oldEnd, oldEnd - count);
+      vectorStorage.end = oldEnd + count;
+      (void)MoveDwordRangeToEnd(oldEnd - count, oldEnd, writePosBase);
+
+      std::uint32_t*       writePos = writePosBase;
+      std::uint32_t* const stampEnd = writePosBase + count;
+      while (writePos != stampEnd) {
+        *writePos = cachedValue;
+        ++writePos;
+      }
+    }
+
+    return;
+  }
+
+  // Reallocate arm: doubled-or-required capacity, copy prefix, splat run,
+  // copy tail, then release the old buffer.
+  std::uint32_t newCapacity = 0u;
+  const std::uint32_t halfCapacity = currentCapacity >> 1;
+  if ((kLegacyVectorDwordMaxCount - halfCapacity) >= currentCapacity) {
+    newCapacity = halfCapacity + currentCapacity;
+  }
+
+  if (newCapacity < requiredSize) {
+    newCapacity = requiredSize;
+  }
+
+  std::uint32_t* newBuffer = nullptr;
+  if (newCapacity != 0u) {
+    newBuffer = static_cast<std::uint32_t*>(
+      ::operator new(newCapacity * sizeof(std::uint32_t)));
+  } else {
+    newBuffer = static_cast<std::uint32_t*>(::operator new(0u));
+  }
+
+  std::uint32_t* const oldFirst = vectorStorage.begin;
+  const std::ptrdiff_t prefixWordCount = (insertPosition - oldFirst);
+  std::uint32_t* const insertSlotInNew = newBuffer + prefixWordCount;
+  if (prefixWordCount != 0) {
+    const std::size_t prefixByteCount =
+      static_cast<std::size_t>(prefixWordCount) * sizeof(std::uint32_t);
+    (void)memmove_s(newBuffer, prefixByteCount, oldFirst, prefixByteCount);
+  }
+
+  std::uint32_t* afterInsertedRun = insertSlotInNew;
+  {
+    // Inline equivalent of `FillDwordSpanCountedLaneJ(&cachedValue, dst, count)`.
+    for (std::uint32_t i = 0; i < count; ++i) {
+      *afterInsertedRun = cachedValue;
+      ++afterInsertedRun;
+    }
+  }
+
+  const std::ptrdiff_t suffixWordCount = vectorStorage.end - insertPosition;
+  if (suffixWordCount != 0) {
+    const std::size_t suffixByteCount =
+      static_cast<std::size_t>(suffixWordCount) * sizeof(std::uint32_t);
+    (void)memmove_s(afterInsertedRun, suffixByteCount, insertPosition, suffixByteCount);
+  }
+
+  const std::uint32_t finalSize = LegacyVectorDwordSize(vectorStorage) + count;
+  if (oldFirst != nullptr) {
+    ::operator delete(oldFirst);
+  }
+
+  vectorStorage.capacityEnd = newBuffer + newCapacity;
+  vectorStorage.end         = newBuffer + finalSize;
+  vectorStorage.begin       = newBuffer;
 }
 } // namespace msvc8::detail

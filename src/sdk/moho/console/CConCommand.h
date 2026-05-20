@@ -75,6 +75,10 @@ namespace moho
   extern int recon_debug;
   extern int rule_Paranoid;
   extern float rule_BlueprintReloadDelay;
+  extern float ai_InitialEnergyCurrency;
+  extern float ai_InitialMassCurrency;
+  extern float ai_InitialEnergyCurrencyMax;
+  extern float ai_InitialMassCurrencyMax;
 
   /**
    * Address: 0x0041E390 (FUN_0041E390)

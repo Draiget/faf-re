@@ -69,6 +69,17 @@ bool moho::sPathDebuggerEnabled = false;
 int moho::rule_Paranoid = 0;
 float moho::rule_BlueprintReloadDelay = 0.0f;
 
+// AI economy tuning convars referenced by `moho::CEconomy::Reset`. The
+// console-startup registration (FUN_00BC8DC0 / FUN_00BC8DE0 family) wires
+// these up as `TConVar<float>` instances at static-init time; the storage
+// definitions live here alongside the other engine convars. Initial values
+// mirror the binary's seed (0.0f at definition; engine config overrides at
+// startup before any `Sim` ticks consume them).
+float moho::ai_InitialEnergyCurrency = 0.0f;
+float moho::ai_InitialMassCurrency = 0.0f;
+float moho::ai_InitialEnergyCurrencyMax = 0.0f;
+float moho::ai_InitialMassCurrencyMax = 0.0f;
+
 namespace
 {
   constexpr std::size_t kSavedConsoleCommandLimit = 0x64u;
@@ -2779,11 +2790,27 @@ namespace
     &moho::con_TestVarStr
   );
   TConVar<int> gTConVar_recon_debug("recon_debug", kConsoleStartupReconDebugDescription, &moho::recon_debug);
+  /**
+   * Address: 0x00BF3950 (FUN_00BF3950, Moho::TConVar_rule_Paranoid::~TConVar_rule_Paranoid)
+   *
+   * The implicit `~TConVar<int>()` destructor runs at process exit on this
+   * global, chaining through `~CConCommand` to reset the vftable and (when a
+   * name lane is still set) reregister the slot via `CON_ReregisterCom`. The
+   * binary records this teardown as a per-instance generated dtor.
+   */
   TConVar<int> gTConVar_rule_Paranoid(
     "rule_Paranoid",
     kConsoleStartupRuleParanoidDescription,
     &moho::rule_Paranoid
   );
+
+  /**
+   * Address: 0x00BF3980 (FUN_00BF3980, Moho::TConVar_rule_BlueprintReloadDelay::~TConVar_rule_BlueprintReloadDelay)
+   *
+   * The implicit `~TConVar<float>()` destructor runs at process exit on this
+   * global, mirroring the same `~CConCommand`-driven teardown shape as the
+   * other recovered rule-bucket convars.
+   */
   TConVar<float> gTConVar_rule_BlueprintReloadDelay(
     "rule_BlueprintReloadDelay",
     kConsoleStartupRuleBlueprintReloadDelayDescription,

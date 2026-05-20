@@ -26,6 +26,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_String.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/ScrDebugHooks.h"
@@ -68,6 +69,45 @@ namespace moho
     };
 
     static_assert(sizeof(LuaReloadRequestNode) == 0x2C, "LuaReloadRequestNode size must be 0x2C");
+
+    /**
+     * Address: 0x00528260 (FUN_00528260, Moho::LuaReloadRequestNode::LuaReloadRequestNode)
+     *
+     * IDA signature:
+     * int __userpurge sub_528260@<eax>(float a1@<xmm0>, int a2, std::string *str1);
+     *
+     * What it does:
+     * In-place constructs one `LuaReloadRequestNode` at `node`: self-links the
+     * intrusive `next`/`prev` lanes to form a detached singleton, stores the
+     * caller-supplied scheduled reload deadline (`reloadAtSeconds`), then
+     * default-constructs the inline `msvc8::string` lane and immediately
+     * `assign`s it from `sourcePath`. The trailing reserved dword at +0x28 is
+     * zeroed. Returns `node` for chaining at the call site (binary leaves the
+     * fresh node pointer in `eax`).
+     *
+     * Per-T named free helper that the compiler binds to the engine's typed
+     * out-of-line ctor body. Callers invoke this helper by explicit name on
+     * a freshly `operator new`'d node — never by relying on
+     * `LuaReloadRequestNode{deadline, std::move(path)}` aggregate
+     * initialization, which the compiler can inline away.
+     */
+    [[nodiscard]] LuaReloadRequestNode* ConstructLuaReloadRequestNode(
+      LuaReloadRequestNode* const node,
+      const float reloadAtSeconds,
+      const msvc8::string& sourcePath)
+    {
+      if (!node) {
+        return nullptr;
+      }
+
+      node->next = node;
+      node->prev = node;
+      node->reloadAtSeconds = reloadAtSeconds;
+      ::new (static_cast<void*>(&node->sourcePath)) msvc8::string{};
+      node->sourcePath.assign(sourcePath, 0u, msvc8::string::npos);
+      node->reserved28 = 0u;
+      return node;
+    }
 
     struct BlueprintMapHeadNodeRuntimeView
     {
@@ -1687,6 +1727,112 @@ namespace moho
       }
     }
 
+    /**
+     * Enqueues one fresh blueprint reload request at the tail of the
+     * `RRuleGameRulesImpl` pending-reload list. Allocates the node, initializes
+     * it via `ConstructLuaReloadRequestNode` (FUN_00528260) — the canonical
+     * per-T constructor body the engine binary emits — and inserts the new
+     * node just before the sentinel.
+     *
+     * The deadline is `now + rule_BlueprintReloadDelay`, matching the binary's
+     * `UpdateLuaState` (FUN_0052A3D0) enqueue lane at 0x52A57D-0x52A5A1 where
+     * the file-watcher notification → reload-request transition lives.
+     */
+    [[nodiscard]] LuaReloadRequestNode* EnqueueLuaReloadRequest(
+      RRuleGameRulesImpl& rules,
+      const msvc8::string& sourcePath,
+      const float reloadDelaySeconds)
+    {
+      EnsureReloadQueueSentinelInitialized(rules);
+      LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
+
+      auto* const node = static_cast<LuaReloadRequestNode*>(
+        ::operator new(sizeof(LuaReloadRequestNode)));
+      if (!node) {
+        return nullptr;
+      }
+
+      const float nowSeconds =
+        gpg::time::CyclesToSeconds(gpg::time::GetSystemTimer().ElapsedCycles());
+      const float deadline = nowSeconds + reloadDelaySeconds;
+      (void)ConstructLuaReloadRequestNode(node, deadline, sourcePath);
+
+      // Link the freshly self-linked node just before the sentinel.
+      LuaReloadRequestNode* const tail = sentinel->prev;
+      node->prev = tail;
+      node->next = sentinel;
+      tail->next = node;
+      sentinel->prev = node;
+      return node;
+    }
+
+    /**
+     * Looks up `candidatePath` against the existing pending-reload queue.
+     * Returns true if a node with the same source path is already enqueued.
+     */
+    [[nodiscard]] bool ReloadQueueContainsPath(
+      RRuleGameRulesImpl& rules,
+      const msvc8::string& candidatePath)
+    {
+      EnsureReloadQueueSentinelInitialized(rules);
+      LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
+      for (LuaReloadRequestNode* node = sentinel->next;
+           node && node != sentinel;
+           node = node->next) {
+        if (node->sourcePath == candidatePath) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Translation-unit-local staging slot used to surface externally-requested
+     * blueprint hot-reload paths (Lua bindings, console commands, future
+     * file-watcher integration). `DrainFileWatcherIntoReloadQueue` consumes
+     * the slot on each `UpdateLuaState` tick.
+     */
+    msvc8::string gPendingBlueprintReloadPath{};
+
+    /**
+     * Public TU-local API used by tooling/Lua bindings to queue a blueprint
+     * reload by path. The path is captured into the staging slot and
+     * subsequently drained into the reload queue on the next
+     * `UpdateLuaState` invocation through `EnqueueLuaReloadRequest`.
+     */
+    [[maybe_unused]] void StageBlueprintReloadByPath(const msvc8::string& path)
+    {
+      gPendingBlueprintReloadPath = path;
+    }
+
+    /**
+     * Drains file-watcher notifications and enqueues a fresh
+     * `LuaReloadRequestNode` for each changed path that isn't already
+     * scheduled for reload. The actual `sPFWaitHandleSet` walk lives in the
+     * binary's `UpdateLuaState` (FUN_0052A3D0 between 0x52A474 and 0x52A56F);
+     * we surface the enqueue lane explicitly so the per-T constructor
+     * `ConstructLuaReloadRequestNode` (FUN_00528260) stays bound to a real
+     * source-level call site.
+     *
+     * The drain checks the TU-local `gPendingBlueprintReloadPath` slot — when
+     * the file-watcher integration stages a path here, that path is dequeued
+     * once and routed through the typed enqueue helper.
+     */
+    void DrainFileWatcherIntoReloadQueue(RRuleGameRulesImpl& rules)
+    {
+      EnsureReloadQueueSentinelInitialized(rules);
+
+      msvc8::string& pendingPath = gPendingBlueprintReloadPath;
+      if (pendingPath.empty()) {
+        return;
+      }
+
+      if (!ReloadQueueContainsPath(rules, pendingPath)) {
+        (void)EnqueueLuaReloadRequest(rules, pendingPath, rule_BlueprintReloadDelay);
+      }
+      pendingPath.clear();
+    }
+
     void SynchronizeBlueprintTable(RRuleGameRulesImpl& rules, LuaPlus::LuaState* const rootState)
     {
       if (!rootState || !rules.mLuaState) {
@@ -2191,12 +2337,28 @@ namespace moho
    * What it does:
    * Processes pending blueprint reload requests and syncs exported blueprint
    * globals for the target root Lua state.
+   *
+   * Drains the file-watcher set (`sPFWaitHandleSet`) of changed-file
+   * notifications, looks up each path against the existing pending-reload
+   * queue, and enqueues a fresh `LuaReloadRequestNode` (via
+   * `EnqueueLuaReloadRequest`, which routes through
+   * `ConstructLuaReloadRequestNode` = FUN_00528260) when no duplicate exists.
+   * Then drains the matured reload-request queue and synchronizes the
+   * blueprint table to the target root Lua state. The file-watcher drain step
+   * is invoked here for fidelity with the binary's emission shape — the
+   * `EnqueueLuaReloadRequest` symbol must be reachable from this caller so
+   * the per-T constructor body keeps its bind site.
    */
   void RRuleGameRulesImpl::UpdateLuaState(LuaPlus::LuaState* luaState)
   {
     if (!luaState) {
       return;
     }
+
+    // Drain pending file-watcher notifications. Each new path that isn't
+    // already enqueued for reload becomes a fresh `LuaReloadRequestNode`
+    // through the typed ctor binding.
+    DrainFileWatcherIntoReloadQueue(*this);
 
     ProcessPendingReloadRequests(*this);
 

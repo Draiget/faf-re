@@ -825,6 +825,33 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063A660 (FUN_0063A660, sub_63A660)
+   *
+   * What it does:
+   * Returns the bone-name string for this pose-bone, resolved through the
+   * pose's skeleton's `mBones[mIdx].mBoneName` (bone-name slot at +0x00 of
+   * `SAniSkelBone`). The skeleton is held briefly via a ref-counted
+   * `shared_ptr<const CAniSkel>` so the bone-array pointers remain valid
+   * for the lookup; the shared-pointer drop on return matches the MSVC8
+   * out-of-line release that the binary emits at the function's tail.
+   */
+  const char* CAniPoseBone::GetBoneName() const
+  {
+    const boost::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
+    const CAniSkel* const skeleton = skeletonHandle.get();
+    const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
+    const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
+
+    const SAniSkelBone* targetBone = nullptr;
+    if (bonesBegin
+        && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
+      targetBone = bonesBegin + boneIndex;
+    }
+
+    return (targetBone != nullptr) ? targetBone->mBoneName : nullptr;
+  }
+
+  /**
    * Address: 0x0054BE30 (FUN_0054BE30, Moho::CAniPoseBone::SetVisibleRecur)
    */
   std::uint32_t CAniPoseBone::SetVisibleRecur(const bool visible)

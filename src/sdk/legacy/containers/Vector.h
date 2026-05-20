@@ -1508,10 +1508,15 @@ namespace msvc8
         /**
          * Address: 0x004430D0 (FUN_004430D0, forwarding lane)
          * Address: 0x00443B80 (FUN_00443B80)
+         * Address: 0x0074DC40 (FUN_0074DC40, msvc8::vector<Moho::CArmyImpl*>::resize)
          *
          * What it does:
          * Resizes logical element count to `newSize` by erasing tail elements when
-         * shrinking or value-initializing appended slots when growing.
+         * shrinking or value-initializing appended slots when growing. The 4-byte
+         * stride binary specialization at `0x0074DC40` is the
+         * `std::vector<CArmyImpl*>::resize` emission used by `Moho::Sim::SerArmies`
+         * (line `mArmiesList.resize(...)`) and `Moho::Sim::CreateArmies` — these
+         * sites invoke this method by name through the `msvc8::vector<T>` API.
          */
         void resize(std::size_t newSize) {
             const std::size_t cur = size();
@@ -1563,10 +1568,19 @@ namespace msvc8
          *
          * Address: 0x00443300 (FUN_00443300)
          * Address: 0x00443420 (FUN_00443420)
+         * Address: 0x0057D820 (FUN_0057D820, msvc8::vector<SAiAttackVectorDebug>::push_back)
+         * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back)
+         * Address: 0x007C8F30 (FUN_007C8F30, msvc8::vector<Moho::LaunchPlayerOptionEntry>::push_back)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
-         * reaches `end_`.
+         * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
+         * engine-type specialization; each `Address:` tag above identifies the
+         * binary symbol for one such specialization, and the recovered caller
+         * (e.g. `CAiBrain::ProcessAttackVectors`, `cfunc_GpgNetSendL`,
+         * `CLobby::LaunchGame`) invokes this method by name through the
+         * `msvc8::vector<T>` API surface — that is the source-level invocation
+         * the linker uses to keep the symbol shape in the recovered binary.
          */
         void push_back(const T& value) {
             ensure_grow_for(1);
@@ -1706,6 +1720,104 @@ namespace msvc8
             return first;
         }
 
+        /**
+         * Insert `count` copies of `value` at iterator `pos`.
+         *
+         * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
+         * sufficient, the live tail `[pos, end)` is shifted right by `count`
+         * slots and the gap is filled with copies of `value`; when capacity
+         * is insufficient, a reallocated buffer of doubled-or-needed size is
+         * built up by moving the head, fill-constructing the gap, and moving
+         * the tail. The recovered per-T resize/insert helper lanes
+         * (`InsertNCopies*Vector`) call this method by name through the
+         * `msvc8::vector<T>` API surface, which is the source-level
+         * invocation that keeps the canonical symbol shape in the recovered
+         * binary.
+         */
+        iterator insert(const_iterator pos, std::size_t count, const T& value) {
+            assert(pos >= first_ && pos <= last_);
+            const std::size_t offset = static_cast<std::size_t>(pos - first_);
+            if (count == 0) {
+                return first_ + offset;
+            }
+
+            const std::size_t cur = size();
+            if (cur + count <= capacity()) {
+                T* const insertAt = first_ + offset;
+                T* const oldLast = last_;
+                const std::size_t tail = static_cast<std::size_t>(oldLast - insertAt);
+                // Shift the tail right by `count` slots.
+                if (tail >= count) {
+                    // Move the trailing `count` elements into uninitialized
+                    // slots past the live range.
+                    uninit_move_n(oldLast - count, count, oldLast);
+                    // Shift the remaining tail elements in-place to the right.
+                    if constexpr (std::is_trivially_copyable_v<T>) {
+                        std::memmove(insertAt + count, insertAt, (tail - count) * sizeof(T));
+                    } else {
+                        for (std::size_t i = tail - count; i > 0; --i) {
+                            insertAt[count + i - 1] = std::move(insertAt[i - 1]);
+                        }
+                    }
+                    // Overwrite the gap with copies of `value`.
+                    for (std::size_t i = 0; i < count; ++i) {
+                        insertAt[i] = value;
+                    }
+                } else {
+                    // Tail smaller than gap: move-construct the whole tail
+                    // into its new slot, fill the trailing-gap section with
+                    // value, and copy-assign the head-gap section.
+                    uninit_move_n(insertAt, tail, insertAt + count);
+                    uninit_fill_n(insertAt + tail, count - tail, value);
+                    for (std::size_t i = 0; i < tail; ++i) {
+                        insertAt[i] = value;
+                    }
+                }
+                last_ = oldLast + count;
+                return first_ + offset;
+            }
+
+            // Reallocation path: build a fresh buffer with head | fill | tail.
+            const std::size_t newCap = recommended_capacity(cur + count);
+            void* rawBuf;
+            if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
+                rawBuf = allocate_dword_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 8u) {
+                rawBuf = allocate_qword_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 64u) {
+                rawBuf = allocate_struct64_slots_checked(newCap);
+            } else if constexpr (sizeof(T) == 0x184u) {
+                rawBuf = allocate_unit_blueprint_weapon_slots_checked(newCap);
+            } else {
+                rawBuf = ::operator new(sizeof(T) * newCap);
+            }
+            T* const newBuf = static_cast<T*>(rawBuf);
+            try {
+                uninit_move_n(first_, offset, newBuf);
+                try {
+                    uninit_fill_n(newBuf + offset, count, value);
+                    try {
+                        uninit_move_n(first_ + offset, cur - offset, newBuf + offset + count);
+                    } catch (...) {
+                        destroy_n(newBuf + offset, count);
+                        throw;
+                    }
+                } catch (...) {
+                    destroy_n(newBuf, offset);
+                    throw;
+                }
+            } catch (...) {
+                ::operator delete(static_cast<void*>(newBuf));
+                throw;
+            }
+            destroy_range(first_, last_);
+            deallocate_all();
+            first_ = newBuf;
+            last_ = newBuf + cur + count;
+            end_ = newBuf + newCap;
+            return first_ + offset;
+        }
+
     private:
         /**
          * Destroy [first,last)
@@ -1752,6 +1864,27 @@ namespace msvc8
             } catch (...) {
                 destroy_n(dst, i);
                 throw;
+            }
+        }
+
+        /**
+         * Uninitialized move (or copy if non-movable) N elements src->dst.
+         * Used by `insert(pos, count, value)` to shift the tail and to
+         * populate the reallocated buffer's head/tail spans.
+         */
+        static void uninit_move_n(T* src, const std::size_t n, T* dst) {
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                std::memcpy(dst, src, n * sizeof(T));
+            } else {
+                std::size_t i = 0;
+                try {
+                    for (; i < n; ++i) {
+                        ::new (static_cast<void*>(dst + i)) T(std::move_if_noexcept(src[i]));
+                    }
+                } catch (...) {
+                    destroy_n(dst, i);
+                    throw;
+                }
             }
         }
 
@@ -1904,6 +2037,17 @@ namespace msvc8
          * Address: 0x005DF520 (FUN_005DF520)
          * Address: 0x0067F7F0 (FUN_0067F7F0)
          * Address: 0x00704530 (FUN_00704530)
+         * Address: 0x007B1240 (FUN_007B1240)
+         * Address: 0x007B1390 (FUN_007B1390)
+         * Address: 0x007DA660 (FUN_007DA660)
+         * Address: 0x008319C0 (FUN_008319C0)
+         * Address: 0x00831A30 (FUN_00831A30)
+         * Address: 0x00831B40 (FUN_00831B40)
+         * Address: 0x00831C20 (FUN_00831C20)
+         * Address: 0x008D6F60 (FUN_008D6F60)
+         * Address: 0x008D9060 (FUN_008D9060)
+         * Address: 0x0092C1E0 (FUN_0092C1E0)
+         * Address: 0x00931BF0 (FUN_00931BF0)
          *
          * IDA signature:
          * void *__fastcall sub_xxxx(unsigned int a1);
@@ -1927,6 +2071,8 @@ namespace msvc8
 
         /**
          * Address: 0x005A1D60 (FUN_005A1D60)
+         * Address: 0x00783D90 (FUN_00783D90)
+         * Address: 0x008B3700 (FUN_008B3700)
          *
          * IDA signature:
          * Moho::WeakPtr_CUnitCommand *__fastcall sub_5A1D60(unsigned int a1);
@@ -1949,6 +2095,99 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x007E5650 (FUN_007E5650)
+         *
+         * IDA signature:
+         * void *__fastcall sub_7E5650(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 12-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * 12-byte element types (e.g., `Wm3::Vector3<float>` / `gpg::Vector3f`).
+         * On `count > 0xFFFFFFFF / 12 == 0x15555555`, constructs a `std::bad_alloc`
+         * via the same VC8 exception-then-vtable-swap lane routed through
+         * `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_triple_dword_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 12u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
+         * Address: 0x008E87F0 (FUN_008E87F0)
+         *
+         * IDA signature:
+         * void *__fastcall sub_8E87F0(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 16-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * a 16-byte (`0x10`) element type. On `count > 0xFFFFFFFF / 0x10 ==
+         * 0x0FFFFFFF`, constructs a `std::bad_alloc` via the same VC8
+         * exception-then-vtable-swap lane routed through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_struct16_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 0x10u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
+         * Address: 0x0085F930 (FUN_0085F930)
+         *
+         * IDA signature:
+         * void *__fastcall sub_85F930(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 52-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * a 52-byte (`0x34`) element type. On `count > 0xFFFFFFFF / 0x34 ==
+         * 0x04EC4EC4`, constructs a `std::bad_alloc` via the same VC8
+         * exception-then-vtable-swap lane routed through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_struct52_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 0x34u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
+         * Address: 0x007FB950 (FUN_007FB950)
+         *
+         * IDA signature:
+         * void *__fastcall sub_7FB950(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 60-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * a 60-byte (`0x3C`) element type. On `count > 0xFFFFFFFF / 0x3C ==
+         * 0x04444444`, constructs a `std::bad_alloc` via the same VC8
+         * exception-then-vtable-swap lane routed through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_struct60_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 0x3Cu;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
          * Address: 0x004C6520 (FUN_004C6520)
          *
          * What it does:
@@ -1959,6 +2198,29 @@ namespace msvc8
         [[nodiscard]] static void* allocate_struct64_slots_checked(const std::size_t count)
         {
             constexpr std::size_t kElementSize = 64u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
+        }
+
+        /**
+         * Address: 0x008F6040 (FUN_008F6040)
+         *
+         * IDA signature:
+         * void *__fastcall sub_8F6040(unsigned int a1);
+         *
+         * What it does:
+         * Allocates one raw 116-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * a 116-byte (`0x74`) element type. On `count > 0xFFFFFFFF / 0x74 ==
+         * 0x02325A19`, constructs a `std::bad_alloc` via the same VC8
+         * exception-then-vtable-swap lane routed through `_CxxThrowException`.
+         */
+        [[nodiscard]] static void* allocate_struct116_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 0x74u;
             if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
                 throw std::bad_alloc();
             }
@@ -2132,6 +2394,39 @@ namespace msvc8
     {
         return *reinterpret_cast<const vector_runtime_view<T>*>(&vec);
     }
+
+    namespace detail
+    {
+        /**
+         * Address: 0x007027A0 (FUN_007027A0)
+         *
+         * Slow-path body the legacy MSVC8 STL emitted for
+         * `std::vector<T,A>::_Insert_n` when `sizeof(T) == sizeof(void*)`.
+         * Inserts `count` copies of `*valuePtr` into the dword-element vector
+         * referenced by `vectorStorage`, at logical position `insertPosition`,
+         * growing the buffer when capacity is exhausted. The IDA shape is:
+         *
+         *   void __userpurge sub_7027A0@<eax>(int* a1@<eax>,
+         *                                     unsigned ecx,
+         *                                     int* a3,
+         *                                     _DWORD* Source);
+         *
+         * Where `a1` carries the value lane pointer, `ecx` carries `count`,
+         * `a3` is the vector pointer (`{proxy, _Myfirst, _Mylast, _Myend}`),
+         * and `Source` is the `_Mylast` insert iterator.
+         *
+         * The function dispatches between the in-place tail-shift path and the
+         * grow-and-copy reallocation path exactly as MSVC8 emitted, reusing the
+         * recovered helpers `MoveDwordRangeToEnd`, `MoveDwordRangeAndReturnEnd`,
+         * and `moho::runtime::RuntimeThrowVectorTooLongBW`. The inline counted
+         * fills match the body the binary reaches through `FUN_00701FA0`.
+         */
+        void LegacyVectorDwordInsertN(
+            vector_runtime_view<std::uint32_t>& vectorStorage,
+            std::uint32_t* insertPosition,
+            std::uint32_t count,
+            const std::uint32_t* valuePtr) noexcept;
+    } // namespace detail
 
     /**
 	 * Small-vector with inline storage and heap fallback (non-owning SDK view).
