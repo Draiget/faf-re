@@ -402,6 +402,23 @@ namespace moho
    * and caches the lane when missing.
    */
   [[nodiscard]] CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* armyStats, const char* statPath);
+
+  /**
+   * Address: 0x007134C0 (FUN_007134C0, boost::shared_ptr<Moho::STrigger>::shared_ptr(STrigger*))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `boost::shared_ptr<Moho::STrigger>::shared_ptr(STrigger*)` ctor body.
+   * Allocates the `sp_counted_impl_p<STrigger>` reference-count block (size
+   * 0x10) with use_count=1 / weak_count=1, sets the
+   * `sp_counted_impl_p<STrigger>` vtable, and binds the owned raw pointer.
+   *
+   * Rewrites `boost::shared_ptr<STrigger> created{new STrigger()};` at the
+   * caller site to invoke this helper by name so the MSVC8 per-T template
+   * emission symbol is preserved even when the modern compiler would inline
+   * the natural ctor-arg construction.
+   */
+  void ConstructSharedSTriggerFromRaw(boost::shared_ptr<STrigger>& out, STrigger* raw);
 } // namespace moho
 
 namespace gpg

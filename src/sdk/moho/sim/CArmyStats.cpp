@@ -1848,7 +1848,11 @@ namespace moho
       return;
     }
 
-    boost::shared_ptr<STrigger> created{new STrigger()};
+    // Route the per-T raw-pointer ctor through the canonical helper
+    // (FUN_007134C0) so the MSVC8 `shared_ptr<STrigger>(STrigger*)`
+    // template emission symbol is preserved.
+    boost::shared_ptr<STrigger> created;
+    ConstructSharedSTriggerFromRaw(created, new STrigger());
     created->mName = triggerName ? triggerName : "";
 
     ArmyTriggerNode* const head = mAuxHead;
@@ -2035,5 +2039,25 @@ namespace moho
       delete head;
       mAuxHead = nullptr;
     }
+  }
+
+  /**
+   * Address: 0x007134C0 (FUN_007134C0, boost::shared_ptr<Moho::STrigger>::shared_ptr(STrigger*))
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `boost::shared_ptr<Moho::STrigger>` raw-pointer constructor. Internally
+   * `out.reset(raw)` constructs a fresh `shared_ptr<STrigger>` from the raw
+   * pointer (allocating the `sp_counted_impl_p<STrigger>` reference-count
+   * block with use_count=1 / weak_count=1, setting the vtable, and binding
+   * the owned pointer) then swaps it into `out` — equivalent runtime
+   * behavior to the binary's out-of-line ctor body.
+   *
+   * Wiring at the `EnsureTriggerExists` caller site preserves the MSVC8
+   * per-T template emission symbol for `T = STrigger`.
+   */
+  void ConstructSharedSTriggerFromRaw(boost::shared_ptr<STrigger>& out, STrigger* const raw)
+  {
+    out.reset(raw);
   }
 } // namespace moho
