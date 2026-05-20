@@ -99,6 +99,27 @@ namespace gpg::gal
             }
         }
 
+        /**
+         * Address: 0x008FE700 (FUN_008FE700, msvc8::vector<gpg::gal::EffectMacro>::vector(const vector&))
+         *
+         * What it does:
+         * Per-T named helper binding the engine-instantiated
+         * `msvc8::vector<gpg::gal::EffectMacro>::vector(const vector&)`
+         * copy-construction body (60-byte elements). Default-zeros the
+         * destination's `_Myfirst/_Mylast/_Myend` triplet (caller has
+         * already initialized to all-null), then placement-new-copy-constructs
+         * the vector from `source` so the per-T template emission symbol
+         * shape is preserved across both `EffectContext` copy-ctor sites
+         * that previously used the inline `::new (...) vector<EffectMacro>(*src)`
+         * form.
+         */
+        void CopyConstructEffectMacroVector(
+            msvc8::vector<EffectMacro>* destination,
+            const msvc8::vector<EffectMacro>& source)
+        {
+            ::new (static_cast<void*>(destination)) msvc8::vector<EffectMacro>(source);
+        }
+
         void DestroyEffectMacroStorage(EffectMacroVectorRuntime& runtime) noexcept
         {
             if (runtime.first != nullptr)
@@ -828,7 +849,10 @@ namespace gpg::gal
 
                 auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
                 const auto* const sourceMacros = reinterpret_cast<const msvc8::vector<EffectMacro>*>(&sourceRuntime->macros);
-                ::new (static_cast<void*>(destinationMacros)) msvc8::vector<EffectMacro>(*sourceMacros);
+                // Route per-T copy-construction through the canonical helper
+                // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
+                // template emission symbol is preserved.
+                CopyConstructEffectMacroVector(destinationMacros, *sourceMacros);
             }
             catch (...)
             {
@@ -900,7 +924,10 @@ namespace gpg::gal
                 runtime->sourceBufferEnd = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mEnd));
 
                 auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
-                ::new (static_cast<void*>(destinationMacros)) msvc8::vector<EffectMacro>(macros);
+                // Route per-T copy-construction through the canonical helper
+                // (FUN_008FE700) so the MSVC8 vector<EffectMacro>::vector(const vector&)
+                // template emission symbol is preserved.
+                CopyConstructEffectMacroVector(destinationMacros, macros);
             }
             catch (...)
             {
