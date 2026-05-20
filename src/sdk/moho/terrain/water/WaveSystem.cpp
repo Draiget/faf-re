@@ -74,6 +74,16 @@ namespace
     return generator;
   }
 
+  /**
+   * Address: 0x0088ACB0 (FUN_0088ACB0, sub_88ACB0)
+   *
+   * What it does:
+   * Search-and-compact lane that walks a `WaveGenerator**` range and shifts
+   * elements left to remove every occurrence of `target`. Records the new
+   * compacted-end pointer through `outEnd`. The binary emits this body
+   * out-of-line; wiring it through the named helper preserves the per-T
+   * shape used by `WaveSystem::RemoveAndDeleteGenerator`.
+   */
   [[nodiscard]] moho::WaveGenerator*** CompactWaveGeneratorPointerRangeWithoutTarget(
     moho::WaveGenerator*** const outEnd,
     moho::WaveGenerator** begin,
