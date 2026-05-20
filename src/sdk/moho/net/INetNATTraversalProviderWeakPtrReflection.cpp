@@ -172,6 +172,27 @@ gpg::RType* gpg::ResolveWeakPtrINetNATTraversalProviderType()
 }
 
 /**
+ * Address: 0x00482560 (FUN_00482560, gpg::RRef_weak_ptr_INetNATTraversalProvider)
+ *
+ * What it does:
+ * Builds one reflected `boost::weak_ptr<moho::INetNATTraversalProvider>`
+ * reference: stores the weak-pointer storage address in `out->mObj` and
+ * the lazily-resolved cached `boost::weak_ptr<...>` `RType*` in
+ * `out->mType`. Called from `Moho::NET_MakeNATTraversal` (FUN_007BC5F0)
+ * to bind the provider into a typed Lua userdata.
+ */
+gpg::RRef* gpg::RRef_weak_ptr_INetNATTraversalProvider(
+  gpg::RRef* const out,
+  boost::weak_ptr<moho::INetNATTraversalProvider>* const provider)
+{
+  if (!out) {
+    return nullptr;
+  }
+  *out = MakeWeakProviderRef(provider);
+  return out;
+}
+
+/**
  * Address: 0x00482350 (FUN_00482350)
  */
 gpg::RWeakPointerType<moho::INetNATTraversalProvider>::~RWeakPointerType() = default;
