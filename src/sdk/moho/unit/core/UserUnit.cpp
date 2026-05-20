@@ -4857,16 +4857,39 @@ void UserUnit::RemoveSelectionSet(const char* const selectionSetName)
 }
 
 /**
+ * Address: 0x008C5B90 (FUN_008C5B90, msvc8::set<msvc8::string>::find)
+ *
+ * What it does:
+ * Per-T canonical-template-helper binding for the engine-instantiated
+ * `msvc8::set<msvc8::string>::find(const key&)` _Tree::_Lbound walk +
+ * key-equal check body. Returns the iterator to the matching node or
+ * `end()` if the key is not present.
+ *
+ * Used by `UserUnit::HasSelectionSet` (FUN_008BF220, the only recovered
+ * caller of FUN_008C5B90 in the binary) to preserve the MSVC8 per-T
+ * `_Tree::find` template emission symbol shape even when the modern
+ * compiler would inline the natural `mSelectionSets.find(...)` call.
+ */
+msvc8::set<msvc8::string>::iterator FindStringSetEntry(
+  const msvc8::set<msvc8::string>& storage,
+  const msvc8::string& key)
+{
+  return storage.find(key);
+}
+
+/**
  * Address: 0x008BF220 (FUN_008BF220)
  *
  * What it does:
  * Returns whether this unit currently stores one named selection-set key.
+ * Routes the per-T `msvc8::set<msvc8::string>::find` through the named
+ * helper (FUN_008C5B90) to preserve the MSVC8 template emission symbol.
  */
 bool UserUnit::HasSelectionSet(const char* const selectionSetName) const
 {
   msvc8::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
-  return mSelectionSets.find(selectionSet) != mSelectionSets.end();
+  return FindStringSetEntry(mSelectionSets, selectionSet) != mSelectionSets.end();
 }
 
 bool UserUnit::IsRepeatQueueEnabled() const
