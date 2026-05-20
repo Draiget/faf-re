@@ -168,6 +168,8 @@ SteeringParams::SteeringParams(
   return outParams;
 }
 
+namespace moho
+{
 /**
  * Address: 0x00698FF0 (FUN_00698FF0)
  */
@@ -190,6 +192,7 @@ SteeringParams BuildSteeringParamsFromTransform(
 
   return SteeringParams(unit, source, destination, forward, 0.0f, true);
 }
+} // namespace moho
 
 /**
  * Address: 0x00698F40 (FUN_00698F40)
@@ -302,6 +305,8 @@ SteeringParams BuildSteeringParamsFromTransform(
   return radiusLimit;
 }
 
+namespace moho
+{
 /**
  * Address: 0x006992C0 (FUN_006992C0)
  */
@@ -355,7 +360,10 @@ Wm3::Vector2f* RotateDirectionTowardTargetLimited(
   outDirection->y = rotatedZ;
   return outDirection;
 }
+} // namespace moho
 
+namespace moho
+{
 /**
  * Address: 0x00699940 (FUN_00699940)
  */
@@ -381,6 +389,7 @@ BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* const direction, Wm3:
   *outOrientation = temp;
   return outOrientation;
 }
+} // namespace moho
 
 Unit* SCollisionLink::ResolveUnitFromIntrusiveSlot() const noexcept
 {

@@ -506,9 +506,11 @@
     <ClCompile Include="moho\app\CScApp.cpp" />
     <ClCompile Include="moho\app\CWaitHandleSet.cpp" />
     <ClCompile Include="moho\app\IWinApp.cpp" />
+    <ClCompile Include="moho\app\WEmitterWx.cpp" />
     <ClCompile Include="moho\app\WinMain.cpp" />
     <ClCompile Include="moho\app\WinApp.cpp" />
     <ClCompile Include="moho\app\WxAppRuntime.cpp" />
+    <ClCompile Include="moho\app\WxAppVectorHelpers.cpp" />
     <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp" />
     <ClCompile Include="moho\app\WxRuntimeTypes.cpp" />
     <ClCompile Include="moho\collision\CCollisionManipulator.cpp" />
@@ -734,6 +736,7 @@
     <ClCompile Include="moho\entity\EntityCategorySetTypeInfo.cpp" />
     <ClCompile Include="moho\entity\EntityCategorySetVectorReflection.cpp" />
     <ClCompile Include="moho\misc\EngineStatsCleanup.cpp" />
+    <ClCompile Include="moho\misc\EngineVectorHelpers.cpp" />
     <ClCompile Include="moho\projectile\Projectile.cpp" />
     <ClCompile Include="moho\projectile\ProjectileLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\projectile\ProjectileSerHelpers.cpp" />
@@ -749,6 +752,7 @@
     <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="moho\misc\WxCrtBridge.cpp" />
     <ClCompile Include="moho\misc\RuntimeTuningGlobals.cpp" />
     <ClCompile Include="moho\misc\DName.cpp" />
     <ClCompile Include="moho\misc\StringUtils.cpp" />
@@ -1046,6 +1050,7 @@
     <ClCompile Include="moho\terrain\TerrainCommon.cpp" />
     <ClCompile Include="moho\terrain\TerrainDynamicTextureHelpers.cpp" />
     <ClCompile Include="moho\terrain\TerrainFactory.cpp" />
+    <ClCompile Include="moho\terrain\TerrainShaderVars.cpp" />
     <ClCompile Include="moho\terrain\water\CWaterShaderProperties.cpp" />
     <ClCompile Include="moho\terrain\water\HighFidelityWater.cpp" />
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp" />
@@ -1403,7 +1408,9 @@
     <ClInclude Include="moho\app\CScApp.h" />
     <ClInclude Include="moho\app\CWaitHandleSet.h" />
     <ClInclude Include="moho\app\IWinApp.h" />
+    <ClInclude Include="moho\app\WEmitterWx.h" />
     <ClInclude Include="moho\app\WxAppRuntime.h" />
+    <ClInclude Include="moho\app\WxAppVectorHelpers.h" />
     <ClInclude Include="moho\app\WxRuntimeTypes.h" />
     <ClInclude Include="moho\client\Localization.h" />
     <ClInclude Include="moho\collision\ECollisionShape.h" />
@@ -1411,6 +1418,7 @@
     <ClInclude Include="moho\command\CCommandDbSerHelpers.h" />
     <ClInclude Include="moho\command\CCommandDbTypeInfo.h" />
     <ClInclude Include="moho\command\CmdDefs.h" />
+    <ClInclude Include="moho\command\CommandIssueHelper.h" />
     <ClInclude Include="moho\command\EUnitCommandTypeTypeInfo.h" />
     <ClInclude Include="moho\command\SSTICommandConstantData.h" />
     <ClInclude Include="moho\command\SSTICommandIssueData.h" />
@@ -1868,6 +1876,7 @@
     <ClInclude Include="moho\entity\EntityCategorySetTypeInfo.h" />
     <ClInclude Include="moho\entity\EntityCategorySetVectorReflection.h" />
     <ClInclude Include="moho\misc\EngineStatsCleanup.h" />
+    <ClInclude Include="moho\misc\EngineVectorHelpers.h" />
     <ClInclude Include="moho\projectile\CProjectileAttributes.h" />
     <ClInclude Include="moho\projectile\EProjectileImpactEvent.h" />
     <ClInclude Include="moho\projectile\Projectile.h" />
@@ -2245,6 +2254,7 @@
     <ClInclude Include="moho\terrain\TerrainCommon.h" />
     <ClInclude Include="moho\terrain\TerrainDynamicTextureHelpers.h" />
     <ClInclude Include="moho\terrain\TerrainFactory.h" />
+    <ClInclude Include="moho\terrain\TerrainShaderVars.h" />
     <ClInclude Include="moho\terrain\water\HighFidelityWater.h" />
     <ClInclude Include="moho\terrain\water\WaterFactory.h" />
     <ClInclude Include="moho\terrain\water\WaterShaderVars.h" />

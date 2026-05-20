@@ -9010,6 +9010,104 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 /**
+ * Address: 0x00AC1571 (FUN_00AC1571, sub_AC1571)
+ *
+ * IDA signature:
+ * __int16 __cdecl sub_AC1571(_WORD *a1, _WORD *a2);
+ *
+ * What it does:
+ * Frexp-style classifier for one packed 32-bit float lane (two 16-bit
+ * words). Inspects the IEEE-754 binary32 biased exponent in `words[1]`
+ * bits 14..7 and either:
+ *   * returns `2` (NaN) or `1` (infinity) for an all-ones exponent,
+ *   * normalizes the value into `[0.5, 1.0)` and stores the unbiased
+ *     exponent into `*exponentOut`, returning `-1` for finite normal /
+ *     denormal values,
+ *   * returns `0` for true zero (all bits zero outside the sign), with
+ *     `*exponentOut = 0`.
+ * Denormal inputs are normalized in place via
+ * `NormalizePackedFloatWordsRuntime` (FUN_00AC14D3) before the exponent
+ * extraction; if that helper reports an all-zero mantissa (positive
+ * delta), the value is re-classified as zero.
+ */
+[[maybe_unused]] std::int16_t FrexpClassifyPackedFloatWordsRuntime(
+  std::int32_t* const exponentOut,
+  std::uint16_t* const words
+) noexcept
+{
+  const std::uint8_t biasedExponent = static_cast<std::uint8_t>(words[1] >> 7u);
+  if (biasedExponent == 0xFFu) {
+    *exponentOut = 0;
+    return ((words[1] & 0x007Fu) != 0u || words[0] != 0u) ? std::int16_t{2} : std::int16_t{1};
+  }
+
+  std::int32_t effectiveExponent = biasedExponent;
+  if (biasedExponent == 0u) {
+    effectiveExponent = NormalizePackedFloatWordsRuntime(words);
+    if (effectiveExponent > 0) {
+      *exponentOut = 0;
+      return 0;
+    }
+  }
+
+  words[1] = static_cast<std::uint16_t>((words[1] & 0x807Fu) | 0x3F00u);
+  *exponentOut = effectiveExponent - 126;
+  return -1;
+}
+
+// Forward declaration: defined below at line ~9113 (FUN_00AC1677).
+[[maybe_unused]] std::int16_t NormalizePackedDoubleMantissaWordsRuntime(
+  std::uint16_t* words) noexcept;
+
+/**
+ * Address: 0x00AC15EC (FUN_00AC15EC, sub_AC15EC)
+ *
+ * IDA signature:
+ * __int16 __cdecl sub_AC15EC(_WORD *a1, _WORD *a2);
+ *
+ * What it does:
+ * Frexp-style classifier for one packed 64-bit double lane (four 16-bit
+ * words). Inspects the IEEE-754 binary64 biased exponent in `words[3]`
+ * bits 14..4 and either:
+ *   * returns `2` (NaN) or `1` (infinity) for an all-ones (`0x7FF`)
+ *     exponent,
+ *   * normalizes the value into `[0.5, 1.0)` and stores the unbiased
+ *     exponent into `*exponentOut`, returning `-1` for finite normal /
+ *     denormal values,
+ *   * returns `0` for true zero, with `*exponentOut = 0`.
+ * Denormal inputs are normalized in place via
+ * `NormalizePackedDoubleMantissaWordsRuntime` (FUN_00AC1677) before the
+ * exponent extraction; if that helper reports an all-zero mantissa
+ * (positive delta), the value is re-classified as zero.
+ */
+[[maybe_unused]] std::int16_t FrexpClassifyPackedDoubleWordsRuntime(
+  std::int32_t* const exponentOut,
+  std::uint16_t* const words
+) noexcept
+{
+  const std::uint16_t biasedExponent = static_cast<std::uint16_t>((words[3] >> 4u) & 0x07FFu);
+  if (biasedExponent == 0x07FFu) {
+    *exponentOut = 0;
+    const bool mantissaNonZero =
+      (words[3] & 0x000Fu) != 0u || words[2] != 0u || words[1] != 0u || words[0] != 0u;
+    return mantissaNonZero ? std::int16_t{2} : std::int16_t{1};
+  }
+
+  std::int32_t effectiveExponent = biasedExponent;
+  if (biasedExponent == 0u) {
+    effectiveExponent = NormalizePackedDoubleMantissaWordsRuntime(words);
+    if (effectiveExponent > 0) {
+      *exponentOut = 0;
+      return 0;
+    }
+  }
+
+  words[3] = static_cast<std::uint16_t>((words[3] & 0x800Fu) | 0x3FE0u);
+  *exponentOut = effectiveExponent - 1022;
+  return -1;
+}
+
+/**
  * Address: 0x00AC1677 (FUN_00AC1677)
  *
  * What it does:
@@ -14151,6 +14249,44 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
 }
 
 /**
+ * Address: 0x0054F8A0 (FUN_0054F8A0, sub_54F8A0)
+ *
+ * IDA signature:
+ * int __cdecl sub_54F8A0(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Tukey-ninther pivot selector for the introsort partition step over a
+ * range of `StringRankLaneRuntime` (`{string,rank}` 8-byte) elements
+ * `[first, end)`. For ranges of `<= 40` elements the helper degenerates
+ * into a plain median-of-three on `(first, mid, end)` via
+ * `SortThreeStringRankLanesRuntime` (FUN_0054FC70). For larger ranges,
+ * three trios anchored at the range's low/middle/high thirds are sorted,
+ * then the medians of those trios are themselves sorted, leaving the
+ * median-of-medians (ninther pivot) at `mid`.
+ */
+[[maybe_unused]] void SelectStringRankNintherPivotForIntrosortRuntime(
+  StringRankLaneRuntime* const first,
+  StringRankLaneRuntime* const mid,
+  StringRankLaneRuntime* const end
+) noexcept
+{
+  const std::ptrdiff_t elementCount = end - first;
+  if (elementCount <= 40) {
+    (void)SortThreeStringRankLanesRuntime(first, mid, end);
+    return;
+  }
+
+  const std::ptrdiff_t partitionElements = (elementCount + 1) / 8;
+  StringRankLaneRuntime* const lowQuartile = first + partitionElements;
+  StringRankLaneRuntime* const lowOctile = first + (partitionElements * 2);
+
+  (void)SortThreeStringRankLanesRuntime(first, lowQuartile, lowOctile);
+  (void)SortThreeStringRankLanesRuntime(mid - partitionElements, mid, mid + partitionElements);
+  (void)SortThreeStringRankLanesRuntime(end - (partitionElements * 2), end - partitionElements, end);
+  (void)SortThreeStringRankLanesRuntime(lowQuartile, mid, end - partitionElements);
+}
+
+/**
  * Address: 0x00595D20 (FUN_00595D20)
  *
  * What it does:
@@ -14280,6 +14416,44 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
 }
 
 /**
+ * Address: 0x007604A0 (FUN_007604A0, sub_7604A0)
+ *
+ * IDA signature:
+ * int __cdecl sub_7604A0(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Tukey-ninther pivot selector for the introsort partition step over a
+ * range of `Dword2LaneRuntime` (`{id,score}`) elements `[first, end)`
+ * sorted descending by `score`. Mirrors `SelectFloat2NintherPivotForIntrosortRuntime`
+ * but dispatches each trio sort through
+ * `SortThreeDwordPairsByScoreDescendingRuntime` (FUN_00760690).
+ */
+[[maybe_unused]] void SelectDwordPairScoreDescendingNintherPivotRuntime(
+  std::uint32_t* const first,
+  std::uint32_t* const mid,
+  std::uint32_t* const end
+) noexcept
+{
+  constexpr std::ptrdiff_t kLaneStrideDwords = 2;          // 8 bytes per element
+  const std::ptrdiff_t elementCount = (end - first) / kLaneStrideDwords;
+  if (elementCount <= 40) {
+    (void)SortThreeDwordPairsByScoreDescendingRuntime(first, mid, end);
+    return;
+  }
+
+  const std::ptrdiff_t partitionElements = (elementCount + 1) / 8;
+  const std::ptrdiff_t partitionDwords = partitionElements * kLaneStrideDwords;
+
+  std::uint32_t* const lowQuartile = first + partitionDwords;
+  std::uint32_t* const lowOctile = first + (partitionDwords * 2);
+
+  (void)SortThreeDwordPairsByScoreDescendingRuntime(first, lowQuartile, lowOctile);
+  (void)SortThreeDwordPairsByScoreDescendingRuntime(mid - partitionDwords, mid, mid + partitionDwords);
+  (void)SortThreeDwordPairsByScoreDescendingRuntime(end - (partitionDwords * 2), end - partitionDwords, end);
+  (void)SortThreeDwordPairsByScoreDescendingRuntime(lowQuartile, mid, end - partitionDwords);
+}
+
+/**
  * Address: 0x00799A10 (FUN_00799A10)
  *
  * What it does:
@@ -14393,6 +14567,141 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
   if (ReadDoubleLane0Runtime(*lane0) > ReadDoubleLane0Runtime(*lane1)) {
     SwapByValueRuntime(*lane0, *lane1);
   }
+}
+
+/**
+ * Address: 0x00A72CB0 (FUN_00A72CB0, sub_A72CB0)
+ *
+ * IDA signature:
+ * int __cdecl sub_A72CB0(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Tukey-ninther pivot selector for the introsort partition step over a
+ * range of `Float2LaneRuntime` (8-byte) elements `[first, end)` whose
+ * candidate pivot lives at `mid`. For ranges of `<= 40` elements the
+ * helper degenerates into a plain median-of-three on `(first, mid, end)`
+ * via `SortThreeFloat2ByLane0AscendingRuntime` (FUN_00A727C0). For larger
+ * ranges, three trios anchored at the range's low/middle/high thirds are
+ * sorted, then the medians of those trios are themselves sorted, leaving
+ * the median-of-medians (ninther pivot) at `mid`. Returns the same value
+ * the inner sort routine returned in `EAX` (its result is unused by the
+ * binary).
+ */
+[[maybe_unused]] void SelectFloat2NintherPivotForIntrosortRuntime(
+  Float2LaneRuntime* const first,
+  Float2LaneRuntime* const mid,
+  Float2LaneRuntime* const end
+) noexcept
+{
+  const std::ptrdiff_t elementCount = end - first;
+  if (elementCount <= 40) {
+    SortThreeFloat2ByLane0AscendingRuntime(first, mid, end);
+    return;
+  }
+
+  const std::ptrdiff_t partitionElements = (elementCount + 1) / 8;
+  Float2LaneRuntime* const lowQuartile = first + partitionElements;
+  Float2LaneRuntime* const lowOctile = first + (partitionElements * 2);
+
+  SortThreeFloat2ByLane0AscendingRuntime(first, lowQuartile, lowOctile);
+  SortThreeFloat2ByLane0AscendingRuntime(mid - partitionElements, mid, mid + partitionElements);
+  SortThreeFloat2ByLane0AscendingRuntime(end - (partitionElements * 2), end - partitionElements, end);
+  SortThreeFloat2ByLane0AscendingRuntime(lowQuartile, mid, end - partitionElements);
+}
+
+/**
+ * Address: 0x00A72D90 (FUN_00A72D90, sub_A72D90)
+ *
+ * IDA signature:
+ * int __cdecl sub_A72D90(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Tukey-ninther pivot selector mirror of `SelectFloat2NintherPivotForIntrosortRuntime`
+ * for the wider `Dword4LaneRuntime` (16-byte) element shape sorted by its
+ * lane0 double key. Uses `SortThreeDword4ByDoubleKeyAscendingRuntime`
+ * (FUN_00A728C0) for both the small-range median-of-three and the four
+ * large-range trio sorts.
+ */
+[[maybe_unused]] void SelectDword4NintherPivotForIntrosortRuntime(
+  Dword4LaneRuntime* const first,
+  Dword4LaneRuntime* const mid,
+  Dword4LaneRuntime* const end
+) noexcept
+{
+  const std::ptrdiff_t elementCount = end - first;
+  if (elementCount <= 40) {
+    SortThreeDword4ByDoubleKeyAscendingRuntime(first, mid, end);
+    return;
+  }
+
+  const std::ptrdiff_t partitionElements = (elementCount + 1) / 8;
+  Dword4LaneRuntime* const lowQuartile = first + partitionElements;
+  Dword4LaneRuntime* const lowOctile = first + (partitionElements * 2);
+
+  SortThreeDword4ByDoubleKeyAscendingRuntime(first, lowQuartile, lowOctile);
+  SortThreeDword4ByDoubleKeyAscendingRuntime(mid - partitionElements, mid, mid + partitionElements);
+  SortThreeDword4ByDoubleKeyAscendingRuntime(end - (partitionElements * 2), end - partitionElements, end);
+  SortThreeDword4ByDoubleKeyAscendingRuntime(lowQuartile, mid, end - partitionElements);
+}
+
+/**
+ * Address: 0x00A73BD0 (FUN_00A73BD0, sub_A73BD0)
+ *
+ * IDA signature:
+ * _DWORD *__cdecl sub_A73BD0(int a1, _DWORD *a2);
+ *
+ * What it does:
+ * Insertion-sort fallback for the introsort over `Dword4LaneRuntime`
+ * (16-byte) elements `[first, end)` keyed by the leading double in
+ * `lane0/lane1`. For each element after `first`:
+ *   * when the candidate's key is `>=` the current `first` key, walks the
+ *     sorted prefix backward shifting elements rightward until the
+ *     predecessor's key is no greater than the candidate, then writes the
+ *     candidate at the resulting hole;
+ *   * otherwise the candidate is the new minimum: shifts the entire
+ *     `[first, current)` prefix one slot rightward (mirroring the binary's
+ *     call to `CopyDwordQuadRangeBackward` (FUN_00A72A90)) and publishes the
+ *     candidate at `first`.
+ * Returns `lane2` of the last processed candidate (the binary's `EAX`
+ * post-condition); the caller treats this as a placeholder pointer, mirrored
+ * here as a raw `std::uint32_t*` reinterpretation.
+ */
+[[maybe_unused]] std::uint32_t* InsertionSortDword4ByDoubleKeyAscendingRuntime(
+  Dword4LaneRuntime* const first,
+  Dword4LaneRuntime* const end
+) noexcept
+{
+  std::uint32_t* result = reinterpret_cast<std::uint32_t*>(end);
+  if (first == end) {
+    return result;
+  }
+
+  for (Dword4LaneRuntime* current = first + 1; current != end; ++current) {
+    const Dword4LaneRuntime savedEntry = *current;
+    const double candidateKey = ReadDoubleLane0Runtime(savedEntry);
+
+    if (candidateKey >= ReadDoubleLane0Runtime(*first)) {
+      Dword4LaneRuntime* hole = current;
+      while (hole != first) {
+        Dword4LaneRuntime* const predecessor = hole - 1;
+        if (candidateKey >= ReadDoubleLane0Runtime(*predecessor)) {
+          break;
+        }
+        *hole = *predecessor;
+        hole = predecessor;
+      }
+      *hole = savedEntry;
+    } else {
+      for (Dword4LaneRuntime* dst = current; dst != first; --dst) {
+        *dst = *(dst - 1);
+      }
+      *first = savedEntry;
+    }
+
+    result = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(savedEntry.lane2));
+  }
+
+  return result;
 }
 
 /**

@@ -687,6 +687,9 @@
     <ClCompile Include="moho\misc\EngineStatsCleanup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\misc\EngineVectorHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\projectile\Projectile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1563,6 +1566,9 @@
     <ClCompile Include="moho\terrain\TerrainFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\terrain\TerrainShaderVars.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1617,7 +1623,13 @@
     <ClCompile Include="moho\app\WinApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\app\WEmitterWx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\app\WxAppRuntime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\app\WxAppVectorHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp">
@@ -1786,6 +1798,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\WxCrtBridge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\StrSafeRuntime.cpp">
@@ -2989,6 +3004,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\EngineStatsCleanup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\EngineVectorHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\projectile\CProjectileAttributes.h">
@@ -4485,6 +4503,9 @@
     <ClInclude Include="moho\terrain\TerrainFactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\terrain\TerrainShaderVars.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\terrain\water\LowFidelityWater.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4512,7 +4533,13 @@
     <ClInclude Include="moho\app\WinApp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\app\WEmitterWx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\app\WxAppRuntime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\app\WxAppVectorHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\WxRuntimeTypes.h">
@@ -5437,6 +5464,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\command\CmdDefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\command\CommandIssueHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\SOCellPos.h">

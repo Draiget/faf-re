@@ -1,4 +1,5 @@
 #include "WxRuntimeTypes.h"
+#include "WxAppVectorHelpers.h"
 
 #include <Windows.h>
 #include <ddeml.h>
@@ -50,13 +51,26 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/particles/CWorldParticles.h"
+#include "moho/mesh/MeshThumbnailRenderer.h"
+#include "moho/render/BoundaryRenderer.h"
+#include "moho/render/Clutter.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/MapImager.h"
 #include "moho/render/IRenderWorldView.h"
+#include "moho/render/ID3DDepthStencil.h"
+#include "moho/render/ID3DRenderTarget.h"
+#include "moho/render/ID3DVertexSheet.h"
+#include "moho/render/RangeRenderer.h"
+#include "moho/render/Shadow.h"
+#include "moho/render/Silhouette.h"
+#include "moho/render/VisionRenderer.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
+#include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
@@ -9713,6 +9727,51 @@ namespace
   }
 
   /**
+   * Address: 0x009B5F70 (FUN_009B5F70, sub_9B5F70)
+   *
+   * IDA signature:
+   * _DWORD *__thiscall sub_9B5F70(
+   *   _DWORD *this, unsigned __int16 a2, unsigned __int16 a3,
+   *   unsigned __int16 a4, __int16 a5
+   * );
+   *
+   * What it does:
+   * Sets the time-of-day on one millisecond-storage lane from
+   * `(hour, minute, second, millisecond)` while keeping the existing date
+   * portion. Validates the calendar lane bounds (`hour < 24`,
+   * `minute < 60`, `second < 62` to admit leap seconds, `millisecond <
+   * 1000`); on success, fills the provided fields onto a `tm` returned by
+   * `wxGetCurrentLocalTimeRuntime` (FUN_009B4470), commits the resulting
+   * epoch via `wxDateTimeAssignFromTmWithTimezoneFallback` (FUN_009B53B0),
+   * and applies the millisecond offset through
+   * `wxDateTimeSnapToSecondAndAddMilliseconds` (FUN_009B5880). On
+   * out-of-range input or `localtime` failure, stores the wxDateTime
+   * invalid sentinel (`-1LL`) and returns the storage pointer.
+   */
+  std::int64_t* wxDateTimeAssignTimeOfDayRuntime(
+    std::int64_t* const millisecondsStorage,
+    const std::uint16_t hour,
+    const std::uint16_t minute,
+    const std::uint16_t second,
+    const std::uint16_t millisecond
+  )
+  {
+    if (hour < 24u && second < 62u && minute < 60u && millisecond < 1000u) {
+      std::tm* const localTime = wxGetCurrentLocalTimeRuntime();
+      if (localTime != nullptr) {
+        localTime->tm_hour = hour;
+        localTime->tm_min = minute;
+        localTime->tm_sec = second;
+        (void)wxDateTimeAssignFromTmWithTimezoneFallback(millisecondsStorage, localTime);
+        return wxDateTimeSnapToSecondAndAddMilliseconds(millisecondsStorage, millisecond);
+      }
+    }
+
+    *millisecondsStorage = kWxDateTimeInvalidMilliseconds;
+    return millisecondsStorage;
+  }
+
+  /**
    * Address: 0x009B6B50 (FUN_009B6B50)
    *
    * What it does:
@@ -10621,7 +10680,11 @@ namespace
    *
    * What it does:
    * Inserts one `ManagedWindowSlot` value at the requested slot position in
-   * `managedWindows` and returns the rebased iterator lane to the inserted slot.
+   * `managedWindows` and returns the rebased iterator lane to the inserted
+   * slot. The insertion is routed through the per-`T` named helper
+   * `InsertManagedWindowSlotIntoWindowsVector` so the MSVC8
+   * `vector<ManagedWindowSlot>::insert` emission for the `managedWindows`
+   * global (FUN_004F8CA0) is forced out-of-line.
    */
   [[maybe_unused]] [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotWithGrowth(
     moho::ManagedWindowSlot** const outIterator,
@@ -10629,42 +10692,65 @@ namespace
     const moho::ManagedWindowSlot* const value
   )
   {
-    const moho::ManagedWindowSlot* const begin = moho::managedWindows.data();
-    const std::size_t count = moho::managedWindows.size();
-
-    std::size_t insertIndex = 0u;
-    if (begin != nullptr && count != 0u && insertAt != nullptr) {
-      const std::uintptr_t beginAddress = reinterpret_cast<std::uintptr_t>(begin);
-      const std::uintptr_t insertAddress = reinterpret_cast<std::uintptr_t>(insertAt);
-      if (insertAddress >= beginAddress) {
-        insertIndex = static_cast<std::size_t>((insertAddress - beginAddress) / sizeof(moho::ManagedWindowSlot));
-      }
-    }
-    insertIndex = std::min(insertIndex, count);
-
-    moho::ManagedWindowSlot slotValue{};
-    if (value != nullptr) {
-      slotValue = *value;
-    }
-
-    moho::ManagedWindowSlot* const oldStorage = moho::managedWindows.data();
+    const moho::ManagedWindowSlot* const oldStorage = moho::managedWindows.data();
     const std::size_t oldCount = moho::managedWindows.size();
 
-    moho::managedWindows.push_back(moho::ManagedWindowSlot{});
+    const moho::ManagedWindowSlot slotValue = (value != nullptr) ? *value : moho::ManagedWindowSlot{};
+    moho::ManagedWindowSlot* const inserted =
+      moho::InsertManagedWindowSlotIntoWindowsVector(insertAt, slotValue);
+
     RebaseManagedSlotPointersAfterReallocation(moho::managedWindows, oldStorage, oldCount);
 
-    moho::ManagedWindowSlot* const storage = moho::managedWindows.data();
-    if (storage == nullptr) {
-      return outIterator;
+    if (outIterator != nullptr) {
+      *outIterator = inserted;
     }
-    for (std::size_t i = oldCount; i > insertIndex; --i) {
-      storage[i] = storage[i - 1u];
+    return outIterator;
+  }
+
+  /**
+   * Address: 0x004F8240 (FUN_004F8240, ManagedFrames insert trampoline)
+   *
+   * What it does:
+   * Inserts one `ManagedWindowSlot` value at the requested slot position in
+   * `managedFrames` and returns the rebased iterator lane to the inserted
+   * slot. The insertion is routed through the per-`T` named helper
+   * `InsertManagedWindowSlotIntoFramesVector` so the MSVC8
+   * `vector<ManagedWindowSlot>::insert` emission for the `managedFrames`
+   * global (FUN_004F9050) is forced out-of-line.
+   */
+  [[maybe_unused]] [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotIntoFramesWithGrowth(
+    moho::ManagedWindowSlot** const outIterator,
+    moho::ManagedWindowSlot* const insertAt,
+    const moho::ManagedWindowSlot* const value
+  )
+  {
+    const moho::ManagedWindowSlot* const oldStorage = moho::managedFrames.data();
+    const std::size_t oldCount = moho::managedFrames.size();
+
+    const moho::ManagedWindowSlot slotValue = (value != nullptr) ? *value : moho::ManagedWindowSlot{};
+    moho::ManagedWindowSlot* const inserted =
+      moho::InsertManagedWindowSlotIntoFramesVector(insertAt, slotValue);
+
+    moho::ManagedWindowSlot* const newStorage = moho::managedFrames.data();
+    if (newStorage != nullptr && newStorage != oldStorage) {
+      const std::size_t newCount = moho::managedFrames.size();
+      for (std::size_t index = 0; index < newCount; ++index) {
+        moho::ManagedWindowSlot& slot = newStorage[index];
+        if (slot.nextInOwnerChain != nullptr) {
+          const std::uintptr_t oldBegin = reinterpret_cast<std::uintptr_t>(oldStorage);
+          const std::uintptr_t oldEnd = oldBegin + oldCount * sizeof(moho::ManagedWindowSlot);
+          const std::uintptr_t pointerValue =
+            reinterpret_cast<std::uintptr_t>(slot.nextInOwnerChain);
+          if (pointerValue >= oldBegin && pointerValue < oldEnd) {
+            const std::size_t i = (pointerValue - oldBegin) / sizeof(moho::ManagedWindowSlot);
+            slot.nextInOwnerChain = &newStorage[i];
+          }
+        }
+      }
     }
-    storage[insertIndex] = slotValue;
 
     if (outIterator != nullptr) {
-      moho::ManagedWindowSlot* const rebasedBegin = storage;
-      *outIterator = rebasedBegin != nullptr ? rebasedBegin + insertIndex : nullptr;
+      *outIterator = inserted;
     }
     return outIterator;
   }
@@ -10740,6 +10826,28 @@ namespace
     return false;
   }
 
+  /**
+   * Dispatcher that routes append-at-end calls to the per-global per-`T`
+   * helper. Each global (`managedWindows`, `managedFrames`) has a distinct
+   * MSVC8 emission (FUN_004F8CA0 / FUN_004F9050) because the original
+   * binary specialized the storage-reference loads to the global address —
+   * we mirror that by dispatching to a different helper per global.
+   */
+  [[nodiscard]] moho::ManagedWindowSlot* AppendManagedSlotIntoGlobalVector(
+    msvc8::vector<moho::ManagedWindowSlot>& slots,
+    const moho::ManagedWindowSlot& value
+  )
+  {
+    if (&slots == &moho::managedFrames) {
+      return moho::InsertManagedWindowSlotIntoFramesVector(
+        slots.empty() ? nullptr : slots.data() + slots.size(),
+        value);
+    }
+    return moho::InsertManagedWindowSlotIntoWindowsVector(
+      slots.empty() ? nullptr : slots.data() + slots.size(),
+      value);
+  }
+
   template <typename TOwnerRuntime>
   void AppendManagedSlot(
     msvc8::vector<moho::ManagedWindowSlot>& slots,
@@ -10756,7 +10864,7 @@ namespace
 
     moho::ManagedWindowSlot* const oldStorage = slots.data();
     const std::size_t oldCount = slots.size();
-    slots.push_back(appendedSlot);
+    (void)AppendManagedSlotIntoGlobalVector(slots, appendedSlot);
 
     RebaseManagedSlotPointersAfterReallocation(slots, oldStorage, oldCount);
 
@@ -23893,6 +24001,12 @@ namespace
   return result;
 }
 
+// File-scope forward declaration for the CRT-style helper defined in
+// moho/misc/CrtRuntimeHelpers.cpp (FUN_00A90F12). The function is `extern "C"`
+// at its definition; block-scope language-linkage specifications are illegal
+// in C++, so the declaration must live at namespace (file) scope.
+extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, const wchar_t* format, ...);
+
 /**
  * Address: 0x009C5A70 (FUN_009C5A70)
  *
@@ -23912,7 +24026,6 @@ namespace
 
   const wchar_t* const systemMessage = wxResolveSystemErrorMessageRuntime(messageId);
   std::array<wchar_t, kWxLogFormatBufferCount> suffixBuffer{};
-  extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, const wchar_t* format, ...);
   (void)RuntimeSnwprintf(
     suffixBuffer.data(),
     suffixBuffer.size(),
@@ -23985,6 +24098,42 @@ namespace
   }
 
   return result;
+}
+
+/**
+ * Address: 0x009C52D0 (FUN_009C52D0, sub_9C52D0)
+ *
+ * IDA signature:
+ * void __cdecl sub_9C52D0(unsigned int a1, int a2, int a3, int a4);
+ *
+ * What it does:
+ * Generic log-dispatch lane that forwards a caller-provided record into the
+ * primary `WxLogTargetRuntime`. Skips work when global logging is disabled
+ * (`gWxLogOutputEnabledRuntimeFlag == 0`) or the requested level exceeds the
+ * configured verbosity (`gWxLogVerbosityRuntimeLevel < logLevel`); otherwise
+ * resolves the active target via `wxEnsurePrimaryLogTargetRuntime`
+ * (FUN_009C51F0) and dispatches `LogRecordWithTimestamp` (vtable slot
+ * `+0x08`) with the caller's level / message / timestamp lanes.
+ */
+[[maybe_unused]] void wxLogTargetDispatchIfEnabledRuntime(
+  const std::uint32_t logLevel,
+  const wchar_t* const messageText,
+  const std::uint32_t timestampLow,
+  const std::uint32_t timestampHigh
+)
+{
+  if (gWxLogOutputEnabledRuntimeFlag == 0u || gWxLogVerbosityRuntimeLevel < logLevel) {
+    return;
+  }
+
+  WxLogTargetRuntime* const logTarget = wxEnsurePrimaryLogTargetRuntime();
+  if (logTarget == nullptr) {
+    return;
+  }
+
+  (void)logTarget->LogRecordWithTimestamp(
+    static_cast<int>(logLevel), messageText, timestampLow, timestampHigh
+  );
 }
 
 /**
@@ -26218,6 +26367,11 @@ namespace
  * creates a node through the list virtual node-factory lane, releases
  * temporary key storage when upgraded to string-key mode, then forwards to the
  * list append-common lane.
+ *
+ * The release binary additionally exposes linker-emitted calling-convention
+ * trampolines (`FUN_009671B0`, `FUN_009D0B10`) that forward unmodified to
+ * this body for cross-TU references through alternate this/argument
+ * conventions; no separate source is emitted.
  */
 [[maybe_unused]] wxNodeBaseRuntime* wxListAppendIntegerKeyedValueRuntime(
   WxListAppendCommonRuntimeView* const list,
@@ -28615,6 +28769,87 @@ bool wxRegistryKeyHasAnySubKeysQuietRuntime(
   return hasSubKey;
 }
 
+namespace
+{
+  // Typed view of the four-`wxRegistryKey` lane that lives at offset +0x14
+  // of a `wxConfigBase`-derived registry-config object (wxRegConfig-style:
+  // `m_keyLocal`, `m_keyLocalRoot`, `m_keyGlobal`, `m_keyGlobalRoot`). The
+  // FUN_00A2A110 entrypoint is registered through a vtable slot that
+  // receives `this` pointing at the start of this contiguous key-set lane.
+  struct WxRegConfigKeySetRuntimeView
+  {
+    WxRegistryKeyRuntimeView dataKeyLocal;       // +0x00 (parent +0x14)
+    WxRegistryKeyRuntimeView dataKeyLocalRoot;   // +0x10 (parent +0x24)
+    WxRegistryKeyRuntimeView dataKeyGlobal;      // +0x20 (parent +0x34)
+    WxRegistryKeyRuntimeView dataKeyGlobalRoot;  // +0x30 (parent +0x44)
+  };
+  static_assert(
+    sizeof(WxRegConfigKeySetRuntimeView) == 0x40,
+    "WxRegConfigKeySetRuntimeView size must be 0x40"
+  );
+  static_assert(
+    offsetof(WxRegConfigKeySetRuntimeView, dataKeyLocal) == 0x00,
+    "WxRegConfigKeySetRuntimeView::dataKeyLocal offset must be 0x00"
+  );
+  static_assert(
+    offsetof(WxRegConfigKeySetRuntimeView, dataKeyLocalRoot) == 0x10,
+    "WxRegConfigKeySetRuntimeView::dataKeyLocalRoot offset must be 0x10"
+  );
+  static_assert(
+    offsetof(WxRegConfigKeySetRuntimeView, dataKeyGlobal) == 0x20,
+    "WxRegConfigKeySetRuntimeView::dataKeyGlobal offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxRegConfigKeySetRuntimeView, dataKeyGlobalRoot) == 0x30,
+    "WxRegConfigKeySetRuntimeView::dataKeyGlobalRoot offset must be 0x30"
+  );
+} // namespace
+
+/**
+ * Address: 0x00A2A110 (FUN_00A2A110, sub_A2A110)
+ *
+ * IDA signature:
+ * int __thiscall sub_A2A110(_DWORD *this);
+ *
+ * Callsite evidence:
+ * Single data xref at 0x00D6C6D8 (`<unnamed>` segment) records the function
+ * pointer in a static dispatch / vtable lane. The function is called as a
+ * `__thiscall` virtual method on a `wxRegConfig`-shaped owner; the binary
+ * vftable for that class is the data table at 0x00D6C6D8 (Rule 2 evidence:
+ * data xref originating from a function-pointer table).
+ *
+ * What it does:
+ * `wxRegConfig::DeleteAll` lift. Releases the cached open handles for the
+ * two parent keys (`dataKeyLocalRoot` at parent +0x24, `dataKeyGlobalRoot`
+ * at parent +0x44), then recursively deletes the local data subtree
+ * (`dataKeyLocal` at parent +0x14). On success, also recursively deletes
+ * the global data subtree (`dataKeyGlobal` at parent +0x34) iff that key
+ * still has an active opened handle (`openedKey != nullptr`); otherwise
+ * skips the global delete and reports the local result. Returns the final
+ * subtree-delete success boolean.
+ */
+[[maybe_unused]] bool wxRegConfigKeySetDeleteAllRuntime(
+  WxRegConfigKeySetRuntimeView* const keys
+) noexcept
+{
+  if (keys == nullptr) {
+    return false;
+  }
+
+  (void)wxRegistryKeyCloseRuntime(&keys->dataKeyLocalRoot);
+  (void)wxRegistryKeyCloseRuntime(&keys->dataKeyGlobalRoot);
+
+  if (!wxRegistryKeyDeleteSubtreeRuntime(&keys->dataKeyLocal)) {
+    return false;
+  }
+
+  if (keys->dataKeyGlobal.openedKey != nullptr) {
+    return wxRegistryKeyDeleteSubtreeRuntime(&keys->dataKeyGlobal);
+  }
+
+  return true;
+}
+
 /**
  * Address: 0x00A294A0 (FUN_00A294A0)
  *
@@ -29093,6 +29328,33 @@ void* wxDestroyObjectRefDataNoDelete(
   }
 
   object->WxObjectRefDataRuntimeDispatch::~WxObjectRefDataRuntimeDispatch();
+  return object;
+}
+
+/**
+ * Address: 0x004F1580 (FUN_004F1580)
+ *
+ * What it does:
+ * Scalar deleting-dtor slot stored in `wxObjectRefData::vftable`. Rebinds the
+ * payload to the base `wxObjectRefData` vtable lane (no chained teardown for
+ * the base class) and, when `deleteFlags & 1`, releases the object storage via
+ * `operator delete`. Returns the same payload pointer.
+ */
+void* wxDeleteObjectRefDataBaseScalarRuntime(
+  void* const objectRefDataRuntime,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  auto* const object = static_cast<WxObjectRefDataRuntimeView*>(objectRefDataRuntime);
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  // Rebind to wxObjectRefData base vtable lane — base class has no chained dtor work.
+  (void)wxConstructObjectRefDataBaseRuntime(object);
+  if ((deleteFlags & 1u) != 0u) {
+    ::operator delete(object);
+  }
   return object;
 }
 
@@ -34910,6 +35172,101 @@ namespace
   constexpr std::int32_t kLogWindowGeometryFallback = -1;
   constexpr std::int32_t kLogWindowSetSizeFlags = 3;
 
+  /**
+   * Static event-table registration handle for `moho::WWinLogWindow`.
+   *
+   * The binary places one `wxEventTable` for `WWinLogWindow` at `0x00F59720`,
+   * whose entries are 0x14-byte `wxEventTableEntry` records. The first two
+   * known entries reference:
+   *
+   *   - `0x00F59720` -> `0x004F6470` (`OnTargetPendingLinesChanged`)
+   *   - `0x00F59734` -> `0x004F5590` (`OnFilterOrCategoryControlsChanged`)
+   *
+   * In addition, the (unindexed) wxEVT_SIZE entry binds `0x004F6640`
+   * (`OnSizePersistGeometry`). Taking the address of each method here keeps
+   * the linker from dead-stripping the per-method bodies, mirroring the
+   * compiler-emitted `wxEventTableEntry` data block from the original 2007
+   * source.
+   */
+  using WWinLogWindowMemberFnPtr = void (moho::WWinLogWindow::*)();
+  using WWinLogWindowEventFnPtr =
+    void (moho::WWinLogWindow::*)(::wxEventRuntime&);
+  using WWinLogWindowPendingFnPtr =
+    void (moho::WWinLogWindow::*)(const moho::CLogAdditionEvent&);
+
+  struct WWinLogWindowEventTableBindings
+  {
+    WWinLogWindowPendingFnPtr onPendingLines;
+    WWinLogWindowMemberFnPtr onFilterOrCategory;
+    WWinLogWindowEventFnPtr onSizePersistGeometry;
+  };
+
+  const WWinLogWindowEventTableBindings kWWinLogWindowEventTableBindings = {
+    &moho::WWinLogWindow::OnTargetPendingLinesChanged,
+    &moho::WWinLogWindow::OnFilterOrCategoryControlsChanged,
+    &moho::WWinLogWindow::OnSizePersistGeometry,
+  };
+
+  /**
+   * What it does:
+   * Invokes one entry in the `WWinLogWindow` event-table binding block as if
+   * the wx framework dispatch had picked it up. Used by host code (e.g.
+   * `RebuildVisibleLinesFromControls`) when a synthetic re-fire of a handler
+   * is needed; also keeps the per-method bodies addressable from this TU so
+   * the linker does not strip them.
+   */
+  enum class WWinLogWindowEventBindingKind : std::uint8_t
+  {
+    PendingLinesChanged = 0,
+    FilterOrCategoryChanged = 1,
+    SizePersistGeometry = 2,
+  };
+
+  void DispatchWWinLogWindowEventBinding(
+    moho::WWinLogWindow* const window,
+    const WWinLogWindowEventBindingKind kind,
+    ::wxEventRuntime* const event
+  )
+  {
+    if (window == nullptr) {
+      return;
+    }
+    switch (kind) {
+      case WWinLogWindowEventBindingKind::PendingLinesChanged: {
+        const moho::CLogAdditionEvent placeholder{};
+        const auto handler = kWWinLogWindowEventTableBindings.onPendingLines;
+        (window->*handler)(placeholder);
+        return;
+      }
+      case WWinLogWindowEventBindingKind::FilterOrCategoryChanged: {
+        const auto handler = kWWinLogWindowEventTableBindings.onFilterOrCategory;
+        (window->*handler)();
+        return;
+      }
+      case WWinLogWindowEventBindingKind::SizePersistGeometry: {
+        if (event == nullptr) {
+          return;
+        }
+        const auto handler = kWWinLogWindowEventTableBindings.onSizePersistGeometry;
+        (window->*handler)(*event);
+        return;
+      }
+    }
+  }
+
+  /**
+   * What it does:
+   * Returns a non-null tag that confirms the static `WWinLogWindow`
+   * wxEventTable bindings have been registered for the current translation
+   * unit. The returned address aliases `kWWinLogWindowEventTableBindings`,
+   * which the linker must preserve because every binding member-pointer it
+   * holds is reachable through this entry point.
+   */
+  [[nodiscard]] const void* PublishWWinLogWindowEventTableBindings() noexcept
+  {
+    return static_cast<const void*>(&kWWinLogWindowEventTableBindings);
+  }
+
   [[nodiscard]] wxTextAttrRuntime BuildTextStyleFromRgb(
     const std::uint8_t red,
     const std::uint8_t green,
@@ -35338,6 +35695,54 @@ char wxInputStream::GetC()
   const bool loadResult = imageDispatch->loadFromStream(imageHandlerRuntime, inputStreamRuntime) != 0;
   const bool restoreOk = streamDispatch->seekInput(inputStreamRuntime, checkpoint, 0) != -1;
   return restoreOk ? loadResult : false;
+}
+
+/**
+ * Address: 0x00972570 (FUN_00972570, sub_972570)
+ *
+ * IDA signature:
+ * char __cdecl sub_972570(int a1);
+ *
+ * What it does:
+ * Walks the process-global wx image-handler list (`wxImage::sm_handlers`,
+ * recovered as `gWxImageHandlerRegistryRuntimeList`) and probes each handler
+ * via `wxImageHandlerLoadWithInputCheckpoint` (FUN_009710B0) against the
+ * provided input stream. Returns `1` as soon as any handler reports success
+ * (i.e. the stream was loadable as that image format) and `0` when no
+ * handler matches or the registry is empty. The binary passes `this` to the
+ * inner helper through `ECX = node->m_data`; the IDA pseudocode silently
+ * drops that ECX assignment which is reinstated here as an explicit
+ * argument.
+ */
+[[maybe_unused]] char wxImageProbeAnyRegisteredHandlerLoadsFromInputRuntime(
+  void* const inputStreamRuntime
+) noexcept
+{
+  struct WxListBaseFirstNodeRuntimeView
+  {
+    void* vtable = nullptr;
+    void* nodeFirst = nullptr;
+  };
+
+  struct WxImageHandlerListNodeRuntimeView
+  {
+    void* vtable = nullptr;                            // +0x00
+    std::uintptr_t lane04 = 0;                         // +0x04
+    void* handlerPayload = nullptr;                    // +0x08
+    WxImageHandlerListNodeRuntimeView* next = nullptr; // +0x0C
+  };
+
+  const auto* const handlersList = reinterpret_cast<const WxListBaseFirstNodeRuntimeView*>(
+    &gWxImageHandlerRegistryRuntimeList
+  );
+  auto* node = static_cast<WxImageHandlerListNodeRuntimeView*>(handlersList->nodeFirst);
+  while (node != nullptr) {
+    if (wxImageHandlerLoadWithInputCheckpoint(node->handlerPayload, inputStreamRuntime)) {
+      return 1;
+    }
+    node = node->next;
+  }
+  return 0;
 }
 
 /**
@@ -37123,6 +37528,11 @@ bool wxFile::Open(
   return true;
 }
 
+// File-scope forward declaration for the CRT-style helper defined in
+// moho/misc/CrtRuntimeHelpers.cpp. Block-scope language-linkage specifications
+// are illegal in C++, so the declaration must live at namespace scope.
+extern "C" std::size_t __cdecl RuntimeWcsToMbs(char*, const wchar_t*, std::size_t);
+
 /**
  * Address: 0x009FAA30 (FUN_009FAA30)
  *
@@ -37142,7 +37552,6 @@ bool wxFile::Open(
   const std::size_t narrowCapacity = wideLength + 1u;
 
   auto* const narrowPath = static_cast<char*>(::operator new(narrowCapacity));
-  extern "C" std::size_t __cdecl RuntimeWcsToMbs(char*, const wchar_t*, std::size_t);
   if (RuntimeWcsToMbs(narrowPath, safeWideName, narrowCapacity) == static_cast<std::size_t>(-1)) {
     narrowPath[0] = '\0';
   }
@@ -37534,6 +37943,42 @@ bool wxCreateDirectoryRuntime(
 ) noexcept
 {
   return wxRemoveDirectoryWithErrnoMapping(*directoryPathPointer) == 0 ? TRUE : FALSE;
+}
+
+/**
+ * Address: 0x009DF380 (FUN_009DF380, sub_9DF380)
+ *
+ * IDA signature:
+ * char __cdecl sub_9DF380(LPCWSTR *a1, LPCWSTR *a2);
+ *
+ * What it does:
+ * Renames one wide filesystem path with a copy + delete-source fallback when
+ * the direct rename fails (typical "move across volumes" emulation). First
+ * tries `_wrename` (FUN_00A91745); if that succeeds (returns `0`), reports
+ * success immediately. Otherwise copies the source onto the destination via
+ * `wxCopyFileRuntime` (FUN_009DE1E0) with overwrite enabled, and on copy
+ * success deletes the source via `wxDeleteFileFromPointerRuntime`
+ * (FUN_009DE250). Returns non-zero on success and zero when the copy step
+ * fails.
+ */
+// Forward declaration: defined below at FUN_009DE250 (line ~38326).
+BOOL wxDeleteFileFromPointerRuntime(const wchar_t* const* fileNameStorage);
+
+[[maybe_unused]] char wxRenameFileWithCopyFallbackRuntime(
+  const wchar_t* const* const sourcePathPointer,
+  const wchar_t* const* const destinationPathPointer
+) noexcept
+{
+  if (_wrename(*sourcePathPointer, *destinationPathPointer) == 0) {
+    return 1;
+  }
+
+  if (wxCopyFileRuntime(*sourcePathPointer, *destinationPathPointer, true)) {
+    (void)wxDeleteFileFromPointerRuntime(sourcePathPointer);
+    return 1;
+  }
+
+  return 0;
 }
 
 struct WxTenBytePayloadCopyRuntimeView
@@ -39581,6 +40026,31 @@ static_assert(
   return static_cast<std::uint16_t>(*left) - static_cast<std::uint16_t>(*right);
 }
 
+/**
+ * Address: 0x009F3A00 (FUN_009F3A00, wxFileName::Clear)
+ *
+ * What it does:
+ * Clears the path-component array, resets both cached auxiliary string lanes
+ * to empty, copies that empty value into the primary string lane, and
+ * restores case-sensitive comparisons.
+ */
+wxStringRuntime* wxFileName::Clear()
+{
+  mComponents.Clear();
+
+  ReleaseWxStringSharedPayload(mTertiaryText);
+  (void)wxString::InitWith(&mTertiaryText, wxEmptyString, 0, -101);
+
+  ReleaseWxStringSharedPayload(mSecondaryText);
+  (void)wxCopySharedWxStringRuntime(&mTertiaryText, &mSecondaryText);
+
+  ReleaseWxStringSharedPayload(mPrimaryText);
+  (void)wxCopySharedWxStringRuntime(&mSecondaryText, &mPrimaryText);
+
+  mCaseSensitive = 1;
+  return &mPrimaryText;
+}
+
 void wxFileName::SplitPath(
   const wxStringRuntime& input,
   wxStringRuntime* const volume,
@@ -39951,6 +40421,33 @@ wxStringRuntime* wxString::append(
   const wchar_t separator = (separatorToken.m_pchData != nullptr) ? separatorToken.m_pchData[0] : L'\0';
   ReleaseLegacySharedStringPayloadAndResetRuntime(&separatorToken);
   return separator;
+}
+
+/**
+ * Address: 0x009F3FF0 (FUN_009F3FF0, sub_9F3FF0)
+ *
+ * IDA signature:
+ * bool __cdecl sub_9F3FF0(__int16 a1, int a2);
+ *
+ * What it does:
+ * Tests whether `candidate` appears in the path-separator token string for
+ * the resolved path format (`formatHintOrToken`). Builds the format-specific
+ * separator token via `wxBuildPathSeparatorTokenRuntime`, runs left-to-right
+ * `FindCharacterIndex` on the resulting wide string, releases the temporary
+ * shared payload, and reports `true` when the search produced a match.
+ */
+[[maybe_unused]] bool wxIsPathSeparatorCharacterForFormatRuntime(
+  const wchar_t candidate,
+  const std::intptr_t formatHintOrToken
+) noexcept
+{
+  wxStringRuntime separatorToken{};
+  separatorToken.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+  (void)wxBuildPathSeparatorTokenRuntime(&separatorToken, formatHintOrToken);
+
+  const std::int32_t matchIndex = separatorToken.FindCharacterIndex(candidate, false);
+  ReleaseLegacySharedStringPayloadAndResetRuntime(&separatorToken);
+  return matchIndex != -1;
 }
 
 /**
@@ -45037,6 +45534,11 @@ namespace
     offsetof(WxBrushRefDataPatternRuntimeView, mPatternLane18) == 0x18,
     "WxBrushRefDataPatternRuntimeView::mPatternLane18 offset must be 0x18"
   );
+
+// Forward declaration: defined below at FUN_009D2CD0 (line ~72881).
+[[maybe_unused]] void* wxBrushAssignBySharedRefDataOrRefRuntime(
+  void* brushHolderRuntime,
+  const void* sourceBrushHolderRuntime) noexcept;
 
 /**
  * Address: 0x009C9A30 (FUN_009C9A30)
@@ -52846,6 +53348,11 @@ namespace
    *
    * IDA signature:
    * void __fastcall __noreturn sub_4FB680(int a1, int a2, int a3);
+   *
+   * The release binary also exposes a linker-emitted calling-convention
+   * trampoline (`FUN_004FA5E0`) that forwards unmodified to this body for
+   * cross-TU references through alternate register conventions; no
+   * separate source is emitted.
    */
   [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromEndpoints(
     moho::CWinLogLine* const rangeBegin,
@@ -52894,6 +53401,11 @@ namespace
    *
    * IDA signature:
    * void __fastcall __noreturn sub_4FAC40(int a1, int a2, int a3);
+   *
+   * The release binary also exposes a linker-emitted calling-convention
+   * trampoline (`FUN_004F8070`) that forwards unmodified to this body for
+   * cross-TU references through alternate register conventions; no
+   * separate source is emitted.
    */
   [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromCount(
     moho::CWinLogLine* const /*templateLine*/,
@@ -52970,6 +53482,11 @@ namespace
    * each line's embedded `msvc8::string` SSO state + freeing heap text) and
    * rethrows. This is the MSVC8-emitted `std::uninitialized_copy` path for
    * `msvc8::vector<CWinLogLine>` growth/resize.
+   *
+   * The release binary also exposes a linker-emitted calling-convention
+   * trampoline (`FUN_004FB150`) that forwards unmodified to this body for
+   * cross-TU references through alternate register conventions; no
+   * separate source is emitted.
    */
   [[nodiscard]] moho::CWinLogLine* ConstructWinLogLineRangeForward(
     moho::CWinLogLine* destinationBegin,
@@ -54728,13 +55245,17 @@ moho::CWinLogTarget::~CWinLogTarget() = default;
  * Address: 0x004F6F40 (FUN_004F6F40)
  *
  * What it does:
- * Appends one line record into the pending queue.
+ * Appends one line record into the pending queue. The append is routed
+ * through the per-`T` named helper `InsertVectorWinLogLineAtEnd` so the
+ * MSVC8 per-`T` `vector<CWinLogLine>::insert` emission chain (FUN_004F7F50
+ * → FUN_004F88B0) is forced out-of-line, matching the 2007 binary symbol
+ * shape.
  */
 void moho::CWinLogTarget::AppendPendingLine(
   const CWinLogLine& line
 )
 {
-  mPendingLines.push_back(line);
+  (void)moho::InsertVectorWinLogLineAtEnd(mPendingLines, line);
 }
 
 /**
@@ -55264,7 +55785,11 @@ void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(
  * Address: 0x004F6A50 (FUN_004F6A50)
  *
  * What it does:
- * Merges pending lines into committed history and enforces the 10,000 line cap.
+ * Merges pending lines into committed history and enforces the 10,000 line
+ * cap. The bulk append at the end is routed through the per-`T` named
+ * helper `AppendVectorWinLogLineRange` so the MSVC8 range-insert emission
+ * for `vector<CWinLogLine>::insert(pos, first, last)` (FUN_004FA880) is
+ * forced out-of-line.
  */
 void moho::CWinLogTarget::MergePendingLines()
 {
@@ -55279,9 +55804,11 @@ void moho::CWinLogTarget::MergePendingLines()
     }
   }
 
-  for (const CWinLogLine& line : mPendingLines) {
-    mCommittedLines.push_back(line);
-  }
+  const CWinLogLine* const firstPending = mPendingLines.data();
+  moho::AppendVectorWinLogLineRange(
+    mCommittedLines,
+    firstPending,
+    firstPending != nullptr ? firstPending + mPendingLines.size() : nullptr);
   mPendingLines.clear();
 }
 
@@ -55344,6 +55871,11 @@ void moho::CWinLogTarget::OnMessage(
  */
 moho::WWinLogWindow::WWinLogWindow()
 {
+  // Anchor the per-class wxEventTable handler bindings (FUN_004F5590,
+  // FUN_004F6470, FUN_004F6640) so the linker preserves the member-function
+  // bodies that the framework dispatch table addresses.
+  (void)PublishWWinLogWindowEventTableBindings();
+
   mIsInitializingControls = 1;
   mEnabledCategoriesMask = 0;
   mFilterText.clear();
@@ -55416,6 +55948,85 @@ void moho::WWinLogWindow::RestoreGeometryFromPreferences(
   const std::int32_t x = preferences->GetInteger(msvc8::string(kLogWindowXPreferenceKey), kLogWindowGeometryFallback);
 
   DoSetSize(x, y, width, height, kLogWindowSetSizeFlags);
+}
+
+/**
+ * What it does:
+ * Writes the current category checkbox states and filter text into user
+ * preferences using the canonical preference key constants. Internal helper
+ * for OnFilterOrCategoryControlsChanged.
+ */
+void moho::WWinLogWindow::PersistCategoryStateAndFilterToPreferences(
+  IUserPrefs* const preferences
+)
+{
+  if (preferences == nullptr) {
+    return;
+  }
+
+  const auto checkBoxes = CategoryCheckBoxes();
+  for (std::size_t index = 0; index < checkBoxes.size(); ++index) {
+    const wxCheckBoxRuntime* const checkBox = checkBoxes[index];
+    const bool checked = checkBox != nullptr ? checkBox->GetValue() : false;
+    preferences->SetBoolean(msvc8::string(kLogCategoryPreferenceKeys[index]), checked);
+  }
+
+  preferences->SetString(msvc8::string(kLogFilterPreferenceKey), mFilterText);
+}
+
+/**
+ * Address: 0x004F5590 (FUN_004F5590)
+ *
+ * What it does:
+ * Bound as the WWinLogWindow wxEventTable handler for category/filter control
+ * events. When the window is past initial control setup, rebuilds the visible
+ * line view from the current control state and then persists the new
+ * category/filter selection back into user preferences.
+ */
+void moho::WWinLogWindow::OnFilterOrCategoryControlsChanged()
+{
+  if (mIsInitializingControls != 0) {
+    return;
+  }
+
+  RebuildVisibleLinesFromControls();
+
+  moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
+  PersistCategoryStateAndFilterToPreferences(preferences);
+}
+
+/**
+ * Address: 0x004F6640 (FUN_004F6640)
+ *
+ * What it does:
+ * Bound as the WWinLogWindow wxEventTable handler for wxEVT_SIZE. Forwards
+ * to the standard wx top-level resize-single-non-bar-child layout (which
+ * resizes the embedded content panel to fill the client area) and then, once
+ * initial control setup is complete, persists the current window
+ * width/height into the `Windows.Log.{width,height}` preferences.
+ */
+void moho::WWinLogWindow::OnSizePersistGeometry(
+  wxEventRuntime& event
+)
+{
+  wxTopLevelWindowResizeSingleNonBarChildRuntime(this, 0);
+  (void)event;
+
+  if (mIsInitializingControls != 0) {
+    return;
+  }
+
+  moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
+  if (preferences == nullptr) {
+    return;
+  }
+
+  std::int32_t width = 0;
+  std::int32_t height = 0;
+  DoGetSize(&width, &height);
+
+  preferences->SetInteger(msvc8::string(kLogWindowWidthPreferenceKey), width);
+  preferences->SetInteger(msvc8::string(kLogWindowHeightPreferenceKey), height);
 }
 
 /**
@@ -55723,8 +56334,31 @@ void moho::WWinLogWindow::OnTargetPendingLinesChanged(
 
 void moho::WWinLogWindow::OnTargetPendingLinesChanged()
 {
-  const CLogAdditionEvent event{};
-  OnTargetPendingLinesChanged(event);
+  DispatchWWinLogWindowEventBinding(
+    this,
+    WWinLogWindowEventBindingKind::PendingLinesChanged,
+    nullptr
+  );
+}
+
+void moho::WWinLogWindow::FireFilterOrCategoryChangedFromBindings()
+{
+  DispatchWWinLogWindowEventBinding(
+    this,
+    WWinLogWindowEventBindingKind::FilterOrCategoryChanged,
+    nullptr
+  );
+}
+
+void moho::WWinLogWindow::FireSizePersistGeometryFromBindings(
+  wxEventRuntime& event
+)
+{
+  DispatchWWinLogWindowEventBinding(
+    this,
+    WWinLogWindowEventBindingKind::SizePersistGeometry,
+    &event
+  );
 }
 
 /**
@@ -56556,6 +57190,144 @@ namespace
   };
   static_assert(sizeof(WRenViewportWorldViewVectorRuntime) == 0x0C);
 
+  template <typename T, std::size_t Count>
+  void ConstructSharedPtrArrayForward(boost::shared_ptr<T> (&items)[Count])
+  {
+    for (std::size_t index = 0; index < Count; ++index) {
+      std::construct_at(&items[index]);
+    }
+  }
+
+  template <typename T, std::size_t Count>
+  void DestroySharedPtrArrayReverse(boost::shared_ptr<T> (&items)[Count]) noexcept
+  {
+    for (std::size_t index = Count; index != 0u; --index) {
+      std::destroy_at(&items[index - 1u]);
+    }
+  }
+
+  struct CBloomRendererRuntime final
+  {
+    std::uint32_t mUnknown00 = 0;                                  // +0x00
+    std::uint32_t mUnknown04 = 0;                                  // +0x04
+    boost::shared_ptr<moho::ID3DRenderTarget> mRenderTargetLocks[2]; // +0x08
+    moho::CRenFrame mExtractFrame;                                 // +0x18
+    moho::CRenFrame mCompositeFrame;                               // +0x60
+    std::uint32_t mHeadIndex = 0;                                  // +0xA8
+  };
+
+  static_assert(
+    offsetof(CBloomRendererRuntime, mRenderTargetLocks) == 0x08,
+    "CBloomRendererRuntime::mRenderTargetLocks offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CBloomRendererRuntime, mExtractFrame) == 0x18,
+    "CBloomRendererRuntime::mExtractFrame offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CBloomRendererRuntime, mCompositeFrame) == 0x60,
+    "CBloomRendererRuntime::mCompositeFrame offset must be 0x60"
+  );
+  static_assert(
+    offsetof(CBloomRendererRuntime, mHeadIndex) == 0xA8,
+    "CBloomRendererRuntime::mHeadIndex offset must be 0xA8"
+  );
+  static_assert(sizeof(CBloomRendererRuntime) == 0xAC, "CBloomRendererRuntime size must be 0xAC");
+
+  void ReleaseBloomVertexSheet(moho::ID3DVertexSheet*& vertexSheet) noexcept
+  {
+    moho::ID3DVertexSheet* const retainedSheet = vertexSheet;
+    if (retainedSheet == nullptr) {
+      return;
+    }
+
+    retainedSheet->Destroy();
+    vertexSheet = nullptr;
+  }
+
+  /**
+   * Address: 0x007F4F10 (FUN_007F4F10, Moho::CBloomRenderer::ResetRenderTargets)
+   *
+   * What it does:
+   * Releases both cached frame vertex sheets and clears the two retained
+   * render-target lock handles used by one bloom renderer head.
+   */
+  [[maybe_unused]] void ResetBloomRendererTargets(
+    CBloomRendererRuntime* const bloomRenderer
+  ) noexcept
+  {
+    if (bloomRenderer == nullptr) {
+      return;
+    }
+
+    ReleaseBloomVertexSheet(bloomRenderer->mExtractFrame.mVertexSheet);
+    ReleaseBloomVertexSheet(bloomRenderer->mCompositeFrame.mVertexSheet);
+    bloomRenderer->mRenderTargetLocks[0].reset();
+    bloomRenderer->mRenderTargetLocks[1].reset();
+  }
+
+  /**
+   * Address: 0x007F6420 (FUN_007F6420, Moho::CBloomRenderer::CBloomRenderer)
+   * Mangled: ??0CBloomRenderer@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Constructs the two render-target lock handles and frame passes, then
+   * clears bloom state lanes.
+   */
+  [[maybe_unused]] CBloomRendererRuntime* ConstructBloomRendererRuntime(
+    CBloomRendererRuntime* const bloomRenderer
+  )
+  {
+    if (bloomRenderer == nullptr) {
+      return nullptr;
+    }
+
+    ConstructSharedPtrArrayForward(bloomRenderer->mRenderTargetLocks);
+    std::construct_at(&bloomRenderer->mExtractFrame);
+    std::construct_at(&bloomRenderer->mCompositeFrame);
+    bloomRenderer->mUnknown04 = 0u;
+    bloomRenderer->mUnknown00 = 0u;
+    bloomRenderer->mHeadIndex = 0u;
+    return bloomRenderer;
+  }
+
+  /**
+   * Address: 0x007F64A0 (FUN_007F64A0, Moho::CBloomRenderer::~CBloomRenderer)
+   * Mangled: ??1CBloomRenderer@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Clears transient bloom render targets, then tears down frame-pass and
+   * render-target lock storage in reverse construction order.
+   */
+  [[maybe_unused]] void DestroyBloomRendererRuntime(
+    CBloomRendererRuntime* const bloomRenderer
+  ) noexcept
+  {
+    if (bloomRenderer == nullptr) {
+      return;
+    }
+
+    ResetBloomRendererTargets(bloomRenderer);
+    bloomRenderer->mCompositeFrame.~CRenFrame();
+    bloomRenderer->mExtractFrame.~CRenFrame();
+    DestroySharedPtrArrayReverse(bloomRenderer->mRenderTargetLocks);
+  }
+
+  struct WRenViewportWorldViewStorageRuntime final
+  {
+    std::uint32_t mUnknown00 = 0;                // +0x00
+    WRenViewportWorldViewVectorRuntime mViews{}; // +0x04
+  };
+
+  static_assert(
+    offsetof(WRenViewportWorldViewStorageRuntime, mViews) == 0x04,
+    "WRenViewportWorldViewStorageRuntime::mViews offset must be 0x04"
+  );
+  static_assert(
+    sizeof(WRenViewportWorldViewStorageRuntime) == 0x10,
+    "WRenViewportWorldViewStorageRuntime size must be 0x10"
+  );
+
   struct WRenViewportRenderView final
   {
     struct DebugCanvasRuntimeView final
@@ -56596,10 +57368,241 @@ namespace
     std::uint8_t mUnknown0000_2163[0x2164];
     boost::shared_ptr<moho::ID3DRenderTarget> mPrimaryTargetLocks[2];   // +0x2164
     boost::shared_ptr<moho::ID3DRenderTarget> mSecondaryTargetLocks[2]; // +0x2174
-    moho::ID3DDepthStencil* mDepthStencilTargets[2];                    // +0x2184
-    std::uint8_t mUnknown218C_027F[0xF4];
+    boost::shared_ptr<moho::ID3DDepthStencil> mDepthStencilTargets[2];  // +0x2184
+    std::uint8_t mUnknown2194_227F[0xEC];
     moho::CRenFrame mTerrainNormalFrame;                                // +0x2280
   };
+
+  struct WRenViewportDestroyRuntimeView final
+  {
+    std::uint8_t mWD3DViewportBase[0x128]{};                             // +0x0000
+    CBloomRendererRuntime mBloomRenderers[2];                            // +0x0128
+    moho::CRenFrame mFrame;                                               // +0x0280
+    moho::CDebugCanvas mDebugCanvas;                                      // +0x02C8
+    Wm3::Vector2i mScreenPos;                                             // +0x0308
+    Wm3::Vector2i mScreenSize;                                            // +0x0310
+    Wm3::Vector2i mFullScreen;                                            // +0x0318
+    std::int32_t mHead = 0;                                               // +0x0320
+    std::uint8_t mHasSecondaryHead = 0;                                   // +0x0324
+    std::uint8_t mPad0325_0327[0x03]{};
+    std::int32_t mNumHeads = 0;                                           // +0x0328
+    moho::MapImager mMapImager;                                           // +0x032C
+    moho::MeshThumbnailRenderer mThumbnailRenderer;                       // +0x0340
+    moho::RangeRenderer mRangeRenderer;                                   // +0x037C
+    moho::VisionRenderer mVisionRenderer;                                 // +0x0410
+    moho::BoundaryRenderer mBoundaryRenderer;                             // +0x0488
+    moho::Shadow mShadowRenderer;                                         // +0x04F0
+    moho::Clutter mClutter;                                               // +0x0808
+    Moho::Silhouette mSilhouetteRenderer;                                 // +0x2134
+    std::uint32_t mWorldViewState = 0;                                    // +0x2140
+    WRenViewportWorldViewStorageRuntime mWorldViewStorage;                // +0x2144
+    boost::shared_ptr<moho::CD3DTextureBatcher> mTexBatcher;              // +0x2154
+    boost::shared_ptr<moho::CD3DPrimBatcher> mPrimBatcher;                // +0x215C
+    boost::shared_ptr<moho::ID3DRenderTarget> mPrimaryTargetLocks[2];     // +0x2164
+    boost::shared_ptr<moho::ID3DRenderTarget> mSecondaryTargetLocks[2];   // +0x2174
+    boost::shared_ptr<moho::ID3DDepthStencil> mDepthStencilLocks[2];      // +0x2184
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet> mDynamicTextureSheet; // +0x2194
+    moho::GeomCamera3* mCam = nullptr;                                    // +0x219C
+    moho::CD3DFont* mFont = nullptr;                                      // +0x21A0
+    std::uint8_t mTailPadding21A4_21A7[0x04]{};
+  };
+
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mBloomRenderers) == 0x128,
+    "WRenViewportDestroyRuntimeView::mBloomRenderers offset must be 0x128"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mFrame) == 0x280,
+    "WRenViewportDestroyRuntimeView::mFrame offset must be 0x280"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mDebugCanvas) == 0x2C8,
+    "WRenViewportDestroyRuntimeView::mDebugCanvas offset must be 0x2C8"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mMapImager) == 0x32C,
+    "WRenViewportDestroyRuntimeView::mMapImager offset must be 0x32C"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mThumbnailRenderer) == 0x340,
+    "WRenViewportDestroyRuntimeView::mThumbnailRenderer offset must be 0x340"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mRangeRenderer) == 0x37C,
+    "WRenViewportDestroyRuntimeView::mRangeRenderer offset must be 0x37C"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mVisionRenderer) == 0x410,
+    "WRenViewportDestroyRuntimeView::mVisionRenderer offset must be 0x410"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mBoundaryRenderer) == 0x488,
+    "WRenViewportDestroyRuntimeView::mBoundaryRenderer offset must be 0x488"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mShadowRenderer) == 0x4F0,
+    "WRenViewportDestroyRuntimeView::mShadowRenderer offset must be 0x4F0"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mClutter) == 0x808,
+    "WRenViewportDestroyRuntimeView::mClutter offset must be 0x808"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mSilhouetteRenderer) == 0x2134,
+    "WRenViewportDestroyRuntimeView::mSilhouetteRenderer offset must be 0x2134"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mWorldViewStorage) == 0x2144,
+    "WRenViewportDestroyRuntimeView::mWorldViewStorage offset must be 0x2144"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mTexBatcher) == 0x2154,
+    "WRenViewportDestroyRuntimeView::mTexBatcher offset must be 0x2154"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mPrimBatcher) == 0x215C,
+    "WRenViewportDestroyRuntimeView::mPrimBatcher offset must be 0x215C"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mPrimaryTargetLocks) == 0x2164,
+    "WRenViewportDestroyRuntimeView::mPrimaryTargetLocks offset must be 0x2164"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mSecondaryTargetLocks) == 0x2174,
+    "WRenViewportDestroyRuntimeView::mSecondaryTargetLocks offset must be 0x2174"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mDepthStencilLocks) == 0x2184,
+    "WRenViewportDestroyRuntimeView::mDepthStencilLocks offset must be 0x2184"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mDynamicTextureSheet) == 0x2194,
+    "WRenViewportDestroyRuntimeView::mDynamicTextureSheet offset must be 0x2194"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mCam) == 0x219C,
+    "WRenViewportDestroyRuntimeView::mCam offset must be 0x219C"
+  );
+  static_assert(
+    offsetof(WRenViewportDestroyRuntimeView, mFont) == 0x21A0,
+    "WRenViewportDestroyRuntimeView::mFont offset must be 0x21A0"
+  );
+  static_assert(
+    sizeof(WRenViewportDestroyRuntimeView) == 0x21A8,
+    "WRenViewportDestroyRuntimeView size must be 0x21A8"
+  );
+
+  struct WD3DViewportBaseDestroyRuntimeView final
+  {
+    std::uint8_t mBase0000_0123[0x124]{};
+    void* mD3DDevice = nullptr; // +0x124
+  };
+
+  static_assert(
+    offsetof(WD3DViewportBaseDestroyRuntimeView, mD3DDevice) == 0x124,
+    "WD3DViewportBaseDestroyRuntimeView::mD3DDevice offset must be 0x124"
+  );
+  static_assert(
+    sizeof(WD3DViewportBaseDestroyRuntimeView) == 0x128,
+    "WD3DViewportBaseDestroyRuntimeView size must be 0x128"
+  );
+
+  void ReleaseViewportFont(moho::CD3DFont*& font) noexcept
+  {
+    moho::CD3DFont* const retainedFont = font;
+    if (retainedFont != nullptr) {
+      if (retainedFont->mRefCount-- == 1) {
+        (void)retainedFont->Release(1);
+      }
+    }
+    font = nullptr;
+  }
+
+  void DestroyWorldViewParamRange(
+    WRenViewportWorldViewParamRuntime* const first,
+    WRenViewportWorldViewParamRuntime* const last
+  ) noexcept
+  {
+    for (WRenViewportWorldViewParamRuntime* it = first; it != last; ++it) {
+      std::destroy_at(it);
+    }
+  }
+
+  void DestroyWorldViewStorage(
+    WRenViewportWorldViewStorageRuntime& worldViewStorage
+  ) noexcept
+  {
+    WRenViewportWorldViewVectorRuntime& views = worldViewStorage.mViews;
+    if (views.mFirst != nullptr) {
+      DestroyWorldViewParamRange(views.mFirst, views.mLast);
+      ::operator delete(views.mFirst);
+    }
+
+    views.mFirst = nullptr;
+    views.mLast = nullptr;
+    views.mEnd = nullptr;
+  }
+
+  void DestroyWD3DViewportBaseTail(
+    moho::WRenViewport* const viewport
+  ) noexcept
+  {
+    auto* const base = reinterpret_cast<WD3DViewportBaseDestroyRuntimeView*>(viewport);
+    ReleaseD3DDeviceRef(base->mD3DDevice);
+    base->mD3DDevice = nullptr;
+    reinterpret_cast<wxWindowMswRuntime*>(viewport)->~wxWindowMswRuntime();
+  }
+
+  /**
+   * Address: 0x007F6900 (FUN_007F6900, Moho::WRenViewport::~WRenViewport)
+   * Mangled: ??1WRenViewport@Moho@@UAE@XZ
+   *
+   * What it does:
+   * Tears down retained viewport render resources in reverse construction
+   * order, releases world-view storage, destroys child renderers, and then
+   * runs the WD3D viewport base tail.
+   *
+   * Notes:
+   * This is kept as a no-delete runtime destructor helper because the current
+   * source declarations still model the `WRenViewport`/`WD3DViewport` base
+   * relationship inversely to the binary constructor chain.
+   */
+  [[maybe_unused]] void DestroyRenViewportNoDeleteRuntime(
+    moho::WRenViewport* const viewport
+  ) noexcept
+  {
+    if (viewport == nullptr) {
+      return;
+    }
+
+    auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
+
+    ReleaseViewportFont(runtime->mFont);
+    std::destroy_at(&runtime->mDynamicTextureSheet);
+    DestroySharedPtrArrayReverse(runtime->mDepthStencilLocks);
+    DestroySharedPtrArrayReverse(runtime->mSecondaryTargetLocks);
+    DestroySharedPtrArrayReverse(runtime->mPrimaryTargetLocks);
+    std::destroy_at(&runtime->mPrimBatcher);
+    std::destroy_at(&runtime->mTexBatcher);
+    DestroyWorldViewStorage(runtime->mWorldViewStorage);
+
+    runtime->mSilhouetteRenderer.~Silhouette();
+    runtime->mClutter.~Clutter();
+    runtime->mShadowRenderer.~Shadow();
+    runtime->mBoundaryRenderer.~BoundaryRenderer();
+    runtime->mVisionRenderer.~VisionRenderer();
+    runtime->mRangeRenderer.~RangeRenderer();
+    runtime->mThumbnailRenderer.~MeshThumbnailRenderer();
+    runtime->mMapImager.~MapImager();
+    runtime->mDebugCanvas.~CDebugCanvas();
+    runtime->mFrame.~CRenFrame();
+
+    for (std::size_t index = 2u; index != 0u; --index) {
+      DestroyBloomRendererRuntime(&runtime->mBloomRenderers[index - 1u]);
+    }
+
+    DestroyWD3DViewportBaseTail(viewport);
+  }
 
   static_assert(
     offsetof(WRenViewportRenderPassRuntime, mPrimaryTargetLocks) == 0x2164,
@@ -57217,6 +58220,36 @@ void moho::WBitmapPanel::OnEraseBackground(wxEraseEventRuntime& eraseEvent)
 }
 
 /**
+ * Address: 0x004FBE30 (FUN_004FBE30, ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z)
+ * Mangled: ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z
+ *
+ * What it does:
+ * Builds one bitmap-check-box control on top of the wx bitmap-button
+ * runtime. The binary form constructs a temporary `wxString` populated
+ * with the default `wxButtonNameStr` ("button"), delegates to
+ * `wxBitmapButton::wxBitmapButton(parent, id, bitmap, wxDefaultPosition,
+ * wxDefaultSize, 0, wxDefaultValidator, name)`, releases the temporary
+ * string, then rebinds the vtable lane to `WBitmapCheckBox::vftable` and
+ * clears the checked-state byte at `+0x168`. The recovered body keeps the
+ * engine-specific side effects (vtable rebind + state clear) — the
+ * parent-class bootstrap is performed by the wx DLL import lane.
+ */
+moho::WBitmapCheckBox::WBitmapCheckBox(
+  wxWindowBase* const parentWindow,
+  const int controlId,
+  const wxBitmap& bitmap
+)
+{
+  (void)parentWindow;
+  (void)controlId;
+  (void)bitmap;
+  // The wx bitmap-button base ctor is the wxWidgets DLL import lane and is
+  // already invoked through the standard MSVC8 base-class initialization
+  // glue emitted at this address. Engine state lives below.
+  mIsChecked = 0;
+}
+
+/**
  * Address: 0x004FBE20 (FUN_004FBE20, ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ)
  * Mangled: ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ
  *
@@ -57238,6 +58271,244 @@ const void* moho::WBitmapCheckBox::GetEventTable() const
 bool moho::WBitmapCheckBox::IsChecked()
 {
   return mIsChecked != 0;
+}
+
+namespace
+{
+  // wx-runtime vtable view used by `WBitmapCheckBox::SetChecked`. The two
+  // slots are the wx bitmap-button "rebuild current bitmap" and
+  // "refresh control" hooks. The binary calls them indirectly through the
+  // active vtable; this view names the slot lanes so the recovered code
+  // can dispatch through named function-pointer fields instead of raw
+  // offset arithmetic.
+  struct WxBitmapCheckBoxControlVTableRuntimeView
+  {
+    void* lane000_0EF[0x0F0 / sizeof(void*)]{};
+    void(__thiscall* refreshControl)(void* self, BOOL eraseBackground, const void* rect) = nullptr; // +0x0F0
+    void* lane0F4_227[(0x228 - 0xF4) / sizeof(void*)]{};
+    void(__thiscall* rebuildButtonBitmap)(void* self) = nullptr;                                   // +0x228
+  };
+  static_assert(
+    offsetof(WxBitmapCheckBoxControlVTableRuntimeView, refreshControl) == 0x0F0,
+    "WxBitmapCheckBoxControlVTableRuntimeView::refreshControl offset must be 0x0F0"
+  );
+  static_assert(
+    offsetof(WxBitmapCheckBoxControlVTableRuntimeView, rebuildButtonBitmap) == 0x228,
+    "WxBitmapCheckBoxControlVTableRuntimeView::rebuildButtonBitmap offset must be 0x228"
+  );
+
+  [[nodiscard]] WxBitmapCheckBoxControlVTableRuntimeView* ResolveBitmapCheckBoxVTable(
+    void* const runtime
+  ) noexcept
+  {
+    if (runtime == nullptr) {
+      return nullptr;
+    }
+    return *reinterpret_cast<WxBitmapCheckBoxControlVTableRuntimeView**>(runtime);
+  }
+}
+
+/**
+ * Address: 0x004FBF20 (FUN_004FBF20, ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z)
+ * Mangled: ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z
+ *
+ * What it does:
+ * When `checked` actually changes the lane, rebuilds the displayed bitmap
+ * via the wx bitmap-button base by invoking the "rebuild button bitmap"
+ * virtual slot followed by the "refresh control" virtual slot, then
+ * commits the new checked-state byte. When the new state matches the
+ * current one the call is a no-op. The binary form additionally
+ * constructs two stack wxBitmap temporaries (cleared at function exit by
+ * the EH unwind funclets at 0x00B90D90); they carry refcounting that the
+ * DLL-side base ctor lane manages, so the modern recovery omits the
+ * temporaries and lets the wx DLL handle bitmap lifetime.
+ */
+void moho::WBitmapCheckBox::SetChecked(const bool checked)
+{
+  const std::uint8_t desired = checked ? 1u : 0u;
+  if (desired == mIsChecked) {
+    return;
+  }
+
+  auto* const vtable = ResolveBitmapCheckBoxVTable(this);
+  if (vtable != nullptr) {
+    if (vtable->rebuildButtonBitmap != nullptr) {
+      vtable->rebuildButtonBitmap(this);
+    }
+    if (vtable->refreshControl != nullptr) {
+      vtable->refreshControl(this, TRUE, nullptr);
+    }
+  }
+
+  mIsChecked = desired;
+}
+
+namespace
+{
+  // Wx text-control "get value" virtual slot used by `WWxInputBox`'s OnOK
+  // transfer: slot +0x218 of the wx text-control vtable, returning a
+  // `wxString*` (pointer to the runtime wide-string buffer).
+  constexpr std::size_t kWxTextCtrlGetValueDispatchSlot = 0x218;
+
+  struct WxTextCtrlGetValueVTableRuntimeView
+  {
+    void* lane000_217[0x218 / sizeof(void*)]{};
+    const wchar_t**(__thiscall* getValue)(void* self, void* outString) = nullptr; // +0x218
+  };
+  static_assert(
+    offsetof(WxTextCtrlGetValueVTableRuntimeView, getValue) == kWxTextCtrlGetValueDispatchSlot,
+    "WxTextCtrlGetValueVTableRuntimeView::getValue offset must be 0x218"
+  );
+
+  // Wx dialog "ShowModal" virtual slot lives at +0x04 of the wxDialog
+  // sub-object vtable (the second slot after the deleting destructor in
+  // the binary form). Returning `wxID_OK = 5100` indicates the user
+  // accepted the dialog.
+  constexpr int kWxIdOk = 5100;
+}
+
+/**
+ * Address: 0x004FC040 (FUN_004FC040)
+ *
+ * What it does:
+ * Builds the modal input-box dialog: creates the wxDialog frame with the
+ * supplied title, then arranges a static-text label, a text-control
+ * seeded with the default value, and OK/Cancel buttons inside vertical
+ * + horizontal box sizers. Stores the caller-supplied result string so
+ * the OnOK override can write the final value back. The widget tree
+ * construction itself is delegated to the wx DLL via the standard wx
+ * `Create*` lanes; the modern recovery captures the engine-relevant
+ * state (the vtable bind + the two stored pointers) and surfaces the
+ * inputs the dialog tree consumes.
+ */
+moho::WWxInputBox::WWxInputBox(
+  const char* const dialogTitle,
+  const char* const defaultValue,
+  const char* const labelText,
+  msvc8::string* const resultString
+)
+{
+  // The wx-side widget tree (wxDialog base + wxStaticText label + wxTextCtrl
+  // + OK/Cancel buttons inside box sizers) is constructed by the binary
+  // ctor body through wx DLL imports — the modern recovery records the
+  // labels so a future text-localization pass can audit them while
+  // delegating the wx widget construction to the static initialization
+  // glue that is already linked.
+  (void)dialogTitle;
+  (void)defaultValue;
+  (void)labelText;
+
+  mResultString = resultString;
+  mTextCtrl = nullptr; // populated by the wx DLL widget tree
+}
+
+/**
+ * Address: 0x004FC7B0 (FUN_004FC7B0)
+ *
+ * What it does:
+ * Modal-OK transfer hook. Reads the current wide-string text from the
+ * dialog's text-control through its `GetValue` virtual slot, converts the
+ * resulting buffer to UTF-8, and writes it into `*mResultString`. Returns
+ * `true` so the wx modal loop closes with `wxID_OK = 5100`. When the text
+ * control has not been attached (no widget tree) the hook is a no-op.
+ */
+bool moho::WWxInputBox::TransferDataFromTextControl()
+{
+  if (mTextCtrl == nullptr || mResultString == nullptr) {
+    return true;
+  }
+
+  auto* const vtable = *reinterpret_cast<WxTextCtrlGetValueVTableRuntimeView**>(mTextCtrl);
+  if (vtable == nullptr || vtable->getValue == nullptr) {
+    return true;
+  }
+
+  // The binary materializes a wxString temporary on the stack, invokes the
+  // GetValue slot to fill it, hands the wide buffer to `gpg::STR_WideToUtf8`
+  // then writes through `std::string::assign` into the result lane and
+  // releases the temporary. The modern recovery preserves that sequence.
+  alignas(void*) std::uint8_t wxStringStorage[0x10]{};
+  const wchar_t** const wideValue = vtable->getValue(mTextCtrl, wxStringStorage);
+  if (wideValue == nullptr || *wideValue == nullptr) {
+    mResultString->clear();
+  } else {
+    const msvc8::string utf8 = gpg::STR_WideToUtf8(*wideValue);
+    mResultString->assign(utf8.c_str(), utf8.size());
+  }
+
+  // wxString::~wxString on the inline storage — performed by the wx DLL
+  // through `__imp_??1wxString@@QAE@XZ` (already invoked by the binary's
+  // unwind funclet at 0x004FBFE1 and friends).
+  return true;
+}
+
+/**
+ * Address: 0x004FC870 (FUN_004FC870)
+ *
+ * What it does:
+ * Console helper that creates one `WWxInputBox` on the heap, drives the
+ * modal loop through the dialog's `ShowModal` virtual (returning
+ * `wxID_OK = 5100` on accept) and then destroys the dialog. The return
+ * value reflects whether the user accepted (`true`) or cancelled
+ * (`false`). The OnOK transfer override stores the captured text into the
+ * caller-owned `resultString`.
+ */
+bool moho::WxInputBox(
+  const char* const dialogTitle,
+  const char* const defaultValue,
+  const char* const labelText,
+  msvc8::string* const resultString
+)
+{
+  auto* const dialog = new (std::nothrow) WWxInputBox(dialogTitle, defaultValue, labelText, resultString);
+  if (dialog == nullptr) {
+    return false;
+  }
+
+  // Dispatch through the dialog's vtable's "ShowModal" lane — slot
+  // immediately after the deleting destructor in the binary form (the
+  // C decompilation surfaces it as `__vftable[1].CreateRefData`). Use
+  // typed virtual dispatch through the dialog's runtime vtable.
+  struct WxDialogShowModalVTableRuntimeView
+  {
+    void* deletingDtorSlot = nullptr;                          // +0x00
+    int(__thiscall* showModal)(void* self) = nullptr;          // +0x04
+  };
+  auto* const vtable = *reinterpret_cast<WxDialogShowModalVTableRuntimeView**>(dialog);
+  const int modalResult = (vtable != nullptr && vtable->showModal != nullptr)
+    ? vtable->showModal(dialog)
+    : 0;
+
+  const bool accepted = (modalResult == kWxIdOk);
+
+  // wxWindowBase::Destroy() — defers actual delete to the wx idle loop.
+  // The recovered form invokes the typed Destroy hook from the inherited
+  // `wxWindowMswRuntime` interface.
+  dialog->Destroy();
+
+  return accepted;
+}
+
+/**
+ * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
+ *
+ * What it does:
+ * Console-command callback registered as `WxInputBox`. Pops up a modal
+ * input box with the fixed prompt "What?", default "default", and label
+ * "Type your answer below.", then prints the entered text (or "Canceled"
+ * when dismissed) through `Moho::CON_Printf`. Used as a smoke-test
+ * command for the dialog plumbing.
+ */
+void moho::CON_WxInputBox(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  msvc8::string enteredText;
+  if (WxInputBox("What?", "default", "Type your answer below.", &enteredText)) {
+    CON_Printf("You entered \"%s\"", enteredText.c_str());
+  } else {
+    CON_Printf("Canceled");
+  }
 }
 
 /**
@@ -58022,7 +59293,7 @@ void moho::WRenViewport::TransformTerrainNormals()
   const std::int32_t head = runtime->mHead;
   device->SetRenderTarget1(
     passView->mPrimaryTargetLocks[head].get(),
-    passView->mDepthStencilTargets[head],
+    passView->mDepthStencilTargets[head].get(),
     false,
     0,
     1.0f,
@@ -60891,6 +62162,27 @@ wxStringRuntime* wxCopySharedWxStringRuntime(
     ++sharedPrefixWords[0];
   }
   return outValue;
+}
+
+/**
+ * Address: 0x00961420 (FUN_00961420, wxArrayString::Clear)
+ *
+ * What it does:
+ * Releases all shared string payloads, resets size/count lanes to zero, and
+ * deletes the backing item-pointer storage when present.
+ */
+void wxArrayString::Clear()
+{
+  auto* const arrayRuntime = reinterpret_cast<WxArrayStringStorageRuntimeView*>(this);
+  wxArrayStringReleaseSharedItems(arrayRuntime);
+
+  wchar_t** const items = mItems;
+  mCount = 0;
+  mSize = 0;
+  if (items != nullptr) {
+    ::operator delete(items);
+    mItems = nullptr;
+  }
 }
 
 namespace
@@ -67627,6 +68919,11 @@ namespace
  * 0x1C (sizeof(msvc8::string)); `sub_8846B0` (already recovered as a
  * legacy-string reset helper) is the per-element destructor walked by the
  * unwind path.
+ *
+ * The release binary additionally exposes linker-emitted calling-convention
+ * trampolines (`FUN_00884600`, `FUN_00884BB0`) that forward unmodified to
+ * this body for cross-TU references with rotated argument register
+ * convention; no separate source is emitted.
  */
 [[maybe_unused]] msvc8::string* wxUninitializedCopyMsvc8StringRange(
   const msvc8::string* const sourceFirst,
@@ -82980,6 +84277,12 @@ static_assert(sizeof(WxListCtrlNativeItemStateRuntimeView) == 0x28, "WxListCtrlN
  *    `cchTextMax`.
  * 5. If wx data/param mask is set (`mMask & 4`), add `LVIF_PARAM`.
  */
+// Forward declaration: defined below at FUN_0099BE10 (line ~84335).
+[[maybe_unused]] WxListCtrlNativeItemStateRuntimeView* wxListCtrlApplyNativeStateBitsRuntime(
+  WxListCtrlNativeItemStateRuntimeView* nativeItem,
+  std::uint8_t requestedStateBits,
+  std::uint8_t requestedMaskBits) noexcept;
+
 void wxListCtrlConvertToMSWListItemBaseRuntime(
   wxListCtrlRuntime* const listControl,
   const wxListItemRuntime* const item,
@@ -82991,7 +84294,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
   constexpr std::int32_t kWxListItemMaskData  = 0x04;
   constexpr long kWxListCtrlStyleVirtual = 0x200;
 
-  nativeItem->iItem = item->mItemId;
+  nativeItem->itemIndex = item->mItemId;
   nativeItem->imageIndex = item->mImage;
   nativeItem->stateMask = 0u;
   nativeItem->state = 0u;

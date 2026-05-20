@@ -1697,7 +1697,12 @@ namespace Wm3
     [[nodiscard]] float GetContactTime() const noexcept { return mContactTime; }
     [[nodiscard]] std::int32_t GetIntersectionType() const noexcept { return mIntersectionType; }
 
-  protected:
+    // Layout-locked members exposed at file scope (not `protected:`) so the
+    // adjacent `static_assert(offsetof(...))` lines and the derived
+    // intersector ctors that share this binary layout can both reach the
+    // canonical field names. The binary at +0x04/+0x08 stores these two
+    // fields directly; the GetContactTime/GetIntersectionType accessors
+    // above are the recovered public read API.
     float mContactTime = 0.0f;          // +0x04 (vftable occupies +0x00)
     std::int32_t mIntersectionType = 0; // +0x08
   };
@@ -6380,6 +6385,34 @@ namespace Wm3
     *outPoppedEntry = *begin;
     const std::int32_t heapCount = static_cast<std::int32_t>(end - begin);
     return SiftDownThenSiftUpHeapEntryDoubleKeyPairLane(begin, 0, heapCount, insertionEntry);
+  }
+
+  /**
+   * Address: 0x00A72F30 (FUN_00A72F30, sub_A72F30)
+   *
+   * IDA signature:
+   * int __cdecl sub_A72F30(_DWORD *a1, int a2);
+   *
+   * What it does:
+   * In-place `pop_heap` for the `HeapEntryDoubleKeyPair` lane range
+   * `[begin, end)`. Saves the trailing element, moves the heap root to that
+   * trailing slot (publishing the popped maximum), then sift-downs the saved
+   * value through the now `count - 1` sized heap rooted at `begin` via
+   * `SiftDownThenSiftUpHeapEntryDoubleKeyPairLane` (FUN_00A72990). On
+   * return the original root entry sits at `end - 1` and the
+   * `[begin, end - 1)` prefix continues to satisfy the max-heap invariant.
+   */
+  [[maybe_unused]] std::uint32_t PopHeapEntryDoubleKeyPairToBackRuntime(
+    HeapEntryDoubleKeyPair* const begin,
+    HeapEntryDoubleKeyPair* const end
+  ) noexcept
+  {
+    HeapEntryDoubleKeyPair* const lastSlot = end - 1;
+    const HeapEntryDoubleKeyPair savedTrailingEntry = *lastSlot;
+    *lastSlot = *begin;
+
+    const std::int32_t shrunkHeapCount = static_cast<std::int32_t>(lastSlot - begin);
+    return SiftDownThenSiftUpHeapEntryDoubleKeyPairLane(begin, 0, shrunkHeapCount, savedTrailingEntry);
   }
 
   struct QueryCacheLaneRuntimeView

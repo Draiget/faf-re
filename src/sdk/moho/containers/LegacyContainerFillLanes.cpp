@@ -5,7 +5,10 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include <boost/function/function_fwd.hpp>
+// boost 1.34.1 ships function_base.hpp (which declares boost::bad_function_call
+// and the function_base layout) but does NOT ship function_fwd.hpp (that header
+// was added in later boost releases). function_base.hpp is sufficient for our
+// boost::function<R(A)> dispatch helpers below.
 #include <boost/function/function_base.hpp>
 #include <boost/throw_exception.hpp>
 

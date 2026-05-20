@@ -1988,9 +1988,9 @@ namespace
    * allocated destination before the threat vector and aggregate lanes are
    * populated.
    */
-  InfluenceGrid* CopyConstructInfluenceGridEntries(
-    InfluenceGrid* const destination,
-    const InfluenceGrid* const source
+  moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
+    moho::InfluenceGrid* const destination,
+    const moho::InfluenceGrid* const source
   )
   {
     // Build a clean sentinel-only set header in destination.entries, then
@@ -2025,21 +2025,21 @@ namespace
     // Initialize destination as an empty vector (proxy/range lanes zeroed).
     ::new (destination) SThreatVector();
 
-    const SThreat* const srcBegin = source->begin();
-    const SThreat* const srcEnd = source->end();
+    const moho::SThreat* const srcBegin = source->begin();
+    const moho::SThreat* const srcEnd = source->end();
     const std::size_t elementCount = (srcBegin != nullptr) ? static_cast<std::size_t>(srcEnd - srcBegin) : 0u;
     if (elementCount == 0u) {
       return destination;
     }
 
-    // msvc8 legacy vector overflow guard: `(0x7FFFFFFF / sizeof(SThreat)) == 0x4924924`.
+    // msvc8 legacy vector overflow guard: `(0x7FFFFFFF / sizeof(moho::SThreat)) == 0x4924924`.
     constexpr std::size_t kSThreatMaxCount = 0x4924924u;
     if (elementCount > kSThreatMaxCount) {
       throw std::length_error("vector<SThreat> too long");
     }
 
     destination->reserve(elementCount);
-    for (const SThreat* it = srcBegin; it != srcEnd; ++it) {
+    for (const moho::SThreat* it = srcBegin; it != srcEnd; ++it) {
       destination->push_back(*it);
     }
     return destination;
@@ -2119,9 +2119,9 @@ namespace
    * Used by `msvc8::vector<InfluenceGrid>` growth paths when the
    * per-cell grid needs to be duplicated, and by serializer scratch copies.
    */
-  [[maybe_unused]] InfluenceGrid* CopyConstructInfluenceGrid(
-    InfluenceGrid* const destination,
-    InfluenceGrid* const source
+  [[maybe_unused]] moho::InfluenceGrid* CopyConstructInfluenceGrid(
+    moho::InfluenceGrid* const destination,
+    moho::InfluenceGrid* const source
   )
   {
     (void)CopyConstructInfluenceGridEntries(destination, source);

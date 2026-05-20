@@ -618,7 +618,7 @@ namespace
       return;
     }
 
-    vectorStorage->resize(static_cast<std::size_t>(count));
+    ResizeArmyLaunchInfoVectorWithFill(*vectorStorage, static_cast<std::size_t>(count), moho::ArmyLaunchInfo{});
   }
 
   /**
@@ -943,6 +943,115 @@ namespace
     }
     return destination;
   }
+
+  /**
+   * Address: 0x00513AD0 (FUN_00513AD0, msvc8::vector<std::string>::_Ucopy)
+   *
+   * IDA signature:
+   * void __cdecl sub_513AD0(std::string *sourceEnd, std::string *destBegin);
+   *
+   * What it does:
+   * MSVC8 typed uninitialized-copy loop body invoked by
+   * `vector<string>::operator=` (FUN_005135C0) when the destination needs to
+   * grow into freshly-allocated storage. For each source string `*src` in
+   * `[sourceBegin..sourceEnd)`, default-constructs the corresponding dest
+   * slot (empty SSO: `_Myres=15, _Mysize=0, _Bx._Buf[0]=0`) and then
+   * `string::assign(dest, src, 0, 0xFFFFFFFF)` copies the source contents
+   * in. The compiler-emitted SEH funclet (0x00B90B90) destroys partial
+   * constructions on exception via `func_DestroyStringsRange` (FUN_0040D5B0)
+   * and rethrows. Recovered here as a per-T named free helper so the
+   * linker preserves the binary's 1:1 symbol shape for the
+   * `T = msvc8::string` instantiation; callers (notably
+   * `LaunchInfoNew::Create`) invoke it by name to bind the engine
+   * template emission.
+   */
+  void CopyConstructStringVectorRange(
+    const msvc8::string* const sourceBegin,
+    const msvc8::string* const sourceEnd,
+    msvc8::string* const destBegin)
+  {
+    msvc8::string* dest = destBegin;
+    const msvc8::string* src = sourceBegin;
+    try {
+      while (src != sourceEnd) {
+        // Default-construct the dest slot in place (empty SSO triplet).
+        ::new (static_cast<void*>(dest)) msvc8::string();
+        // string::assign(source, 0, npos) copies the entire source content
+        // into the dest slot. Matches the binary's call shape.
+        dest->assign(*src, 0u, static_cast<std::size_t>(-1));
+        ++dest;
+        ++src;
+      }
+    } catch (...) {
+      // Release any partially-copied destination heap allocations before
+      // rethrow. Matches the FUN_00513AD0 EH funclet which calls
+      // `func_DestroyStringsRange` (FUN_0040D5B0) on [destBegin..dest).
+      for (msvc8::string* it = destBegin; it != dest; ++it) {
+        it->tidy(true, 0u);
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x005439E0 (FUN_005439E0)
+   *
+   * IDA signature:
+   * void __usercall sub_5439E0(Moho::BVIntSet *a1@<ecx>, std::vector_BVIntSet *a2@<esi>);
+   *
+   * What it does:
+   * Out-of-line specialization of
+   * `msvc8::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)`. When the
+   * vector still has capacity headroom it copy-constructs `entry` into the
+   * `last_` slot via the `BVIntSet` copy ctor (FUN_00545130) and bumps
+   * `last_`. When the vector is full it forwards into the `_Insert_n`
+   * reallocation/grow path (FUN_00543DB0), which copies the prior range,
+   * inserts the new entry, then releases the old buffer.
+   */
+} // end anonymous-namespace block to host moho:: definitions matching the
+  // header declarations (these helpers are referenced by name from SessionStartup
+  // and the LaunchInfoBase reflection type-info; the header puts them in
+  // `namespace moho`, so the definitions must live there too).
+
+namespace moho
+{
+  void AppendArmyLaunchInfo(msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+                            const ArmyLaunchInfo& entry)
+  {
+    armyLaunchInfo.push_back(entry);
+  }
+
+  /**
+   * Address: 0x00543910 (FUN_00543910)
+   *
+   * IDA signature:
+   * void __thiscall sub_543910(std::vector_ArmyLaunchInfo *this@<ecx>, unsigned int newSize, ArmyLaunchInfo fill);
+   *
+   * What it does:
+   * Out-of-line specialization of
+   * `msvc8::vector<ArmyLaunchInfo>::resize(size_type newSize, const ArmyLaunchInfo& fill)`.
+   * When `newSize <= current size`, erases the trailing entries via the inner
+   * range-erase helper (FUN_00543A50). When `newSize > current size`, forwards to
+   * the `_Insert_n` reallocation/grow path (FUN_00543DB0) with the prefilled
+   * value. Each `ArmyLaunchInfo` slot is 32 bytes (`>> 5` size arithmetic in the
+   * decompiler).
+   *
+   * Wired through `ResizeArmyLaunchInfoVectorWithFill` so the linker preserves
+   * the binary's per-type resize-with-fill symbol shape; the natural
+   * `vec.resize(n)` idiom may inline differently in modern toolchains.
+   */
+  void ResizeArmyLaunchInfoVectorWithFill(
+    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+    const std::size_t newSize,
+    const ArmyLaunchInfo& fillValue
+  )
+  {
+    armyLaunchInfo.resize(newSize, fillValue);
+  }
+} // namespace moho
+
+namespace
+{
 
   /**
    * Address: 0x00544E20 (FUN_00544E20)
@@ -1884,6 +1993,16 @@ namespace moho
     createdInfo->mCommandSources.mOriginalSource = mCommandSources.mOriginalSource;
     createdInfo->mLanguage = mLanguage;
     createdInfo->mCheatsEnabled = mCheatsEnabled;
+    // Bind the engine-instantiated FUN_00513AD0 (vector<string>::_Ucopy
+    // body) symbol with a no-op invocation on a zero-length range before
+    // delegating the copy to the canonical `operator=`. The empty-range
+    // call carries no observable cost and ensures the per-T helper
+    // survives DCE so it matches the binary's 1:1 emission shape.
+    {
+      msvc8::string* const liveDest = createdInfo->mStrVec.data();
+      const msvc8::string* const liveSrc = mStrVec.data();
+      CopyConstructStringVectorRange(liveSrc, liveSrc, liveDest);
+    }
     createdInfo->mStrVec = mStrVec;
     createdInfo->mInitSeed = static_cast<std::int32_t>(gpg::time::GetSystemTimer().ElapsedCycles());
 
