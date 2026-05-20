@@ -2,6 +2,8 @@
 
 #include <new>
 
+#include "moho/render/RCamManager.h"
+#include "moho/net/CGpgNetInterface.h"
 #include "moho/unit/core/Unit.h"
 
 namespace moho
@@ -50,5 +52,37 @@ namespace moho
 
     destination.reserve(count);
     destination.insert(destination.end(), source.start_, source.end_);
+  }
+
+  /**
+   * Address: 0x007AE840 (FUN_007AE840, msvc8::vector<Moho::CameraImpl*>::vector(const vector&))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `msvc8::vector<Moho::CameraImpl*>` copy operation. Forwards to the
+   * compiler-emitted copy-assignment body which carries the same
+   * default-zero + allocate + range-copy semantics the binary's
+   * out-of-line copy-ctor encoded.
+   */
+  void CopyConstructVectorOfCameraImplPtr(msvc8::vector<CameraImpl*>& destination,
+                                          const msvc8::vector<CameraImpl*>& source)
+  {
+    destination = source;
+  }
+
+  /**
+   * Address: 0x007BAFE0 (FUN_007BAFE0, msvc8::vector<Moho::SNetCommandArg>::vector(const vector&))
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `msvc8::vector<Moho::SNetCommandArg>` copy operation. Forwards to the
+   * compiler-emitted copy-assignment body which carries the same
+   * default-zero + allocate + element-copy semantics the binary's
+   * out-of-line copy-ctor encoded.
+   */
+  void CopyConstructVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& destination,
+                                           const msvc8::vector<SNetCommandArg>& source)
+  {
+    destination = source;
   }
 } // namespace moho
