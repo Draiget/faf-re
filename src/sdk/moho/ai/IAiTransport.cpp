@@ -290,6 +290,30 @@ namespace
   using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
 
   /**
+   * Address: 0x005EA480 (FUN_005EA480, msvc8::vector<SAiReservedTransportBone>::operator=)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `msvc8::vector<SAiReservedTransportBone>::operator=(const vector&)`
+   * body (32-byte element stride). Forwards to the compiler-emitted
+   * copy-assignment which performs the canonical
+   *   - assign existing slots up to min(srcCount, dstCount),
+   *   - copy-construct or destroy tail to align the destination range,
+   *   - update _Mylast.
+   *
+   * Used by `RVectorType_SAiReservedTransportBone::SerLoad` to bind the
+   * deserialized payload into the destination storage; routing through
+   * the named helper preserves the MSVC8 per-T template emission symbol
+   * shape even when the modern compiler would inline `dst = src;`.
+   */
+  void AssignReservedTransportBoneVector(
+    ReservedTransportBoneVector& destination,
+    const ReservedTransportBoneVector& source)
+  {
+    destination = source;
+  }
+
+  /**
    * Address: 0x005EACC0 (FUN_005EACC0)
    *
    * What it does:
@@ -1015,7 +1039,10 @@ void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
     loaded.push_back(entry);
   }
 
-  *storage = loaded;
+  // Route the per-T copy-assignment through the canonical helper
+  // (FUN_005EA480) so the MSVC8 vector<SAiReservedTransportBone>::operator=
+  // template emission symbol shape is preserved.
+  AssignReservedTransportBoneVector(*storage, loaded);
 }
 
 /**
