@@ -21,6 +21,43 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00605D10 (FUN_00605D10, Moho::CUnitCarrierRetrieve::CUnitCarrierRetrieve)
+     *
+     * IDA signature:
+     * Moho::CUnitCarrierRetrieve *__userpurge sub_605D10@<eax>(
+     *     Moho::CCommandTask *parent@<edi>,
+     *     Moho::CUnitCarrierRetrieve *arg0,
+     *     Moho::EntitySetTemplate_Entity *a2);
+     *
+     * What it does:
+     * Initializes one retrieve-task from parent dispatch context, copies the
+     * tracked-unit set template into the task's local storage, runs the
+     * unit's `OnStartTransportLoading` script callback, registers the
+     * tracked-unit set into the simulation entity DB, and flips the unit's
+     * "carrier-retrieve in progress" state bit (0x100).
+     */
+    CUnitCarrierRetrieve(CCommandTask* parentTask, const SEntitySetTemplateUnit& trackedUnits);
+
+    /**
+     * Address: 0x00606450 (FUN_00606450, Moho::CUnitCarrierRetrieve::operator new)
+     *
+     * IDA signature:
+     * Moho::CUnitCarrierRetrieve *__usercall sub_606450@<eax>(
+     *     Moho::CCommandTask *parent@<edi>,
+     *     Moho::EntitySetTemplate_Entity *a2);
+     *
+     * What it does:
+     * Allocates one retrieve-task (0x60 bytes) and forwards constructor
+     * arguments into in-place construction. On allocation failure returns
+     * `nullptr`; on constructor throw the allocation is released before
+     * the exception propagates.
+     */
+    static CUnitCarrierRetrieve* Create(
+      CCommandTask* parentTask,
+      const SEntitySetTemplateUnit& trackedUnits
+    );
+
+    /**
      * Address: 0x00608630 (FUN_00608630, Moho::CUnitCarrierRetrieve::MemberSerialize)
      *
      * What it does:
