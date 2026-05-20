@@ -47,4 +47,17 @@ namespace gpg
   );
 
   [[nodiscard]] RType* ResolveWeakPtrINetNATTraversalProviderType();
+
+  /**
+   * Address: 0x00482560 (FUN_00482560, gpg::RRef_weak_ptr_INetNATTraversalProvider)
+   *
+   * What it does:
+   * Builds one reflected `boost::weak_ptr<moho::INetNATTraversalProvider>`
+   * reference by storing the weak-pointer storage address in `out->mObj`
+   * and the cached `boost::weak_ptr<...>` `RType*` in `out->mType`. Lazily
+   * resolves the cached `RType` on first call.
+   */
+  RRef* RRef_weak_ptr_INetNATTraversalProvider(
+    RRef* out,
+    boost::weak_ptr<moho::INetNATTraversalProvider>* provider);
 } // namespace gpg

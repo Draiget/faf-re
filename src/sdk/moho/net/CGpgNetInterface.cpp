@@ -2105,14 +2105,46 @@ void CGpgNetInterface::Connected(
 }
 
 /**
+ * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)
+ *
+ * What it does:
+ * Wraps a `boost::weak_ptr<INetNATTraversalProvider>` into a typed LuaPlus
+ * userdata. Mirrors the binary's call sequence exactly:
+ *   1. Resolve the per-T metatable via
+ *      `CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance().Get(state)`.
+ *   2. Default-construct `*out` (LuaObject ctor — empty payload).
+ *   3. Build the reflected weak-pointer RRef via
+ *      `gpg::RRef_weak_ptr_INetNATTraversalProvider(&ref, provider)`.
+ *   4. Bind the userdata payload via `out->AssignNewUserData(state, ref)`.
+ *   5. Attach the resolved metatable via `out->SetMetaTable(metatable)`.
+ *
+ * Returns `out`.
+ */
+LuaPlus::LuaObject* moho::NET_MakeNATTraversal(
+  LuaPlus::LuaState* const state,
+  LuaPlus::LuaObject* const out,
+  boost::weak_ptr<INetNATTraversalProvider>* const provider)
+{
+  LuaPlus::LuaObject metatable =
+    moho::CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance().Get(state);
+
+  ::new (static_cast<void*>(out)) LuaPlus::LuaObject();
+
+  gpg::RRef providerRef{};
+  gpg::RRef_weak_ptr_INetNATTraversalProvider(&providerRef, provider);
+  out->AssignNewUserData(state, providerRef);
+  out->SetMetaTable(metatable);
+  return out;
+}
+
+/**
  * Address: 0x007B7DE0 (FUN_007B7DE0)
  *
  * What it does:
  * Calls Lua-side `CreateLobby` factory and stores returned lobby object.
- *
- * Note:
- * NAT traversal object argument is currently passed as `nil` until
- * `NET_MakeNATTraversal` binding is fully reconstructed.
+ * Builds the NAT traversal userdata from the live `CGpgNetInterface` (which
+ * implements `INetNATTraversalProvider`) via `NET_MakeNATTraversal` and
+ * passes it as the 5th `CreateLobby(...)` argument.
  */
 void CGpgNetInterface::CreateLobby(
   msvc8::vector<SNetCommandArg>& args
@@ -2143,8 +2175,17 @@ void CGpgNetInterface::CreateLobby(
   const int natPort = ExpectIntArg(*this, &args[4]);
   const msvc8::string playerUidText = gpg::STR_Printf("%d", playerUid);
 
+  // Build the NAT-traversal userdata bound to this GPGNet interface (the
+  // engine binary's CreateLobby call shape — NET_MakeNATTraversal is the
+  // public binder; the `sGPGNet` shared_ptr is the natural source for the
+  // weak_ptr backing the provider).
+  LuaPlus::LuaObject natTraversal;
+  boost::weak_ptr<INetNATTraversalProvider> natProvider(GPGNET_GetPtr());
+  (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
+
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);
-  mLobbyObject = createLobbyFn.Call_UDP(useUdp, localPort, playerName, playerUidText.c_str(), nullptr, natPort);
+  mLobbyObject =
+    createLobbyFn.Call_UDP(useUdp, localPort, playerName, playerUidText.c_str(), &natTraversal, natPort);
 
   gpg::Logf("GPGNET: entering lobby state.");
   SNetCommandArg stateArg(msvc8::string("Lobby"));

@@ -444,6 +444,26 @@ namespace moho
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
 
   /**
+   * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)
+   *
+   * What it does:
+   * Wraps a `boost::weak_ptr<INetNATTraversalProvider>` into a typed
+   * LuaPlus userdata. Resolves the metatable from
+   * `CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance()`,
+   * default-constructs `*out`, builds the reflected weak-pointer RRef via
+   * `gpg::RRef_weak_ptr_INetNATTraversalProvider`, assigns the userdata
+   * payload through `LuaPlus::LuaObject::AssignNewUserData`, then attaches
+   * the resolved metatable. Returns `out`.
+   *
+   * Called by `CGpgNetInterface::CreateLobby` to bind the live GPGNet
+   * provider into the `CreateLobby` Lua callback (`/lua/multiplayer/onlineprovider.lua`).
+   */
+  LuaPlus::LuaObject* NET_MakeNATTraversal(
+    LuaPlus::LuaState* state,
+    LuaPlus::LuaObject* out,
+    boost::weak_ptr<INetNATTraversalProvider>* provider);
+
+  /**
    * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)
    *
    * What it does:
