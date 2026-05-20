@@ -218,11 +218,45 @@ namespace
   }
 
   /**
+   * Address: 0x007D4550 (FUN_007D4550, sub_7D4550)
+   *
+   * What it does:
+   * Inner copy-loop body that the binary emitted as a separate symbol.
+   * Walks the source `[first, sentinel)` range and, for each source decal
+   * node, creates a new decal node before the destination sentinel's
+   * `mPrev` lane using the shared `CreateCartographicDecalNodeBefore`
+   * helper, then patches the sentinel/new-node link pair and increments
+   * the destination count.
+   *
+   * Wired into `CopyCartographicDecalList` to preserve the binary's per-T
+   * symbol shape even when the modern compiler would inline the loop.
+   */
+  void CopyCartographicDecalNodesIntoSentinel(
+    moho::CartographicDecalList& destination,
+    const moho::CartographicDecalNode* const sourceFirst,
+    const moho::CartographicDecalNode* const sourceSentinel)
+  {
+    for (const moho::CartographicDecalNode* sourceNode = sourceFirst;
+         sourceNode != sourceSentinel;
+         sourceNode = sourceNode->mNext) {
+      moho::CartographicDecalNode* const sentinel = destination.mDecalSentinel;
+      moho::CartographicDecalNode* const node =
+        CreateCartographicDecalNodeBefore(sentinel, sentinel->mPrev, sourceNode->mDecal);
+      sentinel->mPrev = node;
+      node->mPrev->mNext = node;
+      ++destination.mDecalCount;
+    }
+  }
+
+  /**
    * Address: 0x007D4230 (FUN_007D4230, sub_7D4230)
    *
    * What it does:
    * Initializes a destination cartographic decal list with a fresh sentinel
-   * and deep-copies every source decal node in list order.
+   * and deep-copies every source decal node in list order. Routes the inner
+   * per-element copy loop through the canonical helper
+   * `CopyCartographicDecalNodesIntoSentinel` (FUN_007D4550) to preserve the
+   * binary's symbol shape.
    */
   void CopyCartographicDecalList(
     moho::CartographicDecalList& destination,
@@ -236,16 +270,8 @@ namespace
     try {
       const moho::CartographicDecalNode* const sourceSentinel = source.mDecalSentinel;
       if (sourceSentinel != nullptr) {
-        for (const moho::CartographicDecalNode* sourceNode = sourceSentinel->mNext;
-             sourceNode != sourceSentinel;
-             sourceNode = sourceNode->mNext) {
-          moho::CartographicDecalNode* const sentinel = destination.mDecalSentinel;
-          moho::CartographicDecalNode* const node =
-            CreateCartographicDecalNodeBefore(sentinel, sentinel->mPrev, sourceNode->mDecal);
-          sentinel->mPrev = node;
-          node->mPrev->mNext = node;
-          ++destination.mDecalCount;
-        }
+        CopyCartographicDecalNodesIntoSentinel(
+          destination, sourceSentinel->mNext, sourceSentinel);
       }
     } catch (...) {
       ClearCartographicDecalList(&destination);
