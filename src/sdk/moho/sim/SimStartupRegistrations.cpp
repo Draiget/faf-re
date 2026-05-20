@@ -140,13 +140,26 @@ namespace
   }
 
   /**
-   * Address owner: startup sim-convar registration lane near 0x007353C0.
+   * Address: 0x00735430 (FUN_00735430, Moho::sim_TestVarStr::sim_TestVarStr)
+   *
+   * IDA signature:
+   * void __fastcall Moho::sim_TestVarStr::sim_TestVarStr(bool a1, std::string a2);
    *
    * What it does:
    * Constructs one startup `TSimConVar<msvc8::string>` lane for
-   * `"sim_TestVarStr"` with default value `"string"`.
+   * `"sim_TestVarStr"` with default value `"string"`. The
+   * `static moho::TSimConVar<msvc8::string>` declaration below is the
+   * source-level site that emits the FUN_00735430 ctor template
+   * instantiation: it chains to `CSimConCommand::CSimConCommand`, pulls
+   * a unique index from `Moho::SimConVarIndexCounter`, sets the
+   * `TSimConVar<std::string>` vptr, then in-place initializes the
+   * SBO-default `value` string and assigns the `"string"` literal.
+   *
+   * Source-level callers: `GetSimTestVarStrStorage` invokes this
+   * accessor; first invocation triggers the static-init that emits the
+   * binary ctor at this address.
    */
-  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<msvc8::string>& SimConVar_sim_TestVarStr()
+  [[nodiscard]] moho::TSimConVar<msvc8::string>& SimConVar_sim_TestVarStr()
   {
     static moho::TSimConVar<msvc8::string> sVar(false, "sim_TestVarStr", msvc8::string("string"));
     return sVar;
