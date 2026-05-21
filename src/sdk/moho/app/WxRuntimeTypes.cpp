@@ -61746,6 +61746,16 @@ std::size_t wxSocketConsumeStagedReadCacheRuntime(
  * Marks one wx object as pending delete, refreshes ref-data, clears delayed
  * destroy mode, and appends the object to the pending-delete list once.
  */
+/**
+ * Address: 0x00A32D20 (FUN_00A32D20, wxDestroyListNoDeleteRuntime)
+ *
+ * File-scope forward declaration. The real body lives after the
+ * anonymous namespace that wraps the bulk of wxRuntime helpers (see
+ * `wxDestroyListNoDeleteRuntimeImpl` and the trampoline file-scope
+ * definition near the bottom of this TU); both the in-file caller at
+ * `WxRuntimeTypes.cpp:61788` and the previously-fallback stub in
+ * `EngineUnrecoveredStubs.cpp` now resolve to that real body.
+ */
 [[maybe_unused]] void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept;
 
 /**
@@ -78094,8 +78104,14 @@ namespace
    * What it does:
    * Runs one non-deleting `wxList` teardown lane by rebinding `wxList` vtable
    * state and forwarding to `wxListBase` non-deleting teardown.
+   *
+   * Definition lifted to file scope after this anonymous namespace
+   * closes — the file-scope forward declaration earlier in this TU
+   * (around line 61749) expects external linkage so cross-TU lookups
+   * (and prior `EngineUnrecoveredStubs.cpp` stub fallback) resolve
+   * against the real body instead of a no-op.
    */
-  [[maybe_unused]] void wxDestroyListNoDeleteRuntime(
+  void wxDestroyListNoDeleteRuntimeImpl(
     void* const listRuntime
   ) noexcept
   {
@@ -78862,6 +78878,27 @@ namespace
     return dropTarget;
   }
 } // namespace
+
+/**
+ * Address: 0x00A32D20 (FUN_00A32D20, wxDestroyListNoDeleteRuntime)
+ *
+ * File-scope trampoline that forwards into the anon-namespace
+ * `wxDestroyListNoDeleteRuntimeImpl` body. Exposing the symbol at
+ * file scope is necessary because the forward declaration earlier in
+ * this TU (around line 61749) gave the name external linkage; without
+ * a matching file-scope definition the in-file caller at line 61788
+ * (and any cross-TU caller via `EngineUnrecoveredStubs.cpp`)
+ * previously fell back to a no-op stub.
+ *
+ * Caller body audit: `WxRuntimeTypes.cpp:61788` already invokes by
+ * name (`wxDestroyListNoDeleteRuntime(embeddedListRuntime)`); the
+ * trampoline preserves that name resolution while delegating to the
+ * recovered typed body.
+ */
+void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept
+{
+  wxDestroyListNoDeleteRuntimeImpl(listRuntime);
+}
 
 /**
  * Address: 0x00964EA0 (FUN_00964EA0)
