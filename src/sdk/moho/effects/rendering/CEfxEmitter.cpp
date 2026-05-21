@@ -161,6 +161,82 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x0065B9B0 (FUN_0065B9B0, Moho::CEfxEmitter::CEfxEmitter)
+   *
+   * What it does:
+   * Default-constructs one emitter on top of the freshly-constructed
+   * `CEffectImpl` base. The body matches the binary's per-field
+   * initialization at offsets 0x190-0x6F4:
+   *
+   *   - publishes the `CEfxEmitter` vftable (handled by the C++ ctor chain);
+   *   - zeros `mEmitterType` and the `mPad194` reserved gap;
+   *   - binds `mCurves` as an empty inline-buffer fastvector over the 21-slot
+   *     `mInlineCurveStorage` lane (mFirst/mLast/mOriginalStorage point at
+   *     buffer start, mEnd at `&mBlueprint` = inline-buffer capacity-end);
+   *   - resets blueprint pointer, emission count, lifetime;
+   *   - default-constructs the embedded `mParticle` (`SWorldParticle`);
+   *   - zero-initializes mValid + curve mask + max-lifetime + visible + last-
+   *     update + position.
+   *
+   * The inline-buffer base address is `&mInlineCurveStorage[0]` which the
+   * binary computes as `this + 0x1A8`; the capacity-end is `&mBlueprint`
+   * (= `this + 0x640` = inline-buffer-start + 21*sizeof(SEfxCurve)).
+   */
+  CEfxEmitter::CEfxEmitter()
+    : CEffectImpl()
+    , mEmitterType(static_cast<EmitterType>(0))
+    , mPad194{}
+    , mCurves{}
+    , mInlineCurveStorage{}
+    , mBlueprint(nullptr)
+    , mTotalEmissions(0.0f)
+    , mLife(0u)
+    , mParticle()
+    , mValid(false)
+    , mPad6D9{}
+    , mZCurveMask(0u)
+    , mMaxLifetime(0)
+    , mVisible(false)
+    , mPad6E5{}
+    , mLastUpdate(0u)
+    , mPos{0.0f, 0.0f, 0.0f}
+  {
+    auto* const inlineCurveBase = reinterpret_cast<SEfxCurve*>(&mInlineCurveStorage[0]);
+    mCurves.mFirst = inlineCurveBase;
+    mCurves.mLast = inlineCurveBase;
+    mCurves.mEnd = reinterpret_cast<SEfxCurve*>(&mBlueprint);
+    mCurves.mOriginalStorage = inlineCurveBase;
+  }
+
+  /**
+   * Address: 0x0065DE10 (FUN_0065DE10, Moho::CEfxEmitter::~CEfxEmitter body)
+   *
+   * What it does:
+   * Tears down one emitter: destroys any live `SEfxCurve` entries in the
+   * `mCurves` range, then releases the heap-grown curve storage when the
+   * vector escaped its inline buffer (the binary compares
+   * `mCurves.mFirst != mCurves.mOriginalStorage`). Member dtor for
+   * `mParticle` runs automatically via the C++ destructor chain, as does
+   * the `CEffectImpl` base dtor.
+   *
+   * Note: the binary additionally re-reads `*mOriginalStorage` into
+   * `mCurves.mEnd` after the delete. This is meaningless after the dtor
+   * since the object is being destroyed; we elide it.
+   */
+  CEfxEmitter::~CEfxEmitter()
+  {
+    for (SEfxCurve* curve = mCurves.mFirst; curve != mCurves.mLast; ++curve) {
+      curve->~SEfxCurve();
+    }
+
+    if (mCurves.mFirst != mCurves.mOriginalStorage) {
+      ::operator delete[](mCurves.mFirst);
+      mCurves.mFirst = mCurves.mOriginalStorage;
+    }
+    mCurves.mLast = mCurves.mFirst;
+  }
+
+  /**
    * Address: 0x006593E0 (FUN_006593E0, Moho::CEfxEmitter::InterpolatePosition)
    *
    * What it does:
