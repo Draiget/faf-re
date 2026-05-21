@@ -781,6 +781,17 @@ void CAiPathFinder::SetGoal(const SAiNavigatorGoal& goal)
 
 /**
  * Address: 0x005AA220 (FUN_005AA220)
+ *
+ * The elided body invokes the following helper chain; with the
+ * PathQueue::ImplBase synchronous-work lane still under recovery,
+ * these helpers are not invoked from the modern source and their
+ * roles are absorbed by the elision of the direct-probe synchronous
+ * path-search lane:
+ *   - 0x00765DD0 (synchronous PathQueue::ImplBase setup + WorkOnce
+ *     spin + result-collection wrapper; constructs a stack-local
+ *     ImplBase, seeds it from the active queue, runs one
+ *     PathQueue::WorkOnce iteration under the budget pointer, then
+ *     tears down the temporary ImplBase storage)
  */
 bool CAiPathFinder::RunDirectProbe()
 {
