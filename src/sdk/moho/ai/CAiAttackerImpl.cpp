@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 
 using namespace moho;
@@ -652,6 +653,97 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005D6BC0 (FUN_005D6BC0, Moho::CAiAttackerImpl::~CAiAttackerImpl
+ *   real dtor body — the vtable slot wrapper is 0x005D6A60 / the scalar
+ *   deleting dtor at 0x005D6A60 forwards into this body).
+ *
+ * What it does:
+ * Tears down the recovered embedded objects (mTasks vector of owned
+ * CAcquireTargetTask*, WeakPtr<CTaskThread> mThread, mWeapons vector
+ * of owned UnitWeapon*, CAiTarget mDesiredTarget, CTaskStage mStage,
+ * and CScriptObject base subobject) in the same order the binary
+ * does, and unlinks the IAiAttacker subobject's intrusive-listener
+ * list head at +0x04/+0x08 back to a self-link sentinel. The binary
+ * also re-writes the IAiAttacker/CScriptObject vtable slots before
+ * each base dtor call so virtual dispatch reaches base methods —
+ * the recovered class declaration doesn't yet model the multi-base
+ * vtable thunk slot for CAiAttackerImpl::vftable{for CScriptObject},
+ * so we directly invoke `CScriptObject::~CScriptObject()` on the
+ * embedded subobject and skip the vtable rewrites; observable
+ * behavior matches because the binary's rewrite-then-dispatch ends
+ * at the same destructor body.
+ *
+ * Caller chain: CAiAttackerImplConstruct::Deconstruct
+ *   (CAiAttackerImplConstruct.cpp:156) calls
+ *   `delete static_cast<CAiAttackerImpl*>(object)` which invokes
+ *   the scalar deleting dtor; the deserialization callback that
+ *   triggers `Deconstruct` is registered at CRT static-init by
+ *   `register_CAiAttackerImplConstruct` (same chain as the ctor).
+ */
+CAiAttackerImpl::~CAiAttackerImpl()
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+
+  // Delete owned CAcquireTargetTask* entries via their virtual dtor.
+  // For default-constructed CAiAttackerImpl (mTasks empty), this loop
+  // body is skipped because _Myfirst is null.
+  if (view->mTasks._Myfirst != nullptr) {
+    for (CAcquireTargetTask* const task : view->mTasks) {
+      delete task;
+    }
+  }
+
+  // WeakPtr<CTaskThread>::~WeakPtr resolves the WeakObject linkage
+  // and unlinks from the owner's intrusive weak chain. The recovered
+  // dtor handles the null case safely.
+  std::destroy_at(&view->mThread);
+
+  // Delete owned UnitWeapon* entries via their virtual dtor.
+  if (view->mWeapons._Myfirst != nullptr) {
+    for (UnitWeapon* const weapon : view->mWeapons) {
+      delete weapon;
+    }
+  }
+
+  // CAiTarget destructor unlinks `mDesiredTarget` from its owner
+  // weak-link chain. For default-constructed state (zero entity),
+  // the unlink is a no-op.
+  std::destroy_at(&view->mDesiredTarget);
+
+  // Release raw vector storage for mTasks and mWeapons. msvc8::vector
+  // destructor handles the null _Myfirst case safely.
+  std::destroy_at(&view->mTasks);
+  std::destroy_at(&view->mWeapons);
+
+  // CTaskStage destructor tears down the two embedded intrusive
+  // thread lists. For default-constructed state (lists self-linked
+  // and empty), the teardown is a structural reset.
+  std::destroy_at(&view->mStage);
+
+  // Base CScriptObject subobject at +0x0C — direct destructor call.
+  // The binary additionally re-writes the +0x0C vtable slot to
+  // `IAiAttacker` before this call; we skip the rewrite because the
+  // recovered class doesn't model the multi-base vftable thunk slot.
+  auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
+  reinterpret_cast<CScriptObject*>(bytes + 0x0C)->~CScriptObject();
+
+  // Unlink the IAiAttacker subobject's intrusive-listener list at
+  // +0x04 (head.next) and +0x08 (head.prev). The binary unconditionally
+  // splices the head out of whatever chain it ended up in and resets
+  // to self-link sentinel state.
+  void** const listenerNext = reinterpret_cast<void**>(bytes + 0x04);
+  void** const listenerPrev = reinterpret_cast<void**>(bytes + 0x08);
+  void** const successor = reinterpret_cast<void**>(*listenerNext);
+  void** const predecessor = reinterpret_cast<void**>(*listenerPrev);
+  // successor->prev = *listenerPrev; predecessor->next = *listenerNext.
+  successor[1] = *listenerPrev;
+  predecessor[0] = *listenerNext;
+  // Re-self-link the head sentinel.
+  *listenerNext = bytes + 0x04;
+  *listenerPrev = bytes + 0x04;
+}
+
+/**
  * Address: 0x005D69A0 (FUN_005D69A0, Moho::CAiAttackerImpl::CAiAttackerImpl
  *   default ctor)
  *
@@ -712,10 +804,15 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   // matching the binary's three writes at +0x44/+0x4C/+0x54.
   ::new (&view->mStage) CTaskStage();
 
-  // mWeapons (+0x58), mThread (+0x68), mTasks (+0x70) stay
-  // zero-initialized from the memset above — the binary writes
-  // each begin/end/cap-end pointer as null, which is the same state
-  // a zeroed memory region provides.
+  // Placement-new the embedded vector/WeakPtr objects so their
+  // lifetimes formally start; their default ctors are trivial
+  // (zero-init the begin/end/cap-end / owner-link / next pointers)
+  // so the post-memset bytes are already at the right state, and
+  // these placement-news are no-ops in optimized code while keeping
+  // the matching `std::destroy_at` calls in the dtor well-defined.
+  ::new (&view->mWeapons) msvc8::vector<UnitWeapon*>();
+  ::new (&view->mThread) WeakPtr<CTaskThread>();
+  ::new (&view->mTasks) msvc8::vector<CAcquireTargetTask*>();
 
   // CAiTarget mDesiredTarget at +0x80. Default ctor leaves all
   // fields zero-initialized; the binary additionally writes
