@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "lua/LuaObject.h"
+#include "moho/collision/CColPrimitiveBox3f.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -18,6 +19,7 @@
 #include "moho/math/MathReflection.h"
 #include "gpg/core/time/Timer.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/mesh/Mesh.h"
 #include "moho/render/RCamManager.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/Broadcaster.h"
@@ -37,6 +39,7 @@ namespace moho
   extern float cam_SpinSpeed;
   extern float cam_MinSpinPitch;
   extern float cam_ShakeMult;
+  extern float cam_EntityBoxExpand;
   extern float ren_BorderSize;
   int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplReset(lua_State* luaContext);
@@ -2272,6 +2275,44 @@ void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const f
     CalculateFOV();
   } else {
     SetupHermite();
+  }
+}
+
+/**
+ * Address: 0x007A8580 (FUN_007A8580, Moho::CameraImpl::TargetEntityBox)
+ * Mangled: ?TargetEntityBox@CameraImpl@Moho@@UAEXPAVUserEntity@2@M@Z
+ *
+ * What it does:
+ * Builds one world-space AABB from the entity's interpolated mesh-instance box
+ * (or from the invalid Box3f sentinel when no mesh is attached), expands it on
+ * the X/Z axes by `cam_EntityBoxExpand`, dispatches `TargetBox(expandedBox,
+ * seconds)`, and additionally calls `TargetNothing` when `seconds == 0` so the
+ * camera releases any active entity-tracking state after the framing snap.
+ */
+void moho::CameraImpl::TargetEntityBox(UserEntity* const entity, const float seconds)
+{
+  const Wm3::Box3f* sourceBox = nullptr;
+  if (MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
+      meshInstance != nullptr) {
+    meshInstance->UpdateInterpolatedFields();
+    sourceBox = &meshInstance->box;
+  } else {
+    sourceBox = &Invalid<Wm3::Box3f>();
+  }
+
+  const Wm3::Box3f orientedBox(*sourceBox);
+  Wm3::AxisAlignedBox3f expandedBox{};
+  orientedBox.ComputeAABB(expandedBox.Min, expandedBox.Max);
+
+  expandedBox.Max.x += cam_EntityBoxExpand;
+  expandedBox.Max.z += cam_EntityBoxExpand;
+  expandedBox.Min.x -= cam_EntityBoxExpand;
+  expandedBox.Min.z -= cam_EntityBoxExpand;
+
+  this->TargetBox(expandedBox, seconds);
+
+  if (seconds == 0.0f) {
+    this->TargetNothing();
   }
 }
 
