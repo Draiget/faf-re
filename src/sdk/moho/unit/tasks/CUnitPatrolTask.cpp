@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitPatrolTask.h"
+#include "moho/unit/tasks/CUnitPatrolTaskTypeInfo.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -7,6 +8,15 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 namespace
 {
@@ -54,6 +64,30 @@ namespace
 namespace moho
 {
   gpg::RType* CUnitPatrolTask::sType = nullptr;
+
+  /**
+   * Address: 0x0061B0B0 (FUN_0061B0B0, Moho::CUnitPatrolTask::CUnitPatrolTask default ctor)
+   *
+   * What it does:
+   * Default-constructs one patrol-task with zeroed payload storage.
+   *
+   * The binary body publishes the `CUnitPatrolTask` and embedded
+   * `Listener<ECommandEvent>` / `Listener<EFormationdStatus>` vtables, self-
+   * links the two listener intrusive nodes (offsets 56-60 / 72-76) and the
+   * action-listener nodes near offset 200, then zero-fills the remaining
+   * payload bytes. Those vtables and intrusive-list lanes are not modeled
+   * in the current opaque `mPadding[0xF0]` class layout, so this body only
+   * zero-initializes the padding. The truncated default-init is
+   * SerConstruct-path-safe: the freshly-constructed object is immediately
+   * fed to the archive `Read` chain which overwrites payload fields with
+   * real data before any virtual call is dispatched. A future class-layout
+   * recovery pass should expand `mPadding` into typed fields and restore
+   * the listener/vtable setup.
+   */
+  CUnitPatrolTask::CUnitPatrolTask() noexcept
+    : mPadding{}
+  {
+  }
 
   /**
    * Address: 0x0061C480 (FUN_0061C480, Moho::CUnitPatrolTask::operator new)
@@ -260,4 +294,76 @@ namespace
     type->deleteFunc_ = helper.mDeleteCallback;
     return helper.mConstructCallback;
   }
+
+  /**
+   * Address: 0x0061AD10 (FUN_0061AD10, Moho::CUnitPatrolTaskConstruct::Construct)
+   *
+   * What it does:
+   * Allocates one `CUnitPatrolTask` instance via `operator new(0xF0u)`,
+   * default-constructs it, wraps the result in a typed `gpg::RRef_CUnitPatrolTask`,
+   * and publishes the payload as an unowned construct result through
+   * `gpg::SerConstructResult::SetUnowned`. Invoked by the reflection
+   * subsystem during archive replay when a patrol-task instance must be
+   * materialized before its fields are streamed in.
+   */
+  void ConstructCUnitPatrolTaskSerializerCallback(void* const constructResultStorage)
+  {
+    auto* const result = static_cast<gpg::SerConstructResult*>(constructResultStorage);
+    if (result == nullptr) {
+      return;
+    }
+
+    auto* const task = new (std::nothrow) moho::CUnitPatrolTask{};
+    gpg::RRef taskRef{};
+    (void)gpg::RRef_CUnitPatrolTask(&taskRef, task);
+    result->SetUnowned(taskRef, 0u);
+  }
+
+  /**
+   * Address: 0x0061ADC0 (FUN_0061ADC0, Moho::CUnitPatrolTaskConstruct::Deconstruct)
+   *
+   * What it does:
+   * Releases one heap-owned `CUnitPatrolTask` instance via the standard
+   * scalar `delete` expression; mirrors the binary's reflection-side
+   * destructor lane that fires when the construct result is discarded.
+   */
+  void DestructCUnitPatrolTaskSerializerCallback(void* const taskStorage)
+  {
+    delete static_cast<moho::CUnitPatrolTask*>(taskStorage);
+  }
+
+  /**
+   * Static-init driver that installs `ConstructCUnitPatrolTaskSerializerCallback`
+   * and `DestructCUnitPatrolTaskSerializerCallback` into the cached
+   * `CUnitPatrolTask` reflection descriptor's lifecycle slots. The binary
+   * registers the equivalent helper via a static-init-time
+   * `SerConstructHelper<CUnitPatrolTask>` global; in modern source the same
+   * effect is achieved by a file-scope dummy whose ctor invokes
+   * `InitCUnitPatrolTaskConstructHelper` once at load time. This is the
+   * source-level invocation chain that makes
+   * `InitCUnitPatrolTaskConstructHelper` (and the inner pair of
+   * Construct/Destruct callbacks) non-orphan.
+   */
+  struct CUnitPatrolTaskConstructHelperRegistrar
+  {
+    CUnitPatrolTaskConstructHelperRegistrar() noexcept
+    {
+      // Ensure the CUnitPatrolTask reflection descriptor is pre-registered
+      // before we publish lifecycle callbacks into it. The binary defers
+      // this through its `SerConstructHelper<CUnitPatrolTask>` global ctor
+      // chain; in the modern build we call `preregister_CUnitPatrolTaskTypeInfo`
+      // explicitly to make the order TU-static-init-safe.
+      (void)moho::preregister_CUnitPatrolTaskTypeInfo();
+
+      SerConstructHelperView helper{};
+      helper.mVftable = nullptr;
+      helper.mNext = nullptr;
+      helper.mPrev = nullptr;
+      helper.mConstructCallback = &ConstructCUnitPatrolTaskSerializerCallback;
+      helper.mDeleteCallback = &DestructCUnitPatrolTaskSerializerCallback;
+      (void)InitCUnitPatrolTaskConstructHelper(helper);
+    }
+  };
+
+  [[maybe_unused]] const CUnitPatrolTaskConstructHelperRegistrar gCUnitPatrolTaskConstructHelperRegistrar{};
 } // namespace
