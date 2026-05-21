@@ -512,6 +512,52 @@ bool moho::UI_UpdateDisconnectDialogCallback()
 }
 
 /**
+ * Address: 0x0083DDA0 (FUN_0083DDA0, ?UI_GetCommandMode@Moho@@YA?AUUICommandModeData@1@XZ)
+ *
+ * IDA signature:
+ * UICommandModeData* __cdecl Moho::UI_GetCommandMode(UICommandModeData* out);
+ *
+ * What it does:
+ * Default-constructs `outCommandModeData`, imports
+ * `/lua/ui/game/commandmode.lua`, and calls `GetCommandMode()` through the
+ * active UI manager Lua state. When the Lua function returns a table whose
+ * first element is a string, the string is stored as the mode name; when its
+ * second element is a table, it is captured as the payload. Missing fields
+ * leave the corresponding default-constructed lane untouched.
+ */
+void moho::UI_GetCommandMode(UICommandModeData& outCommandModeData)
+{
+  outCommandModeData.mMode.clear();
+  outCommandModeData.mPayload = LuaPlus::LuaObject{};
+
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  const LuaPlus::LuaObject commandModeModule = SCR_Import(state, "/lua/ui/game/commandmode.lua");
+  const LuaPlus::LuaObject getCommandModeObj = commandModeModule["GetCommandMode"];
+  LuaPlus::LuaFunction<LuaPlus::LuaObject> getCommandModeFn(getCommandModeObj);
+
+  const LuaPlus::LuaObject result = getCommandModeFn();
+  if (!result.IsTable()) {
+    return;
+  }
+
+  const LuaPlus::LuaObject modeField = result[1];
+  if (modeField.IsString()) {
+    const char* const modeText = modeField.GetString();
+    outCommandModeData.mMode = modeText != nullptr ? modeText : "";
+  }
+
+  const LuaPlus::LuaObject payloadField = result[2];
+  if (payloadField.IsTable()) {
+    outCommandModeData.mPayload = payloadField;
+  }
+}
+
+/**
  * Address: 0x0083DF90 (FUN_0083DF90, ?UI_StartCommandMode@Moho@@YAXABUUICommandModeData@1@@Z)
  *
  * What it does:
