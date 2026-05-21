@@ -57554,6 +57554,163 @@ namespace
   }
 
   /**
+   * Address: 0x007F66A0 (FUN_007F66A0, Moho::WRenViewport::WRenViewport)
+   * Mangled: ??0WRenViewport@Moho@@QAE@PAVwxWindow@@VStrArg@gpg@@ABVwxSize@@_N@Z
+   *
+   * IDA signature:
+   * Moho::WRenViewport *__usercall Moho::WRenViewport::WRenViewport@<eax>(
+   *         WSupComFrame *parent@<edx>,
+   *         Moho::WRenViewport *this,
+   *         char *title,
+   *         WCHAR *size,
+   *         char hasSecondHead);
+   *
+   * What it does:
+   * Drives one full WRenViewport runtime initialization in binary construction
+   * order: WD3DViewport base subobject, then derived vftable seat, then
+   * bloom-renderer pair, frame, debug canvas, secondary-head flag, MapImager
+   * vftable + empty mesh-instance vector, mesh thumbnail / range / vision /
+   * boundary renderers, shadow renderer, clutter, Silhouette vftable + null
+   * payload, world-view state lane, world-view vector slot, two texture/
+   * primitive batcher shared_ptr slots, three boost::shared_ptr<> render-
+   * target / depth-stencil arrays, dynamic-texture-sheet shared_ptr slot,
+   * camera pointer, font pointer, and derived head-count lane.
+   */
+  [[maybe_unused]] moho::WD3DViewport* ConstructRenViewportRuntime(
+    moho::WD3DViewport* const viewport,
+    wxWindowBase* const parentWindow,
+    const char* const title,
+    const wxSize& viewportSize,
+    const bool hasSecondaryHead
+  )
+  {
+    if (viewport == nullptr) {
+      return nullptr;
+    }
+
+    // Binary: Moho::WD3DViewport::WD3DViewport(this, parent, title, size).
+    // Placement-construct the most-derived (in the current source model)
+    // WD3DViewport in place so the wx window hierarchy and D3D-device
+    // reference lane are initialized exactly as the binary leaves them. The
+    // constexpr `wxDefaultPosition`-shaped local mirrors the binary's
+    // internal-default-position behavior (the WD3DViewport ctor forwards
+    // `wxDefaultPosition` to `wxWindow::wxWindow` regardless of any
+    // caller-side position argument; see FUN_00430980).
+    constexpr wxPoint defaultPosition{0, 0};
+    std::construct_at(viewport, parentWindow, title, defaultPosition, viewportSize);
+
+    auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
+
+    // Binary seats the most-derived vftable here (`Moho::WRenViewport::vftable`),
+    // overriding the slot the WD3DViewport base just wrote. In the current
+    // source model `WD3DViewport : WRenViewport`, the WD3DViewport ctor above
+    // already left the most-derived vftable in place, so no second write is
+    // needed to match observable virtual-dispatch behavior.
+
+    // mBloomRenderers[0..1] (eh vector ctor iterator, stride 0xAC, count 2).
+    for (CBloomRendererRuntime& bloomRenderer : runtime->mBloomRenderers) {
+      ConstructBloomRendererRuntime(&bloomRenderer);
+    }
+
+    std::construct_at(&runtime->mFrame);
+    std::construct_at(&runtime->mDebugCanvas);
+
+    // Binary stores the secondary-head bool at +0x324 immediately after
+    // `mDebugCanvas`; default-construct the surrounding head lanes so the
+    // derived runtime view is fully initialized before MapImager.
+    runtime->mScreenPos = {0, 0};
+    runtime->mScreenSize = {0, 0};
+    runtime->mFullScreen = {0, 0};
+    runtime->mHead = 0;
+    runtime->mHasSecondaryHead = hasSecondaryHead ? std::uint8_t{1} : std::uint8_t{0};
+    for (std::uint8_t& padByte : runtime->mPad0325_0327) {
+      padByte = 0;
+    }
+
+    // MapImager: the binary skips the explicit constructor call and only
+    // seats the vftable + zeroes the embedded `msvc8::vector<MeshInstance*>`
+    // lane (`_Myfirst = _Mylast = _Myend = 0`). Default-constructing through
+    // the compiler-generated path produces the same observable layout (vtable
+    // seated to the most-derived MapImager slot, empty vector members) and
+    // avoids raw vtable+offset arithmetic in the runtime initializer.
+    std::construct_at(&runtime->mMapImager);
+
+    std::construct_at(&runtime->mThumbnailRenderer);
+    std::construct_at(&runtime->mRangeRenderer);
+    std::construct_at(&runtime->mVisionRenderer);
+    std::construct_at(&runtime->mBoundaryRenderer);
+    std::construct_at(&runtime->mShadowRenderer);
+    std::construct_at(&runtime->mClutter);
+
+    // Silhouette: binary seats the vftable then zeroes the embedded
+    // shared_ptr<SilhouettePayload> slot (`v1 = 0; v2 = 0`). Default-construct
+    // it to obtain identical layout without raw vtable offset arithmetic.
+    std::construct_at(&runtime->mSilhouetteRenderer);
+
+    runtime->mWorldViewState = 0u;
+    runtime->mWorldViewStorage.mUnknown00 = 0u;
+    runtime->mWorldViewStorage.mViews = {nullptr, nullptr, nullptr};
+
+    std::construct_at(&runtime->mTexBatcher);
+    std::construct_at(&runtime->mPrimBatcher);
+
+    // Three 2-element shared_ptr arrays (mPrimary/mSecondary render-target
+    // locks + mDepthStencil locks). Default-construct each via the array
+    // template helper.
+    ConstructSharedPtrArrayForward(runtime->mPrimaryTargetLocks);
+    ConstructSharedPtrArrayForward(runtime->mSecondaryTargetLocks);
+    ConstructSharedPtrArrayForward(runtime->mDepthStencilLocks);
+
+    std::construct_at(&runtime->mDynamicTextureSheet);
+    runtime->mCam = nullptr;
+    runtime->mFont = nullptr;
+    for (std::uint8_t& padByte : runtime->mTailPadding21A4_21A7) {
+      padByte = 0;
+    }
+
+    // Derived head-count: 2 when a secondary head is enabled, otherwise 1.
+    runtime->mNumHeads = hasSecondaryHead ? 2 : 1;
+
+    return viewport;
+  }
+
+  /**
+   * Address: 0x007FA230 (FUN_007FA230, Moho::REN_CreateGameViewport)
+   * Mangled: ?REN_CreateGameViewport@Moho@@YAPAVWD3DViewport@1@PAVwxWindow@@VStrArg@gpg@@ABV?$IVector2@H@Wm3@@_N@Z
+   *
+   * IDA signature:
+   * Moho::WRenViewport *__usercall Moho::REN_CreateGameViewport@<eax>(
+   *         wxSize *size@<esi>,
+   *         WSupComFrame *parent,
+   *         const char *title,
+   *         char hasSecondHead);
+   *
+   * What it does:
+   * Allocates one 0x21A8-byte WRenViewport runtime block (the binary
+   * complete-object size including all retained renderer / batcher /
+   * lock-array tails), then drives the WRenViewport runtime initializer
+   * with the requested parent window, title, viewport size, and
+   * secondary-head flag. Returns the runtime block as the typed
+   * `WD3DViewport*` lane used by `CScApp::CreateAppFrame`.
+   */
+  [[nodiscard]] moho::WD3DViewport* CreateGameViewportRuntime(
+    wxWindowBase* const parentWindow,
+    const char* const title,
+    const wxSize& viewportSize,
+    const bool hasSecondaryHead
+  )
+  {
+    constexpr std::size_t kRenViewportRuntimeSize = 0x21A8u;
+    auto* const allocation =
+      static_cast<moho::WD3DViewport*>(::operator new(kRenViewportRuntimeSize));
+    if (allocation == nullptr) {
+      return nullptr;
+    }
+
+    return ConstructRenViewportRuntime(allocation, parentWindow, title, viewportSize, hasSecondaryHead);
+  }
+
+  /**
    * Address: 0x007F6900 (FUN_007F6900, Moho::WRenViewport::~WRenViewport)
    * Mangled: ??1WRenViewport@Moho@@UAE@XZ
    *
@@ -58143,6 +58300,26 @@ moho::IWldTerrainRes* moho::REN_GetTerrainRes()
   }
 
   return session->mWldMap->mTerrainRes;
+}
+
+/**
+ * Address: 0x007FA230 (FUN_007FA230, Moho::REN_CreateGameViewport)
+ * Mangled: ?REN_CreateGameViewport@Moho@@YAPAVWD3DViewport@1@PAVwxWindow@@VStrArg@gpg@@ABV?$IVector2@H@Wm3@@_N@Z
+ *
+ * What it does:
+ * Allocates one 0x21A8-byte WRenViewport runtime block and drives the binary
+ * WRenViewport constructor lane (FUN_007F66A0) with the requested parent
+ * window, title, viewport size, and secondary-head flag. Returns the
+ * runtime block typed as `WD3DViewport*` for the CScApp startup path.
+ */
+moho::WD3DViewport* moho::REN_CreateGameViewport(
+  wxWindowBase* const parentWindow,
+  const char* const title,
+  const wxSize& size,
+  const bool hasSecondHead
+)
+{
+  return ::CreateGameViewportRuntime(parentWindow, title, size, hasSecondHead);
 }
 
 /**
