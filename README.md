@@ -10,16 +10,16 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`96.52%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,828`*
+  - *Total amount of completed tokens: `64,829`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,941` (81.66%)
+- `recovered`: `52,942` (81.66%)
 - `skip`: `6,104` (9.42%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
 - `external_dependency`: `5,783` (8.92%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
-- `in_progress`: `35` (0.05%)
+- `in_progress`: `34` (0.05%)
 - **`blocked`: `2,365` (3.52%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,368`*
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (52,941 functions) — wiring health
+### Recovered (52,942 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `14,814` | 27.98% |
+| **Confirmed caller** (recovered binary caller wired by name) | `14,815` | 27.98% |
 | Vtable-anchored (virtual override of a recovered class) | `5,791` | 10.94% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,493` | 10.38% |
 | Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,893` | 5.46% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,731` | 44.83% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,731` | 44.82% |
 | Unclassified data xref (manual review) | `215` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
