@@ -188,10 +188,54 @@ namespace moho
   int register_CDamageTypeInfo();
 
   /**
-   * Address: 0x00737E60 (FUN_00737E60, Moho::SIM_Damage)
+   * Address: 0x00737140 (FUN_00737140, Moho::SIM_DoDamagePoint)
+   * Mangled: ?SIM_DoDamagePoint@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
    *
    * What it does:
-   * Applies one typed `CDamage` payload through the core Sim damage pipeline.
+   * Applies one point-damage payload to a single target unit: optionally
+   * draws debug geometry, filters self-damage / projectile-launcher loops,
+   * applies armor scaling and per-army handicap, accumulates per-army
+   * `DamageStats_TotalDamage{Dealt,Received}` and per-unit
+   * `Units_TotalDamageDealt`/`Units_TotalDamageReceive` lanes, and
+   * invokes script callbacks `OnDamageBy`, `OnExtraDamageDealt` and the
+   * target's `OnDamage` callback.
+   */
+  void SIM_DoDamagePoint(Sim* sim, const CDamage& damage);
+
+  /**
+   * Address: 0x00737680 (FUN_00737680, Moho::SIM_DoDamageArea)
+   * Mangled: ?SIM_DoDamageArea@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * What it does:
+   * Applies one area-radius damage payload around `damage.mOrigin` to
+   * all in-range entities filtered by alliance, friendly-fire, and the
+   * `NOSPLASHDAMAGE` category. Body still blocked; declared here so the
+   * `SIM_Damage` dispatcher links its `mMethod==CDamage_AREA_EFFECT`
+   * branch against the real free function once recovered.
+   */
+  void SIM_DoDamageArea(Sim* sim, const CDamage& damage);
+
+  /**
+   * Address: 0x00737B30 (FUN_00737B30, Moho::func_DoDamageRing)
+   *
+   * What it does:
+   * Applies one ring-radius damage payload around `damage.mOrigin` to
+   * all in-range entities, scaled by per-entity distance from the
+   * outer ring radius. Body still blocked; declared here so the
+   * `SIM_Damage` dispatcher links its `mMethod==CDamage_RING_EFFECT`
+   * branch against the real free function once recovered.
+   */
+  void func_DoDamageRing(Sim* sim, const CDamage& damage);
+
+  /**
+   * Address: 0x00737E60 (FUN_00737E60, Moho::SIM_Damage)
+   * Mangled: ?SIM_Damage@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * What it does:
+   * Applies one typed `CDamage` payload through the core Sim damage
+   * pipeline: dispatches by `damage.mMethod` to `SIM_DoDamagePoint`,
+   * `SIM_DoDamageArea`, or `func_DoDamageRing`. Single-target dispatch
+   * additionally skips the call when the target entity is dead.
    */
   void SIM_Damage(Sim* sim, const CDamage& damage);
 
