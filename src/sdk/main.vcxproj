@@ -492,6 +492,7 @@
     <ClCompile Include="moho\audio\SAudioRequestTypeInfo.cpp" />
     <ClCompile Include="moho\audio\SParamKeySerializer.cpp" />
     <ClCompile Include="moho\audio\SParamKeyTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\SoundSubsystemBootstrap.cpp" />
     <ClCompile Include="moho\audio\CUserSoundManager.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManager.cpp" />
     <ClCompile Include="moho\audio\ISoundManager.cpp" />
