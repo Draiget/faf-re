@@ -71,10 +71,9 @@ namespace moho
    * Sets size, lifetime callbacks, initializes base reflection chain,
    * adds CEffectImpl as reflected base, and finishes type registration.
    *
-   * NOTE: NewRef/CtrRef/Delete/Destruct statics are declared but not yet
-   * implemented -- CEfxEmitter class definition is not yet recovered.
-   * Init body is provided from binary evidence but will not link until
-   * those statics and CEfxEmitter are available.
+   * The NewRef/CtrRef/Delete/Destruct statics below provide the
+   * reflection lifecycle binding chain (allocate/in-place-construct/free/
+   * in-place-destroy) for `CEfxEmitter` instances.
    */
   void CEfxEmitterTypeInfo::Init()
   {
@@ -89,6 +88,73 @@ namespace moho
     gpg::RType::Init();
     AddBase_CEffectImpl(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x0065F790 (FUN_0065F790, Moho::CEfxEmitterTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates one `CEfxEmitter` instance via the heap, default-constructs
+   * it, and returns a typed reflection reference wrapping the new object.
+   * On allocation failure (nothrow returns nullptr) the returned RRef is
+   * built from a nullptr object pointer, matching the binary's
+   * `v2 = 0; RRef_CEfxEmitter(&v5, v2)` fallback.
+   */
+  gpg::RRef CEfxEmitterTypeInfo::NewRef()
+  {
+    auto* const object = new (std::nothrow) CEfxEmitter();
+    gpg::RRef ref{};
+    gpg::RRef_CEfxEmitter(&ref, object);
+    return ref;
+  }
+
+  /**
+   * Address: 0x0065F830 (FUN_0065F830, Moho::CEfxEmitterTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Placement-constructs one `CEfxEmitter` instance in caller-provided
+   * storage and returns a typed reflection reference. When the caller
+   * passes `nullptr` the constructor is skipped and the RRef is built
+   * from a nullptr object pointer.
+   */
+  gpg::RRef CEfxEmitterTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const object = (objectStorage != nullptr)
+      ? new (objectStorage) CEfxEmitter()
+      : nullptr;
+    gpg::RRef ref{};
+    gpg::RRef_CEfxEmitter(&ref, object);
+    return ref;
+  }
+
+  /**
+   * Address: 0x0065F810 (FUN_0065F810, Moho::CEfxEmitterTypeInfo::Delete)
+   *
+   * What it does:
+   * Releases one heap-owned `CEfxEmitter` by invoking the virtual
+   * scalar-deleting destructor (vtable slot for `~CEfxEmitter`),
+   * which runs the destructor body and frees the storage block.
+   */
+  void CEfxEmitterTypeInfo::Delete(void* const objectStorage)
+  {
+    if (objectStorage != nullptr) {
+      delete static_cast<CEfxEmitter*>(objectStorage);
+    }
+  }
+
+  /**
+   * Address: 0x0065F8A0 (FUN_0065F8A0, Moho::CEfxEmitterTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs one in-place `CEfxEmitter` destructor through the virtual dtor
+   * slot without freeing the backing storage. Used by the reflection
+   * system when caller-owned storage must be retained after destruction.
+   */
+  void CEfxEmitterTypeInfo::Destruct(void* const objectStorage)
+  {
+    if (objectStorage != nullptr) {
+      static_cast<CEfxEmitter*>(objectStorage)->~CEfxEmitter();
+    }
   }
 
   /**
