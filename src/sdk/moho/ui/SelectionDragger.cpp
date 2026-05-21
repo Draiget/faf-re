@@ -225,6 +225,33 @@ namespace moho
    * Initializes 2D dragger endpoint lanes from the shared invalid-screen
    * sentinel and clears stretch activity state.
    */
+  /**
+   * Address: 0x00865470 (FUN_00865470, Moho::SelectionDragger2D::Func1)
+   *
+   * IDA signature:
+   * SelectionDragger_vtbl** __thiscall sub_865470(SelectionDragger_vtbl** this, char deleteFlags);
+   *
+   * What it does:
+   * Scalar-deleting-destructor variant — runs the implicit
+   * `~SelectionDragger2D()` chain (which forwards into the base
+   * `~SelectionDragger` body that releases the intrusive selection
+   * link list) and conditionally frees the object's heap storage when
+   * bit 0 of `deleteFlags` is set. Matches the binary's `??_G` vtable
+   * slot for SelectionDragger2D.
+   *
+   * Invocation: vtable-slot 0 of `??_7SelectionDragger2D@Moho@@6B@`
+   * — invoked indirectly through `delete dragger2D` callsites that go
+   * through the SelectionDragger2D vtable.
+   */
+  SelectionDragger2D* SelectionDragger2D::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  {
+    this->~SelectionDragger2D();
+    if ((deleteFlags & 1u) != 0u) {
+      ::operator delete(this);
+    }
+    return this;
+  }
+
   SelectionDragger2D::SelectionDragger2D(CameraImpl* const camera, CWldSession* const session)
     : SelectionDragger(camera, session)
     , mStretch(0)
