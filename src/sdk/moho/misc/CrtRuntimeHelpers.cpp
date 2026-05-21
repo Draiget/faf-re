@@ -11589,11 +11589,17 @@ int RuntimeIsWideAlphaNumeric(const wchar_t character)
  *
  * What it does:
  * Lowercases one wide character under the current CRT locale lane.
+ *
+ * Forward declaration here keeps the helper visible to other
+ * anonymous-namespace bodies in this file; the real file-scope
+ * definition lives after the anonymous namespace closes (see
+ * `RuntimeToLowerWideWithCurrentLocale` near `_mbschr` further
+ * down) so the global mangled name is exported and the file-scope
+ * caller `WxRuntimeTypes.cpp:49627` links against the real body
+ * (previously fell back to the no-op stub in
+ * `EngineUnrecoveredStubs.cpp`).
  */
-int RuntimeToLowerWideWithCurrentLocale(const wchar_t character)
-{
-  return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
-}
+int RuntimeToLowerWideWithCurrentLocale(wchar_t character);
 
 /**
  * Address: 0x00AAE493 (FUN_00AAE493, _vwprintf_p_l)
@@ -13475,6 +13481,25 @@ extern "C" int __cdecl fprintf(std::FILE* const stream, const char* const format
 extern "C" unsigned char* __cdecl _mbschr(const unsigned char* const text, const unsigned int searchChar)
 {
   return ::_mbschr_l(text, searchChar, nullptr);
+}
+
+/**
+ * Address: 0x00A8FB50 (FUN_00A8FB50, RuntimeToLowerWideWithCurrentLocale)
+ *
+ * What it does:
+ * Lowercases one wide character under the current CRT locale lane.
+ * File-scope definition (anonymous-namespace lookalike inside this
+ * TU is a forward declaration only); exported so the call site at
+ * `WxRuntimeTypes.cpp:49627` resolves to this body and not to the
+ * no-op stub in `EngineUnrecoveredStubs.cpp`.
+ *
+ * Caller chain:
+ *   - `WxRuntimeTypes.cpp:49627` (typed wxString lowercase loop) calls
+ *     this helper for each character in a wide-string argument.
+ */
+int RuntimeToLowerWideWithCurrentLocale(const wchar_t character)
+{
+  return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
 }
 
 namespace
