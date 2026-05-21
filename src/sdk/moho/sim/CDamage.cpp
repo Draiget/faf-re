@@ -209,10 +209,21 @@ namespace
 
   /**
    * Address: 0x00739DD0 (FUN_00739DD0)
+   * Address: 0x0073A0E0 (FUN_0073A0E0, msvc8::list<T*>::clear per-T
+   *   template emission for 4-byte pointer node-value, 12-byte node)
    *
    * What it does:
    * Clears the temporary shield-iteration list used by the damage path and
    * releases its owned entries.
+   *
+   * The binary's damage path called `msvc8::list<T*>::clear` template
+   * emissions (FUN_0073A0E0 family) directly from
+   * `SIM_DoDamageArea` / `func_DoDamageRing` / `SIM_MetaImpactArea`
+   * to free the temporary intrusive-list scratch state. The 12-byte
+   * node layout (`{_Next, _Prev, _Myval=ptr}`) matches the recovered
+   * `msvc8::list<moho::Shield*>` instantiation, so the per-T clear
+   * emission is absorbed by `shields.clear()` going through the
+   * legacy list's compiler-emitted clear chain.
    */
   [[maybe_unused]] void ResetDamageShieldIterationList(msvc8::list<moho::Shield*>& shields)
   {
