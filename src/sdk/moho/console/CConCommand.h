@@ -572,6 +572,17 @@ namespace moho
   void CON_CreateProp(void* commandArgs);
 
   /**
+   * Address: 0x008338A0 (FUN_008338A0, Moho::CON_StartCommandMode)
+   *
+   * What it does:
+   * Starts/ends a UI command mode (e.g. `RULEUCC_Move`) for the current world
+   * session, gated by an `ERuleBPUnitCommandCaps` bit and the currently
+   * selected user-units. When no session is active, prints localized
+   * "no session" console feedback.
+   */
+  void CON_StartCommandMode(void* commandArgs);
+
+  /**
    * Address: 0x00833E50 (FUN_00833E50, Moho::CON_DebugGenerateBuildTemplateFromSelection)
    *
    * What it does:

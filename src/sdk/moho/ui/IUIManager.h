@@ -285,6 +285,18 @@ namespace moho
   [[nodiscard]] bool UI_UpdateDisconnectDialogCallback();
 
   /**
+   * Address: 0x0083DDA0 (FUN_0083DDA0, ?UI_GetCommandMode@Moho@@YA?AUUICommandModeData@1@XZ)
+   *
+   * What it does:
+   * Imports `/lua/ui/game/commandmode.lua`, invokes `GetCommandMode()` on the
+   * active UI Lua state, and extracts `(modeString, payloadTable)` into
+   * `outCommandModeData` when the returned table is well-formed. Empty mode
+   * (string) and empty payload (default-constructed Lua object) are returned
+   * when no command mode is active.
+   */
+  void UI_GetCommandMode(UICommandModeData& outCommandModeData);
+
+  /**
    * Address: 0x0083DF90 (FUN_0083DF90, ?UI_StartCommandMode@Moho@@YAXABUUICommandModeData@1@@Z)
    *
    * What it does:

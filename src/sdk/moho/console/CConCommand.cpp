@@ -13,6 +13,7 @@
 #include <string_view>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -37,11 +38,14 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/ui/IUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/unit/core/IUnit.h"
+#include "moho/unit/core/UnitAttributes.h"
 #include "moho/unit/core/UserUnit.h"
 
 using namespace moho;
@@ -2152,6 +2156,162 @@ void moho::CON_CreateProp(void* const commandArgs)
   SIM_GetActiveDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
 }
 
+namespace
+{
+  /**
+   * Resolves one `UserEntity*` from a selection weak-ref slot, matching the
+   * `DecodeSelectedUserEntity` helper recovered in CWldSession.cpp. The
+   * selection set stores `&UserEntity::mIUnitChainHead` (offset +0x08) in
+   * `mOwnerLinkSlot`; subtracting that offset yields the owning entity.
+   * Tombstoned slots (null pointer or sentinel `(void*)8`) decode to nullptr.
+   */
+  [[nodiscard]] moho::UserEntity* DecodeUserEntityFromSelectionSlot(
+    const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    void* const ownerLinkSlot = weakRef.mOwnerLinkSlot;
+    if (ownerLinkSlot == nullptr || ownerLinkSlot == reinterpret_cast<void*>(static_cast<std::uintptr_t>(8u))) {
+      return nullptr;
+    }
+
+    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
+    if (raw < kSelectionOwnerLinkOffset) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
+  }
+
+  /**
+   * Returns the bitwise `commandCapsMask` flag (UnitAttributes +0x60) for one
+   * recovered user-unit selection entry, or 0 when the entity is not a
+   * user-unit. Walks the typed `IUnit` bridge subobject the binary stores at
+   * `userUnit + 0x148`.
+   */
+  [[nodiscard]] std::uint32_t GetUserUnitCommandCapsMask(moho::UserUnit* const userUnit) noexcept
+  {
+    moho::IUnit* const iunit = moho::ResolveIUnitBridge(userUnit);
+    if (iunit == nullptr) {
+      return 0u;
+    }
+    return iunit->GetAttributes().commandCapsMask;
+  }
+
+  /**
+   * Walks the live entries of `selection` skipping tombstone nodes and stops
+   * at the first live `UserEntity` whose typed `UserUnit` bridge advertises a
+   * `commandCapsMask` that intersects `requiredCapsMask`. Returns `true` when
+   * the selection has at least one such unit.
+   */
+  [[nodiscard]] bool SelectionHasUnitWithCommandCap(
+    moho::SSelectionSetUserEntity& selection, const std::uint32_t requiredCapsMask
+  )
+  {
+    moho::SSelectionNodeUserEntity* const head = selection.mHead;
+    if (head == nullptr) {
+      return false;
+    }
+
+    moho::SSelectionNodeUserEntity* node = head->mLeft;
+    node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
+    while (node != head) {
+      moho::UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt);
+      if (entity != nullptr) {
+        if (moho::UserUnit* const userUnit = entity->IsUserUnit(); userUnit != nullptr) {
+          if ((GetUserUnitCommandCapsMask(userUnit) & requiredCapsMask) != 0u) {
+            return true;
+          }
+        }
+      }
+
+      moho::SSelectionSetUserEntity::Iterator_inc(&node);
+      node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
+    }
+
+    return false;
+  }
+} // namespace
+
+/**
+ * Address: 0x008338A0 (FUN_008338A0, Moho::CON_StartCommandMode)
+ * Mangled: ?CON_StartCommandMode@Moho@@YAXAAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_StartCommandMode(int commandArgs);
+ *
+ * What it does:
+ * Console handler for the `StartCommandMode` command. When no world session
+ * is active, prints the localized "<LOC _No_session>" feedback. With a
+ * session and at least three argument tokens (program name, mode token, mode
+ * payload tag), builds a `UICommandModeData{mode, {name=arg1}}`, compares the
+ * requested mode against the currently active UI command mode, and:
+ *   - if the mode matches both the active mode string and its `name` payload
+ *     field, ends the current command mode through `UI_EndCommandMode`
+ *     (toggle off);
+ *   - otherwise resolves the mode token to an `ERuleBPUnitCommandCaps` bit
+ *     through the reflection lexical setter, scans the active selection for
+ *     a live user-unit that advertises that command capability, and dispatches
+ *     `UI_StartCommandMode` with the new mode data when a matching unit is
+ *     found.
+ */
+void moho::CON_StartCommandMode(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 3u) {
+    return;
+  }
+
+  const msvc8::string* const modeToken = args.At(1u);
+  if (modeToken == nullptr) {
+    return;
+  }
+
+  // Build the requested command-mode data: mode = arg1, payload = { name = arg1 }.
+  UICommandModeData requested;
+  requested.mMode = modeToken->c_str();
+  requested.mPayload.AssignNewTable(session->mState, 0, 0u);
+  requested.mPayload.SetString("name", modeToken->c_str());
+
+  // Read the active command mode through the UI Lua state.
+  UICommandModeData active;
+  UI_GetCommandMode(active);
+
+  // When the requested mode matches both the active mode string and its
+  // `name` payload field (case-insensitive), the command toggles the mode off.
+  // The binary short-circuits on mode-string mismatch before touching the
+  // payload table; mirror that to preserve allocation order.
+  bool modesMatch = false;
+  if (_stricmp(requested.mMode.c_str(), active.mMode.c_str()) == 0) {
+    const char* const requestedName = requested.mPayload["name"].GetString();
+    const char* const activeName = active.mPayload["name"].GetString();
+    if (requestedName != nullptr && activeName != nullptr && _stricmp(requestedName, activeName) == 0) {
+      modesMatch = true;
+    }
+  }
+
+  if (modesMatch) {
+    UI_EndCommandMode();
+    return;
+  }
+
+  // Translate the requested mode name into an `ERuleBPUnitCommandCaps` bit
+  // through the reflection lexical setter, then scan the selection for a live
+  // user-unit that advertises that capability.
+  ERuleBPUnitCommandCaps requestedCaps = static_cast<ERuleBPUnitCommandCaps>(0);
+  gpg::RRef capsRef{};
+  (void)gpg::RRef_ERuleBPUnitCommandCaps(&capsRef, &requestedCaps);
+  (void)capsRef.mType->SetLexical(capsRef, requested.mPayload["name"].GetString());
+
+  if (SelectionHasUnitWithCommandCap(session->mSelection, static_cast<std::uint32_t>(requestedCaps))) {
+    UI_StartCommandMode(requested);
+  }
+}
+
 /**
  * Address: 0x00847250 (FUN_00847250)
  *
@@ -2724,6 +2884,8 @@ namespace
   constexpr const char* kConsoleStartupConDebugAssertDescription = "Invoke debug assert command callback.";
   constexpr const char* kConsoleStartupConDebugCrashDescription = "Force an intentional debug crash.";
   constexpr const char* kConsoleStartupConDebugThrowDescription = "Throw one debug exception.";
+  constexpr const char* kConsoleStartupConStartCommandModeDescription =
+    "Start/toggle a UI command mode (e.g. RULEUCC_Move) for the active selection.";
   constexpr const char* kConsoleStartupConDebugGenerateBuildTemplateDescription =
     "Generate build templates from current selection.";
   constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
@@ -2763,6 +2925,7 @@ namespace
   CConFunc gCConFunc_Debug_Assert{};
   CConFunc gCConFunc_Debug_Crash{};
   CConFunc gCConFunc_Debug_Throw{};
+  CConFunc gCConFunc_StartCommandMode{};
   CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
   CConFunc gCConFunc_DebugClearBuildTemplates{};
   CConFunc gCConFunc_CreateProp{};
@@ -3814,6 +3977,37 @@ namespace moho
   }
 
   /**
+   * Address: <synthetic teardown lane for gCConFunc_StartCommandMode>
+   *
+   * What it does:
+   * Unregisters startup command storage for `StartCommandMode`.
+   */
+  void cleanup_CConFunc_StartCommandMode()
+  {
+    CleanupStartupConCommand(gCConFunc_StartCommandMode);
+  }
+
+  /**
+   * Address: 0x00BE3FF0 (FUN_00BE3FF0, register_CConFunc_StartCommandMode)
+   *
+   * What it does:
+   * Registers startup console callback for `StartCommandMode`. The binary
+   * stores `&Moho::CON_StartCommandMode` into `gCConFunc_StartCommandMode`'s
+   * function-pointer payload at CRT static-init time and schedules the
+   * matching cleanup lane at process exit.
+   */
+  void register_CConFunc_StartCommandMode()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_StartCommandMode,
+      kConsoleStartupConStartCommandModeDescription,
+      "StartCommandMode",
+      &CON_StartCommandMode,
+      &cleanup_CConFunc_StartCommandMode
+    );
+  }
+
+  /**
    * Address: 0x00C061F0 (FUN_00C061F0, ??1CConFunc_DebugGenerateBuildTemplateFromSelection@Moho@@QAE@@Z)
    *
    * What it does:
@@ -4182,6 +4376,7 @@ namespace
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
       moho::register_CConFunc_CreateProp();
+      moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();
       moho::register_CConFunc_Debug_Warn();
