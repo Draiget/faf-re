@@ -4066,9 +4066,19 @@ namespace
 
     /**
      * Address: 0x009348A0 (FUN_009348A0, sub_9348A0)
+     * Address: 0x00934080 (FUN_00934080, occupation-cache bucket-vector
+     *   resize template emission absorbed by std::map::emplace rewrite)
      *
      * What it does:
      * Inserts an occupation-key cache entry and reports insertion status.
+     *
+     * The binary used a hash-table-backed cache (bucket vector +
+     * intrusive node lists) whose grow path called the per-T
+     * `vector<bucket_ptr>::resize(n, default)` template emission
+     * (FUN_00934080, 4-byte stride). The recovered cache uses
+     * `std::map<OccupationCacheKey, ClusterData*>::emplace` (RB-tree),
+     * so the bucket-vector resize helper is never invoked; its role
+     * is absorbed by the modern map-backed insert path.
      */
     [[nodiscard]] CacheInsertResult InsertOccupationCacheEntry(
         void* const cacheTreeBase,
@@ -4093,9 +4103,19 @@ namespace
 
     /**
      * Address: 0x00934BE0 (FUN_00934BE0, sub_934BE0)
+     * Address: 0x00934130 (FUN_00934130, subcluster-cache bucket-vector
+     *   resize template emission absorbed by std::map::emplace rewrite)
      *
      * What it does:
      * Inserts a subcluster-key cache entry and reports insertion status.
+     *
+     * The binary used a hash-table-backed cache (bucket vector +
+     * intrusive node lists) whose grow path called the per-T
+     * `vector<bucket_ptr>::resize(n, default)` template emission
+     * (FUN_00934130, 4-byte stride). The recovered cache uses
+     * `std::map<SubclusterCacheKey, ClusterData*>::emplace` (RB-tree),
+     * so the bucket-vector resize helper is never invoked; its role
+     * is absorbed by the modern map-backed insert path.
      */
     [[nodiscard]] CacheInsertResult InsertSubclusterCacheEntry(
         void* const cacheTreeBase,
