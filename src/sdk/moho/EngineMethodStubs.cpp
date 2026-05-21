@@ -16,11 +16,13 @@
 namespace moho
 {
 
-// ===== CEfxEmitterTypeInfo private static type-info hooks =====
-gpg::RRef CEfxEmitterTypeInfo::CtrRef(void*)  { return {}; }
-gpg::RRef CEfxEmitterTypeInfo::NewRef()       { return {}; }
-void      CEfxEmitterTypeInfo::Delete(void*)  {}
-void      CEfxEmitterTypeInfo::Destruct(void*) {}
+// CEfxEmitterTypeInfo NewRef / CtrRef / Delete / Destruct lifecycle hooks
+// are recovered in src/sdk/moho/effects/rendering/CEfxEmitterTypeInfo.cpp
+// (matches FUN_0065F790 / FUN_0065F830 / FUN_0065F810 / FUN_0065F8A0). The
+// real bodies are address-taken from `BindRTypeLifecycleCallbacks` inside
+// `CEfxEmitterTypeInfo::Init` (CEfxEmitterTypeInfo.cpp:81-87), so the
+// linker resolves the reflection-callback slots to the real allocators /
+// destructors. Stubs removed to avoid the multiple-definition shadow.
 
 // ===== CFactoryBuildTask static factory =====
 CFactoryBuildTask* CFactoryBuildTask::Create(
