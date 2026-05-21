@@ -43,10 +43,39 @@ namespace moho
   /**
    * VFTABLE: 0x00E1E9CC
    * COL:  0x00E75AF8
+   *
+   * Layout: 0xA4 = 164 bytes total. See `CAiAttackerImplRuntimeView`
+   * in `CAiAttackerImpl.cpp` for the typed field offsets
+   * (mUnit@+0x40, mStage@+0x44, mWeapons@+0x58, mThread@+0x68,
+   * mTasks@+0x70, mDesiredTarget@+0x80, mReportingState@+0xA0).
+   * Fields are accessed through the runtime-view reinterpret pattern
+   * until the class members are typed in-place; until then the
+   * opaque `mLayoutPadding` keeps `sizeof(CAiAttackerImpl) == 0xA4`
+   * so heap allocations and placement-new operate on the correct
+   * binary-faithful storage footprint.
    */
   class CAiAttackerImpl
   {
   public:
+    /**
+     * Address: 0x005D69A0 (FUN_005D69A0, Moho::CAiAttackerImpl::CAiAttackerImpl
+     *   default ctor)
+     *
+     * What it does:
+     * Initializes the IAiAttacker and CAiAttackerImpl vftable pointers,
+     * self-links the IAiAttacker subobject's intrusive-listener list
+     * (mIAiAttackerListenersHead at +0x04/+0x08), invokes the
+     * CScriptObject base ctor on the subobject at +0x0C, in-place
+     * constructs the embedded `CTaskStage mStage` at +0x44, and
+     * zero-clears the embedded msvc8::vector triplets (`mWeapons`,
+     * `mTasks`), the `WeakPtr<CTaskThread> mThread`, the
+     * `CAiTarget mDesiredTarget`, and the trailing `mReportingState`
+     * lane. The `mReportingState` (`+0xA0`) is left at zero; the
+     * binary additionally writes a `-1` sentinel into the embedded
+     * `mDesiredTarget` ownership lane (`+0x98`).
+     */
+    CAiAttackerImpl() noexcept;
+
     /**
      * Address: 0x005D6A60
      * Slot: 0
@@ -315,7 +344,22 @@ namespace moho
      * Decodes packed value from a weapon extra-data ref (returns 0xF0000000 when missing).
      */
     [[nodiscard]] static std::int32_t ReadExtraDataValue(const WeaponExtraRefSubobject* ref);
+
+  private:
+    /**
+     * Opaque storage to size the class to the binary-faithful 0xA4
+     * (164-byte) footprint. The first 4 bytes overlap the vftable
+     * pointer the implicit C++ vptr-init writes; the remaining
+     * 0xA0 bytes cover the IAiAttacker subobject's intrusive list
+     * (+0x04..+0x0C), the CScriptObject subobject (+0x0C..+0x40),
+     * mUnit (+0x40), mStage (+0x44..+0x58), mWeapons (+0x58),
+     * mThread (+0x68), mTasks (+0x70), mDesiredTarget (+0x80), and
+     * mReportingState (+0xA0). Field accesses go through the
+     * recovered `CAiAttackerImplRuntimeView` reinterpret pattern.
+     */
+    std::uint8_t mLayoutPadding[0xA4 - sizeof(void*)] = {};
   };
+  static_assert(sizeof(CAiAttackerImpl) == 0xA4, "CAiAttackerImpl size must be 0xA4");
 
   // Underlying Lua function-definition publishers referenced by this thunk pack.
   /**
