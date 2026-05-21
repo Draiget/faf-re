@@ -198,6 +198,29 @@ namespace
     return sentinel;
   }
 
+  /**
+   * Address: 0x007D46B0 (FUN_007D46B0, sub_7D46B0)
+   *
+   * IDA signature:
+   * int __userpurge sub_7D46B0@<eax>(Moho::CartographicDecal *a1@<esi>, int next, int prev);
+   *
+   * What it does:
+   * Allocates a fresh CartographicDecalNode (48 bytes via the legacy
+   * checked operator new[] lane), wires its `mNext`/`mPrev` link
+   * fields, and copy-constructs the embedded CartographicDecal payload
+   * from `decal`. The binary writes the embedded decal's vtable
+   * pointer + 36-byte mVertexData buffer field-by-field; this modern
+   * form delegates to CartographicDecal's implicit copy ctor through
+   * placement-new which emits the same byte image with proper RAII
+   * (operator-delete-on-throw rollback) the binary did not need
+   * because the embedded ctor cannot fault.
+   *
+   * The IDA decomp's `result != -4`/`result != -8` guards are MSVC's
+   * spurious null-deref defenses around the +4/+8 field writes — they
+   * never trigger for valid pointers, so the modern code skips them
+   * and relies on the operator-new guarantee that the returned buffer
+   * is either non-null or threw.
+   */
   [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalNodeBefore(
     moho::CartographicDecalNode* const next,
     moho::CartographicDecalNode* const prev,
@@ -215,6 +238,39 @@ namespace
     }
 
     return node;
+  }
+
+  /**
+   * Per-iteration "append one decal before the sentinel" step of the
+   * cartographic decal list copy loop. Allocates one node via
+   * `CreateCartographicDecalNodeBefore`, patches the sentinel's
+   * intrusive `mPrev` lane and the new node's predecessor `mNext`
+   * lane to close the circular-list invariant, and increments the
+   * destination's `mDecalCount`.
+   *
+   * Note: the binary emits a discrete symbol (FUN_007D45F0,
+   * `sub_7D45F0`) that combines this step with the legacy VC8
+   * `std::list<T>::_Incsize`-style overflow check at count ==
+   * 107374182 (=UINT32_MAX/40) which forwards into
+   * `FUN_007D4720` to throw `length_error("list<T> too long")`.
+   * The overflow throw is currently elided here — modern
+   * std::list-equivalent ABI relies on `::operator new` exhaustion
+   * to surface allocation failure. Restoring the explicit check
+   * would require a typed `RuntimeIncrementListCountWithOverflowCheck`
+   * helper that pairs with the throw lane at
+   * `CrtRuntimeHelpers.cpp:37372`.
+   */
+  void AppendCartographicDecalListNodeBeforeSentinel(
+    moho::CartographicDecalList& destination,
+    const moho::CartographicDecal& decal
+  )
+  {
+    moho::CartographicDecalNode* const sentinel = destination.mDecalSentinel;
+    moho::CartographicDecalNode* const node =
+      CreateCartographicDecalNodeBefore(sentinel, sentinel->mPrev, decal);
+    sentinel->mPrev = node;
+    node->mPrev->mNext = node;
+    ++destination.mDecalCount;
   }
 
   /**
@@ -239,12 +295,7 @@ namespace
     for (const moho::CartographicDecalNode* sourceNode = sourceFirst;
          sourceNode != sourceSentinel;
          sourceNode = sourceNode->mNext) {
-      moho::CartographicDecalNode* const sentinel = destination.mDecalSentinel;
-      moho::CartographicDecalNode* const node =
-        CreateCartographicDecalNodeBefore(sentinel, sentinel->mPrev, sourceNode->mDecal);
-      sentinel->mPrev = node;
-      node->mPrev->mNext = node;
-      ++destination.mDecalCount;
+      AppendCartographicDecalListNodeBeforeSentinel(destination, sourceNode->mDecal);
     }
   }
 
