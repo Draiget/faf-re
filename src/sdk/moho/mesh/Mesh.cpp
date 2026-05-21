@@ -6090,6 +6090,16 @@ namespace moho
    * still under recovery, so this TU keeps the typed pose-refresh step
    * and drops the draw-call emission until its typed dependencies are
    * wired.
+   *
+   * The binary's draw-call body additionally calls
+   * `msvc8::vector<Wm3::Vector3f>::vector(N, default)` (FUN_007E3730,
+   * 12-byte stride per-T template emission used to pre-size the
+   * bone-line debug batch storage). With the draw-call body elided,
+   * the vector-init helper is never invoked from the modern source —
+   * its role is absorbed by the elision of the entire draw-call lane.
+   * When the draw-call body is fully recovered in a follow-up pass,
+   * the vector-init helper can be re-wired via a typed
+   * `boneLineBatch.assign(boneCount, defaultLine)` invocation.
    */
   void MeshRenderer::RenderSkeleton(
     CD3DPrimBatcher* const debugBatcher,
@@ -6115,6 +6125,9 @@ namespace moho
     // stays blocked on typed CD3DPrimBatcher surface recovery; the pose
     // refresh above produces the same observable side effect as the
     // binary's skeleton-overlay entry before it enters draw-call code.
+    // The elided draw-call lane includes FUN_007E3730 (bone-line vector
+    // pre-size helper) — see the FUN_007E2290 Doxygen block for the
+    // absorption rationale.
   }
 
   /**
