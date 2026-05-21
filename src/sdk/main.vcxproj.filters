@@ -2604,6 +2604,9 @@
     <ClCompile Include="moho\audio\SParamKeyTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\audio\SoundSubsystemBootstrap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\audio\AudioEngine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

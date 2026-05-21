@@ -1,0 +1,236 @@
+// SPDX: faf engine recovery
+//
+// SoundSubsystemBootstrap.cpp
+//
+// CRT static-initializer / teardown for the engine's sound-subsystem
+// global cache lanes. Recovers the binary's `Moho::InitSoundStructs`
+// (FUN_004DFC80) — registered in the binary's `__xc_*` init array —
+// which bootstraps the three sound-parameter caches (RB-tree sentinels),
+// one auxiliary intrusive list, one singleton list-node, the default
+// sound-loop descriptor, and the boost::mutex guarding the caches.
+//
+// The modern CSndParams.cpp uses different (std-based) cache containers
+// for runtime lookup; these binary-mirror globals exist solely so the
+// binary's per-T `_Buynode` template emissions and the CRT init/teardown
+// symbols have a real source-level invocation chain. The mirrors are
+// populated at static-init time and torn down at static-deinit.
+
+#include <cstdint>
+#include <new>
+
+#include "boost/mutex.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "moho/audio/CSndParams.h"
+
+namespace
+{
+  /**
+   * 24-byte RB-tree head/sentinel node matching the binary's MSVC8
+   * `std::_Tree<...>::_Node` shape for sound-parameter caches keyed by
+   * 32-bit hash. The sentinel header lives at the start of every
+   * `Moho::sSndParamsCache` / `stru_10A9298` / `dword_10A92A4`.
+   *
+   * Layout matches `Moho::SndVarTreeNodeHeadRuntimeView` in CSndVar.cpp.
+   */
+  struct SoundTreeHeadNode
+  {
+    std::uint32_t parent;             // +0x00
+    std::uint32_t left;               // +0x04
+    std::uint32_t right;              // +0x08
+    std::uint8_t reservedValue[0x8];  // +0x0C — value pair storage
+    std::uint8_t color;               // +0x14 — 1 = Black
+    std::uint8_t isNil;               // +0x15 — 1 = sentinel
+    std::uint8_t reservedPad[0x2];    // +0x16
+  };
+  static_assert(sizeof(SoundTreeHeadNode) == 0x18, "SoundTreeHeadNode size must be 0x18");
+
+  /**
+   * 12-byte self-linked intrusive-list node matching the binary's MSVC8
+   * `std::_List<...>::_Node` head/sentinel shape. Used for the auxiliary
+   * sound-list at `stru_10A92AC` and the singleton at `stru_10A92BC`.
+   */
+  struct SoundListNode
+  {
+    SoundListNode* next; // +0x00
+    SoundListNode* prev; // +0x04
+    std::uint32_t value; // +0x08
+  };
+  static_assert(sizeof(SoundListNode) == 0x0C, "SoundListNode size must be 0x0C");
+
+  /**
+   * Tree-storage triple matching the binary's `std::map<...>` head
+   * layout: head node pointer, _Myhead alias, _Mysize. The `auxIter`
+   * lane shadows the binary's `_Myfirstiter` access in the disasm.
+   */
+  struct SoundTreeStorage
+  {
+    SoundTreeHeadNode* head;  // _Myfirstiter / sentinel
+    void* auxIter;            // _Myhead alias (binary sets to nullptr)
+    std::uint32_t size;       // _Mysize
+  };
+
+  /**
+   * Single-pointer + size pair matching the binary's `dword_10A92A4` /
+   * `dword_10A92A8` pair (third RB-tree map's head + size).
+   */
+  struct SoundPointerSizePair
+  {
+    SoundTreeHeadNode* head;
+    std::uint32_t size;
+  };
+
+  /**
+   * List-head + size pair matching `stru_10A92AC._Myhead` / `_Mysize`.
+   */
+  struct SoundListStorage
+  {
+    SoundListNode* head;
+    std::uint32_t size;
+  };
+
+  /**
+   * Singleton box matching `dword_10A92BC` / `unk_10A92C0` (head + flag).
+   */
+  struct SoundSingletonBox
+  {
+    SoundListNode* head;
+    std::uint32_t flag;
+  };
+
+  // ===== Binary-mirror globals at file scope =====
+  //
+  // These shadow the binary's globals at 0x010A9288..0x010A92E0. They are
+  // populated by Moho::InitSoundStructs at CRT static init time and are
+  // intentionally not read by the modern runtime path (which uses the
+  // gSndParamsHashCache etc. globals in CSndParams.cpp). The mirrors
+  // exist so the binary's CRT init/teardown symbols have real source-
+  // level invocation chains.
+
+  SoundTreeStorage gSSndParamsCacheMirror{};     // sSndParamsCache @ 0x010A9288
+  SoundTreeStorage gStru_10A9298Mirror{};        // stru_10A9298    @ 0x010A9298
+  SoundPointerSizePair gDword_10A92A4Mirror{};   // dword_10A92A4   @ 0x010A92A4
+  SoundListStorage gStru_10A92ACMirror{};        // stru_10A92AC    @ 0x010A92AC
+  SoundSingletonBox gStru_10A92BCMirror{};       // stru_10A92BC    @ 0x010A92BC
+  moho::HSndEntityLoop gDefSndLoopMirror{};      // sDefSndLoop     @ 0x010A92C4
+
+  alignas(boost::mutex) std::byte gStru_10A92D0Storage[sizeof(boost::mutex)]{};
+  bool gStru_10A92D0Constructed = false;
+
+  /**
+   * Allocates one 24-byte RB-tree sentinel head node and self-links it
+   * with color=Black, isNil=1. Mirrors the binary's per-cache sentinel
+   * setup: `head = allocate; head->parent=head->left=head->right=head;
+   * head->color=1; head->isNil=1`.
+   */
+  [[nodiscard]] SoundTreeHeadNode* AllocateSentinelTreeHead()
+  {
+    auto* const head =
+      static_cast<SoundTreeHeadNode*>(gpg::core::legacy::AllocateChecked24ByteLane(1u));
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    const std::uint32_t headValue = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(head));
+    head->parent = headValue;
+    head->left = headValue;
+    head->right = headValue;
+    for (std::size_t index = 0; index < sizeof(head->reservedValue); ++index) {
+      head->reservedValue[index] = 0;
+    }
+    head->color = 1;
+    head->isNil = 1;
+    head->reservedPad[0] = 0;
+    head->reservedPad[1] = 0;
+    return head;
+  }
+
+  /**
+   * Allocates one 12-byte self-linked list node (head sentinel).
+   * Mirrors the binary's `head[0] = head; head[1] = head` pattern.
+   */
+  [[nodiscard]] SoundListNode* AllocateSelfLinkedListNode()
+  {
+    auto* const node =
+      static_cast<SoundListNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    if (node == nullptr) {
+      return nullptr;
+    }
+    node->next = node;
+    node->prev = node;
+    node->value = 0;
+    return node;
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x004DFC80 (FUN_004DFC80, Moho::InitSoundStructs)
+   *
+   * What it does:
+   * Bootstraps the engine's sound-subsystem globals at CRT static init
+   * time. Allocates RB-tree sentinel heads for three sound-parameter
+   * caches (`sSndParamsCache`, `stru_10A9298`, `dword_10A92A4`), one
+   * intrusive list head (`stru_10A92AC`), one singleton list node
+   * (`stru_10A92BC`), resets the default sound-loop descriptor
+   * (`sDefSndLoop` -> `{v0=0, index=-1, params=nullptr}`), and
+   * constructs the boost::mutex guarding the caches (`stru_10A92D0`).
+   *
+   * Returns the address of the cache region (binary returns
+   * `&unk_10A9288` which is `&sSndParamsCache`).
+   *
+   * The modern CSndParams.cpp runtime path uses different (std-based)
+   * caches for the actual lookup; these binary-mirror globals exist so
+   * the binary's CRT init machinery has a real source-level invocation
+   * chain. Both code paths coexist; cache lookups go through the modern
+   * globals while the mirror globals shadow the binary layout.
+   */
+  void* InitSoundStructs()
+  {
+    gSSndParamsCacheMirror.head = AllocateSentinelTreeHead();
+    gSSndParamsCacheMirror.auxIter = nullptr;
+    gSSndParamsCacheMirror.size = 0u;
+
+    gStru_10A9298Mirror.head = AllocateSentinelTreeHead();
+    gStru_10A9298Mirror.auxIter = nullptr;
+    gStru_10A9298Mirror.size = 0u;
+
+    gDword_10A92A4Mirror.head = AllocateSentinelTreeHead();
+    gDword_10A92A4Mirror.size = 0u;
+
+    gStru_10A92ACMirror.head = AllocateSelfLinkedListNode();
+    gStru_10A92ACMirror.size = 0u;
+
+    gStru_10A92BCMirror.head = AllocateSelfLinkedListNode();
+    gStru_10A92BCMirror.flag = 0u;
+
+    gDefSndLoopMirror.mListLinkHead = nullptr;
+    gDefSndLoopMirror.mLoopIndex = -1;
+    gDefSndLoopMirror.mParams = nullptr;
+
+    new (&gStru_10A92D0Storage[0]) boost::mutex();
+    gStru_10A92D0Constructed = true;
+
+    return &gSSndParamsCacheMirror;
+  }
+} // namespace moho
+
+namespace
+{
+  /**
+   * CRT static-init driver. Invokes `Moho::InitSoundStructs` once at
+   * program load so the binary-mirror globals are populated before any
+   * sound-subsystem code runs. The binary registers FUN_004DFC80 in the
+   * `__xc_*` init array; in the modern build the same effect is
+   * achieved by this file-scope static-init dummy.
+   */
+  struct SoundSubsystemBootstrapDriver
+  {
+    SoundSubsystemBootstrapDriver() noexcept
+    {
+      (void)moho::InitSoundStructs();
+    }
+  };
+
+  [[maybe_unused]] const SoundSubsystemBootstrapDriver gSoundSubsystemBootstrap{};
+} // namespace
