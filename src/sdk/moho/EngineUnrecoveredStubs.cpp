@@ -68,7 +68,9 @@ namespace moho
 // forward decls inside `extern "C"` so they hit the real bodies.
 
 // ===== Misc unrecovered free functions =====
-int RuntimeToLowerWideWithCurrentLocale(wchar_t) { return 0; }
+// RuntimeToLowerWideWithCurrentLocale recovered in CrtRuntimeHelpers.cpp at
+// file scope (was previously hidden inside that file's anonymous
+// namespace, which fell back to this no-op stub at link time).
 
 namespace gpg
 {
