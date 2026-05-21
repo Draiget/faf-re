@@ -2074,6 +2074,7 @@
     <ClInclude Include="moho\sim\ReconBlipTypeInfo.h" />
     <ClInclude Include="moho\sim\RRuleGameRules.h" />
     <ClInclude Include="moho\sim\SelectionListener.h" />
+    <ClInclude Include="moho\sim\SSelectionEvent.h" />
     <ClInclude Include="moho\sim\SessionVisibilityQuery.h" />
     <ClInclude Include="moho\sim\Sim.h" />
     <ClInclude Include="moho\sim\CEconomy.h" />

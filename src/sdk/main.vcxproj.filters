@@ -3438,6 +3438,9 @@
     <ClInclude Include="moho\sim\SelectionListener.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\SSelectionEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\CWldSession.h">
       <Filter>Header Files</Filter>
     </ClInclude>
