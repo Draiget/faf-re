@@ -9,6 +9,7 @@
 
 namespace gpg
 {
+  class BinaryReader;
   class BinaryWriter;
 }
 
@@ -84,6 +85,22 @@ namespace moho
     CartographicDecalBatch(const CartographicDecalBatch& other);
 
     /**
+     * Address: 0x007D4BE0 (FUN_007D4BE0, ??0CartographicDecalBatch@Moho@@QAE@IAAVBinaryReader@gpg@@@Z)
+     *
+     * IDA signature:
+     * Moho::CartographicDecalBatch* __stdcall CartographicDecalBatch(
+     *   CartographicDecalBatch* this, unsigned int version, gpg::BinaryReader* reader);
+     *
+     * What it does:
+     * Default-initializes one cartographic decal-batch lane (empty SSO
+     * strings, null render-resource shared-pointers, dirty vertex-upload
+     * flag, fresh decal-list sentinel) then immediately deserializes the
+     * batch payload from the binary reader at the given map version
+     * through `Read(version, reader)`.
+     */
+    CartographicDecalBatch(std::uint32_t version, gpg::BinaryReader& reader);
+
+    /**
      * Address: 0x007D4C80 (FUN_007D4C80, ??1CartographicDecalBatch@Moho@@UAE@XZ)
      *
      * What it does:
@@ -110,6 +127,23 @@ namespace moho
      * Serializes one cartographic decal-batch payload into the binary writer.
      */
     void Write(gpg::BinaryWriter& writer);
+
+    /**
+     * Address: 0x007D5400 (FUN_007D5400, ?Read@CartographicDecalBatch@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
+     *
+     * IDA signature:
+     * void __thiscall CartographicDecalBatch::Read(
+     *   CartographicDecalBatch* this, unsigned int version, gpg::BinaryReader* reader);
+     *
+     * What it does:
+     * Deserializes one cartographic decal-batch payload from the binary
+     * reader, replacing any prior batch state. Reads the technique name
+     * (defaulting to `"Decal"` for legacy map versions < 0x3C), the
+     * texture resource path, the decal count, and each decal's
+     * nine-float instance payload, appending the decals into the
+     * intrusive `mDecals` list.
+     */
+    void Read(std::uint32_t version, gpg::BinaryReader& reader);
 
     /**
      * Address: 0x007D50D0 (FUN_007D50D0, sub_7D50D0)
@@ -235,6 +269,19 @@ namespace moho
      * intrusive decal batch node in list order.
      */
     void WriteDecals(gpg::BinaryWriter& writer);
+
+    /**
+     * Address: 0x007D1D30 (FUN_007D1D30, ?ReadDecals@Cartographic@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
+     * Mangled: ?ReadDecals@Cartographic@Moho@@QAEXIAAVBinaryReader@gpg@@@Z
+     *
+     * What it does:
+     * Clears the cartographic decal-batch list, reads the batch count
+     * lane from the stream, and then deserializes each batch through
+     * the `CartographicDecalBatch(version, reader)` constructor,
+     * inserting each batch into the intrusive batch list via
+     * `InsertCartographicDecalBatchCopy`.
+     */
+    void ReadDecals(std::uint32_t version, gpg::BinaryReader& reader);
 
     /**
      * Address: 0x007D1E50 (FUN_007D1E50, ?GetEffect@Cartographic@Moho@@AAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
