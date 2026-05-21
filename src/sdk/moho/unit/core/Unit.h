@@ -1580,6 +1580,20 @@ namespace moho
     Unit* GetTransportedBy() const;
 
     /**
+     * Address: 0x005F0980 (FUN_005F0980, Moho::Unit::GetFerryUnit)
+     *
+     * IDA signature:
+     * Moho::Unit *__usercall Moho::Unit::GetFerryUnit@<eax>(Moho::Unit *a1@<eax>);
+     *
+     * What it does:
+     * Resolves the `AssignedTransportRef` intrusive weak-link slot (Unit +0x4C8)
+     * to a `Unit*` for ferry-task lookups. Returns null when the slot is empty
+     * or holds the weak-pointer sentinel.
+     */
+    [[nodiscard]]
+    Unit* GetFerryUnit() const;
+
+    /**
      * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
      *
      * What it does:

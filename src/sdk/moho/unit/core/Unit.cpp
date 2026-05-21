@@ -13608,6 +13608,22 @@ Unit* Unit::GetTransportedBy() const
 }
 
 /**
+ * Address: 0x005F0980 (FUN_005F0980, Moho::Unit::GetFerryUnit)
+ *
+ * IDA signature:
+ * Moho::Unit *__usercall Moho::Unit::GetFerryUnit@<eax>(Moho::Unit *a1@<eax>);
+ *
+ * What it does:
+ * Returns the unit currently bound to this unit's assigned-transport weak
+ * lane (Unit +0x4C8). Identical accessor body to the binary's tiny FUN_005F0980
+ * thunk: load the slot, return owner-decoded pointer or null on sentinel.
+ */
+Unit* Unit::GetFerryUnit() const
+{
+  return AssignedTransportRef.ResolveObjectPtr<Unit>();
+}
+
+/**
  * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
  *
  * What it does:

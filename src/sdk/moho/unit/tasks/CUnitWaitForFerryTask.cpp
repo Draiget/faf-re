@@ -4,15 +4,31 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/entity/Entity.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
+#include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitCallTransport.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
 
 namespace
 {
   constexpr std::uint64_t kUnitStateMaskWaitForFerry = (1ull << 21);
+
+  // Advances a wait-for-ferry task state by one step, matching the binary's
+  // `++this->mTaskState` increments seen in FUN_0060FCA0.
+  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  {
+    return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
+  }
 
   [[nodiscard]] gpg::RType* CachedCUnitWaitForFerryTaskType()
   {
@@ -135,6 +151,105 @@ namespace moho
     }
 
     mFerryUnit.UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Address: 0x0060FCA0 (FUN_0060FCA0, Moho::CUnitWaitForFerryTask::TaskTick)
+   * VFTable SLOT: 1 (CTask::Execute)
+   *
+   * IDA signature:
+   * int __thiscall Moho::CUnitWaitForFerryTask::TaskTick(Moho::CUnitWaitForFerryTask *this);
+   *
+   * What it does:
+   * Per-tick state machine for the wait-for-ferry command lane.
+   *
+   * Preface: resolve `mFerryUnit` to a live `Unit*`; if the ferry weak slot is
+   * empty/sentinel, or the resolved unit is dead, abort with -1.
+   *
+   * Per-state dispatch on `mTaskState`:
+   *   - TASKSTATE_Preparing: capture the ferry beacon position, plan owner unit
+   *     movement to that position (`Unit::PrepareMove`), reserve the destination
+   *     O-grid rectangle, build a one-cell `SNavGoal` from the destination
+   *     footprint cell, and queue a child `NewMoveTask` driving `mDispatch`.
+   *     Advance state and return 1.
+   *   - TASKSTATE_Waiting: release the staging O-grid reservation
+   *     (`Unit::FreeOgridRect`), advance state, and return 0 so the scheduler
+   *     re-enters next tick.
+   *   - TASKSTATE_Starting: when the owner unit is NOT in `UNITSTATE_Attached`
+   *     and its `Unit::GetFerryUnit()` (a.k.a. `AssignedTransportRef`) resolves
+   *     to a unit categorised as `TRANSPORTATION`, queue
+   *     `NewCallTransportCommand(mDispatch, ferryUnit)`, advance state, return 1.
+   *     Otherwise fall through to the default scheduler delay return (10).
+   *   - TASKSTATE_Processing: if the owner unit lost its transport carrier
+   *     (`Unit::GetTransportedBy()` is null), abort with -1; otherwise fall
+   *     through to the default scheduler delay return (10).
+   *   - default: return 10 (idle scheduler delay).
+   */
+  int CUnitWaitForFerryTask::Execute()
+  {
+    Unit* const ferryUnit = mFerryUnit.GetObjectPtr();
+    if (ferryUnit == nullptr || ferryUnit->IsDead()) {
+      return -1;
+    }
+
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        Wm3::Vector3f targetPos = ferryUnit->GetPosition();
+
+        CArmyImpl* const ownerArmy = mUnit->ArmyRef;
+        const bool useWholeMap = (ownerArmy != nullptr) ? ownerArmy->UseWholeMap() : false;
+
+        gpg::Rect2f skirtRect = ferryUnit->GetSkirtRect();
+        (void)mUnit->PrepareMove(0, &targetPos, &skirtRect, useWholeMap);
+
+        const SCoordsVec2 reserveCenterXZ{targetPos.x, targetPos.z};
+        gpg::Rect2i reserveRect{};
+        (void)COORDS_ToGridRect(&reserveRect, reserveCenterXZ, mUnit->GetFootprint());
+        mUnit->ReserveOgridRect(reserveRect);
+
+        const SOCellPos destCell = mUnit->GetFootprint().ToCellPos(targetPos);
+        NewMoveTask(SNavGoal(destCell), mDispatch, 0, nullptr, 0);
+
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
+      }
+
+      case TASKSTATE_Waiting: {
+        mUnit->FreeOgridRect();
+        mTaskState = NextTaskState(mTaskState);
+        return 0;
+      }
+
+      case TASKSTATE_Starting: {
+        bool shouldStartTransport = false;
+        if (!mUnit->IsUnitState(UNITSTATE_Attached)) {
+          if (Unit* const assignedFerry = mUnit->GetFerryUnit(); assignedFerry != nullptr) {
+            if (assignedFerry->Entity::IsInCategory("TRANSPORTATION")) {
+              shouldStartTransport = true;
+            }
+          }
+        }
+
+        if (!shouldStartTransport) {
+          return 10;
+        }
+
+        Unit* const assignedFerry = mUnit->GetFerryUnit();
+        NewCallTransportCommand(mDispatch, assignedFerry);
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
+      }
+
+      case TASKSTATE_Processing: {
+        if (mUnit->GetTransportedBy() == nullptr) {
+          return -1;
+        }
+        return 10;
+      }
+
+      default:
+        return 10;
+    }
   }
 
   /**
