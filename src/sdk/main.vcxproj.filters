@@ -5715,6 +5715,7 @@
     <ClCompile Include="moho\sim\ESTITargetTypeTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\sim\ESTITargetTypeTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\sim\SMassInfo.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\sim\SMassInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\sim\SMassInfoSerializer.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\sim\SMassInfoSerializer.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\sim\SMassInfoTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>

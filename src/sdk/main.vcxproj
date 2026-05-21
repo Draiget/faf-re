@@ -1002,6 +1002,7 @@
     <ClCompile Include="moho\sim\CEconomyTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CEconStorageTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CEconRequestTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\SMassInfo.cpp" />
     <ClCompile Include="moho\sim\SMassInfoSerializer.cpp" />
     <ClCompile Include="moho\sim\SMassInfoTypeInfo.cpp" />
     <ClCompile Include="moho\sim\ESTITargetTypeTypeInfo.cpp" />
