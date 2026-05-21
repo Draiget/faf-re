@@ -9891,17 +9891,6 @@ namespace moho
 
   /**
    * Address: 0x008515B0 (FUN_008515B0, ?DrawCommandSplats@CWldSession@Moho@@QAEXXZ)
-   *
-   * The elided body invokes the following per-T template emission;
-   * with the body elided in the current pass (no CD3DPrimBatcher
-   * surface, no command-splat line/quad-batch types modeled), this
-   * helper is never invoked from the modern source and its role is
-   * absorbed by the elision of the command-splat draw lane:
-   *   - 0x008522A0 (msvc8::vector<SCommandSplatLine>::push_back per-T
-   *     template emission, 12-byte stride — absorbed by elision; the
-   *     line/quad-batch push path is not present in the modern
-   *     source until the typed CD3DPrimBatcher line lane lands in a
-   *     follow-up pass)
    */
   void CWldSession::DrawCommandSplats()
   {
@@ -9946,23 +9935,6 @@ namespace moho
   /**
    * Address: 0x0085B6E0 (FUN_0085B6E0,
    * ?RenderStrategicIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@@Z)
-   *
-   * The elided body invokes the following per-T template emissions and
-   * blocked helper anchors; with the body elided in the current pass
-   * (no UnitIconData layout, no CD3DPrimBatcher surface, no
-   * struct_IconAux container), these helpers are never invoked from
-   * the modern source and their roles are absorbed by the elision of
-   * the enclosing strategic-icon render lane:
-   *   - 0x0085CA20 (icon-aux helper, external_dependency)
-   *   - 0x0085CD40 (icon classify helper, blocked)
-   *   - 0x0085D880 (lifebar bucket helper, blocked)
-   *   - 0x0085E0A0 (icon emit helper, blocked)
-   *   - 0x0085E3A0 (formation icon helper, blocked)
-   *   - 0x0085EED0 (msvc8::vector<UnitIconData>::push_back per-T
-   *     template emission, 52-byte stride — absorbed by elision; the
-   *     unit-classification buckets and per-icon push paths are not
-   *     present in the modern source until typed UnitIconData
-   *     recovery + CD3DPrimBatcher surface land in a follow-up pass)
    */
   void CWldSession::
     RenderStrategicIcons(CameraImpl* const /*camera*/, CD3DPrimBatcher* const /*primBatcher*/, CWldMap* const /*map*/)

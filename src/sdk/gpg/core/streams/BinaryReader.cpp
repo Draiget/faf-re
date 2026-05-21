@@ -190,20 +190,9 @@ int BinaryReader::ReadInt32() const
 
 /**
  * Address: 0x004D4DC0 (FUN_004D4DC0, gpg::BinaryReader::ReadChar)
- * Address: 0x008A9980 (FUN_008A9980, gpg::BinaryReader::ReadChar
- *   inline-fast-path variant emitted at the terrain-load call site)
  *
  * What it does:
  * Reads one byte from stream input and returns it as unsigned char.
- *
- * The binary additionally emitted an inline-fast-path variant at
- * 0x008A9980 that hand-inlines the `Stream::mReadHead == mReadEnd`
- * check + `VirtRead(buf, 1)` refill + `PrematureEOF` throw, used by
- * `CWldTerrainRes::Load` (FUN_008A1700, pure virtual in the recovered
- * header). The inline variant is byte-distinct from the canonical
- * `ReadChar` (which dispatches through `BinaryReader::Read`) but
- * has identical semantics, so the recovered `ReadChar` covers
- * both binary addresses through the single named role.
  */
 std::uint8_t BinaryReader::ReadChar() const
 {

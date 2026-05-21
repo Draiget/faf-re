@@ -84,16 +84,6 @@ namespace moho
    *
    * What it does:
    * Seeds per-batch metadata from mesh/resource input and prepares remap state.
-   *
-   * The elided body invokes the following per-T template emission;
-   * with the body elided in the current pass (no scm-file bone-name
-   * processing wired yet), this helper is never invoked from the
-   * modern source and its role is absorbed by the elision of the
-   * bone-name binding lane:
-   *   - 0x005379D0 (`BuildBoneNamePointerTableFromPacked` — builds an
-   *     array of pointers into a packed-string blob to expose bone
-   *     names by index; the recovered Initialize doesn't yet parse
-   *     the packed bone-name section of the scm file)
    */
   void MeshBatch::Initialize(
     const MeshLOD* const /*lod*/,
@@ -118,8 +108,6 @@ namespace moho
     mBoneRemapIndices.clear();
 
     // Full scm-file and D3D effect binding is recovered in follow-up meshbatch passes.
-    // Bone-name packed-string table build (FUN_005379D0) is elided here until
-    // typed scm-file bone-name section parsing lands.
   }
 
   /**
