@@ -2086,6 +2086,17 @@ namespace moho
     (void)InitializeBlueprintMapHeaderWithAllocator(&mBeamBlueprints, &AllocateBeamBlueprintMapHeadNode);
     (void)InitializeBlueprintMapHeaderWithAllocator(&mTrailBlueprints, &AllocateTrailBlueprintMapHeadNode);
 
+    // Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
+    // The binary allocated and constructed a 0x40-byte
+    // EntityCategorySet (std::map<string, EntityCategory> + BVSet
+    // + helper backref to rules) into the mCategories slot. The
+    // recovered RRuleGameRulesImpl swaps the typed
+    // mCategoryLookup+CategoryWordRangeView layout for the same
+    // role: AllocateCategoryLookupTableRuntime() builds the lookup
+    // table with sentinel head and entity-category bitset storage
+    // routed through mEntityCategoryLookup. The binary's
+    // EntityCategorySet ctor template emission is absorbed by this
+    // typed allocator helper.
     mEntityCategoryLookup = AllocateCategoryLookupTableRuntime();
     mPendingBlueprintReloadNext = &mPendingBlueprintReloadNext;
     mPendingBlueprintReloadPrev = &mPendingBlueprintReloadNext;
