@@ -125,6 +125,23 @@ namespace
     return sentinel;
   }
 
+  /**
+   * Absorbs binary helper:
+   * Address: 0x00767E10 (FUN_00767E10, PathQueue::ImplBase
+   *   cluster-bucket vector-fill helper for 9-slot, 4-byte stride)
+   *
+   * The binary's PathQueue::ImplBase copy-ctor (FUN_00767600) called
+   * FUN_00767E10 to pre-size the cluster-bucket triplet
+   * `{begin, end_cur, end_cap}` window at offset `+0x04..0x10` with
+   * 9 slots filled from a prototype (a sentinel/empty bucket-head
+   * pointer). The modern recovered InitializePathQueueImplBase
+   * zero-fills the entire ImplBase via `std::memset` and assigns
+   * `mClusterBucketMask = 1u` / `mClusterBucketMaxIndex = 1u`
+   * directly (the recovered layout uses a different bucket-count
+   * shape than the binary's 9-slot vector), so the per-T vector-fill
+   * helper is never invoked and its role is absorbed by the
+   * memset + scalar assignment.
+   */
   void InitializePathQueueImplBase(PathQueueImplBaseRuntime& implBase)
   {
     std::memset(&implBase, 0, sizeof(PathQueueImplBaseRuntime));
