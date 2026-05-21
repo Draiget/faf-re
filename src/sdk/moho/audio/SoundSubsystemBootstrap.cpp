@@ -230,8 +230,9 @@ namespace moho
    * The binary's teardown body additionally invokes the
    * `_Tree::erase` / `_Tree::clear` MSVC8 STL template emissions
    * (sub_4E28A0, sub_4E2C80, sub_4E3020, sub_4E3290, sub_4E3410,
-   * sub_4E49A0, sub_4E4A00, sub_4E4A40) to walk the trees and free
-   * each node, plus the defensive `_Tree::_Copy` chain
+   * sub_4E49A0, sub_4E4A00, sub_4E4A40), the per-node erase-at-iterator
+   * inner helpers those erases dispatch to (sub_4E3780, sub_4E3C10,
+   * sub_4E4060), and the defensive `_Tree::_Copy` chain
    * (sub_4E1A60 copy ctor + sub_4E5960 tree-clone inner loop) that
    * copies `unk_10A92B8` into a local tree, walks the copy, then
    * walks the original before freeing both. Since the mirror trees
