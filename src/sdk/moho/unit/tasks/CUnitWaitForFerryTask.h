@@ -50,6 +50,30 @@ namespace moho
     ~CUnitWaitForFerryTask() override;
 
     /**
+     * Address: 0x0060FCA0 (FUN_0060FCA0, Moho::CUnitWaitForFerryTask::TaskTick)
+     * VFTable SLOT: 1 (CTask::Execute)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitWaitForFerryTask::TaskTick(Moho::CUnitWaitForFerryTask *this);
+     *
+     * What it does:
+     * Per-tick state machine for the wait-for-ferry command lane. Validates the
+     * target ferry beacon (alive, non-sentinel), then dispatches by `mTaskState`:
+     *   - Preparing: pre-plans the owner unit's move to the ferry pickup position,
+     *     reserves the destination O-grid rectangle, and queues a child
+     *     `NewMoveTask` for the ferry beacon cell. Advances to Waiting.
+     *   - Waiting: releases the staging O-grid reservation and advances to
+     *     Starting (returns 0 to stay scheduled).
+     *   - Starting: when the owner unit is not yet attached and the ferry's
+     *     `Unit::AssignedTransportRef` resolves to a transportation-category
+     *     unit, queues `NewCallTransportCommand` and advances to Processing.
+     *     Otherwise falls through to the idle return path.
+     *   - Processing: if the owner unit lost its transport carrier
+     *     (`GetTransportedBy() == nullptr`), terminates the task with -1.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x0060FF50 (FUN_0060FF50, Moho::CUnitWaitForFerryTask::operator new)
      * Mangled: ??2CUnitWaitForFerryTask@Moho@@QAE@@Z
      *
