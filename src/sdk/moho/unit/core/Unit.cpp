@@ -11797,23 +11797,48 @@ void UnitWeaponInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteString(const_cast<msvc8::string*>(&mUIMaxRangeVisualId));
 }
 
+namespace moho
+{
 /**
- * Address: 0x005C3850 (FUN_005C3850, init_SSTIUnitWeaponInfoVector_inline)
+ * Address: 0x005C3850 (FUN_005C3850, sub_5C3850, init_SSTIUnitWeaponInfoVector_inline)
  *
  * What it does:
  * Rebinds one weapon-info fastvector to inline storage and applies the
  * zero-count resize lane used during unit-variable-data construction.
+ *
+ * Invocation chain (verified per caller-chain audit hook):
+ *   moho::InitializeSSTIUnitWeaponInfoVector
+ *     ← moho::SSTIUnitVariableData::SSTIUnitVariableData (Unit.cpp:11869)
+ *     ← Unit.cpp:11371 placement-new (slot allocator)
+ *       Unit.cpp:11437, 11544 copy-construction in growth/shift paths
+ *     ← reachable from main via Unit construction / sim-state copy.
+ *
+ * Symbol-binding note: the body lives in `namespace moho` to match the
+ * `moho::InitializeSSTIUnitWeaponInfoVector` declaration in Unit.h:485.
+ * Previously the definition sat at file scope while the declaration was
+ * inside `namespace moho`, so the linker resolved external `moho::`-
+ * qualified callers to the no-op stub in EngineUnrecoveredStubs.cpp.
+ * Caller at Unit.cpp:11869 still resolves correctly via `using
+ * namespace moho;` at Unit.cpp:128 + ADL on the parameter type.
  */
 SSTIUnitWeaponInfoVector* InitializeSSTIUnitWeaponInfoVector(SSTIUnitWeaponInfoVector* const weaponInfo)
 {
-  if (!weaponInfo) {
-    return weaponInfo;
-  }
-
+  // Binary writes the four FastVectorN<UnitWeaponInfo,1> lane pointers
+  // unconditionally — no null check at FUN_005C3850 entry. Matches the
+  // single recovered caller (SSTIUnitVariableData ctor passes
+  // &mWeaponInfo which is always a valid embedded subobject).
   weaponInfo->RebindInlineNoFree();
+
+  // Resize(0, T{}) materializes the default UnitWeaponInfo prototype on
+  // the stack (the `char v2[160]` slot in the IDA decomp), then exits
+  // through the `newSize < currentSize` early-return without touching
+  // the prototype because `currentSize` is already 0 after the rebind.
+  // The prototype's ctor / dtor still run for SEH-correctness — exactly
+  // matching the binary's UnitWeaponInfo()/~UnitWeaponInfo bracket.
   weaponInfo->Resize(0u);
   return weaponInfo;
 }
+} // namespace moho
 
 /**
  * Address: 0x005BD7A0 (FUN_005BD7A0, ??0SSTIUnitVariableData@Moho@@QAE@@Z)

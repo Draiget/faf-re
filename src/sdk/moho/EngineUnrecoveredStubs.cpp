@@ -48,8 +48,10 @@ namespace moho
   // shadowing the real recovered RTTI registration in moho/unit/core/Unit.cpp.
   // The real definitions there were at file scope (not inside namespace moho)
   // so the linker couldn't reach them; that has been fixed by wrapping them
-  // in `namespace moho { ... }`.
-  class gpg::core::FastVectorN<struct moho::UnitWeaponInfo,1> * InitializeSSTIUnitWeaponInfoVector(class gpg::core::FastVectorN<struct moho::UnitWeaponInfo,1> *) { return nullptr; }
+  // in `namespace moho { ... }`. Same fix applied to
+  // InitializeSSTIUnitWeaponInfoVector (FUN_005C3850) — the real body in
+  // moho/unit/core/Unit.cpp is now wrapped in `namespace moho { ... }`
+  // matching the Unit.h:485 declaration, so the no-op stub here is gone.
   class moho::CUnitCommand * func_OrderBuildStructure(class Wm3::Vector3<float> *,class moho::CAiBrain *,class moho::Unit *,char const *,class Wm3::Vector3<float> *,float) { return nullptr; }
   class moho::IWldTerrainRes * WLD_CreateTerrainRes(void) { return nullptr; }
   struct moho::WD3DViewport * REN_CreateGameViewport(class wxWindowBase *,char const *,struct wxSize const &,bool) { return nullptr; }
