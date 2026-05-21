@@ -8,6 +8,7 @@
 #include <new>
 #include <stdexcept>
 
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
@@ -504,6 +505,52 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D4BE0 (FUN_007D4BE0, ??0CartographicDecalBatch@Moho@@QAE@IAAVBinaryReader@gpg@@@Z)
+   *
+   * IDA signature:
+   * Moho::CartographicDecalBatch* __stdcall Moho::CartographicDecalBatch::CartographicDecalBatch(
+   *   Moho::CartographicDecalBatch* a1, unsigned int a2, gpg::BinaryReader* a3);
+   *
+   * What it does:
+   * Default-initializes the batch's empty SSO string lanes, null
+   * render-resource shared-pointers, dirty vertex-upload flag, and a
+   * fresh self-linked decal-list sentinel; then forwards into
+   * `Read(version, reader)` to deserialize the actual batch payload
+   * from the binary reader.
+   *
+   * Mirrors the binary's `??0CartographicDecalBatch@Moho@@QAE@IAAVBinaryReader@gpg@@@Z`
+   * (mangled symbol suffix `_0` — second ctor overload alongside the
+   * copy ctor at FUN_007D40E0). Called from `Cartographic::ReadDecals`
+   * to construct each archived batch in turn.
+   */
+  CartographicDecalBatch::CartographicDecalBatch(
+    const std::uint32_t version, gpg::BinaryReader& reader)
+    : mTechniqueName(),
+      mTexturePath(),
+      mDecalTexture(),
+      mVertexFormat(),
+      mQuadVertexBuffer(),
+      mInstanceVertexBuffer(),
+      mIndexBuffer(),
+      mNeedsVertexUpload(true),
+      mPadding65_67{},
+      mDecals{}
+  {
+    // The member-init list above already places both msvc8::string
+    // lanes in empty-SSO state (mySize=0, myRes=15, bx.buf[0]='\0'),
+    // matching the binary's explicit field writes. Initialize the
+    // intrusive decal-list sentinel before forwarding into Read; the
+    // first thing Read does is Shutdown() which is null-safe on the
+    // list lane but the subsequent decal-append loop expects a valid
+    // sentinel.
+    mDecals.mAllocatorCookie = nullptr;
+    mDecals.mDecalSentinel = CreateCartographicDecalSentinelNode();
+    mDecals.mDecalCount = 0;
+
+    Read(version, reader);
+  }
+
+  /**
    * Address: 0x007D4E60 (FUN_007D4E60, ?Shutdown@CartographicDecalBatch@Moho@@QAEXXZ)
    *
    * What it does:
@@ -705,6 +752,56 @@ namespace moho
   }
 
   /**
+   * Address: 0x007D1D30 (FUN_007D1D30, ?ReadDecals@Cartographic@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
+   * Mangled: ?ReadDecals@Cartographic@Moho@@QAEXIAAVBinaryReader@gpg@@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::Cartographic::ReadDecals(
+   *   Moho::Cartographic* this, unsigned int a2, struct gpg::BinaryReader* a3);
+   *
+   * What it does:
+   * Drops every existing cartographic decal-batch node, reads a fresh
+   * batch count lane from the stream, and then deserializes each
+   * archived batch through the
+   * `CartographicDecalBatch(version, reader)` constructor. Each newly
+   * constructed batch is inserted into the intrusive batch list via
+   * `InsertCartographicDecalBatchCopy`, which handles the legacy VC8
+   * `std::list<T>` overflow check at 0x0234F72C nodes and re-links the
+   * sentinel/predecessor pair.
+   *
+   * The deserialize ctor allocates list-internal storage (decal
+   * sentinel, copy-constructed decals from the reader) on the
+   * stack-local `localBatch`; `InsertCartographicDecalBatchCopy` then
+   * copy-constructs the persistent list node from `localBatch`, which
+   * means the stack-local batch's storage is freed by its destructor
+   * at the end of each iteration. Matches the binary's
+   * `CartographicDecalBatch(&v9, a2, a3); ... ; ~CartographicDecalBatch(&v9)`
+   * SEH-bracketed scope.
+   *
+   * Invocation chain (per caller-chain audit hook):
+   *   Cartographic::ReadDecals (FUN_007D1D30)
+   *     <- CWldTerrainRes::Load (FUN_008A1700, modern body not yet
+   *        in src/sdk; the virtual is declared pure in CWldMap.h:311
+   *        but the concrete CWldTerrainRes override is still
+   *        pending). This recovery commit lands ReadDecals as the
+   *        nearest-reachable layer in the chain.
+   */
+  void Cartographic::ReadDecals(
+    const std::uint32_t version, gpg::BinaryReader& reader)
+  {
+    ClearCartographicBatchList(*this);
+
+    std::int32_t batchCount = 0;
+    reader.Read(reinterpret_cast<char*>(&batchCount), sizeof(batchCount));
+
+    while (batchCount > 0) {
+      CartographicDecalBatch localBatch(version, reader);
+      (void)InsertCartographicDecalBatchCopy(localBatch, *this);
+      --batchCount;
+    }
+  }
+
+  /**
    * Address: 0x007D5650 (FUN_007D5650, ?Write@CartographicDecalBatch@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
    * Mangled: ?Write@CartographicDecalBatch@Moho@@QAEXAAVBinaryWriter@gpg@@@Z
    *
@@ -721,6 +818,92 @@ namespace moho
     const CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
     for (const CartographicDecalNode* node = sentinel->mNext; node != sentinel; node = node->mNext) {
       WriteCartographicDecalPayload(writer, node->mDecal);
+    }
+  }
+
+  /**
+   * Address: 0x007D5400 (FUN_007D5400, ?Read@CartographicDecalBatch@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
+   * Mangled: ?Read@CartographicDecalBatch@Moho@@QAEXIAAVBinaryReader@gpg@@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CartographicDecalBatch::Read(
+   *   Moho::CartographicDecalBatch* this, unsigned int a2, gpg::BinaryReader* a3);
+   *
+   * What it does:
+   * Deserializes one batch payload from `reader` at the given map
+   * version. The wire format is:
+   *
+   *   - msvc8::string mTechniqueName  (NUL-terminated; absent in
+   *     legacy versions below 0x3C where the field defaults to "Decal")
+   *   - msvc8::string mTexturePath    (NUL-terminated)
+   *   - int32         decalCount
+   *   - for each decal:
+   *       - 8 bytes: mVertexData[0..1]
+   *       - 4 bytes (via stack temp): mVertexData[2]
+   *       - 8 bytes: mVertexData[3..4]
+   *       - 8 bytes: mVertexData[5..6]
+   *       - 8 bytes: mVertexData[7..8]
+   *
+   * Each decoded decal is appended to `mDecals` via
+   * `AppendCartographicDecalListNodeBeforeSentinel`, which creates a
+   * new `CartographicDecalNode` linked before the list sentinel and
+   * bumps `mDecalCount`. `Shutdown()` is invoked first to release any
+   * prior batch state — matching the binary's leading
+   * `CartographicDecalBatch::Shutdown(this)` call.
+   *
+   * Invocation chain (per caller-chain audit hook):
+   *   CartographicDecalBatch::Read (FUN_007D5400)
+   *     <- CartographicDecalBatch(version, reader) deserialize ctor
+   *        (FUN_007D4BE0, this commit)
+   *     <- Cartographic::ReadDecals (FUN_007D1D30, this commit)
+   *     <- CWldTerrainRes::Load (FUN_008A1700, still pending modern
+   *        body — the virtual is declared in CWldMap.h:311 but the
+   *        concrete override body is not yet recovered, so this
+   *        chain's top remains orphan until that lands).
+   */
+  void CartographicDecalBatch::Read(
+    const std::uint32_t version, gpg::BinaryReader& reader)
+  {
+    Shutdown();
+
+    // 1. Technique name (defaulted to "Decal" for legacy maps).
+    msvc8::string techniqueName{};
+    if (version < 0x3Cu) {
+      techniqueName.assign("Decal", 5u);
+    } else {
+      reader.ReadString(&techniqueName);
+    }
+    mTechniqueName.assign(techniqueName, 0u, ~0u);
+
+    // 2. Texture resource path.
+    msvc8::string texturePath{};
+    reader.ReadString(&texturePath);
+    mTexturePath.assign(texturePath, 0u, ~0u);
+
+    // 3. Decal payload count.
+    std::int32_t decalCount = 0;
+    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+
+    // 4. Per-decal nine-float instance payload. The binary splits the
+    //    36 bytes into 8 + 4 + 8 + 8 + 8 byte reads with the middle
+    //    lane (mVertexData[2]) routed through a stack temporary — that
+    //    split mirrors the original named field layout (we don't have
+    //    decompiled names for them yet) so we keep the same read shape
+    //    for byte-faithful stream consumption.
+    for (std::int32_t remaining = decalCount; remaining > 0; --remaining) {
+      CartographicDecal decal{};
+
+      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[0]), 8u);
+
+      float lane2 = 0.0f;
+      reader.Read(reinterpret_cast<char*>(&lane2), 4u);
+      decal.mVertexData[2] = lane2;
+
+      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[3]), 8u);
+      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[5]), 8u);
+      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[7]), 8u);
+
+      AppendCartographicDecalListNodeBeforeSentinel(mDecals, decal);
     }
   }
 
