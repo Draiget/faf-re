@@ -22,6 +22,24 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0061B0B0 (FUN_0061B0B0, Moho::CUnitPatrolTask::CUnitPatrolTask default ctor)
+     *
+     * What it does:
+     * Default-constructs one patrol-task lane with zeroed storage. Used by the
+     * SerConstruct reflection callback (FUN_0061AD10) which subsequently
+     * deserializes payload fields into the freshly-allocated object via the
+     * archive `Read` path. The binary's body additionally publishes the
+     * `CUnitPatrolTask` / `Listener<ECommandEvent>` / `Listener<EFormationdStatus>`
+     * vtables and self-links the intrusive-listener nodes — those fields are
+     * not modeled in the current opaque `mPadding[0xF0]` layout, so zero-init
+     * is the maximal binary-faithful default available without deeper
+     * class-layout recovery. Deserialization overwrites the storage with
+     * real field data before any virtual call is dispatched, so the
+     * truncated default-init is safe for the SerConstruct path.
+     */
+    CUnitPatrolTask() noexcept;
+
+    /**
      * Address: 0x0061AE50 (FUN_0061AE50, Moho::CUnitPatrolTask::CUnitPatrolTask)
      *
      * What it does:
