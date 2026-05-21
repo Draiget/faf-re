@@ -8004,6 +8004,12 @@ namespace moho
     mBuildTemplateArg1 = 0.0f;
     mBuildTemplateArg2 = 0.0f;
 
+    // Address: 0x008B58A0 (FUN_008B58A0, struct_session_res1 ctor —
+    //   CommandManager init with IdPool + std::map<id, command> head
+    //   sentinel allocation). Elided here because the typed
+    //   struct_session_res1 (CommandManager) layout is not yet
+    //   modeled in the recovered tree; the field is set null and
+    //   the binary's ctor is absorbed by this initialization.
     mSessionRes1 = nullptr;
     mCurFormation = nullptr;
     mUICommandGraphPx = nullptr;
