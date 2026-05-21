@@ -8,6 +8,7 @@
 #include "moho/containers/BitStorage32.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/WeakPtr.h"
 
 namespace gpg
 {
@@ -26,14 +27,6 @@ namespace moho
 
   using SAniManipBitStorage = SBitStorage32;
 
-  struct SAniManipOwnerLink
-  {
-    SAniManipOwnerLink** mPrevSlot; // +0x00
-    SAniManipOwnerLink* mNext;      // +0x04
-  };
-
-  static_assert(sizeof(SAniManipOwnerLink) == 0x08, "SAniManipOwnerLink size must be 0x08");
-
   class CAnimationManipulator : public IAniManipulator
   {
   public:
@@ -43,18 +36,25 @@ namespace moho
      * Address: 0x0063F380 (FUN_0063F380, ??0CAnimationManipulator@Moho@@QAE@XZ)
      *
      * What it does:
-     * Builds IAniManipulator base state and initializes owner-link, bone-mask,
-     * animation-resource, playback-rate, and runtime flags.
+     * Builds IAniManipulator base state and initializes goal weak link,
+     * bone-mask, animation-resource, playback-rate, and runtime flags.
      */
     CAnimationManipulator();
 
     /**
-     * Address context:
-     * - constructor lane used by `cfunc_CreateAnimatorL` (`FUN_00640530`).
+     * Address: 0x0063F460 (FUN_0063F460, ??0CAnimationManipulation@Moho@@QAE@@Z)
+     * Mangled: ??0CAnimationManipulation@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::CAnimationManipulation::CAnimationManipulation(
+     *   Moho::Unit *a1, Moho::CAniActor *a2,
+     *   Moho::CAnimationManipulator *this, Moho::Sim *a4);
      *
      * What it does:
      * Builds an animation manipulator bound to one sim/actor owner pair,
-     * optionally stores one goal-motion unit weak ref, and creates Lua userdata.
+     * head-inserts an intrusive goal weak link into the optional motion-scale
+     * unit's chain, sizes the bone mask from the actor skeleton, and creates
+     * Lua userdata for script binding.
      */
     CAnimationManipulator(Sim* sim, CAniActor* ownerActor, Unit* goalMotionScaleUnit);
 
@@ -148,7 +148,7 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    SAniManipOwnerLink mOwnerLink;      // +0x80
+    WeakPtr<Unit> mGoal;                // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
     SAniManipBitStorage mBoneMask;      // +0x88
     AnimationResourceRef mAnimationRef; // +0x9C
     float mRate;                        // +0xA4
@@ -639,7 +639,7 @@ namespace moho
   };
 
   static_assert(
-    offsetof(CAnimationManipulator, mOwnerLink) == 0x80, "CAnimationManipulator::mOwnerLink offset must be 0x80"
+    offsetof(CAnimationManipulator, mGoal) == 0x80, "CAnimationManipulator::mGoal offset must be 0x80"
   );
   static_assert(
     offsetof(CAnimationManipulator, mBoneMask) == 0x88, "CAnimationManipulator::mBoneMask offset must be 0x88"
