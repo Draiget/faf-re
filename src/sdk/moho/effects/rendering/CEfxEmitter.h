@@ -14,11 +14,19 @@ namespace moho
 {
   struct GeomCamera3;
   struct REmitterBlueprint;
+  /**
+   * Inline-buffer fastvector wrapper for `SEfxCurve` entries used as
+   * `CEfxEmitter::mCurves`. Matches the binary's 4-pointer layout:
+   * `mFirst`/`mLast` track the live range, `mEnd` is the capacity-end of
+   * the inline buffer, and `mOriginalStorage` records the inline buffer
+   * start for dtor-side heap-vs-inline detection.
+   */
   struct CEfxCurveVectorRuntime
   {
-    SEfxCurve* mFirst; // +0x00
-    SEfxCurve* mLast;  // +0x04
-    SEfxCurve* mEnd;   // +0x08
+    SEfxCurve* mFirst;          // +0x00
+    SEfxCurve* mLast;           // +0x04
+    SEfxCurve* mEnd;            // +0x08
+    SEfxCurve* mOriginalStorage; // +0x0C
 
     [[nodiscard]] SEfxCurve* begin() noexcept
     {
@@ -41,7 +49,7 @@ namespace moho
     }
   };
 
-  static_assert(sizeof(CEfxCurveVectorRuntime) == 0x0C, "CEfxCurveVectorRuntime size must be 0x0C");
+  static_assert(sizeof(CEfxCurveVectorRuntime) == 0x10, "CEfxCurveVectorRuntime size must be 0x10");
 
   /**
    * VFTABLE: 0x00E240B4
@@ -150,14 +158,30 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+  public:
+    /**
+     * Address: 0x0065B9B0 (FUN_0065B9B0, Moho::CEfxEmitter::CEfxEmitter)
+     *
+     * What it does:
+     * Default-constructs one emitter: invokes the `CEffectImpl` base ctor,
+     * publishes the `CEfxEmitter` vftable, zeroes the emitter type, binds
+     * the embedded `mCurves` fastvector to the inline `mInlineCurveStorage`
+     * buffer (21-entry capacity), default-constructs the particle slot, and
+     * zero-initializes the remaining emitter-state fields.
+     */
+    CEfxEmitter();
+
   private:
     friend struct CEfxEmitterLayoutVerifier;
 
-    EmitterType mEmitterType;               // +0x190
-    std::uint8_t mPad194[0x04];             // +0x194
-    CEfxCurveVectorRuntime mCurves;         // +0x198
-    std::uint8_t mUnresolved1A4_63F[0x49C]; // +0x1A4
-    REmitterBlueprint* mBlueprint;          // +0x640
+    /// Number of SEfxCurve slots in the inline curve buffer (matches binary).
+    static constexpr std::size_t kInlineCurveCapacity = 21u;
+
+    EmitterType mEmitterType;                                       // +0x190
+    std::uint8_t mPad194[0x04];                                     // +0x194
+    CEfxCurveVectorRuntime mCurves;                                 // +0x198 (16 bytes)
+    std::uint8_t mInlineCurveStorage[kInlineCurveCapacity * 0x38];  // +0x1A8 (1176 bytes)
+    REmitterBlueprint* mBlueprint;                                  // +0x640
     float mTotalEmissions;                  // +0x644
     std::uint32_t mLife;                    // +0x648
     SWorldParticle mParticle;               // +0x64C
@@ -175,6 +199,7 @@ namespace moho
   {
     static_assert(offsetof(CEfxEmitter, mEmitterType) == 0x190, "CEfxEmitter::mEmitterType offset must be 0x190");
     static_assert(offsetof(CEfxEmitter, mCurves) == 0x198, "CEfxEmitter::mCurves offset must be 0x198");
+    static_assert(offsetof(CEfxEmitter, mInlineCurveStorage) == 0x1A8, "CEfxEmitter::mInlineCurveStorage offset must be 0x1A8");
     static_assert(offsetof(CEfxEmitter, mBlueprint) == 0x640, "CEfxEmitter::mBlueprint offset must be 0x640");
     static_assert(offsetof(CEfxEmitter, mTotalEmissions) == 0x644, "CEfxEmitter::mTotalEmissions offset must be 0x644");
     static_assert(offsetof(CEfxEmitter, mLife) == 0x648, "CEfxEmitter::mLife offset must be 0x648");
