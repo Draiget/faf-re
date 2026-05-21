@@ -11245,3 +11245,50 @@ namespace
   }
 
 } // namespace
+
+namespace gpg
+{
+  /**
+   * Address: 0x0069EF60 (FUN_0069EF60,
+   *   `gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1`)
+   *
+   * File-scope trampoline that exposes the global mangled symbol the
+   * cross-TU caller expects. The real body lives in an anonymous
+   * namespace earlier in this TU (around line 6488) so it has
+   * internal linkage; the call site at
+   * `ProjectileStartupRegistrations.cpp:511` looks up the symbol as
+   * `gpg::Save...` (forward-decl-in-`namespace gpg` ABI) and
+   * previously fell back to the no-op stub in
+   * `EngineUnrecoveredStubs.cpp`.
+   *
+   * Caller body audit
+   * (`ProjectileStartupRegistrations.cpp:508`):
+   * the address is stored as `&gpg::SaveUnowned...` into a
+   * reflection-table save-callback slot — no rewire needed; the
+   * symbol resolution now reaches the real body.
+   */
+  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
+    gpg::WriteArchive* const archive, std::uint32_t* const intrusiveListHeadSlot
+  )
+  {
+    ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
+      archive, intrusiveListHeadSlot
+    );
+  }
+
+  /**
+   * Address: 0x00712860 (FUN_00712860,
+   *   `gpg::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1`)
+   *
+   * Companion trampoline to the above; same reason for the wrapper.
+   * Caller body audit (`SConditionTriggerReflection.cpp:1180`): the
+   * address is stored as `&gpg::SaveOwnedRawPointer...` into a
+   * reflection-table save-callback slot — no rewire needed.
+   */
+  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(
+    gpg::WriteArchive* const archive, const int ownerToken
+  )
+  {
+    ::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(archive, ownerToken);
+  }
+} // namespace gpg

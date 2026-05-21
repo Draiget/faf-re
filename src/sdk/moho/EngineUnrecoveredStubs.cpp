@@ -53,10 +53,12 @@ namespace moho
   class moho::CUnitCommand * func_OrderBuildStructure(class Wm3::Vector3<float> *,class moho::CAiBrain *,class moho::Unit *,char const *,class Wm3::Vector3<float> *,float) { return nullptr; }
   class moho::IWldTerrainRes * WLD_CreateTerrainRes(void) { return nullptr; }
   struct moho::WD3DViewport * REN_CreateGameViewport(class wxWindowBase *,char const *,struct wxSize const &,bool) { return nullptr; }
-  void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(class gpg::ReadArchive *,int,int,class gpg::RRef *) {}
-  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(class gpg::WriteArchive *,int) {}
-  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(class gpg::WriteArchive *,int) {}
-  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(class gpg::WriteArchive *,unsigned int *) {}
+  // moho::-namespace duplicates of the gpg::Save... stubs have been
+  // dropped — no caller in src/sdk/** references the moho-qualified
+  // versions; callers use the gpg::-qualified symbols which now resolve
+  // either to real trampolines (Save{Owned,Unowned}RawPointer*) or to
+  // the remaining gpg-namespace stubs (LoadAndBroadcast...,
+  // SaveBroadcasterListener...) below.
   // CON_WxInputBox now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
   // (FUN_004FC900). Replaces the no-op stub.
   void SIM_Damage(class moho::Sim *,class moho::CDamage const &) {}
@@ -76,24 +78,23 @@ namespace gpg
 {
   // ===== Unrecovered serialization helpers =====
   //
-  // TODO(recovery): SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1 and
+  // SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1 and
   // SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
-  // both have REAL recovered bodies in src/sdk/gpg/core/containers/ArchiveSerialization.cpp
-  // (around line 6526 and 8596 respectively), but they live inside an
-  // anonymous namespace at file scope, giving them internal linkage. The call
-  // sites (SConditionTriggerReflection.cpp, ProjectileStartupRegistrations.cpp)
-  // reference them as `gpg::Save...`, so the linker can't reach the real
-  // implementations and falls back to these no-op stubs. Save/load for these
-  // specific reflection lanes will be lossy until the originals are moved out
-  // of the anon namespace and into `namespace gpg { ... }`.
+  // have file-scope `gpg::` trampolines at the bottom of
+  // src/sdk/gpg/core/containers/ArchiveSerialization.cpp that forward
+  // into the anon-namespace real bodies. The stubs that used to live
+  // here have been removed; the linker now resolves the cross-TU
+  // `gpg::Save...` lookups (SConditionTriggerReflection.cpp,
+  // ProjectileStartupRegistrations.cpp) to the real bodies.
+  //
+  // LoadAndBroadcastManyToOneListenerEProjectileImpactEvent and
+  // SaveBroadcasterListenerChainEUnitCommandQueueStatus remain as
+  // no-op stubs because their real bodies are not yet recovered in
+  // src/sdk/**. Save/load for those reflection lanes is still lossy.
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
       gpg::ReadArchive*, int, int, gpg::RRef*) {}
   void SaveBroadcasterListenerChainEUnitCommandQueueStatus(
       gpg::WriteArchive*, int) {}
-  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(
-      gpg::WriteArchive*, int) {}
-  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
-      gpg::WriteArchive*, unsigned int*) {}
 }
 
 namespace moho
