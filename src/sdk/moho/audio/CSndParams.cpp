@@ -673,6 +673,41 @@ namespace
   }
 
   /**
+   * Address: 0x004E1890 (FUN_004E1890, msvc8::map<CSndParams*, HSndEntityLoop*>::_Insert_lower_bound)
+   *
+   * What it does:
+   * Per-T canonical-template-helper binding for the engine-instantiated
+   * `msvc8::map<CSndParams*, HSndEntityLoop*>::_Insert` lookup-or-insert
+   * lane. The binary walked the RB-tree by `CSndParams*` key, returned the
+   * existing iterator when present, otherwise inserted a fresh node and
+   * returned `(node, inserted=true)`.
+   *
+   * The recovered ambient-loop cache moved to `std::unordered_map` with
+   * `std::unique_ptr` value to preserve RAII, so this wrapper expresses
+   * the same find-or-insert semantics through the modern container while
+   * still exposing the per-T symbol so the engine-instantiated template
+   * emission has a named source-level invocation point.
+   */
+  [[nodiscard]] moho::HSndEntityLoop* EnsureSharedAmbientLoopMapEntry(
+    std::unordered_map<moho::CSndParams*, std::unique_ptr<moho::HSndEntityLoop>>& cache,
+    moho::CSndParams* const params)
+  {
+    const auto it = cache.find(params);
+    if (it != cache.end()) {
+      return it->second.get();
+    }
+
+    auto created = std::make_unique<moho::HSndEntityLoop>();
+    created->mListLinkHead = nullptr;
+    created->mLoopIndex = -1;
+    created->mParams = params;
+
+    moho::HSndEntityLoop* const handle = created.get();
+    cache.emplace(params, std::move(created));
+    return handle;
+  }
+
+  /**
    * Address: 0x004DF2B0 (FUN_004DF2B0, func_GetSndLoop)
    *
    * What it does:
@@ -686,20 +721,7 @@ namespace
     }
 
     std::lock_guard<std::mutex> lock(gSharedAmbientLoopMutex);
-
-    const auto it = gSharedAmbientLoopsByParams.find(params);
-    if (it != gSharedAmbientLoopsByParams.end()) {
-      return it->second.get();
-    }
-
-    auto created = std::make_unique<moho::HSndEntityLoop>();
-    created->mListLinkHead = nullptr;
-    created->mLoopIndex = -1;
-    created->mParams = params;
-
-    moho::HSndEntityLoop* const handle = created.get();
-    gSharedAmbientLoopsByParams.emplace(params, std::move(created));
-    return handle;
+    return EnsureSharedAmbientLoopMapEntry(gSharedAmbientLoopsByParams, params);
   }
 
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
