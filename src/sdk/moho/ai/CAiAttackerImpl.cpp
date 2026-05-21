@@ -651,6 +651,84 @@ namespace
   [[maybe_unused]] CAiAttackerImplLuaFunctionThunksBootstrap gCAiAttackerImplLuaFunctionThunksBootstrap;
 } // namespace
 
+/**
+ * Address: 0x005D69A0 (FUN_005D69A0, Moho::CAiAttackerImpl::CAiAttackerImpl
+ *   default ctor)
+ *
+ * What it does:
+ * Initializes the IAiAttacker and CAiAttackerImpl vftable pointers,
+ * self-links the IAiAttacker subobject's intrusive-listener list at
+ * `+0x04/+0x08`, constructs the embedded CScriptObject base at `+0x0C`,
+ * zero-clears the `mUnit` pointer at `+0x40`, in-place constructs the
+ * embedded `CTaskStage mStage` at `+0x44`, leaves the `mWeapons`
+ * (`+0x58`), `mThread` (`+0x68`), and `mTasks` (`+0x70`) lanes
+ * zero-initialized so that their proxy pointers and begin/end/cap
+ * triplets read as null, in-place constructs `CAiTarget mDesiredTarget`
+ * at `+0x80` and writes the binary's `targetPoint = -1` sentinel,
+ * and zero-initializes `mReportingState` at `+0xA0`. Called from
+ * `ConstructCAiAttackerImplForResult` (in `CAiAttackerImplConstruct.cpp`)
+ * via the `SerConstruct` callback registered at process init by
+ * `register_CAiAttackerImplConstruct` (in the
+ * `AiAttackerRecoveryBootstrap` static-init lane).
+ */
+CAiAttackerImpl::CAiAttackerImpl() noexcept
+{
+  // Compiler-emitted vtable init has already written
+  // `&CAiAttackerImpl::vftable` at offset +0x00 before this body runs.
+  // Zero everything past the vtable pointer so unused/unrecovered
+  // field lanes start at a known state.
+  auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
+  std::memset(bytes + sizeof(void*), 0, sizeof(CAiAttackerImpl) - sizeof(void*));
+
+  // IAiAttacker subobject's intrusive-listener list head at +0x04/+0x08.
+  // Binary self-links so the list reads as empty: prev = next = &head.
+  void** const listenerNext = reinterpret_cast<void**>(bytes + 0x04);
+  void** const listenerPrev = reinterpret_cast<void**>(bytes + 0x08);
+  *listenerNext = bytes + 0x04;
+  *listenerPrev = bytes + 0x04;
+
+  // CScriptObject base subobject at +0x0C. Placement-new sets its own
+  // vtable pointer (+0x0C) and zero-inits its fields. The binary
+  // additionally overrides this slot with the
+  // `??_7CAiAttackerImpl@@6BCScriptObject@@@` thunk-vftable for
+  // multi-base virtual dispatch — that override is out of scope for
+  // the recovered class declaration (CAiAttackerImpl doesn't inherit
+  // CScriptObject in src/sdk/**), so the embedded subobject's own
+  // vtable stays in place after construction. Virtual dispatch via
+  // direct pointer to the embedded base still terminates at
+  // CScriptObject's methods, matching the binary's CScriptObject
+  // base-class call behavior.
+  ::new (bytes + 0x0C) CScriptObject();
+
+  // Typed-view access for the remaining named fields.
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+
+  // mUnit at +0x40 — explicit null is redundant after memset but
+  // makes the initialization order match the binary.
+  view->mUnit = nullptr;
+
+  // CTaskStage embedded at +0x44. CTaskStage's ctor self-links the
+  // two embedded intrusive thread lists and sets `mActive = true`,
+  // matching the binary's three writes at +0x44/+0x4C/+0x54.
+  ::new (&view->mStage) CTaskStage();
+
+  // mWeapons (+0x58), mThread (+0x68), mTasks (+0x70) stay
+  // zero-initialized from the memset above — the binary writes
+  // each begin/end/cap-end pointer as null, which is the same state
+  // a zeroed memory region provides.
+
+  // CAiTarget mDesiredTarget at +0x80. Default ctor leaves all
+  // fields zero-initialized; the binary additionally writes
+  // `targetPoint = -1` at +0x18 (overall +0x98) as a sentinel
+  // "no target selected" value.
+  ::new (&view->mDesiredTarget) CAiTarget();
+  view->mDesiredTarget.targetPoint = -1;
+
+  // mReportingState at +0xA0 — zero is the binary's default "no
+  // event in flight" sentinel value for EAiAttackerEvent.
+  view->mReportingState = static_cast<EAiAttackerEvent>(0);
+}
+
 bool CAiAttackerImpl::TryGetWeaponExtraData(const int index, WeaponExtraData& out) const
 {
   out.key = 0;
