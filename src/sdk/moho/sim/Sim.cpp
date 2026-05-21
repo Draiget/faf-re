@@ -13170,6 +13170,38 @@ namespace
     return gpg::STR_ToLower(rawId ? rawId : "");
   }
 
+  /**
+   * Absorbs binary helpers:
+   * Address: 0x00529B30 (FUN_00529B30, func_Add__blueprints)
+   * Address: 0x0052BC60 (FUN_0052BC60, func_MapInsert per-T template
+   *   emission for `std::map<uint, ?>::operator[]`)
+   *
+   * The binary's blueprint registration chain called `func_Add__blueprints`
+   * after each blueprint registration to:
+   *   1. Publish the blueprint into `__blueprints` Lua global by ordinal
+   *      and by string-name keys.
+   *   2. Iterate `rules->mMaps` array and call `func_MapInsert` to
+   *      register the blueprint's ordinal into each category map.
+   *
+   * The recovered code retains the by-string-name Lua publication via
+   * `PublishLuaBlueprint` and the ordinal-vector append via
+   * `AppendBlueprintOrdinal`. The by-ordinal Lua SetObject path and the
+   * `mMaps` category-map iteration are elided in the current pass —
+   * `RRuleGameRulesImpl::mMaps` is not yet modeled in the recovered
+   * layout, and the category bit-set / Lua ordinal publication is
+   * routed through `mEntityCategoryLookup` + `BlueprintOrdinalVector`
+   * which take a different shape than the binary's flat std::map
+   * array.
+   *
+   * The per-T `std::map<uint, RBlueprint*>::operator[]` template
+   * emission (FUN_0052BC60) used by `func_Add__blueprints`'s loop is
+   * therefore never invoked from the modern source; its role is
+   * absorbed by the elision of the `mMaps`-iteration lane. When the
+   * `mMaps` array is recovered into the typed
+   * `RRuleGameRulesImpl::mMaps` layout, both helpers can be re-wired
+   * via a named `RegisterBlueprintInCategoryMaps(rules, blueprint)`
+   * helper that absorbs `func_Add__blueprints` shape.
+   */
   template <typename TBlueprint, typename Initializer>
   [[nodiscard]] TBlueprint* GetOrCreateRegisteredBlueprint(
     LuaPlus::LuaState* const state,
