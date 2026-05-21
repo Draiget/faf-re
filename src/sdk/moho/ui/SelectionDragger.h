@@ -93,6 +93,19 @@ namespace moho
     ~SelectionDragger2D() override = default;
 
     /**
+     * Address: 0x00865470 (FUN_00865470, Moho::SelectionDragger2D::Func1)
+     *
+     * What it does:
+     * Scalar-deleting-destructor variant for `SelectionDragger2D` —
+     * delegates to the implicit base/derived destructor chain and
+     * conditionally releases the object's heap storage when bit 0 of
+     * `deleteFlags` is set. Provided as an explicit named bridge so the
+     * binary's `??_GSelectionDragger2D@Moho@@UAEPAXI@Z`-style scalar
+     * deleting dtor vtable slot has a recovered source counterpart.
+     */
+    SelectionDragger2D* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
+
+    /**
      * Address: 0x00864FC0 (FUN_00864FC0, Moho::SelectionDragger2D::Func5)
      *
      * What it does:
