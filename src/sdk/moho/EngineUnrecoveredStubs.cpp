@@ -54,7 +54,8 @@ namespace moho
   // matching the Unit.h:485 declaration, so the no-op stub here is gone.
   class moho::CUnitCommand * func_OrderBuildStructure(class Wm3::Vector3<float> *,class moho::CAiBrain *,class moho::Unit *,char const *,class Wm3::Vector3<float> *,float) { return nullptr; }
   class moho::IWldTerrainRes * WLD_CreateTerrainRes(void) { return nullptr; }
-  struct moho::WD3DViewport * REN_CreateGameViewport(class wxWindowBase *,char const *,struct wxSize const &,bool) { return nullptr; }
+  // REN_CreateGameViewport now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
+  // (FUN_007FA230). Replaces the no-op stub.
   // moho::-namespace duplicates of the gpg::Save... stubs have been
   // dropped — no caller in src/sdk/** references the moho-qualified
   // versions; callers use the gpg::-qualified symbols which now resolve
