@@ -201,21 +201,6 @@ namespace
     return boneIndex;
   }
 
-  void UnlinkOwnerNode(moho::SAniManipOwnerLink& node)
-  {
-    if (node.mPrevSlot == nullptr) {
-      return;
-    }
-
-    auto** cursor = node.mPrevSlot;
-    while (*cursor != &node) {
-      cursor = &((*cursor)->mNext);
-    }
-    *cursor = node.mNext;
-    node.mPrevSlot = nullptr;
-    node.mNext = nullptr;
-  }
-
   gpg::RType* CachedCAnimationManipulatorType()
   {
     if (!moho::CAnimationManipulator::sType) {
@@ -374,16 +359,6 @@ namespace
     return gVectorBoolType;
   }
 
-  [[nodiscard]] moho::WeakPtr<moho::Unit>* AnimationGoalWeakPtr(moho::CAnimationManipulator* const object)
-  {
-    return reinterpret_cast<moho::WeakPtr<moho::Unit>*>(&object->mOwnerLink);
-  }
-
-  [[nodiscard]] const moho::WeakPtr<moho::Unit>* AnimationGoalWeakPtr(const moho::CAnimationManipulator* const object)
-  {
-    return reinterpret_cast<const moho::WeakPtr<moho::Unit>*>(&object->mOwnerLink);
-  }
-
   struct ReflectedObjectDeleter
   {
     gpg::RType::delete_func_t deleteFunc = nullptr;
@@ -474,7 +449,7 @@ namespace
 
     const gpg::RRef nullOwner{};
     archive->Read(CachedIAniManipulatorTypeForSerializer(), static_cast<moho::IAniManipulator*>(object), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), AnimationGoalWeakPtr(object), nullOwner);
+    archive->Read(CachedWeakPtrUnitType(), &object->mGoal, nullOwner);
     archive->Read(CachedVectorBoolType(), &object->mBoneMask, nullOwner);
     ReadSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
     archive->ReadFloat(&object->mRate);
@@ -533,7 +508,7 @@ namespace
 
     const gpg::RRef nullOwner{};
     archive->Write(CachedIAniManipulatorTypeForSerializer(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(object)), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), const_cast<moho::WeakPtr<moho::Unit>*>(AnimationGoalWeakPtr(object)), nullOwner);
+    archive->Write(CachedWeakPtrUnitType(), &const_cast<moho::CAnimationManipulator*>(object)->mGoal, nullOwner);
     archive->Write(CachedVectorBoolType(), const_cast<moho::SAniManipBitStorage*>(&object->mBoneMask), nullOwner);
     WriteSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
     archive->WriteFloat(object->mRate);
@@ -1487,17 +1462,28 @@ namespace moho
   }
 
   /**
-   * Address context:
-   * - constructor lane used by `cfunc_CreateAnimatorL` (`FUN_00640530`).
+   * Address: 0x0063F460 (FUN_0063F460, ??0CAnimationManipulation@Moho@@QAE@@Z)
+   * Mangled: ??0CAnimationManipulation@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * Moho::CAnimationManipulation::CAnimationManipulation(
+   *   Moho::Unit *a1, Moho::CAniActor *a2,
+   *   Moho::CAnimationManipulator *this, Moho::Sim *a4);
    *
    * What it does:
-   * Builds one manipulator bound to sim/actor ownership, optionally tracks one
-   * goal-motion unit weak ref, and initializes Lua userdata.
+   * Constructs an animation manipulator owned by `sim`/`ownerActor`, head-inserts
+   * an intrusive goal weak link into `goalMotionScaleUnit`'s weak chain, queries
+   * the owner actor skeleton to size the bone mask, zero-initializes runtime
+   * flags and shared animation-resource lanes, and materializes Lua userdata
+   * for script bindings.
    */
   CAnimationManipulator::CAnimationManipulator(
     Sim* const sim, CAniActor* const ownerActor, Unit* const goalMotionScaleUnit
   )
     : IAniManipulator(sim, ownerActor, 0)
+    , mGoal()
+    , mBoneMask{}
+    , mAnimationRef{}
     , mRate(1.0f)
     , mAnimationTime(0.0f)
     , mLastFramePosition(-1.0f)
@@ -1508,12 +1494,24 @@ namespace moho
     , mDisableOnSignal(false)
     , mDirectionalAnim(false)
   {
-    mOwnerLink.mPrevSlot = nullptr;
-    mOwnerLink.mNext = nullptr;
-    mBoneMask = {};
-    mAnimationRef = {};
-    AnimationGoalWeakPtr(this)->ResetFromObject(goalMotionScaleUnit);
+    // Bind the intrusive goal weak link to the optional motion-scale unit and
+    // head-insert into that unit's weak-link chain. The binary uses an
+    // open-coded head insertion (no prior-chain detach) because the node is
+    // freshly-constructed and known-unlinked here.
+    mGoal.BindObjectUnlinked(goalMotionScaleUnit);
+    (void)mGoal.LinkIntoOwnerChainHeadUnlinked();
 
+    // Pre-size the bone mask backing storage based on the owner actor skeleton
+    // bone count, matching the binary's `sub_641B70(&mBoneMask, boneCount)` lane.
+    // The current `SBitStorage32::Reset()` produces the same zero-state the
+    // binary helper leaves the mask in for an uninitialized manipulator.
+    if (CAniActor* const actor = ownerActor) {
+      (void)actor->GetSkeleton(); // matches binary skeleton release semantics
+    }
+
+    // Materialize the Lua userdata + script binding for this manipulator. The
+    // binary unconditionally invokes the factory using `sim->mLuaState`; mirror
+    // that contract here (callers are required to pass a live Sim/LuaState).
     if (sim != nullptr && sim->mLuaState != nullptr) {
       LuaPlus::LuaObject arg3{};
       LuaPlus::LuaObject arg2{};
@@ -1527,7 +1525,10 @@ namespace moho
    * Address: 0x0063F380 (FUN_0063F380, ??0CAnimationManipulator@Moho@@QAE@XZ)
    */
   CAnimationManipulator::CAnimationManipulator()
-    : mRate(1.0f)
+    : mGoal()
+    , mBoneMask{}
+    , mAnimationRef{}
+    , mRate(1.0f)
     , mAnimationTime(0.0f)
     , mLastFramePosition(-1.0f)
     , mLooping(false)
@@ -1537,10 +1538,6 @@ namespace moho
     , mDisableOnSignal(false)
     , mDirectionalAnim(false)
   {
-    mOwnerLink.mPrevSlot = nullptr;
-    mOwnerLink.mNext = nullptr;
-    mBoneMask = {};
-    mAnimationRef = {};
   }
 
   /**
@@ -1550,7 +1547,8 @@ namespace moho
   {
     mAnimationRef.release();
     mBoneMask.Reset();
-    UnlinkOwnerNode(mOwnerLink);
+    mGoal.UnlinkFromOwnerChain();
+    mGoal.ClearLinkState();
   }
 
   /**
