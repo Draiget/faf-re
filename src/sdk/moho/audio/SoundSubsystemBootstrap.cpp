@@ -16,6 +16,7 @@
 // populated at static-init time and torn down at static-deinit.
 
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 
 #include "boost/mutex.h"
@@ -213,6 +214,72 @@ namespace moho
 
     return &gSSndParamsCacheMirror;
   }
+
+  /**
+   * Address: 0x004DF0E0 (FUN_004DF0E0, Moho::TeardownSoundStructs)
+   *
+   * What it does:
+   * Tears down the engine's sound-subsystem globals at CRT static
+   * deinit time (registered via `std::atexit` mirroring the binary's
+   * CRT teardown registration). The body releases sentinel head nodes
+   * for the three RB-tree caches and the two list nodes, destroys the
+   * boost::mutex via in-place dtor, and resets all mirror globals to
+   * empty state. Modern `CSndParams.cpp` runtime globals are torn down
+   * separately by the compiler's normal static-deinit sequence.
+   *
+   * The binary's teardown body additionally invokes the eight
+   * `_Tree::erase` / `_Tree::clear` MSVC8 STL template emissions
+   * (sub_4E28A0, sub_4E2C80, sub_4E3020, sub_4E3290, sub_4E3410,
+   * sub_4E49A0, sub_4E4A00, sub_4E4A40) to walk the trees and free
+   * each node. Since the mirror trees are populated only with their
+   * sentinel head (no inserted entries — runtime inserts go to the
+   * modern globals), each tree contains zero non-sentinel nodes and
+   * the per-T erase emissions are no-ops; we elide the calls and
+   * directly free the sentinel storage.
+   */
+  void TeardownSoundStructs()
+  {
+    if (gStru_10A92D0Constructed) {
+      reinterpret_cast<boost::mutex*>(&gStru_10A92D0Storage[0])->~mutex();
+      gStru_10A92D0Constructed = false;
+    }
+
+    gDefSndLoopMirror.mListLinkHead = nullptr;
+    gDefSndLoopMirror.mLoopIndex = -1;
+    gDefSndLoopMirror.mParams = nullptr;
+
+    if (gStru_10A92BCMirror.head != nullptr) {
+      ::operator delete(gStru_10A92BCMirror.head);
+      gStru_10A92BCMirror.head = nullptr;
+    }
+    gStru_10A92BCMirror.flag = 0u;
+
+    if (gStru_10A92ACMirror.head != nullptr) {
+      ::operator delete(gStru_10A92ACMirror.head);
+      gStru_10A92ACMirror.head = nullptr;
+    }
+    gStru_10A92ACMirror.size = 0u;
+
+    if (gDword_10A92A4Mirror.head != nullptr) {
+      ::operator delete(gDword_10A92A4Mirror.head);
+      gDword_10A92A4Mirror.head = nullptr;
+    }
+    gDword_10A92A4Mirror.size = 0u;
+
+    if (gStru_10A9298Mirror.head != nullptr) {
+      ::operator delete(gStru_10A9298Mirror.head);
+      gStru_10A9298Mirror.head = nullptr;
+    }
+    gStru_10A9298Mirror.auxIter = nullptr;
+    gStru_10A9298Mirror.size = 0u;
+
+    if (gSSndParamsCacheMirror.head != nullptr) {
+      ::operator delete(gSSndParamsCacheMirror.head);
+      gSSndParamsCacheMirror.head = nullptr;
+    }
+    gSSndParamsCacheMirror.auxIter = nullptr;
+    gSSndParamsCacheMirror.size = 0u;
+  }
 } // namespace moho
 
 namespace
@@ -222,13 +289,17 @@ namespace
    * program load so the binary-mirror globals are populated before any
    * sound-subsystem code runs. The binary registers FUN_004DFC80 in the
    * `__xc_*` init array; in the modern build the same effect is
-   * achieved by this file-scope static-init dummy.
+   * achieved by this file-scope static-init dummy. The same dummy
+   * registers `Moho::TeardownSoundStructs` with `std::atexit` to
+   * mirror the binary's CRT-registered teardown (FUN_004DF0E0 via
+   * `FUN_00BF0E80` thunk).
    */
   struct SoundSubsystemBootstrapDriver
   {
     SoundSubsystemBootstrapDriver() noexcept
     {
       (void)moho::InitSoundStructs();
+      (void)std::atexit(&moho::TeardownSoundStructs);
     }
   };
 
