@@ -645,11 +645,81 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CUIKeyHandlerRuntime) == 0x28, "moho::CUIKeyHandlerRuntime size must be 0x28");
 
   /**
+   * Address: 0x010C1B48 (data segment global, 256 * 28 bytes = 0x1C00)
+   *
+   * Lookup table mapping wxKeyCode (0..255) to msvc8::string name. Populated
+   * at startup by `IN_InitKeyHandler` with "Unknown%02X" placeholders, then
+   * overwritten from `/lua/keymap/keyNames.lua` via `CUIKeyHandlerLoadKeyMappings`.
+   * Consumed by `IN_FindKeyNameIndex` / `IN_FindKeyNameIndexCi` to translate
+   * key-binding token strings into wx key codes.
+   */
+  extern msvc8::string in_keyNames[256];
+
+  /**
+   * Address: 0x00838F30 (FUN_00838F30, Moho::IN_FindKeyNameIndex)
+   *
+   * What it does:
+   * Case-sensitive linear scan of `in_keyNames` for one key name; returns the
+   * matching wxKeyCode (0..255) or -1 when no slot matches.
+   */
+  [[nodiscard]] int IN_FindKeyNameIndex(const msvc8::string& needle);
+
+  /**
+   * Address: 0x00838F80 (FUN_00838F80, Moho::IN_FindKeyNameIndexCi)
+   *
+   * What it does:
+   * Case-insensitive linear scan of `in_keyNames` for one key name; returns
+   * the matching wxKeyCode (0..255) or -1 when no slot matches.
+   */
+  [[nodiscard]] int IN_FindKeyNameIndexCi(const msvc8::string& needle);
+
+  /**
+   * Address: 0x00838C70 (FUN_00838C70, Moho::IN_InitKeyHandler)
+   *
+   * What it does:
+   * Initializes `in_keyNames[0..255]` with "Unknown%02X" placeholder strings,
+   * then loads engine key-name and key-map Lua data via
+   * `CUIKeyHandlerLoadKeyMappings`. Returns `true` on completion (engine's
+   * binary always reports success; failure paths emit warnings without aborting).
+   */
+  [[nodiscard]] bool IN_InitKeyHandler();
+
+  /**
+   * Address: 0x008394B0 (FUN_008394B0, Moho::CUIKeyHandler::SetKeyNameTable)
+   *
+   * What it does:
+   * Iterates one Lua key-names table (string keys are hex code spellings like
+   * "0x20", values are name strings) and overwrites `in_keyNames[parsedCode]`
+   * for each entry. Skips entries whose parsed code is > 0xFF with a warning.
+   *
+   * Recovered as a file-scope free helper because the engine source models
+   * `CUIKeyHandler` as a runtime free-function family rather than a class with
+   * static methods (see also `AddUiKeyMapEntries` / `RemoveUiKeyMapEntries` /
+   * `ClearUiKeyMaps`).
+   */
+  void CUIKeyHandlerSetKeyNameTable(const LuaPlus::LuaObject& keyNamesTable);
+
+  /**
+   * Address: 0x00839690 (FUN_00839690, Moho::CUIKeyHandler::LoadKeyMappings)
+   *
+   * What it does:
+   * Imports `/lua/keymap/keyNames.lua`, passes its `keyNames` sub-table to
+   * `CUIKeyHandlerSetKeyNameTable` to populate `in_keyNames`, then imports
+   * `/lua/keymap/keymapper.lua`, invokes `GetKeyMappings()`, and feeds the
+   * returned table to `AddUiKeyMapEntries`. Recovered as a file-scope free
+   * helper for the same reason as `CUIKeyHandlerSetKeyNameTable`.
+   */
+  void CUIKeyHandlerLoadKeyMappings();
+
+  /**
    * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
    *
    * What it does:
    * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into
-   * one packed keycode/modifier mask lane.
+   * one packed keycode/modifier mask lane. The primary token is resolved
+   * through `IN_FindKeyNameIndexCi` against the runtime-loaded `in_keyNames`
+   * table; modifier tokens ("ALT", "CTRL"/"CONTROL", "SHIFT") OR their
+   * corresponding high-bit flags into the result.
    */
   int IN_ParseKeyModifiers(const std::string& keyBindingSpec);
 
