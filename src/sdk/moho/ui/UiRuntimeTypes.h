@@ -2165,6 +2165,17 @@ namespace moho
      * Recreates mesh thumbnail texture-sheet storage when control dimensions
      * change, then refreshes mesh thumbnail rendering when mesh/rotation lanes
      * are marked dirty.
+     *
+     * The elided body invokes the following helper; with the body
+     * stubbed in EngineMethodStubs2.cpp (typed
+     * `CD3DDynamicTextureSheet` lock/get-size/unlock surface and
+     * `REN_RequestThumbnail` chain still under recovery), this helper
+     * is never invoked from the modern source and its role is absorbed
+     * by the elision of the thumbnail refresh lane:
+     *   - 0x0079E0B0 (`ZeroDynamicTextureSheetBuffer` — locks the
+     *     dynamic texture sheet at `this->mTextureSheet`, memsets
+     *     the locked buffer to zero, then unlocks; called before
+     *     `REN_RequestThumbnail` to clear stale pixels)
      */
     void Frame(float deltaSeconds) override;
 
