@@ -109,14 +109,9 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     moho::CommandModeData* out, moho::MouseInfo*, int, moho::CWldSession*) { return out; }
 
 // ===== Free wxRuntime helper =====
-//
-// TODO(recovery): wxDestroyListNoDeleteRuntime DOES have a recovered body in
-// src/sdk/moho/app/WxRuntimeTypes.cpp:75655, but it lives inside an anonymous
-// namespace (lines 75463-76408) so it has internal linkage and the file-scope
-// caller `wxDestroySocketBaseNoDeleteRuntime` (line 59506) cannot reach it.
-// This no-op stub provides a file-scope definition that satisfies the link;
-// the embedded list at WxSocketBase+0x28 is therefore not torn down. To use
-// the real recovery the wxList runtime helpers around line 75611-75665 need
-// to be lifted out of the anonymous namespace into file scope.
-void wxDestroyListNoDeleteRuntime(void* const) {}
+// wxDestroyListNoDeleteRuntime recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
+// — the anonymous-namespace body (`wxDestroyListNoDeleteRuntimeImpl`) is now
+// wrapped by a file-scope trampoline so the global symbol resolves to the
+// real wxList vtable-rebind + base-teardown body instead of falling back to
+// a no-op (was leaking the embedded list at WxSocketBase+0x28).
 
