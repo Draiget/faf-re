@@ -419,6 +419,24 @@ namespace moho
   int cfunc_IssueFerryL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F6060 (FUN_006F6060, cfunc_IssueRepair)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueRepairL`.
+   */
+  int cfunc_IssueRepair(lua_State* luaContext);
+
+  /**
+   * Address: 0x006F60D0 (FUN_006F60D0, cfunc_IssueRepairL)
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Repair-capable units, removes
+   * the target entity from the worker selection, and issues
+   * `UNITCOMMAND_Repair` on the remaining units against that entity target.
+   */
+  int cfunc_IssueRepairL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00836900 (FUN_00836900, cfunc_DecreaseBuildCountInQueue)
    *
    * What it does:

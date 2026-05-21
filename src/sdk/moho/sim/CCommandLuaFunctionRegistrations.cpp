@@ -128,6 +128,7 @@ namespace
   constexpr const char* kIssueAttackHelpText = "IssueAttack";
   constexpr const char* kIssuePatrolHelpText = "IssuePatrol";
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
+  constexpr const char* kIssueRepairHelpText = "IssueRepair";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
@@ -3635,6 +3636,78 @@ namespace moho
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Ferry);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F6060 (FUN_006F6060, cfunc_IssueRepair)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueRepair(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueRepairL`.
+   */
+  int cfunc_IssueRepair(lua_State* const luaContext)
+  {
+    return cfunc_IssueRepairL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F60D0 (FUN_006F60D0, cfunc_IssueRepairL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueRepairL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Repair-capable units, then
+   * removes the target entity from the worker selection (so a unit does not
+   * try to repair itself). If any workers remain, queues `UNITCOMMAND_Repair`
+   * targeting that entity through the shared dispatch shape.
+   */
+  int cfunc_IssueRepairL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueRepairHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueRepairHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Repair)) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
+
+    SEntitySetTemplateUnit workerSelection{};
+    workerSelection.AddUnits(filteredUnits);
+
+    // Drop the repair target itself out of the worker selection so a unit
+    // does not get tasked to repair itself when the script passed the same
+    // unit as both worker and target.
+    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+    if (workerSelection.Empty()) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.UpdateTarget(targetEntity);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Repair);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
     return 0;
   }
 
