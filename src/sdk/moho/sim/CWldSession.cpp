@@ -9929,6 +9929,23 @@ namespace moho
   /**
    * Address: 0x0085B6E0 (FUN_0085B6E0,
    * ?RenderStrategicIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@@Z)
+   *
+   * The elided body invokes the following per-T template emissions and
+   * blocked helper anchors; with the body elided in the current pass
+   * (no UnitIconData layout, no CD3DPrimBatcher surface, no
+   * struct_IconAux container), these helpers are never invoked from
+   * the modern source and their roles are absorbed by the elision of
+   * the enclosing strategic-icon render lane:
+   *   - 0x0085CA20 (icon-aux helper, external_dependency)
+   *   - 0x0085CD40 (icon classify helper, blocked)
+   *   - 0x0085D880 (lifebar bucket helper, blocked)
+   *   - 0x0085E0A0 (icon emit helper, blocked)
+   *   - 0x0085E3A0 (formation icon helper, blocked)
+   *   - 0x0085EED0 (msvc8::vector<UnitIconData>::push_back per-T
+   *     template emission, 52-byte stride — absorbed by elision; the
+   *     unit-classification buckets and per-icon push paths are not
+   *     present in the modern source until typed UnitIconData
+   *     recovery + CD3DPrimBatcher surface land in a follow-up pass)
    */
   void CWldSession::
     RenderStrategicIcons(CameraImpl* const /*camera*/, CD3DPrimBatcher* const /*primBatcher*/, CWldMap* const /*map*/)
@@ -9938,9 +9955,6 @@ namespace moho
     // 2) Classify units into icon/lifebar buckets (vec1..vec5).
     // 3) Render strategic icons via RenderUnitIcon (0x0085D9A0).
     // 4) Render formation icon pass and unit lifebar pass.
-    //
-    // Helper-chain anchors:
-    // 0x0085CA20, 0x0085CD40, 0x0085D880, 0x0085E0A0, 0x0085E3A0, 0x0085EED0.
     //
     // Deep lift blockers:
     // struct_IconAux/UnitIconData concrete layouts and CD3D* render interfaces.
