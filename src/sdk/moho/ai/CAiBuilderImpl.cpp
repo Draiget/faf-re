@@ -643,6 +643,24 @@ namespace
     RefreshRebuildMapExtremes(map);
   }
 
+  /**
+   * Absorbs binary helper:
+   * Address: 0x005A0040 (FUN_005A0040, msvc8::map<uint, RUnitBlueprint*>::operator[])
+   *
+   * The binary's `BuilderAddRebuildStructure` used the MSVC8
+   * `map<uint, RUnitBlueprint*>::operator[]` template emission to
+   * find-or-default-insert a rebuild entry by encoded cell key, then
+   * assigned the blueprint to the returned value slot. The recovered
+   * `AddOrUpdateRebuildNode` expresses the same find-or-insert
+   * semantics through the typed `SBuilderRebuildMap` (a recovered
+   * RB-tree layout with named fields and head sentinel) plus the
+   * named `FindRebuildNode` / `CreateRebuildMapNode` helpers, so the
+   * binary's `_Tree::operator[]` template emission is absorbed by
+   * the modern hand-coded RB-tree insert path. Observable behavior
+   * is identical (existing key updates blueprint in place; new key
+   * allocates a node, links left/right under the parent walk, and
+   * refreshes head leftmost/rightmost extrema).
+   */
   void AddOrUpdateRebuildNode(SBuilderRebuildMap& map, const std::uint32_t key, const RUnitBlueprint* blueprint)
   {
     if (!map.mHead) {
