@@ -2,55 +2,55 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`20/05/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`21/05/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`96.45%`**
+- Progress coverage:  **`96.48%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,784`*
+  - *Total amount of completed tokens: `64,800`*
 
 Progress DB status breakdown:
 
-- `recovered`: `52,897` (81.65%)
+- `recovered`: `52,913` (81.66%)
 - `skip`: `6,104` (9.42%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
-- `external_dependency`: `5,783` (8.93%) — third-party libs
+- `external_dependency`: `5,783` (8.92%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
-- `in_progress`: `74` (0.11%)
-- **`blocked`: `2,370` (3.53%)**
+- `in_progress`: `62` (0.09%)
+- **`blocked`: `2,366` (3.52%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,373`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,373`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,369`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,369`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Caller-Wiring Health
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (52,897 functions) — wiring health
+### Recovered (52,913 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `14,745` | 27.87% |
-| Vtable-anchored (virtual override of a recovered class) | `5,791` | 10.95% |
+| **Confirmed caller** (recovered binary caller wired by name) | `14,766` | 27.91% |
+| Vtable-anchored (virtual override of a recovered class) | `5,791` | 10.94% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,493` | 10.38% |
-| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,919` | 5.52% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,730` | 44.86% |
+| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,913` | 5.51% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,731` | 44.85% |
 | Unclassified data xref (manual review) | `215` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,373 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,369 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `542` | 22.84% |
-| Vtable-anchored (recover with the owning class) | `239` | 10.07% |
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `541` | 22.84% |
+| Vtable-anchored (recover with the owning class) | `239` | 10.09% |
 | Framework dispatch (wx/EH/Lua/reflection) | `36` | 1.52% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,102` | 46.44% |
-| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `452` | 19.05% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,100` | 46.43% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `451` | 19.04% |
 | Unclassified data xref (manual review) | `1` | 0.04% |
 | RTTI-only | `1` | 0.04% |
 
