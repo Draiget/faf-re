@@ -50,7 +50,6 @@ namespace moho
   int cfunc_IssueNuke(lua_State*) { return 0; }
   int cfunc_IssueOverCharge(lua_State*) { return 0; }
   int cfunc_IssueReclaim(lua_State*) { return 0; }
-  int cfunc_IssueRepair(lua_State*) { return 0; }
   int cfunc_IssueSacrifice(lua_State*) { return 0; }
   int cfunc_IssueScript(lua_State*) { return 0; }
   int cfunc_IssueTeleport(lua_State*) { return 0; }
