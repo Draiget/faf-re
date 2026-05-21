@@ -227,15 +227,19 @@ namespace moho
    * empty state. Modern `CSndParams.cpp` runtime globals are torn down
    * separately by the compiler's normal static-deinit sequence.
    *
-   * The binary's teardown body additionally invokes the eight
+   * The binary's teardown body additionally invokes the
    * `_Tree::erase` / `_Tree::clear` MSVC8 STL template emissions
    * (sub_4E28A0, sub_4E2C80, sub_4E3020, sub_4E3290, sub_4E3410,
    * sub_4E49A0, sub_4E4A00, sub_4E4A40) to walk the trees and free
-   * each node. Since the mirror trees are populated only with their
-   * sentinel head (no inserted entries — runtime inserts go to the
-   * modern globals), each tree contains zero non-sentinel nodes and
-   * the per-T erase emissions are no-ops; we elide the calls and
-   * directly free the sentinel storage.
+   * each node, plus the defensive `_Tree::_Copy` chain
+   * (sub_4E1A60 copy ctor + sub_4E5960 tree-clone inner loop) that
+   * copies `unk_10A92B8` into a local tree, walks the copy, then
+   * walks the original before freeing both. Since the mirror trees
+   * are populated only with their sentinel head (no inserted entries
+   * — runtime inserts go to the modern globals), each tree contains
+   * zero non-sentinel nodes and the per-T erase/clone emissions are
+   * no-ops; we elide the calls and directly free the sentinel
+   * storage.
    */
   void TeardownSoundStructs()
   {
