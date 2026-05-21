@@ -1029,6 +1029,20 @@ namespace
     ResizeOccupySourceBindingVectorWithFill(*storage, static_cast<std::size_t>(count), defaultBinding);
   }
 
+  /**
+   * Address: 0x0076C270 (FUN_0076C270, msvc8::vector<ClusterMap*>::resize)
+   *
+   * The binary's `PathTables::PathTables` ctor called the per-T
+   * `msvc8::vector<ClusterMap*>::resize(n)` template emission
+   * (FUN_0076C270, 4-byte pointer stride) to grow `mImpl->mMaps`
+   * to the footprint count before populating each slot with a fresh
+   * `ClusterMap*`. The recovered `ResizeLegacyPointerStorage`
+   * provides the same role through a single ::operator new[] +
+   * std::memset zero-init pass, so the per-T vector-resize emission
+   * is absorbed by this named helper. The inner blocked helper
+   * FUN_0076C850 (per-T uninitialized fill) corresponds to the
+   * `std::memset(begin, 0, count*sizeof(T))` step below.
+   */
   bool ResizeLegacyPointerStorage(LegacyVectorStorage<moho::ClusterMap*>& storage, const std::size_t count)
   {
     if (count == 0u) {
