@@ -62,7 +62,9 @@ void SMassInfo::MemberSerialize(gpg::WriteArchive*) const {}
 void SkyDome::CreateTextures() {}
 
 // ===== Virtual destructors =====
-CAiAttackerImpl::~CAiAttackerImpl() {}
+// CAiAttackerImpl::~CAiAttackerImpl is recovered in CAiAttackerImpl.cpp
+// (matches FUN_005D6BC0); see the typed dtor body there for the real
+// teardown sequence that pairs with the recovered default ctor.
 SkyDome::~SkyDome() {}
 
 // ===== Virtual Execute() returning int =====
