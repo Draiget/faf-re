@@ -57,8 +57,8 @@ void CMauiMesh::Frame(float) {}
 void CRenFrame::Render(int, int) {}
 void CameraImpl::Frame(float, float) {}
 void CollisionBeamEntity::CheckCollision() {}
-void SMassInfo::MemberDeserialize(gpg::ReadArchive*) {}
-void SMassInfo::MemberSerialize(gpg::WriteArchive*) const {}
+// SMassInfo::MemberDeserialize / MemberSerialize recovered in
+// src/sdk/moho/sim/SMassInfo.cpp (matches FUN_00593030 / FUN_00593080).
 void SkyDome::CreateTextures() {}
 
 // ===== Virtual destructors =====
