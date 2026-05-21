@@ -132,6 +132,7 @@ using EntId = std::int32_t;
 
 std::uint8_t moho::ren_Steering = 0;
 bool moho::sim_KeepAllLogFiles = false;
+bool moho::sim_ShowDamage = false;
 
 namespace moho
 {

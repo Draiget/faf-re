@@ -64,7 +64,14 @@ namespace moho
   // SaveBroadcasterListener...) below.
   // CON_WxInputBox now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
   // (FUN_004FC900). Replaces the no-op stub.
-  void SIM_Damage(class moho::Sim *,class moho::CDamage const &) {}
+  // SIM_Damage now recovered in src/sdk/moho/sim/CDamage.cpp
+  // (FUN_00737E60) along with its mMethod==0 callee
+  // SIM_DoDamagePoint (FUN_00737140). Replaces the no-op stub.
+  // SIM_DoDamageArea (FUN_00737680, mMethod==1) and func_DoDamageRing
+  // (FUN_00737B30, mMethod==2) are still blocked; their stubs live here
+  // so the SIM_Damage dispatcher links until those bodies are recovered.
+  void SIM_DoDamageArea(class moho::Sim *, class moho::CDamage const &) {}
+  void func_DoDamageRing(class moho::Sim *, class moho::CDamage const &) {}
 }
 
 // REMOVED: ADXM_WaitVsync, mpvcdec_InitDct C++-mangled stubs. Their C-linkage

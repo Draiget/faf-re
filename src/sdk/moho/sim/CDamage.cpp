@@ -1,10 +1,12 @@
 #include "moho/sim/CDamage.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <new>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
@@ -13,12 +15,20 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/Shield.h"
+#include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
+#include "moho/projectile/Projectile.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CArmyStats.h"
 #include "moho/sim/CDamageEMethodTypeInfo.h"
 #include "moho/sim/CDamageLuaFunctionRegistrations.h"
+#include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/CPlatoon.h"
 #include "moho/sim/SMinMax.h"
 #include "moho/sim/Sim.h"
+#include "moho/ui/SDebugLine.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -508,6 +518,253 @@ namespace moho
   {
     (void)preregister_CDamageTypeInfo();
     return std::atexit(&cleanup_CDamageTypeInfo);
+  }
+
+  /**
+   * Address: 0x00737140 (FUN_00737140, Moho::SIM_DoDamagePoint)
+   * Mangled: ?SIM_DoDamagePoint@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * IDA signature:
+   * void __cdecl Moho::SIM_DoDamagePoint(Moho::Sim *sim, const Moho::CDamage &damage);
+   *
+   * What it does:
+   * Applies one point-damage payload to a single target unit:
+   *   - When `sim_ShowDamage` is enabled, draws a debug arrow from impact
+   *     origin to the target and (when |amount| is large enough) an
+   *     amount-scaled wire sphere around the target.
+   *   - Skips the body entirely when `damage.mAmount == 0`.
+   *   - Walks one step through any projectile-launcher chain on the
+   *     instigator side and silently returns if the (possibly substituted)
+   *     instigator equals the target and `mDamageSelf` is false.
+   *   - If the target is a unit, applies `Unit::ProcessArmorOnDamage`,
+   *     divides by `(handicap + 1)`, fires the `OnDamageBy` script with
+   *     the instigator's army id, and fires `OnExtraDamageDealt` when the
+   *     post-armor amount is >= 2x the original.
+   *   - When the instigator has an army, accumulates
+   *     `DamageStats_TotalDamageDealt` and the per-blueprint
+   *     `Units_TotalDamageDealt` lane and adds `amount` to that army's
+   *     platoon-for-instigator `mLifetimeStat3` accumulator.
+   *   - When the target has an army, mirrors the same accumulation into
+   *     `DamageStats_TotalDamageReceived` /
+   *     `Units_TotalDamageReceive` and the target platoon's
+   *     `mLifetimeStat4` lane.
+   *   - When the post-armor amount is positive, logs
+   *     `"DealDamage(target=0x%08x, amt=%.1f)"`, packs `mVector` into a
+   *     Lua vec3, and invokes the target's `OnDamage` script callback.
+   */
+  void SIM_DoDamagePoint(Sim* const sim, const CDamage& damage)
+  {
+    Entity* const targetEntity = damage.mTarget.GetObjectPtr();
+
+    // Optional debug overlay: arrow from impact origin to target, plus an
+    // amount-scaled wire sphere when |amount * 0.01| exceeds 1e-6.
+    if (sim_ShowDamage) {
+      CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+      if (targetEntity != nullptr && debugCanvas != nullptr) {
+        const Wm3::Vec3f& targetPosition = targetEntity->Position;
+        SDebugLine debugLine{};
+        debugLine.p0 = targetPosition;
+        debugLine.p1.x = targetPosition.x - damage.mVector.x;
+        debugLine.p1.y = targetPosition.y - damage.mVector.y;
+        debugLine.p1.z = targetPosition.z - damage.mVector.z;
+        debugLine.depth0 = -65536;
+        debugLine.depth1 = -65536;
+        debugCanvas->DebugDrawLine(debugLine);
+
+        const float scaledAmount = damage.mAmount * 0.0099999998f;
+        if (std::fabs(0.000001f) <= std::fabs(scaledAmount)) {
+          const Wm3::Vec3f upAxis{0.0f, 1.0f, 0.0f};
+          debugCanvas->AddWireSphere(targetPosition, upAxis, scaledAmount, static_cast<std::uint32_t>(-65536));
+        }
+      }
+    }
+
+    if (damage.mAmount == 0.0f) {
+      return;
+    }
+
+    // Self-damage suppression: walk one step through the projectile
+    // launcher chain on the instigator side, then early-return if the
+    // resolved instigator equals the target.
+    //
+    // Binary edge case: when the instigator IS a projectile but has no
+    // bound launcher weak-link, the comparison is skipped entirely
+    // (control falls out of the self-damage block without performing
+    // any equality test), so a launcher-less projectile cannot suppress
+    // damage to itself via this path.
+    if (!damage.mDamageSelf) {
+      Entity* const directTarget = damage.mTarget.GetObjectPtr();
+      if (Entity* const rawInstigator = damage.mInstigator.GetObjectPtr(); rawInstigator != nullptr) {
+        Entity* resolvedInstigator = rawInstigator;
+        bool runEqualityCheck = true;
+        if (Projectile* const projectile = rawInstigator->IsProjectile(); projectile != nullptr) {
+          if (Entity* const launcherEntity = projectile->GetLauncherEntity(); launcherEntity != nullptr) {
+            resolvedInstigator = launcherEntity;
+          } else {
+            runEqualityCheck = false;
+          }
+        }
+        if (runEqualityCheck && resolvedInstigator == directTarget) {
+          return;
+        }
+      }
+    }
+
+    // Armor scaling + per-army handicap divisor for the target unit.
+    float postArmorAmount = damage.mAmount;
+    Unit* const targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+    if (targetUnit != nullptr) {
+      const float armoredAmount = targetUnit->ProcessArmorOnDamage(damage.mAmount, damage.mType);
+      CArmyImpl* const targetArmy = targetUnit->ArmyRef;
+      float handicap = 0.0f;
+      if (targetArmy != nullptr && targetArmy->HasHandicap != 0.0f) {
+        handicap = targetArmy->Handicap;
+      }
+      postArmorAmount = armoredAmount / (handicap + 1.0f);
+      const float relativeDamage = postArmorAmount / damage.mAmount;
+
+      if (postArmorAmount > 0.0f) {
+        if (Entity* const scriptInstigator = damage.mInstigator.GetObjectPtr();
+            scriptInstigator != nullptr && scriptInstigator->ArmyRef != nullptr)
+        {
+          const int instigatorArmyIndex = scriptInstigator->ArmyRef->ArmyId + 1;
+          targetUnit->RunScriptInt("OnDamageBy", instigatorArmyIndex);
+        }
+      }
+
+      if (relativeDamage >= 2.0f) {
+        const std::string_view typeView = damage.mType.view();
+        targetUnit->CallString("OnExtraDamageDealt", std::string(typeView.data(), typeView.size()));
+      }
+    }
+
+    // Instigator-side army-wide and per-platoon damage-dealt stats.
+    if (damage.mInstigator.HasValue()) {
+      if (Entity* const instigatorEntity = damage.mInstigator.GetObjectPtr();
+          instigatorEntity != nullptr && instigatorEntity->ArmyRef != nullptr)
+      {
+        CArmyImpl* const instigatorArmy = instigatorEntity->ArmyRef;
+        CArmyStats* const armyStats = instigatorArmy->GetArmyStats();
+        if (armyStats != nullptr) {
+          CArmyStatItem* const dealtItem = ResolveArmyStatItemCachedCreate(armyStats, "DamageStats_TotalDamageDealt");
+          if (dealtItem != nullptr) {
+            dealtItem->SynchronizeAsFloat();
+            (void)dealtItem->AddFloat(&postArmorAmount);
+          }
+
+          if (Unit* const instigatorUnit = instigatorEntity->IsUnit(); instigatorUnit != nullptr) {
+            const RUnitBlueprint* const blueprint = instigatorUnit->GetBlueprint();
+            (void)armyStats->AddBlueprintStatDelta(
+              "Units_TotalDamageDealt",
+              reinterpret_cast<const ArmyBlueprintNameView*>(blueprint),
+              postArmorAmount
+            );
+
+            ESquadClass squadClass{};
+            CPlatoon* const platoon = instigatorArmy->GetPlatoonFor(
+              static_cast<int>(reinterpret_cast<std::uintptr_t>(instigatorUnit)),
+              &squadClass
+            );
+            if (platoon != nullptr) {
+              platoon->mLifetimeStat3 += postArmorAmount;
+            }
+          }
+        }
+      }
+    }
+
+    // Target-side army-wide and per-platoon damage-received stats. The
+    // binary gates both the instigator-side and target-side stat blocks
+    // on the instigator weak-link being non-null and non-sentinel; that
+    // behavior is preserved here (an unbound instigator skips target
+    // stats too).
+    if (damage.mInstigator.HasValue()) {
+      if (Entity* const targetForStats = damage.mTarget.GetObjectPtr();
+          targetForStats != nullptr && targetForStats->ArmyRef != nullptr)
+      {
+        CArmyImpl* const targetArmy = targetForStats->ArmyRef;
+        CArmyStats* const armyStats = targetArmy->GetArmyStats();
+        if (armyStats != nullptr) {
+          CArmyStatItem* const receivedItem = ResolveArmyStatItemCachedCreate(armyStats, "DamageStats_TotalDamageReceived");
+          if (receivedItem != nullptr) {
+            receivedItem->SynchronizeAsFloat();
+            (void)receivedItem->AddFloat(&postArmorAmount);
+          }
+
+          if (Unit* const targetUnitForStats = targetForStats->IsUnit(); targetUnitForStats != nullptr) {
+            const RUnitBlueprint* const targetBlueprint = targetUnitForStats->GetBlueprint();
+            (void)armyStats->AddBlueprintStatDelta(
+              "Units_TotalDamageReceive",
+              reinterpret_cast<const ArmyBlueprintNameView*>(targetBlueprint),
+              postArmorAmount
+            );
+
+            ESquadClass squadClass{};
+            CPlatoon* const platoon = targetArmy->GetPlatoonFor(
+              static_cast<int>(reinterpret_cast<std::uintptr_t>(targetUnitForStats)),
+              &squadClass
+            );
+            if (platoon != nullptr) {
+              platoon->mLifetimeStat4 += postArmorAmount;
+            }
+          }
+        }
+      }
+    }
+
+    // Log and fire target's OnDamage script when the post-armor amount is
+    // still positive after armor/handicap scaling.
+    if (postArmorAmount > 0.0f) {
+      Entity* const finalTarget = damage.mTarget.GetObjectPtr();
+      const EntId targetId = (finalTarget != nullptr) ? finalTarget->id_ : EntId{0};
+      sim->Logf("DealDamage(target=0x%08x, amt=%.1f)\n", targetId, postArmorAmount);
+
+      const LuaPlus::LuaObject damagePayload = SCR_ToLua<Wm3::Vector3<float>>(sim->mLuaState, damage.mVector);
+      if (finalTarget != nullptr) {
+        const std::string_view typeView = damage.mType.view();
+        finalTarget->RunScriptEntityOnDamage(
+          damage.mInstigator,
+          postArmorAmount,
+          damagePayload,
+          std::string(typeView.data(), typeView.size())
+        );
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00737E60 (FUN_00737E60, Moho::SIM_Damage)
+   * Mangled: ?SIM_Damage@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * IDA signature:
+   * void __fastcall Moho::SIM_Damage(Moho::Sim *sim, const Moho::CDamage &damage);
+   *
+   * What it does:
+   * Dispatches one damage payload by `damage.mMethod` to the matching
+   * applier free function. The single-target lane additionally skips the
+   * call when the target entity is already dead.
+   */
+  void SIM_Damage(Sim* const sim, const CDamage& damage)
+  {
+    switch (damage.mMethod) {
+    case CDamage_AREA_EFFECT:
+      SIM_DoDamageArea(sim, damage);
+      return;
+    case CDamage_RING_EFFECT:
+      func_DoDamageRing(sim, damage);
+      return;
+    case CDamage_SINGLE_TARGET:
+    default: {
+      Entity* const targetEntity = damage.mTarget.GetObjectPtr();
+      if (targetEntity == nullptr) {
+        return;
+      }
+      if (!targetEntity->Dead) {
+        SIM_DoDamagePoint(sim, damage);
+      }
+      return;
+    }
+    }
   }
 } // namespace moho
 

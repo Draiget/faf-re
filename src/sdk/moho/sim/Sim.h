@@ -6591,6 +6591,15 @@ namespace moho
   extern std::uint8_t ren_Steering;
 
   /**
+   * Address: 0x010A63D6 (?sim_ShowDamage@Moho@@3_NA)
+   *
+   * What it does:
+   * When enabled, the Sim damage applier draws a debug arrow from impact
+   * origin to target and an amount-scaled wire sphere around the target.
+   */
+  extern bool sim_ShowDamage;
+
+  /**
    * Address: 0x010A63D7 (?sim_KeepAllLogFiles@Moho@@3_NA)
    *
    * What it does:
