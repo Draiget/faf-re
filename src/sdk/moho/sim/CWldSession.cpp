@@ -9885,6 +9885,17 @@ namespace moho
 
   /**
    * Address: 0x008515B0 (FUN_008515B0, ?DrawCommandSplats@CWldSession@Moho@@QAEXXZ)
+   *
+   * The elided body invokes the following per-T template emission;
+   * with the body elided in the current pass (no CD3DPrimBatcher
+   * surface, no command-splat line/quad-batch types modeled), this
+   * helper is never invoked from the modern source and its role is
+   * absorbed by the elision of the command-splat draw lane:
+   *   - 0x008522A0 (msvc8::vector<SCommandSplatLine>::push_back per-T
+   *     template emission, 12-byte stride — absorbed by elision; the
+   *     line/quad-batch push path is not present in the modern
+   *     source until the typed CD3DPrimBatcher line lane lands in a
+   *     follow-up pass)
    */
   void CWldSession::DrawCommandSplats()
   {
