@@ -22506,7 +22506,7 @@ int moho::cfunc_KeycodeMSWToMauiL(LuaPlus::LuaState* const state)
 
 bool moho::UI_InitKeyHandler()
 {
-  return true;
+  return IN_InitKeyHandler();
 }
 
 /**
@@ -23529,6 +23529,12 @@ void moho::UI_DumpCurrentInputCapture()
  * `wxEvtHandlerRuntime` destruction.
  */
 moho::CUIKeyHandlerRuntime::~CUIKeyHandlerRuntime() = default;
+
+namespace moho
+{
+  msvc8::string in_keyNames[256]{};
+} // namespace moho
+
 namespace
 {
   [[nodiscard]] std::string ToUpperAscii(std::string token)
@@ -23542,72 +23548,8 @@ namespace
     return token;
   }
 
-  [[nodiscard]] int ParsePrimaryKeyToken(const std::string& primaryToken)
-  {
-    if (primaryToken.empty()) {
-      return 0;
-    }
-
-    const std::string key = ToUpperAscii(primaryToken);
-    if (key.size() == 1u) {
-      return static_cast<int>(key[0]);
-    }
-
-    if (key[0] == 'F' && key.size() <= 3u) {
-      const int functionIndex = std::atoi(key.c_str() + 1);
-      if (functionIndex >= 1 && functionIndex <= 24) {
-        return moho::MKEY_F1 + (functionIndex - 1);
-      }
-    }
-
-    if (key == "SPACE") {
-      return moho::MKEY_SPACE;
-    }
-    if (key == "TAB") {
-      return moho::MKEY_TAB;
-    }
-    if (key == "ENTER" || key == "RETURN") {
-      return moho::MKEY_RETURN;
-    }
-    if (key == "ESC" || key == "ESCAPE") {
-      return moho::MKEY_ESCAPE;
-    }
-    if (key == "LEFT") {
-      return moho::MKEY_LEFT;
-    }
-    if (key == "RIGHT") {
-      return moho::MKEY_RIGHT;
-    }
-    if (key == "UP") {
-      return moho::MKEY_UP;
-    }
-    if (key == "DOWN") {
-      return moho::MKEY_DOWN;
-    }
-    if (key == "HOME") {
-      return moho::MKEY_HOME;
-    }
-    if (key == "END") {
-      return moho::MKEY_END;
-    }
-    if (key == "PGUP" || key == "PAGEUP" || key == "PRIOR") {
-      return moho::MKEY_PRIOR;
-    }
-    if (key == "PGDN" || key == "PAGEDOWN" || key == "NEXT") {
-      return moho::MKEY_NEXT;
-    }
-
-    return 0;
-  }
 } // namespace
 
-/**
- * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
- *
- * What it does:
- * Parses one key-binding token string (key[-modifier[-modifier...]]) into
- * one packed keycode/modifier mask lane.
- */
 /**
  * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
  *
@@ -23839,6 +23781,157 @@ moho::CScrLuaInitForm* moho::register_IN_ClearKeyMap_LuaFuncDef()
   return func_IN_ClearKeyMap_LuaFuncDef();
 }
 
+/**
+ * Address: 0x00838F30 (FUN_00838F30, Moho::IN_FindKeyNameIndex)
+ *
+ * What it does:
+ * Case-sensitive linear scan of `in_keyNames` for one key name; returns the
+ * matching wxKeyCode (0..255) or -1 when no slot matches. Mirrors the binary's
+ * MSVC8 `std::string::compare(0, _Mysize, needlePtr, needleSize)` per-slot
+ * equality test which returns 0 on match.
+ */
+int moho::IN_FindKeyNameIndex(const msvc8::string& needle)
+{
+  const char* const needlePtr = needle.c_str();
+  const std::size_t needleSize = needle.size();
+
+  for (int index = 0; index < 256; ++index) {
+    const msvc8::string& slot = in_keyNames[index];
+    if (slot.compare(0u, slot.size(), needlePtr, needleSize) == 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Address: 0x00838F80 (FUN_00838F80, Moho::IN_FindKeyNameIndexCi)
+ *
+ * What it does:
+ * Case-insensitive linear scan of `in_keyNames` for one key name; returns the
+ * matching wxKeyCode (0..255) or -1 when no slot matches. The binary uses
+ * `stricmp` on the SSO-resolved character pointers of slot and needle.
+ */
+int moho::IN_FindKeyNameIndexCi(const msvc8::string& needle)
+{
+  const char* const needlePtr = needle.c_str();
+
+  for (int index = 0; index < 256; ++index) {
+    if (_stricmp(in_keyNames[index].c_str(), needlePtr) == 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Address: 0x008394B0 (FUN_008394B0, Moho::CUIKeyHandler::SetKeyNameTable)
+ *
+ * What it does:
+ * Iterates one Lua key-names table (string keys are hex code spellings like
+ * "0x20", values are name strings) and overwrites `in_keyNames[parsedCode]`
+ * for each entry. Skips entries whose parsed code is > 0xFF with a warning,
+ * mirroring the binary's bounds check on `STR_Xtoi`.
+ */
+void moho::CUIKeyHandlerSetKeyNameTable(const LuaPlus::LuaObject& keyNamesTable)
+{
+  if (!keyNamesTable.IsTable()) {
+    gpg::Warnf("CUIKeyHandler::SetKeyNameTable wasn't passed a table");
+    return;
+  }
+
+  for (LuaPlus::LuaTableIterator iter(keyNamesTable, 1); !iter.m_isDone; iter.Next()) {
+    const char* const keyText = iter.m_keyObj.GetString();
+    if (keyText == nullptr) {
+      continue;
+    }
+
+    const unsigned int keyCode = gpg::STR_Xtoi(keyText);
+    if (keyCode > 0xFFu) {
+      gpg::Warnf("CUIKeyHandler::SetKeyNameTable found incorrect key code in key names: %s", keyText);
+      continue;
+    }
+
+    const char* const valueText = iter.m_valueObj.GetString();
+    if (valueText == nullptr) {
+      continue;
+    }
+
+    in_keyNames[keyCode].assign_owned(std::string_view{valueText, std::strlen(valueText)});
+  }
+}
+
+/**
+ * Address: 0x00839690 (FUN_00839690, Moho::CUIKeyHandler::LoadKeyMappings)
+ *
+ * What it does:
+ * Imports `/lua/keymap/keyNames.lua`, passes its `keyNames` sub-table to
+ * `CUIKeyHandlerSetKeyNameTable` to populate `in_keyNames`, then imports
+ * `/lua/keymap/keymapper.lua`, invokes `GetKeyMappings()`, and feeds the
+ * returned table to `AddUiKeyMapEntries`. Warns and returns early when
+ * `keyNames.lua` does not deliver a table; emits a similar warning when
+ * `GetKeyMappings()` returns a non-table value.
+ */
+void moho::CUIKeyHandlerLoadKeyMappings()
+{
+  LuaPlus::LuaState* const state = USER_GetLuaState();
+  if (state == nullptr) {
+    gpg::Warnf("CUIKeyHandler::LoadKeyMappings unable to resolve user lua state.");
+    return;
+  }
+
+  const LuaPlus::LuaObject keyNamesModule = SCR_Import(state, "/lua/keymap/keyNames.lua");
+  if (!keyNamesModule.IsTable()) {
+    gpg::Warnf("CUIKeyHandler::LoadKeyMappings unable to open default key names file.");
+    return;
+  }
+
+  const LuaPlus::LuaObject keyNamesTable = keyNamesModule.GetByName("keyNames");
+  CUIKeyHandlerSetKeyNameTable(keyNamesTable);
+
+  const LuaPlus::LuaObject keymapperModule = SCR_Import(state, "/lua/keymap/keymapper.lua");
+  const LuaPlus::LuaObject getKeyMappingsObject = keymapperModule["GetKeyMappings"];
+  const LuaPlus::LuaFunction<LuaPlus::LuaObject> getKeyMappingsFn(getKeyMappingsObject);
+  const LuaPlus::LuaObject keyMapTable = getKeyMappingsFn.Call_Obj();
+  if (keyMapTable.IsTable()) {
+    AddUiKeyMapEntries(keyMapTable);
+  } else {
+    gpg::Warnf("CUIKeyHandler::LoadKeyMappings unable to map keys, requires table.");
+  }
+}
+
+/**
+ * Address: 0x00838C70 (FUN_00838C70, Moho::IN_InitKeyHandler)
+ *
+ * What it does:
+ * Initializes the 256-entry `in_keyNames` array with "Unknown%02X" placeholder
+ * defaults (indexed by wxKeyCode), then loads Lua-side key name and key-map
+ * tables via `CUIKeyHandlerLoadKeyMappings`. Returns `true` to signal the
+ * caller (CUIManager::Init) that input wiring completed; the binary always
+ * reports success and surfaces failure paths via warnings only.
+ */
+bool moho::IN_InitKeyHandler()
+{
+  for (int code = 0; code < 256; ++code) {
+    const msvc8::string placeholder = gpg::STR_Printf("Unknown%02X", code);
+    in_keyNames[code].assign(placeholder, 0u, msvc8::string::npos);
+  }
+
+  CUIKeyHandlerLoadKeyMappings();
+  return true;
+}
+
+/**
+ * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
+ *
+ * What it does:
+ * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into
+ * one packed keycode/modifier mask lane. The primary token is resolved through
+ * `IN_FindKeyNameIndexCi` against the runtime-loaded `in_keyNames` table, so
+ * unknown primary names yield `-1` (preserving the binary's signed return);
+ * modifier tokens ("ALT", "CTRL"/"CONTROL", "SHIFT") OR their corresponding
+ * high-bit flags into the result.
+ */
 int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
 {
   if (keyBindingSpec.empty()) {
@@ -23864,7 +23957,9 @@ int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
     return 0;
   }
 
-  int keyMask = ParsePrimaryKeyToken(tokens.front());
+  const msvc8::string primaryToken{tokens.front().c_str(), tokens.front().size()};
+  int keyMask = IN_FindKeyNameIndexCi(primaryToken);
+
   for (std::size_t tokenIndex = 1u; tokenIndex < tokens.size(); ++tokenIndex) {
     const std::string modifier = ToUpperAscii(tokens[tokenIndex]);
     if (modifier == "ALT") {
