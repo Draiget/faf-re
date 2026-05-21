@@ -11,7 +11,9 @@
 #include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/console/CConCommand.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -21,7 +23,9 @@
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/render/RCamManager.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/ArmyUnitSet.h"
@@ -33,6 +37,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/ui/IUIManager.h"
+#include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
 {
@@ -324,6 +329,74 @@ namespace
     }
     return selectedUnits;
   }
+
+  /**
+   * Local mirror of `CameraImpl.cpp`'s anonymous helper: build one MSVC RB-tree
+   * head sentinel for `Moho::SSelectionSetUserEntity` and pre-link its
+   * Left/Right/Parent lanes back to itself, matching the engine layout used by
+   * the FUN_007AE1B0 (`WeakSet_UserEntity::Add`) insertion path.
+   */
+  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateLocalSelectionSetHead()
+  {
+    auto* const head =
+      static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity)));
+    head->mLeft = head;
+    head->mParent = head;
+    head->mRight = head;
+    head->mKey = 0u;
+    head->mEnt.mOwnerLinkSlot = nullptr;
+    head->mEnt.mNextOwner = nullptr;
+    head->mColor = 1u;
+    head->mIsSentinel = 1u;
+    head->pad_1A[0] = 0u;
+    head->pad_1A[1] = 0u;
+    return head;
+  }
+
+  void InitializeLocalSelectionSet(moho::SSelectionSetUserEntity& set)
+  {
+    set.mAllocProxy = nullptr;
+    set.mHead = AllocateLocalSelectionSetHead();
+    set.mSize = 0u;
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  /**
+   * Mirrors the engine teardown chain at FUN_007AF740 (`sub_7AF740` —
+   * `EraseRange` over the full tree) followed by `operator delete` on the head
+   * sentinel.
+   */
+  void DestroyLocalSelectionSet(moho::SSelectionSetUserEntity& set) noexcept
+  {
+    moho::SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    moho::SSelectionNodeUserEntity* outNode = nullptr;
+    (void)set.EraseRange(&outNode, head->mLeft, head);
+    ::operator delete(head);
+    set.mAllocProxy = nullptr;
+    set.mHead = nullptr;
+    set.mSize = 0u;
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  class ScopedLocalSelectionSet final
+  {
+  public:
+    ScopedLocalSelectionSet() { InitializeLocalSelectionSet(mSet); }
+    ~ScopedLocalSelectionSet() { DestroyLocalSelectionSet(mSet); }
+
+    ScopedLocalSelectionSet(const ScopedLocalSelectionSet&) = delete;
+    ScopedLocalSelectionSet& operator=(const ScopedLocalSelectionSet&) = delete;
+
+    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept { return mSet; }
+    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept { return mSet; }
+
+  private:
+    moho::SSelectionSetUserEntity mSet{};
+  };
 
   [[nodiscard]] bool TryParseUnitCommandTypeLexical(
     const char* const lexicalCommandType,
@@ -2005,6 +2078,75 @@ namespace moho
   int cfunc_UISelectAndZoomTo(lua_State* const luaContext)
   {
     return cfunc_UISelectAndZoomToL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00866FC0 (FUN_00866FC0, cfunc_UISelectAndZoomToL)
+   *
+   * What it does:
+   * Validates `UISelectAndZoomTo(userunit,[seconds])` from Lua. When the world
+   * session is live and a `WorldCamera` exists, resolves the argument to a
+   * `UserUnit`, replaces the active selection with the single-entity set, and
+   * dispatches `CameraImpl::TargetEntityBox(unit, seconds)` to frame the
+   * entity. Reports localized "No session" or the literal "No world camera
+   * found." line via `CON_Printf` for the missing-prerequisite paths.
+   */
+  int cfunc_UISelectAndZoomToL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 1 || argumentCount > 2) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        kUISelectAndZoomToHelpText, 1, 2, argumentCount
+      );
+    }
+
+    UserUnit* unit = nullptr;
+    {
+      const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+      unit = SCR_FromLua_UserUnit(userUnitObject, state);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      CON_Printf("%s", noSessionText.c_str());
+      return 0;
+    }
+
+    RCamManager* const cameraManager = CAM_GetManager();
+    CameraImpl* const camera =
+      (cameraManager != nullptr) ? cameraManager->GetCamera("WorldCamera") : nullptr;
+    if (camera == nullptr) {
+      CON_Printf("UISelectAndZoomTo: No world camera found.");
+      return 0;
+    }
+
+    ScopedLocalSelectionSet selectionGuard{};
+    SSelectionSetUserEntity& selection = selectionGuard.get();
+    SSelectionSetUserEntity::AddResult addResult{};
+    (void)SSelectionSetUserEntity::Add(
+      &addResult,
+      &selection,
+      reinterpret_cast<UserEntity*>(unit)
+    );
+
+    session->SetSelection(selection);
+
+    float seconds = 0.0f;
+    if (lua_gettop(rawState) == 2) {
+      const LuaPlus::LuaStackObject secondsArg(state, 2);
+      seconds = static_cast<float>(secondsArg.GetNumber());
+    }
+
+    camera->TargetEntityBox(reinterpret_cast<UserEntity*>(unit), seconds);
+    return 0;
   }
 
   /**

@@ -485,6 +485,18 @@ namespace moho
     virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds);
 
     /**
+     * Address: 0x007A8580 (FUN_007A8580, Moho::CameraImpl::TargetEntityBox)
+     * Mangled: ?TargetEntityBox@CameraImpl@Moho@@UAEXPAVUserEntity@2@M@Z
+     *
+     * What it does:
+     * Targets one entity by expanding its mesh-instance interpolated AABB on
+     * the X/Z axes by `cam_EntityBoxExpand` and dispatches through `TargetBox`;
+     * when `seconds == 0` additionally clears any active entity target by
+     * dispatching through `TargetNothing`.
+     */
+    virtual void TargetEntityBox(UserEntity* entity, float seconds);
+
+    /**
      * Address: 0x007A8640 (FUN_007A8640, Moho::CameraImpl::TargetEntities)
      * Mangled: ?TargetEntities@CameraImpl@Moho@@UAEXABV?$WeakSet@VUserEntity@Moho@@@2@_NMM@Z
      *

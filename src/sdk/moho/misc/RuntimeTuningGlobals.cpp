@@ -21,6 +21,7 @@ namespace moho
   float cam_FarPitch = 60.0f;
   float cam_SpinSpeed = 1.0f;
   float cam_MinSpinPitch = -89.0f;
+  float cam_EntityBoxExpand = 20.0f;
   float ren_BorderSize = 0.0f;
   float ren_SyncTerrainLOD = 200.0f;
   float ren_FrameTimeSeconds = 1.0f / 30.0f;
