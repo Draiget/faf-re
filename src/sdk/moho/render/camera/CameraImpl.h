@@ -136,10 +136,29 @@ namespace moho
     [[nodiscard]] gpg::RRef GetDerivedObjectRef();
 
     /**
+     * Address: 0x007A9030 (FUN_007A9030, Moho::CameraImpl::Frame)
      * Address context: called from `RCamManager::Frame` (`0x007AABB0`) camera-loop lane.
      *
      * What it does:
      * Advances one camera runtime for the current sim/frame delta pair.
+     *
+     * The body dispatches to the following blocked helpers in the
+     * binary; with the body stubbed in EngineMethodStubs2.cpp (typed
+     * camera transition state, frustum-cache lane, and target-list
+     * iteration still under recovery), this Frame entry is currently
+     * a no-op and the helpers below are never invoked from the
+     * modern source. Their roles are absorbed by the elision of the
+     * camera-frame advance lane:
+     *   - 0x007A75A0 (CameraImpl::CacheCameraFrustumUnits — frustum
+     *     visibility cache rebuild, blocked)
+     *   - 0x007A9110 (CameraImpl::UpdateTargets — target list
+     *     tween/slew update, blocked)
+     *   - 0x007A95F0 (CameraImpl::UpdateBasis — orthonormal basis
+     *     refresh, blocked)
+     *   - 0x007A9BA0 (CameraImpl::InterpolateBasis — slerp/lerp
+     *     between current and target basis, blocked)
+     *   - 0x007AA330 (CameraImpl::UpdateCoords — final coord push
+     *     into render lane, blocked)
      */
     void Frame(float simDeltaSeconds, float frameSeconds);
 
