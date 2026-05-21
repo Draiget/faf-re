@@ -69,7 +69,10 @@ SkyDome::~SkyDome() {}
 
 // ===== Virtual Execute() returning int =====
 int CFactoryBuildTask::Execute() { return 0; }
-int CUnitCarrierLaunch::Execute() { return 0; }
+// CUnitCarrierLaunch::Execute is recovered in
+// src/sdk/moho/unit/tasks/CUnitCarrierLaunch.cpp (matches FUN_00607000,
+// Moho::CUnitCarrierLaunch::TaskTick) — see the real state-machine body
+// there that drives the carrier-launch four-state flow.
 
 // ===== MapImager virtual destructor proxy =====
 void MapImager::VirtualDtor() {}
