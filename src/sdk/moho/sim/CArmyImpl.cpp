@@ -1279,6 +1279,23 @@ namespace
     VisitUnitBlueprintNodes(node->right, sentinel, minCategoryBit, maxCategoryBit);
   }
 
+  /**
+   * Absorbs binary helpers:
+   * Address: 0x00701D20 (FUN_00701D20, msvc8::map<RResId, RUnitBlueprint*>::map copy ctor)
+   * Address: 0x0052D170 (FUN_0052D170, msvc8::map<RResId, RUnitBlueprint*>::~map SEH-cleanup dtor)
+   *
+   * The binary's CArmyImpl::CArmyImpl made a defensive copy of the rules'
+   * unit-blueprint map into a local stack variable via FUN_00701D20 and then
+   * iterated the copy to compute the category-bit min/max range; FUN_0052D170
+   * was the SEH-unwind dtor invoked only if the inner clone helper threw.
+   * The recovered InitializeArmyUnitCategorySets walks the source map
+   * directly via VisitUnitBlueprintNodes — no defensive copy, no cleanup
+   * destructor — so both template emissions are absorbed by the
+   * recovered no-copy iteration. Observable behavior is identical (same
+   * min/max bit range computed from the same blueprints) without the
+   * extra heap allocation + tree-clone + cleanup overhead the binary
+   * paid.
+   */
   void InitializeArmyUnitCategorySets(moho::CArmyImpl& army)
   {
     army.UnitCategoryBaseIndex = std::numeric_limits<std::uint32_t>::max();
