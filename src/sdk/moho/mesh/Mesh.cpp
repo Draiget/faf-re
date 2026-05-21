@@ -6047,18 +6047,17 @@ namespace moho
    * What it does:
    * Draws one mesh batch tree with optional shadow state.
    *
-   * The elided body (this stub plus the sibling RenderDepth /
-   * RenderCartographic stubs above) invokes the following helper;
-   * with the typed CD3D mesh-batch render surface still under
-   * recovery, this helper is never invoked from the modern source
-   * and its role is absorbed by the elision of the mesh-batch
-   * draw lane:
-   *   - 0x007DD420 (`MeshLOD::GetSkinnedBatch` — lazy-allocates and
-   *     returns the cached `boost::shared_ptr<MeshBatch>` for the
-   *     skinned-mesh draw path, creating one via
-   *     `sub_7E8C70` (blocked HardwareMeshBatch factory) on first
-   *     use; called from Render, RenderDepth, and RenderCartographic
-   *     in the binary's mesh-batch-tree iteration)
+   * The recovered entry is invoked by name at
+   * `src/sdk/moho/app/WxRuntimeTypes.cpp` from the main render lane
+   * (`renderer->Render(meshFlags, *cam, shadowRenderer, instance->meshes)`),
+   * so the function symbol is retained by the linker. The elided
+   * body (CD3D mesh-batch draw chain) additionally invokes
+   * `MeshLOD::GetSkinnedBatch` (0x007DD420) — a lazy-init
+   * `boost::shared_ptr<MeshBatch>` accessor that allocates via the
+   * blocked HardwareMeshBatch factory (sub_7E8C70). With the
+   * draw-call body elided, `GetSkinnedBatch` is not yet invoked from
+   * the modern source; its role is absorbed by the elision and the
+   * recovered entry symbol is anchored by the external Render call.
    */
   void MeshRenderer::Render(
     const std::int32_t meshFlags,
@@ -6103,16 +6102,6 @@ namespace moho
    * still under recovery, so this TU keeps the typed pose-refresh step
    * and drops the draw-call emission until its typed dependencies are
    * wired.
-   *
-   * The binary's draw-call body additionally calls
-   * `msvc8::vector<Wm3::Vector3f>::vector(N, default)` (FUN_007E3730,
-   * 12-byte stride per-T template emission used to pre-size the
-   * bone-line debug batch storage). With the draw-call body elided,
-   * the vector-init helper is never invoked from the modern source —
-   * its role is absorbed by the elision of the entire draw-call lane.
-   * When the draw-call body is fully recovered in a follow-up pass,
-   * the vector-init helper can be re-wired via a typed
-   * `boneLineBatch.assign(boneCount, defaultLine)` invocation.
    */
   void MeshRenderer::RenderSkeleton(
     CD3DPrimBatcher* const debugBatcher,
@@ -6138,9 +6127,6 @@ namespace moho
     // stays blocked on typed CD3DPrimBatcher surface recovery; the pose
     // refresh above produces the same observable side effect as the
     // binary's skeleton-overlay entry before it enters draw-call code.
-    // The elided draw-call lane includes FUN_007E3730 (bone-line vector
-    // pre-size helper) — see the FUN_007E2290 Doxygen block for the
-    // absorption rationale.
   }
 
   /**
