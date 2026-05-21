@@ -4945,6 +4945,22 @@ namespace moho
     return &(*it);
   }
 
+  /**
+   * Absorbs binary helper:
+   * Address: 0x00718360 (FUN_00718360, msvc8::map<uint32, cellIndex>::operator[])
+   *
+   * The binary's `CInfluenceMap::InsertEntry` used the
+   * `msvc8::map<uint32, int32>::operator[]` template emission
+   * (FUN_00718360) to find-or-default-insert a `blipId -> cellIndex`
+   * lookup entry, then assigned the cell index to the returned slot.
+   * The recovered `UpsertBlipCell` expresses the same role through
+   * `mBlipCells` (a `set<InfluenceMapCellIndex>` keyed by entityId)
+   * with a remove + insert pair, so the binary's `_Tree::operator[]`
+   * template emission is absorbed by this named helper. The inner
+   * insert helper FUN_00719AB0 (still blocked) corresponds to the
+   * RB-tree allocate-and-link path inside the modern `insert(...)`
+   * call.
+   */
   void CInfluenceMap::UpsertBlipCell(const std::uint32_t blipId, const std::int32_t cellIndex)
   {
     RemoveBlipCell(blipId);
