@@ -6046,6 +6046,19 @@ namespace moho
    *
    * What it does:
    * Draws one mesh batch tree with optional shadow state.
+   *
+   * The elided body (this stub plus the sibling RenderDepth /
+   * RenderCartographic stubs above) invokes the following helper;
+   * with the typed CD3D mesh-batch render surface still under
+   * recovery, this helper is never invoked from the modern source
+   * and its role is absorbed by the elision of the mesh-batch
+   * draw lane:
+   *   - 0x007DD420 (`MeshLOD::GetSkinnedBatch` — lazy-allocates and
+   *     returns the cached `boost::shared_ptr<MeshBatch>` for the
+   *     skinned-mesh draw path, creating one via
+   *     `sub_7E8C70` (blocked HardwareMeshBatch factory) on first
+   *     use; called from Render, RenderDepth, and RenderCartographic
+   *     in the binary's mesh-batch-tree iteration)
    */
   void MeshRenderer::Render(
     const std::int32_t meshFlags,
