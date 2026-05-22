@@ -13808,15 +13808,6 @@ struct SnapshotOwnerRuntime
   std::uint32_t cachedLane0C; // +0x64
 };
 
-struct SelectionSpanOwnerRuntime
-{
-  std::byte pad00[0x13C];
-  std::byte* begin; // +0x13C
-  std::byte* end; // +0x140
-  std::uint32_t lane144;
-  std::int32_t selectedIndex; // +0x148
-};
-
 struct CacheResolverVTableRuntime
 {
   std::uint32_t lane00;
@@ -14103,22 +14094,6 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
   }
 
   return first;
-}
-
-/**
- * Address: 0x007990F0 (FUN_007990F0)
- *
- * What it does:
- * Returns the number of stride-0x1C entries in a contiguous span lane.
- */
-[[maybe_unused]] int GetSelectionSpanCountRuntime(
-  const SelectionSpanOwnerRuntime* const owner
-) noexcept
-{
-  if (owner == nullptr || owner->begin == nullptr) {
-    return 0;
-  }
-  return static_cast<int>((owner->end - owner->begin) / 0x1C);
 }
 
 /**
@@ -14451,26 +14426,6 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
   (void)SortThreeDwordPairsByScoreDescendingRuntime(mid - partitionDwords, mid, mid + partitionDwords);
   (void)SortThreeDwordPairsByScoreDescendingRuntime(end - (partitionDwords * 2), end - partitionDwords, end);
   (void)SortThreeDwordPairsByScoreDescendingRuntime(lowQuartile, mid, end - partitionDwords);
-}
-
-/**
- * Address: 0x00799A10 (FUN_00799A10)
- *
- * What it does:
- * Selects an in-range stride-0x1C element index or clears selection to `-1`.
- */
-[[maybe_unused]] unsigned int SelectSpanEntryByIndexRuntime(
-  const unsigned int requestedIndex,
-  SelectionSpanOwnerRuntime* const owner
-) noexcept
-{
-  const unsigned int count = static_cast<unsigned int>(GetSelectionSpanCountRuntime(owner));
-  if (count != 0u && requestedIndex < count) {
-    owner->selectedIndex = static_cast<std::int32_t>(requestedIndex);
-  } else {
-    owner->selectedIndex = -1;
-  }
-  return count;
 }
 
 /**

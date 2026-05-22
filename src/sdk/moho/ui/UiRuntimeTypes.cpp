@@ -946,6 +946,29 @@ namespace
     return itemListView.mItems.data() != nullptr ? static_cast<std::int32_t>(itemListView.mItems.size()) : 0;
   }
 
+  /**
+   * Address: 0x00799A10 (FUN_00799A10, Moho::CMauiItemList row-selection helper)
+   *
+   * What it does:
+   * Writes one row index into the item-list current-selection lane when the
+   * requested row is in `[0, count)`, otherwise clears the selection to `-1`.
+   * Returns the current item count, matching the binary helper's return
+   * shape so callers can use it as a clamped item count.
+   */
+  std::uint32_t SetItemListSelectionByRow(
+    moho::CMauiItemListRuntimeView& itemListView,
+    const std::uint32_t requestedRow
+  ) noexcept
+  {
+    const auto count = static_cast<std::uint32_t>(GetItemListEntryCount(itemListView));
+    if (count != 0u && requestedRow < count) {
+      itemListView.mCurSelection = static_cast<std::int32_t>(requestedRow);
+    } else {
+      itemListView.mCurSelection = -1;
+    }
+    return count;
+  }
+
   constexpr moho::EMauiScrollAxis kVerticalScrollAxis = static_cast<moho::EMauiScrollAxis>(0);
 
   LuaPlus::LuaState* gUserLuaState = nullptr;
@@ -12767,9 +12790,7 @@ int moho::cfunc_CMauiItemListSetSelectionL(LuaPlus::LuaState* const state)
 
   if (index >= 0) {
     CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-    const std::size_t itemCount = itemListView->mItems.data() ? itemListView->mItems.size() : 0u;
-    const std::size_t selectionIndex = static_cast<std::size_t>(index);
-    itemListView->mCurSelection = selectionIndex < itemCount ? index : -1;
+    (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(index));
   }
 
   lua_settop(state->m_state, 1);
@@ -13627,6 +13648,176 @@ void moho::CMauiItemList::ShowItem(const std::int32_t index)
   const std::int32_t scrollPosition = itemListView->mScrollPosition;
   if (index < scrollPosition || index >= (scrollPosition + visibleLineCount)) {
     ScrollSetTop(kVerticalScrollAxis, static_cast<float>(index));
+  }
+}
+
+/**
+ * Address: 0x0079A160 (FUN_0079A160, Moho::CMauiItemList::HandleEvent)
+ * Mangled: ?HandleEvent@CMauiItemList@Moho@@UAE_NABUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ *   char __thiscall Moho::CMauiItemList::HandleEvent(
+ *     Moho::CMauiItemList* this, Moho::SMauiEventData* eventData);
+ *
+ * What it does:
+ * Dispatches the incoming MAUI event into list-control behavior. Defers first
+ * to the base `CMauiControl::HandleEvent` Lua hook (which can fully consume
+ * the event); otherwise switches on the event type:
+ *   - MET_MouseMotion: when mouse-over highlighting is enabled, recompute the
+ *     hover row from the cursor Y and emit `OnMouseoverItem(self,row)` when
+ *     the hover row changes.
+ *   - MET_MouseExit: clear any active hover row and emit
+ *     `OnMouseoverItem(self,-1)` once.
+ *   - MET_ButtonPress / MET_ButtonDClick: resolve the clicked row and emit
+ *     `OnClick(self,row,event)` (or `OnDoubleClick`) when a row is hit.
+ *   - MET_WheelRotation: scroll vertically by one line in the wheel direction.
+ *   - MET_Char: route navigation keys (PRIOR/PAGEUP, NEXT/PAGEDOWN, HOME, END,
+ *     UP, DOWN) into selection movement and emit `OnKeySelect(self,row)`;
+ *     other character codes fall through to the same row-click path used by
+ *     button events.
+ */
+bool moho::CMauiItemList::HandleEvent(const SMauiEventData& eventData)
+{
+  if (CMauiControl::HandleEvent(eventData)) {
+    return true;
+  }
+
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+
+  const auto runClickRowCallback = [&]() {
+    const std::int32_t clickedRow = GetItem(eventData.mMousePos.y);
+    if (clickedRow < 0) {
+      return;
+    }
+
+    const char* const callbackName = eventData.mEventType == MET_ButtonPress ? "OnClick" : "OnDoubleClick";
+    LuaPlus::LuaState* const activeState =
+      CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
+    LuaPlus::LuaObject eventObject{};
+    const LuaPlus::LuaObject* const createdEvent =
+      CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);
+    scriptObject->RunScriptIntObject(callbackName, clickedRow, *createdEvent);
+  };
+
+  switch (eventData.mEventType) {
+    case MET_MouseMotion: {
+      if (!itemListView->mShowMouseoverItem) {
+        return false;
+      }
+
+      const std::int32_t previousHover = itemListView->mHoverItem;
+      const std::int32_t newHover = GetItem(eventData.mMousePos.y);
+      itemListView->mHoverItem = newHover;
+      if (previousHover != newHover) {
+        scriptObject->CallbackInt("OnMouseoverItem", itemListView->mHoverItem);
+      }
+      return true;
+    }
+
+    case MET_MouseExit: {
+      if (itemListView->mHoverItem != -1) {
+        itemListView->mHoverItem = -1;
+        scriptObject->CallbackInt("OnMouseoverItem", itemListView->mHoverItem);
+      }
+      return true;
+    }
+
+    case MET_ButtonPress:
+    case MET_ButtonDClick: {
+      runClickRowCallback();
+      return true;
+    }
+
+    case MET_WheelRotation: {
+      const float lineDelta = eventData.mWheelRotation <= 0 ? 1.0f : -1.0f;
+      ScrollLines(kVerticalScrollAxis, lineDelta);
+      return true;
+    }
+
+    case MET_Char: {
+      switch (eventData.mKeyCode) {
+        case MKEY_PRIOR:
+        case MKEY_PAGEUP: {
+          const std::int32_t cursorOffsetInPage =
+            itemListView->mCurSelection - itemListView->mScrollPosition;
+          const std::int32_t scrollBeforePage = itemListView->mScrollPosition;
+          ScrollPages(kVerticalScrollAxis, -1.0f);
+
+          std::int32_t newRow = 0;
+          if (scrollBeforePage != itemListView->mScrollPosition) {
+            newRow = itemListView->mScrollPosition + cursorOffsetInPage;
+          }
+          (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        case MKEY_NEXT:
+        case MKEY_PAGEDOWN: {
+          const std::int32_t cursorOffsetInPage =
+            itemListView->mCurSelection - itemListView->mScrollPosition;
+          const std::int32_t scrollBeforePage = itemListView->mScrollPosition;
+          ScrollPages(kVerticalScrollAxis, 1.0f);
+
+          const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
+          std::int32_t newRow = lastRow;
+          if (scrollBeforePage != itemListView->mScrollPosition) {
+            const std::int32_t candidate = itemListView->mScrollPosition + cursorOffsetInPage;
+            newRow = candidate >= lastRow ? lastRow : candidate;
+          }
+          (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        case MKEY_END: {
+          ScrollToBottom();
+          const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
+          (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(lastRow));
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        case MKEY_HOME: {
+          ScrollSetTop(kVerticalScrollAxis, 0.0f);
+          (void)SetItemListSelectionByRow(*itemListView, 0u);
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        case MKEY_UP: {
+          const std::int32_t candidate = itemListView->mCurSelection - 1;
+          const std::int32_t newRow = candidate <= 0 ? 0 : candidate;
+          (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
+          ShowItem(itemListView->mCurSelection);
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        case MKEY_DOWN: {
+          const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
+          const std::int32_t candidate = itemListView->mCurSelection + 1;
+          const std::int32_t newRow = candidate >= lastRow ? lastRow : candidate;
+          (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
+          ShowItem(itemListView->mCurSelection);
+          scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+          return true;
+        }
+
+        default: {
+          // Mirrors the original `default: goto LABEL_25;` fall-through:
+          // unhandled character codes route through the row-click helper, and
+          // because the event type is MET_Char (not MET_ButtonPress) the helper
+          // emits the `OnDoubleClick` callback name when a row is hit.
+          runClickRowCallback();
+          return true;
+        }
+      }
+    }
+
+    default:
+      return false;
   }
 }
 
