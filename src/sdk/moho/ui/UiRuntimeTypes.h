@@ -2137,6 +2137,17 @@ namespace moho
     void Dump() override;
 
     /**
+     * Address: 0x0079A160 (FUN_0079A160, Moho::CMauiItemList::HandleEvent)
+     *
+     * What it does:
+     * Routes mouse motion/exit/click/wheel and navigation key events into list
+     * row-selection updates and emits matching `OnMouseoverItem` / `OnClick` /
+     * `OnDoubleClick` / `OnKeySelect` script callbacks. Returns whether the
+     * event was consumed by this control.
+     */
+    [[nodiscard]] bool HandleEvent(const SMauiEventData& eventData) override;
+
+    /**
      * Address: 0x007994C0 (FUN_007994C0, sub_7994C0)
      *
      * What it does:
