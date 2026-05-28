@@ -473,6 +473,24 @@ namespace moho
   int cfunc_IssueReclaimL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F6C20 (FUN_006F6C20, cfunc_IssueCapture)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueCaptureL`.
+   */
+  int cfunc_IssueCapture(lua_State* luaContext);
+
+  /**
+   * Address: 0x006F6C90 (FUN_006F6C90, cfunc_IssueCaptureL)
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Capture-capable units, drops
+   * the target entity from the worker selection, and issues
+   * `UNITCOMMAND_Capture` on the remaining units against that entity target.
+   */
+  int cfunc_IssueCaptureL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00836900 (FUN_00836900, cfunc_DecreaseBuildCountInQueue)
    *
    * What it does:
