@@ -6077,7 +6077,7 @@ namespace
    * Resolves one Lua blueprint-id argument into `RUnitBlueprint*`, raising a
    * typed Lua error for non-string non-nil values.
    */
-  [[nodiscard]] RUnitBlueprint* ResolveUnitBlueprintFromLuaArgument(
+  [[nodiscard]] RUnitBlueprint* ResolveUnitBlueprintFromLuaArgumentImpl(
     LuaPlus::LuaState* const state,
     const LuaPlus::LuaStackObject& blueprintObject,
     const char* const functionName
@@ -7906,6 +7906,15 @@ namespace moho
   )
   {
     return ::IssueCommandToSelectedUnitsImpl(sim, selectedUnits, commandIssueData, clearQueue);
+  }
+
+  [[nodiscard]] RUnitBlueprint* ResolveUnitBlueprintFromLuaArgument(
+    LuaPlus::LuaState* const state,
+    const LuaPlus::LuaStackObject& blueprintObject,
+    const char* const functionName
+  )
+  {
+    return ::ResolveUnitBlueprintFromLuaArgumentImpl(state, blueprintObject, functionName);
   }
 } // namespace moho
 

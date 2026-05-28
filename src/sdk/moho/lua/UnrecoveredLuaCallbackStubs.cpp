@@ -51,7 +51,6 @@ namespace moho
   int cfunc_IssueTeleport(lua_State*) { return 0; }
   int cfunc_IssueTeleportToBeacon(lua_State*) { return 0; }
   int cfunc_IssueTransportUnload(lua_State*) { return 0; }
-  int cfunc_IssueUpgrade(lua_State*) { return 0; }
   int cfunc_LoadSavedGame(lua_State*) { return 0; }
   int cfunc_PrefetchSession(lua_State*) { return 0; }
   int cfunc_UnitHasMeleeSpaceAroundTarget(lua_State*) { return 0; }

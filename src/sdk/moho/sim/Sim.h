@@ -57,6 +57,7 @@ namespace moho
   class CSimSoundManager;
   struct SParticleBuffer;
   struct SEntitySetTemplateUnit;
+  struct RUnitBlueprint;
   class CScrLuaInitForm;
 
   /**
@@ -97,6 +98,20 @@ namespace moho
     SEntitySetTemplateUnit& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
+  );
+
+  /**
+   * Address: 0x006EF150 (FUN_006EF150, func_GetUnitBlueprint)
+   *
+   * What it does:
+   * Resolves one Lua blueprint-id argument into `RUnitBlueprint*`, raising a
+   * typed Lua error for non-string non-nil values. Returns `nullptr` when the
+   * stack slot is nil or the lookup fails.
+   */
+  [[nodiscard]] RUnitBlueprint* ResolveUnitBlueprintFromLuaArgument(
+    LuaPlus::LuaState* state,
+    const LuaPlus::LuaStackObject& blueprintObject,
+    const char* functionName
   );
 
   class Sim final : public ICommandSink
