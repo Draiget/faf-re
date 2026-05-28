@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -18,9 +19,21 @@
 
 namespace
 {
-  constexpr std::uint64_t kUnitStateMaskTaskPending = 0x0000000000000100ull;
+  // Air-staging-call uses four 64-bit state-vector lanes on the owning unit:
+  //   bit  7  (0x0000000000000080) = UNITSTATE_WaitingForTransport
+  //   bit  8  (0x0000000000000100) = UNITSTATE_TransportLoading
+  //   bit 32  (0x0000000100000000) = UNITSTATE_ForceSpeedThrough
+  //   bit 35  (0x0000000800000000) = UNITSTATE_LandingOnPlatform
+  // The ctor and Execute() previously referred to bit 8 as `TaskPending` and
+  // bit 35 as `AirStagingPending`; the canonical enum names are kept as the
+  // primary constants below to match the rest of the unit-task subsystem.
+  constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
+  constexpr std::uint64_t kUnitStateMaskTransportLoading = 0x0000000000000100ull;
   constexpr std::uint64_t kUnitStateMaskForceSpeedThrough = 0x0000000100000000ull;
-  constexpr std::uint64_t kUnitStateMaskAirStagingPending = 0x0000000800000000ull;
+  constexpr std::uint64_t kUnitStateMaskLandingOnPlatform = 0x0000000800000000ull;
+  // Back-compat aliases retained for unchanged ctor/Execute() bodies.
+  constexpr std::uint64_t kUnitStateMaskTaskPending = kUnitStateMaskTransportLoading;
+  constexpr std::uint64_t kUnitStateMaskAirStagingPending = kUnitStateMaskLandingOnPlatform;
 
   [[nodiscard]] gpg::RType* CachedCUnitCallAirStagingPlatformType()
   {
@@ -296,6 +309,65 @@ namespace moho
       mUnit->UnitStateMask |= kUnitStateMaskTaskPending;
       mUnit->UnitStateMask |= kUnitStateMaskAirStagingPending;
     }
+  }
+
+  /**
+   * Address: 0x00601950 (FUN_00601950, ??1CUnitCallAirStagingPlatform@Moho@@QAE@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUnitCallAirStagingPlatform::~CUnitCallAirStagingPlatform(
+   *     Moho::CUnitCallAirStagingPlatform *this);
+   *
+   * What it does:
+   * Tears down one air-staging call task. Clears the four owner-unit state
+   * lanes the task owns (`ForceSpeedThrough`, `LandingOnPlatform`,
+   * `TransportLoading`, `WaitingForTransport`); if the attach handshake did
+   * not complete (`!mDone`), restores `UnitMotion::mHeight` to positive
+   * infinity and asks the still-living platform's transport interface to drop
+   * the unit's pickup reservation; finalises the dispatch result lane (1 on
+   * success, 2 on cancellation); unlinks the platform weak-pointer slot from
+   * the platform Unit's intrusive weak-link chain; the base `CCommandTask`
+   * destructor runs implicitly via the standard C++ teardown chain.
+   */
+  CUnitCallAirStagingPlatform::~CUnitCallAirStagingPlatform()
+  {
+    // Drop the four state-mask lanes the air-staging-call task owns on the
+    // owning unit (the binary clears these unconditionally before any further
+    // checks; `mUnit` is non-null on a constructed task — the ctor stores
+    // through it -- so the explicit guard is omitted).
+    mUnit->UnitStateMask &= ~kUnitStateMaskForceSpeedThrough;
+    mUnit->UnitStateMask &= ~kUnitStateMaskLandingOnPlatform;
+    mUnit->UnitStateMask &= ~kUnitStateMaskTransportLoading;
+    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+
+    if (!mDone) {
+      // Cancellation path: the platform never finished the load handshake.
+      // Float the unit back to the configured ceiling and ask the platform
+      // transport to drop our pickup reservation (the binary's "+0x55C ==
+      // AiTransport" load and slot-5 `TransportRemovePickupUnit(unit, true)`
+      // dispatch). The `IsDead()` guard avoids dispatching through a stale
+      // vtable when the platform was destroyed mid-flight.
+      if (CUnitMotion* const unitMotion = mUnit->UnitMotion; unitMotion != nullptr) {
+        unitMotion->mHeight = std::numeric_limits<float>::infinity();
+      }
+
+      if (Unit* const platformUnit = mPlatform.GetObjectPtr();
+          platformUnit != nullptr && platformUnit->AiTransport != nullptr && !platformUnit->IsDead()) {
+        platformUnit->AiTransport->TransportRemovePickupUnit(mUnit, true);
+      }
+    }
+
+    // Dispatch result: success (mDone) writes 1, cancellation writes 2. The
+    // binary computes `*mDispatchResult = 2 - mDone` literally; the typed
+    // form preserves the cast through `EAiResult` for the same width.
+    *mDispatchResult = static_cast<EAiResult>(2 - static_cast<int>(mDone));
+
+    // Detach the platform weak-pointer slot from the platform Unit's
+    // intrusive weak-link chain. The binary inlines the chain walk; the
+    // recovered helper performs the same find-and-relink in one call.
+    mPlatform.UnlinkFromOwnerChain();
+
+    // ~CCommandTask runs implicitly here.
   }
 
   /**
