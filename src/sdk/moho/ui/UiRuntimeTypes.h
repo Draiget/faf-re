@@ -594,6 +594,20 @@ namespace moho
      */
     UIBuildDragger(CWldSession* session, CUIWorldViewBuildDragRuntimeView* worldView, CameraImpl* camera);
 
+    /**
+     * Address: 0x008230A0 (FUN_008230A0, Moho::UIBuildDragger::ReleaseDrag)
+     *
+     * What it does:
+     * Polls the left-mouse command mode for the active session cursor; if the
+     * resolved blueprint is a member of the rules "DRAGBUILD" entity category,
+     * unprojects the event's screen-space mouse position into the world-surface
+     * intersection and, when valid, snaps `mEnd` to it and mirrors both
+     * `mStart`/`mEnd` lanes into the bound world-view build-drag state. Shared
+     * helper invoked by both the `DragMove` and `DragRelease` virtual override
+     * lanes (`FUN_00823BB0` / `FUN_00823BD0`).
+     */
+    void ReleaseDrag(const SMauiEventData* eventData);
+
   public:
     TDatListItem<IMauiDragger, void>* mList = nullptr;      // +0x04
     CWldSession* mWldSession = nullptr;                     // +0x08

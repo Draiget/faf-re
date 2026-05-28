@@ -45,6 +45,9 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/RScmResource.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/math/Vector3f.h"
+#include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -8846,6 +8849,59 @@ moho::UIBuildDragger::UIBuildDragger(
   }
 }
 
+/**
+ * Address: 0x008230A0 (FUN_008230A0, Moho::UIBuildDragger::ReleaseDrag)
+ *
+ * IDA signature:
+ * void __usercall Moho::UIBuildDragger::ReleaseDrag(
+ *     Moho::SMauiEventData *a1@<ebx>, Moho::UIBuildDragger *a2@<edi>);
+ *
+ * What it does:
+ * Resolves the current left-mouse command-mode payload via
+ * `CWldSession::GetLeftMouseButtonAction` (using the session-bound cursor
+ * MouseInfo at +0x4B0), snapshots the rules "DRAGBUILD" entity-category set
+ * locally, and tests whether the resolved blueprint's ordinal bit is set in
+ * the snapshot. When the blueprint participates in DRAGBUILD, projects the
+ * event's screen-space cursor onto the world surface via
+ * `mCam->CameraScreenToSurface()` and, if valid, snaps `mEnd` to the surface
+ * point and mirrors both drag lanes (`mStart`/`mEnd`) into the bound
+ * world-view build-drag state. Shared per-tick drag-tracking helper invoked
+ * by both the `DragMove` and `DragRelease` virtual override lanes.
+ */
+void moho::UIBuildDragger::ReleaseDrag(const moho::SMauiEventData* const eventData)
+{
+  // Re-derive the left-mouse command mode from the session's cursor MouseInfo
+  // lane (the MouseInfo nests directly inside `CWldSession` at +0x4B0).
+  CommandModeData commandMode{};
+  const MouseInfo& cursorInfo = mWldSession->GetCursorInfo();
+  (void)mWldSession->GetLeftMouseButtonAction(&commandMode, &cursorInfo, 0);
+
+  // Take a stack snapshot of the rules' DRAGBUILD entity-category set. The
+  // binary copies (mUniverse, mBits.mFirstWordIndex, mBits.mWords) into a
+  // local BVSet so the per-bit lookup below operates on stable storage even
+  // if the rules-owned source set mutates concurrently.
+  const CategoryWordRangeView* const dragBuildCategory =
+    mWldSession->mRules->GetEntityCategory("DRAGBUILD");
+  CategoryWordRangeView dragBuildSnapshot;
+  dragBuildSnapshot = *dragBuildCategory;
+
+  if (commandMode.mBlueprint != nullptr) {
+    const auto* const blueprint = static_cast<const RBlueprint*>(commandMode.mBlueprint);
+    const std::uint32_t blueprintOrdinal = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
+    if (dragBuildSnapshot.ContainsBit(blueprintOrdinal)) {
+      // Blueprint participates in DRAGBUILD: refresh the drag-end to the
+      // current surface intersection of the event's screen-space cursor.
+      const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
+      const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
+      if (IsValidVector3f(surfacePoint)) {
+        mEnd = surfacePoint;
+        mWldView->mStart = mStart;
+        mWldView->mEnd = mEnd;
+      }
+    }
+  }
+}
+
 namespace
 {
   constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);
@@ -9799,15 +9855,17 @@ public:
   {
   }
 
-  void DragMove(const moho::SMauiEventData* const /*eventData*/) override
+  /**
+   * Address: 0x00823BB0 (FUN_00823BB0, Moho::UIBuildDragger::DragMove)
+   *
+   * What it does:
+   * Forwards one drag-move tick to the shared `ReleaseDrag` helper, which
+   * re-resolves the active build blueprint and snaps `mEnd` to the cursor's
+   * current world-surface intersection when the blueprint is a DRAGBUILD.
+   */
+  void DragMove(const moho::SMauiEventData* const eventData) override
   {
-    if (mWldSession != nullptr) {
-      mEnd = mWldSession->CursorWorldPos;
-    }
-
-    if (mWldView != nullptr) {
-      mWldView->mEnd = mEnd;
-    }
+    ReleaseDrag(eventData);
   }
 
   void DragRelease(const moho::SMauiEventData* const /*eventData*/) override
