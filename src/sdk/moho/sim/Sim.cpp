@@ -98,6 +98,7 @@
 #include "moho/projectile/Projectile.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -9511,6 +9512,62 @@ void Sim::Printf(const char* fmt, ...)
   mPrintField.push_back(gpg::STR_Va(format, args));
 
   va_end(args);
+}
+
+/**
+ * Address: 0x00746310 (FUN_00746310,
+ * ?CreateArmies@Sim@Moho@@QAEXABV?$vector@UArmyLaunchInfo@Moho@@V?$allocator@UArmyLaunchInfo@Moho@@@std@@@std@@ABV?$vector@VLuaObject@LuaPlus@@V?$allocator@VLuaObject@LuaPlus@@@std@@@4@ABVLuaObject@LuaPlus@@@Z)
+ *
+ * IDA signature:
+ * void __stdcall Moho::Sim::CreateArmies(Sim *this,
+ *                                        std::vector<ArmyLaunchInfo> const *launchInfo,
+ *                                        std::vector<LuaObject> const *armySetupObjects,
+ *                                        LuaObject const *scenarioInfoOptions);
+ *
+ * What it does:
+ * Resizes `mArmiesList` to the number of scenario army-launch entries, allocates
+ * one `CArmyImpl` per slot via `AllocateScenarioArmy`, then fires the Lua
+ * `OnCreateArmyBrain(armyIndex+1, brain, armyName, playerName)` callback per
+ * army with a `try/Warnf` guard. The focus-army flag passed into the allocator
+ * is true when the iteration index equals `mSyncFilter.focusArmy`.
+ */
+void Sim::CreateArmies(
+  const msvc8::vector<ArmyLaunchInfo>& launchInfo,
+  const msvc8::vector<LuaPlus::LuaObject>& armySetupObjects,
+  const LuaPlus::LuaObject& scenarioInfoOptions
+)
+{
+  const std::size_t armyCount = launchInfo.size();
+  mArmiesList.resize(armyCount);
+
+  for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
+    const bool isFocusArmy =
+      (static_cast<std::int32_t>(armyIndex) == mSyncFilter.focusArmy);
+
+    CArmyImpl* const army = AllocateScenarioArmy(
+      this,
+      static_cast<std::int32_t>(armyIndex),
+      launchInfo[armyIndex],
+      armySetupObjects[armyIndex],
+      scenarioInfoOptions,
+      isFocusArmy
+    );
+    mArmiesList[armyIndex] = army;
+
+    try {
+      const LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+      const LuaPlus::LuaFunction<> onCreateArmyBrain(globals["OnCreateArmyBrain"]);
+      CAiBrain* const brain = army->GetArmyBrain();
+      onCreateArmyBrain.Call_IntBrainStr2(
+        static_cast<unsigned int>(armyIndex + 1),
+        brain != nullptr ? &brain->mLuaObj : nullptr,
+        army->ArmyName.c_str(),
+        army->PlayerName.c_str()
+      );
+    } catch (const std::exception& ex) {
+      gpg::Warnf("Error running OnCreateArmyBrain: %s", ex.what());
+    }
+  }
 }
 
 /**

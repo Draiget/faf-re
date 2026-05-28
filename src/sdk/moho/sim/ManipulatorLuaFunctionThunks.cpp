@@ -10,6 +10,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "Wm3Vector3.h"
+#include "moho/animation/CAniActor.h"
 #include "moho/animation/IAniManipulator.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAimManipulator.h"
@@ -21,6 +22,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/unit/core/Unit.h"
 
 struct lua_State;
 
@@ -38,6 +40,7 @@ namespace moho
   int cfunc_CreateAimController(lua_State* luaContext);
   int cfunc_CreateBuilderArmController(lua_State* luaContext);
   int cfunc_CreateFootPlantController(lua_State* luaContext);
+  int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateThrustController(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
@@ -636,6 +639,7 @@ namespace
   constexpr const char* kCRotateManipulatorGetCurrentAngleHelpText = "RotateManipulator:GetCurrentAngle()";
   constexpr const char* kCRotateManipulatorSetCurrentAngleHelpText = "RotateManipulator:SetCurrentAngle(angle)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+  constexpr const char* kLuaExpectedRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
@@ -1300,6 +1304,74 @@ namespace moho
       kCreateFootPlantControllerHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00639C80 (FUN_00639C80, cfunc_CreateFootPlantController)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CreateFootPlantControllerL`.
+   */
+  int cfunc_CreateFootPlantController(lua_State* const luaContext)
+  {
+    return cfunc_CreateFootPlantControllerL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00639D00 (FUN_00639D00, cfunc_CreateFootPlantControllerL)
+   *
+   * What it does:
+   * Reads `(unit, footBone, kneeBone, hipBone, [straightLegs=true],
+   * [maxFootFall=0.0])`, resolves the unit, validates that the unit has a
+   * skeleton, resolves each bone selector via the actor's
+   * `CAniActor::ResolveBoneIndex`, and constructs one new
+   * `CFootPlantManipulator` bound to that unit. Pushes the manipulator's Lua
+   * userdata onto the stack as the return value.
+   */
+  int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 4 || argumentCount > 6) {
+      LuaPlus::LuaState::Error(
+        state, kLuaExpectedRangeWarning, kCreateFootPlantControllerHelpText, 4, 6, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const unit = SCR_FromLua_Unit(unitObject);
+    CAniActor* const actor = unit != nullptr ? unit->AniActor : nullptr;
+    if (actor == nullptr) {
+      LuaPlus::LuaState::Error(state, "Unit has no skeleton.");
+    }
+
+    LuaPlus::LuaStackObject footArg(state, 2);
+    const int footBoneIndex = actor->ResolveBoneIndex(footArg);
+    LuaPlus::LuaStackObject kneeArg(state, 3);
+    const int kneeBoneIndex = actor->ResolveBoneIndex(kneeArg);
+    LuaPlus::LuaStackObject hipArg(state, 4);
+    const int hipBoneIndex = actor->ResolveBoneIndex(hipArg);
+
+    bool straightLegs = true;
+    if (argumentCount > 4) {
+      LuaPlus::LuaStackObject straightLegsArg(state, 5);
+      straightLegs = straightLegsArg.GetBoolean();
+    }
+
+    float maxFootFall = 0.0f;
+    if (argumentCount > 5) {
+      LuaPlus::LuaStackObject maxFootFallArg(state, 6);
+      if (lua_type(rawState, 6) != LUA_TNUMBER) {
+        maxFootFallArg.TypeError("number");
+      }
+      maxFootFall = static_cast<float>(lua_tonumber(rawState, 6));
+    }
+
+    CFootPlantManipulator* const manipulator =
+      new CFootPlantManipulator(unit, footBoneIndex, kneeBoneIndex, hipBoneIndex, straightLegs, maxFootFall);
+    manipulator->mLuaObj.PushStack(state);
+    return 1;
   }
 
   /**

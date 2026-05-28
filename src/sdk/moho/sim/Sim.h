@@ -28,6 +28,7 @@ namespace moho
   struct SPhysConstants;
   struct SSyncData;
   struct SUnitConstructionParams;
+  struct ArmyLaunchInfo;
   class CDecalBuffer;
   class CCommandDb;
   class CUnitCommand;
@@ -833,6 +834,28 @@ namespace moho
      * Formats a message and appends it to the pending sim print-line buffer.
      */
     void Printf(const char* fmt, ...);
+
+    /**
+     * Address: 0x00746310 (FUN_00746310,
+     * ?CreateArmies@Sim@Moho@@QAEXABV?$vector@UArmyLaunchInfo@Moho@@V?$allocator@UArmyLaunchInfo@Moho@@@std@@@std@@ABV?$vector@VLuaObject@LuaPlus@@V?$allocator@VLuaObject@LuaPlus@@@std@@@4@ABVLuaObject@LuaPlus@@@Z)
+     *
+     * IDA signature:
+     * void __stdcall Moho::Sim::CreateArmies(Sim *this, std::vector<ArmyLaunchInfo> *launchInfo,
+     *                                        std::vector<LuaObject> *armySetupObjects,
+     *                                        LuaObject *scenarioInfoOptions);
+     *
+     * What it does:
+     * Allocates one `CArmyImpl` per scenario army-launch entry, stores it in
+     * `mArmiesList`, and fires the Lua `OnCreateArmyBrain(armyIndex, brain,
+     * armyName, playerName)` callback for each new army with a `try/Warnf`
+     * guard. The focus-army flag passed into the allocator is set when the
+     * iteration index equals `mSyncFilter.focusArmy`.
+     */
+    void CreateArmies(
+      const msvc8::vector<ArmyLaunchInfo>& launchInfo,
+      const msvc8::vector<LuaPlus::LuaObject>& armySetupObjects,
+      const LuaPlus::LuaObject& scenarioInfoOptions
+    );
 
     /**
      * Address: 0x007464D0 (FUN_007464D0, ?PostInitialize@Sim@Moho@@QAEXABVLuaObject@LuaPlus@@@Z)
