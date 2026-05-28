@@ -455,6 +455,24 @@ namespace moho
   int cfunc_IssueScriptL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F6960 (FUN_006F6960, cfunc_IssueReclaim)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueReclaimL`.
+   */
+  int cfunc_IssueReclaim(lua_State* luaContext);
+
+  /**
+   * Address: 0x006F69D0 (FUN_006F69D0, cfunc_IssueReclaimL)
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Reclaim-capable units, drops
+   * the target entity from the worker selection, and issues
+   * `UNITCOMMAND_Reclaim` on the remaining units against that entity target.
+   */
+  int cfunc_IssueReclaimL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00836900 (FUN_00836900, cfunc_DecreaseBuildCountInQueue)
    *
    * What it does:
