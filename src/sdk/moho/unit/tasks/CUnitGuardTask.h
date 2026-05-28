@@ -59,6 +59,22 @@ namespace moho
     CUnitGuardTask();
 
     /**
+     * Address: 0x00611850 (FUN_00611850, ??1CUnitGuardTask@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Clears owner unit guard/guard-busy state bits, drops the guarded-unit
+     * association, zeros the unit's guarded-position lane, detaches the
+     * embedded command-event listener from the linked command's broadcaster
+     * chain when bound, releases any rebuild-structure bookkeeping on the
+     * owner builder, frees the reserved ogrid footprint, dispatches one
+     * navigator move-abort plus speed-through refresh when the unit moved
+     * this tick, and unlinks the secondary-unit / target-entity / primary
+     * / linked weak-command lanes before tearing down the embedded command
+     * task base slice.
+     */
+    ~CUnitGuardTask() override;
+
+    /**
      * Address: 0x006141A0 (FUN_006141A0, Moho::CUnitGuardTask::TaskTick)
      * Slot: 1
      *

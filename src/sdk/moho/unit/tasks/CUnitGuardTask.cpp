@@ -491,6 +491,86 @@ namespace moho
   }
 
   /**
+   * Address: 0x00611850 (FUN_00611850, ??1CUnitGuardTask@Moho@@QAE@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUnitGuardTask::~CUnitGuardTask(Moho::CUnitGuardTask *this);
+   *
+   * What it does:
+   * Clears owner unit guard/guard-busy state bits, drops the guarded-unit
+   * association, zeros the unit's guarded-position lane, detaches the embedded
+   * command-event listener from the linked command's broadcaster chain when
+   * bound, releases any rebuild-structure bookkeeping on the owner builder,
+   * frees the reserved ogrid footprint when one is held, dispatches one
+   * navigator move-abort plus speed-through refresh when the unit moved this
+   * tick, and unlinks the secondary-unit / target-entity / primary / linked
+   * weak-command lanes before tearing down the embedded command-task base
+   * slice.
+   */
+  CUnitGuardTask::~CUnitGuardTask()
+  {
+    if (Unit* const unit = mUnit; unit != nullptr) {
+      // Drop the two guard-state bits this task owns on the owner unit.
+      unit->UnitStateMask &= ~(1ull << UNITSTATE_GuardBusy);
+      unit->UnitStateMask &= ~(1ull << UNITSTATE_Guarding);
+
+      // Release the guarded-unit association and zero the cached guard pos.
+      unit->SetGuardedUnit(nullptr);
+      unit->GuardedPos = Wm3::Vector3f::Zero();
+    }
+
+    // If we still hold a linked command, detach the embedded command-event
+    // listener from that command's broadcaster chain. The compiler inlines
+    // both the unlink-from-ring and the self-link-reset.
+    if (mCommandRef.GetObjectPtr() != nullptr) {
+      mCommandEventListenerLink.ListUnlink();
+    }
+
+    if (Unit* const unit = mUnit; unit != nullptr) {
+      if (IAiBuilder* const builder = unit->AiBuilder; builder != nullptr) {
+        // Slot 21 on IAiBuilder — finalise any rebuild-structure bookkeeping
+        // (decompiler synonym "ClearBuilding").
+        builder->BuilderClearRebuildStructure();
+      }
+
+      // Release the ogrid footprint reservation when a guard move-anchor was
+      // staked (non-zero indicates an active reservation). Compare uses the
+      // engine's 1e-5 epsilon, matching binary semantics.
+      const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
+      if (Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero)) {
+        unit->FreeOgridRect();
+      }
+
+      if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
+        // Issue one navigator-side abort iff the unit moved this tick.
+        if (Wm3::Vector3f::Compare(&unit->Position, &unit->PrevPosition)) {
+          navigator->AbortMove();
+        }
+        unit->UpdateSpeedThroughStatus();
+      }
+    }
+
+    // Reverse-declaration-order weak-pointer teardown emitted explicitly in
+    // the binary: mSecondaryUnit (+0x7C) → mTarget.targetEntity (+0x58) →
+    // mCommandRef (+0x4C) → mPrimaryCommandRef (+0x44). The non-targetEntity
+    // WeakPtr<T> generic destructor is trivial in our recovered template, so
+    // each owner-chain detach is explicit here. CAiTarget's compiler-emitted
+    // member destructor will redundantly attempt mTarget.targetEntity unlink
+    // after this body returns; the second call is a safe no-op once the slot
+    // is cleared below.
+    mSecondaryUnit.UnlinkFromOwnerChain();
+    mTarget.targetEntity.UnlinkFromOwnerChain();
+    mTarget.targetEntity.ClearLinkState();
+    mCommandRef.UnlinkFromOwnerChain();
+    mPrimaryCommandRef.UnlinkFromOwnerChain();
+
+    // Embedded Listener<ECommandEvent> sub-object teardown: detach the
+    // listener-link from whatever ring it sits in (typically already
+    // self-linked after the conditional unlink above) and reset to singleton.
+    mCommandEventListenerLink.ListUnlink();
+  }
+
+  /**
    * Address: 0x00611A40 (FUN_00611A40)
    *
    * What it does:
