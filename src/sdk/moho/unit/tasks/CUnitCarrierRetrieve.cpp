@@ -6,8 +6,19 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/path/SNavGoal.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/Sim.h"
+#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 
 namespace
@@ -110,6 +121,204 @@ namespace moho
     }
   }
 
+  /**
+   * Address: 0x00605EF0 (FUN_00605EF0, Moho::CUnitCarrierRetrieve::TaskTick)
+   *
+   * IDA signature:
+   * int __thiscall sub_605EF0(Moho::CUnitCarrierRetrieve *this);
+   *
+   * What it does:
+   * Drives the carrier-retrieve state machine across four cases:
+   *
+   *   Pre-switch guard: aborts the task immediately (returns -1) when the
+   *     owning unit is dead or null, or when the task has already advanced
+   *     to Starting AND the unit is in `UNITSTATE_MovingDown`.
+   *
+   *   TASKSTATE_Preparing: walks every tracked-unit slot, checking that
+   *     each loaded unit is still alive, not destroy-queued, not attached,
+   *     and that its current queued command still matches the carrier's
+   *     own current command. If any loaded unit's current command diverges
+   *     from the carrier's, the tick returns 1 (cooperative interrupt).
+   *     When every loaded unit still tracks the carrier's command, the
+   *     handler then specializes by carrier motion type:
+   *       * surfacing-sub carriers (`Physics.MotionType ==
+   *         RULEUMT_SurfacingSub`) currently submerged (`Entity::mCurrentLayer
+   *         == LAYER_Sub`) compute the surface goal cell from the carrier's
+   *         current footprint position, set `UnitMotion->SetNewTargetLayer
+   *         (LAYER_Water)`, advance to Waiting, and return 1 to wait for
+   *         the surface motion to complete;
+   *       * all other carriers ask `AiNavigator->AbortMove()` (when
+   *         present) to release any pre-existing path, advance to Starting,
+   *         and fall through to the default return-1 lane.
+   *
+   *   TASKSTATE_Waiting: when the carrier reaches `LAYER_Water` or
+   *     `LAYER_Air`, asks `AiTransport->TransportResetReservation()` to
+   *     drop pre-launch storage bookkeeping and advances to Starting.
+   *     Returns 1 either way.
+   *
+   *   TASKSTATE_Starting: builds a transient set of tracked units that
+   *     are still actively loading (alive, in `UNITSTATE_TransportLoading`,
+   *     and either focused on the carrier itself or not focused on it at
+   *     all), then removes each from `mTrackedUnits`. When the resulting
+   *     tracked set is empty the handler flips `mRetrievalComplete` to
+   *     true and returns -1 (task complete); otherwise it returns 10 to
+   *     sleep nine frames before the next tick.
+   *
+   *   Default (mTaskState >= TASKSTATE_Processing): returns 1.
+   */
+  int CUnitCarrierRetrieve::Execute()
+  {
+    if (mUnit == nullptr) {
+      return -1;
+    }
+
+    if (mUnit->IsDead()) {
+      return -1;
+    }
+
+    if (mTaskState >= TASKSTATE_Starting && mUnit->IsUnitState(UNITSTATE_MovingDown)) {
+      return -1;
+    }
+
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        // Snapshot the carrier's current command head so we can detect any
+        // tracked unit that drifted onto a different command in the gap
+        // between the load order issuing and this tick.
+        CUnitCommand* const carrierCommand =
+          (mUnit->CommandQueue != nullptr) ? mUnit->CommandQueue->GetCurrentCommand() : nullptr;
+
+        for (Entity** it = mTrackedUnits.mVec.start_; it != mTrackedUnits.mVec.end_; ++it) {
+          Entity* const tracked = *it;
+          if (tracked == nullptr) {
+            continue;
+          }
+
+          Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+          if (trackedUnit == nullptr) {
+            continue;
+          }
+
+          if (trackedUnit->IsDead() || trackedUnit->IsBeingBuilt()
+              || trackedUnit->IsUnitState(UNITSTATE_Attached) || trackedUnit->DestroyQueued()) {
+            continue;
+          }
+
+          CUnitCommand* const trackedCommand = (trackedUnit->CommandQueue != nullptr)
+            ? trackedUnit->CommandQueue->GetCurrentCommand()
+            : nullptr;
+          if (trackedCommand != carrierCommand) {
+            // A tracked unit broke off to a different command -- treat the
+            // batched retrieve as interrupted and yield without changing
+            // state. The next tick re-evaluates the survivors.
+            return 1;
+          }
+        }
+
+        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+        if (blueprint->Physics.MotionType == RULEUMT_SurfacingSub
+            && mUnit->mCurrentLayer == LAYER_Sub) {
+          // Surfacing-submarine carrier waiting underwater: convert the
+          // carrier's world position into footprint-anchored cell coords
+          // (only the cell is consumed by SNavGoal), aim the motion lane at
+          // the water layer, and wait for the surface motion in Waiting.
+          const SFootprint& footprint = mUnit->GetFootprint();
+          const Wm3::Vec3f& worldPos = mUnit->GetPosition();
+          const SOCellPos surfaceCell = footprint.ToCellPos(worldPos);
+          SNavGoal surfaceGoal(surfaceCell);
+          (void)surfaceGoal;
+
+          mUnit->UnitMotion->SetNewTargetLayer(LAYER_Water);
+          mTaskState = TASKSTATE_Waiting;
+          return 1;
+        }
+
+        // Land/water carriers: drop any pre-existing navigator path and
+        // proceed straight to Starting on the next dispatch tick.
+        if (mUnit->AiNavigator != nullptr) {
+          mUnit->AiNavigator->AbortMove();
+        }
+        mTaskState = TASKSTATE_Starting;
+        return 1;
+      }
+
+      case TASKSTATE_Waiting: {
+        // Wait for the surfacing/landing motion to bring the carrier onto
+        // a transport-friendly layer before dropping pickup reservations.
+        const ELayer layer = mUnit->mCurrentLayer;
+        if (layer == LAYER_Water || layer == LAYER_Air) {
+          mUnit->AiTransport->TransportResetReservation();
+          mTaskState = TASKSTATE_Starting;
+        }
+        return 1;
+      }
+
+      case TASKSTATE_Starting: {
+        // Collect every tracked unit that is still actively loading and
+        // either focused on the carrier or not focused on anything; then
+        // remove each from the tracked set so it stops counting toward
+        // the retrieve quorum. When the tracked set drains to empty, mark
+        // the retrieve as complete and tell the dispatcher we're done.
+        SEntitySetTemplateUnit completedSet{};
+
+        Entity* const ownerEntity = (mUnit != nullptr) ? static_cast<Entity*>(mUnit) : nullptr;
+
+        for (Entity** it = mTrackedUnits.mVec.start_; it != mTrackedUnits.mVec.end_; ++it) {
+          Entity* const tracked = *it;
+          if (tracked == nullptr) {
+            // Null sentinel slots feed through the binary's Add path to
+            // keep slot accounting consistent with the original.
+            (void)completedSet.AddUnit(nullptr);
+            continue;
+          }
+
+          Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+          if (trackedUnit == nullptr) {
+            (void)completedSet.AddUnit(nullptr);
+            continue;
+          }
+
+          if (trackedUnit->IsDead() || !trackedUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+            (void)completedSet.AddUnit(trackedUnit);
+            continue;
+          }
+
+          // Focus-points-at-carrier check (binary FocusEntityRef vs
+          // mUnit->Entity comparison). A unit focused on the carrier and
+          // not the carrier itself is still attaching/loading -- skip it
+          // and leave it in the tracked set for the next tick.
+          Entity* const focusedEntity = trackedUnit->FocusEntityRef.ResolveObjectPtr<Entity>();
+          const bool focusedOnCarrier = (focusedEntity == ownerEntity);
+          if (focusedOnCarrier && trackedUnit != mUnit) {
+            continue;
+          }
+
+          (void)completedSet.AddUnit(trackedUnit);
+        }
+
+        // Drain the completed set out of mTrackedUnits. The Remove call
+        // matches the binary's per-entry SEntitySetTemplate_Unit::Remove
+        // dispatch (the IDA listing labels the address "Contains", but
+        // the body is the erase lane recovered as RemoveUnit).
+        for (Entity** it = completedSet.mVec.start_; it != completedSet.mVec.end_; ++it) {
+          Unit* const completedUnit = (*it != nullptr) ? SEntitySetTemplateUnit::UnitFromEntry(*it) : nullptr;
+          (void)mTrackedUnits.RemoveUnit(completedUnit);
+        }
+
+        if (mTrackedUnits.Empty()) {
+          mRetrievalComplete = true;
+          return -1;
+        }
+
+        // Tracked retrieves still in flight: sleep nine frames before the
+        // next tick (matches the binary's `return 10` => mPendingFrames=9).
+        return 10;
+      }
+
+      default:
+        return 1;
+    }
+  }
 
   /**
    * Address: 0x006085A0 (FUN_006085A0, Moho::CUnitCarrierRetrieve::MemberDeserialize)

@@ -58,6 +58,27 @@ namespace moho
     );
 
     /**
+     * Address: 0x00605EF0 (FUN_00605EF0, Moho::CUnitCarrierRetrieve::TaskTick)
+     *
+     * IDA signature:
+     * int __thiscall sub_605EF0(Moho::CUnitCarrierRetrieve *this);
+     *
+     * What it does:
+     * Executes one carrier-retrieve task tick. Pre-switch guard returns -1
+     * (task complete) on dead carrier or on `UNITSTATE_MovingDown` once the
+     * task has reached Starting. State machine: (Preparing) cancels the
+     * tick when any tracked unit drifts to a different command, otherwise
+     * re-targets the carrier into the water layer for surfacing-sub
+     * carriers and advances to Waiting; (Waiting) resets the AiTransport
+     * reservation when the carrier reaches its water/air destination and
+     * advances to Starting; (Starting) drains units that finished docking
+     * from the tracked set, returning -1 once the tracked set is empty
+     * (with `mRetrievalComplete` flipped to true) or 10 (sleep 9 frames)
+     * while units are still loading; default returns 1.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x00608630 (FUN_00608630, Moho::CUnitCarrierRetrieve::MemberSerialize)
      *
      * What it does:
