@@ -43,6 +43,7 @@ namespace moho
   int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateThrustController(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
+  int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* state);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
   int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* luaContext);
   int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* state);
@@ -1151,6 +1152,50 @@ namespace moho
   [[maybe_unused]] gpg::SerHelperBase* cleanup_CBoneEntityManipulatorSerializerStartupThunkB()
   {
     return UnlinkSerializerNode(gCBoneEntityManipulatorSerializerStartupNode);
+  }
+
+  /**
+   * Address: 0x00634C70 (FUN_00634C70, cfunc_CBoneEntityManipulatorSetPivot)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_CBoneEntityManipulatorSetPivotL`.
+   */
+  int cfunc_CBoneEntityManipulatorSetPivot(lua_State* const luaContext)
+  {
+    return cfunc_CBoneEntityManipulatorSetPivotL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00634CF0 (FUN_00634CF0, cfunc_CBoneEntityManipulatorSetPivotL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Resolves one `CBoneEntityManipulator` from Lua arg 1, reads pivot
+   * `(x, y, z)` from Lua args 2-4 as floats, writes them into
+   * `manipulator->mPivot`, trims the Lua stack down to the manipulator
+   * receiver, and returns one value to Lua.
+   */
+  int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 4) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBoneEntityManipulatorSetPivotHelpText, 4, argumentCount);
+    }
+
+    const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CBoneEntityManipulator* const manipulator = moho::SCR_FromLua_CBoneEntityManipulator(manipulatorObject, state);
+
+    const float pivotX = ReadRequiredLuaNumber(state, 2);
+    const float pivotY = ReadRequiredLuaNumber(state, 3);
+    manipulator->mPivot.z = ReadRequiredLuaNumber(state, 4);
+    manipulator->mPivot.x = pivotX;
+    manipulator->mPivot.y = pivotY;
+
+    lua_settop(state->m_state, 1);
+    return 1;
   }
 
   /**
