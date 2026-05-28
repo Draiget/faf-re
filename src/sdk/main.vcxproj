@@ -705,6 +705,7 @@
     <ClCompile Include="moho\render\d3d\ShaderVar.cpp" />
     <ClCompile Include="moho\render\camera\CameraImpl.cpp" />
     <ClCompile Include="moho\render\camera\CameraImplTypeInfo.cpp" />
+    <ClCompile Include="moho\render\camera\CameraTrackingListener.cpp" />
     <ClCompile Include="moho\render\camera\GeomCamera3.cpp" />
     <ClCompile Include="moho\render\camera\VTransform.cpp" />
     <ClCompile Include="moho\particles\CParticleTextureCountedPtr.cpp" />
@@ -1944,6 +1945,7 @@
     <ClInclude Include="moho\render\camera\GeomCamera3.h" />
     <ClInclude Include="moho\render\camera\CameraImpl.h" />
     <ClInclude Include="moho\render\camera\CameraImplTypeInfo.h" />
+    <ClInclude Include="moho\render\camera\CameraTrackingListener.h" />
     <ClInclude Include="moho\render\camera\VTransform.h" />
     <ClInclude Include="moho\particles\CParticleTextureCountedPtr.h" />
     <ClInclude Include="moho\particles\CWorldParticles.h" />
