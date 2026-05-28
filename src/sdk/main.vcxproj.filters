@@ -1254,6 +1254,9 @@
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4252,6 +4255,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.h">

@@ -1107,6 +1107,7 @@
     <ClCompile Include="moho\unit\tasks\CFactoryBuildTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CBuildTaskHelperTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskSerializer.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.cpp" />
@@ -2159,6 +2160,7 @@
     <ClInclude Include="moho\unit\tasks\CFactoryBuildTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CBuildTaskHelperTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskSerializer.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitAssistMoveTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.h" />
