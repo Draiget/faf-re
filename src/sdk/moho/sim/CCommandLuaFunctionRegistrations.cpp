@@ -855,6 +855,7 @@ namespace moho
   int cfunc_IssuePauseL(LuaPlus::LuaState* state);
   int cfunc_IssueKillSelfL(LuaPlus::LuaState* state);
   int cfunc_IssueDestroySelfL(LuaPlus::LuaState* state);
+  int cfunc_IssueOverChargeL(LuaPlus::LuaState* state);
   int cfunc_IssueUpgradeL(LuaPlus::LuaState* state);
   /**
    * Address: 0x006F7F10 (FUN_006F7F10, cfunc_IssueBuildFactoryL)
@@ -3833,6 +3834,74 @@ namespace moho
     selectedUnits.AddUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Ferry);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F1D80 (FUN_006F1D80, cfunc_IssueOverCharge)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueOverCharge(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueOverChargeL`.
+   */
+  int cfunc_IssueOverCharge(lua_State* const luaContext)
+  {
+    return cfunc_IssueOverChargeL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F1DF0 (FUN_006F1DF0, cfunc_IssueOverChargeL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueOverChargeL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Overcharge-capable units, then
+   * (when any workers remain) resolves the target entity into a `CAiTarget`,
+   * encodes it into `SSTICommandIssueData::mTarget`, and queues one
+   * `UNITCOMMAND_OverCharge` through the shared `IssueCommandToSelectedUnits`
+   * (`UNIT_IssueCommand`) dispatch shape with `clearQueue=false`. Mirrors
+   * the binary's `func_GetUnitList` + `func_Validate_IssueCommand(...,
+   * RULEUCC_Overcharge)` + `SCR_FromLua_Entity` + `CAiTarget::UpdateTarget`
+   * + `SSTITarget::FromAiTarget` + `UNIT_IssueCommand` sequence.
+   */
+  int cfunc_IssueOverChargeL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueOverChargeHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueOverChargeHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Overcharge)) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
+
+    CAiTarget target{};
+    target.UpdateTarget(targetEntity);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_OverCharge);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     return 0;
