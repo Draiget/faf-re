@@ -625,6 +625,7 @@
     <ClCompile Include="moho\mesh\MeshEnvironment.cpp" />
     <ClCompile Include="moho\mesh\MeshThumbnail.cpp" />
     <ClCompile Include="moho\mesh\MeshThumbnailRenderer.cpp" />
+    <ClCompile Include="moho\mesh\ShaderDictionary.cpp" />
     <ClCompile Include="moho\mesh\Mesh.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectImpl.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectImplSerializer.cpp" />
@@ -1493,6 +1494,7 @@
     <ClInclude Include="moho\mesh\MeshEnvironment.h" />
     <ClInclude Include="moho\mesh\MeshThumbnail.h" />
     <ClInclude Include="moho\mesh\MeshThumbnailRenderer.h" />
+    <ClInclude Include="moho\mesh\ShaderDictionary.h" />
     <ClInclude Include="moho\mesh\Mesh.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImpl.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImplSerializer.h" />

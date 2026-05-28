@@ -7,9 +7,6 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
-#include <string>
-#include <string_view>
-#include <unordered_map>
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
@@ -18,6 +15,7 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector4f.h"
 #include "moho/mesh/MeshBatch.h"
+#include "moho/mesh/ShaderDictionary.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
@@ -2744,137 +2742,6 @@ namespace
     (void)meshPath;
     (void)ownerWatcher;
     return {};
-  }
-
-  struct ShaderDictionaryEntry
-  {
-    msvc8::string remappedShaderName;
-    std::int32_t sourceGeneration;
-  };
-
-  class ShaderDictionaryRuntime
-  {
-  public:
-    /**
-     * Address: 0x007DB3A0 (FUN_007DB3A0, ??0ShaderDictionary@Moho@@QAE@@Z)
-     *
-     * What it does:
-     * Seeds the runtime shader remap dictionary with legacy-to-modern
-     * annotation aliases used by mesh material creation.
-     */
-    ShaderDictionaryRuntime();
-
-    [[nodiscard]] static ShaderDictionaryRuntime& Instance() noexcept
-    {
-      static ShaderDictionaryRuntime runtime{};
-      return runtime;
-    }
-
-    [[nodiscard]] std::int32_t CurrentGeneration() const noexcept
-    {
-      return mCurrentGeneration;
-    }
-
-    [[nodiscard]] const ShaderDictionaryEntry* Lookup(const msvc8::string& requestedShaderName) const
-    {
-      const auto it = mEntries.find(NormalizeKey(requestedShaderName));
-      if (it == mEntries.end()) {
-        return nullptr;
-      }
-
-      return &it->second;
-    }
-
-    /**
-     * Address: 0x007DBE90 (FUN_007DBE90, sub_7DBE90)
-     *
-     * What it does:
-     * Writes one remap entry for one legacy shader annotation key.
-     */
-    void AssignRemap(const msvc8::string& legacyShaderName, const msvc8::string& remappedShaderName);
-
-  private:
-    template <class TString>
-    [[nodiscard]] static std::string NormalizeKey(const TString& value)
-    {
-      const std::string_view view = value.view();
-      return std::string(view.begin(), view.end());
-    }
-
-    std::int32_t mCurrentGeneration = 0;
-    std::unordered_map<std::string, ShaderDictionaryEntry> mEntries{};
-  };
-
-  /**
-   * Address: 0x007DBE90 (FUN_007DBE90, sub_7DBE90)
-   *
-   * What it does:
-   * Stores one legacy shader key -> remapped shader name pair in the runtime
-   * dictionary and tags the entry with the current dictionary generation.
-   */
-  void ShaderDictionaryRuntime::AssignRemap(
-    const msvc8::string& legacyShaderName,
-    const msvc8::string& remappedShaderName
-  )
-  {
-    ShaderDictionaryEntry& entry = mEntries[NormalizeKey(legacyShaderName)];
-    entry.remappedShaderName = remappedShaderName;
-    entry.sourceGeneration = mCurrentGeneration;
-  }
-
-  /**
-   * Address: 0x007DB3A0 (FUN_007DB3A0, ??0ShaderDictionary@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Initializes the shader remap dictionary with all built-in annotation
-   * aliases used by legacy mesh assets.
-   */
-  ShaderDictionaryRuntime::ShaderDictionaryRuntime()
-  {
-    AssignRemap("TMeshNoLighting", "Flat");
-    AssignRemap("TMeshNoNormals", "VertexNormal");
-    AssignRemap("TMeshAlpha", "NormalMappedAlpha");
-    AssignRemap("TMeshGlow", "NormalMappedGlow");
-    AssignRemap("TMeshTerrain", "NormalMappedTerrain");
-    AssignRemap("Simple", "Unit");
-    AssignRemap("Team", "Unit");
-    AssignRemap("TMeshAlphaGlowFade", "UnitBuild");
-    AssignRemap("TMeshMetalBuild", "AeonBuild");
-    AssignRemap("TMeshShield", "Shield");
-    AssignRemap("TMeshZFill", "ShieldFill");
-    AssignRemap("TMeshAdd", "Effect");
-    AssignRemap("TMeshExplosion", "Explosion");
-    AssignRemap("TMeshCloud", "Cloud");
-    AssignRemap("TMeshOuterCloud", "OuterCloud");
-    AssignRemap("TMeshEMPNuke", "NukeEMP");
-    AssignRemap("TMeshQuantumNuke", "NukeQuantum");
-    AssignRemap("TMeshTemporalBubble", "TemporalBubble");
-  }
-
-  /**
-   * Address: 0x007DBDB0 (FUN_007DBDB0, sub_7DBDB0)
-   *
-   * What it does:
-   * Resolves one shader annotation through runtime shader remap dictionary
-   * and falls back to caller text (or "Unit" for empty names).
-   */
-  [[nodiscard]] msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName)
-  {
-    const ShaderDictionaryRuntime& dictionary = ShaderDictionaryRuntime::Instance();
-    const ShaderDictionaryEntry* const dictionaryEntry = dictionary.Lookup(shaderName);
-    if (!dictionaryEntry) {
-      if (shaderName.empty()) {
-        return msvc8::string("Unit");
-      }
-
-      return msvc8::string(shaderName.view());
-    }
-
-    if (dictionaryEntry->sourceGeneration != dictionary.CurrentGeneration()) {
-      gpg::Warnf("Use of 'old' shader: %s", shaderName.raw_data_unsafe());
-    }
-
-    return msvc8::string(dictionaryEntry->remappedShaderName.view());
   }
 
   [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>

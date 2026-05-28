@@ -1995,6 +1995,9 @@
     <ClCompile Include="moho\mesh\MeshBatchKey.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\mesh\ShaderDictionary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\mesh\MeshEnvironment.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5065,6 +5068,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\mesh\MeshBatchKey.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\mesh\ShaderDictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\mesh\MeshEnvironment.h">
