@@ -175,6 +175,19 @@ namespace LuaPlus
       void (*)(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
 
     /**
+     * Address: 0x00922190 (FUN_00922190, TableConstruct::Construct)
+     *
+     * What it does:
+     * Reads one boolean ownership hint from the archive; when true it resolves a
+     * named-script-object reference through the Lua global
+     * `__serialize_object_for_name` registry and republishes the existing
+     * `Table*` as a shared/named construct ref, otherwise it reads the saved
+     * `narray`/`lnhash` shape and allocates a fresh empty Lua `Table` in the
+     * owner state, returning it as an owned construct ref.
+     */
+    static void Construct(gpg::ReadArchive* archive, int version, gpg::RRef* ref, gpg::SerConstructResult* result);
+
+    /**
      * Address: 0x0091E3F0 (FUN_0091E3F0, TableConstruct::Deconstruct)
      *
      * What it does:
