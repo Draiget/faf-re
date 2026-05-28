@@ -134,6 +134,7 @@ namespace
   constexpr const char* kIssuePatrolHelpText = "IssuePatrol";
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
   constexpr const char* kIssueRepairHelpText = "IssueRepair";
+  constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
@@ -3850,6 +3851,52 @@ namespace moho
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Repair);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F6EE0 (FUN_006F6EE0, cfunc_IssueKillSelf)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueKillSelf(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueKillSelfL`.
+   */
+  int cfunc_IssueKillSelf(lua_State* const luaContext)
+  {
+    return cfunc_IssueKillSelfL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F6F50 (FUN_006F6F50, cfunc_IssueKillSelfL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueKillSelfL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Resolves one unit-list argument and issues one `UNITCOMMAND_KillSelf`
+   * command through the active sim command sink, mirroring the shared
+   * `IssueSimpleUnitCommand` shape used by `IssueStop`/`IssuePause`.
+   */
+  int cfunc_IssueKillSelfL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueKillSelfHelpText, 1, argumentCount);
+    }
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueKillSelfHelpText);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    IssueSimpleUnitCommand(sim, units, EUnitCommandType::UNITCOMMAND_KillSelf);
     return 0;
   }
 
