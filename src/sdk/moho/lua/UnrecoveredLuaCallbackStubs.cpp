@@ -29,7 +29,6 @@ namespace moho
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State*) { return 0; }
   int cfunc_CAiBrainCreateUnitNearSpot(lua_State*) { return 0; }
   int cfunc_CAiBrainFindPlaceToBuild(lua_State*) { return 0; }
-  int cfunc_CBoneEntityManipulatorSetPivot(lua_State*) { return 0; }
   int cfunc_CreateAimController(lua_State*) { return 0; }
   int cfunc_CreateBuilderArmController(lua_State*) { return 0; }
   int cfunc_CreateThrustController(lua_State*) { return 0; }
