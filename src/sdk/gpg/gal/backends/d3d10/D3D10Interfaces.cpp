@@ -37,6 +37,7 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 
 namespace gpg::gal
 {
@@ -7130,41 +7131,81 @@ namespace gpg::gal
    * boost::shared_ptr<EffectD3D10> *,EffectContext *
    *
    * What it does:
-   * Compiles one effect from source memory with recovered macro-injection lanes
-   * and returns a wrapped D3D10 effect handle.
+   * Copy-constructs one local `EffectContext`, injects 20 D3D10-specific
+   * effect-macro pairs via `EffectContext::DefineMacro` (which throws
+   * `gpg::gal::Error` on a duplicate key), compiles the shader source
+   * from the local context's macro lane, and returns a wrapped D3D10
+   * effect handle.
    */
   boost::shared_ptr<EffectD3D10>*
   DeviceD3D10::CreateEffect(boost::shared_ptr<EffectD3D10>* const outEffect, EffectContext* const context)
   {
-    const EffectContextRuntime* const runtime = AsEffectContextRuntime(context);
-    if (runtime->field04 != 2U) {
-      ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
+    // The binary allocates `EffectContext v27` on its own stack and
+    // copy-constructs from the inbound argument. The public class
+    // currently declares `sizeof(EffectContext) == 0x4`, so the actual
+    // 0x64-byte payload is reserved via aligned storage (matching the
+    // same workaround used by `EffectD3D10::context_`).
+    struct ScopedLocalEffectContext final
+    {
+      using Storage = std::aligned_storage_t<0x64, alignof(void*)>;
+
+      ~ScopedLocalEffectContext()
+      {
+        if (context != nullptr) {
+          context->~EffectContext();
+          context = nullptr;
+        }
+      }
+
+      Storage storage{};
+      EffectContext* context = nullptr;
+    };
+
+    ScopedLocalEffectContext localContextScope{};
+    localContextScope.context =
+      ::new (static_cast<void*>(&localContextScope.storage)) EffectContext(*context);
+    EffectContext* const localContext = localContextScope.context;
+
+    for (std::size_t i = 0U; i < kDeviceCreateEffectInjectedMacroCount; ++i) {
+      localContext->DefineMacro(
+        kDeviceCreateEffectInjectedMacros[i].key,
+        kDeviceCreateEffectInjectedMacros[i].value
+      );
     }
 
-    const std::size_t sourceMacroCount = EffectMacroCount(runtime->lane54);
-    const std::size_t totalMacroCount = sourceMacroCount + kDeviceCreateEffectInjectedMacroCount;
+    // Per binary order: macro lane comes from the modified local copy,
+    // but every other context lane (sourceType, sourcePath, source-byte
+    // window) is read from the inbound caller-owned context — the local
+    // copy is consumed for DefineMacro side effects only.
+    const EffectContextRuntime* const inboundRuntime = AsEffectContextRuntime(context);
+    const EffectContextRuntime* const localRuntime = AsEffectContextRuntime(localContext);
+
+    const std::size_t totalMacroCount = EffectMacroCount(localRuntime->lane54);
     D3D10_SHADER_MACRO* defines = nullptr;
     if (totalMacroCount != 0U) {
       defines = new D3D10_SHADER_MACRO[totalMacroCount + 1U];
 
       std::size_t writeIndex = 0U;
-      for (EffectMacro* read = runtime->lane54.first; read != runtime->lane54.last; ++read, ++writeIndex) {
+      for (EffectMacro* read = localRuntime->lane54.first; read != localRuntime->lane54.last; ++read, ++writeIndex) {
         defines[writeIndex].Name = read->keyText_.c_str();
         defines[writeIndex].Definition = read->valueText_.c_str();
-      }
-
-      for (std::size_t i = 0U; i < kDeviceCreateEffectInjectedMacroCount; ++i, ++writeIndex) {
-        defines[writeIndex].Name = kDeviceCreateEffectInjectedMacros[i].key;
-        defines[writeIndex].Definition = kDeviceCreateEffectInjectedMacros[i].value;
       }
 
       defines[writeIndex].Name = nullptr;
       defines[writeIndex].Definition = nullptr;
     }
 
-    const auto* const sourceData = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(runtime->field4C));
+    if (inboundRuntime->field04 != 2U) {
+      delete[] defines;
+      ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
+    }
+
+    const auto* const sourceData =
+      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(inboundRuntime->field4C));
     const std::uint32_t sourceBytes =
-      (runtime->field50 >= runtime->field4C) ? (runtime->field50 - runtime->field4C) : 0U;
+      (inboundRuntime->field50 >= inboundRuntime->field4C)
+        ? (inboundRuntime->field50 - inboundRuntime->field4C)
+        : 0U;
 
     void* dxEffect = nullptr;
     void* errorBlob = nullptr;
@@ -7182,7 +7223,7 @@ namespace gpg::gal
 
     if (result < 0) {
       msvc8::string message("unable to create effect: ");
-      message = message + runtime->field0C;
+      message = message + inboundRuntime->field0C;
       message = message + " reason: ";
       message = message + reason;
       ThrowGalError("DeviceD3D10.cpp", 828, message.c_str());

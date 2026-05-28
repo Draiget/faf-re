@@ -5,6 +5,7 @@
 #include "DrawContext.hpp"
 #include "EffectContext.hpp"
 #include "EffectMacro.hpp"
+#include "Error.hpp"
 #include "IndexBufferContext.hpp"
 #include "OutputContext.hpp"
 #include "RenderTargetContext.hpp"
@@ -139,21 +140,24 @@ namespace gpg::gal
          *
          * What it does:
          * Scans one contiguous `[first,last)` effect-macro range and returns
-         * the first entry whose key text exactly matches `needle->keyText_`;
-         * returns `last` when no exact key match exists.
+         * the first entry whose key text exactly matches `needleKey`; returns
+         * `last` when no exact key match exists. The needle is a free
+         * `msvc8::string`, matching the binary shape used by
+         * `EffectContext::DefineMacro` where a temporary key string sits on
+         * the caller stack before any `EffectMacro` is constructed.
          */
-        [[maybe_unused]] EffectMacro** FindEffectMacroByKeyInRange(
+        EffectMacro** FindEffectMacroByKeyInRange(
             EffectMacro** const outPosition,
             EffectMacro* first,
             EffectMacro* last,
-            const EffectMacro* const needle
+            const msvc8::string& needleKey
         ) noexcept
         {
             EffectMacro* cursor = first;
-            if (first != last && needle != nullptr)
+            if (first != last)
             {
-                const char* const needleText = needle->keyText_.raw_data_unsafe();
-                const std::size_t needleLength = needle->keyText_.size();
+                const char* const needleText = needleKey.raw_data_unsafe();
+                const std::size_t needleLength = needleKey.size();
 
                 while (cursor != last)
                 {
@@ -222,6 +226,42 @@ namespace gpg::gal
         ) noexcept
         {
             return AssignEffectMacroRangeBackward(first, last, outLast);
+        }
+
+        /**
+         * Throws `gpg::gal::Error(file, line, message)`. Used by
+         * `EffectContext::DefineMacro` to preserve the binary's
+         * `Effect.cpp:76 "duplicate effect macro definition"` throw site.
+         */
+        [[noreturn]] void ThrowEffectContextError(const char* const file, const int line, const char* const message)
+        {
+            const std::size_t fileLength = (file != nullptr) ? std::strlen(file) : 0U;
+            const std::size_t messageLength = (message != nullptr) ? std::strlen(message) : 0U;
+            throw Error(
+                msvc8::string((file != nullptr) ? file : "", static_cast<unsigned int>(fileLength)),
+                line,
+                msvc8::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
+            );
+        }
+
+        /**
+         * Address: 0x00940230 (FUN_00940230, msvc8::vector<EffectMacro>::push_back_one)
+         *
+         * What it does:
+         * Appends one copy-constructed `EffectMacro` to the back of the
+         * macro vector lane, dispatching the per-T MSVC8 grow-and-insert
+         * helpers (`_Insert_n` / `_Insert`) that the binary emitted for
+         * `msvc8::vector<EffectMacro>`. Preserves the original "fill one
+         * then bind" two-step pattern via the recovered modern
+         * `msvc8::vector` API.
+         */
+        void PushBackEffectMacroIntoLane(
+            EffectMacroVectorRuntime& runtime,
+            const EffectMacro& source
+        )
+        {
+            auto* const vec = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime);
+            vec->push_back(source);
         }
 
         void AssignSharedCount(
@@ -970,6 +1010,62 @@ namespace gpg::gal
 
         runtime->cachePath.tidy(true, 0U);
         runtime->sourcePath.tidy(true, 0U);
+    }
+
+    /**
+     * Address: 0x009402D0 (FUN_009402D0, gpg::gal::EffectContext::DefineMacro)
+     * Mangled: ?DefineMacro@EffectContext@gal@gpg@@QAEXPBD0@Z
+     *
+     * IDA signature:
+     * int __thiscall gpg::gal::EffectContext::DefineMacro(
+     *     gpg::gal::EffectContext *this, char *name, char *value);
+     *
+     * What it does:
+     * Looks up `name` in this context's effect-macro vector lane; throws
+     * `gpg::gal::Error("duplicate effect macro definition")` from
+     * `Effect.cpp:76` when a macro with the same key already exists, and
+     * otherwise appends a freshly-constructed `EffectMacro{name, value}` to
+     * the back of the macro vector.
+     */
+    void EffectContext::DefineMacro(const char* const name, const char* const value)
+    {
+        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
+
+        const char* const nameText = (name != nullptr) ? name : "";
+        const char* const valueText = (value != nullptr) ? value : "";
+
+        // The binary constructs a scratch `std::string` from `name`, uses
+        // it as the lookup needle, then drops it before either throwing
+        // the duplicate error or appending the new macro. Mirror that
+        // lifetime so the heap/SSO behavior matches the original
+        // function exactly.
+        bool isDuplicate = false;
+        {
+            const msvc8::string needleKey(
+                nameText, static_cast<unsigned int>(std::strlen(nameText))
+            );
+
+            EffectMacro* foundPosition = runtime->macros.last;
+            (void)FindEffectMacroByKeyInRange(
+                &foundPosition,
+                runtime->macros.first,
+                runtime->macros.last,
+                needleKey
+            );
+            isDuplicate = (foundPosition != runtime->macros.last);
+        }
+
+        if (isDuplicate)
+        {
+            ThrowEffectContextError(
+                "c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Effect.cpp",
+                76,
+                "duplicate effect macro definition"
+            );
+        }
+
+        const EffectMacro newMacro(nameText, valueText);
+        PushBackEffectMacroIntoLane(runtime->macros, newMacro);
     }
 
     /**
