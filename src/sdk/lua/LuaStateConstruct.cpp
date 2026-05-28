@@ -9,6 +9,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 
@@ -17,6 +18,8 @@ extern "C" LClosure* luaF_newLclosure(lua_State* state, int nelems, LuaPlus::TOb
 extern "C" UpVal* luaF_newupval(lua_State* state);
 extern "C" Proto* luaF_newproto(lua_State* state);
 extern "C" TString* luaS_newlstr(lua_State* state, const char* str, std::size_t len);
+extern "C" Table* luaH_new(lua_State* state, int narray, int lnhash);
+extern "C" const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);
 extern "C" void luaC_link(lua_State* L, GCObject* object, int typeTag);
 
 namespace gpg
@@ -114,6 +117,72 @@ namespace LuaPlus
   void TStringConstruct::Deconstruct(void* const objectPtr)
   {
     operator delete(objectPtr);
+  }
+
+  /**
+   * Address: 0x00922190 (FUN_00922190, TableConstruct::Construct)
+   *
+   * What it does:
+   * Reads one boolean ownership hint from the archive. When the bool is true,
+   * the saved table was originally registered by name: reads the saved TString
+   * key from the archive, looks it up in the owner Lua state's globals under
+   * `"__serialize_object_for_name"`, fails with `SerializationError` if the
+   * named entry is missing or is not a `Table`, and republishes the existing
+   * `Table*` through the construct result as a shared/named ref (flags bit 0
+   * set, clearing the owned-shared-flag byte). Otherwise reads `narray`
+   * (int) + `lnhash` (ubyte) shape hints saved by
+   * `SerializeTableSaveConstructPayload`, allocates a fresh empty Lua `Table`
+   * in the owner state via `luaH_new`, and republishes it as a freshly-owned
+   * ref (flags = 0).
+   */
+  void TableConstruct::Construct(
+    gpg::ReadArchive* const archive,
+    const int,
+    gpg::RRef* const ref,
+    gpg::SerConstructResult* const result
+  )
+  {
+    lua_State* const state = ref->TryUpcastLuaThreadState();
+
+    bool isNamedReference = false;
+    archive->ReadBool(&isNamedReference);
+
+    if (isNamedReference) {
+      TString* serializedName = nullptr;
+      (void)archive->ReadPointer_TString(&serializedName, ref);
+
+      TString* const serializeMapName = luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu);
+      const TObject* const serializeMapObject =
+        luaH_getstr(static_cast<Table*>(state->_gt.value.p), serializeMapName);
+
+      const TObject* const resolvedObject = (serializeMapObject->tt == LUA_TTABLE)
+        ? luaH_getstr(static_cast<Table*>(serializeMapObject->value.p), serializedName)
+        : &luaO_nilobject;
+
+      const int resolvedType = resolvedObject->tt;
+      if (resolvedType == LUA_TNIL) {
+        throw gpg::SerializationError("Named script object not found");
+      }
+      if (resolvedType != LUA_TTABLE) {
+        throw gpg::SerializationError("Named script object was a table on save but isn't on load.");
+      }
+
+      gpg::RRef sharedRef{};
+      (void)gpg::RRef_Table(&sharedRef, static_cast<Table*>(resolvedObject->value.p));
+      result->SetOwned(sharedRef, 1u);
+      return;
+    }
+
+    int narray = 0;
+    archive->ReadInt(&narray);
+    unsigned __int8 lnhash = 0u;
+    archive->ReadUByte(&lnhash);
+
+    Table* const newTable = luaH_new(state, narray, static_cast<int>(lnhash));
+
+    gpg::RRef ownedRef{};
+    (void)gpg::RRef_Table(&ownedRef, newTable);
+    result->SetOwned(ownedRef, 0u);
   }
 
   /**
@@ -635,4 +704,47 @@ namespace
   };
 
   [[maybe_unused]] LuaStateConstructBootstrap gLuaStateConstructBootstrap{};
+
+  LuaPlus::TableConstruct gTableConstructHelper{};
+
+  /**
+   * Address: 0x00C09AC0 (FUN_00C09AC0, TableConstruct::~TableConstruct)
+   *
+   * What it does:
+   * Unlinks the global Table construct helper from intrusive helper links
+   * at process teardown via `atexit` chain.
+   */
+  void cleanup_TableConstruct()
+  {
+    UnlinkHelperNode(gTableConstructHelper);
+  }
+
+  /**
+   * Address: 0x00BEA340 (FUN_00BEA340, register_TableConstruct)
+   *
+   * What it does:
+   * Initializes the global Table construct helper, binds the
+   * `TableConstruct::Construct` and `TableConstruct::Deconstruct` callbacks
+   * into the reflected `Table` RTType, and schedules teardown via `atexit`.
+   * This is the source-level address-take of `&TableConstruct::Construct`
+   * that anchors the recovered body for linker dead-strip preservation.
+   */
+  void register_TableConstruct()
+  {
+    InitializeHelperNode(gTableConstructHelper);
+    gTableConstructHelper.mConstruct = &LuaPlus::TableConstruct::Construct;
+    gTableConstructHelper.mDeconstruct = &LuaPlus::TableConstruct::Deconstruct;
+    gTableConstructHelper.RegisterConstructFunction();
+    (void)std::atexit(&cleanup_TableConstruct);
+  }
+
+  struct TableConstructBootstrap
+  {
+    TableConstructBootstrap()
+    {
+      register_TableConstruct();
+    }
+  };
+
+  [[maybe_unused]] TableConstructBootstrap gTableConstructBootstrap{};
 } // namespace
