@@ -23,6 +23,7 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/RCamManager.h"
+#include "moho/render/camera/CameraTrackingListener.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/script/CScriptEvent.h"
@@ -646,55 +647,20 @@ namespace
     return cameraBase;
   }
 
-  struct CameraTrackingEvent
+  [[nodiscard]] moho::CameraTrackingBroadcasterLink* AsCameraTrackingBroadcaster(moho::CameraImpl* const camera) noexcept
   {
-    msvc8::string cameraName;
-    std::uint8_t transitionFlag = 0;
-  };
-
-  struct CameraTrackingBroadcasterLink
-  {
-    CameraTrackingBroadcasterLink* mListNext = nullptr; // +0x00
-    CameraTrackingBroadcasterLink* mListPrev = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(CameraTrackingBroadcasterLink, mListNext) == 0x00,
-    "CameraTrackingBroadcasterLink::mListNext offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CameraTrackingBroadcasterLink, mListPrev) == 0x04,
-    "CameraTrackingBroadcasterLink::mListPrev offset must be 0x04"
-  );
-  static_assert(sizeof(CameraTrackingBroadcasterLink) == 0x08, "CameraTrackingBroadcasterLink size must be 0x08");
-
-  struct CameraTrackingListenerLayout
-  {
-    void* vtable = nullptr;                      // +0x00
-    CameraTrackingBroadcasterLink mLink{};       // +0x04
-  };
-  static_assert(
-    offsetof(CameraTrackingListenerLayout, mLink) == 0x04,
-    "CameraTrackingListenerLayout::mLink offset must be 0x04"
-  );
-
-  class CameraTrackingListenerVf
-  {
-  public:
-    virtual void Receive(const CameraTrackingEvent& event) = 0;
-  };
-
-  [[nodiscard]] CameraTrackingBroadcasterLink* AsCameraTrackingBroadcaster(moho::CameraImpl* const camera) noexcept
-  {
-    return reinterpret_cast<CameraTrackingBroadcasterLink*>(reinterpret_cast<std::uint8_t*>(camera) + 0x04);
+    return reinterpret_cast<moho::CameraTrackingBroadcasterLink*>(
+      reinterpret_cast<std::uint8_t*>(camera) + 0x04
+    );
   }
 
-  void CameraTrackingSelfLink(CameraTrackingBroadcasterLink* const node) noexcept
+  void CameraTrackingSelfLink(moho::CameraTrackingBroadcasterLink* const node) noexcept
   {
     node->mListPrev = node;
     node->mListNext = node;
   }
 
-  void CameraTrackingDetach(CameraTrackingBroadcasterLink* const node) noexcept
+  void CameraTrackingDetach(moho::CameraTrackingBroadcasterLink* const node) noexcept
   {
     node->mListNext->mListPrev = node->mListPrev;
     node->mListPrev->mListNext = node->mListNext;
@@ -702,7 +668,7 @@ namespace
   }
 
   void CameraTrackingAttachAfter(
-    CameraTrackingBroadcasterLink* const node, CameraTrackingBroadcasterLink* const anchor
+    moho::CameraTrackingBroadcasterLink* const node, moho::CameraTrackingBroadcasterLink* const anchor
   ) noexcept
   {
     CameraTrackingDetach(node);
@@ -712,14 +678,21 @@ namespace
     node->mListNext->mListPrev = node;
   }
 
-  [[nodiscard]] CameraTrackingListenerVf* CameraTrackingListenerFromLink(
-    CameraTrackingBroadcasterLink* const listenerLink
+  /**
+   * Recover the owning `CameraTrackingListener` instance from one of its
+   * intrusive broadcaster link nodes. The link sits inside the inherited
+   * `Listener<SCameraTracking>::mListenerLink` subobject at offset +0x04
+   * within `CameraTrackingListener`; the binary uses the same fixed offset
+   * for the singleton at `.data:0x00F5B668`.
+   */
+  [[nodiscard]] moho::CameraTrackingListener* CameraTrackingListenerFromLink(
+    moho::CameraTrackingBroadcasterLink* const listenerLink
   ) noexcept
   {
-    auto* const layout = reinterpret_cast<CameraTrackingListenerLayout*>(
-      reinterpret_cast<std::uint8_t*>(listenerLink) - offsetof(CameraTrackingListenerLayout, mLink)
+    constexpr std::ptrdiff_t kListenerLinkOffset = 0x04;
+    return reinterpret_cast<moho::CameraTrackingListener*>(
+      reinterpret_cast<std::uint8_t*>(listenerLink) - kListenerLinkOffset
     );
-    return reinterpret_cast<CameraTrackingListenerVf*>(layout);
   }
 
   /**
@@ -727,14 +700,17 @@ namespace
    *
    * What it does:
    * Moves listeners into a snapshot ring, iterates safely while relinking each
-   * listener back to broadcaster head, and dispatches one camera-tracking event
-   * payload (`cameraName`, `transitionFlag`) per listener.
+   * listener back to broadcaster head, and dispatches one camera-tracking
+   * event payload (`mCameraName`, `mTransitionFlag`) per listener via the
+   * `Listener<SCameraTracking>::OnEvent` vtable slot.
    */
   void BroadcastCameraTrackingEvent(
-    CameraTrackingBroadcasterLink* const broadcaster, const msvc8::string& cameraName, const std::uint8_t transitionFlag
+    moho::CameraTrackingBroadcasterLink* const broadcaster,
+    const msvc8::string& cameraName,
+    const std::uint8_t transitionFlag
   )
   {
-    CameraTrackingBroadcasterLink snapshot{};
+    moho::CameraTrackingBroadcasterLink snapshot{};
     CameraTrackingSelfLink(&snapshot);
 
     if (broadcaster->mListPrev != broadcaster) {
@@ -745,14 +721,16 @@ namespace
       CameraTrackingSelfLink(broadcaster);
 
       while (snapshot.mListPrev != &snapshot) {
-        CameraTrackingBroadcasterLink* const listenerLink = snapshot.mListPrev;
+        moho::CameraTrackingBroadcasterLink* const listenerLink = snapshot.mListPrev;
         CameraTrackingDetach(listenerLink);
         CameraTrackingAttachAfter(listenerLink, broadcaster);
 
-        CameraTrackingEvent event{};
-        event.cameraName = cameraName;
-        event.transitionFlag = transitionFlag;
-        CameraTrackingListenerFromLink(listenerLink)->Receive(event);
+        moho::SCameraTracking event{};
+        event.mCameraName = cameraName;
+        event.mTransitionFlag = transitionFlag;
+
+        moho::CameraTrackingListener* const listener = CameraTrackingListenerFromLink(listenerLink);
+        listener->OnEvent(event);
       }
     }
 

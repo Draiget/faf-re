@@ -5703,6 +5703,8 @@
     <ClInclude Include="moho\net\CDiscoveryServiceTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\render\camera\CameraImplTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\render\camera\CameraImplTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\render\camera\CameraTrackingListener.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="moho\render\camera\CameraTrackingListener.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\render\Cartographic.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\render\Shadow.h"><Filter>Header Files</Filter></ClInclude>
     
