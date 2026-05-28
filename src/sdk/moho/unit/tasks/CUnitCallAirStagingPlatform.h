@@ -29,6 +29,27 @@ namespace moho
     CUnitCallAirStagingPlatform(CCommandTask* parentTask, Unit* platformUnit);
 
     /**
+     * Address: 0x00601950 (FUN_00601950, ??1CUnitCallAirStagingPlatform@Moho@@QAE@@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CUnitCallAirStagingPlatform::~CUnitCallAirStagingPlatform(
+     *     Moho::CUnitCallAirStagingPlatform *this);
+     *
+     * What it does:
+     * Tears down one air-staging call task. Clears the four owner-unit state
+     * lanes the task owns (ForceSpeedThrough, LandingOnPlatform,
+     * TransportLoading, WaitingForTransport); if the attach handshake did not
+     * complete (`!mDone`), restores the owner's `UnitMotion::mHeight` to
+     * positive infinity and asks the still-living platform's transport
+     * interface to drop the unit's pickup reservation; finalises the dispatch
+     * result lane (1 on success, 2 on cancellation); unlinks the platform
+     * weak-pointer slot from the platform Unit's intrusive weak-link chain;
+     * then chains into the embedded `CCommandTask` destructor for the base
+     * teardown.
+     */
+    ~CUnitCallAirStagingPlatform() override;
+
+    /**
      * Address: 0x00603DF0 (FUN_00603DF0)
      *
      * What it does:
