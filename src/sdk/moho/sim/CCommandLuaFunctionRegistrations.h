@@ -437,6 +437,24 @@ namespace moho
   int cfunc_IssueRepairL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F67A0 (FUN_006F67A0, cfunc_IssueScript)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueScriptL`.
+   */
+  int cfunc_IssueScript(lua_State* luaContext);
+
+  /**
+   * Address: 0x006F6810 (FUN_006F6810, cfunc_IssueScriptL)
+   *
+   * What it does:
+   * Parses `(unitList, scriptObject)`, gathers live units, and (when the
+   * selection is non-empty) issues `UNITCOMMAND_Script` carrying the
+   * second Lua argument as the embedded payload.
+   */
+  int cfunc_IssueScriptL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00836900 (FUN_00836900, cfunc_DecreaseBuildCountInQueue)
    *
    * What it does:

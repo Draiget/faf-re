@@ -48,7 +48,6 @@ namespace moho
   int cfunc_IssueOverCharge(lua_State*) { return 0; }
   int cfunc_IssueReclaim(lua_State*) { return 0; }
   int cfunc_IssueSacrifice(lua_State*) { return 0; }
-  int cfunc_IssueScript(lua_State*) { return 0; }
   int cfunc_IssueTeleport(lua_State*) { return 0; }
   int cfunc_IssueTeleportToBeacon(lua_State*) { return 0; }
   int cfunc_IssueTransportUnload(lua_State*) { return 0; }
