@@ -1030,6 +1030,8 @@ namespace
 
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
+  constexpr const char* kCreateCursorName = "_c_CreateCursor";
+  constexpr const char* kCreateCursorHelpText = "_c_CreateCursor(luaobj,spec)";
   constexpr const char* kCursorSetDefaultTextureHelpText = "Cursor:SetDefaultTexture(filename, hotspotX, hotspotY)";
   constexpr const char* kCursorSetNewTextureHelpText = "Cursor:SetTexture(filename, hotspotX, hotspotY)";
   constexpr const char* kCursorResetToDefaultHelpText = "Cursor:ResetToDefault()";
@@ -5503,6 +5505,68 @@ moho::CMauiCursor::~CMauiCursor()
   cursorView->mTexture.reset();
   cursorView->mDefaultTexture.reset();
   reinterpret_cast<CScriptObject*>(this)->~CScriptObject();
+}
+
+/**
+ * Address: 0x0078CFD0 (FUN_0078CFD0, cfunc__c_CreateCursor)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context (`lua_State::stateUserData`) and forwards
+ * the call to `cfunc__c_CreateCursorL`.
+ */
+int moho::cfunc__c_CreateCursor(lua_State* const luaContext)
+{
+  return cfunc__c_CreateCursorL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0078CFF0 (FUN_0078CFF0, func__c_CreateCursor_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global Lua binder metadata for `_c_CreateCursor(luaobj,spec)` into
+ * the user-side `CScrLuaInitFormSet` so the Lua runtime can dispatch to
+ * `cfunc__c_CreateCursor` at script-load time.
+ */
+moho::CScrLuaInitForm* moho::func__c_CreateCursor_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCreateCursorName,
+    &moho::cfunc__c_CreateCursor,
+    nullptr,
+    "<global>",
+    kCreateCursorHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0078D050 (FUN_0078D050, cfunc__c_CreateCursorL)
+ *
+ * IDA signature:
+ * int __usercall cfunc__c_CreateCursorL@<eax>(LuaPlus::LuaState *a1@<esi>);
+ *
+ * What it does:
+ * Validates the `(luaobj, spec)` argument shape (warns when the argument
+ * count differs from 2), allocates one `CMauiCursor` bound to the first Lua
+ * argument, and pushes the cursor's stored Lua object back onto the stack.
+ */
+int moho::cfunc__c_CreateCursorL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateCursorHelpText, 2, argumentCount);
+  }
+
+  CMauiCursor* cursor = nullptr;
+  {
+    LuaPlus::LuaObject luaObjectArgument(LuaPlus::LuaStackObject(state, 1));
+    cursor = new CMauiCursor(&luaObjectArgument);
+  }
+
+  // CMauiCursor shares the CScriptObject runtime layout (cObject @+0x0C, mLuaObj @+0x20).
+  reinterpret_cast<CScriptObject*>(cursor)->mLuaObj.PushStack(state);
+  return 1;
 }
 
 /**

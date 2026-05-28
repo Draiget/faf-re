@@ -3326,6 +3326,33 @@ namespace moho
   void MAUI_ReleaseCursor(CMauiCursor* cursor);
 
   /**
+   * Address: 0x0078CFD0 (FUN_0078CFD0, cfunc__c_CreateCursor)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc__c_CreateCursorL`.
+   */
+  int cfunc__c_CreateCursor(lua_State* luaContext);
+
+  /**
+   * Address: 0x0078CFF0 (FUN_0078CFF0, func__c_CreateCursor_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder metadata for `_c_CreateCursor` into the user
+   * Lua init-form registration set.
+   */
+  CScrLuaInitForm* func__c_CreateCursor_LuaFuncDef();
+
+  /**
+   * Address: 0x0078D050 (FUN_0078D050, cfunc__c_CreateCursorL)
+   *
+   * What it does:
+   * Validates `(luaobj, spec)` argument shape, allocates one `CMauiCursor`
+   * bound to the first Lua argument, and pushes the resulting cursor Lua
+   * object back onto the stack.
+   */
+  int cfunc__c_CreateCursorL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0083D670 (FUN_0083D670)
    *
    * What it does:
