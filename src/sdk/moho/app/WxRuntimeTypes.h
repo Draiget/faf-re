@@ -5612,6 +5612,20 @@ namespace moho
   [[nodiscard]] SplashScreenRuntime* WX_CreateSplashScreen(const char* filename, const wxSize& size);
 
   /**
+   * Returns the runtime-assigned `wxEVT_MOTION` event-type lane backed by
+   * `gWxEvtMotionRuntimeType` (binary `0x00F8F460`). Initializes lazily on
+   * first use just like the original wx startup path.
+   */
+  [[nodiscard]] std::int32_t WX_GetWxEvtMotionType();
+
+  /**
+   * Returns the runtime-assigned `wxEVT_MOUSEWHEEL` event-type lane backed by
+   * `gWxEvtMouseWheelRuntimeType` (binary `0x00F8F4B0`). Initializes lazily on
+   * first use just like the original wx startup path.
+   */
+  [[nodiscard]] std::int32_t WX_GetWxEvtMouseWheelType();
+
+  /**
    * Runtime line-entry record used by `CWinLogTarget` vectors.
    *
    * Evidence:

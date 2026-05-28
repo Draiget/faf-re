@@ -40,6 +40,7 @@
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/misc/StatItem.h"
 #include "moho/app/WinApp.h"
+#include "moho/app/WxRuntimeTypes.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/ResourceManager.h"
@@ -2642,7 +2643,6 @@ namespace
     sizeof(CurrentDraggerSentinel) == sizeof(DraggerLink),
     "CurrentDraggerSentinel must remain intrusive-link-compatible"
   );
-
   struct WxWindowCaptureRuntimeView
   {
     std::uint8_t mUnknown00To107[0x108]{};
@@ -2671,6 +2671,19 @@ namespace
      * destructor lane.
      */
     ~CMauiWxEventMapperRuntime() override;
+
+    /**
+     * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
+     *
+     * wxEvent-table sink installed at `0x00F5A488` for the
+     * `CMauiWxEventMapper` event table. Builds one typed `SMauiEventData`
+     * payload from the wxMouseEvent, hit-tests for the topmost control under
+     * the cursor, emits `MET_MouseEnter` / `MET_MouseExit` on hover changes,
+     * and routes the event to the topmost control via `PostEvent`. Press /
+     * double-click also runs the global `/lua/ui/uimain.lua:OnMouseButtonPress`
+     * Lua callback and notifies the previous keyboard-focus owner.
+     */
+    void OnMouseMove(wxEventRuntime& mouseEvent);
   };
 
   using CMauiWxEventMapperRuntimeView = CMauiWxEventMapperRuntime;
@@ -2710,6 +2723,17 @@ namespace
   POINT sMouseMoveStart{};
   POINT sMouseScrubDelta{};
   POINT sMouseScrubAnchor{};
+
+  /**
+   * Global intrusive sentinel that tracks the `CMauiControl` currently under
+   * the mouse cursor. Mirrors the binary `stru_10BDBA0` storage at
+   * `0x010BDBA0`. The lane is rebound to the new topmost control on every
+   * `MET_MouseEnter` / `MET_MouseExit` boundary inside `func_OnMouseMove`.
+   *
+   * Same shape and sentinel conventions as `Maui_CurrentFocusControl`:
+   * `0` = unbound, `4` = dead weak-owner sentinel.
+   */
+  moho::CMauiCurrentFocusControlRuntimeView gCurrentMouseOverControlLink{};
 
   [[nodiscard]] DraggerLink* CurrentDraggerSentinelLink() noexcept
   {
@@ -4549,6 +4573,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     const char* const message = exception.what() != nullptr ? exception.what() : "";
     scriptObject->LogScriptWarning(scriptObject, "IsScrollable", message);
   }
+
 } // namespace
 
 moho::EUIState moho::sUIState = moho::UIS_none;
@@ -9530,12 +9555,22 @@ static DraggerLink* func_UnlinkCurrentDraggerLink()
  * Mangled: ??1CMauiWxEventMapper@Moho@@QAE@@Z
  *
  * What it does:
- * Restores dragger/capture globals while the event mapper is being destroyed.
+ * Unlinks the global mouse-over control sentinel (`stru_10BDBA0` = local
+ * `gCurrentMouseOverControlLink`) and clears the global mouse-capture flag so
+ * the next mapper instance starts with a clean tracking state.
  */
 CMauiWxEventMapperRuntime::~CMauiWxEventMapperRuntime()
 {
-  (void)func_UnlinkCurrentDraggerLink();
-  (void)func_ResetCurrentDraggerLink();
+  // Unlink the mouse-over sentinel from whatever control it currently tracks.
+  // When the link is in the "dead weak-owner" state (`mPrev == 4`), clear
+  // lanes without dereferencing the dead address — same convention as
+  // `UnlinkFocusControlSentinel`.
+  if (gCurrentMouseOverControlLink.ResolveFocusedControl() != nullptr) {
+    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, nullptr);
+  } else {
+    gCurrentMouseOverControlLink.mFocusedControlPrevNextField = 0u;
+    gCurrentMouseOverControlLink.mNextPrevNextField = 0u;
+  }
   sMouseIsCaptured = 0;
 }
 
@@ -9752,6 +9787,373 @@ static_assert(
 
   func_PostDragger(originFrame, nullptr, eventData);
 }
+
+// Forward declarations for the wx mouse-event selector helpers defined at
+// global scope in `moho/app/WxRuntimeTypes.cpp`. They surface the same
+// runtime behavior as the binary FUN_00979280 / FUN_00979310 / FUN_009793A0 /
+// FUN_00979560 lanes used by `func_OnMouseMove`.
+bool wxMouseEventMatchesDoubleClickSelectorRuntime(
+  const void* mouseEventRuntime, std::int32_t selector
+) noexcept;
+bool wxMouseEventMatchesPressSelectorRuntime(
+  const void* mouseEventRuntime, std::int32_t selector
+) noexcept;
+bool wxMouseEventMatchesReleaseSelectorRuntime(
+  const void* mouseEventRuntime, std::int32_t selector
+) noexcept;
+std::int32_t wxMouseEventResolveButtonSelectorRuntime(
+  const void* mouseEventRuntime
+) noexcept;
+
+namespace
+{
+  /**
+   * Layout view over `wxMouseEvent` fields beyond the `wxEvent` base. Field
+   * offsets are confirmed by FUN_007A4970 asm reads at `[esi+0x20..0x34]`.
+   */
+  struct WxMouseEventDispatchRuntimeView
+  {
+    std::uint8_t mWxEventBase[0x20]{}; // +0x00 wxEventRuntime header
+    std::int32_t mMouseX = 0;          // +0x20
+    std::int32_t mMouseY = 0;          // +0x24
+    std::uint8_t mLeftDown = 0;        // +0x28
+    std::uint8_t mMiddleDown = 0;      // +0x29
+    std::uint8_t mRightDown = 0;       // +0x2A
+    std::uint8_t mControlDown = 0;     // +0x2B
+    std::uint8_t mShiftDown = 0;       // +0x2C
+    std::uint8_t mAltDown = 0;         // +0x2D
+    std::uint8_t mMetaDown = 0;        // +0x2E
+    std::uint8_t mReserved2F = 0;      // +0x2F
+    std::int32_t mWheelRotation = 0;   // +0x30
+    std::int32_t mWheelDelta = 0;      // +0x34
+  };
+  static_assert(
+    offsetof(WxMouseEventDispatchRuntimeView, mMouseX) == 0x20,
+    "WxMouseEventDispatchRuntimeView::mMouseX offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxMouseEventDispatchRuntimeView, mLeftDown) == 0x28,
+    "WxMouseEventDispatchRuntimeView::mLeftDown offset must be 0x28"
+  );
+  static_assert(
+    offsetof(WxMouseEventDispatchRuntimeView, mWheelRotation) == 0x30,
+    "WxMouseEventDispatchRuntimeView::mWheelRotation offset must be 0x30"
+  );
+  static_assert(
+    offsetof(WxMouseEventDispatchRuntimeView, mWheelDelta) == 0x34,
+    "WxMouseEventDispatchRuntimeView::mWheelDelta offset must be 0x34"
+  );
+
+  /**
+   * Builds one `moho::SMauiEventData` payload from a wxMouseEvent, translating
+   * wheel-event coordinates from screen-space to client-space through
+   * `windowRuntime->ScreenToClient`.
+   */
+  [[nodiscard]] moho::SMauiEventData BuildMauiEventPayloadFromWxMouse(
+    const WxMouseEventDispatchRuntimeView* const mouseEvent,
+    const wxEventRuntime* const wxEvent,
+    WxWindowCaptureRuntimeView* const windowRuntime
+  )
+  {
+    moho::SMauiEventData payload{};
+    payload.mEventType = moho::MET_Unknown;
+    payload.mMousePos.x = -1.0f;
+    payload.mMousePos.y = -1.0f;
+
+    const std::int32_t mouseWheelEventType = moho::WX_GetWxEvtMouseWheelType();
+    if (windowRuntime != nullptr && wxEvent->mEventType == mouseWheelEventType) {
+      // Wheel events report screen coordinates; convert to client space.
+      std::int32_t clientX = mouseEvent->mMouseX;
+      std::int32_t clientY = mouseEvent->mMouseY;
+      moho::WX_ScreenToClient(
+        reinterpret_cast<wxWindowBase*>(windowRuntime), clientX, clientY
+      );
+      payload.mMousePos.x = static_cast<float>(clientX);
+      payload.mMousePos.y = static_cast<float>(clientY);
+    } else {
+      payload.mMousePos.x = static_cast<float>(mouseEvent->mMouseX);
+      payload.mMousePos.y = static_cast<float>(mouseEvent->mMouseY);
+    }
+
+    // Map the wxMouseEvent button/modifier flag bytes onto the typed Maui
+    // modifier bitmask. Bit layout proven by FUN_007A4970 disassembly.
+    std::uint32_t modifierBits = 0u;
+    if (mouseEvent->mLeftDown != 0)    { modifierBits |= moho::MEM_Left; }
+    if (mouseEvent->mMiddleDown != 0)  { modifierBits |= moho::MEM_Middle; }
+    if (mouseEvent->mRightDown != 0)   { modifierBits |= moho::MEM_Right; }
+    if (mouseEvent->mControlDown != 0) { modifierBits |= moho::MEM_Ctrl; }
+    if (mouseEvent->mShiftDown != 0)   { modifierBits |= moho::MEM_Shift; }
+    if (mouseEvent->mAltDown != 0)     { modifierBits |= moho::MEM_Alt; }
+    payload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
+
+    return payload;
+  }
+
+  /**
+   * Posts the global Lua `OnMouseButtonPress` callback by importing
+   * `/lua/ui/uimain.lua` and invoking its `OnMouseButtonPress` field with a
+   * fresh `{Type, x, y}` table. Caught exceptions are routed to `gpg::Warnf`
+   * using the original binary's hard-coded error message lane.
+   */
+  void RunGlobalOnMouseButtonPressLuaCallback(
+    LuaPlus::LuaState* const luaState,
+    const bool isPress,
+    const std::int32_t mouseX,
+    const std::int32_t mouseY
+  )
+  {
+    if (luaState == nullptr) {
+      return;
+    }
+
+    LuaPlus::LuaObject payloadTable;
+    payloadTable.AssignNewTable(luaState, 0, 0);
+    payloadTable.SetString("Type", isPress ? "ButtonPress" : "ButtonDClick");
+    payloadTable.SetNumber("x", static_cast<float>(mouseX));
+    payloadTable.SetNumber("y", static_cast<float>(mouseY));
+
+    try {
+      LuaPlus::LuaObject uiMainModule = moho::SCR_Import(luaState, "/lua/ui/uimain.lua");
+      LuaPlus::LuaObject onMouseButtonPress = uiMainModule["OnMouseButtonPress"];
+      const LuaPlus::LuaFunction<void> callback(onMouseButtonPress);
+      callback.Call_Object(payloadTable);
+    } catch (const std::exception& exception) {
+      const char* const message = exception.what() != nullptr ? exception.what() : "";
+      gpg::Warnf(
+        "Error running '/lua/ui/game/construction.lua:OnMouseButtonPress': %s",
+        message
+      );
+    }
+  }
+  /**
+   * Unlinks one local focus-style intrusive sentinel from the control chain it
+   * currently tracks and zeroes its lanes. Mirrors the binary `sub_79DB60`
+   * tail used by FUN_007A4970 on every normal exit path.
+   *
+   * Guards against the `mFocusedControlPrevNextField == 4` "dead weak-owner"
+   * sentinel value by clearing lanes without dereferencing the dead address.
+   */
+  void UnlinkFocusControlSentinel(moho::CMauiCurrentFocusControlRuntimeView* const sentinel) noexcept
+  {
+    if (sentinel == nullptr) {
+      return;
+    }
+    if (sentinel->mFocusedControlPrevNextField == kCMauiControlListNodeNextOffset) {
+      sentinel->mFocusedControlPrevNextField = 0u;
+      sentinel->mNextPrevNextField = 0u;
+      return;
+    }
+    SetCurrentFocusControlLink(sentinel, nullptr);
+  }
+} // namespace
+
+/**
+ * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
+ *
+ * IDA signature:
+ * void __userpurge func_OnMouseMove(Value *ecx0@<ecx>, ..., wxEvent *a5)
+ *
+ * What it does:
+ * Static `wxEventTableEntry` mouse handler at `0x00F5A488` for the
+ * `Moho::CMauiWxEventMapper` event-table family. For every wx mouse event:
+ *  1. Builds one `moho::SMauiEventData` payload from the wxMouseEvent fields,
+ *     translating wheel-event coordinates through the mapper window runtime.
+ *  2. Hit-tests the input-capture stack first, then the mapper frame, to find
+ *     the topmost `CMauiControl` under the cursor.
+ *  3. Emits `MET_MouseExit` / `MET_MouseEnter` when the topmost control
+ *     changes, updating the global mouse-over sentinel.
+ *  4. Routes the event to the topmost control through
+ *     `CMauiControl::PostEvent`, with special paths for active dragger
+ *     interception, wheel rotation, button release, and button press /
+ *     double-click (the latter also runs `/lua/ui/uimain.lua:OnMouseButtonPress`
+ *     and notifies the previous keyboard-focus owner via
+ *     `LosingKeyboardFocus`).
+ */
+void CMauiWxEventMapperRuntime::OnMouseMove(wxEventRuntime& mouseEventRef)
+{
+  wxEventRuntime* const wxEventPtr = &mouseEventRef;
+  auto* const mouseEvent = reinterpret_cast<WxMouseEventDispatchRuntimeView*>(wxEventPtr);
+
+  // ---- Step 1: Build typed Maui event payload from wx mouse event ----
+  moho::SMauiEventData eventPayload =
+    BuildMauiEventPayloadFromWxMouse(mouseEvent, wxEventPtr, mWindowRuntime);
+
+  // ---- Step 2: Resolve topmost-control under the cursor ----
+  // The local tracking sentinel mirrors the binary's stack-local
+  // `TDatListItem_CScriptObject result` lane.
+  moho::CMauiCurrentFocusControlRuntimeView trackingSentinel{};
+
+  moho::CMauiControl* hitRoot = ResolveTopInputCaptureControl();
+  if (hitRoot == nullptr) {
+    hitRoot = mFrame;
+  }
+  moho::CMauiControl* topmostControl =
+    hitRoot != nullptr
+      ? moho::CMauiControl::GetTopmostControl(hitRoot, eventPayload.mMousePos.x, eventPayload.mMousePos.y)
+      : nullptr;
+  SetCurrentFocusControlLink(&trackingSentinel, topmostControl);
+
+  // When the initial hit-root yielded no topmost control, retry against the
+  // mapper's owning frame so clicks on empty area inside the frame still
+  // resolve a default target. If both attempts fail, there is no control to
+  // route the event to.
+  if (trackingSentinel.ResolveFocusedControl() == nullptr) {
+    moho::CMauiControl* const captureControl = ResolveTopInputCaptureControl();
+    moho::CMauiControl* const fallbackRoot =
+      captureControl != nullptr ? captureControl : mFrame;
+    if (fallbackRoot == nullptr) {
+      // No hit-root candidate: ensure the tracking sentinel is detached and
+      // exit. The binary tail-calls `sub_79DB60` here; we do an equivalent
+      // intrusive unlink directly.
+      UnlinkFocusControlSentinel(&trackingSentinel);
+      return;
+    }
+    SetCurrentFocusControlLink(&trackingSentinel, fallbackRoot);
+  }
+
+  moho::CMauiControl* const trackedControl = trackingSentinel.ResolveFocusedControl();
+
+  // ---- Step 3: Emit MouseEnter/MouseExit if the hovered control changed ----
+  moho::CMauiControl* const previousOver = gCurrentMouseOverControlLink.ResolveFocusedControl();
+  if (trackedControl != previousOver) {
+    if (previousOver != nullptr) {
+      eventPayload.mEventType = moho::MET_MouseExit;
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(previousOver);
+      previousOver->PostEvent(eventPayload);
+    }
+    if (trackedControl != nullptr) {
+      eventPayload.mEventType = moho::MET_MouseEnter;
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+      trackedControl->PostEvent(eventPayload);
+    }
+    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, trackedControl);
+  }
+
+  // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
+  const void* const eventVoid = static_cast<const void*>(wxEventPtr);
+  const bool isPress = wxMouseEventMatchesPressSelectorRuntime(eventVoid, -1);
+  const bool isDoubleClick = wxMouseEventMatchesDoubleClickSelectorRuntime(eventVoid, -1);
+
+  if (!isPress && !isDoubleClick) {
+    // ---- Non-press paths: release / motion / wheel / skip ----
+    if (wxMouseEventMatchesReleaseSelectorRuntime(eventVoid, -1)) {
+      eventPayload.mEventType = moho::MET_ButtonRelease;
+      const std::int32_t buttonSelector = wxMouseEventResolveButtonSelectorRuntime(eventVoid);
+      eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(buttonSelector);
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+
+      moho::IMauiDragger* const activeDragger = func_GetCurrentDraggerFromMouseMoveLane();
+      if (activeDragger != nullptr && buttonSelector == sCurrentDraggerKeycode) {
+        activeDragger->DragRelease(&eventPayload);
+        func_PostDragger(nullptr, nullptr, &eventPayload);
+      } else if (trackedControl != nullptr) {
+        trackedControl->PostEvent(eventPayload);
+      }
+      UnlinkFocusControlSentinel(&trackingSentinel);
+      return;
+    }
+
+    const std::int32_t motionEventType = moho::WX_GetWxEvtMotionType();
+    if (wxEventPtr->mEventType == motionEventType) {
+      eventPayload.mEventType = moho::MET_MouseMotion;
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+
+      moho::IMauiDragger* const activeDragger = func_GetCurrentDraggerFromMouseMoveLane();
+      if (activeDragger != nullptr) {
+        activeDragger->DragMove(&eventPayload);
+        UnlinkFocusControlSentinel(&trackingSentinel);
+        return;
+      }
+      if (sMouseIsCaptured != 0) {
+        ::ReleaseCapture();
+        sMouseIsCaptured = 0;
+      }
+      if (trackedControl != nullptr) {
+        trackedControl->PostEvent(eventPayload);
+      }
+      UnlinkFocusControlSentinel(&trackingSentinel);
+      return;
+    }
+
+    if (mouseEvent->mWheelRotation != 0) {
+      if (trackedControl == nullptr) {
+        UnlinkFocusControlSentinel(&trackingSentinel);
+        return;
+      }
+      eventPayload.mEventType = moho::MET_WheelRotation;
+      eventPayload.mWheelRotation = mouseEvent->mWheelRotation;
+      eventPayload.mWheelData = mouseEvent->mWheelDelta;
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+      trackedControl->PostEvent(eventPayload);
+      UnlinkFocusControlSentinel(&trackingSentinel);
+      return;
+    }
+
+    // No release / motion / wheel rotation: mark wx event as skipped so the
+    // framework continues propagation up the wx event chain.
+    wxEventPtr->mSkipped = 1;
+    UnlinkFocusControlSentinel(&trackingSentinel);
+    return;
+  }
+
+  // ---- Press / double-click path ----
+
+  // Notify the currently focused control that focus is being taken away when
+  // the user clicked on a different control.
+  if (moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl();
+      focused != nullptr && focused != trackedControl) {
+    focused->LosingKeyboardFocus();
+  }
+
+  // Run the global `/lua/ui/uimain.lua:OnMouseButtonPress` callback so script
+  // code observes the press before the typed event reaches the topmost control.
+  LuaPlus::LuaState* const luaState =
+    moho::g_UIManager != nullptr ? moho::g_UIManager->mLuaState : nullptr;
+  RunGlobalOnMouseButtonPressLuaCallback(luaState, isPress, mouseEvent->mMouseX, mouseEvent->mMouseY);
+
+  if (trackedControl != nullptr) {
+    eventPayload.mEventType = isPress ? moho::MET_ButtonPress : moho::MET_ButtonDClick;
+    eventPayload.mKeyCode =
+      static_cast<moho::EMauiKeyCode>(wxMouseEventResolveButtonSelectorRuntime(eventVoid));
+    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+    trackedControl->PostEvent(eventPayload);
+  }
+
+  UnlinkFocusControlSentinel(&trackingSentinel);
+}
+
+// wxEventTableEntry sink for `Moho::CMauiWxEventMapper`.
+//
+// The binary places one `wxEventTable` array starting at `0x00F5A488` whose
+// four entries reference the static OnMouseMove handler at `0x007A4970`. In
+// the original 2007 source these are emitted by the wx framework's
+// `BEGIN_EVENT_TABLE` / `EVT_*` macros around the `CMauiWxEventMapper` class.
+//
+// Recovered source stores the member-fn pointer here so the linker keeps
+// `CMauiWxEventMapperRuntime::OnMouseMove` addressable from this TU, mirroring
+// the compiler-emitted event-table data block. The mapper publish helper
+// `PublishCMauiWxEventMapperEventTableBindings` returns the address of the
+// const bindings struct so a real call site (`CMauiFrame::CMauiFrame`) keeps
+// the table alive.
+namespace
+{
+  using CMauiWxEventMapperMouseEventFnPtr =
+    void (CMauiWxEventMapperRuntime::*)(wxEventRuntime&);
+
+  struct CMauiWxEventMapperEventTableBindings
+  {
+    CMauiWxEventMapperMouseEventFnPtr onMouseMove;
+  };
+
+  const CMauiWxEventMapperEventTableBindings kCMauiWxEventMapperEventTableBindings = {
+    &CMauiWxEventMapperRuntime::OnMouseMove,
+  };
+
+  [[nodiscard]] const void* PublishCMauiWxEventMapperEventTableBindings() noexcept
+  {
+    return static_cast<const void*>(&kCMauiWxEventMapperEventTableBindings);
+  }
+} // namespace
 
 /**
  * Address: 0x0078E210 (FUN_0078E210, cfunc_PostDragger)
@@ -21816,6 +22218,11 @@ moho::CMauiFrame::CMauiFrame(LuaPlus::LuaObject* const luaObject, CMauiControl* 
 
   frameView->mEventHandler = nullptr;
   frameView->mTargetHead = 0;
+
+  // Anchor the static wxEventTable bindings for `CMauiWxEventMapper` so the
+  // linker preserves `CMauiWxEventMapperRuntime::OnMouseMove`, mirroring the
+  // compiler-emitted event-table data block at binary `0x00F5A488`.
+  (void)PublishCMauiWxEventMapperEventTableBindings();
 
   auto* const eventMapper = new (std::nothrow) CMauiWxEventMapperRuntime{};
   if (eventMapper != nullptr) {

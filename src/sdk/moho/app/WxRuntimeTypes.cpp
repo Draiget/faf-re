@@ -11293,6 +11293,7 @@ namespace
   std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
   std::int32_t gWxEvtMotionRuntimeType = 0;
+  std::int32_t gWxEvtMouseWheelRuntimeType = 0;
   std::int32_t gWxEvtMouseCaptureChangedRuntimeType = 0;
   std::int32_t gWxEvtUpdateUiRuntimeType = 0;
   std::int32_t gWxEvtCommandMenuSelectedRuntimeType = 0;
@@ -11345,6 +11346,14 @@ namespace
       gWxEvtMotionRuntimeType = wxNewEventType();
     }
     return gWxEvtMotionRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtMouseWheelRuntimeType()
+  {
+    if (gWxEvtMouseWheelRuntimeType == 0) {
+      gWxEvtMouseWheelRuntimeType = wxNewEventType();
+    }
+    return gWxEvtMouseWheelRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtMouseCaptureChangedRuntimeType()
@@ -22446,7 +22455,7 @@ namespace
  * Matches one mouse-event double-click selector lane (`-1/1/2/3`) against
  * event type lane `+0x0C` using left/middle/right-dclick wx event constants.
  */
-[[maybe_unused]] bool wxMouseEventMatchesDoubleClickSelectorRuntime(
+bool wxMouseEventMatchesDoubleClickSelectorRuntime(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22492,7 +22501,7 @@ namespace
  * Matches one mouse-event press selector lane (`-1/1/2/3`) against event
  * type lane `+0x0C` using left/middle/right-down wx event constants.
  */
-[[maybe_unused]] bool wxMouseEventMatchesPressSelectorRuntime(
+bool wxMouseEventMatchesPressSelectorRuntime(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22538,7 +22547,7 @@ namespace
  * Matches one mouse-event release selector lane (`-1/1/2/3`) against event
  * type lane `+0x0C` using left/middle/right-up wx event constants.
  */
-[[maybe_unused]] bool wxMouseEventMatchesReleaseSelectorRuntime(
+bool wxMouseEventMatchesReleaseSelectorRuntime(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22633,7 +22642,7 @@ namespace
  * Returns the first mouse-button selector lane (`1..3`) that matches current
  * event type through `FUN_00979430`, or `-1` when none matches.
  */
-[[maybe_unused]] std::int32_t wxMouseEventResolveButtonSelectorRuntime(const void* const mouseEventRuntime) noexcept
+std::int32_t wxMouseEventResolveButtonSelectorRuntime(const void* const mouseEventRuntime) noexcept
 {
   for (std::int32_t selector = 1; selector <= 3; ++selector) {
     if (wxMouseEventMatchesButtonSelectorRuntime(mouseEventRuntime, selector)) {
@@ -34869,6 +34878,16 @@ bool moho::WX_EnsureSplashPngHandler()
   // Source-only runtime tracks registration state without importing wx handlers.
   gSplashPngHandlerInitialized = true;
   return true;
+}
+
+std::int32_t moho::WX_GetWxEvtMotionType()
+{
+  return EnsureWxEvtMotionRuntimeType();
+}
+
+std::int32_t moho::WX_GetWxEvtMouseWheelType()
+{
+  return EnsureWxEvtMouseWheelRuntimeType();
 }
 
 moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
