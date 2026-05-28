@@ -158,6 +158,17 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x006600D0 (FUN_006600D0, Moho::CEfxEmitter::MemberDeserialize)
+     *
+     * What it does:
+     * Inverse of `MemberSerialize`: reads base effect lanes, emitter
+     * metadata, curves vector, blueprint pointer, particle payload, and
+     * visibility/lifetime state from one read archive in the same
+     * field-by-field order that `MemberSerialize` wrote.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
   public:
     /**
      * Address: 0x0065B9B0 (FUN_0065B9B0, Moho::CEfxEmitter::CEfxEmitter)

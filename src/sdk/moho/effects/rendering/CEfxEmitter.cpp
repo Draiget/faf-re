@@ -7,6 +7,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/gal/Matrix.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
@@ -576,6 +577,66 @@ namespace moho
   )
   {
     emitter->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x0065FA00 (FUN_0065FA00)
+   *
+   * What it does:
+   * Thunk lane that forwards into `CEfxEmitter::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCEfxEmitterMemberThunkA(
+    CEfxEmitter* const emitter,
+    gpg::ReadArchive* const archive
+  )
+  {
+    emitter->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0065FCD0 (FUN_0065FCD0)
+   *
+   * What it does:
+   * Duplicate thunk lane that forwards into `CEfxEmitter::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCEfxEmitterMemberThunkB(
+    CEfxEmitter* const emitter,
+    gpg::ReadArchive* const archive
+  )
+  {
+    emitter->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006600D0 (FUN_006600D0, Moho::CEfxEmitter::MemberDeserialize)
+   *
+   * What it does:
+   * Inverse of `CEfxEmitter::MemberSerialize`: reads base `CEffectImpl`
+   * payload, emitter metadata, curves vector, blueprint pointer, total
+   * emissions, lifetime, particle payload, and visibility/lifetime state
+   * from one read archive lane. The binary's read sequence mirrors the
+   * write sequence one-to-one.
+   */
+  void CEfxEmitter::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef nullOwner{};
+
+    archive->Read(ResolveCEffectImplType(), static_cast<CEffectImpl*>(this), nullOwner);
+    archive->Read(ResolveEmitterTypeRuntimeType(), &mEmitterType, nullOwner);
+    archive->Read(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
+
+    const gpg::RRef blueprintOwner{};
+    (void)archive->ReadPointer_REmitterBlueprint(&mBlueprint, &blueprintOwner);
+
+    archive->ReadFloat(&mTotalEmissions);
+    archive->ReadInt(reinterpret_cast<int*>(&mLife));
+    archive->Read(ResolveSWorldParticleType(), &mParticle, nullOwner);
+    archive->ReadBool(&mValid);
+    archive->ReadInt(reinterpret_cast<int*>(&mZCurveMask));
+    archive->ReadInt(&mMaxLifetime);
+    archive->ReadBool(&mVisible);
+    archive->ReadUInt(&mLastUpdate);
+    archive->Read(ResolveVector3fType(), &mPos, nullOwner);
   }
 
   /**
