@@ -967,32 +967,47 @@ namespace
   }
 
   /**
-   * Address: 0x00724810 (FUN_00724810)
+   * Address: 0x00724810 (FUN_00724810, Moho::ApplySquadPrioritizedTargetList)
+   *
+   * IDA signature:
+   * int __userpurge sub_724810@<eax>(
+   *   std::vector_EntityCategory *a1@<eax>,   // source category vector
+   *   int a2);                                // CSquad*
    *
    * What it does:
-   * Replaces one squad's prioritized target-category list with `categories`.
+   * One-shot register-order wrapper that forwards `categorySource` into
+   * `CSquad::SetPrioritizedTargetList`. The binary emitted this trampoline
+   * because the caller threads the source vector pointer through `eax` and
+   * the squad pointer through the stack lane, while `SetPrioritizedTargetList`
+   * expects `&mCats` (squad+0x50) in `eax`.
    */
-  [[maybe_unused]] msvc8::vector<EntityCategorySet>* SetSquadPrioritizedTargetCategories(
-    CSquadRuntimeView& squadRuntime,
-    const msvc8::vector<EntityCategorySet>& categories
+  void ApplySquadPrioritizedTargetList(
+    CSquad& squad,
+    const msvc8::vector<EntityCategorySet>& categorySource
   )
   {
-    auto& squad = *reinterpret_cast<CSquad*>(&squadRuntime);
-    squad.mCats = categories;
-    return &squad.mCats;
+    squad.SetPrioritizedTargetList(categorySource);
   }
 
   /**
-   * Address: 0x00725990 (FUN_00725990)
+   * Address: 0x00725990 (FUN_00725990, Moho::ApplyPlatoonSquadPrioritizedTargetList)
+   *
+   * IDA signature:
+   * int __fastcall sub_725990(
+   *   int a1,                                 // CPlatoon*
+   *   int a2,                                 // ESquadClass (squadClass selector)
+   *   std::vector_EntityCategory *a3);        // source category vector
    *
    * What it does:
-   * Finds the first squad in `platoonRuntime` matching `squadClass` and
-   * replaces that squad's prioritized target-category list.
+   * Walks the platoon's squad-pointer vector (`mSquadStart..mSquadEnd`) until
+   * one squad reports the requested `squadClass`, then forwards
+   * `categorySource` into that squad's `SetPrioritizedTargetList`. Missing or
+   * mismatched squads short-circuit to no-op.
    */
-  [[maybe_unused]] msvc8::vector<EntityCategorySet>* SetPlatoonSquadPrioritizedTargetCategories(
+  void ApplyPlatoonSquadPrioritizedTargetList(
     CPlatoonRuntimeView& platoonRuntime,
     const ESquadClass squadClass,
-    const msvc8::vector<EntityCategorySet>& categories
+    const msvc8::vector<EntityCategorySet>& categorySource
   )
   {
     for (CSquadRuntimeView** squadLane = platoonRuntime.mSquadStart; squadLane != platoonRuntime.mSquadEnd; ++squadLane) {
@@ -1000,9 +1015,10 @@ namespace
       if (squadRuntime == nullptr || squadRuntime->mSquadClass != squadClass) {
         continue;
       }
-      return SetSquadPrioritizedTargetCategories(*squadRuntime, categories);
+      auto& squad = *reinterpret_cast<CSquad*>(squadRuntime);
+      ApplySquadPrioritizedTargetList(squad, categorySource);
+      return;
     }
-    return nullptr;
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -1451,11 +1467,11 @@ namespace moho
     if (storage != nullptr) {
       squad = static_cast<CSquad*>(storage);
       squad->mSim = nullptr;
+      squad->mPad_0x04 = 0u;
       ::new (&squad->mUnits) SEntitySetTemplateUnit();
       squad->mSquadClass = ESquadClass::Unassigned;
       ::new (&squad->mName) msvc8::string();
       ::new (&squad->mCats) msvc8::vector<EntityCategorySet>();
-      squad->mPad_0x5C = 0u;
     }
 
     if (result == nullptr) {
@@ -4008,7 +4024,7 @@ namespace moho
       }
 
       auto& runtime = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
-      (void)SetPlatoonSquadPrioritizedTargetCategories(runtime, squadClass, prioritizedCategories);
+      ApplyPlatoonSquadPrioritizedTargetList(runtime, squadClass, prioritizedCategories);
     }
 
     return 0;

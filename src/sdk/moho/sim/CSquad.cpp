@@ -437,4 +437,53 @@ namespace moho
     outPos->z *= inverseCount;
     return outPos;
   }
+
+  /**
+   * Address: 0x006DE1C0 (FUN_006DE1C0, Moho::CSquad::SetPrioritizedTargetList)
+   *
+   * IDA signature:
+   * int __userpurge Moho::CSquad::SetPrioritizedTargetList@<eax>(
+   *   int result@<eax>,                       // &this->mCats
+   *   std::vector_EntityCategory *a2);        // source category vector
+   *
+   * What it does:
+   * Replaces this squad's prioritized target-category vector (`mCats`) with
+   * the contents of `categorySource`. The binary expands the MSVC8
+   * `vector<EntityCategorySet>::operator=` template emission inline at the
+   * `mCats` lane:
+   *
+   *   - self-assignment (`&mCats == &source`) is a no-op.
+   *   - empty source path: destroys current `mCats` elements via
+   *     `ResetEntityCategorySetWordStorageRange` (FUN_006DEB80), releases
+   *     storage when present (`operator delete` on `_Myfirst`), and rewinds
+   *     `_Mylast` to `_Myfirst` so the vector becomes logically empty while
+   *     retaining the freed-storage zero state.
+   *   - non-empty source, `source.size() <= mCats.size()` ("fits in size"):
+   *     copy-assigns the first `source.size()` slots in place via
+   *     `CopyEntityCategorySetRangeForward` (FUN_006DDA60), destroys excess
+   *     trailing slots via `ResetEntityCategorySetWordStorageRange`
+   *     (FUN_006DEB80), and rewinds `_Mylast` to `_Myfirst + source.size()`.
+   *   - non-empty source, `mCats.size() < source.size() <= mCats.capacity()`
+   *     ("fits in capacity, grow into reserved slack"): copy-assigns the
+   *     first `mCats.size()` slots in place, then uninit-copies the
+   *     remaining source range into the previously-uninitialised tail via
+   *     `UninitializedCopyEntityCategorySetRange` (FUN_006DEF60 → FUN_006E00A0),
+   *     and advances `_Mylast`.
+   *   - non-empty source, `source.size() > mCats.capacity()` ("grow buffer"):
+   *     destroys current elements, releases storage, allocates a fresh buffer
+   *     sized exactly for the source via `EnsureCapacity` (FUN_006DBBB0), and
+   *     uninit-copies the source into the new buffer, advancing `_Mylast`.
+   *
+   * The modern `msvc8::vector::operator=` already implements all of these
+   * sub-cases identically, so the recovery collapses to a single
+   * vector-assignment expression while preserving the binary's observable
+   * behaviour (same slot-by-slot destroy/copy/uninit-copy ordering).
+   */
+  void CSquad::SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categorySource)
+  {
+    if (&mCats == &categorySource) {
+      return;
+    }
+    mCats = categorySource;
+  }
 } // namespace moho

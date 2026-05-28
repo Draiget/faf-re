@@ -150,19 +150,31 @@ namespace moho
      */
     [[nodiscard]] Wm3::Vector3f* GetCenter(Wm3::Vector3f* outPos) const;
 
+    /**
+     * Address: 0x006DE1C0 (FUN_006DE1C0, Moho::CSquad::SetPrioritizedTargetList)
+     *
+     * What it does:
+     * Replaces this squad's prioritized target-category vector (`mCats`) with
+     * the contents of `categorySource`. The fast-path (capacity already large
+     * enough) does an in-place vector assignment; otherwise the existing
+     * storage is destroyed and a fresh buffer is allocated to fit the new
+     * size. Self-assignment is a no-op.
+     */
+    void SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categorySource);
+
   public:
     Sim* mSim;                                                // +0x00
-    SEntitySetTemplateUnit mUnits;                            // +0x04 (size 0x28)
-    ESquadClass mSquadClass;                                  // +0x2C
-    msvc8::string mName;                                      // +0x30 (size 0x1C)
-    msvc8::vector<EntityCategorySet> mCats;                   // +0x4C (size 0x10)
-    std::uint32_t mPad_0x5C;                                  // +0x5C (alignment tail; binary always-zero observed)
+    std::uint32_t mPad_0x04;                                  // +0x04 (binary leaves this uninitialised; reserved/unused slot)
+    SEntitySetTemplateUnit mUnits;                            // +0x08 (size 0x28)
+    ESquadClass mSquadClass;                                  // +0x30
+    msvc8::string mName;                                      // +0x34 (size 0x1C)
+    msvc8::vector<EntityCategorySet> mCats;                   // +0x50 (size 0x10)
   };
 
   static_assert(offsetof(CSquad, mSim) == 0x00, "CSquad::mSim offset must be 0x00");
-  static_assert(offsetof(CSquad, mUnits) == 0x04, "CSquad::mUnits offset must be 0x04");
-  static_assert(offsetof(CSquad, mSquadClass) == 0x2C, "CSquad::mSquadClass offset must be 0x2C");
-  static_assert(offsetof(CSquad, mName) == 0x30, "CSquad::mName offset must be 0x30");
-  static_assert(offsetof(CSquad, mCats) == 0x4C, "CSquad::mCats offset must be 0x4C");
+  static_assert(offsetof(CSquad, mUnits) == 0x08, "CSquad::mUnits offset must be 0x08");
+  static_assert(offsetof(CSquad, mSquadClass) == 0x30, "CSquad::mSquadClass offset must be 0x30");
+  static_assert(offsetof(CSquad, mName) == 0x34, "CSquad::mName offset must be 0x34");
+  static_assert(offsetof(CSquad, mCats) == 0x50, "CSquad::mCats offset must be 0x50");
   static_assert(sizeof(CSquad) == 0x60, "CSquad size must be 0x60");
 } // namespace moho
