@@ -44,7 +44,6 @@ namespace moho
   int cfunc_IssueDestroySelf(lua_State*) { return 0; }
   int cfunc_IssueDive(lua_State*) { return 0; }
   int cfunc_IssueFactoryAssist(lua_State*) { return 0; }
-  int cfunc_IssueKillSelf(lua_State*) { return 0; }
   int cfunc_IssueMove(lua_State*) { return 0; }
   int cfunc_IssueNuke(lua_State*) { return 0; }
   int cfunc_IssueOverCharge(lua_State*) { return 0; }
