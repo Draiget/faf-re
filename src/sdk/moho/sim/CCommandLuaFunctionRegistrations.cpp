@@ -138,6 +138,11 @@ namespace
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
   constexpr const char* kIssueUpgradeHelpText = "IssueUpgrade";
+  constexpr const char* kIssueBuildFactoryHelpText = "IssueBuildFactory";
+  // Used by the build-count argument parser shared by IssueBuildFactory (and
+  // sibling Lua build callbacks). Mirrors the static string lane at the
+  // 0x006EF580 "Invalid count" error site.
+  constexpr const char* kLuaInvalidCountWarning = "Invalid count in %s; expected a number but got a %s";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
@@ -304,6 +309,40 @@ namespace
         outUnits.Add(unit);
       }
     }
+  }
+
+  /**
+   * Address: 0x006EF580 (FUN_006EF580, sub_6EF580)
+   *
+   * What it does:
+   * Coerces one Lua stack argument to a non-negative integer count, raising
+   * the binary's `"Invalid count in %s; expected a number but got a %s"`
+   * Lua error (followed by the LuaStackObject typed-arg error) when the
+   * argument is not a number. Mirrors the inline body the IDA export
+   * surfaces as `sub_6EF580` and that the build-style Lua issue callbacks
+   * invoke on the count argument.
+   */
+  [[nodiscard]] int ResolveBuildCountArgument(
+    LuaPlus::LuaState* const state,
+    LuaPlus::LuaStackObject countObject,
+    const char* const functionName
+  )
+  {
+    lua_State* const rawState = countObject.m_state ? countObject.m_state->m_state : nullptr;
+    if (rawState == nullptr) {
+      return 0;
+    }
+
+    if (lua_type(rawState, countObject.m_stackIndex) != LUA_TNUMBER) {
+      const LuaPlus::LuaObject countValue(countObject);
+      LuaPlus::LuaState::Error(state, kLuaInvalidCountWarning, functionName, countValue.TypeName());
+    }
+
+    if (lua_type(rawState, countObject.m_stackIndex) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&countObject, "integer");
+    }
+
+    return static_cast<int>(lua_tonumber(rawState, countObject.m_stackIndex));
   }
 
   [[nodiscard]] moho::BVSet<moho::EntId, moho::EntIdUniverse> BuildSelectedEntitySetFromUnits(const moho::UnitSet& units)
@@ -817,6 +856,16 @@ namespace moho
   int cfunc_IssueKillSelfL(LuaPlus::LuaState* state);
   int cfunc_IssueDestroySelfL(LuaPlus::LuaState* state);
   int cfunc_IssueUpgradeL(LuaPlus::LuaState* state);
+  /**
+   * Address: 0x006F7F10 (FUN_006F7F10, cfunc_IssueBuildFactoryL)
+   *
+   * What it does:
+   * Parses `(unitList, factoryBlueprintId, count)`, resolves the destination
+   * `RUnitBlueprint*` for the factory-build target, and issues one
+   * `UNITCOMMAND_BuildFactory` per loop iteration carrying the blueprint
+   * pointer through `SSTICommandIssueData::mBlueprint`.
+   */
+  int cfunc_IssueBuildFactoryL(LuaPlus::LuaState* state);
   /**
    * Address: 0x006F29D0 (FUN_006F29D0, cfunc_IssueMoveOffFactoryL)
    *
@@ -4075,6 +4124,82 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F7EA0 (FUN_006F7EA0, cfunc_IssueBuildFactory)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueBuildFactory(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueBuildFactoryL`.
+   */
+  int cfunc_IssueBuildFactory(lua_State* const luaContext)
+  {
+    return cfunc_IssueBuildFactoryL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F7F10 (FUN_006F7F10, cfunc_IssueBuildFactoryL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueBuildFactoryL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, factoryBlueprintId, count)`, resolves the destination
+   * `RUnitBlueprint*` for the factory build target, and (when both the unit
+   * selection and blueprint are valid) issues `count` copies of
+   * `UNITCOMMAND_BuildFactory` carrying the resolved blueprint pointer
+   * through the shared `IssueCommandToSelectedUnits` (`UNIT_IssueCommand`)
+   * dispatch shape. Each iteration constructs a fresh `SSTICommandIssueData`
+   * and writes the blueprint into `mBlueprint` (offset +0x50) — the offset
+   * the binary writes via `mov [eax+50h], esi` after
+   * `SSTICommandIssueData::SSTICommandIssueData`. The build-count argument
+   * is coerced through `ResolveBuildCountArgument` (recovered shape of
+   * `sub_6EF580`).
+   */
+  int cfunc_IssueBuildFactoryL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildFactoryHelpText, 3, argumentCount);
+    }
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueBuildFactoryHelpText);
+
+    const LuaPlus::LuaStackObject blueprintArg(state, 2);
+    RUnitBlueprint* const factoryBlueprint =
+      moho::ResolveUnitBlueprintFromLuaArgument(state, blueprintArg, kIssueBuildFactoryHelpText);
+
+    if (units.Empty() || factoryBlueprint == nullptr) {
+      return 0;
+    }
+
+    const LuaPlus::LuaStackObject countArg(state, 3);
+    const int repeatCount = ResolveBuildCountArgument(state, countArg, kIssueBuildFactoryHelpText);
+    if (repeatCount <= 0) {
+      return 0;
+    }
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(units);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    for (int issueIndex = 0; issueIndex < repeatCount; ++issueIndex) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_BuildFactory);
+      commandIssueData.mBlueprint = factoryBlueprint;
+      (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    }
+
     return 0;
   }
 

@@ -38,7 +38,6 @@ namespace moho
   int cfunc_EntitySinkAway(lua_State*) { return 0; }
   int cfunc_GenerateBuildTemplateFromSelection(lua_State*) { return 0; }
   int cfunc_GetSessionClients(lua_State*) { return 0; }
-  int cfunc_IssueBuildFactory(lua_State*) { return 0; }
   int cfunc_IssueBuildMobile(lua_State*) { return 0; }
   int cfunc_IssueCapture(lua_State*) { return 0; }
   int cfunc_IssueDive(lua_State*) { return 0; }
