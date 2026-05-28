@@ -15,10 +15,16 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/unit/core/IUnit.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace
 {
@@ -1654,5 +1660,111 @@ namespace moho
   {
     (void)ReleaseRangeProfileTreeStorage(&tree);
     tree.mMeta00 = 0u;
+  }
+
+  /**
+   * Address: 0x007EF0B0 (FUN_007EF0B0, Moho::func_ExtractRanges)
+   * Mangled: (n/a — free function)
+   *
+   * IDA signature:
+   * void __stdcall func_ExtractRanges(
+   *     std::map_string_RangeExtractor::_Node *arg0,  // candidate-pool fastvector view
+   *     float arg4,                                   // alpha
+   *     std::string *a1,                              // profile (SRangeRenderProfile*)
+   *     std::map_string_RangeExtractor::_Node *a2);   // output ring-payload fastvector view
+   *
+   * What it does:
+   * Per-visible-profile extraction pass for `RangeRenderer::Render` Phase 2.
+   * Resolves the registered range extractor by the profile's extractor name,
+   * walks the pre-collected candidate selection-weak-ref pool, gates each
+   * candidate by live-unit checks, applies the profile's category filter,
+   * invokes the extractor's `Extract` virtual, and appends successful
+   * payloads to the output ring extraction payload vector.
+   */
+  void func_ExtractRanges(
+    const SRangeProfileWeakRefCandidatePoolView& candidatePool,
+    const float interpolationAlpha,
+    const SRangeRenderProfile& profile,
+    SRangeExtractionPayloadVector& outRingPayloadVector
+  )
+  {
+    // Resolve the extractor for this profile. The binary emits a clear-then-
+    // find iterator sequence (FUN_007F0C50 followed by FUN_007F01D0); the
+    // recovered `GetRangeExtractor(name)` wraps the same logic in one typed
+    // free function and returns nullptr when no mapping exists, which mirrors
+    // the binary's "iterator == _Myhead -> bail" lane.
+    RangeExtractor* const extractor = GetRangeExtractor(profile.mExtractorName);
+    if (extractor == nullptr) {
+      return;
+    }
+
+    // Walk the candidate pool of 8-byte selection-weak-ref records. Each
+    // record's `mOwnerLinkSlot` points into the owning UserEntity at the
+    // `mIUnitChainHead` (+0x08) slot, so `mOwnerLinkSlot - 0x08` recovers the
+    // owning `UserEntity*`. The binary's `(char *)i + 8` step iterates the
+    // pool with 8-byte stride matching `sizeof(SSelectionWeakRefUserEntity)`.
+    static_assert(
+      sizeof(SSelectionWeakRefUserEntity) == 0x08,
+      "func_ExtractRanges weak-ref candidate pool stride must remain 8 bytes"
+    );
+
+    const auto* const begin = static_cast<const SSelectionWeakRefUserEntity*>(candidatePool.begin);
+    const auto* const end = static_cast<const SSelectionWeakRefUserEntity*>(candidatePool.end);
+    if (begin == nullptr || end == nullptr || begin == end) {
+      return;
+    }
+
+    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
+    static_assert(
+      kSelectionOwnerLinkOffset == 0x08,
+      "UserEntity selection weak-link offset must remain 0x08 (recovery contract)"
+    );
+
+    for (const SSelectionWeakRefUserEntity* candidate = begin; candidate != end; ++candidate) {
+      void* const ownerLinkSlot = candidate->mOwnerLinkSlot;
+      if (ownerLinkSlot == nullptr) {
+        continue;
+      }
+
+      // Skip the synthetic shape-match sentinel the original binary excludes
+      // explicitly: the IDA-decompiled condition `Left != (... *)8` rejects
+      // weak-ref entries whose link slot lies entirely within the first
+      // selection-owner-link offset of address space (a guard against
+      // null-derived owner pointers).
+      const std::uintptr_t rawLink = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
+      if (rawLink < kSelectionOwnerLinkOffset) {
+        continue;
+      }
+
+      UserEntity* const userEntity =
+        reinterpret_cast<UserEntity*>(rawLink - kSelectionOwnerLinkOffset);
+      if (userEntity->IsBeingBuilt()) {
+        continue;
+      }
+
+      UserUnit* const userUnit = userEntity->IsUserUnit();
+      if (userUnit == nullptr) {
+        continue;
+      }
+
+      IUnit* const iunitBridge = reinterpret_cast<IUnit*>(&userUnit->mIUnitAndScriptBridge[0]);
+      if (iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
+      if (blueprint == nullptr) {
+        continue;
+      }
+
+      if (!EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      SRangeExtractionPayload payload{};
+      if (extractor->Extract(&payload, userEntity, interpolationAlpha)) {
+        outRingPayloadVector.push_back(payload);
+      }
+    }
   }
 } // namespace moho

@@ -9,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/misc/RangeExtractor.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/RenderGeometryBuffers.h"
 
@@ -194,5 +195,45 @@ namespace moho
     std::uint32_t selectedColorPacked,
     const RangeRingRadiusParams& innerRingParams,
     const RangeRingRadiusParams& outerRingParams
+  );
+
+  /**
+   * Address: 0x007EF0B0 (FUN_007EF0B0, Moho::func_ExtractRanges)
+   *
+   * Opaque candidate-pool view: a contiguous half-open range of
+   * `SSelectionWeakRefUserEntity` records, modeled as `(begin, end)` raw
+   * pointer pair to match the original fastvector view shape used by
+   * `RangeRenderer::Render`.
+   */
+  struct SRangeProfileWeakRefCandidatePoolView
+  {
+    const void* begin;   // start of weak-ref record range (8 bytes per entry)
+    const void* end;     // one-past-last weak-ref record
+  };
+
+  /**
+   * Output ring extraction payload vector accepted by `func_ExtractRanges`.
+   * The binary appends one entry per successfully extracted candidate using
+   * `AppendRangeExtractionPayload` lane behavior.
+   */
+  using SRangeExtractionPayloadVector = msvc8::vector<SRangeExtractionPayload>;
+
+  /**
+   * Address: 0x007EF0B0 (FUN_007EF0B0, Moho::func_ExtractRanges)
+   *
+   * What it does:
+   * Per-visible-profile extraction pass: resolves the registered range
+   * extractor for the profile's extractor name, iterates over a pre-collected
+   * pool of candidate selection weak-refs to user entities, gates each
+   * candidate by typed live-unit checks (not-being-built, is-user-unit, not
+   * dead/destroy-queued, blueprint present), filters by the profile's
+   * category set, and appends successful extractor payloads to the output
+   * ring extraction payload vector.
+   */
+  void func_ExtractRanges(
+    const SRangeProfileWeakRefCandidatePoolView& candidatePool,
+    float interpolationAlpha,
+    const SRangeRenderProfile& profile,
+    SRangeExtractionPayloadVector& outRingPayloadVector
   );
 } // namespace moho
