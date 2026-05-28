@@ -134,6 +134,7 @@ namespace
   constexpr const char* kIssuePatrolHelpText = "IssuePatrol";
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
   constexpr const char* kIssueRepairHelpText = "IssueRepair";
+  constexpr const char* kIssueScriptHelpText = "IssueScript";
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
@@ -774,6 +775,7 @@ namespace moho
   int cfunc_IssueSacrifice(lua_State* luaContext);
   int cfunc_IssueUpgrade(lua_State* luaContext);
   int cfunc_IssueScript(lua_State* luaContext);
+  int cfunc_IssueScriptL(LuaPlus::LuaState* state);
   int cfunc_IssueReclaim(lua_State* luaContext);
   int cfunc_IssueCapture(lua_State* luaContext);
   int cfunc_IssueKillSelf(lua_State* luaContext);
@@ -3854,6 +3856,65 @@ namespace moho
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Repair);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F67A0 (FUN_006F67A0, cfunc_IssueScript)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueScript(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueScriptL`.
+   */
+  int cfunc_IssueScript(lua_State* const luaContext)
+  {
+    return cfunc_IssueScriptL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F6810 (FUN_006F6810, cfunc_IssueScriptL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueScriptL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, scriptObject)`, gathers live units from the Lua
+   * table, and (when the selection is non-empty) issues one
+   * `UNITCOMMAND_Script` carrying the second Lua argument as the
+   * payload through the embedded `mObject` lane. Mirrors the binary
+   * dispatch shape used by `IssueCommandToSelectedUnits`
+   * (`UNIT_IssueCommand`) with `clearQueue=false`.
+   */
+  int cfunc_IssueScriptL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueScriptHelpText, 2, argumentCount);
+    }
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueScriptHelpText);
+
+    if (units.Empty()) {
+      return 0;
+    }
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(units);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Script);
+    commandIssueData.mObject = LuaPlus::LuaStackObject(state, 2);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     return 0;
   }
 
