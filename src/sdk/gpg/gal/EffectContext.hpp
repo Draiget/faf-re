@@ -64,6 +64,20 @@ namespace gpg::gal
          * destructor thunk ownership.
          */
         virtual ~EffectContext();
+
+        /**
+         * Address: 0x009402D0 (FUN_009402D0, gpg::gal::EffectContext::DefineMacro)
+         *
+         * IDA signature:
+         * int __thiscall gpg::gal::EffectContext::DefineMacro(
+         *     gpg::gal::EffectContext *this, char *name, char *value);
+         *
+         * What it does:
+         * Adds one effect-macro key/value pair to this context's macro vector,
+         * throwing `gpg::gal::Error("duplicate effect macro definition")` from
+         * `Effect.cpp:76` when an entry with the same key already exists.
+         */
+        void DefineMacro(const char* name, const char* value);
     };
 
     static_assert(sizeof(EffectContext) == 0x4, "EffectContext size must be 0x4");
