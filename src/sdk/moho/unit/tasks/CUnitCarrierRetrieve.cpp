@@ -89,6 +89,65 @@ namespace moho
   }
 
   /**
+   * Address: 0x00605DD0 (FUN_00605DD0, ??1CUnitCarrierRetrieve@Moho@@QAE@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CUnitCarrierRetrieve::~CUnitCarrierRetrieve(
+   *     Moho::CUnitCarrierRetrieve *this);
+   *
+   * What it does:
+   * Tears down one retrieve-task. Runs `OnStopTransportLoading` on the
+   * owning unit, releases the transport reservation, and clears the
+   * carrier-retrieve "in progress" state bit (0x100) that the ctor set.
+   * Dispatch result is written next: success path (`mRetrievalComplete`)
+   * stores `EAiResult` value 1, failure path stores 2 after first asking
+   * every still-living tracked unit's AI navigator to abort its in-flight
+   * motion (so transports that never finished the load no longer keep
+   * the loaders trying to dock).
+   *
+   * Member subobject (`mTrackedUnits`, which is an intrusive node + inline
+   * vector wrapper) and the base `CCommandTask` destructor then run via
+   * the standard C++ teardown chain; the binary inlines the SBO-vector
+   * teardown and the intrusive-list unlink but the C++ source expresses
+   * those as the implicit member dtor invocation.
+   */
+  CUnitCarrierRetrieve::~CUnitCarrierRetrieve()
+  {
+    if (mUnit != nullptr) {
+      (void)mUnit->RunScript("OnStopTransportLoading");
+      mUnit->AiTransport->TransportResetReservation();
+      mUnit->UnitStateMask &= ~kUnitStateMaskCarrierRetrieve;
+    }
+
+    if (mRetrievalComplete) {
+      *mDispatchResult = static_cast<EAiResult>(1);
+    } else {
+      // Walk every tracked-unit slot and have the still-living loaders
+      // drop their in-flight navigator commands. This matches the binary's
+      // per-slot SEntitySetTemplate_Unit::UnitFromEntry + Unit::IsDead +
+      // Unit::AiNavigator->AbortMove() chain (the IDA pseudocode renders
+      // the vtable+0x28 dispatch as `(*v4 + 40)(v4)` and the AiNavigator
+      // pointer load as `v4[339]` at +0x54C).
+      for (Entity** it = mTrackedUnits.mVec.start_; it != mTrackedUnits.mVec.end_; ++it) {
+        Entity* const tracked = *it;
+        if (tracked == nullptr) {
+          continue;
+        }
+
+        Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+        if (trackedUnit == nullptr || trackedUnit->IsDead()) {
+          continue;
+        }
+
+        if (trackedUnit->AiNavigator != nullptr) {
+          trackedUnit->AiNavigator->AbortMove();
+        }
+      }
+      *mDispatchResult = static_cast<EAiResult>(2);
+    }
+  }
+
+  /**
    * Address: 0x00606450 (FUN_00606450, Moho::CUnitCarrierRetrieve::operator new)
    *
    * IDA signature:
