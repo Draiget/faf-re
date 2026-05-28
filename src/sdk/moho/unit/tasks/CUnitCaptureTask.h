@@ -83,7 +83,17 @@ namespace moho
      * Saves base command-task state plus capture-task command/target/economy
      * ownership lanes and capture progress/rate values.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00605A60 (FUN_00605A60, Moho::CUnitCaptureTask::MemberDeserialize)
+     *
+     * What it does:
+     * Loads base command-task state plus capture-task command/target/economy
+     * ownership lanes and capture progress/rate values, replacing the owned
+     * economy request and unlinking the prior one from its intrusive lane.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00604FC0 (FUN_00604FC0, Moho::CUnitCaptureTask::Receive)
