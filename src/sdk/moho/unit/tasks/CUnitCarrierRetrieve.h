@@ -39,6 +39,25 @@ namespace moho
     CUnitCarrierRetrieve(CCommandTask* parentTask, const SEntitySetTemplateUnit& trackedUnits);
 
     /**
+     * Address: 0x00605DD0 (FUN_00605DD0, ??1CUnitCarrierRetrieve@Moho@@QAE@@Z)
+     *
+     * IDA signature:
+     * void __stdcall Moho::CUnitCarrierRetrieve::~CUnitCarrierRetrieve(
+     *     Moho::CUnitCarrierRetrieve *this);
+     *
+     * What it does:
+     * Tears down one retrieve-task. Runs the unit's `OnStopTransportLoading`
+     * script callback, releases the transport reservation, clears the carrier-
+     * retrieve in-progress state bit (0x100), and writes the dispatch result:
+     * `EAiResult` value 1 (success) when the load run reported retrieval-
+     * complete, otherwise value 2 (failure) after asking every still-living
+     * tracked unit's AI navigator to abort its in-flight motion. Member
+     * subobject (`mTrackedUnits`) and base `CCommandTask` destructors then
+     * run via the standard C++ teardown chain.
+     */
+    ~CUnitCarrierRetrieve() override;
+
+    /**
      * Address: 0x00606450 (FUN_00606450, Moho::CUnitCarrierRetrieve::operator new)
      *
      * IDA signature:
