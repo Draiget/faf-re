@@ -75,9 +75,19 @@ namespace moho
     Prop(Sim* sim, const RPropBlueprint* blueprint, const VTransform& transform);
 
     /**
-     * Address: 0x006F9D70 (FUN_006F9D70)
+     * Address: 0x006FA000 (FUN_006FA000, ??1Prop@Moho@@QAE@@Z)
+     * Deleting thunk: 0x006F9D70 (FUN_006F9D70, Moho::Prop::dtr) - vtable slot 2.
+     *
+     * IDA signature:
+     * void __cdecl Moho::Prop::~Prop(Moho::Prop *this);
+     *
+     * What it does:
+     * Auto-unregisters this Prop from the EntityDB bounded-reclaim priority
+     * queue when registered, releases the reclaim-area occupancy footprint on
+     * the COGrid when tracked, decrements the per-type instance counter, and
+     * then chains to `Entity::~Entity` for base teardown.
      */
-    ~Prop() override = default;
+    ~Prop() override;
 
     /**
      * Address: 0x006FB3B0 (FUN_006FB3B0)

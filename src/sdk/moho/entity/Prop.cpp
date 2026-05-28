@@ -12,6 +12,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/path/PathTables.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
@@ -157,6 +158,22 @@ namespace
     rect.x1 = rect.x0 + static_cast<int>(footprint.widthCells);
     rect.z1 = rect.z0 + static_cast<int>(footprint.heightCells);
     grid->ExecuteOccupy(static_cast<moho::EOccupancyCaps>(footprint.occupancyCapsBits), rect);
+  }
+
+  /**
+   * Increments or decrements one StatItem's primary counter atomically.
+   *
+   * Binary lane: `Prop::Prop` and `Prop::~Prop` both emit
+   * `_InterlockedExchangeAdd(&statItem->mCounter, +/-1)` against the per-type
+   * instance-counter stat item.
+   */
+  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (statItem == nullptr) {
+      return;
+    }
+
+    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -397,6 +414,51 @@ namespace moho
         );
       }
     }
+  }
+
+  /**
+   * Address: 0x006FA000 (FUN_006FA000, ??1Prop@Moho@@QAE@@Z)
+   * Deleting thunk: 0x006F9D70 (FUN_006F9D70, Moho::Prop::dtr) - vtable slot 2.
+   *
+   * IDA signature:
+   * void __cdecl Moho::Prop::~Prop(Moho::Prop *this);
+   *
+   * What it does:
+   * Auto-unregisters this Prop from the EntityDB bounded-reclaim priority
+   * queue when registered (`mHandleIndex != -1`), releases the reclaim-area
+   * occupancy footprint on the COGrid when `mTracksReclaimArea` is set,
+   * decrements the per-type instance counter, and falls through to
+   * `Entity::~Entity` for base teardown.
+   */
+  Prop::~Prop()
+  {
+    // Binary path: unconditionally dereferences mSim->mEntityDB; the ctor
+    // invariant guarantees both are valid whenever a Prop reaches the dtor.
+    if (mHandleIndex != -1) {
+      SimulationRef->mEntityDB->RemoveBoundedProp(mHandleIndex);
+    }
+
+    if (mTracksReclaimArea) {
+      // Binary path: unconditionally dereferences BluePrint and mOGrid; the
+      // ctor sets mTracksReclaimArea=true only after both were resolved.
+      const auto* const blueprint = static_cast<const RPropBlueprint*>(BluePrint);
+      const SFootprint& footprint = blueprint->mFootprint;
+
+      const int originX = static_cast<int>(Position.x - static_cast<float>(footprint.mSizeX) * 0.5f);
+      const int originZ = static_cast<int>(Position.z - static_cast<float>(footprint.mSizeZ) * 0.5f);
+
+      gpg::Rect2i rect{};
+      rect.x0 = originX;
+      rect.z0 = originZ;
+      rect.x1 = originX + static_cast<int>(footprint.mSizeX);
+      rect.z1 = originZ + static_cast<int>(footprint.mSizeZ);
+
+      SimulationRef->mOGrid->ReleaseOccupy(footprint.mOccupancyCaps, rect);
+    }
+
+    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), -1L);
+
+    // Base `Entity::~Entity` runs implicitly as part of the C++ destructor chain.
   }
 
   /**
