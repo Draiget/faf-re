@@ -7,6 +7,7 @@
 #include <new>
 
 #include "boost/function.hpp"
+#include <boost/ptr_container/exception.hpp>
 #include "moho/app/WxAppRuntime.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/entity/SSTIEntityVariableData.h"
@@ -951,6 +952,42 @@ void SSyncDataQueue::ClearAndDelete()
 }
 
 /**
+ * Address: 0x0073F9C0 (FUN_0073F9C0,
+ *                      boost::ptr_sequence_adapter_deque_SSyncData::pop_front)
+ *
+ * What it does:
+ * Per-T named free helper that captures the engine-instantiated MSVC8 body of
+ * `boost::ptr_sequence_adapter< std::deque<SSyncData*> >::pop_front`. The
+ * binary's `mSyncdat` lane is a `boost::ptr_sequence_adapter` over a deque of
+ * sync-data pointers; the recovered side models the same 0x14-byte layout as
+ * `SSyncDataQueue` (`_Myproxy` / `_Map` / `_Mapsize` / `_Myoff` / `_Mysize`
+ * mapped to `reserved` / `map` / `mapSize` / `head` / `size`).
+ *
+ * Binary semantics, preserved 1:1:
+ *   1. If the underlying deque is empty, construct and throw
+ *      `boost::bad_ptr_container_operation("'pop_front()' on empty container")`.
+ *      The `.rdata` literal at 0x00E33430 matches this exact message and the
+ *      vtable at 0x00E068F0 (`??_7bad_ptr_container_operation@boost@@6B@`)
+ *      is patched onto the on-stack `std::exception` shell before the throw.
+ *   2. Otherwise read the front pointer, advance the front-offset, decrement
+ *      the size, and return the popped pointer. Ownership transfers to the
+ *      caller (the binary does not delete; `GetSyncData` either keeps the
+ *      pointer or runs the auto_type destructor when an exception escapes).
+ *
+ * Callers invoke this helper by explicit name from
+ * `Moho::CSimDriver::GetSyncData` (FUN_0073C520), preserving the MSVC8
+ * out-of-line symbol shape for the ptr_sequence_adapter emission.
+ */
+SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
+{
+  if (queue.size == 0u) {
+    throw boost::bad_ptr_container_operation("'pop_front()' on empty container");
+  }
+
+  return queue.PopFront();
+}
+
+/**
  * Address: 0x0073B570 (FUN_0073B570)
  * Mangled: ??0CSimDriver@Moho@@QAE@@Z
  *
@@ -1507,7 +1544,10 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
     lock.lock();
   }
 
-  outSyncData = mSyncDataQueue.PopFront();
+  // Invoke the engine-instantiated `boost::ptr_sequence_adapter pop_front`
+  // body by its named per-T helper so the MSVC8 out-of-line symbol shape
+  // (FUN_0073F9C0) is preserved at the source-level callsite.
+  outSyncData = PopFrontSSyncDataPtrDeque(mSyncDataQueue);
   if (outSyncData) {
     mLastDequeuedBeat = outSyncData->mCurBeat;
   }
