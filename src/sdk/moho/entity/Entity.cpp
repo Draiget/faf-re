@@ -42,6 +42,7 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -3194,31 +3195,75 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067A720 (FUN_0067A720)
+   * Address: 0x0067A720 (FUN_0067A720, Moho::Entity::SetMesh)
+   * Mangled: ?SetMesh@Entity@Moho@@UAEXABVRResId@2@PAVRMeshBlueprint@2@_N@Z
    *
    * What it does:
-   * Resolves mesh resource id (or explicit placeholder) and updates mesh binding.
+   * Resolves mesh resource id (or explicit placeholder) and updates mesh
+   * binding. When `meshResId.name` is empty, releases the existing mesh
+   * shared-resource lane and clears the mesh blueprint slot. Otherwise
+   * looks up the mesh blueprint, invokes
+   * `RMeshBlueprint::GetMesh` (FUN_0067A5B0) to retrieve the LOD-resolved
+   * `boost::shared_ptr<RScmResource>`, and copies it into the entity's
+   * borrowed shared-resource lane (`mMeshRef` aliased as
+   * `boost::SharedPtrRaw<RScmResource>`). On success, stores the chosen
+   * blueprint pointer in `mMeshTypeClassId` (aliased blueprint slot). On
+   * failure, falls back to the `explicitPlaceholder` blueprint and runs
+   * the same retrieval through `AssignSharedPtrRScmResourceWeak`
+   * (FUN_0055AA60). The `allowExplicitPlaceholder` parameter is part of
+   * the ABI signature but the shipped binary never branches on it.
    */
   void
-  Entity::SetMesh(const RResId& meshResId, RMeshBlueprint* explicitPlaceholder, const bool allowExplicitPlaceholder)
+  Entity::SetMesh(const RResId& meshResId, RMeshBlueprint* const explicitPlaceholder, const bool allowExplicitPlaceholder)
   {
-    RMeshBlueprint* meshBlueprint = nullptr;
+    static_cast<void>(allowExplicitPlaceholder);
 
-    if (SimulationRef && SimulationRef->mRules && !meshResId.name.empty()) {
-      meshBlueprint = SimulationRef->mRules->GetMeshBlueprint(meshResId);
+    auto& meshSharedLane = *reinterpret_cast<boost::SharedPtrRaw<RScmResource>*>(&mMeshRef);
+    auto& meshBlueprintSlot = *reinterpret_cast<RMeshBlueprint**>(&mMeshTypeClassId);
+
+    if (meshResId.name.empty()) {
+      meshSharedLane.release();
+      meshBlueprintSlot = nullptr;
+      return;
     }
 
-    if (!meshBlueprint && allowExplicitPlaceholder) {
-      meshBlueprint = explicitPlaceholder;
+    RMeshBlueprint* const meshBlueprint =
+      SimulationRef->mRules->GetMeshBlueprint(meshResId);
+    if (meshBlueprint == nullptr) {
+      return;
     }
 
-    mMeshRef.mObj = meshBlueprint;
-    mMeshRef.mType = nullptr;
-    mMeshTypeClassId = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(meshBlueprint));
-
-    if (!meshBlueprint && !meshResId.name.empty()) {
-      gpg::Warnf("Failed to load mesh for blueprint %s", meshResId.name.raw_data_unsafe());
+    {
+      const boost::shared_ptr<RScmResource> resolvedMesh = meshBlueprint->GetMesh();
+      const auto& sourceLane =
+        *reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&resolvedMesh);
+      meshSharedLane.assign_retain(sourceLane);
     }
+
+    if (meshSharedLane.px != nullptr) {
+      meshBlueprintSlot = meshBlueprint;
+      return;
+    }
+
+    if (explicitPlaceholder != nullptr) {
+      const boost::shared_ptr<RScmResource> placeholderMesh = explicitPlaceholder->GetMesh();
+      const auto& placeholderLane =
+        *reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&placeholderMesh);
+      (void)boost::AssignSharedPtrRScmResourceWeak(&placeholderLane, &meshSharedLane);
+
+      if (meshSharedLane.px != nullptr) {
+        meshBlueprintSlot = explicitPlaceholder;
+        return;
+      }
+
+      gpg::Warnf(
+        "Failed to load ExplicitPlaceholder %s",
+        explicitPlaceholder->mBlueprintId.raw_data_unsafe()
+      );
+      return;
+    }
+
+    gpg::Warnf("Failed to load mesh for blueprint %s", meshResId.name.raw_data_unsafe());
   }
 
   /**
