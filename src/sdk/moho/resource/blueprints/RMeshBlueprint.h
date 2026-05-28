@@ -3,12 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 
 namespace moho
 {
+  class RScmResource;
+
   /**
    * Address: 0x005184C0 (FUN_005184C0)
    *
@@ -132,6 +135,24 @@ namespace moho
      * Initializes each LOD entry using blueprint source-path derived rules.
      */
     void OnInitBlueprint();
+
+    /**
+     * Address: 0x0067A5B0 (FUN_0067A5B0, Moho::RMeshBlueprint::GetMesh)
+     *
+     * IDA signature:
+     * boost::shared_ptr<RScmResource> *__cdecl Moho::RMeshBlueprint::GetMesh(
+     *     boost::shared_ptr<RScmResource> *out,
+     *     Moho::RMeshBlueprint *this);
+     *
+     * What it does:
+     * Returns the first successfully loaded SCM model resource across this
+     * blueprint's LOD chain. Walks `mLods` in order, dispatches each
+     * non-empty `mMeshName` through `RES_GetResource` with the cached
+     * `RScmResource` reflection descriptor, and returns the first non-empty
+     * shared lock. Returns an empty `boost::shared_ptr<RScmResource>` when
+     * no LOD has a mesh name or none resolves to a live resource.
+     */
+    [[nodiscard]] boost::shared_ptr<RScmResource> GetMesh() const;
   };
 
   static_assert(sizeof(RMeshBlueprintLOD) == 0xCC, "RMeshBlueprintLOD size must be 0xCC");

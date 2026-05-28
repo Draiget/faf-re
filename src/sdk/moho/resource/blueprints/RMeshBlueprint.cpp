@@ -10,7 +10,10 @@
 #include <system_error>
 #include <typeinfo>
 
+#include "boost/weak_ptr.h"
 #include "moho/resource/RResId.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/resource/ResourceManager.h"
 
 namespace moho
 {
@@ -569,5 +572,50 @@ namespace moho
     for (RMeshBlueprintLOD* lod = begin; lod != mLods.end(); ++lod, ++lodIndex) {
       lod->Init(mSource, lodIndex);
     }
+  }
+
+  /**
+   * Address: 0x0067A5B0 (FUN_0067A5B0, Moho::RMeshBlueprint::GetMesh)
+   *
+   * IDA signature:
+   * boost::shared_ptr<RScmResource> *__cdecl Moho::RMeshBlueprint::GetMesh(
+   *     boost::shared_ptr<RScmResource> *out,
+   *     Moho::RMeshBlueprint *this);
+   *
+   * What it does:
+   * Iterates LOD entries in order, dispatches each non-empty `mMeshName`
+   * through `RES_GetResource` against the cached `RScmResource` reflection
+   * type, and returns the first lock that produced a live `RScmResource`.
+   * Returns an empty `boost::shared_ptr<RScmResource>` when the LOD list is
+   * empty, every entry has an empty mesh name, or every lookup resolves to
+   * a dead weak handle.
+   */
+  boost::shared_ptr<RScmResource> RMeshBlueprint::GetMesh() const
+  {
+    gpg::RType* resourceType = moho::RScmResource::sType;
+    if (resourceType == nullptr) {
+      resourceType = gpg::LookupRType(typeid(moho::RScmResource));
+      moho::RScmResource::sType = resourceType;
+    }
+
+    for (const RMeshBlueprintLOD& lod : mLods) {
+      if (lod.mMeshName.empty()) {
+        continue;
+      }
+
+      boost::weak_ptr<RScmResource> weakResource{};
+      (void)moho::RES_GetResource(
+        &weakResource,
+        lod.mMeshName.c_str(),
+        nullptr,
+        resourceType
+      );
+
+      if (boost::shared_ptr<RScmResource> shared = weakResource.lock(); shared) {
+        return shared;
+      }
+    }
+
+    return boost::shared_ptr<RScmResource>{};
   }
 } // namespace moho
