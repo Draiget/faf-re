@@ -15,7 +15,10 @@ namespace moho
   int snd_index = 0;
 
   float cam_NearZoom = 10.0f;
+  float cam_NearPitch = 35.0f;
   float cam_ZoomAmount = 0.05f;
+  float cam_ZoomSpeedLarge = 8.0f;
+  float cam_ZoomSpeedSmall = 1.0f;
   float cam_NearFOV = 45.0f;
   float cam_FarFOV = 80.0f;
   float cam_FarPitch = 60.0f;

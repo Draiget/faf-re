@@ -142,25 +142,49 @@ namespace moho
      * What it does:
      * Advances one camera runtime for the current sim/frame delta pair.
      *
-     * The body dispatches to the following blocked helpers in the
-     * binary; with the body stubbed in EngineMethodStubs2.cpp (typed
-     * camera transition state, frustum-cache lane, and target-list
-     * iteration still under recovery), this Frame entry is currently
-     * a no-op and the helpers below are never invoked from the
-     * modern source. Their roles are absorbed by the elision of the
-     * camera-frame advance lane:
+     * The body dispatches to the helpers listed below in the binary.
+     * Frame's full body is still under recovery (typed camera
+     * transition state, frustum-cache lane, and target-list iteration
+     * still need owner_layout work); the placeholder body in
+     * EngineMethodStubs2.cpp invokes `UpdateBasis` so the recovered
+     * basis/zoom slew lane stays wired and not dead-stripped, while the
+     * remaining four helpers continue to absorb the elision:
      *   - 0x007A75A0 (CameraImpl::CacheCameraFrustumUnits — frustum
      *     visibility cache rebuild, blocked)
      *   - 0x007A9110 (CameraImpl::UpdateTargets — target list
      *     tween/slew update, blocked)
      *   - 0x007A95F0 (CameraImpl::UpdateBasis — orthonormal basis
-     *     refresh, blocked)
+     *     refresh, recovered in CameraImpl.cpp)
      *   - 0x007A9BA0 (CameraImpl::InterpolateBasis — slerp/lerp
      *     between current and target basis, blocked)
      *   - 0x007AA330 (CameraImpl::UpdateCoords — final coord push
      *     into render lane, blocked)
      */
     void Frame(float simDeltaSeconds, float frameSeconds);
+
+    /**
+     * Address: 0x007A95F0 (FUN_007A95F0, Moho::CameraImpl::UpdateBasis)
+     * Mangled: ?UpdateBasis@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Advances camera target-zoom along its log-space slew curve, optionally
+     * pivot-shifts the target focus toward the screen pivot when zooming
+     * out of Location/Hermite targeting, refreshes the camera FOV, then
+     * resolves heading/pitch lanes from the active target type:
+     *
+     *   - NoseCam: pulls heading from the entity's interpolated quaternion
+     *     orientation and combines `COORDS_Pitch` with the saved nose-cam
+     *     pitch adjust into `mFarPitch`.
+     *   - Hermite: snaps heading/pitch to the cached transition endpoints.
+     *   - Otherwise: in rotated mode, slews heading toward +/-pi and pitch
+     *     toward the log-zoom-interpolated camera pitch and clears the
+     *     rotation flags when both lanes are within tolerance; in normal
+     *     mode, sets pitch to the log-zoom-interpolated camera pitch.
+     *
+     * Always finishes by snapping the focus to the terrain surface through
+     * `ClampFocusPos`.
+     */
+    void UpdateBasis(float interpolationAlpha, float frameSeconds);
 
     /**
      * Address: 0x007A6E70 (FUN_007A6E70, Moho::CameraImpl::CameraSetAccType)

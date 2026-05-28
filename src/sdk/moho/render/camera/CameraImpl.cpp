@@ -12,11 +12,13 @@
 
 #include "lua/LuaObject.h"
 #include "moho/collision/CColPrimitiveBox3f.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/Vector3f.h"
 #include "gpg/core/time/Timer.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/mesh/Mesh.h"
@@ -32,7 +34,10 @@ namespace moho
 {
   int cfunc_GetCameraL(LuaPlus::LuaState* state);
   extern float cam_NearZoom;
+  extern float cam_NearPitch;
   extern float cam_ZoomAmount;
+  extern float cam_ZoomSpeedLarge;
+  extern float cam_ZoomSpeedSmall;
   extern float cam_NearFOV;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
@@ -265,7 +270,7 @@ namespace
     float mNearZoom = 0.0f;                               // +0x358
     float mZoom = 0.0f;                                   // +0x35C
     Wm3::Vec3f mOffset{};                                 // +0x360
-    std::uint8_t mUnknown36CTo373[0x08]{};                // +0x36C
+    Wm3::Vector2f mPivot{};                               // +0x36C
     float mHeadingRate = 0.0f;                            // +0x374
     float mZoomRate = 0.0f;                               // +0x378
     std::int32_t mTargetType = 0;                         // +0x37C
@@ -280,7 +285,7 @@ namespace
     CameraTimeSourceRuntime* mTimeSources[3]{};           // +0x3C0
     std::uint8_t mEnableEaseInOut = 0;                    // +0x3CC
     std::uint8_t mUnknown3CDTo3CF[0x03]{};                // +0x3CD
-    float mUnknown3D0 = 0.0f;                             // +0x3D0
+    float mNoseCamPitchAdjust = 0.0f;                     // +0x3D0
     Wm3::Vec3f mTimedMoveOffset{};                        // +0x3D4
     float mTimedMoveZoom = 0.0f;                          // +0x3E0
     float mTimedMoveDuration = 0.0f;                      // +0x3E4
@@ -356,6 +361,10 @@ namespace
     "CameraImplRuntimeView::mOffset offset must be 0x360"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mPivot) == 0x36C,
+    "CameraImplRuntimeView::mPivot offset must be 0x36C"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mHeadingRate) == 0x374,
     "CameraImplRuntimeView::mHeadingRate offset must be 0x374"
   );
@@ -398,6 +407,10 @@ namespace
   static_assert(
     offsetof(CameraImplRuntimeView, mEnableEaseInOut) == 0x3CC,
     "CameraImplRuntimeView::mEnableEaseInOut offset must be 0x3CC"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mNoseCamPitchAdjust) == 0x3D0,
+    "CameraImplRuntimeView::mNoseCamPitchAdjust offset must be 0x3D0"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mTimedMoveOffset) == 0x3D4,
@@ -1487,7 +1500,7 @@ void moho::CameraImpl::CameraReset()
   runtime->mIsRotated = 0u;
   runtime->mFarPitch = cam_FarPitch * kDegreesToRadians;
   runtime->mCurrentPitch = 0.0f;
-  runtime->mUnknown3D0 = 0.0f;
+  runtime->mNoseCamPitchAdjust = 0.0f;
   runtime->mHeadingZoom = runtime->mFarPitch;
   runtime->mEnableEaseInOut = 1u;
 
@@ -2192,6 +2205,205 @@ void moho::CameraImpl::CalculateFOV()
     kDegreesToRadians;
 }
 
+namespace
+{
+  /**
+   * Returns the log-zoom-interpolated camera pitch in radians, matching the
+   * binary's `(((logTargetZoom - logNearZoom) / (logMaxZoom - logNearZoom)) *
+   * (cam_FarPitch - cam_NearPitch) + cam_NearPitch) * (pi/180)` blend used by
+   * `UpdateBasis`. The blend lane reads `mTargetZoom` so callers must already
+   * have applied the per-frame zoom slew before invoking.
+   */
+  [[nodiscard]] float LogZoomInterpolatedPitchRadians(const CameraImplRuntimeView& runtime, const float maxZoom) noexcept
+  {
+    const float logMaxZoom = std::log(maxZoom);
+    const float logTargetZoom = std::log(runtime.mTargetZoom);
+    const float logNearZoom = std::log(moho::cam_NearZoom);
+
+    float clampedLogZoom = (logMaxZoom <= logTargetZoom) ? logMaxZoom : logTargetZoom;
+    if (logNearZoom > clampedLogZoom) {
+      clampedLogZoom = logNearZoom;
+    }
+
+    return (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) *
+              (moho::cam_FarPitch - moho::cam_NearPitch) +
+             moho::cam_NearPitch) *
+           kDegreesToRadians;
+  }
+}
+
+/**
+ * Address: 0x007A95F0 (FUN_007A95F0, Moho::CameraImpl::UpdateBasis)
+ * Mangled: ?UpdateBasis@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * IDA signature:
+ *   void __userpurge UpdateBasis(CameraImpl *this@<eax>, float interpolationAlpha, float frameSeconds)
+ *
+ * What it does:
+ * Advances camera target-zoom along a log-space slew toward `mNearZoom`,
+ * optionally pivot-shifts the focus when zooming out of Location/Hermite
+ * targeting, recomputes FOV, then resolves heading and pitch lanes from the
+ * current target type and finally re-clamps focus onto the terrain surface.
+ */
+void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float frameSeconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  const float startTargetZoom = runtime->mTargetZoom;
+
+  // Move target-zoom in log2 space toward mNearZoom at a slew rate proportional
+  // to the absolute log-distance plus a constant floor, both scaled by frame
+  // seconds.
+  const float logStart = std::log2(startTargetZoom);
+  const float logTarget = std::log2(runtime->mNearZoom);
+  const float logDelta = logTarget - logStart;
+  const float logDeltaMagnitude = std::fabs(logDelta);
+
+  float clampedMagnitude = logDeltaMagnitude;
+  const float allowedStep =
+    ((clampedMagnitude * moho::cam_ZoomSpeedLarge) + moho::cam_ZoomSpeedSmall) * frameSeconds;
+  if (clampedMagnitude > allowedStep) {
+    clampedMagnitude = allowedStep;
+  }
+
+  const float signedStep = std::copysign(clampedMagnitude, logDelta);
+  runtime->mTargetZoom = std::exp2(logStart + signedStep);
+
+  // Clamp target-zoom into [cam_NearZoom, GetMaxZoom()] unless rotated mode is
+  // armed (rotated mode lets the user temporarily exceed the gameplay zoom
+  // envelope without snap-back).
+  if (runtime->mIsRotated == 0u) {
+    const float maxZoomLane = GetMaxZoom();
+    float clampedZoom = runtime->mTargetZoom;
+    if (maxZoomLane <= clampedZoom) {
+      clampedZoom = maxZoomLane;
+    }
+    if (moho::cam_NearZoom > clampedZoom) {
+      clampedZoom = moho::cam_NearZoom;
+    }
+    runtime->mTargetZoom = clampedZoom;
+  }
+
+  // When zooming out of a stationary target (Location/Hermite), shift the
+  // focus point along the screen-space pivot ray so the pivot world point
+  // stays under the screen pivot through the zoom transition.
+  const std::int32_t shiftAnchorType = runtime->mTargetType;
+  if ((shiftAnchorType == kCameraTargetTypeLocation || shiftAnchorType == kCameraTargetTypeHermite) &&
+      startTargetZoom > runtime->mTargetZoom) {
+    moho::GeomLine3 pivotRay = runtime->mCam.Unproject(runtime->mPivot);
+    pivotRay.closest = -std::numeric_limits<float>::infinity();
+
+    moho::CColHitResult hit{};
+    if (STIMap* const stiMap = runtime->mTerrainMap; stiMap != nullptr) {
+      const Wm3::Vec3f pivotSurfacePoint = stiMap->SurfaceIntersection(pivotRay, &hit);
+      if (moho::IsValidVector3f(pivotSurfacePoint)) {
+        float zoomScale = runtime->mTargetZoom;
+        if (startTargetZoom <= zoomScale) {
+          zoomScale = startTargetZoom;
+        }
+        if (zoomScale < 0.0f) {
+          zoomScale = 0.0f;
+        }
+        const float scale = zoomScale / startTargetZoom;
+
+        runtime->mTargetLocation.x =
+          ((runtime->mTargetLocation.x - pivotSurfacePoint.x) * scale) + pivotSurfacePoint.x;
+        runtime->mTargetLocation.y =
+          ((runtime->mTargetLocation.y - pivotSurfacePoint.y) * scale) + pivotSurfacePoint.y;
+        runtime->mTargetLocation.z =
+          ((runtime->mTargetLocation.z - pivotSurfacePoint.z) * scale) + pivotSurfacePoint.z;
+      }
+    }
+  }
+
+  if (!moho::cam_Free) {
+    ClampTargetPos();
+  }
+  runtime->mOffset = runtime->mTargetLocation;
+  CalculateFOV();
+
+  // Heading / pitch resolution branches by target type.
+  const std::int32_t targetTypeAfterFov = runtime->mTargetType;
+
+  if (targetTypeAfterFov == kCameraTargetTypeNoseCam) {
+    UserEntity* const noseTarget = GetTargetEntity();
+    const VTransform interpolated = noseTarget->GetInterpolatedTransform(interpolationAlpha);
+    const Wm3::Quaternionf orient = interpolated.orient_;
+
+    // Heading is the Y-axis yaw extracted from the quaternion:
+    //   atan2(2*(w*y + x*z), 1 - 2*(x*x + y*y))
+    const float orientX = orient.x;
+    const float orientY = orient.y;
+    const float orientZ = orient.z;
+    const float orientW = orient.w;
+    runtime->mHeading = std::atan2(
+      ((orientW * orientY) + (orientX * orientZ)) * 2.0f,
+      1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
+    );
+    runtime->mFarPitch = moho::COORDS_Pitch(orient) + runtime->mNoseCamPitchAdjust;
+    ClampFocusPos();
+    return;
+  }
+
+  if (targetTypeAfterFov == kCameraTargetTypeHermite) {
+    runtime->mHeading = runtime->mHeadingZoom;
+    runtime->mFarPitch = runtime->mCurrentPitch;
+    ClampFocusPos();
+    return;
+  }
+
+  constexpr float kRotatedTolerance = 0.1f;
+
+  if (runtime->mIsRotated != 0u) {
+    if (runtime->mRevertRotation == 0u) {
+      ClampFocusPos();
+      return;
+    }
+
+    // Pitch slews toward the log-zoom-interpolated pitch within tolerance.
+    const float interpolatedPitch = LogZoomInterpolatedPitchRadians(*runtime, GetMaxZoom());
+    float pitchStep = interpolatedPitch;
+    if (runtime->mFarPitch + kRotatedTolerance <= pitchStep) {
+      pitchStep = runtime->mFarPitch + kRotatedTolerance;
+    }
+    if (runtime->mFarPitch - kRotatedTolerance > pitchStep) {
+      pitchStep = runtime->mFarPitch - kRotatedTolerance;
+    }
+    runtime->mFarPitch = pitchStep;
+
+    // Heading slews toward +pi (or -pi for negative heading) within tolerance.
+    const float headingNow = runtime->mHeading;
+    const float headingTarget = (headingNow <= 0.0f) ? -kPi : kPi;
+    float headingStep = headingNow + kRotatedTolerance;
+    if (headingStep > headingTarget) {
+      headingStep = headingTarget;
+    }
+    if (headingNow - kRotatedTolerance > headingStep) {
+      headingStep = headingNow - kRotatedTolerance;
+    }
+    runtime->mHeading = headingStep;
+
+    if (std::fabs(headingStep - headingTarget) >= kRotatedTolerance ||
+        std::fabs(pitchStep - interpolatedPitch) >= kRotatedTolerance) {
+      ClampFocusPos();
+      return;
+    }
+
+    // Both lanes settled — snap heading to +pi, pitch to the interpolated
+    // value, and clear the rotation flags.
+    runtime->mHeading = kPi;
+    runtime->mFarPitch = interpolatedPitch;
+    runtime->mRevertRotation = 0u;
+    runtime->mIsRotated = 0u;
+    ClampFocusPos();
+    return;
+  }
+
+  // Non-rotated mode: pitch tracks the log-zoom-interpolated camera pitch.
+  runtime->mFarPitch = LogZoomInterpolatedPitchRadians(*runtime, GetMaxZoom());
+  ClampFocusPos();
+}
+
 /**
   * Alias of FUN_007A6BF0 (non-canonical helper lane).
  * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
@@ -2467,7 +2679,7 @@ void moho::CameraImpl::TargetNoseCam(
     NormalizeQuadrantRelative(HeadingFromEntityOrientation(targetTransform.orient_), runtime->mTimedMoveHeading);
   runtime->mCurrentPitch = PitchFromEntityOrientation(targetTransform.orient_) + pitchAdjust;
   runtime->mNearZoom = zoom;
-  runtime->mUnknown3D0 = pitchAdjust;
+  runtime->mNoseCamPitchAdjust = pitchAdjust;
   runtime->mFarPitch = runtime->mCurrentPitch;
   runtime->mTargetType = kCameraTargetTypeNoseCam;
   runtime->mHeading = runtime->mHeadingZoom;
