@@ -1,23 +1,33 @@
 #include "moho/script/CUnitScriptTask.h"
 
+#include <cmath>
 #include <exception>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
 
+#include "Wm3Vector3.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Logging.h"
+#include "lua/LuaPrimitives.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/ai/EAiTargetType.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/path/SNavGoal.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
 
 using namespace moho;
 
@@ -29,6 +39,10 @@ namespace
   constexpr const char* kSetAIResultName = "SetAIResult";
   constexpr const char* kSetAIResultHelpText = "Set the AI result, success or fail";
   constexpr const char* kUnitScriptTaskLuaClassName = "CUnitScriptTask";
+  constexpr const char* kLUnitMoveName = "LUnitMove";
+  constexpr const char* kLUnitMoveHelpText = "ScriptTask.LUnitMove(self,target)";
+  constexpr const char* kLUnitMoveGroupName = "<global>";
+  constexpr const char* kLUnitMoveCannotDeduceTarget = "Could not deduce target from lua object.";
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -571,6 +585,111 @@ int moho::cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* const state)
   const int rawResult = static_cast<int>(lua_tonumber(rawState, 2));
   *task->mDispatchResult = static_cast<EAiResult>(rawResult);
   return 0;
+}
+
+/**
+ * Address: 0x006236E0 (FUN_006236E0, cfunc_LUnitMoveL)
+ * Mangled: <anonymous-ns>::cfunc_LUnitMoveL@<eax>(LuaPlus::LuaState* this@<ecx>)
+ *
+ * IDA signature:
+ * int __thiscall cfunc_LUnitMoveL(LuaPlus::LuaState* this);
+ *
+ * What it does:
+ * Lua-bound `ScriptTask.LUnitMove(self, target)` body. Resolves the bound
+ * `CUnitScriptTask` from argument 1, parses argument 2 as a Lua AI-target
+ * payload, then asks the navigator to move the task's unit to a one-cell
+ * `SNavGoal` at the target's gun-aim position adjusted by the unit's
+ * footprint origin offset. Raises a Lua error when the target argument
+ * does not resolve to a usable entity/ground target.
+ */
+int moho::cfunc_LUnitMoveL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLUnitMoveHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
+  CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
+
+  const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+  Sim* const sim = lua_getglobaluserdata(rawState);
+
+  CAiTarget target{};
+  (void)target.GetLuaTarget(sim, targetObject);
+
+  if (target.targetType == EAiTargetType::AITARGET_None) {
+    // `LuaState::Error` raises `lua_error`, which longjmps out of this
+    // frame; control never returns. Match the binary by falling through.
+    LuaPlus::LuaState::Error(state, kLUnitMoveCannotDeduceTarget);
+    return 0;
+  }
+
+  const SFootprint& footprint = task->mUnit->GetFootprint();
+  const Wm3::Vec3f targetPos = target.GetTargetPosGun(false);
+
+  // Binary writes the low 16 bits of the float-truncation as a `word`, then
+  // sign-extends it back to 32-bit when the Rect2i field is read. Preserve
+  // that exact truncation so out-of-range targets fold the same way as in
+  // the shipped engine.
+  const float halfFootprintX = static_cast<float>(footprint.mSizeX) * 0.5f;
+  const float halfFootprintZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
+  const int originX = static_cast<int>(
+    static_cast<std::int16_t>(static_cast<int>(targetPos.x - halfFootprintX))
+  );
+  const int originZ = static_cast<int>(
+    static_cast<std::int16_t>(static_cast<int>(targetPos.z - halfFootprintZ))
+  );
+
+  SNavGoal goal{};
+  goal.mPos1 = gpg::Rect2i{originX, originZ, originX + 1, originZ + 1};
+  goal.mPos2 = gpg::Rect2i{0, 0, 0, 0};
+  goal.mLayer = LAYER_None;
+
+  NewMoveTask(goal, task, 0, nullptr, 0);
+  return 0;
+}
+
+/**
+ * Address: 0x00623660 (FUN_00623660, cfunc_LUnitMove)
+ * Mangled: <anonymous-ns>::cfunc_LUnitMove(lua_State* luaContext)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_LUnitMove(int luaContext);
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_LUnitMoveL`.
+ */
+int moho::cfunc_LUnitMove(lua_State* const luaContext)
+{
+  return cfunc_LUnitMoveL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00623680 (FUN_00623680, func_LUnitMove_LuaFuncDef)
+ * Mangled: <anonymous-ns>::func_LUnitMove_LuaFuncDef()
+ *
+ * IDA signature:
+ * Moho::CScrLuaInitForm* func_LUnitMove_LuaFuncDef();
+ *
+ * What it does:
+ * Publishes the global Lua binder for `ScriptTask.LUnitMove(self,target)`.
+ * Registers `cfunc_LUnitMove` against the `"sim"` init-form set under the
+ * `<global>` group with no owner factory (script-task helper invoked off
+ * the Lua-side `self` argument rather than a userdata metatable).
+ */
+moho::CScrLuaInitForm* moho::func_LUnitMove_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kLUnitMoveName,
+    &moho::cfunc_LUnitMove,
+    nullptr,
+    kLUnitMoveGroupName,
+    kLUnitMoveHelpText
+  );
+  return &binder;
 }
 
 /**
