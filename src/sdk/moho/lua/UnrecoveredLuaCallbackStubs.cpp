@@ -106,7 +106,6 @@ namespace moho
   CScrLuaInitForm* func_CreateUnitHPR_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CreateUnit_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_LUnitMoveNear_LuaFuncDef() { return nullptr; }
-  CScrLuaInitForm* func_LUnitMove_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_SplitProp_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func__c_CreateEntity_LuaFuncDef() { return nullptr; }
 }

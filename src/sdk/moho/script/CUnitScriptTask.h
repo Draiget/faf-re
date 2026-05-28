@@ -213,6 +213,32 @@ namespace moho
    */
   int cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* state);
 
+  /**
+   * Address: 0x00623660 (FUN_00623660, cfunc_LUnitMove)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_LUnitMoveL`.
+   */
+  int cfunc_LUnitMove(lua_State* luaContext);
+
+  /**
+   * Address: 0x00623680 (FUN_00623680, func_LUnitMove_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `ScriptTask.LUnitMove(self,target)` Lua binder.
+   */
+  CScrLuaInitForm* func_LUnitMove_LuaFuncDef();
+
+  /**
+   * Address: 0x006236E0 (FUN_006236E0, cfunc_LUnitMoveL)
+   *
+   * What it does:
+   * Lua-bound script-task move helper. Resolves one `CUnitScriptTask` plus
+   * one AI-target argument, then issues a one-cell navigator move to the
+   * target's gun-aim position adjusted by the unit's footprint origin.
+   */
+  int cfunc_LUnitMoveL(LuaPlus::LuaState* state);
+
   static_assert(sizeof(CUnitScriptTask) == 0xB8, "CUnitScriptTask size must be 0xB8");
   static_assert(
     offsetof(CUnitScriptTask, mSourceCommand) == 0x70, "CUnitScriptTask::mSourceCommand offset must be 0x70"
