@@ -10,6 +10,7 @@
 #include <map>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -25,9 +26,13 @@
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/LaunchInfoBase.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/IClientManager.h"
+#include "moho/net/IClientMgrUIInterface.h"
 #include "moho/resource/RResId.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/VTransform.h"
@@ -9994,21 +9999,77 @@ namespace moho
 
   namespace
   {
+    /**
+     * Address: 0x0088BEE0 (FUN_0088BEE0, Moho::func_DoPreload)
+     *
+     * IDA signature:
+     * void func_DoPreload();
+     *
+     * What it does:
+     * Drives the world-session `Preload` frame action: tears down any active
+     * world-session runtime, saves user preferences, restarts the in-game UI
+     * lane on the active Lua state, opens the world UI provider's loading
+     * dialog, asks the session loader to prefetch the pending session's
+     * scenario, installs the no-op `IClientMgrUIInterface` bootstrap on the
+     * pending session's client manager, and transitions the world-frame
+     * dispatch lane to `Loading`. The bracketing ` DoPreload 1` / ` DoPreload
+     * 2` `std::string` temporaries match the binary's profiler-marker shape
+     * (built and immediately destroyed with no consumer in the retail body).
+     */
     void WLD_DoPreload()
     {
-      // `FUN_0088BEE0` starts preload by tearing down any active world/session
-      // runtime before moving to the loading action.
-      WLD_Teardown();
-
-      if (LuaPlus::LuaState* const state = USER_GetLuaState(); state != nullptr) {
-        (void)UI_StartGameUI(state);
+      // ` DoPreload 1` bracket marker: the retail binary constructs one
+      // 12-byte `std::string` literal here purely as a profiler/log marker
+      // and discards it immediately. Preserved 1:1 to keep observable
+      // string-allocation side effects (operator new/delete pair when the
+      // SSO threshold would be exceeded) identical to the binary.
+      {
+        const std::string marker(" DoPreload 1", 12u);
+        (void)marker;
       }
 
-      if (CWldSessionLoaderImpl* const loader = GetWldSessionLoader(); loader != nullptr) {
-        loader->SetCreated();
+      WLD_Teardown();
+      USER_SavePreferences();
+
+      LuaPlus::LuaState* const state = USER_GetLuaState();
+      (void)UI_StartGameUI(state);
+
+      if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
+        wldUIProvider->StartLoadingDialog();
+      }
+
+      CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
+      SWldSessionInfo* const pendingSession = gPendingWldSessionInfo;
+      if (loader != nullptr && pendingSession != nullptr) {
+        LaunchInfoBase* const launchInfo = pendingSession->mLaunchInfo.px;
+        if (launchInfo != nullptr) {
+          // Binary slot 2 dispatch on `IWldSessionLoader` is
+          // `GetScenarioInfo(mapName, &mGameMods, setGameData)`. The retail
+          // call site at 0x0088BF52 only pushes 2 args; the third dword
+          // consumed by the callee's `retn 0Ch` is whatever stale stack
+          // value sits at `[esp+8]`. Recover as a 3-arg invocation with the
+          // setGameData lane wired to the prefetch-then-mark semantics the
+          // preload action needs (mark the requested scenario as the active
+          // game-data target before the `Loading` action begins iterating
+          // on it).
+          (void)loader->GetScenarioInfo(
+            pendingSession->mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true
+          );
+        }
+      }
+
+      if (pendingSession != nullptr && pendingSession->mClientManager != nullptr) {
+        pendingSession->mClientManager->SetUIInterface(GetClientMgrUiInterfaceBootstrap());
       }
 
       gWldFrameAction = EWldFrameAction::Loading;
+
+      // ` DoPreload 2` bracket marker (paired with the opening marker
+      // above): same profiler/log-string discard pattern.
+      {
+        const std::string marker(" DoPreload 2", 12u);
+        (void)marker;
+      }
     }
 
     void WLD_DoLoading(bool* const outContinue)

@@ -18,6 +18,20 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00F5B6E0 (sCWldUiInterface)
+   *
+   * What it does:
+   * Returns the process-global no-op `IClientMgrUIInterface` bootstrap object
+   * statically reserved in `gClientMgrUiInterfaceStorage`. The address-taken
+   * use site is `FUN_0088BEE0` (`Moho::func_DoPreload`) which installs this
+   * default interface on `sSessionInfo->mClientManager` via virtual slot 10.
+   */
+  IClientMgrUIInterface* GetClientMgrUiInterfaceBootstrap() noexcept
+  {
+    return ClientMgrUiInterfaceBootstrapObject();
+  }
+
+  /**
    * Address: 0x0088B6C0 (FUN_0088B6C0)
    *
    * What it does:

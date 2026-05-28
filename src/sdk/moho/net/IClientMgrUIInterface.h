@@ -61,4 +61,16 @@ namespace moho
      */
     virtual void ReportBottleneckCleared();
   };
+
+  /**
+   * Address: 0x00F5B6E0 (sCWldUiInterface)
+   *
+   * What it does:
+   * Returns the process-global no-op `IClientMgrUIInterface` bootstrap object
+   * (statically reserved storage initialized by
+   * `InitializeClientMgrUiInterfaceBootstrapLane*`). Used by the world-preload
+   * frame action (`FUN_0088BEE0`) to install a default UI interface on the
+   * active client manager before the loading lane begins.
+   */
+  [[nodiscard]] IClientMgrUIInterface* GetClientMgrUiInterfaceBootstrap() noexcept;
 } // namespace moho
