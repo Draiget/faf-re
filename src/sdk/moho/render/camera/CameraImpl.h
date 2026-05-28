@@ -146,13 +146,14 @@ namespace moho
      * Frame's full body is still under recovery (typed camera
      * transition state, frustum-cache lane, and target-list iteration
      * still need owner_layout work); the placeholder body in
-     * EngineMethodStubs2.cpp invokes `UpdateBasis` so the recovered
-     * basis/zoom slew lane stays wired and not dead-stripped, while the
-     * remaining four helpers continue to absorb the elision:
+     * EngineMethodStubs2.cpp invokes `UpdateTargets` and `UpdateBasis` so
+     * the recovered target-tracking and basis/zoom slew lanes stay wired
+     * and not dead-stripped, while the remaining three helpers continue
+     * to absorb the elision:
      *   - 0x007A75A0 (CameraImpl::CacheCameraFrustumUnits — frustum
      *     visibility cache rebuild, blocked)
-     *   - 0x007A9110 (CameraImpl::UpdateTargets — target list
-     *     tween/slew update, blocked)
+     *   - 0x007A9110 (CameraImpl::UpdateTargets — per-frame target list
+     *     tween/slew update, recovered in CameraImpl.cpp)
      *   - 0x007A95F0 (CameraImpl::UpdateBasis — orthonormal basis
      *     refresh, recovered in CameraImpl.cpp)
      *   - 0x007A9BA0 (CameraImpl::InterpolateBasis — slerp/lerp
@@ -185,6 +186,29 @@ namespace moho
      * `ClampFocusPos`.
      */
     void UpdateBasis(float interpolationAlpha, float frameSeconds);
+
+    /**
+     * Address: 0x007A9110 (FUN_007A9110, Moho::CameraImpl::UpdateTargets)
+     * Mangled: ?UpdateTargets@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Advances entity-target tracking lanes for one Frame tick. Decrements the
+     * tracked-target countdown timer (`mTargetTimeLeft`) when armed and
+     * dispatches `TargetNextEntity` when it elapses, then resolves behavior by
+     * target type:
+     *
+     *   - Entity/NoseCam: refreshes `mTargetLocation` from the live entity's
+     *     interpolated transform; in NoseCam mode also recomputes
+     *     `mCurrentPitch` from `COORDS_Pitch + mNoseCamPitchAdjust` and
+     *     `mHeadingZoom` from the quaternion-derived heading wrapped relative
+     *     to `mTimedMoveHeading`. When the live entity is gone, arms
+     *     `mTargetTime` for a tracking-stop broadcast, demotes to Location
+     *     mode, and schedules a rotation revert when previously rotated.
+     *   - Hermite: integrates `mHeadingZoom` and `mNearZoom` along the cached
+     *     spin rates (`mHeadingRate * delta * 2pi` and `mZoomRate * delta`).
+     *   - Otherwise (Location/Box): no-op early exit.
+     */
+    void UpdateTargets(float interpolationAlpha, float frameSeconds);
 
     /**
      * Address: 0x007A6E70 (FUN_007A6E70, Moho::CameraImpl::CameraSetAccType)

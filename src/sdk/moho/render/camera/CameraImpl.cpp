@@ -2383,6 +2383,96 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
 }
 
 /**
+ * Address: 0x007A9110 (FUN_007A9110, Moho::CameraImpl::UpdateTargets)
+ * Mangled: ?UpdateTargets@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * IDA signature:
+ *   void __thiscall UpdateTargets(CameraImpl *this, float interpolationAlpha, float frameSeconds)
+ *
+ * What it does:
+ * Per-frame entity-target tracking update — see header docstring for the
+ * target-type dispatch summary. Invoked from `CameraImpl::Frame` immediately
+ * before `UpdateBasis`.
+ */
+void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float frameSeconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Tracked-target countdown: when armed, decay toward zero and dispatch
+  // TargetNextEntity through the virtual lane when it hits zero so the next
+  // queued entity becomes active (or fallback behavior fires when empty).
+  if (runtime->mTargetTime != 0u) {
+    float remainingTime = runtime->mTargetTimeLeft - frameSeconds;
+    if (remainingTime < 0.0f) {
+      remainingTime = 0.0f;
+    }
+    runtime->mTargetTimeLeft = remainingTime;
+    if (remainingTime == 0.0f) {
+      TargetNextEntity();
+    }
+  }
+
+  const std::int32_t targetType = runtime->mTargetType;
+  if (targetType < kCameraTargetTypeEntity) {
+    return;
+  }
+
+  if (targetType <= kCameraTargetTypeNoseCam) {
+    UserEntity* const targetEntity = GetTargetEntity();
+    if (targetEntity == nullptr) {
+      // Live entity vanished: arm a tracking-stop broadcast for single-entity
+      // entity-mode follow, demote target type to Location, and schedule a
+      // rotation revert when we were previously in rotated mode.
+      runtime->mTargetTime = 1u;
+      const bool wasEntityMode = (runtime->mTargetType == kCameraTargetTypeEntity);
+      if (wasEntityMode && runtime->mTargetEntities.mSize <= 1) {
+        BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+      }
+      const bool wasRotated = (runtime->mIsRotated != 0u);
+      runtime->mTargetType = kCameraTargetTypeLocation;
+      if (wasRotated) {
+        runtime->mRevertRotation = 1u;
+      }
+      return;
+    }
+
+    // Live entity: snap the target lane to its interpolated world transform
+    // each frame so the camera focus follows.
+    const VTransform interpolated = targetEntity->GetInterpolatedTransform(interpolationAlpha);
+    runtime->mTargetLocation = interpolated.pos_;
+
+    if (runtime->mTargetType == kCameraTargetTypeNoseCam) {
+      // NoseCam: derive pitch from the entity orientation plus the saved
+      // pitch adjust into `mCurrentPitch`, and derive heading by extracting
+      // the standard quaternion yaw and wrapping it relative to
+      // `mTimedMoveHeading` so the camera does not flip orientation across
+      // the +/-pi boundary.
+      const Wm3::Quaternionf& orient = interpolated.orient_;
+      runtime->mCurrentPitch = moho::COORDS_Pitch(orient) + runtime->mNoseCamPitchAdjust;
+
+      const float orientX = orient.x;
+      const float orientY = orient.y;
+      const float orientZ = orient.z;
+      const float orientW = orient.w;
+      const float headingFromQuat = std::atan2(
+        ((orientW * orientY) + (orientX * orientZ)) * 2.0f,
+        1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
+      );
+      runtime->mHeadingZoom = NormalizeQuadrantRelative(headingFromQuat, runtime->mTimedMoveHeading);
+    }
+    return;
+  }
+
+  if (targetType == kCameraTargetTypeHermite) {
+    // Hermite spin lane: integrate heading at the cached angular rate (rev/s
+    // -> rad via 2pi) and zoom at the linear rate, both scaled by delta.
+    runtime->mHeadingZoom += runtime->mHeadingRate * frameSeconds * kTwoPi;
+    runtime->mNearZoom += runtime->mZoomRate * frameSeconds;
+  }
+  // Location/Box: nothing to do.
+}
+
+/**
   * Alias of FUN_007A6BF0 (non-canonical helper lane).
  * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
  *
