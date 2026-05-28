@@ -3551,12 +3551,7 @@ namespace gpg::gal
             void* const handle
         )
         {
-            auto* const rawTechnique = new EffectTechniqueD3D9();
-            rawTechnique->name_.assign_owned(name != nullptr ? name : "");
-            rawTechnique->effect_ = CreateWeakEffectReference(effect);
-            rawTechnique->handle_ = handle;
-            rawTechnique->beginEndActive_ = false;
-
+            auto* const rawTechnique = new EffectTechniqueD3D9(name, CreateWeakEffectReference(effect), handle);
             boost::shared_ptr<EffectTechniqueD3D9> technique;
             (void)ConstructSharedEffectTechniqueD3D9FromRaw(&technique, rawTechnique);
             return technique;
@@ -8327,6 +8322,30 @@ namespace gpg::gal
     StateManagerD3D9* PipelineStateD3D9::GetStateManager()
     {
         return reinterpret_cast<StateManagerD3D9*>(stateManager_);
+    }
+
+    /**
+     * Address: 0x008F3AC0 (FUN_008F3AC0, ??0EffectTechniqueD3D9@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Stores technique-name/effect-handle lanes and validates that the
+     * referenced effect is still live; throws `gpg::gal::Error` with the
+     * legacy `EffectTechniqueD3D9.cpp:36` "invalid effect specified"
+     * payload if the weak effect reference has no live owner.
+     */
+    EffectTechniqueD3D9::EffectTechniqueD3D9(
+        const char* const techniqueName,
+        const boost::weak_ptr<EffectD3D9>& effect,
+        void* const handle
+    )
+        : name_(techniqueName != nullptr ? techniqueName : "", (techniqueName != nullptr) ? std::strlen(techniqueName) : 0U),
+          effect_(effect),
+          handle_(handle)
+    {
+        if (effect_.use_count() <= 0)
+        {
+            ThrowGalError("EffectTechniqueD3D9.cpp", 36, "invalid effect specified");
+        }
     }
 
     /**
