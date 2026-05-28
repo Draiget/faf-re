@@ -3181,6 +3181,17 @@ namespace gpg
   RRef* RRef_Listener_EAiTransportEvent(RRef* out, moho::Listener<moho::EAiTransportEvent>* value);
 
   /**
+   * Address: 0x00572C90 (FUN_00572C90, gpg::RRef_Listener_EFormationdStatus)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::Listener<moho::EFormationdStatus>`
+   * object pointer.
+   */
+  RRef* RRef_Listener_EFormationdStatus(
+    RRef* out, moho::Listener<moho::EFormationdStatus>* value
+  );
+
+  /**
    * Address: 0x005EDD30 (FUN_005EDD30, gpg::RRef_SAiReservedTransportBone)
    *
    * What it does:

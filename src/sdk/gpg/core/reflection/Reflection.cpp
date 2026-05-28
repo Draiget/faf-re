@@ -31,6 +31,7 @@
 #include "moho/ai/EAiTargetType.h"
 #include "moho/ai/EAiResult.h"
 #include "moho/ai/ECompareType.h"
+#include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatch.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -1497,6 +1498,8 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gListenerEAiAttackerEventRRefCache{false, {}};
   gpg::RType* gListenerEAiTransportEventRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEAiTransportEventRRefCache{false, {}};
+  gpg::RType* gListenerEFormationdStatusRRefType = nullptr;
+  thread_local TypeInfoCache3 gListenerEFormationdStatusRRefCache{false, {}};
   gpg::RType* gSAssignedLocInfoRRefType = nullptr;
   gpg::RType* gSPickUpInfoRRefType = nullptr;
   gpg::RType* gSAttachPointRRefType = nullptr;
@@ -10204,6 +10207,36 @@ RRef_Listener_EAiTransportEvent(RRef* const out, moho::Listener<moho::EAiTranspo
     typeid(moho::Listener<moho::EAiTransportEvent>),
     gListenerEAiTransportEventRRefType,
     gListenerEAiTransportEventRRefCache
+  );
+}
+
+/**
+ * Address: 0x00572C90 (FUN_00572C90, gpg::RRef_Listener_EFormationdStatus)
+ * Mangled: ?RRef_Listener_EFormationdStatus@gpg@@YAPAVRRef@1@PAV01@PAV?$Listener@W4EFormationdStatus@Moho@@@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_Listener_EFormationdStatus(
+ *   gpg::RRef *arg0, Moho::Listener_EFormationdStatus *a1);
+ *
+ * What it does:
+ * Builds a reflection reference for `Listener<EFormationdStatus>` using cached
+ * RTTI lookup and derived-type normalization. When the runtime type matches the
+ * declared type the pair is written directly; otherwise the runtime type is
+ * resolved through the 3-entry per-thread cache and the object pointer is
+ * adjusted by the base sub-object offset returned by
+ * `gpg::RType::IsDerivedFrom`.
+ */
+gpg::RRef* RRef_Listener_EFormationdStatus(
+  RRef* const out,
+  moho::Listener<moho::EFormationdStatus>* const value
+)
+{
+  return BuildTypedRefWithCache<moho::Listener<moho::EFormationdStatus>>(
+    out,
+    value,
+    typeid(moho::Listener<moho::EFormationdStatus>),
+    gListenerEFormationdStatusRRefType,
+    gListenerEFormationdStatusRRefCache
   );
 }
 

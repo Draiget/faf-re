@@ -586,13 +586,6 @@ namespace gpg
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Stats_StatItem>());
   }
 
-  gpg::RRef* RRef_Listener_EFormationdStatus(
-    gpg::RRef* const outRef, moho::Listener_EFormationdStatus* const value
-  )
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Listener_EFormationdStatus>());
-  }
-
   gpg::RRef* RRef_Sim(gpg::RRef* const outRef, moho::Sim* const value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Sim>());
