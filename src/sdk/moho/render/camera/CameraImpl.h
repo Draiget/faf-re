@@ -126,6 +126,33 @@ namespace moho
     CameraImpl(gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* luaState);
 
     /**
+     * Address: 0x007A7F00 (FUN_007A7F00, ??1CameraImpl@Moho@@UAE@XZ)
+     * Mangled: ??1CameraImpl@Moho@@UAE@XZ
+     *
+     * IDA signature:
+     * Moho::Broadcaster *__stdcall Moho::CameraImpl::~CameraImpl(int a1);
+     *
+     * What it does:
+     * Tears down one runtime camera in reverse construction order. Unlinks each
+     * of the three frustum/spotter inline weak-vector lanes from their tracked
+     * `UserEntity` owners and releases any heap-grown storage. Clears the
+     * intrusive target-entity weak list (`mTargetEntities`) and frees its head
+     * sentinel. Destroys both heap-allocated `CameraTimeSourceRuntime` slots
+     * via the EH vector-destructor iterator. Releases the embedded
+     * `GeomCamera3` solid-frustum heap storage, tears down the `mName`
+     * `msvc8::string` SSO buffer, runs the `CScriptEvent` sub-object teardown,
+     * and finally chains into `RCamCamera::~RCamCamera` which forgets this
+     * camera from the global manager and rejoins the broadcaster ring to its
+     * self-linked idle state.
+     *
+     * Invoked from the scalar-deleting wrapper at vtable slot 0
+     * (`operator_delete`, FUN_007A7DC0); the wrapper itself is referenced from
+     * the `CameraImpl` vtable (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474) and
+     * its `CScriptEvent` / `CScriptObject` sub-object vtable thunks.
+     */
+    ~CameraImpl();
+
+    /**
      * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
      * Mangled: ?GetDerivedObjectRef@CameraImpl@Moho@@UAE?AVRRef@gpg@@XZ
      *
