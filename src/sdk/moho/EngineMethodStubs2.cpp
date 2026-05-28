@@ -55,15 +55,16 @@ void ICommandSink::EndGame() {}
 // ===== Misc instance methods =====
 void CMauiMesh::Frame(float) {}
 void CRenFrame::Render(int, int) {}
-// CameraImpl::Frame is partially wired here pending recovery of its four
-// sibling helpers (UpdateTargets / InterpolateBasis / UpdateCoords /
+// CameraImpl::Frame is partially wired here pending recovery of its three
+// remaining sibling helpers (InterpolateBasis / UpdateCoords /
 // CacheCameraFrustumUnits) — see the docstring on CameraImpl::Frame for the
 // remaining blocked addresses. The placeholder body invokes the recovered
-// UpdateBasis lane so the basis/zoom slew stays in the linked binary; the
-// other four helpers remain absorbed by the elision until their owner_layout
-// work is complete.
+// UpdateTargets and UpdateBasis lanes so the per-frame target-tracking and
+// basis/zoom slew stay in the linked binary; the other three helpers remain
+// absorbed by the elision until their owner_layout work is complete.
 void CameraImpl::Frame(float simDeltaSeconds, float frameSeconds)
 {
+  UpdateTargets(simDeltaSeconds, frameSeconds);
   UpdateBasis(simDeltaSeconds, frameSeconds);
 }
 void CollisionBeamEntity::CheckCollision() {}
