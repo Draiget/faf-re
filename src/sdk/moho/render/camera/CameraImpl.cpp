@@ -8,6 +8,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <span>
 #include <stdexcept>
 
 #include "lua/LuaObject.h"
@@ -222,7 +223,14 @@ namespace
   class CameraTimeSourceRuntime
   {
   public:
+    // VTable slot 0: `Time()` (matches `CameraImpl::Frame` query through
+    // `mTimeSources[mTimeSource]->Time()`).
     virtual float Time() = 0;
+
+    // VTable slot 1: scalar-deleting destructor wrapper invoked by the
+    // `eh vector destructor iterator` lane in `CameraImpl::~CameraImpl`
+    // (matches FUN_007AE630, which dispatches through slot 1).
+    virtual ~CameraTimeSourceRuntime() = default;
   };
 
   class GameTimeSource final : public CameraTimeSourceRuntime
@@ -1204,25 +1212,99 @@ namespace
     "CameraFrustumUserEntityStorage::mInlineStorage offset must be 0x10"
   );
 
-  struct CameraImplArmyFrustumView
+  /**
+   * Layout view across all three runtime camera inline-storage weak-vector lanes
+   * carved out of the `CameraImpl` runtime block. The binary places three
+   * 0x150-byte `CameraFrustumUserEntityStorage` (`gpg::fastvector_n40_WeakPtr<UserEntity>`)
+   * lanes consecutively at +0x460 / +0x5B0 / +0x700. The constructor at
+   * 0x007A7950 wires each lane's `mView` to point at its own
+   * `mInlineStorage[0]` sentinel, and the destructor at 0x007A7F00 walks
+   * each lane and detaches every still-tracked weak entity owner before
+   * releasing any heap-grown storage.
+   *
+   * The `mArmyUnitsInFrustum` lane (+0x700) is also exposed through
+   * `CameraImpl::GetArmyUnitsInFrustum` to callers querying the per-frame
+   * focus-army units inside the camera frustum.
+   */
+  struct CameraImplFrustumLanesView
   {
-    std::uint8_t mUnknown000To6FF[0x700]{};
+    std::uint8_t mUnknown000To45F[0x460]{};
+    CameraFrustumUserEntityStorage mFrustumLaneA; // +0x460
+    CameraFrustumUserEntityStorage mFrustumLaneB; // +0x5B0
     CameraFrustumUserEntityStorage mArmyUnitsInFrustum; // +0x700
   };
 
   static_assert(
-    offsetof(CameraImplArmyFrustumView, mArmyUnitsInFrustum) == 0x700,
-    "CameraImplArmyFrustumView::mArmyUnitsInFrustum offset must be 0x700"
+    offsetof(CameraImplFrustumLanesView, mFrustumLaneA) == 0x460,
+    "CameraImplFrustumLanesView::mFrustumLaneA offset must be 0x460"
   );
   static_assert(
-    offsetof(CameraImplArmyFrustumView, mArmyUnitsInFrustum) + sizeof(CameraFrustumUserEntityStorage) ==
+    offsetof(CameraImplFrustumLanesView, mFrustumLaneB) == 0x5B0,
+    "CameraImplFrustumLanesView::mFrustumLaneB offset must be 0x5B0"
+  );
+  static_assert(
+    offsetof(CameraImplFrustumLanesView, mArmyUnitsInFrustum) == 0x700,
+    "CameraImplFrustumLanesView::mArmyUnitsInFrustum offset must be 0x700"
+  );
+  static_assert(
+    offsetof(CameraImplFrustumLanesView, mArmyUnitsInFrustum) + sizeof(CameraFrustumUserEntityStorage) ==
       offsetof(CameraImplZoomLimitView, mMaxZoomMult),
-    "CameraImplArmyFrustumView::mArmyUnitsInFrustum must end at mMaxZoomMult"
+    "CameraImplFrustumLanesView::mArmyUnitsInFrustum must end at mMaxZoomMult"
   );
 
-  [[nodiscard]] CameraImplArmyFrustumView* AsArmyFrustumView(moho::CameraImpl* const camera) noexcept
+  [[nodiscard]] CameraImplFrustumLanesView* AsFrustumLanesView(moho::CameraImpl* const camera) noexcept
   {
-    return reinterpret_cast<CameraImplArmyFrustumView*>(camera);
+    return reinterpret_cast<CameraImplFrustumLanesView*>(camera);
+  }
+
+  /**
+   * Detach every still-attached `CameraUserEntityWeakRef` lane in `[begin, end)`
+   * from the tracked owner's intrusive next-back-link chain. For each lane,
+   * walks the owner's chain (starting at `*mOwnerLinkSlot`) until finding the
+   * slot that points back to this lane and rewires that slot to skip over us
+   * by storing this lane's saved `mNextOwnerRef` value. This is the typed
+   * mirror of FUN_007AF240 / `RuntimeDetachBacklinkedPairRangeLaneA` operating
+   * over `CameraImpl`'s 8-byte inline weak-ref pair lanes.
+   */
+  void DetachCameraFrustumWeakRefRange(
+    moho::CameraUserEntityWeakRef* begin, moho::CameraUserEntityWeakRef* const end
+  ) noexcept
+  {
+    for (; begin != end; ++begin) {
+      auto* ownerChainSlot = static_cast<std::uintptr_t*>(begin->mOwnerLinkSlot);
+      if (ownerChainSlot == nullptr) {
+        continue;
+      }
+
+      const auto laneSelfMarker = reinterpret_cast<std::uintptr_t>(begin);
+      while (*ownerChainSlot != laneSelfMarker) {
+        ownerChainSlot = reinterpret_cast<std::uintptr_t*>(*ownerChainSlot + sizeof(void*));
+      }
+      *ownerChainSlot = reinterpret_cast<std::uintptr_t>(begin->mNextOwnerRef);
+    }
+  }
+
+  /**
+   * Walk one runtime camera frustum-weak-vector lane, unlink every tracked
+   * weak entity ref through `DetachCameraFrustumWeakRefRange`, release any
+   * heap-grown storage with `operator delete[]`, and restore the lane to its
+   * post-construction inline sentinel state (`mView.mStart ==
+   * mView.mInlineOrigin`).
+   */
+  void TeardownCameraFrustumStorageLane(CameraFrustumUserEntityStorage& storage) noexcept
+  {
+    moho::CameraFrustumUserEntityList& view = storage.mView;
+    DetachCameraFrustumWeakRefRange(view.mStart, view.mFinish);
+
+    if (view.mStart != view.mInlineOrigin) {
+      ::operator delete[](view.mStart);
+      view.mStart = view.mInlineOrigin;
+      // Restore the SBO "capacity end" cache the binary maintains by reading
+      // the first word stored at the inline origin (the post-construction
+      // capacity bound seeded by `CameraImpl::CameraImpl`).
+      view.mCapacity = *reinterpret_cast<moho::CameraUserEntityWeakRef**>(view.mInlineOrigin);
+    }
+    view.mFinish = view.mStart;
   }
 
   [[nodiscard]] CameraImplZoomLimitView* AsZoomLimitView(moho::CameraImpl* const camera) noexcept
@@ -1302,16 +1384,93 @@ namespace moho
 }
 
 /**
+ * Address: 0x007A7F00 (FUN_007A7F00, ??1CameraImpl@Moho@@UAE@XZ)
+ * Mangled: ??1CameraImpl@Moho@@UAE@XZ
+ *
+ * IDA signature:
+ * Moho::Broadcaster *__stdcall Moho::CameraImpl::~CameraImpl(int a1);
+ *
+ * What it does:
+ * Reverses construction of one runtime camera. Detaches each of the three
+ * inline frustum/spotter weak-vector lanes from their tracked entity owners
+ * and releases any heap-grown storage. Tears down the intrusive target weak
+ * list (`mTargetEntities`) and frees its head sentinel. Releases the two
+ * heap-allocated `CameraTimeSourceRuntime` slots (`SystemTimeSource` at index
+ * 0 and `GameTimeSource` at index 1) through their scalar-deleting vtable
+ * slot (mirroring the binary's `eh vector destructor iterator`). Destroys
+ * the embedded `GeomCamera3` and `msvc8::string` name lanes, runs
+ * `CScriptEvent::~CScriptEvent` on the sub-object at +0x0C, and finally
+ * chains through `RCamCamera::~RCamCamera` (via `DetachRuntimeCameraBase`)
+ * to forget this camera from the global manager and rejoin the broadcaster
+ * ring to its self-linked idle state.
+ *
+ * Reached from the scalar-deleting wrapper at vtable slot 0 (FUN_007A7DC0,
+ * `operator_delete`), which is referenced by the `CameraImpl` vtable at
+ * 0x00E3C474 and its `CScriptEvent` / `CScriptObject` sub-object vtable
+ * thunks. The wrapper is invoked at runtime via `delete camera` from
+ * `RCamManager::~RCamManager` (0x007AA930).
+ */
+moho::CameraImpl::~CameraImpl()
+{
+  // Detach the three inline weak-vector lanes (entity-tracker lists) used by
+  // CameraImpl: the per-frame army-units-in-frustum cache at +0x700 first,
+  // then the two rotating spotter lanes at +0x5B0 and +0x460. The binary
+  // tears these down in reverse-construction order; each lane unlinks every
+  // still-attached weak ref from its owner chain before releasing heap
+  // storage.
+  CameraImplFrustumLanesView* const frustumLanes = AsFrustumLanesView(this);
+  TeardownCameraFrustumStorageLane(frustumLanes->mArmyUnitsInFrustum);
+  TeardownCameraFrustumStorageLane(frustumLanes->mFrustumLaneB);
+  TeardownCameraFrustumStorageLane(frustumLanes->mFrustumLaneA);
+
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Release both heap-owned `CameraTimeSourceRuntime` slots via their virtual
+  // scalar-deleting destructor (vtable slot 1). Only indices 0 and 1 are
+  // populated (`SystemTimeSource` and `GameTimeSource`); index 2 is unused.
+  // The binary uses an `eh vector destructor iterator` over the two slots.
+  for (auto*& source : std::span{runtime->mTimeSources, 2}) {
+    delete source;
+    source = nullptr;
+  }
+
+  // Clear the intrusive target-entity weak list, then release the heap-
+  // allocated head sentinel (allocated by `EnsureCameraTargetListInitialized`
+  // during construction or first append). The runtime view's pointer is
+  // nulled afterwards so any future use is detectable.
+  CameraTargetListClear(runtime->mTargetEntities);
+  ::operator delete(runtime->mTargetEntities.mHead);
+  runtime->mTargetEntities.mHead = nullptr;
+
+  // Destroy the embedded `GeomCamera3` (releases solid-frustum heap storage)
+  // and reset the `mName` `msvc8::string` to empty SSO state (frees heap
+  // buffer when not in SSO mode).
+  runtime->mCam.~GeomCamera3();
+  runtime->mName.tidy(true, 0U);
+
+  // Sub-object teardown for the `CScriptEvent` vbase at +0x0C and the
+  // `RCamCamera` base lane at +0x00 (the latter forgets this camera from the
+  // global manager and rejoins the broadcaster sentinel).
+  auto* const scriptEventSubobject = reinterpret_cast<moho::CScriptEvent*>(
+    reinterpret_cast<std::uint8_t*>(this) + 0x0C
+  );
+  scriptEventSubobject->~CScriptEvent();
+
+  (void)moho::DetachRuntimeCameraBase(this);
+}
+
+/**
  * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
  *
  * What it does:
- * Executes CameraImpl teardown and conditionally frees this object when
- * `deleteFlags & 1` is set.
+ * Scalar-deleting destructor wrapper sitting in vtable slot 0 (and the
+ * matching `CScriptEvent` / `CScriptObject` sub-object vtable slots).
+ * Runs `~CameraImpl` and, when `deleteFlags & 1` is set, releases this
+ * object's storage through the global `operator delete`.
  */
 void moho::CameraImpl::operator_delete(const std::int32_t deleteFlags)
 {
   this->~CameraImpl();
-  (void)DetachRuntimeCameraBase(this);
   if ((deleteFlags & 1) != 0) {
     ::operator delete(this);
   }
@@ -1841,7 +2000,7 @@ Wm3::Vector3f moho::CameraImpl::GetTargetPosition() const
  */
 moho::CameraFrustumUserEntityList* moho::CameraImpl::GetArmyUnitsInFrustum()
 {
-  return &AsArmyFrustumView(this)->mArmyUnitsInFrustum.mView;
+  return &AsFrustumLanesView(this)->mArmyUnitsInFrustum.mView;
 }
 
 /**
