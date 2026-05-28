@@ -229,6 +229,26 @@ namespace moho
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncDataQueue) == 0x14, "SSyncDataQueue size must be 0x14");
 
+  /**
+   * Address: 0x0073F9C0 (FUN_0073F9C0,
+   *                      boost::ptr_sequence_adapter_deque_SSyncData::pop_front)
+   *
+   * IDA signature:
+   * Moho::SSyncData **__userpurge boost::ptr_sequence_adapter_deque_SSyncData::pop_front@<eax>(
+   *     std::deque_SSyncData *this@<ecx>, Moho::SSyncData **a2);
+   *
+   * What it does:
+   * Per-T named free helper that captures the binary's engine-instantiated
+   * body of `boost::ptr_sequence_adapter< std::deque<SSyncData*> >::pop_front`.
+   * Pops the front element off the sync-data queue, transfers ownership to the
+   * caller, and throws `boost::bad_ptr_container_operation` with the message
+   * "'pop_front()' on empty container" when the queue is empty.
+   *
+   * Caller: `Moho::CSimDriver::GetSyncData` (FUN_0073C520) — the sole binary
+   * caller of the ptr_sequence_adapter pop_front emission.
+   */
+  [[nodiscard]] SSyncData* PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue);
+
   enum class EDriverState : int32_t
   {
     Startup = 0,
