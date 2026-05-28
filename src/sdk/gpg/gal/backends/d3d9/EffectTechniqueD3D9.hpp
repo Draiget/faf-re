@@ -20,6 +20,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x008F3AC0 (FUN_008F3AC0, ??0EffectTechniqueD3D9@gal@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Stores technique-name/effect-handle lanes and validates that the
+         * referenced effect is still live (throws `gpg::gal::Error` otherwise).
+         */
+        EffectTechniqueD3D9(const char* techniqueName, const boost::weak_ptr<EffectD3D9>& effect, void* handle);
+
+        /**
          * Address: 0x008F3AA0 (FUN_008F3AA0)
          *
          * What it does:
