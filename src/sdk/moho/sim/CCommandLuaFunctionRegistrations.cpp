@@ -135,6 +135,7 @@ namespace
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
   constexpr const char* kIssueRepairHelpText = "IssueRepair";
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
+  constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
@@ -810,6 +811,8 @@ namespace moho
   int cfunc_IssueClearCommandsL(LuaPlus::LuaState* state);
   int cfunc_IssueStopL(LuaPlus::LuaState* state);
   int cfunc_IssuePauseL(LuaPlus::LuaState* state);
+  int cfunc_IssueKillSelfL(LuaPlus::LuaState* state);
+  int cfunc_IssueDestroySelfL(LuaPlus::LuaState* state);
   /**
    * Address: 0x006F29D0 (FUN_006F29D0, cfunc_IssueMoveOffFactoryL)
    *
@@ -3897,6 +3900,53 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     IssueSimpleUnitCommand(sim, units, EUnitCommandType::UNITCOMMAND_KillSelf);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F7060 (FUN_006F7060, cfunc_IssueDestroySelf)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueDestroySelf(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueDestroySelfL`.
+   */
+  int cfunc_IssueDestroySelf(lua_State* const luaContext)
+  {
+    return cfunc_IssueDestroySelfL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F70D0 (FUN_006F70D0, cfunc_IssueDestroySelfL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueDestroySelfL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Resolves one unit-list argument and issues one `UNITCOMMAND_DestroySelf`
+   * command through the active sim command sink, mirroring the shared
+   * `IssueSimpleUnitCommand` shape used by `IssueStop` / `IssuePause` /
+   * `IssueKillSelf`.
+   */
+  int cfunc_IssueDestroySelfL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDestroySelfHelpText, 1, argumentCount);
+    }
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueDestroySelfHelpText);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    IssueSimpleUnitCommand(sim, units, EUnitCommandType::UNITCOMMAND_DestroySelf);
     return 0;
   }
 
