@@ -32,7 +32,6 @@ namespace moho
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State*) { return 0; }
   int cfunc_CreateAimController(lua_State*) { return 0; }
   int cfunc_CreateBuilderArmController(lua_State*) { return 0; }
-  int cfunc_CreateFootPlantController(lua_State*) { return 0; }
   int cfunc_CreateThrustController(lua_State*) { return 0; }
   int cfunc_EntityAttachBoneToEntityBone(lua_State*) { return 0; }
   int cfunc_EntityPushOver(lua_State*) { return 0; }

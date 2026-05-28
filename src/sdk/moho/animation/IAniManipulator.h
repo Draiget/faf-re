@@ -155,6 +155,29 @@ namespace moho
      */
     CFootPlantManipulator();
 
+    /**
+     * Address: 0x00639380 (FUN_00639380, ??0CFootPlantManipulator@Moho@@QAE@@Z)
+     * Mangled: ??0CFootPlantManipulator@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::CFootPlantManipulator::CFootPlantManipulator(
+     *   Moho::Unit *unit, Moho::CFootPlantManipulator *this,
+     *   LuaPlus::LuaObject *footBone, int kneeBone, int hipBone,
+     *   LuaPlus::LuaObject *straightLegs, float maxFootFall);
+     *
+     * What it does:
+     * Constructs one foot-plant manipulator owned by `unit`'s sim/actor pair,
+     * head-inserts an intrusive goal weak link into the unit's weak chain,
+     * stores foot/knee/hip bone indices plus stance tuning fields, materializes
+     * Lua userdata for script binding, registers each watched bone in the
+     * IAniManipulator binding storage, and computes the half-leg span from the
+     * actor pose's foot/hip composite-transform vertical separation.
+     */
+    CFootPlantManipulator(
+      Unit* unit, int footBoneIndex, int kneeBoneIndex, int hipBoneIndex,
+      bool straightLegs, float maxFootFall
+    );
+
     bool ManipulatorUpdate() override;
 
     WeakPtr<Unit> mGoalUnit;         // +0x80

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -12,10 +13,13 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/animation/CAniActor.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -1266,6 +1270,90 @@ namespace moho
     , mMaxFootFall(0.0f)
     , mHalfLegSpan(0.0f)
   {
+  }
+
+  /**
+   * Address: 0x00639380 (FUN_00639380, ??0CFootPlantManipulator@Moho@@QAE@@Z)
+   * Mangled: ??0CFootPlantManipulator@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * Moho::CFootPlantManipulator::CFootPlantManipulator(
+   *   Moho::Unit *unit, Moho::CFootPlantManipulator *this,
+   *   LuaPlus::LuaObject *footBone, int kneeBone, int hipBone,
+   *   LuaPlus::LuaObject *straightLegs, float maxFootFall);
+   *
+   * What it does:
+   * Constructs one foot-plant manipulator owned by `unit`'s sim/actor pair,
+   * head-inserts an intrusive goal weak link into the unit's weak chain,
+   * stores foot/knee/hip bone indices plus stance tuning fields, materializes
+   * Lua userdata for script binding, registers each watched bone in the
+   * IAniManipulator binding storage, and computes the half-leg span from the
+   * actor pose's foot/hip composite-transform vertical separation.
+   */
+  CFootPlantManipulator::CFootPlantManipulator(
+    Unit* const unit, const int footBoneIndex, const int kneeBoneIndex, const int hipBoneIndex,
+    const bool straightLegs, const float maxFootFall
+  )
+    : IAniManipulator(unit->SimulationRef, unit->AniActor, 0)
+    , mGoalUnit()
+    , mFootBoneIndex(footBoneIndex)
+    , mKneeBoneIndex(kneeBoneIndex)
+    , mHipBoneIndex(hipBoneIndex)
+    , mStraightLegs(straightLegs)
+    , mMaxFootFall(maxFootFall)
+    , mHalfLegSpan(0.0f)
+  {
+    // Bind the intrusive goal weak link to the owning unit and head-insert into
+    // that unit's weak-link chain (open-coded head insertion matching the
+    // binary's freshly-constructed, known-unlinked node pattern at 0x006393D6).
+    mGoalUnit.BindObjectUnlinked(unit);
+    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
+
+    // Materialize the Lua userdata + script binding for this manipulator. The
+    // binary unconditionally invokes `func_CreateLuaFootPlantManipulatorObject`
+    // using `sim->mLuaState` (loaded as `[sim+0x8D8]` then passed in ESI to the
+    // factory). Mirror that contract here.
+    if (Sim* const sim = mOwnerSim; sim != nullptr && sim->mLuaState != nullptr) {
+      LuaPlus::LuaObject arg3{};
+      LuaPlus::LuaObject arg2{};
+      LuaPlus::LuaObject arg1{};
+      LuaPlus::LuaObject scriptFactory{};
+      (void)func_CreateLuaFootPlantManipulatorObject(&scriptFactory, sim->mLuaState);
+      CreateLuaObject(scriptFactory, arg1, arg2, arg3);
+    }
+    // Register foot/knee/hip bones as watched bindings in IAniManipulator
+    // base lane, in the same insertion order the binary emits (foot, knee, hip).
+    (void)AddWatchBone(mFootBoneIndex);
+    (void)AddWatchBone(mKneeBoneIndex);
+    (void)AddWatchBone(mHipBoneIndex);
+
+    // Half-leg span = |foot.composite.y - hip.composite.y| * 0.5. The binary
+    // reads the watch-binding list back to recover the recorded bone indices
+    // (start[0] = foot, start[2] = hip), and then looks up the corresponding
+    // pose bones via the owner actor's CAniPose::mBones array, returning a
+    // null pointer when the bone index is past the array end.
+    if (CAniActor* const actor = mOwnerActor; actor != nullptr && actor->mPose.px != nullptr) {
+      CAniPose* const pose = actor->mPose.px;
+      const std::size_t boneCount = pose->mBones.end() - pose->mBones.begin();
+      const SAniManipBinding* const watchBegin = mWatchBones.mBegin;
+      const std::uint32_t footIndex = watchBegin != nullptr
+        ? static_cast<std::uint32_t>(watchBegin[0].mBoneIndex)
+        : std::numeric_limits<std::uint32_t>::max();
+      const std::uint32_t hipIndex = watchBegin != nullptr
+        ? static_cast<std::uint32_t>(watchBegin[2].mBoneIndex)
+        : std::numeric_limits<std::uint32_t>::max();
+
+      const CAniPoseBone* const footBone =
+        footIndex < boneCount ? &pose->mBones.begin()[footIndex] : nullptr;
+      const CAniPoseBone* const hipBone =
+        hipIndex < boneCount ? &pose->mBones.begin()[hipIndex] : nullptr;
+
+      if (footBone != nullptr && hipBone != nullptr) {
+        const float footY = footBone->GetCompositeTransform().pos_.y;
+        const float hipY = hipBone->GetCompositeTransform().pos_.y;
+        mHalfLegSpan = std::fabs(footY - hipY) * 0.5f;
+      }
+    }
   }
 
   /**
