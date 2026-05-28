@@ -137,6 +137,7 @@ namespace
   constexpr const char* kIssueScriptHelpText = "IssueScript";
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
+  constexpr const char* kIssueUpgradeHelpText = "IssueUpgrade";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
@@ -815,6 +816,7 @@ namespace moho
   int cfunc_IssuePauseL(LuaPlus::LuaState* state);
   int cfunc_IssueKillSelfL(LuaPlus::LuaState* state);
   int cfunc_IssueDestroySelfL(LuaPlus::LuaState* state);
+  int cfunc_IssueUpgradeL(LuaPlus::LuaState* state);
   /**
    * Address: 0x006F29D0 (FUN_006F29D0, cfunc_IssueMoveOffFactoryL)
    *
@@ -4008,6 +4010,71 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     IssueSimpleUnitCommand(sim, units, EUnitCommandType::UNITCOMMAND_DestroySelf);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F6600 (FUN_006F6600, cfunc_IssueUpgrade)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueUpgrade(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueUpgradeL`.
+   */
+  int cfunc_IssueUpgrade(lua_State* const luaContext)
+  {
+    return cfunc_IssueUpgradeL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F6670 (FUN_006F6670, cfunc_IssueUpgradeL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueUpgradeL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, upgradeBlueprintId)`, resolves the destination
+   * `RUnitBlueprint*` for the upgrade target, and (when both the unit
+   * selection and blueprint are valid) issues one `UNITCOMMAND_Upgrade`
+   * carrying the resolved blueprint pointer through the shared
+   * `IssueCommandToSelectedUnits` (`UNIT_IssueCommand`) dispatch shape.
+   * The blueprint pointer is stored in `SSTICommandIssueData::mBlueprint`
+   * (offset +0x50) — the offset the binary writes via
+   * `mov [eax+50h], esi` after `SSTICommandIssueData::SSTICommandIssueData`.
+   */
+  int cfunc_IssueUpgradeL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueUpgradeHelpText, 2, argumentCount);
+    }
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueUpgradeHelpText);
+
+    const LuaPlus::LuaStackObject blueprintArg(state, 2);
+    RUnitBlueprint* const upgradeBlueprint =
+      moho::ResolveUnitBlueprintFromLuaArgument(state, blueprintArg, kIssueUpgradeHelpText);
+
+    if (units.Empty() || upgradeBlueprint == nullptr) {
+      return 0;
+    }
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(units);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Upgrade);
+    commandIssueData.mBlueprint = upgradeBlueprint;
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     return 0;
   }
 
