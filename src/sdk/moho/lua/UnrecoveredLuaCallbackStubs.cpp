@@ -43,7 +43,6 @@ namespace moho
   int cfunc_IssueFactoryAssist(lua_State*) { return 0; }
   int cfunc_IssueMove(lua_State*) { return 0; }
   int cfunc_IssueNuke(lua_State*) { return 0; }
-  int cfunc_IssueReclaim(lua_State*) { return 0; }
   int cfunc_IssueSacrifice(lua_State*) { return 0; }
   int cfunc_IssueTeleport(lua_State*) { return 0; }
   int cfunc_IssueTeleportToBeacon(lua_State*) { return 0; }

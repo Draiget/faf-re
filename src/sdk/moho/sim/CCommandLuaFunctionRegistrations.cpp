@@ -134,6 +134,7 @@ namespace
   constexpr const char* kIssuePatrolHelpText = "IssuePatrol";
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
   constexpr const char* kIssueRepairHelpText = "IssueRepair";
+  constexpr const char* kIssueReclaimHelpText = "IssueReclaim";
   constexpr const char* kIssueScriptHelpText = "IssueScript";
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
@@ -817,6 +818,7 @@ namespace moho
   int cfunc_IssueScript(lua_State* luaContext);
   int cfunc_IssueScriptL(LuaPlus::LuaState* state);
   int cfunc_IssueReclaim(lua_State* luaContext);
+  int cfunc_IssueReclaimL(LuaPlus::LuaState* state);
   int cfunc_IssueCapture(lua_State* luaContext);
   int cfunc_IssueKillSelf(lua_State* luaContext);
   int cfunc_IssueDestroySelf(lua_State* luaContext);
@@ -4035,6 +4037,88 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F6960 (FUN_006F6960, cfunc_IssueReclaim)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueReclaim(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueReclaimL`. The
+   * binary stub is a 3-instruction tail-jump (`mov eax,[esp+4]; mov ecx,
+   * [eax+0x44]; jmp cfunc_IssueReclaimL`) which the modern engine expresses
+   * through `SCR_ResolveBindingState`.
+   */
+  int cfunc_IssueReclaim(lua_State* const luaContext)
+  {
+    return cfunc_IssueReclaimL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F69D0 (FUN_006F69D0, cfunc_IssueReclaimL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueReclaimL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Reclaim-capable units through
+   * `func_Validate_IssueCommand` with `RULEUCC_Reclaim` (0x100000), drops the
+   * target entity out of the worker selection (so a unit does not get tasked
+   * to reclaim itself when script passes the same unit as both worker and
+   * target), resolves the target entity into a `CAiTarget`, encodes it into
+   * `SSTICommandIssueData::mTarget`, and queues one `UNITCOMMAND_Reclaim`
+   * (0x13) through the shared `IssueCommandToSelectedUnits`
+   * (`UNIT_IssueCommand`) dispatch shape with `clearQueue=false`. Mirrors
+   * the binary's `func_GetUnitList` + `func_Validate_IssueCommand(...,
+   * RULEUCC_Reclaim)` + `SCR_FromLua_Entity` + `EntitySetTemplate_Unit::
+   * Remove` + `CAiTarget::UpdateTarget` + `SSTITarget::FromAiTarget` +
+   * `UNIT_IssueCommand` sequence.
+   */
+  int cfunc_IssueReclaimL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueReclaimHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueReclaimHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Reclaim)) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
+
+    SEntitySetTemplateUnit workerSelection{};
+    workerSelection.AddUnits(filteredUnits);
+
+    // Drop the reclaim target itself out of the worker selection so a unit
+    // does not get tasked to reclaim itself when the script passed the same
+    // unit as both worker and target. Unlike Repair, the binary keeps issuing
+    // even when the resulting worker set is empty (the per-unit dispatcher
+    // discards impossible commands at the unit level).
+    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+
+    CAiTarget target{};
+    target.UpdateTarget(targetEntity);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Reclaim);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
     return 0;
   }
 
