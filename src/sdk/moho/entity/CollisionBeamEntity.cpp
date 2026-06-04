@@ -15,11 +15,15 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/misc/Stats.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/EImpactTypeTypeInfo.h"
 #include "moho/sim/Sim.h"
+#include "moho/ui/SDebugLine.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "moho/unit/tasks/CAcquireTargetTask.h"
 #include "Wm3Box3.h"
 
 namespace gpg
@@ -113,34 +117,6 @@ namespace
     weakLink.UnlinkFromOwnerChain();
   }
 
-  struct CollisionBeamHelperRuntimeView
-  {
-    std::uint8_t mUnknown00_07[0x08];
-    moho::WeakPtr<moho::Entity> mTargetEntity; // +0x08
-    std::uint8_t mUnknown10_23[0x14];
-    moho::WeakPtr<moho::Entity> mSourceEntity; // +0x24
-  };
-  static_assert(sizeof(CollisionBeamHelperRuntimeView) == 0x2C, "CollisionBeamHelperRuntimeView size must be 0x2C");
-  static_assert(
-    offsetof(CollisionBeamHelperRuntimeView, mTargetEntity) == 0x08,
-    "CollisionBeamHelperRuntimeView::mTargetEntity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CollisionBeamHelperRuntimeView, mSourceEntity) == 0x24,
-    "CollisionBeamHelperRuntimeView::mSourceEntity offset must be 0x24"
-  );
-
-  /**
-   * Address: 0x00673580 (FUN_00673580, Moho::CollisionBeamHelper::~CollisionBeamHelper)
-   *
-   * What it does:
-   * Unlinks source and target entity weak-link lanes from their owner chains.
-   */
-  [[maybe_unused]] void DestroyCollisionBeamHelperLinks(CollisionBeamHelperRuntimeView& helper) noexcept
-  {
-    helper.mSourceEntity.UnlinkFromOwnerChain();
-    helper.mTargetEntity.UnlinkFromOwnerChain();
-  }
 } // namespace
 
 namespace moho
@@ -461,6 +437,78 @@ namespace moho
   bool CollisionBeamEntity::IsEnabled() const
   {
     return mEnabled != 0u;
+  }
+
+  /**
+   * Address: 0x006732D0 (FUN_006732D0, Moho::CollisionBeamEntity::CheckCollision)
+   * Mangled: ?CheckCollision@CollisionBeamEntity@Moho@@IAEXXZ
+   *
+   * What it does:
+   * Runs one beam collision pass: resolves the launcher weapon's beam-impact
+   * result for the attach bone, broadcasts the corresponding hit/miss/irrelevant
+   * event to the bound listener, optionally draws a debug line, pushes the beam
+   * length into the active effect, and fires the `OnImpact` script for terrain or
+   * water impacts.
+   */
+  void CollisionBeamEntity::CheckCollision()
+  {
+    UnitWeapon* const launcherWeapon = mLauncher.GetObjectPtr();
+
+    CollisionBeamHelper beam;
+    if (launcherWeapon != nullptr) {
+      launcherWeapon->CreateCollisionBeamHelper(&beam, mAttachInfo.mParentBoneIndex);
+    }
+
+    // Notify the bound listener of the collision outcome.
+    if (auto* const listener =
+          static_cast<ManyToOneListener_ECollisionBeamEvent*>(mListener.ownerLinkSlot);
+        listener != nullptr) {
+      Entity* const hitEntity = beam.mEntity.GetObjectPtr();
+      ECollisionBeamEvent eventCode;
+      if (beam.mTarget.ImpactDidHitEntity(hitEntity, beam.mImpactType)) {
+        eventCode = CollisionBeamEvent_HitTarget;
+      } else if (hitEntity != nullptr
+                 && (static_cast<std::uint32_t>(hitEntity->id_) & 0xF0000000u) == 0x40000000u) {
+        eventCode = CollisionBeamEvent_Irrelavent;
+      } else {
+        eventCode = CollisionBeamEvent_MissTarget;
+      }
+      listener->HandleCollisionBeamListenerState(eventCode);
+    }
+
+    if (dbg_CollisionBeam) {
+      const Wm3::Vec3f forwardOffset{
+        beam.mLine.Direction.x * beam.mLineScale,
+        beam.mLine.Direction.y * beam.mLineScale,
+        beam.mLine.Direction.z * beam.mLineScale,
+      };
+      SDebugLine line{};
+      line.p0 = Wm3::Vec3f{
+        beam.mLine.Origin.x - forwardOffset.x,
+        beam.mLine.Origin.y - forwardOffset.y,
+        beam.mLine.Origin.z - forwardOffset.z,
+      };
+      line.p1 = Wm3::Vec3f{
+        beam.mLine.Origin.x + forwardOffset.x,
+        beam.mLine.Origin.y + forwardOffset.y,
+        beam.mLine.Origin.z + forwardOffset.z,
+      };
+      line.depth0 = static_cast<std::int32_t>(0xFF00FF00u);
+      line.depth1 = static_cast<std::int32_t>(0xFF00FF00u);
+      SimulationRef->GetDebugCanvas()->DebugDrawLine(line);
+    }
+
+    mLastBeamLength = beam.mBeamLength;
+
+    if (IEffect* const beamEffect = mEffect.GetObjectPtr(); beamEffect != nullptr) {
+      constexpr std::int32_t kBeamLengthParam = 6;
+      beamEffect->SetFloatParam(kBeamLengthParam, beam.mBeamLength);
+    }
+
+    if (beam.mImpactType != IMPACT_Invalid) {
+      const char* const impactTypeString = ENT_GetImpactTypeString(beam.mImpactType);
+      (void)RunScript("OnImpact", impactTypeString);
+    }
   }
 
   /**
