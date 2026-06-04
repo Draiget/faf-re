@@ -604,4 +604,36 @@ void SkyDome::Destroy()
     RenderDomeUsing(technique);
   }
 
+  /**
+   * Address: 0x00819650 (FUN_00819650, ?RenderCirrus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SkyDome::RenderCirrus(int tick, float interpolant, const GeomCamera3 &cam);
+   *
+   * What it does:
+   * Selects the "Cirrus" technique, feeds the animation tick/interpolant lanes,
+   * the camera position/projection, cirrus multiplier/color, cloud texture, and
+   * the packed cirrus parameter block, then renders the dome with that
+   * technique.
+   */
+  void SkyDome::RenderCirrus(const int tick, const float interpolant, const GeomCamera3& cam)
+  {
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Cirrus");
+
+    effect->SetMatrix("tick")->Func6(tick);
+    effect->SetMatrix("interpolant")->SetFloat(interpolant);
+
+    const Vector4f& cameraPosition = cam.inverseView.r[3];
+    const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
+    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
+    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->SetMatrix("cirrusMultiplier")->SetFloat(mCirrusMultiplier);
+    effect->SetMatrix("cirrusColor")->SetPtr(&mCirrusColor_R, 3 * sizeof(float));
+    effect->SetMatrix("cirrusTexture")->SetTexture(mCloudsTexture);
+    effect->SetMatrix("aCirrus")->SetPtr(mCirrusData, sizeof(mCirrusData));
+
+    RenderDomeUsing(technique);
+  }
+
 } // namespace moho
