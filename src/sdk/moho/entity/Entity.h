@@ -1437,6 +1437,15 @@ namespace moho
     [[nodiscard]] msvc8::string GetUniqueName() const;
 
     /**
+     * Address: 0x00689F50 (FUN_00689F50)
+     *
+     * What it does:
+     * Returns whether per-entity realtime-stats accounting (shots fired, hit/miss,
+     * fire-range stats) is currently enabled for this entity.
+     */
+    [[nodiscard]] bool IsRealtimeStatsEnabled() const noexcept;
+
+    /**
      * Address: 0x00678B70 (FUN_00678B70, ?GetBlueprintId@Entity@Moho@@QBEPBDXZ)
      *
      * What it does:
@@ -1520,7 +1529,8 @@ namespace moho
     std::uint8_t mInterfaceCreated;        // 0x01EC
     char pad_01ED[0x07];                   // 0x01ED
     std::int32_t readinessFlags;           // 0x01F4
-    char pad_01F8_01FC[0x04];              // 0x01F8
+    std::uint8_t RealtimeStatsEnabled;     // 0x01F8 (per-entity realtime-stats accounting gate; FUN_00689F50)
+    char pad_01F9_01FB[0x03];              // 0x01F9
     msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
     EntitySetBase mShooters;               // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
     Wm3::Vector3f mCollisionBoundsMin;     // 0x0240
