@@ -164,31 +164,24 @@ namespace moho
 
     /**
      * Address: 0x007A9030 (FUN_007A9030, Moho::CameraImpl::Frame)
+     * Mangled: ?Frame@CameraImpl@Moho@@QAEXMM@Z
      * Address context: called from `RCamManager::Frame` (`0x007AABB0`) camera-loop lane.
      *
      * What it does:
-     * Advances one camera runtime for the current sim/frame delta pair.
-     *
-     * The body dispatches to the helpers listed below in the binary.
-     * Frame's full body is still under recovery (typed camera
-     * transition state, frustum-cache lane, and target-list iteration
-     * still need owner_layout work); the placeholder body in
-     * EngineMethodStubs2.cpp invokes `UpdateTargets` and `UpdateBasis` so
-     * the recovered target-tracking and basis/zoom slew lanes stay wired
-     * and not dead-stripped, while the remaining three helpers continue
-     * to absorb the elision:
-     *   - 0x007A75A0 (CameraImpl::CacheCameraFrustumUnits — frustum
-     *     visibility cache rebuild, blocked)
-     *   - 0x007A9110 (CameraImpl::UpdateTargets — per-frame target list
-     *     tween/slew update, recovered in CameraImpl.cpp)
-     *   - 0x007A95F0 (CameraImpl::UpdateBasis — orthonormal basis
-     *     refresh, recovered in CameraImpl.cpp)
-     *   - 0x007A9BA0 (CameraImpl::InterpolateBasis — slerp/lerp
-     *     between current and target basis, blocked)
-     *   - 0x007AA330 (CameraImpl::UpdateCoords — final coord push
-     *     into render lane, blocked)
+     * Advances one camera runtime for the current sim/frame delta pair. When the
+     * camera follows the game clock, recomputes the frame delta from the
+     * game-time source against the last frame's recorded time, advances the
+     * camera-shake elapsed timer (clamped to the shake duration), flips the
+     * shake phase sign, then drives the five per-frame lanes by name:
+     *   - 0x007A9110 (UpdateTargets — entity-target tracking)
+     *   - 0x007A95F0 (UpdateBasis) when no timed transition is active, else
+     *     0x007A9BA0 (InterpolateBasis) when `mTimedMoveDuration > 0`
+     *   - 0x007AA330 (UpdateCoords — push view transform + projection into mCam)
+     *   - 0x007A75A0 (CacheCameraFrustumUnits — rebuild cached in-frustum units)
+     * and records the game-clock time for the next frame's delta. Recovered in
+     * CameraImpl.cpp.
      */
-    void Frame(float simDeltaSeconds, float frameSeconds);
+    void Frame(float interpolationAlpha, float frameSeconds);
 
     /**
      * Address: 0x007A95F0 (FUN_007A95F0, Moho::CameraImpl::UpdateBasis)
@@ -236,6 +229,50 @@ namespace moho
      *   - Otherwise (Location/Box): no-op early exit.
      */
     void UpdateTargets(float interpolationAlpha, float frameSeconds);
+
+    /**
+     * Address: 0x007A9BA0 (FUN_007A9BA0, Moho::CameraImpl::InterpolateBasis)
+     * Mangled: ?InterpolateBasis@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Drives one active timed-move / Hermite camera transition for the current
+     * frame. Computes linear transition progress from the active time source,
+     * refreshes the entity target when following, and either snaps to the
+     * transition endpoint or Hermite-blends offset/heading/far-pitch/target-zoom
+     * between the cached endpoints using the acceleration-curve-shaped progress,
+     * then snaps the offset to the terrain surface and demotes finished
+     * Hermite/Box transitions to Location mode. The second float matches the
+     * Frame-lane ABI and is unused on this code path.
+     */
+    void InterpolateBasis(float interpolationAlpha, float frameSeconds);
+
+    /**
+     * Address: 0x007AA330 (FUN_007AA330, Moho::CameraImpl::UpdateCoords)
+     * Mangled: ?UpdateCoords@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Rebuilds the embedded `GeomCamera3` view transform and projection from the
+     * current camera state: converts target-zoom into an eye distance, derives
+     * near/far clip planes, builds the orientation quaternion (heading/pitch in
+     * perspective mode, fixed top-down in ortho mode), places the eye at
+     * `mOffset` plus the rotated forward axis times the eye distance (with shake
+     * in perspective mode), builds the projection matrix, and re-initializes
+     * `mCam`. Both floats match the Frame-lane ABI and are unused on this path.
+     */
+    void UpdateCoords(float interpolationAlpha, float frameSeconds);
+
+    /**
+     * Address: 0x007A75A0 (FUN_007A75A0, Moho::CameraImpl::CacheCameraFrustumUnits)
+     * Mangled: ?CacheCameraFrustumUnits@CameraImpl@Moho@@QAEXM@Z
+     *
+     * What it does:
+     * Periodically rebuilds the three cached "units in camera frustum" weak
+     * lists (all-entities, all-units, focus-army units), gated by a frame-time
+     * accumulator. On rebuild it clears the lanes, queries the world spatial DB
+     * for every unit/entity intersecting the current camera view, and bins each
+     * live entity into the appropriate cached list(s).
+     */
+    void CacheCameraFrustumUnits(float deltaFrame);
 
     /**
      * Address: 0x007A6E70 (FUN_007A6E70, Moho::CameraImpl::CameraSetAccType)

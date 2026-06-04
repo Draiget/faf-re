@@ -11,13 +11,17 @@
 #include <span>
 #include <stdexcept>
 
+#include "gpg/core/containers/FastVector.h"
 #include "lua/LuaObject.h"
 #include "moho/collision/CColPrimitiveBox3f.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/sim/COGrid.h"
+#include "moho/task/CTaskEvent.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/Vector3f.h"
 #include "gpg/core/time/Timer.h"
@@ -48,6 +52,9 @@ namespace moho
   extern float cam_ShakeMult;
   extern float cam_EntityBoxExpand;
   extern float ren_BorderSize;
+  extern bool cam_Free;
+  /** Address: 0x00F57FEC (?cam_PanSpeed@Moho@@3MA) */
+  extern float cam_PanSpeed;
   int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplReset(lua_State* luaContext);
   int cfunc_CameraImplResetL(LuaPlus::LuaState* state);
@@ -139,6 +146,7 @@ namespace
   constexpr const char* kCameraImplSpinHelpText = "Camera:Spin(headingRate[,zoomRate])";
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr float kPi = 3.1415927f;
+  constexpr float kHalfPi = 1.5707964f;
   constexpr float kTwoPi = 6.2831855f;
   constexpr float kCameraSpinPitchUpperBound = 1.5607964f;
   constexpr std::int32_t kCameraTargetTypeLocation = 0;
@@ -291,7 +299,8 @@ namespace
     std::uint8_t mTargetTime = 0;                         // +0x3B8
     std::uint8_t mUnknown3B9To3BB[0x03]{};                // +0x3B9
     std::int32_t mTimeSource = 0;                         // +0x3BC
-    CameraTimeSourceRuntime* mTimeSources[3]{};           // +0x3C0
+    CameraTimeSourceRuntime* mTimeSources[2]{};           // +0x3C0 (System=0, Game=1)
+    float mLastFrameTime = 0.0f;                          // +0x3C8
     std::uint8_t mEnableEaseInOut = 0;                    // +0x3CC
     std::uint8_t mUnknown3CDTo3CF[0x03]{};                // +0x3CD
     float mNoseCamPitchAdjust = 0.0f;                     // +0x3D0
@@ -314,6 +323,9 @@ namespace
     std::uint8_t mCanShake = 0;                           // +0x44C
     std::uint8_t mUnknown44DTo44F[0x03]{};                // +0x44D
     std::int32_t mAccType = 0;                            // +0x450
+    float mFrustumCacheTimer = 0.0f;                      // +0x454
+    float mFrustumCacheZoomMark = 0.0f;                   // +0x458
+    std::uint8_t mUnknown45CTo45F[0x04]{};                // +0x45C
   };
 
   static_assert(
@@ -414,6 +426,14 @@ namespace
     "CameraImplRuntimeView::mTimeSource offset must be 0x3BC"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mTimeSources) == 0x3C0,
+    "CameraImplRuntimeView::mTimeSources offset must be 0x3C0"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mLastFrameTime) == 0x3C8,
+    "CameraImplRuntimeView::mLastFrameTime offset must be 0x3C8"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mEnableEaseInOut) == 0x3CC,
     "CameraImplRuntimeView::mEnableEaseInOut offset must be 0x3CC"
   );
@@ -461,7 +481,18 @@ namespace
     offsetof(CameraImplRuntimeView, mAccType) == 0x450,
     "CameraImplRuntimeView::mAccType offset must be 0x450"
   );
-  static_assert(sizeof(CameraImplRuntimeView) == 0x454, "CameraImplRuntimeView size must be 0x454");
+  static_assert(
+    offsetof(CameraImplRuntimeView, mFrustumCacheTimer) == 0x454,
+    "CameraImplRuntimeView::mFrustumCacheTimer offset must be 0x454"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mFrustumCacheZoomMark) == 0x458,
+    "CameraImplRuntimeView::mFrustumCacheZoomMark offset must be 0x458"
+  );
+  static_assert(
+    sizeof(CameraImplRuntimeView) == 0x460,
+    "CameraImplRuntimeView size must be 0x460 (ends at the +0x460 frustum lane start)"
+  );
 
   [[nodiscard]] CameraImplRuntimeView* AsRuntimeView(moho::CameraImpl* const camera) noexcept
   {
@@ -1305,6 +1336,100 @@ namespace
       view.mCapacity = *reinterpret_cast<moho::CameraUserEntityWeakRef**>(view.mInlineOrigin);
     }
     view.mFinish = view.mStart;
+  }
+
+  // The camera frustum lanes track entities by their `IUnit` intrusive
+  // weak-link chain head, which sits at +0x08 in each collected entity (the
+  // `mIUnitChainHead` slot). A lane node's `mOwnerLinkSlot` points at that
+  // chain-head slot; `mNextOwnerRef` is the next node in the owner's chain.
+  constexpr std::uintptr_t kEntityIUnitChainHeadOffset = 0x08;
+
+  // Detaches one temporary lane node from the owner chain it was spliced into,
+  // restoring the saved previous head. Mirrors the binary's per-push unsplice
+  // (`*cursor = savedHead`) after a node is copied into the lane storage.
+  void DetachTemporaryCameraFrustumNode(
+    moho::CameraUserEntityWeakRef& tempNode, void* const savedPreviousHead
+  ) noexcept
+  {
+    auto* chainSlot = static_cast<std::uintptr_t*>(tempNode.mOwnerLinkSlot);
+    if (chainSlot == nullptr) {
+      return;
+    }
+    const auto tempMarker = reinterpret_cast<std::uintptr_t>(&tempNode);
+    if (*chainSlot != tempMarker) {
+      // Walk the owner chain to the node that points at the temp node.
+      while (*reinterpret_cast<std::uintptr_t*>(*chainSlot) != tempMarker) {
+        chainSlot = reinterpret_cast<std::uintptr_t*>(*chainSlot + sizeof(void*));
+      }
+      chainSlot = reinterpret_cast<std::uintptr_t*>(*chainSlot);
+    }
+    *chainSlot = reinterpret_cast<std::uintptr_t>(savedPreviousHead);
+  }
+
+  // Appends one weak entity reference to the end of a camera frustum lane.
+  // Splices a fresh lane node into `entity`'s IUnit weak chain head so the lane
+  // is automatically pruned when the entity is destroyed. Grows inline storage
+  // (doubling) when the lane is at capacity, matching the binary's
+  // `sub_7AF0B0` growth lane.
+  void PushUserEntityIntoCameraFrustumLane(
+    moho::CameraFrustumUserEntityList& lane, moho::UserEntity* const entity
+  )
+  {
+    void* const ownerChainHead =
+      reinterpret_cast<std::uint8_t*>(entity) + kEntityIUnitChainHeadOffset;
+
+    if (lane.mFinish == lane.mCapacity) {
+      // Grow: allocate a larger inline-style buffer, relink every existing
+      // node into its owner chain at the new address, then append.
+      const std::size_t oldSize = static_cast<std::size_t>(lane.mFinish - lane.mStart);
+      const std::size_t oldCapacity = static_cast<std::size_t>(lane.mCapacity - lane.mStart);
+      std::size_t newCapacity = oldCapacity != 0 ? oldCapacity * 2u : 1u;
+      if (newCapacity < oldSize + 1u) {
+        newCapacity = oldSize + 1u;
+      }
+
+      auto* const newStart = static_cast<moho::CameraUserEntityWeakRef*>(
+        ::operator new[](sizeof(moho::CameraUserEntityWeakRef) * newCapacity)
+      );
+
+      // Move existing nodes, repointing each owner chain to the new address.
+      for (std::size_t i = 0; i < oldSize; ++i) {
+        moho::CameraUserEntityWeakRef& src = lane.mStart[i];
+        moho::CameraUserEntityWeakRef& dst = newStart[i];
+        dst.mOwnerLinkSlot = src.mOwnerLinkSlot;
+        dst.mNextOwnerRef = src.mNextOwnerRef;
+        if (src.mOwnerLinkSlot != nullptr) {
+          auto* cursor = static_cast<std::uintptr_t*>(src.mOwnerLinkSlot);
+          const auto srcMarker = reinterpret_cast<std::uintptr_t>(&src);
+          while (*cursor != srcMarker) {
+            cursor = reinterpret_cast<std::uintptr_t*>(*cursor + sizeof(void*));
+          }
+          *cursor = reinterpret_cast<std::uintptr_t>(&dst);
+        }
+      }
+
+      moho::CameraUserEntityWeakRef& appended = newStart[oldSize];
+      appended.mOwnerLinkSlot = ownerChainHead;
+      auto* const head = static_cast<std::uintptr_t*>(ownerChainHead);
+      appended.mNextOwnerRef = reinterpret_cast<moho::CameraUserEntityWeakRef*>(*head);
+      *head = reinterpret_cast<std::uintptr_t>(&appended);
+
+      if (lane.mStart != lane.mInlineOrigin) {
+        ::operator delete[](lane.mStart);
+      }
+      lane.mStart = newStart;
+      lane.mFinish = newStart + oldSize + 1u;
+      lane.mCapacity = newStart + newCapacity;
+      return;
+    }
+
+    // In-place append: splice the new node at the owner chain head.
+    moho::CameraUserEntityWeakRef* const slot = lane.mFinish;
+    slot->mOwnerLinkSlot = ownerChainHead;
+    auto* const head = static_cast<std::uintptr_t*>(ownerChainHead);
+    slot->mNextOwnerRef = reinterpret_cast<moho::CameraUserEntityWeakRef*>(*head);
+    *head = reinterpret_cast<std::uintptr_t>(slot);
+    ++lane.mFinish;
   }
 
   [[nodiscard]] CameraImplZoomLimitView* AsZoomLimitView(moho::CameraImpl* const camera) noexcept
@@ -2630,6 +2755,100 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
   }
   // Location/Box: nothing to do.
 }
+
+
+
+
+
+/**
+ * Address: 0x007A75A0 (FUN_007A75A0, Moho::CameraImpl::CacheCameraFrustumUnits)
+ * Mangled: ?CacheCameraFrustumUnits@CameraImpl@Moho@@QAEXM@Z
+ *
+ * IDA signature:
+ *   void __thiscall CacheCameraFrustumUnits(CameraImpl *this, float deltaFrame)
+ *
+ * What it does:
+ * Periodically rebuilds the three cached "units in camera frustum" weak-vector
+ * lanes (all-entities, all-units, focus-army units). A frame-time accumulator
+ * (`mFrustumCacheTimer`) gates the rebuild so it runs at most a few times a
+ * second: the cache refreshes when more than 0.5s have elapsed, or when the
+ * near-zoom changed and more than 0.2s have elapsed. On rebuild it clears all
+ * three lanes, queries the world spatial DB for every unit/entity intersecting
+ * the current camera view, and for each live (non-dead) entity:
+ *   - adds it to the sound/all-entities lane,
+ *   - if it resolves to a `UserUnit` (virtual `IsUserUnit`), adds it to the
+ *     all-units lane,
+ *   - if it belongs to the current focus army, adds it to the focus-army lane.
+ *
+ * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) as the final
+ * per-frame step.
+ */
+void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
+{
+  moho::CWldSession* const session = moho::WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Frame-time gate: refresh the cache only every ~0.5s, or every ~0.2s when
+  // the near-zoom has changed since the last refresh.
+  const float elapsed = runtime->mFrustumCacheTimer + deltaFrame;
+  runtime->mFrustumCacheTimer = elapsed;
+  const bool nearZoomChanged = (runtime->mFrustumCacheZoomMark != runtime->mNearZoom);
+  if (!(elapsed > 0.5f || (nearZoomChanged && elapsed > 0.2f))) {
+    return;
+  }
+
+  runtime->mFrustumCacheZoomMark = runtime->mNearZoom;
+  runtime->mFrustumCacheTimer = 0.0f;
+
+  // Clear all three cached lanes (detaching any still-tracked weak refs and
+  // releasing heap-grown storage) before the rebuild.
+  CameraImplFrustumLanesView* const lanes = AsFrustumLanesView(this);
+  moho::CameraFrustumUserEntityList& soundEntities = lanes->mFrustumLaneA.mView;
+  moho::CameraFrustumUserEntityList& allUnits = lanes->mFrustumLaneB.mView;
+  moho::CameraFrustumUserEntityList& armyUnits = lanes->mArmyUnitsInFrustum.mView;
+  TeardownCameraFrustumStorageLane(lanes->mFrustumLaneA);
+  TeardownCameraFrustumStorageLane(lanes->mFrustumLaneB);
+  TeardownCameraFrustumStorageLane(lanes->mArmyUnitsInFrustum);
+
+  UserArmy* const focusArmy = session->GetFocusArmy();
+
+  // Collect every unit/entity intersecting the current camera view.
+  gpg::fastvector<UserEntity*> unitsInView;
+  auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+  auto* const cameraView = const_cast<moho::GeomCamera3*>(&CameraGetView());
+  spatialDb->CollectInView(
+    cameraView, unitsInView, static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Entity)
+  );
+
+  for (UserEntity* const entity : unitsInView) {
+    if (entity == nullptr) {
+      continue;
+    }
+    // Skip entities flagged dead this frame.
+    if (entity->mVariableData.mIsDead != 0u) {
+      continue;
+    }
+
+    // Every live in-view entity goes into the sound/all-entities lane.
+    PushUserEntityIntoCameraFrustumLane(soundEntities, entity);
+
+    // Units (entities that resolve to a `UserUnit`) also go into the all-units
+    // lane (virtual `IsUserUnit`, vtable slot 3).
+    if (entity->IsUserUnit() != nullptr) {
+      PushUserEntityIntoCameraFrustumLane(allUnits, entity);
+
+      // Units owned by the current focus army also go into the focus-army lane.
+      if (focusArmy == entity->mArmy) {
+        PushUserEntityIntoCameraFrustumLane(armyUnits, entity);
+      }
+    }
+  }
+}
+
 
 /**
   * Alias of FUN_007A6BF0 (non-canonical helper lane).
