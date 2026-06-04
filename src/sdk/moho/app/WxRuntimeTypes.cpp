@@ -58994,11 +58994,10 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 
     // Render the atmosphere/cloud sky dome for this world view before the
     // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
-    // dispatches SkyDome::Render right after the per-view camera bind).
+    // dispatches the sky dome pass right after the per-view camera bind,
+    // guarded by the ren_SkyDome tuning flag).
     if (moho::ren_SkyDome) {
-      moho::SkyDome& skyDome = moho::REN_GetTerrainRes()->GetSkyDome();
-      const msvc8::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
-      skyDome.Render(head, moho::REN_GetSimDeltaSeconds(), *runtime->mCam, cumulusVertices);
+      RenderSkyDome();
     }
 
     moho::TerrainCommon* const terrain = worldView->terrain.get();
@@ -59029,6 +59028,51 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 
     runtime->mCam = nullptr;
   }
+}
+
+/**
+ * Address: 0x007F80C0 (FUN_007F80C0)
+ * Mangled: ?Render@SkyDome@Moho@@QAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::SkyDome::Render(WRenViewport *this);
+ *
+ * What it does:
+ * Binds the active head's sky render target and viewport rectangle, resolves
+ * the active terrain's SkyDome, ensures its render resources exist, then runs
+ * the atmosphere, decal, cirrus, and cumulus passes for this viewport's camera.
+ *
+ * The PDB attributes this body to ?Render@SkyDome@Moho@@..., but the compiled
+ * `this` is a WRenViewport (the body reads WRenViewport fields mHead@+0x320,
+ * mScreenPos@+0x308, mScreenSize@+0x310, mCam@+0x219C, all beyond SkyDome's
+ * 0x224 size). The symbol is a genuine misattribution, so the body is modeled
+ * here as a WRenViewport member that drives the SkyDome render passes.
+ */
+void moho::WRenViewport::RenderSkyDome()
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+
+  moho::CD3DDevice* device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+
+  device = moho::D3D_GetDevice();
+  device->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
+
+  moho::SkyDome& skyDome = moho::REN_GetTerrainRes()->GetSkyDome();
+
+  // The dispatcher hands the cumulus pass an empty per-cloud instance stream;
+  // the producer that fills it is a separate (unrecovered) upload path.
+  const msvc8::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
+
+  const moho::GeomCamera3& cam = *runtime->mCam;
+  const float simDeltaSeconds = moho::REN_GetSimDeltaSeconds();
+  const int gameTick = moho::REN_GetGameTick();
+
+  skyDome.CreateRenderAbility();
+  skyDome.RenderAtmosphere(cam);
+  skyDome.RenderDecals(cam);
+  skyDome.RenderCirrus(gameTick, simDeltaSeconds, cam);
+  skyDome.RenderCumulus(runtime->mHead, simDeltaSeconds, cam, cumulusVertices);
 }
 
 /**

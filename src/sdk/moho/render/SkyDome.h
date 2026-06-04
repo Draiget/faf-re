@@ -30,6 +30,7 @@ namespace moho
   class CD3DVertexFormat;
   class RD3DTextureResource;
   struct GeomCamera3;
+  struct WRenViewport;
 
   struct SkyDomeDecalUploadNode
   {
@@ -217,27 +218,18 @@ namespace moho
      */
     void UpdateDecalBuffer();
 
-    /**
-     * Address: 0x007F80C0 (FUN_007F80C0)
-     * Mangled: ?Render@SkyDome@Moho@@QAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z
-     *
-     * IDA signature:
-     * void __thiscall Moho::SkyDome::Render(int head, float deltaFrame,
-     *     const GeomCamera3 &cam, const std::vector<CumulusVertex> &cumulusVertices);
-     *
-     * What it does:
-     * Binds the sky render target/viewport for `head`, ensures the dome render
-     * resources exist, then dispatches the atmosphere, decal, cirrus, and
-     * cumulus passes for the active camera.
-     */
-    void Render(
-      int head,
-      float deltaFrame,
-      const GeomCamera3& cam,
-      const msvc8::vector<CumulusVertex>& cumulusVertices
-    );
-
   private:
+    // The per-head sky render dispatcher (FUN_007F80C0, PDB symbol
+    // ?Render@SkyDome@Moho@@QAEX...) compiles with a `this` that is actually a
+    // WRenViewport, not a SkyDome (its body reads WRenViewport fields mHead,
+    // mScreenPos, mScreenSize, mCam — all far beyond SkyDome's 0x224 layout).
+    // It is modeled as moho::WRenViewport::RenderSkyDome, which drives the
+    // private atmosphere/decal/cirrus/cumulus passes below. The original
+    // private access of those passes (mangled `AAE` = private __thiscall) is
+    // preserved by granting WRenViewport friendship rather than widening them
+    // to public.
+    friend struct WRenViewport;
+
     /**
      * Address: 0x00818B40 (FUN_00818B40)
      * Mangled: ?RenderAtmosphere@SkyDome@Moho@@AAEXABVGeomCamera3@2@@Z
