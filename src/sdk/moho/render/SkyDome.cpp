@@ -636,4 +636,75 @@ void SkyDome::Destroy()
     RenderDomeUsing(technique);
   }
 
+  /**
+   * Address: 0x00818FB0 (FUN_00818FB0, ?RenderCumulus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SkyDome::RenderCumulus(int head, float deltaFrame,
+   *     const GeomCamera3 &cam, const std::vector<CumulusVertex> &cumulusVertices);
+   *
+   * What it does:
+   * When cumulus instance records exist, uploads them to the instanced cumulus
+   * vertex stream, selects the "Cumulus" technique, binds the quad/instance/
+   * index streams plus the cumulus dispersion/light ramp and cumulus textures,
+   * then issues one indexed quad draw per technique pass.
+   *
+   * Note: `head`/`deltaFrame` carry the public Render dispatch lanes named by
+   * the binary symbol; this pass consumes the camera and cumulus instance
+   * stream.
+   */
+  void SkyDome::RenderCumulus(
+    const int head,
+    const float deltaFrame,
+    const GeomCamera3& cam,
+    const msvc8::vector<CumulusVertex>& cumulusVertices
+  )
+  {
+    (void)head;
+    (void)deltaFrame;
+
+    const std::size_t cloudCount = cumulusVertices.size();
+    if (cloudCount == 0) {
+      return;
+    }
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Cumulus");
+
+    // Upload the per-cloud instance records into the instanced cumulus stream.
+    void* const instanceData = mDecalVertBuf3->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
+    std::memcpy(instanceData, cumulusVertices.data(), cloudCount * sizeof(CumulusVertex));
+    mDecalVertBuf3->Unlock();
+
+    device->SetVertexDeclaration(mDecalFormat2->mFormat);
+    device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(cloudCount), 0);
+    device->SetVertexBuffer(1u, mDecalVertBuf3, 1, 0);
+    device->SetBufferIndices(mDecalIndexBuf);
+
+    const float viewRightVec[3] = {cam.view.r[0].x, cam.view.r[1].x, cam.view.r[2].x};
+    effect->SetMatrix("viewRight")->SetPtr(viewRightVec, sizeof(viewRightVec));
+
+    const float viewUpVec[3] = {cam.view.r[0].y, cam.view.r[1].y, cam.view.r[2].y};
+    effect->SetMatrix("viewUp")->SetPtr(viewUpVec, sizeof(viewUpVec));
+
+    const Vector4f& cameraPosition = cam.inverseView.r[3];
+    const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
+    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
+    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+
+    effect->SetMatrix("cumulusDispersionRamp")->SetTexture(mDecalTex2);
+    effect->SetMatrix("cumulusLightRamp")->SetTexture(mDecalTex1);
+    effect->SetMatrix("cumulusTexture")->SetTexture(mDecalTex3);
+
+    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int pass = 0; pass < passCount; ++pass) {
+      technique->BeginPass(static_cast<int>(pass));
+      gpg::gal::DrawIndexedContext drawContext(kSkyTopologyTriangleList, 4, 6, 0, 0);
+      device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
+  }
+
 } // namespace moho
