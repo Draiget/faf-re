@@ -575,4 +575,33 @@ void SkyDome::Destroy()
     techniqueImpl->EndTechnique();
   }
 
+  /**
+   * Address: 0x00818B40 (FUN_00818B40, ?RenderAtmosphere@SkyDome@Moho@@AAEXABVGeomCamera3@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SkyDome::RenderAtmosphere(const GeomCamera3 &cam);
+   *
+   * What it does:
+   * Selects the "Atmosphere" technique on the sky effect, feeds the camera
+   * view position/projection plus the horizon begin/end, horizon/sky colors,
+   * and horizon lookup texture, then renders the dome with that technique.
+   */
+  void SkyDome::RenderAtmosphere(const GeomCamera3& cam)
+  {
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Atmosphere");
+
+    const Vector4f& cameraPosition = cam.inverseView.r[3];
+    const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
+    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
+    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->SetMatrix("horizonBegin")->SetFloat(mDomeShapeParams.x);
+    effect->SetMatrix("horizonEnd")->SetFloat(mHorizonSize + mDomeShapeParams.x);
+    effect->SetMatrix("horizonColor")->SetPtr(&mHorizonColor, sizeof(mHorizonColor));
+    effect->SetMatrix("skyColor")->SetPtr(&mSkyColor, sizeof(mSkyColor));
+    effect->SetMatrix("horizonLookup")->SetTexture(mHorizonLookupTex);
+
+    RenderDomeUsing(technique);
+  }
+
 } // namespace moho
