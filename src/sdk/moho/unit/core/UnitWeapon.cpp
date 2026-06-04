@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
+#include <intrin.h>
 #include <limits>
 #include <typeinfo>
 
@@ -15,6 +16,7 @@
 #include "moho/audio/CSimSoundManager.h"
 #include "moho/audio/CSndParams.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/IAiAttacker.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategorySetVectorReflection.h"
@@ -32,6 +34,8 @@
 #include "moho/projectile/Projectile.h"
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CArmyStats.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -835,46 +839,6 @@ namespace
     return reinterpret_cast<UnitWeaponProjectileVelocityRuntimeView*>(&projectile)->mVelocity;
   }
 
-  void ResetWeaponFireTaskThread(moho::UnitWeapon* const weapon)
-  {
-    if (weapon == nullptr || weapon->mFireWeaponTask == nullptr || weapon->mFireWeaponTask->mOwnerThread == nullptr) {
-      return;
-    }
-
-    moho::CTaskThread* const taskThread = weapon->mFireWeaponTask->mOwnerThread;
-    taskThread->mPendingFrames = 0;
-    if (taskThread->mStaged) {
-      taskThread->Unstage();
-    }
-  }
-
-  void ApplyRecoveredTargetUpdate(moho::UnitWeapon* const weapon, const moho::CAiTarget& newTarget)
-  {
-    if (weapon == nullptr) {
-      return;
-    }
-
-    const bool hadTarget = weapon->mTarget.targetType != moho::EAiTargetType::AITARGET_None;
-    const bool hasTarget = newTarget.targetType != moho::EAiTargetType::AITARGET_None;
-
-    if (hadTarget && !hasTarget) {
-      (void)weapon->RunScript("OnLostTarget");
-    } else if (!hadTarget && hasTarget) {
-      weapon->NotifyOnGotTarget();
-    }
-
-    weapon->mTarget = newTarget;
-    weapon->PickNewTargetAimSpot();
-
-    if (!hadTarget && hasTarget) {
-      (void)weapon->RunScript("OnGotTarget");
-    }
-
-    ResetWeaponFireTaskThread(weapon);
-    weapon->mUnknown170 = 0;
-    weapon->mUnknown174 = 1u;
-    weapon->mShotsAtTarget = 0;
-  }
 } // namespace
 
 namespace moho
@@ -1088,7 +1052,7 @@ namespace moho
     if (CanWeaponAttackEntityTarget(targetEntity, weapon)) {
       CAiTarget target{};
       (void)target.UpdateTarget(targetEntity);
-      ApplyRecoveredTargetUpdate(weapon, target);
+      weapon->SetTarget(&target);
     }
 
     return 0;
@@ -1154,7 +1118,7 @@ namespace moho
     groundTarget.targetIsMobile = false;
 
     if (UnitWeapon::CanAttackTarget(&groundTarget, weapon)) {
-      ApplyRecoveredTargetUpdate(weapon, groundTarget);
+      weapon->SetTarget(&groundTarget);
     }
 
     return 0;
@@ -3541,6 +3505,336 @@ namespace moho
   }
 
   /**
+   * Address: 0x00673580 (FUN_00673580, Moho::CollisionBeamHelper::~CollisionBeamHelper)
+   *
+   * What it does:
+   * Unlinks the resolved-impact and bound-target weak-entity links from their
+   * owner chains before teardown.
+   */
+  CollisionBeamHelper::~CollisionBeamHelper()
+  {
+    mEntity.UnlinkFromOwnerChain();
+    mTarget.targetEntity.UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Address: 0x006D6B00 sub-flow (inline init inside CreateCollisionBeamHelper)
+   *
+   * What it does:
+   * Zero-initializes the impact lane, the bound source target, and the resolved
+   * weak-entity link. `CreateCollisionBeamHelper` overwrites every other field
+   * before the helper is used, so only the link/impact lanes need defaulting.
+   */
+  CollisionBeamHelper::CollisionBeamHelper()
+    : mImpactType(IMPACT_Invalid)
+    , mTarget{}
+    , mEntity{}
+    , mPos{}
+    , mBeamLength(0.0f)
+    , mLine{}
+    , mLineScale(0.0f)
+  {
+  }
+
+  /**
+   * Address: 0x006D78F0 (FUN_006D78F0, sub_6D78F0)
+   *
+   * What it does:
+   * Ages the per-weapon target blacklist: decrements each row's remaining-tick
+   * counter and erases rows whose entity is gone, has moved off its recorded
+   * spot, or whose counter has reached zero.
+   */
+  void UnitWeapon::AgeBlacklist()
+  {
+    for (auto it = mBlacklist.begin(); it != mBlacklist.end();) {
+      SBlackListInfo& row = *it;
+      --row.mValue;
+
+      const Entity* const blacklistedEntity = row.mEntity.GetObjectPtr();
+      const bool entityGone = (blacklistedEntity == nullptr);
+
+      bool entityMoved = false;
+      if (!entityGone) {
+        // The original tests whether the blacklisted entity moved this tick by
+        // comparing its current world position against its previous-tick world
+        // position. `Wm3::Vector3f::Compare` returns true when the vectors DIFFER.
+        entityMoved = Wm3::Vector3f::Compare(&blacklistedEntity->Position, &blacklistedEntity->PrevPosition);
+      }
+
+      if (entityGone || entityMoved || row.mValue <= 0) {
+        it = mBlacklist.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  namespace
+  {
+    /**
+     * Address: 0x00593220 (FUN_00593220, func_SetUnitStat)
+     *
+     * What it does:
+     * Resolves one army-stat float lane by path, marks it float-typed, and
+     * atomically replaces its stored value with `value`.
+     */
+    void SetArmyFloatStat(CArmyStats& armyStats, const char* const statPath, const float value)
+    {
+      CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&armyStats, statPath);
+      item->SynchronizeAsFloat();
+
+      volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+      std::int32_t desiredBits = 0;
+      std::memcpy(&desiredBits, &value, sizeof(desiredBits));
+      for (;;) {
+        const std::int32_t observed = _InterlockedCompareExchange(counter, 0, 0);
+        const std::int32_t result = _InterlockedCompareExchange(counter, desiredBits, observed);
+        if (result == observed) {
+          return;
+        }
+      }
+    }
+
+    /**
+     * Address: 0x006D31D0 (FUN_006D31D0, sub_6D31D0)
+     *
+     * What it does:
+     * Returns whether two AI targets currently resolve to the same target: same
+     * target type, same raw target entity, and (for ground targets only) the same
+     * ground position.
+     */
+    [[nodiscard]] bool AiTargetsAreSame(const CAiTarget& current, const CAiTarget& candidate) noexcept
+    {
+      if (current.targetType != candidate.targetType) {
+        return false;
+      }
+      if (current.targetEntity.GetObjectPtr() != candidate.targetEntity.GetObjectPtr()) {
+        return false;
+      }
+      if (candidate.targetType == EAiTargetType::AITARGET_Ground) {
+        // `Wm3::Vector3f::Compare` returns true when the vectors DIFFER, so the
+        // targets are "same" only when the ground positions do NOT differ.
+        return !Wm3::Vector3f::Compare(&candidate.position, &current.position);
+      }
+      return true;
+    }
+
+    /**
+     * Address: 0x006D5F30 sub-flow (inline block inside SetTarget).
+     *
+     * What it does:
+     * When `weapon` is the unit's controlling weapon for its current target,
+     * rebinds the owning unit's target-blip lane: binds it directly to a recon
+     * blip target, resolves a unit target to its recon blip, or clears it
+     * otherwise. Marks the unit's sync-game-data lane dirty afterward.
+     */
+    void MaintainTargetBlip(UnitWeapon& weapon)
+    {
+      Unit* const unit = weapon.mUnit;
+      if (unit == nullptr) {
+        return;
+      }
+
+      CAiAttackerImpl* const attacker = unit->AiAttacker;
+      if (attacker == nullptr) {
+        return;
+      }
+
+      // Only the weapon that "owns" this target drives the unit's target blip.
+      UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&weapon.mTarget);
+      const bool weaponControlsTarget = (targetWeapon != nullptr)
+        ? (&weapon == targetWeapon)
+        : (&weapon == attacker->GetPrimaryWeapon());
+      if (!weaponControlsTarget) {
+        return;
+      }
+
+      Entity* const targetEntity = weapon.mTarget.targetEntity.GetObjectPtr();
+      if (targetEntity != nullptr) {
+        if (targetEntity->IsReconBlip() != nullptr) {
+          // Target is already a recon blip: bind the blip lane straight to it.
+          unit->TargetBlipEntityRef.ResetObjectPtr<Entity>(targetEntity);
+          unit->NeedSyncGameData = true;
+          return;
+        }
+
+        if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
+          // Real unit target: resolve the owning army's recon blip for it.
+          CAiReconDBImpl* const reconDb = (unit->ArmyRef != nullptr) ? unit->ArmyRef->GetReconDB() : nullptr;
+          ReconBlip* const reconBlip = (reconDb != nullptr) ? reconDb->ReconGetBlip(targetUnit) : nullptr;
+          unit->SetTargetBlipEntity(reconBlip);
+          return;
+        }
+      }
+
+      // No bindable target: clear the blip lane.
+      unit->TargetBlipEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+      unit->NeedSyncGameData = true;
+    }
+
+    /**
+     * Address: 0x006D61F0 sub-flow (inline block inside Fire).
+     *
+     * What it does:
+     * Records this weapon's realtime fire statistics for the owning unit:
+     * increments shots-fired, stores the configured max fire range, accumulates
+     * the actual target range into the total/average lanes. Mirrors the engine's
+     * `RealTimeStats_<unitName>_Shots_*` accounting.
+     */
+    void AccountFireRangeStats(Unit& unit, UnitWeapon& weapon)
+    {
+      CArmyStats* const armyStats = (unit.ArmyRef != nullptr) ? unit.ArmyRef->GetArmyStats() : nullptr;
+      if (armyStats == nullptr) {
+        return;
+      }
+
+      const msvc8::string statPrefix = msvc8::string("RealTimeStats_") + unit.GetUniqueName();
+
+      // _Shots_Fired: integer counter, atomically incremented by one.
+      const msvc8::string shotsFiredPath = statPrefix + "_Shots_Fired";
+      {
+        CArmyStatItem* const shotsFired = armyStats->GetItem(shotsFiredPath.c_str());
+        shotsFired->Synchronize();
+        (void)_InterlockedExchangeAdd(&shotsFired->mPrimaryValueBits, 1);
+      }
+
+      // Number of shots fired so far, used to average the fire-range lanes.
+      const int shotCount = armyStats->TraverseTables(shotsFiredPath.c_str(), true)->GetInt(false);
+
+      // _Shots_MaxFireRange: store the weapon's configured max radius.
+      {
+        const msvc8::string statPath = statPrefix + "_Shots_MaxFireRange";
+        const float maxFireRange = weapon.mWeaponBlueprint->MaxRadius;
+        SetArmyFloatStat(*armyStats, statPath.c_str(), maxFireRange);
+      }
+
+      // Actual range to the current target point.
+      const Wm3::Vec3f& unitPosition = unit.GetPosition();
+      const Wm3::Vec3f targetPosition = weapon.mTarget.GetTargetPosGun(false);
+      const float dx = targetPosition.x - unitPosition.x;
+      const float dy = targetPosition.y - unitPosition.y;
+      const float dz = targetPosition.z - unitPosition.z;
+      const float targetRange = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+
+      // _Shots_TotalFireRange: accumulate the actual range, then average it.
+      {
+        const msvc8::string totalPath = statPrefix + "_Shots_TotalFireRange";
+
+        CArmyStatItem* const totalRange = ResolveArmyStatItemCachedCreate(armyStats, totalPath.c_str());
+        totalRange->SynchronizeAsFloat();
+        float rangeDelta = targetRange;
+        (void)totalRange->AddFloat(&rangeDelta);
+
+        const float accumulatedTotal = armyStats->TraverseTablesCreate(totalPath.c_str())->GetFloat(false);
+
+        // _Shots_AvgFireRange: accumulated total divided by the shots-fired count.
+        const msvc8::string avgPath = statPrefix + "_Shots_AvgFireRange";
+        const float averageRange = accumulatedTotal / static_cast<float>(shotCount);
+        SetArmyFloatStat(*armyStats, avgPath.c_str(), averageRange);
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x006D5F30 (FUN_006D5F30, Moho::UnitWeapon::SetTarget)
+   *
+   * IDA signature:
+   * Moho::CTaskThread *__thiscall Moho::UnitWeapon::SetTarget(Moho::UnitWeapon *this, Moho::CAiTarget *target);
+   *
+   * What it does:
+   * Replaces this weapon's active AI target. No-ops when the new target equals
+   * the current one. Otherwise: ages the blacklist (or runs the `OnLostTarget`
+   * script when losing a target), maintains the old/new target entities' shooter
+   * sets, rebinds the owning unit's target-blip lane when this is the controlling
+   * weapon, re-aims, fires the `OnGotTarget` script on a fresh acquisition, and
+   * restages the fire task.
+   */
+  void UnitWeapon::SetTarget(CAiTarget* const target)
+  {
+    if (AiTargetsAreSame(mTarget, *target)) {
+      return;
+    }
+
+    const bool hadTarget = (mTarget.targetType != EAiTargetType::AITARGET_None);
+    const bool wantsTarget = (target->targetType != EAiTargetType::AITARGET_None);
+
+    if (hadTarget) {
+      if (wantsTarget) {
+        AgeBlacklist();
+      } else {
+        RunScript("OnLostTarget");
+      }
+    } else if (wantsTarget) {
+      AgeBlacklist();
+    }
+
+    // Drop this unit from the previous target entity's shooter set.
+    if (Entity* const previousTargetEntity = mTarget.GetEntity(); previousTargetEntity != nullptr) {
+      if (previousTargetEntity->Dead == 0u && previousTargetEntity->DestroyQueuedFlag == 0u) {
+        if (mUnit != nullptr) {
+          previousTargetEntity->RemoveShooter(static_cast<Entity*>(mUnit));
+        }
+      }
+    }
+
+    mTarget = *target;
+
+    MaintainTargetBlip(*this);
+
+    PickNewTargetAimSpot();
+
+    // Add this unit to the new target entity's shooter set.
+    if (Entity* const newTargetEntity = mTarget.GetEntity(); newTargetEntity != nullptr) {
+      if (newTargetEntity->Dead == 0u && newTargetEntity->DestroyQueuedFlag == 0u) {
+        Entity* const ownerEntity = (mUnit != nullptr) ? static_cast<Entity*>(mUnit) : nullptr;
+        newTargetEntity->AddShooter(ownerEntity);
+      }
+    }
+
+    if (!hadTarget && wantsTarget) {
+      RunScript("OnGotTarget");
+    }
+
+    // Restage the fire task so it re-evaluates against the new target next tick.
+    CTaskThread* const fireThread = mFireWeaponTask->mOwnerThread;
+    fireThread->mPendingFrames = 0;
+    if (fireThread->mStaged) {
+      fireThread->Unstage();
+    }
+
+    mUnknown170 = 0;
+    mUnknown174 = 1u;
+    mShotsAtTarget = 0;
+  }
+
+  /**
+   * Address: 0x006D61F0 (FUN_006D61F0, Moho::UnitWeapon::Fire)
+   *
+   * IDA signature:
+   * void __thiscall Moho::UnitWeapon::Fire(Moho::UnitWeapon *this);
+   *
+   * What it does:
+   * Performs one weapon fire when the owning unit is not stunned. When the unit
+   * has realtime-stats accounting enabled, records shots-fired, max/total/average
+   * fire-range statistics. Always runs the `OnFire` script and bumps the
+   * shots-at-target counter.
+   */
+  void UnitWeapon::Fire()
+  {
+    Unit* const unit = mUnit;
+    if (unit->VarDat().mStunTicks != 0) {
+      return;
+    }
+
+    if (unit != nullptr && unit->IsRealtimeStatsEnabled()) {
+      AccountFireRangeStats(*unit, *this);
+    }
+
+    RunScript("OnFire");
+    ++mShotsAtTarget;
+  }
+
+  /**
    * Address: 0x006D6A00 (FUN_006D6A00, Moho::UnitWeapon::GetClosestCollision)
    *
    * What it does:
@@ -3760,6 +4054,169 @@ namespace moho
     }
 
     return projectile;
+  }
+
+  /**
+   * Address: 0x006D6B00 (FUN_006D6B00, Moho::UnitWeapon::CreateCollisionBeamHelper)
+   *
+   * IDA signature:
+   * Moho::CollisionBeamHelper *__thiscall Moho::UnitWeapon::CreateCollisionBeamHelper(
+   *   Moho::UnitWeapon *this, Moho::CollisionBeamHelper *outHelper, int bone);
+   *
+   * What it does:
+   * Places a beam center line from the requested muzzle bone along its forward
+   * axis, scaled to the weapon's maximum beam length, then resolves the nearest
+   * entity collision and terrain/water surface intersection along it. Fills
+   * `outHelper` with the resolved contact entity, contact point, beam length, and
+   * impact type.
+   */
+  void UnitWeapon::CreateCollisionBeamHelper(CollisionBeamHelper* const outHelper, const std::int32_t bone)
+  {
+    // Resolve the beam reach: weapon blueprint override, else the (clamped)
+    // attribute max radius, else the blueprint max radius.
+    float beamReach = mWeaponBlueprint->MaximumBeamLength;
+    if (beamReach <= 0.0f) {
+      beamReach = mAttributes.mMaxRadius;
+      if (beamReach < 0.0f) {
+        beamReach = mAttributes.mBlueprint->MaxRadius;
+      }
+    }
+    const float maxBeamLength = beamReach;
+
+    // Copy the current weapon target and reset the resolved-impact lanes.
+    outHelper->mTarget = mTarget;
+    outHelper->mPos = GetRecoveredInvalidAimingVector();
+    outHelper->mBeamLength = maxBeamLength;
+    outHelper->mImpactType = IMPACT_Invalid;
+
+    // Forward axis of the firing bone (same construction as GetForwardVector).
+    const VTransform boneTransform = mUnit->GetBoneWorldTransform(bone);
+    const Wm3::Quaternionf& q = boneTransform.orient_;
+    Wm3::Vector3f forward{
+      ((q.w * q.y) + (q.z * q.x)) * 2.0f,
+      ((q.w * q.z) - (q.y * q.x)) * 2.0f,
+      1.0f - (((q.y * q.y) + (q.z * q.z)) * 2.0f),
+    };
+
+    const Wm3::Vec3f beamStart = boneTransform.pos_;
+
+    // Far endpoint at full reach, used to size the swept segment.
+    const Wm3::Vec3f reachEnd{
+      (forward.x * maxBeamLength) + boneTransform.pos_.x,
+      (forward.y * maxBeamLength) + boneTransform.pos_.y,
+      (forward.z * maxBeamLength) + boneTransform.pos_.z,
+    };
+
+    // Planar (XZ) length of the swept segment, used to clamp very-short beams.
+    const float planarDx = boneTransform.pos_.x - reachEnd.x;
+    const float planarDz = boneTransform.pos_.z - reachEnd.z;
+    const float planarLength = std::sqrt((planarDx * planarDx) + (planarDz * planarDz));
+
+    float reachScale;
+    if (planarLength <= 0.001f) {
+      reachScale = 1.0f;
+    } else {
+      reachScale = maxBeamLength / planarLength;
+      if ((maxBeamLength / planarLength) > 5.0f) {
+        reachScale = 5.0f;
+      }
+    }
+    const float sweepLength = reachScale * maxBeamLength;
+
+    // Swept segment end point and beam center-line midpoint.
+    const Wm3::Vec3f sweepEnd{
+      (forward.x * sweepLength) + boneTransform.pos_.x,
+      boneTransform.pos_.y + (forward.y * sweepLength),
+      boneTransform.pos_.z + (forward.z * sweepLength),
+    };
+
+    outHelper->mLine.Origin = Wm3::Vector3f{
+      ((forward.x * sweepLength) * 0.5f) + boneTransform.pos_.x,
+      boneTransform.pos_.y + ((forward.y * sweepLength) * 0.5f),
+      boneTransform.pos_.z + ((forward.z * sweepLength) * 0.5f),
+    };
+    outHelper->mLine.Direction = forward;
+    outHelper->mLineScale = sweepLength * 0.5f;
+
+    // Gather entity collisions along the segment and pick the nearest valid hit.
+    WeaponCollisionEntryVec collisions;
+    mSim->mOGrid->GetEntityCollisionsInLine(
+      reinterpret_cast<EntityLineCollisionVector&>(collisions),
+      beamStart,
+      sweepEnd
+    );
+
+    if (collisions.begin() != collisions.end()) {
+      const bool ignoreAlly = (mWeaponBlueprint->IgnoresAlly != 0u);
+      if (WeaponCollisionEntry* const closest = GetClosestCollision(&collisions, this, mUnit, ignoreAlly);
+          closest != nullptr) {
+        Entity* const hitEntity = closest->entity;
+        outHelper->mPos = closest->contactPoint;
+        outHelper->mEntity.Set(hitEntity);
+
+        // Distance from the beam start to the contact point (using a per-entity
+        // reference position depending on what the beam hit).
+        Entity* const boundEntity = outHelper->mEntity.GetObjectPtr();
+        Wm3::Vec3f referencePoint{};
+        if (boundEntity != nullptr && (static_cast<std::uint32_t>(boundEntity->id_) & 0xF0000000u) == 0x40000000u) {
+          referencePoint = closest->contactPoint;
+        } else if (boundEntity != nullptr && boundEntity->IsUnit() == nullptr) {
+          referencePoint = boundEntity->Position;
+        } else if (boundEntity != nullptr) {
+          referencePoint = boundEntity->GetBoneWorldTransform(-1).pos_;
+        }
+
+        const float dx = beamStart.x - referencePoint.x;
+        const float dy = beamStart.y - referencePoint.y;
+        const float dz = beamStart.z - referencePoint.z;
+        outHelper->mBeamLength = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      }
+    }
+
+    // Resolve the terrain/water surface intersection along the centered segment.
+    GeomLine3 surfaceLine{};
+    surfaceLine.pos = Wm3::Vec3f{
+      outHelper->mLine.Origin.x - (outHelper->mLine.Direction.x * outHelper->mLineScale),
+      outHelper->mLine.Origin.y - (outHelper->mLine.Direction.y * outHelper->mLineScale),
+      outHelper->mLine.Origin.z - (outHelper->mLine.Direction.z * outHelper->mLineScale),
+    };
+    surfaceLine.dir = outHelper->mLine.Direction;
+    surfaceLine.closest = 0.0f;
+    surfaceLine.farthest = outHelper->mLineScale * 2.0f;
+
+    CColHitResult surfaceHit{};
+    surfaceHit.distance = std::numeric_limits<float>::quiet_NaN();
+    surfaceHit.v1 = std::numeric_limits<float>::quiet_NaN();
+    surfaceHit.hitKind = 0;
+    const Wm3::Vec3f surfacePoint = mSim->mMapData->SurfaceIntersection(surfaceLine, &surfaceHit);
+
+    if (IsValidVector3f(surfacePoint) && outHelper->mBeamLength > surfaceHit.distance) {
+      // Surface hit is closer than any entity hit: unbind the entity and adopt
+      // the surface contact point + impact type.
+      outHelper->mBeamLength = surfaceHit.distance;
+      outHelper->mEntity.UnlinkFromOwnerChain();
+      outHelper->mPos = surfacePoint;
+
+      if (surfaceHit.hitKind == 3) {
+        outHelper->mImpactType = IMPACT_Water;
+        return;
+      }
+      if (surfaceHit.hitKind == 1) {
+        outHelper->mImpactType = IMPACT_Terrain;
+        return;
+      }
+    }
+
+    // No closer surface: classify the resolved impact point if still unset.
+    if (outHelper->mImpactType == IMPACT_Invalid) {
+      if (IsValidVector3f(outHelper->mPos)) {
+        Entity* const boundEntity = outHelper->mEntity.GetObjectPtr();
+        outHelper->mImpactType = ENT_GetImpactType(mSim, boundEntity, outHelper->mPos);
+      } else {
+        outHelper->mPos = sweepEnd;
+        outHelper->mImpactType = IMPACT_Air;
+      }
+    }
   }
 
   /**
