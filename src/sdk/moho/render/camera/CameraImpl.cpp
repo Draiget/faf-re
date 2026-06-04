@@ -3074,6 +3074,151 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
   }
 }
 
+/**
+ * Address: 0x007AA330 (FUN_007AA330, Moho::CameraImpl::UpdateCoords)
+ * Mangled: ?UpdateCoords@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * IDA signature:
+ *   void __usercall UpdateCoords(CameraImpl *this@<eax>)
+ *   (declared `void(float, float)` by the mangled name; both floats are unused
+ *   by this code path and present only to keep the Frame-lane ABI identical to
+ *   the sibling slew helpers.)
+ *
+ * What it does:
+ * Rebuilds the embedded `GeomCamera3` view transform and projection from the
+ * current camera state for one frame. Converts the target-zoom into a world
+ * eye distance (`mZoom = targetZoom / tan(farFov/2) / 2`), derives near/far
+ * clip planes from the eye distance, builds the camera orientation quaternion
+ * (heading/pitch in perspective mode, a fixed top-down look in ortho mode),
+ * places the eye at `mOffset` plus the rotated forward axis times the eye
+ * distance (with per-frame shake applied in perspective mode), constructs the
+ * projection matrix (D3D-style FOV perspective, or a hand-built orthographic
+ * matrix), and finally re-initializes `mCam` via `GeomCamera3::Init`.
+ *
+ * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) after the
+ * per-frame basis/zoom slew.
+ */
+void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const float /*frameSeconds*/)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  const float targetZoom = runtime->mTargetZoom;
+
+  // Eye distance: convert the target zoom (vertical world extent) into a camera
+  // distance using the current vertical FOV, then halve it.
+  const float eyeDistance = targetZoom / std::tan(runtime->mFarFov * 0.5f) / 2.0f;
+  runtime->mZoom = eyeDistance;
+
+  // Near clip = max(eyeDistance * 0.01, 0.01); far clip = eyeDistance + 17000.
+  // Both are negated to match the binary's right-handed depth convention.
+  float nearScale = eyeDistance * 0.0099999998f;
+  if (nearScale < 0.0099999998f) {
+    nearScale = 0.0099999998f;
+  }
+  const float nearClip = -nearScale;
+  const float farClip = -(eyeDistance + 17000.0f);
+
+  moho::VTransform viewTransform{};
+  moho::VMatrix4 projection{};
+
+  if (runtime->mIsOrtho != 0u) {
+    // Orthographic mode: fixed top-down look (heading=pi, pitch=pi/2) and a
+    // hand-built orthographic projection sized to the target zoom and its
+    // metric-scaled vertical extent.
+    const float verticalExtent = targetZoom / runtime->mVerticalZoomMetricScale;
+
+    const Wm3::Quaternionf look = moho::COORDS_Orient(kPi, kHalfPi);
+    const float lx = look.x;
+    const float ly = look.y;
+    const float lz = look.z;
+    const float lw = look.w;
+
+    // Conjugate-rotation expansion of the look quaternion (matches the binary's
+    // open-coded `q * conj` lane that yields the orientation rows).
+    const float lxZero = lx * 0.0f;
+    const float lyZero = ly * 0.0f;
+    const float lzZero = lz * 0.0f;
+    const float lwZero = lw * 0.0f;
+    const float qx = ((lxZero - lyZero) - lz) - lwZero;
+    const float qy = (((lzZero + lyZero) + lxZero) - lw);
+    const float qz = (((lzZero + lwZero) + lx) - lyZero);
+    const float qw = (((lwZero + lxZero) + ly) - lzZero);
+
+    viewTransform.orient_.x = qx;
+    viewTransform.orient_.y = qy;
+    viewTransform.orient_.z = qz;
+    viewTransform.orient_.w = qw;
+
+    viewTransform.pos_.x =
+      runtime->mOffset.x + ((((qy * qw) + (qz * qx)) * 2.0f) * eyeDistance);
+    viewTransform.pos_.y =
+      runtime->mOffset.y + ((((qz * qw) - (qy * qx)) * 2.0f) * eyeDistance);
+    viewTransform.pos_.z =
+      runtime->mOffset.z + ((1.0f - (((qy * qy) + (qz * qz)) * 2.0f)) * eyeDistance);
+
+    // Orthographic projection rows (row-vector convention).
+    projection.r[0] = Vector4f{};
+    projection.r[1] = Vector4f{};
+    projection.r[2] = Vector4f{};
+    projection.r[3] = Vector4f{};
+    projection.r[0].x = 2.0f / ((targetZoom * 0.5f) - (targetZoom * -0.5f));
+    projection.r[1].y = 2.0f / ((verticalExtent * 0.5f) - (verticalExtent * -0.5f));
+    projection.r[2].z = 1.0f / (farClip - nearClip);
+    projection.r[3].x =
+      (((targetZoom * -0.5f) + (targetZoom * 0.5f)) / ((targetZoom * -0.5f) - (targetZoom * 0.5f))) -
+      (1.0f / static_cast<float>(static_cast<int>(targetZoom)));
+    projection.r[3].y =
+      (((verticalExtent * -0.5f) + (verticalExtent * 0.5f)) /
+       ((verticalExtent * -0.5f) - (verticalExtent * 0.5f))) +
+      (1.0f / static_cast<float>(static_cast<int>(verticalExtent)));
+    projection.r[3].z = nearClip / (nearClip - farClip);
+    projection.r[3].w = 1.0f;
+  } else {
+    // Perspective mode: build the orientation quaternion from heading/pitch.
+    const Wm3::Quaternionf orient = moho::COORDS_Orient(runtime->mHeading, runtime->mFarPitch);
+    const float ox = orient.x;
+    const float oy = orient.y;
+    const float oz = orient.z;
+    const float ow = orient.w;
+
+    const float oxZero = ox * 0.0f;
+    const float oyZero = oy * 0.0f;
+    const float ozZero = oz * 0.0f;
+    const float owZero = ow * 0.0f;
+
+    const float qx = ((oxZero - oyZero) - oz) - owZero;
+    const float qy = (((ozZero + oyZero) + oxZero) - ow);
+    const float qz = ((ox + ozZero) + owZero) - oyZero;
+    const float qw = ((oy + owZero) + oxZero) - ozZero;
+
+    viewTransform.orient_.x = qx;
+    viewTransform.orient_.y = qy;
+    viewTransform.orient_.z = qz;
+    viewTransform.orient_.w = qw;
+
+    // Eye position = offset + rotated forward axis (from the quaternion) scaled
+    // by the eye distance, before shake.
+    const float eyeY = runtime->mOffset.y + ((((qw * qz) - (qy * qx)) * 2.0f) * eyeDistance);
+    const float eyeX = runtime->mOffset.x + ((((qw * qy) + (qz * qx)) * 2.0f) * eyeDistance);
+    const float eyeZ = runtime->mOffset.z + ((1.0f - (((qz * qz) + (qy * qy)) * 2.0f)) * eyeDistance);
+
+    // Apply per-frame camera shake to the eye position.
+    Wm3::Vector3f shakeOffset{};
+    Wm3::Vector3f* const shake =
+      func_CameraImplUpdateShake(&runtime->mOffset, &shakeOffset, &runtime->mCamShakeParams);
+    viewTransform.pos_.x = shake->x + eyeX;
+    viewTransform.pos_.y = shake->y + eyeY;
+    viewTransform.pos_.z = shake->z + eyeZ;
+
+    // D3D-style perspective projection from the current FOV, clip planes, and
+    // vertical metric scale (used as the aspect lane).
+    projection = moho::VEC_D3DProjectionMatrixFOV(
+      runtime->mFarFov, runtime->mFarFov, nearClip, farClip, runtime->mVerticalZoomMetricScale
+    );
+  }
+
+  runtime->mCam.Init(viewTransform, projection);
+}
 
 /**
   * Alias of FUN_007A6BF0 (non-canonical helper lane).
