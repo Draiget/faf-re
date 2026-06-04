@@ -4,6 +4,7 @@ namespace moho
   bool ren_Skirt = true;
   bool ren_Water = true;
   bool ren_Reflection = true;
+  bool ren_SkyDome = true;
   bool ren_Fx = true;
   bool ren_ErrorCache = true;
   bool fog_DistanceFog = true;
