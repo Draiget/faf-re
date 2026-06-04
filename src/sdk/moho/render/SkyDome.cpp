@@ -759,44 +759,4 @@ void SkyDome::Destroy()
     }
     technique->EndTechnique();
   }
-
-  /**
-   * Address: 0x007F80C0 (FUN_007F80C0, ?Render@SkyDome@Moho@@QAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z)
-   *
-   * IDA signature:
-   * void __thiscall Moho::SkyDome::Render(int head, float deltaFrame,
-   *     const GeomCamera3 &cam, const std::vector<CumulusVertex> &cumulusVertices);
-   *
-   * What it does:
-   * Binds the sky render target and viewport for `head`, ensures the dome
-   * render resources exist, then runs the atmosphere, decal, cirrus, and
-   * cumulus passes for the active camera. The original body fetched `head`,
-   * `deltaFrame`, `cam`, and the (empty) cumulus stream from the owning
-   * viewport before dispatching; here those arrive as parameters and the
-   * viewport rectangle is read back from the device for the active head.
-   */
-  void SkyDome::Render(
-    const int head,
-    const float deltaFrame,
-    const GeomCamera3& cam,
-    const msvc8::vector<CumulusVertex>& cumulusVertices
-  )
-  {
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    device->SetRenderTarget2(head, false, 0, 1.0f, 0);
-
-    Wm3::Vector2i viewportPos{};
-    Wm3::Vector2i viewportSize{};
-    float viewportMinZ = 0.0f;
-    float viewportMaxZ = 1.0f;
-    device->GetView(&viewportPos, &viewportSize, &viewportMinZ, &viewportMaxZ);
-    device->SetViewport(&viewportPos, &viewportSize, 0.0f, 1.0f);
-
-    CreateRenderAbility();
-
-    RenderAtmosphere(cam);
-    RenderDecals(cam);
-    RenderCirrus(moho::REN_GetGameTick(), deltaFrame, cam);
-    RenderCumulus(head, deltaFrame, cam, cumulusVertices);
-  }
 } // namespace moho

@@ -6221,6 +6221,27 @@ namespace moho
     void RenderCompositeTerrain(TerrainCommon* terrain);
 
     /**
+     * Address: 0x007F80C0 (FUN_007F80C0)
+     * Mangled: ?Render@SkyDome@Moho@@QAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::Render(WRenViewport *this);
+     *
+     * What it does:
+     * Binds the sky render target and viewport rectangle for the active head,
+     * resolves the active terrain's SkyDome, ensures its render resources exist,
+     * then dispatches the atmosphere, decal, cirrus, and cumulus passes for the
+     * active world-view camera.
+     *
+     * The PDB attributes FUN_007F80C0 to ?Render@SkyDome@Moho@@..., but the
+     * compiled body's `this` is a WRenViewport (it reads WRenViewport fields
+     * mHead@+0x320, mScreenPos@+0x308, mScreenSize@+0x310, mCam@+0x219C, all
+     * beyond SkyDome's 0x224 size). The symbol is a genuine misattribution, so
+     * the body is modeled here as a WRenViewport member.
+     */
+    void RenderSkyDome();
+
+    /**
      * Address: 0x007F8350 (FUN_007F8350, ?RenderWaterMask@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
      * Mangled: ?RenderWaterMask@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
      *
