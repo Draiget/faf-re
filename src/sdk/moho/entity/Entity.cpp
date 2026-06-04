@@ -2555,7 +2555,8 @@ namespace moho
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
-    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    RealtimeStatsEnabled = 0u;
+    std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
     mCollisionCellSpan.mCellStartX = 0u;
     mCollisionCellSpan.mCellStartZ = 0u;
@@ -2645,7 +2646,8 @@ namespace moho
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
-    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    RealtimeStatsEnabled = 0u;
+    std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
     mCollisionCellSpan.mCellStartX = 0u;
     mCollisionCellSpan.mCellStartZ = 0u;
@@ -2732,7 +2734,8 @@ namespace moho
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
-    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    RealtimeStatsEnabled = 0u;
+    std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
     LuaPlus::LuaObject arg1{};
     LuaPlus::LuaObject arg2{};
@@ -2831,7 +2834,8 @@ namespace moho
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
-    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    RealtimeStatsEnabled = 0u;
+    std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
     mCollisionCellSpan.mCellStartX = 0u;
     mCollisionCellSpan.mCellStartZ = 0u;
@@ -4344,26 +4348,6 @@ namespace moho
     DirtySyncState = 1;
   }
 
-  struct EntityFlag1F8RuntimeView
-  {
-    std::byte pad0000_01F7[0x1F8];
-    std::uint8_t flag1F8; // +0x1F8
-  };
-  static_assert(
-    offsetof(EntityFlag1F8RuntimeView, flag1F8) == 0x1F8,
-    "EntityFlag1F8RuntimeView::flag1F8 offset must be 0x1F8"
-  );
-
-  /**
-   * Address: 0x00689F50 (FUN_00689F50)
-   *
-   * What it does:
-   * Reads one entity runtime byte flag at offset `+0x1F8`.
-   */
-  [[maybe_unused]] std::uint8_t ReadEntityRuntimeFlag1F8(const Entity* const entity) noexcept
-  {
-    return reinterpret_cast<const EntityFlag1F8RuntimeView*>(entity)->flag1F8;
-  }
 
   /**
    * Address: 0x00689F60 (FUN_00689F60)
@@ -4451,6 +4435,18 @@ namespace moho
   msvc8::string Entity::GetUniqueName() const
   {
     return msvc8::string(mUniqueName.data(), mUniqueName.size());
+  }
+
+  /**
+   * Address: 0x00689F50 (FUN_00689F50)
+   *
+   * What it does:
+   * Returns whether per-entity realtime-stats accounting is currently enabled
+   * for this entity (gates the shots-fired / hit-miss / fire-range stat lanes).
+   */
+  bool Entity::IsRealtimeStatsEnabled() const noexcept
+  {
+    return RealtimeStatsEnabled != 0u;
   }
 
   /**
