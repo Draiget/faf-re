@@ -130,6 +130,59 @@ namespace moho
   void DetachWeakPtrCUnitCommandRange(WeakPtr<CUnitCommand>* begin, WeakPtr<CUnitCommand>* end);
 
   /**
+   * Address: 0x006EC5B0 (FUN_006EC5B0)
+   * Address: 0x007A5FE0 (FUN_007A5FE0, ICF twin)
+   *
+   * What it does:
+   * Fill-constructs `count` `WeakPtr<CUnitCommand>` lanes starting at
+   * `destination`, copying one source node's owner-link slot into each lane and
+   * relinking each filled lane at the owner-chain head. Returns the cursor one
+   * past the last written lane.
+   *
+   * This is the `WeakPtr<CUnitCommand>`-typed twin of the ICF-folded generic
+   * single-owner-slot fill lane (recovered byte-erased as
+   * `RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot` in CrtRuntimeHelpers).
+   * It is the canonical typed body the VC8 `vector<WeakPtr<CUnitCommand>>`
+   * insert/grow path reaches; behavior is identical to the folded lane.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* FillConstructWeakPtrCUnitCommandLanes(
+    WeakPtr<CUnitCommand>* destination,
+    std::int32_t count,
+    const WeakPtr<CUnitCommand>& source
+  ) noexcept;
+
+  /**
+   * Address: 0x006EA440 (FUN_006EA440, std::vector_WeakPtr_CUnitCommand::_Insert_n)
+   *
+   * What it does:
+   * MSVC8 `vector<WeakPtr<CUnitCommand>>::_Insert_n` reserve/grow lane: inserts
+   * `count` copies of `value` at `insertPosition`, dispatching between the
+   * in-place tail-shift arm (sufficient capacity) and the geometric
+   * reallocate arm, while preserving intrusive owner-chain links for every
+   * moved/copied weak lane. Returns the (relinked) source value node.
+   */
+  void GrowAndFillWeakPtrCUnitCommandVector(
+    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
+    WeakPtr<CUnitCommand>* insertPosition,
+    std::uint32_t count,
+    const WeakPtr<CUnitCommand>& value
+  );
+
+  /**
+   * Address: 0x006E9680 (FUN_006E9680, std::vector_WeakPtr_CUnitCommand::push_back)
+   *
+   * What it does:
+   * `vector<WeakPtr<CUnitCommand>>::push_back(const WeakPtr<CUnitCommand>&)`:
+   * when the vector is at capacity it forwards to the grow lane, otherwise it
+   * fill-constructs one lane at `_Mylast` and bumps the end cursor. Preserves
+   * the copied node's intrusive owner-chain link.
+   */
+  void PushBackWeakPtrCUnitCommand(
+    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
+    const WeakPtr<CUnitCommand>& value
+  );
+
+  /**
    * Address: 0x006EBE50 (FUN_006EBE50, sub_6EBE50)
    *
    * What it does:
