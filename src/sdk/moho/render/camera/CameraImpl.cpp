@@ -2756,6 +2756,63 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
   // Location/Box: nothing to do.
 }
 
+/**
+ * Address: 0x007A9030 (FUN_007A9030, Moho::CameraImpl::Frame)
+ * Mangled: ?Frame@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * IDA signature:
+ *   void __userpurge Frame(CameraImpl *this@<eax>, float interpolationAlpha, float frameSeconds)
+ *
+ * What it does:
+ * Advances one runtime camera for the current sim/frame delta pair. When the
+ * camera is bound to the game clock, the frame delta is recomputed from the
+ * game-time source against the last frame's time. Advances the camera-shake
+ * elapsed timer (clamped to the shake duration), flips the shake phase sign,
+ * then drives the per-frame lanes in order:
+ *   - UpdateTargets       — entity-target tracking
+ *   - UpdateBasis / InterpolateBasis — basis/zoom slew (the latter when a timed
+ *                            transition is active, i.e. mTimedMoveDuration > 0)
+ *   - UpdateCoords        — push view transform + projection into mCam
+ *   - CacheCameraFrustumUnits — rebuild the cached in-frustum unit lists
+ * and finally records the game-clock time for the next frame's delta.
+ *
+ * Invoked from `RCamManager::Frame` (0x007AABB0) over the camera loop.
+ */
+void moho::CameraImpl::Frame(const float interpolationAlpha, float frameSeconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  CameraTimeSourceRuntime* const gameTimeSource = runtime->mTimeSources[kCameraTimeSourceGame];
+
+  // Game-clock cameras derive the per-frame delta from the game-time source
+  // rather than the passed-in frame seconds.
+  if (runtime->mTimeSource == kCameraTimeSourceGame) {
+    frameSeconds = gameTimeSource->Time() - runtime->mLastFrameTime;
+  }
+
+  // Advance the shake elapsed timer, clamped to the shake duration; flip the
+  // shake phase sign each frame (the binary alternates the shake scale sign).
+  float shakeElapsed = runtime->mCamShakeParams.mElapsed + frameSeconds;
+  if (runtime->mCamShakeParams.mDuration <= shakeElapsed) {
+    shakeElapsed = runtime->mCamShakeParams.mDuration;
+  }
+  runtime->mCamShakeParams.mElapsed = shakeElapsed;
+  runtime->mCamShakeParams.mScale = -runtime->mCamShakeParams.mScale;
+
+  UpdateTargets(interpolationAlpha, frameSeconds);
+
+  if (runtime->mTimedMoveDuration <= 0.0f) {
+    UpdateBasis(interpolationAlpha, frameSeconds);
+  } else {
+    InterpolateBasis(interpolationAlpha, frameSeconds);
+  }
+
+  UpdateCoords(interpolationAlpha, frameSeconds);
+  CacheCameraFrustumUnits(frameSeconds);
+
+  // Record the game-clock time for next frame's game-delta computation.
+  runtime->mLastFrameTime = gameTimeSource->Time();
+}
 
 namespace
 {
@@ -2984,6 +3041,66 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
   }
 }
 
+/**
+ * Address: 0x007A6F00 (FUN_007A6F00, Moho::CameraImpl::CameraPan)
+ * Mangled: ?CameraPan@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+ * Slot: 32 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED)
+ *
+ * IDA signature:
+ *   _DWORD *__thiscall CameraPan(CameraImpl *this, const Wm3::Vector2f *delta)
+ *
+ * What it does:
+ * Pans the camera target location across the ground plane by a 2D screen
+ * delta, unless the UI is in non-interactive (NIS) cinematic mode. Imports
+ * `/lua/ui/game/gamemain.lua` and queries `IsNISMode()`; when not in NIS mode,
+ * first clears any active entity target through the virtual `TargetNothing`
+ * lane, then moves `mTargetLocation` along the camera's inverse-view right axis
+ * (row 0) by the X delta and along a ground-flattened forward axis (row 1 with
+ * Y zeroed and renormalized) by the Y delta. Both axes are scaled by the
+ * current target zoom, the inverse viewport width, and `cam_PanSpeed`.
+ */
+void moho::CameraImpl::CameraPan(const Wm3::Vector2f& panDelta)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Skip panning entirely while the UI is in NIS (non-interactive scripted)
+  // mode, as reported by the gamemain UI module.
+  LuaPlus::LuaObject gameMain = moho::SCR_Import(runtime->mLuaObject.m_state, "/lua/ui/game/gamemain.lua");
+  LuaPlus::LuaFunction isNisMode{gameMain["IsNISMode"]};
+  if (isNisMode.Call_x_Bool()) {
+    return;
+  }
+
+  // Panning releases any active entity target.
+  TargetNothing();
+
+  const moho::GeomCamera3& cam = runtime->mCam;
+  const float viewportWidth = cam.viewport.r[3].z;
+  const float inverseViewportWidth = 1.0f / viewportWidth;
+
+  // Right axis = inverse-view row 0; ground-flattened forward axis = inverse-
+  // view row 1 with Y zeroed and renormalized.
+  const Vector4f& rightAxis = cam.inverseView.r[0];
+  const Vector4f& forwardRow = cam.inverseView.r[1];
+
+  Wm3::Vector3f flattenedForward{};
+  flattenedForward.x = forwardRow.x;
+  flattenedForward.y = 0.0f;
+  flattenedForward.z = forwardRow.z;
+  (void)Wm3::Vector3f::Normalize(&flattenedForward);
+
+  // X delta moves along the (negated) right axis.
+  const float panX = (runtime->mTargetZoom * inverseViewportWidth) * moho::cam_PanSpeed * panDelta.x;
+  runtime->mTargetLocation.x -= panX * rightAxis.x;
+  runtime->mTargetLocation.y -= panX * rightAxis.y;
+  runtime->mTargetLocation.z -= panX * rightAxis.z;
+
+  // Y delta moves along the flattened forward axis.
+  const float panY = (runtime->mTargetZoom * inverseViewportWidth) * moho::cam_PanSpeed * panDelta.y;
+  runtime->mTargetLocation.x += flattenedForward.x * panY;
+  runtime->mTargetLocation.y += flattenedForward.y * panY;
+  runtime->mTargetLocation.z += flattenedForward.z * panY;
+}
 
 /**
  * Address: 0x007A75A0 (FUN_007A75A0, Moho::CameraImpl::CacheCameraFrustumUnits)
