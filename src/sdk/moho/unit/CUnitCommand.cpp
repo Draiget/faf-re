@@ -1923,8 +1923,12 @@ void CUnitCommand::CoordinateWith(CUnitCommand* const other)
   temp.nextInOwner = ownerSlotHead;
   ownerSlotHead = &temp;
 
+  // Binary pushes the staged weak node through the typed VC8
+  // `vector<WeakPtr<CUnitCommand>>::push_back` lane (FUN_006E9680), not the
+  // generic vector template; invoke the recovered helper by name so the same
+  // symbol is exercised here.
   auto& coordinatingOrders = other->mCoordinatingOrders;
-  coordinatingOrders.push_back(temp);
+  PushBackWeakPtrCUnitCommand(coordinatingOrders, temp);
   temp.UnlinkFromOwnerChain();
 }
 
