@@ -63,6 +63,7 @@
 #include "moho/render/RangeRenderer.h"
 #include "moho/render/Shadow.h"
 #include "moho/render/Silhouette.h"
+#include "moho/render/SkyDome.h"
 #include "moho/render/VisionRenderer.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -58060,6 +58061,7 @@ namespace moho
   extern bool ren_ShowSkeletons;
   extern bool ren_Water;
   extern bool ren_Reflection;
+  extern bool ren_SkyDome;
   extern bool fog_DistanceFog;
   extern float fog_OffsetMultiplier;
 } // namespace moho
@@ -58988,6 +58990,15 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     runtime->mCam = reinterpret_cast<moho::GeomCamera3*>(worldView->view->GetCamera());
     if (runtime->mCam == nullptr) {
       continue;
+    }
+
+    // Render the atmosphere/cloud sky dome for this world view before the
+    // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
+    // dispatches SkyDome::Render right after the per-view camera bind).
+    if (moho::ren_SkyDome) {
+      moho::SkyDome& skyDome = moho::REN_GetTerrainRes()->GetSkyDome();
+      const msvc8::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
+      skyDome.Render(head, moho::REN_GetSimDeltaSeconds(), *runtime->mCam, cumulusVertices);
     }
 
     moho::TerrainCommon* const terrain = worldView->terrain.get();
