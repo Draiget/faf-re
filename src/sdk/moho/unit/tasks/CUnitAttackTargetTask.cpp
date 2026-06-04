@@ -372,25 +372,6 @@ namespace
     }
   }
 
-  void SetWeaponTarget(moho::UnitWeapon* const weapon, const moho::CAiTarget& target)
-  {
-    if (weapon == nullptr) {
-      return;
-    }
-
-    weapon->mTarget = target;
-    weapon->PickNewTargetAimSpot();
-  }
-
-  void FireWeapon(moho::UnitWeapon* const weapon)
-  {
-    if (weapon == nullptr) {
-      return;
-    }
-
-    (void)weapon->RunScript("OnFire");
-    ++weapon->mShotsAtTarget;
-  }
 
   [[nodiscard]] bool HasEntityMoved(const moho::Entity& entity) noexcept
   {
@@ -1444,7 +1425,7 @@ namespace moho
           return -2;
         }
 
-        SetWeaponTarget(runtime->mWeapon, runtime->mTarget);
+        runtime->mWeapon->SetTarget(&runtime->mTarget);
         commandTask->mTaskState = TASKSTATE_Complete;
         return 1;
       }
@@ -1496,7 +1477,7 @@ namespace moho
         }
 
         if (runtime->mWeapon->mEnabled != 0u && UnitWeapon::CanFire(runtime->mWeapon, &runtime->mTarget)) {
-          FireWeapon(runtime->mWeapon);
+          runtime->mWeapon->Fire();
           commandTask->mTaskState = TASKSTATE_5;
           return 10;
         }
