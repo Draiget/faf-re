@@ -707,4 +707,57 @@ void SkyDome::Destroy()
     technique->EndTechnique();
   }
 
+  /**
+   * Address: 0x00819C90 (FUN_00819C90, ?RenderDecals@SkyDome@Moho@@AAEXABVGeomCamera3@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SkyDome::RenderDecals(const GeomCamera3 &cam);
+   *
+   * What it does:
+   * When decal records and both decal textures exist, flushes the decal upload
+   * buffer, selects the "Decal" technique, binds the decal billboard/instance/
+   * index streams plus albedo/glow textures and the glow multiplier, then
+   * issues one indexed quad draw per technique pass.
+   */
+  void SkyDome::RenderDecals(const GeomCamera3& cam)
+  {
+    if (mDecalUploadCount == 0 || !mAtmosphereTex || !mAtmosphereTex2) {
+      return;
+    }
+
+    UpdateDecalBuffer();
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Decal");
+
+    device->SetVertexDeclaration(mDecalFormat1->mFormat);
+    device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(mDecalUploadCount), 0);
+    device->SetVertexBuffer(1u, mDecalVertBuf2, 1, 0);
+    device->SetBufferIndices(mDecalIndexBuf);
+
+    const float viewRightVec[3] = {cam.view.r[0].x, cam.view.r[1].x, cam.view.r[2].x};
+    effect->SetMatrix("viewRight")->SetPtr(viewRightVec, sizeof(viewRightVec));
+
+    const float viewUpVec[3] = {cam.view.r[0].y, cam.view.r[1].y, cam.view.r[2].y};
+    effect->SetMatrix("viewUp")->SetPtr(viewUpVec, sizeof(viewUpVec));
+
+    const Vector4f& cameraPosition = cam.inverseView.r[3];
+    const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
+    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
+    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->SetMatrix("decalGlowMultiplier")->SetFloat(mHorizonBlend);
+    effect->SetMatrix("decalAlbedoTexture")->SetTexture(mAtmosphereTex);
+    effect->SetMatrix("decalGlowTexture")->SetTexture(mAtmosphereTex2);
+
+    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int pass = 0; pass < passCount; ++pass) {
+      technique->BeginPass(static_cast<int>(pass));
+      gpg::gal::DrawIndexedContext drawContext(kSkyTopologyTriangleList, 4, 6, 0, 0);
+      device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
+  }
+
 } // namespace moho
