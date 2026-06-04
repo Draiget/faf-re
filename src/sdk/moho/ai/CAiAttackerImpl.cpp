@@ -1001,7 +1001,8 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
       continue;
     }
 
-    weapon->mTarget = clearedTarget;
+    CAiTarget weaponTarget = clearedTarget;
+    weapon->SetTarget(&weaponTarget);
 
     if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->NeedPrep != 0u && hasDesiredTarget) {
       weapon->NotifyOnGotTarget();

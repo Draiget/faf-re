@@ -13,6 +13,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/serialization/SBlackListInfo.h"
+#include "moho/sim/EImpactTypeTypeInfo.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 #include "Wm3Vector3.h"
 
@@ -63,6 +64,70 @@ namespace moho
     TRS_OutsideMaxRange = 3,
   };
   static_assert(sizeof(ESolutionStatus) == 0x04, "ESolutionStatus size must be 0x04");
+
+  /**
+   * One-segment world-space beam ray (origin + unit direction) carried inside a
+   * `CollisionBeamHelper`. Distinct from `moho::GeomLine3` (which adds
+   * `closest`/`farthest` clip bounds); this is just the placed beam center line.
+   */
+  struct WeaponBeamLine
+  {
+    Wm3::Vector3f Origin;    // +0x00
+    Wm3::Vector3f Direction; // +0x0C
+  };
+  static_assert(sizeof(WeaponBeamLine) == 0x18, "WeaponBeamLine size must be 0x18");
+
+  /**
+   * Transient beam-impact resolution payload built by
+   * `UnitWeapon::CreateCollisionBeamHelper` and consumed by
+   * `CollisionBeamEntity::CheckCollision` / `UnitWeapon::DoInstaHit`. Carries the
+   * resolved impact entity/target, contact point, beam length, impact type, and
+   * the placed beam center line. Holds two intrusive weak-entity links
+   * (`mTarget.targetEntity` and `mEntity`) that the destructor unlinks.
+   *
+   * Address evidence:
+   * - ctor body inside `CreateCollisionBeamHelper` (0x006D6B00) writes these
+   *   offsets directly; destructor at 0x00673580.
+   */
+  struct CollisionBeamHelper
+  {
+    /**
+     * Address: 0x006D6B00 sub-flow (inline init inside CreateCollisionBeamHelper)
+     *
+     * What it does:
+     * Zero-initializes the impact lane, copy-binds the source target, and resets
+     * the resolved-impact weak-entity link.
+     */
+    CollisionBeamHelper();
+
+    /**
+     * Address: 0x00673580 (FUN_00673580, Moho::CollisionBeamHelper::~CollisionBeamHelper)
+     *
+     * What it does:
+     * Unlinks the resolved-impact and bound-target weak-entity links from their
+     * owner chains before teardown.
+     */
+    ~CollisionBeamHelper();
+
+    CollisionBeamHelper(const CollisionBeamHelper&) = delete;
+    CollisionBeamHelper& operator=(const CollisionBeamHelper&) = delete;
+
+    EImpactType mImpactType;     // +0x00
+    CAiTarget mTarget;           // +0x04
+    WeakPtr<Entity> mEntity;     // +0x24
+    Wm3::Vector3f mPos;          // +0x2C
+    float mBeamLength;           // +0x38
+    WeaponBeamLine mLine;        // +0x3C
+    float mLineScale;            // +0x54
+  };
+  static_assert(sizeof(CollisionBeamHelper) == 0x58, "CollisionBeamHelper size must be 0x58");
+  static_assert(offsetof(CollisionBeamHelper, mImpactType) == 0x00, "CollisionBeamHelper::mImpactType offset must be 0x00");
+  static_assert(offsetof(CollisionBeamHelper, mTarget) == 0x04, "CollisionBeamHelper::mTarget offset must be 0x04");
+  static_assert(offsetof(CollisionBeamHelper, mEntity) == 0x24, "CollisionBeamHelper::mEntity offset must be 0x24");
+  static_assert(offsetof(CollisionBeamHelper, mPos) == 0x2C, "CollisionBeamHelper::mPos offset must be 0x2C");
+  static_assert(offsetof(CollisionBeamHelper, mBeamLength) == 0x38, "CollisionBeamHelper::mBeamLength offset must be 0x38");
+  static_assert(offsetof(CollisionBeamHelper, mLine) == 0x3C, "CollisionBeamHelper::mLine offset must be 0x3C");
+  static_assert(offsetof(CollisionBeamHelper, mLineScale) == 0x54, "CollisionBeamHelper::mLineScale offset must be 0x54");
 
   class UnitWeapon : public CScriptEvent
   {
@@ -205,6 +270,37 @@ namespace moho
     Projectile* CreateProjectile(std::int32_t muzzleBoneIndex);
 
     /**
+     * Address: 0x006D5F30 (FUN_006D5F30, Moho::UnitWeapon::SetTarget)
+     *
+     * What it does:
+     * Replaces this weapon's active AI target: fires lost/got-target scripts,
+     * maintains the old/new target entities' shooter sets, updates the owning
+     * unit's focus/target-blip lanes, re-aims, and restages the fire task.
+     */
+    void SetTarget(CAiTarget* target);
+
+    /**
+     * Address: 0x006D61F0 (FUN_006D61F0, Moho::UnitWeapon::Fire)
+     *
+     * What it does:
+     * Performs one weapon fire: when the owner is unstunned, accounts realtime
+     * shot/fire-range statistics (if enabled), runs the `OnFire` script, and
+     * increments the shots-at-target counter.
+     */
+    void Fire();
+
+    /**
+     * Address: 0x006D6B00 (FUN_006D6B00, Moho::UnitWeapon::CreateCollisionBeamHelper)
+     *
+     * What it does:
+     * Resolves one instant-beam collision result for the given muzzle bone:
+     * places the beam center line, queries entity/terrain/water intersections,
+     * and fills `outHelper` with the resolved contact entity, point, beam length,
+     * and impact type.
+     */
+    void CreateCollisionBeamHelper(CollisionBeamHelper* outHelper, std::int32_t bone);
+
+    /**
      * Address: 0x006D4740 (FUN_006D4740, Moho::UnitWeapon::CreateInstance)
      *
      * What it does:
@@ -327,6 +423,17 @@ namespace moho
      * Returns whether `entity` is present in weapon blacklist rows.
      */
     [[nodiscard]] static bool IsEntityBlacklisted(const UnitWeapon* weapon, const Entity* entity);
+
+  private:
+    /**
+     * Address: 0x006D78F0 (FUN_006D78F0, sub_6D78F0)
+     *
+     * What it does:
+     * Ages the per-weapon target blacklist: decrements each row's remaining-tick
+     * counter and erases rows whose entity is gone, has moved, or whose counter
+     * has expired. Invoked by `SetTarget` whenever the active target changes.
+     */
+    void AgeBlacklist();
 
   public:
     Sim* mSim;                                  // +0x44
