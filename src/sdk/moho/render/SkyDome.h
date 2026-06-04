@@ -5,6 +5,7 @@
 
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -17,6 +18,7 @@ namespace gpg::gal
 {
   class Effect;
   class EffectTechnique;
+  class EffectTechniqueD3D9;
   class TextureD3D9;
   class IndexBufferD3D9;
   class VertexBufferD3D9;
@@ -54,6 +56,25 @@ namespace moho
   class SkyDome
   {
   public:
+    /**
+     * One per-cumulus-cloud instance record uploaded to the instanced cumulus
+     * vertex stream (`mDecalVertBuf3`) by `RenderCumulus`.
+     *
+     * The stride is proven by the binary: `RenderCumulus` derives the cloud
+     * count as `(verts.end() - verts.begin()) / 0x3C` and uploads
+     * `count * 0x3C` bytes verbatim into the per-instance stream. The internal
+     * field decomposition is not separately observable from the render path
+     * (the records are copied as an opaque 0x3C-byte block), so the payload is
+     * modeled as a raw byte lane pending a producer-side recovery that reveals
+     * the named sub-fields.
+     */
+    struct CumulusVertex
+    {
+      std::uint8_t mPayload[0x3C]; // +0x00
+    };
+
+    static_assert(sizeof(CumulusVertex) == 0x3C, "SkyDome::CumulusVertex size must be 0x3C");
+
     /**
      * Address: 0x008149E0 (FUN_008149E0, ??0SkyDome@Moho@@QAE@XZ)
      *
@@ -196,6 +217,107 @@ namespace moho
      */
     void UpdateDecalBuffer();
 
+    /**
+     * Address: 0x007F80C0 (FUN_007F80C0)
+     * Mangled: ?Render@SkyDome@Moho@@QAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::Render(int head, float deltaFrame,
+     *     const GeomCamera3 &cam, const std::vector<CumulusVertex> &cumulusVertices);
+     *
+     * What it does:
+     * Binds the sky render target/viewport for `head`, ensures the dome render
+     * resources exist, then dispatches the atmosphere, decal, cirrus, and
+     * cumulus passes for the active camera.
+     */
+    void Render(
+      int head,
+      float deltaFrame,
+      const GeomCamera3& cam,
+      const msvc8::vector<CumulusVertex>& cumulusVertices
+    );
+
+  private:
+    /**
+     * Address: 0x00818B40 (FUN_00818B40)
+     * Mangled: ?RenderAtmosphere@SkyDome@Moho@@AAEXABVGeomCamera3@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::RenderAtmosphere(const GeomCamera3 &cam);
+     *
+     * What it does:
+     * Selects the "Atmosphere" technique and feeds the dome shader the camera
+     * view position/projection, horizon begin/end/colors, sky color, and the
+     * horizon lookup texture, then renders the dome geometry.
+     */
+    void RenderAtmosphere(const GeomCamera3& cam);
+
+    /**
+     * Address: 0x00819650 (FUN_00819650)
+     * Mangled: ?RenderCirrus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::RenderCirrus(int tick, float interpolant,
+     *     const GeomCamera3 &cam);
+     *
+     * What it does:
+     * Selects the "Cirrus" technique, feeds the tick/interpolant lanes plus the
+     * camera/cirrus parameters and cloud texture, then renders the dome
+     * geometry.
+     */
+    void RenderCirrus(int tick, float interpolant, const GeomCamera3& cam);
+
+    /**
+     * Address: 0x00818FB0 (FUN_00818FB0)
+     * Mangled: ?RenderCumulus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::RenderCumulus(int head, float deltaFrame,
+     *     const GeomCamera3 &cam, const std::vector<CumulusVertex> &cumulusVertices);
+     *
+     * What it does:
+     * Uploads the per-cloud cumulus instance records, selects the "Cumulus"
+     * technique, binds the instanced quad/index streams plus cumulus textures,
+     * then issues one indexed draw per technique pass.
+     */
+    void RenderCumulus(
+      int head,
+      float deltaFrame,
+      const GeomCamera3& cam,
+      const msvc8::vector<CumulusVertex>& cumulusVertices
+    );
+
+    /**
+     * Address: 0x00819C90 (FUN_00819C90)
+     * Mangled: ?RenderDecals@SkyDome@Moho@@AAEXABVGeomCamera3@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::SkyDome::RenderDecals(const GeomCamera3 &cam);
+     *
+     * What it does:
+     * When decal records and both decal textures exist, flushes the decal
+     * upload buffer, selects the "Decal" technique, binds the decal streams and
+     * albedo/glow textures, then issues one indexed draw per technique pass.
+     */
+    void RenderDecals(const GeomCamera3& cam);
+
+    /**
+     * Address: 0x00819AF0 (FUN_00819AF0)
+     * Mangled: ?RenderDomeUsing@SkyDome@Moho@@AAEXV?$shared_ptr@VEffectTechnique@gal@gpg@@@boost@@@Z
+     *
+     * IDA signature:
+     * void __stdcall Moho::SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique);
+     *
+     * What it does:
+     * Binds the dome vertex format/vertex buffer/index buffer, then iterates the
+     * technique passes issuing one indexed dome draw per pass.
+     *
+     * The runtime object is always the D3D9 backend technique; the parameter is
+     * typed as the concrete `EffectTechniqueD3D9` (the base `gpg::gal::EffectTechnique`
+     * is the pure-virtual skeleton and its inheritance is not yet recovered).
+     */
+    void RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique);
+
   public:
     // --- Layout from constructor ASM evidence ---
     std::uint8_t mPad04[0x04];                                    // +0x04
@@ -228,21 +350,27 @@ namespace moho
     boost::shared_ptr<CD3DVertexFormat> mDomeFormat;               // +0x198
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDomeVertBuf;    // +0x1A0
     boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDomeIndexBuf;    // +0x1A8
-    boost::shared_ptr<RD3DTextureResource> mHorizonLookupTex;      // +0x1B0
+    // Texture lanes hold the GAL base texture extracted from each source
+    // RD3DTextureResource (CreateTextures @0x00817850 stores
+    // `resource->GetBaseTexture()` into these fields, and the render passes
+    // bind them directly to EffectVariableD3D9::SetTexture, which takes a
+    // shared_ptr<TextureD3D9>). They are GAL texture handles, not the owning
+    // resource wrappers.
+    boost::shared_ptr<gpg::gal::TextureD3D9> mHorizonLookupTex;    // +0x1B0
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf1;  // +0x1B8
     boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDecalIndexBuf;   // +0x1C0
     bool mNeedsRebuild = true;                                     // +0x1C8
     std::uint8_t mPad1C9[0x03];                                    // +0x1C9
-    boost::shared_ptr<RD3DTextureResource> mAtmosphereTex;         // +0x1CC
-    boost::shared_ptr<RD3DTextureResource> mAtmosphereTex2;        // +0x1D4
+    boost::shared_ptr<gpg::gal::TextureD3D9> mAtmosphereTex;       // +0x1CC (decal albedo lane)
+    boost::shared_ptr<gpg::gal::TextureD3D9> mAtmosphereTex2;      // +0x1D4 (decal glow lane)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat1;             // +0x1DC
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf2;  // +0x1E4
-    boost::shared_ptr<RD3DTextureResource> mDecalTex1;             // +0x1EC
-    boost::shared_ptr<RD3DTextureResource> mDecalTex2;             // +0x1F4
-    boost::shared_ptr<RD3DTextureResource> mDecalTex3;             // +0x1FC
+    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex1;           // +0x1EC (cumulus light ramp)
+    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex2;           // +0x1F4 (cumulus dispersion ramp)
+    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex3;           // +0x1FC (cumulus texture)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat2;             // +0x204
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf3;  // +0x20C
-    boost::shared_ptr<RD3DTextureResource> mCirrusTex;             // +0x214
+    boost::shared_ptr<gpg::gal::TextureD3D9> mCirrusTex;           // +0x214
     boost::shared_ptr<gpg::gal::TextureD3D9> mCloudsTexture;       // +0x21C
   };
 

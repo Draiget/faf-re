@@ -6,13 +6,19 @@
 #include <cstring>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "gpg/gal/DrawContext.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/CD3DVertexFormat.h"
@@ -509,4 +515,64 @@ void SkyDome::Destroy()
     mDecalVertBuf2->Unlock();
     mNeedsRebuild = false;
   }
+
+  namespace
+  {
+    constexpr int kSkyTopologyTriangleList = 4; // gpg::gal::DrawContext::TOPOLOGY D3DPT_TRIANGLELIST
+
+    /**
+     * Resolves the concrete D3D9 "sky" effect the render passes drive.
+     *
+     * This is the body of `SkyDome::GetEffect` (FUN_00817810):
+     * `D3D_GetDevice()->GetResources()->FindEffect("sky")->GetBaseEffect()`.
+     * It is inlined here rather than calling `GetEffect()` because that
+     * accessor's recovered return type is the base `gpg::gal::Effect` (whose
+     * slots are all pure-virtual in the current SDK), so it cannot drive the
+     * concrete `EffectD3D9` parameter/technique virtuals the render passes
+     * need. The base/derived `Effect`/`EffectD3D9` relationship is not yet
+     * recovered; once it is, these passes can call `GetEffect()` by name.
+     */
+    [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> ResolveSkyEffect()
+    {
+      moho::CD3DEffect* const skyEffect = moho::D3D_GetDevice()->GetResources()->FindEffect("sky");
+      return skyEffect->GetBaseEffect();
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00819AF0 (FUN_00819AF0, ?RenderDomeUsing@SkyDome@Moho@@AAEXV?$shared_ptr@VEffectTechnique@gal@gpg@@@boost@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique);
+   *
+   * What it does:
+   * Binds the dome vertex format/vertex buffer/index buffer on the active GAL
+   * device, then iterates each pass of the supplied technique issuing one
+   * indexed dome draw per pass.
+   *
+   * The parameter is typed as the concrete D3D9 backend technique (the runtime
+   * object), because the base `gpg::gal::EffectTechnique` is the pure-virtual
+   * skeleton whose inheritance from `EffectTechniqueD3D9` is not yet recovered.
+   */
+  void SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique)
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::EffectTechniqueD3D9* const techniqueImpl = technique.get();
+
+    device->SetVertexDeclaration(mDomeFormat->mFormat);
+    device->SetVertexBuffer(0u, mDomeVertBuf, 1, 0);
+    device->SetBufferIndices(mDomeIndexBuf);
+
+    const unsigned int passCount = static_cast<unsigned int>(techniqueImpl->BeginTechnique());
+    for (unsigned int pass = 0; pass < passCount; ++pass) {
+      techniqueImpl->BeginPass(static_cast<int>(pass));
+      gpg::gal::DrawIndexedContext drawContext(
+        kSkyTopologyTriangleList, mDomeVertexCount, mDomeIndexCount, 0, 0
+      );
+      device->DrawIndexedPrimitive(&drawContext);
+      techniqueImpl->EndPass();
+    }
+    techniqueImpl->EndTechnique();
+  }
+
 } // namespace moho
