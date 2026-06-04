@@ -25,6 +25,10 @@ namespace moho
   float cam_FarPitch = 60.0f;
   float cam_SpinSpeed = 1.0f;
   float cam_MinSpinPitch = -89.0f;
+  // Address: 0x00F57FF0 (?cam_ShakeMult@Moho@@3MA) — per-frame camera-shake scale.
+  float cam_ShakeMult = 1.0f;
+  // Address: 0x00F57FEC (?cam_PanSpeed@Moho@@3MA) — ground-plane pan speed scale.
+  float cam_PanSpeed = 1.0f;
   float cam_EntityBoxExpand = 20.0f;
   float ren_BorderSize = 0.0f;
   float ren_SyncTerrainLOD = 200.0f;
