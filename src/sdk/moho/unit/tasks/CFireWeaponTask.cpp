@@ -148,16 +148,6 @@ namespace
     return weapon->TargetIsTooClose(&weapon->mTarget) != ESolutionStatus::TRS_Available;
   }
 
-  void FireWeapon(UnitWeapon* const weapon)
-  {
-    if (!weapon) {
-      return;
-    }
-
-    (void)weapon->RunScript("OnFire");
-    ++weapon->mShotsAtTarget;
-  }
-
   template <class T>
   void WriteTrackedPointer(gpg::WriteArchive* archive, T* pointer, gpg::TrackedPointerState state, const gpg::RRef& owner)
   {
@@ -250,7 +240,7 @@ int CFireWeaponTask::Execute()
       const bool canAttackGround =
         weapon->mWeaponBlueprint == nullptr || weapon->mWeaponBlueprint->CannotAttackGround == 0u;
       if (canAttackGround || weapon->mTarget.targetType != EAiTargetType::AITARGET_Ground) {
-        FireWeapon(weapon);
+        weapon->Fire();
 
         float rateOfFire = weapon->mAttributes.mRateOfFire;
         if (rateOfFire < 0.0f && weapon->mAttributes.mBlueprint) {
