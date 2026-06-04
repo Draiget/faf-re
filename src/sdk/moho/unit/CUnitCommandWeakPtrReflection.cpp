@@ -445,6 +445,264 @@ namespace moho
     view.end = nullptr;
     view.capacityEnd = nullptr;
   }
+
+  namespace
+  {
+    // VC8 `vector<WeakPtr<CUnitCommand>>` enforces `_Myend - _Myfirst <=
+    // 0x1FFFFFFF` (max element count for an 8-byte element type). The binary
+    // throws `std::length_error("vector<T> too long")` (FUN_005A0DD0) when an
+    // insert would exceed it.
+    constexpr std::uint32_t kWeakPtrVectorMaxCount = 0x1FFFFFFFu;
+
+    [[noreturn]] void ThrowWeakPtrVectorTooLong()
+    {
+      throw std::length_error("vector<T> too long");
+    }
+
+    [[nodiscard]] std::uint32_t WeakPtrVectorSize(const msvc8::vector_runtime_view<WeakPtr<CUnitCommand>>& view) noexcept
+    {
+      return view.begin ? static_cast<std::uint32_t>(view.end - view.begin) : 0u;
+    }
+
+    [[nodiscard]] std::uint32_t
+    WeakPtrVectorCapacity(const msvc8::vector_runtime_view<WeakPtr<CUnitCommand>>& view) noexcept
+    {
+      return view.begin ? static_cast<std::uint32_t>(view.capacityEnd - view.begin) : 0u;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x006EC5B0 (FUN_006EC5B0)
+   * Address: 0x007A5FE0 (FUN_007A5FE0, ICF twin)
+   *
+   * What it does:
+   * Fill-constructs `count` weak lanes from one source node, relinking each
+   * filled lane at the source owner-chain head. Typed twin of the ICF-folded
+   * generic single-owner-slot fill lane recovered as
+   * `RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot`.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* FillConstructWeakPtrCUnitCommandLanes(
+    WeakPtr<CUnitCommand>* destination,
+    std::int32_t count,
+    const WeakPtr<CUnitCommand>& source
+  ) noexcept
+  {
+    for (; count != 0; --count, ++destination) {
+      if (destination == nullptr) {
+        continue;
+      }
+
+      void* const ownerLinkSlot = source.ownerLinkSlot;
+      destination->ownerLinkSlot = ownerLinkSlot;
+      if (ownerLinkSlot == nullptr) {
+        destination->nextInOwner = nullptr;
+      } else {
+        auto** const ownerHead = reinterpret_cast<WeakPtr<CUnitCommand>**>(ownerLinkSlot);
+        destination->nextInOwner = *ownerHead;
+        *ownerHead = destination;
+      }
+    }
+
+    return destination;
+  }
+
+  namespace
+  {
+    /**
+     * Address: 0x006EC520 (FUN_006EC520)
+     *
+     * Assign-fills `[destination, end)` from one source node, unlinking each
+     * destination lane from its current owner chain (when it differs) and
+     * relinking it to the source owner-chain head. Unlike the construct fill
+     * (`FillConstructWeakPtrCUnitCommandLanes`), the destination lanes are
+     * already live, so the old link is removed first.
+     */
+    WeakPtr<CUnitCommand>* AssignFillWeakPtrCUnitCommandLanes(
+      WeakPtr<CUnitCommand>* destination,
+      const WeakPtr<CUnitCommand>& source,
+      WeakPtr<CUnitCommand>* const end
+    ) noexcept
+    {
+      const WeakPtr<void>& src = reinterpret_cast<const WeakPtr<void>&>(source);
+      for (; destination != end; ++destination) {
+        AssignWeakPtrLaneWithRelink(reinterpret_cast<WeakPtr<void>&>(*destination), src);
+      }
+      return destination;
+    }
+
+    /**
+     * Address: 0x006EB820 (FUN_006EB820) -> 0x006ED0F0 (FUN_006ED0F0)
+     *
+     * Range backward assign-with-relink: copy-assigns `[sourceBegin,
+     * sourceEnd)` into the storage ending at `destinationEnd`, walking back to
+     * front so a right-shift over overlapping storage is safe.
+     */
+    WeakPtr<CUnitCommand>* AssignWeakPtrCUnitCommandRangeBackward(
+      WeakPtr<CUnitCommand>* destinationEnd,
+      const WeakPtr<CUnitCommand>* sourceBegin,
+      const WeakPtr<CUnitCommand>* sourceEnd
+    ) noexcept
+    {
+      auto* const out = AssignWeakPtrRangeBackward(
+        reinterpret_cast<WeakPtr<void>*>(destinationEnd),
+        reinterpret_cast<const WeakPtr<void>*>(sourceBegin),
+        reinterpret_cast<const WeakPtr<void>*>(sourceEnd));
+      return reinterpret_cast<WeakPtr<CUnitCommand>*>(out);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x006EA440 (FUN_006EA440, std::vector_WeakPtr_CUnitCommand::_Insert_n)
+   *
+   * What it does:
+   * MSVC8 `vector<WeakPtr<CUnitCommand>>::_Insert_n` reserve/grow lane. The
+   * incoming `value` is the staged source weak node; the binary materializes a
+   * by-value copy of it (relinked at the owner-chain head) and fills the
+   * inserted run from that copy so the new lanes share the same owner chain.
+   * The copy's chain link is restored when the lane goes out of scope.
+   *
+   * IDA struct field mapping (the IDA names are swapped):
+   *   begin       = a1->_M_finish        (_Myfirst)
+   *   end (size)  = a1->_M_end_of_storage (_Mylast)
+   *   capacityEnd = a1[1]._M_start        (_Myend)
+   */
+  void GrowAndFillWeakPtrCUnitCommandVector(
+    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
+    WeakPtr<CUnitCommand>* const insertPosition,
+    const std::uint32_t count,
+    const WeakPtr<CUnitCommand>& value
+  )
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+
+    // Materialize the by-value `WeakPtr` parameter: copy `value`'s owner-link
+    // slot and splice the local copy in at the owner-chain head so the fill
+    // lanes relink against a stable node. The owner head is restored at the
+    // end (the by-value copy's destructor).
+    WeakPtr<CUnitCommand> stagedValue{};
+    void* const stagedOwnerSlot = value.ownerLinkSlot;
+    stagedValue.ownerLinkSlot = stagedOwnerSlot;
+    WeakPtr<CUnitCommand>* savedNext = nullptr;
+    if (stagedOwnerSlot != nullptr) {
+      auto** const ownerHead = reinterpret_cast<WeakPtr<CUnitCommand>**>(stagedOwnerSlot);
+      savedNext = *ownerHead;
+      stagedValue.nextInOwner = savedNext;
+      *ownerHead = &stagedValue;
+    } else {
+      stagedValue.nextInOwner = nullptr;
+    }
+
+    if (count != 0u) {
+      const std::uint32_t capacity = WeakPtrVectorCapacity(view);
+      const std::uint32_t size = WeakPtrVectorSize(view);
+
+      if ((kWeakPtrVectorMaxCount - size) < count) {
+        // Restore the staged copy's owner chain before propagating the throw.
+        if (stagedOwnerSlot != nullptr) {
+          *reinterpret_cast<WeakPtr<CUnitCommand>**>(stagedOwnerSlot) = savedNext;
+        }
+        ThrowWeakPtrVectorTooLong();
+      }
+
+      const std::uint32_t requiredSize = count + size;
+
+      if (capacity >= requiredSize) {
+        // In-place arm: enough capacity, tail-shift then fill the seam.
+        WeakPtr<CUnitCommand>* const oldEnd = view.end;
+        const std::uint32_t tailCount = static_cast<std::uint32_t>(oldEnd - insertPosition);
+
+        if (tailCount >= count) {
+          // Tail is at least `count`: append a copy of the trailing run,
+          // back-shift the middle, then fill the seam with the staged value.
+          (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(oldEnd, oldEnd - count, oldEnd);
+          view.end = oldEnd + count;
+          (void)AssignWeakPtrCUnitCommandRangeBackward(oldEnd, insertPosition, oldEnd - count);
+          (void)AssignFillWeakPtrCUnitCommandLanes(insertPosition, stagedValue, insertPosition + count);
+        } else {
+          // Tail shorter than insert run: copy the tail past the gap, fill the
+          // gap with the staged value, bump end, then assign-fill the seam.
+          (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(insertPosition + count, insertPosition, oldEnd);
+          (void)FillConstructWeakPtrCUnitCommandLanes(
+            oldEnd, static_cast<std::int32_t>(count - tailCount), stagedValue);
+          view.end = oldEnd + count;
+          (void)AssignFillWeakPtrCUnitCommandLanes(insertPosition, stagedValue, oldEnd);
+        }
+      } else {
+        // Reallocate arm: geometric growth = max(capacity * 1.5, required).
+        std::uint32_t newCapacity = 0u;
+        const std::uint32_t halfCapacity = capacity >> 1;
+        if ((kWeakPtrVectorMaxCount - halfCapacity) >= capacity) {
+          newCapacity = halfCapacity + capacity;
+        }
+        if (newCapacity < requiredSize) {
+          newCapacity = requiredSize;
+        }
+
+        WeakPtr<CUnitCommand>* newBuffer = nullptr;
+        if (newCapacity != 0u) {
+          newBuffer = static_cast<WeakPtr<CUnitCommand>*>(
+            ::operator new(static_cast<std::size_t>(newCapacity) * sizeof(WeakPtr<CUnitCommand>)));
+        } else {
+          newBuffer = static_cast<WeakPtr<CUnitCommand>*>(::operator new(0u));
+        }
+
+        // Copy prefix [begin, insertPos), fill the inserted run, copy suffix
+        // [insertPos, end), then detach + release the old buffer.
+        WeakPtr<CUnitCommand>* const afterPrefix =
+          CopyWeakPtrCUnitCommandRangeAndReturnEnd(newBuffer, view.begin, insertPosition);
+        (void)FillConstructWeakPtrCUnitCommandLanes(
+          afterPrefix, static_cast<std::int32_t>(count), stagedValue);
+        WeakPtr<CUnitCommand>* const afterRun = afterPrefix + count;
+        (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(afterRun, insertPosition, view.end);
+
+        const std::uint32_t finalSize = size + count;
+        if (view.begin != nullptr) {
+          DetachWeakPtrCUnitCommandRange(view.begin, view.end);
+          ::operator delete(view.begin);
+        }
+
+        view.capacityEnd = newBuffer + newCapacity;
+        view.end = newBuffer + finalSize;
+        view.begin = newBuffer;
+      }
+    }
+
+    // By-value copy destructor: unlink `stagedValue` and restore the head.
+    if (stagedValue.ownerLinkSlot != nullptr) {
+      auto** cursor = reinterpret_cast<WeakPtr<CUnitCommand>**>(stagedValue.ownerLinkSlot);
+      while (*cursor != &stagedValue) {
+        cursor = &(*cursor)->nextInOwner;
+      }
+      *cursor = stagedValue.nextInOwner;
+    }
+  }
+
+  /**
+   * Address: 0x006E9680 (FUN_006E9680, std::vector_WeakPtr_CUnitCommand::push_back)
+   *
+   * What it does:
+   * `push_back(const WeakPtr<CUnitCommand>&)`: grow when at capacity, else
+   * fill-construct one lane at the end cursor and bump it.
+   */
+  void PushBackWeakPtrCUnitCommand(
+    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
+    const WeakPtr<CUnitCommand>& value
+  )
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+
+    const std::uint32_t size = WeakPtrVectorSize(view);
+    const std::uint32_t capacity = WeakPtrVectorCapacity(view);
+
+    if (view.begin == nullptr || size >= capacity) {
+      GrowAndFillWeakPtrCUnitCommandVector(storage, view.end, 1u, value);
+      return;
+    }
+
+    WeakPtr<CUnitCommand>* const end = view.end;
+    (void)FillConstructWeakPtrCUnitCommandLanes(end, 1, value);
+    view.end = end + 1;
+  }
 } // namespace moho
 
 namespace moho
