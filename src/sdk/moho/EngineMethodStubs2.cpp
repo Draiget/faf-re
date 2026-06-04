@@ -55,18 +55,11 @@ void ICommandSink::EndGame() {}
 // ===== Misc instance methods =====
 void CMauiMesh::Frame(float) {}
 void CRenFrame::Render(int, int) {}
-// CameraImpl::Frame is partially wired here pending recovery of its three
-// remaining sibling helpers (InterpolateBasis / UpdateCoords /
-// CacheCameraFrustumUnits) — see the docstring on CameraImpl::Frame for the
-// remaining blocked addresses. The placeholder body invokes the recovered
-// UpdateTargets and UpdateBasis lanes so the per-frame target-tracking and
-// basis/zoom slew stay in the linked binary; the other three helpers remain
-// absorbed by the elision until their owner_layout work is complete.
-void CameraImpl::Frame(float simDeltaSeconds, float frameSeconds)
-{
-  UpdateTargets(simDeltaSeconds, frameSeconds);
-  UpdateBasis(simDeltaSeconds, frameSeconds);
-}
+// CameraImpl::Frame is fully recovered in
+// src/sdk/moho/render/camera/CameraImpl.cpp (matches FUN_007A9030). The real
+// body drives UpdateTargets / UpdateBasis / InterpolateBasis / UpdateCoords /
+// CacheCameraFrustumUnits by name — all five sibling helpers are now
+// recovered, so the placeholder stub here is no longer needed.
 void CollisionBeamEntity::CheckCollision() {}
 // SMassInfo::MemberDeserialize / MemberSerialize recovered in
 // src/sdk/moho/sim/SMassInfo.cpp (matches FUN_00593030 / FUN_00593080).

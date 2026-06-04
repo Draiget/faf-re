@@ -332,6 +332,25 @@ namespace moho
     void CameraHoldRotation();
 
     /**
+     * Address: 0x007A6F00 (FUN_007A6F00, Moho::CameraImpl::CameraPan)
+     * Mangled: ?CameraPan@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+     * Slot: 32 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474)
+     *
+     * IDA signature:
+     * _DWORD *__thiscall Moho::CameraImpl::CameraPan(CameraImpl *this, const Wm3::Vector2f *delta);
+     *
+     * What it does:
+     * Pans the camera target location across the ground plane by a 2D input
+     * delta, unless the UI is in non-interactive (NIS) mode. The screen-space
+     * delta is projected onto the camera's inverse-view right axis (row 0) and
+     * a flattened forward axis (row 1 with Y zeroed and renormalized), scaled by
+     * the current target zoom, the inverse viewport width, and `cam_PanSpeed`.
+     * Panning first clears any active entity target through the virtual
+     * `TargetNothing` lane.
+     */
+    virtual void CameraPan(const Wm3::Vector2f& panDelta);
+
+    /**
      * Address: 0x007A80A0 (FUN_007A80A0, Moho::CameraImpl::CameraReset)
      * Mangled: ?CameraReset@CameraImpl@Moho@@UAEXXZ
      *
