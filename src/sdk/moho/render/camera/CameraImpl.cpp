@@ -2757,7 +2757,232 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
 }
 
 
+namespace
+{
+  // Hermite basis polynomials evaluated at parameter `t` in [0,1], matching the
+  // binary's open-coded cubic blend in `CameraImpl::InterpolateBasis`:
+  //   h00 =  2t^3 - 3t^2 + 1   (start value)
+  //   h10 =      t^3 - 2t^2 + t (start tangent)
+  //   h01 =      t^3 -  t^2     (end tangent)
+  //   h11 = -2t^3 + 3t^2       (end value)
+  struct CameraHermiteWeights
+  {
+    float startValue;
+    float startTangent;
+    float endTangent;
+    float endValue;
+  };
 
+  [[nodiscard]] CameraHermiteWeights MakeCameraHermiteWeights(const float t) noexcept
+  {
+    const float tt = t * t;
+    const float ttt = tt * t;
+    CameraHermiteWeights weights{};
+    weights.startValue = ((ttt * 2.0f) - (tt * 3.0f)) + 1.0f;
+    weights.startTangent = (ttt - (tt * 2.0f)) + t;
+    weights.endTangent = ttt - tt;
+    weights.endValue = (tt * 3.0f) - (ttt * 2.0f);
+    return weights;
+  }
+
+  // Signals the camera's embedded `CScriptEvent` (a `CTaskEvent`) sub-object at
+  // +0x0C that a timed transition has completed. Matches the binary's
+  // `CTaskEvent::EventSetSignaled((CTaskEvent*)&this->CScriptEvent, 1)`.
+  void EventSetSignaledCameraTransition(moho::CameraImpl& camera, const bool signaled) noexcept
+  {
+    auto* const scriptEvent = reinterpret_cast<moho::CScriptEvent*>(
+      reinterpret_cast<std::uint8_t*>(&camera) + 0x0C
+    );
+    scriptEvent->EventSetSignaled(signaled);
+  }
+}
+
+/**
+ * Address: 0x007A9BA0 (FUN_007A9BA0, Moho::CameraImpl::InterpolateBasis)
+ * Mangled: ?InterpolateBasis@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * IDA signature:
+ *   int __userpurge InterpolateBasis@<eax>(CameraImpl *this@<ebx>, float interpolationAlpha)
+ *   (declared `void(float, float)` by the mangled name; the second float is
+ *   unused by this code path and passed only to keep the timed-move/Frame ABI
+ *   identical to the sibling slew lanes.)
+ *
+ * What it does:
+ * Drives one active timed-move / Hermite camera transition for the current
+ * frame. Computes the linear transition progress from the active time source,
+ * refreshes the entity target location when following an entity, and either
+ * snaps to the transition endpoint (progress >= 1) or evaluates the
+ * acceleration-curve-shaped progress and Hermite-blends offset / heading /
+ * far-pitch / target-zoom between the cached start and end deltas. For
+ * non-targeted (Location/Box) transitions it derives the far-pitch from the
+ * log-zoom interpolation lane, then snaps the offset onto the terrain surface
+ * and demotes finished Hermite/Box transitions back to Location mode.
+ *
+ * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) on the
+ * transition lane (`mTimedMoveDuration > 0`).
+ */
+void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const float /*frameSeconds*/)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Linear transition progress = (now - startTime) / duration along the active
+  // time source.
+  CameraTimeSourceRuntime* const timeSource = runtime->mTimeSources[runtime->mTimeSource];
+  float progress = (timeSource->Time() - runtime->mTimedMoveStartTime) / runtime->mTimedMoveDuration;
+
+  // Entity-follow transitions keep the target location pinned to the live
+  // entity each frame.
+  if (runtime->mTargetType == kCameraTargetTypeEntity) {
+    if (UserEntity* const targetEntity = GetTargetEntity(); targetEntity != nullptr) {
+      const VTransform interpolated = targetEntity->GetInterpolatedTransform(interpolationAlpha);
+      runtime->mTargetLocation = interpolated.pos_;
+    }
+  }
+
+  if (progress >= 1.0f) {
+    // Transition complete: snap to the cached endpoint state.
+    runtime->mOffset = runtime->mTargetLocation;
+    const bool isBoxTransition = (runtime->mTargetType == kCameraTargetTypeHermite + kCameraTargetTypeBox);
+    runtime->mTimedMoveDuration = 0.0f;
+    runtime->mTargetZoom = runtime->mNearZoom;
+    if (!isBoxTransition) {
+      EventSetSignaledCameraTransition(*this, true);
+    }
+    if (runtime->mTargetType == kCameraTargetTypeHermite || runtime->mTargetType == kCameraTargetTypeNoseCam) {
+      runtime->mIsRotated = 1u;
+      runtime->mHeading = runtime->mHeadingZoom;
+      runtime->mFarPitch = runtime->mTimedMovePitch;
+    }
+  } else {
+    // NoseCam transitions use a separate (shorter) transition-parameter
+    // duration to drive the acceleration curve.
+    float curveInput = progress;
+    if (runtime->mTargetType == kCameraTargetTypeNoseCam) {
+      float noseProgress = 1.0f;
+      if (runtime->mTimedMoveTransitionParam > 0.0f) {
+        CameraTimeSourceRuntime* const noseSource = runtime->mTimeSources[runtime->mTimeSource];
+        noseProgress =
+          (noseSource->Time() - runtime->mTimedMoveStartTime) / runtime->mTimedMoveTransitionParam;
+        if (noseProgress > 1.0f) {
+          noseProgress = 1.0f;
+        }
+      }
+      curveInput = noseProgress;
+    }
+
+    // Acceleration-shaped progress: ease-out (FastInSlowOut) or ease-in-out
+    // (SlowInOut). Linear acceleration leaves the parameter untouched.
+    float shapedProgress = curveInput;
+    if (runtime->mAccType == kCameraAccTypeFastInSlowOut) {
+      shapedProgress = std::sin(curveInput * kHalfPi);
+    } else if (runtime->mAccType == kCameraAccTypeSlowInOut) {
+      shapedProgress = (progress < 0.5f)
+        ? (1.0f - std::cos(curveInput * kPi)) * 0.5f
+        : (std::sin((curveInput - 0.5f) * kPi) * 0.5f) + 0.5f;
+    }
+
+    const float t = shapedProgress;
+    const CameraHermiteWeights w = MakeCameraHermiteWeights(t);
+
+    // Targeted (Hermite/NoseCam) transitions Hermite-blend heading and pitch
+    // between the cached transition endpoints. The blend control points are
+    // (startValue, startTangent, endTangent, endValue):
+    //   far-pitch : mTimedMovePitch / mHermitePitchStartDelta /
+    //               mHermitePitchEndDelta / mCurrentPitch
+    //   heading   : mTimedMoveHeading / mHermiteHeadingStartDelta /
+    //               mHermiteHeadingEndDelta / mHeadingZoom
+    if (runtime->mTargetType == kCameraTargetTypeHermite || runtime->mTargetType == kCameraTargetTypeNoseCam) {
+      runtime->mFarPitch =
+        (runtime->mHermitePitchEndDelta * w.endTangent) +
+        (runtime->mHermitePitchStartDelta * w.startTangent) +
+        (runtime->mTimedMovePitch * w.startValue) +
+        (runtime->mCurrentPitch * w.endValue);
+
+      runtime->mHeading =
+        (runtime->mTimedMoveHeading * w.startValue) +
+        (runtime->mHermiteHeadingStartDelta * w.startTangent) +
+        (runtime->mHermiteHeadingEndDelta * w.endTangent) +
+        (runtime->mHeadingZoom * w.endValue);
+      runtime->mIsRotated = 1u;
+    }
+
+    // Target-zoom is always Hermite-blended between the cached zoom endpoints:
+    //   startValue=mTimedMoveZoom, startTangent=mHermiteZoomStartDelta,
+    //   endTangent=mHermiteZoomEndDelta, endValue=mNearZoom.
+    runtime->mTargetZoom =
+      (runtime->mHermiteZoomStartDelta * w.startTangent) +
+      (runtime->mTimedMoveZoom * w.startValue) +
+      (runtime->mHermiteZoomEndDelta * w.endTangent) +
+      (runtime->mNearZoom * w.endValue);
+
+    // Offset is Hermite-blended between the cached offset endpoints:
+    //   startValue=mTimedMoveOffset, startTangent=mHermiteOffsetEndDelta,
+    //   endTangent=mHermiteOffsetStartDelta, endValue=mTargetLocation.
+    runtime->mOffset.x =
+      (runtime->mTimedMoveOffset.x * w.startValue) +
+      (runtime->mTargetLocation.x * w.endValue) +
+      (runtime->mHermiteOffsetEndDelta.x * w.startTangent) +
+      (runtime->mHermiteOffsetStartDelta.x * w.endTangent);
+    runtime->mOffset.y =
+      (runtime->mTimedMoveOffset.y * w.startValue) +
+      (runtime->mTargetLocation.y * w.endValue) +
+      (runtime->mHermiteOffsetEndDelta.y * w.startTangent) +
+      (runtime->mHermiteOffsetStartDelta.y * w.endTangent);
+    runtime->mOffset.z =
+      (runtime->mTimedMoveOffset.z * w.startValue) +
+      (runtime->mTargetLocation.z * w.endValue) +
+      (runtime->mHermiteOffsetEndDelta.z * w.startTangent) +
+      (runtime->mHermiteOffsetStartDelta.z * w.endTangent);
+  }
+
+  // Non-targeted transitions (Location/Box) derive the far-pitch from the
+  // log-zoom interpolation lane (matches CalculateFOV's blend domain).
+  if (runtime->mTargetType != kCameraTargetTypeHermite &&
+      runtime->mTargetType != kCameraTargetTypeNoseCam &&
+      runtime->mTargetType != kCameraTargetTypeEntity) {
+    const float logMaxZoom = std::log(GetMaxZoom());
+    const float logTargetZoom = std::log(runtime->mTargetZoom);
+    const float logNearZoom = std::log(moho::cam_NearZoom);
+    float clampedLogZoom = (logMaxZoom <= logTargetZoom) ? logMaxZoom : logTargetZoom;
+    if (logNearZoom > clampedLogZoom) {
+      clampedLogZoom = logNearZoom;
+    }
+    runtime->mFarPitch =
+      (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) *
+         (moho::cam_FarPitch - moho::cam_NearPitch) +
+       moho::cam_NearPitch) *
+      kDegreesToRadians;
+  }
+
+  CalculateFOV();
+
+  // Snap the interpolated offset onto the terrain/water surface along the
+  // heading/pitch ray.
+  STIMap* const stiMap = runtime->mTerrainMap;
+  moho::GeomLine3 line{};
+  const float cosPitch = std::cos(runtime->mFarPitch);
+  line.pos = runtime->mOffset;
+  line.closest = 0.0f;
+  line.farthest = std::numeric_limits<float>::infinity();
+  line.dir.x = std::sin(runtime->mHeading) * cosPitch;
+  line.dir.y = -std::sin(runtime->mFarPitch);
+  line.dir.z = cosPitch * std::cos(runtime->mHeading);
+
+  moho::CColHitResult hit{};
+  const Wm3::Vec3f surfacePoint = stiMap->SurfaceIntersection(line, &hit);
+  if (moho::IsValidVector3f(surfacePoint)) {
+    runtime->mOffset = surfacePoint;
+  }
+
+  // When the transition has finished, demote Hermite/Box transitions to
+  // Location mode (Entity/NoseCam stay tracked).
+  if (progress >= 1.0f) {
+    if (runtime->mTargetType != kCameraTargetTypeNoseCam &&
+        runtime->mTargetType != kCameraTargetTypeEntity) {
+      runtime->mTargetType = kCameraTargetTypeLocation;
+    }
+  }
+}
 
 
 /**
