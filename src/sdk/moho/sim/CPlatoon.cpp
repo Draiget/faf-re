@@ -39,6 +39,7 @@
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/IArmy.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
@@ -85,6 +86,9 @@ namespace
 
   constexpr ESquadClass kAllSquadsClass = static_cast<ESquadClass>(6);
   constexpr ESquadClass kUnassignedSquadClass = static_cast<ESquadClass>(0);
+  // Sentinel entity id for ground-target commands (mirrors the value in
+  // CCommandLuaFunctionRegistrations.cpp; the engine uses -0x10000000).
+  constexpr std::int32_t kGroundTargetEntitySentinel = -0x10000000;
   constexpr std::uintptr_t kSquadUnitOwnerBias = 0x8;
   constexpr int kLuaNumberTypeTag = 3;
 
@@ -4481,6 +4485,110 @@ namespace moho
   }
 
   /**
+   * Address: 0x00728700 (FUN_00728700, Moho::CPlatoon::FerryToLocation)
+   *
+   * What it does:
+   * Snaps `targetPos.y` to the terrain/water surface, collects transport-capable
+   * (and alive, not-being-built) units across all squad classes, and issues a
+   * single `UNITCOMMAND_Ferry` to that ground point.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::FerryToLocation(Wm3::Vector3f& targetPos)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    // Snap the requested point to the terrain (or water, when higher) surface.
+    STIMap* const mapData = mSim->mMapData;
+    float surfaceElevation = mapData->mHeightField->GetElevation(targetPos.x, targetPos.z);
+    if (mapData->mWaterEnabled && mapData->mWaterElevation > surfaceElevation) {
+      surfaceElevation = mapData->mWaterElevation;
+    }
+    targetPos.y = surfaceElevation;
+
+    SEntitySetTemplateUnit transports{};
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
+            continue;
+          }
+          if (unit->IsInCategory("TRANSPORTATION")) {
+            (void)transports.AddUnit(unit);
+          }
+        }
+        break;
+      }
+    }
+
+    if (!transports.Empty()) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Ferry);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+      commandIssueData.mTarget.mPos = targetPos;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, transports, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00730700 (FUN_00730700, cfunc_CPlatoonFerryToLocationL)
+   *
+   * What it does:
+   * Parses `(platoon, location)`, validates the point, issues the ferry orders
+   * via `CPlatoon::FerryToLocation`, returns the issued commands as a Lua array,
+   * then releases the weak command links.
+   */
+  int cfunc_CPlatoonFerryToLocationL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFerryToLocationHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 2));
+    Wm3::Vector3f targetPos = SCR_FromLuaCopy<Wm3::Vec3f>(locationObject);
+    if (!IsValidVector3f(targetPos)) {
+      LuaPlus::LuaState::Error(state, "Platoon:FerryToLocation Passed in an invalid target point");
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->FerryToLocation(targetPos);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00730680 (FUN_00730680, cfunc_CPlatoonFerryToLocation)
    *
    * What it does:
@@ -4616,6 +4724,103 @@ namespace moho
   }
 
   /**
+   * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
+   *
+   * What it does:
+   * Collects transport/carrier units (alive, not-being-built) across all squad
+   * classes and issues one `UNITCOMMAND_TransportUnloadUnits` to `targetPos`.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadAllAtLocation(const Wm3::Vector3f& targetPos)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    SEntitySetTemplateUnit carriers{};
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
+            continue;
+          }
+          if (unit->IsInCategory("TRANSPORTATION") || unit->IsInCategory("CARRIER")) {
+            (void)carriers.AddUnit(unit);
+          }
+        }
+        break;
+      }
+    }
+
+    if (!carriers.Empty()) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadUnits);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+      commandIssueData.mTarget.mPos = targetPos;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, carriers, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00730E30 (FUN_00730E30, cfunc_CPlatoonUnloadAllAtLocationL)
+   *
+   * What it does:
+   * Parses `(platoon, location)`, validates the point, issues the unload orders
+   * via `CPlatoon::UnloadAllAtLocation`, returns the issued commands as a Lua
+   * array, then releases the weak command links.
+   */
+  int cfunc_CPlatoonUnloadAllAtLocationL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", kUnloadAllAtLocationHelpText, 2, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 2));
+    const Wm3::Vector3f targetPos = SCR_FromLuaCopy<Wm3::Vec3f>(locationObject);
+    if (!IsValidVector3f(targetPos)) {
+      LuaPlus::LuaState::Error(state, "Platoon:UnloadAllAtLocation Passed in an invalid target point");
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadAllAtLocation(targetPos);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00730DB0 (FUN_00730DB0, cfunc_CPlatoonUnloadAllAtLocation)
    *
    * What it does:
@@ -4676,6 +4881,129 @@ namespace moho
   }
 
   /**
+   * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
+   *
+   * What it does:
+   * Issues `UNITCOMMAND_Guard` (target = `guardTarget`) on the platoon's units
+   * and returns the created command links. When the platoon has no formation
+   * name it issues one command per matching squad class (1..2, or all when
+   * `kAllSquadsClass`); otherwise it issues a single command on the whole merged
+   * platoon unit set.
+   */
+  static msvc8::vector<WeakPtr<CUnitCommand>> IssueGuardTargetToPlatoon(
+    CPlatoon* const platoon,
+    Unit* const guardTarget,
+    const ESquadClass squadClass
+  )
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    const auto issueGuardOnUnits = [&](SEntitySetTemplateUnit& units) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Guard);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(guardTarget->GetEntityId());
+      commandIssueData.mTarget.mPos.x = 0.0f;
+      commandIssueData.mTarget.mPos.y = 0.0f;
+      commandIssueData.mTarget.mPos.z = 0.0f;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(platoon->mSim, units, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    };
+
+    if (platoon->mFormation.empty()) {
+      const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(platoon);
+      for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
+        if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+          continue;
+        }
+
+        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+            continue;
+          }
+
+          SEntitySetTemplateUnit squadUnits{};
+          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+          issueGuardOnUnits(squadUnits);
+          break;
+        }
+      }
+    } else {
+      SEntitySetTemplateUnit formationUnits{};
+      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(platoon), formationUnits);
+      issueGuardOnUnits(formationUnits);
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x007310A0 (FUN_007310A0, cfunc_CPlatoonGuardTargetL)
+   *
+   * What it does:
+   * Parses `(platoon, targetUnit, [squadClass])`, issues guard orders on the
+   * platoon via `IssueGuardTargetToPlatoon`, returns the issued commands as a
+   * Lua array, then releases the weak command links.
+   */
+  int cfunc_CPlatoonGuardTargetL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        kGuardTargetHelpText,
+        2,
+        3,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Unit* const guardTarget = SCR_FromLua_Unit(targetObject);
+
+    ESquadClass squadClass = kAllSquadsClass;
+    if (lua_gettop(state->m_state) > 2) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 3);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 3);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = IssueGuardTargetToPlatoon(platoon, guardTarget, squadClass);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00731020 (FUN_00731020, cfunc_CPlatoonGuardTarget)
    *
    * What it does:
@@ -4703,6 +5031,91 @@ namespace moho
       kGuardTargetHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00726210 (FUN_00726210, sub_726210, CPlatoon destroy-squads helper)
+   *
+   * What it does:
+   * Clears the platoon's cached Lua unit list, then for each matching squad
+   * class detaches every unit from its squad and queues `UNITCOMMAND_DestroySelf`
+   * on the live members.
+   */
+  static void DestroyPlatoonSquads(CPlatoon* const platoon, const ESquadClass squadClass)
+  {
+    auto& runtime = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    runtime.mHasLuaList = 0u;
+
+    SEntitySetTemplateUnit doomedUnits{};
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        continue;
+      }
+
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquadRuntimeView* const squadView = *squadLane;
+        if (squadView == nullptr || static_cast<std::int32_t>(squadView->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, reinterpret_cast<const CSquad*>(squadView));
+
+        // Live members get the destroy order; every member is detached from the squad.
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          if (unit != nullptr && !unit->IsDead()) {
+            (void)doomedUnits.AddUnit(unit);
+          }
+        }
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          RemoveUnitFromSquad(squadView, SEntitySetTemplateUnit::UnitFromEntry(*entry));
+        }
+        break;
+      }
+    }
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_DestroySelf);
+    (void)IssueCommandToSelectedUnits(platoon->mSim, doomedUnits, commandIssueData, false);
+  }
+
+  /**
+   * Address: 0x00731570 (FUN_00731570, cfunc_CPlatoonDestroyL)
+   *
+   * What it does:
+   * Parses `(platoon, [squadClass])`, and when the platoon is still alive,
+   * destroys the selected squads via `DestroyPlatoonSquads`.
+   */
+  int cfunc_CPlatoonDestroyL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 1 || argumentCount > 2) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kDestroyHelpText, 1, 2, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoonOpt(platoonObject, state);
+    if (platoon != nullptr) {
+      ESquadClass squadClass = kAllSquadsClass;
+      if (lua_gettop(state->m_state) > 1) {
+        gpg::RRef enumRef{};
+        gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+        const char* const squadClassName = lua_tostring(state->m_state, 2);
+        if (squadClassName == nullptr) {
+          LuaPlus::LuaStackObject typeErrorArg(state, 2);
+          LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+        }
+
+        SCR_GetEnum(state, squadClassName, enumRef);
+      }
+
+      DestroyPlatoonSquads(platoon, squadClass);
+    }
+
+    return 0;
   }
 
   /**
@@ -4793,6 +5206,123 @@ namespace moho
       kUseFerryBeaconHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00729D20 (FUN_00729D20, Moho::CPlatoon::UseTeleporter)
+   *
+   * What it does:
+   * Accumulates units from the matching squad classes (1..5, or all when
+   * `kAllSquadsClass`) into one set, appends the teleporter unit, and issues a
+   * single `UNITCOMMAND_TransportLoadUnits` targeting the teleporter. Returns
+   * the issued command weak-links.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UseTeleporter(Unit* const teleporter, const ESquadClass squadClass)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    SEntitySetTemplateUnit selectedUnits{};
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        continue;
+      }
+
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          (void)selectedUnits.AddUnit(SEntitySetTemplateUnit::UnitFromEntry(*entry));
+        }
+        break;
+      }
+    }
+
+    if (!selectedUnits.Empty() && teleporter != nullptr) {
+      (void)selectedUnits.AddUnit(teleporter);
+
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(teleporter->GetEntityId());
+      commandIssueData.mTarget.mPos.x = 0.0f;
+      commandIssueData.mTarget.mPos.y = 0.0f;
+      commandIssueData.mTarget.mPos.z = 0.0f;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, selectedUnits, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00731CB0 (FUN_00731CB0, cfunc_CPlatoonUseTeleporterL)
+   *
+   * What it does:
+   * Parses `(platoon, teleporterUnit, [squadClass])`, issues the teleporter-load
+   * orders via `CPlatoon::UseTeleporter`, returns the issued commands as a Lua
+   * array, then releases the weak command links.
+   */
+  int cfunc_CPlatoonUseTeleporterL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        kUseTeleporterHelpText,
+        2,
+        3,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject teleporterObject(LuaPlus::LuaStackObject(state, 2));
+    Unit* const teleporter = SCR_FromLua_Unit(teleporterObject);
+
+    ESquadClass squadClass = kAllSquadsClass;
+    if (lua_gettop(state->m_state) > 2) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 3);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 3);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseTeleporter(teleporter, squadClass);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
   }
 
   /**

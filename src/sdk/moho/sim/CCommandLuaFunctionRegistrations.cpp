@@ -130,6 +130,13 @@ namespace
   constexpr const char* kIssueFormPatrolHelpText = "IssueFormPatrol";
   constexpr const char* kIssueTransportLoadHelpText = "IssueTransportLoad";
   constexpr const char* kIssueGuardHelpText = "IssueGuard";
+  constexpr const char* kIssueMoveHelpText = "IssueMove";
+  constexpr const char* kIssueNukeHelpText = "IssueNuke";
+  constexpr const char* kIssueTacticalHelpText = "IssueTactical";
+  constexpr const char* kIssueTeleportHelpText = "IssueTeleport";
+  constexpr const char* kIssueTeleportToBeaconHelpText = "IssueTeleportToBeacon";
+  constexpr const char* kIssueTransportUnloadHelpText = "IssueTransportUnload";
+  constexpr const char* kIssueFactoryAssistHelpText = "IssueFactoryAssist";
   constexpr const char* kIssueAttackHelpText = "IssueAttack";
   constexpr const char* kIssuePatrolHelpText = "IssuePatrol";
   constexpr const char* kIssueFerryHelpText = "IssueFerry";
@@ -146,6 +153,7 @@ namespace
   // 0x006EF580 "Invalid count" error site.
   constexpr const char* kLuaInvalidCountWarning = "Invalid count in %s; expected a number but got a %s";
   constexpr const char* kIssueMoveOffFactoryInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
+  constexpr const char* kIssueMoveInvalidTargetError = "IssueMove: Passed in an invalid target point.";
   constexpr const char* kIssueFormMoveInvalidTargetError = "IssueFormMove: Passed in an invalid target point.";
   // Binary string lane for FUN_006F3140 uses the same text as move-off-factory.
   constexpr const char* kIssueGuardInvalidTargetError = "IssueMoveOffFactory: Passed in an invalid target point.";
@@ -889,6 +897,13 @@ namespace moho
    */
   int cfunc_IssueFormMoveL(LuaPlus::LuaState* state);
   int cfunc_IssueTacticalL(LuaPlus::LuaState* state);
+  int cfunc_IssueNukeL(LuaPlus::LuaState* state);
+  int cfunc_IssueMoveL(LuaPlus::LuaState* state);
+  int cfunc_IssueTeleportL(LuaPlus::LuaState* state);
+  int cfunc_IssueDiveL(LuaPlus::LuaState* state);
+  int cfunc_IssueFactoryAssistL(LuaPlus::LuaState* state);
+  int cfunc_IssueTransportUnloadL(LuaPlus::LuaState* state);
+  int cfunc_IssueTeleportToBeaconL(LuaPlus::LuaState* state);
   int cfunc_IssuePatrolL(LuaPlus::LuaState* state);
   int cfunc_IssueFormPatrolL(LuaPlus::LuaState* state);
   /**
@@ -3484,6 +3499,440 @@ namespace moho
   int cfunc_IssueTactical(lua_State* const luaContext)
   {
     return cfunc_IssueTacticalL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F4500 (FUN_006F4500, cfunc_IssueTacticalL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters tactical-capable units, resolves the
+   * target payload, and queues `UNITCOMMAND_Tactical` on the selection.
+   */
+  int cfunc_IssueTacticalL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTacticalHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueTacticalHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Tactical)) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueTacticalHelpText, LuaPlus::LuaStackObject(state, 2));
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Tactical);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F4200 (FUN_006F4200, cfunc_IssueNuke)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueNukeL`.
+   */
+  int cfunc_IssueNuke(lua_State* const luaContext)
+  {
+    return cfunc_IssueNukeL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F4270 (FUN_006F4270, cfunc_IssueNukeL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters nuke-capable units, resolves the
+   * target payload, and queues `UNITCOMMAND_Nuke` on the selection.
+   */
+  int cfunc_IssueNukeL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueNukeHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueNukeHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Nuke)) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueNukeHelpText, LuaPlus::LuaStackObject(state, 2));
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Nuke);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F4720 (FUN_006F4720, cfunc_IssueTeleport)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueTeleportL`.
+   */
+  int cfunc_IssueTeleport(lua_State* const luaContext)
+  {
+    return cfunc_IssueTeleportL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F4790 (FUN_006F4790, cfunc_IssueTeleportL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters teleport-capable units, resolves the
+   * target payload, and queues `UNITCOMMAND_Teleport` on the selection.
+   */
+  int cfunc_IssueTeleportL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTeleportHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueTeleportHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Teleport)) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueTeleportHelpText, LuaPlus::LuaStackObject(state, 2));
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Teleport);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F2660 (FUN_006F2660, cfunc_IssueMove)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueMoveL`.
+   */
+  int cfunc_IssueMove(lua_State* const luaContext)
+  {
+    return cfunc_IssueMoveL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F26D0 (FUN_006F26D0, cfunc_IssueMoveL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters move-capable units, validates the
+   * target point, issues `UNITCOMMAND_Move`, and returns the created Lua
+   * command object (or `nil` when no command is issued).
+   */
+  int cfunc_IssueMoveL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueMoveHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueMoveHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Move)) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueMoveHelpText, LuaPlus::LuaStackObject(state, 2));
+    if (!IsValidVector3f(target.position) || target.targetType == EAiTargetType::AITARGET_None) {
+      LuaPlus::LuaState::Error(state, kIssueMoveInvalidTargetError);
+    }
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+
+    CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    if (issuedCommand == nullptr) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
+
+    issuedCommand->mArgs.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x006F2030 (FUN_006F2030, cfunc_IssueDive)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueDiveL`.
+   */
+  int cfunc_IssueDive(lua_State* const luaContext)
+  {
+    return cfunc_IssueDiveL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F20A0 (FUN_006F20A0, cfunc_IssueDiveL)
+   *
+   * What it does:
+   * Parses one `(unitList)` argument and queues `UNITCOMMAND_Dive` on the live
+   * units (no capability filter), returning the created Lua command object or
+   * `nil` when no command is issued.
+   */
+  int cfunc_IssueDiveL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDiveHelpText, 1, argumentCount);
+    }
+
+    // The dive command object is constructed before the unit list is parsed,
+    // mirroring the binary's ordering (FUN_006F20A0).
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Dive);
+
+    UnitSet units{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(units, state, unitListArg, kIssueDiveHelpText);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(units);
+
+    CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    if (issuedCommand != nullptr) {
+      issuedCommand->mArgs.PushStack(state);
+    } else {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x006F33A0 (FUN_006F33A0, cfunc_IssueFactoryAssist)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueFactoryAssistL`.
+   */
+  int cfunc_IssueFactoryAssist(lua_State* const luaContext)
+  {
+    return cfunc_IssueFactoryAssistL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F3410 (FUN_006F3410, cfunc_IssueFactoryAssistL)
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, keeps only the factories able to guard,
+   * resolves the assist target entity, and queues `UNITCOMMAND_Guard` on the
+   * filtered factories.
+   */
+  int cfunc_IssueFactoryAssistL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueFactoryAssistHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueFactoryAssistHelpText);
+
+    SEntitySetTemplateUnit selectedFactories{};
+    if (!FilterFactoryUnitsByCommandCap(
+          sourceUnits, selectedFactories, static_cast<std::uint32_t>(RULEUCC_Guard))) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const assistTarget = SCR_FromLua_Entity(targetObject, state);
+    target.UpdateTarget(assistTarget);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Guard);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedFactories, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F7530 (FUN_006F7530, cfunc_IssueTransportUnload)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueTransportUnloadL`.
+   */
+  int cfunc_IssueTransportUnload(lua_State* const luaContext)
+  {
+    return cfunc_IssueTransportUnloadL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F75A0 (FUN_006F75A0, cfunc_IssueTransportUnloadL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters transport-capable units, resolves the
+   * target to a ground-gun position, and queues `UNITCOMMAND_TransportUnloadUnits`
+   * on the selection.
+   */
+  int cfunc_IssueTransportUnloadL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTransportUnloadHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueTransportUnloadHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Transport)) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueTransportUnloadHelpText, LuaPlus::LuaStackObject(state, 2));
+    const Wm3::Vec3f groundPosition = target.GetTargetPosGun(false);
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadUnits);
+    commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+    commandIssueData.mTarget.mPos = groundPosition;
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F77E0 (FUN_006F77E0, cfunc_IssueTeleportToBeacon)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueTeleportToBeaconL`.
+   */
+  int cfunc_IssueTeleportToBeacon(lua_State* const luaContext)
+  {
+    return cfunc_IssueTeleportToBeaconL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F7850 (FUN_006F7850, cfunc_IssueTeleportToBeaconL)
+   *
+   * What it does:
+   * Parses `(unitList, target)`, filters transport-capable units, resolves the
+   * target payload, and queues `UNITCOMMAND_TransportUnloadUnits` on the
+   * selection.
+   */
+  int cfunc_IssueTeleportToBeaconL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTeleportToBeaconHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueTeleportToBeaconHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Transport)) {
+      return 0;
+    }
+
+    CAiTarget target{};
+    target.SetTarget(state, kIssueTeleportToBeaconHelpText, LuaPlus::LuaStackObject(state, 2));
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    selectedUnits.AddUnits(filteredUnits);
+
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadUnits);
+    target.EncodeToSSTITarget(commandIssueData.mTarget);
+    (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    return 0;
   }
 
   /**

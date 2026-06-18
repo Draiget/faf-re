@@ -38,14 +38,7 @@ namespace moho
   int cfunc_GenerateBuildTemplateFromSelection(lua_State*) { return 0; }
   int cfunc_GetSessionClients(lua_State*) { return 0; }
   int cfunc_IssueBuildMobile(lua_State*) { return 0; }
-  int cfunc_IssueDive(lua_State*) { return 0; }
-  int cfunc_IssueFactoryAssist(lua_State*) { return 0; }
-  int cfunc_IssueMove(lua_State*) { return 0; }
-  int cfunc_IssueNuke(lua_State*) { return 0; }
   int cfunc_IssueSacrifice(lua_State*) { return 0; }
-  int cfunc_IssueTeleport(lua_State*) { return 0; }
-  int cfunc_IssueTeleportToBeacon(lua_State*) { return 0; }
-  int cfunc_IssueTransportUnload(lua_State*) { return 0; }
   int cfunc_LoadSavedGame(lua_State*) { return 0; }
   int cfunc_PrefetchSession(lua_State*) { return 0; }
   int cfunc_UnitHasMeleeSpaceAroundTarget(lua_State*) { return 0; }
@@ -59,8 +52,6 @@ namespace moho
   int cfunc_CPlatoonAggressiveMoveToLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonCanFormPlatoonL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonDestroyL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonFerryToLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState*) { return 0; }
@@ -68,20 +59,16 @@ namespace moho
   int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonGetFerryBeaconsL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonGuardTargetL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonMoveToLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonPatrolL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonUnloadAllAtLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonUnloadUnitsAtLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonUseFerryBeaconL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonUseTeleporterL(LuaPlus::LuaState*) { return 0; }
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState*) { return 0; }
   int cfunc_GetRolloverInfoL(LuaPlus::LuaState*) { return 0; }
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState*) { return 0; }
   int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState*) { return 0; }
   int cfunc_IssueDockCommandL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_IssueTacticalL(LuaPlus::LuaState*) { return 0; }
   int cfunc_OpenURLL(LuaPlus::LuaState*) { return 0; }
   int cfunc_SetActiveBuildTemplateL(LuaPlus::LuaState*) { return 0; }
   int cfunc_UISelectionByCategoryL(LuaPlus::LuaState*) { return 0; }
