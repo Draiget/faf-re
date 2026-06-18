@@ -224,6 +224,36 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> LoadUnits(const EntityCategorySet* categorySet);
 
     /**
+     * Address: 0x00729D20 (FUN_00729D20, Moho::CPlatoon::UseTeleporter)
+     *
+     * What it does:
+     * Gathers units from the matching squad classes, appends the teleporter
+     * unit, issues one `UNITCOMMAND_TransportLoadUnits` targeting the teleporter,
+     * and returns the issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseTeleporter(Unit* teleporter, ESquadClass squadClass);
+
+    /**
+     * Address: 0x00728700 (FUN_00728700, Moho::CPlatoon::FerryToLocation)
+     *
+     * What it does:
+     * Snaps `targetPos.y` to the terrain/water surface, gathers transport-capable
+     * units across all squads, issues one `UNITCOMMAND_Ferry` to that ground
+     * point, and returns the issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> FerryToLocation(Wm3::Vector3f& targetPos);
+
+    /**
+     * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
+     *
+     * What it does:
+     * Gathers transport/carrier units across all squads and issues one
+     * `UNITCOMMAND_TransportUnloadUnits` to `targetPos`, returning the issued
+     * command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadAllAtLocation(const Wm3::Vector3f& targetPos);
+
+    /**
      * Address: 0x00729FE0 (FUN_00729FE0, Moho::CPlatoon::SquadsHaveOrders)
      *
      * What it does:
