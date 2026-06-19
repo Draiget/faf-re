@@ -42,7 +42,6 @@ namespace moho
   int cfunc_LoadSavedGame(lua_State*) { return 0; }
   int cfunc_PrefetchSession(lua_State*) { return 0; }
   int cfunc_UnitHasMeleeSpaceAroundTarget(lua_State*) { return 0; }
-  int cfunc_UnitMeleeWarpAdjacentToTarget(lua_State*) { return 0; }
   int func_FlushEvents(lua_State*) { return 0; }
 }
 

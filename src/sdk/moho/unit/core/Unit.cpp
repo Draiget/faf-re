@@ -4891,6 +4891,97 @@ CScrLuaInitForm* moho::func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef()
 }
 
 /**
+ * Address: 0x006CDF50 (FUN_006CDF50, cfunc_UnitMeleeWarpAdjacentToTargetL)
+ *
+ * IDA signature:
+ * int __thiscall cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState *this);
+ *
+ * What it does:
+ * Reads `(meleeUnit, target)`, computes the target footprint-origin cell, and
+ * asks the melee unit whether it has adjacent melee space around the target
+ * (large-target check for mobile multi-cell targets, otherwise the small-target
+ * check). When space exists, converts the (possibly adjusted) cell back to a
+ * world position using the melee unit's footprint, orients the melee unit toward
+ * the target, and warps it to that adjacent transform.
+ */
+int moho::cfunc_UnitMeleeWarpAdjacentToTargetL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitMeleeWarpAdjacentToTargetHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject meleeUnitObject(LuaPlus::LuaStackObject(state, 1));
+  Unit* const meleeUnit = SCR_FromLua_Unit(meleeUnitObject);
+
+  const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+  Unit* const target = SCR_FromLua_Unit(targetObject);
+
+  const SFootprint& targetFootprint = target->GetFootprint();
+  const Wm3::Vec3f& targetPosition = target->GetPosition();
+
+  SOCellPos cell{};
+  cell.x = static_cast<std::int16_t>(static_cast<int>(targetPosition.x - (targetFootprint.mSizeX * 0.5f)));
+  cell.z = static_cast<std::int16_t>(static_cast<int>(targetPosition.z - (targetFootprint.mSizeZ * 0.5f)));
+
+  bool hasMeleeSpace = false;
+  if (target->IsMobile()) {
+    const SFootprint& mobileFootprint = target->GetFootprint();
+    const int targetSize = std::max<int>(mobileFootprint.mSizeX, mobileFootprint.mSizeZ);
+    if (targetSize > 1) {
+      if (!meleeUnit->HasMeleeSpaceAroundLargeTarget(target, &cell, 1)) {
+        return 0;
+      }
+      hasMeleeSpace = true;
+    }
+  }
+  if (!hasMeleeSpace) {
+    hasMeleeSpace = meleeUnit->HasMeleeSpaceAroundSmallTarget(target, &cell);
+  }
+
+  if (hasMeleeSpace) {
+    const STIMap* const mapData = meleeUnit->SimulationRef->mMapData;
+    const SFootprint& meleeFootprint = meleeUnit->GetFootprint();
+    // The binary forwards the melee unit's footprint occupancy-cap byte as the
+    // layer selector for the cell->world conversion (preserved 1:1).
+    const Wm3::Vec3f worldPosition = COORDS_ToWorldPos(
+      mapData,
+      cell,
+      static_cast<ELayer>(static_cast<std::uint8_t>(meleeFootprint.mOccupancyCaps)),
+      meleeFootprint.mSizeX,
+      meleeFootprint.mSizeZ
+    );
+
+    const Wm3::Vec3f& warpTargetPosition = target->GetPosition();
+    Wm3::Vec3f facingDirection{
+      warpTargetPosition.x - worldPosition.x,
+      warpTargetPosition.y - worldPosition.y,
+      warpTargetPosition.z - worldPosition.z,
+    };
+    Wm3::Vector3f::Normalize(&facingDirection);
+
+    const Wm3::Quaternionf orientation = COORDS_Orient(facingDirection);
+    const VTransform warpTransform(worldPosition, orientation);
+    meleeUnit->Warp(warpTransform);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x006CDED0 (FUN_006CDED0, cfunc_UnitMeleeWarpAdjacentToTarget)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_UnitMeleeWarpAdjacentToTargetL`.
+ */
+int moho::cfunc_UnitMeleeWarpAdjacentToTarget(lua_State* const luaContext)
+{
+  return cfunc_UnitMeleeWarpAdjacentToTargetL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
  * Address: 0x006CDEF0 (FUN_006CDEF0, func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef)
  *
  * What it does:
