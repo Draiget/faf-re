@@ -10041,7 +10041,7 @@ namespace moho
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
       SWldSessionInfo* const pendingSession = gPendingWldSessionInfo;
       if (loader != nullptr && pendingSession != nullptr) {
-        LaunchInfoBase* const launchInfo = pendingSession->mLaunchInfo.px;
+        LaunchInfoBase* const launchInfo = pendingSession->mLaunchInfo.get();
         if (launchInfo != nullptr) {
           // Binary slot 2 dispatch on `IWldSessionLoader` is
           // `GetScenarioInfo(mapName, &mGameMods, setGameData)`. The retail

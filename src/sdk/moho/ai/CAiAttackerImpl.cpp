@@ -686,8 +686,8 @@ CAiAttackerImpl::~CAiAttackerImpl()
 
   // Delete owned CAcquireTargetTask* entries via their virtual dtor.
   // For default-constructed CAiAttackerImpl (mTasks empty), this loop
-  // body is skipped because _Myfirst is null.
-  if (view->mTasks._Myfirst != nullptr) {
+  // body is skipped.
+  if (!view->mTasks.empty()) {
     for (CAcquireTargetTask* const task : view->mTasks) {
       delete task;
     }
@@ -699,7 +699,7 @@ CAiAttackerImpl::~CAiAttackerImpl()
   std::destroy_at(&view->mThread);
 
   // Delete owned UnitWeapon* entries via their virtual dtor.
-  if (view->mWeapons._Myfirst != nullptr) {
+  if (!view->mWeapons.empty()) {
     for (UnitWeapon* const weapon : view->mWeapons) {
       delete weapon;
     }
@@ -779,18 +779,16 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   *listenerNext = bytes + 0x04;
   *listenerPrev = bytes + 0x04;
 
-  // CScriptObject base subobject at +0x0C. Placement-new sets its own
-  // vtable pointer (+0x0C) and zero-inits its fields. The binary
-  // additionally overrides this slot with the
-  // `??_7CAiAttackerImpl@@6BCScriptObject@@@` thunk-vftable for
-  // multi-base virtual dispatch — that override is out of scope for
-  // the recovered class declaration (CAiAttackerImpl doesn't inherit
-  // CScriptObject in src/sdk/**), so the embedded subobject's own
-  // vtable stays in place after construction. Virtual dispatch via
-  // direct pointer to the embedded base still terminates at
-  // CScriptObject's methods, matching the binary's CScriptObject
-  // base-class call behavior.
-  ::new (bytes + 0x0C) CScriptObject();
+  // CScriptObject base subobject at +0x0C. The binary constructs it here and
+  // overrides the slot with the `??_7CAiAttackerImpl@@6BCScriptObject@@@`
+  // thunk-vftable for multi-base virtual dispatch. CScriptObject is an abstract
+  // class (pure `GetClass`/`GetDerivedObjectRef`, protected ctor), so it cannot
+  // be constructed in isolation, and the recovered CAiAttackerImpl deliberately
+  // does not inherit CScriptObject. The memset above already zero-initialises
+  // the subobject's field lanes; the embedded subobject's vtable pointer is left
+  // null because nothing in the recovered CAiAttackerImpl dispatches a virtual
+  // through it (the runtime CScriptObject vtable/thunk setup belongs to the
+  // not-yet-modeled multi-base inheritance and is out of scope here).
 
   // Typed-view access for the remaining named fields.
   CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);

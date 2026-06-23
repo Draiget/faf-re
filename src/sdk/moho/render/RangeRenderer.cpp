@@ -1714,11 +1714,12 @@ namespace moho
       return;
     }
 
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-    static_assert(
-      kSelectionOwnerLinkOffset == 0x08,
-      "UserEntity selection weak-link offset must remain 0x08 (recovery contract)"
-    );
+    // UserEntity::mIUnitChainHead sits at +0x08. `offsetof` on UserEntity is
+    // not a usable constant expression here (UserEntity is non-standard-layout:
+    // it derives from the polymorphic WeakObject), so the offset is taken as the
+    // documented recovery contract literal. The actual layout is enforced by the
+    // `static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08)` in UserEntity.h.
+    constexpr std::uintptr_t kSelectionOwnerLinkOffset = 0x08;
 
     for (const SSelectionWeakRefUserEntity* candidate = begin; candidate != end; ++candidate) {
       void* const ownerLinkSlot = candidate->mOwnerLinkSlot;

@@ -21,6 +21,10 @@ extern "C" TString* luaS_newlstr(lua_State* state, const char* str, std::size_t 
 extern "C" Table* luaH_new(lua_State* state, int narray, int lnhash);
 extern "C" const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);
 extern "C" void luaC_link(lua_State* L, GCObject* object, int typeTag);
+// Lua nil sentinel TObject (defined with C linkage in LuaObject.cpp). Declared
+// extern "C" at global scope so unqualified use inside namespace LuaPlus binds
+// to the same `_luaO_nilobject` symbol.
+extern "C" const LuaPlus::TObject luaO_nilobject;
 
 namespace gpg
 {

@@ -22456,7 +22456,7 @@ namespace
  * Matches one mouse-event double-click selector lane (`-1/1/2/3`) against
  * event type lane `+0x0C` using left/middle/right-dclick wx event constants.
  */
-bool wxMouseEventMatchesDoubleClickSelectorRuntime(
+bool wxMouseEventMatchesDoubleClickSelectorRuntime_Impl(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22502,7 +22502,7 @@ bool wxMouseEventMatchesDoubleClickSelectorRuntime(
  * Matches one mouse-event press selector lane (`-1/1/2/3`) against event
  * type lane `+0x0C` using left/middle/right-down wx event constants.
  */
-bool wxMouseEventMatchesPressSelectorRuntime(
+bool wxMouseEventMatchesPressSelectorRuntime_Impl(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22548,7 +22548,7 @@ bool wxMouseEventMatchesPressSelectorRuntime(
  * Matches one mouse-event release selector lane (`-1/1/2/3`) against event
  * type lane `+0x0C` using left/middle/right-up wx event constants.
  */
-bool wxMouseEventMatchesReleaseSelectorRuntime(
+bool wxMouseEventMatchesReleaseSelectorRuntime_Impl(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22610,9 +22610,9 @@ bool wxMouseEventMatchesReleaseSelectorRuntime(
   );
 
   if (selector == -1) {
-    return wxMouseEventMatchesReleaseSelectorRuntime(mouseEventRuntime, -1)
-      || wxMouseEventMatchesPressSelectorRuntime(mouseEventRuntime, -1)
-      || wxMouseEventMatchesDoubleClickSelectorRuntime(mouseEventRuntime, -1);
+    return wxMouseEventMatchesReleaseSelectorRuntime_Impl(mouseEventRuntime, -1)
+      || wxMouseEventMatchesPressSelectorRuntime_Impl(mouseEventRuntime, -1)
+      || wxMouseEventMatchesDoubleClickSelectorRuntime_Impl(mouseEventRuntime, -1);
   }
 
   const auto* const eventView = static_cast<const WxMouseEventTypeRuntimeView*>(mouseEventRuntime);
@@ -22643,7 +22643,7 @@ bool wxMouseEventMatchesReleaseSelectorRuntime(
  * Returns the first mouse-button selector lane (`1..3`) that matches current
  * event type through `FUN_00979430`, or `-1` when none matches.
  */
-std::int32_t wxMouseEventResolveButtonSelectorRuntime(const void* const mouseEventRuntime) noexcept
+std::int32_t wxMouseEventResolveButtonSelectorRuntime_Impl(const void* const mouseEventRuntime) noexcept
 {
   for (std::int32_t selector = 1; selector <= 3; ++selector) {
     if (wxMouseEventMatchesButtonSelectorRuntime(mouseEventRuntime, selector)) {
@@ -27225,6 +27225,28 @@ namespace
   constexpr wchar_t kWxProfileMissingSentinel[] = L"$$default";
   constexpr std::size_t kWxProfileReadBufferChars = 1000u;
 } // namespace
+
+// External-linkage forwarders for the wx mouse-event selector helpers. The real
+// bodies live in this file's anonymous namespace (internal linkage); the
+// canonical global symbols (non-const-pointer params, matching the cross-TU
+// forward declarations in UiRuntimeTypes.cpp) are provided here so other
+// translation units link against them.
+bool wxMouseEventMatchesDoubleClickSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept
+{
+  return wxMouseEventMatchesDoubleClickSelectorRuntime_Impl(mouseEventRuntime, selector);
+}
+bool wxMouseEventMatchesPressSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept
+{
+  return wxMouseEventMatchesPressSelectorRuntime_Impl(mouseEventRuntime, selector);
+}
+bool wxMouseEventMatchesReleaseSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept
+{
+  return wxMouseEventMatchesReleaseSelectorRuntime_Impl(mouseEventRuntime, selector);
+}
+std::int32_t wxMouseEventResolveButtonSelectorRuntime(const void* mouseEventRuntime) noexcept
+{
+  return wxMouseEventResolveButtonSelectorRuntime_Impl(mouseEventRuntime);
+}
 
 /**
  * Address: 0x009C7970 (FUN_009C7970, sub_9C7970)
