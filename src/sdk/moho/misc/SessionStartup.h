@@ -230,6 +230,7 @@ namespace moho
    * `cfunc_LoadSavedGameL`.
    */
   int cfunc_LoadSavedGame(lua_State* luaContext);
+  int cfunc_LoadSavedGameL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00880C60 (FUN_00880C60, func_LoadSavedGame_LuaFuncDef)

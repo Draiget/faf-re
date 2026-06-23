@@ -28,6 +28,7 @@
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/MotorFallDown.h"
+#include "moho/entity/MotorSinkAway.h"
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/entity/intel/CIntel.h"
@@ -2080,6 +2081,7 @@ namespace moho
   int cfunc_EntityFallDownL(LuaPlus::LuaState* state);
   int cfunc_MotorFallDownWhack(lua_State* luaContext);
   int cfunc_EntitySinkAway(lua_State* luaContext);
+  int cfunc_EntitySinkAwayL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x005BD530 (FUN_005BD530, Moho::EntityAttributes::GetRange)
@@ -7886,6 +7888,54 @@ namespace moho
       kMotorFallDownWhackHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x006969E0 (FUN_006969E0, cfunc_EntitySinkAway)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_EntitySinkAwayL`.
+   */
+  int cfunc_EntitySinkAway(lua_State* const luaContext)
+  {
+    return cfunc_EntitySinkAwayL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00696A60 (FUN_00696A60, cfunc_EntitySinkAwayL)
+   *
+   * What it does:
+   * Reads `(entity, sinkDeltaY)`, creates one `MotorSinkAway` motor bound to the
+   * Lua state and sink velocity, sets it on the entity, and returns the motor
+   * Lua object.
+   */
+  int cfunc_EntitySinkAwayL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntitySinkAwayHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+    Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+    LuaPlus::LuaStackObject sinkArg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&sinkArg, "number");
+    }
+    const float sinkDeltaY = static_cast<float>(lua_tonumber(rawState, 2));
+
+    MotorSinkAway* const motor = new MotorSinkAway(state, sinkDeltaY);
+    motor->mLuaObj.PushStack(state);
+
+    msvc8::auto_ptr<EntityMotor> motorOwnership(motor);
+    entity->SetMotor(motorOwnership);
+    return 1;
   }
 
   /**
