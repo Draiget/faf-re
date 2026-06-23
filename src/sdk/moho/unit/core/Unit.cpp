@@ -4891,6 +4891,68 @@ CScrLuaInitForm* moho::func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef()
 }
 
 /**
+ * Address: 0x006CDD10 (FUN_006CDD10, cfunc_UnitHasMeleeSpaceAroundTargetL)
+ *
+ * IDA signature:
+ * int __thiscall cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState *this);
+ *
+ * What it does:
+ * Reads `(meleeUnit, target)`, computes the target footprint-origin cell, and
+ * pushes whether the melee unit has adjacent melee space around the target
+ * (large-target check for mobile multi-cell targets, otherwise the small-target
+ * check). Returns the boolean to Lua.
+ */
+int moho::cfunc_UnitHasMeleeSpaceAroundTargetL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitHasMeleeSpaceAroundTargetHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject meleeUnitObject(LuaPlus::LuaStackObject(state, 1));
+  Unit* const meleeUnit = SCR_FromLua_Unit(meleeUnitObject);
+
+  const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+  Unit* const target = SCR_FromLua_Unit(targetObject);
+
+  const SFootprint& targetFootprint = target->GetFootprint();
+  const Wm3::Vec3f& targetPosition = target->GetPosition();
+
+  SOCellPos cell{};
+  cell.x = static_cast<std::int16_t>(static_cast<int>(targetPosition.x - (targetFootprint.mSizeX * 0.5f)));
+  cell.z = static_cast<std::int16_t>(static_cast<int>(targetPosition.z - (targetFootprint.mSizeZ * 0.5f)));
+
+  bool useLargeTargetCheck = false;
+  if (target->IsMobile()) {
+    const SFootprint& mobileFootprint = target->GetFootprint();
+    if (std::max<int>(mobileFootprint.mSizeX, mobileFootprint.mSizeZ) > 1) {
+      useLargeTargetCheck = true;
+    }
+  }
+
+  const bool hasMeleeSpace = useLargeTargetCheck
+    ? meleeUnit->HasMeleeSpaceAroundLargeTarget(target, &cell, 1)
+    : meleeUnit->HasMeleeSpaceAroundSmallTarget(target, &cell);
+
+  lua_pushboolean(rawState, hasMeleeSpace ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x006CDC90 (FUN_006CDC90, cfunc_UnitHasMeleeSpaceAroundTarget)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_UnitHasMeleeSpaceAroundTargetL`.
+ */
+int moho::cfunc_UnitHasMeleeSpaceAroundTarget(lua_State* const luaContext)
+{
+  return cfunc_UnitHasMeleeSpaceAroundTargetL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
  * Address: 0x006CDF50 (FUN_006CDF50, cfunc_UnitMeleeWarpAdjacentToTargetL)
  *
  * IDA signature:

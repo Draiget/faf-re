@@ -815,6 +815,43 @@ namespace moho
   }
 
   /**
+   * Address: 0x00880C40 (FUN_00880C40, cfunc_LoadSavedGame)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_LoadSavedGameL`.
+   */
+  int cfunc_LoadSavedGame(lua_State* const luaContext)
+  {
+    return cfunc_LoadSavedGameL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00880CC0 (FUN_00880CC0, cfunc_LoadSavedGameL)
+   *
+   * What it does:
+   * Parses one `(filename)` argument, builds a `CSavedGame`, and creates the
+   * single-player session info that starts loading the saved game.
+   */
+  int cfunc_LoadSavedGameL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLoadSavedGameHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaStackObject filenameArg(state, 1);
+    const char* const filename = lua_tostring(rawState, 1);
+    if (filename == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&filenameArg, "string");
+    }
+
+    CSavedGame savedGame(filename);
+    (void)savedGame.CreateSinglePlayerSessionInfo();
+    return 0;
+  }
+
+  /**
    * Address: 0x00880C60 (FUN_00880C60, func_LoadSavedGame_LuaFuncDef)
    *
    * What it does:
