@@ -2189,7 +2189,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t GetUserUnitCommandCapsMask(moho::UserUnit* const userUnit) noexcept
   {
-    moho::IUnit* const iunit = moho::ResolveIUnitBridge(userUnit);
+    moho::IUnit* const iunit = ResolveIUnitBridge(userUnit);
     if (iunit == nullptr) {
       return 0u;
     }

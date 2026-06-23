@@ -819,7 +819,11 @@ extern "C"
 	void luaX_checklimit(void* ls, int v, int l, const char* what);
 	void luaX_syntaxerror(void* ls, const char* msg);
 	TString* luaS_newlstr(lua_State* L, const char* str, size_t len);
-	extern const TObject luaO_nilobject;
+	// Lua nil sentinel TObject. The Lua VM core that originally owned this
+	// global is not part of the recovered link set, so it is defined here with
+	// external linkage (extern + initializer). A default-constructed TObject is
+	// the nil value (tt == LUA_TNIL, value.p == nullptr).
+	extern const TObject luaO_nilobject{};
 	int luaO_rawequalObj(const TObject* t1, const TObject* t2);
 	Node* luaH_mainposition(const Table* t, const TObject* key);
 	const TObject* luaH_getany(const TObject* key, Table* t);

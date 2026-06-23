@@ -6478,7 +6478,7 @@ namespace
    * `gpg::RRef_ManyToOneListener_EProjectileImpactEvent` lane as `unowned`
    * tracked-pointer state into one write archive lane.
    */
-  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
+  void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
     gpg::WriteArchive* archive,
     std::uint32_t* intrusiveListHeadSlot
   )
@@ -8548,7 +8548,7 @@ namespace
    * What it does:
    * Writes one reflected `gpg::RRef_CArmyStatItem` owner-field lane as `owned` tracked-pointer state into one write archive lane.
    */
-  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(gpg::WriteArchive* archive, int ownerToken)
+  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1_Impl(gpg::WriteArchive* archive, int ownerToken)
   {
     struct OwnerFieldView
     {
@@ -11261,10 +11261,10 @@ namespace gpg
    * symbol resolution now reaches the real body.
    */
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
-    gpg::WriteArchive* const archive, std::uint32_t* const intrusiveListHeadSlot
+    gpg::WriteArchive* archive, std::uint32_t* intrusiveListHeadSlot
   )
   {
-    ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
+    ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
       archive, intrusiveListHeadSlot
     );
   }
@@ -11279,9 +11279,9 @@ namespace gpg
    * reflection-table save-callback slot — no rewire needed.
    */
   void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(
-    gpg::WriteArchive* const archive, const int ownerToken
+    gpg::WriteArchive* archive, int ownerToken
   )
   {
-    ::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(archive, ownerToken);
+    ::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1_Impl(archive, ownerToken);
   }
 } // namespace gpg

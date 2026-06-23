@@ -3583,7 +3583,7 @@ namespace moho
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&armyStats, statPath);
       item->SynchronizeAsFloat();
 
-      volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+      volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
       std::int32_t desiredBits = 0;
       std::memcpy(&desiredBits, &value, sizeof(desiredBits));
       for (;;) {
@@ -3695,7 +3695,7 @@ namespace moho
       {
         CArmyStatItem* const shotsFired = armyStats->GetItem(shotsFiredPath.c_str());
         shotsFired->Synchronize();
-        (void)_InterlockedExchangeAdd(&shotsFired->mPrimaryValueBits, 1);
+        (void)_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&shotsFired->mPrimaryValueBits), 1);
       }
 
       // Number of shots fired so far, used to average the fire-range lanes.
