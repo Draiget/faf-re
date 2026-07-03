@@ -81733,16 +81733,11 @@ namespace moho::runtime
     return (value == 2) ? TRUE : FALSE;
   }
 
-  /**
-   * Address: 0x0077EDE0 (FUN_0077EDE0)
-   *
-   * What it does:
-   * Returns TRUE when pointed dword is non-zero, otherwise FALSE.
-   */
-  BOOL __stdcall LegacyIsPointedDwordNonZeroRuntimeLaneAlpha(const std::uint32_t* const valuePointer)
-  {
-    return (valuePointer[0] != 0U) ? TRUE : FALSE;
-  }
+  // NOTE: FUN_0077EDE0 was previously transcribed here as a generic runtime
+  // helper (LegacyIsPointedDwordNonZeroRuntimeLaneAlpha). It is actually the
+  // GetCount vtable slot of gpg::RPointerType<moho::CDecalHandle> and is now
+  // recovered as a method of that specialization in
+  // gpg/core/reflection/Reflection.cpp (one-address-one-function).
 
   /**
    * Address: 0x00AC5A50 (FUN_00AC5A50)

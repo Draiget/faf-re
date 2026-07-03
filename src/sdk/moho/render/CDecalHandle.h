@@ -18,6 +18,7 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
 
     /**
       * Alias of FUN_007788B0 (non-canonical helper lane).
@@ -27,6 +28,14 @@ namespace moho
      */
     [[nodiscard]]
     static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0077E9F0 (FUN_0077E9F0, Moho::CDecalHandle::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `CDecalHandle*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x007788F0 (FUN_007788F0, Moho::CDecalHandle::CDecalHandle)

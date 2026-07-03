@@ -950,6 +950,15 @@ namespace gpg
   [[nodiscard]] RType* preregister_ShieldPointerTypeStartup();
 
   /**
+   * Address: 0x0077EBA0 (FUN_0077EBA0, preregister_CDecalHandlePointerTypeStartup)
+   *
+   * What it does:
+   * Preregisters the startup-owned pointer reflection descriptor for
+   * `moho::CDecalHandle*`.
+   */
+  [[nodiscard]] RType* preregister_CDecalHandlePointerTypeStartup();
+
+  /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
    * Address: 0x1001CEB0 (gpgcore.dll)
    *
@@ -2940,15 +2949,9 @@ namespace gpg
    */
   RRef* PackRRef_CDecalHandle_P(RRef* out, moho::CDecalHandle** value);
 
-  /**
-   * Address: 0x0077EAB0 (FUN_0077EAB0)
-   *
-   * What it does:
-   * Builds and caches one pointer-type name lane (`"Type*"`) for
-   * `moho::CDecalHandle*`.
-   */
-  const char* BuildCDecalHandlePointerTypeName();
-  msvc8::string* BuildCDecalHandlePointerLexical(msvc8::string* out, moho::CDecalHandle*** slot);
+  // FUN_0077EAB0 (GetName) and FUN_0077EC40 (GetLexical) are recovered as
+  // methods of RPointerType<moho::CDecalHandle> (below); the earlier free-helper
+  // declarations were re-homed into that specialization.
 
   /**
    * Address: 0x0077E390 (FUN_0077E390, gpg::RRef_CDecalHandle)
@@ -2968,14 +2971,10 @@ namespace gpg
    */
   RRef* PackRRef_CDecalHandle(RRef* out, moho::CDecalHandle* value);
 
-  /**
-   * Address: 0x0077EDF0 (FUN_0077EDF0)
-   *
-   * What it does:
-   * Builds one reflected reference from the `index`-th contiguous
-   * `CDecalHandle` lane starting at `(*firstElementSlot)`.
-   */
-  RRef* RRef_CDecalHandleArraySlot(RRef* out, moho::CDecalHandle* const* firstElementSlot, int index);
+  // FUN_0077EDF0 is the SubscriptIndex vtable slot of
+  // RPointerType<moho::CDecalHandle> (below); the earlier free-helper
+  // declaration (RRef_CDecalHandleArraySlot) was the same address and has been
+  // re-homed into that specialization.
 
   /**
    * Address: 0x005E0300 (FUN_005E0300, gpg::RRef_CAiAttackerImpl)
@@ -4651,6 +4650,84 @@ namespace gpg
     RType* GetPointeeType() const override;
   };
   static_assert(sizeof(RPointerType<moho::Shield>) == 0x68, "RPointerType<Shield> size must be 0x68");
+
+  /**
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::CDecalHandle> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x0077EEC0 (FUN_0077EEC0)
+     * Demangled: gpg::RPointerType_CDecalHandle::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x0077EAB0 (FUN_0077EAB0)
+     * Demangled: gpg::RPointerType_CDecalHandle::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x0077EC40 (FUN_0077EC40)
+     * Demangled: gpg::RPointerType_CDecalHandle::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x0077EDC0 (FUN_0077EDC0)
+     * Demangled: gpg::RPointerType_CDecalHandle::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0077EDD0 (FUN_0077EDD0)
+     * Demangled: gpg::RPointerType_CDecalHandle::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x0077EDF0 (FUN_0077EDF0)
+     * Demangled: gpg::RPointerType_CDecalHandle::SubscriptIndex
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0077EDE0 (FUN_0077EDE0)
+     * Demangled: gpg::RPointerType_CDecalHandle::GetCount
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0077EE30 (FUN_0077EE30)
+     * Demangled: gpg::RPointerType_CDecalHandle::AssignPointer
+     *
+     * What it does:
+     * Upcasts a reflected source reference to `CDecalHandle*` and stores it in
+     * the destination pointer slot.
+     */
+    void AssignPointer(void* obj, const RRef& from) const override;
+
+    /**
+     * Address: 0x0077EC10 (FUN_0077EC10)
+     * Demangled: gpg::RPointerType_CDecalHandle::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::CDecalHandle>) == 0x68, "RPointerType<CDecalHandle> size must be 0x68");
 
   /**
    * Source hints:

@@ -2514,18 +2514,11 @@ T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
 // FUN_00750510 is the AssignPointer vtable slot of RPointerType<moho::Shield>,
 // recovered as a method of that specialization (one-address-one-function).
 
-/**
- * Address: 0x0077EE30 (FUN_0077EE30)
- *
- * What it does:
- * Upcasts one reflected source reference to `CDecalHandle*` and stores it
- * into one destination pointer-slot lane.
- */
-[[maybe_unused]] void AssignCDecalHandlePointerSlotFromRef(void* const slotObject, gpg::RRef* const sourceRef)
-{
-  const gpg::RRef source = (sourceRef != nullptr) ? *sourceRef : gpg::RRef{};
-  AssignPointerSlotWithTypeCache<moho::CDecalHandle>(slotObject, source, moho::CDecalHandle::sType);
-}
+// FUN_0077EE30 is the AssignPointer vtable slot of
+// RPointerType<moho::CDecalHandle>, recovered as a method of that
+// specialization (one-address-one-function). The earlier free-helper
+// transcription (AssignCDecalHandlePointerSlotFromRef) was the same address
+// and has been re-homed into the specialization.
 
 template <class T>
 RRef MakePointeeRef(T* const object, RType* const baseType)
@@ -3926,6 +3919,7 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RPointerType<moho::CAcquireTargetTask> gCAcquireTargetTaskPointerType;
   gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
   gpg::RPointerType<moho::Shield> gShieldPointerType;
+  gpg::RPointerType<moho::CDecalHandle> gCDecalHandlePointerType;
   gpg::RPointerType<moho::RBlueprint> gRBlueprintPointerType;
   gpg::RPointerType<moho::UnitWeapon> gUnitWeaponPointerType;
   gpg::RPointerType<moho::IAniManipulator> gIAniManipulatorPointerType;
@@ -4745,6 +4739,7 @@ struct PointerTypeRegistration
         (void)gpg::preregister_CAcquireTargetTaskPointerTypeStartup();
         (void)gpg::preregister_SimArmyPointerTypeStartup();
         (void)gpg::preregister_ShieldPointerTypeStartup();
+        (void)gpg::preregister_CDecalHandlePointerTypeStartup();
         gpg::PreRegisterRType(typeid(moho::RBlueprint*), &gRBlueprintPointerType);
         gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &gUnitWeaponPointerType);
         gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &gIAniManipulatorPointerType);
@@ -4800,6 +4795,19 @@ gpg::RType* preregister_ShieldPointerTypeStartup()
 {
   gpg::PreRegisterRType(typeid(moho::Shield*), &gShieldPointerType);
   return &gShieldPointerType;
+}
+
+/**
+ * Address: 0x0077EBA0 (FUN_0077EBA0, preregister_CDecalHandlePointerTypeStartup)
+ *
+ * What it does:
+ * Preregisters the startup-owned pointer reflection descriptor for
+ * `moho::CDecalHandle*` and returns it.
+ */
+gpg::RType* preregister_CDecalHandlePointerTypeStartup()
+{
+  gpg::PreRegisterRType(typeid(moho::CDecalHandle*), &gCDecalHandlePointerType);
+  return &gCDecalHandlePointerType;
 }
 
 RType* RType::sType = nullptr;
@@ -9620,63 +9628,11 @@ gpg::RRef* PackRRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const v
   return out;
 }
 
-/**
- * Address: 0x0077EC40 (FUN_0077EC40)
- *
- * What it does:
- * Builds one bracketed lexical string (`[TypeLexical]`) for a reflected
- * `moho::CDecalHandle*` slot, or `"NULL"` when the slot is empty.
- */
-msvc8::string* BuildCDecalHandlePointerLexical(
-  msvc8::string* const out,
-  moho::CDecalHandle*** const slot)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
-
-  if (slot == nullptr || *slot == nullptr || **slot == nullptr) {
-    out->assign_owned("NULL");
-    return out;
-  }
-
-  gpg::RRef objectRef{};
-  (void)gpg::RRef_CDecalHandle(&objectRef, **slot);
-
-  gpg::RType* runtimeType = moho::CDecalHandle::sType;
-  if (runtimeType == nullptr) {
-    runtimeType = gpg::LookupRType(typeid(moho::CDecalHandle));
-    moho::CDecalHandle::sType = runtimeType;
-  }
-
-  const msvc8::string lexical = runtimeType != nullptr ? runtimeType->GetLexical(objectRef) : msvc8::string();
-  const msvc8::string bracketed = gpg::STR_Printf("[%s]", lexical.c_str());
-  out->assign_owned(bracketed.c_str());
-  return out;
-}
-
-/**
- * Address: 0x0077EAB0 (FUN_0077EAB0)
- *
- * What it does:
- * Builds and caches one pointer-type name lane (`"Type*"`) for
- * `moho::CDecalHandle*`, reusing the reflected `CDecalHandle::sType` cache.
- */
-const char* BuildCDecalHandlePointerTypeName()
-{
-  static msvc8::string sCachedName;
-  if (sCachedName.empty()) {
-    gpg::RType* runtimeType = moho::CDecalHandle::sType;
-    if (runtimeType == nullptr) {
-      runtimeType = gpg::LookupRType(typeid(moho::CDecalHandle));
-      moho::CDecalHandle::sType = runtimeType;
-    }
-
-    const char* const baseName = runtimeType != nullptr ? runtimeType->GetName() : "";
-    sCachedName.assign_owned(gpg::STR_Printf("%s*", baseName).c_str());
-  }
-  return sCachedName.c_str();
-}
+// FUN_0077EC40 (GetLexical) and FUN_0077EAB0 (GetName) are the corresponding
+// vtable slots of RPointerType<moho::CDecalHandle>, recovered as methods of
+// that specialization (one-address-one-function). The earlier free-helper
+// transcriptions (BuildCDecalHandlePointerLexical / BuildCDecalHandlePointerTypeName)
+// were the same two addresses and have been re-homed into the specialization.
 
 /**
  * Address: 0x0077E390 (FUN_0077E390, gpg::RRef_CDecalHandle)
@@ -9715,32 +9671,11 @@ gpg::RRef* PackRRef_CDecalHandle(RRef* const out, moho::CDecalHandle* const valu
   return out;
 }
 
-/**
- * Address: 0x0077EDF0 (FUN_0077EDF0)
- *
- * What it does:
- * Builds one reflected reference from the `index`-th contiguous
- * `CDecalHandle` lane starting at `(*firstElementSlot)`.
- */
-gpg::RRef* RRef_CDecalHandleArraySlot(
-  RRef* const out,
-  moho::CDecalHandle* const* const firstElementSlot,
-  const int index
-)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
-
-  moho::CDecalHandle* const firstElement = (firstElementSlot != nullptr) ? *firstElementSlot : nullptr;
-  if (firstElement == nullptr) {
-    out->mObj = nullptr;
-    out->mType = nullptr;
-    return out;
-  }
-
-  return RRef_CDecalHandle(out, firstElement + static_cast<std::ptrdiff_t>(index));
-}
+// FUN_0077EDF0 is the SubscriptIndex vtable slot of
+// RPointerType<moho::CDecalHandle>, recovered as a method of that
+// specialization (one-address-one-function). The earlier free-helper
+// transcription (RRef_CDecalHandleArraySlot) was the same address and has been
+// re-homed into the specialization.
 
 /**
  * Address: 0x005E0300 (FUN_005E0300, gpg::RRef_CAiAttackerImpl)
@@ -12653,6 +12588,131 @@ RType* gpg::RPointerType<moho::Shield>::GetPointeeType() const
         gShieldRRefType = gpg::LookupRType(typeid(moho::Shield));
     }
     return gShieldRRefType;
+}
+
+/**
+ * Address: 0x0077EEC0 (FUN_0077EEC0)
+ * Demangled: gpg::RPointerType_CDecalHandle::dtr
+ */
+gpg::RPointerType<moho::CDecalHandle>::~RPointerType() = default;
+
+/**
+ * Address: 0x0077EAB0 (FUN_0077EAB0)
+ * Demangled: gpg::RPointerType_CDecalHandle::GetName
+ *
+ * What it does:
+ * Builds and caches the `"CDecalHandle*"` pointer-type name lane from the
+ * pointee's reflected name.
+ */
+const char* gpg::RPointerType<moho::CDecalHandle>::GetName() const
+{
+    static msvc8::string cachedName;
+    if (cachedName.empty()) {
+        cachedName = BuildPointerName(GetPointeeType());
+    }
+    return cachedName.c_str();
+}
+
+/**
+ * Address: 0x0077EC40 (FUN_0077EC40)
+ * Demangled: gpg::RPointerType_CDecalHandle::GetLexical
+ *
+ * What it does:
+ * Renders a reflected `CDecalHandle*` slot as `"[<pointee lexical>]"`, or
+ * `"NULL"` when the slot is empty.
+ */
+msvc8::string gpg::RPointerType<moho::CDecalHandle>::GetLexical(const RRef& ref) const
+{
+    return BuildPointerLexical<moho::CDecalHandle>(ref.mObj, GetPointeeType());
+}
+
+/**
+ * Address: 0x0077EDC0 (FUN_0077EDC0)
+ * Demangled: gpg::RPointerType_CDecalHandle::IsIndexed
+ */
+const RIndexed* gpg::RPointerType<moho::CDecalHandle>::IsIndexed() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x0077EDD0 (FUN_0077EDD0)
+ * Demangled: gpg::RPointerType_CDecalHandle::IsPointer
+ */
+const RIndexed* gpg::RPointerType<moho::CDecalHandle>::IsPointer() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x0077EDF0 (FUN_0077EDF0)
+ * Demangled: gpg::RPointerType_CDecalHandle::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `CDecalHandle` in the array the
+ * pointer slot addresses (stride `sizeof(CDecalHandle)`).
+ */
+RRef gpg::RPointerType<moho::CDecalHandle>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::CDecalHandle**>(obj);
+    RRef out{};
+    gpg::RRef_CDecalHandle(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x0077EDE0 (FUN_0077EDE0)
+ * Demangled: gpg::RPointerType_CDecalHandle::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds at
+ * most one element).
+ */
+size_t gpg::RPointerType<moho::CDecalHandle>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::CDecalHandle* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
+ * Address: 0x0077EE30 (FUN_0077EE30)
+ * Demangled: gpg::RPointerType_CDecalHandle::AssignPointer
+ *
+ * What it does:
+ * Upcasts a reflected source reference to `CDecalHandle*` and stores it in the
+ * destination pointer slot.
+ */
+void gpg::RPointerType<moho::CDecalHandle>::AssignPointer(void* const obj, const RRef& from) const
+{
+    AssignPointerSlotWithTypeCache<moho::CDecalHandle>(obj, from, moho::CDecalHandle::sType);
+}
+
+/**
+ * Address: 0x0077EC10 (FUN_0077EC10)
+ * Demangled: gpg::RPointerType_CDecalHandle::Init
+ *
+ * What it does:
+ * Marks the descriptor active, records the pointer element size, and installs
+ * the per-`CDecalHandle` slot new/copy/delete/construct/move operation
+ * handlers.
+ */
+void gpg::RPointerType<moho::CDecalHandle>::Init()
+{
+    v24 = true;
+    size_ = sizeof(moho::CDecalHandle*);
+    newRefFunc_ = &NewPointerSlotRef<moho::CDecalHandle>;
+    cpyRefFunc_ = &CopyPointerSlotRef<moho::CDecalHandle>;
+    deleteFunc_ = &DeletePointerSlot<moho::CDecalHandle>;
+    ctorRefFunc_ = &ConstructPointerSlotRef<moho::CDecalHandle>;
+    movRefFunc_ = &MovePointerSlotRef<moho::CDecalHandle>;
+}
+
+RType* gpg::RPointerType<moho::CDecalHandle>::GetPointeeType() const
+{
+    if (moho::CDecalHandle::sType == nullptr) {
+        moho::CDecalHandle::sType = gpg::LookupRType(typeid(moho::CDecalHandle));
+    }
+    return moho::CDecalHandle::sType;
 }
 
 /**
