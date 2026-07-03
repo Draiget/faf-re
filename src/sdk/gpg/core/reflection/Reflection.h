@@ -932,6 +932,15 @@ namespace gpg
   [[nodiscard]] RType* preregister_CAcquireTargetTaskPointerTypeStartup();
 
   /**
+   * Address: 0x0074FE70 (FUN_0074FE70, preregister_SimArmyPointerTypeStartup)
+   *
+   * What it does:
+   * Preregisters the startup-owned pointer reflection descriptor for
+   * `moho::SimArmy*`.
+   */
+  [[nodiscard]] RType* preregister_SimArmyPointerTypeStartup();
+
+  /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
    * Address: 0x1001CEB0 (gpgcore.dll)
    *
@@ -2406,15 +2415,9 @@ namespace gpg
    */
   RRef* PackRRef_SimArmy(RRef* out, moho::SimArmy* value);
 
-  /**
-   * Address: 0x0074FD80 (FUN_0074FD80)
-   *
-   * What it does:
-   * Builds and caches one pointer-type name lane (`"Type*"`) for
-   * `moho::SimArmy*`.
-   */
-  const char* BuildSimArmyPointerTypeName();
-  msvc8::string* BuildSimArmyPointerLexical(msvc8::string* out, moho::SimArmy*** slot);
+  // FUN_0074FD80 (GetName) and FUN_0074FF10 (GetLexical) are recovered as
+  // methods of RPointerType<moho::SimArmy> (below); the earlier free-helper
+  // declarations were re-homed into that specialization.
 
   /**
    * Address: 0x00544EE0 (FUN_00544EE0, gpg::RRef_LaunchInfoNew)
@@ -4487,6 +4490,85 @@ namespace gpg
   static_assert(
     sizeof(RPointerType<moho::CAcquireTargetTask>) == 0x68, "RPointerType<CAcquireTargetTask> size must be 0x68"
   );
+
+  /**
+   * VFTABLE: 0x00E34864 (primary) / 0x00E34894 (RIndexed subobject @ +0x64)
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::SimArmy> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x00750630 (FUN_00750630)
+     * Demangled: gpg::RPointerType_SimArmy::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x0074FD80 (FUN_0074FD80)
+     * Demangled: gpg::RPointerType_SimArmy::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x0074FF10 (FUN_0074FF10)
+     * Demangled: gpg::RPointerType_SimArmy::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x00750090 (FUN_00750090)
+     * Demangled: gpg::RPointerType_SimArmy::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x007500A0 (FUN_007500A0)
+     * Demangled: gpg::RPointerType_SimArmy::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x007500C0 (FUN_007500C0)
+     * Demangled: gpg::RPointerType_SimArmy::SubscriptIndex
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x007500B0 (FUN_007500B0)
+     * Demangled: gpg::RPointerType_SimArmy::GetCount
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x00750100 (FUN_00750100)
+     * Demangled: gpg::RPointerType_SimArmy::AssignPointer
+     *
+     * What it does:
+     * Upcasts a reflected source reference to `SimArmy*` and stores it in the
+     * destination pointer slot.
+     */
+    void AssignPointer(void* obj, const RRef& from) const override;
+
+    /**
+     * Address: 0x0074FEE0 (FUN_0074FEE0)
+     * Demangled: gpg::RPointerType_SimArmy::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::SimArmy>) == 0x68, "RPointerType<SimArmy> size must be 0x68");
 
   /**
    * Source hints:

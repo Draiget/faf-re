@@ -67,7 +67,10 @@ namespace moho
    * Address: 0x0074E550 (FUN_0074E550, Moho::SimArmy::GetPointerType)
    *
    * What it does:
-   * Lazily resolves and caches reflected RTTI for `SimArmy*`.
+   * Lazily resolves and caches the reflected pointer type for `SimArmy*` by
+   * driving the startup registrar `preregister_SimArmyPointerTypeStartup`
+   * (FUN_0074FE70), falling back to a plain `LookupRType` when the descriptor
+   * is not yet registered.
    */
   gpg::RType* SimArmy::GetPointerType()
   {
@@ -75,7 +78,10 @@ namespace moho
 
     gpg::RType* cached = sPointerType;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(SimArmy*));
+      cached = gpg::preregister_SimArmyPointerTypeStartup();
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(SimArmy*));
+      }
       sPointerType = cached;
     }
 

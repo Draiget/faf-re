@@ -929,6 +929,16 @@ RType* CachedCAcquireTargetTaskType()
     return cached;
 }
 
+RType* CachedSimArmyType()
+{
+    RType* cached = moho::SimArmy::sType;
+    if (!cached) {
+        cached = gpg::LookupRType(typeid(moho::SimArmy));
+        moho::SimArmy::sType = cached;
+    }
+    return cached;
+}
+
 RType* CachedEntityType()
 {
     static RType* cached = nullptr;
@@ -3934,6 +3944,7 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::Rect2fSerializer gRect2fSerializer;
   gpg::RPointerType<moho::CTaskThread> gCTaskThreadPointerType;
   gpg::RPointerType<moho::CAcquireTargetTask> gCAcquireTargetTaskPointerType;
+  gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
   gpg::RPointerType<moho::RBlueprint> gRBlueprintPointerType;
   gpg::RPointerType<moho::UnitWeapon> gUnitWeaponPointerType;
   gpg::RPointerType<moho::IAniManipulator> gIAniManipulatorPointerType;
@@ -4751,6 +4762,7 @@ struct PointerTypeRegistration
     PointerTypeRegistration()
     {
         (void)gpg::preregister_CAcquireTargetTaskPointerTypeStartup();
+        (void)gpg::preregister_SimArmyPointerTypeStartup();
         gpg::PreRegisterRType(typeid(moho::RBlueprint*), &gRBlueprintPointerType);
         gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &gUnitWeaponPointerType);
         gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &gIAniManipulatorPointerType);
@@ -4780,6 +4792,19 @@ gpg::RType* preregister_CAcquireTargetTaskPointerTypeStartup()
 {
   gpg::PreRegisterRType(typeid(moho::CAcquireTargetTask*), &gCAcquireTargetTaskPointerType);
   return &gCAcquireTargetTaskPointerType;
+}
+
+/**
+ * Address: 0x0074FE70 (FUN_0074FE70, preregister_SimArmyPointerTypeStartup)
+ *
+ * What it does:
+ * Preregisters the startup-owned pointer reflection descriptor for
+ * `moho::SimArmy*` and returns it.
+ */
+gpg::RType* preregister_SimArmyPointerTypeStartup()
+{
+  gpg::PreRegisterRType(typeid(moho::SimArmy*), &gSimArmyPointerType);
+  return &gSimArmyPointerType;
 }
 
 RType* RType::sType = nullptr;
@@ -8510,61 +8535,12 @@ gpg::RRef* PackRRef_SimArmy(RRef* const out, moho::SimArmy* const value)
   return out;
 }
 
-/**
- * Address: 0x0074FF10 (FUN_0074FF10)
- *
- * What it does:
- * Builds one bracketed lexical string (`[TypeLexical]`) for a reflected
- * `moho::SimArmy*` slot, or `"NULL"` when the slot is empty.
- */
-msvc8::string* BuildSimArmyPointerLexical(msvc8::string* const out, moho::SimArmy*** const slot)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
-
-  if (slot == nullptr || *slot == nullptr || **slot == nullptr) {
-    out->assign_owned("NULL");
-    return out;
-  }
-
-  gpg::RRef objectRef{};
-  (void)gpg::RRef_SimArmy(&objectRef, **slot);
-
-  gpg::RType* runtimeType = moho::SimArmy::sType;
-  if (runtimeType == nullptr) {
-    runtimeType = gpg::LookupRType(typeid(moho::SimArmy));
-    moho::SimArmy::sType = runtimeType;
-  }
-
-  const msvc8::string lexical = runtimeType != nullptr ? runtimeType->GetLexical(objectRef) : msvc8::string();
-  const msvc8::string bracketed = gpg::STR_Printf("[%s]", lexical.c_str());
-  out->assign_owned(bracketed.c_str());
-  return out;
-}
-
-/**
- * Address: 0x0074FD80 (FUN_0074FD80)
- *
- * What it does:
- * Builds and caches one pointer-type name lane (`"Type*"`) for
- * `moho::SimArmy*`, reusing the reflected `SimArmy::sType` lookup cache.
- */
-const char* BuildSimArmyPointerTypeName()
-{
-  static msvc8::string sCachedName;
-  if (sCachedName.empty()) {
-    gpg::RType* runtimeType = moho::SimArmy::sType;
-    if (runtimeType == nullptr) {
-      runtimeType = gpg::LookupRType(typeid(moho::SimArmy));
-      moho::SimArmy::sType = runtimeType;
-    }
-
-    const char* const baseName = runtimeType != nullptr ? runtimeType->GetName() : "";
-    sCachedName.assign_owned(gpg::STR_Printf("%s*", baseName).c_str());
-  }
-  return sCachedName.c_str();
-}
+// NOTE: FUN_0074FF10 and FUN_0074FD80 are the RPointerType<moho::SimArmy>
+// GetLexical / GetName vtable slots; recovered as methods of that
+// specialization (see gpg::RPointerType<moho::SimArmy>::GetLexical / ::GetName
+// above). The earlier free-helper transcriptions (BuildSimArmyPointerLexical /
+// BuildSimArmyPointerTypeName) were the same two addresses and have been
+// re-homed into the specialization (one-address-one-function).
 
 /**
  * Address: 0x00544EE0 (FUN_00544EE0, gpg::RRef_LaunchInfoNew)
@@ -12487,6 +12463,127 @@ void gpg::RPointerType<moho::CAcquireTargetTask>::Init()
 RType* gpg::RPointerType<moho::CAcquireTargetTask>::GetPointeeType() const
 {
     return CachedCAcquireTargetTaskType();
+}
+
+/**
+ * Address: 0x00750630 (FUN_00750630)
+ * Demangled: gpg::RPointerType_SimArmy::dtr
+ */
+gpg::RPointerType<moho::SimArmy>::~RPointerType() = default;
+
+/**
+ * Address: 0x0074FD80 (FUN_0074FD80)
+ * Demangled: gpg::RPointerType_SimArmy::GetName
+ *
+ * What it does:
+ * Builds and caches the `"SimArmy*"` pointer-type name lane from the pointee's
+ * reflected name.
+ */
+const char* gpg::RPointerType<moho::SimArmy>::GetName() const
+{
+    static msvc8::string cachedName;
+    if (cachedName.empty()) {
+        cachedName = BuildPointerName(GetPointeeType());
+    }
+    return cachedName.c_str();
+}
+
+/**
+ * Address: 0x0074FF10 (FUN_0074FF10)
+ * Demangled: gpg::RPointerType_SimArmy::GetLexical
+ *
+ * What it does:
+ * Renders a reflected `SimArmy*` slot as `"[<pointee lexical>]"`, or `"NULL"`
+ * when the slot is empty.
+ */
+msvc8::string gpg::RPointerType<moho::SimArmy>::GetLexical(const RRef& ref) const
+{
+    return BuildPointerLexical<moho::SimArmy>(ref.mObj, GetPointeeType());
+}
+
+/**
+ * Address: 0x00750090 (FUN_00750090)
+ * Demangled: gpg::RPointerType_SimArmy::IsIndexed
+ */
+const RIndexed* gpg::RPointerType<moho::SimArmy>::IsIndexed() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x007500A0 (FUN_007500A0)
+ * Demangled: gpg::RPointerType_SimArmy::IsPointer
+ */
+const RIndexed* gpg::RPointerType<moho::SimArmy>::IsPointer() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x007500C0 (FUN_007500C0)
+ * Demangled: gpg::RPointerType_SimArmy::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `SimArmy` in the array the
+ * pointer slot addresses (stride `sizeof(SimArmy)`).
+ */
+RRef gpg::RPointerType<moho::SimArmy>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::SimArmy**>(obj);
+    RRef out{};
+    gpg::RRef_SimArmy(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x007500B0 (FUN_007500B0)
+ * Demangled: gpg::RPointerType_SimArmy::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds at
+ * most one element).
+ */
+size_t gpg::RPointerType<moho::SimArmy>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::SimArmy* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
+ * Address: 0x00750100 (FUN_00750100)
+ * Demangled: gpg::RPointerType_SimArmy::AssignPointer
+ *
+ * What it does:
+ * Upcasts a reflected source reference to `SimArmy*` and stores it in the
+ * destination pointer slot.
+ */
+void gpg::RPointerType<moho::SimArmy>::AssignPointer(void* const obj, const RRef& from) const
+{
+    AssignPointerSlotWithTypeCache<moho::SimArmy>(obj, from, moho::SimArmy::sType);
+}
+
+/**
+ * Address: 0x0074FEE0 (FUN_0074FEE0)
+ * Demangled: gpg::RPointerType_SimArmy::Init
+ *
+ * What it does:
+ * Marks the descriptor active, records the pointer element size, and installs
+ * the per-`SimArmy` slot new/copy/delete/construct/move operation handlers.
+ */
+void gpg::RPointerType<moho::SimArmy>::Init()
+{
+    v24 = true;
+    size_ = sizeof(moho::SimArmy*);
+    newRefFunc_ = &NewPointerSlotRef<moho::SimArmy>;
+    cpyRefFunc_ = &CopyPointerSlotRef<moho::SimArmy>;
+    deleteFunc_ = &DeletePointerSlot<moho::SimArmy>;
+    ctorRefFunc_ = &ConstructPointerSlotRef<moho::SimArmy>;
+    movRefFunc_ = &MovePointerSlotRef<moho::SimArmy>;
+}
+
+RType* gpg::RPointerType<moho::SimArmy>::GetPointeeType() const
+{
+    return CachedSimArmyType();
 }
 
 /**
