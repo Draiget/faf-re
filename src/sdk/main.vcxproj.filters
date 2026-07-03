@@ -180,6 +180,9 @@
     <ClCompile Include="moho\entity\Shield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\entity\ShieldListReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\SSTIEntityVariableData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

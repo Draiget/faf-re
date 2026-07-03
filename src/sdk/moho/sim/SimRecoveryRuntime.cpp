@@ -14963,22 +14963,6 @@ namespace
   return self + 8;
 }
 
-/**
- * Address: 0x0074CDA0 (FUN_0074CDA0)
- *
- * What it does:
- * Initializes one lane config profile with 12-byte elements and two callback
- * slots.
- */
-[[maybe_unused]] void InitializeLaneConfig12Runtime(
-  LaneConfigOwnerRuntime* const owner,
-  const OpaqueCallbackRuntime callback1C,
-  const OpaqueCallbackRuntime callback14
-) noexcept
-{
-  InitializeLaneConfigWithCallbacks(owner, 12u, callback1C, callback14);
-}
-
 // NOTE: FUN_0074FEE0, FUN_00750090, FUN_007500A0 and FUN_007500B0 were
 // previously transcribed here as generic [[maybe_unused]] runtime helpers
 // (InitializeTentCallbackProfileRuntimeA / GetOptionalInlineLane100RuntimeC /

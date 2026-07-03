@@ -586,6 +586,7 @@
     <ClCompile Include="moho\entity\PropSerializer.cpp" />
     <ClCompile Include="moho\entity\PropTypeInfo.cpp" />
     <ClCompile Include="moho\entity\Shield.cpp" />
+    <ClCompile Include="moho\entity\ShieldListReflection.cpp" />
     <ClCompile Include="moho\entity\SSTIEntityVariableData.cpp" />
     <ClCompile Include="moho\entity\UserEntity.cpp" />
     <ClCompile Include="moho\path\IPathTraveler.cpp" />
