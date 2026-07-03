@@ -14996,22 +14996,6 @@ namespace
 }
 
 /**
- * Address: 0x00763660 (FUN_00763660)
- *
- * What it does:
- * Initializes one lane config profile with 8-byte elements and two callback
- * slots.
- */
-[[maybe_unused]] void InitializeLaneConfig8Runtime(
-  LaneConfigOwnerRuntime* const owner,
-  const OpaqueCallbackRuntime callback1C,
-  const OpaqueCallbackRuntime callback14
-) noexcept
-{
-  InitializeLaneConfigWithCallbacks(owner, 8u, callback1C, callback14);
-}
-
-/**
  * Address: 0x00763720 (FUN_00763720)
  *
  * What it does:

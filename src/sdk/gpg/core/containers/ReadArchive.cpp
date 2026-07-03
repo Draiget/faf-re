@@ -5342,11 +5342,15 @@ ReadArchive* ReadArchive::ReadPointer_Listener_NavPath(
  * What it does:
  * Repeatedly reads `Listener<const SNavPath&>` pointers from `archive` and
  * relinks each non-null listener node into the intrusive ring immediately
- * before `listHead`.
+ * before the broadcaster sentinel `listHead`. `listHead` is the reflected
+ * object (`typeid(moho::Broadcaster)`), i.e. a bare `Broadcaster` ring node
+ * (mPrev@+0/mNext@+4) — the FUN_007638D0 asm links each node before
+ * `listHead` at offset 0, so the sentinel is the `Broadcaster` itself, not a
+ * `Listener::mListenerLink` sub-object.
  */
 moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
   ReadArchive* const archive,
-  moho::Listener<const moho::SNavPath&>* const listHead,
+  moho::Broadcaster* const listHead,
   const int version,
   const gpg::RRef* const ownerRef
 )
@@ -5360,7 +5364,7 @@ moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
   moho::Listener<const moho::SNavPath&>* listener = nullptr;
   archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
   while (listener != nullptr) {
-    listener->mListenerLink.ListLinkBefore(&listHead->mListenerLink);
+    listener->mListenerLink.ListLinkBefore(listHead);
     archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
   }
 
