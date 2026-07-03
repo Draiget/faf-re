@@ -2508,18 +2508,8 @@ T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
   return upcast.mObj;
 }
 
-/**
- * Address: 0x00750100 (FUN_00750100)
- *
- * What it does:
- * Upcasts one reflected source reference to `SimArmy*` and stores it into one
- * destination pointer-slot lane.
- */
-[[maybe_unused]] void AssignSimArmyPointerSlotFromRef(void* const slotObject, gpg::RRef* const sourceRef)
-{
-  const gpg::RRef source = (sourceRef != nullptr) ? *sourceRef : gpg::RRef{};
-  AssignPointerSlotWithTypeCache<moho::SimArmy>(slotObject, source, moho::SimArmy::sType);
-}
+// FUN_00750100 is the AssignPointer vtable slot of RPointerType<moho::SimArmy>,
+// recovered as a method of that specialization (one-address-one-function).
 
 /**
  * Address: 0x00750510 (FUN_00750510)

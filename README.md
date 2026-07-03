@@ -30,27 +30,27 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (53,034 functions) — wiring health
+### Recovered (53,038 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `14,947` | 28.18% |
-| Vtable-anchored (virtual override of a recovered class) | `5,797` | 10.93% |
+| **Confirmed caller** (recovered binary caller wired by name) | `14,948` | 28.18% |
+| Vtable-anchored (virtual override of a recovered class) | `5,799` | 10.93% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,494` | 10.36% |
 | Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,844` | 5.36% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,733` | 44.75% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,734` | 44.75% |
 | Unclassified data xref (manual review) | `215` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,276 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,272 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `490` | 21.53% |
-| Vtable-anchored (recover with the owning class) | `231` | 10.15% |
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `489` | 21.52% |
+| Vtable-anchored (recover with the owning class) | `229` | 10.08% |
 | Framework dispatch (wx/EH/Lua/reflection) | `35` | 1.54% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,069` | 46.97% |
-| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `449` | 19.73% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,069` | 47.05% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `448` | 19.72% |
 | Unclassified data xref (manual review) | `1` | 0.04% |
 | RTTI-only | `1` | 0.04% |
 
