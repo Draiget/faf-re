@@ -47,7 +47,6 @@ namespace moho
   // ===== Unrecovered cfunc_*L(LuaPlus::LuaState*) inner callbacks =====
   int cfunc_CPlatoonAggressiveMoveToLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonCanFormPlatoonL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState*) { return 0; }

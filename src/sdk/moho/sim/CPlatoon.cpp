@@ -1,5 +1,6 @@
 #include "moho/sim/CPlatoon.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -3916,6 +3917,141 @@ namespace moho
       kCanConsiderFormingPlatoonHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x0072CEF0 (FUN_0072CEF0, cfunc_CPlatoonCanFormPlatoonL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CPlatoonCanFormPlatoonL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Implements `CPlatoon:CanFormPlatoon(template, sizeMultiplier[, center, radius])`.
+   * A platoon template is `{name, aiPlan, {unitFilter, perSquadCount}, ...}`; the
+   * leading name/plan strings are extracted (as the binary does) but do not feed
+   * the feasibility test. For each squad spec the required count is
+   * `floor(sizeMultiplier * perSquadCount)`. With <=4 args the check counts every
+   * unassigned unit matching the filter (blueprint id or category); with 5 args it
+   * counts only unassigned, live units within `radius` of `center`. If any squad
+   * spec has fewer available units than required the platoon cannot be formed and
+   * the callback returns `false`; otherwise it returns `true` when at least one
+   * unit was counted across all specs.
+   */
+  int cfunc_CPlatoonCanFormPlatoonL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 3 || argumentCount > 5) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kCanFormPlatoonHelpText, 3, 5, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject templatesObject(LuaPlus::LuaStackObject(state, 2));
+    const LuaPlus::LuaObject sizeObject(LuaPlus::LuaStackObject(state, 3));
+
+    // The binary reads the template's leading name (index 1) and AI-plan (index 2)
+    // strings before scanning the squad specs. They are not consumed by the
+    // feasibility test, but the extraction is a preserved side effect.
+    const LuaPlus::LuaObject nameObject = templatesObject[1];
+    const msvc8::string platoonName(nameObject.GetString());
+    const LuaPlus::LuaObject planObject = templatesObject[2];
+    const msvc8::string platoonPlan(planObject.GetString());
+    (void)platoonName;
+    (void)platoonPlan;
+
+    if (!templatesObject.IsTable()) {
+      LuaPlus::LuaState::Error(state, "Attempted to pass in a non table as a platoon template");
+      lua_pushboolean(state->m_state, 0);
+      (void)lua_gettop(state->m_state);
+      return 1;
+    }
+
+    const int templateCount = templatesObject.GetCount();
+    int totalAvailable = 0;
+    for (int specIndex = 1; specIndex <= templateCount; ++specIndex) {
+      const LuaPlus::LuaObject squadSpec = templatesObject[specIndex];
+      if (!squadSpec.IsTable()) {
+        continue;  // skip the leading name/plan string entries
+      }
+
+      const LuaPlus::LuaObject unitFilter = squadSpec[1];
+      const LuaPlus::LuaObject countObject = squadSpec[2];
+      // The binary reads the size multiplier as a float and multiplies in float
+      // (x87 float*float), so narrow before the multiply to avoid a double-rounding
+      // that could shift the floor result by one at boundary values.
+      const float scaledSize =
+        static_cast<float>(sizeObject.GetNumber()) * static_cast<float>(countObject.GetInteger());
+      const int requiredSize = static_cast<int>(std::floor(scaledSize));
+
+      if (argumentCount <= 4) {
+        int available;
+        if (unitFilter.IsString()) {
+          available = platoon->CountUnassignedUnitsWithBP(unitFilter.GetString());
+        } else {
+          const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
+          available = platoon->CountUnassignedUnitsInCategory(category);
+        }
+        totalAvailable += available;
+        if (available < requiredSize) {
+          lua_pushboolean(state->m_state, 0);
+          (void)lua_gettop(state->m_state);
+          return 1;
+        }
+      } else {
+        SEntitySetTemplateUnit candidates{};
+        if (unitFilter.IsString()) {
+          platoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
+        } else {
+          const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
+          platoon->GetUnassignedUnitsInCategory(category, 1000, candidates);
+        }
+
+        const LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 4));
+        const Wm3::Vector3f center = SCR_FromLuaCopy<Wm3::Vector3<float>>(centerObject);
+
+        LuaPlus::LuaStackObject radiusArg(state, 5);
+        if (lua_type(state->m_state, 5) != 3 /* LUA_TNUMBER */) {
+          LuaPlus::LuaStackObject::TypeError(&radiusArg, "number");
+        }
+        const float radius = static_cast<float>(lua_tonumber(state->m_state, 5));
+
+        int inRadius = 0;
+        for (Entity* const* entityIt = candidates.mVec.begin(); entityIt != candidates.mVec.end(); ++entityIt) {
+          Entity* const entity = *entityIt;
+          if (entity == nullptr) {
+            continue;
+          }
+          // Entries are unassigned units; Entity is the +8 base subobject of Unit,
+          // so the static downcast performs the -8 adjustment the binary emits.
+          Unit* const unit = static_cast<Unit*>(entity);
+          if (unit == nullptr) {
+            continue;
+          }
+          if (unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+            continue;
+          }
+          const Wm3::Vec3f& unitPosition = unit->GetPosition();
+          const float deltaX = unitPosition.x - center.x;
+          const float deltaZ = unitPosition.z - center.z;
+          if (radius > std::sqrt(deltaX * deltaX + deltaZ * deltaZ)) {
+            ++inRadius;
+            ++totalAvailable;
+          }
+        }
+        if (inRadius < requiredSize) {
+          lua_pushboolean(state->m_state, 0);
+          (void)lua_gettop(state->m_state);
+          return 1;
+        }
+      }
+    }
+
+    lua_pushboolean(state->m_state, totalAvailable != 0 ? 1 : 0);
+    (void)lua_gettop(state->m_state);
+    return 1;
   }
 
   /**
