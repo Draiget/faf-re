@@ -14840,21 +14840,6 @@ namespace
 {
   using OpaqueCallbackRuntime = void (*)();
 
-  struct LaneConfigOwnerRuntime
-  {
-    std::byte pad00[0x08];
-    std::uint32_t elementBytes; // +0x08
-    std::uint32_t enabled; // +0x0C
-    std::byte pad10[0x04];
-    OpaqueCallbackRuntime callback14; // +0x14
-    std::byte pad18[0x04];
-    OpaqueCallbackRuntime callback1C; // +0x1C
-  };
-  static_assert(offsetof(LaneConfigOwnerRuntime, elementBytes) == 0x08, "LaneConfigOwnerRuntime::elementBytes offset must be 0x08");
-  static_assert(offsetof(LaneConfigOwnerRuntime, enabled) == 0x0C, "LaneConfigOwnerRuntime::enabled offset must be 0x0C");
-  static_assert(offsetof(LaneConfigOwnerRuntime, callback14) == 0x14, "LaneConfigOwnerRuntime::callback14 offset must be 0x14");
-  static_assert(offsetof(LaneConfigOwnerRuntime, callback1C) == 0x1C, "LaneConfigOwnerRuntime::callback1C offset must be 0x1C");
-
   struct TentCallbackProfileOwnerRuntime
   {
     std::byte pad00[0x08];
@@ -14897,19 +14882,6 @@ namespace
     "OptionalReleaseOwnerRuntime::target offset must be 0x0C"
   );
 
-  void InitializeLaneConfigWithCallbacks(
-    LaneConfigOwnerRuntime* const owner,
-    const std::uint32_t elementBytes,
-    const OpaqueCallbackRuntime callback1C,
-    const OpaqueCallbackRuntime callback14
-  ) noexcept
-  {
-    owner->elementBytes = elementBytes;
-    owner->enabled = 1u;
-    owner->callback1C = callback1C;
-    owner->callback14 = callback14;
-  }
-
   void InitializeTentCallbackProfile(
     TentCallbackProfileOwnerRuntime* const owner,
     const OpaqueCallbackRuntime callback48,
@@ -14931,34 +14903,12 @@ namespace
 }
 
 /**
- * Address: 0x006F82D0 (FUN_006F82D0)
- *
- * What it does:
- * Sets one lane element-size field at `+0x08` to 12 bytes.
- */
-[[maybe_unused]] void SetLaneElementSize12RuntimeA(LaneConfigOwnerRuntime* const owner) noexcept
-{
-  owner->elementBytes = 12u;
-}
-
-/**
  * Address: 0x007359F0 (FUN_007359F0)
  *
  * What it does:
  * Returns `this + 0x08`.
  */
 [[maybe_unused]] char* GetInlineLane08RuntimeA(char* const self) noexcept
-{
-  return self + 8;
-}
-
-/**
- * Address: 0x00735AD0 (FUN_00735AD0)
- *
- * What it does:
- * Returns `this + 0x08`.
- */
-[[maybe_unused]] char* GetInlineLane08RuntimeB(char* const self) noexcept
 {
   return self + 8;
 }
@@ -14993,17 +14943,6 @@ namespace
     return 0;
   }
   return owner->target->vtable->release(owner->target, 1);
-}
-
-/**
- * Address: 0x00763720 (FUN_00763720)
- *
- * What it does:
- * Sets one lane element-size field at `+0x08` to 12 bytes.
- */
-[[maybe_unused]] void SetLaneElementSize12RuntimeB(LaneConfigOwnerRuntime* const owner) noexcept
-{
-  owner->elementBytes = 12u;
 }
 
 // NOTE: FUN_0077EC10, FUN_0077EDC0 and FUN_0077EDD0 were previously transcribed
