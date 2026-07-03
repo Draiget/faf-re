@@ -15244,46 +15244,13 @@ namespace
   owner->elementBytes = 12u;
 }
 
-/**
- * Address: 0x0077EC10 (FUN_0077EC10)
- *
- * What it does:
- * Initializes one tent callback profile (enabled flag, element size, and five
- * callback lanes including destroy slot).
- */
-[[maybe_unused]] void InitializeTentCallbackProfileRuntimeC(
-  TentCallbackProfileOwnerRuntime* const owner,
-  const OpaqueCallbackRuntime callback48,
-  const OpaqueCallbackRuntime callback54,
-  const OpaqueCallbackRuntime callback4C,
-  const OpaqueCallbackRuntime callback58,
-  const OpaqueCallbackRuntime destroy50
-) noexcept
-{
-  InitializeTentCallbackProfile(owner, callback48, callback54, callback4C, callback58, destroy50);
-}
-
-/**
- * Address: 0x0077EDC0 (FUN_0077EDC0)
- *
- * What it does:
- * Returns `this + 0x64` when `this` is non-null.
- */
-[[maybe_unused]] char* GetOptionalInlineLane100RuntimeI(char* const self) noexcept
-{
-  return OptionalThisPlusOffset(self, 100u);
-}
-
-/**
- * Address: 0x0077EDD0 (FUN_0077EDD0)
- *
- * What it does:
- * Returns `this + 0x64` when `this` is non-null.
- */
-[[maybe_unused]] char* GetOptionalInlineLane100RuntimeJ(char* const self) noexcept
-{
-  return OptionalThisPlusOffset(self, 100u);
-}
+// NOTE: FUN_0077EC10, FUN_0077EDC0 and FUN_0077EDD0 were previously transcribed
+// here as generic [[maybe_unused]] runtime helpers
+// (InitializeTentCallbackProfileRuntimeC / GetOptionalInlineLane100RuntimeI /
+// GetOptionalInlineLane100RuntimeJ). They are actually the Init / IsIndexed /
+// IsPointer vtable slots of gpg::RPointerType<moho::CDecalHandle> and are now
+// recovered as methods of that specialization in
+// gpg/core/reflection/Reflection.cpp (one-address-one-function).
 
 namespace
 {

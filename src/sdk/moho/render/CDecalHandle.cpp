@@ -264,6 +264,7 @@ namespace moho
   } // namespace
 
   gpg::RType* CDecalHandle::sType = nullptr;
+  gpg::RType* CDecalHandle::sPointerType = nullptr;
   CScrLuaMetatableFactory<CDecalHandle> CScrLuaMetatableFactory<CDecalHandle>::sInstance{};
 
   CScrLuaMetatableFactory<CDecalHandle>::CScrLuaMetatableFactory()
@@ -326,6 +327,31 @@ namespace moho
       sType = gpg::LookupRType(typeid(CDecalHandle));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x0077E9F0 (FUN_0077E9F0, Moho::CDecalHandle::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches the reflected pointer type for `CDecalHandle*`
+   * by driving the startup registrar `preregister_CDecalHandlePointerTypeStartup`
+   * (FUN_0077EBA0), falling back to a plain `LookupRType` when the descriptor
+   * is not yet registered.
+   */
+  gpg::RType* CDecalHandle::GetPointerType()
+  {
+    (void)StaticGetClass();
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::preregister_CDecalHandlePointerTypeStartup();
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(CDecalHandle*));
+      }
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**
