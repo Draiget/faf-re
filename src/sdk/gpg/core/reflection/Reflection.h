@@ -941,6 +941,15 @@ namespace gpg
   [[nodiscard]] RType* preregister_SimArmyPointerTypeStartup();
 
   /**
+   * Address: 0x00750280 (FUN_00750280, preregister_ShieldPointerTypeStartup)
+   *
+   * What it does:
+   * Preregisters the startup-owned pointer reflection descriptor for
+   * `moho::Shield*`.
+   */
+  [[nodiscard]] RType* preregister_ShieldPointerTypeStartup();
+
+  /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
    * Address: 0x1001CEB0 (gpgcore.dll)
    *
@@ -3539,15 +3548,9 @@ namespace gpg
    */
   RRef* PackRRef_Shield_P(RRef* out, moho::Shield** value);
 
-  /**
-   * Address: 0x00750190 (FUN_00750190)
-   *
-   * What it does:
-   * Builds and caches one pointer-type name lane (`"Type*"`) for
-   * `moho::Shield*`.
-   */
-  const char* BuildShieldPointerTypeName();
-  msvc8::string* BuildShieldPointerLexical(msvc8::string* out, moho::Shield*** slot);
+  // FUN_00750190 (GetName) and FUN_00750320 (GetLexical) are recovered as
+  // methods of RPointerType<moho::Shield> (below); the earlier free-helper
+  // declarations were re-homed into that specialization.
 
   /**
    * Address: 0x00758910 (FUN_00758910, gpg::RRef_IEffectManager)
@@ -4569,6 +4572,85 @@ namespace gpg
     RType* GetPointeeType() const override;
   };
   static_assert(sizeof(RPointerType<moho::SimArmy>) == 0x68, "RPointerType<SimArmy> size must be 0x68");
+
+  /**
+   * VFTABLE: 0x00E348A8 (primary) / 0x00E348D8 (RIndexed subobject @ +0x64)
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::Shield> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x00750690 (FUN_00750690)
+     * Demangled: gpg::RPointerType_Shield::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x00750190 (FUN_00750190)
+     * Demangled: gpg::RPointerType_Shield::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x00750320 (FUN_00750320)
+     * Demangled: gpg::RPointerType_Shield::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x007504A0 (FUN_007504A0)
+     * Demangled: gpg::RPointerType_Shield::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x007504B0 (FUN_007504B0)
+     * Demangled: gpg::RPointerType_Shield::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x007504D0 (FUN_007504D0)
+     * Demangled: gpg::RPointerType_Shield::SubscriptIndex
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x007504C0 (FUN_007504C0)
+     * Demangled: gpg::RPointerType_Shield::GetCount
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x00750510 (FUN_00750510)
+     * Demangled: gpg::RPointerType_Shield::AssignPointer
+     *
+     * What it does:
+     * Upcasts a reflected source reference to `Shield*` and stores it in the
+     * destination pointer slot.
+     */
+    void AssignPointer(void* obj, const RRef& from) const override;
+
+    /**
+     * Address: 0x007502F0 (FUN_007502F0)
+     * Demangled: gpg::RPointerType_Shield::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::Shield>) == 0x68, "RPointerType<Shield> size must be 0x68");
 
   /**
    * Source hints:

@@ -15114,57 +15114,14 @@ namespace
 // specialization in gpg/core/reflection/Reflection.cpp
 // (one-address-one-function).
 
-/**
- * Address: 0x007502F0 (FUN_007502F0)
- *
- * What it does:
- * Initializes one tent callback profile (enabled flag, element size, and five
- * callback lanes including destroy slot).
- */
-[[maybe_unused]] void InitializeTentCallbackProfileRuntimeB(
-  TentCallbackProfileOwnerRuntime* const owner,
-  const OpaqueCallbackRuntime callback48,
-  const OpaqueCallbackRuntime callback54,
-  const OpaqueCallbackRuntime callback4C,
-  const OpaqueCallbackRuntime callback58,
-  const OpaqueCallbackRuntime destroy50
-) noexcept
-{
-  InitializeTentCallbackProfile(owner, callback48, callback54, callback4C, callback58, destroy50);
-}
-
-/**
- * Address: 0x007504A0 (FUN_007504A0)
- *
- * What it does:
- * Returns `this + 0x64` when `this` is non-null.
- */
-[[maybe_unused]] char* GetOptionalInlineLane100RuntimeE(char* const self) noexcept
-{
-  return OptionalThisPlusOffset(self, 100u);
-}
-
-/**
- * Address: 0x007504B0 (FUN_007504B0)
- *
- * What it does:
- * Returns `this + 0x64` when `this` is non-null.
- */
-[[maybe_unused]] char* GetOptionalInlineLane100RuntimeF(char* const self) noexcept
-{
-  return OptionalThisPlusOffset(self, 100u);
-}
-
-/**
- * Address: 0x007504C0 (FUN_007504C0)
- *
- * What it does:
- * Returns whether the first dword lane is nonzero.
- */
-[[maybe_unused]] BOOL IsFirstDwordNonZeroRuntimeB(const FirstDwordLaneRuntime* const lane) noexcept
-{
-  return (lane->lane0 != 0u) ? TRUE : FALSE;
-}
+// NOTE: FUN_007502F0, FUN_007504A0, FUN_007504B0 and FUN_007504C0 were
+// previously transcribed here as generic [[maybe_unused]] runtime helpers
+// (InitializeTentCallbackProfileRuntimeB / GetOptionalInlineLane100RuntimeE /
+// GetOptionalInlineLane100RuntimeF / IsFirstDwordNonZeroRuntimeB). They are
+// actually the Init / IsIndexed / IsPointer / GetCount vtable slots of
+// gpg::RPointerType<moho::Shield> and are now recovered as methods of that
+// specialization in gpg/core/reflection/Reflection.cpp
+// (one-address-one-function).
 
 /**
  * Address: 0x00755FC0 (FUN_00755FC0)
