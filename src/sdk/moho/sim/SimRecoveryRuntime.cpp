@@ -14877,23 +14877,6 @@ namespace
     "TentCallbackProfileOwnerRuntime::enabled60 offset must be 0x60"
   );
 
-  struct SpanAtOffset4Runtime
-  {
-    std::byte pad00[0x04];
-    std::uint8_t* begin; // +0x04
-    std::uint8_t* end; // +0x08
-  };
-  static_assert(offsetof(SpanAtOffset4Runtime, begin) == 0x04, "SpanAtOffset4Runtime::begin offset must be 0x04");
-  static_assert(offsetof(SpanAtOffset4Runtime, end) == 0x08, "SpanAtOffset4Runtime::end offset must be 0x08");
-
-  struct SpanAtOffset0Runtime
-  {
-    std::uint8_t* begin; // +0x00
-    std::uint8_t* end; // +0x04
-  };
-  static_assert(offsetof(SpanAtOffset0Runtime, begin) == 0x00, "SpanAtOffset0Runtime::begin offset must be 0x00");
-  static_assert(offsetof(SpanAtOffset0Runtime, end) == 0x04, "SpanAtOffset0Runtime::end offset must be 0x04");
-
   struct ReleaseVTableRuntime
   {
     int (__thiscall* release)(void* self, int lane);
@@ -14913,19 +14896,6 @@ namespace
     offsetof(OptionalReleaseOwnerRuntime, target) == 0x0C,
     "OptionalReleaseOwnerRuntime::target offset must be 0x0C"
   );
-
-  struct FirstDwordLaneRuntime
-  {
-    std::uint32_t lane0;
-  };
-
-  [[nodiscard]] char* OptionalThisPlusOffset(char* const self, const std::size_t offset) noexcept
-  {
-    if (self == nullptr) {
-      return nullptr;
-    }
-    return self + offset;
-  }
 
   void InitializeLaneConfigWithCallbacks(
     LaneConfigOwnerRuntime* const owner,
@@ -14958,18 +14928,6 @@ namespace
     owner->destroy50 = destroy50;
   }
 
-  [[nodiscard]] int CountSpanElementsWithStride(
-    const std::uint8_t* const begin,
-    const std::uint8_t* const end,
-    const std::int32_t stride
-  ) noexcept
-  {
-    if (stride == 0) {
-      return 0;
-    }
-    const std::ptrdiff_t byteDelta = end - begin;
-    return static_cast<int>(byteDelta / stride);
-  }
 }
 
 /**
