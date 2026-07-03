@@ -36,6 +36,13 @@ namespace moho
   {
     std::uint16_t x;
     std::uint16_t z;
+
+    /**
+     * Reflection descriptor cache for `moho::HPathCell` (the vector element
+     * type). Populated lazily via `gpg::LookupRType(typeid(HPathCell))` by the
+     * `RVectorType<HPathCell>` reflection lane (name/serialize helpers).
+     */
+    static gpg::RType* sType;
   };
 
   /**

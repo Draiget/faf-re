@@ -367,6 +367,7 @@
     <ClCompile Include="moho\ai\CAiPathFinder.cpp" />
     <ClCompile Include="moho\ai\CAiPathFinderSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPathFinderTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\HPathCellVectorReflection.cpp" />
     <ClCompile Include="moho\ai\CAiPathNavigator.cpp" />
     <ClCompile Include="moho\ai\CAiPathNavigatorSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPathNavigatorTypeInfo.cpp" />
@@ -1731,6 +1732,7 @@
     <ClInclude Include="moho\ai\CAiPathFinder.h" />
     <ClInclude Include="moho\ai\CAiPathFinderSerializer.h" />
     <ClInclude Include="moho\ai\CAiPathFinderTypeInfo.h" />
+    <ClInclude Include="moho\ai\HPathCellVectorReflection.h" />
     <ClInclude Include="moho\ai\CAiPathNavigator.h" />
     <ClInclude Include="moho\ai\CAiPathNavigatorSerializer.h" />
     <ClInclude Include="moho\ai\CAiPathNavigatorTypeInfo.h" />

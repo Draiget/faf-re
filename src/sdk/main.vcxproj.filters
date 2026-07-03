@@ -1017,6 +1017,9 @@
     <ClCompile Include="moho\ai\CAiPathFinderTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\HPathCellVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAiPathNavigator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4015,6 +4018,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiPathFinderTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\HPathCellVectorReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiPathNavigator.h">
