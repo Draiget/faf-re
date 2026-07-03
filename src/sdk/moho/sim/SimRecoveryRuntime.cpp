@@ -15176,48 +15176,6 @@ namespace
 }
 
 /**
- * Address: 0x00763480 (FUN_00763480)
- *
- * What it does:
- * Initializes one lane config profile with 16-byte elements and two callback
- * slots.
- */
-[[maybe_unused]] void InitializeLaneConfig16RuntimeD(
-  LaneConfigOwnerRuntime* const owner,
-  const OpaqueCallbackRuntime callback1C,
-  const OpaqueCallbackRuntime callback14
-) noexcept
-{
-  InitializeLaneConfigWithCallbacks(owner, 16u, callback1C, callback14);
-}
-
-/**
- * Address: 0x00763530 (FUN_00763530)
- *
- * What it does:
- * Returns `this + 0x64` when `this` is non-null.
- */
-[[maybe_unused]] char* GetOptionalInlineLane100RuntimeH(char* const self) noexcept
-{
-  return OptionalThisPlusOffset(self, 100u);
-}
-
-/**
- * Address: 0x00763540 (FUN_00763540)
- *
- * What it does:
- * Returns element count from one span lane `(end - begin) / 4`, returning 0
- * when the begin lane is null.
- */
-[[maybe_unused]] int CountSpanElementsStride4RuntimeB(const SpanAtOffset4Runtime* const span) noexcept
-{
-  if (span->begin == nullptr) {
-    return 0;
-  }
-  return CountSpanElementsWithStride(span->begin, span->end, 4);
-}
-
-/**
  * Address: 0x00763660 (FUN_00763660)
  *
  * What it does:
