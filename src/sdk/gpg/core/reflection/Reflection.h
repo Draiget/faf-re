@@ -959,6 +959,37 @@ namespace gpg
   [[nodiscard]] RType* preregister_CDecalHandlePointerTypeStartup();
 
   /**
+   * Address: 0x007522B0 (FUN_007522B0, register/preregister of RVectorType<SimArmy*>)
+   *
+   * What it does:
+   * Constructs the startup-owned `gpg::RVectorType<moho::SimArmy*>` descriptor
+   * global (installing both vtables) and preregisters it under
+   * `typeid(std::vector<moho::SimArmy*>)`.
+   */
+  [[nodiscard]] RType* preregister_SimArmyVectorTypeStartup();
+
+  /**
+   * Address: 0x0074E240 (FUN_0074E240, gpg::RVectorType<SimArmy*> element deserializer)
+   *
+   * What it does:
+   * Reads the element count, then reads that many tracked `moho::SimArmy*`
+   * pointers and installs them into the destination `std::vector<moho::SimArmy*>`
+   * addressed by `vectorPtr`. Signature matches `RType::load_func_t`; the
+   * trailing version/owner lanes are unused by this vector body.
+   */
+  void DeserializeSimArmyPtrVector(ReadArchive* archive, int vectorPtr, int version, RRef* ownerRef);
+
+  /**
+   * Address: 0x0074E350 (FUN_0074E350, gpg::RVectorType<SimArmy*> element serializer)
+   *
+   * What it does:
+   * Writes the element count, then writes each `moho::SimArmy*` element as one
+   * unowned tracked raw pointer. Signature matches `RType::save_func_t`; the
+   * trailing version/owner lanes are unused by this vector body.
+   */
+  void SerializeSimArmyPtrVector(WriteArchive* archive, int vectorPtr, int version, RRef* ownerRef);
+
+  /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
    * Address: 0x1001CEB0 (gpgcore.dll)
    *
@@ -5617,6 +5648,161 @@ namespace gpg
   static_assert(
     sizeof(RPointerType<moho::CArmyStatItem>) == 0x68, "RPointerType<CArmyStatItem> size must be 0x68"
   );
+
+  template <class T>
+  class RVectorType;
+
+  /**
+   * Common base for vector-reflection wrappers (`std::vector<T>`).
+   *
+   * What it does:
+   * Owns the shared indexed-container semantics for reflected
+   * `std::vector<T>` descriptors so per-element specializations only recover
+   * the type-specific virtual surface (name/lexical/element (de)serializers)
+   * from FA.
+   *
+   * Layout note:
+   * This is a DISTINCT binary class (own primary + RIndexed vtables and RTTI)
+   * whose complete-object layout is byte-identical to `RPointerTypeBase`
+   * (bases `RType`/`RObject` (via RType)/`RIndexed`; the RType base owns the two
+   * `msvc8::vector<RField>` members `bases_`/`fields_` whose storage lanes at
+   * +0x2C and +0x3C are freed by the scalar-deleting dtor; size 0x68). It
+   * mirrors that layout intentionally — it is not a duplicate-layout of the
+   * pointer base, it is the vector base with its own vtable identity.
+   */
+  class RVectorTypeBase : public RType, public RIndexed
+  {
+  public:
+    /**
+     * Shared indexed-self helper used by specialization thunks (returns the
+     * `RIndexed` subobject at +0x64).
+     */
+    [[nodiscard]]
+    const RIndexed* AsIndexedSelf() const noexcept;
+
+  protected:
+    [[nodiscard]]
+    virtual RType* GetPointeeType() const = 0;
+  };
+  static_assert(sizeof(RVectorTypeBase) == 0x68, "RVectorTypeBase size must be 0x68");
+
+  /**
+   * VFTABLE: 0x00E34778 (primary, 11 slots) / 0x00E347A8 (RIndexed subobject @ +0x64, 4 slots)
+   * COL:  gpg::RVectorType<moho::SimArmy*> (reflection of std::vector<moho::SimArmy*>)
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   *
+   * Slot map (from rtti_dump_all.hpp @ 0xE34778 / 0xE347A8):
+   *  primary   0 GetClass            0x401370  (RType base, inherited)
+   *  primary   1 GetDerivedObjectRef 0x401390  (RType base, inherited)
+   *  primary   2 dtor                0x00752420 (override)
+   *  primary   3 GetName             0x0074CB70 (override)
+   *  primary   4 GetLexical          0x0074CC10 (override)
+   *  primary   5 SetLexical          0x8D86E0  (RType base, inherited)
+   *  primary   6 IsIndexed           0x0074CCA0 (override)
+   *  primary   7 IsPointer           0x4013C0  (RType base, inherited — a vector is NOT a pointer)
+   *  primary   8 IsEnumType          0x4013D0  (RType base, inherited)
+   *  primary   9 Init                0x0074CBF0 (override)
+   *  primary  10 Finish              0x8DF4A0  (RType base, inherited)
+   *  secondary 0 SubscriptIndex      0x0074CCE0 (override)
+   *  secondary 1 GetCount            0x0074CCB0 (override)
+   *  secondary 2 SetCount            0x0074CCD0 (override)
+   *  secondary 3 AssignPointer       0x401320  (RIndexed base, inherited)
+   */
+  template <>
+  class RVectorType<moho::SimArmy*> final : public RVectorTypeBase
+  {
+  public:
+    /**
+     * Address: 0x00752420 (FUN_00752420)
+     * Demangled: gpg::RVectorType_SimArmy_P::dtr (scalar-deleting)
+     *
+     * What it does:
+     * Frees the RType base's two `msvc8::vector<RField>` storage lanes
+     * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
+     * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
+     * source: the compiler-generated `~RType()` reproduces this behavior.
+     */
+    ~RVectorType() override;
+
+    /**
+     * Address: 0x0074CB70 (FUN_0074CB70)
+     * Demangled: gpg::RVectorType_SimArmy_P::GetName
+     *
+     * What it does:
+     * Builds and caches `"vector<SimArmy*>"` from the element pointer-type name
+     * (`moho::SimArmy::GetPointerType()->GetName()`).
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x0074CC10 (FUN_0074CC10)
+     * Demangled: gpg::RVectorType_SimArmy_P::GetLexical
+     *
+     * What it does:
+     * Renders the reflected vector as `"<base RType lexical>, size=<count>"`.
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x0074CCA0 (FUN_0074CCA0)
+     * Demangled: gpg::RVectorType_SimArmy_P::IsIndexed
+     *
+     * What it does:
+     * Returns the `RIndexed` subobject (`this ? this+0x64 : nullptr`).
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0074CCE0 (FUN_0074CCE0)
+     * Demangled: gpg::RVectorType_SimArmy_P::SubscriptIndex
+     *
+     * What it does:
+     * Wraps `&vec._Myfirst[ind]` (a `moho::SimArmy**` slot) as one
+     * `gpg::RRef_SimArmy_P` reference.
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0074CCB0 (FUN_0074CCB0)
+     * Demangled: gpg::RVectorType_SimArmy_P::GetCount
+     *
+     * What it does:
+     * Returns the vector element count `(_Mylast - _Myfirst) / sizeof(SimArmy*)`.
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0074CCD0 (FUN_0074CCD0)
+     * Demangled: gpg::RVectorType_SimArmy_P::SetCount
+     *
+     * What it does:
+     * Resizes the underlying `std::vector<SimArmy*>` storage to `count`.
+     */
+    void SetCount(void* obj, int count) const override;
+
+    /**
+     * Address: 0x0074CBF0 (FUN_0074CBF0)
+     * Demangled: gpg::RVectorType_SimArmy_P::Init
+     *
+     * What it does:
+     * Records the element byte-size (16 = sizeof(std::vector<SimArmy*>)),
+     * version 1, and installs the element (de)serialize callbacks
+     * (`serLoadFunc_ = &DeserializeSimArmyPtrVector`,
+     * `serSaveFunc_ = &SerializeSimArmyPtrVector`).
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RVectorType<moho::SimArmy*>) == 0x68, "RVectorType<SimArmy*> size must be 0x68");
 
 
   /**

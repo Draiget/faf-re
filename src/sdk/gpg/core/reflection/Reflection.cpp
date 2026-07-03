@@ -6,6 +6,7 @@
 #include <new>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 #include <boost/shared_ptr.hpp>
 
@@ -3949,6 +3950,17 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RPointerType<moho::ReconBlip> gReconBlipPointerType;
   gpg::RPointerType<moho::CArmyStatItem> gCArmyStatItemPointerType;
 
+  /**
+   * Address: 0x01106AD8 (global storage for gpg::RVectorType<moho::SimArmy*>)
+   *
+   * What it does:
+   * Startup-owned reflection descriptor for `std::vector<moho::SimArmy*>`.
+   * The binary's registrar at 0x007522B0 runs the base `gpg::RType` ctor,
+   * installs both vtables, and preregisters this global under
+   * `typeid(std::vector<moho::SimArmy*>)`.
+   */
+  gpg::RVectorType<moho::SimArmy*> gSimArmyVectorType;
+
   [[nodiscard]] gpg::Rect2iTypeInfo& GetRect2iTypeInfo() noexcept
   {
     return EnsureTypeInfo(gRect2iTypeInfoStorage);
@@ -4740,6 +4752,7 @@ struct PointerTypeRegistration
         (void)gpg::preregister_SimArmyPointerTypeStartup();
         (void)gpg::preregister_ShieldPointerTypeStartup();
         (void)gpg::preregister_CDecalHandlePointerTypeStartup();
+        (void)gpg::preregister_SimArmyVectorTypeStartup();
         gpg::PreRegisterRType(typeid(moho::RBlueprint*), &gRBlueprintPointerType);
         gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &gUnitWeaponPointerType);
         gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &gIAniManipulatorPointerType);
@@ -4808,6 +4821,25 @@ gpg::RType* preregister_CDecalHandlePointerTypeStartup()
 {
   gpg::PreRegisterRType(typeid(moho::CDecalHandle*), &gCDecalHandlePointerType);
   return &gCDecalHandlePointerType;
+}
+
+/**
+ * Address: 0x007522B0 (FUN_007522B0, register/preregister of RVectorType<SimArmy*>)
+ *
+ * What it does:
+ * Preregisters the startup-owned `std::vector<moho::SimArmy*>` reflection
+ * descriptor and returns it. In the binary this address also runs the base
+ * `gpg::RType` ctor and installs both vtables; those side effects are produced
+ * here by the `gSimArmyVectorType` global's construction (base `RType` ctor +
+ * the specialization's vtable install), so this function reproduces the
+ * remaining observable effect — registration before first reflection query.
+ * Called from the reflection registration aggregator (binary `sub_BDBE20`),
+ * modeled at source level by the `PointerTypeRegistration` static-init block.
+ */
+gpg::RType* preregister_SimArmyVectorTypeStartup()
+{
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SimArmy*>), &gSimArmyVectorType);
+  return &gSimArmyVectorType;
 }
 
 RType* RType::sType = nullptr;
@@ -12192,6 +12224,11 @@ const RIndexed* gpg::RPointerTypeBase::AsIndexedSelf() const noexcept
     return this;
 }
 
+const RIndexed* gpg::RVectorTypeBase::AsIndexedSelf() const noexcept
+{
+    return this;
+}
+
 /**
  * Address: 0x0040C8B0 (FUN_0040C8B0)
  * Demangled: sub_40C8B0
@@ -12464,6 +12501,184 @@ void gpg::RPointerType<moho::SimArmy>::Init()
 RType* gpg::RPointerType<moho::SimArmy>::GetPointeeType() const
 {
     return CachedSimArmyType();
+}
+
+// ---------------------------------------------------------------------------
+// gpg::RVectorType<moho::SimArmy*> — reflection of std::vector<moho::SimArmy*>.
+// First exemplar of the RVectorType<T> family (22 element types). Vtable
+// @ 0x00E34778 (primary) / 0x00E347A8 (RIndexed subobject @ +0x64).
+// ---------------------------------------------------------------------------
+
+/**
+ * Address: 0x00752420 (FUN_00752420, gpg::RVectorType_SimArmy_P::dtr)
+ *
+ * What it does:
+ * Scalar-deleting dtor. The binary frees the two `msvc8::vector<RField>`
+ * storage lanes owned by the RType base (`bases_._Myfirst` @ +0x2C,
+ * `fields_._Myfirst` @ +0x3C), restores the RObject vftable, and conditionally
+ * deletes `this`. The compiler-generated `~RType()` reproduces this exactly, so
+ * the source dtor is defaulted.
+ */
+gpg::RVectorType<moho::SimArmy*>::~RVectorType() = default;
+
+/**
+ * Address: 0x0074CB70 (FUN_0074CB70, gpg::RVectorType_SimArmy_P::GetName)
+ *
+ * What it does:
+ * Builds and caches `"vector<SimArmy*>"` from the element pointer-type name
+ * (`moho::SimArmy::GetPointerType()->GetName()` = `"SimArmy*"`).
+ */
+const char* gpg::RVectorType<moho::SimArmy*>::GetName() const
+{
+    static msvc8::string cachedName;
+    if (cachedName.empty()) {
+        RType* const elementType = GetPointeeType();
+        const char* const elementName = elementType ? elementType->GetName() : "null";
+        cachedName = STR_Printf("vector<%s>", elementName ? elementName : "null");
+    }
+    return cachedName.c_str();
+}
+
+/**
+ * Address: 0x0074CC10 (FUN_0074CC10, gpg::RVectorType_SimArmy_P::GetLexical)
+ *
+ * What it does:
+ * Renders the reflected vector as `"<base RType lexical>, size=<count>"`,
+ * where the base lexical comes from `RType::GetLexical` and the count comes
+ * from the RIndexed subobject's `GetCount(ref.mObj)`.
+ */
+msvc8::string gpg::RVectorType<moho::SimArmy*>::GetLexical(const RRef& ref) const
+{
+    const msvc8::string base = RType::GetLexical(ref);
+    const size_t count = GetCount(ref.mObj);
+    return STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(count));
+}
+
+/**
+ * Address: 0x0074CCA0 (FUN_0074CCA0, gpg::RVectorType_SimArmy_P::IsIndexed)
+ *
+ * What it does:
+ * Returns the `RIndexed` subobject (`this ? this+0x64 : nullptr`). A vector is
+ * indexed but NOT a pointer, so only slot 6 (IsIndexed) is overridden; slot 7
+ * (IsPointer) keeps the RType base (returns nullptr).
+ */
+const RIndexed* gpg::RVectorType<moho::SimArmy*>::IsIndexed() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x0074CCE0 (FUN_0074CCE0, gpg::RVectorType_SimArmy_P::SubscriptIndex)
+ *
+ * What it does:
+ * Wraps `&vec[ind]` (a `moho::SimArmy**` slot inside the vector storage) as one
+ * `gpg::RRef_SimArmy_P` reference.
+ */
+RRef gpg::RVectorType<moho::SimArmy*>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const vec = static_cast<msvc8::vector<moho::SimArmy*>*>(obj);
+    RRef out{};
+    gpg::RRef_SimArmy_P(&out, vec->ptr_at(static_cast<std::size_t>(ind)));
+    return out;
+}
+
+/**
+ * Address: 0x0074CCB0 (FUN_0074CCB0, gpg::RVectorType_SimArmy_P::GetCount)
+ *
+ * What it does:
+ * Returns the vector element count (`_Mylast - _Myfirst` divided by the 4-byte
+ * pointer stride), or 0 when the storage is unallocated.
+ */
+size_t gpg::RVectorType<moho::SimArmy*>::GetCount(void* const obj) const
+{
+    auto* const vec = static_cast<const msvc8::vector<moho::SimArmy*>*>(obj);
+    return vec->size();
+}
+
+/**
+ * Address: 0x0074CCD0 (FUN_0074CCD0, gpg::RVectorType_SimArmy_P::SetCount)
+ *
+ * What it does:
+ * Resizes the underlying `std::vector<SimArmy*>` storage to `count` (forwards to
+ * `msvc8::vector<SimArmy*>::resize` at 0x0074DC40).
+ */
+void gpg::RVectorType<moho::SimArmy*>::SetCount(void* const obj, const int count) const
+{
+    auto* const vec = static_cast<msvc8::vector<moho::SimArmy*>*>(obj);
+    vec->resize(static_cast<std::size_t>(count));
+}
+
+/**
+ * Address: 0x0074CBF0 (FUN_0074CBF0, gpg::RVectorType_SimArmy_P::Init)
+ *
+ * What it does:
+ * Records the element byte-size (16 = `sizeof(std::vector<SimArmy*>)`),
+ * version 1, and installs the element (de)serialize callbacks.
+ */
+void gpg::RVectorType<moho::SimArmy*>::Init()
+{
+    size_ = sizeof(msvc8::vector<moho::SimArmy*>);
+    version_ = 1;
+    serLoadFunc_ = &gpg::DeserializeSimArmyPtrVector;
+    serSaveFunc_ = &gpg::SerializeSimArmyPtrVector;
+}
+
+RType* gpg::RVectorType<moho::SimArmy*>::GetPointeeType() const
+{
+    return moho::SimArmy::GetPointerType();
+}
+
+/**
+ * Address: 0x0074E240 (FUN_0074E240, gpg::RVectorType<SimArmy*> element deserializer)
+ *
+ * What it does:
+ * Reads the element count, then reads that many tracked `moho::SimArmy*`
+ * pointers (each via `ReadArchive::ReadPointer_SimArmy` with an empty owner
+ * reference) into a fresh temporary vector and installs it into the
+ * destination `std::vector<moho::SimArmy*>`, releasing the destination's old
+ * storage. Bound as `RType::serLoadFunc_`; `version`/`ownerRef` are unused by
+ * this body (the binary loads a fresh vector, not an owner-anchored slot).
+ */
+void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const int vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+{
+    auto* const outVector = reinterpret_cast<msvc8::vector<moho::SimArmy*>*>(vectorPtr);
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    msvc8::vector<moho::SimArmy*> loaded;
+    loaded.reserve(count);
+
+    const gpg::RRef emptyOwner{};
+    for (unsigned int i = 0; i < count; ++i) {
+        moho::SimArmy* element = nullptr;
+        archive->ReadPointer_SimArmy(&element, &emptyOwner);
+        loaded.push_back(element);
+    }
+
+    *outVector = std::move(loaded);
+}
+
+/**
+ * Address: 0x0074E350 (FUN_0074E350, gpg::RVectorType<SimArmy*> element serializer)
+ *
+ * What it does:
+ * Writes the element count, then writes each `moho::SimArmy*` element as one
+ * unowned tracked raw pointer (`RRef_SimArmy` + `WriteRawPointer`). Bound as
+ * `RType::serSaveFunc_`; `version`/`ownerRef` are unused by this body.
+ */
+void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const int vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+{
+    const auto* const vector = reinterpret_cast<const msvc8::vector<moho::SimArmy*>*>(vectorPtr);
+
+    const std::size_t count = vector->size();
+    archive->WriteUInt(static_cast<unsigned int>(count));
+
+    for (std::size_t i = 0; i < count; ++i) {
+        RRef elementRef{};
+        gpg::RRef_SimArmy(&elementRef, (*vector)[i]);
+        gpg::WriteRawPointer(archive, elementRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    }
 }
 
 /**
