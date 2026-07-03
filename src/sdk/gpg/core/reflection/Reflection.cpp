@@ -2511,18 +2511,8 @@ T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
 // FUN_00750100 is the AssignPointer vtable slot of RPointerType<moho::SimArmy>,
 // recovered as a method of that specialization (one-address-one-function).
 
-/**
- * Address: 0x00750510 (FUN_00750510)
- *
- * What it does:
- * Upcasts one reflected source reference to `Shield*` and stores it into one
- * destination pointer-slot lane.
- */
-[[maybe_unused]] void AssignShieldPointerSlotFromRef(void* const slotObject, gpg::RRef* const sourceRef)
-{
-  const gpg::RRef source = (sourceRef != nullptr) ? *sourceRef : gpg::RRef{};
-  AssignPointerSlotWithTypeCache<moho::Shield>(slotObject, source, moho::Shield::sType);
-}
+// FUN_00750510 is the AssignPointer vtable slot of RPointerType<moho::Shield>,
+// recovered as a method of that specialization (one-address-one-function).
 
 /**
  * Address: 0x0077EE30 (FUN_0077EE30)
@@ -3935,6 +3925,7 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RPointerType<moho::CTaskThread> gCTaskThreadPointerType;
   gpg::RPointerType<moho::CAcquireTargetTask> gCAcquireTargetTaskPointerType;
   gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
+  gpg::RPointerType<moho::Shield> gShieldPointerType;
   gpg::RPointerType<moho::RBlueprint> gRBlueprintPointerType;
   gpg::RPointerType<moho::UnitWeapon> gUnitWeaponPointerType;
   gpg::RPointerType<moho::IAniManipulator> gIAniManipulatorPointerType;
@@ -4753,6 +4744,7 @@ struct PointerTypeRegistration
     {
         (void)gpg::preregister_CAcquireTargetTaskPointerTypeStartup();
         (void)gpg::preregister_SimArmyPointerTypeStartup();
+        (void)gpg::preregister_ShieldPointerTypeStartup();
         gpg::PreRegisterRType(typeid(moho::RBlueprint*), &gRBlueprintPointerType);
         gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &gUnitWeaponPointerType);
         gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &gIAniManipulatorPointerType);
@@ -4795,6 +4787,19 @@ gpg::RType* preregister_SimArmyPointerTypeStartup()
 {
   gpg::PreRegisterRType(typeid(moho::SimArmy*), &gSimArmyPointerType);
   return &gSimArmyPointerType;
+}
+
+/**
+ * Address: 0x00750280 (FUN_00750280, preregister_ShieldPointerTypeStartup)
+ *
+ * What it does:
+ * Preregisters the startup-owned pointer reflection descriptor for
+ * `moho::Shield*` and returns it.
+ */
+gpg::RType* preregister_ShieldPointerTypeStartup()
+{
+  gpg::PreRegisterRType(typeid(moho::Shield*), &gShieldPointerType);
+  return &gShieldPointerType;
 }
 
 RType* RType::sType = nullptr;
@@ -10481,61 +10486,11 @@ gpg::RRef* PackRRef_Shield_P(RRef* const out, moho::Shield** const value)
   return out;
 }
 
-/**
- * Address: 0x00750320 (FUN_00750320)
- *
- * What it does:
- * Builds one bracketed lexical string (`[TypeLexical]`) for a reflected
- * `moho::Shield*` slot, or `"NULL"` when the slot is empty.
- */
-msvc8::string* BuildShieldPointerLexical(msvc8::string* const out, moho::Shield*** const slot)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
-
-  if (slot == nullptr || *slot == nullptr || **slot == nullptr) {
-    out->assign_owned("NULL");
-    return out;
-  }
-
-  gpg::RRef objectRef{};
-  (void)gpg::RRef_Shield(&objectRef, **slot);
-
-  gpg::RType* runtimeType = gShieldRRefType;
-  if (runtimeType == nullptr) {
-    runtimeType = gpg::LookupRType(typeid(moho::Shield));
-    gShieldRRefType = runtimeType;
-  }
-
-  const msvc8::string lexical = runtimeType != nullptr ? runtimeType->GetLexical(objectRef) : msvc8::string();
-  const msvc8::string bracketed = gpg::STR_Printf("[%s]", lexical.c_str());
-  out->assign_owned(bracketed.c_str());
-  return out;
-}
-
-/**
- * Address: 0x00750190 (FUN_00750190)
- *
- * What it does:
- * Builds and caches one pointer-type name lane (`"Type*"`) for
- * `moho::Shield*`, reusing the reflected `Shield::sType` lookup cache.
- */
-const char* BuildShieldPointerTypeName()
-{
-  static msvc8::string sCachedName;
-  if (sCachedName.empty()) {
-    gpg::RType* runtimeType = gShieldRRefType;
-    if (runtimeType == nullptr) {
-      runtimeType = gpg::LookupRType(typeid(moho::Shield));
-      gShieldRRefType = runtimeType;
-    }
-
-    const char* const baseName = runtimeType != nullptr ? runtimeType->GetName() : "";
-    sCachedName.assign_owned(gpg::STR_Printf("%s*", baseName).c_str());
-  }
-  return sCachedName.c_str();
-}
+// FUN_00750320 (GetLexical) and FUN_00750190 (GetName) are the corresponding
+// vtable slots of RPointerType<moho::Shield>, recovered as methods of that
+// specialization (one-address-one-function). The earlier free-helper
+// transcriptions (BuildShieldPointerLexical / BuildShieldPointerTypeName) were
+// the same two addresses and have been re-homed into the specialization.
 
 /**
  * Address: 0x00758910 (FUN_00758910, gpg::RRef_IEffectManager)
@@ -12574,6 +12529,130 @@ void gpg::RPointerType<moho::SimArmy>::Init()
 RType* gpg::RPointerType<moho::SimArmy>::GetPointeeType() const
 {
     return CachedSimArmyType();
+}
+
+/**
+ * Address: 0x00750690 (FUN_00750690)
+ * Demangled: gpg::RPointerType_Shield::dtr
+ */
+gpg::RPointerType<moho::Shield>::~RPointerType() = default;
+
+/**
+ * Address: 0x00750190 (FUN_00750190)
+ * Demangled: gpg::RPointerType_Shield::GetName
+ *
+ * What it does:
+ * Builds and caches the `"Shield*"` pointer-type name lane from the pointee's
+ * reflected name.
+ */
+const char* gpg::RPointerType<moho::Shield>::GetName() const
+{
+    static msvc8::string cachedName;
+    if (cachedName.empty()) {
+        cachedName = BuildPointerName(GetPointeeType());
+    }
+    return cachedName.c_str();
+}
+
+/**
+ * Address: 0x00750320 (FUN_00750320)
+ * Demangled: gpg::RPointerType_Shield::GetLexical
+ *
+ * What it does:
+ * Renders a reflected `Shield*` slot as `"[<pointee lexical>]"`, or `"NULL"`
+ * when the slot is empty.
+ */
+msvc8::string gpg::RPointerType<moho::Shield>::GetLexical(const RRef& ref) const
+{
+    return BuildPointerLexical<moho::Shield>(ref.mObj, GetPointeeType());
+}
+
+/**
+ * Address: 0x007504A0 (FUN_007504A0)
+ * Demangled: gpg::RPointerType_Shield::IsIndexed
+ */
+const RIndexed* gpg::RPointerType<moho::Shield>::IsIndexed() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x007504B0 (FUN_007504B0)
+ * Demangled: gpg::RPointerType_Shield::IsPointer
+ */
+const RIndexed* gpg::RPointerType<moho::Shield>::IsPointer() const
+{
+    return AsIndexedSelf();
+}
+
+/**
+ * Address: 0x007504D0 (FUN_007504D0)
+ * Demangled: gpg::RPointerType_Shield::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `Shield` in the array the
+ * pointer slot addresses (stride `sizeof(Shield)`).
+ */
+RRef gpg::RPointerType<moho::Shield>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::Shield**>(obj);
+    RRef out{};
+    gpg::RRef_Shield(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x007504C0 (FUN_007504C0)
+ * Demangled: gpg::RPointerType_Shield::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds at
+ * most one element).
+ */
+size_t gpg::RPointerType<moho::Shield>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::Shield* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
+ * Address: 0x00750510 (FUN_00750510)
+ * Demangled: gpg::RPointerType_Shield::AssignPointer
+ *
+ * What it does:
+ * Upcasts a reflected source reference to `Shield*` and stores it in the
+ * destination pointer slot.
+ */
+void gpg::RPointerType<moho::Shield>::AssignPointer(void* const obj, const RRef& from) const
+{
+    AssignPointerSlotWithTypeCache<moho::Shield>(obj, from, gShieldRRefType);
+}
+
+/**
+ * Address: 0x007502F0 (FUN_007502F0)
+ * Demangled: gpg::RPointerType_Shield::Init
+ *
+ * What it does:
+ * Marks the descriptor active, records the pointer element size, and installs
+ * the per-`Shield` slot new/copy/delete/construct/move operation handlers.
+ */
+void gpg::RPointerType<moho::Shield>::Init()
+{
+    v24 = true;
+    size_ = sizeof(moho::Shield*);
+    newRefFunc_ = &NewPointerSlotRef<moho::Shield>;
+    cpyRefFunc_ = &CopyPointerSlotRef<moho::Shield>;
+    deleteFunc_ = &DeletePointerSlot<moho::Shield>;
+    ctorRefFunc_ = &ConstructPointerSlotRef<moho::Shield>;
+    movRefFunc_ = &MovePointerSlotRef<moho::Shield>;
+}
+
+RType* gpg::RPointerType<moho::Shield>::GetPointeeType() const
+{
+    if (gShieldRRefType == nullptr) {
+        gShieldRRefType = gpg::LookupRType(typeid(moho::Shield));
+    }
+    return gShieldRRefType;
 }
 
 /**

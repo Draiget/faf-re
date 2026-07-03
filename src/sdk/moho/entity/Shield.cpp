@@ -417,7 +417,10 @@ namespace moho
    * Address: 0x0074E5D0 (FUN_0074E5D0, Moho::Shield::GetPointerType)
    *
    * What it does:
-   * Lazily resolves and caches reflected RTTI for `Shield*`.
+   * Lazily resolves and caches the reflected pointer type for `Shield*` by
+   * driving the startup registrar `preregister_ShieldPointerTypeStartup`
+   * (FUN_00750280), falling back to a plain `LookupRType` when the descriptor
+   * is not yet registered.
    */
   gpg::RType* Shield::GetPointerType()
   {
@@ -425,7 +428,10 @@ namespace moho
 
     gpg::RType* cached = sPointerType;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(Shield*));
+      cached = gpg::preregister_ShieldPointerTypeStartup();
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(Shield*));
+      }
       sPointerType = cached;
     }
 
