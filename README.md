@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`23/06/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`03/07/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
@@ -10,20 +10,20 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`96.66%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `64,921`*
+  - *Total amount of completed tokens: `64,925`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,034` (81.69%)
+- `recovered`: `53,038` (81.69%)
 - `skip`: `6,104` (9.40%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
 - `external_dependency`: `5,783` (8.91%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
-- `in_progress`: `30` (0.04%)
-- **`blocked`: `2,277` (3.39%)**
+- `in_progress`: `34` (0.05%)
+- **`blocked`: `2,269` (3.38%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,280`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,280`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,272`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,272`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Caller-Wiring Health
@@ -42,15 +42,15 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `215` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,280 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,276 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `491` | 21.54% |
-| Vtable-anchored (recover with the owning class) | `232` | 10.18% |
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `490` | 21.53% |
+| Vtable-anchored (recover with the owning class) | `231` | 10.15% |
 | Framework dispatch (wx/EH/Lua/reflection) | `35` | 1.54% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,071` | 46.97% |
-| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `449` | 19.69% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,069` | 46.97% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `449` | 19.73% |
 | Unclassified data xref (manual review) | `1` | 0.04% |
 | RTTI-only | `1` | 0.04% |
 
