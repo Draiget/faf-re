@@ -489,6 +489,7 @@
     <ClCompile Include="moho\audio\CSndVar.cpp" />
     <ClCompile Include="moho\audio\CSndVarTypeInfo.cpp" />
     <ClCompile Include="moho\audio\HSoundTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\SAudioRequestFastVectorReflection.cpp" />
     <ClCompile Include="moho\audio\SAudioRequestSerializer.cpp" />
     <ClCompile Include="moho\audio\SAudioRequestTypeInfo.cpp" />
     <ClCompile Include="moho\audio\SParamKeySerializer.cpp" />
