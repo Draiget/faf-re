@@ -2601,6 +2601,9 @@
     <ClCompile Include="moho\audio\HSoundTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\audio\SAudioRequestFastVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\audio\SAudioRequestSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
