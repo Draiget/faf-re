@@ -40,6 +40,15 @@ namespace moho
     ~RBroadcasterRType_NavPath() override;
 
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00763660 (FUN_00763660, Moho::RBroadcasterRType_NavPath::Init)
+     *
+     * What it does:
+     * Records the broadcaster byte-size (8) and version, then installs the
+     * listener-ring (de)serialize callbacks.
+     */
+    void Init() override;
   };
 
   class RListenerRType_NavPath final : public gpg::RType
@@ -527,6 +536,56 @@ namespace
 
 } // namespace
 
+namespace
+{
+  /**
+   * container_of: recover the owning `Listener<const SNavPath&>` from its
+   * intrusive `mListenerLink` node (`mListenerLink` sits at +0x04 in Listener),
+   * mirroring the `node - 4` recovery in FUN_00763940.
+   */
+  [[nodiscard]] moho::Listener<const moho::SNavPath&>* NavPathListenerFromLink(moho::Broadcaster* const link) noexcept
+  {
+    return reinterpret_cast<moho::Listener<const moho::SNavPath&>*>(
+      reinterpret_cast<char*>(link) - offsetof(moho::Listener<const moho::SNavPath&>, mListenerLink)
+    );
+  }
+
+  /**
+   * Address: 0x00763940 (FUN_00763940)
+   *
+   * What it does:
+   * Serializes the broadcaster's `Listener<const SNavPath&>` ring as a
+   * null-terminated sequence of unowned tracked pointers: walk from
+   * `listHead->mNext` back to the `Broadcaster` sentinel, writing each listener
+   * (via `RRef_Listener_NavPath` + `WriteRawPointer`), then write one
+   * null-listener terminator. Bound as `serSaveFunc_`; `version` is unused.
+   */
+  void WriteNavPathListeners(
+    gpg::WriteArchive* const archive,
+    moho::Broadcaster* const listHead,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || listHead == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (auto* node = listHead->mNext; node != listHead; node = node->mNext) {
+      moho::Listener<const moho::SNavPath&>* const listener =
+        node ? NavPathListenerFromLink(static_cast<moho::Broadcaster*>(node)) : nullptr;
+      gpg::RRef ref{};
+      gpg::RRef_Listener_NavPath(&ref, listener);
+      gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, owner);
+    }
+
+    gpg::RRef endRef{};
+    gpg::RRef_Listener_NavPath(&endRef, nullptr);
+    gpg::WriteRawPointer(archive, endRef, gpg::TrackedPointerState::Unowned, owner);
+  }
+} // namespace
+
 /**
  * Address: 0x007635C0 (FUN_007635C0, Moho::RBroadcasterRType_NavPath::GetName)
  *
@@ -547,6 +606,25 @@ const char* moho::RBroadcasterRType_NavPath::GetName() const
   }
 
   return gBroadcasterNavPathTypeName.c_str();
+}
+
+/**
+ * Address: 0x00763660 (FUN_00763660, Moho::RBroadcasterRType_NavPath::Init)
+ *
+ * What it does:
+ * Records the broadcaster byte-size (8 = `sizeof(moho::Broadcaster)`) and
+ * version 1, then installs the listener-ring (de)serialize callbacks. The
+ * typed ring (de)serializers are stored into the type-erased
+ * `serLoadFunc_`/`serSaveFunc_` slots exactly as the binary stores the raw
+ * function addresses (`this[7]`/`this[5]`); the calling convention is identical
+ * (the object pointer occupies the generic `int` object lane).
+ */
+void moho::RBroadcasterRType_NavPath::Init()
+{
+  size_ = 8;
+  version_ = 1;
+  serLoadFunc_ = reinterpret_cast<load_func_t>(&gpg::ReadAndLinkNavPathListeners);
+  serSaveFunc_ = reinterpret_cast<save_func_t>(&WriteNavPathListeners);
 }
 
 /**
