@@ -31,7 +31,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00764010 (FUN_00764010, Moho::RBroadcasterRType_NavPath::dtr)
+     * Address: 0x00764070 (FUN_00764070, Moho::RBroadcasterRType_NavPath::dtr)
      *
      * What it does:
      * Tears down one broadcaster-navpath type-info descriptor and releases
@@ -55,7 +55,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00764070 (FUN_00764070, Moho::RListenerRType_NavPath::dtr)
+     * Address: 0x007640D0 (FUN_007640D0, Moho::RListenerRType_NavPath::dtr)
      *
      * What it does:
      * Tears down one listener-navpath type-info descriptor and releases
@@ -64,6 +64,16 @@ namespace moho
     ~RListenerRType_NavPath() override;
 
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00763720 (FUN_00763720, Moho::RListenerRType_NavPath::Init)
+     *
+     * What it does:
+     * Records the reflected listener byte-size (12 = `sizeof(moho::Listener)`).
+     * Unlike the broadcaster, a single listener carries no custom ring
+     * (de)serialize callbacks, so `Init` only stamps `size_`.
+     */
+    void Init() override;
   };
 } // namespace moho
 
@@ -328,6 +338,15 @@ namespace
   {
     gBroadcasterNavPathTypeName.clear();
     gBroadcasterNavPathTypeNameInitGuard = 0u;
+  }
+
+  msvc8::string gListenerNavPathTypeName{};
+  std::uint32_t gListenerNavPathTypeNameInitGuard = 0u;
+
+  void cleanup_ListenerNavPathTypeName()
+  {
+    gListenerNavPathTypeName.clear();
+    gListenerNavPathTypeNameInitGuard = 0u;
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
@@ -628,7 +647,7 @@ void moho::RBroadcasterRType_NavPath::Init()
 }
 
 /**
- * Address: 0x00764010 (FUN_00764010, Moho::RBroadcasterRType_NavPath::dtr)
+ * Address: 0x00764070 (FUN_00764070, Moho::RBroadcasterRType_NavPath::dtr)
  *
  * What it does:
  * Tears down one broadcaster-navpath type-info descriptor and releases
@@ -690,16 +709,41 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
 }
 
 /**
+ * Address: 0x00763680 (FUN_00763680, Moho::RListenerRType_NavPath::GetName)
+ *
  * What it does:
- * Returns the lexical type label for `Listener<NavPath>`.
+ * Lazily builds and caches the reflected lexical type label `Listener<NavPath>`
+ * from runtime RTTI metadata (the wrapped value type's own `GetName()`).
  */
 const char* moho::RListenerRType_NavPath::GetName() const
 {
-  return "Listener<NavPath>";
+  if ((gListenerNavPathTypeNameInitGuard & 1u) == 0u) {
+    gListenerNavPathTypeNameInitGuard |= 1u;
+
+    gpg::RType* const valueType = CachedNavPathType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "NavPath";
+    gListenerNavPathTypeName =
+      gpg::STR_Printf("Listener<%s>", valueTypeName ? valueTypeName : "NavPath");
+    (void)std::atexit(&cleanup_ListenerNavPathTypeName);
+  }
+
+  return gListenerNavPathTypeName.c_str();
 }
 
 /**
- * Address: 0x00764070 (FUN_00764070, Moho::RListenerRType_NavPath::dtr)
+ * Address: 0x00763720 (FUN_00763720, Moho::RListenerRType_NavPath::Init)
+ *
+ * What it does:
+ * Stamps the reflected listener byte-size (12). No custom ring (de)serialize
+ * callbacks are installed — a single listener is not a serialized ring.
+ */
+void moho::RListenerRType_NavPath::Init()
+{
+  size_ = 12;
+}
+
+/**
+ * Address: 0x007640D0 (FUN_007640D0, Moho::RListenerRType_NavPath::dtr)
  *
  * What it does:
  * Tears down one listener-navpath type-info descriptor and releases
