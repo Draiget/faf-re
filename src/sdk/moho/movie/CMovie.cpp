@@ -157,6 +157,57 @@ namespace moho
   }
 
   /**
+   * Address: 0x00873D80 (FUN_00873D80, ??1CMovie@Moho@@QAE@@Z)
+   * Mangled: ??1CMovie@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * Moho::TDatListItem_Listener *__stdcall Moho::CMovie::~CMovie(Moho::CMovie *this);
+   *
+   * What it does:
+   * Unlinks this movie from the active D3D device-event listener ring, tears
+   * down live playback and owned buffers/strings, then runs base listener and
+   * IMovie subobject teardown.
+   */
+  CMovie::~CMovie()
+  {
+    // [0x00873DB1-0x00873DD5] While a device is active, unlink this listener
+    // from the live device-event ring. The redundant D3D_GetDevice() call
+    // mirrors the binary (its result is unused; intrusive unlink is
+    // self-contained and does not need the ring head).
+    if (D3D_GetDevice() != nullptr) {
+      (void)D3D_GetDevice();
+      mDeviceListener.mLink.ListUnlink();
+    }
+
+    // [0x00873DDA] Tear down active Sofdec playback + texture-sheet owner lane.
+    Dispose();
+
+    // [0x00873DDF-0x00873DF4] Destroy any remaining Sofdec playback handle.
+    if (mPly != nullptr) {
+      ::mwPlyDestroy(mPly);
+    }
+    mPly = nullptr;
+
+    // Member subobject teardown, in binary (reverse-declaration) order:
+    // [0x00873DFA] free subtitle-text heap buffer (base +0x60).
+    mSubtitleText.tidy(true, 0U);
+    // [0x00873E1A] free movie-name heap buffer (base +0x44).
+    mMovieName.tidy(true, 0U);
+    // [0x00873E3A] release Sofdec work-buffer shared owner (+0x2C).
+    mWorkbuffer.release();
+    // [0x00873E70] release subtitle mem-buffer shared owner (+0x1C).
+    mSubtitleBuffer.Reset();
+    // [0x00873EA6] release movie texture-sheet shared owner (+0x14). Already
+    // null after Dispose(), so this matches the skipped binary block.
+    mTextureSheet.release();
+
+    // [0x00873EDF-0x00873EF9] ~Listener<SD3DDeviceEvent const&> base subobject:
+    // unlink this listener node from its ring (no-op when the conditional
+    // unlink above already ran; the real unlink when no device was present).
+    mDeviceListener.mLink.ListUnlink();
+  }
+
+  /**
    * Address: 0x00874CD0 (FUN_00874CD0, ??2CMovie@Moho@@QAE@@Z)
    *
    * What it does:
