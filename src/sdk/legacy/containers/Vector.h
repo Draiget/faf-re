@@ -1743,6 +1743,8 @@ namespace msvc8
          * Address: 0x006E24D0 (FUN_006E24D0, msvc8::vector<Moho::CmdId>::_Insert_n
          * scalar-int32 grow lane; emitted via AppendPendingReleasedCommandId
          * push_back (Sim.cpp:5045)).
+         * Address: 0x00692930 (FUN_00692930, msvc8::vector<Moho::SyncCameraShakeRequest>::_Insert_n
+         * grow lane; emitted via mSyncCamShake.push_back (Entity.cpp:879)).
          * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
          * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
