@@ -33,7 +33,6 @@ namespace moho
   int cfunc_CreateBuilderArmController(lua_State*) { return 0; }
   int cfunc_CreateThrustController(lua_State*) { return 0; }
   int cfunc_EntityAttachBoneToEntityBone(lua_State*) { return 0; }
-  int cfunc_GenerateBuildTemplateFromSelection(lua_State*) { return 0; }
   int cfunc_IssueBuildMobile(lua_State*) { return 0; }
   int func_FlushEvents(lua_State*) { return 0; }
 }
