@@ -491,6 +491,25 @@ namespace moho
   int cfunc_IssueCaptureL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F6330 (FUN_006F6330, cfunc_IssueSacrifice)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueSacrificeL`.
+   */
+  int cfunc_IssueSacrifice(lua_State* luaContext);
+
+  /**
+   * Address: 0x006F63A0 (FUN_006F63A0, cfunc_IssueSacrificeL)
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Sacrifice-capable units, drops
+   * the target entity from the worker selection, and — only when a worker unit
+   * remains — issues `UNITCOMMAND_Sacrifice` on the remaining units against
+   * that entity target. A unit cannot sacrifice into itself.
+   */
+  int cfunc_IssueSacrificeL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00836900 (FUN_00836900, cfunc_DecreaseBuildCountInQueue)
    *
    * What it does:

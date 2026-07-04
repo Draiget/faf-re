@@ -143,6 +143,7 @@ namespace
   constexpr const char* kIssueRepairHelpText = "IssueRepair";
   constexpr const char* kIssueReclaimHelpText = "IssueReclaim";
   constexpr const char* kIssueCaptureHelpText = "IssueCapture";
+  constexpr const char* kIssueSacrificeHelpText = "IssueSacrifice";
   constexpr const char* kIssueScriptHelpText = "IssueScript";
   constexpr const char* kIssueKillSelfHelpText = "IssueKillSelf";
   constexpr const char* kIssueDestroySelfHelpText = "IssueDestroySelf";
@@ -822,6 +823,7 @@ namespace moho
   int cfunc_IssueBuildMobile(lua_State* luaContext);
   int cfunc_IssueRepair(lua_State* luaContext);
   int cfunc_IssueSacrifice(lua_State* luaContext);
+  int cfunc_IssueSacrificeL(LuaPlus::LuaState* state);
   int cfunc_IssueUpgrade(lua_State* luaContext);
   int cfunc_IssueScript(lua_State* luaContext);
   int cfunc_IssueScriptL(LuaPlus::LuaState* state);
@@ -4712,6 +4714,87 @@ namespace moho
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Capture);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F6330 (FUN_006F6330, cfunc_IssueSacrifice)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueSacrifice(int a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueSacrificeL`.
+   */
+  int cfunc_IssueSacrifice(lua_State* const luaContext)
+  {
+    return cfunc_IssueSacrificeL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F63A0 (FUN_006F63A0, cfunc_IssueSacrificeL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueSacrificeL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Parses `(unitList, targetEntity)`, filters Sacrifice-capable units through
+   * `func_Validate_IssueCommand` with `RULEUCC_Sacrifice` (0x10000), drops the
+   * target entity out of the worker selection (a unit cannot sacrifice into
+   * itself), and — only when at least one worker unit remains — resolves the
+   * target into a `CAiTarget`, encodes it into `SSTICommandIssueData::mTarget`,
+   * and queues one `UNITCOMMAND_Sacrifice` (0x20) through the shared
+   * `IssueCommandToSelectedUnits` (`UNIT_IssueCommand`) dispatch shape with
+   * `clearQueue=false`. Mirrors the binary's `func_GetUnitList` +
+   * `func_Validate_IssueCommand(..., RULEUCC_Sacrifice)` + `SCR_FromLua_Entity`
+   * + `EntitySetTemplate_Unit::Remove` + `CAiTarget::UpdateTarget` +
+   * `SSTITarget::FromAiTarget` + `UNIT_IssueCommand` sequence. Unlike the
+   * sibling Capture/Reclaim callbacks (which issue unconditionally), Sacrifice
+   * gates the entire dispatch behind a non-empty post-removal worker set.
+   */
+  int cfunc_IssueSacrificeL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueSacrificeHelpText, 2, argumentCount);
+    }
+
+    UnitSet sourceUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueSacrificeHelpText);
+
+    UnitSet filteredUnits{};
+    if (!ValidateIssueCommandUnits(sourceUnits, filteredUnits, RULEUCC_Sacrifice)) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
+
+    SEntitySetTemplateUnit workerSelection{};
+    workerSelection.AddUnits(filteredUnits);
+
+    // Drop the sacrifice target itself out of the worker selection so a unit is
+    // not tasked to sacrifice into itself when the script passed the same unit
+    // as both worker and target. Unlike the sibling Capture/Reclaim callbacks,
+    // Sacrifice only issues when a worker unit remains after the removal.
+    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+
+    if (!workerSelection.Empty()) {
+      CAiTarget target{};
+      target.UpdateTarget(targetEntity);
+
+      Sim* const sim = lua_getglobaluserdata(rawState);
+
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Sacrifice);
+      target.EncodeToSSTITarget(commandIssueData.mTarget);
+      (void)IssueCommandToSelectedUnits(sim, workerSelection, commandIssueData, false);
+    }
     return 0;
   }
 
