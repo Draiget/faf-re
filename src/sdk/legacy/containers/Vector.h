@@ -1745,11 +1745,22 @@ namespace msvc8
          * push_back (Sim.cpp:5045)).
          * Address: 0x00692930 (FUN_00692930, msvc8::vector<Moho::SyncCameraShakeRequest>::_Insert_n
          * grow lane; emitted via mSyncCamShake.push_back (Entity.cpp:879)).
+         * Address: 0x00940D40 (FUN_00940D40, msvc8::vector<gpg::gal::AdapterModeD3D9>::_Insert_n
+         * 16-byte-element grow lane; emitted via PushBackAdapterModeD3D9 modes.push_back
+         * (D3D9Interfaces.cpp:3258)).
+         * Address: 0x00882BA0 (FUN_00882BA0, msvc8::vector<msvc8::string>::_Insert_n
+         * grow-and-fill lane; emitted via ResizeLegacyStringVectorExact
+         * outStrings.resize(n, fillValue) (CSaveGameRequestImpl.cpp:125)).
          * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
          * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
          * — MSVC8's push_back (FUN_005DBD90) is insert(end(),1,value) when full —
          * so this per-T pointer symbol is emitted).
+         * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
+         * grow lane for Moho::Shoreline::mCells; the recovered caller
+         * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
+         * by name — MSVC8's push_back (FUN_008135A0) is insert(end(),1,value) when
+         * full — so this per-T 8-byte shared_ptr symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
