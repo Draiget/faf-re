@@ -31,6 +31,7 @@
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StringUtils.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/Common.h"
 #include "moho/net/INetTCPSocket.h"
@@ -868,6 +869,54 @@ namespace moho
       kLoadSavedGameHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00886350 (FUN_00886350, cfunc_PrefetchSession)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_PrefetchSessionL`.
+   */
+  int cfunc_PrefetchSession(lua_State* const luaContext)
+  {
+    return cfunc_PrefetchSessionL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x008863D0 (FUN_008863D0, cfunc_PrefetchSessionL)
+   *
+   * What it does:
+   * Parses `(mapname, mods, hipri)` and starts a background scenario load by
+   * resolving the world-session loader and requesting its scenario info for
+   * the given map and mods. `hipri` is forwarded as the loader's
+   * set-game-data / high-priority flag; the returned scenario info is
+   * discarded. The loader method dispatched is the vtable slot-1 entry
+   * `CWldSessionLoaderImpl::GetScenarioInfo` (confirmed from the
+   * `??_7CWldSessionLoaderImpl@Moho@@6B@` vtable at 0x00E49FC4).
+   */
+  int cfunc_PrefetchSessionL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kPrefetchSessionHelpText, 3, argumentCount);
+    }
+
+    LuaPlus::LuaStackObject mapNameArg(state, 1);
+    const char* const mapName = lua_tostring(rawState, 1);
+    if (mapName == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&mapNameArg, "string");
+    }
+
+    LuaPlus::LuaObject modsObject(LuaPlus::LuaStackObject(state, 2));
+    msvc8::string gameMods = SCR_ToString(modsObject);
+
+    LuaPlus::LuaStackObject highPriorityArg(state, 3);
+    const bool highPriority = highPriorityArg.GetBoolean();
+
+    CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
+    (void)loader->GetScenarioInfo(mapName, &gameMods, highPriority);
+    return 0;
   }
 
   /**

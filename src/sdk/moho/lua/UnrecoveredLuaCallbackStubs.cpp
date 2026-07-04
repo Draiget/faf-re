@@ -37,7 +37,6 @@ namespace moho
   int cfunc_GenerateBuildTemplateFromSelection(lua_State*) { return 0; }
   int cfunc_GetSessionClients(lua_State*) { return 0; }
   int cfunc_IssueBuildMobile(lua_State*) { return 0; }
-  int cfunc_PrefetchSession(lua_State*) { return 0; }
   int func_FlushEvents(lua_State*) { return 0; }
 }
 

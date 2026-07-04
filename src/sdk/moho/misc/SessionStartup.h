@@ -250,6 +250,15 @@ namespace moho
   int cfunc_PrefetchSession(lua_State* luaContext);
 
   /**
+   * Address: 0x008863D0 (FUN_008863D0, cfunc_PrefetchSessionL)
+   *
+   * What it does:
+   * Parses `(mapname, mods, hipri)` and requests one background scenario load
+   * from the world-session loader (`GetScenarioInfo`).
+   */
+  int cfunc_PrefetchSessionL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00886370 (FUN_00886370, func_PrefetchSession_LuaFuncDef)
    *
    * What it does:
