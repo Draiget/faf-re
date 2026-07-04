@@ -990,6 +990,86 @@ namespace moho
   }
 
   /**
+   * Address: 0x00737680 (FUN_00737680, Moho::SIM_DoDamageArea)
+   * Mangled: ?SIM_DoDamageArea@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * What it does:
+   * Applies an area-effect splash payload: resolves the shields covering the origin
+   * (SIM_DoDamage), gathers every entity in the damage sphere (radius mRadius) via
+   * COGrid::ForAllEntitiesIterator, and for each valid target (non-ally,
+   * non-"NOSPLASHDAMAGE") applies the shield-reduced origin damage as a single-target
+   * SIM_DoDamagePoint. Unlike the ring lane, it then also damages each absorbing
+   * shield itself by the amount that shield absorbed.
+   */
+  void SIM_DoDamageArea(Sim* const sim, const CDamage& damage)
+  {
+    msvc8::list<SShieldDamageEntry> absorbingShields;
+    SIM_DoDamage(sim, absorbingShields, damage);
+
+    Wm3::Sphere3f querySphere{};
+    querySphere.Center = damage.mOrigin;
+    querySphere.Radius = damage.mRadius;
+
+    CollisionResultFastVectorN10 areaResults{};
+    sim->mOGrid->ForAllEntitiesIterator(
+      areaResults,
+      static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity),
+      querySphere);
+
+    Entity* const instigator = damage.mInstigator.GetObjectPtr();
+
+    const CollisionResult* const resultsBegin = areaResults.start_;
+    const CollisionResult* const resultsEnd = areaResults.end_;
+    for (const CollisionResult* result = resultsBegin; result != resultsEnd; ++result) {
+      Entity* const target = result->sourceEntity;
+
+      if (!damage.mDamageFriendly && instigator != nullptr) {
+        CArmyImpl* const instigatorArmy = instigator->ArmyRef;
+        if (instigatorArmy != nullptr) {
+          CArmyImpl* const targetArmy = target->ArmyRef;
+          const std::uint32_t targetIndex =
+            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->ArmyId) : 0xFFFFFFFFu;
+          if (ArmyIsAlly(instigatorArmy, targetIndex)) {
+            continue;
+          }
+        }
+      }
+
+      if (target->IsInCategory("NOSPLASHDAMAGE")) {
+        continue;
+      }
+
+      const float shieldedAmount = ComputeShieldedDamageForEntity(target, absorbingShields, damage.mAmount);
+      if (shieldedAmount <= 0.0f) {
+        continue;
+      }
+
+      CDamage pointDamage = damage;
+      pointDamage.mAmount = shieldedAmount;
+      const Wm3::Vec3f& targetPosition = target->GetPositionWm3();
+      pointDamage.mVector.x = targetPosition.x - damage.mOrigin.x;
+      pointDamage.mVector.y = targetPosition.y - damage.mOrigin.y;
+      pointDamage.mVector.z = targetPosition.z - damage.mOrigin.z;
+      pointDamage.mTarget.Set(target);
+      SIM_DoDamagePoint(sim, pointDamage);
+    }
+
+    // Then apply each absorbing shield's absorbed amount back onto the shield itself.
+    for (const SShieldDamageEntry& entry : absorbingShields) {
+      Shield* const shield = entry.shield;
+
+      CDamage shieldDamage = damage;
+      shieldDamage.mAmount = entry.absorption;
+      const Wm3::Vec3f& shieldPosition = shield->GetPositionWm3();
+      shieldDamage.mVector.x = shieldPosition.x - damage.mOrigin.x;
+      shieldDamage.mVector.y = shieldPosition.y - damage.mOrigin.y;
+      shieldDamage.mVector.z = shieldPosition.z - damage.mOrigin.z;
+      shieldDamage.mTarget.Set(shield);
+      SIM_DoDamagePoint(sim, shieldDamage);
+    }
+  }
+
+  /**
    * Address: 0x00737E60 (FUN_00737E60, Moho::SIM_Damage)
    * Mangled: ?SIM_Damage@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
    *

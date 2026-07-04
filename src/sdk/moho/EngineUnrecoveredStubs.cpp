@@ -70,7 +70,6 @@ namespace moho
   // SIM_DoDamageArea (FUN_00737680, mMethod==1) and func_DoDamageRing
   // (FUN_00737B30, mMethod==2) are still blocked; their stubs live here
   // so the SIM_Damage dispatcher links until those bodies are recovered.
-  void SIM_DoDamageArea(class moho::Sim *, class moho::CDamage const &) {}
 }
 
 // REMOVED: ADXM_WaitVsync, mpvcdec_InitDct C++-mangled stubs. Their C-linkage
