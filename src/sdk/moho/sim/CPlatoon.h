@@ -289,6 +289,16 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
 
     /**
+     * Address: 0x00729A70 (FUN_00729A70, Moho::CPlatoon::UseFerryBeacon)
+     *
+     * What it does:
+     * Collects the platoon's alive, mobile, not-being-built units whose blueprint
+     * ordinal is a member of `category` (across all squad classes) and issues one
+     * UNITCOMMAND_TransportLoadUnits targeted at the `beacon` ferry entity.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseFerryBeacon(const EntityCategorySet* category, Unit* beacon);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:
