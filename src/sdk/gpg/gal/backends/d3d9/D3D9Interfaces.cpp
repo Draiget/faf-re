@@ -3374,11 +3374,25 @@ namespace gpg::gal
             return false;
         }
 
+        /**
+         * Address: 0x008F1600 (FUN_008F1600, gpg::gal::DeviceD3D9::CheckHardwareBasedInstancing)
+         *
+         * IDA signature:
+         * void __thiscall CheckHardwareBasedInstancing(gpg::gal::DeviceD3D9 *this, D3DCAPS9 *caps);
+         *
+         * What it does:
+         * Dispatches the virtual Func1() pre-hook, then probes D3D9 hardware
+         * instancing support: for pre-SM3.0 devices it checks the INST FourCC
+         * surface format and the POINTSIZE render-state trick, with an ATI/Intel
+         * deviceId fallback whitelist (X800/X850/X1650). Clears mHWBasedInstancing
+         * when unsupported.
+         */
         void CheckHardwareInstancingSupport(DeviceD3D9& device, const D3DCAPS9& caps)
         {
             auto& runtime = AsDeviceD3D9Runtime(device);
             DeviceContext& context = runtime.deviceContext;
 
+            device.Func1();
             context.mHWBasedInstancing = true;
             if (caps.VertexShaderVersion < kVertexShaderModel30)
             {

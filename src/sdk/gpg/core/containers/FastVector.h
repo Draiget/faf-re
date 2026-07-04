@@ -1391,6 +1391,8 @@ namespace gpg
 
   /**
    * Address: 0x00402C20 (FUN_00402C20)
+   * Address: 0x00710F70 (FUN_00710F70, gpg::FastVectorRuntimeCopyRange<moho::SCondition> —
+   * emitted transitively via InsertRange<SCondition> from CArmyStats trigger-condition append)
    *
    * What it does:
    * Copies [sourceBegin, sourceEnd) into `destination` and returns the first
