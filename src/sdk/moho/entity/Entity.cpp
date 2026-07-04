@@ -2077,6 +2077,7 @@ namespace
 namespace moho
 {
   int cfunc_EntityPushOver(lua_State* luaContext);
+  int cfunc_EntityPushOverL(LuaPlus::LuaState* state);
   int cfunc_EntityFallDown(lua_State* luaContext);
   int cfunc_EntityFallDownL(LuaPlus::LuaState* state);
   int cfunc_MotorFallDownWhack(lua_State* luaContext);
@@ -7955,6 +7956,110 @@ namespace moho
       kEntitySinkAwayHelpText
     );
     return &binder;
+  }
+
+  [[nodiscard]] static Wm3::Quaternionf* BuildTiltShortestArcDelta(
+    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* outDelta, const Wm3::Vector3f& currentUp);
+
+  /**
+   * Address: 0x006FCA80 (FUN_006FCA80, cfunc_EntityPushOver)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_EntityPushOver(int a1);
+   *
+   * What it does:
+   * Unwraps the Lua callback context and forwards to `cfunc_EntityPushOverL`.
+   */
+  int cfunc_EntityPushOver(lua_State* const luaContext)
+  {
+    return cfunc_EntityPushOverL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006FCB00 (FUN_006FCB00, cfunc_EntityPushOverL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_EntityPushOverL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Implements `Entity:PushOver(nx, ny, nz, depth)`. Reads the entity plus one
+   * push direction (nx,ny,nz) scaled by depth, adds it to the entity's bone-tip
+   * world position to form a target surface normal (clamped so the entity is
+   * not pushed below its own Y), and — when that normal is non-degenerate —
+   * tilts the entity's current orientation so its local up-axis aligns to the
+   * pushed normal (shortest-arc pre-multiply), then commits the result as a
+   * pending transform.
+   */
+  int cfunc_EntityPushOverL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityPushOverHelpText, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+    Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+    LuaPlus::LuaStackObject nxArg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&nxArg, "number");
+    }
+    const float pushNormalX = static_cast<float>(lua_tonumber(rawState, 2));
+
+    LuaPlus::LuaStackObject nyArg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&nyArg, "number");
+    }
+    const float pushNormalY = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject nzArg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&nzArg, "number");
+    }
+    const float pushNormalZ = static_cast<float>(lua_tonumber(rawState, 4));
+
+    LuaPlus::LuaStackObject depthArg(state, 5);
+    if (lua_type(rawState, 5) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&depthArg, "number");
+    }
+    const float pushDepth = static_cast<float>(lua_tonumber(rawState, 5));
+
+    VTransform tran = entity->GetTransformWm3();
+    const VTransform boneTip = entity->GetBoneWorldTransform(-1);
+
+    float targetY = (pushDepth * pushNormalY) + boneTip.pos_.y;
+    const float targetZ = (pushDepth * pushNormalZ) + boneTip.pos_.z;
+    if (tran.pos_.y > targetY) {
+      targetY = tran.pos_.y;
+    }
+
+    Wm3::Vector3f pushedUp{
+      ((pushDepth * pushNormalX) + boneTip.pos_.x) - tran.pos_.x,
+      targetY - tran.pos_.y,
+      targetZ - tran.pos_.z,
+    };
+
+    if (Wm3::Vector3f::Normalize(&pushedUp) != 0.0f) {
+      const Wm3::Quaternionf o = tran.orient_;
+
+      // Local up-axis from the current orientation, spelled with the raw
+      // VTransform::orient_ union lanes exactly as the binary reads Entity's
+      // Orientation Vector4f (the same construct as the recovered COORDS_Tilt).
+      const Wm3::Vector3f currentUp{
+        ((o.z * o.y) - (o.w * o.x)) * 2.0f,
+        1.0f - (((o.w * o.w) + (o.y * o.y)) * 2.0f),
+        ((o.w * o.z) + (o.y * o.x)) * 2.0f,
+      };
+
+      Wm3::Quaternionf tiltDelta{};
+      BuildTiltShortestArcDelta(pushedUp, &tiltDelta, currentUp);
+
+      tran.orient_ = Wm3::Quaternionf::Multiply(tiltDelta, o);
+      NormalizeQuatInPlace(&tran.orient_);
+      entity->SetPendingTransform(tran, 1.0f);
+    }
+    return 0;
   }
 
   /**
