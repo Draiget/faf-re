@@ -254,6 +254,12 @@ namespace msvc8
             return { iterator(z, _Myhead), true };
         }
 
+        /**
+         * Address: 0x00718410 (FUN_00718410, msvc8::set<Moho::InfluenceMapEntry,
+         * Moho::InfluenceMapEntryLess>::erase(iterator) — RB-tree node erase +
+         * rebalance; emitted via InfluenceGrid::RemoveEntry `entries.erase(it)`
+         * at CInfluenceMap.cpp:4448).
+         */
         iterator erase(iterator pos) {
             assert(pos.head_ == _Myhead && "foreign iterator");
             rb_base* n = pos.cur_;

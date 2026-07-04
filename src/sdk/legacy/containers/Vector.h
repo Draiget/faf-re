@@ -1740,8 +1740,9 @@ namespace msvc8
          * grow lane for the global reflection TypeVec; the recovered caller
          * gpg::RType::RegisterType invokes insert(end(), 1, this) by name so this
          * per-T symbol is emitted).
-         * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
-         * fill-insert grow lane; emitted via the UnitWeapon push_back path).
+         * Address: 0x006E24D0 (FUN_006E24D0, msvc8::vector<Moho::CmdId>::_Insert_n
+         * scalar-int32 grow lane; emitted via AppendPendingReleasedCommandId
+         * push_back (Sim.cpp:5045)).
          * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
          * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
