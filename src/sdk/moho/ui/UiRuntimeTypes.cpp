@@ -12691,9 +12691,42 @@ moho::CMauiHistogram::CMauiHistogram(LuaPlus::LuaObject* const luaObject, CMauiC
   : CMauiControl(luaObject, parent, "group")
 {
   CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(this);
-  histogramView->mUnknown128 = 0;
-  histogramView->mUnknown12C = 0;
-  histogramView->mUnknown130 = 0;
+  histogramView->mDataStart = nullptr;
+  histogramView->mDataEnd = nullptr;
+  histogramView->mDataCapacity = nullptr;
+}
+
+/**
+ * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
+ *
+ * IDA signature:
+ * _DWORD* __usercall ~CMauiHistogram@<eax>(CMauiHistogram* this@<esi>);
+ *
+ * What it does:
+ * Destroys the histogram column array: scalar-deletes each column's owned
+ * value buffer, frees the column array storage, and clears the column-array
+ * lanes. Base `CMauiControl` teardown is emitted implicitly by the compiler.
+ */
+moho::CMauiHistogram::~CMauiHistogram()
+{
+  CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(this);
+
+  SHistogramColumn* const columns = histogramView->mDataStart;
+  if (columns != nullptr) {
+    for (SHistogramColumn* column = columns; column != histogramView->mDataEnd; ++column) {
+      if (column->mValues != nullptr) {
+        ::operator delete(column->mValues);
+      }
+      column->mValues = nullptr;
+      column->mValuesEnd = nullptr;
+      column->mValuesCapacity = nullptr;
+    }
+    ::operator delete(columns);
+  }
+
+  histogramView->mDataStart = nullptr;
+  histogramView->mDataEnd = nullptr;
+  histogramView->mDataCapacity = nullptr;
 }
 
 /**

@@ -1996,7 +1996,14 @@ namespace moho
      */
     CMauiHistogram(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
-    virtual ~CMauiHistogram() = default;
+    /**
+     * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
+     *
+     * What it does:
+     * Releases each histogram column's owned value buffer and the column array
+     * itself, then resets the column-array lanes, before base teardown.
+     */
+    ~CMauiHistogram() override;
 
     /**
      * Address: 0x007978F0 (FUN_007978F0, Moho::CMauiHistogram::Draw)
@@ -3029,14 +3036,32 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiEditRuntimeView) == 0x198, "CMauiEditRuntimeView size must be 0x198");
 
+  /**
+   * One histogram data series ("column"). Layout: 0x14 bytes. Only the value
+   * buffer at +0x08 owns heap storage; it is released (and the whole column
+   * array freed) when the owning CMauiHistogram is destroyed. Matches the
+   * generic stride-20 owned-pointer-triplet teardown at
+   * `DestroyOwnedPointerTripletsInStride20Range` (FUN_00798D10).
+   */
+  struct SHistogramColumn
+  {
+    std::uint32_t field_0x00 = 0;      // +0x00 (packed color from Moho::SCR_DecodeColor)
+    std::uint32_t field_0x04 = 0;      // +0x04
+    float* mValues = nullptr;          // +0x08 owned per-bar value buffer (begin)
+    float* mValuesEnd = nullptr;       // +0x0C
+    float* mValuesCapacity = nullptr;  // +0x10
+  };
+  static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
+  static_assert(offsetof(SHistogramColumn, mValues) == 0x08, "SHistogramColumn::mValues offset must be 0x08");
+
   struct CMauiHistogramRuntimeView : CMauiControlRuntimeView
   {
     std::uint8_t mUnknown0D4To11B[0x48]{};
-    std::int32_t mXIncrement = 0; // +0x11C
-    std::int32_t mYIncrement = 0; // +0x120
-    std::int32_t mUnknown128 = 0; // +0x128
-    std::int32_t mUnknown12C = 0; // +0x12C
-    std::int32_t mUnknown130 = 0; // +0x130
+    std::int32_t mXIncrement = 0;              // +0x11C
+    std::int32_t mYIncrement = 0;              // +0x120
+    SHistogramColumn* mDataStart = nullptr;    // +0x128 column-array begin (owned)
+    SHistogramColumn* mDataEnd = nullptr;      // +0x12C column-array end
+    SHistogramColumn* mDataCapacity = nullptr; // +0x130 column-array capacity
 
     [[nodiscard]] static CMauiHistogramRuntimeView* FromHistogram(CMauiHistogram* histogram) noexcept
     {
@@ -3058,16 +3083,16 @@ namespace moho
     "CMauiHistogramRuntimeView::mYIncrement offset must be 0x120"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mUnknown128) == 0x128,
-    "CMauiHistogramRuntimeView::mUnknown128 offset must be 0x128"
+    offsetof(CMauiHistogramRuntimeView, mDataStart) == 0x128,
+    "CMauiHistogramRuntimeView::mDataStart offset must be 0x128"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mUnknown12C) == 0x12C,
-    "CMauiHistogramRuntimeView::mUnknown12C offset must be 0x12C"
+    offsetof(CMauiHistogramRuntimeView, mDataEnd) == 0x12C,
+    "CMauiHistogramRuntimeView::mDataEnd offset must be 0x12C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mUnknown130) == 0x130,
-    "CMauiHistogramRuntimeView::mUnknown130 offset must be 0x130"
+    offsetof(CMauiHistogramRuntimeView, mDataCapacity) == 0x130,
+    "CMauiHistogramRuntimeView::mDataCapacity offset must be 0x130"
   );
 
   struct CMauiItemListRuntimeView : CMauiControlRuntimeView
