@@ -15,6 +15,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/Shield.h"
+#include "moho/sim/COGrid.h"
+#include "legacy/containers/List.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
@@ -729,6 +731,261 @@ namespace moho
           std::string(typeView.data(), typeView.size())
         );
       }
+    }
+  }
+
+  // Moho::IArmy::IsAlly (0x005BD630) is shadowed on CArmyImpl by the same-named
+  // cached-flag data member (+0x128), so replicate the ally-bitset membership test.
+  [[nodiscard]] bool ArmyIsAlly(const CArmyImpl* const army, const std::uint32_t armyIndex) noexcept
+  {
+    if (army == nullptr || armyIndex == 0xFFFFFFFFu) {
+      return false;
+    }
+    const Set& allies = army->Allies;
+    if (allies.items_begin == nullptr || allies.items_end == nullptr) {
+      return false;
+    }
+    return allies.Contains(armyIndex);
+  }
+
+  [[nodiscard]] bool PointInsideSphere(const Wm3::Vec3f& point, const Wm3::Sphere3f& sphere) noexcept
+  {
+    const float dx = point.x - sphere.Center.x;
+    const float dy = point.y - sphere.Center.y;
+    const float dz = point.z - sphere.Center.z;
+    return (dx * dx + dy * dy + dz * dz) <= sphere.Radius * sphere.Radius;
+  }
+
+  // One shield the damage sphere intersects, paired with the amount that shield
+  // absorbs (from RunScriptOnGetDamageAbsorption). Element of the intrusive list
+  // SIM_DoDamage builds and func_DoDamageRing consumes.
+  struct SShieldDamageEntry
+  {
+    Shield* shield;
+    float absorption;
+  };
+  static_assert(sizeof(SShieldDamageEntry) == 0x08, "SShieldDamageEntry must be 0x08");
+
+  /**
+   * Address: 0x00736EB0 (FUN_00736EB0, Moho::SIM_DoDamage)
+   *
+   * What it does:
+   * Collects the shields that stand between `damage.mOrigin` and the outside world:
+   * for every live shield in `sim->mShields` whose collision volume the damage
+   * sphere (mRadius, falling back to mMaxRadius for ring damage) intersects -- but
+   * which does not already contain the origin, and is not an ally of the instigator
+   * unless friendly fire is enabled -- the shield's script-driven absorption is
+   * queried and, when positive, the shield is appended to `absorbingShields`.
+   */
+  void SIM_DoDamage(Sim* const sim, msvc8::list<SShieldDamageEntry>& absorbingShields, const CDamage& damage)
+  {
+    msvc8::list<Shield*> shieldSnapshot = sim->mShields;
+    for (Shield* const shield : shieldSnapshot) {
+      if (shield == nullptr) {
+        continue;
+      }
+      EntityCollisionUpdater* const shieldShape = shield->CollisionExtents;
+      if (shieldShape == nullptr) {
+        continue;
+      }
+
+      if (!damage.mDamageFriendly) {
+        Entity* const instigator = damage.mInstigator.GetObjectPtr();
+        if (instigator != nullptr) {
+          CArmyImpl* const shieldArmy = shield->ArmyRef;
+          if (shieldArmy != nullptr) {
+            CArmyImpl* const instigatorArmy = instigator->ArmyRef;
+            const std::uint32_t instigatorIndex =
+              instigatorArmy != nullptr ? static_cast<std::uint32_t>(instigatorArmy->ArmyId) : 0xFFFFFFFFu;
+            if (ArmyIsAlly(shieldArmy, instigatorIndex)) {
+              continue;
+            }
+          }
+        }
+      }
+
+      if (const Wm3::Sphere3f* const shieldSphere = shieldShape->GetSphere()) {
+        Wm3::Sphere3f containmentSphere{};
+        containmentSphere.Center = shieldSphere->Center;
+        containmentSphere.Radius = shieldSphere->Radius - 0.1f;
+        if (PointInsideSphere(damage.mOrigin, containmentSphere)) {
+          continue;
+        }
+      }
+
+      CollisionPairResult collisionScratch{};
+      Wm3::Sphere3f damageSphere{};
+      damageSphere.Center = damage.mOrigin;
+      damageSphere.Radius = damage.mRadius;
+      bool intersects = shieldShape->CollideSphere(&damageSphere, &collisionScratch);
+      if (damage.mMethod == CDamage_RING_EFFECT && !intersects) {
+        Wm3::Sphere3f maxDamageSphere{};
+        maxDamageSphere.Center = damage.mOrigin;
+        maxDamageSphere.Radius = damage.mMaxRadius;
+        intersects = shieldShape->CollideSphere(&maxDamageSphere, &collisionScratch);
+      }
+      if (!intersects) {
+        continue;
+      }
+
+      if (damage.mAmount <= 0.0f) {
+        // Damage is already spent; the binary appends the shield with an
+        // uninitialized absorption dword on this path -- model as 0.0f (harmless,
+        // since ComputeShieldedDamage starts every entity from mAmount and no
+        // amount remains to absorb).
+        absorbingShields.push_back(SShieldDamageEntry{shield, 0.0f});
+      } else {
+        const float absorbed =
+          shield->RunScriptOnGetDamageAbsorption(damage.mInstigator, damage.mAmount, std::string(damage.mType.c_str()));
+        if (absorbed > 0.0f) {
+          absorbingShields.push_back(SShieldDamageEntry{shield, absorbed});
+        }
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00736E40 (FUN_00736E40, Moho::sub_736E40)
+   *
+   * What it does:
+   * Reduces `amount` by the absorption of every shield (from `absorbingShields`)
+   * whose collision volume contains `entity`'s position, and returns the residual
+   * damage that reaches the entity.
+   */
+  [[nodiscard]] float ComputeShieldedDamageForEntity(
+    Entity* const entity, const msvc8::list<SShieldDamageEntry>& absorbingShields, float amount)
+  {
+    for (const SShieldDamageEntry& entry : absorbingShields) {
+      Shield* const shield = entry.shield;
+      EntityCollisionUpdater* const shieldShape = shield != nullptr ? shield->CollisionExtents : nullptr;
+      if (shield != nullptr && shieldShape != nullptr) {
+        const Wm3::Vec3f& entityPosition = entity->GetPositionWm3();
+        if (shieldShape->PointInShape(&entityPosition)) {
+          amount -= entry.absorption;
+        }
+      } else {
+        gpg::Logf("invalid shield or missing collision primitive!");
+      }
+    }
+    return amount;
+  }
+
+  /**
+   * Address: 0x00722560 (FUN_00722560, Moho::sub_722560)
+   *
+   * What it does:
+   * Gathers into `outResults` every entity in the annulus around `damage.mOrigin`
+   * that collides the outer sphere (radius mMaxRadius) but not the inner sphere
+   * (radius mRadius) -- the ring band a ring-effect damage payload strikes.
+   */
+  void GatherEntitiesInDamageRing(
+    const CDamage& damage, COGrid* const oGrid, CollisionResultFastVectorN10& outResults)
+  {
+    Wm3::Sphere3f innerSphere{};
+    innerSphere.Center = damage.mOrigin;
+    innerSphere.Radius = damage.mRadius;
+
+    Wm3::Sphere3f outerSphere{};
+    outerSphere.Center = damage.mOrigin;
+    outerSphere.Radius = damage.mMaxRadius;
+
+    // Bounding cell rect covering the outer sphere (one collision cell = 4 world units).
+    const float minX = damage.mOrigin.x - damage.mMaxRadius;
+    const float minZ = damage.mOrigin.z - damage.mMaxRadius;
+    const float maxX = damage.mOrigin.x + damage.mMaxRadius;
+    const float maxZ = damage.mOrigin.z + damage.mMaxRadius;
+    const int minCellX = static_cast<int>(std::floor(minX)) >> 2;
+    const int minCellZ = static_cast<int>(std::floor(minZ)) >> 2;
+    const int maxCellX = (static_cast<int>(std::ceil(maxX)) + 3) >> 2;
+    const int maxCellZ = (static_cast<int>(std::ceil(maxZ)) + 3) >> 2;
+
+    CollisionDBRect cellRect{};
+    cellRect.mStartX = static_cast<std::uint16_t>(std::clamp(minCellX, 0, 0xFFFF));
+    cellRect.mStartZ = static_cast<std::uint16_t>(std::clamp(minCellZ, 0, 0xFFFF));
+    cellRect.mWidth = static_cast<std::uint16_t>(
+      std::clamp(maxCellX - static_cast<int>(cellRect.mStartX), 0, 0xFFFF - static_cast<int>(cellRect.mStartX)));
+    cellRect.mHeight = static_cast<std::uint16_t>(
+      std::clamp(maxCellZ - static_cast<int>(cellRect.mStartZ), 0, 0xFFFF - static_cast<int>(cellRect.mStartZ)));
+
+    EntityGatherVector gatheredEntities{};
+    (void)oGrid->mEntityOccupationManager.GatherUnmarkedEntities(
+      gatheredEntities,
+      cellRect,
+      static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity));
+
+    outResults.ResetStorageToInline();
+
+    CollisionPairResult collisionScratch{};
+    for (Entity* const candidate : gatheredEntities) {
+      EntityCollisionUpdater* const shape = candidate->CollisionExtents;
+      if (shape != nullptr && shape->CollideSphere(&innerSphere, &collisionScratch)) {
+        // Inside the inner radius -- excluded from the ring band.
+        continue;
+      }
+      if (shape != nullptr && shape->CollideSphere(&outerSphere, &collisionScratch)) {
+        collisionScratch.sourceEntity = candidate;
+        outResults.PushBack(collisionScratch);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00737B30 (FUN_00737B30, Moho::func_DoDamageRing)
+   * Mangled: ?func_DoDamageRing (mMethod==CDamage_RING_EFFECT branch of SIM_Damage)
+   *
+   * What it does:
+   * Applies a ring-effect splash payload: first resolves the shields covering the
+   * origin (SIM_DoDamage), then for each entity in the ring band that is a valid
+   * (non-ally, non-"NOSPLASHDAMAGE") target, applies the origin damage reduced by
+   * the shields covering that entity via a single-target SIM_DoDamagePoint.
+   */
+  void func_DoDamageRing(Sim* const sim, const CDamage& damage)
+  {
+    msvc8::list<SShieldDamageEntry> absorbingShields;
+    SIM_DoDamage(sim, absorbingShields, damage);
+
+    CollisionResultFastVectorN10 ringResults{};
+    GatherEntitiesInDamageRing(damage, sim->mOGrid, ringResults);
+
+    Entity* const instigator = damage.mInstigator.GetObjectPtr();
+
+    const CollisionResult* const resultsBegin = ringResults.start_;
+    const CollisionResult* const resultsEnd = ringResults.end_;
+    for (const CollisionResult* result = resultsBegin; result != resultsEnd; ++result) {
+      Entity* const target = result->sourceEntity;
+      if (target == nullptr) {
+        continue;
+      }
+
+      if (!damage.mDamageFriendly && instigator != nullptr) {
+        CArmyImpl* const instigatorArmy = instigator->ArmyRef;
+        if (instigatorArmy != nullptr) {
+          CArmyImpl* const targetArmy = target->ArmyRef;
+          const std::uint32_t targetIndex =
+            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->ArmyId) : 0xFFFFFFFFu;
+          if (ArmyIsAlly(instigatorArmy, targetIndex)) {
+            continue;
+          }
+        }
+      }
+
+      if (target->IsInCategory("NOSPLASHDAMAGE")) {
+        continue;
+      }
+
+      const float shieldedAmount = ComputeShieldedDamageForEntity(target, absorbingShields, damage.mAmount);
+      if (shieldedAmount <= 0.0f) {
+        continue;
+      }
+
+      CDamage pointDamage = damage;
+      pointDamage.mAmount = shieldedAmount;
+      const Wm3::Vec3f& targetPosition = target->GetPositionWm3();
+      pointDamage.mVector.x = targetPosition.x - damage.mOrigin.x;
+      pointDamage.mVector.y = targetPosition.y - damage.mOrigin.y;
+      pointDamage.mVector.z = targetPosition.z - damage.mOrigin.z;
+      pointDamage.mTarget.Set(target);
+      SIM_DoDamagePoint(sim, pointDamage);
     }
   }
 
