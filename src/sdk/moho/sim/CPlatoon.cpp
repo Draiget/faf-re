@@ -1858,6 +1858,16 @@ namespace moho
     );
   }
 
+  /**
+   * Address: 0x0072AB50 (FUN_0072AB50, sub_72AB50)
+   *
+   * IDA signature:
+   * void __cdecl sub_72AB50(Moho::CSquad* a1);
+   *
+   * What it does:
+   * Serializer delete-callback for CSquad instances: destroys the squad and frees
+   * its storage. Address-taken into `gCSquadConstructHelper.mDeleteCallback`.
+   */
   void DeleteConstructedCSquadForSerializer(void* const objectPtr)
   {
     auto* const squad = static_cast<CSquad*>(objectPtr);
