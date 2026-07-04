@@ -272,6 +272,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     friend class CAniPoseBone;
+    friend class CBoneEntityManipulator;
 
   private:
     /**

@@ -225,12 +225,51 @@ namespace moho
      */
     ~CBoneEntityManipulator() override;
 
+    /**
+     * Address: 0x00634460 (FUN_00634460, ??0CBoneEntityManipulator@Moho@@QAE@PAVEntity@1@PAVUnit@1@HHH@Z_0)
+     *
+     * What it does:
+     * Builds one bone-attach manipulator owned by `goalUnit`'s sim/actor pair,
+     * head-inserts the goal-unit and target-entity intrusive weak links,
+     * materializes the Lua binding object, registers the watched unit bone,
+     * seeds `mPivot` from that bone's skeleton bounds, runs an initial solve,
+     * and (when `markSkipInterp`) flags the watched pose bone to skip the next
+     * interpolation step.
+     */
+    CBoneEntityManipulator(
+      Entity* targetEntity, Unit* goalUnit,
+      int watchedBoneIndex, int referenceBoneIndex, bool markSkipInterp
+    );
+
     bool ManipulatorUpdate() override;
+
+    /**
+     * Address: 0x006347E0 (FUN_006347E0, ?MoveManipulator@CBoneEntityManipulator@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Drives the watched pose bone to track the target entity bone. With a live
+     * target: sets the bone local transform to the target bone's world pose,
+     * offset by the pivot rotated into that bone's frame, and accumulates the
+     * running max displacement from the goal unit position. With no target:
+     * parks the bone at (0, -10000, 0) with identity orientation and resets the
+     * pose max-offset to -inf.
+     */
+    void MoveManipulator();
 
     WeakPtr<Unit> mGoalUnit;           // +0x80
     WeakPtr<Entity> mTargetEntity;     // +0x88
     std::int32_t mReferenceBoneIndex;  // +0x90
     Wm3::Vector3f mPivot;              // +0x94
+
+  private:
+    /**
+     * Address: 0x00634700 (FUN_00634700)
+     *
+     * What it does:
+     * Seeds `mPivot` with the center of the watched bone's skeleton-space
+     * bounding box (per-component midpoint of the SAniSkelBone min/max bounds).
+     */
+    void InitPivotFromBoneBounds();
   };
   static_assert(
     offsetof(CBoneEntityManipulator, mGoalUnit) == 0x80,
