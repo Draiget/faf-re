@@ -27,6 +27,7 @@ namespace
   constexpr const char* kEntityCategoryMulHelpText = "Generate a category list that is an intersection of cat1 and cat2";
   constexpr const char* kEntityCategoryEmptyHelpText = "Test for an empty category";
   constexpr const char* kSecondsPerTickHelpText = "SecondsPerTick() - Return how many seconds in a tick";
+  constexpr const char* kEntityCategoryGetUnitListHelpText = "Get a list of units blueprint names from a category";
 
   [[nodiscard]] gpg::RType* CachedBVIntSetType()
   {
@@ -737,6 +738,97 @@ namespace
   void register_SecondsPerTick_LuaFuncDef()
   {
     (void)func_SecondsPerTick_LuaFuncDef();
+  }
+
+  /**
+   * Address: 0x00555B60 (FUN_00555B60, cfunc_EntityCategoryGetUnitList)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_EntityCategoryGetUnitList(int a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context (`lua_State`) into its owning
+   * `LuaState` wrapper and forwards to the typed worker.
+   */
+  int cfunc_EntityCategoryGetUnitList(lua_State* const luaContext)
+  {
+    return cfunc_EntityCategoryGetUnitListL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00555BE0 (FUN_00555BE0, cfunc_EntityCategoryGetUnitListL)
+   *
+   * IDA signature:
+   * int __usercall cfunc_EntityCategoryGetUnitListL@<eax>(LuaPlus::LuaState *a1@<ebx>);
+   *
+   * What it does:
+   * Validates a single `EntityCategory` argument, then walks every set ordinal
+   * in its bitset. For each ordinal it resolves the owning game-rules object
+   * (packed as the category's word-universe handle) and calls
+   * `GetBlueprintFromOrdinal(ordinal)` to obtain the blueprint, appending the
+   * blueprint id string into a freshly created Lua array. Pushes and returns
+   * that array (one Lua result).
+   */
+  int cfunc_EntityCategoryGetUnitListL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryGetUnitListHelpText, 1, argumentCount);
+    }
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
+    EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+    LuaPlus::LuaObject resultTable;
+    resultTable.AssignNewTable(state, 0, 0);
+
+    const BVIntSet& bits = categorySet->mBits;
+    moho::RRuleGameRulesImpl* const rules = ResolveCategoryRules(*categorySet);
+    const unsigned int endOrdinalExclusive = bits.Max();
+
+    int insertIndex = 1;
+    for (unsigned int ordinal = bits.GetNext(std::numeric_limits<unsigned int>::max()); ordinal != endOrdinalExclusive;
+         ordinal = bits.GetNext(ordinal)) {
+      RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(static_cast<int>(ordinal));
+
+      LuaPlus::LuaObject nameObject;
+      nameObject.AssignString(state, blueprint->mBlueprintId.c_str());
+      resultTable.Insert(insertIndex++, nameObject);
+    }
+
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00555B80 (FUN_00555B80, func_EntityCategoryGetUnitList_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `EntityCategoryGetUnitList` global Lua binder into the core
+   * init-form set.
+   */
+  CScrLuaInitForm* func_EntityCategoryGetUnitList_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      CoreLuaInitSet(),
+      "EntityCategoryGetUnitList",
+      &moho::cfunc_EntityCategoryGetUnitList,
+      nullptr,
+      "<global>",
+      kEntityCategoryGetUnitListHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BC9EB0 (FUN_00BC9EB0, register_EntityCategoryGetUnitList_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_EntityCategoryGetUnitList_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EntityCategoryGetUnitList_LuaFuncDef()
+  {
+    return func_EntityCategoryGetUnitList_LuaFuncDef();
   }
 
   /**
