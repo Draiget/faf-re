@@ -30,6 +30,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiBrain.h"
+#include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiPersonality.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -4984,6 +4985,147 @@ namespace moho
       kUnloadAllAtLocationHelpText
     );
     return &binder;
+  }
+
+  // All-squad-classes sentinel used by the patrol/move Lua bindings: patrols every
+  // assigned squad class (1..5). Not one of the ESquadClass enum's named members.
+  constexpr std::int32_t kAllSquadClassesSentinel = 6;
+
+  /**
+   * What it does:
+   * Issues one patrol order over `units` toward `target`. When a valid formation
+   * script resolved and the set holds more than one unit, issues
+   * UNITCOMMAND_FormPatrol carrying the formation script index and an identity
+   * orientation; otherwise a plain UNITCOMMAND_Patrol. Shared by both
+   * CPlatoon::Patrol dispatch branches.
+   */
+  static void IssuePlatoonPatrolCommand(
+    Sim* const sim,
+    SEntitySetTemplateUnit& units,
+    const Wm3::Vector3f& target,
+    const int formationScriptIndex
+  )
+  {
+    const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
+
+    SSTICommandIssueData commandIssueData(
+      useFormation ? EUnitCommandType::UNITCOMMAND_FormPatrol : EUnitCommandType::UNITCOMMAND_Patrol
+    );
+    commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+    commandIssueData.mTarget.mPos = target;
+
+    if (useFormation) {
+      commandIssueData.unk38 = formationScriptIndex;  // FormPatrol formation-script lane
+      commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+      commandIssueData.unk4C = 1.0f;                   // FormPatrol orientation weight
+    }
+
+    (void)IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
+  }
+
+  /**
+   * Address: 0x00726420 (FUN_00726420, Moho::CPlatoon::Patrol)
+   *
+   * IDA signature:
+   * void __userpurge CPlatoon::Patrol(Wm3::Vector3f *target@<edi>, CPlatoon *this,
+   *                                   ESquadClass squadClass)
+   *
+   * What it does:
+   * Issues a patrol order for the platoon toward `target`, first snapping the
+   * point to the map/water surface elevation. If the platoon has a named
+   * formation it patrols the whole platoon as one formation set; otherwise it
+   * patrols each requested squad class independently (Attack..Scout, or every
+   * class when `squadClass` is the all-classes sentinel 6). Each set is issued as
+   * FormPatrol when a formation script resolves and it holds more than one unit,
+   * else a plain Patrol.
+   */
+  void CPlatoon::Patrol(Wm3::Vector3f& target, const ESquadClass squadClass)
+  {
+    // Snap the requested point to the terrain (or water, when higher) surface.
+    STIMap* const mapData = mSim->mMapData;
+    float surfaceElevation = mapData->mHeightField->GetElevation(target.x, target.z);
+    if (mapData->mWaterEnabled && mapData->mWaterElevation > surfaceElevation) {
+      surfaceElevation = mapData->mWaterElevation;
+    }
+    target.y = surfaceElevation;
+
+    CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
+
+    // Platoon-wide formation patrol.
+    if (!mFormation.empty()) {
+      SEntitySetTemplateUnit platoonUnits{};
+      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(this), platoonUnits);
+      const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
+      IssuePlatoonPatrolCommand(mSim, platoonUnits, target, formationScriptIndex);
+      return;
+    }
+
+    // Per-squad-class patrol: each requested class patrols on its own.
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
+          static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        continue;
+      }
+
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
+        IssuePlatoonPatrolCommand(mSim, squadUnits, target, formationScriptIndex);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00731370 (FUN_00731370, cfunc_CPlatoonPatrolL)
+   *
+   * IDA signature:
+   * int __usercall cfunc_CPlatoonPatrolL@<eax>(LuaPlus::LuaState *state@<ebx>)
+   *
+   * What it does:
+   * Resolves `(platoon, targetPoint[, squadClass])`, validates the point, and
+   * issues the patrol via `CPlatoon::Patrol`. The squad class defaults to the
+   * all-classes sentinel and is only read from arg 3 when supplied.
+   */
+  int cfunc_CPlatoonPatrolL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kPatrolHelpText, 2, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Wm3::Vector3f targetPoint = SCR_FromLuaCopy<Wm3::Vector3<float>>(targetObject);
+    if (!IsValidVector3f(targetPoint)) {
+      LuaPlus::LuaState::Error(state, "Platoon:Patrol Passed in an invalid target point");
+    }
+
+    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    if (lua_gettop(state->m_state) > 2) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 3);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 3);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    platoon->Patrol(targetPoint, squadClass);
+    return 0;
   }
 
   /**
