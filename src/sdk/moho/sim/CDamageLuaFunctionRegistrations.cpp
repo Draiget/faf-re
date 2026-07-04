@@ -22,6 +22,8 @@ namespace
     "DamageArea(instigator,location,radius,amount,damageType,damageFriendly,[damageSelf])";
   constexpr const char* kDamageRingHelpText =
     "DamageRing(instigator,location,minRadius,maxRadius,amount,damageType,damageFriendly,[damageSelf])";
+  constexpr const char* kMetaImpactHelpText =
+    "MetaImpact(instigator,location,fMaxRadius,iAmount,affectsCategory,[damageFriendly])";
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -697,5 +699,118 @@ namespace moho
       kCDamageSetTargetHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x007396E0 (FUN_007396E0, cfunc_MetaImpact)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_MetaImpactL`.
+   */
+  int cfunc_MetaImpact(lua_State* const luaContext)
+  {
+    return cfunc_MetaImpactL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00739700 (FUN_00739700, func_MetaImpact_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `MetaImpact`.
+   */
+  CScrLuaInitForm* func_MetaImpact_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "MetaImpact",
+      &cfunc_MetaImpact,
+      nullptr,
+      "<global>",
+      kMetaImpactHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDB7C0 (FUN_00BDB7C0, register_MetaImpact_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_MetaImpact_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_MetaImpact_LuaFuncDef()
+  {
+    return func_MetaImpact_LuaFuncDef();
+  }
+
+  /**
+   * Address: 0x00739760 (FUN_00739760, cfunc_MetaImpactL)
+   *
+   * What it does:
+   * Builds one transient area-effect `CDamage` payload from Lua args
+   * (instigator, location, radius, amount, damageType, [damageFriendly]) and
+   * dispatches it to `SIM_MetaImpactArea` after validating radius > 0 and amount > 0.
+   */
+  int cfunc_MetaImpactL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 5 || argumentCount > 6) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kMetaImpactHelpText, 5, 6, argumentCount);
+    }
+
+    Sim* const sim = lua_getglobaluserdata(state->m_state);
+    CDamage damage(sim);
+
+    if (lua_type(state->m_state, 1) != LUA_TNIL) {
+      const LuaPlus::LuaObject instigatorObject(LuaPlus::LuaStackObject(state, 1));
+      Entity* const instigator = SCR_FromLua_EntityOpt(instigatorObject);
+      damage.mInstigator.ResetFromObject(instigator);
+    }
+
+    const LuaPlus::LuaObject originObject(LuaPlus::LuaStackObject(state, 2));
+    damage.mOrigin = SCR_FromLuaCopy<Wm3::Vec3f>(originObject);
+
+    LuaPlus::LuaStackObject radiusArg(state, 3);
+    if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+      radiusArg.TypeError("number");
+    }
+    damage.mRadius = static_cast<float>(lua_tonumber(state->m_state, 3));
+
+    LuaPlus::LuaStackObject amountArg(state, 4);
+    if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+      amountArg.TypeError("number");
+    }
+    damage.mAmount = static_cast<float>(lua_tonumber(state->m_state, 4));
+
+    LuaPlus::LuaStackObject damageTypeArg(state, 5);
+    const char* damageType = lua_tostring(state->m_state, 5);
+    if (!damageType) {
+      damageTypeArg.TypeError("string");
+      damageType = "";
+    }
+    damage.mType.assign_owned(damageType);
+
+    if (lua_gettop(state->m_state) == 6) {
+      LuaPlus::LuaStackObject damageFriendlyArg(state, 6);
+      damage.mDamageFriendly = damageFriendlyArg.GetBoolean();
+    } else {
+      damage.mDamageFriendly = 0;
+    }
+
+    damage.mMethod = CDamage_AREA_EFFECT;
+
+    if (damage.mRadius <= 0.0f) {
+      LuaPlus::LuaState::Error(state, "Invalid radius specified. Has to be > 0");
+    }
+    if (damage.mAmount <= 0.0f) {
+      LuaPlus::LuaState::Error(state, "Invalid amount specified. Has to be > 0");
+    }
+
+    SIM_MetaImpactArea(sim, damage);
+    return 1;
   }
 } // namespace moho
