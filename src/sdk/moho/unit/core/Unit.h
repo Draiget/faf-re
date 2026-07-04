@@ -521,6 +521,18 @@ namespace moho
      */
     SSTIUnitVariableData& AssignFrom(const SSTIUnitVariableData& other);
 
+    /**
+     * Address: 0x0055E030 (FUN_0055E030, Moho::SSTIUnitVariableData::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes the reflected unit variable-data payload (creator id,
+     * econ/silo counts, custom name, econ pairs, focus/guard/target ids,
+     * shared animation poses, weapon-info vector, unit attributes, and
+     * script/state flags) from one archive, in the same field order as the
+     * serializer.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     EntId mCreator;                // +0x000
     std::int32_t mCreationTick;    // +0x004
     bool mAutoMode;                // +0x008
