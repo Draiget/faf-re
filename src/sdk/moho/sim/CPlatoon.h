@@ -306,6 +306,17 @@ namespace moho
      * `UNITCOMMAND_TransportUnloadUnits` to `targetPos`, returning the issued
      * command weak-links.
      */
+    /**
+     * Address: 0x007291C0 (FUN_007291C0, Moho::CPlatoon::UnloadUnitsAtLocation)
+     *
+     * What it does:
+     * Snaps `pos` to the terrain/water surface, then for each alive transport/carrier
+     * in the platoon unloads the held units whose blueprint category-bit index is a
+     * member of `category` (plus the carrier itself) via one
+     * UNITCOMMAND_TransportUnloadSpecificUnits at that point.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
+
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadAllAtLocation(const Wm3::Vector3f& targetPos);
 
     /**

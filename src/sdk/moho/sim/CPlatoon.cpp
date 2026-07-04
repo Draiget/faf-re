@@ -5420,6 +5420,139 @@ namespace moho
   }
 
   /**
+   * Address: 0x007291C0 (FUN_007291C0, Moho::CPlatoon::UnloadUnitsAtLocation)
+   *
+   * IDA signature:
+   * gpg::fastvector_shared_ptr_CUnitCommand* __stdcall
+   *   CPlatoon::UnloadUnitsAtLocation(CPlatoon* this, gpg::fastvector* out,
+   *                                   EntityCategory* category, float* point);
+   *
+   * What it does:
+   * Snaps `pos` to the terrain/water surface, then walks every squad class (1..5)
+   * looking for alive, not-being-built transport/carrier units. For each such
+   * carrier it inspects the units it currently holds (attached entities); every
+   * held unit whose blueprint category-bit index is a member of `category` is
+   * added to the unload set, and if a carrier gave up at least one held unit the
+   * carrier itself is added too. Finally issues one
+   * UNITCOMMAND_TransportUnloadSpecificUnits to the snapped ground point.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadUnitsAtLocation(const EntityCategorySet* const category, Wm3::Vector3f& pos)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    // Snap the requested point to the terrain (or water, when higher) surface.
+    STIMap* const mapData = mSim->mMapData;
+    float surfaceElevation = mapData->mHeightField->GetElevation(pos.x, pos.z);
+    if (mapData->mWaterEnabled && mapData->mWaterElevation > surfaceElevation) {
+      surfaceElevation = mapData->mWaterElevation;
+    }
+    pos.y = surfaceElevation;
+
+    SEntitySetTemplateUnit unitsToUnload{};
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          Unit* const carrier = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          if (carrier == nullptr || carrier->IsDead() || carrier->IsBeingBuilt()) {
+            continue;
+          }
+          if (!carrier->IsInCategory("TRANSPORTATION") && !carrier->IsInCategory("CARRIER")) {
+            continue;
+          }
+
+          bool carrierGaveUpAUnit = false;
+          for (Entity* const attachedEntity : carrier->GetAttachedEntities()) {
+            Unit* const heldUnit = attachedEntity->IsUnit();
+            if (heldUnit == nullptr) {
+              continue;
+            }
+            const std::uint32_t ordinal = heldUnit->GetBlueprint()->mCategoryBitIndex;
+            if (category->mBits.Contains(ordinal)) {
+              (void)unitsToUnload.AddUnit(heldUnit);
+              carrierGaveUpAUnit = true;
+            }
+          }
+          if (carrierGaveUpAUnit) {
+            (void)unitsToUnload.AddUnit(carrier);
+          }
+        }
+        break;
+      }
+    }
+
+    if (!unitsToUnload.Empty()) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+      commandIssueData.mTarget.mPos = pos;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, unitsToUnload, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00730B90 (FUN_00730B90, cfunc_CPlatoonUnloadUnitsAtLocationL)
+   *
+   * What it does:
+   * Parses `(platoon, category, location)`, resolves the reflected
+   * `EntityCategorySet`, validates the point, issues the unload orders via
+   * `CPlatoon::UnloadUnitsAtLocation`, returns the issued commands as a Lua array,
+   * then releases the weak command links.
+   */
+  int cfunc_CPlatoonUnloadUnitsAtLocationL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kUnloadUnitsAtLocationHelpText, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+    const EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    const LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 3));
+    Wm3::Vector3f targetPos = SCR_FromLuaCopy<Wm3::Vec3f>(locationObject);
+    if (!IsValidVector3f(targetPos)) {
+      LuaPlus::LuaState::Error(state, "Platoon:UnloadUnitsAtLocation Passed in an invalid target point");
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadUnitsAtLocation(category, targetPos);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x00730B10 (FUN_00730B10, cfunc_CPlatoonUnloadUnitsAtLocation)
    *
    * What it does:
