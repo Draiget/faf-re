@@ -416,4 +416,39 @@ namespace moho
    * Startup thunk that forwards to `func_SecondsPerTick_LuaFuncDef`.
    */
   void register_SecondsPerTick_LuaFuncDef();
+
+  /**
+   * Address: 0x00555B60 (FUN_00555B60, cfunc_EntityCategoryGetUnitList)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_EntityCategoryGetUnitListL`.
+   */
+  int cfunc_EntityCategoryGetUnitList(lua_State* luaContext);
+
+  /**
+   * Address: 0x00555BE0 (FUN_00555BE0, cfunc_EntityCategoryGetUnitListL)
+   *
+   * What it does:
+   * Builds a Lua array of blueprint id strings for every category ordinal set
+   * in the argument `EntityCategory`, resolving each ordinal to its blueprint
+   * through the owning game-rules `GetBlueprintFromOrdinal`.
+   */
+  int cfunc_EntityCategoryGetUnitListL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00555B80 (FUN_00555B80, func_EntityCategoryGetUnitList_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `EntityCategoryGetUnitList`.
+   */
+  CScrLuaInitForm* func_EntityCategoryGetUnitList_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC9EB0 (FUN_00BC9EB0, register_EntityCategoryGetUnitList_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_EntityCategoryGetUnitList_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EntityCategoryGetUnitList_LuaFuncDef();
 } // namespace moho
