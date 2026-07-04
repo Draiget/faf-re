@@ -216,4 +216,37 @@ namespace moho
    * Publishes `CDamage:SetTarget()` in the sim Lua init-form set.
    */
   CScrLuaInitForm* func_CDamageSetTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x007396E0 (FUN_007396E0, cfunc_MetaImpact)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_MetaImpactL`.
+   */
+  int cfunc_MetaImpact(lua_State* luaContext);
+
+  /**
+   * Address: 0x00739760 (FUN_00739760, cfunc_MetaImpactL)
+   *
+   * What it does:
+   * Builds one area-effect `CDamage` from Lua args and dispatches it to
+   * `SIM_MetaImpactArea` (physics knockback impulse).
+   */
+  int cfunc_MetaImpactL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00739700 (FUN_00739700, func_MetaImpact_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `MetaImpact`.
+   */
+  CScrLuaInitForm* func_MetaImpact_LuaFuncDef();
+
+  /**
+   * Address: 0x00BDB7C0 (FUN_00BDB7C0, register_MetaImpact_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_MetaImpact_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_MetaImpact_LuaFuncDef();
 } // namespace moho

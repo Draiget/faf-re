@@ -16,6 +16,9 @@
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/Shield.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/CUnitMotion.h"
 #include "legacy/containers/List.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/InstanceCounter.h"
@@ -179,28 +182,6 @@ namespace
     }
 
     gpg::Logf("invalid shield or missing collision primitive!");
-    return false;
-  }
-
-  /**
-   * Address: 0x00736DE0 (FUN_00736DE0, sub_736DE0)
-   *
-   * What it does:
-   * Returns true when `entity` lies inside at least one active shield
-   * collision primitive in `sim`.
-   */
-  [[maybe_unused]] bool EntityOverlapsAnyShield(moho::Sim* const sim, moho::Entity* const entity)
-  {
-    if (sim == nullptr || entity == nullptr) {
-      return false;
-    }
-
-    for (moho::Shield* const shield : sim->mShields) {
-      if (ShieldContainsEntityPosition(shield, entity)) {
-        return true;
-      }
-    }
-
     return false;
   }
 
@@ -1066,6 +1047,97 @@ namespace moho
       shieldDamage.mVector.z = shieldPosition.z - damage.mOrigin.z;
       shieldDamage.mTarget.Set(shield);
       SIM_DoDamagePoint(sim, shieldDamage);
+    }
+  }
+
+  /**
+   * Address: 0x00736DE0 (FUN_00736DE0, sub_736DE0)
+   *
+   * What it does:
+   * Returns true when `entity`'s position lies inside any of the shields recorded
+   * in the damage's absorbing-shield list.
+   */
+  [[nodiscard]] bool EntityInsideAnyAbsorbingShield(
+    const msvc8::list<SShieldDamageEntry>& absorbingShields, Entity* const entity)
+  {
+    if (entity == nullptr) {
+      return false;
+    }
+    for (const SShieldDamageEntry& entry : absorbingShields) {
+      if (ShieldContainsEntityPosition(entry.shield, entity)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Address: 0x00737ED0 (FUN_00737ED0, Moho::SIM_MetaImpactArea)
+   * Mangled: ?SIM_MetaImpactArea@Moho@@YAXPAVSim@1@ABVCDamage@1@@Z
+   *
+   * What it does:
+   * Applies a physics knockback impulse (not damage) to every category-matching,
+   * non-shielded, live unit that has motion within the damage sphere (radius
+   * mRadius). The impulse points horizontally away from the origin with an upward
+   * lift that grows toward the centre, is normalized, then scaled by mAmount times a
+   * linear distance falloff. Allies of the instigator are spared unless friendly
+   * fire is enabled. Shields covering the origin still absorb (SIM_DoDamage), and a
+   * unit already inside one of those shields receives no impulse.
+   */
+  void SIM_MetaImpactArea(Sim* const sim, const CDamage& damage)
+  {
+    msvc8::list<SShieldDamageEntry> absorbingShields;
+    SIM_DoDamage(sim, absorbingShields, damage);
+
+    const EntityCategorySet* const category = sim->mRules->GetEntityCategory(damage.mType.c_str());
+
+    Wm3::Sphere3f querySphere{};
+    querySphere.Center = damage.mOrigin;
+    querySphere.Radius = damage.mRadius;
+
+    CollisionResultFastVectorN10 impactResults{};
+    sim->mOGrid->ForAllEntitiesIterator(impactResults, ENTITYTYPE_Unit, querySphere);
+
+    Entity* const instigator = damage.mInstigator.GetObjectPtr();
+    CArmyImpl* const instigatorArmy = instigator != nullptr ? instigator->ArmyRef : nullptr;
+
+    for (const CollisionResult* result = impactResults.start_; result != impactResults.end_; ++result) {
+      Unit* const unit = result->sourceEntity->IsUnit();
+      if (unit == nullptr || unit->IsDead() || unit->UnitMotion == nullptr) {
+        continue;
+      }
+
+      const std::uint32_t ordinal = unit->GetBlueprint()->mCategoryBitIndex;
+      if (category == nullptr || !category->mBits.Contains(ordinal)) {
+        continue;
+      }
+
+      if (!damage.mDamageFriendly && instigatorArmy != nullptr &&
+          ArmyIsAlly(instigatorArmy, static_cast<std::uint32_t>(static_cast<Entity*>(unit)->GetArmyIndex()))) {
+        continue;
+      }
+
+      if (EntityInsideAnyAbsorbingShield(absorbingShields, static_cast<Entity*>(unit))) {
+        continue;
+      }
+
+      const Wm3::Vec3f& unitPosition = unit->GetPosition();
+      const float dx = unitPosition.x - damage.mOrigin.x;
+      const float dz = unitPosition.z - damage.mOrigin.z;
+      const float horizontalDistance = std::sqrt(dx * dx + dz * dz);
+
+      Wm3::Vec3f impulse{};
+      impulse.x = dx;
+      impulse.y = damage.mRadius - horizontalDistance;
+      impulse.z = dz;
+      impulse.Normalize();
+
+      const float magnitude = (1.0f - (horizontalDistance / damage.mRadius) * 0.25f) * damage.mAmount;
+      impulse.x *= magnitude;
+      impulse.y *= magnitude;
+      impulse.z *= magnitude;
+
+      unit->UnitMotion->AddImpulse(impulse, true);
     }
   }
 
