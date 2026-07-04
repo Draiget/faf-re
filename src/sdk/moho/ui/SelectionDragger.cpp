@@ -261,6 +261,32 @@ namespace moho
   {}
 
   /**
+   * Address: 0x00864D10 (FUN_00864D10, ??1SelectionDragger2D@Moho@@UAE@XZ)
+   * Mangled: ??1SelectionDragger2D@Moho@@UAE@XZ
+   *
+   * IDA signature:
+   * SelectionDragger_vtbl* __stdcall sub_864D10(SelectionDragger_vtbl** this);
+   *
+   * What it does:
+   * Derived-destructor body for `SelectionDragger2D`. Drops every node from the
+   * process-global `sSelectionBrackets` weak-set by taking the full-range erase
+   * path (identical to the binary's inlined `DestroySubtree(head->mParent)` +
+   * head/size reset sequence at 0x864D37-0x864D64). The base `~SelectionDragger()`
+   * chains automatically afterwards to unlink the intrusive selection-link list
+   * and restore the IMauiDragger base vtable (binary 0x864D67-0x864D84).
+   *
+   * Invocation: reached from `SelectionDragger2D::DeleteWithFlag` (0x00865470,
+   * the `??_G` scalar-deleting-dtor vtable slot), which calls this dtor before
+   * conditionally freeing the object.
+   */
+  SelectionDragger2D::~SelectionDragger2D()
+  {
+    SSelectionNodeUserEntity* cursor =
+      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
+    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+  }
+
+  /**
    * Address: 0x00864FC0 (FUN_00864FC0, Moho::SelectionDragger2D::Func5)
    *
    * What it does:
