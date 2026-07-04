@@ -2387,6 +2387,66 @@ namespace moho
   }
 
   /**
+   * Address: 0x008475E0 (FUN_008475E0, cfunc_SetActiveBuildTemplateL)
+   *
+   * What it does:
+   * Parses one Lua build-template table `{xSpan, zSpan, {bpId, buildOrder, x, z}...}`,
+   * assembles the entries into a build-template buffer, and installs it as the
+   * active world-session build template together with its X/Z spans (only when at
+   * least one valid entry was parsed). Malformed template/entry tables are reported
+   * via gpg::Warnf and skipped.
+   */
+  int cfunc_SetActiveBuildTemplateL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetActiveBuildTemplateHelpText, 1, argumentCount);
+    }
+
+    CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject buildTemplate(LuaPlus::LuaStackObject(state, 1));
+    if (!buildTemplate.IsTable() || buildTemplate.GetCount() < 3) {
+      gpg::Warnf("Build template error! Not a table or insufficient members");
+      return 0;
+    }
+
+    SBuildTemplateBuffer templates;
+    templates.InitInlineStorage();
+
+    const float templateSpanX = static_cast<float>(buildTemplate[1].GetNumber());
+    const float templateSpanZ = static_cast<float>(buildTemplate[2].GetNumber());
+
+    const int entryCount = buildTemplate.GetCount();
+    for (int entryIndex = 3; entryIndex <= entryCount; ++entryIndex) {
+      const LuaPlus::LuaObject entryObject = buildTemplate[entryIndex];
+      if (!entryObject.IsTable() || entryObject.GetCount() < 4) {
+        gpg::Warnf("Template info error! Not a table or insufficient members");
+        continue;
+      }
+
+      SBuildTemplateInfo info{};
+      info.mBlueprintId = entryObject[1].GetString();
+      info.mBuildOrder = entryObject[2].GetInteger();
+      info.mPos.x = static_cast<float>(entryObject[3].GetNumber());
+      info.mPos.z = static_cast<float>(entryObject[4].GetNumber());
+      info.mPos.y = 0.0f;
+
+      templates.PushBack(info);
+    }
+
+    if (!templates.Empty()) {
+      session->SetActiveBuildTemplate(templates, templateSpanX, templateSpanZ);
+    }
+
+    templates.DestroyStorage();
+    return 0;
+  }
+
+  /**
    * Address: 0x00847560 (FUN_00847560, cfunc_SetActiveBuildTemplate)
    *
    * What it does:

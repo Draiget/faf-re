@@ -8850,6 +8850,33 @@ namespace moho
     mBuildTemplateArg2 = 0.0f;
   }
 
+  // gpg::fastvector_n<SBuildTemplateInfo, 16> behaviour, out-of-line so the
+  // inline-buffer growth/teardown helpers above are in scope. Used by callers in
+  // other translation units (e.g. the SetActiveBuildTemplate Lua callback) that
+  // build a template buffer before handing it to CWldSession::SetActiveBuildTemplate.
+  void SBuildTemplateBuffer::InitInlineStorage() noexcept
+  {
+    mStart = reinterpret_cast<SBuildTemplateInfo*>(&mInlineStorage[0]);
+    mFinish = mStart;
+    mCapacity = mStart + (sizeof(mInlineStorage) / sizeof(SBuildTemplateInfo)); // 16 inline entries
+    mOriginalStart = mStart;
+  }
+
+  void SBuildTemplateBuffer::PushBack(const SBuildTemplateInfo& info)
+  {
+    AppendBuildTemplateEntry(*this, info);
+  }
+
+  void SBuildTemplateBuffer::DestroyStorage()
+  {
+    DestroyBuildTemplateRange(mStart, mFinish);
+    if (mStart != mOriginalStart) {
+      ::operator delete[](mStart);
+    }
+    mStart = mOriginalStart;
+    mFinish = mOriginalStart;
+  }
+
   /**
    * Address: 0x00899790 (FUN_00899790,
    *   gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator=)
