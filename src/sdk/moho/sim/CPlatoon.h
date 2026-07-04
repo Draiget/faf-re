@@ -299,6 +299,17 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseFerryBeacon(const EntityCategorySet* category, Unit* beacon);
 
     /**
+     * Address: 0x007268E0 (FUN_007268E0, Moho::CPlatoon::AggressiveMoveToLocation)
+     *
+     * What it does:
+     * Snaps `pos` to the terrain/water surface, then issues aggressive-move orders
+     * (FormAggressiveMove when the target set has a formation script, else
+     * AggressiveMove) either to the whole platoon (named formation) or to each
+     * requested squad class (1..5) independently.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:
