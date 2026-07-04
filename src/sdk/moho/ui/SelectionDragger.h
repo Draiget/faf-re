@@ -12,6 +12,11 @@ namespace moho
   class CWldSession;
   struct SSelectionSetUserEntity;
 
+  // Global selection-bracket weak-set, defined in moho/ui/UiRuntimeTypes.cpp.
+  // SelectionDragger2D::~SelectionDragger2D() (0x00864D10) clears it as part of
+  // its derived-destructor body.
+  extern SSelectionSetUserEntity sSelectionBrackets;
+
   struct SelectionDraggerLink
   {
     SelectionDraggerLink* mOwnerHead = nullptr; // +0x00
@@ -90,7 +95,20 @@ namespace moho
      */
     SelectionDragger2D(CameraImpl* camera, CWldSession* session);
 
-    ~SelectionDragger2D() override = default;
+    /**
+     * Address: 0x00864D10 (FUN_00864D10, ??1SelectionDragger2D@Moho@@UAE@XZ)
+     * Mangled: ??1SelectionDragger2D@Moho@@UAE@XZ
+     *
+     * IDA signature:
+     * SelectionDragger_vtbl* __stdcall sub_864D10(SelectionDragger_vtbl** this);
+     *
+     * What it does:
+     * Derived-destructor body for the 2D selection dragger: clears the global
+     * `sSelectionBrackets` weak-set via the full-range erase path, then chains
+     * into the base `~SelectionDragger()` (which unlinks the intrusive
+     * selection-link list and restores the IMauiDragger base vtable).
+     */
+    ~SelectionDragger2D() override;
 
     /**
      * Address: 0x00865470 (FUN_00865470, Moho::SelectionDragger2D::Func1)
