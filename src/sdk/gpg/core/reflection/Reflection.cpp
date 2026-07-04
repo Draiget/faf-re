@@ -14361,8 +14361,19 @@ void RType::RegisterType()
   // original: *sub_8DF330(map, &name) = this;
   GetRTypeMap()[name] = this;
 
-  // 2) Append to global type list
-  GetRTypeVec().push_back(this);
+  // 2) Append `this` to the global type-index vector.
+  //
+  // The binary (FUN_008DF960) inlines the fast append and, when the vector
+  // is at capacity, calls the out-of-line grow lane
+  // `msvc8::vector<RType*>::insert` (FUN_008DD050) as `_Insert_n(_Mylast, 1, this)`.
+  // Mirror that shape so the front-end emits that per-T `insert` symbol: fast
+  // path when there is spare capacity, otherwise invoke `insert(end(), 1, this)`.
+  TypeVec& typeVec = GetRTypeVec();
+  if (typeVec.size() < typeVec.capacity()) {
+    typeVec.push_back(this);
+  } else {
+    (void)typeVec.insert(typeVec.end(), static_cast<std::size_t>(1), this);
+  }
 }
 
 /**

@@ -6,6 +6,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -140,6 +141,71 @@ namespace moho
 
     mGuardAssistMode = mUnit != nullptr
       && (mUnit->IsUnitState(UNITSTATE_Guarding) || mUnit->IsUnitState(UNITSTATE_AssistingCommander));
+  }
+
+  /**
+   * Address: 0x005F8E20 (FUN_005F8E20, ??1CUnitRepairTask@Moho@@QAE@@Z body)
+   * Scalar deleting dtor thunk: 0x005F8FE0 (FUN_005F8FE0, vtable slot 0)
+   *
+   * IDA signature:
+   * int __stdcall Moho::CUnitRepairTask::~CUnitRepairTask(Moho::CUnitRepairTask *this);
+   *
+   * What it does:
+   * Runs the "ClearWork" unit script, detaches the embedded command-event
+   * listener, clears the owner unit's repairing state bit, zeros its work
+   * progress and builder aim target, releases the reserved ogrid footprint
+   * when still held mid-prep, clears the build-target unit's no-reclaim bit,
+   * stops the shared build helper, records the task's dispatch result, and
+   * unlinks the build-target/target weak lanes. The primary/Listener vftable
+   * resets and the CBuildTaskHelper/CCommandTask sub-object teardowns are
+   * emitted by the compiler and are not written here.
+   */
+  CUnitRepairTask::~CUnitRepairTask()
+  {
+    // Notify the unit script that the active repair work is being torn down.
+    // The binary dereferences mUnit unconditionally here (no null guard).
+    mUnit->RunScript("ClearWork");
+
+    // Detach the embedded command-event listener from whatever broadcaster
+    // ring it currently sits in and reset it to a self-linked singleton.
+    mListenerLink.ListUnlinkSelf();
+
+    // Drop the repairing state bit this task owns on the owner unit.
+    mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Repairing);
+
+    // Clear the owner unit's cached work-progress and builder aim target.
+    mUnit->WorkProgress = 0.0f;
+    if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
+      builder->BuilderSetAimTarget(Wm3::Vector3f::Zero());
+    }
+
+    // Release the reserved ogrid footprint if we were still preparing and had
+    // not yet reached the repair position (TASKSTATE_Waiting == 1).
+    if (mTaskState == TASKSTATE_Waiting && !mInPosition) {
+      mUnit->FreeOgridRect();
+    }
+
+    // Clear the no-reclaim protection bit on the unit we were building/assisting.
+    if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
+      buildTarget->UnitStateMask &= ~(1ull << UNITSTATE_NoReclaim);
+    }
+
+    // Stop the shared build helper (failed == true), matching the binary.
+    mBuildHelper.OnStopBuild(true);
+
+    // Publish the dispatch result: 1 when the task finished in TASKSTATE_5,
+    // otherwise 2. EAiResult has no lexical labels in the recovered RTTI.
+    *mDispatchResult = static_cast<EAiResult>(mTaskState == TASKSTATE_5 ? 1 : 2);
+
+    // Unlink both weak lanes from their owner chains (declaration-reverse order
+    // in the binary: build-target then target). WeakPtr<T>'s generic destructor
+    // is trivial in our model, so these detaches are explicit.
+    mBuildTargetUnit.UnlinkFromOwnerChain();
+    mTargetUnit.UnlinkFromOwnerChain();
+
+    // Final explicit Listener sub-object detach (trivially-destructible in our
+    // model, so the compiler does not emit it): unlink and reset to singleton.
+    mListenerLink.ListUnlinkSelf();
   }
 
   /**

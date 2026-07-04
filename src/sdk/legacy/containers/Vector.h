@@ -1403,6 +1403,7 @@ namespace msvc8
          * Address: 0x008D7550 (FUN_008D7550, msvc8::vector<gpg::gal::HeadAdapterMode>::operator=(const vector&))
          * Address: 0x006E2F30 (FUN_006E2F30, msvc8::vector<void*>::operator=(const vector&))
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
+         * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
          *
          * Copy assignment (strong exception safety)
          */
@@ -1733,6 +1734,11 @@ namespace msvc8
 
         /**
          * Insert `count` copies of `value` at iterator `pos`.
+         *
+         * Address: 0x008DD050 (FUN_008DD050, msvc8::vector<gpg::RType*>::_Insert_n
+         * grow lane for the global reflection TypeVec; the recovered caller
+         * gpg::RType::RegisterType invokes insert(end(), 1, this) by name so this
+         * per-T symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`

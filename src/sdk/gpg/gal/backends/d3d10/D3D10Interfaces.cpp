@@ -2834,15 +2834,163 @@ namespace gpg::gal
       adapters.push_back(adapter);
     }
 
+    // Defined later in this TU; used by the vector<void*>::_Insert_n grow lane below.
+    [[noreturn]] void ThrowVectorTooLongLengthErrorB();
+
+    /**
+     * Address: 0x008FE010 (FUN_008FE010)
+     *
+     * IDA signature:
+     * char* __thiscall sub_8FE010(int this@<ecx>, _BYTE* insertPos,
+     *                             unsigned int count, char* valueSlot);
+     *
+     * What it does:
+     * Out-of-line MSVC8 STL `msvc8::vector<void*>::insert(pos, count, &value)`
+     * (`_Insert_n`) slow path for the D3D10 backend swap-chain vector
+     * (`DeviceD3D10BackendObject::swapChains_`, 4-byte pointer element). Inserts
+     * `count` copies of `*valueSlot` at `insertPos`, tail-shifting in place when
+     * capacity covers the new size, otherwise reallocating with growth
+     * `max(cap + cap/2, size + count)` and splicing the run into the new buffer.
+     * Mirrors the binary's three-arm dispatch (length-error throw / in-place
+     * tail-shift / grow-and-copy) exactly, reusing the recovered length-error
+     * (`ThrowVectorTooLongLengthErrorB`) and allocation (`AllocateStride04Array`)
+     * helpers; the trivially-copyable `void*` copy/fill lanes are inlined as
+     * typed pointer loops (binary helpers sub_8FA8F0/8FA970/8F9A50/8FA5C0).
+     */
+    void InsertSwapChainPointerRange(
+      msvc8::vector_runtime_view<void*>& swapChains,
+      void** const insertPos,
+      const std::uint32_t count,
+      void* const* const valueSlot) noexcept
+    {
+      // mov ecx,[eax] at entry: read the source value once before any
+      // reallocation can invalidate the slot (empty count==0 call still reads).
+      void* const cachedValue = *valueSlot;
+
+      const std::uint32_t currentCapacity =
+        swapChains.begin ? static_cast<std::uint32_t>(swapChains.capacityEnd - swapChains.begin) : 0u;
+
+      if (count == 0u) {
+        return;
+      }
+
+      const std::uint32_t currentSize =
+        swapChains.begin ? static_cast<std::uint32_t>(swapChains.end - swapChains.begin) : 0u;
+      if ((0x3FFFFFFFu - currentSize) < count) {
+        ThrowVectorTooLongLengthErrorB();
+      }
+
+      const std::uint32_t requiredSize = count + currentSize;
+
+      if (currentCapacity >= requiredSize) {
+        // In-place arm: enough capacity, tail-shift then fill the seam.
+        void** const oldEnd = swapChains.end;
+        const std::uint32_t tailCount = static_cast<std::uint32_t>(oldEnd - insertPos);
+
+        if (tailCount < count) {
+          // Copy [insertPos, oldEnd) forward to [insertPos+count, ...).
+          {
+            void** src = insertPos;
+            void** dst = insertPos + count;
+            while (src != oldEnd) { *dst = *src; ++src; ++dst; }
+          }
+          // Fill the (count - tailCount) freshly-extended slots at oldEnd.
+          {
+            void** gap = oldEnd;
+            void** const gapEnd = insertPos + count;
+            while (gap != gapEnd) { *gap = cachedValue; ++gap; }
+          }
+          swapChains.end = oldEnd + count;
+          // Stamp the original [insertPos, oldEnd) prefix of the run.
+          {
+            void** wr = insertPos;
+            while (wr != oldEnd) { *wr = cachedValue; ++wr; }
+          }
+        } else {
+          // Tail >= count: copy the trailing run out, back-shift, fill seam.
+          {
+            void** srcEnd = oldEnd;
+            void** dstEnd = oldEnd + count;
+            void** const srcBegin = oldEnd - count;
+            while (srcEnd != srcBegin) { --srcEnd; --dstEnd; *dstEnd = *srcEnd; }
+          }
+          swapChains.end = oldEnd + count;
+          {
+            void** src = insertPos;
+            void** dst = oldEnd;
+            const std::uint32_t moveCount = static_cast<std::uint32_t>((oldEnd - count) - insertPos);
+            for (std::uint32_t i = 0; i < moveCount; ++i) { *dst = *src; ++src; ++dst; }
+          }
+          {
+            void** wr = insertPos;
+            void** const wrEnd = insertPos + count;
+            while (wr != wrEnd) { *wr = cachedValue; ++wr; }
+          }
+        }
+        return;
+      }
+
+      // Grow arm: growth = max(cap + cap/2, size + count), clamped on overflow.
+      std::uint32_t newCapacity = 0u;
+      const std::uint32_t halfCapacity = currentCapacity >> 1;
+      if ((0x3FFFFFFFu - halfCapacity) >= currentCapacity) {
+        newCapacity = halfCapacity + currentCapacity;
+      }
+      if (newCapacity < requiredSize) {
+        newCapacity = requiredSize;
+      }
+
+      void** const newBuffer = static_cast<void**>(AllocateStride04Array(newCapacity));
+      void** const oldFirst = swapChains.begin;
+
+      // Copy prefix [oldFirst, insertPos) into the new buffer.
+      void** writeCursor = newBuffer;
+      {
+        void** src = oldFirst;
+        while (src != insertPos) { *writeCursor = *src; ++src; ++writeCursor; }
+      }
+      // Fill the inserted run of `count` copies.
+      for (std::uint32_t i = 0; i < count; ++i) { *writeCursor = cachedValue; ++writeCursor; }
+      // Copy tail [insertPos, oldEnd) after the run.
+      {
+        void** src = insertPos;
+        void** const oldEnd = swapChains.end;
+        while (src != oldEnd) { *writeCursor = *src; ++src; ++writeCursor; }
+      }
+
+      const std::uint32_t sizeBeforeGrow =
+        swapChains.begin ? static_cast<std::uint32_t>(swapChains.end - swapChains.begin) : 0u;
+      const std::uint32_t finalSize = sizeBeforeGrow + count;
+      if (oldFirst != nullptr) {
+        ::operator delete(oldFirst);
+      }
+      swapChains.begin       = newBuffer;
+      swapChains.capacityEnd = newBuffer + newCapacity;
+      swapChains.end         = newBuffer + finalSize;
+    }
+
     /**
      * Address: 0x008FE4B0 (FUN_008FE4B0)
      *
      * What it does:
      * Appends one swap-chain handle into the retained backend swap-chain vector.
+     * Fast path stores into the free slot; when capacity is exhausted it falls
+     * into the recovered `msvc8::vector<void*>::_Insert_n` grow path
+     * (`InsertSwapChainPointerRange`, FUN_008FE010) - the by-name call keeps that
+     * symbol linker-reachable.
      */
     void* AppendBackendSwapChain(msvc8::vector<void*>& swapChains, IDXGISwapChain* const swapChain)
     {
-      swapChains.push_back(swapChain);
+      auto& view = msvc8::AsVectorRuntimeView(swapChains);
+      void* const value = swapChain;
+      if (view.begin == nullptr ||
+          static_cast<std::uint32_t>(view.end - view.begin) >=
+            static_cast<std::uint32_t>(view.capacityEnd - view.begin)) {
+        InsertSwapChainPointerRange(view, view.end, 1u, &value);
+      } else {
+        *view.end = value;
+        ++view.end;
+      }
       return swapChain;
     }
 
