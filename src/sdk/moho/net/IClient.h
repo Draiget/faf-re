@@ -8,6 +8,7 @@
 namespace moho
 {
   struct BVIntSet;
+  class CClientBase;
 
   /**
    * VFTABLE: 0x00E16ABC
@@ -96,8 +97,12 @@ namespace moho
     /**
      * Address: 0x00A82547 (_purecall)
      * Slot: 11
+     *
+     * What it does:
+     * Collects the clients that have authored a pending eject request against
+     * this client (the "ejectedBy" set surfaced to Lua).
      */
-    virtual void CollectPendingIds(msvc8::vector<int>& out) = 0;
+    virtual void CollectEjecters(msvc8::vector<const CClientBase*>& out) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)

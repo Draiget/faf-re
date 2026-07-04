@@ -165,8 +165,12 @@ namespace moho
     /**
      * Address: 0x0053CC60 (FUN_0053CC60)
      * Slot: 11
+     *
+     * What it does:
+     * Under the manager lock, fills `out` with the requester client pointer of
+     * every pending eject request (`SEjectRequest::mRequester`).
      */
-    void CollectPendingIds(msvc8::vector<int>& out) override;
+    void CollectEjecters(msvc8::vector<const CClientBase*>& out) override;
 
     /**
      * Address: 0x0053CDC0 (FUN_0053CDC0)

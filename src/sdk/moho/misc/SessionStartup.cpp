@@ -958,6 +958,96 @@ namespace moho
   }
 
   /**
+   * Address: 0x0088D4C0 (FUN_0088D4C0, cfunc_GetSessionClients)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetSessionClientsL`.
+   */
+  int cfunc_GetSessionClients(lua_State* const luaContext)
+  {
+    return cfunc_GetSessionClientsL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0088D540 (FUN_0088D540, cfunc_GetSessionClientsL)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_GetSessionClientsL(LuaPlus::LuaState* state, ...);
+   *
+   * What it does:
+   * Enumerates every client in the active session and returns a Lua table of
+   * per-client records (name, uid, connected, ping, quiet, local, maxSP,
+   * authorizedCommandSources, ejectedBy). Returns nil when no simulation
+   * driver is active.
+   */
+  int cfunc_GetSessionClientsL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 0) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", kGetSessionClientsHelpText, 0, argumentCount
+      );
+    }
+
+    LuaPlus::LuaObject clientsTable{};
+
+    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    if (activeDriver == nullptr) {
+      clientsTable.AssignNil(state);
+      clientsTable.PushStack(state);
+      return 1;
+    }
+
+    clientsTable.AssignNewTable(state, 0, 0);
+
+    CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+    IClient* const localClient = clientManager->GetLocalClient();
+    const std::size_t clientCount = clientManager->NumberOfClients();
+
+    for (std::size_t clientIndex = 0; clientIndex < clientCount; ++clientIndex) {
+      auto* const client = static_cast<CClientBase*>(clientManager->GetClient(static_cast<int>(clientIndex)));
+
+      LuaPlus::LuaObject clientEntry{};
+      clientEntry.AssignNewTable(state, 0, 0);
+
+      clientEntry.SetInteger("maxSP", client->mSimRate);
+      clientEntry.SetString("name", client->GetNickname().c_str());
+      clientEntry.SetString("uid", gpg::STR_Printf("%u", client->GetOwnerId()).c_str());
+      clientEntry.SetBoolean("connected", client->NoEjectionPending());
+      clientEntry.SetNumber("ping", client->GetStatusMetricA());
+      clientEntry.SetNumber("quiet", client->GetStatusMetricB());
+      clientEntry.SetBoolean("local", static_cast<IClient*>(client) == localClient);
+
+      LuaPlus::LuaObject commandSources{};
+      commandSources.AssignNewTable(state, 0, 0);
+      int commandSourceKey = 1;
+      BVIntSet* const validSources = client->GetValidCommandSources();
+      for (unsigned int value = validSources->GetNext(~0u); value != validSources->Max();
+           value = validSources->GetNext(value)) {
+        commandSources.SetInteger(commandSourceKey++, static_cast<int>(value + 1u));
+      }
+      clientEntry.SetObject("authorizedCommandSources", commandSources);
+
+      msvc8::vector<const CClientBase*> ejecters;
+      client->CollectEjecters(ejecters);
+
+      LuaPlus::LuaObject ejectedByTable{};
+      ejectedByTable.AssignNewTable(state, 0, 0);
+      for (std::size_t ejecterIndex = 0; ejecterIndex < ejecters.size(); ++ejecterIndex) {
+        ejectedByTable.SetInteger(static_cast<int>(ejecterIndex + 1), ejecters[ejecterIndex]->GetIndex() + 1);
+      }
+      clientEntry.SetObject("ejectedBy", ejectedByTable);
+
+      clientsTable.SetObject(static_cast<int>(clientIndex + 1), clientEntry);
+    }
+
+    clientsTable.PushStack(state);
+    return 1;
+  }
+
+  /**
    * Address: 0x00881AB0 (FUN_00881AB0, cfunc_InternalSaveGame)
    *
    * What it does:
