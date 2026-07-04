@@ -326,6 +326,8 @@ namespace moho
 
 #if defined(MOHO_ABI_MSVC8_COMPAT)
   static_assert(sizeof(CUnitCommand) == 0x178, "CUnitCommand size must be 0x178");
+  // mUnit is the ferry-beacon weak lane read by Unit::GetTransportFerryBeacon (+0x158).
+  static_assert(offsetof(CUnitCommand, mUnit) == 0x158, "CUnitCommand::mUnit offset must be 0x158");
 #endif
 
   /**

@@ -299,6 +299,15 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseFerryBeacon(const EntityCategorySet* category, Unit* beacon);
 
     /**
+     * Address: 0x00725870 (FUN_00725870, Moho::CPlatoon::GetFerryBeacons)
+     *
+     * What it does:
+     * Collects into `outBeacons` the ferry-beacon units referenced by the head
+     * command of every platoon unit currently in the Ferrying state.
+     */
+    void GetFerryBeacons(SEntitySetTemplateUnit& outBeacons);
+
+    /**
      * Address: 0x007268E0 (FUN_007268E0, Moho::CPlatoon::AggressiveMoveToLocation)
      *
      * What it does:
