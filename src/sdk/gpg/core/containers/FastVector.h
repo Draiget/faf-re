@@ -801,6 +801,7 @@ namespace gpg::core
      * Address: 0x004C7FD0 (FUN_004C7FD0, gpg::fastvector_n<LuaPlus::LuaObject>::GrowInsert lane)
      * Address: 0x005811A0 (FUN_005811A0, gpg::fastvector_Entity::GrowInsert)
      * Address: 0x00505BA0 (FUN_00505BA0, gpg::fastvector_UserEntity::GrowInsert)
+     * Address: 0x00723340 (FUN_00723340, gpg::fastvector_n<moho::CollisionResult, 10>::GrowInsert lane)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes

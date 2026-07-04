@@ -2478,7 +2478,17 @@ namespace moho
      * Logs this text control label, ARGB color lane, and current text payload.
      */
     void Dump() override;
-    virtual ~CMauiText() = default;
+
+    /**
+     * Address: 0x007A2D60 (FUN_007A2D60, Moho::CMauiText::~CMauiText)
+     * Deleting dtor: 0x007A2D40 (FUN_007A2D40, Moho::CMauiText::dtr)
+     *
+     * What it does:
+     * Destroys the four text/font lazy-var LuaObject lanes, tidies the cached
+     * text string, releases the intrusive font reference, and chains into the
+     * base CMauiControl teardown.
+     */
+    ~CMauiText() override;
   };
 
   class CMauiBorder : public CMauiControl
