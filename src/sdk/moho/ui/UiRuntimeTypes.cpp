@@ -13167,6 +13167,31 @@ moho::CMauiText::CMauiText(LuaPlus::LuaObject* const luaObject, CMauiControl* co
 }
 
 /**
+ * Address: 0x007A2D60 (FUN_007A2D60, Moho::CMauiText::~CMauiText)
+ * Deleting dtor: 0x007A2D40 (FUN_007A2D40, Moho::CMauiText::dtr)
+ *
+ * IDA signature:
+ * _DWORD *__stdcall sub_7A2D60(CMauiText *this);
+ *
+ * What it does:
+ * Destroys the four lazy-var LuaObject lanes (external-leading, descent,
+ * ascent, text-advance), tidies the cached text string, releases the
+ * intrusive font reference, then falls through to the base CMauiControl
+ * destructor.
+ */
+moho::CMauiText::~CMauiText()
+{
+  CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
+  AsLazyVarObject(textView->mFontExternalLeadingLV).~LuaObject();
+  AsLazyVarObject(textView->mFontDescentLV).~LuaObject();
+  AsLazyVarObject(textView->mFontAscentLV).~LuaObject();
+  AsLazyVarObject(textView->mTextAdvanceLV).~LuaObject();
+
+  textView->mText.~string();
+  ReleaseIntrusiveFont(textView->mFont);
+}
+
+/**
  * Address: 0x00799340 (FUN_00799340, Moho::CMauiItemList::CMauiItemList)
  *
  * What it does:
