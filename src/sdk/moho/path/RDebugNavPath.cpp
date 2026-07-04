@@ -34,6 +34,18 @@ namespace
     return elevation;
   }
 
+  /**
+   * Address: 0x00650290 (FUN_00650290)
+   *
+   * IDA signature:
+   * void __usercall sub_650290(Moho::Sim *a1@<ecx>, unsigned __int8 *a2@<ebx>, int a3);
+   *   a1 = Sim, a2 = SFootprint*, a3 = SNavPath*
+   *
+   * What it does:
+   * Draws one unit's navigator path as a debug overlay: a wire circle at each
+   * SOCellPos center (footprint-offset, terrain/water elevation) plus a debug
+   * line connecting consecutive circle centers.
+   */
   void DrawNavigatorPathOverlay(moho::Sim* const sim, const moho::SFootprint& footprint, const moho::SNavPath* const navPath)
   {
     if (sim == nullptr || sim->mMapData == nullptr || navPath == nullptr || navPath->start == nullptr ||

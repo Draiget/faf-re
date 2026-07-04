@@ -33,12 +33,23 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005B6B40 (FUN_005B6B40, default ctor body)
+     *
+     * What it does:
+     * Parameterless (no-Sim) constructor used by the reflection construct
+     * callback. Runs the default `CScriptObject()` base ctor, bumps the
+     * per-type instance counter, and empty/zero-inits every member (empty
+     * name/chat strings, all profile ranges 0, empty favourite lists).
+     */
+    CAiPersonality();
+
+    /**
      * Address: 0x005B6DC0 (FUN_005B6DC0, ctor body)
      *
      * What it does:
      * Initializes scripting/metatable state and personality defaults.
      */
-    explicit CAiPersonality(Sim* sim = nullptr);
+    explicit CAiPersonality(Sim* sim);
 
     /**
      * Address: 0x005B6DA0 (FUN_005B6DA0, scalar deleting thunk)
