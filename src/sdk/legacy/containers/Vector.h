@@ -1583,6 +1583,7 @@ namespace msvc8
          * Address: 0x0057D820 (FUN_0057D820, msvc8::vector<SAiAttackVectorDebug>::push_back)
          * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back)
          * Address: 0x007C8F30 (FUN_007C8F30, msvc8::vector<Moho::LaunchPlayerOptionEntry>::push_back)
+         * Address: 0x007E3850 (FUN_007E3850, msvc8::vector<Moho::MeshLOD*>::push_back — Mesh::CreateLOD lods.push_back)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -1739,6 +1740,13 @@ namespace msvc8
          * grow lane for the global reflection TypeVec; the recovered caller
          * gpg::RType::RegisterType invokes insert(end(), 1, this) by name so this
          * per-T symbol is emitted).
+         * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
+         * fill-insert grow lane; emitted via the UnitWeapon push_back path).
+         * Address: 0x005DD120 (FUN_005DD120, msvc8::vector<Moho::UnitWeapon*>::_Insert_n
+         * grow lane for CAiAttackerImpl::mWeapons; the recovered caller
+         * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
+         * — MSVC8's push_back (FUN_005DBD90) is insert(end(),1,value) when full —
+         * so this per-T pointer symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
