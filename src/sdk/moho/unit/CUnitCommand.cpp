@@ -1661,8 +1661,10 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
     return;
   }
 
-  const EFormationType formationType = (unit->mCurrentLayer == LAYER_Air) ? EFormationType::Air : EFormationType::Surface;
-  const char* const scriptName = formationDb->GetScriptName(command->mVarDat.v2, formationType);
+  // The formation bucket is chosen from the command unit set's composition
+  // (air / non-air / mixed) inside GetScriptName -- not from a single unit's
+  // layer -- so pass the unit set directly, matching the binary.
+  const char* const scriptName = formationDb->GetScriptName(command->mVarDat.v2, &command->mUnitSet);
   if (!scriptName) {
     return;
   }

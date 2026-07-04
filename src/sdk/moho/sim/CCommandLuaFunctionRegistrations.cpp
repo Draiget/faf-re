@@ -582,11 +582,10 @@ namespace
       return -1;
     }
 
-    const auto packedSelectionLane = static_cast<std::uint32_t>(
-      reinterpret_cast<std::uintptr_t>(static_cast<const void*>(&selectedUnits))
-    );
-    const auto formationType = static_cast<moho::EFormationType>(packedSelectionLane);
-    return formationDb->GetScriptIndex(formationName, formationType);
+    // GetScriptIndex derives the formation bucket from the unit set's composition;
+    // pass the set directly (type-erased) rather than punning a pointer through an
+    // EFormationType lane.
+    return formationDb->GetScriptIndex(formationName, &selectedUnits);
   }
 
   void PackFormCommandOrientationLanes(

@@ -111,18 +111,26 @@ namespace moho
      * Mangled: ?GetScriptName@CAiFormationDBImpl@Moho@@UAEPBDHW4EFormationType@2@@Z
      *
      * What it does:
-     * Returns the script-name string for a formation script index/type.
+     * Returns the script-name string for a formation script index, selecting the
+     * formation bucket from the passed unit set's composition. The PDB mangles the
+     * second parameter as `EFormationType`, but the binary actually passes a
+     * type-erased unit-set pointer (`SEntitySetTemplateUnit`/`SCommandUnitSet`)
+     * whose unit composition `ResolveFormationBucketTypeFromUnitSet` scans to
+     * derive the bucket -- it is NOT a caller-chosen formation-type enum.
      */
-    virtual const char* GetScriptName(int scriptIndex, EFormationType formationType) = 0;
+    virtual const char* GetScriptName(int scriptIndex, const void* unitSet) = 0;
 
     /**
      * Address: 0x0059C0F0 (FUN_0059C0F0)
      * Mangled: ?GetScriptIndex@CAiFormationDBImpl@Moho@@UAEHPBDW4EFormationType@2@@Z
      *
      * What it does:
-     * Resolves a formation script name into its zero-based index.
+     * Resolves a formation script name into its zero-based index within the
+     * bucket derived from the passed unit set. As with GetScriptName, the second
+     * parameter is a type-erased unit-set pointer that the PDB mislabels as
+     * `EFormationType`.
      */
-    virtual int GetScriptIndex(gpg::StrArg scriptName, EFormationType formationType) = 0;
+    virtual int GetScriptIndex(gpg::StrArg scriptName, const void* unitSet) = 0;
 
     /**
      * Address: 0x0059C060 (FUN_0059C060)
