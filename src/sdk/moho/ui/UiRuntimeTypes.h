@@ -5692,6 +5692,23 @@ namespace moho
   CScrLuaInitForm* func_InternalCreateFrame_LuaFuncDef();
 
   /**
+   * Address: 0x0078E0B0 (FUN_0078E0B0, cfunc_InternalCreateDragger)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_InternalCreateDraggerL`.
+   */
+  int cfunc_InternalCreateDragger(lua_State* luaContext);
+
+  /**
+   * Address: 0x0078E0D0 (FUN_0078E0D0, func_InternalCreateDragger_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateDragger(luaobj)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateDragger_LuaFuncDef();
+
+  /**
    * Address: 0x007857B0 (FUN_007857B0, cfunc_InternalCreateBorder)
    *
    * What it does:

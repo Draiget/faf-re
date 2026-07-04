@@ -879,6 +879,7 @@ namespace moho
   int cfunc_CMauiHistogramSetDataL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateGroupL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateFrameL(LuaPlus::LuaState* state);
+  int cfunc_InternalCreateDraggerL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateHistogramL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateBitmapL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateBorderL(LuaPlus::LuaState* state);
@@ -1125,6 +1126,8 @@ namespace
     "InternalCreateGroup(luaobj,parent) -- For internal use by CreateGroup()";
   constexpr const char* kInternalCreateFrameHelpText =
     "InternalCreateFrame(luaobj) -- For internal use by CreateFrame()";
+  constexpr const char* kInternalCreateDraggerHelpText =
+    "InternalCreateDragger(luaobj) -- for internal use by CreateDragger()";
   constexpr const char* kInternalCreateBitmapHelpText =
     "InternalCreateBitmap(luaobj,parent) -- for internal use by CreateBitmap()";
   constexpr const char* kInternalCreateBorderHelpText =
@@ -12444,6 +12447,59 @@ int moho::cfunc_InternalCreateFrameL(LuaPlus::LuaState* const state)
   CMauiFrame* const frame = new CMauiFrame(&luaObject, nullptr);
   frame->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(frame)->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0078E0B0 (FUN_0078E0B0, cfunc_InternalCreateDragger)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_InternalCreateDraggerL`.
+ */
+int moho::cfunc_InternalCreateDragger(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateDraggerL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0078E0D0 (FUN_0078E0D0, func_InternalCreateDragger_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateDragger(luaobj)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateDragger_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateDragger",
+    &moho::cfunc_InternalCreateDragger,
+    nullptr,
+    "<global>",
+    kInternalCreateDraggerHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0078E130 (FUN_0078E130, cfunc_InternalCreateDraggerL)
+ *
+ * What it does:
+ * Reads `(luaobj)`, allocates and constructs one `CMauiLuaDragger`, and
+ * pushes the created dragger's Lua object. Unlike control factories the
+ * dragger dispatches no `DoInit`.
+ */
+int moho::cfunc_InternalCreateDraggerL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateDraggerHelpText, 1, argumentCount);
+  }
+
+  auto* const dragger = static_cast<CMauiLuaDragger*>(::operator new(0x3C));
+  LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
+  func_CMauiLuaDraggerConstruct(dragger, &luaObject);
+  reinterpret_cast<CScriptObject*>(dragger)->mLuaObj.PushStack(state);
   return 1;
 }
 
