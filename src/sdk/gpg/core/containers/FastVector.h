@@ -542,6 +542,7 @@ namespace gpg::core
      * Address: 0x0057FE30 (FUN_0057FE30, gpg::fastvector_Entity::InsertAt)
      * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
      * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
+     * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::SFormationLinkedUnitRef, 4>::InsertAt)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -1540,9 +1541,20 @@ namespace gpg
 
   /**
    * Address: 0x004028E0 (FUN_004028E0, gpg::fastvector_uint::cpy)
+   * Address: 0x00553370 (FUN_00553370, gpg::fastvector<Moho::SOCellPos>::cpy)
    *
    * What it does:
    * Copies source contents into destination runtime view.
+   *
+   * The 0x00553370 entry is the same template body specialized for
+   * 8-byte `Moho::SOCellPos` elements: the compiler emits element-wise
+   * assignment loops instead of the 4-byte `memmove` seen in the uint
+   * (0x004028E0) emission, but the three branches are identical
+   * (fits-in-place forward copy; reallocate-insert via
+   * `FastVectorRuntimeReallocateInsert`; copy-prefix + tail
+   * `FastVectorRuntimeInsertRange`). Instantiated for `SOCellPos`
+   * through `FastVectorN2RebindAndCopy` at the `CopySOCellPosFastVectorN2`
+   * call in `Moho::SSTICommandIssueData`'s copy constructor.
    */
   template <class T>
   [[nodiscard]] inline fastvector_runtime_view<T>*
@@ -1710,6 +1722,7 @@ namespace gpg
    * Address: 0x0059CE20 (FUN_0059CE20, pointer-element inline clone used by
    * `RFastVectorType_IFormationInstance_P::SetCount` and its internal
    * reflect/resize shim)
+   * Address: 0x0065ECE0 (FUN_0065ECE0, gpg::FastVectorRuntimeResizeFill<moho::SEfxCurve> — 56-byte element resize-fill)
    *
    * What it does:
    * Resizes runtime-view storage and fills appended values with `*fillValue`.
