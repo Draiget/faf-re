@@ -1496,6 +1496,9 @@ namespace msvc8
         T& back() const noexcept { return *(last_ - 1); }
 
         /**
+         * Address: 0x00882920 (FUN_00882920, msvc8::vector<moho::SSavedGameArmyInfo>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 0x1C-byte element)
+         *
          * Reserve storage for at least new_cap elements
          */
         void reserve(const std::size_t newCap) {
