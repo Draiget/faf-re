@@ -244,6 +244,17 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> FerryToLocation(Wm3::Vector3f& targetPos);
 
     /**
+     * Address: 0x00726420 (FUN_00726420, Moho::CPlatoon::Patrol)
+     *
+     * What it does:
+     * Snaps `target` to the terrain/water surface, then issues a patrol order:
+     * the whole platoon as one formation set when the platoon has a named
+     * formation, otherwise each requested squad class independently. Uses
+     * FormPatrol (with the resolved formation script) when applicable, else Patrol.
+     */
+    void Patrol(Wm3::Vector3f& target, ESquadClass squadClass);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:
