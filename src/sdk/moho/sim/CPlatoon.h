@@ -266,6 +266,18 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AttackTarget(Entity* target, ESquadClass squadClass);
 
     /**
+     * Address: 0x00727740 (FUN_00727740, Moho::CPlatoon::MoveToTarget)
+     *
+     * What it does:
+     * Orders the platoon to move to an entity target. With `useTransports` it
+     * moves the requested squad classes plus all alive transports as one set;
+     * otherwise the whole platoon (formation) or each requested squad class
+     * independently. Uses FormMove/Move by the usual threshold. Returns the
+     * issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:
