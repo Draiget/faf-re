@@ -98,6 +98,16 @@ namespace gpg
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
+
+    /**
+     * Address: 0x005DC4E0 (FUN_005DC4E0, gpg::RVectorType_UnitWeapon_P::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `msvc8::vector<moho::UnitWeapon*>` payload from archive
+     * count + reflected pointer lanes.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -566,6 +576,46 @@ void gpg::RVectorType_UnitWeaponPtr::Init()
 {
   size_ = sizeof(UnitWeaponPtrVector);
   version_ = 1;
+  serLoadFunc_ = &RVectorType_UnitWeaponPtr::SerLoad;
+}
+
+/**
+ * Address: 0x005DC4E0 (FUN_005DC4E0, gpg::RVectorType_UnitWeapon_P::SerLoad)
+ *
+ * IDA signature:
+ * void __cdecl sub_5DC4E0(gpg::ReadArchive *a2, _DWORD *arg4);
+ *
+ * What it does:
+ * Reads a uint element count, then that many reflected `moho::UnitWeapon*`
+ * entries via ReadPointer_UnitWeapon, and replaces the destination
+ * `msvc8::vector<moho::UnitWeapon*>` storage in a single assignment.
+ */
+void gpg::RVectorType_UnitWeaponPtr::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  auto* const storage = PointerFromArchiveInt<UnitWeaponPtrVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  UnitWeaponPtrVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+  for (unsigned int i = 0; i < count; ++i) {
+    moho::UnitWeapon* value = nullptr;
+    archive->ReadPointer_UnitWeapon(&value, ownerRef);
+    loaded.push_back(value);
+  }
+
+  *storage = loaded;
 }
 
 gpg::RRef gpg::RVectorType_UnitWeaponPtr::SubscriptIndex(void* const obj, const int ind) const
