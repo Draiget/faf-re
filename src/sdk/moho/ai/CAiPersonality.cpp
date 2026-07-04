@@ -1893,6 +1893,58 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<CAiPersonality>::Create(LuaPlus::LuaS
 }
 
 /**
+ * Address: 0x005B6B40 (FUN_005B6B40, default ctor body)
+ *
+ * IDA signature:
+ * int __stdcall sub_5B6B40(int a1);
+ *
+ * What it does:
+ * Parameterless CAiPersonality constructor taken by the reflection construct
+ * callback. Chains the default `CScriptObject()` base ctor (no Lua metatable),
+ * then empty/zero-initializes every member: both name strings default to empty
+ * SSO, every `SAiPersonalityRange` is {0, 0}, and both favourite lists are
+ * empty. The binary's explicit InstanceCounter bump is modeled the same way as
+ * the sibling `CAiPersonality(Sim*)` ctor (elided from source).
+ */
+CAiPersonality::CAiPersonality()
+  : mSim(nullptr)
+  , mPersonalityName()
+  , mChatPersonality()
+  , mArmySize{}
+  , mPlatoonSize{}
+  , mAttackFrequency{}
+  , mRepeatAttackFrequency{}
+  , mCounterForces{}
+  , mIntelGathering{}
+  , mCoordinatedAttacks{}
+  , mExpansionDriven{}
+  , mTechAdvancement{}
+  , mUpgradesDriven{}
+  , mDefenseDriven{}
+  , mEconomyDriven{}
+  , mFactoryTycoon{}
+  , mIntelBuildingTycoon{}
+  , mSuperWeaponTendency{}
+  , mFavouriteStructures()
+  , mAirUnitsEmphasis{}
+  , mTankUnitsEmphasis{}
+  , mBotUnitsEmphasis{}
+  , mSeaUnitsEmphasis{}
+  , mSpecialtyForcesEmphasis{}
+  , mSupportUnitsEmphasis{}
+  , mDirectDamageEmphasis{}
+  , mIndirectDamageEmphasis{}
+  , mFavouriteUnits()
+  , mSurvivalEmphasis{}
+  , mTeamSupport{}
+  , mFormationUse{}
+  , mTargetSpread{}
+  , mQuittingTendency{}
+  , mChatFrequency{}
+{
+}
+
+/**
  * Address: 0x005B6DC0 (FUN_005B6DC0, ctor body)
  */
 CAiPersonality::CAiPersonality(Sim* const sim)

@@ -1398,6 +1398,9 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x008D76B0 (FUN_008D76B0, msvc8::vector<std::int32_t>::operator=(const vector&))
+         * Address: 0x008D77E0 (FUN_008D77E0, msvc8::vector<std::int32_t>::operator=(const vector&) twin)
+         *
          * Copy assignment (strong exception safety)
          */
         vector& operator=(const vector& rhs) {
