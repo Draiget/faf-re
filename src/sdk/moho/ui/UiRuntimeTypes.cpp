@@ -878,6 +878,7 @@ namespace moho
   int cfunc_CMauiEditGetStringAdvanceL(LuaPlus::LuaState* state);
   int cfunc_CMauiHistogramSetDataL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateGroupL(LuaPlus::LuaState* state);
+  int cfunc_InternalCreateFrameL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateHistogramL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateBitmapL(LuaPlus::LuaState* state);
   int cfunc_InternalCreateBorderL(LuaPlus::LuaState* state);
@@ -1122,6 +1123,8 @@ namespace
     "InternalCreateHistogram(luaobj,parent) -- For internal use by CreateHistogram()";
   constexpr const char* kInternalCreateGroupHelpText =
     "InternalCreateGroup(luaobj,parent) -- For internal use by CreateGroup()";
+  constexpr const char* kInternalCreateFrameHelpText =
+    "InternalCreateFrame(luaobj) -- For internal use by CreateFrame()";
   constexpr const char* kInternalCreateBitmapHelpText =
     "InternalCreateBitmap(luaobj,parent) -- for internal use by CreateBitmap()";
   constexpr const char* kInternalCreateBorderHelpText =
@@ -12389,6 +12392,58 @@ int moho::cfunc_InternalCreateBitmapL(LuaPlus::LuaState* const state)
   CMauiBitmap* const bitmap = new CMauiBitmap(&luaObject, parentControl);
   bitmap->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(bitmap)->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00796790 (FUN_00796790, cfunc_InternalCreateFrame)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_InternalCreateFrameL`.
+ */
+int moho::cfunc_InternalCreateFrame(lua_State* const luaContext)
+{
+  return cfunc_InternalCreateFrameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007967B0 (FUN_007967B0, func_InternalCreateFrame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `InternalCreateFrame(luaobj)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_InternalCreateFrame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "InternalCreateFrame",
+    &moho::cfunc_InternalCreateFrame,
+    nullptr,
+    "<global>",
+    kInternalCreateFrameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00796810 (FUN_00796810, cfunc_InternalCreateFrameL)
+ *
+ * What it does:
+ * Reads `(luaobj)`, constructs one root `CMauiFrame` (no parent), dispatches
+ * `DoInit`, and pushes the created control's Lua object.
+ */
+int moho::cfunc_InternalCreateFrameL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateFrameHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
+  CMauiFrame* const frame = new CMauiFrame(&luaObject, nullptr);
+  frame->DoInit();
+  CMauiControlScriptObjectRuntimeView::FromControl(frame)->mLuaObj.PushStack(state);
   return 1;
 }
 
