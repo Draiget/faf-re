@@ -4688,6 +4688,227 @@ namespace moho
   }
 
   /**
+   * What it does:
+   * Adds each pointer-word in `[begin, end)` to `dest` as a `Unit*` (the stored
+   * entity word maps to its owning unit by the -8 Entity-subobject adjustment;
+   * a null word adds a null lane). Mirrors the compiler-emitted range-add the
+   * transport-move branch uses (FUN_006F8F10) -- an unconditional add, unlike
+   * SEntitySetTemplateUnit::AddRange which filters to live units.
+   */
+  static void AddUnitPointerRangeToSet(
+    SEntitySetTemplateUnit& dest,
+    Entity* const* const begin,
+    Entity* const* const end
+  )
+  {
+    for (Entity* const* cursor = begin; cursor != end; ++cursor) {
+      Unit* const unit = (*cursor != nullptr) ? static_cast<Unit*>(*cursor) : nullptr;
+      (void)dest.AddUnit(unit);
+    }
+  }
+
+  /**
+   * What it does:
+   * Issues one move order over `units` toward the entity `target`. When a
+   * formation script resolved and the set holds more than one unit, issues
+   * UNITCOMMAND_FormMove carrying the formation script index + identity
+   * orientation; otherwise a plain UNITCOMMAND_Move. Appends the issued command
+   * (if any) to `issuedCommands`.
+   */
+  static void IssuePlatoonMoveCommand(
+    Sim* const sim,
+    SEntitySetTemplateUnit& units,
+    Entity* const target,
+    const int formationScriptIndex,
+    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+  )
+  {
+    const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
+
+    SSTICommandIssueData commandIssueData(
+      useFormation ? EUnitCommandType::UNITCOMMAND_FormMove : EUnitCommandType::UNITCOMMAND_Move
+    );
+    commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+    commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(target->id_);
+    commandIssueData.mTarget.mPos.x = 0.0f;
+    commandIssueData.mTarget.mPos.y = 0.0f;
+    commandIssueData.mTarget.mPos.z = 0.0f;
+
+    if (useFormation) {
+      commandIssueData.unk38 = formationScriptIndex;  // FormMove formation-script lane
+      commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+      commandIssueData.unk4C = 1.0f;                   // FormMove orientation weight
+    }
+
+    CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
+    if (issuedCommand != nullptr) {
+      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+    }
+  }
+
+  /**
+   * Address: 0x00727740 (FUN_00727740, Moho::CPlatoon::MoveToTarget)
+   *
+   * IDA signature:
+   * void __stdcall CPlatoon::MoveToTarget(CPlatoon *this,
+   *     msvc8::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
+   *     char useTransports, ESquadClass squadClass)
+   *
+   * What it does:
+   * Orders the platoon to move to an entity target. Dispatches three ways:
+   *   - useTransports: gathers the requested squad classes' units into one move
+   *     set, plus every alive TRANSPORTATION unit across all classes, and issues a
+   *     single UNITCOMMAND_Move to the combined set.
+   *   - else if a named formation exists: moves the whole platoon as one formation
+   *     set (FormMove / Move by the usual threshold).
+   *   - else: moves each requested squad class independently (classes 1..5).
+   * Returns the issued command weak-links.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToTarget(
+    Entity* const target, const bool useTransports, const ESquadClass squadClass
+  )
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+
+    if (useTransports) {
+      SEntitySetTemplateUnit transports{};
+      SEntitySetTemplateUnit moveSet{};
+
+      for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+            continue;
+          }
+
+          SEntitySetTemplateUnit squadUnits{};
+          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+
+          // Collect alive transports from every class.
+          for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+            Entity* const entity = *entry;
+            if (entity == nullptr) {
+              continue;
+            }
+            Unit* const unit = static_cast<Unit*>(entity);
+            if (unit == nullptr || unit->IsDead()) {
+              continue;
+            }
+            if (unit->IsInCategory("TRANSPORTATION")) {
+              (void)transports.AddUnit(unit);
+            }
+          }
+
+          // Only the requested classes' units join the move set.
+          if (static_cast<std::int32_t>(squadClass) == kAllSquadClassesSentinel ||
+              static_cast<std::int32_t>(squadClass) == squadClassIndex) {
+            AddUnitPointerRangeToSet(moveSet, squadUnits.mVec.begin(), squadUnits.mVec.end());
+          }
+          break;
+        }
+      }
+
+      if (!moveSet.Empty()) {
+        if (!transports.Empty()) {
+          AddUnitPointerRangeToSet(moveSet, transports.mVec.begin(), transports.mVec.end());
+        }
+        IssuePlatoonMoveCommand(mSim, moveSet, target, -1, issuedCommands);
+      }
+    } else if (!mFormation.empty()) {
+      SEntitySetTemplateUnit platoonUnits{};
+      BuildPlatoonUnitSet(runtime, platoonUnits);
+      const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
+      IssuePlatoonMoveCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
+    } else {
+      for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
+            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+          continue;
+        }
+
+        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+            continue;
+          }
+
+          SEntitySetTemplateUnit squadUnits{};
+          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+          const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
+          IssuePlatoonMoveCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
+          break;
+        }
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x0072FE30 (FUN_0072FE30, cfunc_CPlatoonMoveToTargetL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Resolves `(platoon, targetEntity, useTransports[, squadClass])` and issues the
+   * move via `CPlatoon::MoveToTarget`, returning the issued commands as a Lua
+   * array. The squad class defaults to the all-classes sentinel; arg 4 overrides.
+   */
+  int cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 4) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kMoveToTargetHelpText, 2, 4, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const target = SCR_FromLua_Entity(targetObject, state);
+
+    LuaPlus::LuaStackObject useTransportsArg(state, 3);
+    const bool useTransports = useTransportsArg.GetBoolean();
+
+    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    if (lua_gettop(state->m_state) > 3) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 4);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 4);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->MoveToTarget(target, useTransports, squadClass);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x0072FDB0 (FUN_0072FDB0, cfunc_CPlatoonMoveToTarget)
    *
    * What it does:
