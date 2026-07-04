@@ -875,15 +875,23 @@ namespace
   );
   static_assert(sizeof(UserArmyIdleSetRuntimeView) == 0x218, "UserArmyIdleSetRuntimeView size must be 0x218");
 
-  [[nodiscard]] const IUnit* GetIUnitBridge(const UserUnit* const self) noexcept
+} // namespace
+
+namespace moho
+{
+  const IUnit* GetIUnitBridge(const UserUnit* const self) noexcept
   {
     return reinterpret_cast<const IUnit*>(self->mIUnitAndScriptBridge);
   }
 
-  [[nodiscard]] IUnit* GetIUnitBridge(UserUnit* const self) noexcept
+  IUnit* GetIUnitBridge(UserUnit* const self) noexcept
   {
     return reinterpret_cast<IUnit*>(self->mIUnitAndScriptBridge);
   }
+} // namespace moho
+
+namespace
+{
 
   struct UserUnitIUnitStateBridgeView
   {
@@ -3831,6 +3839,10 @@ namespace
     return cached;
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x008377E0 (FUN_008377E0, func_GetUserUnitOpt)
    *
@@ -3838,7 +3850,7 @@ namespace
    * Converts one Lua object to `UserUnit*`, raising Lua errors for missing or
    * type-mismatched game-object payloads while allowing destroyed-object slots.
    */
-  [[nodiscard]] [[maybe_unused]] UserUnit*
+  [[nodiscard]] UserUnit*
   GetUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
   {
     CScriptObject** const scriptObjectSlot = SCR_FromLua_CScriptObject(object);
@@ -3861,6 +3873,10 @@ namespace
 
     return static_cast<UserUnit*>(upcast.mObj);
   }
+} // namespace moho
+
+namespace
+{
 
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
