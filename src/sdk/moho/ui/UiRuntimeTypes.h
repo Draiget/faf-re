@@ -5675,6 +5675,23 @@ namespace moho
   CScrLuaInitForm* func_InternalCreateBitmap_LuaFuncDef();
 
   /**
+   * Address: 0x00796790 (FUN_00796790, cfunc_InternalCreateFrame)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_InternalCreateFrameL`.
+   */
+  int cfunc_InternalCreateFrame(lua_State* luaContext);
+
+  /**
+   * Address: 0x007967B0 (FUN_007967B0, func_InternalCreateFrame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `InternalCreateFrame(luaobj)` Lua binder.
+   */
+  CScrLuaInitForm* func_InternalCreateFrame_LuaFuncDef();
+
+  /**
    * Address: 0x007857B0 (FUN_007857B0, cfunc_InternalCreateBorder)
    *
    * What it does:
