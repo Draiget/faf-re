@@ -278,6 +278,17 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
 
     /**
+     * Address: 0x00726DE0 (FUN_00726DE0, Moho::CPlatoon::MoveToLocation)
+     *
+     * What it does:
+     * Snaps `pos` to the terrain/water surface, then orders the platoon to move
+     * there. With `useTransports` it moves the requested squad classes plus all
+     * alive transports as one set; otherwise the whole platoon (formation) or each
+     * requested squad class independently. Returns the issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:

@@ -53,7 +53,6 @@ namespace moho
   int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonGetFerryBeaconsL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonMoveToLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonUnloadUnitsAtLocationL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonUseFerryBeaconL(LuaPlus::LuaState*) { return 0; }
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState*) { return 0; }
