@@ -151,19 +151,19 @@ namespace
    * Address: 0x0062EE40 (FUN_0062EE40)
    *
    * What it does:
-   * Scans one packed weak-unit set lane, queries each unit's formation-bucket
-   * class tag (`+0x290` in the slot-7 runtime-info object), and returns:
-   * `0 = no air bucket`, `1 = only air bucket`, `2 = mixed buckets`.
+   * Scans one unit set's weak-entry lane, queries each unit's formation-bucket
+   * class tag (`+0x290` in the slot-7 runtime-info object), and returns the
+   * bucket: `0 = no air bucket`, `1 = only air bucket`, `2 = mixed buckets`.
+   *
+   * The unit set is taken type-erased: callers pass two distinct but
+   * layout-compatible types -- `moho::SEntitySetTemplateUnit` (GetScriptIndex) and
+   * `moho::SCommandUnitSet` (GetScriptName) -- both exposing the weak-entry
+   * begin/end lane at the same offsets, viewed here through
+   * `FormationTypeSelectionSetRuntimeView`.
    */
-  [[nodiscard]] int ResolveFormationBucketTypeFromPackedWeakSetLane(const std::uint32_t packedWeakSetLane)
+  [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const void* const unitSet)
   {
-    // Some callsites pass a direct enum lane instead of a packed weak-set view.
-    if (packedWeakSetLane <= static_cast<std::uint32_t>(EFormationType::Mixed)) {
-      return static_cast<int>(packedWeakSetLane);
-    }
-
-    auto* const weakSet =
-      reinterpret_cast<const FormationTypeSelectionSetRuntimeView*>(static_cast<std::uintptr_t>(packedWeakSetLane));
+    const auto* const weakSet = static_cast<const FormationTypeSelectionSetRuntimeView*>(unitSet);
     if (weakSet == nullptr || weakSet->begin == weakSet->end) {
       return 0;
     }
@@ -580,14 +580,13 @@ void CAiFormationDBImpl::RemoveFormation(CAiFormationInstance* const formation)
 /**
  * Address: 0x0059C0C0 (FUN_0059C0C0)
  */
-const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const EFormationType formationType)
+const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const void* const unitSet)
 {
   if (!mSim) {
     return nullptr;
   }
 
-  const int resolvedBucket =
-    ResolveFormationBucketTypeFromPackedWeakSetLane(static_cast<std::uint32_t>(formationType));
+  const int resolvedBucket = ResolveFormationBucketTypeFromUnitSet(unitSet);
   return FORMATION_GetScriptName(
     mSim->GetLuaState(),
     scriptIndex,
@@ -598,14 +597,13 @@ const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const EForm
 /**
  * Address: 0x0059C0F0 (FUN_0059C0F0)
  */
-int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const EFormationType formationType)
+int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void* const unitSet)
 {
   if (!mSim) {
     return 0;
   }
 
-  const int resolvedBucket =
-    ResolveFormationBucketTypeFromPackedWeakSetLane(static_cast<std::uint32_t>(formationType));
+  const int resolvedBucket = ResolveFormationBucketTypeFromUnitSet(unitSet);
   return FORMATION_GetScriptIndex(
     mSim->GetLuaState(),
     scriptName,

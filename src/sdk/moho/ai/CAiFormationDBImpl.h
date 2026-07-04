@@ -44,12 +44,12 @@ namespace moho
     /**
      * Address: 0x0059C0C0 (FUN_0059C0C0)
      */
-    const char* GetScriptName(int scriptIndex, EFormationType formationType) override;
+    const char* GetScriptName(int scriptIndex, const void* unitSet) override;
 
     /**
      * Address: 0x0059C0F0 (FUN_0059C0F0)
      */
-    int GetScriptIndex(gpg::StrArg scriptName, EFormationType formationType) override;
+    int GetScriptIndex(gpg::StrArg scriptName, const void* unitSet) override;
 
     /**
      * Address: 0x0059C060 (FUN_0059C060)
