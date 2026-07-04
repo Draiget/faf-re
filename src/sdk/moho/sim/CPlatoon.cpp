@@ -6297,6 +6297,75 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725870 (FUN_00725870, Moho::CPlatoon::GetFerryBeacons)
+   *
+   * IDA signature:
+   * SEntitySetTemplateUnit* __stdcall CPlatoon::GetFerryBeacons(CPlatoon* this,
+   *                                                             SEntitySetTemplateUnit* out);
+   *
+   * What it does:
+   * Collects the ferry-beacon units the platoon is currently ferrying to: for every
+   * platoon unit in the Ferrying state, the beacon named by the head of its command
+   * queue (Unit::GetTransportFerryBeacon) is added to `outBeacons` (deduplicated by
+   * the entity set). The decompiler mislabels the result as `std::map_uint_Entity`;
+   * it is the intrusive unit set the callback then exposes to Lua.
+   */
+  void CPlatoon::GetFerryBeacons(SEntitySetTemplateUnit& outBeacons)
+  {
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    SEntitySetTemplateUnit platoonUnits{};
+    BuildPlatoonUnitSet(runtime, platoonUnits);
+
+    for (Entity* const* entry = platoonUnits.mVec.begin(); entry != platoonUnits.mVec.end(); ++entry) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+      if (unit == nullptr || !unit->IsUnitState(EUnitState::UNITSTATE_Ferrying)) {
+        continue;
+      }
+      if (Unit* const beacon = unit->GetTransportFerryBeacon()) {
+        (void)outBeacons.AddUnit(beacon);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00731840 (FUN_00731840, cfunc_CPlatoonGetFerryBeaconsL)
+   *
+   * What it does:
+   * Parses `(platoon)`, gathers the platoon's ferry beacons via
+   * `CPlatoon::GetFerryBeacons`, and returns them as a Lua array of unit objects.
+   */
+  int cfunc_CPlatoonGetFerryBeaconsL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetFerryBeaconsHelpText, 1, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    SEntitySetTemplateUnit ferryBeacons{};
+    platoon->GetFerryBeacons(ferryBeacons);
+
+    LuaPlus::LuaObject beaconTable{};
+    beaconTable.AssignNewTable(state, static_cast<int>(ferryBeacons.Size()), 0);
+
+    int beaconIndex = 1;
+    for (Entity* const* entry = ferryBeacons.mVec.begin(); entry != ferryBeacons.mVec.end(); ++entry) {
+      Unit* const beacon = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+      if (beacon == nullptr) {
+        continue;
+      }
+      LuaPlus::LuaObject beaconObject = beacon->GetLuaObject();
+      beaconTable.Insert(beaconIndex, beaconObject);
+      ++beaconIndex;
+    }
+
+    beaconTable.PushStack(state);
+    return 1;
+  }
+
+  /**
    * Address: 0x007317C0 (FUN_007317C0, cfunc_CPlatoonGetFerryBeacons)
    *
    * What it does:
