@@ -187,18 +187,12 @@ namespace moho
       const boost::shared_ptr<MeshMaterial> material =
         MeshMaterial::Create(shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr);
 
-      boost::shared_ptr<Mesh> mesh(new Mesh(modelResource, material));
-      if (!mesh->lods.empty()) {
-        MeshLOD* const primaryLod = mesh->lods.front();
-        if (primaryLod != nullptr) {
-          primaryLod->SetCutoff(lodCutoff);
-        }
-      }
-
       CWldSession* const worldSession = WLD_GetActiveSession();
       const int gameTick = worldSession != nullptr ? worldSession->mGameTick : 0;
       const Wm3::Vec3f scale{uniformScale, uniformScale, uniformScale};
-      mMeshInstance = meshRenderer != nullptr ? meshRenderer->CreateMeshInstance(gameTick, color, scale, false, mesh) : nullptr;
+      mMeshInstance = meshRenderer != nullptr
+        ? meshRenderer->CreateMeshInstance(gameTick, color, modelResource, scale, false, material, lodCutoff)
+        : nullptr;
     } else {
       const LuaPlus::LuaObject blueprintIdObject = meshDescriptor["BlueprintID"];
       if (blueprintIdObject.IsNil()) {

@@ -938,6 +938,25 @@ namespace moho
     );
 
     /**
+     * Address: 0x007DF710 (FUN_007DF710,
+     * ?CreateMeshInstance@MeshRenderer@Moho@@QAEPAVMeshInstance@2@HIV?$shared_ptr@VRScmResource@Moho@@@boost@@ABV?$Vector3@M@Wm3@@_NV?$shared_ptr@VMeshMaterial@Moho@@@5@M@Z)
+     *
+     * What it does:
+     * Builds a one-LOD mesh directly from a resolved resource/material pair,
+     * stamps the LOD cutoff, and creates an instance through the
+     * shared_ptr<Mesh> overload.
+     */
+    MeshInstance* CreateMeshInstance(
+      std::int32_t gameTick,
+      std::int32_t color,
+      boost::shared_ptr<RScmResource> resource,
+      const Wm3::Vec3f& scale,
+      bool isStaticPose,
+      boost::shared_ptr<MeshMaterial> material,
+      float lodCutoff
+    );
+
+    /**
      * Address: 0x007E0380 (FUN_007E0380, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@@Z)
      *
      * What it does:

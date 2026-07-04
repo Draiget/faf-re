@@ -5876,6 +5876,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x007DF710 (FUN_007DF710,
+   * ?CreateMeshInstance@MeshRenderer@Moho@@QAEPAVMeshInstance@2@HIV?$shared_ptr@VRScmResource@Moho@@@boost@@ABV?$Vector3@M@Wm3@@_NV?$shared_ptr@VMeshMaterial@Moho@@@5@M@Z)
+   *
+   * IDA signature:
+   * Moho::MeshInstance *__userpurge CreateMeshInstance(
+   *   Moho::MeshRenderer *this@<ecx>, int gameTick, unsigned int color,
+   *   boost::shared_ptr<RScmResource> resource, const Wm3::Vector3<float> &scale,
+   *   bool isStaticPose, boost::shared_ptr<MeshMaterial> material, float lodCutoff);
+   *
+   * What it does:
+   * Constructs a standalone one-LOD mesh from an already-resolved
+   * resource/material pair, applies the LOD cutoff distance to that single
+   * LOD, then creates and links a mesh instance via the shared_ptr<Mesh>
+   * overload. The resource/material ctor (0x007DD750) always creates exactly
+   * one LOD, so the front LOD is always valid.
+   */
+  MeshInstance* MeshRenderer::CreateMeshInstance(
+    const std::int32_t gameTick,
+    const std::int32_t color,
+    const boost::shared_ptr<RScmResource> resource,
+    const Wm3::Vec3f& scale,
+    const bool isStaticPose,
+    const boost::shared_ptr<MeshMaterial> material,
+    const float lodCutoff
+  )
+  {
+    boost::shared_ptr<Mesh> mesh(new Mesh(resource, material));
+    mesh->lods.front()->SetCutoff(lodCutoff);
+    return CreateMeshInstance(gameTick, color, scale, isStaticPose, mesh);
+  }
+
+  /**
    * Address: 0x007DFF30 (FUN_007DFF30, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@...@Z)
    *
    * What it does:
