@@ -1400,6 +1400,9 @@ namespace msvc8
         /**
          * Address: 0x008D76B0 (FUN_008D76B0, msvc8::vector<std::int32_t>::operator=(const vector&))
          * Address: 0x008D77E0 (FUN_008D77E0, msvc8::vector<std::int32_t>::operator=(const vector&) twin)
+         * Address: 0x008D7550 (FUN_008D7550, msvc8::vector<gpg::gal::HeadAdapterMode>::operator=(const vector&))
+         * Address: 0x006E2F30 (FUN_006E2F30, msvc8::vector<void*>::operator=(const vector&))
+         * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          *
          * Copy assignment (strong exception safety)
          */

@@ -612,6 +612,16 @@ namespace
     return type;
   }
 
+  [[nodiscard]] gpg::RType* CachedMapEntIdSUnitOffsetInfoType()
+  {
+    gpg::RType* type = moho::SOffsetInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(FormationUnitOffsetMap));
+      moho::SOffsetInfo::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RRef MakeSimRef(moho::Sim* sim)
   {
     gpg::RRef out{};
@@ -3198,10 +3208,11 @@ namespace
 
     formation.mPlanUpdateRequested = 0u;
     (void)formation.RemoveDeadUnits(nullptr);
+    formation.CleanupFormation();
 
-    // Binary also executes CFormationInstance::CleanupFormation (0x00568AC0)
-    // and CAiFormationInstance::UpdateFormation (0x00568CA0) here; those
-    // dependencies are tracked separately.
+    // Binary also executes CAiFormationInstance::UpdateFormation (0x00568CA0)
+    // here immediately after CleanupFormation; that dependency is tracked
+    // separately.
   }
 
   [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
@@ -3584,6 +3595,69 @@ namespace moho
   }
 
   /**
+   * Address: 0x00570B60 (FUN_00570B60, Moho::SOffsetInfo::MemberSerialize)
+   *
+   * What it does:
+   * Writes one offset-info payload: the whole unit-offset map, formation
+   * position, four 2D coordinate lanes, two flags, two scalars, and the owning
+   * unit weak-link, each through its reflected RTTI serializer.
+   */
+  void SOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    GPG_ASSERT(mapType != nullptr);
+    if (mapType) {
+      archive->Write(mapType, this, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Write(vectorType, &mPos, ownerRef);
+    }
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &mCoords1, ownerRef);
+      archive->Write(coordsType, &mCoords2, ownerRef);
+      archive->Write(coordsType, &mCoords3, ownerRef);
+      archive->Write(coordsType, &mCoords4, ownerRef);
+    }
+
+    archive->WriteBool(mFlagA != 0);
+    archive->WriteBool(mFlagB != 0);
+    archive->WriteFloat(mScalarA);
+    archive->WriteFloat(mScalarB);
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Write(weakPtrType, &mUnit, ownerRef);
+    }
+  }
+
+  /**
+   * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Static reflection serializer callback: forwards one `SOffsetInfo` payload
+   * to `SOffsetInfo::MemberSerialize`.
+   */
+  void SOffsetInfoSerializer::Serialize(gpg::WriteArchive* const archive, SOffsetInfo* const offsetInfo)
+  {
+    if (offsetInfo != nullptr) {
+      offsetInfo->MemberSerialize(archive);
+    }
+  }
+
+  /**
    * Address: 0x0059BD60 (FUN_0059BD60, ??3CAiFormationInstance@Moho@@QAE@@Z)
    *
    * What it does:
@@ -3744,6 +3818,41 @@ namespace moho
     mOccupiedSlots.ResetStorageToInline();
     ResetCoordCacheMap(mCoordCachePrimary);
     ResetCoordCacheMap(mCoordCacheSecondary);
+  }
+
+  /**
+   * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
+   *
+   * IDA signature:
+   * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
+   *     Moho::CFormationInstance *this@<eax>);
+   *
+   * What it does:
+   * Resets transient formation-plan state so a fresh plan can be recomputed:
+   * clears the occupied-slot vector to its inline buffer, resets both coord
+   * caches in place (keeping the head sentinel, unlike the destructor path
+   * which frees it), zeroes the orientation baseline, and for each of the two
+   * lane vectors destroys every entry's unit map + unlinks its weak back-link
+   * words, then resets the lane vector to inline storage.
+   */
+  void CAiFormationInstance::CleanupFormation()
+  {
+    mOccupiedSlots.ResetStorageToInline();
+    ResetCoordCacheMap(mCoordCachePrimary);
+    ResetCoordCacheMap(mCoordCacheSecondary);
+    mOrientationBaseline = kZeroQuaternion;
+
+    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
+      SFormationLaneEntry* lane = mLanes[laneIndex].begin();
+      const SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
+      while (lane != laneEnd) {
+        UnlinkWeakWordNode(lane->linkedUnitBackLinkHeadWord, lane->linkedUnitBackLinkNextWord);
+        DestroyLaneMapStorage(lane->unitMap);
+        ++lane;
+      }
+
+      mLanes[laneIndex].ResetStorageToInline();
+    }
   }
 
   /**

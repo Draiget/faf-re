@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 
 #include "gpg/core/containers/FastVector.h"
 #include "moho/ai/IFormationInstance.h"
@@ -134,6 +135,60 @@ namespace moho
   static_assert(
     offsetof(SUnitOffsetInfo, mSpeedBandHigh) == 0x2C, "SUnitOffsetInfo::mSpeedBandHigh offset must be 0x2C"
   );
+
+  struct SOffsetInfo
+  {
+    inline static gpg::RType* sType = nullptr;
+
+    /**
+     * Address: 0x00570B60 (FUN_00570B60, Moho::SOffsetInfo::MemberSerialize)
+     *
+     * What it does:
+     * Writes one offset-info payload: the whole unit-offset map, formation
+     * position, four 2D coordinate lanes, two flags, two scalars, and the
+     * owning unit weak-link.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    // std::map<EntId, SUnitOffsetInfo>; EntId is int32_t (see moho/entity/Entity.h).
+    std::map<std::int32_t, SUnitOffsetInfo> mUnitOffsets; // +0x00
+    Wm3::Vec3f mPos;                                       // +0x0C
+    SCoordsVec2 mCoords1;                                  // +0x18
+    SCoordsVec2 mCoords2;                                  // +0x20
+    SCoordsVec2 mCoords3;                                  // +0x28
+    SCoordsVec2 mCoords4;                                  // +0x30
+    std::uint8_t mFlagA;                                   // +0x38
+    std::uint8_t mFlagB;                                   // +0x39
+    std::uint8_t pad3A[2];                                 // +0x3A
+    float mScalarA;                                        // +0x3C
+    float mScalarB;                                        // +0x40
+    WeakPtr<IUnit> mUnit;                                  // +0x44
+  };
+  static_assert(sizeof(SOffsetInfo) == 0x4C, "SOffsetInfo size must be 0x4C");
+  static_assert(offsetof(SOffsetInfo, mPos) == 0x0C, "SOffsetInfo::mPos offset must be 0x0C");
+  static_assert(offsetof(SOffsetInfo, mCoords1) == 0x18, "SOffsetInfo::mCoords1 offset must be 0x18");
+  static_assert(offsetof(SOffsetInfo, mCoords2) == 0x20, "SOffsetInfo::mCoords2 offset must be 0x20");
+  static_assert(offsetof(SOffsetInfo, mCoords3) == 0x28, "SOffsetInfo::mCoords3 offset must be 0x28");
+  static_assert(offsetof(SOffsetInfo, mCoords4) == 0x30, "SOffsetInfo::mCoords4 offset must be 0x30");
+  static_assert(offsetof(SOffsetInfo, mFlagA) == 0x38, "SOffsetInfo::mFlagA offset must be 0x38");
+  static_assert(offsetof(SOffsetInfo, mFlagB) == 0x39, "SOffsetInfo::mFlagB offset must be 0x39");
+  static_assert(offsetof(SOffsetInfo, mScalarA) == 0x3C, "SOffsetInfo::mScalarA offset must be 0x3C");
+  static_assert(offsetof(SOffsetInfo, mScalarB) == 0x40, "SOffsetInfo::mScalarB offset must be 0x40");
+  static_assert(offsetof(SOffsetInfo, mUnit) == 0x44, "SOffsetInfo::mUnit offset must be 0x44");
+
+  /**
+   * Static reflection serializer callback for `SOffsetInfo`.
+   */
+  struct SOffsetInfoSerializer
+  {
+    /**
+     * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards one `SOffsetInfo` payload to `SOffsetInfo::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, SOffsetInfo* offsetInfo);
+  };
 
   struct SFormationLaneEntry
   {
@@ -507,6 +562,22 @@ namespace moho
      * and reports whether `checkForUnit` remains live in the set.
      */
     bool RemoveDeadUnits(Unit* checkForUnit);
+
+    /**
+     * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
+     *
+     * IDA signature:
+     * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
+     *     Moho::CFormationInstance *this@<eax>);
+     *
+     * What it does:
+     * Resets transient formation-plan state: clears the occupied-slot vector to
+     * its inline buffer, resets both coord-cache RB-trees in place (keeping the
+     * head sentinel), zeroes the orientation-baseline quaternion, and tears down
+     * each of the two lane vectors (destroying every lane entry's unit map and
+     * unlinking its weak back-link words) before resetting them to inline.
+     */
+    void CleanupFormation();
 
     /**
      * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)
