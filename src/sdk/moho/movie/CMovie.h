@@ -55,6 +55,18 @@ namespace moho
     CMovie();
 
     /**
+     * Address: 0x00873D80 (FUN_00873D80, ??1CMovie@Moho@@QAE@@Z)
+     * Mangled: ??1CMovie@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Unlinks this movie from the live D3D device-event listener ring, tears down
+     * active Sofdec playback and the movie texture-sheet owner, releases the
+     * subtitle/work buffers and name strings, then runs base listener/IMovie
+     * teardown.
+     */
+    ~CMovie() override;
+
+    /**
      * Address: 0x00874CD0 (FUN_00874CD0, ??2CMovie@Moho@@QAE@@Z)
      *
      * What it does:
@@ -167,7 +179,7 @@ namespace moho
     std::uint8_t mReserved11_13[0x3]{};  // +0x11
     TextureSheetHandle mTextureSheet{};  // +0x14
     gpg::MemBuffer<char> mSubtitleBuffer{}; // +0x1C
-    std::uint8_t mReserved2C_33[0x08]{};    // +0x2C
+    boost::SharedPtrRaw<void> mWorkbuffer{}; // +0x2C (Sofdec work buffer shared owner)
     std::int32_t mWidth = 0;             // +0x34
     std::int32_t mHeight = 0;            // +0x38
     std::uint8_t mReserved3C_43[0x08]{}; // +0x3C
@@ -182,6 +194,7 @@ namespace moho
   static_assert(offsetof(CMovie, mDeviceListener.mLink) == 0x08, "CMovie::mDeviceListener.mLink offset must be 0x08");
   static_assert(offsetof(CMovie, mTextureSheet) == 0x14, "CMovie::mTextureSheet offset must be 0x14");
   static_assert(offsetof(CMovie, mSubtitleBuffer) == 0x1C, "CMovie::mSubtitleBuffer offset must be 0x1C");
+  static_assert(offsetof(CMovie, mWorkbuffer) == 0x2C, "CMovie::mWorkbuffer offset must be 0x2C");
   static_assert(offsetof(CMovie, mWidth) == 0x34, "CMovie::mWidth offset must be 0x34");
   static_assert(offsetof(CMovie, mHeight) == 0x38, "CMovie::mHeight offset must be 0x38");
   static_assert(offsetof(CMovie, mMovieName) == 0x44, "CMovie::mMovieName offset must be 0x44");
