@@ -1498,6 +1498,8 @@ namespace msvc8
         /**
          * Address: 0x00882920 (FUN_00882920, msvc8::vector<moho::SSavedGameArmyInfo>::reserve
          * out-of-line emission — reallocate-to-capacity for the 0x1C-byte element)
+         * Address: 0x006DC3C0 (FUN_006DC3C0, msvc8::vector<moho::EntityCategorySet>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 0x28-byte element)
          *
          * Reserve storage for at least new_cap elements
          */
@@ -1858,6 +1860,9 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x006DEA30 (FUN_006DEA30, msvc8::vector<moho::EntityCategorySet>::uninit_fill_n
+         * — reallocation fill-n-with-copy path of push_back for the 0x28-byte element)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
