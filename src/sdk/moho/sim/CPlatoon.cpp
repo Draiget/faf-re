@@ -5181,6 +5181,158 @@ namespace moho
   }
 
   /**
+   * Issues one aggressive-move order to a prepared unit set at `pos`.
+   *
+   * Unlike Move/Patrol, AggressiveMove always selects the Form* variant whenever a
+   * formation script exists (`formationScriptIndex >= 0`) with no unit-count gate,
+   * and always writes the orientation lane (script lane clamped to >= 0, zero
+   * quaternion, weight 1.0f) regardless of the chosen variant.
+   */
+  static void IssuePlatoonAggressiveMoveCommand(
+    Sim* const sim,
+    SEntitySetTemplateUnit& units,
+    const Wm3::Vector3f& pos,
+    const int formationScriptIndex,
+    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+  )
+  {
+    SSTICommandIssueData commandIssueData(
+      formationScriptIndex >= 0 ? EUnitCommandType::UNITCOMMAND_FormAggressiveMove
+                                : EUnitCommandType::UNITCOMMAND_AggressiveMove
+    );
+    commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+    commandIssueData.mTarget.mPos = pos;
+    commandIssueData.unk38 = formationScriptIndex > 0 ? formationScriptIndex : 0;  // formation-script lane, clamped to >= 0
+    commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+    commandIssueData.unk4C = 1.0f;                                                 // orientation weight
+
+    CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
+    if (issuedCommand != nullptr) {
+      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+    }
+  }
+
+  /**
+   * Address: 0x007268E0 (FUN_007268E0, Moho::CPlatoon::AggressiveMoveToLocation)
+   *
+   * IDA signature:
+   * std::vector<WeakPtr<CUnitCommand>>* __userpurge
+   *   CPlatoon::AggressiveMoveToLocation(float* point@<edi>, CPlatoon* this,
+   *                                      std::vector* out, ESquadClass squadClass);
+   *
+   * What it does:
+   * Snaps `pos` to the terrain/water surface, then orders an aggressive move there.
+   * If the platoon has a named formation it moves the whole platoon as one
+   * formation set; otherwise it moves each requested squad class (1..5)
+   * independently. Every command is a FormAggressiveMove when the target set has a
+   * formation script, else a plain AggressiveMove. Returns the issued command
+   * weak-links.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::AggressiveMoveToLocation(Wm3::Vector3f& pos, const ESquadClass squadClass)
+  {
+    // Snap the requested point to the terrain (or water, when higher) surface.
+    STIMap* const mapData = mSim->mMapData;
+    float surfaceElevation = mapData->mHeightField->GetElevation(pos.x, pos.z);
+    if (mapData->mWaterEnabled && mapData->mWaterElevation > surfaceElevation) {
+      surfaceElevation = mapData->mWaterElevation;
+    }
+    pos.y = surfaceElevation;
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+
+    if (mFormation.empty()) {
+      for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
+            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+          continue;
+        }
+
+        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+            continue;
+          }
+
+          SEntitySetTemplateUnit squadUnits{};
+          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+          const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
+          IssuePlatoonAggressiveMoveCommand(mSim, squadUnits, pos, formationScriptIndex, issuedCommands);
+          break;
+        }
+      }
+    } else {
+      SEntitySetTemplateUnit platoonUnits{};
+      BuildPlatoonUnitSet(runtime, platoonUnits);
+      const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
+      IssuePlatoonAggressiveMoveCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00730420 (FUN_00730420, cfunc_CPlatoonAggressiveMoveToLocationL)
+   *
+   * What it does:
+   * Parses `(platoon, location[, squadClass])`, validates the point, issues the
+   * aggressive-move orders via `CPlatoon::AggressiveMoveToLocation`, returns the
+   * issued commands as a Lua array, then releases the weak command links.
+   */
+  int cfunc_CPlatoonAggressiveMoveToLocationL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kAggressiveMoveToLocationHelpText, 2, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 2));
+    Wm3::Vector3f targetPoint = SCR_FromLuaCopy<Wm3::Vector3<float>>(locationObject);
+    if (!IsValidVector3f(targetPoint)) {
+      LuaPlus::LuaState::Error(state, "Platoon:AggressiveMoveToLocation Passed in an invalid target point");
+    }
+
+    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    if (lua_gettop(state->m_state) > 2) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 3);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 3);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AggressiveMoveToLocation(targetPoint, squadClass);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x007303A0 (FUN_007303A0, cfunc_CPlatoonAggressiveMoveToLocation)
    *
    * What it does:
