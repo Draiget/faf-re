@@ -12,8 +12,11 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "Wm3Vector3.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -1356,6 +1359,36 @@ namespace moho
     }
   }
 
+  // File-local forward declaration of the quaternion-rotate-vector helper shared
+  // across the manipulator family (canonical Moho::MultQuadVec, defined in
+  // QuaternionMath.cpp) — matches the sibling manipulator translation units.
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+
+  namespace
+  {
+    /**
+     * Resolves the pose bone at `boneIndex` within `pose`, returning nullptr
+     * when the index is past the packed bone array. Mirrors the binary's
+     * unsigned index-vs-count guard performed before every watched-bone write.
+     */
+    [[nodiscard]] CAniPoseBone* ResolvePoseBoneByIndex(CAniPose* const pose, const std::int32_t boneIndex) noexcept
+    {
+      if (pose == nullptr) {
+        return nullptr;
+      }
+      CAniPoseBone* const first = pose->mBones.begin();
+      CAniPoseBone* const last = pose->mBones.end();
+      if (first == nullptr) {
+        return nullptr;
+      }
+      const std::ptrdiff_t boneCount = last - first;
+      if (boneIndex < 0 || static_cast<std::ptrdiff_t>(boneIndex) >= boneCount) {
+        return nullptr;
+      }
+      return &first[boneIndex];
+    }
+  } // namespace
+
   /**
    * Address: 0x00634400 (FUN_00634400, ??0CBoneEntityManipulator@Moho@@QAE@@Z)
    */
@@ -1366,6 +1399,63 @@ namespace moho
     , mReferenceBoneIndex(0)
     , mPivot(0.0f, 0.0f, 0.0f)
   {
+  }
+
+  /**
+   * Address: 0x00634460 (FUN_00634460, ??0CBoneEntityManipulator@Moho@@QAE@PAVEntity@1@PAVUnit@1@HHH@Z_0)
+   *
+   * IDA signature:
+   * Moho::CBoneEntityManipulator *__fastcall Moho::CBoneEntityManipulator::CBoneEntityManipulator(
+   *   Moho::Entity *targetEntity, Moho::Unit *goalUnit, Moho::CBoneEntityManipulator *this,
+   *   int watchedBoneIndex, int referenceBoneIndex, char markSkipInterp);
+   *
+   * What it does:
+   * Builds one bone-attach manipulator owned by `goalUnit`'s sim/actor pair,
+   * head-inserts the goal-unit and target-entity intrusive weak links, binds a
+   * fresh Lua object, registers the watched unit bone, seeds `mPivot` from that
+   * bone's skeleton bounds, runs an initial solve, and (when `markSkipInterp`)
+   * flags the watched pose bone to skip the next interpolation step.
+   */
+  CBoneEntityManipulator::CBoneEntityManipulator(
+    Entity* const targetEntity, Unit* const goalUnit,
+    const int watchedBoneIndex, const int referenceBoneIndex, const bool markSkipInterp
+  )
+    : IAniManipulator(goalUnit->SimulationRef, goalUnit->AniActor, 0)
+    , mGoalUnit()
+    , mTargetEntity()
+    , mReferenceBoneIndex(referenceBoneIndex)
+    , mPivot(0.0f, 0.0f, 0.0f)
+  {
+    // Head-insert the intrusive goal (unit) and target (entity) weak links into
+    // their owners' weak-link chains, matching the binary's freshly-constructed
+    // (known-unlinked) node insertion at 0x0063448E / 0x006344B8.
+    mGoalUnit.BindObjectUnlinked(goalUnit);
+    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
+    mTargetEntity.BindObjectUnlinked(targetEntity);
+    (void)mTargetEntity.LinkIntoOwnerChainHeadUnlinked();
+
+    // Materialize the Lua userdata + script binding. The binary loads the sim's
+    // Lua state and passes it to func_CreateLuaBoneEntityManipulatorObject.
+    if (Sim* const sim = mOwnerSim; sim != nullptr && sim->mLuaState != nullptr) {
+      LuaPlus::LuaObject arg3{};
+      LuaPlus::LuaObject arg2{};
+      LuaPlus::LuaObject arg1{};
+      LuaPlus::LuaObject scriptFactory{};
+      (void)func_CreateLuaBoneEntityManipulatorObject(&scriptFactory, sim->mLuaState);
+      CreateLuaObject(scriptFactory, arg1, arg2, arg3);
+    }
+
+    (void)AddWatchBone(watchedBoneIndex);
+    InitPivotFromBoneBounds();
+    MoveManipulator();
+
+    if (markSkipInterp) {
+      if (CAniPoseBone* const watchedBone =
+            ResolvePoseBoneByIndex(mOwnerActor->mPose.px, mWatchBones.mBegin->mBoneIndex);
+          watchedBone != nullptr) {
+        watchedBone->mSkipNextInterp = 1;
+      }
+    }
   }
 
   /**
@@ -1391,6 +1481,97 @@ namespace moho
   bool CBoneEntityManipulator::ManipulatorUpdate()
   {
     return false;
+  }
+
+  /**
+   * Address: 0x006347E0 (FUN_006347E0, ?MoveManipulator@CBoneEntityManipulator@Moho@@QAEXXZ)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CBoneEntityManipulator::MoveManipulator(CBoneEntityManipulator *this);
+   *
+   * What it does:
+   * Solves the watched pose bone toward the target entity bone. With a live
+   * target: fetches the target bone's world transform, offsets its position by
+   * the pivot rotated into that bone's frame, records the running max
+   * displacement from the goal unit position, and writes the result into the
+   * watched bone's local transform (flagged as already-composite). With no
+   * target: parks the bone at (0, -10000, 0) with identity orientation and
+   * resets the pose max-offset to -inf.
+   */
+  void CBoneEntityManipulator::MoveManipulator()
+  {
+    CAniPose* const pose = mOwnerActor->mPose.px;
+    Entity* const targetEntity = mTargetEntity.GetObjectPtr();
+
+    if (targetEntity != nullptr) {
+      const VTransform targetBoneWorld = targetEntity->GetBoneWorldTransform(mReferenceBoneIndex);
+
+      Wm3::Vec3f rotatedPivot{};
+      (void)MultQuadVec(&rotatedPivot, &mPivot, &targetBoneWorld.orient_);
+
+      const Wm3::Vec3f desiredPos{
+        targetBoneWorld.pos_.x - rotatedPivot.x,
+        targetBoneWorld.pos_.y - rotatedPivot.y,
+        targetBoneWorld.pos_.z - rotatedPivot.z,
+      };
+
+      const Wm3::Vec3f& goalPos = mGoalUnit.GetObjectPtr()->GetPosition();
+      const float displacement = std::sqrt(
+        ((goalPos.x - desiredPos.x) * (goalPos.x - desiredPos.x)) +
+        ((goalPos.y - desiredPos.y) * (goalPos.y - desiredPos.y)) +
+        ((goalPos.z - desiredPos.z) * (goalPos.z - desiredPos.z))
+      );
+      if (displacement > pose->mMaxOffset) {
+        pose->mMaxOffset = displacement;
+      }
+
+      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.mBegin->mBoneIndex);
+          bone != nullptr) {
+        bone->mCompositeIsLocal = 1;
+        bone->mPose->MarkBoneDirty(bone->mIdx);
+
+        bone->mLocalTransform.orient_ = targetBoneWorld.orient_;
+        bone->mLocalTransform.pos_ = desiredPos;
+        bone->mPose->MarkBoneDirty(bone->mIdx);
+      }
+    } else {
+      if (CAniPoseBone* const bone = ResolvePoseBoneByIndex(pose, mWatchBones.mBegin->mBoneIndex);
+          bone != nullptr) {
+        bone->mLocalTransform.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
+        bone->mLocalTransform.pos_ = Wm3::Vec3f(0.0f, -10000.0f, 0.0f);
+        bone->mPose->MarkBoneDirty(bone->mIdx);
+      }
+      pose->mMaxOffset = -std::numeric_limits<float>::infinity();
+    }
+  }
+
+  /**
+   * Address: 0x00634700 (FUN_00634700)
+   *
+   * IDA signature:
+   * unsigned int __usercall sub_634700@<eax>(int this@<ebx>);
+   *
+   * What it does:
+   * Seeds `mPivot` with the per-component midpoint of the watched bone's
+   * skeleton-space bounding box (center of the SAniSkelBone min/max bounds).
+   */
+  void CBoneEntityManipulator::InitPivotFromBoneBounds()
+  {
+    const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+    const CAniSkel* const skel = skeleton.get();
+    if (skel == nullptr) {
+      return;
+    }
+
+    const SAniSkelBone* const bone =
+      skel->GetBone(static_cast<std::uint32_t>(mWatchBones.mBegin->mBoneIndex));
+    if (bone == nullptr) {
+      return;
+    }
+
+    mPivot.x = (bone->mBoundsMinX + bone->mBoundsMaxX) * 0.5f;
+    mPivot.y = (bone->mBoundsMinY + bone->mBoundsMaxY) * 0.5f;
+    mPivot.z = (bone->mBoundsMinZ + bone->mBoundsMaxZ) * 0.5f;
   }
 
   /**

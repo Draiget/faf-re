@@ -12,6 +12,7 @@
 #include "Wm3Vector3.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/entity/Entity.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CBuilderArmManipulator.h"
@@ -45,6 +46,7 @@ namespace moho
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* state);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
+  int cfunc_EntityAttachBoneToEntityBoneL(LuaPlus::LuaState* state);
   int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* luaContext);
   int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* state);
   int cfunc_CBuilderArmManipulatorGetHeadingPitch(lua_State* luaContext);
@@ -1215,6 +1217,64 @@ namespace moho
       kCBoneEntityManipulatorSetPivotHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00634E80 (FUN_00634E80, cfunc_EntityAttachBoneToEntityBone)
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context to its bound LuaPlus::LuaState and
+   * forwards to `cfunc_EntityAttachBoneToEntityBoneL`.
+   */
+  int cfunc_EntityAttachBoneToEntityBone(lua_State* const luaContext)
+  {
+    return cfunc_EntityAttachBoneToEntityBoneL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00634F00 (FUN_00634F00, cfunc_EntityAttachBoneToEntityBoneL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_EntityAttachBoneToEntityBoneL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Reads `(unit, unitBone, targetEntity, targetBone, keepMark)`, resolves the
+   * owning unit and its Entity subobject, resolves the watched bone on the unit
+   * (no nil/special indices) and the reference bone on the target entity (nil/
+   * special allowed), reads the keep-interp-mark flag, and constructs one new
+   * `CBoneEntityManipulator` pinning the unit bone to the target entity bone.
+   * Pushes the manipulator's Lua userdata onto the stack as the return value.
+   */
+  int cfunc_EntityAttachBoneToEntityBoneL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(
+        state, kLuaExpectedArgsWarning, kEntityAttachBoneToEntityBoneHelpText, 5, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const goalUnit = SCR_FromLua_Unit(unitObject);
+    Entity* const goalEntity = goalUnit != nullptr ? static_cast<Entity*>(goalUnit) : nullptr;
+
+    LuaPlus::LuaStackObject unitBoneArg(state, 2);
+    const int watchedBoneIndex = ENTSCR_ResolveBoneIndex(goalEntity, unitBoneArg, false);
+
+    const LuaPlus::LuaObject targetEntityObject(LuaPlus::LuaStackObject(state, 3));
+    Entity* const targetEntity = SCR_FromLua_Entity(targetEntityObject, state);
+
+    LuaPlus::LuaStackObject targetBoneArg(state, 4);
+    const int referenceBoneIndex = ENTSCR_ResolveBoneIndex(targetEntity, targetBoneArg, true);
+
+    LuaPlus::LuaStackObject keepMarkArg(state, 5);
+    const bool markSkipInterp = keepMarkArg.GetBoolean();
+
+    CBoneEntityManipulator* const manipulator = new CBoneEntityManipulator(
+      targetEntity, goalUnit, watchedBoneIndex, referenceBoneIndex, markSkipInterp
+    );
+    manipulator->mLuaObj.PushStack(state);
+    return 1;
   }
 
   /**
