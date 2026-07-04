@@ -276,6 +276,17 @@ namespace moho
   int cfunc_GetSessionClients(lua_State* luaContext);
 
   /**
+   * Address: 0x0088D540 (FUN_0088D540, cfunc_GetSessionClientsL)
+   *
+   * What it does:
+   * Builds and returns a Lua table describing every client in the active
+   * session (name, uid, connected, ping, quiet, local, maxSP,
+   * authorizedCommandSources, ejectedBy). Returns nil when no session driver
+   * is active.
+   */
+  int cfunc_GetSessionClientsL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0088D4E0 (FUN_0088D4E0, func_GetSessionClients_LuaFuncDef)
    *
    * What it does:

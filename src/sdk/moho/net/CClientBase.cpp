@@ -552,15 +552,14 @@ void CClientBase::Eject()
 /**
  * Address: 0x0053CC60 (FUN_0053CC60)
  */
-void CClientBase::CollectPendingIds(msvc8::vector<int>& out)
+void CClientBase::CollectEjecters(msvc8::vector<const CClientBase*>& out)
 {
   std::scoped_lock lock(mManager->mLock);
 
   out.clear();
   out.reserve(mEjectRequests.size());
   for (const SEjectRequest& request : mEjectRequests) {
-    const auto ptr = reinterpret_cast<std::uintptr_t>(request.mRequester);
-    out.push_back(static_cast<int>(ptr));
+    out.push_back(request.mRequester);
   }
 }
 
