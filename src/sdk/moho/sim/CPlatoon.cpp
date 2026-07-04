@@ -6042,6 +6042,114 @@ namespace moho
   }
 
   /**
+   * Address: 0x00729A70 (FUN_00729A70, Moho::CPlatoon::UseFerryBeacon)
+   *
+   * IDA signature:
+   * gpg::fastvector_shared_ptr_CUnitCommand* __userpurge
+   *   CPlatoon::UseFerryBeacon(EntityCategory* cat@<edi>, CPlatoon* this,
+   *                            gpg::fastvector* out, int beacon);
+   *
+   * What it does:
+   * Scans every squad class (1..5) of the platoon and collects the alive,
+   * not-being-built, mobile units whose blueprint ordinal is a member of
+   * `category` into a single set, then issues one UNITCOMMAND_TransportLoadUnits
+   * targeted at the ferry-beacon entity so those units load onto the beacon.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UseFerryBeacon(const EntityCategorySet* const category, Unit* const beacon)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    SEntitySetTemplateUnit loadableUnits{};
+    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
+      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+          continue;
+        }
+
+        SEntitySetTemplateUnit squadUnits{};
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
+          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt() || !unit->IsMobile()) {
+            continue;
+          }
+          // The category bitset is keyed by the blueprint's category-bit index
+          // (REntityBlueprint::mCategoryBitIndex, +0x5C -- the decompiler's
+          // "mBlueprintOrdinal" on the RUnitBlueprint returned by GetBlueprint).
+          const std::uint32_t ordinal = unit->GetBlueprint()->mCategoryBitIndex;
+          if (category->mBits.Contains(ordinal)) {
+            (void)loadableUnits.AddUnit(unit);
+          }
+        }
+        break;
+      }
+    }
+
+    if (!loadableUnits.Empty()) {
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(beacon->id_);
+      commandIssueData.mTarget.mPos.x = 0.0f;
+      commandIssueData.mTarget.mPos.y = 0.0f;
+      commandIssueData.mTarget.mPos.z = 0.0f;
+
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, loadableUnits, commandIssueData, false);
+      if (issuedCommand != nullptr) {
+        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      }
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x00731A30 (FUN_00731A30, cfunc_CPlatoonUseFerryBeaconL)
+   *
+   * What it does:
+   * Parses `(platoon, category, beacon)`, resolves the reflected `EntityCategorySet`
+   * and the beacon unit, issues the load orders via `CPlatoon::UseFerryBeacon`,
+   * returns the issued commands as a Lua array, then releases the weak command links.
+   */
+  int cfunc_CPlatoonUseFerryBeaconL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kUseFerryBeaconHelpText, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+    const EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    const LuaPlus::LuaObject beaconObject(LuaPlus::LuaStackObject(state, 3));
+    Unit* const beacon = SCR_FromLua_Unit(beaconObject);
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseFerryBeacon(category, beacon);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x007319B0 (FUN_007319B0, cfunc_CPlatoonUseFerryBeacon)
    *
    * What it does:
