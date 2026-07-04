@@ -91,6 +91,9 @@ namespace
   // Sentinel entity id for ground-target commands (mirrors the value in
   // CCommandLuaFunctionRegistrations.cpp; the engine uses -0x10000000).
   constexpr std::int32_t kGroundTargetEntitySentinel = -0x10000000;
+  // All-squad-classes sentinel used by the patrol/attack/move Lua bindings: applies
+  // to every assigned squad class. Not one of the ESquadClass enum's named members.
+  constexpr std::int32_t kAllSquadClassesSentinel = 6;
   constexpr std::uintptr_t kSquadUnitOwnerBias = 0x8;
   constexpr int kLuaNumberTypeTag = 3;
 
@@ -4502,6 +4505,159 @@ namespace moho
   }
 
   /**
+   * What it does:
+   * Issues one attack order over `units` against `target`. When a formation
+   * script resolved and the set holds more than one unit, issues
+   * UNITCOMMAND_FormAttack carrying the formation script index + identity
+   * orientation; otherwise a plain UNITCOMMAND_Attack. The target is an entity
+   * (AITARGET_Entity, zero position). Appends the issued command (if any) to
+   * `issuedCommands`. Shared by both CPlatoon::AttackTarget dispatch branches.
+   */
+  static void IssuePlatoonAttackCommand(
+    Sim* const sim,
+    SEntitySetTemplateUnit& units,
+    Entity* const target,
+    const int formationScriptIndex,
+    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+  )
+  {
+    const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
+
+    SSTICommandIssueData commandIssueData(
+      useFormation ? EUnitCommandType::UNITCOMMAND_FormAttack : EUnitCommandType::UNITCOMMAND_Attack
+    );
+    commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
+    commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(target->id_);
+    commandIssueData.mTarget.mPos.x = 0.0f;
+    commandIssueData.mTarget.mPos.y = 0.0f;
+    commandIssueData.mTarget.mPos.z = 0.0f;
+
+    if (useFormation) {
+      commandIssueData.unk38 = formationScriptIndex;  // FormAttack formation-script lane
+      commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+      commandIssueData.unk4C = 1.0f;                   // FormAttack orientation weight
+    }
+
+    CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
+    if (issuedCommand != nullptr) {
+      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+    }
+  }
+
+  /**
+   * Address: 0x00727F50 (FUN_00727F50, Moho::CPlatoon::AttackTarget)
+   *
+   * IDA signature:
+   * void __stdcall CPlatoon::AttackTarget(CPlatoon *this,
+   *     msvc8::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
+   *     ESquadClass squadClass)
+   *
+   * What it does:
+   * Orders the platoon to attack `target`. If the platoon has a named formation
+   * it attacks as one formation set (whole platoon); otherwise it attacks with
+   * each requested attack-capable squad class independently (Attack and Artillery
+   * only -- classes 1..2, or both when `squadClass` is the all-classes sentinel).
+   * Each set is issued as FormAttack when a formation script resolves and it holds
+   * more than one unit, else a plain Attack. Returns the issued command weak-links.
+   */
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::AttackTarget(Entity* const target, const ESquadClass squadClass)
+  {
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+
+    CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
+
+    if (mFormation.empty()) {
+      // Per-squad attack: only the Attack (1) and Artillery (2) squad classes.
+      const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+      for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
+        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
+            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+          continue;
+        }
+
+        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
+          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
+            continue;
+          }
+
+          SEntitySetTemplateUnit squadUnits{};
+          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+          const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
+          IssuePlatoonAttackCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
+          break;
+        }
+      }
+    } else {
+      // Platoon-wide formation attack.
+      SEntitySetTemplateUnit platoonUnits{};
+      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(this), platoonUnits);
+      const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
+      IssuePlatoonAttackCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
+    }
+
+    return issuedCommands;
+  }
+
+  /**
+   * Address: 0x0072FB60 (FUN_0072FB60, cfunc_CPlatoonAttackTargetL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Resolves `(platoon, targetEntity[, squadClass])` and issues the attack via
+   * `CPlatoon::AttackTarget`, returning the issued commands as a Lua array. The
+   * squad class defaults to the all-classes sentinel; arg 3 overrides it.
+   */
+  int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 2 || argumentCount > 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kAttackTargetHelpText, 2, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+    Entity* const target = SCR_FromLua_Entity(targetObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    if (lua_gettop(state->m_state) > 2) {
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+      const char* const squadClassName = lua_tostring(state->m_state, 3);
+      if (squadClassName == nullptr) {
+        LuaPlus::LuaStackObject typeErrorArg(state, 3);
+        LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+      }
+      SCR_GetEnum(state, squadClassName, enumRef);
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AttackTarget(target, squadClass);
+
+    LuaPlus::LuaObject commandTable{};
+    commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
+
+    int commandIndex = 1;
+    for (const WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      commandTable.Insert(commandIndex, command->mArgs);
+      ++commandIndex;
+    }
+
+    commandTable.PushStack(state);
+
+    for (WeakPtr<CUnitCommand>& commandLink : issuedCommands) {
+      commandLink.ResetFromObject(nullptr);
+    }
+
+    return 1;
+  }
+
+  /**
    * Address: 0x0072FAE0 (FUN_0072FAE0, cfunc_CPlatoonAttackTarget)
    *
    * What it does:
@@ -4986,10 +5142,6 @@ namespace moho
     );
     return &binder;
   }
-
-  // All-squad-classes sentinel used by the patrol/move Lua bindings: patrols every
-  // assigned squad class (1..5). Not one of the ESquadClass enum's named members.
-  constexpr std::int32_t kAllSquadClassesSentinel = 6;
 
   /**
    * What it does:

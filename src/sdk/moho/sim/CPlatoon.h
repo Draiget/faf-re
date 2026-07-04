@@ -255,6 +255,17 @@ namespace moho
     void Patrol(Wm3::Vector3f& target, ESquadClass squadClass);
 
     /**
+     * Address: 0x00727F50 (FUN_00727F50, Moho::CPlatoon::AttackTarget)
+     *
+     * What it does:
+     * Orders the platoon to attack `target`: the whole platoon as one formation
+     * set when it has a named formation, otherwise the Attack/Artillery squad
+     * classes independently. Uses FormAttack (with the resolved formation script)
+     * when applicable, else Attack. Returns the issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AttackTarget(Entity* target, ESquadClass squadClass);
+
+    /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
      *
      * What it does:
