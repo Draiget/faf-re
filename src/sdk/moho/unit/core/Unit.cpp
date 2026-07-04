@@ -11341,6 +11341,65 @@ namespace
     return cached;
   }
 
+  // Lazy reflected-type caches used by SSTIUnitVariableData::MemberDeserialize.
+  // Mirror the binary's `if (!X::sType) X::sType = gpg::LookupRType(&X RTTI)`
+  // idiom at FUN_0055E030; typeid(T) resolves to the same ??_R0 descriptor the
+  // binary passes to LookupRType.
+  [[nodiscard]] gpg::RType* CachedEntIdType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(EntId));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSEconValueType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(SEconValue));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitAttributesType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(UnitAttributes));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitWeaponInfoVectorType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(SSTIUnitWeaponInfoVector));
+    }
+    return cached;
+  }
+
+  // Re-expresses the binary's inline shared-pointer load (which passes the
+  // shared_ptr storage straight to gpg::ReadArchive::ReadPointerShared_CAniPose)
+  // through the SharedPtrRaw view, matching SSTIEntityVariableData.cpp's
+  // ReadSharedRScmResourcePointer wrapper.
+  void ReadSharedCAniPosePointer(
+    boost::shared_ptr<moho::CAniPose>& outPointer,
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
+  {
+    static_assert(
+      sizeof(boost::shared_ptr<moho::CAniPose>) == sizeof(boost::SharedPtrRaw<moho::CAniPose>),
+      "boost::shared_ptr<CAniPose> must match legacy raw shared-pointer layout"
+    );
+
+    auto& rawPointer = *reinterpret_cast<boost::SharedPtrRaw<moho::CAniPose>*>(&outPointer);
+    gpg::ReadPointerShared_CAniPose(rawPointer, archive, ownerRef);
+  }
+
   class UnitWeaponInfoTypeInfo final : public gpg::RType
   {
   public:
@@ -11948,6 +12007,77 @@ void UnitWeaponInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteFloat(mEffectiveRadius);
   archive->WriteString(const_cast<msvc8::string*>(&mUIMinRangeVisualId));
   archive->WriteString(const_cast<msvc8::string*>(&mUIMaxRangeVisualId));
+}
+
+/**
+ * Address: 0x0055E030 (FUN_0055E030, Moho::SSTIUnitVariableData::MemberDeserialize)
+ *
+ * IDA signature:
+ * int __usercall sub_55E030@<eax>(int this@<eax>, gpg::ReadArchive* archive@<esi>);
+ *
+ * What it does:
+ * Loads the full reflected unit variable-data payload from one archive in the
+ * serializer's field order. mCommands/mBuildQueue (+0x98/+0xC8) are runtime
+ * command queues and are deliberately not serialized (the binary skips them).
+ */
+void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  archive->Read(CachedEntIdType(), &mCreator, ownerRef);
+  archive->ReadInt(&mCreationTick);
+  archive->ReadBool(&mAutoMode);
+  archive->ReadBool(&mAutoSurfaceMode);
+  archive->ReadBool(&mIsBusy);
+  archive->ReadFloat(&mFuelRatio);
+  archive->ReadFloat(&mShieldRatio);
+  archive->ReadInt(&mStunTicks);
+  archive->ReadBool(&mIsPaused);
+  archive->ReadBool(&mIsValidTarget);
+  archive->ReadBool(&mRepeatQueue);
+  // Binary reads mJobType/mFireState via the reflected Moho::EJobType /
+  // Moho::EFireState enum RTypes; those enums are not modeled in the SDK, and
+  // for a 4-byte enum-storage lane the reflected read is byte-identical to a
+  // plain 32-bit read, so ReadInt preserves the exact stream behavior.
+  archive->ReadInt(&mJobType);
+  archive->ReadInt(&mFireState);
+  archive->ReadFloat(&mWorkProgress);
+
+  // Binary emits a 2-iteration, stride-4 interleaved loop over the tactical/
+  // nuke silo-count pairs (base +0x30, reads cursor-8 / cursor / cursor+8 each
+  // iteration). That yields the exact stream order below.
+  archive->ReadInt(&mTacticalSiloBuildCount);
+  archive->ReadInt(&mTacticalSiloStorageCount);
+  archive->ReadInt(&mTacticalSiloMaxStorageCount);
+  archive->ReadInt(&mNukeSiloBuildCount);
+  archive->ReadInt(&mNukeSiloStorageCount);
+  archive->ReadInt(&mNukeSiloMaxStorageCount);
+
+  archive->Read(CachedEntIdType(), &mUnknown40, ownerRef);
+  archive->ReadString(&mCustomName);
+
+  archive->Read(CachedSEconValueType(), &mProduced, ownerRef);
+  archive->Read(CachedSEconValueType(), &mResourcesSpent, ownerRef);
+  archive->Read(CachedSEconValueType(), &mMaintainenceCost, ownerRef);
+
+  archive->Read(CachedEntIdType(), &mFocusUnit, ownerRef);
+  archive->Read(CachedEntIdType(), &mGuardedUnit, ownerRef);
+  archive->Read(CachedEntIdType(), &mTargetBlip, ownerRef);
+
+  ReadSharedCAniPosePointer(mPriorSharedPose, archive, ownerRef);
+  ReadSharedCAniPosePointer(mSharedPose, archive, ownerRef);
+
+  archive->Read(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
+  archive->Read(CachedUnitAttributesType(), &mAttributes, ownerRef);
+
+  archive->ReadInt(reinterpret_cast<int*>(&mScriptbits));
+  archive->ReadInt64(reinterpret_cast<__int64*>(&mUnitStates));
+  archive->ReadBool(&mDidRefresh);
+  archive->ReadBool(&mOverchargePaused);
 }
 
 namespace moho
