@@ -76,6 +76,15 @@ namespace moho
     SBuildTemplateInfo* mCapacity;      // +0x08
     SBuildTemplateInfo* mOriginalStart; // +0x0C
     std::uint8_t mInlineStorage[0x2C0]; // +0x10 (16 * sizeof(SBuildTemplateInfo), 0x2C each)
+
+    // gpg::fastvector_n<SBuildTemplateInfo, 16> behaviour. Declared as named
+    // methods (not ctor/dtor) so the struct stays trivially-copyable POD for the
+    // callers that manipulate the lanes directly; defined out-of-line in
+    // CWldSession.cpp where the inline-buffer growth/teardown helpers live.
+    void InitInlineStorage() noexcept;                     // rebind lanes to the inline buffer (empty)
+    void PushBack(const SBuildTemplateInfo& info);         // append one entry, growing off-inline as needed
+    void DestroyStorage();                                 // destroy entries + free any spilled buffer
+    [[nodiscard]] bool Empty() const noexcept { return mFinish == mStart; }
   };
 
   static_assert(sizeof(SBuildTemplateBuffer) == 0x2D0, "SBuildTemplateBuffer size must be 0x2D0");
