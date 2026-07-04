@@ -20830,6 +20830,29 @@ moho::CScrLuaInitForm* moho::func_SetOverlayFilters_LuaFuncDef()
 }
 
 /**
+ * Address: 0x008471C0 (FUN_008471C0, cfunc_GenerateBuildTemplateFromSelection)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_GenerateBuildTemplateFromSelection(LuaPlus::LuaState *a1);
+ *
+ * What it does:
+ * Lua callback for the global `GenerateBuildTemplateFromSelection()` binding.
+ * Resolves the LuaPlus state wrapper (result unused) and, when a world session
+ * is active, regenerates its build templates from the current selection.
+ * Pushes no return values.
+ */
+int moho::cfunc_GenerateBuildTemplateFromSelection(lua_State* const luaContext)
+{
+  (void)LuaPlus::LuaState::CastState(luaContext);
+
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    session->GenerateBuildTemplates();
+  }
+
+  return 0;
+}
+
+/**
  * Address: 0x008471F0 (FUN_008471F0, func_GenerateBuildTemplateFromSelection_LuaFuncDef)
  *
  * What it does:
