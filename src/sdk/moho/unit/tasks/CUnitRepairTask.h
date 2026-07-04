@@ -65,6 +65,23 @@ namespace moho
      */
     CUnitRepairTask(IAiCommandDispatchImpl* dispatchTask, Unit* targetUnit, bool isSiloBuild);
 
+    /**
+     * Address: 0x005F8E20 (FUN_005F8E20, ??1CUnitRepairTask@Moho@@QAE@@Z body)
+     * Scalar deleting dtor thunk: 0x005F8FE0 (FUN_005F8FE0, vtable slot 0)
+     *
+     * IDA signature:
+     * int __stdcall Moho::CUnitRepairTask::~CUnitRepairTask(Moho::CUnitRepairTask *this);
+     *
+     * What it does:
+     * Runs the "ClearWork" unit script, detaches the embedded command-event
+     * listener, clears the owner unit's repairing state bit, zeros its work
+     * progress and builder aim target, releases the reserved ogrid footprint
+     * when still held mid-prep, clears the build-target unit's no-reclaim bit,
+     * stops the shared build helper, records the task's dispatch result, and
+     * unlinks the build-target/target weak lanes before base/member teardown.
+     */
+    ~CUnitRepairTask() override;
+
   public:
     CBuildTaskHelper mBuildHelper;  // 0x40
     CUnitCommand* mCommand;         // 0x84
