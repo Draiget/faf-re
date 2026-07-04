@@ -55,7 +55,6 @@ namespace moho
   int cfunc_IssueDockCommandL(LuaPlus::LuaState*) { return 0; }
   int cfunc_OpenURLL(LuaPlus::LuaState*) { return 0; }
   int cfunc_UISelectionByCategoryL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_UIZoomToL(LuaPlus::LuaState*) { return 0; }
 }
 
 namespace moho

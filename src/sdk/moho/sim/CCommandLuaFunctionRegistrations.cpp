@@ -1,8 +1,10 @@
 #include "moho/sim/CCommandLuaFunctionRegistrations.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -2236,6 +2238,115 @@ namespace moho
   int cfunc_UIZoomTo(lua_State* const luaContext)
   {
     return cfunc_UIZoomToL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00867240 (FUN_00867240, cfunc_UIZoomToL)
+   *
+   * IDA signature:
+   * int __usercall cfunc_UIZoomToL@<eax>(LuaPlus::LuaState *state@<ebx>);
+   *
+   * What it does:
+   * Implements `UIZoomTo(units,[seconds])`. Validates arg count (1..2). When the
+   * world session is live and a `WorldCamera` exists, walks the Lua unit table,
+   * resolves each element via `GetUserUnitOptional`, and accumulates the
+   * world-space XZ bounds plus the Y centroid over all resolved units. When at
+   * least one unit contributed, builds a world-space AABB centered on the XZ
+   * min/max and the average Y, expanded by a fixed 20-unit margin on every face
+   * (half-extent = 0.5 * max(spanX, spanZ)), and frames it through
+   * `CameraImpl::TargetBox(box, seconds)` followed by `TargetNothing()`.
+   * `seconds` defaults to 0 and is read from arg 2 when present. Reports the
+   * localized "<LOC _No_session>" line when no session is active and
+   * "UISelectAndZoomTo: No world camera found." when the world camera is missing.
+   */
+  int cfunc_UIZoomToL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 1 || argumentCount > 2) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        kUIZoomToHelpText, 1, 2, argumentCount
+      );
+    }
+
+    if (WLD_GetActiveSession() == nullptr) {
+      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      CON_Printf("%s", noSessionText.c_str());
+      return 0;
+    }
+
+    RCamManager* const cameraManager = CAM_GetManager();
+    CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
+    if (camera == nullptr) {
+      CON_Printf("UISelectAndZoomTo: No world camera found.");
+      return 0;
+    }
+
+    const LuaPlus::LuaObject unitTable(LuaPlus::LuaStackObject(state, 1));
+    if (!unitTable.IsTable() || unitTable.GetCount() <= 0) {
+      return 0;
+    }
+
+    constexpr float kPositiveInfinity = std::numeric_limits<float>::infinity();
+    constexpr float kNegativeInfinity = -std::numeric_limits<float>::infinity();
+    constexpr float kBoxMargin = 20.0f;
+
+    float minX = kPositiveInfinity;
+    float maxX = kNegativeInfinity;
+    float minZ = kPositiveInfinity;
+    float maxZ = kNegativeInfinity;
+    float sumY = 0.0f;
+    float count = 0.0f;
+
+    const int unitCount = unitTable.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = unitTable[unitIndex];
+      UserUnit* const unit = GetUserUnitOptional(unitObject, state);
+      if (unit == nullptr) {
+        continue;
+      }
+
+      const Wm3::Vec3f& position = GetIUnitBridge(unit)->GetPosition();
+      minZ = std::min(minZ, position.z);
+      maxZ = std::max(maxZ, position.z);
+      minX = std::min(minX, position.x);
+      maxX = std::max(maxX, position.x);
+      sumY += position.y;
+      count += 1.0f;
+    }
+
+    if (count <= 0.0f) {
+      return 0;
+    }
+
+    const float averageY = sumY / count;
+    const float spanX = maxX - minX;
+    const float spanZ = maxZ - minZ;
+    const float halfExtent = std::max(spanX, spanZ) * 0.5f;
+
+    Wm3::AxisAlignedBox3f targetBox{};
+    targetBox.Min.x = minX - kBoxMargin;
+    targetBox.Min.y = (averageY - halfExtent) - kBoxMargin;
+    targetBox.Min.z = minZ - kBoxMargin;
+    targetBox.Max.x = maxX + kBoxMargin;
+    targetBox.Max.y = (averageY + halfExtent) + kBoxMargin;
+    targetBox.Max.z = maxZ + kBoxMargin;
+
+    float seconds = 0.0f;
+    if (lua_gettop(rawState) == 2) {
+      const LuaPlus::LuaStackObject secondsArg(state, 2);
+      seconds = static_cast<float>(secondsArg.GetNumber());
+    }
+
+    camera->TargetBox(targetBox, seconds);
+    camera->TargetNothing();
+    return 0;
   }
 
   /**

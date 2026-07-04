@@ -30,6 +30,7 @@ namespace moho
   struct UserUnitManager;
   struct UserCommand;
   class UserUnitWeapon;
+  class IUnit;
   class CWldSession;
   struct RUnitBlueprint;
   struct SCoordsVec2;
@@ -762,6 +763,21 @@ namespace moho
     const RUnitBlueprint* unitBlueprint,
     const Wm3::Vector3f& worldPosition
   );
+
+  /**
+   * Address: 0x008377E0 (FUN_008377E0, func_GetUserUnitOpt)
+   *
+   * What it does:
+   * Converts one Lua object to `UserUnit*`, raising Lua errors for missing or
+   * type-mismatched game-object payloads while allowing destroyed-object slots.
+   */
+  [[nodiscard]] UserUnit* GetUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+
+  /**
+   * Typed accessor for the embedded IUnit bridge subobject at UserUnit+0x148.
+   */
+  [[nodiscard]] const IUnit* GetIUnitBridge(const UserUnit* self) noexcept;
+  [[nodiscard]] IUnit* GetIUnitBridge(UserUnit* self) noexcept;
 
   /**
    * Address: 0x008C2010 (FUN_008C2010, cfunc_UserUnitCanAttackTarget)
