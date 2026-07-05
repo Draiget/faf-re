@@ -226,16 +226,18 @@ namespace
     return CachedType<moho::CProjectileAttributes>(moho::CProjectileAttributes::sType);
   }
 
-  [[nodiscard]] gpg::RType* CachedProjectileType()
+  [[nodiscard]] [[maybe_unused]] gpg::RType* CachedProjectileType()
   {
     return CachedType<moho::Projectile>(moho::Projectile::sType);
   }
 
   [[nodiscard]] gpg::RRef MakeProjectileRef(moho::Projectile* const object)
   {
+    // Delegates to the recovered gpg::RRef_Projectile (FUN_0069FEA0), which
+    // performs the polymorphic derived-type normalization the earlier inline
+    // stand-in elided.
     gpg::RRef out{};
-    out.mObj = object;
-    out.mType = CachedProjectileType();
+    gpg::RRef_Projectile(&out, object);
     return out;
   }
 
