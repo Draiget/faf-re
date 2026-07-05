@@ -3658,6 +3658,76 @@ namespace moho
   }
 
   /**
+   * Address: 0x005709A0 (FUN_005709A0, Moho::SOffsetInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Read mirror of `MemberSerialize`: reads the unit-offset map, formation
+   * position, four 2D coordinate lanes, two flags, two scalars, and the owning
+   * unit weak-link, each through its reflected RTTI serializer.
+   */
+  void SOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    GPG_ASSERT(mapType != nullptr);
+    if (mapType) {
+      archive->Read(mapType, this, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Read(vectorType, &mPos, ownerRef);
+    }
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &mCoords1, ownerRef);
+      archive->Read(coordsType, &mCoords2, ownerRef);
+      archive->Read(coordsType, &mCoords3, ownerRef);
+      archive->Read(coordsType, &mCoords4, ownerRef);
+    }
+
+    // mFlagA/mFlagB are 1-byte fields written via WriteBool; read back through a
+    // bool lane (matches the binary's ReadBool into the byte).
+    bool flagA = false;
+    archive->ReadBool(&flagA);
+    mFlagA = flagA ? 1u : 0u;
+    bool flagB = false;
+    archive->ReadBool(&flagB);
+    mFlagB = flagB ? 1u : 0u;
+
+    archive->ReadFloat(&mScalarA);
+    archive->ReadFloat(&mScalarB);
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Read(weakPtrType, &mUnit, ownerRef);
+    }
+  }
+
+  /**
+   * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Static reflection serializer callback: forwards one `SOffsetInfo` payload
+   * to `SOffsetInfo::MemberDeserialize`.
+   */
+  void SOffsetInfoSerializer::Deserialize(gpg::ReadArchive* const archive, SOffsetInfo* const offsetInfo)
+  {
+    if (offsetInfo != nullptr) {
+      offsetInfo->MemberDeserialize(archive);
+    }
+  }
+
+  /**
    * Address: 0x0059BD60 (FUN_0059BD60, ??3CAiFormationInstance@Moho@@QAE@@Z)
    *
    * What it does:

@@ -197,6 +197,7 @@ namespace moho
   class REmitterCurveKey;
   class REmitterBlueprintCurve;
   struct REmitterBlueprint;
+  class Projectile;
   struct RProjectileBlueprint;
   struct RTrailBlueprint;
   class RRuleGameRules;
@@ -2330,6 +2331,15 @@ namespace gpg
    * pointer with derived-type normalization.
    */
   RRef* RRef_RProjectileBlueprint(RRef* out, moho::RProjectileBlueprint* value);
+
+  /**
+   * Address: 0x0069FEA0 (FUN_0069FEA0, gpg::RRef_Projectile)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::Projectile` object pointer with
+   * derived-type normalization (via the polymorphic `sType`/typeid cache).
+   */
+  RRef* RRef_Projectile(RRef* out, moho::Projectile* value);
 
   /**
    * Address: 0x0051AAE0 (FUN_0051AAE0, gpg::RRef_RMeshBlueprint)

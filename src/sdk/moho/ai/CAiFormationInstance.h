@@ -150,6 +150,16 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x005709A0 (FUN_005709A0, Moho::SOffsetInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Read mirror of `MemberSerialize`: reads the whole unit-offset map,
+     * formation position, four 2D coordinate lanes, two flags, two scalars,
+     * and the owning unit weak-link, each through its reflected RTTI serializer.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     // std::map<EntId, SUnitOffsetInfo>; EntId is int32_t (see moho/entity/Entity.h).
     std::map<std::int32_t, SUnitOffsetInfo> mUnitOffsets; // +0x00
     Wm3::Vec3f mPos;                                       // +0x0C
@@ -188,6 +198,14 @@ namespace moho
      * Forwards one `SOffsetInfo` payload to `SOffsetInfo::MemberSerialize`.
      */
     static void Serialize(gpg::WriteArchive* archive, SOffsetInfo* offsetInfo);
+
+    /**
+     * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards one `SOffsetInfo` payload to `SOffsetInfo::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, SOffsetInfo* offsetInfo);
   };
 
   struct SFormationLaneEntry

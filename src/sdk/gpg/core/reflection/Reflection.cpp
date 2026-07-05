@@ -102,6 +102,7 @@
 #include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RTrailBlueprint.h"
+#include "moho/projectile/Projectile.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/CSimResources.h"
@@ -1610,6 +1611,7 @@ RType* CachedRBlueprintType()
   gpg::RType* gRTrailBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gRTrailBlueprintRRefCache{false, {}};
   thread_local TypeInfoCache3 gRProjectileBlueprintRRefCache{false, {}};
+  thread_local TypeInfoCache3 gProjectileRRefCache{false, {}};
   thread_local TypeInfoCache3 gRMeshBlueprintRRefCache{false, {}};
   gpg::RType* gRMeshBlueprintLODRRefType = nullptr;
   thread_local TypeInfoCache3 gRMeshBlueprintLODRRefCache{false, {}};
@@ -8246,6 +8248,25 @@ gpg::RRef* RRef_RProjectileBlueprint(RRef* const out, moho::RProjectileBlueprint
     typeid(moho::RProjectileBlueprint),
     moho::RProjectileBlueprint::sType,
     gRProjectileBlueprintRRefCache
+  );
+}
+
+/**
+ * Address: 0x0069FEA0 (FUN_0069FEA0, gpg::RRef_Projectile)
+ *
+ * What it does:
+ * Builds a reflected reference for one `moho::Projectile` object pointer.
+ * `moho::Projectile` is polymorphic, so `BuildTypedRefWithCache` resolves the
+ * runtime type via `typeid(*value)` and the per-type `sType`/TLS cache.
+ */
+gpg::RRef* RRef_Projectile(RRef* const out, moho::Projectile* const value)
+{
+  return BuildTypedRefWithCache<moho::Projectile>(
+    out,
+    value,
+    typeid(moho::Projectile),
+    moho::Projectile::sType,
+    gProjectileRRefCache
   );
 }
 
