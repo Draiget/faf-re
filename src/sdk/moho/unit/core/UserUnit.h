@@ -695,6 +695,47 @@ namespace moho
     ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept;
 
   /**
+   * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
+   *
+   * What it does:
+   * Clears one user-unit command-issue queue and pushes a reset marker entry,
+   * marking the resolved-link range dirty. Exposed so the client-side
+   * `ISSUE_Command` keystone (Sim.cpp) can reset a unit queue on a clearing
+   * command.
+   */
+  void ResetUserUnitManagerState(UserUnitManager* manager, std::int32_t commandType);
+
+  /**
+   * Address: 0x008B6DE0 (FUN_008B6DE0, struct_UserUnitManager::add)
+   *
+   * What it does:
+   * Appends one pending command-issue helper to a user-unit command queue and
+   * enqueues the matching select-unit update event. Exposed so the client-side
+   * `ISSUE_Command` keystone (Sim.cpp) can enqueue an issued command per unit.
+   */
+  void UserUnitManagerAdd(UserUnitManager* manager, UserCommandIssueHelper* helper, CmdId cmdId, bool clearFlag);
+
+  /**
+   * Address: 0x0081D030 (FUN_0081D030, struct_UserUnitManager queue-length accessor)
+   *
+   * What it does:
+   * Returns the number of resolved command-queue link entries currently held by
+   * one user-unit command manager (the depth the client-side `ISSUE_Command`
+   * keystone caps at 500 before enqueuing).
+   */
+  [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(UserUnitManager* managerPtr) noexcept;
+
+  /**
+   * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
+   *
+   * What it does:
+   * Appends a "select unit" local update event to one command-issue helper's
+   * ring queue (when needed) and inserts `unit` into that event's weak-set.
+   * Defined in Sim.cpp; declared here so `UserUnitManagerAdd` can invoke it.
+   */
+  void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* helper, CmdId cmdId, UserUnit* unit);
+
+  /**
    * VFTABLE: 0x00E4DB6C
    * COL:  0x00E9E888
    */

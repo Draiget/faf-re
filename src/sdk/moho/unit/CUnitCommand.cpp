@@ -669,16 +669,20 @@ namespace
   {
     return source->lane13C;
   }
+} // namespace
 
+namespace moho
+{
   /**
    * Address: 0x005527C0 (FUN_005527C0, struct_CommandIssueDataHelper::struct_CommandIssueDataHelper)
    *
    * What it does:
    * Initializes one published-command descriptor from issue-data lanes
    * (`nextCommandId`, orientation/aux scalars, blueprint, and Lua-object
-   * lexical payload).
+   * lexical payload). Exposed (namespace moho, declared in SSTICommandConstantData.h)
+   * so the client-side `ISSUE_Command` keystone can publish a command descriptor.
    */
-  [[maybe_unused]] SSTICommandConstantData* InitializePublishedCommandDescriptorFromIssueData(
+  SSTICommandConstantData* InitializePublishedCommandDescriptorFromIssueData(
     SSTICommandConstantData* const destination,
     const SSTICommandIssueData* const issueData
   )
@@ -691,6 +695,10 @@ namespace
     destination->unk2 = SCR_ToString(issueData->mObject);
     return destination;
   }
+} // namespace moho
+
+namespace
+{
 
   /**
    * Address: 0x006E7BD0 (FUN_006E7BD0, struct_CommandIssueDataHelper::cpy)

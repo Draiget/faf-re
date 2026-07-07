@@ -9,6 +9,7 @@
 namespace moho
 {
   struct REntityBlueprint;
+  struct SSTICommandIssueData;
 
   struct SSTICommandConstantData
   {
@@ -112,4 +113,18 @@ namespace moho
    * Constructs/preregisters RTTI metadata for `SSTICommandConstantData`.
    */
   [[nodiscard]] gpg::RType* preregister_SSTICommandConstantDataTypeInfo();
+
+  /**
+   * Address: 0x005527C0 (FUN_005527C0, struct_CommandIssueDataHelper::struct_CommandIssueDataHelper)
+   *
+   * What it does:
+   * Initializes one published-command descriptor (`destination`) from issue-data
+   * lanes (command id, orientation/aux scalars, blueprint, and Lua-object lexical
+   * payload) and returns `destination`. Defined in CUnitCommand.cpp; declared here
+   * so the client-side `ISSUE_Command` keystone (Sim.cpp) can publish a command.
+   */
+  SSTICommandConstantData* InitializePublishedCommandDescriptorFromIssueData(
+    SSTICommandConstantData* destination,
+    const SSTICommandIssueData* issueData
+  );
 } // namespace moho

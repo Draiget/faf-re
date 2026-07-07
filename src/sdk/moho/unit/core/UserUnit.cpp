@@ -2857,21 +2857,30 @@ namespace
 
     return &manager.resolvedLinks;
   }
+} // namespace
 
+namespace moho
+{
   /**
    * Address: 0x0081D030 (FUN_0081D030)
    *
    * What it does:
    * Returns the active user-command queue length (element count) by rebuilding
    * and resolving the current queue vector, then computing `(end - begin)`.
+   * Exposed (namespace moho, declared in UserUnit.h) so the client-side
+   * `ISSUE_Command` keystone (Sim.cpp) can enforce the 500-entry depth cap.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(
+  [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(
     UserUnitManager* const managerPtr
   ) noexcept
   {
     const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
     return static_cast<std::int32_t>(queueVector->end - queueVector->begin);
   }
+} // namespace moho
+
+namespace
+{
 
   [[nodiscard]] UserManagerHelperEntry* AllocateUserManagerHelperSlots(const std::uint32_t count)
   {
@@ -2883,6 +2892,15 @@ namespace
     return static_cast<UserManagerHelperEntry*>(::operator new(byteCount));
   }
 
+  /**
+   * Address: 0x008B79E0 (FUN_008B79E0, std::deque map-growth lane for the issue queue)
+   *
+   * What it does:
+   * Grows one user-manager issue-queue block map (the deque of 16-byte helper
+   * entries) by ~1.5x (min +8, clamped to 0x0FFFFFFF slots), re-homing existing
+   * block pointers into the freshly-allocated map by modulo-reindex. Behaviorally
+   * identical to the binary's 3-part memmove recentering (verified vs .asm).
+   */
   void GrowUserManagerIssueQueueMap(UserManagerIssueQueueRuntimeView& queue)
   {
     constexpr std::uint32_t kMaxMapSlots = 0x0FFFFFFFu;
@@ -2954,6 +2972,15 @@ namespace
     queue.blockCount = 0u;
   }
 
+  /**
+   * Address: 0x008B76D0 (FUN_008B76D0, std::queue<UserManagerHelperEntry>::push_back)
+   *
+   * What it does:
+   * Pushes one `UserManagerHelperEntry` (0x10 bytes) onto the tail of the
+   * user-manager issue-queue deque, growing the block map (GrowUserManagerIssueQueueMap)
+   * and allocating a fresh block (AllocateUserManagerHelperSlots) when the tail
+   * block is full.
+   */
   void PushUserManagerIssue(UserManagerIssueQueueRuntimeView& queue, const UserManagerHelperEntry& entry)
   {
     if (queue.blockCount <= (queue.size + 1u)) {
@@ -3031,33 +3058,6 @@ namespace
     ClearUserManagerIssueQueue(manager.issueQueue);
 
     (void)ResetQueueLinkVectorToInlineStorage(&manager.primaryLinks);
-  }
-
-  /**
-   * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
-   *
-   * What it does:
-   * Clears pending issue queue state, pushes one reset marker helper, marks the
-   * resolved range dirty, and restores resolved-link storage to inline mode.
-   */
-  [[maybe_unused]] void ResetUserUnitManagerState(UserUnitManager* const managerPtr, const std::int32_t commandType)
-  {
-    if (managerPtr == nullptr) {
-      return;
-    }
-
-    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
-    ClearUserManagerIssueQueue(manager.issueQueue);
-
-    UserManagerHelperEntry resetHelper{};
-    resetHelper.commandType = commandType;
-    resetHelper.isResetCommand = 1;
-    resetHelper.subject = nullptr;
-    resetHelper.sequenceOrCount = -1;
-    PushUserManagerIssue(manager.issueQueue, resetHelper);
-
-    manager.resolvedLinksDirty = 1u;
-    (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
   }
 
   /**
@@ -3872,6 +3872,70 @@ namespace moho
     }
 
     return static_cast<UserUnit*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x008B6DE0 (FUN_008B6DE0, struct_UserUnitManager::add)
+   *
+   * IDA signature:
+   * int *__userpurge struct_UserUnitManager::add@<eax>(
+   *     struct_UserUnitManager *a1@<edi>, _DWORD *eax0@<eax>, int a3, int a4);
+   *
+   * What it does:
+   * Records one pending command-issue for `manager`: appends a
+   * `UserManagerHelperEntry` {commandType=cmdId, isResetCommand=0,
+   * subject=helper, sequenceOrCount=clearFlag} onto the manager's issue queue,
+   * enqueues the helper's select-unit update event against the manager owner
+   * unit, marks the resolved-link range dirty, and restores that range to
+   * inline storage.
+   */
+  void UserUnitManagerAdd(
+    UserUnitManager* const manager,
+    UserCommandIssueHelper* const helper,
+    const CmdId cmdId,
+    const bool clearFlag)
+  {
+    auto& view = *reinterpret_cast<UserUnitManagerRuntimeView*>(manager);
+
+    UserManagerHelperEntry entry{};
+    entry.commandType = static_cast<std::int32_t>(cmdId);
+    entry.isResetCommand = 0;
+    entry.subject = helper;
+    entry.sequenceOrCount = static_cast<std::int32_t>(clearFlag);
+    PushUserManagerIssue(view.issueQueue, entry);
+
+    QueueCommandIssueSelectUnitEvent(helper, cmdId, view.ownerUnit);
+
+    view.resolvedLinksDirty = 1u;
+    (void)ResetQueueLinkVectorToInlineStorage(&view.resolvedLinks);
+  }
+
+  /**
+   * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
+   *
+   * What it does:
+   * Clears one user-unit command-issue queue and pushes a reset marker entry
+   * {commandType, isResetCommand=1, subject=null, sequenceOrCount=-1}, marks the
+   * resolved-link range dirty, and restores it to inline storage.
+   */
+  void ResetUserUnitManagerState(UserUnitManager* const managerPtr, const std::int32_t commandType)
+  {
+    if (managerPtr == nullptr) {
+      return;
+    }
+
+    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    ClearUserManagerIssueQueue(manager.issueQueue);
+
+    UserManagerHelperEntry resetHelper{};
+    resetHelper.commandType = commandType;
+    resetHelper.isResetCommand = 1;
+    resetHelper.subject = nullptr;
+    resetHelper.sequenceOrCount = -1;
+    PushUserManagerIssue(manager.issueQueue, resetHelper);
+
+    manager.resolvedLinksDirty = 1u;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
   }
 } // namespace moho
 

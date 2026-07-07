@@ -9411,6 +9411,65 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B05E0 (FUN_008B05E0,
+   * ?ISSUE_Command@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * IDA signature:
+   * void __usercall Moho::ISSUE_Command(WeakSet_UserEntity *entities@<ebx>,
+   *     SSTICommandIssueData *data, BOOL clearQueue);
+   *
+   * What it does:
+   * Converts one selected weak-set of user entities into live `UserUnit*` lanes
+   * (inline-buffered fastvector, capacity pre-reserved from the set size) and
+   * forwards to the explicit-unit `ISSUE_Command(fastvector)` overload, which
+   * takes the command payload by value (copy-constructed on the stack here).
+   */
+  void ISSUE_Command(
+    const SSelectionSetUserEntity& entities,
+    const SSTICommandIssueData& commandIssueData,
+    const bool clearQueue
+  )
+  {
+    gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
+    const std::int32_t entityCount = entities.size();
+    if (entityCount > 0) {
+      selectedUnits.reserve(static_cast<std::size_t>(entityCount));
+    }
+
+    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
+    SSelectionNodeUserEntity* node = nullptr;
+    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
+    while (node != mutableEntities->mHead) {
+      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
+      if (selectedUnit != nullptr) {
+        selectedUnits.push_back(selectedUnit);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
+    }
+
+    ISSUE_Command(selectedUnits, commandIssueData, clearQueue);
+  }
+
+  /**
+   * Address: 0x00822270 (FUN_00822270, sub_822270)
+   *
+   * What it does:
+   * Inserts one unit into a user-entity selection/weak-set under a scoped
+   * weak-owner guard, discarding the `{set,node,found}` payload. Thin void
+   * wrapper over the file-static `InsertSelectionUnitWithWeakGuard`; exposed
+   * (declared in CWldSession.h) so the command-issue update-event path (Sim.cpp)
+   * can insert into an event weak-set without naming the private result type.
+   */
+  void InsertUnitIntoCommandIssueWeakSet(SSelectionSetUserEntity* const set, UserUnit* const unit)
+  {
+    SelectionFindResBool discardedResult{};
+    (void)InsertSelectionUnitWithWeakGuard(&discardedResult, set, unit);
+  }
+
+  /**
    * Address: 0x00894280 (FUN_00894280, ?LookupEntityId@CWldSession@Moho@@QAEPAVUserEntity@2@VEntId@2@@Z)
    *
    * What it does:
