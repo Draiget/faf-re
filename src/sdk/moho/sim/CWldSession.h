@@ -1320,6 +1320,44 @@ namespace moho
   );
 
   /**
+   * Address: 0x008B0180 (FUN_008B0180,
+   * ?ISSUE_Command@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Client/UI-side command-issue keystone over an explicit `UserUnit*` list:
+   * allocates a command id, runs the no-rush gate, dispatches to the sim driver,
+   * publishes the command-issue helper, and enqueues it into each unit's command
+   * manager. Defined in Sim.cpp.
+   */
+  void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
+
+  /**
+   * Address: 0x008B05E0 (FUN_008B05E0,
+   * ?ISSUE_Command@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Converts one selected weak-set of user entities into live `UserUnit*` lanes
+   * and forwards to the explicit-unit `ISSUE_Command` overload. Defined in
+   * CWldSession.cpp.
+   */
+  void ISSUE_Command(
+    const SSelectionSetUserEntity& entities,
+    const SSTICommandIssueData& commandIssueData,
+    bool clearQueue
+  );
+
+  /**
+   * Address: 0x00822270 (FUN_00822270, sub_822270)
+   *
+   * What it does:
+   * Inserts one unit into a user-entity selection/weak-set under a scoped
+   * weak-owner guard, discarding the find-result payload. Thin void wrapper over
+   * the file-static `InsertSelectionUnitWithWeakGuard`; declared here so the
+   * command-issue update-event path (Sim.cpp) can insert into an event weak-set.
+   */
+  void InsertUnitIntoCommandIssueWeakSet(SSelectionSetUserEntity* set, UserUnit* unit);
+
+  /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
    *   `WLD_Frame`.

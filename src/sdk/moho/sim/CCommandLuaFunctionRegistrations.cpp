@@ -6,7 +6,9 @@
 #include <cstring>
 #include <limits>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiTarget.h"
@@ -34,6 +36,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
@@ -367,21 +370,6 @@ namespace
       }
 
       (void)selectedUnits.mBits.Add(static_cast<unsigned int>(unit->id_));
-    }
-    return selectedUnits;
-  }
-
-  [[nodiscard]] moho::BVSet<moho::EntId, moho::EntIdUniverse>
-    BuildSelectedEntitySetFromUserUnits(const msvc8::vector<moho::UserUnit*>& userUnits)
-  {
-    moho::BVSet<moho::EntId, moho::EntIdUniverse> selectedUnits{};
-    for (moho::UserUnit* const unit : userUnits) {
-      if (unit == nullptr) {
-        continue;
-      }
-
-      const auto* const userEntity = reinterpret_cast<const moho::UserEntity*>(unit);
-      (void)selectedUnits.mBits.Add(userEntity->mParams.mEntityId);
     }
     return selectedUnits;
   }
@@ -1923,25 +1911,43 @@ namespace moho
       return 0;
     }
 
+    // Silo build commands (BuildSiloTactical=5 / BuildSiloNuke=6) do NOT go
+    // through the command-issue pipeline. The binary iterates the live world
+    // selection weak-set directly and forwards each selected entity id to the
+    // sync-driver as an "add" info-pair (asm 0x84177C-0x8417F6).
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical
         || commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke) {
-      if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
-        msvc8::vector<UserUnit*> selectedUnits{};
-        session->GetSelectionUnits(selectedUnits);
-
-        const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
-          ? "SiloBuildTactical"
-          : "SiloBuildNuke";
-        for (UserUnit* const unit : selectedUnits) {
-          if (unit == nullptr) {
-            continue;
-          }
-
-          const auto* const userEntity = reinterpret_cast<const moho::UserEntity*>(unit);
-          const auto entityIdAsPtr =
-            reinterpret_cast<void*>(static_cast<std::uintptr_t>(userEntity->mParams.mEntityId));
-          driver->ProcessInfoPair(entityIdAsPtr, commandKey, "add");
+      // Local mirror of DecodeSelectedUserEntity / DecodeUserEntityFromSelectionSlot:
+      // the weak-set stores &UserEntity::mIUnitChainHead (offset 0x08) in
+      // mOwnerLinkSlot; null or the tombstone sentinel (void*)8 decode to null.
+      const auto decodeSelectionSlot = [](const SSelectionWeakRefUserEntity& weakRef) -> UserEntity* {
+        constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
+        const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+        if (raw == 0 || raw == kSelectionOwnerLinkOffset) {
+          return nullptr;
         }
+        return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
+      };
+
+      const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
+        ? "SiloBuildTactical"
+        : "SiloBuildNuke";
+
+      SSelectionSetUserEntity& selection = session->mSelection;
+      SSelectionNodeUserEntity* node = nullptr;
+      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
+      while (node != selection.mHead) {
+        if (UserEntity* const selectedEntity = decodeSelectionSlot(node->mEnt); selectedEntity != nullptr) {
+          // sSimDriver global read fresh each iteration (asm reloads it in-loop).
+          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+            const auto entityIdAsPtr =
+              reinterpret_cast<void*>(static_cast<std::uintptr_t>(selectedEntity->mParams.mEntityId));
+            driver->ProcessInfoPair(entityIdAsPtr, commandKey, "add");
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
       return 0;
     }
@@ -1956,16 +1962,10 @@ namespace moho
       clearQueue = LuaPlus::LuaStackObject(state, 3).GetBoolean();
     }
 
-    msvc8::vector<UserUnit*> selectedUnits{};
-    session->GetSelectionUnits(selectedUnits);
-    const BVSet<EntId, EntIdUniverse> selectedEntityIds = BuildSelectedEntitySetFromUserUnits(selectedUnits);
-    if (selectedEntityIds.mBits.Count() == 0) {
-      return 0;
-    }
-
-    if (Sim* const sim = lua_getglobaluserdata(rawState); sim != nullptr) {
-      sim->IssueCommand(selectedEntityIds, commandIssueData, clearQueue);
-    }
+    // Client-side issue path: forward the current world selection weak-set to
+    // the CWldSession ISSUE_Command(WeakSet) overload (asm 0x841748), NOT the
+    // sim-side Sim::IssueCommand(BVSet) shortcut.
+    ISSUE_Command(session->mSelection, commandIssueData, clearQueue);
     return 0;
   }
 
@@ -2011,15 +2011,13 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Unit list expected as first argument");
     }
 
-    msvc8::vector<UserUnit*> selectedUnits{};
-    const LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
-    if (unitListObject.IsTable()) {
-      const int unitCount = unitListObject.GetCount();
-      for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
-        UserUnit* const unit = SCR_FromLua_UserUnit(unitListObject[unitIndex], state);
-        if (unit != nullptr) {
-          selectedUnits.push_back(unit);
-        }
+    // Binary walks the explicit unit table with a LuaTableIterator and pushes every
+    // decoded value unconditionally (no null filter) into a gpg::fastvector<UserUnit*>.
+    gpg::fastvector<UserUnit*> units{};
+    {
+      LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
+      for (LuaPlus::LuaTableIterator iter(unitListObject, 1); !iter.m_isDone; iter.Next()) {
+        units.push_back(SCR_FromLua_UserUnit(iter.m_valueObj, state));
       }
     }
 
@@ -2031,7 +2029,8 @@ namespace moho
     }
 
     EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-    if (!TryParseUnitCommandTypeLexical(commandLexical, commandType) || commandType == EUnitCommandType::UNITCOMMAND_None) {
+    if (!TryParseUnitCommandTypeLexical(commandLexical, commandType)
+        || commandType == EUnitCommandType::UNITCOMMAND_None) {
       return 0;
     }
 
@@ -2045,14 +2044,9 @@ namespace moho
       clearQueue = LuaPlus::LuaStackObject(state, 4).GetBoolean();
     }
 
-    const BVSet<EntId, EntIdUniverse> selectedEntityIds = BuildSelectedEntitySetFromUserUnits(selectedUnits);
-    if (selectedEntityIds.mBits.Count() == 0) {
-      return 0;
-    }
-
-    if (Sim* const sim = lua_getglobaluserdata(rawState); sim != nullptr) {
-      sim->IssueCommand(selectedEntityIds, commandIssueData, clearQueue);
-    }
+    // Binary passes the SSTICommandIssueData BY VALUE to the fastvector overload of
+    // Moho::ISSUE_Command (asm 0x00841B3B) — NOT via the sim BVSet path.
+    ISSUE_Command(units, commandIssueData, clearQueue);
     return 0;
   }
 

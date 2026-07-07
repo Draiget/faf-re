@@ -114,6 +114,8 @@
 #include "moho/sim/SpecialFileType.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/math/Vector3f.h"
+#include "moho/containers/BVSet.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -4797,6 +4799,77 @@ namespace
     DestroyCommandIssueUpdateEvent(localEvent);
   }
 
+  // Local command-issue update event type used for "select this unit" events
+  // (the ring's default event kind that InsertUnitIntoCommandIssueWeakSet fills).
+  constexpr std::uint32_t kCommandIssueUpdateEventTypeSelectUnit = 0u;
+
+  // Computes the ring index of the most-recently-enqueued (last) event.
+  // Binary form (0x008B474D-0x008B4762): index = readIndex + count - 1, with a
+  // single-step wrap when it reaches/exceeds the ring capacity.
+  [[nodiscard]] std::uint32_t LastCommandIssueEventIndex(const CommandIssueUpdateQueueRuntimeView& queue)
+  {
+    std::uint32_t index = queue.readIndex + queue.count - 1u;
+    if (queue.capacity <= index) {
+      index -= queue.capacity;
+    }
+    return index;
+  }
+
+  /**
+   * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
+   *
+   * IDA signature:
+   * int __userpurge sub_8B4720@<eax>(_DWORD *ebx0@<ebx>, int a2, unsigned int a3);
+   *   ebx = UserCommandIssueHelper*, a2 = CmdId, a3 = UserUnit*
+   *
+   * What it does:
+   * Appends a "select unit" local update event into the helper's local ring
+   * queue when the queue is empty, or when the last event is not already a
+   * select-event (eventType != 0) for this command id, then inserts `unit`
+   * into that last event's weak-set. The freshly-built temp event is created
+   * via InitializeCommandIssueUpdateEvent, enqueued (deep-copied into the ring)
+   * via EnqueueCommandIssueUpdateEvent, and torn down via
+   * DestroyCommandIssueUpdateEvent; the binary wraps that teardown in an SEH
+   * frame so the temp is released on both the normal and throwing paths, which
+   * is modeled here with an RAII scope guard.
+   */
+  void QueueCommandIssueSelectUnitEventImpl(
+    UserCommandIssueHelper& helper,
+    const CmdId commandId,
+    UserUnit* const unit
+  )
+  {
+    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(helper);
+    CommandIssueUpdateQueueRuntimeView& queue = helperView.localQueue;
+
+    bool needNewEvent = true;
+    if (queue.count != 0u) {
+      const CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
+      if (lastEvent->eventType == kCommandIssueUpdateEventTypeSelectUnit && lastEvent->commandId == commandId) {
+        needNewEvent = false;
+      }
+    }
+
+    if (needNewEvent) {
+      CommandIssueUpdateEventRuntimeView localEvent{};
+      InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSelectUnit);
+      struct LocalEventScopeGuard
+      {
+        CommandIssueUpdateEventRuntimeView* event;
+        ~LocalEventScopeGuard() { DestroyCommandIssueUpdateEvent(*event); }
+      } guard{&localEvent};
+      EnqueueCommandIssueUpdateEvent(queue, localEvent);
+    }
+
+    CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
+    // entitySet is the 0x0C {proxy, head@+4, size} weak-set at event+0x08; it is
+    // layout-compatible with the leading 0x0C of SSelectionSetUserEntity, which is
+    // all the exposed insert helper touches (contract DUPLICATE-LAYOUT note).
+    InsertUnitIntoCommandIssueWeakSet(
+      reinterpret_cast<SSelectionSetUserEntity*>(&lastEvent->entitySet), unit
+    );
+  }
+
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
   {
     if (!commandDb || !commandDb->commands.header_ptr()) {
@@ -7916,6 +7989,20 @@ namespace moho
   {
     return ::ResolveUnitBlueprintFromLuaArgumentImpl(state, blueprintObject, functionName);
   }
+
+  /**
+   * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
+   *
+   * What it does:
+   * Public entry point (declared in UserUnit.h) that appends a "select unit"
+   * local update event into `helper`'s ring queue when needed, then inserts
+   * `unit` into that event's weak-set. Forwards to
+   * QueueCommandIssueSelectUnitEventImpl.
+   */
+  void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
+  {
+    ::QueueCommandIssueSelectUnitEventImpl(*helper, cmdId, unit);
+  }
 } // namespace moho
 
 extern "C" gpg::Rect2i* Rect2CopyRange(const gpg::Rect2i* first, const gpg::Rect2i* last, gpg::Rect2i* destination);
@@ -10682,6 +10769,58 @@ namespace
     out->set = bits;
     out->value = static_cast<std::int32_t>(endValue);
     return out;
+  }
+
+  /**
+   * Address: 0x008B00A0 (FUN_008B00A0, func_DecodeEntIdSet)
+   *
+   * IDA signature:
+   * Moho::EntIdSet *__cdecl func_DecodeEntIdSet(Moho::EntIdSet *a1, gpg::fastvector_UserUnit *a2);
+   *
+   * What it does:
+   * Builds an `EntIdSet` (BVSet<EntId,EntIdUniverse>) from a list of selected
+   * user units: resets `out`'s bit-set to empty, then walks `units` and inserts
+   * each unit's entity id into the set. Every entity id must share the same
+   * high-nibble type (`id >> 28`) as the first unit; a mismatch is a fatal
+   * `gpg::Die`, matching CDecoder::DecodeEntIdSet's wire-decode guard.
+   */
+  void func_DecodeEntIdSet(
+    moho::BVSet<moho::EntId, moho::EntIdUniverse>& out, const gpg::fastvector<moho::UserUnit*>& units
+  )
+  {
+    // out->mSet default-empty: mFirstWordIndex/reserved cleared, SBO words
+    // self-referential and empty (asm 0x8B00D0..0x8B00E1).
+    out.Bits() = moho::BVIntSet{};
+
+    if (units.begin() == units.end()) {
+      return;
+    }
+
+    // The engine reads the packed entity id straight from the UserEntity
+    // sub-object at [unit+0x44] (mParams.mEntityId). UserUnit and its
+    // UserEntity view share the same address (see UserUnit.cpp's file-static
+    // ResolveUserEntityView), so a direct reinterpret_cast reproduces the load.
+    const auto entityIdOf = [](const moho::UserUnit* const unit) noexcept -> std::uint32_t {
+      return reinterpret_cast<const moho::UserEntity*>(unit)->mParams.mEntityId;
+    };
+
+    // The shared id type is taken from the first unit and compared against
+    // every element (asm reloads v5 from v7 == first nibble each iteration).
+    const std::uint32_t firstType = entityIdOf(units.front()) >> 28u;
+
+    for (moho::UserUnit* const unit : units) {
+      const std::uint32_t entityId = entityIdOf(unit);
+      const std::uint32_t entityType = entityId >> 28u;
+      if (firstType != entityType) {
+        gpg::Die(
+          "Attempt to construct EntIdSet with different types of IDs (%d and %d) in DecodeEntIdSet",
+          firstType,
+          entityType
+        );
+      }
+
+      (void)out.Bits().Add(entityId);
+    }
   }
 } // namespace
 
@@ -27331,4 +27470,125 @@ void SimTypeInfo::Init()
   gpg::PreRegisterRType(typeid(Sim), &typeInfo);
   return &typeInfo;
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x008B0180 (FUN_008B0180)
+   * Mangled: ?ISSUE_Command@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_Command(gpg::fastvector<UserUnit*> const& units,
+   *                                 Moho::SSTICommandIssueData data, bool clearQueue);
+   *
+   * What it does:
+   * Client/UI-side command-issue keystone. Allocates a packed command id from
+   * the active session command manager, early-outs when the id's source byte is
+   * the 0xFF overflow marker, gates the issue against the focus army's no-rush
+   * rules (map-playable test + no-rush radius on the XZ plane), then dispatches
+   * the command to the sim driver, publishes the command-issue helper (constant
+   * + variable payload), enqueues it into each selected unit's command-queue
+   * manager (respecting the 500-entry depth cap and the clear flag), and finally
+   * notifies the UI script layer and dirties the command graph.
+   */
+  void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData data, const bool clearQueue)
+  {
+    CWldSession* const session = WLD_GetActiveSession();
+
+    // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
+    auto* const commandManager = static_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+
+    // The playable-rect source at terrain-res +0x04 is the live STIMap in this
+    // build; STIMap::IsPlayable is the concrete method dispatched at 0x008B030F.
+    STIMap* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+
+    // Allocate the next command id and stamp it into the issue payload.
+    std::uint32_t packedCommandId = 0u;
+    data.nextCommandId = static_cast<std::int32_t>(*AllocatePackedCommandIdFromManager(commandManager, &packedCommandId));
+    if ((static_cast<std::uint32_t>(data.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+      return; // id-pool exhausted for this command source; nothing to issue.
+    }
+
+    // No-rush / playability gate. The command is issued unless the target is a
+    // concrete, valid point that violates the focus army's no-rush constraints.
+    bool shouldIssue = true;
+    if (data.mTarget.mType != EAiTargetType::AITARGET_None) {
+      constexpr float kInvalidLane = std::numeric_limits<float>::quiet_NaN();
+      Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
+
+      if (data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+        if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(data.mTarget.mEnt))) {
+          targetPoint = targetEntity->mVariableData.mCurTransform.pos_;
+        }
+        // Missing entity leaves the NaN sentinel -> IsValidVector3f() is false.
+      } else {
+        targetPoint = data.mTarget.mPos;
+      }
+
+      const std::int32_t focusArmyIndex = session->FocusArmy;
+      if (IsValidVector3f(targetPoint) && focusArmyIndex >= 0 &&
+          session->userArmies[static_cast<std::size_t>(focusArmyIndex)] != nullptr) {
+        const UserArmy* const focusArmy = session->GetFocusArmy();
+        const bool insidePlayableArea =
+          focusArmy->mVarDat.mUseWholeMap != 0u || playableMap == nullptr || playableMap->IsPlayable(targetPoint);
+
+        if (!insidePlayableArea) {
+          shouldIssue = false;
+        } else if (focusArmy->mVarDat.mNoRushTimer > 0) {
+          const float deltaX = (focusArmy->mVarDat.mArmyStart.x + focusArmy->mVarDat.mNoRushOffset.x) - targetPoint.x;
+          const float deltaZ = (focusArmy->mVarDat.mArmyStart.y + focusArmy->mVarDat.mNoRushOffset.y) - targetPoint.z;
+          const float noRushDistance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+          if (noRushDistance > focusArmy->mVarDat.mNoRushRadius) {
+            shouldIssue = false;
+          }
+        }
+      }
+    }
+
+    if (!shouldIssue) {
+      return; // No-rush rejection; the by-value `data` destructs on return.
+    }
+
+    // Decode the selected units into an entity-id set and dispatch to the driver.
+    // NOTE: the binary callsite discards a return-by-value command cookie; the
+    // recovered 3-arg driver IssueCommand returns void, so nothing is discarded.
+    BVSet<EntId, EntIdUniverse> issuedEntitySet{};
+    func_DecodeEntIdSet(issuedEntitySet, units);
+    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+      simDriver->IssueCommand(issuedEntitySet, data, clearQueue);
+    }
+
+    // Publish the constant command descriptor and find/create its helper.
+    SSTICommandConstantData commandConstantData{};
+    InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &data);
+
+    const std::int32_t commandId = data.nextCommandId;
+    UserCommandIssueHelper* const commandHelper =
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, commandId);
+
+    // Overwrite the helper's variable payload from the issue data and mark dirty.
+    commandHelper->mVariableData = SSTICommandVariableData(data);
+    commandHelper->mVariableDataDirty = 1u;
+
+    // Enqueue the published command into each selected unit's command manager.
+    for (UserUnit* const unit : units) {
+      auto* const unitManager = reinterpret_cast<UserUnitManager*>(unit->GetCommandQueue2());
+      if (unitManager == nullptr) {
+        continue;
+      }
+
+      if (GetUserUnitManagerQueueSize(unitManager) <= 500) {
+        if (clearQueue) {
+          ResetUserUnitManagerState(unitManager, commandId);
+        }
+        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
+      } else if (clearQueue) {
+        ResetUserUnitManagerState(unitManager, commandId);
+      }
+    }
+
+    UI_OnCommandIssued(units, data, clearQueue);
+    session->DirtyCommandGraph();
+  }
+} // namespace moho
 
