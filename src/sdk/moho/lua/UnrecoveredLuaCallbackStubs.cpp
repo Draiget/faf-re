@@ -56,7 +56,6 @@ namespace moho
   CScrLuaInitForm* func_CAiBrainCheckBlockingTerrain_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainGetThreatsAroundPosition_LuaFuncDef() { return nullptr; }
-  CScrLuaInitForm* func_CAiBrainGetUnitsAroundPoint_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainPickBestAttackVector_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CreatePropHPR_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CreateStorageManip_LuaFuncDef() { return nullptr; }

@@ -1851,6 +1851,32 @@ namespace moho
   int cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x0058E3D0 (FUN_0058E3D0, cfunc_CAiBrainGetUnitsAroundPoint)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetUnitsAroundPointL`.
+   */
+  int cfunc_CAiBrainGetUnitsAroundPoint(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058E3F0 (FUN_0058E3F0, func_CAiBrainGetUnitsAroundPoint_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetUnitsAroundPoint()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetUnitsAroundPoint_LuaFuncDef();
+
+  /**
+   * Address: 0x0058E450 (FUN_0058E450, cfunc_CAiBrainGetUnitsAroundPointL)
+   *
+   * What it does:
+   * Returns a Lua array of the script objects for all units within `radius`
+   * of a point that match a category (and optionally an alliance state).
+   */
+  int cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0058C490 (FUN_0058C490, cfunc_CAiBrainBuildPlatoon)
    *
    * What it does:
