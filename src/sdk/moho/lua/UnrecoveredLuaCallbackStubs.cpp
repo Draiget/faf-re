@@ -39,10 +39,6 @@ namespace moho
 namespace moho
 {
   // ===== Unrecovered cfunc_*L(LuaPlus::LuaState*) inner callbacks =====
-  int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_CPlatoonFindHighestValueUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState*) { return 0; }
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState*) { return 0; }

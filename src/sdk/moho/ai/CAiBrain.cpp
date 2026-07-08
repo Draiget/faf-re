@@ -1672,7 +1672,10 @@ namespace
   }
 
   constexpr int kAiBrainAllianceAnySentinel = 3;
+} // namespace
 
+namespace moho
+{
   /**
    * Address: 0x0057B290 (FUN_0057B290, func_GetUnitsAroundPoint)
    *
@@ -1680,8 +1683,11 @@ namespace
    * Resets one output unit-set lane, gathers nearby unit entities around
    * `position` within `dist`, filters by liveness/destroy-queue/alliance/recon
    * visibility/category membership, and appends matching units.
+   *
+   * Called by CPlatoon::FindClosestUnitToPos (the COMPARE_LeastDefended lane)
+   * to score how well-defended each candidate is.
    */
-  [[maybe_unused]] SEntitySetTemplateUnit* CollectUnitsAroundPointFiltered(
+  SEntitySetTemplateUnit* CollectUnitsAroundPointFiltered(
     CAiBrain* const brain,
     SEntitySetTemplateUnit* const outUnits,
     const EntityCategorySet* const categorySet,
@@ -1740,7 +1746,7 @@ namespace
 
     return outUnits;
   }
-} // namespace
+} // namespace moho
 
 gpg::RType* CAiBrain::sType = nullptr;
 

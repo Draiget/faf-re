@@ -28,6 +28,7 @@ namespace moho
   struct SEntitySetTemplateUnit;
   class Sim;
   class Unit;
+  enum EAlliance : std::int32_t;
 
   struct SBuildResourceInfoLink
   {
@@ -262,6 +263,22 @@ namespace moho
    * Allocates the next Lua metatable-factory object index for the CAiBrain startup lane.
    */
   int register_CScrLuaMetatableFactory_CAiBrain_Index();
+
+  /**
+   * Address: 0x0057B290 (FUN_0057B290, func_GetUnitsAroundPoint)
+   *
+   * What it does:
+   * Resets `outUnits`, gathers unit entities within `dist` of `position`, and
+   * appends those passing liveness / destroy-queue / alliance / recon-visibility
+   * / category filters. Returns `outUnits`.
+   */
+  SEntitySetTemplateUnit* CollectUnitsAroundPointFiltered(
+    CAiBrain* brain,
+    SEntitySetTemplateUnit* outUnits,
+    const EntityCategorySet* categorySet,
+    const Wm3::Vector3f& position,
+    float dist,
+    EAlliance alliance);
 } // namespace moho
 
 /**
