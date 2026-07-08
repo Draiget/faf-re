@@ -10,20 +10,20 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`96.88%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,069`*
+  - *Total amount of completed tokens: `65,070`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,190` (81.74%)
+- `recovered`: `53,191` (81.74%)
 - `skip`: `6,099` (9.37%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
 - `external_dependency`: `5,780` (8.88%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `32` (0.05%)
-- **`blocked`: `2,127` (3.17%)**
+- **`blocked`: `2,126` (3.17%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,130`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,130`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,129`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,129`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Caller-Wiring Health
