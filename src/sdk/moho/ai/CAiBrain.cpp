@@ -128,6 +128,8 @@ namespace
   constexpr const char* kAiBrainActiveUnitsStatPath = "Units_Active";
   constexpr const char* kAiBrainGetAttackVectorsHelpText = "CAiBrain:GetAttackVectors()";
   constexpr const char* kAiBrainGetAttackVectorsName = "GetAttackVectors";
+  constexpr const char* kAiBrainGetUnitsAroundPointHelpText = "CAiBrain:GetUnitsAroundPoint()";
+  constexpr const char* kAiBrainGetUnitsAroundPointName = "GetUnitsAroundPoint";
   constexpr const char* kAiBrainGetEconomyStoredHelpText = "CAiBrain:GetEconomyStored()";
   constexpr const char* kAiBrainGetEconomyStoredName = "GetEconomyStored";
   constexpr const char* kAiBrainGetEconomyIncomeHelpText = "CAiBrain:GetEconomyIncome()";
@@ -6449,6 +6451,114 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
   CAiBrain* const closestBrain = closestArmy->GetArmyBrain();
   closestBrain->mLuaObj.PushStack(state);
   return 1;
+}
+
+/**
+ * Address: 0x0058E450 (FUN_0058E450, cfunc_CAiBrainGetUnitsAroundPointL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CAiBrainGetUnitsAroundPointL@<eax>(LuaPlus::LuaState *state@<ebx>);
+ *
+ * What it does:
+ * Implements `CAiBrain:GetUnitsAroundPoint(category, position, radius[, allianceState])`.
+ * Parses the brain, entity-category set, Vector3 position and numeric radius
+ * (plus an optional alliance-enum string), gathers the matching units via
+ * CollectUnitsAroundPointFiltered, and returns a Lua array of their script
+ * objects.
+ */
+int moho::cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 4 || argumentCount > 5) {
+    LuaPlus::LuaState::Error(
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetUnitsAroundPointHelpText, 4, 5, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 3));
+  Wm3::Vector3f point{};
+  (void)SCR_FromLuaCopy<Wm3::Vector3<float>>(&positionObject, &point);
+
+  LuaPlus::LuaStackObject radiusArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    radiusArg.TypeError("number");
+  }
+  const float radius = static_cast<float>(lua_tonumber(rawState, 4));
+
+  SEntitySetTemplateUnit gatheredUnits{};
+
+  if (lua_gettop(rawState) == 5) {
+    EAlliance requestedAlliance{};
+    gpg::RRef allianceRef{};
+    (void)gpg::RRef_EAlliance(&allianceRef, &requestedAlliance);
+
+    LuaPlus::LuaStackObject allianceArg(state, 5);
+    const char* const allianceName = lua_tostring(rawState, 5);
+    if (!allianceName) {
+      allianceArg.TypeError("string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    SEntitySetTemplateUnit scratchUnits{};
+    (void)CollectUnitsAroundPointFiltered(brain, &scratchUnits, categorySet, point, radius, requestedAlliance);
+    gatheredUnits.mVec.AddAll(&scratchUnits.mVec);
+  } else {
+    SEntitySetTemplateUnit scratchUnits{};
+    (void)CollectUnitsAroundPointFiltered(
+      brain, &scratchUnits, categorySet, point, radius, static_cast<EAlliance>(kAiBrainAllianceAnySentinel));
+    gatheredUnits.mVec.AddAll(&scratchUnits.mVec);
+  }
+
+  LuaPlus::LuaObject resultTable{};
+  resultTable.AssignNewTable(state, 0, 0);
+  for (Entity* const* it = gatheredUnits.mVec.begin(); it != gatheredUnits.mVec.end(); ++it) {
+    // Entries are Unit-owned Entity* lanes; the Entity subobject sits at +0x8 in
+    // Unit (Unit : IUnit, Entity), so the static_cast recovers the Unit* the
+    // binary reaches via the `-0x8` adjustment before its GetLuaObject vtable call.
+    Unit* const unit = static_cast<Unit*>(*it);
+    LuaPlus::LuaObject entryObject = unit->GetLuaObject();
+    resultTable.Insert(entryObject);
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0058E3D0 (FUN_0058E3D0, cfunc_CAiBrainGetUnitsAroundPoint)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainGetUnitsAroundPointL`.
+ */
+int moho::cfunc_CAiBrainGetUnitsAroundPoint(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainGetUnitsAroundPointL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058E3F0 (FUN_0058E3F0, func_CAiBrainGetUnitsAroundPoint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:GetUnitsAroundPoint()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainGetUnitsAroundPoint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainGetUnitsAroundPointName,
+    &moho::cfunc_CAiBrainGetUnitsAroundPoint,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainGetUnitsAroundPointHelpText
+  );
+  return &binder;
 }
 
 /**

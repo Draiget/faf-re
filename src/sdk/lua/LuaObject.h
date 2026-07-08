@@ -564,6 +564,16 @@ namespace LuaPlus
 		void Insert(int32_t key, const LuaObject& obj) const;
 
 		/**
+		 * Address: 0x00909AF0 (FUN_00909AF0, LuaPlus::LuaObject::Insert)
+		 * Mangled: ?Insert@LuaObject@LuaPlus@@QBEXABV12@@Z
+		 *
+		 * What it does:
+		 * Appends `obj` to the end of this Lua table (`table.insert(this, obj)`)
+		 * using the active state and restores the caller's original Lua stack top.
+		 */
+		void Insert(const LuaObject& obj) const;
+
+		/**
 		 * Address: 0x00909EB0 (FUN_00909EB0, LuaPlus::LuaObject::Remove)
 		 *
 		 * What it does:
