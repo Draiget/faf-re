@@ -1567,6 +1567,12 @@ namespace moho
   [[nodiscard]] ISTIDriver* WLD_GetDriver();
 
   /**
+   * Process-global selection cheat toggle (`0x010A645E`). When set (with cheats
+   * enabled) unit selection ignores focus-army ownership.
+   */
+  extern bool UI_SelectAnything;
+
+  /**
    * Address context:
    * - global `Moho::sWldSession` consumed by save/load request paths.
    *

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -34,15 +36,22 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#include "moho/mesh/Mesh.h"
+#include "moho/sim/COGrid.h"
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
+#include "moho/collision/CColPrimitiveBox3f.h"
+#include "Wm3Box3.h"
 
 namespace moho
 {
@@ -441,6 +450,265 @@ namespace
   private:
     moho::SSelectionSetUserEntity mSet{};
   };
+
+  // ---- UISelectionByCategory support (FUN_008662B0 / FUN_00865590) ----
+
+  // Selection weak-set nodes store `&UserEntity::mIUnitChainHead` (offset 0x08)
+  // in their owner-link slot; a null slot or the tombstone sentinel `(void*)8`
+  // decodes to null. Mirrors the file's existing decodeSelectionSlot lambda.
+  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+    if (raw == 0u || raw == kOwnerLinkOffset) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerLinkOffset);
+  }
+
+  // Camera frustum-list entries use the identical owner-link encoding.
+  [[nodiscard]] moho::UserEntity* DecodeFrustumEntity(const moho::CameraUserEntityWeakRef& weakRef) noexcept
+  {
+    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+    if (raw == 0u || raw == kOwnerLinkOffset) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerLinkOffset);
+  }
+
+  // File-static camera-focus cycle state for CycleCameraFocusOnSelection.
+  // Decompiler globals: dword_10C4424 (3-state 0/1/2) + stru_10C4418 (a
+  // persistent selection snapshot, lazily constructed).
+  int gCameraFocusCycleState = 0;
+  moho::SSelectionSetUserEntity* gCameraFocusCycleSelection = nullptr;
+
+  [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
+  {
+    moho::MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
+    if (meshInstance != nullptr) {
+      meshInstance->UpdateInterpolatedFields();
+      return &meshInstance->box;
+    }
+    return &moho::Invalid<Wm3::Box3f>();
+  }
+
+  /**
+   * Address: 0x00865590 (FUN_00865590, sub_865590, CycleCameraFocusOnSelection)
+   *
+   * What it does:
+   * Three-state camera focus cycler over a selection weak-set. State 0 snapshots
+   * the selection and arms the cycle; state 1 frames all selected entities with a
+   * zoomed multi-target; state 2 frames the first entity's mesh box then releases
+   * tracking. Advances the static cycle state each call.
+   */
+  void CycleCameraFocusOnSelection(moho::SSelectionSetUserEntity* const selection, moho::CameraImpl* const camera)
+  {
+    if (gCameraFocusCycleState == 0) {
+      gCameraFocusCycleState = 1;
+      if (gCameraFocusCycleSelection == nullptr) {
+        gCameraFocusCycleSelection = new moho::SSelectionSetUserEntity{};
+        InitializeLocalSelectionSet(*gCameraFocusCycleSelection);
+      }
+      if (selection != gCameraFocusCycleSelection) {
+        moho::SSelectionNodeUserEntity* eraseCursor = nullptr;
+        (void)gCameraFocusCycleSelection->EraseRange(
+          &eraseCursor, gCameraFocusCycleSelection->mHead->mLeft, gCameraFocusCycleSelection->mHead
+        );
+        for (moho::SSelectionNodeUserEntity* node =
+               moho::SSelectionSetUserEntity::find(selection, selection->mHead->mLeft, &node);
+             node != selection->mHead;) {
+          if (moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt); entity != nullptr) {
+            moho::SSelectionSetUserEntity::AddResult addResult{};
+            (void)moho::SSelectionSetUserEntity::Add(&addResult, gCameraFocusCycleSelection, entity);
+          }
+          moho::SSelectionSetUserEntity::Iterator_inc(&node);
+          node = moho::SSelectionSetUserEntity::find(selection, node, &node);
+        }
+      }
+      return;
+    }
+
+    if (gCameraFocusCycleState == 1) {
+      const float targetZoom = camera->CameraGetTargetZoom();
+      camera->TargetEntities(*selection, false, targetZoom, 0.0f);
+      gCameraFocusCycleState = 2;
+      return;
+    }
+
+    // gCameraFocusCycleState == 2: frame the first selected entity's mesh box.
+    moho::SSelectionNodeUserEntity* firstNode = nullptr;
+    firstNode = moho::SSelectionSetUserEntity::find(selection, selection->mHead->mLeft, &firstNode);
+    const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(DecodeSelectionEntity(firstNode->mEnt)));
+    Wm3::AxisAlignedBox3f frameBox{};
+    orientedBox.ComputeAABB(frameBox.Min, frameBox.Max);
+
+    camera->TargetBox(frameBox, 0.0f);
+    camera->TargetNothing();
+    gCameraFocusCycleState = 1;
+  }
+
+  /**
+   * Address: 0x008662B0 (FUN_008662B0, sub_8662B0, SelectUnitsByCategory)
+   *
+   * What it does:
+   * Core of UISelectionByCategory. Gathers candidate units (camera frustum or the
+   * spatial DB), filters by selectability / focus-army ownership / optional idle /
+   * category (+ optional engineer/command exclusion), then either replaces or
+   * extends the world selection. Optionally frames the result with the camera.
+   */
+  void SelectUnitsByCategory(
+    moho::CWldSession* const session,
+    moho::CameraImpl* const camera,
+    const char* const categoryExpr,
+    const bool addToSelection,        // a4
+    const bool inViewFrustum,         // a5
+    const bool nearestToMouse,        // a6
+    const bool mustBeIdle,            // a7
+    const bool doCameraTarget,        // a8
+    const bool excludeEngineerCommand // a9
+  )
+  {
+    // ---- Gather candidate entities ----
+    gpg::fastvector<moho::UserEntity*> gathered{};
+    if (inViewFrustum && camera != nullptr) {
+      moho::CameraFrustumUserEntityList* const frustumList = camera->GetArmyUnitsInFrustum();
+      for (moho::CameraUserEntityWeakRef* ref = frustumList->mStart; ref != frustumList->mFinish; ++ref) {
+        if (moho::UserEntity* const entity = DecodeFrustumEntity(*ref); entity != nullptr) {
+          gathered.push_back(entity);
+        }
+      }
+    } else {
+      auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+      (void)spatialDb->Collect(gathered, moho::ENTITYTYPE_Unit);
+    }
+
+    // Parse the category expression once (RRuleGameRules slot 23).
+    const moho::CategoryWordRangeView parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
+
+    // Result set: start empty, optionally seed with the current selection.
+    ScopedLocalSelectionSet resultGuard{};
+    moho::SSelectionSetUserEntity& resultSet = resultGuard.get();
+    if (addToSelection && &resultSet != &session->mSelection) {
+      for (moho::SSelectionNodeUserEntity* seedNode =
+             moho::SSelectionSetUserEntity::find(&session->mSelection, session->mSelection.mHead->mLeft, &seedNode);
+           seedNode != session->mSelection.mHead;) {
+        if (moho::UserEntity* const seedEntity = DecodeSelectionEntity(seedNode->mEnt); seedEntity != nullptr) {
+          moho::SSelectionSetUserEntity::AddResult addResult{};
+          (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, seedEntity);
+        }
+        moho::SSelectionSetUserEntity::Iterator_inc(&seedNode);
+        seedNode = moho::SSelectionSetUserEntity::find(&session->mSelection, seedNode, &seedNode);
+      }
+    }
+
+    // ---- Per-candidate filter ----
+    const moho::UserArmy* const focusArmy = session->GetFocusArmy();
+
+    moho::UserEntity* nearestEntity = nullptr;
+    float nearestDistance = std::numeric_limits<float>::infinity();
+
+    for (moho::UserEntity* const candidate : gathered) {
+      moho::UserUnit* const unit = candidate->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      // Selectable AND (owned by focus army OR cheat-select).
+      if (!unit->Select()) {
+        continue;
+      }
+      const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);
+      if (!ownedByFocusArmy && !(moho::UI_SelectAnything && session->IsCheatsEnabled)) {
+        continue;
+      }
+
+      // Optional idle filter: not busy AND no queued commands.
+      if (mustBeIdle) {
+        if (unit->mSelectableOverride /* +0x1A2: UI busy/not-idle gate */) {
+          continue;
+        }
+        if (moho::GetUserUnitManagerQueueSize(unit->mManager) != 0) {
+          continue;
+        }
+      }
+
+      // Category test (open-coded bitset in the binary -> EntityCategory::HasBlueprint).
+      const moho::IUnit* const iunit = moho::GetIUnitBridge(unit);
+      if (!moho::EntityCategory::HasBlueprint(iunit->GetBlueprint(), &parsedCategory)) {
+        continue;
+      }
+
+      // Optional engineer/command exclusion (a9).
+      if (excludeEngineerCommand) {
+        const msvc8::string engineerCategory("ENGINEER");
+        const msvc8::string commandCategory("COMMAND");
+        if (candidate->IsInCategory(engineerCategory) || candidate->IsInCategory(commandCategory)) {
+          continue;
+        }
+      }
+
+      if (nearestToMouse) {
+        // Keep only the single unit nearest the cursor world position.
+        const Wm3::Vec3f& unitPos = iunit->GetPosition();
+        const float dx = unitPos.x - session->CursorWorldPos.x;
+        const float dy = unitPos.y - session->CursorWorldPos.y;
+        const float dz = unitPos.z - session->CursorWorldPos.z;
+        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (nearestDistance > distance) {
+          nearestEntity = candidate;
+          nearestDistance = distance;
+        }
+      } else if (!iunit->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
+        // Add every passing unit (skip units mid-upgrade).
+        moho::SSelectionSetUserEntity::AddResult addResult{};
+        (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, candidate);
+      }
+    }
+
+    if (nearestToMouse && nearestEntity != nullptr) {
+      moho::SSelectionSetUserEntity::AddResult addResult{};
+      (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, nearestEntity);
+    }
+
+    // ---- Optional camera framing of the result ----
+    moho::SSelectionNodeUserEntity* probeNode = nullptr;
+    probeNode = moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &probeNode);
+    if (probeNode != resultSet.mHead && doCameraTarget && camera != nullptr) {
+      if (mustBeIdle) {
+        CycleCameraFocusOnSelection(&resultSet, camera);
+      } else if (resultSet.size() == 1) {
+        moho::SSelectionNodeUserEntity* firstNode = nullptr;
+        firstNode = moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &firstNode);
+        camera->TargetEntityBox(DecodeSelectionEntity(firstNode->mEnt), 0.0f);
+      } else {
+        // Combined AABB over all selected entities, then frame it.
+        Wm3::AxisAlignedBox3f combined = moho::Empty<Wm3::AxisAlignedBox3f>();
+        for (moho::SSelectionNodeUserEntity* node =
+               moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &node);
+             node != resultSet.mHead;) {
+          const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(DecodeSelectionEntity(node->mEnt)));
+          Wm3::AxisAlignedBox3f entityBox{};
+          orientedBox.ComputeAABB(entityBox.Min, entityBox.Max);
+
+          if (entityBox.Min.x <= combined.Min.x) { combined.Min.x = entityBox.Min.x; }
+          if (entityBox.Min.y <= combined.Min.y) { combined.Min.y = entityBox.Min.y; }
+          if (entityBox.Min.z <= combined.Min.z) { combined.Min.z = entityBox.Min.z; }
+          if (entityBox.Max.x >  combined.Max.x) { combined.Max.x = entityBox.Max.x; }
+          if (entityBox.Max.y >  combined.Max.y) { combined.Max.y = entityBox.Max.y; }
+          if (entityBox.Max.z >  combined.Max.z) { combined.Max.z = entityBox.Max.z; }
+
+          moho::SSelectionSetUserEntity::Iterator_inc(&node);
+          node = moho::SSelectionSetUserEntity::find(&resultSet, node, &node);
+        }
+
+        camera->TargetBox(combined, 0.0f);
+        camera->TargetNothing();
+      }
+    }
+
+    session->SetSelection(resultSet);
+  }
 
   [[nodiscard]] bool TryParseUnitCommandTypeLexical(
     const char* const lexicalCommandType,
@@ -2129,6 +2397,63 @@ namespace moho
   int cfunc_GetRolloverInfo(lua_State* const luaContext)
   {
     return cfunc_GetRolloverInfoL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00866DB0 (FUN_00866DB0, cfunc_UISelectionByCategoryL)
+   *
+   * What it does:
+   * Lua worker for UISelectionByCategory(expression, addToCurSel, inViewFrustum,
+   * nearestToMouse, mustBeIdle). Validates 5 args, resolves the world camera, and
+   * dispatches SelectUnitsByCategory (camera-target / engineer-exclusion are
+   * always off from Lua). Emits a localized error when there is no active session.
+   */
+  int cfunc_UISelectionByCategoryL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUISelectionByCategoryHelpText, 5, argumentCount);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      CON_Printf(noSessionText.c_str());
+      return 0;
+    }
+
+    const char* const categoryExpr = lua_tostring(rawState, 1);
+    if (categoryExpr == nullptr) {
+      LuaPlus::LuaStackObject categoryArg(state, 1);
+      LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
+    }
+
+    // Decompiler bind order: arg5=mustBeIdle, arg4=nearestToMouse, arg3=inViewFrustum, arg2=addToCurSel.
+    LuaPlus::LuaStackObject mustBeIdleArg(state, 5);
+    const bool mustBeIdle = mustBeIdleArg.GetBoolean();
+    LuaPlus::LuaStackObject nearestToMouseArg(state, 4);
+    const bool nearestToMouse = nearestToMouseArg.GetBoolean();
+    LuaPlus::LuaStackObject inViewFrustumArg(state, 3);
+    const bool inViewFrustum = inViewFrustumArg.GetBoolean();
+    LuaPlus::LuaStackObject addToSelectionArg(state, 2);
+    const bool addToSelection = addToSelectionArg.GetBoolean();
+
+    RCamManager* const cameraManager = CAM_GetManager();
+    CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
+
+    SelectUnitsByCategory(
+      session,
+      camera,
+      categoryExpr,
+      addToSelection,  // a4
+      inViewFrustum,   // a5
+      nearestToMouse,  // a6
+      mustBeIdle,      // a7
+      false,           // a8 doCameraTarget (no Lua arg)
+      false            // a9 excludeEngineerCommand (no Lua arg)
+    );
+    return 0;
   }
 
   /**
