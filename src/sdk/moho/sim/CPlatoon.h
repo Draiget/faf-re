@@ -39,6 +39,8 @@ namespace moho
   class Unit;
   enum class ESquadClass : std::int32_t;
   enum EUnitState : std::int32_t;
+  enum EAlliance : std::int32_t;
+  enum ECompareType : std::int32_t;
 
   /**
    * Recovered `CPlatoon` runtime object.
@@ -156,6 +158,44 @@ namespace moho
      * Returns the first squad lane matching `squadClass`, or null when absent.
      */
     CSquad* GetSquad(ESquadClass squadClass);
+
+    /**
+     * Address: 0x00725CF0 (FUN_00725CF0, Moho::CPlatoon::FindClosestUnitToPos)
+     *
+     * IDA signature:
+     * Moho::Unit *__userpurge FindClosestUnitToPos@<eax>(
+     *   Moho::ESquadClass squadClass@<ecx>, Moho::CPlatoon *this,
+     *   Moho::EntityCategorySet *category, Moho::ECompareType cmpType,
+     *   Moho::EAlliance alliance, bool canAttack, Wm3::Vector3f const *pos);
+     *
+     * What it does:
+     * Scans the recon-DB blip list for live, category-matching, alliance-matching
+     * units and returns the one that best satisfies `cmpType` relative to `pos`
+     * (nearest / furthest / highest build-value / least-defended). `canAttack`
+     * further gates candidates through the requested squad's attack check.
+     */
+    [[nodiscard]] Unit* FindClosestUnitToPos(
+      EntityCategorySet* category,
+      ECompareType cmpType,
+      ESquadClass squadClass,
+      EAlliance alliance,
+      bool canAttack,
+      const Wm3::Vector3f& pos);
+
+    /**
+     * Address: 0x00726120 (FUN_00726120, Moho::CPlatoon::FindClosestUnit)
+     *
+     * What it does:
+     * Resolves the squad for `squadClass`, and when that squad has a non-zero
+     * center delegates to `FindClosestUnitToPos` using the squad center as the
+     * reference point; otherwise returns null.
+     */
+    [[nodiscard]] Unit* FindClosestUnit(
+      EntityCategorySet* category,
+      ECompareType cmpType,
+      ESquadClass squadClass,
+      EAlliance alliance,
+      bool canAttack);
 
     /**
      * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)

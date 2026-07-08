@@ -32,6 +32,8 @@
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiPersonality.h"
+#include "moho/ai/CAiReconDBImpl.h"
+#include "moho/ai/ECompareType.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ArmyUnitSet.h"
@@ -39,7 +41,10 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/IArmy.h"
+#include "moho/sim/ReconBlip.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
@@ -4243,6 +4248,396 @@ namespace moho
       kFindPrioritizedUnitHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00725CF0 (FUN_00725CF0, Moho::CPlatoon::FindClosestUnitToPos)
+   *
+   * IDA signature:
+   * Moho::Unit *__userpurge FindClosestUnitToPos@<eax>(
+   *   Moho::ESquadClass squadClass@<ecx>, Moho::CPlatoon *this,
+   *   Moho::EntityCategorySet *category, Moho::ECompareType cmpType,
+   *   Moho::EAlliance alliance, bool canAttack, Wm3::Vector3f const *pos);
+   *
+   * What it does:
+   * Walks the owning army's recon-DB blip list and returns the live,
+   * category-matching, alliance-matching source unit that best satisfies
+   * `cmpType` relative to `pos`. When `canAttack` is set a candidate must also
+   * pass the requested squad's attack check.
+   */
+  Unit* CPlatoon::FindClosestUnitToPos(
+    EntityCategorySet* const category,
+    const ECompareType cmpType,
+    const ESquadClass squadClass,
+    const EAlliance alliance,
+    const bool canAttack,
+    const Wm3::Vector3f& pos)
+  {
+    // flt_E4F6E8: negative sentinel so the first admissible candidate always wins.
+    constexpr float kBestValueUnset = -1.0f;
+    // dword_DFF31C: footprint-dimension -> gather-radius scale (COMPARE_LeastDefended).
+    constexpr float kLeastDefendedRadiusScale = 10.0f;
+
+    // Re-resolve the squad for `squadClass`; it also gates candidates via CanAttackTarget.
+    CSquad* squad = nullptr;
+    for (CSquad* const candidate : mSquadList) {
+      if (candidate->mSquadClass == squadClass) {
+        squad = candidate;
+        break;
+      }
+    }
+    if (squad == nullptr) {
+      return nullptr;
+    }
+
+    Unit* bestUnit = nullptr;
+    float bestValue = kBestValueUnset;
+
+    for (ReconBlip* const blip : mArmy->GetReconDB()->ReconGetBlips()) {
+      Unit* const unit = blip->mCreator.GetObjectPtr();
+      if (unit == nullptr || unit->IsDead()) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      if (!EntityCategory::HasBlueprint(blueprint, category)) {
+        continue;
+      }
+
+      Entity* const unitEntity = unit;
+      if (mArmy->GetAllianceWith(static_cast<IArmy*>(unitEntity->ArmyRef)) != alliance) {
+        continue;
+      }
+
+      float candidateValue = 0.0f;
+      switch (cmpType) {
+        case COMPARE_Closest:
+        case COMPARE_Furthest: {
+          const Wm3::Vector3f& unitPos = unit->GetPosition();
+          const float dx = unitPos.x - pos.x;
+          const float dy = unitPos.y - pos.y;
+          const float dz = unitPos.z - pos.z;
+          candidateValue = dx * dx + dy * dy + dz * dz;
+          const bool better = (cmpType == COMPARE_Closest) ? (bestValue > candidateValue)
+                                                           : (candidateValue > bestValue);
+          if (!better && bestValue >= 0.0f) {
+            continue;
+          }
+          break;
+        }
+        case COMPARE_HighestValue: {
+          candidateValue = blueprint->Economy.BuildCostMass + blueprint->Economy.BuildCostEnergy;
+          if (candidateValue <= bestValue && bestValue >= 0.0f) {
+            continue;
+          }
+          break;
+        }
+        case COMPARE_LeastDefended: {
+          // Not reached at runtime (no caller passes COMPARE_LeastDefended); recovered
+          // for 1:1 completeness. Score = summed build value of nearby armed allies.
+          const SFootprint& footprint = unitEntity->GetFootprint();
+          std::uint8_t maxDimension = footprint.mSizeX;
+          if (footprint.mSizeZ > maxDimension) {
+            maxDimension = footprint.mSizeZ;
+          }
+          const float gatherRadius = static_cast<float>(maxDimension) * kLeastDefendedRadiusScale;
+
+          SEntitySetTemplateUnit nearbyDefenders{};
+          (void)CollectUnitsAroundPointFiltered(
+            unitEntity->ArmyRef->GetArmyBrain(),
+            &nearbyDefenders,
+            category,
+            unit->GetPosition(),
+            gatherRadius,
+            ALLIANCE_Ally);
+
+          candidateValue = 0.0f;
+          for (Entity* const* defenderSlot = nearbyDefenders.mVec.begin();
+               defenderSlot != nearbyDefenders.mVec.end();
+               ++defenderSlot) {
+            const Unit* const defender = SEntitySetTemplateUnit::UnitFromEntry(*defenderSlot);
+            if (defender == nullptr) {
+              continue;
+            }
+            const RUnitBlueprint* const defenderBlueprint = defender->GetBlueprint();
+            if (!defenderBlueprint->Weapons.WeaponBlueprints.empty()) {
+              candidateValue +=
+                defenderBlueprint->Economy.BuildCostMass + defenderBlueprint->Economy.BuildCostEnergy;
+            }
+          }
+          if (bestValue <= candidateValue && bestValue >= 0.0f) {
+            continue;
+          }
+          break;
+        }
+        default:
+          continue;
+      }
+
+      if (canAttack && !squad->CanAttackTarget(unit)) {
+        continue;
+      }
+      bestUnit = unit;
+      bestValue = candidateValue;
+    }
+
+    return bestUnit;
+  }
+
+  /**
+   * Address: 0x00726120 (FUN_00726120, Moho::CPlatoon::FindClosestUnit)
+   *
+   * IDA signature:
+   * Moho::Unit *__userpurge FindClosestUnit@<eax>(Moho::CPlatoon *this@<edi>,
+   *   Moho::EntityCategorySet *category, Moho::ECompareType cmpType,
+   *   Moho::ESquadClass squadClass, Moho::EAlliance alliance, bool canAttack);
+   *
+   * What it does:
+   * Resolves the squad for `squadClass`; when it has a non-zero center delegates
+   * to `FindClosestUnitToPos` using that center, otherwise returns null.
+   */
+  Unit* CPlatoon::FindClosestUnit(
+    EntityCategorySet* const category,
+    const ECompareType cmpType,
+    const ESquadClass squadClass,
+    const EAlliance alliance,
+    const bool canAttack)
+  {
+    CSquad* squad = nullptr;
+    for (CSquad* const candidate : mSquadList) {
+      if (candidate->mSquadClass == squadClass) {
+        squad = candidate;
+        break;
+      }
+    }
+    if (squad == nullptr) {
+      return nullptr;
+    }
+
+    Wm3::Vector3f center;
+    squad->GetCenter(&center);
+    if (center != Wm3::Vector3f::ZERO) {
+      return FindClosestUnitToPos(category, cmpType, squadClass, alliance, canAttack, center);
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x0072EE60 (FUN_0072EE60, cfunc_CPlatoonFindClosestUnitL)
+   *
+   * What it does:
+   * Resolves `(platoon, squadClass, alliance, canAttack, category)` from Lua and
+   * returns the nearest matching unit to the requested squad center.
+   */
+  int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFindClosestUnitHelpText, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef squadClassRef{};
+    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, squadClassRef);
+
+    EAlliance alliance = static_cast<EAlliance>(0);
+    gpg::RRef allianceRef{};
+    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    const char* const allianceName = lua_tostring(state->m_state, 3);
+    if (allianceName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 3);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    LuaPlus::LuaStackObject canAttackArg(state, 4);
+    const bool canAttack = canAttackArg.GetBoolean();
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 5));
+    EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    Unit* const foundUnit = platoon->FindClosestUnit(category, COMPARE_Closest, squadClass, alliance, canAttack);
+    if (foundUnit != nullptr) {
+      foundUnit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state->m_state);
+      (void)lua_gettop(state->m_state);
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x0072F310 (FUN_0072F310, cfunc_CPlatoonFindFurthestUnitL)
+   *
+   * What it does:
+   * Twin of `cfunc_CPlatoonFindClosestUnitL` selecting the furthest matching
+   * unit from the requested squad center (COMPARE_Furthest).
+   */
+  int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFindFurthestUnitHelpText, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef squadClassRef{};
+    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, squadClassRef);
+
+    EAlliance alliance = static_cast<EAlliance>(0);
+    gpg::RRef allianceRef{};
+    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    const char* const allianceName = lua_tostring(state->m_state, 3);
+    if (allianceName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 3);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    LuaPlus::LuaStackObject canAttackArg(state, 4);
+    const bool canAttack = canAttackArg.GetBoolean();
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 5));
+    EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    Unit* const foundUnit = platoon->FindClosestUnit(category, COMPARE_Furthest, squadClass, alliance, canAttack);
+    if (foundUnit != nullptr) {
+      foundUnit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state->m_state);
+      (void)lua_gettop(state->m_state);
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x0072F550 (FUN_0072F550, cfunc_CPlatoonFindHighestValueUnitL)
+   *
+   * What it does:
+   * Twin of `cfunc_CPlatoonFindClosestUnitL` selecting the highest build-value
+   * matching unit (COMPARE_HighestValue).
+   */
+  int cfunc_CPlatoonFindHighestValueUnitL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFindHighestValueUnitHelpText, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef squadClassRef{};
+    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, squadClassRef);
+
+    EAlliance alliance = static_cast<EAlliance>(0);
+    gpg::RRef allianceRef{};
+    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    const char* const allianceName = lua_tostring(state->m_state, 3);
+    if (allianceName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 3);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    LuaPlus::LuaStackObject canAttackArg(state, 4);
+    const bool canAttack = canAttackArg.GetBoolean();
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 5));
+    EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    Unit* const foundUnit = platoon->FindClosestUnit(category, COMPARE_HighestValue, squadClass, alliance, canAttack);
+    if (foundUnit != nullptr) {
+      foundUnit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state->m_state);
+      (void)lua_gettop(state->m_state);
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x0072F0A0 (FUN_0072F0A0, cfunc_CPlatoonFindClosestUnitToBaseL)
+   *
+   * What it does:
+   * Like `cfunc_CPlatoonFindClosestUnitL` but references the army's base center
+   * (`CAiBrain::CenterOfArmy`) instead of a squad center, calling the leaf query
+   * directly with COMPARE_Closest.
+   */
+  int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", kFindClosestUnitToBaseHelpText, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef squadClassRef{};
+    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, squadClassRef);
+
+    EAlliance alliance = static_cast<EAlliance>(0);
+    gpg::RRef allianceRef{};
+    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    const char* const allianceName = lua_tostring(state->m_state, 3);
+    if (allianceName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 3);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    LuaPlus::LuaStackObject canAttackArg(state, 4);
+    const bool canAttack = canAttackArg.GetBoolean();
+
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 5));
+    EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+    Wm3::Vector3f baseCenter;
+    platoon->mArmy->GetArmyBrain()->CenterOfArmy(&baseCenter);
+
+    Unit* const foundUnit =
+      platoon->FindClosestUnitToPos(category, COMPARE_Closest, squadClass, alliance, canAttack, baseCenter);
+    if (foundUnit != nullptr) {
+      foundUnit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state->m_state);
+      (void)lua_gettop(state->m_state);
+    }
+    return 1;
   }
 
   /**
