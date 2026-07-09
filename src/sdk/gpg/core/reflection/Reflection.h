@@ -224,6 +224,7 @@ namespace moho
   using CColPrimitiveBase = EntityCollisionUpdater;
   class SphereCollisionPrimitive;
   class BoxCollisionPrimitive;
+  class MotorSinkAway;
 } // namespace moho
 
 namespace LuaPlus
@@ -2144,6 +2145,15 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_RUnitBlueprint(RRef* out, moho::RUnitBlueprint* value);
+
+  /**
+   * Address: 0x00697000 (FUN_00697000, gpg::RRef_MotorSinkAway)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::MotorSinkAway` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_MotorSinkAway(RRef* out, moho::MotorSinkAway* value);
 
   /**
    * Address: 0x0050E2A0 (FUN_0050E2A0, gpg::RRef_RBlueprint)
