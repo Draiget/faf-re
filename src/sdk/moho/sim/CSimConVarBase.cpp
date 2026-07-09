@@ -23,6 +23,17 @@ namespace
 }
 
 /**
+ * Address: 0x00743210 (FUN_00743210, sub_743210)
+ *
+ * What it does:
+ * Returns the process-global sim-convar index counter lane.
+ */
+std::uint32_t moho::GetSimConVarIndexCounter() noexcept
+{
+  return gSimConVarIndexCounter;
+}
+
+/**
  * Address: 0x00579760 (FUN_00579760, Moho::CSimConVarBase::CSimConVarBase)
  *
  * What it does:
