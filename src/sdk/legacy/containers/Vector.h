@@ -1774,6 +1774,14 @@ namespace msvc8
          * insert(end(),1,value) when full), so this per-T 4-byte pointer symbol
          * is emitted. Shared by 7 vector<Entity*> _Insert_n sites in the Entity
          * subsystem, all folding to this emission).
+         * Address: 0x0087A830 (FUN_0087A830, msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n
+         * grow lane for Moho::CDecalManager::mDecals @+0x10; the recovered helper
+         * InsertNCopiesCWldTerrainDecalPtrVector (CWldSplat.cpp) invokes
+         * storage.insert(begin()+offset, count, value) by name, and
+         * CDecalManager::LoadDecal / NewSplat route their mDecals append through the
+         * push_back-shape helper AppendDecal which calls it on the capacity-full path
+         * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
+         * pointer symbol is emitted).
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
          * grow lane for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)

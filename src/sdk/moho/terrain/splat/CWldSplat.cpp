@@ -817,6 +817,56 @@ namespace moho
   }
 
   /**
+   * Address: 0x0087A830 (FUN_0087A830, msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n)
+   *
+   * IDA signature:
+   * char *__userpurge sub_87A830@<eax>(int *value@<eax>, int vec, char *pos);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n`.
+   * Inserts `insertCount` copies of `fillValue` at `insertPosition`; on sufficient
+   * capacity shifts the live tail right by `insertCount` and fills the gap, else
+   * 1.5x-grows the buffer (head-move / gap-fill / tail-move / free-old). Backs the
+   * `push_back(decal)` slow-path append used by CDecalManager::LoadDecal / NewSplat
+   * for the mDecals vector; the body lives in `msvc8::vector<T>::insert`
+   * (legacy/containers/Vector.h) and this per-T free helper is the source-level
+   * by-name invocation that keeps the emitted symbol.
+   */
+  void InsertNCopiesCWldTerrainDecalPtrVector(
+    msvc8::vector<CWldTerrainDecal*>& storage,
+    CWldTerrainDecal** const insertPosition,
+    const unsigned int insertCount,
+    CWldTerrainDecal* const fillValue)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
+   * Address: 0x008780A0 (Moho::CDecalManager decal-append lane, inlined push_back in LoadDecal/NewSplat)
+   *
+   * What it does:
+   * Appends one `CWldTerrainDecal*` into the manager's `mDecals` vector, mirroring
+   * the MSVC8 inlined `push_back` shape used by the binary: when the reserved
+   * capacity is exhausted the append reaches the canonical
+   * `vector<CWldTerrainDecal*>::_Insert_n` slow-path
+   * (`InsertNCopiesCWldTerrainDecalPtrVector`, FUN_0087A830); otherwise a fast-path
+   * in-place store.
+   */
+  void AppendDecal(msvc8::vector<CWldTerrainDecal*>& storage, CWldTerrainDecal* const value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesCWldTerrainDecalPtrVector(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
+  }
+
+  /**
    * Address: 0x008780A0 (FUN_008780A0, Moho::CDecalManager::LoadDecal)
    *
    * What it does:
@@ -837,7 +887,7 @@ namespace moho
       decalsView.begin != nullptr ? static_cast<std::uint32_t>(decalsView.end - decalsView.begin) : 0u;
     loaded->mVecIndex = vectorIndex;
 
-    mDecals.push_back(loaded);
+    AppendDecal(mDecals, loaded);
 
     std::uint32_t* const valueLane =
       ResolveLookupValueSlotForKey(mDecalGroupLookupByDecalIndex, static_cast<std::uint32_t>(loaded->mIndex));
@@ -916,7 +966,7 @@ namespace moho
     }
     --decalsView.end;
 
-    mDecals.push_back(decal);
+    AppendDecal(mDecals, decal);
     Reindex();
   }
 
