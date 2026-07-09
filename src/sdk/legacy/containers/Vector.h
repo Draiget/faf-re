@@ -1787,6 +1787,17 @@ namespace msvc8
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
          * by name — MSVC8's push_back (FUN_008135A0) is insert(end(),1,value) when
          * full — so this per-T 8-byte shared_ptr symbol is emitted).
+         * Address: 0x008EF500 (FUN_008EF500, msvc8::vector<std::int32_t>::_Insert_n
+         * grow lane for gpg::gal::Head::validFormats1 @+0x70; the recovered caller
+         * gpg::gal::DeviceD3D9::BuildDeviceCapabilities appends valid texture formats
+         * and, on the capacity-full path, invokes validFormats1.insert(end(),1,token)
+         * by name (MSVC8's push_back is insert(end(),1,value) when full), so this
+         * per-T scalar-int32 symbol is emitted).
+         * Address: 0x008EF2B0 (FUN_008EF2B0, msvc8::vector<std::int32_t>::_Insert_n
+         * grow lane for gpg::gal::Head::validFormats2 @+0x60; the same recovered
+         * caller appends valid GAL-format tokens and invokes
+         * validFormats2.insert(end(),1,token) by name, so this per-T scalar-int32
+         * symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`

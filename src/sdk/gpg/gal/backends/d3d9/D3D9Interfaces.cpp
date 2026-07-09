@@ -6190,7 +6190,20 @@ namespace gpg::gal
                 );
                 if (result >= 0)
                 {
-                    head.validFormats1.push_back(formatToken);
+                    // MSVC8 inlines the fast in-place append and, when the vector is
+                    // at capacity, calls the out-of-line grow lane
+                    // msvc8::vector<std::int32_t>::_Insert_n (FUN_008EF500) as
+                    // _Insert_n(_Mylast, 1, &formatToken). Mirror that shape so the
+                    // front-end emits that per-T insert symbol.
+                    if (head.validFormats1.size() < head.validFormats1.capacity())
+                    {
+                        head.validFormats1.push_back(formatToken);
+                    }
+                    else
+                    {
+                        static_cast<void>(head.validFormats1.insert(
+                            head.validFormats1.end(), static_cast<std::size_t>(1), formatToken));
+                    }
                 }
             }
 
@@ -6208,7 +6221,20 @@ namespace gpg::gal
                 );
                 if (result >= 0)
                 {
-                    head.validFormats2.push_back(formatToken);
+                    // MSVC8 inlines the fast in-place append and, when the vector is
+                    // at capacity, calls the out-of-line grow lane
+                    // msvc8::vector<std::int32_t>::_Insert_n (FUN_008EF2B0) as
+                    // _Insert_n(_Mylast, 1, &formatToken). Mirror that shape so the
+                    // front-end emits that per-T insert symbol.
+                    if (head.validFormats2.size() < head.validFormats2.capacity())
+                    {
+                        head.validFormats2.push_back(formatToken);
+                    }
+                    else
+                    {
+                        static_cast<void>(head.validFormats2.insert(
+                            head.validFormats2.end(), static_cast<std::size_t>(1), formatToken));
+                    }
                 }
             }
 
