@@ -5327,6 +5327,21 @@ namespace
     const wxStringRuntime* sourceValue
   );
 
+  // Forward declarations for the wxModulePathSplit chain (bodies below).
+  wxStringRuntime* wxStringAppendWideNullTerminatedRuntime(
+    wxStringRuntime* outText,
+    const wchar_t* appendText
+  );
+  void wxSplitPathDirectoryFromCopiedSource(
+    wxStringRuntime srcPath,
+    wxStringRuntime* outDir,
+    wxStringRuntime* outName,
+    wxStringRuntime* outExt
+  );
+  wxStringRuntime* wxResolveUserHomeDirectory(
+    wxStringRuntime* outText
+  );
+
   [[nodiscard]] WxFileConfigLineRuntime* WxFileConfigGetLastEntryLine(
     WxFileConfigGroupRuntimeView* groupView
   );
@@ -40821,42 +40836,96 @@ wxStringRuntime* wxBuildCurrentWorkingDirectoryStringRuntime(
 
 namespace
 {
-  [[nodiscard]] std::wstring WxResolveUserConfigRootPath()
+  /**
+   * Address: 0x009DE7B0 (FUN_009DE7B0, sub_9DE7B0)
+   *
+   * IDA signature:
+   * void __cdecl sub_9DE7B0(wxString a1, wxString *a2, wxString *a3, wxString *a4);
+   *
+   * What it does:
+   * Makes an assign-without-copy owned duplicate of `srcPath`, runs
+   * wxFileName::SplitPath_0 to split it into directory/name/extension out
+   * lanes, then releases the local shared COW copy. `outName`/`outExt` may be
+   * null (the module-path caller passes both null to take only the directory).
+   */
+  void wxSplitPathDirectoryFromCopiedSource(
+    wxStringRuntime srcPath,
+    wxStringRuntime* const outDir,
+    wxStringRuntime* const outName,
+    wxStringRuntime* const outExt
+  )
   {
-    if (const wchar_t* const home = _wgetenv(L"HOME"); home != nullptr && *home != L'\0') {
-      return std::wstring(home);
+    if (srcPath.m_pchData != nullptr) {
+      const wchar_t* const sourceText = srcPath.m_pchData;
+      srcPath.m_pchData = nullptr;
+      // InitWith(begin=0, len=-101) == assign-without-copy: own the full source lane.
+      wxString::InitWith(&srcPath, sourceText, 0, -101);
+      wxFileName::SplitPath_0(srcPath, outDir, outName, outExt, nullptr);
+      // wxString dtor tail: refcount-decrement, delete on drop.
+      ReleaseWxStringSharedPayload(srcPath);
     }
+  }
 
-    std::wstring homeFromDrivePath{};
-    if (const wchar_t* const homeDrive = _wgetenv(L"HOMEDRIVE"); homeDrive != nullptr) {
-      homeFromDrivePath += homeDrive;
-    }
+  /**
+   * Address: 0x009C6F90 (FUN_009C6F90, sub_9C6F90)
+   *
+   * IDA signature:
+   * wxString __cdecl sub_9C6F90(wxString a1);
+   *
+   * What it does:
+   * Resolves the user's home directory into `outText`: HOME (whole-string),
+   * else HOMEDRIVE+HOMEPATH (appended, cleared when HOMEPATH=="\\"), else
+   * USERPROFILE, else the directory of the running module
+   * (GetModuleFileNameW -> SplitPath directory extraction). The binary passes
+   * the out slot by value as the `wxString` argument and returns it; here it is
+   * the `outText` out pointer, returned unchanged.
+   */
+  wxStringRuntime* wxResolveUserHomeDirectory(
+    wxStringRuntime* const outText
+  )
+  {
+    outText->Empty(0);
 
-    if (const wchar_t* const homePath = _wgetenv(L"HOMEPATH"); homePath != nullptr) {
-      homeFromDrivePath += homePath;
-      if (std::wcscmp(homePath, L"\\") == 0) {
-        homeFromDrivePath.clear();
+    if (const wchar_t* const home = _wgetenv(L"HOME"); home != nullptr) {
+      AssignOwnedWxString(outText, std::wstring(home));
+    } else {
+      if (const wchar_t* const homeDrive = _wgetenv(L"HOMEDRIVE"); homeDrive != nullptr) {
+        wxStringAppendWideNullTerminatedRuntime(outText, homeDrive);
+      }
+      if (const wchar_t* const homePath = _wgetenv(L"HOMEPATH"); homePath != nullptr) {
+        wxStringAppendWideNullTerminatedRuntime(outText, homePath);
+        if (std::wcscmp(homePath, L"\\") == 0) {
+          outText->Empty(0);
+        }
       }
     }
 
-    if (!homeFromDrivePath.empty()) {
-      return homeFromDrivePath;
+    // Header length word[-2]: zero means the out lane is still empty.
+    if ((reinterpret_cast<const std::int32_t*>(outText->m_pchData) - 3)[1] == 0) {
+      if (const wchar_t* const userProfile = _wgetenv(L"USERPROFILE"); userProfile != nullptr) {
+        AssignOwnedWxString(outText, std::wstring(userProfile));
+      }
     }
 
-    if (const wchar_t* const userProfile = _wgetenv(L"USERPROFILE"); userProfile != nullptr && *userProfile != L'\0') {
-      return std::wstring(userProfile);
+    if ((reinterpret_cast<const std::int32_t*>(outText->m_pchData) - 3)[1] != 0) {
+      return outText;
     }
 
-    std::array<wchar_t, 0x104> modulePath{};
-    if (::GetModuleFileNameW(::GetModuleHandleW(nullptr), modulePath.data(), static_cast<DWORD>(modulePath.size())) == 0u) {
-      return {};
-    }
+    // Fallback: split the running module's full path, keep only the directory.
+    wxStringRuntime modulePath{};
+    modulePath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    std::array<wchar_t, 0x104> moduleBuffer{};
+    ::GetModuleFileNameW(
+      ::GetModuleHandleW(nullptr),
+      moduleBuffer.data(),
+      static_cast<DWORD>(moduleBuffer.size())
+    );
+    AssignOwnedWxString(&modulePath, std::wstring(moduleBuffer.data()));
 
-    try {
-      return std::filesystem::path(modulePath.data()).parent_path().wstring();
-    } catch (const std::exception&) {
-      return {};
-    }
+    wxSplitPathDirectoryFromCopiedSource(modulePath, outText, nullptr, nullptr);
+
+    ReleaseWxStringSharedPayload(modulePath);
+    return outText;
   }
 } // namespace
 
@@ -40875,7 +40944,7 @@ wxStringRuntime* wxBuildUserConfigRootPath(
     return nullptr;
   }
 
-  AssignOwnedWxString(outText, WxResolveUserConfigRootPath());
+  wxResolveUserHomeDirectory(outText);
   (void)EnsureUniqueOwnedWxStringBuffer(outText);
 
   const wchar_t* const pathText = outText->c_str();
