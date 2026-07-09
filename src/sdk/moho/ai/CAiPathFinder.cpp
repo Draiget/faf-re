@@ -1069,7 +1069,7 @@ void CAiPathFinder::OnPathAccepted(const SNavPath& path)
   mHasPathResult = 1;
   mIsQueuedOnPathQueue = 0;
   mResultCell = LastPathCell(path);
-  BroadcastPathEvent();
+  static_cast<Broadcaster*>(this)->BroadcastEvent(path);
 }
 
 /**
@@ -1119,7 +1119,7 @@ void CAiPathFinder::OnPathRejected(const SNavPath& path)
   mHasPathResult = 0;
   mIsQueuedOnPathQueue = 0;
   mResultCell = LastPathCell(path);
-  BroadcastPathEvent();
+  static_cast<Broadcaster*>(this)->BroadcastEvent(path);
 }
 
 /**
@@ -1336,26 +1336,48 @@ void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
   ++mRecentSearchRects.mSize;
 }
 
-void CAiPathFinder::BroadcastPathEvent()
+/**
+ * Address: 0x005AAD80 (FUN_005AAD80,
+ * ?BroadcastEvent@?$Broadcaster@ABUSNavPath@Moho@@@Moho@@IAEXABUSNavPath@2@@Z)
+ *
+ * IDA signature:
+ * int callcnv_F3 sub_5AAD80@<eax>(SNavPath* event@<edi>, Broadcaster* this@<esi>);
+ *
+ * What it does:
+ * Broadcasts one navigation-path payload to every linked path listener. The
+ * whole listener ring is detached into a local sentinel first; each detached
+ * node is then relinked directly after the live head and its owning
+ * CAiPathNavigator receives OnEvent(event). Detaching before dispatch keeps
+ * iteration safe when a listener unlinks/relinks itself inside the callback.
+ * Same intrusive-broadcast shape as Broadcaster::BroadcastEvent(ECommandEvent)
+ * (FUN_006E94A0), distinct per-T body (not ICF-folded).
+ */
+void moho::Broadcaster::BroadcastEvent(const SNavPath& event)
 {
-  Broadcaster* const head = static_cast<Broadcaster*>(this);
-  if (!head || head->ListIsSingleton()) {
+  Broadcaster detached{};
+
+  if (mPrev == this) {
     return;
   }
 
-  Broadcaster pending{};
-  head->move_nodes_to(pending);
+  detached.mPrev = mPrev;
+  detached.mNext = mNext;
+  detached.mNext->mPrev = &detached;
+  detached.mPrev->mNext = &detached;
+  mPrev = this;
+  mNext = this;
 
-  const SNavPath emptyPath{};
+  while (detached.mPrev != &detached) {
+    auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
+    listenerLink->ListLinkAfter(this);
 
-  for (auto* pendingNode = pending.pop_back(); pendingNode; pendingNode = pending.pop_back()) {
-    auto* const node = static_cast<Broadcaster*>(pendingNode);
-    head->push_front(node);
-
-    if (auto* const navigator = CAiPathNavigator::FromListenerLink(node)) {
-      (void)navigator->OnEvent(emptyPath);
+    if (CAiPathNavigator* const navigator = CAiPathNavigator::FromListenerLink(listenerLink)) {
+      (void)navigator->OnEvent(event);
     }
   }
+
+  detached.mNext->mPrev = detached.mPrev;
+  detached.mPrev->mNext = detached.mNext;
 }
 
 void CAiPathFinder::UpdatePlayableRectGate()

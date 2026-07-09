@@ -244,7 +244,6 @@ namespace moho
   private:
     void ClearRectHistory();
     void PushRectHistory(const gpg::Rect2i& rect);
-    void BroadcastPathEvent();
     void UpdatePlayableRectGate();
     [[nodiscard]] bool RectHistoryIntersects(const gpg::Rect2i& rect) const;
     [[nodiscard]] bool IsBlockedByHistory(const SOCellPos& cellPos) const;
