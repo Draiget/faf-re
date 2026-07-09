@@ -3795,6 +3795,59 @@ namespace moho
   }
 
   /**
+   * Address: 0x0067DB40 (FUN_0067DB40, msvc8::vector<Moho::Entity*>::_Insert_n)
+   *
+   * IDA signature:
+   * char *__userpurge sub_67DB40@<eax>(int *value@<eax>, unsigned int count@<ecx>, int *vec, char *pos);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<Moho::Entity*>::_Insert_n`.
+   * Inserts `insertCount` copies of `fillValue` at `insertPosition`. When spare
+   * capacity is sufficient the live tail `[pos, end)` is shifted right by
+   * `insertCount` slots and the gap is filled with the pointer value; otherwise
+   * a 1.5x-grown buffer is allocated, the head is moved, the insert window is
+   * fill-constructed, the tail is moved, and the previous block is freed. This
+   * canonical MSVC8 `_Insert_n` lane backs the `push_back(this)` slow-path append
+   * used by `Entity::AttachTo` for the parent attached-entities vector; the body
+   * itself lives in `msvc8::vector<T>::insert` (legacy/containers/Vector.h) and
+   * this per-T free helper is the source-level by-name invocation that keeps the
+   * emitted symbol.
+   */
+  void InsertNCopiesEntityPtrVector(
+    msvc8::vector<Entity*>& storage,
+    Entity** const insertPosition,
+    const unsigned int insertCount,
+    Entity* const fillValue)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
+   * Address: 0x0067961C (Moho::Entity::AttachTo attached-entities append lane, FUN_00679550)
+   *
+   * What it does:
+   * Appends one child `Entity*` into the parent attached-entities vector,
+   * mirroring the MSVC8 inlined `push_back` shape used by the binary AttachTo
+   * body: when the reserved capacity is exhausted the append reaches the
+   * canonical `vector<Entity*>::_Insert_n` slow-path
+   * (`InsertNCopiesEntityPtrVector`, FUN_0067DB40, `call sub_67DB40` at
+   * 0x0067961C); otherwise it is a fast-path in-place store.
+   */
+  void AppendAttachedEntity(msvc8::vector<Entity*>& storage, Entity* const value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesEntityPtrVector(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
+  }
+
+  /**
     * Alias of FUN_00679550 (non-canonical helper lane).
    *
    * What it does:
@@ -3826,7 +3879,7 @@ namespace moho
       return false;
     }
 
-    parentChildren.push_back(this);
+    AppendAttachedEntity(parentChildren, this);
     ResetAttachRuntimeNodeIfQueued(this);
     ApplyAttachInfo(mAttachInfo, attachInfo);
     return true;
