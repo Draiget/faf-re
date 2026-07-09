@@ -4484,6 +4484,43 @@ namespace
   constexpr std::uint8_t kCommandIssueTreeBlack = 1u;
   constexpr std::uint32_t kCommandIssueQueueMaxCapacity = 53687091u;
 
+  /**
+   * Address: 0x008B5410 (FUN_008B5410, sub_8B5410)
+   *
+   * IDA signature:
+   * void __noreturn sub_8B5410();
+   *
+   * What it does:
+   * MSVC8 std::deque<T>::_Xlen for the command-issue update ring: throws
+   * std::length_error("deque<T> too long") when the block map would exceed its
+   * maximum size (kCommandIssueQueueMaxCapacity). Never returns.
+   */
+  [[noreturn]] void ThrowCommandIssueQueueTooLong()
+  {
+    throw std::length_error("deque<T> too long");
+  }
+
+  /**
+   * Address: 0x008B5690 (FUN_008B5690, sub_8B5690)
+   *
+   * IDA signature:
+   * void *__fastcall sub_8B5690(unsigned int a1);
+   *
+   * What it does:
+   * MSVC8 std::allocator<CommandIssueUpdateEventRuntimeView*>::allocate for the
+   * command-issue ring's block map: rejects an element count that would overflow
+   * the byte size (0xFFFFFFFF / n < 4) by throwing std::bad_alloc, otherwise
+   * returns operator new(4 * n) raw storage for `n` slot pointers.
+   */
+  [[nodiscard]] CommandIssueUpdateEventRuntimeView** AllocateCommandIssueUpdateMap(std::uint32_t slotCount)
+  {
+    if (0xFFFFFFFFu / slotCount < sizeof(CommandIssueUpdateEventRuntimeView*)) {
+      throw std::bad_alloc();
+    }
+    return static_cast<CommandIssueUpdateEventRuntimeView**>(
+      ::operator new(sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(slotCount)));
+  }
+
   [[nodiscard]] CommandIssueWeakSetNode* AllocateCommandIssueWeakSetHead()
   {
     auto* const head = static_cast<CommandIssueWeakSetNode*>(::operator new(sizeof(CommandIssueWeakSetNode)));
@@ -4687,11 +4724,32 @@ namespace
     return storage;
   }
 
-  void GrowCommandIssueUpdateQueue(CommandIssueUpdateQueueRuntimeView& queue)
+  /**
+   * Address: 0x008B50A0 (FUN_008B50A0, sub_8B50A0)
+   *
+   * IDA signature:
+   * char *__usercall sub_8B50A0@<eax>(int this@<esi>);  // this = deque map struct
+   *
+   * What it does:
+   * MSVC8 std::deque<CommandIssueUpdateEventRuntimeView>::_Growmap for the
+   * command-issue helper's local ring (block size 1). Enlarges the block-pointer
+   * map by growth = clamp(oldCapacity/2, min 8) capped so oldCapacity+growth does
+   * not exceed kCommandIssueQueueMaxCapacity (throws std::length_error otherwise).
+   * Allocates a new map (checked allocator, or bare operator new when the new size
+   * is 0), then relocates the wrapped contents preserving the ABSOLUTE readIndex
+   * (_Myoff) position: the tail [readIndex..oldCapacity) stays in place; the front
+   * segment [0..readIndex) is split across the newly-added high slots and the low
+   * slots depending on whether readIndex <= growth, with the vacated slots zeroed.
+   * Frees the old map, then sets capacity += growth and slots = newMap. readIndex
+   * and count are left unchanged. Returns the new map (caller ignores the result).
+   */
+  CommandIssueUpdateEventRuntimeView** GrowCommandIssueUpdateQueue(CommandIssueUpdateQueueRuntimeView& queue)
   {
     const std::uint32_t oldCapacity = queue.capacity;
-    if (oldCapacity == kCommandIssueQueueMaxCapacity) {
-      throw std::bad_alloc();
+
+    // deque map-size overflow guard (0x3333333 - mapsize < 1 == mapsize maxed out).
+    if ((kCommandIssueQueueMaxCapacity - oldCapacity) < 1u) {
+      ThrowCommandIssueQueueTooLong();
     }
 
     std::uint32_t growth = 1u;
@@ -4704,30 +4762,65 @@ namespace
     }
 
     const std::uint32_t newCapacity = oldCapacity + growth;
-    auto** const newSlots = static_cast<CommandIssueUpdateEventRuntimeView**>(
-      ::operator new(sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(newCapacity))
-    );
-    std::memset(newSlots, 0, sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(newCapacity));
+    const std::uint32_t readIndex = queue.readIndex;
 
-    if (queue.slots != nullptr && oldCapacity != 0u && queue.count != 0u) {
-      for (std::uint32_t offset = 0u; offset < queue.count; ++offset) {
-        std::uint32_t oldIndex = queue.readIndex + offset;
-        if (oldIndex >= oldCapacity) {
-          oldIndex -= oldCapacity;
-        }
+    CommandIssueUpdateEventRuntimeView** const newSlots =
+      (newCapacity != 0u)
+        ? AllocateCommandIssueUpdateMap(newCapacity)
+        : static_cast<CommandIssueUpdateEventRuntimeView**>(::operator new(0));
 
-        std::uint32_t newIndex = queue.readIndex + offset;
-        if (newIndex >= newCapacity) {
-          newIndex -= newCapacity;
-        }
+    constexpr std::size_t slotBytes = sizeof(CommandIssueUpdateEventRuntimeView*);
+    CommandIssueUpdateEventRuntimeView** const oldSlots = queue.slots;
 
-        newSlots[newIndex] = queue.slots[oldIndex];
+    // Tail: new[readIndex..oldCapacity) = old[readIndex..oldCapacity).
+    const std::uint32_t tailCount = oldCapacity - readIndex;
+    if (tailCount != 0u) {
+      ::memmove_s(newSlots + readIndex, tailCount * slotBytes,
+                  oldSlots + readIndex, tailCount * slotBytes);
+    }
+
+    if (readIndex > growth) {
+      // Front [0..readIndex) wraps past the newly added slots.
+      // Head-copy: new[oldCapacity..oldCapacity+growth) = old[0..growth).
+      if (growth != 0u) {
+        ::memmove_s(newSlots + oldCapacity, growth * slotBytes,
+                    oldSlots, growth * slotBytes);
+      }
+      // Mid-copy: new[0..readIndex-growth) = old[growth..readIndex).
+      const std::uint32_t midCount = readIndex - growth;
+      if (midCount != 0u) {
+        ::memmove_s(newSlots, midCount * slotBytes,
+                    oldSlots + growth, midCount * slotBytes);
+      }
+      // Zero the slots vacated by the wrap: new[readIndex-growth..readIndex).
+      if (growth != 0u) {
+        std::memset(newSlots + (readIndex - growth), 0, growth * slotBytes);
+      }
+    } else {
+      // Front fits within the added slots.
+      // Head-copy: new[oldCapacity..oldCapacity+readIndex) = old[0..readIndex).
+      if (readIndex != 0u) {
+        ::memmove_s(newSlots + oldCapacity, readIndex * slotBytes,
+                    oldSlots, readIndex * slotBytes);
+      }
+      // Zero the freshly grown remainder: new[oldCapacity+readIndex..newCapacity).
+      if (growth != readIndex) {
+        std::memset(newSlots + (oldCapacity + readIndex), 0,
+                    (growth - readIndex) * slotBytes);
+      }
+      // Zero the low slots the front vacated: new[0..readIndex).
+      if (readIndex != 0u) {
+        std::memset(newSlots, 0, readIndex * slotBytes);
       }
     }
 
-    ::operator delete(queue.slots);
+    if (oldSlots != nullptr) {
+      ::operator delete(oldSlots);
+    }
+
+    queue.capacity = oldCapacity + growth;
     queue.slots = newSlots;
-    queue.capacity = newCapacity;
+    return newSlots;
   }
 
   /**
