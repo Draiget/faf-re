@@ -1756,6 +1756,14 @@ namespace msvc8
          * CAiAttackerImpl::CreateWeapon invokes mWeapons.push_back(weapon) by name
          * — MSVC8's push_back (FUN_005DBD90) is insert(end(),1,value) when full —
          * so this per-T pointer symbol is emitted).
+         * Address: 0x005DD570 (FUN_005DD570, msvc8::vector<moho::CAcquireTargetTask*>::_Insert_n
+         * grow lane for the AiAttacker CAcquireTargetTask* reflection vector; the
+         * recovered helper InsertNCopiesCAcquireTargetTaskPtrVector (IAiAttacker.cpp)
+         * invokes storage.insert(begin()+offset, count, value) by name, and both
+         * RVectorType_CAcquireTargetTaskPtr::SerLoad (FUN_005DC660) and
+         * ResizeCAcquireTargetTaskPointerVector (FUN_005DC9B0) route their
+         * append/grow lanes through it, so this per-T 4-byte pointer symbol is
+         * emitted).
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
          * grow lane for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
