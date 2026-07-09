@@ -1764,6 +1764,16 @@ namespace msvc8
          * ResizeCAcquireTargetTaskPointerVector (FUN_005DC9B0) route their
          * append/grow lanes through it, so this per-T 4-byte pointer symbol is
          * emitted).
+         * Address: 0x0067DB40 (FUN_0067DB40, msvc8::vector<Moho::Entity*>::_Insert_n
+         * grow lane for Moho::Entity::mAttachedEntities @+0x17C; the recovered
+         * helper InsertNCopiesEntityPtrVector (Entity.cpp) invokes
+         * storage.insert(begin()+offset, count, value) by name, and
+         * Moho::Entity::AttachTo (FUN_00679550) routes its attached-entities
+         * append through the push_back-shape helper AppendAttachedEntity which
+         * calls it on the capacity-full path (MSVC8's push_back is
+         * insert(end(),1,value) when full), so this per-T 4-byte pointer symbol
+         * is emitted. Shared by 7 vector<Entity*> _Insert_n sites in the Entity
+         * subsystem, all folding to this emission).
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
          * grow lane for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
