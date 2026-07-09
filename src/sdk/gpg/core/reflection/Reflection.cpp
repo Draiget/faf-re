@@ -14901,7 +14901,11 @@ bool REnumType::GetEnumValue(const char* name, int* outVal) const
   const REnumType::ROptionValue& value
 )
 {
-  options.push_back(value);
+  // sub_8DF290: fast in-place fill when capacity remains, else sub_8DCB70 =
+  // insert(end(),1,value). insert() contains both paths, so a single by-name
+  // call reproduces the binary and pins FUN_008DCB70 as the grow-lane emission.
+  static_assert(sizeof(REnumType::ROptionValue) == 8, "REnumType::ROptionValue must be 8 bytes");
+  options.insert(options.end(), 1, value);
   return options.empty() ? nullptr : &options.back();
 }
 

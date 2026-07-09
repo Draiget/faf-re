@@ -1798,6 +1798,12 @@ namespace msvc8
          * caller appends valid GAL-format tokens and invokes
          * validFormats2.insert(end(),1,token) by name, so this per-T scalar-int32
          * symbol is emitted).
+         * Address: 0x008DCB70 (FUN_008DCB70, msvc8::vector<gpg::REnumType::ROptionValue>::_Insert_n
+         * grow/insert lane for the 8-byte enum-option element {int mValue; const char* mName;};
+         * the recovered caller gpg::AppendEnumOptionValue (Reflection.cpp) invokes
+         * options.insert(options.end(), 1, value) by name (MSVC8's push_back at FUN_008DF290
+         * is insert(end(),1,value) on the capacity-full path), so this per-T 8-byte
+         * trivially-copyable symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
