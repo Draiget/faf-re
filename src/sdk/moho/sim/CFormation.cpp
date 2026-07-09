@@ -5,10 +5,17 @@
 #include <cstring>
 #include <new>
 
+#include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/IFormationInstance.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/time/Timer.h"
+#include "lua/LuaObject.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector3.h"
 
 namespace
 {
@@ -159,10 +166,7 @@ namespace moho
     , mBestFormation(-1)
     , mTravelFormation(-1)
     , mNumFormationScripts(0)
-    , mDirectionX(0.0f)
-    , mDirectionY(0.0f)
-    , mDirectionZ(0.0f)
-    , mDirectionW(1.0f)
+    , mDirection(/*w*/ 0.0f, /*x*/ 0.0f, /*y*/ 0.0f, /*z*/ 1.0f)
     , mDirectionScale(1.0f)
     , mTimeLeft(0.5f)
     , mLastUpdate(0.0f)
@@ -230,12 +234,77 @@ namespace moho
     std::memset(&mMousePos, 0, sizeof(mMousePos));
 
     mNumFormationScripts = 0;
-    mDirectionX = 0.0f;
-    mDirectionY = 0.0f;
-    mDirectionZ = 0.0f;
-    mDirectionW = 1.0f;
+    mDirection = Wm3::Quaternionf(/*w*/ 0.0f, /*x*/ 0.0f, /*y*/ 0.0f, /*z*/ 1.0f);
     mDirectionScale = 1.0f;
     mTimeLeft = 0.5f;
     mLastUpdate = 0.0f;
+  }
+
+  /**
+   * Address: 0x00838860 (FUN_00838860, Moho::CFormation::UpdateOrientation)
+   *
+   * IDA signature:
+   * void __fastcall Moho::CFormation::UpdateOrientation(
+   *     Wm3::Vector3f *mouseWorldPos, Moho::CFormation *formation);
+   *
+   * What it does:
+   * Advances the command-formation orientation timer; once it expires and the
+   * mouse has moved far enough from both the last mouse position and the finish
+   * point, recomputes the formation direction quaternion from (mouse - finish)
+   * and pushes it into the live formation instance via SetOrientation, unless
+   * the UI reports NIS mode (in which case the formation is reset).
+   */
+  void CFormation::UpdateOrientation(const Wm3::Vector3f& mouseWorldPos, CFormation* const formation)
+  {
+    if (!formation->mReady || formation->mCurInstance == nullptr) {
+      return;
+    }
+
+    const float currentTime = gpg::time::GetSystemTimer().ElapsedSeconds();
+    const float deltaSeconds = currentTime - formation->mLastUpdate;
+    formation->mLastUpdate = currentTime;
+
+    const float remainingTime = formation->mTimeLeft - deltaSeconds;
+    formation->mTimeLeft = (remainingTime > 0.0f) ? remainingTime : 0.0f;
+    if (formation->mTimeLeft > 0.0f) {
+      return;
+    }
+
+    const float dxMouse = formation->mMousePos.x - mouseWorldPos.x;
+    const float dyMouse = formation->mMousePos.y - mouseWorldPos.y;
+    const float dzMouse = formation->mMousePos.z - mouseWorldPos.z;
+    const float mouseDeltaSq = dxMouse * dxMouse + dyMouse * dyMouse + dzMouse * dzMouse;
+
+    const float dxFinish = formation->mFinish.x - mouseWorldPos.x;
+    const float dyFinish = formation->mFinish.y - mouseWorldPos.y;
+    const float dzFinish = formation->mFinish.z - mouseWorldPos.z;
+    const float finishDeltaSq = dxFinish * dxFinish + dyFinish * dyFinish + dzFinish * dzFinish;
+
+    if (mouseDeltaSq < 0.0025f || finishDeltaSq < 0.0025f) {
+      return;
+    }
+
+    LuaPlus::LuaState* const state = WLD_GetActiveSession()->mState;
+    LuaPlus::LuaObject gameMainModule = SCR_Import(state, "/lua/ui/game/gamemain.lua");
+    LuaPlus::LuaFunction<> isNisMode(gameMainModule["IsNISMode"]);
+    if (isNisMode.Call_x_Bool()) {
+      formation->Reset();
+      return;
+    }
+
+    formation->mMousePos = mouseWorldPos;
+
+    const Wm3::Vector3f directionVector(
+      mouseWorldPos.x - formation->mFinish.x,
+      0.0f,
+      mouseWorldPos.z - formation->mFinish.z
+    );
+    formation->mDirection = COORDS_Orient(directionVector);
+
+    IFormationInstance* const instance = formation->mCurInstance;
+    if (instance != nullptr) {
+      const Wm3::Quaternionf orientation = formation->mDirection;
+      static_cast<CAiFormationInstance*>(instance)->SetOrientation(orientation);
+    }
   }
 } // namespace moho
