@@ -6211,4 +6211,29 @@ namespace boost
     }
     return nullptr;
   }
+
+  /**
+   * Address: 0x00883F60 (FUN_00883F60, boost::shared_ptr<Moho::LaunchInfoLoad>::shared_ptr)
+   * Mangled: ??0?$shared_ptr@VLaunchInfoLoad@Moho@@@boost@@QAE@PAVLaunchInfoLoad@Moho@@@Z
+   *
+   * IDA signature:
+   * boost::shared_ptr_LaunchInfoLoad *__userpurge sub_883F60@<eax>(
+   *     Moho::LaunchInfoLoad **a1@<edi>, boost::shared_ptr_LaunchInfoLoad *this);
+   *
+   * What it does:
+   * Placement-new constructs one `boost::shared_ptr<LaunchInfoLoad>` over an
+   * uninitialized output slot from one raw `LaunchInfoLoad*` pointee, taking
+   * strong ownership through a freshly allocated sp_counted_impl_p<LaunchInfoLoad>
+   * control block (use/weak counts = 1). LaunchInfoLoad does not derive
+   * enable_shared_from_this, so the trailing sp_enable_shared_from_this hook is a
+   * no-op. Engine-instantiated boost templated ctor emission.
+   */
+  boost::shared_ptr<moho::LaunchInfoLoad>* ConstructSharedLaunchInfoLoadFromRaw(
+    boost::shared_ptr<moho::LaunchInfoLoad>* const outLaunchInfo,
+    moho::LaunchInfoLoad* const rawLaunchInfo
+  )
+  {
+    return ::new (static_cast<void*>(outLaunchInfo))
+      boost::shared_ptr<moho::LaunchInfoLoad>(rawLaunchInfo);
+  }
 } // namespace boost

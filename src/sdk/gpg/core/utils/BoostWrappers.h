@@ -1278,6 +1278,26 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x00883F60 (FUN_00883F60, boost::shared_ptr<Moho::LaunchInfoLoad>::shared_ptr)
+     * Mangled: ??0?$shared_ptr@VLaunchInfoLoad@Moho@@@boost@@QAE@PAVLaunchInfoLoad@Moho@@@Z
+     *
+     * IDA signature:
+     * boost::shared_ptr_LaunchInfoLoad *__userpurge sub_883F60@<eax>(
+     *     Moho::LaunchInfoLoad **a1@<edi>, boost::shared_ptr_LaunchInfoLoad *this);
+     *
+     * What it does:
+     * Placement-new constructs one `boost::shared_ptr<LaunchInfoLoad>` over an
+     * uninitialized output slot, taking ownership of one raw `LaunchInfoLoad*`
+     * (allocates one sp_counted_impl_p<LaunchInfoLoad> control block with
+     * use/weak counts = 1). Engine-instantiated boost templated ctor emission,
+     * kept as a recoverable engine helper.
+     */
+    [[nodiscard]] boost::shared_ptr<moho::LaunchInfoLoad>* ConstructSharedLaunchInfoLoadFromRaw(
+        boost::shared_ptr<moho::LaunchInfoLoad>* outLaunchInfo,
+        moho::LaunchInfoLoad* rawLaunchInfo
+    );
+
+    /**
      * Address: 0x0089B840 (FUN_0089B840, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::sp_counted_impl_p)
      *
      * What it does:
