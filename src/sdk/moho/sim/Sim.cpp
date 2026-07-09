@@ -8332,6 +8332,7 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
     static_cast<CSimSoundManager*>(LoadPointerByRType(archive, {"ISoundManager", "Moho::ISoundManager"}, ownerRef));
 
   LoadTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
+  SerVars(archive);
   LoadObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
   SerDirtyEnts(archive);
 
@@ -8376,6 +8377,62 @@ void Sim::SerVars(gpg::WriteArchive* archive)
 
   msvc8::string endOfVars;
   archive->WriteString(&endOfVars);
+}
+
+/**
+ * Address: 0x00745500 (FUN_00745500, ?SerVars@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+ * Mangled: ?SerVars@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z
+ *
+ * IDA signature:
+ * void __stdcall Moho::Sim::SerVars(Moho::Sim *this, gpg::ReadArchive &archive, int);
+ *
+ * What it does:
+ * Load counterpart of SerVars(WriteArchive*): restores console-variable
+ * overrides. Reads a var name; while non-empty, reads its lexical value,
+ * looks the name up in the `simcons` sim-command registry, and (when found)
+ * resolves/creates the per-Sim CSimConVarInstanceBase indexed by
+ * CSimConVarBase::mIndex, growing `mSimVars` to the global convar-index
+ * counter, then applies the value through the instance's reflection RRef via
+ * SetLexical. Unknown names are logged.
+ */
+void Sim::SerVars(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  msvc8::string varName;
+  archive->ReadString(&varName);
+  while (!varName.empty()) {
+    msvc8::string varValue;
+    archive->ReadString(&varValue);
+
+    // `simcons` map value is a CSimConVarBase (only convar entries are saved by
+    // SerVars(WriteArchive*)); the binary's virtual Identity() adjustment is a
+    // no-op for this single-inheritance chain, so a static_cast is 1:1.
+    CSimConVarBase* const conVar = static_cast<CSimConVarBase*>(FindRegisteredSimConCommand(varName.c_str()));
+    if (!conVar) {
+      Logf("Reference to unknown console variable: %s", varName.c_str());
+    } else {
+      const std::size_t index = static_cast<std::size_t>(conVar->mIndex);
+      if (mSimVars.size() <= index) {
+        // Binary reserves to the global convar count in one shot (not index+1).
+        mSimVars.resize(static_cast<std::size_t>(GetSimConVarIndexCounter()), nullptr);
+      }
+
+      CSimConVarInstanceBase* instance = mSimVars[index];
+      if (!instance) {
+        instance = conVar->CreateInstance();
+        mSimVars[index] = instance;
+      }
+
+      gpg::RRef valueRef{};
+      instance->GetValueRef(&valueRef);
+      valueRef.SetLexical(varValue.c_str());
+    }
+
+    archive->ReadString(&varName);
+  }
 }
 
 /**

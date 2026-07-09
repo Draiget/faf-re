@@ -1107,6 +1107,17 @@ namespace moho
     void SerVars(gpg::WriteArchive* archive);
 
     /**
+     * Address: 0x00745500 (FUN_00745500, ?SerVars@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Reads `(name, lexical value)` console-variable pairs until an empty-name
+     * sentinel; resolves each name in the `simcons` registry, lazily creates the
+     * per-Sim convar instance in `mSimVars`, and applies the value via
+     * `RRef::SetLexical`. Logs unknown console variable names.
+     */
+    void SerVars(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x007551C0 (FUN_007551C0)
      *
      * What it does:

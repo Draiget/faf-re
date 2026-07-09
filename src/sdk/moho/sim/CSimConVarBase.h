@@ -61,6 +61,16 @@ namespace moho
     std::uint32_t mIndex; // +0x0C
   };
 
+  /**
+   * Address: 0x00743210 (FUN_00743210, sub_743210)
+   *
+   * What it does:
+   * Returns the current process-global sim-convar index counter (number of
+   * distinct console variables registered so far). Used by the Sim load-
+   * serializer to grow `mSimVars` to full convar count before indexing.
+   */
+  [[nodiscard]] std::uint32_t GetSimConVarIndexCounter() noexcept;
+
   static_assert(sizeof(CSimConVarBase) == 0x10, "CSimConVarBase size must be 0x10");
   static_assert(offsetof(CSimConVarBase, mName) == 0x04, "CSimConVarBase::mName offset must be 0x04");
   static_assert(offsetof(CSimConVarBase, mRequiresCheat) == 0x08, "CSimConVarBase::mRequiresCheat offset must be 0x08");
