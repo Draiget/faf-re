@@ -9088,6 +9088,8 @@ namespace moho
       mTimeSinceLastTick += deltaSeconds * 10.0f;
     }
 
+    CFormation::UpdateOrientation(AccessCursorInfo(*this).mMouseWorldPos, mCurFormation);
+
     mTimeSinceLastTick = std::max(0.0f, std::min(mTimeSinceLastTick, 1.0f));
 
     const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));

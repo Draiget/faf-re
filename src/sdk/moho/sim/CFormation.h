@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
 namespace moho
@@ -52,6 +53,23 @@ namespace moho
      */
     void Reset();
 
+    /**
+     * Address: 0x00838860 (FUN_00838860, Moho::CFormation::UpdateOrientation)
+     *
+     * IDA signature:
+     * void __fastcall Moho::CFormation::UpdateOrientation(
+     *     Wm3::Vector3f *mouseWorldPos, Moho::CFormation *formation);
+     *
+     * What it does:
+     * Per-frame command-formation orientation update. Once the formation timer
+     * expires and the mouse has moved far enough, recomputes the formation
+     * direction quaternion from (mouse - finish) and pushes it into the live
+     * formation instance via SetOrientation, unless the UI is in NIS mode (then
+     * it resets the formation). Modeled static because the binary passes the
+     * formation in edx, not as a thiscall receiver.
+     */
+    static void UpdateOrientation(const Wm3::Vector3f& mouseWorldPos, CFormation* formation);
+
   public:
     void* mTreeAllocProxy;             // +0x00
     Node* mNodeHead;                   // +0x04
@@ -66,10 +84,7 @@ namespace moho
     std::int32_t mBestFormation;       // +0x3C
     std::int32_t mTravelFormation;     // +0x40
     std::int32_t mNumFormationScripts; // +0x44
-    float mDirectionX;                 // +0x48
-    float mDirectionY;                 // +0x4C
-    float mDirectionZ;                 // +0x50
-    float mDirectionW;                 // +0x54
+    Wm3::Quaternionf mDirection;       // +0x48 (Wm3 layout: w@+0x48, x@+0x4C, y@+0x50, z@+0x54)
     float mDirectionScale;             // +0x58
     float mTimeLeft;                   // +0x5C
     float mLastUpdate;                 // +0x60
@@ -91,7 +106,8 @@ namespace moho
   static_assert(offsetof(CFormation, mBestFormation) == 0x3C, "CFormation::mBestFormation offset must be 0x3C");
   static_assert(offsetof(CFormation, mTravelFormation) == 0x40, "CFormation::mTravelFormation offset must be 0x40");
   static_assert(offsetof(CFormation, mNumFormationScripts) == 0x44, "CFormation::mNumFormationScripts offset must be 0x44");
-  static_assert(offsetof(CFormation, mDirectionW) == 0x54, "CFormation::mDirectionW offset must be 0x54");
+  static_assert(offsetof(CFormation, mDirection) == 0x48, "CFormation::mDirection offset must be 0x48");
+  static_assert(sizeof(Wm3::Quaternionf) == 0x10, "Wm3::Quaternionf size must be 0x10");
   static_assert(offsetof(CFormation, mTimeLeft) == 0x5C, "CFormation::mTimeLeft offset must be 0x5C");
   static_assert(offsetof(CFormation, mLastUpdate) == 0x60, "CFormation::mLastUpdate offset must be 0x60");
 } // namespace moho
