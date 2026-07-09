@@ -1194,7 +1194,11 @@ namespace moho
    */
   msvc8::auto_ptr<SWldSessionInfo> CSavedGame::CreateSinglePlayerSessionInfo()
   {
-    boost::shared_ptr<LaunchInfoLoad> launchInfo(new LaunchInfoLoad());
+    // MSVC8 emitted the boost::shared_ptr<LaunchInfoLoad>(LaunchInfoLoad*) ctor
+    // out-of-line (FUN_00883F60); invoke it by name so the front-end keeps that
+    // per-type templated-ctor symbol (a plain `shared_ptr x(new T())` may inline it).
+    boost::shared_ptr<LaunchInfoLoad> launchInfo;
+    (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&launchInfo, new LaunchInfoLoad());
     gpg::ReadPointerShared_SSessionSaveData(launchInfo->mLoadSessionData, mReader, NullOwnerRef());
     mReader->EndSection(false);
 
