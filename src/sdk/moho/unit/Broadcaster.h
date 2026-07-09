@@ -13,6 +13,7 @@ namespace moho
 {
   enum ECommandEvent : int;
   enum EUnitCommandQueueStatus : int;
+  struct SNavPath;
 
   class Broadcaster : public TDatList<Broadcaster, void>
   {
@@ -36,6 +37,20 @@ namespace moho
      * preserving iteration safety when listeners relink/unlink during callback.
      */
     void BroadcastEvent(EUnitCommandQueueStatus event);
+
+    /**
+     * Address: 0x005AAD80 (FUN_005AAD80,
+     * ?BroadcastEvent@?$Broadcaster@ABUSNavPath@Moho@@@Moho@@IAEXABUSNavPath@2@@Z)
+     *
+     * What it does:
+     * Broadcasts one navigation-path payload to all linked path listeners
+     * (CAiPathNavigator) while preserving iteration safety when listeners
+     * relink/unlink themselves during callback. Same intrusive-broadcast shape
+     * as the ECommandEvent / EUnitCommandQueueStatus overloads (distinct per-T
+     * body, not ICF-folded); the definition lives in CAiPathFinder.cpp because
+     * the concrete listener dispatch resolves to CAiPathNavigator::OnEvent.
+     */
+    void BroadcastEvent(const SNavPath& event);
   };
 
   static_assert(offsetof(Broadcaster, mPrev) == 0x00, "Broadcaster::mPrev offset must be 0x00");
