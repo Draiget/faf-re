@@ -159,12 +159,35 @@ namespace
 #endif
   }
 
-  [[nodiscard]] gpg::RRef MakeMotorSinkAwayRef(moho::MotorSinkAway* const object)
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
   {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = CachedMotorSinkAwayType();
-    return ref;
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived =
+      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
   }
 
   /**
@@ -179,7 +202,8 @@ namespace
     moho::MotorSinkAway* const value
   )
   {
-    const gpg::RRef ref = MakeMotorSinkAwayRef(value);
+    gpg::RRef ref{};
+    (void)gpg::RRef_MotorSinkAway(&ref, value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -224,7 +248,8 @@ namespace
       return;
     }
 
-    const gpg::RRef ref = MakeMotorSinkAwayRef(object);
+    gpg::RRef ref{};
+    (void)gpg::RRef_MotorSinkAway(&ref, object);
     result->SetUnowned(ref, 0u);
   }
 
@@ -664,6 +689,32 @@ namespace moho
     return index;
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00697000 (FUN_00697000, gpg::RRef_MotorSinkAway)
+   * Mangled: ?RRef_MotorSinkAway@gpg@@ (per-type reflection-ref builder)
+   *
+   * IDA signature:
+   * gpg::RRef* __cdecl gpg::RRef_MotorSinkAway(gpg::RRef* out, Moho::MotorSinkAway* value);
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::MotorSinkAway*`. On the
+   * exact-type fast path returns `{value, sType}`; for a derived object it
+   * resolves the most-derived RType, asserts derivation, and stores
+   * `{value - baseOffset, dynamicType}`.
+   */
+  gpg::RRef* RRef_MotorSinkAway(gpg::RRef* const out, moho::MotorSinkAway* const value)
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, CachedMotorSinkAwayType());
+    return out;
+  }
+} // namespace gpg
 
 namespace
 {
