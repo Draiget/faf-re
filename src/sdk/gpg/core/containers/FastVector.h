@@ -581,10 +581,26 @@ namespace gpg::core
      * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
      * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
      * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::SFormationLinkedUnitRef, 4>::InsertAt)
+     * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
      * storage when required.
+     *
+     * Two distinct emissions share this template, gated on element triviality:
+     *  - Trivially-relocatable T (char @0x0047C590; the pointer lanes Entity ptr
+     *    @0x0057FE30 and UserEntity ptr @0x005050A0; and the POD structs
+     *    SAssignedLocInfo @0x0059CC10, SFormationLinkedUnitRef @0x0056B2F0) blit
+     *    the tail with memcpy/memmove (the fast path below).
+     *  - Deep-copy T (msvc8::string @0x0083B6F0, LuaPlus::LuaObject @0x004C7EB0,
+     *    boost::shared_ptr<CMauiFrame> @0x0084E570) must NOT relocate raw bytes
+     *    (that would shallow-copy owned heap pointers and double-free). Those
+     *    emissions shift elements one at a time via copy-construct
+     *    (UninitializedCopyForward, binary _Ucopy) into the freshly grown tail
+     *    and copy-assign (CopyBackwardAssign, binary std::_Copy_backward) over
+     *    live slots, mirroring std::vector::insert on a non-trivial value type.
+     *    The branch structure (fits-in-tail vs. spills-past-end vs. grow) is
+     *    identical across both emissions; only the per-element operation differs.
      */
     void InsertAt(T* pos, const T* insStart, const T* insEnd)
     {
@@ -593,24 +609,52 @@ namespace gpg::core
         return;
 
       if constexpr (!std::is_trivially_copyable_v<T>) {
-        const size_t sz = this->Size();
-        const size_t cap = this->Capacity();
-        size_t posIndex = index_of(this->start_, pos);
-        if (sz + insertCount > cap) {
-          size_t newCap = cap ? cap * 2 : N;
-          if (newCap < sz + insertCount)
-            newCap = sz + insertCount;
-          GrowToCapacity(newCap);
+        // Deep-copy lane (FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570): element-wise
+        // construct + assign; never memmove a value type that owns storage.
+        T* const start = this->start_;
+        T* const end = this->end_;
+        const size_t requiredSize = static_cast<size_t>(end - start) + insertCount;
+        const size_t currentCapacity = static_cast<size_t>(this->capacity_ - start);
+        if (requiredSize > currentCapacity) {
+          size_t growTo = requiredSize;
+          const size_t doubledCapacity = currentCapacity * 2;
+          if (growTo < doubledCapacity) {
+            growTo = doubledCapacity;
+          }
+          GrowInsertDeepCopy(pos, growTo, insStart, insEnd);
+          return;
         }
-        pos = ptr_at(this->start_, posIndex);
-        const size_t tailCount = static_cast<size_t>(this->end_ - pos);
-        if (tailCount) {
-          std::memmove(pos + insertCount, pos, tailCount * ElemSize);
+
+        // posAfter = pos + insertCount (address translated, matches the
+        // binary's `(char*)pos + ElemSize*insertCount`).
+        T* const posAfter = pos + insertCount;
+        if (posAfter <= end) {
+          // Branch A: the inserted range fits within the current live tail.
+          // 1. Extend by copy-constructing the trailing `insertCount` slots
+          //    past end (binary `_Ucopy(end-insertCount, end, end)`).
+          T* const tailStart = end - insertCount;
+          this->end_ = UninitializedCopyForward(end, tailStart, end);
+          // 2. Assign-shift the middle block [pos, tailStart) up by insertCount
+          //    (binary `std::_Copy_backward(pos, tailStart, end)`).
+          CopyBackwardAssign(tailStart, end, pos);
+          // 3. Assign the inserted values into [pos, pos+insertCount)
+          //    (binary `std::_Copy_backward(insStart, insEnd, posAfter)`).
+          CopyBackwardAssign(insEnd, posAfter, insStart);
+          return;
         }
-        for (size_t i = 0; i < insertCount; ++i) {
-          pos[i] = insStart[i];
-        }
-        this->end_ += insertCount;
+
+        // Branch B: the inserted range spills past the current end.
+        // 1. Copy-construct the overflow suffix of the insert range past end
+        //    (binary `_Ucopy(insStart + (end-pos), insEnd, end)`).
+        const size_t prefixCount = static_cast<size_t>(end - pos);
+        T* write = UninitializedCopyForward(end, insStart + prefixCount, insEnd);
+        this->end_ = write;
+        // 2. Copy-construct the displaced old tail [pos, end) after the overflow
+        //    (binary `_Ucopy(pos, end, write)`).
+        this->end_ = UninitializedCopyForward(write, pos, end);
+        // 3. Assign the insert prefix over the vacated original [pos, end)
+        //    (binary `std::_Copy_backward(insStart, insStart+prefixCount, end)`).
+        CopyBackwardAssign(insStart + prefixCount, end, insStart);
         return;
       }
 
@@ -833,6 +877,91 @@ namespace gpg::core
         destinationAddress += ElemSize;
       }
       return reinterpret_cast<T*>(destinationAddress);
+    }
+
+    /**
+     * Address: 0x006584C0 (FUN_006584C0, std::_Uninit_copy<std::string> lane == _Ucopy)
+     *
+     * What it does:
+     * Copy-CONSTRUCTS `[copyBegin, copyEnd)` into raw storage at `dest` and
+     * returns the advanced destination pointer. Mirrors the binary helper that
+     * default-initializes each destination slot (`_Myres=15,_Mysize=0`) and then
+     * `assign`s the source string; expressed here as placement-new copy so
+     * owned heap buffers are deep-copied, never aliased. Advances without
+     * writing when `dest == nullptr`, matching the binary's null-guarded lane.
+     */
+    static T* UninitializedCopyForward(T* dest, const T* copyBegin, const T* copyEnd)
+    {
+      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(dest);
+      for (const T* cur = copyBegin; cur != copyEnd; ++cur) {
+        if (destinationAddress != 0u) {
+          ::new (reinterpret_cast<void*>(destinationAddress)) T(*cur);
+        }
+        destinationAddress += ElemSize;
+      }
+      return reinterpret_cast<T*>(destinationAddress);
+    }
+
+    /**
+     * Address: 0x0083C5C0 (FUN_0083C5C0, std::_Copy_backward<std::string> lane)
+     * Address: 0x0083C5F0 (FUN_0083C5F0, std::_Copy_backward<std::string> twin)
+     *
+     * What it does:
+     * Copy-ASSIGNS `[first, last)` into the range ending at `resultLast`,
+     * walking backward so overlapping shifts toward higher addresses stay
+     * correct (binary `std::_Copy_backward`). Destination slots already hold
+     * live objects, so this is assignment (not construction). Returns the
+     * final (lowest) destination pointer written.
+     */
+    static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
+    {
+      while (last != first) {
+        --last;
+        --resultLast;
+        *resultLast = *last;
+      }
+      return resultLast;
+    }
+
+    /**
+     * Address: 0x00658200 (FUN_00658200, std::vector<std::string>::_Insert_n grow lane)
+     *
+     * What it does:
+     * Deep-copy grow-and-insert for non-trivially-relocatable T (the reallocate
+     * arm of FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570). Allocates a typed
+     * `newCapacity` buffer and copy-ASSIGNS the three slices
+     * `[start, pos) + [insStart, insEnd) + [pos, end)` into it, so each element's
+     * owned storage is deep-copied (never aliased). The binary emits raw
+     * `operator new` + `_Ucopy` (construct) + `_Destroy_range`; in this typed
+     * reconstruction the `new T[]` slots are default-constructed and then
+     * copy-assigned, and the old live range is released by the buffer's own
+     * destruction (inline origin via the enclosing object's `inlineVec_[N]`
+     * lifetime; heap via `delete[]`), which is behaviorally equivalent — each
+     * source element is destroyed exactly once. No inline-capacity sentinel is
+     * stamped here: for a value type the inline slots are live objects, not raw
+     * bytes, so the sentinel write of the trivially-relocatable lanes must not
+     * run.
+     */
+    void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
+    {
+      T* const oldStart = this->start_;
+      T* const oldEnd = this->end_;
+
+      T* const newBuffer = new T[newCapacity];
+      T* write = CopyRangeForward(newBuffer, oldStart, pos);
+      write = CopyRangeForward(write, insStart, insEnd);
+      write = CopyRangeForward(write, pos, oldEnd);
+
+      if (oldStart != originalVec_) {
+        delete[] oldStart;
+      }
+      // Inline-origin case: the old elements remain in inlineVec_[] and are
+      // destroyed once when this fastvector_n is destroyed (RAII), matching the
+      // binary's single _Destroy_range over the old range.
+
+      this->start_ = newBuffer;
+      this->end_ = write;
+      this->capacity_ = newBuffer + newCapacity;
     }
 
     /**
