@@ -668,8 +668,10 @@ namespace moho
       return entities;
     }
 
-    gpg::core::FastVectorN<EntId, 4> rawIds{};
-    rawIds.Resize(static_cast<std::size_t>(count));
+    // Binary constructs `gpg::fastvector_n2_uint v16` via `sub_6E5720(&v16, count)`
+    // (FUN_006E5720): the count-taking ctor that inline-binds the lanes and
+    // zero-fills `count` slots through FastVectorRuntimeResizeFill.
+    gpg::core::FastVectorN<EntId, 4> rawIds(static_cast<std::size_t>(count));
     reader.Read(reinterpret_cast<char*>(rawIds.start_), static_cast<std::size_t>(count) * sizeof(EntId));
 
     const auto firstEntityId = static_cast<std::uint32_t>(rawIds[0]);
