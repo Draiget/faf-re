@@ -8,6 +8,20 @@
 #include <new>
 #include <type_traits>
 
+namespace gpg
+{
+  // Forward declarations so gpg::core::FastVectorN's inline members can name the
+  // runtime-view resize helpers (defined later in this header, in namespace gpg).
+  template <class T>
+  struct fastvector_runtime_view;
+
+  template <class T>
+  fastvector_runtime_view<T>& AsFastVectorRuntimeView(void* object) noexcept;
+
+  template <class T>
+  void FastVectorRuntimeResizeFill(const T* fillValue, const unsigned int newSize, fastvector_runtime_view<T>& view);
+} // namespace gpg
+
 namespace gpg::core
 {
   namespace detail
@@ -430,6 +444,30 @@ namespace gpg::core
       this->capacity_ = inlineVec_ + N;
       originalVec_ = inlineVec_;
       SaveInlineCapacity_();
+    }
+
+    /**
+     * Address: 0x006E5720 (FUN_006E5720, gpg::fastvector_n<uint,4>::fastvector_n(unsigned int))
+     * Mangled: ??0?$fastvector_n@I$03@gpg@@QAE@I@Z (count ctor lane)
+     *
+     * IDA signature:
+     * gpg::fastvector_n2_uint *__stdcall sub_6E5720(gpg::fastvector_n2_uint *this, unsigned int count);
+     *
+     * What it does:
+     * Binds all four pointer lanes to the inline storage window WITHOUT writing
+     * the inline-capacity header (distinct from the default ctor), then resizes
+     * the logical element count to `count`, zero-filling appended slots through
+     * the shared fastvector_uint_resize helper (FUN_004022D0 =
+     * FastVectorRuntimeResizeFill). This is the emitted constructor the decoder
+     * uses to preallocate the raw entity-id scratch buffer.
+     */
+    explicit FastVectorN(std::size_t count)
+    {
+      RebindInlineNoFree();
+      const T zeroFill{};
+      gpg::FastVectorRuntimeResizeFill<T>(
+        &zeroFill, static_cast<unsigned int>(count), gpg::AsFastVectorRuntimeView<T>(this)
+      );
     }
 
     /**
@@ -1283,6 +1321,10 @@ namespace gpg::core
 
   static_assert(sizeof(FastVector<int>) == 0x0C, "FastVector<int> must be 0x0C (start/end/cap)");
   static_assert(sizeof(FastVectorN<int, 4>) == 0x20, "FastVectorN<int,4> must be 0x20");
+  static_assert(
+    sizeof(FastVectorN<std::uint32_t, 4>) == 0x20,
+    "FastVectorN<uint,4> must be 0x20 (start/end/cap/originalVec + 4 inline uints; FUN_006E5720 ctor lane)"
+  );
   static_assert(sizeof(FastVectorN<char, 64>) == 0x50, "FastVectorN<char,64> must be 0x50");
 } // namespace gpg::core
 
@@ -1750,7 +1792,7 @@ namespace gpg
       return;
     }
 
-    FastVectorRuntimeEnsureCapacity(static_cast<std::size_t>(newSize), view);
+    (void)FastVectorRuntimeEnsureCapacity(static_cast<std::size_t>(newSize), view);
     while (view.end != view.begin + newSize) {
       T* const slot = view.end;
       view.end = slot + 1;
