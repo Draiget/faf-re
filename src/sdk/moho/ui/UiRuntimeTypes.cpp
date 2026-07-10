@@ -24424,21 +24424,6 @@ namespace moho
   msvc8::string in_keyNames[256]{};
 } // namespace moho
 
-namespace
-{
-  [[nodiscard]] std::string ToUpperAscii(std::string token)
-  {
-    std::transform(
-      token.begin(),
-      token.end(),
-      token.begin(),
-      [](unsigned char value) { return static_cast<char>(std::toupper(value)); }
-    );
-    return token;
-  }
-
-} // namespace
-
 /**
  * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
  *
@@ -24812,59 +24797,69 @@ bool moho::IN_InitKeyHandler()
 
 /**
  * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
+ * Mangled: ?IN_ParseKeyModifiers@Moho@@... (thiscall on the spec std::string)
+ *
+ * IDA signature:
+ * int __thiscall Moho::IN_ParseKeyModifiers(std::string *this);
  *
  * What it does:
- * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into
- * one packed keycode/modifier mask lane. The primary token is resolved through
- * `IN_FindKeyNameIndexCi` against the runtime-loaded `in_keyNames` table, so
- * unknown primary names yield `-1` (preserving the binary's signed return);
- * modifier tokens ("ALT", "CTRL"/"CONTROL", "SHIFT") OR their corresponding
- * high-bit flags into the result.
+ * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into a
+ * single packed keycode/modifier mask. Tokens are split on '-' by
+ * gpg::STR_GetToken and each is inserted at the FRONT of a small-buffer scratch
+ * vector (gpg::fastvector_n<msvc8::string,4>), so after tokenizing, slot 0 holds
+ * the LAST token (the key name) and slots 1..n hold the modifiers in reverse
+ * order. Slot 0 is resolved through IN_FindKeyNameIndexCi against the
+ * runtime-loaded in_keyNames table (unknown key names yield -1, preserving the
+ * binary's signed return). Each modifier slot is compared case-insensitively
+ * (ALT -> 0x80000000, CONTROL -> 0x40000000, SHIFT -> 0x20000000); an
+ * unrecognized modifier emits a gpg::Warnf. Returns 0 when the input string is
+ * empty.
+ *
+ * The three modifier reference strings live in the binary as runtime-initialized
+ * msvc8::string globals at 0x10C1D08 / 0x10C1D24 / 0x10C1D40; their initializer
+ * is not in the recovered evidence set, so the literal spellings are modeled
+ * here. See the reconstruction note for the CTRL-vs-CONTROL open item.
  */
 int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
 {
+  // Binary reference strings @ 0x10C1D08 / 0x10C1D24 / 0x10C1D40, compared in
+  // ALT -> CONTROL -> SHIFT order. Modeled literals (runtime-init in binary).
+  const msvc8::string altModifier{"ALT"};
+  const msvc8::string controlModifier{"CONTROL"};
+  const msvc8::string shiftModifier{"SHIFT"};
+
+  // SBO scratch: 4 inline msvc8::string slots, teardown frees heap only when the
+  // token count spilled past the inline window (start != inline origin).
+  gpg::fastvector_n<msvc8::string, 4> tokens{};
+  msvc8::string token{};
+
+  // Tokenize the spec, inserting each token at begin() so the final slot 0 is
+  // the last (key) token and the modifiers follow in reverse token order.
+  const char* cursor = keyBindingSpec.c_str();
+  while (gpg::STR_GetToken(cursor, "-", token)) {
+    tokens.InsertAt(tokens.begin(), &token, &token + 1);
+  }
+
+  // Guard on the ORIGINAL spec being non-empty (matches the binary's
+  // `if (this->_Mysize)`), not on the token count.
   if (keyBindingSpec.empty()) {
     return 0;
   }
 
-  std::vector<std::string> tokens{};
-  std::size_t start = 0u;
-  while (start <= keyBindingSpec.size()) {
-    const std::size_t split = keyBindingSpec.find('-', start);
-    const std::size_t tokenLength =
-      (split == std::string::npos) ? (keyBindingSpec.size() - start) : (split - start);
-    if (tokenLength > 0u) {
-      tokens.emplace_back(keyBindingSpec.substr(start, tokenLength));
-    }
-    if (split == std::string::npos) {
-      break;
-    }
-    start = split + 1u;
-  }
+  int keyMask = IN_FindKeyNameIndexCi(tokens.Data()[0]);
 
-  if (tokens.empty()) {
-    return 0;
-  }
-
-  const msvc8::string primaryToken{tokens.front().c_str(), tokens.front().size()};
-  int keyMask = IN_FindKeyNameIndexCi(primaryToken);
-
-  for (std::size_t tokenIndex = 1u; tokenIndex < tokens.size(); ++tokenIndex) {
-    const std::string modifier = ToUpperAscii(tokens[tokenIndex]);
-    if (modifier == "ALT") {
+  const std::size_t tokenCount = tokens.Size();
+  for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
+    const msvc8::string& modifier = tokens.Data()[tokenIndex];
+    if (_stricmp(modifier.c_str(), altModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x80000000u);
-      continue;
-    }
-    if (modifier == "CTRL" || modifier == "CONTROL") {
+    } else if (_stricmp(modifier.c_str(), controlModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x40000000u);
-      continue;
-    }
-    if (modifier == "SHIFT") {
+    } else if (_stricmp(modifier.c_str(), shiftModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x20000000u);
-      continue;
+    } else {
+      gpg::Warnf("Key map contains unrecognized modifier string: %s\n", modifier.c_str());
     }
-
-    gpg::Warnf("Key map contains unrecognized modifier string: %s\n", tokens[tokenIndex].c_str());
   }
 
   return keyMask;
