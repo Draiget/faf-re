@@ -1779,6 +1779,14 @@ namespace msvc8
          * insert(end(),1,value) when full), so this per-T 4-byte pointer symbol
          * is emitted. Shared by 7 vector<Entity*> _Insert_n sites in the Entity
          * subsystem, all folding to this emission).
+         * Address: 0x00543DB0 (FUN_00543DB0, msvc8::vector<moho::ArmyLaunchInfo>::_Insert_n
+         * grow lane for the 0x20-byte non-trivial ArmyLaunchInfo element (element
+         * copies route through the BVIntSet copy-ctor FUN_00545130, never a raw
+         * byte copy); the recovered helper moho::AppendArmyLaunchInfo
+         * (LaunchInfoBase.cpp) invokes armyLaunchInfo.push_back(value) by name from
+         * Moho::SessionStartup (SessionStartup.cpp:475 & :1224), and MSVC8's
+         * push_back is insert(end(),1,value) on the capacity-full path — pos is
+         * _Mylast=end() (append, verified), so this per-T 0x20-byte symbol is emitted).
          * Address: 0x0087A830 (FUN_0087A830, msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n
          * grow lane for Moho::CDecalManager::mDecals @+0x10; the recovered helper
          * InsertNCopiesCWldTerrainDecalPtrVector (CWldSplat.cpp) invokes
