@@ -123,6 +123,60 @@ namespace moho
   {}
 
   /**
+   * Address: 0x00671250 (FUN_00671250, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
+   * Mangled: ??0CEfxTrailEmitter@Moho@@QAE@PAVCEffectManagerImpl@1@PBMPAVRTrailBlueprint@1@H@Z
+   *
+   * IDA signature:
+   * Moho::CEfxTrailEmitter *__thiscall Moho::CEfxTrailEmitter::CEfxTrailEmitter(
+   *     Moho::CEffectManagerImpl *manager, Moho::CEfxTrailEmitter *this,
+   *     const float *position, Moho::RTrailBlueprint *blueprint, int armyIndex);
+   *
+   * What it does:
+   * Blueprint-driven trail ctor. Chains the manager-bound CEffectImpl base ctor,
+   * stores the trail blueprint, zero-inits the trail payload lanes, sizes the
+   * effect param/texture/string lanes, then seeds the emit position, unit scale
+   * (param 5 = 1.0), blueprint lifetime and length, and binds the repeat/ramp
+   * textures. CEfxTrailEmitter::Invalidate is a no-op override, so the parameter
+   * setters here only publish values into the param lane (matching the binary's
+   * inlined writes + no-op invalidate calls).
+   */
+  CEfxTrailEmitter::CEfxTrailEmitter(
+    CEffectManagerImpl* const manager,
+    const float* const position,
+    RTrailBlueprint* const blueprint,
+    const int armyIndex
+  )
+    : CEffectImpl(manager, armyIndex)
+    , mTrailBlueprint(blueprint)
+    , mTrailLength(0)
+    , mTotalTicks(0.0f)
+    , mLife(0.0f)
+    , mLength(0.0f)
+    , mSerializedTrailPosition()
+    , mCreated(false)
+    , mVisible(false)
+    , mPad1B2{0, 0}
+    , mLastUpdate(0u)
+  {
+    // Size the effect parameter lanes (fastvector_n resize emissions):
+    // params -> 6 floats, textures -> 2 null slots, strings -> 2 empty.
+    mParams.resize(TRAIL_LASTPARAM, 0.0f);
+    mParticleTextures.resize(2, nullptr);
+    {
+      const msvc8::string emptyString;
+      mStrings.resize(2, emptyString);
+    }
+
+    // Seed the emit position and blueprint-derived trail parameters.
+    SetNParam(TRAIL_POSITION, position, 3);
+    SetFloatParam(TRAIL_SCALE, 1.0f);
+    SetFloatParam(TRAIL_LIFETIME, blueprint->Lifetime);
+    SetFloatParam(TRAIL_LENGTH, blueprint->TrailLength);
+    OnInit(0, blueprint->RepeatTexture.c_str());
+    OnInit(1, blueprint->RampTexture.c_str());
+  }
+
+  /**
    * Address: 0x00671420 (FUN_00671420, Moho::CEfxTrailEmitter::Invalidate1)
    *
    * What it does:

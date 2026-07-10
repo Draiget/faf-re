@@ -41,6 +41,24 @@ namespace moho
     CEfxTrailEmitter();
 
     /**
+     * Address: 0x00671250 (FUN_00671250, Moho::CEfxTrailEmitter::CEfxTrailEmitter)
+     *
+     * What it does:
+     * Blueprint-driven trail-emitter ctor bound to `manager`: chains the
+     * manager-bound CEffectImpl base ctor, stores the trail blueprint, sizes the
+     * effect parameter/texture/string lanes, then seeds the initial emit
+     * `position`, unit scale, and the blueprint lifetime/length before binding
+     * the repeat and ramp textures. `armyIndex` is forwarded to the base effect
+     * as its owning-army/script token.
+     */
+    CEfxTrailEmitter(
+      CEffectManagerImpl* manager,
+      const float* position,
+      RTrailBlueprint* blueprint,
+      int armyIndex
+    );
+
+    /**
      * Address: 0x00671420 (FUN_00671420, Moho::CEfxTrailEmitter::Invalidate1)
      *
      * What it does:

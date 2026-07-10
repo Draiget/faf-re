@@ -6,6 +6,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/CEfxBeam.h"
+#include "moho/effects/rendering/CEfxTrailEmitter.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/StartupHelpers.h"
@@ -178,20 +179,6 @@ namespace moho
 
       const EntityTransformStackLane stackLane{entity.Orientation, entity.Position};
       effect.SetNParam(0, &stackLane.position.x, 3);
-      effect.Interpolate();
-    }
-
-    void ApplyTrailBlueprintParams(CEffectImpl& effect, const RTrailBlueprint* const blueprint)
-    {
-      effect.SetFloatParam(5, 1.0f);
-
-      if (blueprint != nullptr) {
-        effect.SetFloatParam(3, blueprint->Lifetime);
-        effect.SetFloatParam(4, blueprint->TrailLength);
-        effect.OnInit(0, blueprint->RepeatTexture.c_str());
-        effect.OnInit(1, blueprint->RampTexture.c_str());
-      }
-
       effect.Interpolate();
     }
 
@@ -445,8 +432,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     RTrailBlueprint* const blueprint = LookupTrailBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -454,13 +439,16 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    // The binary seeds the trail emitter from a zeroed initial emit position and
+    // relies on the blueprint ctor to publish lifetime/length/textures + scale.
+    const float initialPosition[3] = {0.0f, 0.0f, 0.0f};
+    CEfxTrailEmitter* const effect =
+      new (std::nothrow) CEfxTrailEmitter(this, initialPosition, blueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
     }
+    LinkActiveEffect(mActiveEffects, effect);
 
-    SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
-    ApplyTrailBlueprintParams(*effect, blueprint);
     effect->SetBone(entity, boneIndex);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
