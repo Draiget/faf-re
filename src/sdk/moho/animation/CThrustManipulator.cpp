@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <new>
@@ -9,6 +10,7 @@
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
@@ -296,7 +298,7 @@ namespace
    * base state, unit weak-pointer lane, label/state lanes, thrust-cap vectors,
    * turn scalars, direction lane, and orientation quaternion.
    */
-  [[maybe_unused]] void DeserializeCThrustManipulatorSerializerState(
+  void DeserializeCThrustManipulatorSerializerState(
     CThrustManipulatorSerializerRuntimeView* const object,
     gpg::ReadArchive* const archive
   )
@@ -320,13 +322,52 @@ namespace
   }
 
   /**
+   * Address: 0x0064B890 (FUN_0064B890, CThrustManipulator serializer save body)
+   *
+   * IDA signature:
+   * void __usercall sub_64B890(Moho::CThrustManipulator *object@<eax>, BinaryWriteArchive *archive@<esi>);
+   *
+   * What it does:
+   * Line-for-line mirror of `DeserializeCThrustManipulatorSerializerState` on
+   * the write side: saves `IAniManipulator` base state, unit weak-pointer lane,
+   * label/state/enabled lanes, thrust-cap vectors, turn scalars, direction lane,
+   * and the orientation quaternion, in the same field order.
+   */
+  void SerializeCThrustManipulatorSerializerState(
+    const CThrustManipulatorSerializerRuntimeView* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !object) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(
+      CachedIAniManipulatorType(),
+      static_cast<const moho::IAniManipulator*>(object),
+      owner
+    );
+    archive->Write(CachedWeakPtrUnitType(), &object->mUnit, owner);
+    archive->WriteString(const_cast<msvc8::string*>(&object->mLabel));
+    archive->WriteInt(object->mStateLane);
+    archive->WriteBool(object->mEnabledLane);
+    archive->Write(CachedVector3fType(), &object->mCapMin, owner);
+    archive->Write(CachedVector3fType(), &object->mCapMax, owner);
+    archive->WriteFloat(object->mTurnForceMult);
+    archive->WriteFloat(object->mTurnSpeed);
+    archive->Write(CachedVector3fType(), &object->mDirectionLane, owner);
+    archive->Write(CachedQuaternionfType(), &object->mOrientation, owner);
+  }
+
+  /**
    * Address: 0x0064A380 (FUN_0064A380)
    *
    * What it does:
-   * Startup cleanup variant that unlinks and self-resets the global
+   * atexit cleanup lane that unlinks and self-resets the global
    * CThrustManipulator serializer helper node.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CThrustManipulatorSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CThrustManipulatorSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCThrustManipulatorSerializer);
   }
@@ -342,6 +383,89 @@ namespace
   {
     return UnlinkSerializerNode(gCThrustManipulatorSerializer);
   }
+
+  /**
+   * Address: 0x0064A380 (FUN_0064A380, atexit adapter)
+   *
+   * What it does:
+   * `void()`-shaped atexit adapter that discards the helper-node self pointer
+   * returned by the unlink lane.
+   */
+  void CleanupCThrustManipulatorSerializerAtexit()
+  {
+    (void)cleanup_CThrustManipulatorSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x0064A340 (FUN_0064A340, Moho::CThrustManipulatorSerializer::Serialize)
+   *
+   * IDA signature:
+   * void __cdecl Moho::CThrustManipulatorSerializer::Serialize(BinaryWriteArchive *archive, int objectPtr);
+   *
+   * What it does:
+   * Reflection save-callback facade for `CThrustManipulator`. Forwards the
+   * reflected object pointer to the save body. FUN_0064B4E0/FUN_0064B370 are
+   * phantom `jmp sub_64B890` thunks and are intentionally not reproduced.
+   */
+  void CThrustManipulatorSerializerSerialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    SerializeCThrustManipulatorSerializerState(
+      reinterpret_cast<const CThrustManipulatorSerializerRuntimeView*>(objectPtr),
+      archive
+    );
+  }
+
+  /**
+   * Address: 0x0064A2C0 (FUN_0064A2C0, Moho::CThrustManipulatorSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CThrustManipulator`. Forwards the
+   * reflected object pointer to the existing load body.
+   */
+  void CThrustManipulatorSerializerDeserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    DeserializeCThrustManipulatorSerializerState(
+      reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectPtr),
+      archive
+    );
+  }
+
+  /**
+   * Address: 0x00BD37A0 (FUN_00BD37A0, register_CThrustManipulatorSerializer)
+   *
+   * What it does:
+   * Startup registration root for the `CThrustManipulator` serializer helper.
+   * Initializes the intrusive helper node and binds both load and save
+   * reflection callbacks, giving both bodies a source-level invocation. In the
+   * binary this also installs an atexit unlink of the helper node.
+   */
+  void register_CThrustManipulatorSerializer()
+  {
+    (void)UnlinkSerializerNode(gCThrustManipulatorSerializer);
+    gCThrustManipulatorSerializer.mSerLoadFunc = &CThrustManipulatorSerializerDeserialize;
+    gCThrustManipulatorSerializer.mSerSaveFunc = &CThrustManipulatorSerializerSerialize;
+    (void)std::atexit(&CleanupCThrustManipulatorSerializerAtexit);
+  }
+
+  struct CThrustManipulatorSerializerStartupBootstrap
+  {
+    CThrustManipulatorSerializerStartupBootstrap()
+    {
+      register_CThrustManipulatorSerializer();
+    }
+  };
+
+  CThrustManipulatorSerializerStartupBootstrap gCThrustManipulatorSerializerStartupBootstrap;
 } // namespace
 
 namespace moho
