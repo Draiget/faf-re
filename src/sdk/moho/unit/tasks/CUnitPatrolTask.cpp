@@ -166,6 +166,61 @@ namespace moho
   {
   }
 
+  /**
+   * Address: 0x0061B140 (FUN_0061B140, Moho::CUnitPatrolTask::~CUnitPatrolTask)
+   * Mangled: ??1CUnitPatrolTask@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUnitPatrolTask::~CUnitPatrolTask(Moho::CUnitPatrolTask *this);
+   *
+   * What it does:
+   * Complete-object destructor. Detaches this patrol task from the owner unit's
+   * listener/navigator state and clears the transient patrol move state before
+   * base `CCommandTask` teardown. See the header block for the full binary-order
+   * teardown sequence.
+   *
+   * The MSVC per-sub-object vtable restores and the second, unconditional
+   * listener relinks at the binary head/tail (0x0061B15E, 0x0061B28E..0x0061B2CC)
+   * are dead stores to the dying object's own memory; together with the embedded
+   * `EntitySetTemplate<Entity>` membership teardown (0x0061B258..0x0061B28C, i.e.
+   * `~EntitySetTemplate<Entity>()` on `mMembership`) they are handled implicitly
+   * by the C++ destructor and are not reproduced as raw pointer arithmetic.
+   */
+  CUnitPatrolTask::~CUnitPatrolTask()
+  {
+    // (1) Unconditionally unlink the command-event listener lane
+    // (0x0061B17A: splice prev/next, then self-relink the node).
+    mCommandEventListener.mListenerLink.ListUnlink();
+
+    // (2) Navigator branch: stop honoring the formation, and abort the active
+    // move only when the unit's current and previous positions compare equal
+    // (0x0061B192..0x0061B1CF: `Wm3::Vector3::Compare` returns nonzero for an
+    // approximate match, and the binary branches to `AbortMove` on nonzero).
+    if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
+      navigator->IgnoreFormation(false);
+      if (Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+        navigator->AbortMove();
+      }
+    }
+
+    // (3) Formation-status listener lane: unlink only when a formation instance
+    // is bound (0x0061B1CF: `cmp [esi+58h], 0`).
+    if (mFormationInstance != nullptr) {
+      mFormationStatusListener.mListenerLink.ListUnlink();
+    }
+
+    // (4) Clear the two patrol move-state bits on the owner unit
+    // (0x0061B1ED / 0x0061B206: `&= ~0x2000000` then `&= ~0x1000`; the binary's
+    // read-back of the high dword is a no-op, so the 64-bit masks stay intact).
+    mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x2000000u);
+    mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x1000u);
+
+    // (5) Reset the owner unit's guarded position to the zero vector
+    // (0x0061B21F..0x0061B250: three `movss` stores from the shared `vec0`
+    // zero-vector global into `Unit::GuardedPos`).
+    mUnit->GuardedPos = Wm3::Vector3f::Zero();
+  }
+
   namespace
   {
     /**

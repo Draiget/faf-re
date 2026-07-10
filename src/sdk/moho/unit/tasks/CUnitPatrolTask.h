@@ -89,6 +89,34 @@ namespace moho
     );
 
     /**
+     * Address: 0x0061B140 (FUN_0061B140, Moho::CUnitPatrolTask::~CUnitPatrolTask)
+     * Mangled: ??1CUnitPatrolTask@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::CUnitPatrolTask::~CUnitPatrolTask(Moho::CUnitPatrolTask *this);
+     *
+     * What it does:
+     * Complete-object destructor. In binary order: (1) unconditionally unlink the
+     * command-event listener lane; (2) if the owner unit still has a navigator,
+     * stop honoring its formation, and abort the active move when the current
+     * and previous positions compare equal; (3) when a formation instance
+     * is bound, unlink the formation-status listener lane; (4) clear the owner
+     * unit's two patrol move-state bits (0x2000000 and 0x1000) in `UnitStateMask`;
+     * (5) reset the owner unit's `GuardedPos` to the zero vector. The embedded
+     * `EntitySetTemplate<Entity>` membership node and the final listener relinks
+     * are torn down implicitly by the C++ destructor. Base `CCommandTask`
+     * teardown runs implicitly after this body.
+     *
+     * The MSVC per-sub-object vtable restores at the binary head/tail are dead
+     * stores to the dying object's own memory and carry no observable side
+     * effect; they are expressed implicitly by the C++ destructor and are not
+     * reproduced as raw vtable-address writes. Because this dtor is virtual, the
+     * vtable slot-0 scalar-deleting destructor (FUN_0061B090) is MSVC
+     * auto-generated and needs no hand-written body.
+     */
+    ~CUnitPatrolTask() override;
+
+    /**
      * Address: 0x0061C480 (FUN_0061C480, Moho::CUnitPatrolTask::operator new)
      *
      * What it does:
