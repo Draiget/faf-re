@@ -18538,6 +18538,55 @@ int moho::cfunc_CUIWorldViewSetHighlightEnabledL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0086A530 (??0CLuaWldUIProvider@Moho@@QAE@@Z, Moho::CLuaWldUIProvider::CLuaWldUIProvider)
+ * Mangled: ??0CLuaWldUIProvider@Moho@@QAE@@Z
+ *
+ * IDA signature:
+ * Moho::CLuaWldUIProvider *__thiscall Moho::CLuaWldUIProvider::CLuaWldUIProvider(
+ *     Moho::CLuaWldUIProvider *this, LuaPlus::LuaObject *a2);
+ *
+ * What it does:
+ * Constructs the multiple-inheritance world-UI provider: publishes the
+ * `IWldUIProvider` sub-object vtable, default-constructs the embedded
+ * `CScriptObject` base, seeds the prefetch-texture cache lane to empty, then
+ * binds the incoming script object via the protected base helper. The
+ * transient in-construction vtable publish and the final vtable publish are
+ * emitted by the C++ front-end from the multiple-inheritance ctor sequence
+ * (matching the `mov [esi], IWldUIProvider vftable` / `mov [esi],
+ * CLuaWldUIProvider vftable` stores in the binary).
+ */
+moho::CLuaWldUIProvider::CLuaWldUIProvider(LuaPlus::LuaObject* const luaObject)
+  : IWldUIProvider()
+  , CScriptObject()
+{
+  // mPrefetchData default-constructs to an empty FastVector (start_/end_/
+  // capacity_ = nullptr), matching the three `mov [esi+3Ch/40h/44h], 0` stores.
+  SetLuaObject(*luaObject);
+}
+
+/**
+ * Address: 0x0086A5D0 (??1CLuaWldUIProvider@Moho@@QAE@@Z, Moho::CLuaWldUIProvider::~CLuaWldUIProvider)
+ * Mangled: ??1CLuaWldUIProvider@Moho@@QAE@@Z
+ * Deleting destructor thunk: 0x0086A5A0 (Moho::CLuaWldUIProvider::dtr)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CLuaWldUIProvider::~CLuaWldUIProvider(Moho::CLuaWldUIProvider *a1);
+ *
+ * What it does:
+ * Tears down the provider in reverse construction order. The member
+ * `mPrefetchData` (a `FastVector<boost::shared_ptr<PrefetchData>>`) is
+ * destroyed first — its inlined destructor releases each cached shared handle
+ * (refcount drop + weak-dispose through the boost detail vtable) and frees the
+ * element buffer, matching `sub_4A89A0` + `operator delete` in the binary.
+ * The `CScriptObject` base destructor and the trailing `IWldUIProvider`
+ * vtable restore are then emitted automatically by the C++ front-end from the
+ * multiple-inheritance dtor sequence. The body is therefore intentionally
+ * empty: writing an explicit `mPrefetchData` teardown here would double-free,
+ * because the compiler already emits the member destructor after this body.
+ */
+moho::CLuaWldUIProvider::~CLuaWldUIProvider() = default;
+
+/**
  * Address: 0x0086A650 (FUN_0086A650, Moho::CLuaWldUIProvider::StartLoadingDialog)
  *
  * What it does:

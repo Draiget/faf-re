@@ -91,8 +91,9 @@ CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
 // src/sdk/moho/unit/tasks/CUnitPatrolTask.cpp (FUN_0061AE50) — the former
 // empty-stub false-recovery here was removed in favor of the real body.
 
-CLuaWldUIProvider::CLuaWldUIProvider(LuaPlus::LuaObject*) {}
-CLuaWldUIProvider::~CLuaWldUIProvider() {}
+// CLuaWldUIProvider ctor (FUN_0086A530) and dtor (FUN_0086A5D0) are recovered
+// 1:1 in src/sdk/moho/ui/UiRuntimeTypes.cpp — the former empty-stub
+// false-recoveries here were removed in favor of the real bodies.
 gpg::RType* CLuaWldUIProvider::GetClass() const { return nullptr; }
 gpg::RRef CLuaWldUIProvider::GetDerivedObjectRef() { return {}; }
 void CLuaWldUIProvider::CreateGameInterface(bool) {}
