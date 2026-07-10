@@ -10,11 +10,13 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/Sim.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -130,6 +132,41 @@ namespace
 
     return reinterpret_cast<moho::Broadcaster*>(&navigator->mListenerNode);
   }
+
+  /**
+   * Address: 0x00618700 (FUN_00618700, inline switch/short-circuit lane)
+   *
+   * What it does:
+   * Re-derives the move-task "next command is instant" decision used during
+   * teardown. When the queue head command family is itself instant the flag is
+   * set; otherwise the queue must hold at least two live commands and the second
+   * (next) command must be a known, instant command family. Lifts the binary's
+   * raw `mCommandVec` triplet walk into typed size/index accessors.
+   */
+  [[nodiscard]] bool ComputeNextCommandIsInstant(moho::CUnitCommandQueue* const commandQueue) noexcept
+  {
+    if (moho::CommandIsInstant(commandQueue->mCommandType)) {
+      return true;
+    }
+
+    // Non-instant head: require a live second command whose family is instant.
+    const auto& commands = commandQueue->mCommandVec;
+    if (commands.size() < 2u || !commands[1].HasValue()) {
+      return false;
+    }
+
+    moho::CUnitCommand* const nextCommand = commandQueue->GetNextCommand();
+    if (nextCommand == nullptr) {
+      return false;
+    }
+
+    const moho::EUnitCommandType nextType = nextCommand->mVarDat.mCmdType;
+    if (static_cast<std::uint32_t>(nextType) > static_cast<std::uint32_t>(moho::EUnitCommandType::UNITCOMMAND_DestroySelf)) {
+      return false;
+    }
+
+    return moho::CommandIsInstant(nextType);
+  }
 } // namespace
 
 namespace moho
@@ -224,6 +261,112 @@ namespace moho
     , mHasPreparedDynamicGoal(0)
     , mPad_0096_0098{0, 0}
   {}
+
+  /**
+   * Address: 0x00618700 (FUN_00618700, Moho::CUnitMoveTask::~CUnitMoveTask)
+   * Mangled: ??1CUnitMoveTask@Moho@@QAE@XZ
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUnitMoveTask::~CUnitMoveTask(Moho::CUnitMoveTask *this);
+   *
+   * What it does:
+   * Complete-object destructor. In binary order: (1) if the command weak
+   * reference still resolves, unlink the command-event listener lane; (2) if
+   * this task established a ferry-transport weak link
+   * (`mRequiresTransportCategoryCheck`), splice the owner unit's assigned
+   * transport weak reference out of its transport's owner chain; (3) clear the
+   * owner unit's move-in-progress state bit (bit 2 of `UnitStateMask`); (4)
+   * trace; (5) re-derive the next-command instant flag from the queue head/next
+   * command; (6) unlink the navigator listener lane and abort the active move
+   * when instant; (7) free the reserved occupancy rectangle when occupying; (8)
+   * when the source command's formation still contains this unit, unlink the
+   * formation-status listener lane; (9) splice the command weak reference out of
+   * its owner chain; (10) relink all three listener lanes to self. Base
+   * `CCommandTask` teardown runs implicitly after this body.
+   *
+   * The MSVC per-sub-object vtable restores at the binary head/tail are dead
+   * stores to the dying object's own memory and carry no observable side
+   * effect; they are expressed implicitly by the C++ destructor and are not
+   * reproduced as raw vtable-address writes.
+   */
+  CUnitMoveTask::~CUnitMoveTask()
+  {
+    // (2 in binary head order) Command-event listener lane: unlink only while
+    // the command weak reference still resolves to a live command object.
+    if (mCommandRef.GetObjectPtr() != nullptr) {
+      mCommandEventListenerLink.ListUnlink();
+    }
+
+    // (3) Ferry-transport weak link: when this task required a transport
+    // category check it linked the owner unit's assigned-transport weak
+    // reference into the transport's owner chain; splice it back out here.
+    if (mRequiresTransportCategoryCheck != 0u && mUnit != nullptr) {
+      WeakPtr<Unit>& ferryRef = mUnit->AssignedTransportRef.AsWeakPtr<Unit>();
+      if (ferryRef.IsLinkedInOwnerChain()) {
+        ferryRef.UnlinkFromOwnerChain();
+      }
+    }
+
+    // (4) Clear the unit's move-in-progress state bit (bit 2 of UnitStateMask).
+    if (mUnit != nullptr) {
+      mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x4u);
+    }
+
+    // (5) Trace teardown for the owning unit.
+    if (mUnit != nullptr && mUnit->SimulationRef != nullptr) {
+      mUnit->SimulationRef->Logf(
+        "  CUnitMoveTask::~CUnitMoveTask(), mUnit=0x%08x\n",
+        static_cast<std::uint32_t>(mUnit->id_)
+      );
+    }
+
+    // (6) Re-derive the "next command is instant" flag from the queue head/next
+    // command, matching the exact switch/short-circuit chain from the binary.
+    if (mUnit != nullptr) {
+      if (CUnitCommandQueue* const commandQueue = mUnit->CommandQueue; commandQueue != nullptr) {
+        mNextCmdIsInstant = ComputeNextCommandIsInstant(commandQueue) ? 1u : 0u;
+      }
+    }
+
+    // (7) Navigator listener lane: unlink, and abort the active move when the
+    // next command was classified instant.
+    if (mUnit != nullptr) {
+      if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
+        mNavigatorListenerLink.ListUnlink();
+        if (mNextCmdIsInstant != 0u) {
+          navigator->AbortMove();
+        }
+      }
+    }
+
+    // (8) Release the reserved occupancy rectangle when this task took one.
+    if (mIsOccupying != 0u && mUnit != nullptr) {
+      mUnit->FreeOgridRect();
+    }
+
+    // (9) Formation-status listener lane: unlink only when the source command's
+    // formation still reports this unit as a member.
+    if (CUnitCommand* const command = mCommandRef.GetObjectPtr(); command != nullptr) {
+      CAiFormationInstance* const formation = command->mFormationInstance;
+      if (formation != nullptr && mUnit != nullptr && formation->Func17(mUnit, true) &&
+          command->mFormationInstance != nullptr) {
+        mFormationStatusListenerLink.ListUnlink();
+      }
+    }
+
+    // (10) Splice the command weak reference out of its owner chain.
+    if (mCommandRef.IsLinkedInOwnerChain()) {
+      mCommandRef.UnlinkFromOwnerChain();
+    }
+
+    // (11) Final unconditional relink of all three listener lanes to self. The
+    // binary also rewrites each sub-object's vtable pointer to the base
+    // `Listener<E>` vftable; those are dead stores on the dying object and are
+    // handled implicitly by the C++ destructor.
+    mCommandEventListenerLink.ListUnlink();
+    mFormationStatusListenerLink.ListUnlink();
+    mNavigatorListenerLink.ListUnlink();
+  }
 
   /**
    * Address: 0x0061A750 (FUN_0061A750)

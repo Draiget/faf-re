@@ -71,6 +71,22 @@ namespace moho
     );
 
     /**
+     * Address: 0x00618700 (FUN_00618700, Moho::CUnitMoveTask::~CUnitMoveTask)
+     * Mangled: ??1CUnitMoveTask@Moho@@QAE@XZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::CUnitMoveTask::~CUnitMoveTask(Moho::CUnitMoveTask *this);
+     *
+     * What it does:
+     * Complete-object destructor. Detaches all three intrusive listener lanes
+     * (command-event, formation-status, navigator), splices the ferry-transport
+     * weak link and the command weak reference out of their owner chains, clears
+     * the owner unit's move-in-progress state bit, and re-derives the
+     * next-command instant flag before running base command-task teardown.
+     */
+    ~CUnitMoveTask() override;
+
+    /**
      * Address: 0x00618A00 (FUN_00618A00, sub_618A00)
      *
      * What it does:
