@@ -167,7 +167,7 @@ namespace moho
     float mReclaimMass;               // +0x270
     float mReclaimEnergy;             // +0x274
     bool mTracksReclaimArea;          // +0x278 (set when reclaim mass/energy > 0)
-    bool mReclaimTerminated;          // +0x279 (set by 0x006FA150 / 0x006FA180 terminal path)
+    bool mReclaimTerminated;          // +0x279 (set by 0x006FA150 / 0x006FA180 terminal path; read by Prop::Sync @0x006FA2B8 as the mEraseIds-vs-mDeleteIds selector, IDA names it mDestroy)
     std::uint8_t pad_027A[0x02];      // +0x27A
     SPropPriorityInfo mPriorityInfo;  // +0x27C
     std::int32_t mHandleIndex;        // +0x284

@@ -19,6 +19,7 @@
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
+#include "moho/sim/SimDriver.h"
 
 namespace
 {
@@ -513,12 +514,34 @@ namespace moho
 
   /**
    * Address: 0x006FA2A0 (FUN_006FA2A0)
+   *
+   * IDA signature:
+   * void __thiscall Moho::Prop::Sync(Moho::Prop *this, Moho::SSyncData *a2);
+   *
+   * What it does:
+   * Overrides Entity::Sync for props. When the prop has dispatched its
+   * on-destroy pass (`mOnDestroyDispatched`) and still has a live interface
+   * lane (`mInterfaceCreated`), it queues this prop's id_ onto one of two sync
+   * lanes selected by the terminal reclaim/kill flag (`mReclaimTerminated`,
+   * +0x279): set -> `SSyncData::mEraseIds` (immediate erase, 0x006FA2D6), clear
+   * -> `SSyncData::mDeleteIds` (deferred delete, 0x006FA2F1), then clears the
+   * interface-created flag. Otherwise it lazily creates the interface and syncs
+   * it. Finally, when the current transform equals the previous transform, it
+   * unlinks the coord-list node.
    */
   void Prop::Sync(SSyncData* syncData)
   {
     if (mOnDestroyDispatched != 0u) {
       if (mInterfaceCreated != 0u) {
-        DestroyInterface(syncData);
+        // 1:1 dual-branch push (asm 0x006FA2B8 selector on +0x279): a
+        // terminated (reclaimed/killed) prop is erased immediately, otherwise
+        // it is queued for deferred deletion.
+        if (mReclaimTerminated) {
+          PushBackDeleteEntId(syncData->mEraseIds, id_);
+        } else {
+          PushBackDeleteEntId(syncData->mDeleteIds, id_);
+        }
+        mInterfaceCreated = 0u;
       }
     } else {
       if (mInterfaceCreated == 0u) {
