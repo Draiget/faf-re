@@ -18,6 +18,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -75,6 +76,8 @@
 #include "moho/sim/STIMap.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/core/EFireStateTypeInfo.h"
+#include "moho/unit/core/EJobTypeTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UnitLuaFunctionThunks.h"
 #include "moho/unit/core/UnitWeapon.h"
@@ -11366,6 +11369,29 @@ namespace
     return cached;
   }
 
+  // Write-side reflected-enum caches used by SSTIUnitVariableData::MemberSerialize.
+  // The binary's FUN_0055E420 streams mJobType/mFireState through the reflected
+  // Moho::EJobType / Moho::EFireState RTypes; each enum's PrimitiveSerHelper
+  // (FUN_0055D390 / FUN_0055D400) bottoms out in a single WriteInt of the value,
+  // so the reflected Write is stream-symmetric with MemberDeserialize's ReadInt.
+  [[nodiscard]] gpg::RType* CachedEJobTypeType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(EJobType));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedEFireStateType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(EFireState));
+    }
+    return cached;
+  }
+
   [[nodiscard]] gpg::RType* CachedUnitAttributesType()
   {
     static gpg::RType* cached = nullptr;
@@ -11436,7 +11462,32 @@ namespace
   };
 
   gpg::SerSaveLoadHelperListRuntime gUnitWeaponInfoSerializer{};
-  gpg::SerSaveLoadHelperListRuntime gSSTIUnitVariableDataSerializer{};
+
+  // Runtime shape of the binary's `SerSaveLoadHelper<SSTIUnitVariableData>`
+  // static-init global: the 0x0C intrusive-list links followed by the two
+  // published reflection callbacks (load @ +0x0C, save @ +0x10). The engine
+  // install path copies mSerLoadFunc / mSerSaveFunc into the reflection
+  // descriptor's serLoadFunc_ / serSaveFunc_ slots.
+  struct SSTIUnitVariableDataSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(SSTIUnitVariableDataSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "SSTIUnitVariableDataSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSTIUnitVariableDataSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "SSTIUnitVariableDataSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SSTIUnitVariableDataSerializerHelperNode) == 0x14,
+    "SSTIUnitVariableDataSerializerHelperNode size must be 0x14"
+  );
+
+  SSTIUnitVariableDataSerializerHelperNode gSSTIUnitVariableDataSerializer{};
 
   /**
    * Address: 0x0055C1B0 (FUN_0055C1B0, SerSaveLoadHelper<UnitWeaponInfo>::unlink lane A)
@@ -11471,7 +11522,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer.mListLinks);
   }
 
   /**
@@ -11483,8 +11534,86 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer.mListLinks);
   }
+
+  /**
+   * Address: 0x0055C760 (FUN_0055C760, Moho::SSTIUnitVariableDataSerializer::Deserialize)
+   *
+   * IDA signature:
+   * int sub_55C760(); // elided tail-jump: return sub_55E030();
+   *
+   * What it does:
+   * Reflection load-callback facade for `SSTIUnitVariableData`. Forwards the
+   * reflected object pointer to the class member load body; `version` and the
+   * owner-ref lane are unused by the member (mirrors the binary tail-jump into
+   * FUN_0055E030).
+   */
+  void SSTIUnitVariableDataSerializerDeserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const data = reinterpret_cast<moho::SSTIUnitVariableData*>(objectPtr);
+    if (data == nullptr) {
+      return;
+    }
+    data->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0055C770 (FUN_0055C770, Moho::SSTIUnitVariableDataSerializer::Serialize)
+   *
+   * IDA signature:
+   * int sub_55C770(); // elided tail-jump: return sub_55E420();
+   *
+   * What it does:
+   * Reflection save-callback facade for `SSTIUnitVariableData`. Forwards the
+   * reflected object pointer to the class member save body; `version` and the
+   * owner-ref lane are unused by the member (mirrors the binary tail-jump into
+   * FUN_0055E420).
+   */
+  void SSTIUnitVariableDataSerializerSerialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const data = reinterpret_cast<moho::SSTIUnitVariableData*>(objectPtr);
+    if (data == nullptr) {
+      return;
+    }
+    data->MemberSerialize(archive);
+  }
+
+  /**
+   * Static-init driver that publishes the load/save reflection callbacks for
+   * `SSTIUnitVariableData`. The binary registers the equivalent helper via a
+   * static-init-time `SerSaveLoadHelper<SSTIUnitVariableData>` global whose
+   * ctor self-links the intrusive node and stores the two facade trampolines
+   * (FUN_0055C760 / FUN_0055C770) into +0x0C / +0x10. The engine install path
+   * later copies those into the reflection descriptor's serLoadFunc_ /
+   * serSaveFunc_. Binding both facades by name here is the source-level
+   * invocation that keeps FUN_0055E030 / FUN_0055E420 reachable.
+   */
+  struct SSTIUnitVariableDataSerializerRegistrar
+  {
+    SSTIUnitVariableDataSerializerRegistrar() noexcept
+    {
+      // Ensure the SSTIUnitVariableData reflection descriptor is pre-registered
+      // before publishing callbacks; idempotent with gUnitTypeInfoPreRegisterBootstrap.
+      (void)moho::preregister_SSTIUnitVariableDataTypeInfo();
+
+      (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
+      gSSTIUnitVariableDataSerializer.mSerLoadFunc = &SSTIUnitVariableDataSerializerDeserialize;
+      gSSTIUnitVariableDataSerializer.mSerSaveFunc = &SSTIUnitVariableDataSerializerSerialize;
+    }
+  };
+
+  [[maybe_unused]] const SSTIUnitVariableDataSerializerRegistrar gSSTIUnitVariableDataSerializerRegistrar{};
 } // namespace
 
 // Wrapped in `namespace moho` so the linker mangles these as
@@ -12081,6 +12210,88 @@ void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadInt64(reinterpret_cast<__int64*>(&mUnitStates));
   archive->ReadBool(&mDidRefresh);
   archive->ReadBool(&mOverchargePaused);
+}
+
+/**
+ * Address: 0x0055E420 (FUN_0055E420, Moho::SSTIUnitVariableData::MemberSerialize)
+ *
+ * IDA signature:
+ * void __usercall sub_55E420(SSTIUnitVariableData* this@<edi>, gpg::WriteArchive* archive@<esi>);
+ *
+ * What it does:
+ * Write mirror of MemberDeserialize (FUN_0055E030). Emits the full reflected
+ * unit variable-data payload into one archive, field-for-field and in the same
+ * order the deserializer reads. The two shared animation poses are written as
+ * SHARED tracked raw pointers via gpg::RRef_CAniPose; mCommands/mBuildQueue
+ * (+0x98/+0xC8) are runtime command queues the binary deliberately skips.
+ */
+void SSTIUnitVariableData::MemberSerialize(gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  archive->Write(CachedEntIdType(), &mCreator, ownerRef);
+  archive->WriteInt(mCreationTick);
+  archive->WriteBool(mAutoMode);
+  archive->WriteBool(mAutoSurfaceMode);
+  archive->WriteBool(mIsBusy);
+  archive->WriteFloat(mFuelRatio);
+  archive->WriteFloat(mShieldRatio);
+  archive->WriteInt(mStunTicks);
+  archive->WriteBool(mIsPaused);
+  archive->WriteBool(mIsValidTarget);
+  archive->WriteBool(mRepeatQueue);
+  // Binary writes mJobType/mFireState through the reflected Moho::EJobType /
+  // Moho::EFireState enum RTypes; those enums are not modeled in the SDK, and
+  // for a 4-byte enum-storage lane the reflected write is byte-identical to a
+  // plain 32-bit write, so WriteInt preserves the exact stream behavior.
+  archive->Write(CachedEJobTypeType(), &mJobType, ownerRef);
+  archive->Write(CachedEFireStateType(), &mFireState, ownerRef);
+  archive->WriteFloat(mWorkProgress);
+
+  // Binary emits a 2-iteration, stride-4 interleaved loop over the tactical/
+  // nuke silo-count pairs (cursor base +0x30 = mTacticalSiloStorageCount,
+  // writes cursor-8 / cursor / cursor+8 each iteration, then cursor += 4).
+  // That yields the exact stream order below (Build/Storage/Max for tactical,
+  // then the same three for nuke).
+  archive->WriteInt(mTacticalSiloBuildCount);
+  archive->WriteInt(mTacticalSiloStorageCount);
+  archive->WriteInt(mTacticalSiloMaxStorageCount);
+  archive->WriteInt(mNukeSiloBuildCount);
+  archive->WriteInt(mNukeSiloStorageCount);
+  archive->WriteInt(mNukeSiloMaxStorageCount);
+
+  archive->Write(CachedEntIdType(), &mUnknown40, ownerRef);
+  archive->WriteString(&mCustomName);
+
+  archive->Write(CachedSEconValueType(), &mProduced, ownerRef);
+  archive->Write(CachedSEconValueType(), &mResourcesSpent, ownerRef);
+  archive->Write(CachedSEconValueType(), &mMaintainenceCost, ownerRef);
+
+  archive->Write(CachedEntIdType(), &mFocusUnit, ownerRef);
+  archive->Write(CachedEntIdType(), &mGuardedUnit, ownerRef);
+  archive->Write(CachedEntIdType(), &mTargetBlip, ownerRef);
+
+  // Two SHARED tracked animation-pose pointers: prior pose then current pose,
+  // each wrapped via gpg::RRef_CAniPose and emitted through WriteRawPointer
+  // with TrackedPointerState::Shared (the binary's `push 3; state`).
+  gpg::RRef poseRef{};
+  (void)gpg::RRef_CAniPose(&poseRef, mPriorSharedPose.get());
+  gpg::WriteRawPointer(archive, poseRef, gpg::TrackedPointerState::Shared, ownerRef);
+
+  (void)gpg::RRef_CAniPose(&poseRef, mSharedPose.get());
+  gpg::WriteRawPointer(archive, poseRef, gpg::TrackedPointerState::Shared, ownerRef);
+
+  archive->Write(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
+  archive->Write(CachedUnitAttributesType(), &mAttributes, ownerRef);
+
+  archive->WriteInt(static_cast<int>(mScriptbits));
+  archive->WriteInt64(static_cast<std::int64_t>(mUnitStates));
+  archive->WriteBool(mDidRefresh);
+  archive->WriteBool(mOverchargePaused);
 }
 
 namespace moho
