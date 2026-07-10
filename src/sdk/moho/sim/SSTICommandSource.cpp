@@ -337,4 +337,78 @@ void AppendSSTICommandSource(
 {
   commandSources.push_back(entry);
 }
+
+/**
+ * Address: 0x00755810 (FUN_00755810, sub_755810)
+ *
+ * IDA signature:
+ * void __cdecl sub_755810(Moho::SSTICommandSource *srcBegin,
+ *                         Moho::SSTICommandSource *srcEnd,
+ *                         Moho::SSTICommandSource *destBegin);
+ *
+ * What it does:
+ * Copy-assigns one half-open `SSTICommandSource` source range `[srcBegin,srcEnd)`
+ * into already-constructed destination lanes starting at `destBegin`, returning
+ * the destination cursor one past the last written entry. If a copy-assignment
+ * throws, the entries written so far are destroyed before the exception is
+ * rethrown. This is the fill lane invoked by the command-source vector
+ * copy-construct helper (`FUN_0074C500`); it is a distinct emission from the
+ * shape-identical `CopyAssignSSTICommandSourceHalfOpenRange` (`FUN_007CECC0`).
+ */
+SSTICommandSource* CopyAssignCommandSourceRangeForVectorFill(
+  const SSTICommandSource* const srcBegin,
+  const SSTICommandSource* const srcEnd,
+  SSTICommandSource* const destBegin
+)
+{
+  SSTICommandSource* destCursor = destBegin;
+  try {
+    for (const SSTICommandSource* srcCursor = srcBegin; srcCursor != srcEnd;
+         ++srcCursor, ++destCursor) {
+      *destCursor = *srcCursor;
+    }
+    return destCursor;
+  } catch (...) {
+    for (SSTICommandSource* rollbackCursor = destBegin; rollbackCursor != destCursor;
+         ++rollbackCursor) {
+      rollbackCursor->~SSTICommandSource();
+    }
+    throw;
+  }
+}
+
+/**
+ * Address: 0x0074C500 (FUN_0074C500, sub_74C500)
+ *
+ * IDA signature:
+ * std::vector_SSTICommandSource *__thiscall
+ * sub_74C500(Moho::SCommandSource *this, std::vector_SSTICommandSource *out);
+ *
+ * What it does:
+ * Copy-constructs one command-source vector lane out of the source vector held
+ * by a `SLaunchCommandSources` block (its `mSrcs` lane). The destination `out`
+ * is first reset to empty; if the source is non-empty its capacity is reserved,
+ * the destination lanes are value-initialized, and each element is copy-assigned
+ * from the source through `CopyAssignCommandSourceRangeForVectorFill`
+ * (`FUN_00755810`). Mirrors the binary's reserve + default-construct + assign
+ * sequence exactly (the `Sim` constructor uses this to seed `mCommandSources`
+ * from `LaunchInfoBase::mCommandSources.mSrcs`).
+ */
+msvc8::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
+  const msvc8::vector<SSTICommandSource>& src,
+  msvc8::vector<SSTICommandSource>* const out
+)
+{
+  out->reset_range_lanes_preserve_proxy();
+
+  const std::size_t count = src.size();
+  if (count != 0U) {
+    // Reserve + value-construct the destination lanes, then copy-assign over
+    // them from the source range (binary: sub_543480 reserve -> sub_755810 fill).
+    out->resize(count);
+    (void)CopyAssignCommandSourceRangeForVectorFill(src.begin(), src.end(), out->data());
+  }
+
+  return out;
+}
 } // namespace moho

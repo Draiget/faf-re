@@ -93,4 +93,31 @@ namespace moho
     msvc8::vector<SSTICommandSource>& commandSources,
     const SSTICommandSource& entry
   );
+
+  /**
+   * Address: 0x00755810 (FUN_00755810, sub_755810)
+   *
+   * What it does:
+   * Copy-assigns one half-open `SSTICommandSource` range into already-constructed
+   * destination lanes, destroying written entries and rethrowing on failure.
+   * Fill lane used by `CopyConstructCommandSourceVector` (`FUN_0074C500`).
+   */
+  SSTICommandSource* CopyAssignCommandSourceRangeForVectorFill(
+    const SSTICommandSource* srcBegin,
+    const SSTICommandSource* srcEnd,
+    SSTICommandSource* destBegin
+  );
+
+  /**
+   * Address: 0x0074C500 (FUN_0074C500, sub_74C500)
+   *
+   * What it does:
+   * Copy-constructs one command-source vector lane from a source vector (the
+   * `mSrcs` lane of a `SLaunchCommandSources` block). Used by the `Sim`
+   * constructor to seed `Sim::mCommandSources` from the launch info.
+   */
+  msvc8::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
+    const msvc8::vector<SSTICommandSource>& src,
+    msvc8::vector<SSTICommandSource>* out
+  );
 } // namespace moho

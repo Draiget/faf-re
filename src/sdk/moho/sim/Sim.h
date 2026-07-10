@@ -48,6 +48,9 @@ namespace moho
   class PathTables;
   class COGrid;
   class LuaState;
+  class LaunchInfoBase;
+  class LaunchInfoNew;
+  class LaunchInfoLoad;
   class RRuleGameRules;
   class CSimResources;
   class STIMap;
@@ -117,9 +120,20 @@ namespace moho
   class Sim final : public ICommandSink
   {
   public:
-    // Destruction through base is expected to be possible.
-    // Implemented in .cpp (even if empty), because base dtor is pure.
-    ~Sim() = default;
+    /**
+     * Address: 0x007458E0 (FUN_007458E0, ??1Sim@Moho@@UAE@XZ)
+     * Mangled: ??1Sim@Moho@@UAE@XZ
+     *
+     * What it does:
+     * Tears down every subsystem in reverse-construction order: task stages,
+     * databases, armies, RNG, path tables, sim vars, effect/decal/sound managers,
+     * synclog files, Lua state, sync-filter storage, intrusive entity/shield/
+     * overlay lists, and finally the desync log lanes. Clears `sInstance`.
+     *
+     * Virtual in the binary (`??1Sim@Moho@@UAE@XZ`); `ICommandSink` does not yet
+     * declare a virtual destructor in this model, so `override` cannot be used.
+     */
+    virtual ~Sim();
 
     /**
      * Address: 0x00748650
@@ -1132,6 +1146,65 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+
+    // Global "current sim" singleton. Set by Sim::Create right after the
+    // instance is constructed and cleared by ~Sim. Distinct from the Lua
+    // global-userdata pointer installed via lua_setglobaluserdata.
+    static Sim* sInstance;
+
+    /**
+     * Address: 0x007434D0 (FUN_007434D0, ??0Sim@Moho@@AAE@PAULaunchInfoBase@1@@Z)
+     * Mangled: ??0Sim@Moho@@AAE@PAULaunchInfoBase@1@@Z
+     *
+     * IDA signature:
+     * Moho::Sim *__stdcall Moho::Sim::Sim(Moho::Sim *this, Moho::LaunchInfoBase *info);
+     *
+     * What it does:
+     * Factory constructor. Zero/initializes every Sim member, seeds the command
+     * source vector and focus army from the launch info, optionally opens the
+     * synclog file, builds a fresh `LuaState`, runs the "core" and "sim" Lua init
+     * sets, loads `simInit.lua`/`saveload.lua`, loads terrain types, allocates the
+     * occupation grid + path tables, and exports the rules to Lua while seeding
+     * the rolling checksum.
+     */
+    explicit Sim(LaunchInfoBase* info);
+
+    /**
+     * Address: 0x00744060 (FUN_00744060, ?Setup@Sim@Moho@@AAEXPAVLaunchInfoNew@2@@Z)
+     * Mangled: ?Setup@Sim@Moho@@AAEXPAVLaunchInfoNew@2@@Z
+     *
+     * What it does:
+     * New-game initialization pass. Fills the subsystems the constructor left
+     * null: disk watcher, decal buffer, per-run RNG stream, physics constants,
+     * ArmySetup Lua table, heightfield bounds, formation/effect/entity/command
+     * databases, sim resources, armies, optional sound manager and props, then
+     * runs `BeginSession` and `PostInitialize`.
+     */
+    void Setup(LaunchInfoNew* info);
+
+    /**
+     * Address: 0x007449A0 (FUN_007449A0, ?Load@Sim@Moho@@AAEXPAVLaunchInfoLoad@2@@Z)
+     * Mangled: ?Load@Sim@Moho@@AAEXPAVLaunchInfoLoad@2@@Z
+     *
+     * What it does:
+     * Load-game initialization pass. Deserializes this Sim from the saved
+     * archive, refreshes heightfield bounds, re-binds every loaded prop into the
+     * entity DB, then re-syncs the playable rectangle and fires `OnPostLoad`
+     * through Lua.
+     */
+    void Load(LaunchInfoLoad* loadInfo);
+
+    /**
+     * Address: 0x007433B0 (FUN_007433B0,
+     * ?Create@Sim@Moho@@SAPAV12@ABV?$shared_ptr@ULaunchInfoBase@Moho@@@boost@@@Z)
+     *
+     * What it does:
+     * Factory entry point. Allocates a Sim, constructs it from the shared launch
+     * info, publishes it as `sInstance`, and dispatches to `Setup` (new game) or
+     * `Load` (saved game); throws `std::runtime_error` for an unknown launch-info
+     * subclass.
+     */
+    [[nodiscard]] static Sim* Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
 
     msvc8::string mLogFilePrefix;
     std::FILE* mLog;
