@@ -2,13 +2,23 @@
 
 #include <memory>
 #include <new>
+#include <typeinfo>
 
+#include "Wm3Quaternion.h"
+#include "Wm3Vector3.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/Rect2.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/Sim.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
@@ -18,6 +28,92 @@ namespace
 {
   constexpr std::uint64_t kUnitStateBuildingMask = (1ull << moho::UNITSTATE_Building);
   constexpr std::uint64_t kUnitStateNoReclaimMask = (1ull << moho::UNITSTATE_NoReclaim);
+
+  // Reflection-type caches used by the archive load/save lanes. The binary
+  // caches each reflected `gpg::RType*` in a dedicated global initialized on
+  // first use via `gpg::LookupRType(typeid(...))`. Where the type owns a
+  // class-static `sType` (CCommandTask, WeakPtr<T>, gpg::Rect2<T>) we mirror
+  // that lane; where it does not (CBuildTaskHelper, Wm3::Vector3f,
+  // Wm3::Quaternionf) we mirror the binary's file-level `Xxx__sType` global
+  // with a file-static cache, exactly as the sibling CUnitPatrolTask does for
+  // `Wm3::Box3f`.
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCBuildTaskHelperType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedQuaternionfType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+      moho::WeakPtr<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Entity>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
+      moho::WeakPtr<moho::Entity>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedRect2iType()
+  {
+    gpg::RType* type = gpg::Rect2i::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(gpg::Rect2<int>));
+      gpg::Rect2i::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedRect2fType()
+  {
+    gpg::RType* type = gpg::Rect2f::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(gpg::Rect2<float>));
+      gpg::Rect2f::sType = type;
+    }
+    return type;
+  }
 
   struct CUnitCommandEventBroadcasterRuntimeView
   {
@@ -276,5 +372,114 @@ namespace moho
     });
 
     return std::construct_at(guard.release(), dispatchTask, blueprint, buildPosition, buildOrientation, buildDirection);
+  }
+
+  /**
+   * Address: 0x005FE710 (FUN_005FE710, Moho::CUnitMobileBuildTask::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall MemberDeserialize(CUnitCommand** this@<ecx>, gpg::ReadArchive* archive@<eax>);
+   *
+   * What it does:
+   * Restores mobile-build-task state from an archive, lane by lane in binary
+   * order (12 reads). The transform / rect / weak-link / helper lanes flow
+   * through the reflected `Read`; the two tracked pointer lanes through the
+   * typed `ReadPointer_*` slots; the placement-retry counter through the
+   * virtual `ReadInt` slot.
+   */
+  void CUnitMobileBuildTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    // The binary reuses one zero-initialized owner-ref record across every
+    // reflected `Read` (each call re-zeroes it before use); mirror that with a
+    // single fresh, empty owner-ref.
+    const gpg::RRef ownerRef{};
+
+    // 1. base CCommandTask sub-object (offset 0x00).
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    // 2. embedded build helper (offset 0x40).
+    archive->Read(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+
+    // 3. command pointer lane (offset 0x84).
+    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
+
+    // 4. blueprint pointer lane (offset 0x88). ReadPointer_RUnitBlueprint wants
+    //    a non-const `RUnitBlueprint**`; round-trip through a mutable local.
+    RUnitBlueprint* blueprint = const_cast<RUnitBlueprint*>(mBlueprint);
+    archive->ReadPointer_RUnitBlueprint(&blueprint, &ownerRef);
+    mBlueprint = blueprint;
+
+    // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).
+    archive->Read(CachedVector3fType(), &mBuildPosition, ownerRef);
+    archive->Read(CachedQuaternionfType(), &mBuildOrientation, ownerRef);
+    archive->Read(CachedVector3fType(), &mBuildDirection, ownerRef);
+
+    // 8. placement-retry counter (offset 0xB4) via the virtual ReadInt slot.
+    archive->ReadInt(&mPlacementRetryCount);
+
+    // 9-10. runtime weak links (offsets 0xB8 / 0xC0).
+    archive->Read(CachedWeakPtrUnitType(), &mBuildUnit, ownerRef);
+    archive->Read(CachedWeakPtrEntityType(), &mPendingBuildEntity, ownerRef);
+
+    // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
+    archive->Read(CachedRect2iType(), &mBuildRect, ownerRef);
+    archive->Read(CachedRect2fType(), &mBuildSkirt, ownerRef);
+  }
+
+  /**
+   * Address: 0x005FE950 (FUN_005FE950, Moho::CUnitMobileBuildTask::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall MemberSerialize(CUnitMobileBuildTask* this@<eax>, gpg::WriteArchive* archive@<esi>);
+   *
+   * What it does:
+   * Line-for-line write mirror of `MemberDeserialize` over the identical field
+   * set and order (12 writes). The reflected `Write` lanes carry an empty owner
+   * ref; the two tracked pointer lanes build a typed `RRef_*` and emit it as an
+   * unowned raw pointer; the placement-retry counter is written through the
+   * virtual `WriteInt` slot.
+   */
+  void CUnitMobileBuildTask::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    // 1. base CCommandTask sub-object (offset 0x00).
+    archive->Write(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    // 2. embedded build helper (offset 0x40).
+    archive->Write(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+
+    // 3. command pointer lane (offset 0x84): typed RRef then unowned raw pointer.
+    gpg::RRef pointerRef{};
+    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    // 4. blueprint pointer lane (offset 0x88).
+    (void)gpg::RRef_RUnitBlueprint(&pointerRef, const_cast<RUnitBlueprint*>(mBlueprint));
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).
+    archive->Write(CachedVector3fType(), &mBuildPosition, ownerRef);
+    archive->Write(CachedQuaternionfType(), &mBuildOrientation, ownerRef);
+    archive->Write(CachedVector3fType(), &mBuildDirection, ownerRef);
+
+    // 8. placement-retry counter (offset 0xB4) via the virtual WriteInt slot.
+    archive->WriteInt(mPlacementRetryCount);
+
+    // 9-10. runtime weak links (offsets 0xB8 / 0xC0).
+    archive->Write(CachedWeakPtrUnitType(), &mBuildUnit, ownerRef);
+    archive->Write(CachedWeakPtrEntityType(), &mPendingBuildEntity, ownerRef);
+
+    // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
+    archive->Write(CachedRect2iType(), &mBuildRect, ownerRef);
+    archive->Write(CachedRect2fType(), &mBuildSkirt, ownerRef);
   }
 } // namespace moho

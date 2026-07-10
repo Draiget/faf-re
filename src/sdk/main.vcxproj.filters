@@ -5777,6 +5777,8 @@
     <ClInclude Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTask.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTask.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.h"><Filter>Header Files</Filter></ClInclude>
+    <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
