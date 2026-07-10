@@ -416,6 +416,7 @@
     <ClCompile Include="moho\ai\IAiTransportSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiTransportTypeInfo.cpp" />
     <ClCompile Include="moho\ai\SPickUpInfo.cpp" />
+    <ClCompile Include="moho\ai\SPickUpInfoVectorReflection.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImpl.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplSerializer.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplTypeInfo.cpp" />
@@ -1784,6 +1785,7 @@
     <ClInclude Include="moho\ai\IAiTransportSerializer.h" />
     <ClInclude Include="moho\ai\IAiTransportTypeInfo.h" />
     <ClInclude Include="moho\ai\SPickUpInfo.h" />
+    <ClInclude Include="moho\ai\SPickUpInfoVectorReflection.h" />
     <ClInclude Include="moho\ai\LAiAttackerImpl.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h" />

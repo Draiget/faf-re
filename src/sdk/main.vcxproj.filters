@@ -1167,6 +1167,9 @@
     <ClCompile Include="moho\ai\SPickUpInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\SPickUpInfoVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\LAiAttackerImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4165,6 +4168,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\SPickUpInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SPickUpInfoVectorReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\LAiAttackerImpl.h">
