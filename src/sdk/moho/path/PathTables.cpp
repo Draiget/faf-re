@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "gpg/core/containers/DList.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
@@ -174,6 +175,46 @@ namespace
     next->mPrev = prev;
     prev->mNext = next;
     ResetPathQueueNodeLinks(node);
+  }
+
+  /**
+   * Splices every node currently linked into the circular `source` ring into
+   * the destination ring immediately after `afterNode`, then resets `source`
+   * back to an empty self-linked singleton.
+   *
+   * This is the O(1) whole-ring transfer the binary open-codes inline in
+   * `DeserializePathQueueImplRefCallback` (0x00768A10) via three pointer
+   * rewrites: the deserialized `mBase.mTraveler` traveler ring is drained into
+   * the height-sentinel ring (the ring whose head node `afterNode` is the
+   * sentinel's predecessor), preserving traveler order.
+   *
+   * Returns the source ring's original first node (`source.mNext`) when the
+   * ring was non-empty, or `&source` when it was already empty, mirroring the
+   * binary's `eax` return lane (discarded by the `load_func_t` callback).
+   */
+  PathQueueIntrusiveNode* SplicePathQueueNodesAfter(
+    PathQueueIntrusiveNode& source,
+    PathQueueIntrusiveNode* const afterNode
+  ) noexcept
+  {
+    if (source.mPrev == &source) {
+      // Empty ring: nothing to move; return the empty-ring sentinel address.
+      return source.mPrev;
+    }
+
+    PathQueueIntrusiveNode* const first = source.mNext;
+    PathQueueIntrusiveNode* const last = source.mPrev;
+    PathQueueIntrusiveNode* const afterOldNext = afterNode->mNext;
+
+    // Stitch the moved chain [first .. last] between afterNode and its old next.
+    afterOldNext->mPrev = last;
+    afterNode->mNext = first;
+    first->mPrev = afterNode;
+    last->mNext = afterOldNext;
+
+    // Source ring becomes empty again.
+    ResetPathQueueNodeLinks(source);
+    return first;
   }
 
   void ResetPathQueuePointerTriplet(PathQueuePointerTriplet& triplet)
@@ -701,6 +742,71 @@ namespace moho
      * calling-convention thunk 0x00766BC0 that the reflection slot dispatches to
      * is subsumed by this body.
      */
+    /**
+     * Address: 0x00768A10 (FUN_00768A10, Moho::PathQueueImplSerializer::Deserialize body)
+     * Mangled: (reached via the cdecl->usercall trampoline 0x00766BB0,
+     *   Moho::PathQueueImplSerializer::Deserialize)
+     *
+     * IDA signature:
+     * int *__usercall sub_768A10@<eax>(gpg::ReadArchive *this@<ecx>, int a2@<eax>);
+     *
+     * What it does:
+     * Reflected load callback for `Moho::PathQueue::Impl`, the exact inverse of
+     * `SavePathQueueImplRefCallback` (0x00768AD0):
+     *   1) reads the tracked `PathTables*` owner lane into the impl header
+     *      (+0x00) via `ReadArchive::ReadPointer_PathTables`;
+     *   2) reads the height sentinel ring (`mHeightSentinel`, +0x04) as a
+     *      `gpg::DList<Moho::IPathTraveler,void>` value;
+     *   3) reads the base traveler ring head (`mBase.mTraveler`, +0x58) as a
+     *      `gpg::DList<Moho::IPathTraveler,void>` value;
+     *   4) splices every deserialized traveler node out of `mBase.mTraveler`
+     *      and into the height-sentinel ring immediately after the sentinel's
+     *      predecessor (`mHeightSentinel.mPrev`), leaving `mBase.mTraveler`
+     *      empty. This re-homes the freshly read travelers onto the live queue
+     *      ring the runtime iterates.
+     *
+     * The `DList<IPathTraveler,void>` reflected type is resolved once through a
+     * cached `sType` singleton (lazy `LookupRType`), matching both the binary's
+     * idiom and the save side, and every read passes a fresh zeroed owner `RRef`
+     * temporary, just as the binary rebuilds the temporary before each call. The
+     * thin cdecl calling-convention trampoline 0x00766BB0 (`return
+     * sub_768A10(a1)`) that the reflection slot dispatches to is subsumed by this
+     * body; the binary's discarded `eax` return lane (the spliced ring's first
+     * node) is not propagated because `load_func_t` returns void.
+     */
+    void DeserializePathQueueImplRefCallback(gpg::ReadArchive* const archive, PathQueue::Impl* const impl)
+    {
+      // (1) Owner PathTables* lane at the impl header (+0x00).
+      gpg::RRef ownerRef{};
+      ownerRef.mObj = nullptr;
+      ownerRef.mType = nullptr;
+      archive->ReadPointer_PathTables(
+        reinterpret_cast<PathTables**>(&impl->mSize),
+        &ownerRef
+      );
+
+      static gpg::RType* dlistType = nullptr;
+      if (dlistType == nullptr) {
+        dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
+      }
+
+      // (2) Height sentinel ring (+0x04).
+      gpg::RRef heightRef{};
+      archive->Read(dlistType, &impl->mHeightSentinel, heightRef);
+
+      if (dlistType == nullptr) {
+        dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
+      }
+
+      // (3) Base traveler ring head (+0x58).
+      gpg::RRef travelerRef{};
+      archive->Read(dlistType, &impl->mBase.mTraveler, travelerRef);
+
+      // (4) Splice the deserialized travelers into the height-sentinel ring
+      // right after the sentinel's predecessor, then empty the source ring.
+      (void)SplicePathQueueNodesAfter(impl->mBase.mTraveler, impl->mHeightSentinel.mPrev);
+    }
+
     void SavePathQueueImplRefCallback(PathQueue::Impl* const impl, gpg::WriteArchive& archive)
     {
       // The impl header lane at +0x00 holds the owning `PathTables*` in the
@@ -730,47 +836,51 @@ namespace moho
     }
 
     /**
-     * Source-level wiring for the `PathQueue::Impl` reflected save callback.
+     * Source-level wiring for the `PathQueue::Impl` reflected serializer pair.
      *
      * The binary stores the address of the save callback (via the 0x00766BC0
-     * calling-convention thunk over 0x00768AD0) into the
-     * `SerSaveLoadHelper_PathQueue_Impl` helper node's save lane, which
+     * calling-convention thunk over 0x00768AD0) and the load callback (via the
+     * 0x00766BB0 trampoline over 0x00768A10) into the
+     * `SerSaveLoadHelper_PathQueue_Impl` helper node's save/load lanes, which
      * `InstallPathQueueImplSerializerCallbacks` (0x00767140) then copies into
-     * the reflected `Moho::PathQueue::Impl` type's `serSaveFunc_` slot. Taking
-     * the address of `SavePathQueueImplRefCallback` here is the source-level
-     * invocation (evidence class 2, function-pointer table) that keeps the
-     * callback linked into the engine binary.
+     * the reflected `Moho::PathQueue::Impl` type's `serSaveFunc_` /
+     * `serLoadFunc_` slots. Taking the address of both callbacks here is the
+     * source-level invocation (evidence class 2, function-pointer table) that
+     * keeps them linked into the engine binary.
      */
     SerSaveLoadHelperInitRuntimeView gPathQueueImplSaveHelper{};
 
     /**
-     * Populates the `PathQueue::Impl` serializer helper node's save lane with
-     * the recovered save callback address, mirroring the binary's startup
-     * helper-node population. Installing the lanes onto the live reflected type
-     * is deferred to `InstallPathQueueImplSerializerCallbacks`, which the engine
-     * runs once the `Moho::PathQueue::Impl` type descriptor is registered.
+     * Populates the `PathQueue::Impl` serializer helper node's save and load
+     * lanes with the recovered callback addresses, mirroring the binary's
+     * startup helper-node population. Installing the lanes onto the live
+     * reflected type is deferred to `InstallPathQueueImplSerializerCallbacks`,
+     * which the engine runs once the `Moho::PathQueue::Impl` type descriptor is
+     * registered.
      */
-    SerSaveLoadHelperInitRuntimeView* PopulatePathQueueImplSaveCallbackStorage() noexcept
+    SerSaveLoadHelperInitRuntimeView* PopulatePathQueueImplSerializerCallbackStorage() noexcept
     {
+      gPathQueueImplSaveHelper.mLoadCallback =
+        reinterpret_cast<gpg::RType::load_func_t>(&DeserializePathQueueImplRefCallback);
       gPathQueueImplSaveHelper.mSaveCallback =
         reinterpret_cast<gpg::RType::save_func_t>(&SavePathQueueImplRefCallback);
       return &gPathQueueImplSaveHelper;
     }
 
-    [[maybe_unused]] gpg::RType::load_func_t InstallPathQueueImplSaveCallbacks()
+    [[maybe_unused]] gpg::RType::load_func_t InstallPathQueueImplSerializerLifecycleCallbacks()
     {
-      return InstallPathQueueImplSerializerCallbacks(PopulatePathQueueImplSaveCallbackStorage());
+      return InstallPathQueueImplSerializerCallbacks(PopulatePathQueueImplSerializerCallbackStorage());
     }
 
-    struct PathQueueImplSaveCallbackBootstrap
+    struct PathQueueImplSerializerCallbackBootstrap
     {
-      PathQueueImplSaveCallbackBootstrap() noexcept
+      PathQueueImplSerializerCallbackBootstrap() noexcept
       {
-        (void)PopulatePathQueueImplSaveCallbackStorage();
+        (void)PopulatePathQueueImplSerializerCallbackStorage();
       }
     };
 
-    [[maybe_unused]] PathQueueImplSaveCallbackBootstrap gPathQueueImplSaveCallbackBootstrap;
+    [[maybe_unused]] PathQueueImplSerializerCallbackBootstrap gPathQueueImplSerializerCallbackBootstrap;
 
     class PathQueueTypeInfo final : public gpg::RType
     {
