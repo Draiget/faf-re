@@ -123,6 +123,37 @@ namespace moho
      */
     void RefreshPreviewEmitter();
 
+    /**
+     * Address: 0x00666F40 (FUN_00666F40, Moho::WEmitterWx::~WEmitterWx)
+     *
+     * IDA signature:
+     * int __stdcall sub_666F40(WEmitterWx *this);
+     *
+     * What it does:
+     * Complete-object destructor. Deletes every live curve panel, releases the
+     * previewed effect through the sim effect-manager, releases the interlock
+     * ref on the active sim driver, tears down the ramp/texture wx-string
+     * caches, the blueprint/bone string lanes, the curve-panel vector storage,
+     * the four blueprint/texture path lanes, unlinks the attached-unit and
+     * preview-effect weak nodes, drains the managed-frame owner slots, and runs
+     * the shared non-deleting frame teardown as a tail call. Teardown runs in
+     * exact binary reverse-construction order.
+     */
+    ~WEmitterWx();
+
+    /**
+     * Address: 0x00669E10 (FUN_00669E10, Moho::WEmitterWx::dtr)
+     * Slot: scalar-deleting destructor thunk
+     *
+     * IDA signature:
+     * void *__thiscall Moho::WEmitterWx::dtr(WEmitterWx *this, char deleteFlags);
+     *
+     * What it does:
+     * Scalar-deleting destructor thunk. Runs `~WEmitterWx()` teardown and
+     * releases the object storage when `deleteFlags & 1` is set.
+     */
+    WEmitterWx* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
+
     Sim* mSim = nullptr;                                      // +0x17C
     Wm3::Vector3f mSpawnPosition{};                           // +0x180
     WEmitterTextControl* mLifetimeControl = nullptr;           // +0x18C
