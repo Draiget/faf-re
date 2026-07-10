@@ -51,8 +51,6 @@ namespace
 
   CThrustManipulatorSerializerHelperNode gCThrustManipulatorSerializer;
 
-  using ScalarDeletingDtorFn = int(__thiscall*)(void* self, int deleteFlag);
-
   struct CThrustManipulatorTypeLifecycleSlotsRuntimeView
   {
     std::uint8_t mPad00_47[0x48]{}; // +0x00
@@ -153,6 +151,32 @@ namespace
     float mTurnSpeed;                // +0xC8
     Wm3::Vector3f mDirectionLane;    // +0xCC
     Wm3::Quaternionf mOrientation;   // +0xD8
+
+    /**
+     * Address: 0x0064A740 (FUN_0064A740, Moho::CThrustManipulator::~CThrustManipulator)
+     *
+     * IDA signature:
+     * void __usercall sub_64A740(Moho::CThrustManipulator *this@<esi>);
+     *
+     * What it does:
+     * Complete-object destructor. Releases the label heap storage, unlinks the
+     * weak unit pointer from its owner chain, then runs `IAniManipulator` base
+     * teardown as a tail call.
+     */
+    ~CThrustManipulatorSerializerRuntimeView() override;
+
+    /**
+     * Address: 0x0064A480 (FUN_0064A480, Moho::CThrustManipulator::dtr)
+     * Slot: 0
+     *
+     * IDA signature:
+     * void *__thiscall sub_64A480(void *this, char deleteFlags);
+     *
+     * What it does:
+     * Scalar-deleting destructor (vtable slot 0). Runs the complete-object
+     * teardown and frees the object storage when `deleteFlags & 1` is set.
+     */
+    virtual void operator_delete(std::int32_t deleteFlags);
   };
 
   static_assert(
@@ -199,6 +223,40 @@ namespace
     sizeof(CThrustManipulatorSerializerRuntimeView) == 0xE8,
     "CThrustManipulatorSerializerRuntimeView size must be 0xE8"
   );
+
+  /**
+   * Address: 0x0064A740 (FUN_0064A740, Moho::CThrustManipulator::~CThrustManipulator)
+   *
+   * What it does:
+   * Complete-object destructor. Releases the heap-backed label storage, unlinks
+   * the weak unit pointer from its owner chain, then runs `IAniManipulator` base
+   * teardown as a tail call. The two MSVC vtable restores at function entry are
+   * expressed implicitly by the C++ destructor.
+   */
+  CThrustManipulatorSerializerRuntimeView::~CThrustManipulatorSerializerRuntimeView()
+  {
+    mLabel.tidy(true, 0U);
+    mUnit.UnlinkFromOwnerChain();
+
+    auto* const baseManipulator = static_cast<moho::IAniManipulator*>(this);
+    baseManipulator->IAniManipulator::~IAniManipulator();
+  }
+
+  /**
+   * Address: 0x0064A480 (FUN_0064A480, Moho::CThrustManipulator::dtr)
+   * Slot: 0
+   *
+   * What it does:
+   * Scalar-deleting destructor (vtable slot 0). Runs `CThrustManipulator`
+   * teardown and frees the object storage when `deleteFlags & 1` is set.
+   */
+  void CThrustManipulatorSerializerRuntimeView::operator_delete(const std::int32_t deleteFlags)
+  {
+    this->~CThrustManipulatorSerializerRuntimeView();
+    if ((deleteFlags & 1) != 0) {
+      ::operator delete(this);
+    }
+  }
 
   [[nodiscard]] moho::CAniPoseBone* ResolveWatchedBoneForThrustManipulator(
     moho::IAniManipulator* const manipulator
@@ -676,14 +734,12 @@ namespace moho
       return;
     }
 
-    auto* const vtable = *reinterpret_cast<ScalarDeletingDtorFn**>(objectStorage);
-    (void)vtable[0](objectStorage, 1);
+    reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectStorage)->operator_delete(1);
   }
 
   [[maybe_unused]] void DestructCThrustManipulatorStorageRuntime(void* const objectStorage)
   {
-    auto* const vtable = *reinterpret_cast<ScalarDeletingDtorFn**>(objectStorage);
-    (void)vtable[0](objectStorage, 0);
+    reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(objectStorage)->operator_delete(0);
   }
 
   [[nodiscard]] gpg::RRef NewCThrustManipulatorRefForTypeInfo()
