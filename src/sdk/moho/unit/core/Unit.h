@@ -555,6 +555,22 @@ namespace moho
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
+    /**
+     * Address: 0x0055E420 (FUN_0055E420, Moho::SSTIUnitVariableData::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall MemberSerialize(SSTIUnitVariableData* this@<edi>, gpg::WriteArchive* archive@<esi>);
+     *
+     * What it does:
+     * Write mirror of `MemberDeserialize`: stores the reflected unit
+     * variable-data payload (creator id, econ/silo counts, custom name, econ
+     * pairs, focus/guard/target ids, shared animation poses, weapon-info
+     * vector, unit attributes, and script/state flags) into one archive, in
+     * the same field order the deserializer reads. mCommands/mBuildQueue
+     * (+0x98/+0xC8) runtime command queues are deliberately not serialized.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
     EntId mCreator;                // +0x000
     std::int32_t mCreationTick;    // +0x004
     bool mAutoMode;                // +0x008
