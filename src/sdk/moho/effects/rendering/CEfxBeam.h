@@ -11,6 +11,7 @@
 namespace moho
 {
   struct GeomCamera3;
+  struct RBeamBlueprint;
 
   class CEfxBeam : public CEffectImpl
   {
@@ -24,6 +25,19 @@ namespace moho
      * Initializes default effect, attachment, and beam payload state.
      */
     CEfxBeam();
+
+    /**
+     * Address: 0x006547C0 (FUN_006547C0, Moho::CEfxBeam::CEfxBeam)
+     *
+     * What it does:
+     * Constructs a blueprint-driven beam effect bound to `manager`: chains the
+     * manager-bound CEffectImpl base ctor, seeds the endpoint attach-info to the
+     * detached beam-end default, sizes the effect parameter/texture/string lanes,
+     * then copies every beam render parameter and both textures from `blueprint`
+     * before rebuilding render state via Reset(). `armyIndex` is forwarded to the
+     * base effect as its owning-army/script token.
+     */
+    CEfxBeam(CEffectManagerImpl* manager, const RBeamBlueprint* blueprint, int armyIndex);
 
     /**
      * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)

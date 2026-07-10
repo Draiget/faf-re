@@ -575,12 +575,12 @@ namespace moho
    */
   IEffect* CEffectManagerImpl::CreateBeam(const RBeamBlueprint* const beamBlueprint, const int armyIndex)
   {
-    CEfxBeam* const effect = new (std::nothrow) CEfxBeam();
+    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
     }
 
-    effect->mBlendMode = beamBlueprint != nullptr ? beamBlueprint->BlendMode : armyIndex;
+    // Blend mode and every beam parameter are seeded by the blueprint ctor above.
     LinkActiveEffect(mActiveEffects, effect);
 
     if (!IsBlueprintEnabledForCurrentFidelity(beamBlueprint)) {
@@ -625,12 +625,12 @@ namespace moho
     const int armyIndex
   )
   {
-    CEfxBeam* const effect = new (std::nothrow) CEfxBeam();
+    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
     }
 
-    effect->mBlendMode = beamBlueprint != nullptr ? beamBlueprint->BlendMode : armyIndex;
+    // Blend mode and every beam parameter are seeded by the blueprint ctor above.
     LinkActiveEffect(mActiveEffects, effect);
 
     const VTransform sourceTransform = sourceEntity->GetBoneWorldTransform(sourceBoneIndex);
@@ -661,12 +661,12 @@ namespace moho
     const int armyIndex
   )
   {
-    CEfxBeam* const effect = new (std::nothrow) CEfxBeam();
+    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
     }
 
-    effect->mBlendMode = beamBlueprint != nullptr ? beamBlueprint->BlendMode : armyIndex;
+    // Blend mode and every beam parameter are seeded by the blueprint ctor above.
     LinkActiveEffect(mActiveEffects, effect);
 
     effect->AttachEntityToEntity(sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex);
