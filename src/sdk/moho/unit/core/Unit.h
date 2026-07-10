@@ -1003,6 +1003,23 @@ namespace moho
     [[nodiscard]] bool IsIdleState() const;
 
     /**
+     * Address: 0x0062F030 (FUN_0062F030, Moho::Unit::FindPlatform)
+     *
+     * IDA signature:
+     * Moho::Unit* __usercall FindPlatform@<eax>(Moho::Unit* this@<ecx>, int @<ebx>);
+     *
+     * What it does:
+     * When this air unit needs refuel/repair (fuel below the NeedRefuel sim-var
+     * threshold, or max/health ratio above the NeedRepair threshold) and is not
+     * its own formation lead, scans the owning army's AIRSTAGINGPLATFORM units
+     * for the first idle, in-bounds transport within staging-platform scan
+     * radius that can accept this unit (carrier-with-storage or free transport
+     * space). Returns that platform unit, or null when none qualifies. The
+     * ebx-classified second argument is unused by the body.
+     */
+    [[nodiscard]] Unit* FindPlatform();
+
+    /**
      * Address: 0x006AC940 (FUN_006AC940, ?UpdateSpeedThroughStatus@Unit@Moho@@QAEXXZ)
      *
      * What it does:

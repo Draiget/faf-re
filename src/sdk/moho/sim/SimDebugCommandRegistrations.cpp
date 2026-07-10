@@ -1165,6 +1165,16 @@ namespace moho
     return &ConstructAiRunOpponentAISimConVar();
   }
 
+  CSimConVarBase* GetNeedRefuelThresholdRatioSimConVarDef()
+  {
+    return &ConstructNeedRefuelThresholdRatioSimConVar();
+  }
+
+  CSimConVarBase* GetNeedRepairThresholdRatioSimConVarDef()
+  {
+    return &ConstructNeedRepairThresholdRatioSimConVar();
+  }
+
   /**
    * Address: 0x00BF5FE0 (FUN_00BF5FE0, sub_BF5FE0)
    *
