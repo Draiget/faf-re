@@ -5,6 +5,9 @@
 #include <cstring>
 #include <new>
 
+#include <stdexcept>
+
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/time/Timer.h"
@@ -111,6 +114,116 @@ namespace
 
     *outEnd = write;
     return outEnd;
+  }
+
+  /**
+   * Address: 0x0088A7B0 (FUN_0088A7B0, sub_88A7B0)
+   * Mangled: (out-of-line std::vector<Moho::WaveGenerator*>::_Insert_n grow lane)
+   *
+   * IDA signature:
+   * void __userpurge sub_88A7B0(WaveGenerator **value@<eax>, VectorTriplet *vec, WaveGenerator **pos);
+   *
+   * What it does:
+   * The reallocate/insert-one arm of `WaveSystem::mWaveGenerators`'s append
+   * (the capacity-full path of the vector<WaveGenerator*>::push_back the engine
+   * open-codes in WaveSystem::Load). It is the classic MSVC8 STL
+   * `vector<T>::_Insert_n` shape specialised for a 4-byte pointer element and a
+   * single inserted value:
+   *   - Length guard: if the current size has reached 0x3FFFFFFF the growth
+   *     would overflow the legacy 30-bit count field, so raise the standard
+   *     "vector<T> too long" length-error (binary FUN_0088A9C0).
+   *   - In-place-fit arm: when capacity already covers size+1, shift the live
+   *     tail `[pos, end)` right by one slot and drop `value` at `pos`.
+   *   - Grow arm: otherwise allocate a 1.5x-grown buffer (floored to size+1,
+   *     capped at 0x3FFFFFFF), copy the head `[start, pos)`, place `value`,
+   *     copy the tail `[pos, end)`, release the old storage, and rebind the
+   *     `{start_, end_, capacity_}` triplet.
+   *
+   * The allocation forwards to `gpg::core::legacy::AllocateCheckedDwordLaneOrEmpty`
+   * (binary FUN_00537F80 = the `newCap==0 ? operator new(0) : checked new(newCap*4)`
+   * branch the binary inlines around FUN_0088AF50). The pointer element is
+   * trivially relocatable, so the head/tail relocations are dword `memmove`s,
+   * matching the binary's `memmove_s` lanes (FUN_0088AEE0 / FUN_0088AF20) and the
+   * single-slot fill (FUN_0088A2E0).
+   */
+  moho::WaveGenerator** InsertWaveGeneratorWithGrow(
+    gpg::core::FastVector<moho::WaveGenerator*>& vec,
+    moho::WaveGenerator** const pos,
+    moho::WaveGenerator* const value
+  )
+  {
+    using Generator = moho::WaveGenerator*;
+
+    Generator* const start = vec.start_;
+    Generator* const end = vec.end_;
+    Generator* const capacityEnd = vec.capacity_;
+
+    constexpr std::size_t kMaxCount = 0x3FFFFFFFu;
+
+    const std::size_t currentSize = static_cast<std::size_t>(end - start);
+    const std::size_t currentCapacity = static_cast<std::size_t>(capacityEnd - start);
+
+    // _Xlen guard: the legacy count field is 30-bit; refuse to grow past it.
+    if (kMaxCount - currentSize < 1u) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    const std::size_t requiredSize = currentSize + 1u;
+
+    if (currentCapacity >= requiredSize) {
+      // In-place-fit arm: reserved capacity already covers the new element.
+      const std::size_t tailCount = static_cast<std::size_t>(end - pos);
+      if (tailCount == 0u) {
+        // pos == end: the new slot is one past the live range.
+        *end = value;
+        vec.end_ = end + 1;
+        return pos;
+      }
+
+      // Shift the live tail [pos, end) right by one slot, then drop value at pos.
+      // (memmove is safe/overlap-correct and matches the binary's memmove_s lanes
+      // for the 4-byte trivially-relocatable pointer element.)
+      std::memmove(pos + 1, pos, tailCount * sizeof(Generator));
+      vec.end_ = end + 1;
+      *pos = value;
+      return pos;
+    }
+
+    // Grow arm: 1.5x growth, floored to size+1, capped at 0x3FFFFFFF.
+    std::size_t newCapacity = currentCapacity + (currentCapacity >> 1);
+    if (kMaxCount - (currentCapacity >> 1) < currentCapacity) {
+      // 1.5x would overflow the count field; fall back to the exact required size.
+      newCapacity = requiredSize;
+    }
+    if (newCapacity < requiredSize) {
+      newCapacity = requiredSize;
+    }
+
+    Generator* const newBuffer = static_cast<Generator*>(
+      gpg::core::legacy::AllocateCheckedDwordLaneOrEmpty(static_cast<std::uint32_t>(newCapacity))
+    );
+
+    const std::size_t prefixCount = static_cast<std::size_t>(pos - start);
+    if (prefixCount != 0u) {
+      std::memmove(newBuffer, start, prefixCount * sizeof(Generator));
+    }
+
+    Generator* const insertSlot = newBuffer + prefixCount;
+    *insertSlot = value;
+
+    const std::size_t tailCount = static_cast<std::size_t>(end - pos);
+    if (tailCount != 0u) {
+      std::memmove(insertSlot + 1, pos, tailCount * sizeof(Generator));
+    }
+
+    if (start != nullptr) {
+      ::operator delete(static_cast<void*>(start));
+    }
+
+    vec.start_ = newBuffer;
+    vec.end_ = newBuffer + requiredSize;
+    vec.capacity_ = newBuffer + newCapacity;
+    return insertSlot;
   }
 } // namespace
 
@@ -438,7 +551,20 @@ namespace moho
 
     for (std::int32_t index = 0; index < generatorCount; ++index) {
       WaveGenerator* const generator = new (std::nothrow) WaveGenerator(&mSpatialMeshInstance, formatVersion, reader);
-      mWaveGenerators.push_back(generator);
+
+      // Binary append shape (FUN_008899E0 @ 0x00889A72): fast in-place store when
+      // storage is allocated and has spare capacity, otherwise route through the
+      // grow lane by name. This is the vector<WaveGenerator*>::push_back the engine
+      // open-codes as `insert(end(), 1, value)` on the capacity-full path.
+      WaveGenerator** const first = mWaveGenerators.start_;
+      WaveGenerator** const last = mWaveGenerators.end_;
+      WaveGenerator** const capacityEnd = mWaveGenerators.capacity_;
+      if (first != nullptr && static_cast<std::size_t>(last - first) < static_cast<std::size_t>(capacityEnd - first)) {
+        *last = generator;
+        mWaveGenerators.end_ = last + 1;
+      } else {
+        (void)InsertWaveGeneratorWithGrow(mWaveGenerators, last, generator);
+      }
     }
   }
 
