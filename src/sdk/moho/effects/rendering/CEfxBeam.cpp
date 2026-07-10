@@ -16,6 +16,7 @@
 #include "moho/render/EBeamParam.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/resource/CParticleTexture.h"
+#include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
@@ -279,6 +280,76 @@ namespace moho
     , mIsNew(true)
     , mPad295{0}
   {}
+
+  /**
+   * Address: 0x006547C0 (FUN_006547C0, Moho::CEfxBeam::CEfxBeam)
+   * Mangled: ??0CEfxBeam@Moho@@QAE@PAVCEffectManagerImpl@1@PBVRBeamBlueprint@1@H@Z
+   *
+   * IDA signature:
+   * Moho::CEfxBeam *__thiscall Moho::CEfxBeam::CEfxBeam(
+   *     Moho::CEffectManagerImpl *manager, Moho::CEfxBeam *this,
+   *     const Moho::RBeamBlueprint *blueprint, int armyIndex);
+   *
+   * What it does:
+   * Blueprint-driven beam ctor. Chains the manager-bound CEffectImpl base ctor,
+   * initializes the endpoint attach-info to the detached beam-end default
+   * (orientation x=1, others zero), sizes the effect param/texture/string lanes,
+   * then seeds every beam parameter (LOD cutoff, length, lifetime, UV scroll,
+   * thickness, start/end colour, repeat rate) and both texture slots from the
+   * blueprint before rebuilding beam render state via Reset().
+   */
+  CEfxBeam::CEfxBeam(
+    CEffectManagerImpl* const manager,
+    const RBeamBlueprint* const blueprint,
+    const int armyIndex
+  )
+    : CEffectImpl(manager, armyIndex)
+    , mBlendMode(0)
+    , mVisible(false)
+    , mPad195{0}
+    , mLastUpdate(0)
+    , mBeam{}
+    , mIsNew(true)
+    , mPad295{0}
+  {
+    // Endpoint attach-info: detached weak target, invalid parent/child bones,
+    // beam-end default orientation (x=1, y=z=w=0), zero relative position.
+    mEnd.mAttachTargetWeak.ownerLinkSlot = nullptr;
+    mEnd.mAttachTargetWeak.nextInOwner = nullptr;
+    mEnd.mParentBoneIndex = -1;
+    mEnd.mChildBoneIndex = -1;
+    mEnd.mRelativeOrientX = 1.0f;
+    mEnd.mRelativeOrientY = 0.0f;
+    mEnd.mRelativeOrientZ = 0.0f;
+    mEnd.mRelativeOrientW = 0.0f;
+    mEnd.mRelativePosX = 0.0f;
+    mEnd.mRelativePosY = 0.0f;
+    mEnd.mRelativePosZ = 0.0f;
+
+    // Size the effect parameter lanes (fastvector_n resize emissions):
+    // params -> 21 floats, textures -> 2 null slots, strings -> 2 empty.
+    mParams.resize(BEAM_LASTPARAM, 0.0f);
+    mParticleTextures.resize(2, nullptr);
+    {
+      const msvc8::string emptyString;
+      mStrings.resize(2, emptyString);
+    }
+
+    // Seed scalar and colour beam parameters from the blueprint.
+    SetFloatParam(BEAM_LODCUTOFF, blueprint->LODCutoff);
+    SetFloatParam(BEAM_LENGTH, blueprint->Length);
+    SetFloatParam(BEAM_LIFETIME, blueprint->Lifetime);
+    SetFloatParam(BEAM_USHIFT, blueprint->UShift);
+    SetFloatParam(BEAM_VSHIFT, blueprint->VShift);
+    SetFloatParam(BEAM_THICKNESS, blueprint->Thickness);
+    SetNParam(BEAM_STARTCOLOR, &blueprint->StartColor.x, 4);
+    SetNParam(BEAM_ENDCOLOR, &blueprint->EndColor.x, 4);
+    OnInit(0, blueprint->TextureName.c_str());
+    OnInit(1, nullptr);
+    SetFloatParam(BEAM_REPEATRATE, blueprint->RepeatRate);
+    mBlendMode = blueprint->BlendMode;
+    Reset();
+  }
 
   /**
    * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)
