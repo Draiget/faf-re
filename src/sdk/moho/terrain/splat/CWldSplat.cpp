@@ -421,16 +421,100 @@ namespace
   }
 
   /**
+   * In-order successor step for the decal-group lookup tree, matching the
+   * MSVC8 `std::_Tree::_Inc` traversal the STL range-erase emission open-codes.
+   * A raw pointer walk is retained here because this is the exact successor
+   * mechanics the binary reproduces; higher-level range helpers cannot express
+   * the sentinel-anchored parent climb without changing node visitation order.
+   */
+  [[nodiscard]] moho::DecalGroupLookupNode*
+  AdvanceLookupNodeToInOrderSuccessor(moho::DecalGroupLookupNode* node) noexcept
+  {
+    if (node->mIsNil != 0u) {
+      return node;
+    }
+
+    if (node->mRight->mIsNil != 0u) {
+      // No right subtree: climb to the first ancestor whose left branch we came from.
+      moho::DecalGroupLookupNode* ancestor = node->mParent;
+      while (ancestor->mIsNil == 0u && node == ancestor->mRight) {
+        node = ancestor;
+        ancestor = ancestor->mParent;
+      }
+      return ancestor;
+    }
+
+    // Right subtree exists: successor is its left-most descendant.
+    node = node->mRight;
+    for (moho::DecalGroupLookupNode* left = node->mLeft; left->mIsNil == 0u; left = node->mLeft) {
+      node = left;
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x00879C30 (FUN_00879C30, sub_879C30)
+   * Mangled: MSVC8 `std::_Tree<...>::erase(iterator first, iterator last)`
+   *          emission for the primary decal-index lookup map.
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_879C30@<eax>(int this@<edi>, _DWORD *out,
+   *                                      _DWORD *first, _DWORD *last);
+   *
+   * What it does:
+   * Erases the half-open node range `[first,last)` from the decal-group lookup
+   * tree. When the range spans the whole tree (`first` is the minimum and
+   * `last` is the head sentinel) it destroys the entire body in one recursive
+   * sweep and re-links the sentinel to the empty state, keeping the head node
+   * alive for reuse. Otherwise it erases node-by-node in in-order sequence.
+   * Returns the node one past the erased range (`out`).
+   */
+  moho::DecalGroupLookupNode* ClearDecalLookupTree(
+    moho::DecalGroupLookupTree& tree,
+    moho::DecalGroupLookupNode* first,
+    moho::DecalGroupLookupNode* last
+  )
+  {
+    moho::DecalGroupLookupNode* const head = tree.mHead;
+
+    // Fast path: erasing every element ([_Lmost, _Head)) collapses to one
+    // recursive subtree destroy plus a sentinel re-link (head is retained).
+    if (first == head->mLeft && last == head) {
+      DeleteLookupSubtree(head->mParent, head);
+      head->mParent = head;
+      tree.mNodeCount = 0u;
+      head->mLeft = head;
+      head->mRight = head;
+      return head->mLeft;
+    }
+
+    // General range erase: remove each node in [first,last) individually,
+    // advancing to the in-order successor before the node is unlinked/freed.
+    moho::DecalGroupLookupNode* cursor = first;
+    while (cursor != last) {
+      moho::DecalGroupLookupNode* const doomed = cursor;
+      cursor = AdvanceLookupNodeToInOrderSuccessor(cursor);
+      // Unique-key map: erasing the specific node equals erasing by its key.
+      const std::int32_t doomedKey = static_cast<std::int32_t>(doomed->mKey);
+      (void)EraseLookupEntriesByKey(tree, &doomedKey);
+    }
+
+    return last;
+  }
+
+  /**
    * Address: 0x00878D30 (FUN_00878D30)
    *
    * What it does:
-   * Releases one keyed lookup tree (`+0x1C` lane), deletes its sentinel, and
-   * resets the tree header to `{head=null,count=0}`.
+   * Releases one keyed lookup tree (`+0x1C` lane): clears every node via the
+   * `_Tree::erase` range emission (which keeps and re-links the sentinel),
+   * deletes the now-empty sentinel, and resets the header to
+   * `{head=null,count=0}`.
    */
   std::int32_t ResetDecalLookupTreePrimary(moho::DecalGroupLookupTree& lookupTree)
   {
     if (lookupTree.mHead != nullptr) {
-      DeleteLookupSubtree(lookupTree.mHead->mParent, lookupTree.mHead);
+      (void)ClearDecalLookupTree(lookupTree, lookupTree.mHead->mLeft, lookupTree.mHead);
       delete lookupTree.mHead;
     }
     lookupTree.mHead = nullptr;
