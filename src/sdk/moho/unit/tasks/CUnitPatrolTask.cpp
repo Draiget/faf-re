@@ -19,14 +19,20 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/CAiTransportImpl.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/ai/IFormationInstance.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/EAllianceTypeInfo.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/task/CCommandTask.h"
@@ -128,10 +134,74 @@ namespace
     out.mType = dynamicType;
     return out;
   }
+
+  /**
+   * Shared 90-degree yaw quaternion used by the patrol search-box builder.
+   *
+   * The binary reads this rotation from the `flt_10B1A44` global (populated once
+   * at static-init by FUN_00BD11C0 as `{w=cos(45deg), x=sin(45deg)*0,
+   * y=sin(45deg), z=0}` -> a pure +Y rotation of 90 degrees). Modeled here as the
+   * equivalent named constant so the recovered behavior uses a typed quaternion
+   * instead of a raw data-address dereference.
+   */
+  const Wm3::Quaternionf kSearchBoxYawQuat{0.70710677f, 0.0f, 0.70710677f, 0.0f};
+
+  /**
+   * Length threshold (`dword_DFF0AC` = 0.001f) below which the patrol leg
+   * direction is treated as degenerate and replaced with the `+Z` fallback.
+   */
+  constexpr float kPatrolLegMinLength = 0.001f;
+
+  /**
+   * Returns the formation-status broadcaster ring head embedded in an
+   * `IFormationInstance`. Mirrors `NavigatorListenerHead` in CUnitMoveTask: the
+   * instance stores its self-linked `Broadcaster` node immediately after the
+   * interface vtable pointer (binary `formationInstance + 0x04`; the interface's
+   * own ctor FUN_00569450 self-links it). The recovered header models
+   * `IFormationInstance` as vtable-only, so the typed ring head is recovered
+   * through this narrow accessor rather than an inline offset in the ctor body.
+   */
+  [[nodiscard]] moho::Broadcaster* FormationStatusBroadcasterHead(
+    moho::IFormationInstance* const formationInstance
+  ) noexcept
+  {
+    if (formationInstance == nullptr) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::Broadcaster*>(reinterpret_cast<char*>(formationInstance) + sizeof(void*));
+  }
+
+  /**
+   * Resolves the queue-head (`front == true`) or queue-tail command from the
+   * owner unit's command queue, returning null when the queue is empty or the
+   * weak slot is expired. Mirrors the binary's `_Myfirst`/`_Mylast` guard plus
+   * weak-owner decode (the `count>>3` empty-check and the `-4` owner adjustment
+   * that `WeakPtr::GetObjectPtr` performs).
+   */
+  [[nodiscard]] moho::CUnitCommand* ResolvePatrolQueueCommand(
+    moho::CUnitCommandQueue* const commandQueue,
+    const bool front
+  ) noexcept
+  {
+    if (commandQueue == nullptr || commandQueue->mCommandVec.empty()) {
+      return nullptr;
+    }
+
+    const moho::WeakPtr<moho::CUnitCommand>& slot =
+      front ? commandQueue->mCommandVec.front() : commandQueue->mCommandVec.back();
+    return slot.GetObjectPtr();
+  }
 } // namespace
 
 namespace moho
 {
+  // Forward declaration mirroring the file-local decl in QuaternionMath.cpp
+  // (0x0062FA80, Moho::MultQuadVec): rotate `vec` by conjugate(`quat`) into
+  // `dest`. Not published in a header yet, so declared here for the patrol
+  // search-box builder that invokes it by name.
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+
   gpg::RType* CUnitPatrolTask::sType = nullptr;
 
   /**
@@ -164,6 +234,124 @@ namespace moho
     , mPadC4{}
     , mMembership()
   {
+  }
+
+  /**
+   * Address: 0x0061AE50 (FUN_0061AE50, Moho::CUnitPatrolTask::CUnitPatrolTask)
+   * Mangled: ??0CUnitPatrolTask@Moho@@QAE@PAVCCommandTask@1@PBXPAVIFormationInstance@1@_N@Z
+   *
+   * IDA signature:
+   * Moho::CUnitPatrolTask* __thiscall CUnitPatrolTask(
+   *   CUnitPatrolTask* this, CCommandTask* dispatchTask, const void* goalPayload,
+   *   IFormationInstance* formationInstance, bool inFormation);
+   *
+   * What it does:
+   * Constructs one active patrol task. Runs the `CCommandTask` base ctor,
+   * publishes the task/listener identity, self-links the two embedded listener
+   * nodes and the per-army `EntitySetTemplate<Entity>` membership node, copies
+   * the navigator goal payload, sets the formation-mode flag, resolves the queue
+   * head command, splices the command-event listener into that command's
+   * broadcaster ring, links the membership node into `mUnit->mSim->mEntityDB`'s
+   * registered-set list, splices the formation-status listener into the bound
+   * formation instance's broadcaster ring, refreshes navigator speed-through
+   * state, issues one desired-target clear on immobile need-unpack attackers,
+   * builds the oriented `mSearchBox`, and enters the Preparing task state.
+   */
+  CUnitPatrolTask::CUnitPatrolTask(
+    CCommandTask* const dispatchTask,
+    const void* const goalPayload,
+    IFormationInstance* const formationInstance,
+    const bool inFormation
+  )
+    : CCommandTask(dispatchTask)
+    , mFirstCommand(nullptr)
+    , mCommandEventListener()
+    , mReserved40(0)
+    , mFormationStatusListener()
+    , mDispatch(static_cast<IAiCommandDispatchImpl*>(dispatchTask))
+    , mFormationBinding(nullptr)
+    , mFormationInstance(formationInstance)
+    , mGoal{}
+    , mMoving(false)
+    , mNavStalled(false)
+    , mInFormation(inFormation)
+    , mPad83(0)
+    , mSearchBox{}
+    , mTickCounter(0)
+    , mPadC4{}
+    , mMembership()
+  {
+    // Copy the navigator goal payload (const void* -> SNavGoal), matching the
+    // binary's `rep movsd` of 9 dwords (0x24 bytes) from the goal argument.
+    if (goalPayload != nullptr) {
+      mGoal = *static_cast<const SNavGoal*>(goalPayload);
+    }
+
+    // Publish the task identity + set the owner-unit patrol state bit and enter
+    // the linking sequence. The base ctor already resolved `mUnit` from dispatch.
+    Unit* const unit = mUnit;
+
+    // Owner unit gains the patrol move-state bit (0x1000). The binary loads and
+    // writes back the high dword unchanged, so the 64-bit mask stays intact.
+    unit->UnitStateMask |= static_cast<std::uint64_t>(0x1000u);
+
+    // Resolve the queue-head command and store it as the bound patrol command
+    // (binary `this + 0x54` = mFormationBinding, the CUnitCommand* the search-box
+    // builder later reads as the leg-start command). The binary leaves
+    // `mFirstCommand` (+0x30) untouched here; we initialized it to null above.
+    CUnitCommandQueue* const commandQueue = unit->CommandQueue;
+    CUnitCommand* const frontCommand = ResolvePatrolQueueCommand(commandQueue, /*front=*/true);
+    mFormationBinding = frontCommand;
+
+    // Splice the command-event listener node into the front command's
+    // broadcaster ring (the command derives Broadcaster at offset 0). When the
+    // queue is empty the binary splices before a null head; here the ring head
+    // falls back to the node's own self-linked broadcaster to stay well-defined.
+    Broadcaster* const commandBroadcasterHead = (frontCommand != nullptr)
+      ? static_cast<Broadcaster*>(frontCommand)
+      : &mCommandEventListener.mListenerLink;
+    mCommandEventListener.mListenerLink.ListLinkBefore(commandBroadcasterHead);
+
+    // Link the per-army membership node into the sim entity DB's registered-set
+    // list (binary `mUnit->mSim->mEntityDB + 0x18`).
+    CEntityDb* const entityDb = unit->SimulationRef->mEntityDB;
+    mMembership.ListLinkBefore(
+      reinterpret_cast<EntitySetTemplate<Entity>*>(&entityDb->mRegisteredEntitySets)
+    );
+
+    // When a formation instance is bound, splice the formation-status listener
+    // into that instance's broadcaster ring.
+    if (mFormationInstance != nullptr) {
+      if (Broadcaster* const formationHead = FormationStatusBroadcasterHead(mFormationInstance);
+          formationHead != nullptr) {
+        mFormationStatusListener.mListenerLink.ListLinkBefore(formationHead);
+      }
+    }
+
+    // Refresh navigator speed-through state when the unit still has a navigator.
+    if (unit->AiNavigator != nullptr) {
+      unit->UpdateSpeedThroughStatus();
+    }
+
+    // Immobile need-unpack attackers get their desired target cleared so the
+    // pack/unpack transition is not held by a stale attack target.
+    if (unit->IsUnitState(UNITSTATE_Immobile)) {
+      if (const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+          blueprint != nullptr && blueprint->AI.NeedUnpack) {
+        if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
+          CAiTarget clearTarget{};
+          clearTarget.targetType = EAiTargetType::AITARGET_None;
+          clearTarget.position = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+          clearTarget.targetPoint = -1;
+          clearTarget.targetIsMobile = false;
+          attacker->SetDesiredTarget(&clearTarget);
+        }
+      }
+    }
+
+    // Build the oriented search box, then enter the Preparing state.
+    RecomputePatrolSearchBox();
+    mTaskState = TASKSTATE_Preparing;
   }
 
   /**
@@ -484,6 +672,105 @@ namespace moho
     }
 
     return bestCandidate;
+  }
+
+  /**
+   * Address: 0x0061B2F0 (FUN_0061B2F0, Moho::CUnitPatrolTask::RecomputePatrolSearchBox)
+   *
+   * IDA signature:
+   * void __stdcall RecomputePatrolSearchBox(Moho::CUnitPatrolTask* this);
+   *
+   * What it does:
+   * Rebuilds the oriented world-space `mSearchBox` for the current patrol leg.
+   * See the header block for the full lane-by-lane description.
+   */
+  void CUnitPatrolTask::RecomputePatrolSearchBox()
+  {
+    Unit* const unit = mUnit;
+    CUnitCommandQueue* const commandQueue = unit->CommandQueue;
+
+    // Cache the owner's guard-scan radius, used for the box's fixed lateral
+    // extent and as the base of the along-leg extent (binary `v28` = read from
+    // `GetBlueprint()->AI` +0x00, i.e. `RUnitBlueprintAI::GuardScanRadius`).
+    const float guardScanRadius = unit->GetBlueprint()->AI.GuardScanRadius;
+
+    // Queue head/tail commands: only used to gate the leg-end branch below. The
+    // binary resolves both weak slots (`v24` = head, `a1` = tail) up front.
+    CUnitCommand* const queueHeadCommand = ResolvePatrolQueueCommand(commandQueue, /*front=*/true);
+    CUnitCommand* const queueTailCommand = ResolvePatrolQueueCommand(commandQueue, /*front=*/false);
+
+    STIMap* const map = unit->SimulationRef->mMapData;
+
+    // Leg-start world position: the patrol's bound command (`mFormationBinding`,
+    // binary `this + 0x54`, a CUnitCommand*) resolved to a cell then converted
+    // via the owner footprint's layer/size.
+    auto* const legStartCommand = static_cast<CUnitCommand*>(mFormationBinding);
+    const SFootprint& startFootprint = unit->GetFootprint();
+    SOCellPos startCell{};
+    const SOCellPos* const startPosCell = CUnitCommand::GetPosition(legStartCommand, unit, &startCell);
+    const Wm3::Vector3f startPos = COORDS_ToWorldPos(
+      map,
+      *startPosCell,
+      static_cast<ELayer>(static_cast<std::uint8_t>(startFootprint.mOccupancyCaps)),
+      startFootprint.mSizeX,
+      startFootprint.mSizeZ
+    );
+
+    // Leg-end reference position: the queue-tail command's world position when it
+    // is a distinct Patrol/FormPatrol command (binary type 16/18); otherwise the
+    // owner unit's own current position. The type is read via the named
+    // `mVarDat.mCmdType` field, consistent with every other recovered task.
+    Wm3::Vector3f endPos;
+    if (queueTailCommand != nullptr && queueTailCommand != queueHeadCommand
+        && (queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Patrol
+            || queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_FormPatrol)) {
+      const SFootprint& tailFootprint = unit->GetFootprint();
+      SOCellPos tailCell{};
+      const SOCellPos* const tailPosCell = CUnitCommand::GetPosition(queueTailCommand, unit, &tailCell);
+      endPos = COORDS_ToWorldPos(
+        map,
+        *tailPosCell,
+        static_cast<ELayer>(static_cast<std::uint8_t>(tailFootprint.mOccupancyCaps)),
+        tailFootprint.mSizeX,
+        tailFootprint.mSizeZ
+      );
+    } else {
+      endPos = unit->GetPosition();
+    }
+
+    // Leg direction (start minus end), flattened onto the XZ plane.
+    Wm3::Vector3f direction{startPos.x - endPos.x, 0.0f, startPos.z - endPos.z};
+
+    // Leg half-length gate: the binary squares the flattened deltas (the y term
+    // is always 0*0) and takes the sqrt; below 0.001 the direction degenerates
+    // to the fixed `+Z` fallback, otherwise it is normalized in place.
+    const float legLength = std::sqrt((direction.z * direction.z) + (0.0f * 0.0f) + (direction.x * direction.x));
+    if (legLength >= kPatrolLegMinLength) {
+      Wm3::Vector3f::Normalize(&direction);
+    } else {
+      direction.x = 0.0f;
+      direction.y = 0.0f;
+      direction.z = 1.0f;
+    }
+
+    // Lateral axis: the leg direction rotated 90 degrees about +Y.
+    Wm3::Vector3f lateralAxis;
+    MultQuadVec(&lateralAxis, &direction, &kSearchBoxYawQuat);
+
+    // Fill the oriented box. Center is the leg midpoint (each lane * 0.5);
+    // axis0 = lateral, axis1 = +Y, axis2 = direction; extents are
+    // {guardScanRadius, 100.0, guardScanRadius + legHalfLength}.
+    mSearchBox.Center.x = (startPos.x + endPos.x) * 0.5f;
+    mSearchBox.Center.y = (endPos.y * 2.0f) * 0.5f;
+    mSearchBox.Center.z = (startPos.z + endPos.z) * 0.5f;
+
+    mSearchBox.Axis[0] = lateralAxis;
+    mSearchBox.Axis[1] = Wm3::Vector3f{0.0f, 1.0f, 0.0f};
+    mSearchBox.Axis[2] = direction;
+
+    mSearchBox.Extent[0] = guardScanRadius;
+    mSearchBox.Extent[1] = 100.0f;
+    mSearchBox.Extent[2] = guardScanRadius + (legLength * 0.5f);
   }
 
   /**

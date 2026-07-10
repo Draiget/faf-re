@@ -213,6 +213,29 @@ namespace moho
      */
     [[nodiscard]] Entity* EvaluatePatrolReclaimAttack();
 
+    /**
+     * Address: 0x0061B2F0 (FUN_0061B2F0, Moho::CUnitPatrolTask::RecomputePatrolSearchBox)
+     *
+     * IDA signature:
+     * void __stdcall RecomputePatrolSearchBox(Moho::CUnitPatrolTask* this);
+     *
+     * What it does:
+     * Rebuilds the oriented world-space `mSearchBox` (Wm3::Box3f) covering the
+     * patrol leg. Resolves the queue front command and (when the tail command is
+     * a Patrol/FormPatrol family, type 16/18) the queue back command to two
+     * world positions via `COORDS_ToWorldPos` using the owner unit's footprint
+     * layer/size. Builds the leg direction (front minus tail, y flattened),
+     * normalizes it (or falls back to `+Z` below the 0.001 length threshold),
+     * rotates it 90 degrees about Y (the shared `kSearchBoxYawQuat`) to form the
+     * lateral axis, and fills the box: center is the leg midpoint, axes are
+     * `{lateral, +Y, direction}`, and extents are
+     * `{guardScanRadius, 100.0, guardScanRadius + legHalfLength}` where
+     * `guardScanRadius = GetBlueprint()->AI.GuardScanRadius`. The leg-start cell
+     * comes from the bound patrol command (`mFormationBinding`); the leg-end cell
+     * from the queue-tail command only when it is a distinct Patrol/FormPatrol.
+     */
+    void RecomputePatrolSearchBox();
+
   public:
     // --- Derived fields (replace the former opaque mPadding[0xF0]) ---
 
