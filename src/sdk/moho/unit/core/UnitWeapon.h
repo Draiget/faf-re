@@ -1203,4 +1203,27 @@ namespace moho
   static_assert(offsetof(UnitWeapon, mShotsAtTarget) == 0x184, "UnitWeapon::mShotsAtTarget offset must be 0x184");
   static_assert(sizeof(UnitWeapon) == 0x188, "UnitWeapon size must be 0x188");
   static_assert(WeakPtr<UnitWeapon>::kOwnerLinkOffset == 0x14, "UnitWeapon weak-owner slot offset must be 0x14");
+
+  /**
+   * Address: 0x006D5590 (FUN_006D5590, func_PickTargetPoint)
+   *
+   * What it does:
+   * Validates one entity target against a weapon's layer/category constraints
+   * and resolves above/below-water aim-point requirements, returning true when
+   * the weapon may target the entity. Public entry point onto the recovered body
+   * so cross-subsystem callers (e.g. `CAiAttackerImpl::TrackToTarget`) can invoke
+   * it by name as the binary does.
+   */
+  [[nodiscard]] bool WeaponCanAttackEntityTarget(Entity* targetEntity, UnitWeapon* weapon);
+
+  /**
+   * Address: 0x006DBD70 (FUN_006DBD70)
+   *
+   * What it does:
+   * Clears a weapon's target blacklist: unlinks every blacklist entry's weak
+   * entity reference and rewinds the vector to empty without releasing capacity.
+   * Public entry point onto the recovered body so the acquire-target task can
+   * invoke it by name (e.g. after the owning unit moves).
+   */
+  void WeaponResetBlacklist(UnitWeapon& weapon);
 } // namespace moho

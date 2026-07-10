@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -39,6 +40,85 @@ namespace moho
     std::uint32_t reserved18;         // +0x18
   };
   static_assert(sizeof(EntityCollisionBoundsScratch) == 0x1C, "EntityCollisionBoundsScratch size must be 0x1C");
+
+  /**
+   * Quantized collision-cell rectangle (one cell = 4 world units). Layout matches
+   * `Moho::CollisionDBRect` (COGrid.h) exactly; kept as a distinct name for the
+   * `BuildCollisionCellRectFromBounds` return, and reinterpret-bridged where a
+   * `CollisionDBRect` is required.
+   */
+  struct CollisionCellRect
+  {
+    std::uint16_t startX;
+    std::uint16_t startZ;
+    std::uint16_t width;
+    std::uint16_t height;
+  };
+  static_assert(sizeof(CollisionCellRect) == 0x08, "CollisionCellRect size must be 0x08");
+
+  namespace detail
+  {
+    [[nodiscard]] inline int FloorToInt(const float value) noexcept
+    {
+      return static_cast<int>(std::floor(static_cast<double>(value)));
+    }
+
+    [[nodiscard]] inline int CeilToInt(const float value) noexcept
+    {
+      return static_cast<int>(std::ceil(static_cast<double>(value)));
+    }
+
+    [[nodiscard]] inline std::uint16_t ClampCellStartToU16(const int value) noexcept
+    {
+      if (value <= 0) {
+        return 0;
+      }
+      if (value >= 0xFFFF) {
+        return 0xFFFFu;
+      }
+      return static_cast<std::uint16_t>(value);
+    }
+
+    [[nodiscard]] inline std::uint16_t ClampCellExtentToU16(const int extentCandidate, const std::uint16_t startCell) noexcept
+    {
+      const int maxExtent = 0xFFFF - static_cast<int>(startCell);
+      int extent = extentCandidate;
+      if (extent >= maxExtent) {
+        extent = maxExtent;
+      }
+      if (extent < 0) {
+        extent = 0;
+      }
+      return static_cast<std::uint16_t>(extent);
+    }
+  } // namespace detail
+
+  /**
+   * Address: 0x004FCBE0 (FUN_004FCBE0)
+   *
+   * What it does:
+   * Converts world-space AABB bounds `{min,max}` into a quantized collision-cell
+   * rectangle `{startX,startZ,width,height}` (one cell = 4 world units): floors
+   * the min corner and ceils the max corner (both `>> 2`), clamping the start
+   * corner into `[0, 0xFFFF]` and the width/height to at least the remaining
+   * span. Shared leaf used by `func_EntitiesAroundPoint` (COGrid.cpp) and the
+   * entity collision-updater rebuild path (Entity.cpp).
+   */
+  [[nodiscard]] inline CollisionCellRect
+  BuildCollisionCellRectFromBounds(const EntityCollisionBoundsView& bounds) noexcept
+  {
+    const int minCellX = detail::FloorToInt(bounds.minX) >> 2;
+    const int minCellZ = detail::FloorToInt(bounds.minZ) >> 2;
+    const int maxCellX = (detail::CeilToInt(bounds.maxX) + 3) >> 2;
+    const int maxCellZ = (detail::CeilToInt(bounds.maxZ) + 3) >> 2;
+
+    CollisionCellRect rect{};
+    rect.startX = detail::ClampCellStartToU16(minCellX);
+    rect.startZ = detail::ClampCellStartToU16(minCellZ);
+    rect.width = detail::ClampCellExtentToU16(maxCellX - static_cast<int>(rect.startX), rect.startX);
+    rect.height = detail::ClampCellExtentToU16(maxCellZ - static_cast<int>(rect.startZ), rect.startZ);
+    return rect;
+  }
 
   /**
    * Address: 0x004FE7A0 / 0x004FE860 / 0x004FF150 / 0x004FF260

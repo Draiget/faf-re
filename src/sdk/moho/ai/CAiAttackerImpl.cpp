@@ -19,7 +19,9 @@
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/STIMap.h"
+#include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -1787,6 +1789,134 @@ void CAiAttackerImpl::Stop()
   stopTarget.targetIsMobile = false;
   SetDesiredTarget(&stopTarget);
   stopTarget.targetEntity.UnlinkFromOwnerChain();
+}
+
+/**
+ * Address: 0x005D7320 (FUN_005D7320, Moho::CAiAttackerImp::SetState)
+ *
+ * IDA signature:
+ * void __userpurge SetState(CAiAttackerImpl *this@<eax>, CAiAttackerImpl::State state@<ecx>);
+ *
+ * What it does:
+ * Stores a new targeting state into `mReportingState` (+0xA0) and broadcasts it
+ * to the attacker's listeners, but only when the value actually changes. The
+ * reporting-state lane is a raw dword shared with `EAiAttackerEvent`; the
+ * comparison and store operate on that dword.
+ */
+void CAiAttackerImpl::SetState(const State state)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto stateValue = static_cast<std::int32_t>(state);
+  if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
+    view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
+    BroadcastAiAttackerEvent(this, static_cast<EAiAttackerEvent>(stateValue));
+  }
+}
+
+/**
+ * Address: 0x005D8000 (FUN_005D8000, Moho::CAiAttackerImpl::TrackToTarget)
+ *
+ * IDA signature:
+ * Moho::Entity *__thiscall TrackToTarget(CAiAttackerImpl *this, Moho::UnitWeapon *weapon);
+ *
+ * What it does:
+ * Returns the best enemy projectile to intercept for `weapon` (see header). Bails
+ * out early when the unit has no attacker, the weapon silo check fails, or the
+ * unit is stunned/busy; otherwise gathers projectiles within the weapon tracking
+ * radius and returns the closest eligible one by squared horizontal distance.
+ */
+Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  Unit* const unit = view->mUnit;
+
+  if (unit->AiAttacker == nullptr) {
+    return nullptr;
+  }
+  if (!weapon->CheckSilo()) {
+    return nullptr;
+  }
+  if (unit->StunnedState != 0 || unit->IsUnitState(UNITSTATE_Busy)) {
+    return nullptr;
+  }
+
+  Sim* const sim = unit->SimulationRef;
+  CArmyImpl* const army = unit->ArmyRef;
+  STIMap* const mapData = sim->mMapData;
+  RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
+
+  // Effective vertical filter: water elevation when the map has water enabled,
+  // otherwise an unbounded floor.
+  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+
+  const Wm3::Vector3f unitPosition = unit->GetPosition();
+
+  // Effective search radius: tracking radius scaled by the weapon max radius,
+  // floored by the raw max radius.
+  const float maxRadius =
+    (weapon->mAttributes.mMaxRadius >= 0.0f) ? weapon->mAttributes.mMaxRadius : weapon->mAttributes.mBlueprint->MaxRadius;
+  const float scaledRadius =
+    (weapon->mAttributes.mMaxRadius < 0.0f) ? weapon->mAttributes.mBlueprint->MaxRadius : weapon->mAttributes.mMaxRadius;
+  float searchRadius = weaponBlueprint->TrackingRadius * scaledRadius;
+  if (maxRadius > searchRadius) {
+    searchRadius = maxRadius;
+  }
+
+  Entity* bestProjectile = nullptr;
+  float bestDistanceSquared = std::numeric_limits<float>::infinity();
+
+  CollisionResultFastVectorN10 projectilesInRange{};
+  EntitiesAroundPoint(projectilesInRange, searchRadius, *sim->mOGrid, ENTITYTYPE_Projectile, unitPosition);
+
+  for (const CollisionResult& hit : projectilesInRange) {
+    Entity* const candidate = hit.sourceEntity;
+    if (candidate == nullptr || candidate->IsProjectile() == nullptr) {
+      continue;
+    }
+    if (candidate->Dead != 0u) {
+      continue;
+    }
+
+    // Projectile single-inherits Entity at offset 0, so IsProjectile() returns
+    // `this`; the entity we scored is the same object (matches the binary's v18).
+    Entity* const projectile = candidate;
+    const std::uint32_t projectileArmyIndex = static_cast<std::uint32_t>(projectile->GetArmyIndex());
+    if (!army->IsEnemy(projectileArmyIndex)) {
+      continue;
+    }
+
+    const ELayer layerCaps = weapon->mFireTargetLayerCaps;
+    const float projectileX = projectile->Position.x;
+    const float projectileY = projectile->Position.y;
+    const float projectileZ = projectile->Position.z;
+
+    // Layer/height caps: bit 0x08 permits below-water, bit 0x10 permits above-water.
+    const bool belowWaterOk = (layerCaps & 8) != 0 || waterElevation < projectileY;
+    const bool aboveWaterOk = (layerCaps & 0x10) != 0 || projectileY <= waterElevation;
+    if (!belowWaterOk || !aboveWaterOk) {
+      continue;
+    }
+
+    if (!WeaponCanAttackEntityTarget(projectile, weapon)) {
+      continue;
+    }
+    if (weapon->GetSolutionStatus(projectile) != ESolutionStatus::TRS_Available) {
+      continue;
+    }
+    if (projectile->GetNumShooters() >= projectile->BluePrint->mDesiredShooterCap) {
+      continue;
+    }
+
+    const float deltaX = unitPosition.x - projectileX;
+    const float deltaZ = unitPosition.z - projectileZ;
+    const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
+    if (bestDistanceSquared > distanceSquared) {
+      bestDistanceSquared = distanceSquared;
+      bestProjectile = projectile;
+    }
+  }
+
+  return bestProjectile;
 }
 
 /**

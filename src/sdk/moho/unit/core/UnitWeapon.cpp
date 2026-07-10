@@ -846,6 +846,30 @@ namespace moho
   gpg::RType* UnitWeapon::sType = nullptr;
   gpg::RType* UnitWeapon::sPointerType = nullptr;
 
+  /**
+   * Address: 0x006D5590 (FUN_006D5590, func_PickTargetPoint)
+   *
+   * Public entry point onto the recovered `CanWeaponAttackEntityTarget` body
+   * (file-static in this TU), so out-of-TU callers can invoke FUN_006D5590 by
+   * name.
+   */
+  bool WeaponCanAttackEntityTarget(Entity* const targetEntity, UnitWeapon* const weapon)
+  {
+    return CanWeaponAttackEntityTarget(targetEntity, weapon);
+  }
+
+  /**
+   * Address: 0x006DBD70 (FUN_006DBD70)
+   *
+   * Public entry point onto the recovered `ResetBlacklistRangeToBegin` body
+   * (file-static in this TU), so out-of-TU callers can clear a weapon's target
+   * blacklist by name.
+   */
+  void WeaponResetBlacklist(UnitWeapon& weapon)
+  {
+    (void)ResetBlacklistRangeToBegin(weapon.mBlacklist);
+  }
+
   // Callback bodies are recovered in adjacent lanes; publishers are required
   // here so startup thunk registration resolves to source-defined binders.
   int cfunc_UnitWeaponSetTargetEntity(lua_State* luaContext);
