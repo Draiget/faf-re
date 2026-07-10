@@ -9,13 +9,17 @@
 #include <typeinfo>
 
 #include "Wm3Box3.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/CAiTransportImpl.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
@@ -25,7 +29,9 @@
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/task/ETaskStatus.h"
+#include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
@@ -48,6 +54,47 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::CUnitPatrolTask));
       moho::CUnitPatrolTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSNavGoalType()
+  {
+    gpg::RType* type = moho::SNavGoal::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SNavGoal));
+      moho::SNavGoal::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedBox3fType()
+  {
+    // Box3f has no class-static `sType`; mirror the binary's dedicated
+    // `Wm3__Box3f__RType` global with a file-static lazily-resolved cache.
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Box3<float>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedEntitySetTemplateEntityType()
+  {
+    gpg::RType* type = moho::EntitySetTemplate<moho::Entity>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Entity>));
+      moho::EntitySetTemplate<moho::Entity>::sType = type;
     }
     return type;
   }
@@ -482,6 +529,102 @@ namespace moho
   }
 
   /**
+   * Address: 0x0061CF50 (FUN_0061CF50, Moho::CUnitPatrolTask::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall MemberDeserialize(CUnitPatrolTask* this@<ecx>, gpg::ReadArchive* archive@<eax>);
+   *
+   * What it does:
+   * Loads patrol-task state from an archive in binary lane order:
+   *   1. base `CCommandTask` sub-object (by reflected type).
+   *   2. `mDispatch` via `ReadPointer_CCommandTask` (IAiCommandDispatchImpl is a
+   *      CCommandTask).
+   *   3. `mFormationBinding` via `ReadPointer_CUnitCommand`.
+   *   4. `mFormationInstance` via `ReadPointer_IFormationInstance`.
+   *   5. `mGoal` (`SNavGoal`) by reflected type.
+   *   6. `mMoving` / `mNavStalled` / `mInFormation` via the virtual `ReadBool`
+   *      archive slot (vtbl +0x38).
+   *   7. `mSearchBox` (`Box3f`) by reflected type.
+   *   8. `mTickCounter` via the virtual `ReadInt` archive slot (vtbl +0x24).
+   *   9. `mMembership` (`EntitySetTemplate<Entity>`) by reflected type.
+   */
+  void CUnitPatrolTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    CCommandTask* dispatchTask = static_cast<CCommandTask*>(mDispatch);
+    archive->ReadPointer_CCommandTask(&dispatchTask, &ownerRef);
+    mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchTask);
+
+    CUnitCommand* formationBinding = static_cast<CUnitCommand*>(mFormationBinding);
+    archive->ReadPointer_CUnitCommand(&formationBinding, &ownerRef);
+    mFormationBinding = formationBinding;
+
+    archive->ReadPointer_IFormationInstance(&mFormationInstance, &ownerRef);
+
+    archive->Read(CachedSNavGoalType(), &mGoal, ownerRef);
+
+    archive->ReadBool(&mMoving);
+    archive->ReadBool(&mNavStalled);
+    archive->ReadBool(&mInFormation);
+
+    archive->Read(CachedBox3fType(), &mSearchBox, ownerRef);
+    archive->ReadInt(&mTickCounter);
+    archive->Read(CachedEntitySetTemplateEntityType(), &mMembership, ownerRef);
+  }
+
+  /**
+   * Address: 0x0061D0C0 (FUN_0061D0C0, Moho::CUnitPatrolTask::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall MemberSerialize(CUnitPatrolTask* this@<eax>, gpg::WriteArchive* archive@<esi>);
+   *
+   * What it does:
+   * Line-for-line mirror of `MemberDeserialize` over the identical field set and
+   * order: base sub-object via reflected `Write`, the three tracked pointer
+   * lanes via `RRef_*` + `WriteRawPointer(... Unowned ...)`, the goal payload via
+   * reflected `Write`, the three flags via the virtual `WriteBool` slot, the
+   * search box via reflected `Write`, the tick counter via the virtual
+   * `WriteInt` slot, and the membership node via reflected `Write`.
+   */
+  void CUnitPatrolTask::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    archive->Write(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+
+    gpg::RRef pointerRef{};
+    (void)gpg::RRef_CCommandTask(&pointerRef, static_cast<CCommandTask*>(mDispatch));
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    (void)gpg::RRef_CUnitCommand(&pointerRef, static_cast<CUnitCommand*>(mFormationBinding));
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    (void)gpg::RRef_IFormationInstance(&pointerRef, mFormationInstance);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    archive->Write(CachedSNavGoalType(), &mGoal, ownerRef);
+
+    archive->WriteBool(mMoving);
+    archive->WriteBool(mNavStalled);
+    archive->WriteBool(mInFormation);
+
+    archive->Write(CachedBox3fType(), &mSearchBox, ownerRef);
+    archive->WriteInt(mTickCounter);
+    archive->Write(CachedEntitySetTemplateEntityType(), &mMembership, ownerRef);
+  }
+
+  /**
    * Address: 0x0061C480 (FUN_0061C480, Moho::CUnitPatrolTask::operator new)
    *
    * What it does:
@@ -607,7 +750,37 @@ namespace gpg
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitPatrolTaskSerializer{};
+  /**
+   * Runtime view of the binary `SerSaveLoadHelper<CUnitPatrolTask>` global.
+   *
+   * Binary layout (0x14 bytes):
+   * - +0x00: vtable pointer / intrusive-list head (`SerSaveLoadHelperListRuntime`)
+   * - +0x04: `mNext`
+   * - +0x08: `mPrev`
+   * - +0x0C: `mSerLoadFunc` (published to the reflection descriptor's
+   *          `serLoadFunc_` by `InstallMohoCUnitPatrolTaskSerializerCallbacks`)
+   * - +0x10: `mSerSaveFunc` (published to `serSaveFunc_`)
+   */
+  struct CUnitPatrolTaskSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitPatrolTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitPatrolTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitPatrolTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitPatrolTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitPatrolTaskSerializerHelperNode) == 0x14,
+    "CUnitPatrolTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitPatrolTaskSerializerHelperNode gCUnitPatrolTaskSerializer{};
 
   /**
    * Address: 0x0061ADF0 (FUN_0061ADF0)
@@ -618,7 +791,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitPatrolTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitPatrolTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitPatrolTaskSerializer.mListLinks);
   }
 
   /**
@@ -630,7 +803,57 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitPatrolTaskSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitPatrolTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitPatrolTaskSerializer.mListLinks);
+  }
+
+  /**
+   * Address: 0x0061ADA0 (FUN_0061ADA0, Moho::CUnitPatrolTaskSerializer::Deserialize)
+   *
+   * IDA signature:
+   * int __cdecl Deserialize(ReadArchive* archive, void* objectPtr, int version, RRef* ownerRef);
+   *
+   * What it does:
+   * Reflection load-callback facade for `CUnitPatrolTask`. Forwards the
+   * reflected object pointer to the class member load body; `version` and the
+   * owner-ref lane are unused by the member (mirrors the binary tail-jump).
+   */
+  void CUnitPatrolTaskSerializerDeserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitPatrolTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0061ADB0 (FUN_0061ADB0, Moho::CUnitPatrolTaskSerializer::Serialize)
+   *
+   * IDA signature:
+   * int __cdecl Serialize(WriteArchive* archive, void* objectPtr, int version, RRef* ownerRef);
+   *
+   * What it does:
+   * Reflection save-callback facade for `CUnitPatrolTask`. Forwards the
+   * reflected object pointer to the class member save body; `version` and the
+   * owner-ref lane are unused by the member (mirrors the binary tail-jump).
+   */
+  void CUnitPatrolTaskSerializerSerialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitPatrolTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
   }
 
   struct SerConstructHelperView
@@ -754,6 +977,18 @@ namespace
       helper.mConstructCallback = &ConstructCUnitPatrolTaskSerializerCallback;
       helper.mDeleteCallback = &DestructCUnitPatrolTaskSerializerCallback;
       (void)InitCUnitPatrolTaskConstructHelper(helper);
+
+      // Publish the load/save reflection callbacks. This binds both facade
+      // trampolines (FUN_0061ADA0 / FUN_0061ADB0) by name so the member bodies
+      // (FUN_0061CF50 / FUN_0061D0C0) are reachable, and self-links the
+      // intrusive helper node exactly like the binary's
+      // `SerSaveLoadHelper<CUnitPatrolTask>` static-init registrar
+      // (mirrors register_CThrustManipulatorSerializer). The engine install
+      // path `InstallMohoCUnitPatrolTaskSerializerCallbacks` copies these into
+      // the reflection descriptor's `serLoadFunc_` / `serSaveFunc_`.
+      (void)UnlinkCUnitPatrolTaskSerializerNodePrimary();
+      gCUnitPatrolTaskSerializer.mSerLoadFunc = &CUnitPatrolTaskSerializerDeserialize;
+      gCUnitPatrolTaskSerializer.mSerSaveFunc = &CUnitPatrolTaskSerializerSerialize;
     }
   };
 
