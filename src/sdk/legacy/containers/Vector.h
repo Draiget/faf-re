@@ -1814,6 +1814,13 @@ namespace msvc8
          * options.insert(options.end(), 1, value) by name (MSVC8's push_back at FUN_008DF290
          * is insert(end(),1,value) on the capacity-full path), so this per-T 8-byte
          * trivially-copyable symbol is emitted).
+         * Address: 0x007B0340 (FUN_007B0340, msvc8::vector<Moho::RCamCamera*>::_Insert_n
+         * grow lane for the 4-byte camera-pointer element; the recovered caller
+         * Moho::CAM_GetAllRCamCameras (FUN_007AADE0, RCamManager.cpp) copies the
+         * manager's temporary camera vector into the returned result via
+         * result.push_back(cam) by name — MSVC8's push_back is insert(end(),1,value)
+         * on the capacity-full path — so this per-T 4-byte pointer symbol is
+         * emitted. RCamCamera is the public alias of CameraImpl).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`

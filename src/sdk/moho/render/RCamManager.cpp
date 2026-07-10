@@ -356,12 +356,25 @@ namespace moho
    * Address: 0x007AADE0 (FUN_007AADE0, ?CAM_GetAllRCamCameras@Moho@@YA?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
    *
    * What it does:
-   * Returns a copy of the manager camera-pointer vector.
+   * Copies every camera pointer from the manager's temporary camera vector into
+   * a freshly allocated result vector and returns it. The binary builds a
+   * temporary from RCamManager::GetAllCameras(), copies each element into the
+   * result through a manual push_back loop (routing the capacity-full path
+   * through the msvc8::vector<RCamCamera*>::_Insert_n grow lane FUN_007B0340),
+   * then frees the temporary's buffer on scope exit.
    */
   msvc8::vector<CameraImpl*> CAM_GetAllRCamCameras()
   {
+    msvc8::vector<CameraImpl*> result{};
     RCamManager* const manager = CAM_GetManager();
-    return manager->GetAllCameras();
+    // Temporary; its buffer is released on scope exit == the binary's
+    // operator delete(start) at the end of the copy loop.
+    msvc8::vector<CameraImpl*> allCameras = manager->GetAllCameras();
+    const std::size_t cameraCount = allCameras.size();
+    for (std::size_t i = 0; i < cameraCount; ++i) {
+      result.push_back(allCameras[i]);
+    }
+    return result;
   }
 
   /**
