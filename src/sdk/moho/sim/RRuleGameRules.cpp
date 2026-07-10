@@ -2678,15 +2678,24 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_0052B280 (non-canonical helper lane).
+   * Address: 0x0052B280 (FUN_0052B280, Moho::RRuleGameRulesImpl::ParseEntityCategory)
+   * VTable slot: 23
+   *
+   * IDA signature:
+   * Moho::EntityCategory* __thiscall Moho::RRuleGameRulesImpl::ParseEntityCategory(
+   *     Moho::RRuleGameRulesImpl* this, Moho::EntityCategory* out, const char* expr);
    *
    * What it does:
-   * Delegates category expression parsing to the shared resolver implementation.
+   * Thin virtual wrapper. Forwards the category-lookup handle
+   * (`this->mEntityCategoryLookup`, +0xC4) and the expression to the free
+   * function `moho::ParseEntityCategory` (0x005552F0), which builds the result
+   * in place, and returns it by value.
    */
   CategoryWordRangeView RRuleGameRulesImpl::ParseEntityCategory(const char* categoryExpression) const
   {
-    const auto* const resolver = reinterpret_cast<const EntityCategoryLookupResolver*>(this);
-    return resolver->EntityCategoryLookupResolver::ParseEntityCategory(categoryExpression);
+    CategoryWordRangeView out;
+    (void)moho::ParseEntityCategory(mEntityCategoryLookup, &out, categoryExpression);
+    return out;
   }
 
   /**

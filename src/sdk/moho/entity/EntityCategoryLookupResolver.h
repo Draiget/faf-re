@@ -167,16 +167,17 @@ namespace moho
     virtual const CategoryWordRangeView* GetEntityCategory(const char*) const;
 
     /**
-     * Address: 0x0052B280 (FUN_0052B280)
      * VTable slot: 23
      *
-     * IDA signature:
-     * int __thiscall sub_52B280(_DWORD* this, int out, int source);
+     * Thin virtual wrapper. The concrete override lives in
+     * `RRuleGameRulesImpl::ParseEntityCategory` (0x0052B280) and forwards to the
+     * free function `moho::ParseEntityCategory` (0x005552F0). Kept pure here so
+     * the interface owns no parse body.
      *
      * What it does:
      * Parses category expression into a category-word range set.
      */
-    virtual CategoryWordRangeView ParseEntityCategory(const char*) const;
+    virtual CategoryWordRangeView ParseEntityCategory(const char*) const = 0;
 
     /**
      * Address: 0x0052B2B0
@@ -184,4 +185,22 @@ namespace moho
      */
     virtual void UpdateChecksum(void* md5Context, void* fileHandle) = 0;
   };
+
+  /**
+   * Address: 0x005552F0 (FUN_005552F0, Moho::ParseEntityCategory)
+   *
+   * IDA signature:
+   * Moho::EntityCategory* __userpurge Moho::ParseEntityCategory@<eax>(
+   *     Moho::EntityCategorySet* categoryLookup, Moho::EntityCategory* out, const char* expr);
+   *
+   * What it does:
+   * Parses a comma-separated category expression against a game-rules category
+   * lookup table. Each comma clause intersects its space-separated terms; every
+   * non-empty clause is then unioned into `out`. `categoryLookup` is the opaque
+   * `RRuleGameRulesImpl::mEntityCategoryLookup` handle (+0xC4); `out` is an
+   * uninitialized category set built in place and returned for chaining.
+   */
+  CategoryWordRangeView* ParseEntityCategory(
+    const void* categoryLookup, CategoryWordRangeView* out, const char* categoryExpression
+  );
 } // namespace moho

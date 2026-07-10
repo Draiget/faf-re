@@ -12,6 +12,7 @@
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/path/SNamedFootprint.h"
 #include "moho/resource/RResId.h"
@@ -848,10 +849,14 @@ namespace moho
     auto* const economyCategoryCache = reinterpret_cast<EntityCategorySet*>(&Economy.CategoryCache);
 
     for (msvc8::string* it = buildableCategoriesView.begin; it != buildableCategoriesView.end; ++it) {
-      const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(it->c_str());
-      CategoryWordRangeView mergedCategory{};
-      (void)func_EntityCategoryAdd(&parsedCategory, &mergedCategory, economyCategoryCache);
-      *economyCategoryCache = mergedCategory;
+      // The binary parses through the free function directly (a1 =
+      // rules->mEntityCategoryLookup at +0xC4), not the virtual dispatch.
+      CategoryWordRangeView parsedCategory;
+      (void)moho::ParseEntityCategory(rules->mEntityCategoryLookup, &parsedCategory, it->c_str());
+
+      // Then folds the parsed clause bits into the runtime economy cache via the
+      // ordinal-remapping `EntityCategory::Add(out /*cache*/, source /*parsed*/)`.
+      (void)EntityCategory::Add(economyCategoryCache, &parsedCategory);
     }
   }
 
