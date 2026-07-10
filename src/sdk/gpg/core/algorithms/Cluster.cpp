@@ -184,9 +184,11 @@ namespace
      *
      * What it does:
      * Scans four occupancy edge lanes, emits packed edge-contact markers into
-     * `outEdges`, sorts them, and removes duplicates in-place.
+     * `outEdges`, sorts them, and removes duplicates in-place. Each packed word
+     * is one cluster boundary `Node` (`x | (z << 8)`); `gpg::HaStar::ClusterBuild`
+     * consumes the result as the cluster's node set.
      */
-    [[maybe_unused]] std::int16_t* BuildOccupationEdgeContacts(
+    std::int16_t* BuildOccupationEdgeContacts(
       const gpg::HaStar::OccupationData& occupationData,
       FastVectorShortRuntimeView& outEdges
     )
@@ -1082,7 +1084,7 @@ namespace
      * Initializes one path-frontier node as self-linked with zero cost/state
      * lanes.
      */
-    [[maybe_unused]] PathSearchFrontierNodeRuntime* InitializePathSearchFrontierNode(
+    PathSearchFrontierNodeRuntime* InitializePathSearchFrontierNode(
       PathSearchFrontierNodeRuntime* const node
     ) noexcept
     {
@@ -3625,7 +3627,7 @@ namespace
      * shrinking and fill-writing one byte value into appended slots when
      * growing.
      */
-    [[maybe_unused]] void
+    void
     FastVectorN12CharResize(FastVectorN12CharRuntime& view, const unsigned int newSize, const char* const fillValue)
     {
         const auto currentSize = (view.start != nullptr && view.end != nullptr)
@@ -4281,6 +4283,334 @@ namespace
       *out = static_cast<std::uint8_t>(static_cast<int>(gpg::HaStar::Cluster::QuantizeEdgeCost(traversalCost, distance)));
       return out;
     }
+
+    // ------------------------------------------------------------------
+    // gpg::HaStar cluster edge-cost search (octile grid label-correcting)
+    // tables. The binary's four relaxation blocks (loop unrolled x4 over the
+    // eight octile neighbours) all read the same underlying delta/mask tables at
+    // a shifted base, so a single ascending pass over `k = 0..7` reproduces the
+    // exact relaxation order. Values extracted byte-for-byte from the `.rdata`
+    // blocks at 0x00D49430 (sHaStar_datf8, step costs), 0x00D49450
+    // (sHaStar_dat7, row deltas), 0x00D49458 (sHaStar_dat6, column deltas) and
+    // 0x00D49460 (sHaStar_dat5, diagonal prerequisite masks).
+    // ------------------------------------------------------------------
+    constexpr std::array<float, 8> kOctileStepCost = {
+      1.0f, 1.0f, 1.0f, 1.0f,
+      1.41421354f, 1.41421354f, 1.41421354f, 1.41421354f
+    };
+    constexpr std::array<std::int8_t, 8> kOctileRowDelta = { -1, 0, 1, 0, -1, 1, 1, -1 };
+    constexpr std::array<std::int8_t, 8> kOctileColDelta = { 0, -1, 0, 1, -1, -1, 1, 1 };
+    // Diagonal neighbours (k>=4) may only relax once both of their orthogonal
+    // neighbours have already been settled this expansion; orthogonals (k<4)
+    // have no prerequisite.
+    constexpr std::array<std::uint8_t, 8> kNeighborPrereqMask = { 0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u };
+    constexpr float kOctileDiagonalFactor = 0.41421354f;
+
+    // 9x9 expansion grid: cell (row z, column x) lives at grid[9*z + x].
+    constexpr std::int32_t kEdgeSearchGridSpan = 9;
+    constexpr std::int32_t kEdgeSearchGridCells = kEdgeSearchGridSpan * kEdgeSearchGridSpan; // 81
+
+    /**
+     * What it does:
+     * Unlinks one frontier node from its current ring position
+     * (`prev->next = next; next->prev = prev`). Mirrors the inlined unlink the
+     * binary performs both when popping the open-list head and when re-queuing a
+     * relaxed neighbour.
+     */
+    void UnlinkFrontierNode(PathSearchFrontierNodeRuntime* const node) noexcept
+    {
+      node->prev->next = node->next;
+      node->next->prev = node->prev;
+    }
+
+    /**
+     * What it does:
+     * Appends one frontier node immediately before `head` (i.e. at the tail of
+     * the FIFO open-list ring), matching the binary's insert-before-sentinel
+     * sequence.
+     */
+    void AppendFrontierNodeToTail(
+      PathSearchFrontierNodeRuntime* const head,
+      PathSearchFrontierNodeRuntime* const node
+    ) noexcept
+    {
+      node->prev = head->prev;
+      node->next = head;
+      head->prev->next = node;
+      head->prev = node;
+    }
+
+    /**
+     * Address: 0x00954A40 (FUN_00954A40, sub_954A40)
+     * Mangled: (file-local; emitted as sub_954A40)
+     *
+     * IDA signature:
+     * void __cdecl sub_954A40(
+     *   gpg::HaStar::OccupationData *a1,
+     *   int *a2 [fastvector<Node>],
+     *   gpg::fastvector<gpg::HaStar::Cluster::Edge> *a3);
+     *
+     * What it does:
+     * Builds the cluster's triangular edge-cost matrix. For each ordered node
+     * pair (s < t) it runs a label-correcting octile-grid search (FIFO ring
+     * open-list over a 9x9 cell grid, seeded from node s) and, once the grid is
+     * settled, quantizes the path cost of node t's cell against the straight
+     * octile distance into a 0..31 bucket via
+     * `gpg::HaStar::Cluster::QuantizeEdgeCost`. Unreachable pairs store -1.
+     * Edge (s, t) is written at triangular index `s + t*(t-1)/2`. When fewer
+     * than two nodes exist the edge vector is emptied.
+     */
+    void BuildClusterEdgeCosts(
+      const gpg::HaStar::OccupationData& occupation,
+      const FastVectorShortRuntimeView& nodes,
+      InlineBackedByteVectorRuntime& outEdges
+    )
+    {
+      const std::uint32_t nodeCount =
+        static_cast<std::uint32_t>(nodes.end - nodes.start);
+
+      if (nodeCount < 2u) {
+        // No pairs: drop any heap storage and reset the edge vector to empty.
+        if (outEdges.mBegin != outEdges.mInlineStorageLane) {
+          ::operator delete[](outEdges.mBegin);
+          outEdges.mBegin = outEdges.mInlineStorageLane;
+          outEdges.mCapacityEnd =
+            *reinterpret_cast<std::uint8_t**>(outEdges.mInlineStorageLane);
+        }
+        outEdges.mEnd = outEdges.mBegin;
+        return;
+      }
+
+      // Prefill the whole triangular matrix with -1 (unreachable).
+      const std::uint32_t triangularSize = TriangularEdgePairIndex(0u, nodeCount);
+      const std::uint8_t fillUnreachable = 0xFFu;
+      (void)ResizeInlineBackedByteVectorWithFill(outEdges, triangularSize, &fillUnreachable);
+
+      // 9x9 search grid + FIFO open-list sentinel. The binary constructs all 81
+      // cells once (each self-linked with zero cost/flags/packedCell) via the
+      // eh-vector-ctor over InitializePathSearchFrontierNode, then re-inits the
+      // cost/flag/packedCell lanes once per source expansion while leaving the
+      // ring links self-linked between sources.
+      std::array<PathSearchFrontierNodeRuntime, kEdgeSearchGridCells> grid;
+      for (auto& cell : grid) {
+        (void)InitializePathSearchFrontierNode(&cell);
+      }
+      const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(nodes.start);
+      // Occupation rows are a uint16 bitmask grid: row r's passability mask is
+      // the 16-bit word at byte offset r*2 (the binary reads word ptr[a1 + r*2]).
+      const auto* const layerRows = reinterpret_cast<const std::uint16_t*>(occupation.mWords);
+
+      for (std::uint32_t source = 0u; source + 1u < nodeCount; ++source) {
+        PathSearchFrontierNodeRuntime openListHead{};
+        openListHead.next = &openListHead;
+        openListHead.prev = &openListHead;
+
+        // Re-initialise every grid cell for this source expansion. Cell
+        // (row z, col x) encodes packedCell = (z << 4) | x.
+        for (std::int32_t row = 0; row < kEdgeSearchGridSpan; ++row) {
+          for (std::int32_t col = 0; col < kEdgeSearchGridSpan; ++col) {
+            PathSearchFrontierNodeRuntime& cell = grid[row * kEdgeSearchGridSpan + col];
+            cell.pathCost = 0.0f;
+            cell.visitFlags = 0u;
+            cell.packedCell = static_cast<std::uint8_t>((row << 4) | col);
+          }
+        }
+
+        // Seed the source node's cell (grid[z_s][x_s]) into the open list.
+        const std::uint8_t sourceX = nodeBytes[2u * source];
+        const std::uint8_t sourceZ = nodeBytes[2u * source + 1u];
+        PathSearchFrontierNodeRuntime& seed =
+          grid[sourceZ * kEdgeSearchGridSpan + sourceX];
+        UnlinkFrontierNode(&seed);
+        seed.visitFlags = 1u;
+        AppendFrontierNodeToTail(&openListHead, &seed);
+
+        // Label-correcting drain of the FIFO ring.
+        while (openListHead.next != &openListHead) {
+          PathSearchFrontierNodeRuntime* const current = openListHead.next;
+          UnlinkFrontierNode(current);
+          current->next = current;
+          current->prev = current;
+
+          std::uint8_t settledMask = 0u;
+          const std::int32_t currentRow = current->packedCell >> 4;
+          const std::int32_t currentCol = current->packedCell & 0x0F;
+
+          for (std::int32_t k = 0; k < 8; ++k) {
+            if ((settledMask & kNeighborPrereqMask[k]) != kNeighborPrereqMask[k]) {
+              continue;
+            }
+
+            const std::int32_t neighborRow = currentRow + kOctileRowDelta[k];
+            const std::int32_t neighborCol = currentCol + kOctileColDelta[k];
+            if (neighborCol < 0 || neighborRow < 0 || neighborCol > 8 || neighborRow > 8) {
+              continue;
+            }
+            if ((static_cast<unsigned int>(layerRows[neighborRow]) & (1u << neighborCol)) == 0u) {
+              continue;
+            }
+
+            const float candidateCost = kOctileStepCost[k] + current->pathCost;
+            settledMask |= static_cast<std::uint8_t>(1u << k);
+
+            PathSearchFrontierNodeRuntime& neighbor =
+              grid[neighborRow * kEdgeSearchGridSpan + neighborCol];
+            if (neighbor.visitFlags != 0u && candidateCost >= neighbor.pathCost) {
+              continue;
+            }
+
+            UnlinkFrontierNode(&neighbor);
+            neighbor.visitFlags = 1u;
+            neighbor.pathCost = candidateCost;
+            AppendFrontierNodeToTail(&openListHead, &neighbor);
+          }
+        }
+
+        // Emit the quantized edge cost for every later node t (source < t).
+        for (std::uint32_t target = source + 1u; target < nodeCount; ++target) {
+          const std::uint32_t edgeIndex = TriangularEdgePairIndex(source, target);
+          const std::uint8_t targetX = nodeBytes[2u * target];
+          const std::uint8_t targetZ = nodeBytes[2u * target + 1u];
+          const PathSearchFrontierNodeRuntime& targetCell =
+            grid[targetZ * kEdgeSearchGridSpan + targetX];
+
+          if (targetCell.visitFlags == 0u) {
+            outEdges.mBegin[edgeIndex] = fillUnreachable;
+            continue;
+          }
+
+          const float deltaX =
+            std::fabs(static_cast<float>(static_cast<int>(sourceX) - static_cast<int>(targetX)));
+          const float deltaZ =
+            std::fabs(static_cast<float>(static_cast<int>(sourceZ) - static_cast<int>(targetZ)));
+          const float octileDistance = (deltaZ <= deltaX)
+            ? (deltaZ * kOctileDiagonalFactor + deltaX)
+            : (deltaX * kOctileDiagonalFactor + deltaZ);
+
+          const int bucket = static_cast<int>(
+            gpg::HaStar::Cluster::QuantizeEdgeCost(targetCell.pathCost, octileDistance)
+          );
+          outEdges.mBegin[edgeIndex] = static_cast<std::uint8_t>(static_cast<std::int8_t>(bucket));
+        }
+      }
+    }
+
+    /**
+     * Address: 0x00954650 (FUN_00954650,
+     * ?EraseUnconnectedNodes@HaStar@gpg@@YAXAAV?$fastvector@UNode@Cluster@HaStar@gpg@@@2@AAV?$fastvector@UEdge@Cluster@HaStar@gpg@@@2@@Z)
+     * Mangled: ?EraseUnconnectedNodes@HaStar@gpg@@YAX...@Z
+     *
+     * IDA signature:
+     * void __cdecl gpg::HaStar::EraseUnconnectedNodes(
+     *   gpg::fastvector<Node> *ioNodes, gpg::fastvector<Edge> *ioEdges);
+     *
+     * What it does:
+     * Drops every cluster node that has no non-negative edge to any other node,
+     * compacting both the node array and the triangular edge matrix in place so
+     * that only reachable nodes and their pairwise edges survive. A node counts
+     * as reached if it is an endpoint of at least one edge whose quantized cost
+     * is >= 0. Asserts the post-compaction sizes:
+     * `nnodes_used == ioNodes.size()` and
+     * `ioEdges.size() == TriangularSize(nnodes_used)`.
+     */
+    void EraseUnconnectedNodes(
+      FastVectorShortRuntimeView& ioNodes,
+      InlineBackedByteVectorRuntime& ioEdges
+    )
+    {
+      // Reachability scratch: one byte per node, backed by a fastvector_n<char,12>.
+      // The binary keeps a 12-byte inline buffer with the capacity sentinel in a
+      // separate 12-byte region; mirror that stack layout here so
+      // `FastVectorN12CharResize` follows the inline/heap transition faithfully.
+      struct FastVectorN12CharStorage
+      {
+        FastVectorN12CharRuntime header;
+        char inlineVec[12];
+        char capacitySentinel[12];
+      };
+      FastVectorN12CharStorage scratch{};
+      FastVectorN12CharRuntime& reachable = scratch.header;
+      reachable.start = scratch.inlineVec;
+      reachable.end = scratch.inlineVec;
+      reachable.capacityEnd = scratch.capacitySentinel;
+      reachable.inlineOrigin = scratch.inlineVec;
+
+      const std::uint32_t nodeCount =
+        static_cast<std::uint32_t>(ioNodes.end - ioNodes.start);
+      const char clearFlag = 0;
+      FastVectorN12CharResize(reachable, nodeCount, &clearFlag);
+
+      auto* const edgeBytes = ioEdges.mBegin;
+      std::int32_t reachedCount = 0;
+
+      // Mark endpoints of every non-negative edge as reached.
+      for (std::uint32_t high = 0u; high < nodeCount; ++high) {
+        if (high == 0u) {
+          continue;
+        }
+        std::uint32_t edgeIndex = TriangularEdgePairIndex(0u, high);
+        for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
+          if (static_cast<std::int8_t>(edgeBytes[edgeIndex]) >= 0) {
+            reachedCount += (reachable.start[low] == 0) ? 1 : 0;
+            reachedCount += (reachable.start[high] == 0) ? 1 : 0;
+            reachable.start[low] = 1;
+            reachable.start[high] = 1;
+          }
+        }
+      }
+
+      if (reachedCount != static_cast<std::int32_t>(nodeCount)) {
+        // Compact both arrays, keeping only reached nodes and their pairwise
+        // edges (writing the surviving triangular matrix row by row).
+        auto* edgeWrite = edgeBytes;
+        auto* nodeWrite = ioNodes.start;
+
+        for (std::uint32_t high = 0u; high < nodeCount; ++high) {
+          if (reachable.start[high] == 0) {
+            continue;
+          }
+          if (high != 0u) {
+            const std::uint32_t rowBase = TriangularEdgePairIndex(0u, high);
+            for (std::uint32_t low = 0u; low < high; ++low) {
+              if (reachable.start[low] != 0) {
+                *edgeWrite = edgeBytes[rowBase + low];
+                ++edgeWrite;
+              }
+            }
+          }
+          *nodeWrite = ioNodes.start[high];
+          ++nodeWrite;
+        }
+
+        if (nodeWrite != ioNodes.end) {
+          ioNodes.end = nodeWrite;
+        }
+        if (edgeWrite != ioEdges.mEnd) {
+          ioEdges.mEnd = edgeWrite;
+        }
+
+        if (reachedCount != static_cast<std::int32_t>(ioNodes.end - ioNodes.start)) {
+          gpg::HandleAssertFailure(
+            "nnodes_used == ioNodes.size()",
+            168,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
+          );
+        }
+        const std::uint32_t survivingTriangular =
+          TriangularEdgePairIndex(0u, static_cast<std::uint32_t>(reachedCount));
+        if (static_cast<std::uint32_t>(ioEdges.mEnd - ioEdges.mBegin) != survivingTriangular) {
+          gpg::HandleAssertFailure(
+            "ioEdges.size() == TriangularSize(nnodes_used)",
+            169,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
+          );
+        }
+      }
+
+      if (reachable.start != reachable.inlineOrigin) {
+        ::operator delete[](reachable.start);
+      }
+    }
 }
 
 namespace gpg::HaStar
@@ -4348,6 +4678,15 @@ Cluster::~Cluster()
 {
     ReleaseClusterData(mData);
 }
+
+/**
+ * Address: 0x00F32C60 (?sDefaultConstructData@Cluster@HaStar@gpg@@0UData@123@B)
+ *
+ * Shared zero-node sentinel payload used by `ClusterBuild`. Initialized with
+ * `mRefs=1` so the sentinel is never destroyed, no dispose callback, and zero
+ * nodes; the trailing `mNodes[1]` flexible slot is value-initialized.
+ */
+Cluster::Data Cluster::sDefaultConstructData = { 1, nullptr, 0u, 0u, { { 0u, 0u } } };
 
 /**
  * Address: 0x0092D8B0 (FUN_0092D8B0, ?QuantizeEdgeCost@Cluster@HaStar@gpg@@SAMMM@Z)
@@ -4449,17 +4788,60 @@ void Cluster::SetData(
  * Address: 0x009552D0 (FUN_009552D0,
  * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUOccupationData@12@@Z)
  *
- * Notes:
- * Full occupancy-cell-to-cluster extraction is still being recovered; this
- * stub preserves the binary's allocation + `SetData` wiring so the payload is
- * a valid refcounted empty cluster until the edge-extraction lane is finished.
+ * IDA signature:
+ * gpg::HaStar::Cluster *__cdecl gpg::HaStar::ClusterBuild(
+ *   gpg::HaStar::Cluster *result, const gpg::HaStar::OccupationData *occupation);
+ *
+ * What it does:
+ * Builds a cluster payload from occupancy cell data. Extracts the boundary
+ * node set (`BuildOccupationEdgeContacts`), computes the pairwise octile-search
+ * edge-cost matrix (`BuildClusterEdgeCosts`), drops nodes with no reachable
+ * edge (`EraseUnconnectedNodes`), seeds the handle with the shared empty
+ * sentinel payload, then commits the surviving nodes/edges via
+ * `Cluster::SetData`. Both scratch vectors free their heap storage (edges
+ * first, then nodes) before returning.
  */
 Cluster ClusterBuild(const OccupationData& occupationData)
 {
-    (void)occupationData;
+    // Node scratch: fastvector<Node> with a 32-byte (16-node) inline buffer.
+    // The capacity cursor is one past the inline buffer, matching the binary's
+    // stack layout where `capacity` points just past the 32-byte region.
+    std::int16_t nodeInline[16] = {};
+    FastVectorShortRuntimeView nodeView{};
+    nodeView.start = nodeInline;
+    nodeView.end = nodeInline;
+    nodeView.capacity = nodeInline + 16;
+    nodeView.inlineOrigin = nodeInline;
+
+    // Edge scratch: fastvector<Edge> with a 120-byte inline buffer.
+    std::uint8_t edgeInline[120] = {};
+    InlineBackedByteVectorRuntime edgeView{};
+    edgeView.mBegin = edgeInline;
+    edgeView.mEnd = edgeInline;
+    edgeView.mCapacityEnd = edgeInline + 120;
+    edgeView.mInlineStorageLane = edgeInline;
+
+    (void)BuildOccupationEdgeContacts(occupationData, nodeView);
+    BuildClusterEdgeCosts(occupationData, nodeView, edgeView);
+    EraseUnconnectedNodes(nodeView, edgeView);
 
     Cluster cluster{};
-    cluster.SetData(nullptr, nullptr, 0u);
+    cluster.mData = &Cluster::sDefaultConstructData;
+    ++Cluster::sDefaultConstructData.mRefs;
+    cluster.SetData(
+        reinterpret_cast<const Cluster::Node*>(nodeView.start),
+        reinterpret_cast<const Cluster::Edge*>(edgeView.mBegin),
+        static_cast<unsigned int>(nodeView.end - nodeView.start)
+    );
+
+    // Release scratch heap storage (edges first, then nodes) if either spilled.
+    if (edgeView.mBegin != edgeInline) {
+        ::operator delete[](edgeView.mBegin);
+    }
+    if (nodeView.start != nodeInline) {
+        ::operator delete[](nodeView.start);
+    }
+
     return cluster;
 }
 
