@@ -1584,6 +1584,11 @@ namespace msvc8
          * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back)
          * Address: 0x007C8F30 (FUN_007C8F30, msvc8::vector<Moho::LaunchPlayerOptionEntry>::push_back)
          * Address: 0x007E3850 (FUN_007E3850, msvc8::vector<Moho::MeshLOD*>::push_back — Mesh::CreateLOD lods.push_back)
+         * Address: 0x0075F1A0 (FUN_0075F1A0, msvc8::vector<Moho::Sim::DumpUnitsCountEntry>::push_back
+         * splitter for the 8-byte element {const RUnitBlueprint* blueprint; int count};
+         * Sim::DumpUnits invokes counts.push_back({blueprint,1}) by name — on the
+         * capacity-full path this routes to insert(end(),1,value) → _Insert_n
+         * (FUN_0075F810), on the fast path it appends in place)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -1821,6 +1826,12 @@ namespace msvc8
          * result.push_back(cam) by name — MSVC8's push_back is insert(end(),1,value)
          * on the capacity-full path — so this per-T 4-byte pointer symbol is
          * emitted. RCamCamera is the public alias of CameraImpl).
+         * Address: 0x0075F810 (FUN_0075F810, msvc8::vector<Moho::Sim::DumpUnitsCountEntry>::_Insert_n
+         * grow lane for the 8-byte trivially-copyable element {const RUnitBlueprint* blueprint; int count};
+         * >>3 stride, 0x1FFFFFFF max, 1.5x growth. Sim::DumpUnits invokes
+         * counts.push_back({blueprint,1}) by name — MSVC8's push_back (FUN_0075F1A0)
+         * is insert(end(),1,value) on the capacity-full path — so this per-T 8-byte
+         * symbol is emitted).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
