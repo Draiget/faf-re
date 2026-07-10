@@ -7,6 +7,7 @@
 #include "moho/resource/blueprints/RMeshBlueprintLODTypeInfo.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/ui/SDebugScreenText.h"
 #include "moho/ui/SDebugWorldText.h"
 #include <cstring>
@@ -7821,6 +7822,68 @@ namespace moho::runtime
   [[noreturn]] void RuntimeThrowVectorTooLongBW()
   {
     throw std::length_error("vector<T> too long");
+  }
+}
+
+namespace moho
+{
+  /**
+   * Address: 0x0067D660 (FUN_0067D660, msvc8::vector<Moho::EntId>::_Insert_n)
+   *
+   * IDA signature:
+   * int *__thiscall sub_67D660(int this, int *a2, int *a3);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<EntId>::_Insert_n` for the sync
+   * delete/erase id lanes. Inserts `insertCount` copies of `value` at
+   * `insertPosition`. When spare capacity is sufficient the live tail
+   * `[pos, end)` is shifted right by `insertCount` slots and the gap is filled
+   * with the id value; otherwise a 1.5x-grown buffer is allocated, the head is
+   * moved, the insert window is fill-constructed, the tail is moved, and the
+   * previous block is freed. The canonical body lives in
+   * `msvc8::vector<T>::insert` (legacy/containers/Vector.h); this per-T free
+   * helper is the source-level by-name invocation that keeps the emitted symbol
+   * and is reached from `PushBackDeleteEntId` on the capacity-full branch
+   * (`call sub_67D660` at 0x0067B866).
+   */
+  void InsertNCopiesDeleteEntId(
+    msvc8::vector<EntId>& storage,
+    EntId* const insertPosition,
+    const unsigned int insertCount,
+    const EntId value)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), value);
+  }
+
+  /**
+   * Address: 0x0067B810 (FUN_0067B810,
+   *                      Moho::Entity::DestroyInterface delete-id append lane)
+   *
+   * IDA signature:
+   * int __usercall sub_67B810@<eax>(int a1@<edx>, _DWORD *a2@<esi>);
+   *
+   * What it does:
+   * Appends one `EntId` into a sync delete/erase id vector, mirroring the MSVC8
+   * inlined `push_back` shape used by the binary AttachTo/DestroyInterface
+   * bodies: when the reserved capacity is exhausted the append reaches the
+   * canonical `vector<EntId>::_Insert_n` slow-path (`InsertNCopiesDeleteEntId`,
+   * FUN_0067D660, `call sub_67D660` at 0x0067B866); otherwise it is a fast-path
+   * in-place store. Called by `Moho::Entity::DestroyInterface` (FUN_0067A260)
+   * into `mDeleteIds` and by `Moho::Prop::Sync` (FUN_006FA2A0) into
+   * `mEraseIds`/`mDeleteIds`.
+   */
+  void PushBackDeleteEntId(msvc8::vector<EntId>& storage, const EntId value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesDeleteEntId(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
   }
 }
 

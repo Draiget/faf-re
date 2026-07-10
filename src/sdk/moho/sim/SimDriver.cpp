@@ -267,6 +267,18 @@ namespace
     offsetof(SSyncDataTeardownRuntimeView, mUnitUpdates) == 0x158,
     "SSyncData::mUnitUpdates offset must be 0x158"
   );
+  // The teardown view mirrors the promoted `SSyncData::mDeleteIds` (+0x168) and
+  // `SSyncData::mEraseIds` (+0x178) members; `LegacyVectorSlot<EntId>` shares the
+  // 0x10-byte {proxy,first,last,end} layout of `msvc8::vector<EntId>`, so the two
+  // structs describe one owning layout for these lanes.
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mDeleteIds) == 0x168,
+    "SSyncData::mDeleteIds offset must be 0x168"
+  );
+  static_assert(
+    offsetof(SSyncDataTeardownRuntimeView, mEraseIds) == 0x178,
+    "SSyncData::mEraseIds offset must be 0x178"
+  );
   static_assert(
     offsetof(SSyncDataTeardownRuntimeView, mNewCommands) == 0x188,
     "SSyncData::mNewCommands offset must be 0x188"
@@ -715,7 +727,9 @@ SSyncData::SSyncData()
   : mCurBeat(0)
   , pad_0004_0138{}
   , mNewUnits()
-  , pad_0144_0188{}
+  , pad_0144_0168{}
+  , mDeleteIds()
+  , mEraseIds()
   , mPublishedCommandDescriptors()
   , mPublishedCommandPackets()
   , mPendingCommandEventRemovals()

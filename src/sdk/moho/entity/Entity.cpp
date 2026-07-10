@@ -59,6 +59,7 @@
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
@@ -3779,10 +3780,20 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067A260
+   * Address: 0x0067A260 (FUN_0067A260, ?DestroyInterface@Entity@Moho@@MAEXPAUSSyncData@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::Entity::DestroyInterface(Moho::Entity *this, Moho::SSyncData *a2);
+   *
+   * What it does:
+   * Queues this entity's id (`id_`, +0x68) onto the sync packet's delete-id lane
+   * (`SSyncData::mDeleteIds`, +0x168) via the canonical push_back-shape helper
+   * (`PushBackDeleteEntId`, FUN_0067B810, `call sub_67B810` at 0x0067A27A), then
+   * clears the interface-created flag (`mInterfaceCreated`, +0x1EC).
    */
-  void Entity::DestroyInterface(SSyncData*)
+  void Entity::DestroyInterface(SSyncData* const syncData)
   {
+    PushBackDeleteEntId(syncData->mDeleteIds, id_);
     mInterfaceCreated = 0u;
   }
 
