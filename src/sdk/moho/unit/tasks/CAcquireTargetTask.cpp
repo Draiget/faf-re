@@ -16,6 +16,16 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/entity/Entity.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/ReconBlip.h"
+#include "moho/sim/COGrid.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/ArmyUnitSet.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
+#include "moho/task/ETaskStatus.h"
+#include "moho/unit/core/EFireStateTypeInfo.h"
+#include "gpg/core/utils/Logging.h"
 
 using namespace moho;
 
@@ -223,6 +233,66 @@ namespace
     weapon.mUnknown174 = 1u;
     weapon.mShotsAtTarget = 0;
   }
+
+  /**
+   * Address: 0x005D8AD0 (FUN_005D8AD0)
+   *
+   * IDA signature:
+   * char __userpurge sub_5D8AD0@<al>(int target@<ebx>, CAcquireTargetTask *task@<edi>);
+   *
+   * What it does:
+   * Decides whether the acquire-target task should treat the current desired
+   * `target` as exempt (drop it) this tick. Returns true when either:
+   *   1. The unit is attacking, has a guard position (its own guarded-unit
+   *      position when guarding a unit, otherwise its stored guard point), and
+   *      has strayed farther than the blueprint guard-return radius from it, or
+   *   2. The target resolves to an entity, the unit is immobile, and that entity
+   *      is a recon blip the owning army sees as fake (per-army recon flags with
+   *      the low 5 bits clear).
+   * Returns false otherwise. Mirrors FUN_005D8AD0's two-branch structure.
+   */
+  [[nodiscard]] bool CheckTargetGuardExempt(const CAiTarget& target, CAcquireTargetTask& task)
+  {
+    Unit* const unit = task.mUnit;
+    if (!unit->IsUnitState(EUnitState::UNITSTATE_Attacking)) {
+      return false;
+    }
+
+    // Guard position: the guarded unit's live position when guarding a unit,
+    // otherwise this unit's stored guard point.
+    Wm3::Vector3f guardPosition = unit->GuardedPos;
+    if (Unit* const guardedUnit = unit->GetGuardedUnit(); guardedUnit != nullptr) {
+      guardPosition = guardedUnit->GetPosition();
+    }
+
+    // Wm3::Vector3f::Compare returns true when the vectors differ, so this is a
+    // "guard position is set (non-zero)" test.
+    if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); Wm3::Vector3f::Compare(&guardPosition, &zero)) {
+      const RUnitBlueprintAI& ai = unit->GetBlueprint()->AI;
+      const Wm3::Vec3f& unitPosition = unit->GetPosition();
+      const float deltaX = unitPosition.x - guardPosition.x;
+      const float deltaY = unitPosition.y - guardPosition.y;
+      const float deltaZ = unitPosition.z - guardPosition.z;
+      const float distance = std::sqrt((deltaZ * deltaZ) + (deltaY * deltaY) + (deltaX * deltaX));
+      if (distance > ai.GuardReturnRadius) {
+        return true;
+      }
+    }
+
+    // Recon-fake exemption: immobile unit targeting an entity that the owning
+    // army sees as a fake recon blip.
+    Entity* const targetEntity = target.targetEntity.GetObjectPtr();
+    if (targetEntity != nullptr && !unit->IsMobile()) {
+      if (ReconBlip* const blip = targetEntity->IsReconBlip(); blip != nullptr) {
+        const std::int32_t armyIndex = unit->ArmyRef->ArmyId;
+        if ((blip->mReconDat[static_cast<std::size_t>(armyIndex)].mReconFlags & 0x1Fu) == 0u) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
 } // namespace
 
 namespace moho
@@ -342,10 +412,275 @@ namespace moho
   /**
    * Address: 0x005D8D10 (FUN_005D8D10, Moho::CAcquireTargetTask::TaskTick)
    * Slot: 1
+   *
+   * IDA signature:
+   * Moho::ETaskStatus __thiscall TaskTick(Moho::CAcquireTargetTask *this);
+   *
+   * What it does:
+   * One acquire-target scheduler tick. Computes the reschedule interval, then —
+   * unless the unit is mid-unpack-move — resolves the weapon's target for this
+   * tick: honours manual fire and primary-weapon target sharing, evaluates the
+   * attacker's desired target (recording an attacker `State`), and, when no
+   * higher-priority target applies, either intercepts the closest tracked
+   * projectile (`TrackToTarget`) or picks the best enemy blip
+   * (`FindBestEnemy` over `GetBlipsInRange`) and optionally auto-issues an attack
+   * command. Returns `TASKSTATUS_Done` (manual fire), `TASKSTATUS_Wait`
+   * (auto-initiate / can-target / mid-unpack-attacking short-circuit), or the
+   * interval wait value (`ceil(TargetCheckInterval*10)` clamped to >=1, plus 1).
    */
   int CAcquireTargetTask::Execute()
   {
-    return 1;
+    RUnitBlueprintWeapon* const weaponBlueprint = mWeapon->mWeaponBlueprint;
+
+    // Reschedule interval: ceil(TargetCheckInterval * 10) clamped to at least 1,
+    // then +1 (the ">= 2 => wait N-1 beats" band). This is the default return.
+    const float intervalTicksFloat = weaponBlueprint->TargetCheckInterval * 10.0f;
+    int intervalTicks = static_cast<int>(std::ceil(intervalTicksFloat));
+    if (intervalTicks < 1) {
+      intervalTicks = 1;
+    }
+    const int waitStatus = intervalTicks + 1;
+
+    // Selected-unit set used by the auto-issue attack command below.
+    SEntitySetTemplateUnit selectedUnits{};
+    (void)selectedUnits.AddUnit(mUnit);
+
+    // Mid-unpack move short-circuit: units that must unpack before firing simply
+    // wait while moving / (un)loading transport.
+    const bool needsUnpack = mUnit->GetBlueprint()->AI.NeedUnpack != 0u;
+    if (needsUnpack
+        && (mUnit->IsUnitState(UNITSTATE_Moving) || mUnit->IsUnitState(UNITSTATE_TransportLoading)
+            || mUnit->IsUnitState(UNITSTATE_WaitingForTransport))) {
+      return waitStatus;
+    }
+
+    UnitWeapon* const weapon = mWeapon;
+    if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->ManualFire != 0u) {
+      return TASKSTATUS_Done;
+    }
+
+    // Clear the target blacklist whenever the unit has moved this tick.
+    if (Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+      WeaponResetBlacklist(*weapon);
+    }
+
+    if (mUnit->IsBeingBuilt() || mWeapon->mEnabled == 0u) {
+      return waitStatus;
+    }
+
+    // Stop-on-primary-weapon-busy: if a different primary weapon already has an
+    // attackable target, drop this weapon's target and wait.
+    if (weaponBlueprint->StopOnPrimaryWeaponBusy != 0u) {
+      if (UnitWeapon* const primaryWeapon = mAttacker->GetPrimaryWeapon(); primaryWeapon != nullptr) {
+        if (mWeapon != primaryWeapon && primaryWeapon->mTarget.HasTarget()
+            && UnitWeapon::CanAttackTarget(&primaryWeapon->mTarget, primaryWeapon)) {
+          CAiTarget clearedTarget{};
+          clearedTarget.targetPoint = -1;
+          mWeapon->SetTarget(&clearedTarget);
+          return waitStatus;
+        }
+      }
+    }
+
+    // Prefer-primary-weapon-target: adopt the primary weapon's target when this
+    // weapon has a firing solution for it.
+    if (weaponBlueprint->PrefersPrimaryWeaponTarget != 0u) {
+      if (UnitWeapon* const primaryWeapon = mAttacker->GetPrimaryWeapon(); primaryWeapon != nullptr) {
+        if (mWeapon != primaryWeapon && primaryWeapon->mTarget.HasTarget()
+            && UnitWeapon::CanAttackTarget(&primaryWeapon->mTarget, mWeapon)) {
+          const Wm3::Vec3f targetPositionGun = primaryWeapon->mTarget.GetTargetPosGun(false);
+          float distanceSq = 0.0f;
+          if (mWeapon->TargetSolutionStatusGun(&targetPositionGun, &distanceSq) == ESolutionStatus::TRS_Available) {
+            mWeapon->SetTarget(&primaryWeapon->mTarget);
+            return waitStatus;
+          }
+        }
+      }
+    }
+
+    // Evaluate the attacker's desired target and record the resulting state.
+    CAiTarget* const desiredTarget = mAttacker->GetDesiredTarget();
+    const bool desiredHasNoTarget = desiredTarget->NoTarget();
+    UnitWeapon* const desiredTargetWeapon = mAttacker->GetTargetWeapon(desiredTarget);
+
+    // Whether this weapon "owns" the desired target (drives whether SetState runs).
+    bool ownsDesiredTarget;
+    if (desiredTarget->HasTarget() && desiredTargetWeapon != nullptr) {
+      ownsDesiredTarget = (mWeapon == desiredTargetWeapon);
+    } else {
+      ownsDesiredTarget = (mWeapon == mAttacker->GetPrimaryWeapon());
+    }
+    mUpdateAttackerState = ownsDesiredTarget ? 1u : 0u;
+
+    const ESolutionStatus desiredTooClose = mWeapon->TargetIsTooClose(desiredTarget);
+
+    CAiAttackerImpl::State reportedState;
+    if (!desiredTarget->HasTarget() || desiredHasNoTarget) {
+      reportedState = CAiAttackerImpl::State::AAS_NoTarget;
+    } else if (CheckTargetGuardExempt(*desiredTarget, *this)
+               || mAttacker->IsTargetExempt(desiredTarget->GetEntity())) {
+      reportedState = CAiAttackerImpl::State::AAS_TargetExempt;
+    } else if (mTargetCooldown != 0 || mWeapon->mUnknown174 == 0u) {
+      reportedState = CAiAttackerImpl::State::AAS_6;
+    } else if (desiredTooClose != ESolutionStatus::TRS_Available
+               || UnitWeapon::CanAttackTarget(desiredTarget, mWeapon)) {
+      // `a2.mSpot != 0` in the binary == "too-close status is not Available".
+      const bool canFly = mUnit->GetBlueprint()->Air.CanFly != 0u;
+      if (canFly || desiredTooClose == ESolutionStatus::TRS_Available) {
+        if (desiredTarget->targetType == EAiTargetType::AITARGET_Ground
+            && mWeapon->mShotsAtTarget >= mWeapon->mWeaponBlueprint->AttackGroundTries
+            && mUnit->CommandQueue->GetNextCommand() != nullptr) {
+          reportedState = CAiAttackerImpl::State::AAS_OverShotCount;
+        } else if (UnitWeapon::CanAttackTarget(desiredTarget, mWeapon)) {
+          reportedState = CAiAttackerImpl::State::AAS_CanTarget;
+          mWeapon->SetTarget(desiredTarget);
+        } else {
+          reportedState = CAiAttackerImpl::State::AAS_CannotTarget;
+        }
+      } else {
+        reportedState = (desiredTooClose != ESolutionStatus::TRS_InsideMinRange)
+          ? CAiAttackerImpl::State::AAS_2
+          : CAiAttackerImpl::State::AAS_7;
+      }
+    } else {
+      reportedState = CAiAttackerImpl::State::AAS_CannotAttack;
+    }
+
+    if (mUpdateAttackerState != 0u) {
+      mAttacker->SetState(reportedState);
+    }
+    if (mTargetCooldown > 0) {
+      --mTargetCooldown;
+    }
+
+    // Auto-initiate / can-target / mid-unpack-attacking short-circuit: wait.
+    CAiTarget* const weaponTarget = &mWeapon->mTarget;
+    if (mUnit->IsUnitState(UNITSTATE_Attacking)
+        && ((mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand != 0u && !CheckAutoInitiate())
+            || mUnit->GetBlueprint()->AI.NeedUnpack != 0u
+            || reportedState == CAiAttackerImpl::State::AAS_CanTarget)) {
+      return TASKSTATUS_Wait;
+    }
+
+    // Keep the current weapon target if it is still attackable and in range.
+    if (mWeapon->mWeaponBlueprint->AlwaysRecheckTarget == 0u
+        && mWeapon->TargetIsTooClose(weaponTarget) == ESolutionStatus::TRS_Available) {
+      if (UnitWeapon::CanAttackTarget(weaponTarget, mWeapon) && weaponTarget->HasTarget()) {
+        Entity* const weaponTargetEntity = weaponTarget->GetEntity();
+        if (!mAttacker->IsTargetExempt(weaponTargetEntity)) {
+          return waitStatus;
+        }
+      }
+    }
+
+    // Hold-fire clears the weapon target and waits.
+    if (mUnit->FireState == FIRESTATE_HoldFire) {
+      if (mWeapon != nullptr) {
+        CAiTarget clearedTarget{};
+        clearedTarget.targetPoint = -1;
+        mWeapon->SetTarget(&clearedTarget);
+        return waitStatus;
+      }
+    }
+
+    // Warn on a zero-radius weapon (mirrors the binary's diagnostic).
+    {
+      const float instanceMaxRadius = mWeapon->mAttributes.mMaxRadius;
+      const float effectiveMaxRadius =
+        (instanceMaxRadius < 0.0f) ? mWeapon->mAttributes.mBlueprint->MaxRadius : instanceMaxRadius;
+      if (effectiveMaxRadius <= 0.0f) {
+        gpg::Warnf(
+          "%s's weapon %s has 0 max radius.",
+          mUnit->GetBlueprint()->mBlueprintId.c_str(),
+          mWeapon->mWeaponBlueprint->Label.c_str()
+        );
+      }
+    }
+
+    if (weaponBlueprint->TargetType == ERuleBPUnitWeaponTargetType::RULEWTT_Projectile) {
+      // Projectile-tracking weapon: intercept the closest incoming projectile.
+      if (Entity* const trackedProjectile = mAttacker->TrackToTarget(mWeapon); trackedProjectile != nullptr) {
+        CAiTarget projectileTarget{};
+        projectileTarget.UpdateTarget(trackedProjectile);
+        mWeapon->SetTarget(&projectileTarget);
+        return waitStatus;
+      }
+      if (!desiredTarget->HasTarget()) {
+        CAiTarget clearedTarget{};
+        clearedTarget.targetPoint = -1;
+        mWeapon->SetTarget(&clearedTarget);
+        return waitStatus;
+      }
+      return waitStatus;
+    }
+
+    // Normal weapon: search for the best enemy blip within effective range.
+    const float instanceMaxRadius = mWeapon->mAttributes.mMaxRadius;
+    const float floorRadius =
+      (instanceMaxRadius < 0.0f) ? mWeapon->mAttributes.mBlueprint->MaxRadius : instanceMaxRadius;
+    const float scaledRadius =
+      (instanceMaxRadius < 0.0f) ? mWeapon->mAttributes.mBlueprint->MaxRadius : instanceMaxRadius;
+    float searchRadius = weaponBlueprint->TrackingRadius * scaledRadius;
+    if (searchRadius <= floorRadius) {
+      searchRadius = floorRadius;
+    }
+    const bool use3DDistance = weaponBlueprint->Turreted != 0u || weaponBlueprint->SlavedToBody != 0u;
+
+    if (Entity* const attachedTarget = ResolveAttachedParentDesiredTarget(mAttacker, mWeapon);
+        attachedTarget != nullptr) {
+      CAiTarget attachedAiTarget{};
+      attachedAiTarget.UpdateTarget(attachedTarget);
+      mWeapon->SetTarget(&attachedAiTarget);
+      return waitStatus;
+    }
+
+    // The reschedule value (waitStatus == v6 == intervalTicks + 1) doubles as the
+    // blip staleness bound: a value of 1 would use the raw cached list, but since
+    // v6 is always >= 2, the binary always refreshes through GetBlipsInRange with
+    // a max-age of v6 - 1 (== intervalTicks).
+    gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange;
+    if (waitStatus == 1) {
+      blipsInRange = &mUnit->mBlipsInRange;
+    } else {
+      blipsInRange = &mUnit->GetBlipsInRange(static_cast<unsigned int>(waitStatus - 1));
+    }
+
+    Entity* const bestEnemy = mAttacker->FindBestEnemy(mWeapon, blipsInRange, searchRadius, use3DDistance);
+    if (bestEnemy == nullptr) {
+      if (desiredTarget->HasTarget() && UnitWeapon::CanAttackTarget(desiredTarget, mWeapon)) {
+        mWeapon->SetTarget(desiredTarget);
+        return waitStatus;
+      }
+      CAiTarget clearedTarget{};
+      clearedTarget.targetPoint = -1;
+      mWeapon->SetTarget(&clearedTarget);
+      return waitStatus;
+    }
+
+    if (!CheckAutoInitiate()) {
+      CAiTarget bestEnemyTarget{};
+      bestEnemyTarget.UpdateTarget(bestEnemy);
+      mWeapon->SetTarget(&bestEnemyTarget);
+      return waitStatus;
+    }
+
+    // Auto-initiate an attack command on the best enemy.
+    {
+      CAiTarget bestEnemyTarget{};
+      bestEnemyTarget.UpdateTarget(bestEnemy);
+      mWeapon->SetTarget(&bestEnemyTarget);
+    }
+
+    const EntId bestEnemyId = bestEnemy->id_;
+    SSTICommandIssueData attackCommand(EUnitCommandType::UNITCOMMAND_Attack);
+    attackCommand.mTarget.mType = EAiTargetType::AITARGET_Entity;
+    attackCommand.mTarget.mEnt = static_cast<std::uint32_t>(bestEnemyId);
+    attackCommand.mTarget.mPos.x = 0.0f;
+    attackCommand.mTarget.mPos.y = 0.0f;
+    attackCommand.mTarget.mPos.z = 0.0f;
+    (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, selectedUnits, attackCommand, true);
+
+    return waitStatus;
   }
 
   /**

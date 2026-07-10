@@ -265,6 +265,27 @@ namespace moho
   [[nodiscard]] bool COGrid_RectHasBlockingUnit(const gpg::Rect2f& rect, COGrid& grid);
 
   /**
+   * Address: 0x00722350 (FUN_00722350, func_EntitiesAroundPoint)
+   *
+   * What it does:
+   * Gathers every entity of the requested `type` whose horizontal (XZ) distance
+   * from `center` is within `radius`, appending one `CollisionResult`
+   * (`sourceEntity` set) per hit into `outResults`. Builds a `radius`-sized AABB
+   * around `center` (with an effectively unbounded Y extent), quantizes it to a
+   * collision-cell rect, gathers the unmarked entities in that rect from the
+   * grid's occupation manager, then range-filters them on squared XZ distance.
+   * Used by `Unit::UpdateBlipsInRange`, `CAiAttackerImpl::TrackToTarget`, and the
+   * unit-search helpers.
+   */
+  void EntitiesAroundPoint(
+    CollisionResultFastVectorN10& outResults,
+    float radius,
+    COGrid& grid,
+    EEntityType type,
+    const Wm3::Vector3f& center
+  );
+
+  /**
    * VFTABLE: 0x00E3192C
    * COL: 0x00E8E5B4
    */

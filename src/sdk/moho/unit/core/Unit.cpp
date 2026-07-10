@@ -36,6 +36,7 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/intel/CIntel.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -13806,6 +13807,143 @@ bool Unit::IsUnitState(const EUnitState state) const
 Unit* Unit::GetGuardedUnit() const
 {
   return GuardedUnitRef.ResolveObjectPtr<Unit>();
+}
+
+/**
+ * Address: 0x006AD060 (FUN_006AD060,
+ *   ?GetBlipsInRange@Unit@Moho@@QAEAAV?$fastvector_n@V?$WeakPtr@VEntity@Moho@@@Moho@@$0BE@@gpg@@I@Z)
+ *
+ * IDA signature:
+ * gpg::fastvector_n20_WeakPtr_Entity *__userpurge GetBlipsInRange@<eax>(
+ *   Moho::Unit *this@<esi>, unsigned int interval);
+ *
+ * What it does:
+ * Refreshes `mBlipsInRange` via `UpdateBlipsInRange()` when it is at least
+ * `maxAgeTicks` ticks stale (current sim tick minus the last update tick, as an
+ * unsigned compare), then returns a reference to the cached list.
+ */
+gpg::core::FastVectorN<SWeakRefSlot, 20>& Unit::GetBlipsInRange(const unsigned int maxAgeTicks)
+{
+  const unsigned int ticksSinceUpdate =
+    SimulationRef->mCurTick - static_cast<unsigned int>(mBlipLastUpdateTick);
+  if (ticksSinceUpdate >= maxAgeTicks) {
+    UpdateBlipsInRange();
+  }
+  return mBlipsInRange;
+}
+
+/**
+ * Address: 0x006ACC60 (FUN_006ACC60, ?UpdateBlipsInRange@Unit@Moho@@QAEXXZ)
+ *
+ * IDA signature:
+ * void __stdcall Moho::Unit::UpdateBlipsInRange(Moho::Unit *this);
+ *
+ * What it does:
+ * Rebuilds `mBlipsInRange` (see the field-by-field walk in the header). Computes
+ * the effective scan radius (guard-scan blueprint radius when the head command is
+ * a guard/patrol command, extended by the attacker's max weapon range), gathers
+ * enemy units in that radius via `COGrid::EntitiesAroundPoint`, keeps those the
+ * army can see as recon blips and (when set) within the army no-rush radius,
+ * records a weak reference to each, and additionally records the jamming-shadow
+ * blips of any candidate whose intel manager has active jamming. Finally stamps
+ * `mBlipLastUpdateTick` with the current sim tick.
+ */
+void Unit::UpdateBlipsInRange()
+{
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  CAiAttackerImpl* const attacker = AiAttacker;
+
+  // Guard-scan radius: zero unless the head command is a guard/patrol command
+  // (mVarDat flag bits 0x30), in which case use the blueprint guard-scan radius.
+  float scanRadius = 0.0f;
+  CUnitCommand* const headCommand = CommandQueue->GetCurrentCommand();
+  if (headCommand != nullptr && (headCommand->mVarDat.v2 & 0x30) != 0) {
+    scanRadius = blueprint->AI.GuardScanRadius;
+  }
+
+  // Extend the scan radius by the attacker's max weapon range.
+  if (attacker != nullptr) {
+    const float maxWeaponRange = attacker->GetMaxWeaponRange();
+    if (maxWeaponRange > scanRadius) {
+      scanRadius = maxWeaponRange;
+    }
+  }
+
+  // No-rush centre = army start position + configured no-rush offset; used to
+  // reject blips outside the no-rush radius while the no-rush timer is active.
+  CArmyImpl* const army = ArmyRef;
+  const float noRushOffsetX = army->NoRushOffsetX;
+  const float noRushOffsetY = army->NoRushOffsetY;
+  Wm3::Vector2f armyStartPosition{};
+  army->GetArmyStartPos(armyStartPosition);
+  const float noRushCenterX = armyStartPosition.x + noRushOffsetX;
+  const float noRushCenterZ = armyStartPosition.y + noRushOffsetY;
+  const float noRushRadius = army->NoRushRadius;
+
+  // Gather every unit within the scan radius of this unit's position.
+  CollisionResultFastVectorN10 unitsInRange{};
+  COGrid* const grid = SimulationRef->mOGrid;
+  EntitiesAroundPoint(unitsInRange, scanRadius, *grid, ENTITYTYPE_Unit, GetPosition());
+
+  // Reset the blip list: unlink every currently-held weak reference from its
+  // owner chain, release escaped heap storage, and rebind to inline storage.
+  UnlinkWeakPtrRangeWithoutClearing(
+    reinterpret_cast<WeakPtr<void>*>(mBlipsInRange.begin()),
+    reinterpret_cast<WeakPtr<void>*>(mBlipsInRange.end())
+  );
+  mBlipsInRange.ResetStorageToInline();
+
+  for (const CollisionResult& hit : unitsInRange) {
+    Entity* const candidate = hit.sourceEntity;
+    if (candidate == nullptr || candidate->Dead != 0u) {
+      continue;
+    }
+
+    Unit* const candidateUnit = candidate->IsUnit();
+    if (candidateUnit == nullptr || candidate->DestroyQueuedFlag != 0u) {
+      continue;
+    }
+
+    CArmyImpl* const candidateArmy = candidate->ArmyRef;
+    const std::uint32_t candidateArmyIndex =
+      (candidateArmy != nullptr) ? static_cast<std::uint32_t>(candidateArmy->ArmyId) : 0xFFFFFFFFu;
+    // IArmy::IsAlly (FUN_005BD630) is shadowed on CArmyImpl by the same-named
+    // cached byte field (+0x128); its body is the allies bit-set membership
+    // test, replicated here via the shared `Set::Contains` helper.
+    if (army->Allies.Contains(candidateArmyIndex)) {
+      continue;
+    }
+
+    CAiReconDBImpl* const reconDb = army->GetReconDB();
+    ReconBlip* const blip = (reconDb != nullptr) ? reconDb->ReconGetBlip(candidateUnit) : nullptr;
+    if (blip == nullptr) {
+      continue;
+    }
+
+    if (army->NoRushTicks > 0) {
+      const float deltaX = noRushCenterX - candidate->Position.x;
+      const float deltaZ = noRushCenterZ - candidate->Position.z;
+      const float distance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+      if (distance > noRushRadius) {
+        continue;
+      }
+    }
+
+    // Record a weak reference to the visible enemy.
+    WeakPtr<Entity> blipRef(candidate);
+    mBlipsInRange.push_back(reinterpret_cast<const SWeakRefSlot&>(blipRef));
+
+    // When the candidate is actively jamming, also record its shadow blips.
+    if (candidateUnit->mIntelManager->HasActiveJamming()) {
+      EntitySetTemplate<Entity> jammingBlips = army->GetReconDB()->ReconGetJamingBlips(candidateUnit);
+      for (Entity* const jammingEntity : jammingBlips) {
+        WeakPtr<Entity> jammingRef(jammingEntity);
+        mBlipsInRange.push_back(reinterpret_cast<const SWeakRefSlot&>(jammingRef));
+      }
+    }
+  }
+
+  mBlipLastUpdateTick = static_cast<std::int32_t>(SimulationRef->mCurTick);
 }
 
 /**

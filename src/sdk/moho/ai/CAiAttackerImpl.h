@@ -58,6 +58,25 @@ namespace moho
   {
   public:
     /**
+     * Attacker targeting outcome recorded into `mReportingState` (+0xA0) and
+     * broadcast to listeners by `SetState` (see FUN_005D7320). These are the
+     * `Moho::CAiAttackerImpl::State` values the acquire-target task scheduler
+     * feeds to `SetState` each tick (FUN_005D8D10).
+     */
+    enum class State : std::int32_t
+    {
+      AAS_CannotTarget = 0,
+      AAS_CanTarget = 1,
+      AAS_2 = 2,
+      AAS_CannotAttack = 3,
+      AAS_NoTarget = 4,
+      AAS_TargetExempt = 5,
+      AAS_6 = 6,
+      AAS_7 = 7,
+      AAS_OverShotCount = 8,
+    };
+
+    /**
      * Address: 0x005D69A0 (FUN_005D69A0, Moho::CAiAttackerImpl::CAiAttackerImpl
      *   default ctor)
      *
@@ -294,6 +313,28 @@ namespace moho
      * the temporary weak-target node from owner chain state.
      */
     void Stop();
+
+    /**
+     * Address: 0x005D7320 (FUN_005D7320, Moho::CAiAttackerImp::SetState)
+     *
+     * What it does:
+     * Records a new targeting `State` into `mReportingState` and broadcasts it to
+     * the attacker's listeners, but only when the state actually changes.
+     */
+    void SetState(State state);
+
+    /**
+     * Address: 0x005D8000 (FUN_005D8000, Moho::CAiAttackerImpl::TrackToTarget)
+     *
+     * What it does:
+     * Finds the best enemy projectile to intercept for `weapon`: gathers
+     * projectiles within the weapon's tracking radius of this unit, filters them
+     * by liveness, enemy allegiance, weapon layer/height caps, aim-point
+     * availability, and remaining shooter capacity, and returns the closest
+     * eligible projectile by squared horizontal distance (or null when none
+     * qualify).
+     */
+    [[nodiscard]] Entity* TrackToTarget(UnitWeapon* weapon);
 
     /**
      * Address: 0x005E13B0 (FUN_005E13B0, Moho::CAiAttackerImpl::MemberDeserialize)

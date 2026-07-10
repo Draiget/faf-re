@@ -1257,6 +1257,80 @@ namespace moho
     }
     return false;
   }
+
+  /**
+   * Address: 0x00722350 (FUN_00722350, func_EntitiesAroundPoint)
+   *
+   * IDA signature:
+   * void __userpurge func_EntitiesAroundPoint(
+   *   gpg::fastvector_CollisionResult *out@<esi>, float dist@<xmm0>,
+   *   Moho::COGrid *grid, Moho::EEntityType type, Wm3::Vector3f *pos);
+   *
+   * What it does:
+   * Collects entities of `type` whose XZ distance to `center` is within `radius`
+   * into `outResults` (one `CollisionResult` per hit, `sourceEntity` set). Builds
+   * a radius-sized AABB (Y spanning [-10000, 10000]), quantizes it via
+   * `BuildCollisionCellRectFromBounds` (FUN_004FCBE0), gathers unmarked entities
+   * in that cell rect from the grid occupation manager
+   * (`GatherUnmarkedEntities` = FUN_00722DF0), clears `outResults`, then appends
+   * each entity that passes the squared-XZ range test — growing through
+   * `InsertCollisionResultRange` (FUN_00723090) when full.
+   */
+  void EntitiesAroundPoint(
+    CollisionResultFastVectorN10& outResults,
+    const float radius,
+    COGrid& grid,
+    const EEntityType type,
+    const Wm3::Vector3f& center
+  )
+  {
+    const float radiusSquared = radius * radius;
+
+    // AABB around the query centre with an effectively unbounded vertical extent
+    // (matches the binary's -10000 / +10000 Y lanes). Layout is
+    // {minX, minY, minZ, maxX, maxY, maxZ} = Wm3::AxisAlignedBox3f.
+    EntityCollisionBoundsView queryBounds{};
+    queryBounds.minX = center.x - radius;
+    queryBounds.minY = -10000.0f;
+    queryBounds.minZ = center.z - radius;
+    queryBounds.maxX = center.x + radius;
+    queryBounds.maxY = 10000.0f;
+    queryBounds.maxZ = center.z + radius;
+
+    const CollisionCellRect cellRect = BuildCollisionCellRectFromBounds(queryBounds);
+    static_assert(
+      sizeof(CollisionCellRect) == sizeof(CollisionDBRect),
+      "CollisionCellRect must alias CollisionDBRect for the grid gather call"
+    );
+    const CollisionDBRect gatherRect = reinterpret_cast<const CollisionDBRect&>(cellRect);
+
+    EntityGatherVector gatheredEntities{};
+    grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
+
+    // Release any escaped heap storage and rebind to the inline window before
+    // repopulating (binary frees the heap buffer and restores the inline
+    // start/cap sentinel, then sets end == start).
+    outResults.ResetStorageToInline();
+
+    CollisionResult hit{};
+    for (Entity* const entity : gatheredEntities) {
+      const float deltaX = entity->Position.x - center.x;
+      const float deltaZ = entity->Position.z - center.z;
+      if (radiusSquared <= (deltaX * deltaX) + (deltaZ * deltaZ)) {
+        continue;
+      }
+
+      hit.sourceEntity = entity;
+      if (outResults.end_ == outResults.capacity_) {
+        InsertCollisionResultRange(outResults, outResults.end_, &hit, &hit + 1);
+      } else {
+        if (outResults.end_ != nullptr) {
+          *outResults.end_ = hit;
+        }
+        ++outResults.end_;
+      }
+    }
+  }
 } // namespace moho
 
 namespace

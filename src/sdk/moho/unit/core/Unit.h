@@ -144,6 +144,28 @@ namespace moho
   static_assert(sizeof(SWeakRefSlot) == 0x08, "SWeakRefSlot size must be 0x08");
   static_assert(offsetof(SWeakRefSlot, valueWithTag) == 0x00, "SWeakRefSlot::valueWithTag offset must be 0x00");
   static_assert(offsetof(SWeakRefSlot, backlink) == 0x04, "SWeakRefSlot::backlink offset must be 0x04");
+} // namespace moho
+
+namespace gpg::core
+{
+  // `SWeakRefSlot` is the sole element type that routes `FastVectorN::push_back`
+  // and its grow/insert lane through the intrusive weak-ref relink path
+  // (FUN_0061C5E0 / FUN_0061C750 family). Although the slot is two `void*` and is
+  // therefore trivially copyable at the C++ level, appending/relocating one must
+  // splice the node into (or out of) its target's weak-owner chain — so the
+  // trivially-copyable memmove branch would be incorrect. `valueWithTag`/`backlink`
+  // alias `IntrusiveWeakLinkNode::ownerLinkSlot`/`nextInOwner` one-to-one.
+  template <>
+  struct IsIntrusiveWeakRefSlot<::moho::SWeakRefSlot> : std::true_type
+  {};
+  static_assert(
+    sizeof(::moho::SWeakRefSlot) == sizeof(IntrusiveWeakLinkNode),
+    "SWeakRefSlot must alias IntrusiveWeakLinkNode layout for the relink lane"
+  );
+} // namespace gpg::core
+
+namespace moho
+{
 
   /**
    * Encoded weak-owner slot lane used by Unit guarded-by lists.
@@ -1542,6 +1564,33 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetGuardedUnit() const;
+
+    /**
+     * Address: 0x006ACC60 (FUN_006ACC60, ?UpdateBlipsInRange@Unit@Moho@@QAEXXZ)
+     * Mangled: ?UpdateBlipsInRange@Unit@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Rebuilds `mBlipsInRange`: computes an effective scan radius from the unit's
+     * guard-scan blueprint value and its attacker's max weapon range, gathers
+     * enemy units in range (respecting the army no-rush radius), resolves each to
+     * a recon blip visible to this army, and records their weak references (plus
+     * any recon-only blip children). Stamps `mBlipLastUpdateTick` with the current
+     * sim tick.
+     */
+    void UpdateBlipsInRange();
+
+    /**
+     * Address: 0x006AD060 (FUN_006AD060,
+     *   ?GetBlipsInRange@Unit@Moho@@QAEAAV?$fastvector_n@V?$WeakPtr@VEntity@Moho@@@Moho@@$0BE@@gpg@@I@Z)
+     * Mangled: ?GetBlipsInRange@Unit@Moho@@QAEAAV?$fastvector_n@V?$WeakPtr@VEntity@Moho@@@Moho@@$0BE@@gpg@@I@Z
+     *
+     * What it does:
+     * Returns the cached in-range blip list, refreshing it via
+     * `UpdateBlipsInRange()` first when it is at least `maxAgeTicks` ticks stale
+     * (current sim tick minus `mBlipLastUpdateTick`).
+     */
+    [[nodiscard]]
+    gpg::core::FastVectorN<SWeakRefSlot, 20>& GetBlipsInRange(unsigned int maxAgeTicks);
 
     /**
      * Address: 0x006A76A0 (FUN_006A76A0, Moho::Unit::SetGuardedUnit)

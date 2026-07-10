@@ -1393,70 +1393,13 @@ namespace
     return (static_cast<std::uint8_t>(caps) & bit) != 0u;
   }
 
-  struct CollisionCellRect
-  {
-    std::uint16_t startX;
-    std::uint16_t startZ;
-    std::uint16_t width;
-    std::uint16_t height;
-  };
-
-  [[nodiscard]] int FloorToInt(const float value) noexcept
-  {
-    return static_cast<int>(std::floor(static_cast<double>(value)));
-  }
-
-  [[nodiscard]] int CeilToInt(const float value) noexcept
-  {
-    return static_cast<int>(std::ceil(static_cast<double>(value)));
-  }
-
-  [[nodiscard]] std::uint16_t ClampCellStartToU16(const int value) noexcept
-  {
-    if (value <= 0) {
-      return 0;
-    }
-    if (value >= 0xFFFF) {
-      return 0xFFFFu;
-    }
-    return static_cast<std::uint16_t>(value);
-  }
-
-  [[nodiscard]] std::uint16_t ClampCellExtentToU16(const int extentCandidate, const std::uint16_t startCell) noexcept
-  {
-    const int maxExtent = 0xFFFF - static_cast<int>(startCell);
-    int extent = extentCandidate;
-    if (extent >= maxExtent) {
-      extent = maxExtent;
-    }
-    if (extent < 0) {
-      extent = 0;
-    }
-    return static_cast<std::uint16_t>(extent);
-  }
-
-  /**
-   * Address: 0x004FCBE0 (FUN_004FCBE0)
-   *
-   * What it does:
-   * Converts world-space AABB bounds into quantized collision-cell rectangle:
-   * {startX,startZ,width,height}.
-   */
-  [[nodiscard]] CollisionCellRect
-  BuildCollisionCellRectFromBounds(const moho::EntityCollisionBoundsView& bounds) noexcept
-  {
-    const int minCellX = FloorToInt(bounds.minX) >> 2;
-    const int minCellZ = FloorToInt(bounds.minZ) >> 2;
-    const int maxCellX = (CeilToInt(bounds.maxX) + 3) >> 2;
-    const int maxCellZ = (CeilToInt(bounds.maxZ) + 3) >> 2;
-
-    CollisionCellRect rect{};
-    rect.startX = ClampCellStartToU16(minCellX);
-    rect.startZ = ClampCellStartToU16(minCellZ);
-    rect.width = ClampCellExtentToU16(maxCellX - static_cast<int>(rect.startX), rect.startX);
-    rect.height = ClampCellExtentToU16(maxCellZ - static_cast<int>(rect.startZ), rect.startZ);
-    return rect;
-  }
+  // `CollisionCellRect` + `BuildCollisionCellRectFromBounds` (FUN_004FCBE0) and
+  // their floor/ceil/clamp helpers were promoted to public
+  // `moho::` scope in `EntityCollisionUpdater.h` so the shared leaf can be
+  // invoked by name from `func_EntitiesAroundPoint` (COGrid.cpp) as the binary
+  // does. The call sites below still name them unqualified via this alias.
+  using moho::BuildCollisionCellRectFromBounds;
+  using moho::CollisionCellRect;
 
   /**
    * Address: 0x004FD9B0 (FUN_004FD9B0, append-path subset)
