@@ -133,6 +133,35 @@ namespace moho
      */
     int Execute() override;
 
+    /**
+     * Address: 0x0061CF50 (FUN_0061CF50, Moho::CUnitPatrolTask::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall MemberDeserialize(CUnitPatrolTask* this@<ecx>, gpg::ReadArchive* archive@<eax>);
+     *
+     * What it does:
+     * Loads patrol-task state from an archive in binary lane order: the base
+     * `CCommandTask` sub-object (by reflected type), the dispatch / formation
+     * binding / formation instance pointer lanes, the navigator goal payload,
+     * the three boolean state flags, the search box, the tick counter, and the
+     * per-army membership node.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0061D0C0 (FUN_0061D0C0, Moho::CUnitPatrolTask::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall MemberSerialize(CUnitPatrolTask* this@<eax>, gpg::WriteArchive* archive@<esi>);
+     *
+     * What it does:
+     * Line-for-line mirror of `MemberDeserialize`: saves the same field set in
+     * the same order using the reflection write path, `RRef_*` + WriteRawPointer
+     * for the tracked pointer lanes, and the virtual `WriteBool`/`WriteInt`
+     * archive slots for the scalar lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
   private:
     /**
      * Address: 0x0061B710 (FUN_0061B710, Moho::CUnitPatrolTask::FindTarget)
