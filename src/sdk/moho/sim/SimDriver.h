@@ -104,7 +104,9 @@ namespace moho
     int32_t mCurBeat = 0;                                  // +0x000
     std::uint8_t pad_0004_0138[0x134]{};                    // +0x004
     msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
-    std::uint8_t pad_0144_0188[0x44]{};                     // +0x144
+    std::uint8_t pad_0144_0168[0x24]{};                     // +0x144
+    msvc8::vector<EntId> mDeleteIds;                        // +0x168
+    msvc8::vector<EntId> mEraseIds;                         // +0x178
     msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
     msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
     msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
@@ -146,6 +148,14 @@ namespace moho
     "SSyncData::mNewUnits offset must be 0x138"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mDeleteIds) == 0x168,
+    "SSyncData::mDeleteIds offset must be 0x168"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mEraseIds) == 0x178,
+    "SSyncData::mEraseIds offset must be 0x178"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
     "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
   );
@@ -168,6 +178,54 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
+
+  /**
+   * Address: 0x0067D660 (FUN_0067D660, msvc8::vector<Moho::EntId>::_Insert_n)
+   *
+   * IDA signature:
+   * int *__thiscall sub_67D660(int this, int *a2, int *a3);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<EntId>::_Insert_n` for the sync
+   * delete/erase id lanes. Inserts `count` copies of `value` at `pos`. When the
+   * reserved capacity is sufficient the live tail `[pos, end)` is shifted right
+   * by `count` slots and the gap is filled with the id value; otherwise a
+   * 1.5x-grown buffer is allocated, the head is moved, the insert window is
+   * fill-constructed, the tail is moved, and the previous block is freed. This
+   * canonical MSVC8 `_Insert_n` lane backs the `PushBackDeleteEntId` slow-path
+   * append; the body itself lives in `msvc8::vector<T>::insert`
+   * (legacy/containers/Vector.h) and this per-T free helper is the source-level
+   * by-name invocation that keeps the emitted symbol.
+   *
+   * Caller: `PushBackDeleteEntId` (FUN_0067B810) on the capacity-full branch
+   * (`call sub_67D660` at 0x0067B866).
+   */
+  void InsertNCopiesDeleteEntId(
+    msvc8::vector<EntId>& storage,
+    EntId* insertPosition,
+    unsigned int insertCount,
+    EntId value);
+
+  /**
+   * Address: 0x0067B810 (FUN_0067B810,
+   *                      Moho::Entity::DestroyInterface delete-id append lane)
+   *
+   * IDA signature:
+   * int __usercall sub_67B810@<eax>(int a1@<edx>, _DWORD *a2@<esi>);
+   *
+   * What it does:
+   * Appends one `EntId` into a sync delete/erase id vector, mirroring the MSVC8
+   * inlined `push_back` shape used by the binary: when the reserved capacity is
+   * exhausted the append reaches the canonical `vector<EntId>::_Insert_n`
+   * slow-path (`InsertNCopiesDeleteEntId`, FUN_0067D660, `call sub_67D660` at
+   * 0x0067B866); otherwise it is a fast-path in-place store.
+   *
+   * Callers: `Moho::Entity::DestroyInterface` (FUN_0067A260, `call sub_67B810`
+   * at 0x0067A27A) into `mDeleteIds`, and `Moho::Prop::Sync` (FUN_006FA2A0,
+   * `call sub_67B810` at 0x006FA2D6 into `mEraseIds` / 0x006FA2F1 into
+   * `mDeleteIds`).
+   */
+  void PushBackDeleteEntId(msvc8::vector<EntId>& storage, EntId value);
 
   /**
    * Address: 0x005C38E0 (FUN_005C38E0)
