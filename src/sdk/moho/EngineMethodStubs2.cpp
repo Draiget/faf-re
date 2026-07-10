@@ -87,7 +87,9 @@ bool CMauiMovie::LoadFile(const char*) { return false; }
 // ===== Constructors (no-op default-init) =====
 CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
     : CMauiControl(lo, parent, msvc8::string{}) {}
-CUnitPatrolTask::CUnitPatrolTask(CCommandTask*, const void*, IFormationInstance*, bool) {}
+// CUnitPatrolTask parameterized ctor is recovered 1:1 in
+// src/sdk/moho/unit/tasks/CUnitPatrolTask.cpp (FUN_0061AE50) — the former
+// empty-stub false-recovery here was removed in favor of the real body.
 
 CLuaWldUIProvider::CLuaWldUIProvider(LuaPlus::LuaObject*) {}
 CLuaWldUIProvider::~CLuaWldUIProvider() {}
