@@ -55,29 +55,19 @@ namespace
     return raw != 0u && raw != kInvalidEntitySlot;
   }
 
-  struct SPickUpInfoSortProbe
+  /**
+   * Address: 0x006248D0 (FUN_006248D0)
+   *
+   * What it does:
+   * Computes the transport-load metric for one pickup candidate as
+   * `mSizeX * mSizeY * mSizeZ * mAverageDensity` read from the candidate unit's
+   * blueprint (blueprint fields at +0xAC/+0xB0/+0xB4/+0xB8). Mirrors the
+   * `movss/mulss` chain the comparator body applies to each operand's blueprint
+   * before the metric compare.
+   */
+  [[nodiscard]] float ComputePickUpInfoLoadMetric(const moho::SPickUpInfo& entry) noexcept
   {
-    void* ownerLinkSlot;                       // +0x00
-    moho::WeakPtr<moho::Unit>* nextInOwner;   // +0x04
-    float distanceSq;                          // +0x08
-  };
-  static_assert(sizeof(SPickUpInfoSortProbe) == 0x0C, "SPickUpInfoSortProbe size must be 0x0C");
-  static_assert(
-    offsetof(SPickUpInfoSortProbe, ownerLinkSlot) == 0x00,
-    "SPickUpInfoSortProbe::ownerLinkSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SPickUpInfoSortProbe, nextInOwner) == 0x04,
-    "SPickUpInfoSortProbe::nextInOwner offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SPickUpInfoSortProbe, distanceSq) == 0x08,
-    "SPickUpInfoSortProbe::distanceSq offset must be 0x08"
-  );
-
-  [[nodiscard]] float ComputePickUpInfoLoadMetric(const SPickUpInfoSortProbe& probe) noexcept
-  {
-    const moho::Unit* const unit = moho::WeakPtr<moho::Unit>::DecodeOwnerObject(probe.ownerLinkSlot);
+    const moho::Unit* const unit = entry.GetUnit();
     GPG_ASSERT(unit != nullptr);
     const moho::RUnitBlueprint* const blueprint = unit != nullptr ? unit->GetBlueprint() : nullptr;
     GPG_ASSERT(blueprint != nullptr);
@@ -88,51 +78,43 @@ namespace
     return ((blueprint->mAverageDensity * blueprint->mSizeZ) * blueprint->mSizeY) * blueprint->mSizeX;
   }
 
-  void RestorePickUpInfoProbeOwnerChain(SPickUpInfoSortProbe& probe) noexcept
-  {
-    if (probe.ownerLinkSlot == nullptr) {
-      return;
-    }
-
-    auto** cursor = reinterpret_cast<moho::WeakPtr<moho::Unit>**>(probe.ownerLinkSlot);
-    auto* const stackNode = reinterpret_cast<moho::WeakPtr<moho::Unit>*>(&probe.ownerLinkSlot);
-    while (*cursor != stackNode) {
-      GPG_ASSERT(*cursor != nullptr);
-      if (*cursor == nullptr) {
-        return;
-      }
-      cursor = &(*cursor)->nextInOwner;
-    }
-    *cursor = probe.nextInOwner;
-  }
-
   /**
-   * Address: 0x006248D0 (FUN_006248D0)
+   * Address: 0x006248D0 (FUN_006248D0, std::sort comparator predicate)
+   *
+   * IDA signature:
+   * bool __stdcall sub_6248D0(_DWORD *lhsUnitSlot, int, float lhsDistSq,
+   *                           _DWORD *rhsUnitSlot, int, float rhsDistSq);
    *
    * What it does:
-   * Compares two temporary pickup-info probe lanes by transport load metric
-   * (`sizeX * sizeY * sizeZ * averageDensity`), breaks ties by lower
-   * distance-squared, and restores both intrusive weak-owner chains from the
-   * probe copies before returning.
+   * Strict-weak-ordering predicate for `std::sort(mPickupQueue.begin(),
+   * mPickupQueue.end(), ...)` in `CUnitLoadUnits::DoTask`. Orders pickup
+   * candidates by descending transport-load metric
+   * (`sizeX*sizeY*sizeZ*averageDensity`); when the two metrics compare equal,
+   * breaks the tie by ascending distance-squared (nearer unit first). This is
+   * the source-level comparator whose `std::sort<SPickUpInfo*>` instantiation
+   * emits the introsort/heap/partition/rotate/med3 COMDAT cluster
+   * (FUN_00628740 `_Sort`, FUN_006292F0 `_Unguarded_partition`,
+   * FUN_00629D80 `_Make_heap`, FUN_0062A000 `_Med3`, FUN_0062A610 `_Rotate`,
+   * and siblings).
+   *
+   * The binary passes each `SPickUpInfo` operand by value, so its body also
+   * relinks/unlinks each copy's weak-owner intrusive chain around the compare;
+   * that relink is a net no-op artifact of the by-value predicate signature and
+   * does not affect the ordering result, so the modern predicate takes the
+   * operands by const reference.
    */
-  [[maybe_unused]] bool ComparePickUpInfoLoadMetricThenDistance(
-    SPickUpInfoSortProbe lhsProbe,
-    SPickUpInfoSortProbe rhsProbe
+  [[nodiscard]] bool ComparePickUpInfoLoadMetricThenDistance(
+    const moho::SPickUpInfo& lhs,
+    const moho::SPickUpInfo& rhs
   ) noexcept
   {
-    const float lhsMetric = ComputePickUpInfoLoadMetric(lhsProbe);
-    const float rhsMetric = ComputePickUpInfoLoadMetric(rhsProbe);
+    const float lhsMetric = ComputePickUpInfoLoadMetric(lhs);
+    const float rhsMetric = ComputePickUpInfoLoadMetric(rhs);
 
-    bool result = false;
     if (lhsMetric == rhsMetric) {
-      result = rhsProbe.distanceSq > lhsProbe.distanceSq;
-    } else if (lhsMetric > rhsMetric) {
-      result = true;
+      return rhs.mDistanceSq > lhs.mDistanceSq;
     }
-
-    RestorePickUpInfoProbeOwnerChain(lhsProbe);
-    RestorePickUpInfoProbeOwnerChain(rhsProbe);
-    return result;
+    return lhsMetric > rhsMetric;
   }
 
   /**
@@ -611,11 +593,11 @@ namespace moho
       mPickupQueue.push_back(SPickUpInfo(candidate, distanceSq));
     }
 
-    std::sort(
-      mPickupQueue.begin(),
-      mPickupQueue.end(),
-      [](const SPickUpInfo& lhs, const SPickUpInfo& rhs) noexcept { return lhs.mDistanceSq < rhs.mDistanceSq; }
-    );
+    // std::sort<SPickUpInfo*> instantiation. Emits the MSVC8 introsort COMDAT
+    // cluster (FUN_00628740 _Sort, FUN_006292F0 _Unguarded_partition,
+    // FUN_00629D80 _Make_heap, FUN_0062A000 _Med3, FUN_0062A610 _Rotate, and
+    // siblings) with FUN_006248D0 as the comparator predicate.
+    std::sort(mPickupQueue.begin(), mPickupQueue.end(), ComparePickUpInfoLoadMetricThenDistance);
 
     EntitySetTemplate<Unit> unitsToPickup{};
     bool rejectedByCapacity = false;
