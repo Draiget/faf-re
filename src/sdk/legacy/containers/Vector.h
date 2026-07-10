@@ -1782,6 +1782,16 @@ namespace msvc8
          * push_back-shape helper AppendDecal which calls it on the capacity-full path
          * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
          * pointer symbol is emitted).
+         * Address: 0x0087BB40 (FUN_0087BB40, msvc8::vector<Moho::CWldSplat*>::_Insert_n
+         * grow lane for Moho::CDecalManager::mSplats @+0x48; the recovered helper
+         * InsertNCopiesCWldSplatPtrVector (CWldSplat.cpp) invokes
+         * storage.insert(begin()+offset, count, value) by name, and
+         * CDecalManager::NewSplat routes its mSplats append through the
+         * push_back-shape helper AppendSplat which calls it on the capacity-full path
+         * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
+         * pointer symbol is emitted. Byte-identical body to the FUN_0087A830 sibling —
+         * both are 4-byte trivially-copyable pointer instantiations sharing this
+         * canonical template method).
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
          * grow lane for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)

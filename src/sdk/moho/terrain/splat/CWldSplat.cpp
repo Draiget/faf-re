@@ -1179,6 +1179,57 @@ namespace moho
   }
 
   /**
+   * Address: 0x0087BB40 (FUN_0087BB40, msvc8::vector<Moho::CWldSplat*>::_Insert_n)
+   *
+   * IDA signature:
+   * char *__userpurge sub_87BB40@<eax>(int *value@<eax>, int vec, char *pos);
+   *
+   * What it does:
+   * Engine-instantiated body of `msvc8::vector<Moho::CWldSplat*>::_Insert_n`.
+   * Inserts `insertCount` copies of `fillValue` at `insertPosition`; on sufficient
+   * capacity shifts the live tail right by `insertCount` and fills the gap, else
+   * 1.5x-grows the buffer (head-move / gap-fill / tail-move / free-old). Backs the
+   * `push_back(splat)` slow-path append used by CDecalManager::NewSplat for the
+   * mSplats vector; the body lives in `msvc8::vector<T>::insert`
+   * (legacy/containers/Vector.h) and this per-T free helper is the source-level
+   * by-name invocation that keeps the emitted symbol. Byte-identical to the
+   * mDecals sibling FUN_0087A830 (both 4-byte pointer instantiations).
+   */
+  void InsertNCopiesCWldSplatPtrVector(
+    msvc8::vector<CWldSplat*>& storage,
+    CWldSplat** const insertPosition,
+    const unsigned int insertCount,
+    CWldSplat* const fillValue)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
+   * Address: 0x00878190 (Moho::CDecalManager splat-append lane, inlined push_back in NewSplat)
+   *
+   * What it does:
+   * Appends one `CWldSplat*` into the manager's `mSplats` vector, mirroring the
+   * MSVC8 inlined `push_back` shape used by the binary: when the reserved capacity
+   * is exhausted the append reaches the canonical
+   * `vector<CWldSplat*>::_Insert_n` slow-path
+   * (`InsertNCopiesCWldSplatPtrVector`, FUN_0087BB40); otherwise a fast-path
+   * in-place store.
+   */
+  void AppendSplat(msvc8::vector<CWldSplat*>& storage, CWldSplat* const value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesCWldSplatPtrVector(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
+  }
+
+  /**
    * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)
    *
    * What it does:
@@ -1189,7 +1240,7 @@ namespace moho
   {
     auto* const spatialDbOwner = AsDecalManagerSpatialDbRuntime(this);
     CWldSplat* const splat = new CWldSplat(spatialDbOwner, mWldTerrain);
-    mSplats.push_back(splat);
+    AppendSplat(mSplats, splat);
     return splat;
   }
 
