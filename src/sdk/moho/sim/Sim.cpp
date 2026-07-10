@@ -21,6 +21,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <vector>
@@ -12016,6 +12017,10 @@ namespace
     int count = 0;
   };
 
+  static_assert(sizeof(DumpUnitsCountEntry) == 8, "DumpUnitsCountEntry size must be 8");
+  static_assert(std::is_trivially_copyable_v<DumpUnitsCountEntry>,
+                "DumpUnitsCountEntry must be trivially copyable for the msvc8 _Insert_n memmove lane");
+
   /**
    * Address: 0x0075FDB0 (FUN_0075FDB0)
    *
@@ -12073,7 +12078,10 @@ int Sim::DumpUnits(
     return 0;
   }
 
-  std::vector<DumpUnitsCountEntry> counts;
+  // ABI: msvc8::vector so counts.push_back(...) names the MSVC8 STL grow lane
+  // vector<DumpUnitsCountEntry>::_Insert_n (FUN_0075F810) on the capacity-full
+  // path, matching the original binary; std::vector would inline its own grow.
+  msvc8::vector<DumpUnitsCountEntry> counts;
   CEntityDb* const entityDb = sim->mEntityDB;
   CEntityDbAllUnitsNode* node = entityDb->AllUnitsEnd(0u);
   CEntityDbAllUnitsNode* const end = entityDb->AllUnitsEnd();
