@@ -91,6 +91,39 @@ namespace moho
      */
     CUnitMobileBuildTask* SetBlueprint(const RUnitBlueprint* blueprint) noexcept;
 
+    /**
+     * Address: 0x005FE710 (FUN_005FE710, Moho::CUnitMobileBuildTask::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall MemberDeserialize(CUnitCommand** this@<ecx>, gpg::ReadArchive* archive@<eax>);
+     *
+     * What it does:
+     * Loads mobile-build-task state from an archive in binary lane order: the
+     * base `CCommandTask` sub-object and the embedded `CBuildTaskHelper` by
+     * reflected type; the command / blueprint pointer lanes via the typed
+     * `ReadPointer_*` slots; the build position / orientation / direction and
+     * build rect/skirt payloads by reflected type; the placement-retry counter
+     * via the virtual `ReadInt` slot; and the build-unit / pending-build-entity
+     * weak links by reflected type.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005FE950 (FUN_005FE950, Moho::CUnitMobileBuildTask::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall MemberSerialize(CUnitMobileBuildTask* this@<eax>, gpg::WriteArchive* archive@<esi>);
+     *
+     * What it does:
+     * Line-for-line write mirror of `MemberDeserialize` over the identical field
+     * set and order: the base sub-object and the build helper via reflected
+     * `Write`; the command / blueprint pointer lanes via `RRef_*` +
+     * `WriteRawPointer(... Unowned ...)`; the transform + rect payloads via
+     * reflected `Write`; the placement-retry counter via the virtual `WriteInt`
+     * slot; and the two weak links via reflected `Write`.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
     void OnEvent(ECommandEvent) override {}
 
   public:

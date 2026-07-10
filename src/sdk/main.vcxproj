@@ -1127,6 +1127,7 @@
     <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTask.cpp" />
+      <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.cpp" />
@@ -2181,6 +2182,7 @@
     <ClInclude Include="moho\unit\tasks\CUnitReclaimTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitReclaimTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRepairTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.h" />
