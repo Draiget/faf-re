@@ -67,8 +67,10 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/ai/CAiTransportImpl.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/SPhysConstants.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimStartupRegistrations.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/CUnitMotion.h"
@@ -13695,6 +13697,117 @@ bool Unit::IsIdleState() const
 
   const CUnitCommand* const headCommand = commandQueue->mCommandVec.front().GetObjectPtr();
   return headCommand == nullptr || reinterpret_cast<std::uintptr_t>(headCommand) == kInvalidWeakCommandSentinel;
+}
+
+/**
+ * Address: 0x0062F030 (FUN_0062F030, Moho::Unit::FindPlatform)
+ *
+ * IDA signature:
+ * Moho::Unit* __usercall FindPlatform@<eax>(Moho::Unit* this@<ecx>, int @<ebx>);
+ *
+ * What it does:
+ * For an air unit needing refuel/repair (and not its own formation lead),
+ * scans the owning army's AIRSTAGINGPLATFORM units for the first idle,
+ * in-bounds transport within staging-platform scan radius that can receive
+ * this unit. Returns that platform, or null.
+ */
+Unit* Unit::FindPlatform()
+{
+  // Guard: alive flying unit, fueled (or no motor), with the refuel-order cap.
+  if (IsDead()) {
+    return nullptr;
+  }
+  if (!GetBlueprint()->Air.CanFly) {
+    return nullptr;
+  }
+  if (UnitMotion != nullptr && FuelRatio < 0.0f) {
+    return nullptr;
+  }
+  if ((GetAttributes().commandCapsMask & 0x400000u) == 0u) {
+    return nullptr;
+  }
+
+  // Skip if this unit is its own formation lead.
+  if (IUnit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<IUnit>();
+      formationLead != nullptr && formationLead->IsUnit() == this) {
+    return nullptr;
+  }
+
+  // Need refuel: threshold ratio exceeds current fuel ratio.
+  const float fuelRatio = FuelRatio;
+  bool needsService = false;
+  if (CSimConVarBase* const needRefuelDef = GetNeedRefuelThresholdRatioSimConVarDef();
+      needRefuelDef != nullptr) {
+    if (CSimConVarInstanceBase* const needRefuel = SimulationRef->GetSimVar(needRefuelDef);
+        needRefuel != nullptr) {
+      needsService = *static_cast<const float*>(needRefuel->GetValueStorage()) > fuelRatio;
+    }
+  }
+  // Need repair: threshold ratio exceeds (maxHealth / health).
+  if (!needsService) {
+    const float health = Health;
+    const float maxHealth = MaxHealth;
+    if (CSimConVarBase* const needRepairDef = GetNeedRepairThresholdRatioSimConVarDef();
+        needRepairDef != nullptr) {
+      if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef);
+          needRepair != nullptr) {
+        needsService = *static_cast<const float*>(needRepair->GetValueStorage()) > (maxHealth / health);
+      }
+    }
+  }
+  if (!needsService) {
+    return nullptr;
+  }
+
+  RRuleGameRules* const rules = SimulationRef->mRules;
+  const EntityCategorySet* const stagingPlatformCategory = rules->GetEntityCategory("AIRSTAGINGPLATFORM");
+  const EntityCategorySet* const carrierCategory = rules->GetEntityCategory("CARRIER");
+
+  EntitySetTemplate<Entity> stagingPlatforms;
+  ArmyRef->GetUnits(&stagingPlatforms, const_cast<EntityCategorySet*>(stagingPlatformCategory));
+
+  for (Entity* const platformEntity : stagingPlatforms) {
+    if (platformEntity == nullptr) {
+      continue;
+    }
+    Unit* const platform = static_cast<Unit*>(platformEntity);
+    if (platform->IsDead() || platform->IsBeingBuilt() || platform->DestroyQueued()) {
+      continue;
+    }
+    IAiTransport* const transport = platform->AiTransport;
+    if (transport == nullptr) {
+      continue;
+    }
+
+    const Wm3::Vec3f& platformPos = platform->GetPosition();
+    const Wm3::Vec3f& selfPos = GetPosition();
+    const float dz = selfPos.z - platformPos.z;
+    const float dx = selfPos.x - platformPos.x;
+    const float distance = std::sqrt(dz * dz + dx * dx);
+    if (distance > platform->GetBlueprint()->AI.StagingPlatformScanRadius) {
+      continue;
+    }
+    if (!platform->IsInBounds(ArmyRef->UseWholeMap(), 1.0f)) {
+      continue;
+    }
+    if (!platform->IsIdleState()) {
+      continue;
+    }
+    const ELayer platformLayer = platform->mCurrentLayer;
+    if (platformLayer == LAYER_Seabed || platformLayer == LAYER_Sub) {
+      continue;
+    }
+
+    if (EntityCategory::HasBlueprint(platform->GetBlueprint(), carrierCategory)) {
+      if (transport->TransportHasAvailableStorage()) {
+        return platform;
+      }
+    } else if (transport->TransportHasSpaceFor(GetBlueprint())) {
+      return platform;
+    }
+  }
+
+  return nullptr;
 }
 
 /**

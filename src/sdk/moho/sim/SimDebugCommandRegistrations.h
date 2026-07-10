@@ -259,6 +259,22 @@ namespace moho
   [[nodiscard]] CSimConVarBase* GetAI_RunOpponentAI_SimConVarDef();
 
   /**
+   * What it does:
+   * Returns the recovered `NeedRefuelThresholdRatio` float sim-convar
+   * definition object (default 0.2). Read by `Unit::FindPlatform` to gate
+   * air-unit refuel platform search on fuel ratio.
+   */
+  [[nodiscard]] CSimConVarBase* GetNeedRefuelThresholdRatioSimConVarDef();
+
+  /**
+   * What it does:
+   * Returns the recovered `NeedRepairThresholdRatio` float sim-convar
+   * definition object (default 0.75). Read by `Unit::FindPlatform` to gate
+   * air-unit repair platform search on health ratio.
+   */
+  [[nodiscard]] CSimConVarBase* GetNeedRepairThresholdRatioSimConVarDef();
+
+  /**
    * Address: 0x00BCB0D0 (FUN_00BCB0D0, register_AI_DebugArmyIndex_ConAlias)
    *
    * What it does:
