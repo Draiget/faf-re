@@ -81,6 +81,16 @@ namespace gpg::HaStar
         static_assert(offsetof(Data, mNodeCount) == 0x0C, "Cluster::Data::mNodeCount offset must be 0x0C");
         static_assert(offsetof(Data, mNodes) == 0x0D, "Cluster::Data::mNodes offset must be 0x0D");
 
+        /**
+         * Address: 0x00F32C60 (?sDefaultConstructData@Cluster@HaStar@gpg@@0UData@123@B)
+         *
+         * Shared zero-node sentinel payload (`mRefs=1`, no dispose callback,
+         * `mNodeCount=0`). `ClusterBuild` seeds a fresh handle with this
+         * sentinel and bumps its refcount before `SetData` allocates the real
+         * payload; kept writable because the refcount is mutated at runtime.
+         */
+        static Data sDefaultConstructData;
+
         Data* mData{};
 
         Cluster() = default;
@@ -255,7 +265,9 @@ namespace gpg::HaStar
      * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUOccupationData@12@@Z)
      *
      * What it does:
-     * Builds a cluster payload from occupancy cell data.
+     * Builds a cluster payload from occupancy cell data: extracts boundary
+     * nodes, computes the pairwise octile-search edge-cost matrix, drops
+     * unconnected nodes, and commits the surviving nodes/edges via `SetData`.
      */
     [[nodiscard]] Cluster ClusterBuild(const OccupationData& occupationData);
 
