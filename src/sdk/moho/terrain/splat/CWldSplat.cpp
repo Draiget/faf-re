@@ -526,13 +526,17 @@ namespace
    * Address: 0x00878D60 (FUN_00878D60)
    *
    * What it does:
-   * Releases one keyed lookup tree (`+0x38` lane), deletes its sentinel, and
-   * resets the tree header to `{head=null,count=0}`.
+   * Releases one keyed lookup tree (`+0x38` lane): clears every node via the
+   * `_Tree::erase` range emission (which keeps and re-links the sentinel),
+   * deletes the now-empty sentinel, and resets the header to
+   * `{head=null,count=0}`. The secondary tree shares the unified
+   * `ClearDecalLookupTree` helper with the primary lane (the binary emits a
+   * per-map instantiation, sub_87A080, folded here onto the generic body).
    */
   std::int32_t ResetDecalLookupTreeSecondary(moho::DecalGroupLookupTree& lookupTree)
   {
     if (lookupTree.mHead != nullptr) {
-      DeleteLookupSubtree(lookupTree.mHead->mParent, lookupTree.mHead);
+      (void)ClearDecalLookupTree(lookupTree, lookupTree.mHead->mLeft, lookupTree.mHead);
       delete lookupTree.mHead;
     }
     lookupTree.mHead = nullptr;
