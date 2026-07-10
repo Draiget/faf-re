@@ -14,19 +14,6 @@ namespace
     lhs.mBits.IntersectWith(&rhs.mBits);
   }
 
-  void UnionCategoryWordRanges(moho::CategoryWordRangeView& lhs, const moho::CategoryWordRangeView& rhs)
-  {
-    if (rhs.Empty()) {
-      return;
-    }
-    if (lhs.Empty()) {
-      lhs = rhs;
-      return;
-    }
-
-    lhs.mBits.AddAllFrom(&rhs.mBits);
-  }
-
   struct CategoryNameMapNodeView : msvc8::Tree<CategoryNameMapNodeView>
   {
     std::uint8_t color;
@@ -359,29 +346,34 @@ namespace moho
   }
 
   /**
-   * Address: 0x0052B280 (FUN_0052B280)
+   * Address: 0x005552F0 (FUN_005552F0, Moho::ParseEntityCategory)
    *
    * IDA signature:
-   * int __thiscall sub_52B280(_DWORD* this, int out, int source);
+   * Moho::EntityCategory* __userpurge Moho::ParseEntityCategory@<eax>(
+   *     Moho::EntityCategorySet* categoryLookup, Moho::EntityCategory* out, const char* expr);
    *
    * What it does:
-   * Parses comma-separated category clauses; each clause intersects space-
-   * separated terms, then unions all clauses into a resulting category set.
+   * Real parse body behind the `RRuleGameRulesImpl::ParseEntityCategory`
+   * (0x0052B280) thin virtual wrapper. Tokenizes `categoryExpression` on ','
+   * into clauses; each clause is further tokenized on ' ' into terms. Every
+   * resolved term looks up its precomputed category-word range in the lookup
+   * table map; the first term in a clause seeds the clause accumulator and each
+   * further term intersects into it. Every non-empty clause is then unioned
+   * (via `EntityCategory::Add`, which ordinal-remaps bits) into `out`. `out` is
+   * built in place, seeded to empty with the table's word-universe handle, and
+   * returned for chaining.
    */
-  CategoryWordRangeView EntityCategoryLookupResolver::ParseEntityCategory(const char* categoryExpression) const
+  CategoryWordRangeView*
+  ParseEntityCategory(const void* const categoryLookup, CategoryWordRangeView* const out, const char* const categoryExpression)
   {
-    const auto* const rules = reinterpret_cast<const RRuleGameRulesCategoryStorageView*>(this);
-    CategoryWordRangeView parsed;
-    if (!rules->categoryLookup) {
-      parsed.ResetToEmpty(0u);
-      return parsed;
-    }
+    const auto* const lookupTable = static_cast<const EntityCategoryLookupTableView*>(categoryLookup);
 
-    const EntityCategoryLookupTableView& lookup = *rules->categoryLookup;
+    // Binary seeds the out set to empty using the table's word-universe handle
+    // (the decompiler labels the +0x38 lane `mHelper.mRules`).
+    out->ResetToEmpty(lookupTable->wordUniverseHandle);
 
-    parsed.ResetToEmpty(lookup.wordUniverseHandle);
-    if (!categoryExpression || !*categoryExpression) {
-      return parsed;
+    if (!categoryExpression) {
+      return out;
     }
 
     const char* clauseCursor = categoryExpression;
@@ -389,7 +381,7 @@ namespace moho
     const char* clauseEnd = nullptr;
     while (NextSegmentToken(clauseCursor, ',', clauseStart, clauseEnd)) {
       CategoryWordRangeView clauseAccum;
-      clauseAccum.ResetToEmpty(lookup.wordUniverseHandle);
+      clauseAccum.ResetToEmpty(lookupTable->wordUniverseHandle);
       bool hasResolvedClauseTerm = false;
 
       const char* termCursor = clauseStart;
@@ -397,8 +389,8 @@ namespace moho
       const char* termEnd = nullptr;
       while (NextBoundedToken(termCursor, clauseEnd, ' ', termStart, termEnd)) {
         const msvc8::string termToken(termStart, termEnd);
-        const CategoryNameMapNodeView* const node = FindCategoryNodeOrHead(lookup.categoryMap, termToken);
-        if (!node || node == lookup.categoryMap.head) {
+        const CategoryNameMapNodeView* const node = FindCategoryNodeOrHead(lookupTable->categoryMap, termToken);
+        if (!node || node == lookupTable->categoryMap.head) {
           continue;
         }
 
@@ -410,11 +402,12 @@ namespace moho
         }
       }
 
-      if (hasResolvedClauseTerm) {
-        UnionCategoryWordRanges(parsed, clauseAccum);
-      }
+      // Fold the fully-intersected clause into the result. In the binary this
+      // is `EntityCategory::Add(out /*result@ebx*/, &clauseAccum /*source@ecx*/)`,
+      // which ordinal-remaps every set bit of the clause into `out`.
+      (void)EntityCategory::Add(out, &clauseAccum);
     }
 
-    return parsed;
+    return out;
   }
 } // namespace moho
