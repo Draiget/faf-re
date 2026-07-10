@@ -7,10 +7,38 @@
 namespace gpg
 {
   struct SerHelperBase;
+  class WriteArchive;
 } // namespace gpg
 
 namespace moho
 {
+  class CDecalBuffer;
+
+  /**
+   * Address: 0x0077F160 (FUN_0077F160)
+   *
+   * IDA signature:
+   * void __usercall sub_77F160(BinaryWriteArchive *ar@<eax>, Moho::CDecalBuffer *buf@<esi>);
+   *
+   * What it does:
+   * Save body for one `CDecalBuffer` payload: writes the owning `Sim` as an
+   * unowned tracked pointer, the id-pool sub-object via reflection, then the
+   * full owned decal-handle list.
+   */
+  void CDecalBufferSaveCallback(gpg::WriteArchive* ar, const CDecalBuffer* buf);
+
+  /**
+   * Address: 0x00779CE0 (FUN_00779CE0)
+   *
+   * IDA signature:
+   * void __usercall sub_779CE0(Moho::CDecalBuffer *buf@<eax>, BinaryWriteArchive *ar@<ebx>);
+   *
+   * What it does:
+   * Writes every live `CDecalHandle` in the intrusive handle list as an owned
+   * tracked pointer, then a terminating null owned-pointer sentinel.
+   */
+  void WriteDecalHandles(const CDecalBuffer* buf, gpg::WriteArchive* ar);
+
   /**
    * VFTABLE: 0x00E373D8
    * COL: 0x00E91490
