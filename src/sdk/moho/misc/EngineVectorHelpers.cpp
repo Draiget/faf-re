@@ -71,6 +71,49 @@ namespace moho
   }
 
   /**
+   * Address: 0x007AFD10 (FUN_007AFD10, msvc8::vector<Moho::CameraImpl*>::_Insert_n)
+   *
+   * What it does:
+   * Per-T named helper binding the engine-instantiated
+   * `msvc8::vector<CameraImpl*>` grow/insert lane. Forwards to the modeled
+   * `msvc8::vector<CameraImpl*>::insert(pos, count, value)` which carries the
+   * same capacity-check / 1.5x-grow / head+tail-move / gap-fill semantics the
+   * binary's out-of-line `_Insert_n` body encoded for the 4-byte pointer element.
+   */
+  void InsertNCopiesCameraImplPtrVector(msvc8::vector<CameraImpl*>& storage,
+                                        CameraImpl** const insertPosition,
+                                        const unsigned int insertCount,
+                                        CameraImpl* const fillValue)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
+   * Address: 0x007AE990 (FUN_007AE990, msvc8::vector<Moho::CameraImpl*>::push_back)
+   *
+   * What it does:
+   * Per-T push_back-shape helper for `msvc8::vector<CameraImpl*>`, mirroring the
+   * MSVC8 inlined append shape: when the reserved capacity is exhausted the
+   * append reaches the canonical `_Insert_n` slow-path
+   * (`InsertNCopiesCameraImplPtrVector`, FUN_007AFD10); otherwise a fast-path
+   * in-place store through the modeled `push_back`. This is the shape
+   * `Moho::RCamManager::CreateCamera` open-codes around `mCams.push_back(camera)`.
+   */
+  void AppendCameraImplPtr(msvc8::vector<CameraImpl*>& storage, CameraImpl* const value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesCameraImplPtrVector(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
+  }
+
+  /**
    * Address: 0x007BAFE0 (FUN_007BAFE0, msvc8::vector<Moho::SNetCommandArg>::vector(const vector&))
    *
    * What it does:

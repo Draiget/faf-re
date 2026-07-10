@@ -115,6 +115,56 @@ namespace moho
                                           const msvc8::vector<CameraImpl*>& source);
 
   /**
+   * Address: 0x007AFD10 (FUN_007AFD10, msvc8::vector<Moho::CameraImpl*>::_Insert_n)
+   *
+   * IDA signature:
+   * int *__userpurge sub_7AFD10@<eax>(int *a1@<eax>, int a2, char *Source);
+   *
+   * What it does:
+   * Engine-instantiated grow/insert lane of `msvc8::vector<CameraImpl*>` for the
+   * 4-byte pointer element. When the reserved capacity is sufficient the trailing
+   * range is shifted right by one slot and the gap is filled with the new value;
+   * when capacity is exhausted the MSVC8 slow path allocates a 1.5x-grown buffer
+   * (via `_Allocate` = FUN_007B1240), moves the head/tail ranges (via `_Umove` =
+   * FUN_007B11D0/FUN_007B1210), fill-constructs the gap (via FUN_007AF3B0),
+   * frees the old storage, and rebinds the `{_Myfirst,_Mylast,_Myend}` triplet.
+   * The `_Xlength` guard (FUN_007AFF20, "vector<T> too long") caps growth.
+   *
+   * Caller: Moho::RCamManager::CreateCamera (0x007AA9C0) — invokes this lane
+   * directly on the capacity-full append path (0x007AAA68 `call sub_7AFD10`).
+   *
+   * This per-T named free helper routes through the modeled
+   * `msvc8::vector<CameraImpl*>::insert(pos, count, value)` (the canonical
+   * `_Insert_n` lane), which is the source-level invocation that keeps this
+   * 4-byte-pointer grow-lane symbol emitted.
+   */
+  void InsertNCopiesCameraImplPtrVector(msvc8::vector<CameraImpl*>& storage,
+                                        CameraImpl** insertPosition,
+                                        unsigned int insertCount,
+                                        CameraImpl* fillValue);
+
+  /**
+   * Address: 0x007AE990 (FUN_007AE990, msvc8::vector<Moho::CameraImpl*>::push_back)
+   *
+   * IDA signature:
+   * int *__usercall sub_7AE990@<eax>(int *a1@<eax>, int a2@<ecx>);
+   *
+   * What it does:
+   * push_back-shape append lane for `msvc8::vector<CameraImpl*>`: when the active
+   * range has spare capacity it stores `value` in place at `_Mylast` and bumps
+   * `_Mylast`; otherwise it delegates to the `_Insert_n` grow lane
+   * (`InsertNCopiesCameraImplPtrVector`, FUN_007AFD10). This mirrors the MSVC8
+   * inlined `push_back` shape (`insert(end(),1,value)` on the capacity-full path)
+   * that `Moho::RCamManager::CreateCamera` open-codes around its
+   * `mCams.push_back(camera)` append.
+   *
+   * The fast path invokes the modeled `msvc8::vector<CameraImpl*>::push_back` by
+   * name and the slow path invokes the per-T `_Insert_n` helper, so both binary
+   * symbols are kept emitted through this one push_back-shape wrapper.
+   */
+  void AppendCameraImplPtr(msvc8::vector<CameraImpl*>& storage, CameraImpl* value);
+
+  /**
    * Address: 0x007BAFE0 (FUN_007BAFE0, msvc8::vector<Moho::SNetCommandArg>::vector(const vector&))
    *
    * What it does:
