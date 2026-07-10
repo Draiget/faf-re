@@ -65,6 +65,7 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
+#include "moho/entity/EntityPositionWatchEntry.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/path/PathTables.h"
@@ -84,6 +85,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_Color.h"
 #include "moho/lua/SCR_FromLua.h"
+#include "moho/lua/SCR_String.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
 #include "moho/resource/RResId.h"
@@ -100,6 +102,9 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/ScrDebugHooks.h"
+#include "moho/task/CLuaTask.h"
+#include "moho/task/ScrDiskWatcherTask.h"
+#include "moho/sim/SRuleFootprintsBlueprint.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -6655,6 +6660,18 @@ namespace
     return tableObject;
   }
 
+  // One scenario prop-spawn record as stored in LaunchInfoNew::mProps (a
+  // msvc8::vector<SPropInfo>, exposed as void* in LaunchInfoBase.h). The stride
+  // is 0x38 bytes: a 0x1C-byte VTransform plus a 0x1C-byte msvc8::string
+  // blueprint. The Sim::Setup props loop passes `transform` to PROP_Create and
+  // `blueprint` as the blueprint id.
+  struct SPropInfo
+  {
+    VTransform transform;    // +0x00
+    msvc8::string blueprint; // +0x1C
+  };
+  static_assert(sizeof(SPropInfo) == 0x38, "SPropInfo size must be 0x38");
+
   struct Rect2iVectorRuntimeView
   {
     void* allocatorProxy;
@@ -6713,7 +6730,8 @@ namespace
    * Drains one pending-ref counter lane to zero (clearing owner lane at zero),
    * then deletes every non-null slot payload and frees the slot table storage.
    */
-  [[maybe_unused]] void DrainPendingRefsAndReleasePointerSlots(PointerSlotCollectionRuntimeView* const runtime) noexcept
+  // Invoked by ~Sim to drain the deletion-queue pending-ref lane.
+  void DrainPendingRefsAndReleasePointerSlots(PointerSlotCollectionRuntimeView* const runtime) noexcept
   {
     while (runtime->pendingRefCount != 0u) {
       std::uint32_t count = runtime->pendingRefCount;
@@ -9758,6 +9776,625 @@ void Sim::Printf(const char* fmt, ...)
   mPrintField.push_back(gpg::STR_Va(format, args));
 
   va_end(args);
+}
+
+// Global "current sim" singleton and reflection type descriptor.
+Sim* Sim::sInstance = nullptr;
+
+/**
+ * Address: 0x007434D0 (FUN_007434D0, ??0Sim@Moho@@AAE@PAULaunchInfoBase@1@@Z)
+ * Mangled: ??0Sim@Moho@@AAE@PAULaunchInfoBase@1@@Z
+ *
+ * IDA signature:
+ * Moho::Sim *__stdcall Moho::Sim::Sim(Moho::Sim *this, Moho::LaunchInfoBase *info);
+ *
+ * What it does:
+ * Placement-constructed factory constructor. Establishes the full 0xAF8 Sim
+ * layout, seeds the command-source vector + focus army from the launch info,
+ * optionally opens the synclog file, builds a fresh Lua state, runs the "core"
+ * and "sim" init sets, loads `simInit.lua`/`saveload.lua`, loads terrain types,
+ * allocates the occupation grid and path tables, then exports the rules to Lua
+ * and seeds the rolling sim checksum.
+ */
+Sim::Sim(LaunchInfoBase* const info)
+  : ICommandSink()
+  , mLog(nullptr)
+  , mIsDesyncFree(true)
+  , mEffectManager(nullptr)
+  , mSoundManager(nullptr)
+  , mRules(info->mGameRules)
+  , mMapData(nullptr)
+  , mLuaState(nullptr)
+  , mGameEnded(false)
+  , mGameOver(false)
+  , mPausedByCommandSource(-1)
+  , mSingleStep(false)
+  , mAdvancedThisTick(false)
+  , mCheatsEnabled(false)
+  , mReserved8E7(false)
+  , mCurBeat(0)
+  , mDidProcess(true)
+  , mCurTick(0)
+  , mRngState(nullptr)
+  , mOGrid(nullptr)
+  , mCurCommandSource(255)
+  , mPathTables(nullptr)
+  , mFormationDB(nullptr)
+  , mCommandDB(nullptr)
+  , mEntityDB(nullptr)
+  , mReserved98C(0)
+  , mReserved990(0)
+  , mDecalBuffer(nullptr)
+  , mPhysConstants(nullptr)
+  , mRequestXMLArmyStatsSubmit(false)
+  , mSyncArmy(-1)
+  , mDidSync(false)
+{
+  // POD lanes the compiler does not default-init are cleared here to match the
+  // binary's explicit member zeroing.
+  mSyncReserveUnused = 0;
+  for (std::int32_t& reserveCount : mSyncReserveCounts) {
+    reserveCount = 0;
+  }
+  mContext.Reset();
+
+  // Seed the command-source vector from the launch info block, then mark the
+  // "no source" sentinel and adopt the focus army.
+  (void)CopyConstructCommandSourceVector(info->mCommandSources.mSrcs, &mCommandSources);
+
+  // Optionally open the per-beat synclog when /synclog was requested.
+  msvc8::vector<msvc8::string> synclogArgs;
+  if (CFG_GetArgOption("/synclog", 1u, &synclogArgs) && !synclogArgs.empty()) {
+    const msvc8::string& synclogDir = synclogArgs.front();
+    ::CreateDirectoryA(synclogDir.c_str(), nullptr);
+
+    const msvc8::string filenamePrefix = LOG_GenerateFilenamePrefix();
+    const msvc8::string prefixWithSlash = synclogDir + msvc8::string("/");
+    mLogFilePrefix.assign(prefixWithSlash + filenamePrefix, 0, msvc8::string::npos);
+
+    ::CreateDirectoryA(mLogFilePrefix.c_str(), nullptr);
+    (void)mLogFilePrefix.append("/", 1u);
+
+    const msvc8::string beatFile = FormatBeatLogFilePath(mLogFilePrefix, static_cast<int>(mCurBeat));
+    mLog = std::fopen(beatFile.c_str(), "w");
+  }
+
+  Logf("********** beat %d **********\n", mCurBeat);
+
+  // Adopt ownership of the map data (moved out of the launch info).
+  STIMap* const previousMap = mMapData;
+  mMapData = info->mMap;
+  info->mMap = nullptr;
+  if (previousMap) {
+    delete previousMap;
+  }
+
+  mSyncFilter.focusArmy = info->mCommandSources.mOriginalSource;
+
+  // Build a fresh Lua state, bind this Sim as the global userdata, and run the
+  // registered core + sim init form sets.
+  {
+    auto* const newState = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaState* const previousState = mLuaState;
+    mLuaState = newState;
+    if (previousState) {
+      delete previousState;
+    }
+  }
+  lua_setglobaluserdata(mLuaState->m_state, this);
+
+  if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("core"); coreSet != nullptr) {
+    coreSet->RunInits(mLuaState);
+  }
+  if (CScrLuaInitFormSet* const simSet = SCR_FindLuaInitFormSet("sim"); simSet != nullptr) {
+    simSet->RunInits(mLuaState);
+  }
+  if (SCR_IsDebugWindowActive()) {
+    lua_sethook(mLuaState->m_state, &moho::DebugLuaHook, 4, 0);
+  }
+  mLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(&mDiskWatcherTaskStage);
+
+  {
+    gpg::LogScopeEntry luaBpScope(msvc8::string("MEM: %i bytes LUABP"));
+    mRules->ExportToLuaState(mLuaState);
+    luaBpScope.Emit();
+  }
+
+  {
+    LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+    globals.SetString("__language", info->mLanguage.c_str());
+  }
+
+  (void)SCR_LuaDoScript(mLuaState, "/lua/simInit.lua", nullptr);
+  (void)SCR_LuaDoScript(mLuaState, "/lua/system/saveload.lua", nullptr);
+  mMapData->LoadTerrainTypes(mLuaState);
+
+  // Allocate the occupation grid.
+  {
+    gpg::LogScopeEntry ogridScope(msvc8::string("MEM: %i bytes OGRID"));
+    auto* const newGrid = new COGrid(this);
+    COGrid* const previousGrid = mOGrid;
+    mOGrid = newGrid;
+    if (previousGrid) {
+      delete previousGrid;
+    }
+    ogridScope.Emit();
+  }
+
+  // Allocate the path tables sized to the interior of the heightfield.
+  {
+    CHeightField* const heightField = mMapData->mHeightField.get();
+    const std::int32_t interiorWidth = heightField->width - 1;
+    const std::int32_t interiorHeight = heightField->height - 1;
+    const SRuleFootprintsBlueprint* const footprints = mRules->GetFootprints();
+    auto* const newTables = new PathTables(*footprints, mOGrid, interiorWidth, interiorHeight);
+    PathTables* const previousTables = mPathTables;
+    mPathTables = newTables;
+    if (previousTables) {
+      delete previousTables;
+    }
+  }
+
+  // Seed the rolling sim checksum from the rules and log the initial digest.
+  mRules->UpdateChecksum(&mContext, mLog);
+  const gpg::MD5Digest digest = mContext.Digest();
+  Logf("SimChecksum after rules: %s\n", digest.ToString().c_str());
+}
+
+/**
+ * Address: 0x00744060 (FUN_00744060, ?Setup@Sim@Moho@@AAEXPAVLaunchInfoNew@2@@Z)
+ * Mangled: ?Setup@Sim@Moho@@AAEXPAVLaunchInfoNew@2@@Z
+ *
+ * IDA signature:
+ * void __stdcall Moho::Sim::Setup(Moho::Sim *this, Moho::LaunchInfoNew *info);
+ *
+ * What it does:
+ * New-game initialization pass, populating the subsystems the constructor left
+ * null and running the Lua `SetupSession`/`BeginSession` callbacks around
+ * `CreateArmies`/`PostInitialize`. See the class declaration for the ordered
+ * list of subsystems constructed here.
+ */
+void Sim::Setup(LaunchInfoNew* const info)
+{
+  mCheatsEnabled = info->mCheatsEnabled;
+
+  // Disk-watcher task, staged on the disk-watcher task stage (binary:
+  // CTask::CreateTaskThread(diskWatcher, &mDiskWatcherTaskStage, true)).
+  {
+    auto* const diskWatcher = new ScrDiskWatcherTask(mLuaState);
+    auto* const thread = new CTaskThread(&mDiskWatcherTaskStage);
+    diskWatcher->mAutoDelete = true;
+    diskWatcher->mOwnerThread = thread;
+    diskWatcher->mSubtask = thread->mTaskTop;
+    thread->mTaskTop = diskWatcher;
+  }
+
+  // Decal buffer.
+  {
+    auto* const newDecalBuffer = new CDecalBuffer(this);
+    CDecalBuffer* const previousDecalBuffer = mDecalBuffer;
+    mDecalBuffer = newDecalBuffer;
+    if (previousDecalBuffer) {
+      delete previousDecalBuffer;
+    }
+  }
+
+  // Per-run RNG stream seeded from the launch info.
+  {
+    auto* const newRng = new CRandomStream(static_cast<std::uint32_t>(info->mInitSeed));
+    CRandomStream* const previousRng = mRngState;
+    mRngState = newRng;
+    if (previousRng) {
+      delete previousRng;
+    }
+  }
+
+  // Physics constants (gravity = (0, -4.9, 0)).
+  {
+    auto* const newPhys = new SPhysConstants();
+    SPhysConstants* const previousPhys = mPhysConstants;
+    mPhysConstants = newPhys;
+    delete previousPhys;
+  }
+
+  // Build the ScenarioInfo.ArmySetup Lua table from the army name/setup strings.
+  // The scenario table is deserialized from the launch info's ScenarioInfo blob,
+  // and each army's setup table from its entry in the army-setup string vector.
+  LuaPlus::LuaObject scenarioInfo{};
+  (void)SCR_FromString(&scenarioInfo, info->mScenarioInfo, mLuaState);
+
+  msvc8::vector<LuaPlus::LuaObject> armySetupObjects{};
+  LuaPlus::LuaObject armySetupTable{};
+  armySetupTable.AssignNewTable(mLuaState, 0, 0);
+
+  const std::size_t armyCount = info->mStrVec.size();
+  for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
+    LuaPlus::LuaObject armySetup{};
+    (void)SCR_FromString(&armySetup, info->mStrVec.begin()[armyIndex], mLuaState);
+    armySetup.SetInteger("ArmyIndex", static_cast<std::int32_t>(armyIndex + 1));
+    armySetupObjects.push_back(armySetup);
+
+    const char* const armyName = armySetup["ArmyName"].GetString();
+    armySetupTable.SetObject(armyName, armySetup);
+  }
+  scenarioInfo.SetObject("ArmySetup", armySetupTable);
+  mLuaState->GetGlobals().SetObject("ScenarioInfo", scenarioInfo);
+
+  // SetupSession() Lua callback.
+  {
+    LuaPlus::LuaFunction setupSession(mLuaState->GetGlobal("SetupSession"));
+    if (!setupSession.IsFunction()) {
+      setupSession.TypeError("call");
+    }
+    setupSession.Call();
+  }
+
+  // Refresh heightfield bounds to the full grid.
+  {
+    CHeightField* const heightField = mMapData->mHeightField.get();
+    const gpg::Rect2i fullBounds{0, 0, 0x7FFFFFFF, 0x7FFFFFFF};
+    heightField->UpdateBounds(fullBounds);
+  }
+
+  // Formation database.
+  {
+    auto* const newFormationDB = new CAiFormationDBImpl();
+    newFormationDB->mSim = this;
+    CAiFormationDBImpl* const previousFormationDB = mFormationDB;
+    mFormationDB = newFormationDB;
+    if (previousFormationDB) {
+      delete previousFormationDB;
+    }
+  }
+
+  // Sim resources (shared-pointer lane). The binary assigns a freshly-owned
+  // control block (use_count = 1); build one via the deleter ctor and transfer
+  // ownership into the member (which starts null).
+  {
+    auto* const newResources = new CSimResources();
+    boost::SharedPtrRaw<CSimResources> owningResources(
+      newResources, [](CSimResources* const p) noexcept { delete p; });
+    mSimResources.px = owningResources.px;
+    mSimResources.pi = owningResources.pi;
+    owningResources.px = nullptr;
+    owningResources.pi = nullptr;
+  }
+
+  // Resolve ScenarioInfo.Options for the army/post-init callbacks.
+  LuaPlus::LuaObject scenarioInfoOptions = mLuaState->GetGlobals().Lookup("ScenarioInfo.Options");
+
+  // Entity database.
+  {
+    auto* const newEntityDB = new CEntityDb();
+    CEntityDb* const previousEntityDB = mEntityDB;
+    mEntityDB = newEntityDB;
+    if (previousEntityDB) {
+      delete previousEntityDB;
+    }
+  }
+
+  // Command database.
+  {
+    auto* const newCommandDB = new CCommandDb(this);
+    CCommandDb* const previousCommandDB = mCommandDB;
+    mCommandDB = newCommandDB;
+    if (previousCommandDB) {
+      delete previousCommandDB;
+    }
+  }
+
+  // Effect manager (interface-owned).
+  {
+    auto* const newEffectManager = new CEffectManagerImpl(this);
+    CEffectManagerImpl* const previousEffectManager = mEffectManager;
+    mEffectManager = newEffectManager;
+    if (previousEffectManager) {
+      delete previousEffectManager;
+    }
+  }
+
+  // Create the armies from the scenario launch info.
+  CreateArmies(info->mArmyLaunchInfo, armySetupObjects, scenarioInfoOptions);
+
+  // Optional sound manager: only when a non-empty engine list is configured and
+  // sound is not disabled.
+  if (sSoundConfiguration != nullptr && sSoundConfiguration->mEngines.mStart != nullptr &&
+      sSoundConfiguration->mEngines.mFinish != sSoundConfiguration->mEngines.mStart &&
+      sSoundConfiguration->mNoSound == 0) {
+    auto* const newSoundManager = new CSimSoundManager(this);
+    CSimSoundManager* const previousSoundManager = mSoundManager;
+    mSoundManager = newSoundManager;
+    if (previousSoundManager) {
+      delete previousSoundManager;
+    }
+  }
+
+  // Spawn scenario props unless /noprops was requested. Each record's blueprint
+  // id is resolved through the rules and instantiated at its stored transform.
+  if (!CFG_GetArgOption("/noprops", 0u, nullptr)) {
+    auto* const props = static_cast<msvc8::vector<SPropInfo>*>(info->mProps);
+    int propCount = 0;
+    if (props != nullptr) {
+      for (SPropInfo& prop : *props) {
+        const RPropBlueprint* const blueprint = ResolvePropBlueprintById(mRules, prop.blueprint.c_str());
+        (void)CreatePropFromBlueprintResolved(this, prop.transform, blueprint);
+      }
+      propCount = static_cast<int>(props->size());
+    }
+    gpg::Warnf(" NUM PROPS = %d", propCount);
+  }
+
+  // BeginSession() Lua callback.
+  {
+    LuaPlus::LuaFunction beginSession(mLuaState->GetGlobal("BeginSession"));
+    if (!beginSession.IsFunction()) {
+      beginSession.TypeError("call");
+    }
+    beginSession.Call();
+  }
+
+  // Final post-initialization pass (prebuilt units, etc.).
+  PostInitialize(scenarioInfoOptions);
+}
+
+/**
+ * Address: 0x007449A0 (FUN_007449A0, ?Load@Sim@Moho@@AAEXPAVLaunchInfoLoad@2@@Z)
+ * Mangled: ?Load@Sim@Moho@@AAEXPAVLaunchInfoLoad@2@@Z
+ *
+ * IDA signature:
+ * void __stdcall Moho::Sim::Load(Moho::Sim *this, Moho::LaunchInfoLoad *loadInfo);
+ *
+ * What it does:
+ * Load-game initialization pass. Deserializes this Sim from the saved archive,
+ * refreshes heightfield bounds, re-arms every loaded unit's intel handles and
+ * re-binds each loaded prop into the entity DB bounded-prop queue, then re-syncs
+ * the playable rectangle and fires the `OnPostLoad` Lua callback.
+ */
+void Sim::Load(LaunchInfoLoad* const loadInfo)
+{
+  gpg::ReadArchive* const archive = loadInfo->mReadArchive;
+
+  // Deserialize this Sim instance from the saved archive.
+  if (!Sim::sType) {
+    Sim::sType = gpg::LookupRType(typeid(Sim));
+  }
+  gpg::RRef ownerRef{};
+  archive->Read(Sim::sType, this, ownerRef);
+  archive->EndSection(false);
+
+  // Refresh the heightfield bounds to the full grid.
+  {
+    CHeightField* const heightField = mMapData->mHeightField.get();
+    const gpg::Rect2i fullBounds{0, 0, 0x7FFFFFFF, 0x7FFFFFFF};
+    heightField->UpdateBounds(fullBounds);
+  }
+
+  // Walk every loaded unit: re-arm its intel handles (AddViz) and re-bind any
+  // prop entity into the entity DB bounded-prop priority queue.
+  for (CUnitIterAllArmies iter(this); iter.mItr != iter.mEnd; iter.Next()) {
+    auto* const entity = static_cast<Entity*>(iter.mCur);
+    if (!entity) {
+      continue;
+    }
+
+    if (CIntel* const intel = entity->mIntelManager; intel != nullptr) {
+      for (CIntelPosHandle* const handle : intel->mIntelHandles) {
+        if (handle) {
+          handle->AddViz();
+        }
+      }
+    }
+
+    if (Prop* const prop = entity->IsProp(); prop != nullptr && prop->mHandleIndex != -1) {
+      prop->mHandleIndex = mEntityDB->AddBoundedProp(prop);
+    }
+  }
+
+  // Re-sync the playable rectangle through /lua/SimSync.lua::SyncPlayableRect.
+  {
+    LuaPlus::LuaObject simSyncModule = SCR_Import(mLuaState, "/lua/SimSync.lua");
+    LuaPlus::LuaFunction syncPlayableRect(simSyncModule["SyncPlayableRect"]);
+    if (!syncPlayableRect.IsFunction()) {
+      syncPlayableRect.TypeError("call");
+    }
+
+    const gpg::Rect2i playableRect = mMapData->mPlayableRect;
+    const LuaPlus::LuaObject rectObject = SCR_ToLua<gpg::Rect2<int>>(mLuaState, playableRect);
+    syncPlayableRect.Call_Object(rectObject);
+  }
+
+  // Fire the OnPostLoad Lua callback.
+  {
+    LuaPlus::LuaFunction onPostLoad(mLuaState->GetGlobal("OnPostLoad"));
+    if (!onPostLoad.IsFunction()) {
+      onPostLoad.TypeError("call");
+    }
+    onPostLoad.Call();
+  }
+}
+
+/**
+ * Address: 0x007433B0 (FUN_007433B0,
+ * ?Create@Sim@Moho@@SAPAV12@ABV?$shared_ptr@ULaunchInfoBase@Moho@@@boost@@@Z)
+ * Mangled: ?Create@Sim@Moho@@SAPAV12@ABV?$shared_ptr@ULaunchInfoBase@Moho@@@boost@@@Z
+ *
+ * IDA signature:
+ * Moho::Sim *__thiscall Moho::Sim::Create(boost::shared_ptr<LaunchInfoBase> *launchInfo);
+ *
+ * What it does:
+ * Factory entry point and coupling hub for the Sim construction chain. Allocates
+ * one Sim (operator new of 0xAF8 bytes), constructs it from the launch info,
+ * publishes it as the `sInstance` singleton, and dispatches to `Setup` (new
+ * game) or `Load` (saved game). Throws `std::runtime_error` when the launch info
+ * is neither a `LaunchInfoNew` nor a `LaunchInfoLoad`.
+ */
+Sim* Sim::Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo)
+{
+  LaunchInfoBase* const info = launchInfo.px;
+
+  // Allocate + placement-construct the Sim (0xAF8-byte layout). The EH unwind of
+  // this `new` expression is what references ~Sim in the binary.
+  Sim* const sim = new Sim(info);
+  Sim::sInstance = sim;
+
+  if (LaunchInfoNew* const newInfo = info->GetNew(); newInfo != nullptr) {
+    sim->Setup(newInfo);
+    return sim;
+  }
+
+  if (LaunchInfoLoad* const loadInfo = info->GetLoad(); loadInfo != nullptr) {
+    sim->Load(loadInfo);
+    return sim;
+  }
+
+  const msvc8::string message =
+    gpg::STR_Printf("Unknown subclass of LaunchInfoBase: %s", typeid(*info).name());
+  throw std::runtime_error(message.c_str());
+}
+
+/**
+ * Address: 0x007458E0 (FUN_007458E0, ??1Sim@Moho@@UAE@XZ)
+ * Mangled: ??1Sim@Moho@@UAE@XZ
+ *
+ * IDA signature:
+ * void __stdcall Moho::Sim::~Sim(Moho::Sim *this);
+ *
+ * What it does:
+ * Reverse-construction teardown. Stops the task stages, deletes every owned
+ * subsystem (formation/effect/decal/sound/entity/command DBs, occupation grid,
+ * path tables, RNG, sim vars, physics constants, map, Lua state), rotates and
+ * deletes retained synclog files, cancels the rules Lua export, and drains the
+ * per-beat pending-ref slot lane. All container / shared_ptr / task-stage
+ * members are destroyed automatically after this body runs; the singleton
+ * pointer is cleared.
+ */
+Sim::~Sim()
+{
+  // Stop the three task stages (disk-watcher + two sim task stages).
+  mDiskWatcherTaskStage.Teardown();
+  mTaskStageA.Teardown();
+  mTaskStageB.Teardown();
+
+  // Formation DB (interface-owned; virtual delete).
+  if (mFormationDB) {
+    delete mFormationDB;
+    mFormationDB = nullptr;
+  }
+
+  // Occupation grid.
+  if (mOGrid) {
+    delete mOGrid;
+    mOGrid = nullptr;
+  }
+
+  // Command DB.
+  if (mCommandDB) {
+    delete mCommandDB;
+    mCommandDB = nullptr;
+  }
+
+  // Armies (each entry owned).
+  for (std::size_t i = 0; i < mArmiesList.size(); ++i) {
+    if (mArmiesList[i]) {
+      delete mArmiesList[i];
+      mArmiesList[i] = nullptr;
+    }
+  }
+
+  // Entity DB.
+  if (mEntityDB) {
+    delete mEntityDB;
+    mEntityDB = nullptr;
+  }
+
+  // Random stream (raw storage; no destructor in the binary).
+  if (mRngState) {
+    delete mRngState;
+    mRngState = nullptr;
+  }
+
+  // Path tables.
+  if (mPathTables) {
+    delete mPathTables;
+    mPathTables = nullptr;
+  }
+
+  // Sim convar instances (interface-owned).
+  for (CSimConVarInstanceBase*& simVar : mSimVars) {
+    if (simVar) {
+      delete simVar;
+      simVar = nullptr;
+    }
+  }
+
+  // Effect manager (interface-owned).
+  if (mEffectManager) {
+    delete mEffectManager;
+    mEffectManager = nullptr;
+  }
+
+  // Decal buffer.
+  if (mDecalBuffer) {
+    delete mDecalBuffer;
+    mDecalBuffer = nullptr;
+  }
+
+  // Sound manager (interface-owned).
+  if (mSoundManager) {
+    delete mSoundManager;
+    mSoundManager = nullptr;
+  }
+
+  // Close and rotate the synclog: retain the current line for desync-free runs,
+  // then delete each retained log file recorded in mDesyncLogLines.
+  if (mLog) {
+    std::fclose(mLog);
+    mLog = nullptr;
+    if (mIsDesyncFree) {
+      mDesyncLogLines.push_back(mDesyncLogLine);
+    }
+  }
+  while (!mDesyncLogLines.empty()) {
+    const msvc8::string logFile = mDesyncLogLines.front();
+    (void)mDesyncLogLines.erase(mDesyncLogLines.begin());
+    if (!::DeleteFileA(logFile.c_str())) {
+      gpg::Warnf("Error deleting sim log file: %s", logFile.c_str());
+    }
+  }
+
+  // Cancel the rules Lua export, then destroy the Lua state.
+  mRules->CancelExport(mLuaState);
+  if (mLuaState) {
+    delete mLuaState;
+    mLuaState = nullptr;
+  }
+
+  // Clear the global "current sim" singleton (before member teardown, matching
+  // the binary ordering).
+  Sim::sInstance = nullptr;
+
+  // Drain the deletion-queue pending-ref slot lane. `mDeletionQueue` (an
+  // msvc8::deque) is layout-identical to PointerSlotCollectionRuntimeView
+  // (_Map/_Mapsize/_Myoff/_Mysize map to slots/slotCount/ownerRefOrState/
+  // pendingRefCount), which is what the binary's sub_74DF10 drains at +0xA48.
+  DrainPendingRefsAndReleasePointerSlots(
+    reinterpret_cast<PointerSlotCollectionRuntimeView*>(&mDeletionQueue));
+
+  // Physics constants (raw storage).
+  if (mPhysConstants) {
+    delete mPhysConstants;
+    mPhysConstants = nullptr;
+  }
+
+  // Map data.
+  if (mMapData) {
+    delete mMapData;
+    mMapData = nullptr;
+  }
+
+  // Remaining container / shared_ptr / task-stage / sync-filter members are
+  // destroyed by their own destructors after this body returns, matching the
+  // binary's compiler-generated member teardown pass.
 }
 
 /**
