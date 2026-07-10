@@ -2439,7 +2439,19 @@ namespace moho
      */
     void OnCurrentDraggerReplaced() override;
 
-    virtual ~CMauiScrollbar() = default;
+    /**
+     * Address: 0x007A0590 (FUN_007A0590, Moho::CMauiScrollbar::~CMauiScrollbar)
+     * Deleting dtor: 0x007A0570 (FUN_007A0570, Moho::CMauiScrollbar::dtr)
+     *
+     * What it does:
+     * Tears down one scrollbar control in-place in reverse construction order:
+     * releases the four `CD3DBatchTexture` shared-pointer lanes (background,
+     * thumb-middle, thumb-bottom, thumb-top), unlinks the bound scrollable
+     * focus sentinel, restores the embedded `IMauiDragger` sub-object vtable and
+     * detaches its dragger list, then chains into the base `CMauiControl` /
+     * `IMauiDragger` teardown emitted by the compiler.
+     */
+    ~CMauiScrollbar() override;
   };
 
   class CMauiText : public CMauiControl
