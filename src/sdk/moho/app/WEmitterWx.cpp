@@ -8,6 +8,7 @@
 #include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 
 namespace
@@ -188,6 +189,22 @@ namespace
       }
     }
     text.m_pchData = nullptr;
+  }
+
+  // Frees the heap storage backing one `msvc8::vector<WEmitterCurvePanel*>` and
+  // resets its {begin,end,capacityEnd} lanes to the empty state. This mirrors
+  // the inline `operator delete` + pointer-zeroing the binary emits for the
+  // `mCurvePanels` member at its teardown point (0x006670BE), operating on the
+  // named member through the sanctioned runtime view (no raw `this + 0xNN`).
+  void ReleaseCurvePanelVectorStorage(msvc8::vector<moho::WEmitterCurvePanel*>& curvePanels) noexcept
+  {
+    auto& view = msvc8::AsVectorRuntimeView(curvePanels);
+    if (view.begin != nullptr) {
+      ::operator delete(static_cast<void*>(view.begin));
+    }
+    view.begin = nullptr;
+    view.end = nullptr;
+    view.capacityEnd = nullptr;
   }
 
   [[nodiscard]] double ParseWideDouble(const wchar_t* const text) noexcept
@@ -424,5 +441,93 @@ namespace moho
 
     ApplyCurvePayloads(*effect, *this);
     ApplyEmitterTextures(*effect, *this);
+  }
+
+  /**
+   * Address: 0x00666F40 (FUN_00666F40, Moho::WEmitterWx::~WEmitterWx)
+   *
+   * What it does:
+   * Complete-object destructor. The MSVC vtable restore at function entry is
+   * expressed implicitly by the C++ destructor; the remaining teardown runs in
+   * exact binary reverse-construction order:
+   *   1. delete every live curve panel via its scalar-deleting dtor,
+   *   2. release the previewed effect through the sim effect-manager,
+   *   3. drop the interlock ref on the active sim driver,
+   *   4/5. release the ramp/texture wx-string caches,
+   *   6/7. tidy the blueprint/bone SSO string lanes,
+   *   8. unlink the attached-unit weak node,
+   *   9. unlink the preview-effect weak node,
+   *   10. free the curve-panel vector storage,
+   *   11..14. release the four blueprint/texture path wx-string lanes,
+   *   15. drain the managed-frame owner slots,
+   *   16. run shared non-deleting frame teardown as a tail call.
+   */
+  WEmitterWx::~WEmitterWx()
+  {
+    // (1) Delete each live curve panel through its scalar-deleting destructor.
+    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
+    for (WEmitterCurvePanel* const* cursor = curvePanelView.begin; cursor != curvePanelView.end; ++cursor) {
+      if (WEmitterCurvePanel* const panel = *cursor) {
+        (void)panel->DeleteWithFlag(1);
+      }
+    }
+
+    // (2) Release the previewed effect through the sim effect-manager when the
+    //     weak preview lane still references a live effect.
+    if (mPreviewEffect.HasValue()) {
+      mSim->mEffectManager->DestroyEffect(mPreviewEffect.GetObjectPtr());
+    }
+
+    // (3) Drop the interlock ref on the active sim driver (binary reads the
+    //     process-global driver directly and dispatches slot 37).
+    SIM_GetActiveDriver()->ReleaseInterlockRef();
+
+    // (4/5) Release the ramp/texture wx-string caches (refcount decrement).
+    ReleaseCopiedWxString(mRampNameText);
+    ReleaseCopiedWxString(mTextureNameText);
+
+    // (6/7) Tidy the blueprint/bone SSO string lanes.
+    mBlueprintName.tidy(true, 0U);
+    mBoneName.tidy(true, 0U);
+
+    // (8) Unlink the attached-unit weak node from its owner chain.
+    mAttachedUnit.UnlinkFromOwnerChain();
+
+    // (9) Unlink the preview-effect weak node from its owner chain.
+    mPreviewEffect.UnlinkFromOwnerChain();
+
+    // (10) Free the curve-panel vector storage.
+    ReleaseCurvePanelVectorStorage(mCurvePanels);
+
+    // (11..14) Release the four blueprint/texture path wx-string lanes.
+    ReleaseCopiedWxString(mBlueprintIdPath);
+    ReleaseCopiedWxString(mBlueprintFilePath);
+    ReleaseCopiedWxString(mRampTexturePath);
+    ReleaseCopiedWxString(mTexturePath);
+
+    // (15) Drain this frame's managed-owner slots.
+    ReleaseManagedOwnerSlots();
+
+    // (16) Run shared non-deleting frame teardown as a tail call. The binary
+    //      treats this WEmitterWx as a top-level frame at teardown and passes
+    //      the same object pointer to the shared frame-destroy lane.
+    (void)WX_FrameDestroyWithoutDelete(reinterpret_cast<wxTopLevelWindowRuntime*>(this));
+  }
+
+  /**
+   * Address: 0x00669E10 (FUN_00669E10, Moho::WEmitterWx::dtr)
+   * Slot: scalar-deleting destructor thunk
+   *
+   * What it does:
+   * Scalar-deleting destructor thunk. Runs `~WEmitterWx()` teardown and frees
+   * the object storage when `deleteFlags & 1` is set.
+   */
+  WEmitterWx* WEmitterWx::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  {
+    this->~WEmitterWx();
+    if ((deleteFlags & 1u) != 0u) {
+      ::operator delete(this);
+    }
+    return this;
   }
 } // namespace moho
