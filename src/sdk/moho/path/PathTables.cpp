@@ -9,6 +9,8 @@
 #include <typeinfo>
 #include <utility>
 
+#include "gpg/core/containers/DList.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/path/ClusterMap.h"
@@ -673,6 +675,102 @@ namespace moho
       type->serSaveFunc_ = helper->mSaveCallback;
       return loadCallback;
     }
+
+    /**
+     * Address: 0x00768AD0 (FUN_00768AD0, Moho::PathQueueImplSerializer::Serialize body)
+     * Mangled: (reached via the cdecl->usercall thunk 0x00766BC0,
+     *   Moho::PathQueueImplSerializer::Serialize)
+     *
+     * IDA signature:
+     * void __usercall sub_768AD0(
+     *     Moho::PathQueue::Impl *a1@<eax>, BinaryWriteArchive *a2@<ebx>);
+     *
+     * What it does:
+     * Reflected save callback for `Moho::PathQueue::Impl`:
+     *   1) reads the `PathTables*` lane at the impl header (+0x00) and writes
+     *      it as an UNOWNED tracked raw pointer via `RRef_PathTables`;
+     *   2) writes the height sentinel (`mHeightSentinel`, +0x04) as a
+     *      `gpg::DList<Moho::IPathTraveler,void>` value;
+     *   3) writes the base traveler list head (`mBase.mTraveler`, +0x58) as a
+     *      `gpg::DList<Moho::IPathTraveler,void>` value.
+     *
+     * The `DList<IPathTraveler,void>` reflected type is resolved once through a
+     * cached `sType` singleton (lazy `LookupRType`), matching the binary's
+     * idiom, and every write passes a fresh zeroed owner `RRef` temporary, just
+     * as the binary rebuilds the temporary before each call. The thin cdecl
+     * calling-convention thunk 0x00766BC0 that the reflection slot dispatches to
+     * is subsumed by this body.
+     */
+    void SavePathQueueImplRefCallback(PathQueue::Impl* const impl, gpg::WriteArchive& archive)
+    {
+      // The impl header lane at +0x00 holds the owning `PathTables*` in the
+      // serialize context (IDA reads `[edi]` and hands it to RRef_PathTables).
+      auto* const pathTables =
+        reinterpret_cast<PathTables*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(impl->mSize)));
+
+      gpg::RRef pathTablesRef{};
+      (void)gpg::RRef_PathTables(&pathTablesRef, pathTables);
+      gpg::RRef ownerRef{};
+      gpg::WriteRawPointer(&archive, pathTablesRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+      static gpg::RType* dlistType = nullptr;
+      if (dlistType == nullptr) {
+        dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
+      }
+
+      gpg::RRef heightRef{};
+      archive.Write(dlistType, &impl->mHeightSentinel, heightRef);
+
+      if (dlistType == nullptr) {
+        dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
+      }
+
+      gpg::RRef travelerRef{};
+      archive.Write(dlistType, &impl->mBase.mTraveler, travelerRef);
+    }
+
+    /**
+     * Source-level wiring for the `PathQueue::Impl` reflected save callback.
+     *
+     * The binary stores the address of the save callback (via the 0x00766BC0
+     * calling-convention thunk over 0x00768AD0) into the
+     * `SerSaveLoadHelper_PathQueue_Impl` helper node's save lane, which
+     * `InstallPathQueueImplSerializerCallbacks` (0x00767140) then copies into
+     * the reflected `Moho::PathQueue::Impl` type's `serSaveFunc_` slot. Taking
+     * the address of `SavePathQueueImplRefCallback` here is the source-level
+     * invocation (evidence class 2, function-pointer table) that keeps the
+     * callback linked into the engine binary.
+     */
+    SerSaveLoadHelperInitRuntimeView gPathQueueImplSaveHelper{};
+
+    /**
+     * Populates the `PathQueue::Impl` serializer helper node's save lane with
+     * the recovered save callback address, mirroring the binary's startup
+     * helper-node population. Installing the lanes onto the live reflected type
+     * is deferred to `InstallPathQueueImplSerializerCallbacks`, which the engine
+     * runs once the `Moho::PathQueue::Impl` type descriptor is registered.
+     */
+    SerSaveLoadHelperInitRuntimeView* PopulatePathQueueImplSaveCallbackStorage() noexcept
+    {
+      gPathQueueImplSaveHelper.mSaveCallback =
+        reinterpret_cast<gpg::RType::save_func_t>(&SavePathQueueImplRefCallback);
+      return &gPathQueueImplSaveHelper;
+    }
+
+    [[maybe_unused]] gpg::RType::load_func_t InstallPathQueueImplSaveCallbacks()
+    {
+      return InstallPathQueueImplSerializerCallbacks(PopulatePathQueueImplSaveCallbackStorage());
+    }
+
+    struct PathQueueImplSaveCallbackBootstrap
+    {
+      PathQueueImplSaveCallbackBootstrap() noexcept
+      {
+        (void)PopulatePathQueueImplSaveCallbackStorage();
+      }
+    };
+
+    [[maybe_unused]] PathQueueImplSaveCallbackBootstrap gPathQueueImplSaveCallbackBootstrap;
 
     class PathQueueTypeInfo final : public gpg::RType
     {

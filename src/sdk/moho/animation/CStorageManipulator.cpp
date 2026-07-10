@@ -1,4 +1,5 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
@@ -558,7 +559,7 @@ namespace moho
    * All reflected type lookups go through cached `sType` singletons (lazy
    * `LookupRType` via RTTI descriptor) matching the binary's idiom.
    */
-  [[maybe_unused]] void SerializeCStorageManipulatorRuntime(
+  void SerializeCStorageManipulatorRuntime(
     CStorageManipulatorRuntimeView* const runtime,
     gpg::WriteArchive* const archive
   )
@@ -592,6 +593,60 @@ namespace moho
   }
 
   /**
+   * Address: 0x00649DB0 (FUN_00649DB0, Moho::CStorageManipulator::MemberDeserialize)
+   *
+   * IDA signature:
+   * void __usercall sub_649DB0(
+   *     Moho::Unit **obj@<ecx>, gpg::ReadArchive *a2@<eax>);
+   *
+   * What it does:
+   * Deserializes a `CStorageManipulator` runtime lane from a binary read archive
+   * (exact mirror of `SerializeCStorageManipulatorRuntime`, FUN_00649EF0):
+   *   1) reads the base `IAniManipulator` subobject payload;
+   *   2) reads the owning `Moho::Unit` tracked pointer into `mUnit`;
+   *   3) reads `mMax`, `mMin`, `mCur` as `Wm3::Vector3f` values;
+   *   4) reads `mResourceType` as an `EEconResource` enum value.
+   *
+   * All reflected type lookups go through cached `sType` singletons (lazy
+   * `LookupRType` via RTTI descriptor) matching the binary's idiom. Each read
+   * passes a fresh zeroed owner `RRef`, exactly as the binary rebuilds the
+   * temporary before every call.
+   */
+  void DeserializeCStorageManipulatorRuntime(
+    CStorageManipulatorRuntimeView* const runtime,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (runtime == nullptr || archive == nullptr) {
+      return;
+    }
+
+    gpg::RRef ownerRef{};
+
+    gpg::RType* const aniManipulatorType = CachedIAniManipulatorTypeForStorageManipulatorTypeInfo();
+    archive->Read(aniManipulatorType, runtime, ownerRef);
+
+    archive->ReadPointer_Unit(&runtime->mUnit, &ownerRef);
+
+    gpg::RType* const vector3Type = gpg::LookupRType(typeid(Wm3::Vector3f));
+
+    Wm3::Vector3f maxValue{};
+    archive->Read(vector3Type, &maxValue, ownerRef);
+    runtime->mMax = ToStorageVectorRuntime(maxValue);
+
+    Wm3::Vector3f minValue{};
+    archive->Read(vector3Type, &minValue, ownerRef);
+    runtime->mMin = ToStorageVectorRuntime(minValue);
+
+    Wm3::Vector3f curValue{};
+    archive->Read(vector3Type, &curValue, ownerRef);
+    runtime->mCur = ToStorageVectorRuntime(curValue);
+
+    gpg::RType* const resourceType = gpg::LookupRType(typeid(moho::EEconResource));
+    archive->Read(resourceType, &runtime->mResourceType, ownerRef);
+  }
+
+  /**
    * Address: 0x00649B60 (FUN_00649B60, func_CreateLuaCStorageManipulator)
    *
    * What it does:
@@ -620,3 +675,41 @@ namespace moho
     return &instance;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Source-level wiring for the `CStorageManipulator` reflected serializer.
+   *
+   * The binary stores the address of the load callback (0x00649DB0,
+   * `DeserializeCStorageManipulatorRuntime`) and the save callback
+   * (0x00649EF0, `SerializeCStorageManipulatorRuntime`) into the global
+   * `SerSaveLoadHelper_Moho_CStorageManipulator` helper node's callback
+   * lanes, exactly as the archive-serialization helper nodes bind their
+   * load/save pairs (see `InitializeSPathNeighborSerializerHelperStorage`).
+   * `InstallMohoCStorageManipulatorSerializerCallbacks` (0x00649930) later
+   * copies these lanes into the reflected `Moho::CStorageManipulator` type's
+   * `serLoadFunc_` / `serSaveFunc_` slots. Taking the address of each callback
+   * here is the source-level invocation (evidence class 2, function-pointer
+   * table) that keeps both callbacks linked into the engine binary.
+   */
+  [[maybe_unused]] CStorageManipulatorSerializerHelperNode* InstallCStorageManipulatorSerializerCallbackStorage() noexcept
+  {
+    (void)UnlinkSerializerNode(gCStorageManipulatorSerializer);
+    gCStorageManipulatorSerializer.mSerLoadFunc =
+      reinterpret_cast<gpg::RType::load_func_t>(&moho::DeserializeCStorageManipulatorRuntime);
+    gCStorageManipulatorSerializer.mSerSaveFunc =
+      reinterpret_cast<gpg::RType::save_func_t>(&moho::SerializeCStorageManipulatorRuntime);
+    return &gCStorageManipulatorSerializer;
+  }
+
+  struct CStorageManipulatorSerializerBootstrap
+  {
+    CStorageManipulatorSerializerBootstrap()
+    {
+      (void)InstallCStorageManipulatorSerializerCallbackStorage();
+    }
+  };
+
+  [[maybe_unused]] CStorageManipulatorSerializerBootstrap gCStorageManipulatorSerializerBootstrap;
+} // namespace
