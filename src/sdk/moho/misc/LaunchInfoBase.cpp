@@ -637,7 +637,19 @@ namespace
     archive->ReadUInt(&itemCount);
 
     ArmyLaunchInfoVector loaded;
-    loaded.resize(itemCount);
+    const std::size_t targetCount = static_cast<std::size_t>(itemCount);
+    if (targetCount > 0u) {
+      // The binary grows the destination with reserve(count)
+      // (FUN_005437F0, msvc8::vector<ArmyLaunchInfo>::reserve) then fills;
+      // not resize() (which routes through reallocate_to).
+      loaded.reserve(targetCount);
+      auto& view = msvc8::AsVectorRuntimeView(loaded);
+      auto* const slotsBegin = view.end;
+      for (std::size_t i = 0u; i < targetCount; ++i) {
+        ::new (static_cast<void*>(slotsBegin + i)) moho::ArmyLaunchInfo();
+      }
+      view.end = slotsBegin + targetCount;
+    }
     const gpg::RRef owner = NullOwnerRef();
     for (unsigned int i = 0; i < itemCount; ++i) {
       ReadArmyLaunchInfoReflectedObject(archive, &loaded[static_cast<std::size_t>(i)], owner);
