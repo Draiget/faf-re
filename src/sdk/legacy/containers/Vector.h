@@ -1516,6 +1516,9 @@ namespace msvc8
          * Address: 0x005437F0 (FUN_005437F0, msvc8::vector<moho::ArmyLaunchInfo>::reserve
          * out-of-line emission — reallocate-to-capacity for the 0x20-byte element;
          * invoked by name from ArmyLaunchInfoVectorTypeInfo::SerLoad's reserve(count) path)
+         * Address: 0x006EB1D0 (FUN_006EB1D0, msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 8-byte weak-link element;
+         * invoked by name from moho::LoadWeakPtrCUnitCommandVector's reserve(count) path)
          *
          * Reserve storage for at least new_cap elements
          */

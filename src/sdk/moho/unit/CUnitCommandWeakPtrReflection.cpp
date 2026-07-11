@@ -209,11 +209,25 @@ namespace
       weak.ResetFromObject(nullptr);
     }
     storage->clear();
-    storage->resize(static_cast<std::size_t>(count));
 
-    for (auto& weak : *storage) {
-      weak.ownerLinkSlot = nullptr;
-      weak.nextInOwner = nullptr;
+    // The binary grows the destination with reserve(count)
+    // (FUN_006EB1D0, msvc8::vector<WeakPtr<CUnitCommand>>::reserve) then fills
+    // each slot with an empty weak link; not resize(), which routes through
+    // reallocate_to. Prior contents are explicitly unregistered above (the
+    // WeakPtr<T> primary-template dtor is trivial and does not unlink on its
+    // own), so the in-place reserve + placement-fill is safe.
+    const std::size_t targetCount = static_cast<std::size_t>(count);
+    if (targetCount > 0u) {
+      storage->reserve(targetCount);
+      auto& view = msvc8::AsVectorRuntimeView(*storage);
+      auto* const slotsBegin = view.end;
+      for (std::size_t i = 0u; i < targetCount; ++i) {
+        auto* const slot =
+          ::new (static_cast<void*>(slotsBegin + i)) moho::WeakPtr<moho::CUnitCommand>();
+        slot->ownerLinkSlot = nullptr;
+        slot->nextInOwner = nullptr;
+      }
+      view.end = slotsBegin + targetCount;
     }
 
     gpg::RType* const weakType = CachedWeakPtrCUnitCommandType();
