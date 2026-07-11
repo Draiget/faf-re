@@ -27,7 +27,12 @@ namespace moho
    * - owner slot stores encoded pointer to owner's weak-link head slot.
    * - second dword links this node into owner weak-chain.
    * - Bone indices default to -1 when detached.
-   * - Orientation defaults to identity (w=1), relative position defaults to zero.
+   * - Orientation defaults to the identity quaternion, which this engine stores
+   *   scalar-first: the first orientation word (mRelativeOrientX) holds the
+   *   scalar and is 1.0, the remaining three are 0. Every binary attach-info
+   *   init writes orient.x = 1.0 (Entity ctors 0x006779E0/0x00678160,
+   *   CEffectImpl ctors 0x00659090/0x00659190, CEfxBeam ctor 0x006547C0); no
+   *   binary path writes orient.w = 1.0. Relative position defaults to zero.
    */
   struct SEntAttachInfo
   {
@@ -82,10 +87,13 @@ namespace moho
       info.mAttachTargetWeak.nextInOwner = nullptr;
       info.mParentBoneIndex = -1;
       info.mChildBoneIndex = -1;
-      info.mRelativeOrientX = 0.0f;
+      // Identity quaternion, scalar-first: orient.x is the scalar (1.0). This
+      // matches every binary attach-info init; the previous (0,0,0,1) placed
+      // the scalar in the wrong word and produced a bogus 180 deg orientation.
+      info.mRelativeOrientX = 1.0f;
       info.mRelativeOrientY = 0.0f;
       info.mRelativeOrientZ = 0.0f;
-      info.mRelativeOrientW = 1.0f;
+      info.mRelativeOrientW = 0.0f;
       info.mRelativePosX = 0.0f;
       info.mRelativePosY = 0.0f;
       info.mRelativePosZ = 0.0f;
