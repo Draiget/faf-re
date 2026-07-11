@@ -1519,6 +1519,15 @@ namespace msvc8
          * Address: 0x006EB1D0 (FUN_006EB1D0, msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>::reserve
          * out-of-line emission — reallocate-to-capacity for the 8-byte weak-link element;
          * invoked by name from moho::LoadWeakPtrCUnitCommandVector's reserve(count) path)
+         * Address: 0x005EAE10 (FUN_005EAE10, msvc8::vector<moho::SAiReservedTransportBone>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 0x20-byte element;
+         * invoked by name from gpg::RVectorType_SAiReservedTransportBone::SerLoad's reserve(count) path)
+         * Address: 0x005DD400 (FUN_005DD400, msvc8::vector<Moho::CAcquireTargetTask*>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 4-byte pointer element;
+         * invoked by name from gpg::RVectorType_CAcquireTargetTask_P::SerLoad's reserve(count) path)
+         * Address: 0x0057FF70 (FUN_0057FF70, msvc8::vector<moho::SPointVector>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 0x18-byte element;
+         * invoked by name from gpg::RVectorType_SPointVector::SerLoad's reserve(count) path)
          *
          * Reserve storage for at least new_cap elements
          */
