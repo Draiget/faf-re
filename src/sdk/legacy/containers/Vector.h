@@ -1510,6 +1510,9 @@ namespace msvc8
          * Address: 0x006DC9F0 (FUN_006DC9F0, msvc8::vector<moho::SBlackListInfo>::reserve
          * out-of-line emission — reallocate-to-capacity for the 0x0C-byte element;
          * invoked by name from moho::LoadSBlackListInfoVector's reserve(count) path)
+         * Address: 0x0067D9B0 (FUN_0067D9B0, msvc8::vector<moho::Entity*>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 4-byte pointer element;
+         * invoked by name from moho::LoadEntityPointerVector's reserve(count) path)
          *
          * Reserve storage for at least new_cap elements
          */

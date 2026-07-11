@@ -194,7 +194,19 @@ namespace
     archive->ReadUInt(&count);
 
     EntityPtrVector loaded{};
-    loaded.resize(static_cast<std::size_t>(count), nullptr);
+    const std::size_t targetCount = static_cast<std::size_t>(count);
+    if (targetCount > 0u) {
+      // The binary grows the destination with reserve(count)
+      // (FUN_0067D9B0, msvc8::vector<Entity*>::reserve) followed by an
+      // element fill, not resize() (which routes through reallocate_to).
+      loaded.reserve(targetCount);
+      auto& view = msvc8::AsVectorRuntimeView(loaded);
+      auto* const slotsBegin = view.end;
+      for (std::size_t i = 0u; i < targetCount; ++i) {
+        slotsBegin[i] = nullptr;
+      }
+      view.end = slotsBegin + targetCount;
+    }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
