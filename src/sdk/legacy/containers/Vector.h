@@ -1528,6 +1528,9 @@ namespace msvc8
          * Address: 0x0057FF70 (FUN_0057FF70, msvc8::vector<moho::SPointVector>::reserve
          * out-of-line emission — reallocate-to-capacity for the 0x18-byte element;
          * invoked by name from gpg::RVectorType_SPointVector::SerLoad's reserve(count) path)
+         * Address: 0x005DCFB0 (FUN_005DCFB0, msvc8::vector<Moho::UnitWeapon*>::reserve
+         * out-of-line emission — reallocate-to-capacity for the 4-byte pointer element;
+         * invoked by name from gpg::RVectorType_UnitWeapon_P::SerLoad's reserve(count) path)
          *
          * Reserve storage for at least new_cap elements
          */
