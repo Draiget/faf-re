@@ -76,7 +76,21 @@ namespace
     archive->ReadUInt(&count);
 
     SBlackListInfoVector loaded{};
-    loaded.resize(static_cast<std::size_t>(count));
+    const std::size_t targetCount = static_cast<std::size_t>(count);
+    if (targetCount > 0u) {
+      // Pre-grow the destination to `count` capacity, then materialize one
+      // empty SBlackListInfo per slot before deserialization writes into it.
+      // This mirrors the binary's reserve(count) + uninitialized-fill path
+      // (FUN_006DC9F0, msvc8::vector<SBlackListInfo>::reserve) rather than a
+      // resize(), which would route through reallocate_to instead of reserve.
+      loaded.reserve(targetCount);
+      auto& view = msvc8::AsVectorRuntimeView(loaded);
+      moho::SBlackListInfo* const slotsBegin = view.end;
+      for (std::size_t i = 0u; i < targetCount; ++i) {
+        ::new (static_cast<void*>(slotsBegin + i)) moho::SBlackListInfo();
+      }
+      view.end = slotsBegin + targetCount;
+    }
 
     gpg::RType* const elementType = ResolveSBlackListInfoType();
     if (!elementType) {
