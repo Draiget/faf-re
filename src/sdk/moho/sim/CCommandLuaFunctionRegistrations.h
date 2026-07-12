@@ -437,6 +437,15 @@ namespace moho
   int cfunc_IssueRepairL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006F5B60 (FUN_006F5B60, cfunc_IssueBuildMobileL)
+   *
+   * What it does:
+   * Resolves the build target + blueprint + cell list, picks the buildable unit
+   * closest to the target, and issues one `UNITCOMMAND_BuildMobile`.
+   */
+  int cfunc_IssueBuildMobileL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x006F67A0 (FUN_006F67A0, cfunc_IssueScript)
    *
    * What it does:

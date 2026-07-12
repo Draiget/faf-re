@@ -20,6 +20,8 @@
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/sim/SOCellPos.h"
+#include "gpg/core/containers/String.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -185,6 +187,10 @@ namespace
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr const char* kIssueTransportUnloadSpecificHelpText = "IssueTransportUnloadSpecific";
   constexpr std::int32_t kGroundTargetEntitySentinel = -0x10000000;
+  constexpr const char* kIssueBuildMobileName = "IssueBuildMobile";
+  constexpr const char* kInvalidCellListError = "Invalid list of cells in %s; expected a table but got a %s";
+  constexpr const char* kInvalidCellError =
+    "Invalid cell in %s; expected a two element table but got a %s";
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -4918,6 +4924,158 @@ namespace moho
     target.EncodeToSSTITarget(commandIssueData.mTarget);
     (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     return 0;
+  }
+
+  /**
+   * Address: 0x006EF270 (FUN_006EF270, func_GetCells)
+   *
+   * IDA signature:
+   * std::vector *__cdecl func_GetCells(std::vector *ret, LuaPlus::LuaState *state,
+   *                                    LuaPlus::LuaStackObject obj);
+   *
+   * What it does:
+   * Parses a Lua `{ {x,z}, {x,z}, ... }` cell list into a vector of `SOCellPos`
+   * (x = element[1], z = element[2]). Raises the binary's Lua errors when the
+   * argument is not a table, or any element is not a two-element table.
+   */
+  [[nodiscard]] msvc8::vector<SOCellPos> func_GetCells(LuaPlus::LuaState* const state, LuaPlus::LuaStackObject cellListArg)
+  {
+    msvc8::vector<SOCellPos> cells{};
+
+    lua_State* const rawState = cellListArg.m_state->m_state;
+    if (lua_type(rawState, cellListArg.m_stackIndex) != LUA_TTABLE) {
+      const LuaPlus::LuaObject listObject(cellListArg);
+      LuaPlus::LuaState::Error(state, kInvalidCellListError, kIssueBuildMobileName, listObject.TypeName());
+    }
+
+    const int cellCount = lua_getn(rawState, cellListArg.m_stackIndex);
+    for (int cellIndex = 1; cellIndex <= cellCount; ++cellIndex) {
+      lua_rawgeti(rawState, cellListArg.m_stackIndex, cellIndex);
+      const LuaPlus::LuaObject cellObject(LuaPlus::LuaStackObject(cellListArg.m_state, lua_gettop(rawState)));
+
+      if (!cellObject.IsTable() || cellObject.GetCount() != 2) {
+        if (cellObject.IsTable()) {
+          const msvc8::string describe = gpg::STR_Printf("%d element table", cellObject.GetCount());
+          LuaPlus::LuaState::Error(state, kInvalidCellError, kIssueBuildMobileName, describe.c_str());
+        } else {
+          const LuaPlus::LuaObject listObject(cellListArg);
+          LuaPlus::LuaState::Error(state, kInvalidCellError, kIssueBuildMobileName, listObject.TypeName());
+        }
+      }
+
+      // Binary packs element[1] -> low int16 (x), element[2] -> high int16 (z).
+      const std::int32_t x = cellObject[1].GetInteger();
+      const std::int32_t z = cellObject[2].GetInteger();
+      cells.push_back(SOCellPos{static_cast<std::int16_t>(x), static_cast<std::int16_t>(z)});
+    }
+
+    return cells;
+  }
+
+  /**
+   * Address: 0x006F5B60 (FUN_006F5B60, cfunc_IssueBuildMobileL)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueBuildMobileL(LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Lua `IssueBuildMobile(unitList, target, blueprintId, cellList)`. Resolves the
+   * build target world position and the blueprint to build, parses the cell list,
+   * then picks the single buildable unit from `unitList` whose position is closest
+   * to the target, and issues one `UNITCOMMAND_BuildMobile` at the target ground
+   * position carrying the blueprint and the cell list.
+   */
+  int cfunc_IssueBuildMobileL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 4) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildMobileName, 4, argumentCount);
+    }
+
+    // arg1: candidate builders.
+    UnitSet candidateUnits{};
+    LuaPlus::LuaStackObject unitListArg(state, 1);
+    CollectLiveUnitsFromLuaTable(candidateUnits, state, unitListArg, kIssueBuildMobileName);
+
+    // arg2: build target -> resolved world position. `target`'s destructor unlinks
+    // its weak entity link at scope exit (the .c tail weak-list loop is that dtor).
+    CAiTarget target{};
+    (void)target.SetTarget(state, kIssueBuildMobileName, LuaPlus::LuaStackObject(state, 2));
+    const Wm3::Vec3f targetPos = target.GetTargetPosGun(false);
+
+    // arg3: blueprint to build.
+    RUnitBlueprint* const blueprint =
+      ResolveUnitBlueprintFromLuaArgument(state, LuaPlus::LuaStackObject(state, 3), kIssueBuildMobileName);
+
+    // arg4: cell list.
+    const msvc8::vector<SOCellPos> cells = func_GetCells(state, LuaPlus::LuaStackObject(state, 4));
+
+    if (blueprint == nullptr) {
+      return 0;
+    }
+
+    // NaN sentinel: a real closest unit's squared distance always beats an
+    // invalid sentinel via IsValidVector3f. Matches the binary's invalid_vec.
+    static const Wm3::Vector3f kInvalidVec(
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN()
+    );
+
+    Unit* closestUnit = nullptr;
+    Wm3::Vector3f closestDelta = kInvalidVec;
+    for (Unit* const candidate : candidateUnits) {
+      const Wm3::Vec3f& unitPos = candidate->GetPosition();
+      const bool buildable = candidate->CanBuild(blueprint);
+
+      const float dx = unitPos.x - targetPos.x;
+      const float dy = unitPos.y - targetPos.y;
+      const float dz = unitPos.z - targetPos.z;
+      const float candidateDistSq = dx * dx + dy * dy + dz * dz;
+      const float closestDistSq =
+        closestDelta.x * closestDelta.x + closestDelta.y * closestDelta.y + closestDelta.z * closestDelta.z;
+
+      if (buildable && IsValidVector3f(unitPos)
+          && (!IsValidVector3f(closestDelta) || candidateDistSq < closestDistSq)) {
+        closestDelta = Wm3::Vector3f(dx, dy, dz);
+        closestUnit = candidate;
+      }
+    }
+
+    if (closestUnit != nullptr) {
+      SEntitySetTemplateUnit selectedUnits{};
+      (void)selectedUnits.AddUnit(closestUnit);
+
+      Sim* const sim = lua_getglobaluserdata(rawState);
+
+      SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_BuildMobile);
+      commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
+      commandIssueData.mTarget.mPos = targetPos;
+      commandIssueData.mBlueprint = blueprint;
+      for (const SOCellPos& cell : cells) {
+        commandIssueData.mCells.push_back(cell);
+      }
+
+      (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x006F5AF0 (FUN_006F5AF0, cfunc_IssueBuildMobile)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_IssueBuildMobile(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueBuildMobileL`.
+   */
+  int cfunc_IssueBuildMobile(lua_State* const luaContext)
+  {
+    return cfunc_IssueBuildMobileL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
