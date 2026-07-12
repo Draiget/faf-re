@@ -28366,6 +28366,16 @@ namespace moho
     commandHelper->mVariableDataDirty = 1u;
 
     // Enqueue the published command into each selected unit's command manager.
+    // FUN_008B0180 asm 0x008B0540-0x008B0577: the binary gates the per-unit
+    // reset and the UI notification on a separate "command issued" latch
+    // (ebp-4, set to 1 at 0x008B03F7 on this post-gate path), NOT on clearQueue.
+    // That latch is always 1 here (the loop is only reached once the command
+    // has been issued), so both the <=500 and >500 queue-size branches reset
+    // the manager and then add the command -- the >500 branch reaches the
+    // shared reset->add through the binary's fall-through (loc_8B055C ->
+    // loc_8B0566). clearQueue (the BOOL param a2) feeds only
+    // UserUnitManagerAdd's flag; UI_OnCommandIssued's bool arg is the issued
+    // latch, i.e. true.
     for (UserUnit* const unit : units) {
       auto* const unitManager = reinterpret_cast<UserUnitManager*>(unit->GetCommandQueue2());
       if (unitManager == nullptr) {
@@ -28373,16 +28383,15 @@ namespace moho
       }
 
       if (GetUserUnitManagerQueueSize(unitManager) <= 500) {
-        if (clearQueue) {
-          ResetUserUnitManagerState(unitManager, commandId);
-        }
-        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
-      } else if (clearQueue) {
         ResetUserUnitManagerState(unitManager, commandId);
+        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
+      } else {
+        ResetUserUnitManagerState(unitManager, commandId);
+        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
       }
     }
 
-    UI_OnCommandIssued(units, data, clearQueue);
+    UI_OnCommandIssued(units, data, true);
     session->DirtyCommandGraph();
   }
 } // namespace moho
