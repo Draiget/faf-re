@@ -5,10 +5,15 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "lua/LuaObject.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/script/CScriptObject.h"
+#include "moho/sim/ManipulatorLuaFunctionThunks.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
@@ -347,6 +352,97 @@ namespace moho
     , mOnTarget(false)
   {
     // Binary constructor leaves the 0x90 lane untouched.
+  }
+
+  /**
+   * Address: 0x00635CA0 (FUN_00635CA0, ??0CBuilderArmManipulator@Moho@@QAE@PAVUnit@1@PAVSim@1@IHH@Z)
+   *
+   * IDA signature:
+   * Moho::CBuilderArmManipulator *__fastcall Moho::CBuilderArmManipulator::CBuilderArmManipulator(
+   *     Moho::Unit *unit, Moho::Sim *sim, Moho::CBuilderArmManipulator *this,
+   *     unsigned int boneA, int boneB, int boneMuzzle);
+   *
+   * What it does:
+   * Builds one builder-arm aim manipulator bound to `{unit, sim}`: constructs the
+   * `IAniManipulator` base on the unit's actor, head-inserts the intrusive weak
+   * goal-unit link, seeds arc/tracking defaults, materializes the Lua script
+   * object, registers the two watched bones, records the reference (muzzle) bone,
+   * seeds the heading center from the watched bone's local orientation, and clears
+   * the unit builder's on-target latch.
+   */
+  CBuilderArmManipulator::CBuilderArmManipulator(
+    Unit* const unit,
+    Sim* const sim,
+    const std::uint32_t boneA,
+    const std::int32_t boneB,
+    const std::int32_t boneMuzzle
+  )
+    : IAniManipulator(sim, unit->AniActor, 0)
+    , mGoalUnit()
+    , mHeading(0.0f)
+    , mPitch(0.0f)
+    , mTrackingScriptActive(false)
+    , mHeadingCenter(0.0f)
+    , mHeadingHalfArc(kPiRadians)
+    , mHeadingMaxSlew(0.06283185631036758f)
+    , mPitchCenter(15.0f)
+    , mPitchHalfArc(30.0f)
+    , mPitchMaxSlew(0.06108652427792549f)
+    , mOnTarget(false)
+  {
+    // Head-insert the intrusive weak goal-unit link (freshly constructed node,
+    // known-unlinked → bind-then-head-insert; mirrors the binary's list insert).
+    mGoalUnit.BindObjectUnlinked(unit);
+    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
+
+    // Materialize the Lua script object through the builder-arm metatable factory
+    // (FUN_006371B0).
+    {
+      LuaPlus::LuaObject scriptContext3{};
+      LuaPlus::LuaObject scriptContext2{};
+      LuaPlus::LuaObject scriptContext1{};
+      LuaPlus::LuaObject metatableObject{};
+      (void)func_CreateLuaBuilderArmObject(&metatableObject, sim != nullptr ? sim->mLuaState : nullptr);
+      static_cast<CScriptObject*>(this)->CreateLuaObject(metatableObject, scriptContext1, scriptContext2, scriptContext3);
+    }
+
+    // Read the goal unit's actor skeleton (RAII shared_ptr; released at scope end).
+    Unit* const goalUnit = mGoalUnit.GetObjectPtr();
+    const boost::shared_ptr<const CAniSkel> skeleton = goalUnit->AniActor->GetSkeleton();
+    const CAniSkel* const skel = skeleton.get();
+
+    // Register the two watched bones, then record the reference (muzzle) bone:
+    // muzzle, then boneB, then boneA in priority order.
+    AddWatchBone(static_cast<int>(boneA));
+    AddWatchBone(boneB);
+
+    std::int32_t referenceBone = boneMuzzle;
+    if (boneMuzzle < 0) {
+      referenceBone = boneB;
+      if (boneB < 0) {
+        referenceBone = static_cast<std::int32_t>(boneA);
+      }
+    }
+    mReferenceBoneIdx = referenceBone;
+
+    // Seed the heading center from the watched (boneA) bone local orientation.
+    const SAniSkelBone* const bonesBegin = skel != nullptr ? skel->mBones.begin() : nullptr;
+    if (bonesBegin != nullptr) {
+      const std::size_t boneCount = static_cast<std::size_t>(skel->mBones.end() - bonesBegin);
+      if (boneA < boneCount) {
+        const Wm3::Quaternionf& ori = bonesBegin[boneA].mBoneTransform.orient_;
+        mHeadingCenter = std::atan2(
+          ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
+          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+        );
+      }
+    }
+
+    // Clear the unit builder's on-target latch (IAiBuilder vtable slot 17).
+    if (Unit* const targetUnit = mGoalUnit.GetObjectPtr();
+        targetUnit != nullptr && targetUnit->AiBuilder != nullptr) {
+      targetUnit->AiBuilder->BuilderSetOnTarget(false);
+    }
   }
 
   /**
