@@ -21,6 +21,8 @@ namespace moho
   class CAiTarget;
   class CAniPoseBone;
   class CScrLuaInitForm;
+  class Sim;
+  class UnitWeapon;
 
   /**
    * Address: 0x010A6396 (?dbg_Ballistics@Moho@@3_NA)
@@ -69,6 +71,26 @@ namespace moho
      * and identity quaternions for both watched aim bones.
      */
     CAimManipulator();
+
+    /**
+     * Address: 0x00630220 (FUN_00630220, ??0CAimManipulator@Moho@@QAE@PAVUnitWeapon@1@PAVSim@1@PBDIHH@Z)
+     *
+     * IDA signature:
+     * Moho::CAimManipulator *__thiscall Moho::CAimManipulator::CAimManipulator(
+     *     Moho::UnitWeapon *weapon, Moho::CAimManipulator *this, Moho::Sim *sim,
+     *     const char *label, unsigned int boneA, int boneB, int boneMuzzle);
+     *
+     * What it does:
+     * Builds one aim manipulator bound to `{weapon, sim}`: constructs the
+     * `IAniManipulator` base on the weapon owner's actor, head-inserts intrusive
+     * weak links to the owning unit and weapon, seeds label/arc/tracking/quaternion
+     * defaults, resolves the projectile physics sub-blueprint, materializes the Lua
+     * script object, registers the two watched aim bones, and seeds the heading arc
+     * from the turret bone's local orientation.
+     */
+    CAimManipulator(
+      UnitWeapon* weapon, Sim* sim, const char* label, std::uint32_t boneA, std::int32_t boneB, std::int32_t boneMuzzle
+    );
 
     /**
      * Address: 0x0062FDF0 (FUN_0062FDF0, Moho::CAimManipulator::StaticGetClass)

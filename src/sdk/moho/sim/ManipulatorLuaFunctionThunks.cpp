@@ -24,6 +24,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/UnitWeapon.h"
 
 struct lua_State;
 
@@ -39,6 +40,7 @@ namespace moho
   class Unit;
 
   int cfunc_CreateAimController(lua_State* luaContext);
+  int cfunc_CreateAimControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateBuilderArmController(lua_State* luaContext);
   int cfunc_CreateFootPlantController(lua_State* luaContext);
   int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* state);
@@ -1352,6 +1354,90 @@ namespace moho
       kCBuilderArmManipulatorSetHeadingPitchHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00631FA0 (FUN_00631FA0, cfunc_CreateAimControllerL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CreateAimControllerL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Reads `(weapon, label, turretBone, [barrelBone], [muzzleBone])`, resolves the
+   * weapon and requires its owner to have a skeleton, resolves the three bone
+   * selectors via `CAniActor::ResolveBoneIndex`, records the effective muzzle bone
+   * on the weapon, constructs one new `CAimManipulator` bound to that weapon, and
+   * pushes the manipulator's Lua userdata as the return value.
+   */
+  int cfunc_CreateAimControllerL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 2 || argumentCount > 5) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedRangeWarning, kCreateAimControllerHelpText, 2, 5, argumentCount);
+    }
+
+    const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
+    UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
+
+    LuaPlus::LuaStackObject labelArg(state, 2);
+    const char* const label = lua_tostring(rawState, 2);
+    if (label == nullptr) {
+      labelArg.TypeError("string");
+    }
+
+    CAniActor* const actor = weapon->mUnit->AniActor;
+    if (actor == nullptr) {
+      LuaPlus::LuaState::Error(state, "Unit has no skeleton.");
+    }
+
+    lua_settop(rawState, 5);
+
+    int boneIndices[3] = {0, 0, 0};
+    for (int i = 0; i < 3; ++i) {
+      LuaPlus::LuaStackObject boneArg(state, i + 3);
+      boneIndices[i] = actor->ResolveBoneIndex(boneArg);
+    }
+    const std::uint32_t turretBone = static_cast<std::uint32_t>(boneIndices[0]);
+    const int barrelBone = boneIndices[1];
+    const int muzzleBoneArg = boneIndices[2];
+
+    // Effective muzzle bone: muzzle, then barrel, then turret in priority order.
+    // The constructor re-derives this internally; the raw muzzle selector is what
+    // is forwarded, matching the binary.
+    int effectiveMuzzleBone = muzzleBoneArg;
+    if (muzzleBoneArg < 0) {
+      effectiveMuzzleBone = barrelBone;
+      if (barrelBone < 0) {
+        effectiveMuzzleBone = static_cast<int>(turretBone);
+      }
+    }
+    weapon->mBone = effectiveMuzzleBone;
+
+    // The binary allocates the full 0x110-byte manipulator and constructs it in
+    // place; `CAimManipulator` is modeled as a thin view over that storage, so the
+    // allocation size is explicit rather than `sizeof(CAimManipulator)`.
+    void* const storage = ::operator new(0x110u);
+    CAimManipulator* const manipulator =
+      new (storage) CAimManipulator(weapon, weapon->mSim, label, turretBone, barrelBone, muzzleBoneArg);
+
+    reinterpret_cast<CScriptObject*>(manipulator)->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00631F20 (FUN_00631F20, cfunc_CreateAimController)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_CreateAimController(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to
+   * `cfunc_CreateAimControllerL`.
+   */
+  int cfunc_CreateAimController(lua_State* const luaContext)
+  {
+    return cfunc_CreateAimControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
