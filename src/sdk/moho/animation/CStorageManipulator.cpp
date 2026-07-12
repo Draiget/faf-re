@@ -6,7 +6,9 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
@@ -279,7 +281,7 @@ namespace moho
    * min/max/current resource offsets, creates the Lua object lane, and applies
    * the initial current offset to the watched local bone transform.
    */
-  [[maybe_unused]] CStorageManipulatorRuntimeView* ConstructCStorageManipulatorRuntime(
+  CStorageManipulatorRuntimeView* ConstructCStorageManipulatorRuntime(
     CStorageManipulatorRuntimeView* const runtime,
     moho::Unit* const unit,
     const std::int32_t boneIndex,
@@ -323,6 +325,105 @@ namespace moho
     }
 
     return runtime;
+  }
+
+  /**
+   * Address: 0x006494C0 (FUN_006494C0, cfunc_CreateStorageManipL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CreateStorageManipL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Reads `(unit, bone, resourceName, minX, minY, minZ, maxX, maxY, maxZ)`,
+   * forces the unit skeleton to load, resolves the watched bone, parses the
+   * resource enum, allocates and constructs one storage manipulator bound to the
+   * unit, and pushes the manipulator's Lua userdata.
+   *
+   * NOTE: the binary passes the Lua `min*` args (stack 4-6) as the constructor's
+   * max-offset and the `max*` args (stack 7-9) as the min-offset; this inversion
+   * is preserved 1:1.
+   */
+  int cfunc_CreateStorageManipL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 2 || argumentCount > 9) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        "CreateStorageManip(unit, bone, resouceName, minX, minY, minZ, maxX, maxY, maxZ)",
+        2,
+        9,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const unit = SCR_FromLua_Unit(unitObject);
+
+    CAniActor* const actor = unit->AniActor;
+    // Force the skeleton to load (fetched then released), matching the binary.
+    (void)actor->GetSkeleton();
+
+    LuaPlus::LuaStackObject boneArg(state, 2);
+    const int boneIndex = actor->ResolveBoneIndex(boneArg);
+    if (boneIndex < 0) {
+      LuaPlus::LuaState::Error(state, "A valid bone is required");
+    }
+
+    moho::EEconResource resourceType{};
+    gpg::RRef resourceRef;
+    (void)gpg::RRef_EEconResource(&resourceRef, &resourceType);
+    const char* const resourceName = lua_tostring(rawState, 3);
+    if (resourceName == nullptr) {
+      LuaPlus::LuaStackObject resourceArg(state, 3);
+      resourceArg.TypeError("string");
+    }
+    SCR_GetEnum(state, resourceName, resourceRef);
+
+    // The binary allocates before validating the six coordinate args (leaking on
+    // a Lua type error, which longjmps); the runtime-view type + constructor
+    // helper are file-private to this TU.
+    auto* const runtime =
+      static_cast<CStorageManipulatorRuntimeView*>(::operator new(sizeof(CStorageManipulatorRuntimeView)));
+
+    const auto readNumberArg = [&](const int stackIndex) -> float {
+      LuaPlus::LuaStackObject numberArg(state, stackIndex);
+      if (lua_type(rawState, stackIndex) != LUA_TNUMBER) {
+        numberArg.TypeError("number");
+      }
+      return static_cast<float>(lua_tonumber(rawState, stackIndex));
+    };
+
+    // Validation/error precedence is stack 9 -> 4, matching the binary.
+    const float coord9 = readNumberArg(9);
+    const float coord8 = readNumberArg(8);
+    const float coord7 = readNumberArg(7);
+    const float coord6 = readNumberArg(6);
+    const float coord5 = readNumberArg(5);
+    const float coord4 = readNumberArg(4);
+
+    const Wm3::Vector3f minOffset{coord7, coord8, coord9};
+    const Wm3::Vector3f maxOffset{coord4, coord5, coord6};
+    (void)ConstructCStorageManipulatorRuntime(runtime, unit, boneIndex, &minOffset, &maxOffset, resourceType);
+
+    static_cast<CScriptObject*>(reinterpret_cast<IAniManipulator*>(runtime))->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00649440 (FUN_00649440, cfunc_CreateStorageManip)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_CreateStorageManip(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to
+   * `cfunc_CreateStorageManipL`.
+   */
+  int cfunc_CreateStorageManip(lua_State* const luaContext)
+  {
+    return cfunc_CreateStorageManipL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

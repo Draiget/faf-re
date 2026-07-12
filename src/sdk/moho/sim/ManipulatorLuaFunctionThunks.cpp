@@ -46,6 +46,7 @@ namespace moho
   int cfunc_CreateFootPlantController(lua_State* luaContext);
   int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateThrustController(lua_State* luaContext);
+  int cfunc_CreateStorageManip(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
   int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* state);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
@@ -586,6 +587,9 @@ namespace moho
 namespace
 {
   constexpr const char* kGlobalLuaFactoryClassName = "<global>";
+  constexpr const char* kCreateStorageManipName = "CreateStorageManip";
+  constexpr const char* kCreateStorageManipHelpText =
+    "CreateStorageManip(unit, bone, resouceName, minX, minY, minZ, maxX, maxY, maxZ)";
   constexpr const char* kCreateAimControllerName = "CreateAimController";
   constexpr const char* kCreateAimControllerHelpText =
     "CreateAimController(weapon, label, turretBone, [barrelBone], [muzzleBone])";
@@ -1555,6 +1559,25 @@ namespace moho
       nullptr,
       kGlobalLuaFactoryClassName,
       kCreateFootPlantControllerHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00649460 (FUN_00649460, func_CreateStorageManip_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateStorageManip(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateStorageManip_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateStorageManipName,
+      &cfunc_CreateStorageManip,
+      nullptr,
+      kGlobalLuaFactoryClassName,
+      kCreateStorageManipHelpText
     );
     return &binder;
   }
