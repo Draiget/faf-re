@@ -20,6 +20,16 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/animation/CAniSkel.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/containers/String.h"
+
+namespace moho
+{
+  // Defined in QuaternionMath.cpp (no shared header); rotate a vector by a quaternion.
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+}
 
 namespace
 {
@@ -27,6 +37,10 @@ namespace
   constexpr const char* kPropAddBoundedPropName = "AddBoundedProp";
   constexpr const char* kPropAddBoundedPropHelpText = "Prop:AddBoundedProp(priority)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+  constexpr const char* kSplitPropName = "SplitProp";
+  constexpr const char* kSplitPropHelpText =
+    "SplitProp(original, blueprint_name) -- split a prop into multiple child props, one per bone; "
+    "returns all the created props";
 
   constexpr std::uint8_t kPropEntityIdSourceIndex = moho::kEntityIdSourceIndexInvalid;
   constexpr std::uint32_t kPropEntityIdFamilySourceBits =
@@ -192,6 +206,11 @@ namespace moho
   CScrLuaMetatableFactory<Prop> CScrLuaMetatableFactory<Prop>::sInstance{};
   int cfunc_PropAddBoundedProp(lua_State* luaContext);
   int cfunc_PropAddBoundedPropL(LuaPlus::LuaState* state);
+  int cfunc_SplitProp(lua_State* luaContext);
+  int cfunc_SplitPropL(LuaPlus::LuaState* state);
+  void SplitPropIntoBoneChildren(
+    Entity* original, const RPropBlueprint* childBlueprint, gpg::fastvector_n<Prop*, 20>* out
+  );
 
   /**
    * Address: 0x006FAAD0 (FUN_006FAAD0, Moho::InstanceCounter<Moho::Prop>::GetStatItem)
@@ -317,6 +336,80 @@ namespace moho
     prop->mPriorityInfo.mBoundedTick = static_cast<std::int32_t>(sim->mCurTick);
     prop->mHandleIndex = sim->mEntityDB->AddBoundedProp(prop);
     return 0;
+  }
+
+  /**
+   * Address: 0x006FC850 (FUN_006FC850, func_SplitProp_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `SplitProp(original, blueprint_name)` Lua binder.
+   */
+  CScrLuaInitForm* func_SplitProp_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kSplitPropName,
+      &cfunc_SplitProp,
+      nullptr,
+      "<global>",
+      kSplitPropHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x006FC830 (FUN_006FC830, cfunc_SplitProp)
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to `cfunc_SplitPropL`.
+   */
+  int cfunc_SplitProp(lua_State* const luaContext)
+  {
+    return cfunc_SplitPropL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006FC8B0 (FUN_006FC8B0, cfunc_SplitPropL)
+   *
+   * What it does:
+   * Reads `(original, blueprint_name)`, resolves the source prop and the child
+   * prop blueprint, splits the source into per-bone child props via
+   * `SplitPropIntoBoneChildren`, pushes each created child's Lua userdata, and
+   * returns the child count.
+   */
+  int cfunc_SplitPropL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSplitPropHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject propObject(LuaPlus::LuaStackObject(state, 1));
+    Prop* const prop = SCR_FromLua_Prop(propObject, state);
+
+    LuaPlus::LuaStackObject blueprintArg(state, 2);
+    const char* const blueprintName = lua_tostring(rawState, 2);
+    if (blueprintName == nullptr) {
+      blueprintArg.TypeError("string");
+    }
+
+    msvc8::string blueprintFilename;
+    (void)gpg::STR_InitFilename(&blueprintFilename, blueprintName);
+    const RPropBlueprint* const childBlueprint = prop->SimulationRef->mRules->GetPropBlueprint(blueprintFilename);
+
+    gpg::fastvector_n<Prop*, 20> spawnedChildren;
+    if (childBlueprint != nullptr) {
+      SplitPropIntoBoneChildren(prop, childBlueprint, &spawnedChildren);
+    }
+
+    lua_settop(rawState, 0);
+    const int childCount = static_cast<int>(spawnedChildren.end() - spawnedChildren.begin());
+    lua_checkstack(rawState, childCount);
+    for (Prop* const child : spawnedChildren) {
+      child->mLuaObj.PushStack(state);
+    }
+    return childCount;
   }
 
   /**
@@ -478,6 +571,140 @@ namespace moho
     }
 
     return new (std::nothrow) Prop(sim, blueprint, transform);
+  }
+
+  /**
+   * Address: 0x006FB620 (FUN_006FB620, sub_6FB620)
+   *
+   * IDA signature:
+   * void __cdecl sub_6FB620(Moho::Entity *original, Moho::RPropBlueprint *childBlueprint,
+   *                         gpg::fastvector_n<Prop*,20> *out);
+   *
+   * What it does:
+   * Splits one source prop into per-bone child props. For every bone of the source
+   * mesh skeleton it inverts the bone local transform, scales the translation by
+   * the source draw-scale, applies a fixed 90-degree quaternion rotation, composes
+   * with the source world transform, and spawns a child Prop of `childBlueprint`
+   * there. When the spawned child has its own mesh, it rescales the child by the
+   * source-bone-bounds / child-mesh-box ratio, warps the child so its root bone
+   * sits at the composed pose, stores that scale, and relinks the child coord node
+   * into `Sim::mCoordEntities`. Every spawned child pointer is appended to `out`.
+   * Finally the source prop is destroyed. Sole caller: cfunc_SplitPropL.
+   */
+  void SplitPropIntoBoneChildren(
+    Entity* const original,
+    const RPropBlueprint* const childBlueprint,
+    gpg::fastvector_n<Prop*, 20>* const out
+  )
+  {
+    constexpr float kQ = 0.70710677f; // sqrt(2)/2; fixed 90-degree rotation lane.
+
+    boost::SharedPtrRaw<RScmResource> meshResource = original->GetMesh();
+    if (meshResource.px == nullptr) {
+      meshResource.release();
+      return;
+    }
+
+    const CAniSkel* sourceSkeleton = nullptr;
+    {
+      // Binary grabs the raw skeleton pointer then drops the shared owner; the
+      // mesh resource keeps the skeleton alive for the loop.
+      const boost::shared_ptr<const CAniSkel> handle = meshResource.px->GetSkeleton();
+      sourceSkeleton = handle.get();
+    }
+    if (sourceSkeleton == nullptr) {
+      meshResource.release();
+      return;
+    }
+
+    const SAniSkelBone* const bonesBegin = sourceSkeleton->mBones.begin();
+    const std::size_t boneCount = static_cast<std::size_t>(sourceSkeleton->mBones.end() - bonesBegin);
+    for (std::size_t i = 0; i < boneCount; ++i) {
+      const SAniSkelBone& bone = bonesBegin[i];
+
+      VTransform invTransform = bone.mBoneTransform.Inverse();
+      const float scaleX = original->mDrawScaleX;
+      const float scaleY = original->mDrawScaleY;
+      const float scaleZ = original->mDrawScaleZ;
+      invTransform.pos_.x *= scaleX;
+      invTransform.pos_.y *= scaleY;
+      invTransform.pos_.z *= scaleZ;
+
+      // Fixed 90-degree quaternion multiply (q' = q * qFixed), from the original
+      // lanes before any are overwritten. 1:1 with FUN_006FB620.
+      const float qx = invTransform.orient_.x;
+      const float qy = invTransform.orient_.y;
+      const float qz = invTransform.orient_.z;
+      const float qw = invTransform.orient_.w;
+      const float newY = (((qz * 0.0f) + (qy * kQ)) + (qx * kQ)) - (qw * 0.0f);
+      const float newZ = (((qz * kQ) + (qx * 0.0f)) + (qw * kQ)) - (qy * 0.0f);
+      const float newW = (((qy * 0.0f) + (qx * 0.0f)) + (qw * kQ)) - (qz * kQ);
+      const float newX = (((qx * kQ) - (qy * kQ)) - (qz * 0.0f)) - (qw * 0.0f);
+      invTransform.orient_.x = newX;
+      invTransform.orient_.y = newY;
+      invTransform.orient_.z = newZ;
+      invTransform.orient_.w = newW;
+
+      const VTransform composed = VTransform::Compose(invTransform, original->GetTransformWm3());
+      Prop* const child = Prop::CreateFromBlueprintResolved(original->SimulationRef, childBlueprint, composed);
+
+      boost::SharedPtrRaw<RScmResource> childMeshResource = child->GetMesh();
+      if (childMeshResource.px != nullptr) {
+        const RScmResource* const childMesh = childMeshResource.px;
+
+        // Per-axis child scale = source-bone-bounds extent / child-mesh-box extent.
+        Wm3::Vector3f childScale{};
+        childScale.x = ((bone.mBoundsMaxX - bone.mBoundsMinX) * scaleX) /
+          (childMesh->mBounds.Max.x - childMesh->mBounds.Min.x);
+        childScale.y = (scaleY * (bone.mBoundsMaxY - bone.mBoundsMinY)) /
+          (childMesh->mBounds.Max.y - childMesh->mBounds.Min.y);
+        childScale.z = (scaleZ * (bone.mBoundsMaxZ - bone.mBoundsMinZ)) /
+          (childMesh->mBounds.Max.z - childMesh->mBounds.Min.z);
+
+        {
+          const boost::shared_ptr<const CAniSkel> childHandle = childMeshResource.px->GetSkeleton();
+          const CAniSkel* const childSkeleton = childHandle.get();
+          if (childSkeleton != nullptr && childSkeleton->mBones.begin() != childSkeleton->mBones.end()) {
+            const SAniSkelBone* const rootBone = childSkeleton->GetBone(0);
+            // Root-bone local translation ("dir" == mBoneTransform.pos_), y negated,
+            // scaled per-axis, rotated by the composed orientation.
+            Wm3::Vector3f localOffset{};
+            localOffset.x = childScale.x * rootBone->mBoneTransform.pos_.x;
+            localOffset.y = childScale.y * rootBone->mBoneTransform.pos_.z;
+            localOffset.z = childScale.z * (-0.0f - rootBone->mBoneTransform.pos_.y);
+
+            Wm3::Vector3f rotatedOffset{};
+            MultQuadVec(&rotatedOffset, &localOffset, &composed.orient_);
+
+            VTransform warpTransform{};
+            warpTransform.orient_ = composed.orient_;
+            warpTransform.pos_.x = composed.pos_.x + rotatedOffset.x;
+            warpTransform.pos_.y = composed.pos_.y + rotatedOffset.y;
+            warpTransform.pos_.z = composed.pos_.z + rotatedOffset.z;
+            child->Warp(warpTransform);
+          }
+        }
+
+        // Store the child's draw-scale and relink its coord node at the tail of
+        // sim->mCoordEntities (inlined; matches SetEntityDrawScaleAndRelinkCoordNode).
+        child->mDrawScaleX = childScale.x;
+        child->mDrawScaleY = childScale.y;
+        child->mDrawScaleZ = childScale.z;
+        TDatListItem<Entity, void>* const node = &child->mCoordNode;
+        TDatListItem<Entity, void>* const head = &child->SimulationRef->mCoordEntities;
+        node->ListUnlink();
+        node->mPrev = head->mPrev;
+        node->mNext = head;
+        head->mPrev = node;
+        node->mPrev->mNext = node;
+      }
+      childMeshResource.release();
+
+      out->push_back(child);
+    }
+
+    original->Destroy();
+    meshResource.release();
   }
 
   /**
