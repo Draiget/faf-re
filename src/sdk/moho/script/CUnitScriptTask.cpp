@@ -28,6 +28,8 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/render/camera/VTransform.h"
 
 using namespace moho;
 
@@ -43,6 +45,8 @@ namespace
   constexpr const char* kLUnitMoveHelpText = "ScriptTask.LUnitMove(self,target)";
   constexpr const char* kLUnitMoveGroupName = "<global>";
   constexpr const char* kLUnitMoveCannotDeduceTarget = "Could not deduce target from lua object.";
+  constexpr const char* kLUnitMoveNearName = "LUnitMoveNear";
+  constexpr const char* kLUnitMoveNearHelpText = "ScriptTask.LUnitMoveNear(self,target,range)";
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -688,6 +692,163 @@ moho::CScrLuaInitForm* moho::func_LUnitMove_LuaFuncDef()
     nullptr,
     kLUnitMoveGroupName,
     kLUnitMoveHelpText
+  );
+  return &binder;
+}
+
+namespace
+{
+  /**
+   * Address: 0x005E2C00 (FUN_005E2C00, sub_5E2C00)
+   *
+   * IDA signature:
+   * gpg::Rect2i* __usercall sub_5E2C00@<eax>(Moho::CAiTarget* target@<eax>, gpg::Rect2i* out@<esi>);
+   *
+   * What it does:
+   * Computes the target grid-cell rectangle for one AI target. For an entity
+   * target it uses the entity's world origin-bone position + footprint; for a
+   * ground target it makes a one-cell rect at floor(pos - 0.5) (int16-truncated,
+   * matching the binary's word store); otherwise a zero rect.
+   */
+  [[nodiscard]] gpg::Rect2i* ComputeTargetGridRect(const moho::CAiTarget* const target, gpg::Rect2i* const out)
+  {
+    if (target->targetType == moho::EAiTargetType::AITARGET_Entity) {
+      moho::Entity* const entity = target->targetEntity.GetObjectPtr();
+      if (entity != nullptr) {
+        const moho::VTransform worldTransform = entity->GetBoneWorldTransform(-1);
+        const moho::SCoordsVec2 centerXZ{worldTransform.pos_.x, worldTransform.pos_.z};
+        return moho::COORDS_ToGridRect(out, centerXZ, entity->GetFootprint());
+      }
+    } else if (target->targetType == moho::EAiTargetType::AITARGET_Ground) {
+      // Binary stores each corner as a word (int16), then sign-extends on read;
+      // preserve that truncation so out-of-range ground targets fold the same.
+      const auto originX = static_cast<std::int16_t>(static_cast<int>(target->position.x - 0.5f));
+      const auto originZ = static_cast<std::int16_t>(static_cast<int>(target->position.z - 0.5f));
+      out->x0 = originX;
+      out->z0 = originZ;
+      out->x1 = originX + 1;
+      out->z1 = originZ + 1;
+      return out;
+    }
+
+    out->x0 = 0;
+    out->z0 = 0;
+    out->x1 = 0;
+    out->z1 = 0;
+    return out;
+  }
+
+  /**
+   * Address: 0x00619110 (FUN_00619110, sub_619110)
+   *
+   * IDA signature:
+   * void __usercall sub_619110(int range@<eax>, Moho::CCommandTask* task@<edx>, const gpg::Rect2i* cellRect@<ecx>);
+   *
+   * What it does:
+   * Builds one `SNavGoal` whose inner rect (`mPos2`) is the footprint-origin-
+   * adjusted target cell rect and whose outer rect (`mPos1`) is that rect
+   * expanded by `range`, then issues a move via `NewMoveTask`.
+   */
+  void IssueMoveToGridRect(const int range, moho::CCommandTask* const task, const gpg::Rect2i* const cellRect)
+  {
+    const moho::SFootprint& footprint = task->mUnit->GetFootprint();
+
+    moho::SNavGoal goal{};
+    goal.mPos2.x0 = 1 - static_cast<int>(footprint.mSizeX) + cellRect->x0;
+    goal.mPos2.z0 = 1 - static_cast<int>(footprint.mSizeZ) + cellRect->z0;
+    goal.mPos2.x1 = cellRect->x1;
+    goal.mPos2.z1 = cellRect->z1;
+    goal.mLayer = moho::LAYER_None;
+    goal.mPos1.x0 = goal.mPos2.x0 - range;
+    goal.mPos1.z0 = goal.mPos2.z0 - range;
+    goal.mPos1.x1 = range + cellRect->x1;
+    goal.mPos1.z1 = range + goal.mPos2.z1;
+
+    moho::NewMoveTask(goal, task, 0, nullptr, 0);
+  }
+} // namespace
+
+/**
+ * Address: 0x00623980 (FUN_00623980, cfunc_LUnitMoveNearL)
+ *
+ * IDA signature:
+ * int __thiscall cfunc_LUnitMoveNearL(LuaPlus::LuaState* this);
+ *
+ * What it does:
+ * Lua-bound `ScriptTask.LUnitMoveNear(self,target,range)` body. Resolves the
+ * bound `CUnitScriptTask` (arg 1), parses arg 2 as a Lua AI-target, requires
+ * arg 3 to be a number range, then moves the task's unit toward the target
+ * cell rect expanded by `range`. Raises a Lua error when the target argument
+ * does not resolve to a usable entity/ground target.
+ */
+int moho::cfunc_LUnitMoveNearL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLUnitMoveNearHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
+  CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
+
+  const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
+  Sim* const sim = lua_getglobaluserdata(rawState);
+
+  CAiTarget target{};
+  (void)target.GetLuaTarget(sim, targetObject);
+
+  if (target.targetType != EAiTargetType::AITARGET_None) {
+    LuaPlus::LuaStackObject rangeArg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      rangeArg.TypeError("integer");
+    }
+    const int range = static_cast<int>(lua_tonumber(rawState, 3));
+
+    gpg::Rect2i cellRect{};
+    (void)ComputeTargetGridRect(&target, &cellRect);
+    IssueMoveToGridRect(range, task, &cellRect);
+  } else {
+    // `LuaState::Error` raises `lua_error`, which longjmps out of this frame;
+    // control never returns. Match the binary by falling through.
+    LuaPlus::LuaState::Error(state, kLUnitMoveCannotDeduceTarget);
+  }
+
+  // The `CAiTarget target` local's destructor unlinks `target.targetEntity` from
+  // its owner weak-link chain at scope exit, matching the inlined weak-list
+  // unlink loop the compiler emitted at the tail of the binary.
+  return 0;
+}
+
+/**
+ * Address: 0x00623900 (FUN_00623900, cfunc_LUnitMoveNear)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_LUnitMoveNear(lua_State* a1);
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_LUnitMoveNearL`.
+ */
+int moho::cfunc_LUnitMoveNear(lua_State* const luaContext)
+{
+  return cfunc_LUnitMoveNearL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00623920 (FUN_00623920, func_LUnitMoveNear_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `ScriptTask.LUnitMoveNear(self,target,range)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_LUnitMoveNear_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kLUnitMoveNearName,
+    &moho::cfunc_LUnitMoveNear,
+    nullptr,
+    kLUnitMoveGroupName,
+    kLUnitMoveNearHelpText
   );
   return &binder;
 }

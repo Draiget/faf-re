@@ -239,6 +239,32 @@ namespace moho
    */
   int cfunc_LUnitMoveL(LuaPlus::LuaState* state);
 
+  /**
+   * Address: 0x00623900 (FUN_00623900, cfunc_LUnitMoveNear)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_LUnitMoveNearL`.
+   */
+  int cfunc_LUnitMoveNear(lua_State* luaContext);
+
+  /**
+   * Address: 0x00623920 (FUN_00623920, func_LUnitMoveNear_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `ScriptTask.LUnitMoveNear(self,target,range)` Lua binder.
+   */
+  CScrLuaInitForm* func_LUnitMoveNear_LuaFuncDef();
+
+  /**
+   * Address: 0x00623980 (FUN_00623980, cfunc_LUnitMoveNearL)
+   *
+   * What it does:
+   * Resolves the bound `CUnitScriptTask`, parses a Lua AI-target and integer
+   * range, and moves the task's unit toward the target cell rect expanded by
+   * `range`.
+   */
+  int cfunc_LUnitMoveNearL(LuaPlus::LuaState* state);
+
   static_assert(sizeof(CUnitScriptTask) == 0xB8, "CUnitScriptTask size must be 0xB8");
   static_assert(
     offsetof(CUnitScriptTask, mSourceCommand) == 0x70, "CUnitScriptTask::mSourceCommand offset must be 0x70"
