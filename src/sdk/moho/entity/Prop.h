@@ -214,4 +214,16 @@ namespace moho
    * Assigns startup factory-object index for `CScrLuaMetatableFactory<Prop>::sInstance`.
    */
   int register_CScrLuaMetatableFactory_Prop_Index();
+
+  /**
+   * Address: 0x006FB420 (FUN_006FB420)
+   *
+   * IDA signature:
+   * Moho::Prop * __cdecl Moho::PROP_Create(Moho::Sim *, Moho::VTransform const &, char const *);
+   *
+   * What it does:
+   * Normalizes the prop blueprint id string, resolves the `RPropBlueprint` from
+   * game rules, and creates the prop at the given transform (defined in Sim.cpp).
+   */
+  Prop* PROP_Create(Sim* sim, const VTransform& transform, const char* blueprintId);
 } // namespace moho
