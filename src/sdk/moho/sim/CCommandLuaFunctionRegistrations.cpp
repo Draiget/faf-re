@@ -2238,6 +2238,143 @@ namespace moho
   }
 
   /**
+   * Address: 0x00841C10 (FUN_00841C10, cfunc_IssueBlueprintCommandL)
+   *
+   * What it does:
+   * Parses a command lexical + a blueprint id + a repeat count (+ an optional
+   * clear-queue flag) and issues that many blueprint-build commands to the
+   * current world selection. Silo builds bypass the issue pipeline (per-entity
+   * "add" info-pair, like cfunc_IssueCommandL); BuildFactory issues one command
+   * per selected live FACTORY-category unit; every other command type issues to
+   * the whole selection.
+   */
+  int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 3 || argumentCount > 4) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kIssueBlueprintCommandHelpText, 3, 4, argumentCount);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      gpg::Warnf("Attempt to call IssueBlueprintCommand before world sessions exists.");
+      return 0;
+    }
+
+    // Arg 1: command lexical -> EUnitCommandType (validated by the None gate below).
+    const LuaPlus::LuaStackObject commandArg(state, 1);
+    const char* const commandLexical = lua_tostring(rawState, 1);
+    if (commandLexical == nullptr) {
+      commandArg.TypeError("string");
+      return 0;
+    }
+    EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
+    TryParseUnitCommandTypeLexical(commandLexical, commandType);
+
+    // Arg 2: blueprint id -> normalized filename -> resolved blueprint pointer.
+    const LuaPlus::LuaStackObject blueprintArg(state, 2);
+    const char* const blueprintLexical = lua_tostring(rawState, 2);
+    if (blueprintLexical == nullptr) {
+      blueprintArg.TypeError("string");
+      return 0;
+    }
+    RResId blueprintResId{};
+    gpg::STR_InitFilename(&blueprintResId.name, blueprintLexical);
+    REntityBlueprint* const blueprint = session->mRules->GetEntityBlueprint(blueprintResId);
+
+    // Arg 3: repeat count (integer).
+    const LuaPlus::LuaStackObject countArg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      countArg.TypeError("integer");
+      return 0;
+    }
+    const int repeatCount = static_cast<int>(lua_tonumber(rawState, 3));
+
+    // Arg 4 (optional): clear-queue flag; defaults to false when absent.
+    bool clearQueue = false;
+    if (argumentCount >= 4) {
+      clearQueue = LuaPlus::LuaStackObject(state, 4).GetBoolean();
+    }
+
+    // The binary resolves the blueprint pointer, reinterprets it as a float, and
+    // gates on == 0.0 (a null-pointer test); an unparsable command type is None.
+    if (blueprint == nullptr || commandType == EUnitCommandType::UNITCOMMAND_None) {
+      return 0;
+    }
+
+    // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):
+    // forward each selected entity id to the sync-driver as an "add" info-pair.
+    if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical
+        || commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke) {
+      const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
+        ? "SiloBuildTactical"
+        : "SiloBuildNuke";
+
+      SSelectionSetUserEntity& selection = session->mSelection;
+      SSelectionNodeUserEntity* node = nullptr;
+      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
+      while (node != selection.mHead) {
+        if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
+          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+            const auto entityIdAsPtr =
+              reinterpret_cast<void*>(static_cast<std::uintptr_t>(selectedEntity->mParams.mEntityId));
+            driver->ProcessInfoPair(entityIdAsPtr, commandKey, "add");
+          }
+        }
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+      return 0;
+    }
+
+    // BuildFactory: issue `count` commands per selected live FACTORY-category
+    // unit. The binary stashes the blueprint pointer bits in the command's
+    // orientation quaternion w-component (a float slot), NOT in mBlueprint
+    // (FUN_00841C10 branch write to mOri.w @ +0x48, distinct from the else
+    // branch's mBlueprint @ +0x50).
+    if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
+      std::memcpy(&factoryCommand.mOri.w, &blueprint, sizeof(float));
+
+      const msvc8::string factoryCategory("FACTORY");
+      SSelectionSetUserEntity& selection = session->mSelection;
+      SSelectionNodeUserEntity* node = nullptr;
+      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
+      while (node != selection.mHead) {
+        if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
+          UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
+          const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
+          if (selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead()
+              && selectedEntity->IsInCategory(factoryCategory)) {
+            ScopedLocalSelectionSet oneUnit{};
+            SSelectionSetUserEntity::AddResult addResult{};
+            SSelectionSetUserEntity::Add(&addResult, &oneUnit.get(), selectedEntity);
+            for (int remaining = repeatCount; remaining > 0; --remaining) {
+              ISSUE_Command(oneUnit.get(), factoryCommand, clearQueue);
+            }
+          }
+        }
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+      return 0;
+    }
+
+    // Every other command type: issue `count` copies to the whole selection.
+    SSTICommandIssueData blueprintCommand(commandType);
+    blueprintCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
+    for (int remaining = repeatCount; remaining > 0; --remaining) {
+      ISSUE_Command(session->mSelection, blueprintCommand, clearQueue);
+    }
+    return 0;
+  }
+
+  /**
    * Address: 0x008418C0 (FUN_008418C0, cfunc_IssueUnitCommandL)
    *
    * What it does:
