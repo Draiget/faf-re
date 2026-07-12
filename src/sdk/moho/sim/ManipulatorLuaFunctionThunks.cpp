@@ -42,6 +42,7 @@ namespace moho
   int cfunc_CreateAimController(lua_State* luaContext);
   int cfunc_CreateAimControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateBuilderArmController(lua_State* luaContext);
+  int cfunc_CreateBuilderArmControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateFootPlantController(lua_State* luaContext);
   int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* state);
   int cfunc_CreateThrustController(lua_State* luaContext);
@@ -1457,6 +1458,67 @@ namespace moho
       kCreateAimControllerHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00636880 (FUN_00636880, cfunc_CreateBuilderArmControllerL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CreateBuilderArmControllerL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Reads `(unit, bone0, [bone1], [bone2])`, requires the unit to have a skeleton,
+   * resolves the three bone selectors via `CAniActor::ResolveBoneIndex`, constructs
+   * one new `CBuilderArmManipulator` bound to that unit, and pushes the manipulator's
+   * Lua userdata as the return value.
+   */
+  int cfunc_CreateBuilderArmControllerL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 2 || argumentCount > 4) {
+      LuaPlus::LuaState::Error(
+        state, kLuaExpectedRangeWarning, kCreateBuilderArmControllerHelpText, 2, 4, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const unit = SCR_FromLua_Unit(unitObject);
+
+    CAniActor* const actor = unit->AniActor;
+    if (actor == nullptr) {
+      LuaPlus::LuaState::Error(state, "Unit has no skeleton.");
+    }
+
+    lua_settop(rawState, 4);
+
+    int boneIndices[3] = {0, 0, 0};
+    for (int i = 0; i < 3; ++i) {
+      LuaPlus::LuaStackObject boneArg(state, i + 2);
+      boneIndices[i] = actor->ResolveBoneIndex(boneArg);
+    }
+
+    CBuilderArmManipulator* const manipulator = new CBuilderArmManipulator(
+      unit, unit->SimulationRef, static_cast<std::uint32_t>(boneIndices[0]), boneIndices[1], boneIndices[2]
+    );
+
+    manipulator->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00636800 (FUN_00636800, cfunc_CreateBuilderArmController)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_CreateBuilderArmController(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to
+   * `cfunc_CreateBuilderArmControllerL`.
+   */
+  int cfunc_CreateBuilderArmController(lua_State* const luaContext)
+  {
+    return cfunc_CreateBuilderArmControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

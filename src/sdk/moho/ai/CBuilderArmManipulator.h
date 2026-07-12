@@ -10,6 +10,7 @@
 namespace moho
 {
   class CAniPoseBone;
+  class Sim;
   class Unit;
 
   /**
@@ -32,6 +33,23 @@ namespace moho
      * tracking parameters and cleared weak-target state.
      */
     CBuilderArmManipulator();
+
+    /**
+     * Address: 0x00635CA0 (FUN_00635CA0, ??0CBuilderArmManipulator@Moho@@QAE@PAVUnit@1@PAVSim@1@IHH@Z)
+     *
+     * IDA signature:
+     * Moho::CBuilderArmManipulator *__fastcall Moho::CBuilderArmManipulator::CBuilderArmManipulator(
+     *     Moho::Unit *unit, Moho::Sim *sim, Moho::CBuilderArmManipulator *this,
+     *     unsigned int boneA, int boneB, int boneMuzzle);
+     *
+     * What it does:
+     * Builds one builder-arm aim manipulator bound to `{unit, sim}`: constructs the
+     * `IAniManipulator` base on the unit's actor, head-inserts the weak goal-unit
+     * link, seeds arc/tracking defaults, materializes the Lua script object,
+     * registers the two watched bones, records the reference bone, seeds the heading
+     * center from the watched bone orientation, and clears the builder on-target latch.
+     */
+    CBuilderArmManipulator(Unit* unit, Sim* sim, std::uint32_t boneA, std::int32_t boneB, std::int32_t boneMuzzle);
 
     /**
      * Address: 0x00635FA0 (FUN_00635FA0, ??1CBuilderArmManipulator@Moho@@UAE@XZ)
