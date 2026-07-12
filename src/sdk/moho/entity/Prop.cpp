@@ -23,6 +23,7 @@
 #include "moho/animation/CAniSkel.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/math/QuaternionMath.h"
 #include "gpg/core/containers/String.h"
 
 namespace moho
@@ -41,6 +42,9 @@ namespace
   constexpr const char* kSplitPropHelpText =
     "SplitProp(original, blueprint_name) -- split a prop into multiple child props, one per bone; "
     "returns all the created props";
+  constexpr const char* kCreatePropHPRName = "CreatePropHPR";
+  constexpr const char* kCreatePropHPRHelpText = "CreatePropHPR(blueprint, x, y, z, heading, pitch, roll)";
+  constexpr float kDegreesToRadians = 0.017453292f;
 
   constexpr std::uint8_t kPropEntityIdSourceIndex = moho::kEntityIdSourceIndexInvalid;
   constexpr std::uint32_t kPropEntityIdFamilySourceBits =
@@ -211,6 +215,8 @@ namespace moho
   void SplitPropIntoBoneChildren(
     Entity* original, const RPropBlueprint* childBlueprint, gpg::fastvector_n<Prop*, 20>* out
   );
+  int cfunc_CreatePropHPR(lua_State* luaContext);
+  int cfunc_CreatePropHPRL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x006FAAD0 (FUN_006FAAD0, Moho::InstanceCounter<Moho::Prop>::GetStatItem)
@@ -410,6 +416,121 @@ namespace moho
       child->mLuaObj.PushStack(state);
     }
     return childCount;
+  }
+
+  /**
+   * Address: 0x006FBFB0 (FUN_006FBFB0, func_CreatePropHPR_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreatePropHPR(blueprint, x, y, z, heading, pitch, roll)`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CreatePropHPR_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreatePropHPRName,
+      &cfunc_CreatePropHPR,
+      nullptr,
+      "<global>",
+      kCreatePropHPRHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x006FBF90 (FUN_006FBF90, cfunc_CreatePropHPR)
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to `cfunc_CreatePropHPRL`.
+   */
+  int cfunc_CreatePropHPR(lua_State* const luaContext)
+  {
+    return cfunc_CreatePropHPRL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006FC010 (FUN_006FC010, cfunc_CreatePropHPRL)
+   *
+   * IDA signature:
+   * int __usercall cfunc_CreatePropHPRL@<eax>(LuaPlus::LuaState *this@<ebx>);
+   *
+   * What it does:
+   * Reads `(blueprint, x, y, z, heading, pitch, roll)`, builds a heading/pitch/roll
+   * rotation quaternion, spawns the prop at `{position, orientation}`, and pushes
+   * the created prop's Lua userdata.
+   */
+  int cfunc_CreatePropHPRL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 7) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreatePropHPRHelpText, 7, argumentCount);
+    }
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    LuaPlus::LuaStackObject blueprintArg(state, 1);
+    const char* const blueprintName = lua_tostring(rawState, 1);
+    if (blueprintName == nullptr) {
+      blueprintArg.TypeError("string");
+    }
+    const msvc8::string blueprintId(blueprintName, std::strlen(blueprintName));
+
+    // Position (args 2,3,4) and Euler angles (args 5,6,7); validated in the
+    // binary's order (4, 3, 2, then 5, 6, 7).
+    LuaPlus::LuaStackObject zArg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      zArg.TypeError("number");
+    }
+    const float posZ = static_cast<float>(lua_tonumber(rawState, 4));
+
+    LuaPlus::LuaStackObject yArg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      yArg.TypeError("number");
+    }
+    const float posY = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject xArg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      xArg.TypeError("number");
+    }
+    const float posX = static_cast<float>(lua_tonumber(rawState, 2));
+
+    LuaPlus::LuaStackObject headingArg(state, 5);
+    if (lua_type(rawState, 5) != LUA_TNUMBER) {
+      headingArg.TypeError("number");
+    }
+    const float heading = static_cast<float>(lua_tonumber(rawState, 5)) * kDegreesToRadians;
+
+    LuaPlus::LuaStackObject pitchArg(state, 6);
+    if (lua_type(rawState, 6) != LUA_TNUMBER) {
+      pitchArg.TypeError("number");
+    }
+    const float pitch = static_cast<float>(lua_tonumber(rawState, 6)) * kDegreesToRadians;
+
+    LuaPlus::LuaStackObject rollArg(state, 7);
+    if (lua_type(rawState, 7) != LUA_TNUMBER) {
+      rollArg.TypeError("number");
+    }
+    const float roll = static_cast<float>(lua_tonumber(rawState, 7)) * kDegreesToRadians;
+
+    Wm3::Vector3f rotationMatrix[3];
+    (void)BuildRotationMatrixFromEulerHPR(rotationMatrix, heading, pitch, roll);
+
+    VTransform transform{};
+    transform.pos_.x = posX;
+    transform.pos_.y = posY;
+    transform.pos_.z = posZ;
+    (void)MatrixToQuat(rotationMatrix, &transform.orient_);
+
+    Prop* const prop = PROP_Create(sim, transform, blueprintId.c_str());
+    if (prop == nullptr) {
+      LuaPlus::LuaState::Error(state, "Unable to create prop '%s'", blueprintId.c_str());
+    }
+
+    prop->mLuaObj.PushStack(state);
+    return 1;
   }
 
   /**

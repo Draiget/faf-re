@@ -741,4 +741,63 @@ namespace moho
     }
     return outOrientation;
   }
+
+  /**
+   * Address: 0x006D2680 (FUN_006D2680, sub_6D2680)
+   *
+   * IDA signature:
+   * float *__userpurge sub_6D2680@<eax>(float *result@<eax>, int a2, float *a3);
+   *
+   * What it does:
+   * Multiplies two row-major 3x3 matrices (`result = a * b`), each stored as three
+   * consecutive `Wm3::Vector3f` rows. `result` must not alias `a` or `b`.
+   */
+  Wm3::Vector3f* Multiply3x3RowMatrices(
+    Wm3::Vector3f* const result, const Wm3::Vector3f* const a, const Wm3::Vector3f* const b
+  ) noexcept
+  {
+    for (int row = 0; row < 3; ++row) {
+      result[row].x = (a[row].x * b[0].x) + (a[row].y * b[1].x) + (a[row].z * b[2].x);
+      result[row].y = (a[row].x * b[0].y) + (a[row].y * b[1].y) + (a[row].z * b[2].y);
+      result[row].z = (a[row].x * b[0].z) + (a[row].y * b[1].z) + (a[row].z * b[2].z);
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x006D1E30 (FUN_006D1E30, sub_6D1E30)
+   *
+   * IDA signature:
+   * void *__userpurge sub_6D1E30@<eax>(void *a1@<esi>, float a2, float a3, float a4);
+   *
+   * What it does:
+   * Builds a row-major 3x3 rotation matrix (three `Wm3::Vector3f` rows) from
+   * heading/pitch/roll Euler angles in radians: `outMatrix = headingY * pitchX * rollZ`.
+   */
+  Wm3::Vector3f* BuildRotationMatrixFromEulerHPR(
+    Wm3::Vector3f* const outMatrix, const float heading, const float pitch, const float roll
+  ) noexcept
+  {
+    const float ch = std::cosf(heading);
+    const float sh = std::sinf(heading);
+    const float cp = std::cosf(pitch);
+    const float sp = std::sinf(pitch);
+    const float cr = std::cosf(roll);
+    const float sr = std::sinf(roll);
+
+    const Wm3::Vector3f headingMatrix[3] = {
+      Wm3::Vector3f{ch, 0.0f, sh}, Wm3::Vector3f{0.0f, 1.0f, 0.0f}, Wm3::Vector3f{-sh, 0.0f, ch}
+    };
+    const Wm3::Vector3f pitchMatrix[3] = {
+      Wm3::Vector3f{1.0f, 0.0f, 0.0f}, Wm3::Vector3f{0.0f, cp, -sp}, Wm3::Vector3f{0.0f, sp, cp}
+    };
+    const Wm3::Vector3f rollMatrix[3] = {
+      Wm3::Vector3f{cr, -sr, 0.0f}, Wm3::Vector3f{sr, cr, 0.0f}, Wm3::Vector3f{0.0f, 0.0f, 1.0f}
+    };
+
+    Wm3::Vector3f pitchRoll[3];
+    (void)Multiply3x3RowMatrices(pitchRoll, pitchMatrix, rollMatrix);
+    (void)Multiply3x3RowMatrices(outMatrix, headingMatrix, pitchRoll);
+    return outMatrix;
+  }
 } // namespace moho

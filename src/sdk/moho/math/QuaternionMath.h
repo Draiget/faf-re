@@ -196,4 +196,24 @@ namespace moho
     Wm3::Quaternionf* outOrientation
   ) noexcept;
 
+  /**
+   * Address: 0x006D2680 (FUN_006D2680, sub_6D2680)
+   *
+   * Multiplies two row-major 3x3 matrices (`result = a * b`), each three
+   * consecutive `Wm3::Vector3f` rows. `result` must not alias `a`/`b`.
+   */
+  Wm3::Vector3f* Multiply3x3RowMatrices(
+    Wm3::Vector3f* result, const Wm3::Vector3f* a, const Wm3::Vector3f* b
+  ) noexcept;
+
+  /**
+   * Address: 0x006D1E30 (FUN_006D1E30, sub_6D1E30)
+   *
+   * Builds a row-major 3x3 rotation matrix (three `Wm3::Vector3f` rows) from
+   * heading/pitch/roll Euler angles in radians (`headingY * pitchX * rollZ`).
+   */
+  Wm3::Vector3f* BuildRotationMatrixFromEulerHPR(
+    Wm3::Vector3f* outMatrix, float heading, float pitch, float roll
+  ) noexcept;
+
 } // namespace moho
