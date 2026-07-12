@@ -29,7 +29,6 @@ namespace moho
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State*) { return 0; }
   int cfunc_CAiBrainCreateUnitNearSpot(lua_State*) { return 0; }
   int cfunc_CAiBrainFindPlaceToBuild(lua_State*) { return 0; }
-  int cfunc_IssueBuildMobile(lua_State*) { return 0; }
   int func_FlushEvents(lua_State*) { return 0; }
 }
 
