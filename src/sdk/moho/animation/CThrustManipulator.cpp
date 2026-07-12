@@ -17,9 +17,11 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
@@ -596,7 +598,7 @@ namespace moho
    * unit/link + label/state/cap defaults, creates Lua object lanes, and seeds
    * thrust direction/orientation from the watched bone local orientation.
    */
-  [[maybe_unused]] CThrustManipulatorSerializerRuntimeView* ConstructCThrustManipulatorRuntime(
+  CThrustManipulatorSerializerRuntimeView* ConstructCThrustManipulatorRuntime(
     CThrustManipulatorSerializerRuntimeView* const runtime,
     const char* const label,
     moho::Unit* const unit,
@@ -651,6 +653,72 @@ namespace moho
     const Wm3::Vector3f worldUp{0.0f, 1.0f, 0.0f};
     (void)BuildShortestArcDeltaQuaternion(&runtime->mOrientation, worldUp, runtime->mDirectionLane);
     return runtime;
+  }
+
+  /**
+   * Address: 0x0064ABC0 (FUN_0064ABC0, cfunc_CreateThrustControllerL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CreateThrustControllerL(LuaPlus::LuaState *this);
+   *
+   * What it does:
+   * Reads `(unit, label, thrustBone)`, requires the unit to have a skeleton,
+   * resolves the thrust bone via `CAniActor::ResolveBoneIndex`, allocates and
+   * constructs one thrust manipulator bound to that unit, and pushes the
+   * manipulator's Lua userdata as the return value.
+   */
+  int cfunc_CreateThrustControllerL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", "CreateThrustController(unit, label, thrustBone)", 3, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const unit = SCR_FromLua_Unit(unitObject);
+
+    LuaPlus::LuaStackObject labelArg(state, 2);
+    const char* const label = lua_tostring(rawState, 2);
+    if (label == nullptr) {
+      labelArg.TypeError("string");
+    }
+
+    CAniActor* const actor = unit->AniActor;
+    if (actor == nullptr) {
+      LuaPlus::LuaState::Error(state, "Unit has no skeleton.");
+    }
+
+    LuaPlus::LuaStackObject boneArg(state, 3);
+    const int boneIndex = actor->ResolveBoneIndex(boneArg);
+
+    // The binary allocates the full manipulator and constructs it in place; the
+    // runtime-view type + constructor helper are file-private to this TU, so the
+    // allocation size is taken from the modeled runtime-view size.
+    auto* const runtime = static_cast<CThrustManipulatorSerializerRuntimeView*>(
+      ::operator new(sizeof(CThrustManipulatorSerializerRuntimeView))
+    );
+    (void)ConstructCThrustManipulatorRuntime(runtime, label, unit, boneIndex);
+
+    static_cast<CScriptObject*>(reinterpret_cast<IAniManipulator*>(runtime))->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x0064AB40 (FUN_0064AB40, cfunc_CreateThrustController)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_CreateThrustController(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to
+   * `cfunc_CreateThrustControllerL`.
+   */
+  int cfunc_CreateThrustController(lua_State* const luaContext)
+  {
+    return cfunc_CreateThrustControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
