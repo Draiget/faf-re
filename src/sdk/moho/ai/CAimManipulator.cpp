@@ -18,6 +18,7 @@
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/animation/IAniManipulator.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -28,6 +29,7 @@
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
@@ -750,6 +752,152 @@ moho::CAimManipulator::CAimManipulator()
   runtimeView->mBone1Rot.w = 0.0f;
 
   runtimeView->mHeadingOffset = 0.0f;
+}
+
+/**
+ * Address: 0x00630220 (FUN_00630220, ??0CAimManipulator@Moho@@QAE@PAVUnitWeapon@1@PAVSim@1@PBDIHH@Z)
+ *
+ * IDA signature:
+ * Moho::CAimManipulator *__thiscall Moho::CAimManipulator::CAimManipulator(
+ *     Moho::UnitWeapon *weapon, Moho::CAimManipulator *this, Moho::Sim *sim,
+ *     const char *label, unsigned int boneA, int boneB, int boneMuzzle);
+ *
+ * What it does:
+ * Builds one aim manipulator bound to `{weapon, sim}`: constructs the
+ * `IAniManipulator` base on the weapon owner's actor, head-inserts intrusive weak
+ * links to the owning unit and weapon, seeds label/arc/tracking/quaternion
+ * defaults, resolves the projectile physics sub-blueprint, materializes the Lua
+ * script object, registers the two watched aim bones, and seeds the heading arc
+ * from the turret bone's local orientation.
+ */
+moho::CAimManipulator::CAimManipulator(
+  UnitWeapon* const weapon,
+  Sim* const sim,
+  const char* const label,
+  const std::uint32_t boneA,
+  const std::int32_t boneB,
+  const std::int32_t boneMuzzle
+)
+{
+  Unit* const ownerUnit = weapon->mUnit;
+
+  // Construct the IAniManipulator base subobject in place (this class is modeled
+  // as a runtime view with no C++ base), anchored to the weapon owner's actor,
+  // then plant the primary + CScriptObject-subobject vtable tags.
+  (void)new (static_cast<void*>(this)) moho::IAniManipulator(sim, ownerUnit->AniActor, 0);
+
+  static std::uint8_t sCAimManipulatorPrimaryVTableTag = 0;
+  static std::uint8_t sCAimManipulatorScriptObjectVTableTag = 0;
+  *reinterpret_cast<void**>(this) = &sCAimManipulatorPrimaryVTableTag;
+  *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(this) + 0x10) = &sCAimManipulatorScriptObjectVTableTag;
+
+  auto* const runtimeView = AimManipulatorRuntimeView(this);
+
+  // Head-insert the intrusive weak links (owning unit + weapon). Both nodes are
+  // freshly constructed and known-unlinked, so bind-then-head-insert mirrors the
+  // binary's open-coded list insert (no prior-link scan).
+  (void)new (static_cast<void*>(&runtimeView->mUnit)) moho::WeakPtr<moho::Unit>();
+  runtimeView->mUnit.BindObjectUnlinked(ownerUnit);
+  (void)runtimeView->mUnit.LinkIntoOwnerChainHeadUnlinked();
+
+  (void)new (static_cast<void*>(&runtimeView->mWeapon)) moho::WeakPtr<moho::UnitWeapon>();
+  runtimeView->mWeapon.BindObjectUnlinked(weapon);
+  (void)runtimeView->mWeapon.LinkIntoOwnerChainHeadUnlinked();
+
+  // Label.
+  (void)new (static_cast<void*>(&runtimeView->mLabel)) msvc8::string(label, std::strlen(label));
+
+  // Field defaults (firing arc, tracking state, identity bone quaternions).
+  runtimeView->mMaxHeading = 3.1415927f;
+  runtimeView->mHeadingMaxSlew = 0.062831849f;
+  runtimeView->mMinPitch = 15.0f;
+  runtimeView->mMaxPitch = 30.0f;
+  runtimeView->mPitchMaxSlew = 0.061086524f;
+  runtimeView->mUnitWepBlueprint = weapon->mWeaponBlueprint;
+  runtimeView->mProjPhysBlueprint = nullptr;
+  runtimeView->mEnabled = true;
+  runtimeView->mHeading = 0.0f;
+  runtimeView->mPitch = 0.0f;
+  runtimeView->mIsTracking = false;
+  runtimeView->mMinHeading = 0.0f;
+  runtimeView->mOnTarget = false;
+  runtimeView->mUnknownBoolE1 = false;
+  runtimeView->mResetPoseTime = 0;
+  runtimeView->mResetTime = 0;
+  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.y = 0.0f;
+  runtimeView->mBone0Rot.z = 0.0f;
+  runtimeView->mBone0Rot.w = 0.0f;
+  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.y = 0.0f;
+  runtimeView->mBone1Rot.z = 0.0f;
+  runtimeView->mBone1Rot.w = 0.0f;
+  runtimeView->mHeadingOffset = 0.0f;
+
+  // Materialize the Lua script object through the CAimManipulator metatable
+  // factory (FUN_00633050).
+  {
+    LuaPlus::LuaObject scriptContext3{};
+    LuaPlus::LuaObject scriptContext2{};
+    LuaPlus::LuaObject scriptContext1{};
+    LuaPlus::LuaObject metatableObject{};
+    (void)func_CreateLuaAimManipulatorObject(&metatableObject, sim != nullptr ? sim->mLuaState : nullptr);
+
+    auto* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+    scriptObject->CreateLuaObject(metatableObject, scriptContext1, scriptContext2, scriptContext3);
+  }
+
+  // Resolve the projectile physics sub-blueprint from the weapon's projectile
+  // blueprint (typed navigation of the binary's weapon->blueprint->physics chain).
+  if (RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint; projectileBlueprint != nullptr) {
+    runtimeView->mProjPhysBlueprint = &projectileBlueprint->Physics;
+  }
+
+  // Read the owner actor skeleton (RAII shared_ptr; released at scope end).
+  const boost::shared_ptr<const CAniSkel> skeleton = ownerUnit->AniActor->GetSkeleton();
+  const CAniSkel* const skel = skeleton.get();
+
+  // Register the two watched aim bones, then pick the muzzle bone (muzzle, then
+  // barrel, then turret in priority order).
+  auto* const baseManipulator = reinterpret_cast<moho::IAniManipulator*>(this);
+  (void)baseManipulator->AddWatchBone(static_cast<int>(boneA));
+  (void)baseManipulator->AddWatchBone(boneB);
+
+  std::int32_t muzzleBone = boneMuzzle;
+  if (boneMuzzle < 0) {
+    muzzleBone = boneB;
+    if (boneB < 0) {
+      muzzleBone = static_cast<std::int32_t>(boneA);
+    }
+  }
+  runtimeView->mMuzzleBone = muzzleBone;
+
+  // Seed the heading arc from the turret (boneA) bone local orientation quaternion.
+  const SAniSkelBone* const bonesBegin = skel != nullptr ? skel->mBones.begin() : nullptr;
+  if (bonesBegin != nullptr) {
+    const std::size_t boneCount = static_cast<std::size_t>(skel->mBones.end() - bonesBegin);
+    if (boneA < boneCount) {
+      const SAniSkelBone& bone = bonesBegin[boneA];
+      const Wm3::Quaternionf& ori = bone.mBoneTransform.orient_;
+
+      const RUnitBlueprintWeapon* const weaponBlueprint = runtimeView->mUnitWepBlueprint;
+      runtimeView->mMinHeading =
+        std::atan2(
+          ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
+          1.0f - (((ori.z * ori.z) + (ori.y * ori.y)) * 2.0f)
+        )
+        + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
+      runtimeView->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
+
+      if (std::fabs(((ori.w * ori.z) - (ori.y * ori.x)) * 2.0f) > 0.70700002f) {
+        runtimeView->mUnknownBoolE1 = true;
+      }
+    }
+  }
+
+  // Clear the weapon's can-fire latch and the base task-event triggered flag.
+  weapon->mCanFire = 0u;
+  AimManipulatorBaseView(this)->mTaskEventTriggered = false;
 }
 
 /**
