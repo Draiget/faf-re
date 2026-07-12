@@ -708,8 +708,13 @@ namespace moho
      * What it does:
      * Releases runtime-owned entity resources, unlinks attach/shooter state,
      * and then falls through to base/member teardown.
+     *
+     * Non-pure: the binary constructs a bare base `Entity` directly (the Lua
+     * `_c_CreateEntity` factory does `operator new(0x270)` + this ctor), so the
+     * complete object is concrete. The vtable slot is unchanged (this dtor
+     * already has an out-of-line body).
      */
-    virtual ~Entity() = 0;
+    virtual ~Entity();
 
     /**
      * Address: 0x006779E0 (FUN_006779E0)

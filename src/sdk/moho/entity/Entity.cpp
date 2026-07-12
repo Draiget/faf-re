@@ -5132,6 +5132,107 @@ namespace moho
     return &binder;
   }
 
+  // _c_CreateEntity global Lua factory (name/help preserved from FUN_006922D0).
+  constexpr const char* kCreateEntityName = "_c_CreateEntity";
+  constexpr const char* kCreateEntityHelpText = "_c_CreateEntity(spec)";
+
+  /**
+   * Address: 0x00692330 (FUN_00692330, cfunc__c_CreateEntityL)
+   *
+   * IDA signature:
+   * int __usercall cfunc__c_CreateEntityL@<eax>(LuaPlus::LuaState *this@<ebx>);
+   *
+   * What it does:
+   * Global Lua `_c_CreateEntity(spec)` factory. Requires exactly 2 args, resolves
+   * the Sim from the Lua global userdata, and derives the owning army index from
+   * the spec table's "Owner" (integer or game-object) / "Army" (one-based) fields,
+   * defaulting to 255. Reserves a created-entity id `((army|0x500)<<20)`,
+   * heap-constructs one Entity bound to arg 1's Lua object, and pushes the new
+   * entity's Lua userdata.
+   */
+  int cfunc__c_CreateEntityL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateEntityHelpText, 2, argumentCount);
+    }
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+    const LuaPlus::LuaStackObject specObject(state, 1);
+
+    int armyIndex = 255;
+    if (lua_type(rawState, 2) == LUA_TTABLE) {
+      lua_pushstring(rawState, "Owner");
+      lua_gettable(rawState, 2);
+      const LuaPlus::LuaStackObject ownerObject(state, lua_gettop(rawState));
+
+      lua_pushstring(rawState, "Army");
+      lua_gettable(rawState, 2);
+      const LuaPlus::LuaStackObject armyObject(state, lua_gettop(rawState));
+
+      if (lua_type(rawState, ownerObject.m_stackIndex) != LUA_TNIL) {
+        if (lua_type(rawState, ownerObject.m_stackIndex) == LUA_TNUMBER) {
+          armyIndex = ownerObject.GetInteger();
+        } else {
+          const LuaPlus::LuaObject ownerLuaObject(ownerObject);
+          Entity* const owner = SCR_FromLua_EntityOpt(ownerLuaObject);
+          armyIndex = (owner != nullptr) ? owner->ArmyRef->ArmyId : 255;
+        }
+      } else if (lua_type(rawState, armyObject.m_stackIndex) != LUA_TNIL) {
+        armyIndex = armyObject.GetInteger() - 1;
+        if (armyIndex < 0) {
+          LuaPlus::LuaState::Error(state, "Army < 0 passed in");
+        }
+      }
+    }
+
+    // The binary allocates raw storage, constructs in place, then pushes the owned
+    // Lua object; keep the explicit new/ctor split for 1:1 behavior.
+    auto* const storage = static_cast<Entity*>(::operator new(sizeof(Entity)));
+    const LuaPlus::LuaObject entityLuaObject(specObject);
+    const EntId reservedId = static_cast<EntId>(
+      sim->mEntityDB->DoReserveId((static_cast<std::uint32_t>(armyIndex) | 0x500u) << moho::kEntityIdSourceShift)
+    );
+    Entity* const created = new (storage) Entity(entityLuaObject, sim, reservedId);
+
+    created->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x006922B0 (FUN_006922B0, cfunc__c_CreateEntity)
+   *
+   * IDA signature:
+   * int __cdecl cfunc__c_CreateEntity(lua_State *a1);
+   *
+   * What it does:
+   * Unwraps the raw Lua callback context and forwards to `cfunc__c_CreateEntityL`.
+   */
+  int cfunc__c_CreateEntity(lua_State* const luaContext)
+  {
+    return cfunc__c_CreateEntityL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006922D0 (FUN_006922D0, func__c_CreateEntity_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua factory `_c_CreateEntity(spec)` binder.
+   */
+  CScrLuaInitForm* func__c_CreateEntity_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateEntityName,
+      &cfunc__c_CreateEntity,
+      nullptr,
+      "<global>",
+      kCreateEntityHelpText
+    );
+    return &binder;
+  }
+
   /**
    * Address: 0x0068B0B0 (FUN_0068B0B0, cfunc_GetBlueprintSim)
    *
