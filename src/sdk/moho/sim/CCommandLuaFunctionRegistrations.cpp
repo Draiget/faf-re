@@ -47,6 +47,9 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
+#include "moho/sim/UserArmy.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/mesh/Mesh.h"
@@ -2529,6 +2532,324 @@ namespace moho
   int cfunc_IssueBlueprintCommand(lua_State* const luaContext)
   {
     return cfunc_IssueBlueprintCommandL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  namespace
+  {
+    // Typed field view over a UI-side UserUnit for the GetRolloverInfo builders.
+    // Every offset is asm-confirmed from FUN_008421F0 and matches the committed
+    // UserUnitLuaRuntimeView (UserUnit.cpp). Read-only: instances are obtained by
+    // reinterpret_cast over a live UserUnit, so no ctor/dtor runs on the members.
+    struct RolloverUnitView
+    {
+      std::uint8_t pad_0000_0044[0x44];
+      std::uint32_t entityId;                    // +0x44  UserEntity::mParams.mEntityId
+      std::uint8_t pad_0048_0068[0x68 - 0x48];
+      float health;                              // +0x68  mVariableData.mHealth
+      float maxHealth;                           // +0x6C  mVariableData.mMaxHealth
+      std::uint8_t pad_0070_0120[0x120 - 0x70];
+      UserArmy* army;                            // +0x120
+      std::uint8_t pad_0124_01A4[0x1A4 - 0x124];
+      float fuelRatio;                           // +0x1A4
+      float shieldRatio;                         // +0x1A8
+      std::uint8_t pad_01AC_01BC[0x1BC - 0x1AC];
+      float workProgress;                        // +0x1BC
+      std::int32_t tacticalSiloBuildCount;       // +0x1C0
+      std::int32_t nukeSiloBuildCount;           // +0x1C4
+      std::int32_t tacticalSiloStorageCount;     // +0x1C8
+      std::int32_t nukeSiloStorageCount;         // +0x1CC
+      std::int32_t tacticalSiloMaxStorageCount;  // +0x1D0
+      std::int32_t nukeSiloMaxStorageCount;      // +0x1D4
+      std::uint8_t pad_01D8_01DC[0x1DC - 0x1D8];
+      msvc8::string customName;                  // +0x1DC
+      float producedEnergy;                      // +0x1F8  mUnitVarDat.mProduced.ENERGY
+      float producedMass;                        // +0x1FC  mUnitVarDat.mProduced.MASS
+      float spentEnergy;                         // +0x200  mResourcesSpent.ENERGY (consumed)
+      float spentMass;                           // +0x204  mResourcesSpent.MASS
+      float maintEnergy;                         // +0x208  mMaintainenceCost.ENERGY (requested)
+      float maintMass;                           // +0x20C  mMaintainenceCost.MASS
+      EntId focusUnitId;                         // +0x210  (mFocusUnit)
+      EntId guardedUnitId;                       // +0x214  (mGuardedUnit)
+      EntId targetBlipId;                        // +0x218  (mTargetBlip)
+      std::uint8_t pad_021C_03E0[0x3E0 - 0x21C];
+      std::uint32_t dataFlags;                   // +0x3E0  (mIntelStateFlags; 0x10=has-data, 0x08=health-valid)
+    };
+    static_assert(offsetof(RolloverUnitView, entityId) == 0x44, "rollover entityId @0x44");
+    static_assert(offsetof(RolloverUnitView, health) == 0x68, "rollover health @0x68");
+    static_assert(offsetof(RolloverUnitView, maxHealth) == 0x6C, "rollover maxHealth @0x6C");
+    static_assert(offsetof(RolloverUnitView, army) == 0x120, "rollover army @0x120");
+    static_assert(offsetof(RolloverUnitView, fuelRatio) == 0x1A4, "rollover fuelRatio @0x1A4");
+    static_assert(offsetof(RolloverUnitView, shieldRatio) == 0x1A8, "rollover shieldRatio @0x1A8");
+    static_assert(offsetof(RolloverUnitView, workProgress) == 0x1BC, "rollover workProgress @0x1BC");
+    static_assert(offsetof(RolloverUnitView, tacticalSiloBuildCount) == 0x1C0, "rollover tacSiloBuild @0x1C0");
+    static_assert(offsetof(RolloverUnitView, nukeSiloBuildCount) == 0x1C4, "rollover nukeSiloBuild @0x1C4");
+    static_assert(offsetof(RolloverUnitView, tacticalSiloStorageCount) == 0x1C8, "rollover tacSiloStore @0x1C8");
+    static_assert(offsetof(RolloverUnitView, nukeSiloStorageCount) == 0x1CC, "rollover nukeSiloStore @0x1CC");
+    static_assert(offsetof(RolloverUnitView, tacticalSiloMaxStorageCount) == 0x1D0, "rollover tacSiloMax @0x1D0");
+    static_assert(offsetof(RolloverUnitView, nukeSiloMaxStorageCount) == 0x1D4, "rollover nukeSiloMax @0x1D4");
+    static_assert(offsetof(RolloverUnitView, customName) == 0x1DC, "rollover customName @0x1DC");
+    static_assert(offsetof(RolloverUnitView, producedEnergy) == 0x1F8, "rollover producedEnergy @0x1F8");
+    static_assert(offsetof(RolloverUnitView, spentEnergy) == 0x200, "rollover spentEnergy @0x200");
+    static_assert(offsetof(RolloverUnitView, maintEnergy) == 0x208, "rollover maintEnergy @0x208");
+    static_assert(offsetof(RolloverUnitView, focusUnitId) == 0x210, "rollover focusUnitId @0x210");
+    static_assert(offsetof(RolloverUnitView, guardedUnitId) == 0x214, "rollover guardedUnitId @0x214");
+    static_assert(offsetof(RolloverUnitView, targetBlipId) == 0x218, "rollover targetBlipId @0x218");
+    static_assert(offsetof(RolloverUnitView, dataFlags) == 0x3E0, "rollover dataFlags @0x3E0");
+
+    // Per-tick economy value → per-second UI rate (ds:dword_DFF31C == 10.0f).
+    constexpr float kRolloverEconomyPerSecondToUiRate = 10.0f;
+
+    [[nodiscard]] const RolloverUnitView& AsRolloverUnitView(const UserUnit* const unit) noexcept
+    {
+      return *reinterpret_cast<const RolloverUnitView*>(unit);
+    }
+
+    /**
+     * Address: 0x008421F0 (FUN_008421F0, sub_8421F0)
+     *
+     * IDA signature:
+     * void __usercall sub_8421F0(LuaPlus::LuaObject *out@<edi>,
+     *                            Moho::UserUnit *unit@<esi>,
+     *                            LuaPlus::LuaState *state);
+     *
+     * What it does:
+     * Fills one rollover-info Lua table with full stats for a live user unit:
+     * blueprint id, health/max, KILLS stat, per-second economy, silo counters,
+     * fuel/shield/work ratios, the unit's own Lua object, entity id, army index
+     * and encoded team color. When the +0x3E0 flag word lacks the has-unit-data
+     * bit only a stubbed blueprintId / armyIndex / teamColor is written; when the
+     * entity id nibble marks a being-placed entity the stat block is sentinel-filled.
+     */
+    void BuildUserUnitRolloverInfo(LuaPlus::LuaObject& out, UserUnit* const unit, LuaPlus::LuaState* const state)
+    {
+      out.AssignNewTable(state, 0, 0);
+
+      const RolloverUnitView& view = AsRolloverUnitView(unit);
+      if ((view.dataFlags & 0x10u) != 0u) {
+        IUnit* const bridge = GetIUnitBridge(unit);
+        out.SetString("blueprintId", bridge->GetBlueprint()->mBlueprintId.c_str());
+
+        if ((view.dataFlags & 0x08u) != 0u) {
+          out.SetNumber("health", view.health);
+          out.SetNumber("maxHealth", view.maxHealth);
+        }
+
+        if ((view.entityId & 0xF0000000u) == 0x30000000u) {
+          // Placeholder / being-placed entity: sentinel values.
+          out.SetNumber("kills", 0.0f);
+          out.SetInteger("energyConsumed", -1);
+          out.SetInteger("massConsumed", -1);
+          out.SetInteger("energyRequested", 0);
+          out.SetInteger("massRequested", 0);
+          out.SetInteger("energyProduced", -1);
+          out.SetInteger("massProduced", -1);
+          out.SetInteger("tacticalSiloBuildCount", 0);
+          out.SetInteger("tacticalSiloStorageCount", 0);
+          out.SetInteger("tacticalSiloMaxStorageCount", 0);
+          out.SetInteger("nukeSiloBuildCount", 0);
+          out.SetInteger("nukeSiloStorageCount", 0);
+          out.SetInteger("nukeSiloMaxStorageCount", 0);
+          out.SetInteger("fuelRatio", -1);
+          out.SetInteger("shieldRatio", -1);
+          out.SetInteger("workProgress", -1);
+        } else {
+          int killsDefault = 0;
+          StatItem* const killsStat = bridge->GetStat("KILLS", killsDefault);
+          out.SetNumber("kills", static_cast<float>(killsStat->GetInt(false)));
+
+          out.SetInteger("energyConsumed", static_cast<int>(view.spentEnergy * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("massConsumed", static_cast<int>(view.spentMass * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("energyRequested", static_cast<int>(view.maintEnergy * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("massRequested", static_cast<int>(view.maintMass * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("energyProduced", static_cast<int>(view.producedEnergy * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("massProduced", static_cast<int>(view.producedMass * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("tacticalSiloBuildCount", view.tacticalSiloBuildCount);
+          out.SetInteger("tacticalSiloStorageCount", view.tacticalSiloStorageCount);
+          out.SetInteger("tacticalSiloMaxStorageCount", view.tacticalSiloMaxStorageCount);
+          out.SetInteger("nukeSiloBuildCount", view.nukeSiloBuildCount);
+          out.SetInteger("nukeSiloStorageCount", view.nukeSiloStorageCount);
+          out.SetInteger("nukeSiloMaxStorageCount", view.nukeSiloMaxStorageCount);
+          out.SetNumber("fuelRatio", view.fuelRatio);
+          out.SetNumber("shieldRatio", view.shieldRatio);
+          out.SetNumber("workProgress", view.workProgress);
+
+          const LuaPlus::LuaObject unitObject = bridge->GetLuaObject();
+          out.SetObject("userUnit", unitObject);
+
+          const msvc8::string entityIdText = gpg::STR_Printf("%d", view.entityId);
+          out.SetString("entityId", entityIdText.c_str());
+        }
+
+        out.SetInteger("armyIndex", static_cast<int>(view.army->mArmyIndex));
+        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, view.army->mVarDat.mPlayerColorBgra);
+        out.SetObject("teamColor", teamColor);
+
+        if (!view.customName.empty()) {
+          out.SetString("customName", view.customName.c_str());
+        }
+      } else {
+        out.SetString("blueprintId", "unknown");
+        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, view.army->mVarDat.mPlayerColorBgra);
+        out.SetObject("teamColor", teamColor);
+        out.SetInteger("armyIndex", static_cast<int>(view.army->mArmyIndex));
+      }
+    }
+
+    /**
+     * Address: 0x008427E0 (FUN_008427E0, sub_8427E0)
+     *
+     * IDA signature:
+     * void __usercall sub_8427E0(LuaPlus::LuaState *state@<eax>,
+     *                            Moho::UserUnit *unit@<edi>,
+     *                            LuaPlus::LuaObject *out);
+     *
+     * What it does:
+     * Fills one compact rollover sub-table for a focus / upgrade target unit:
+     * blueprintId + health/max when the target blueprint is present and the unit
+     * data flags gate (mobile → 0x08, otherwise 0x10) is satisfied; otherwise a
+     * stubbed "unknown" blueprintId.
+     */
+    void BuildFocusUnitRolloverInfo(LuaPlus::LuaObject& out, UserUnit* const unit, LuaPlus::LuaState* const state)
+    {
+      out.AssignNewTable(state, 0, 0);
+
+      IUnit* const bridge = GetIUnitBridge(unit);
+      const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
+      const RolloverUnitView& view = AsRolloverUnitView(unit);
+
+      bool hasBlueprintId = false;
+      if (blueprint != nullptr) {
+        const std::uint32_t requiredFlag = blueprint->IsMobile() ? 0x08u : 0x10u;
+        hasBlueprintId = (view.dataFlags & requiredFlag) != 0u;
+      }
+
+      if (!hasBlueprintId) {
+        out.SetString("blueprintId", "unknown");
+        return;
+      }
+
+      out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
+      out.SetNumber("health", view.health);
+      out.SetNumber("maxHealth", view.maxHealth);
+    }
+
+    /**
+     * Address: 0x00842770 (FUN_00842770, sub_842770)
+     *
+     * IDA signature:
+     * void __usercall sub_842770(LuaPlus::LuaObject *out@<esi>,
+     *                            Moho::UserEntity *prop@<edi>,
+     *                            LuaPlus::LuaState *state);
+     *
+     * What it does:
+     * Fills one rollover sub-table for a focused prop entity: blueprintId +
+     * fractionComplete, or "unknown"/0.0 when the prop has no blueprint.
+     */
+    void BuildFocusPropRolloverInfo(LuaPlus::LuaObject& out, UserEntity* const prop, LuaPlus::LuaState* const state)
+    {
+      out.AssignNewTable(state, 0, 0);
+
+      const REntityBlueprint* const blueprint = prop->mParams.mBlueprint;
+      if (blueprint != nullptr) {
+        out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
+        out.SetNumber("fractionComplete", prop->mVariableData.mFractionComplete);
+      } else {
+        out.SetString("blueprintId", "unknown");
+        out.SetNumber("fractionComplete", 0.0f);
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00842920 (FUN_00842920, cfunc_GetRolloverInfoL)
+   *
+   * IDA signature:
+   * int __userpurge cfunc_GetRolloverInfoL(LuaPlus::LuaState *state@<edi>);
+   *
+   * What it does:
+   * Builds the `GetRolloverInfo()` Lua table for the currently hovered unit:
+   * fills full unit stats, then resolves the hovered unit's target-blip / focus /
+   * focus-prop / guarded targets into nested tables. Pushes nil when there is no
+   * in-world hovered unit. Holds a transient weak-link guard on the hovered unit
+   * for the duration of the build.
+   */
+  int cfunc_GetRolloverInfoL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 0) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetRolloverInfoHelpText, 0, argumentCount);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+
+    // Snapshot the hovered-unit weak slot and pin it with a transient guard node
+    // linked into the entity's weak-owner chain (mirrors FUN_00842920 var_48 dance).
+    moho::WeakObject* hoverOwner = nullptr;
+    UserEntity* hoveredEntity = nullptr;
+    bool inWorld = false;
+    if (session != nullptr) {
+      const MouseInfo& cursor = session->GetCursorInfo();
+      if (cursor.mUnitHover != nullptr) {
+        hoverOwner = reinterpret_cast<moho::WeakObject*>(cursor.mUnitHover);
+        // The hovered UserEntity is (weak-slot value) - offsetof(UserEntity, mIUnitChainHead).
+        if (reinterpret_cast<std::uintptr_t>(cursor.mUnitHover) != offsetof(UserEntity, mIUnitChainHead)) {
+          hoveredEntity = reinterpret_cast<UserEntity*>(
+            reinterpret_cast<char*>(cursor.mUnitHover) - offsetof(UserEntity, mIUnitChainHead));
+        }
+      }
+      inWorld = cursor.mHitValid != 0;
+    }
+
+    moho::WeakObject::ScopedWeakLinkGuard hoverGuard(hoverOwner);
+
+    LuaPlus::LuaObject result;
+
+    UserUnit* hoveredUnit = nullptr;
+    if (hoveredEntity != nullptr && inWorld) {
+      hoveredUnit = hoveredEntity->IsUserUnit();
+    }
+
+    if (hoveredUnit == nullptr) {
+      result.AssignNil(state);
+    } else {
+      BuildUserUnitRolloverInfo(result, hoveredUnit, state);
+
+      const RolloverUnitView& view = AsRolloverUnitView(hoveredUnit);
+
+      if (UserEntity* const targetEntity = session->LookupEntityId(view.targetBlipId); targetEntity != nullptr) {
+        if (UserUnit* const targetUnit = targetEntity->IsUserUnit(); targetUnit != nullptr) {
+          LuaPlus::LuaObject focusTable;
+          BuildFocusUnitRolloverInfo(focusTable, targetUnit, state);
+          result.SetObject("focus", focusTable);
+        }
+      } else if (UserEntity* const focusEntity = session->LookupEntityId(view.focusUnitId); focusEntity != nullptr) {
+        if (UserUnit* const focusUnit = focusEntity->IsUserUnit(); focusUnit != nullptr) {
+          LuaPlus::LuaObject focusTable;
+          BuildUserUnitRolloverInfo(focusTable, focusUnit, state);
+          // The upgrade/focus key is chosen from the HOVERED unit's state, not the focus unit's.
+          IUnit* const hoveredBridge = GetIUnitBridge(hoveredUnit);
+          if (hoveredBridge->IsUnitState(UNITSTATE_Upgrading)) {
+            result.SetObject("focusUpgrade", focusTable);
+          } else {
+            result.SetObject("focus", focusTable);
+          }
+        } else if ((view.focusUnitId & 0xF0000000u) == 0x20000000u) {
+          LuaPlus::LuaObject propTable;
+          BuildFocusPropRolloverInfo(propTable, focusEntity, state);
+          result.SetObject("focusProp", propTable);
+        }
+      } else if (UserEntity* const guardedEntity = session->LookupEntityId(view.guardedUnitId); guardedEntity != nullptr) {
+        if (UserUnit* const guardedUnit = guardedEntity->IsUserUnit(); guardedUnit != nullptr) {
+          LuaPlus::LuaObject guardedTable;
+          BuildUserUnitRolloverInfo(guardedTable, guardedUnit, state);
+          result.SetObject("guarded", guardedTable);
+        }
+      }
+    }
+
+    result.PushStack(state);
+    return 1;
   }
 
   /**
