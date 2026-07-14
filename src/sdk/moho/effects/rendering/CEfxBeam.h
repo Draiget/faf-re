@@ -12,6 +12,7 @@ namespace moho
 {
   struct GeomCamera3;
   struct RBeamBlueprint;
+  struct SCreateBeamParams;
 
   class CEfxBeam : public CEffectImpl
   {
@@ -38,6 +39,20 @@ namespace moho
      * base effect as its owning-army/script token.
      */
     CEfxBeam(CEffectManagerImpl* manager, const RBeamBlueprint* blueprint, int armyIndex);
+
+    /**
+     * Address: 0x00654A70 (FUN_00654A70, Moho::CEfxBeam::CEfxBeam)
+     *
+     * What it does:
+     * Create-params beam ctor. Chains the default CEffectImpl base ctor (manager
+     * binding happens later, via LinkActiveEffect in the factory), seeds the
+     * endpoint attach-info to the detached beam-end default, sizes the effect
+     * parameter/texture/string lanes, then applies every beam render parameter
+     * from `params` (endpoints, shared start/end colour, length, thickness, UV
+     * shift, repeat rate, a fixed LOD cutoff of 150, and the beam texture) before
+     * rebuilding render state via Reset().
+     */
+    explicit CEfxBeam(const SCreateBeamParams& params);
 
     /**
      * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)

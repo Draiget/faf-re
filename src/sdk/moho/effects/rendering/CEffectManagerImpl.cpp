@@ -583,7 +583,11 @@ namespace moho
    */
   IEffect* CEffectManagerImpl::CreateBeam(const SCreateBeamParams& params)
   {
-    CEfxBeam* const effect = new (std::nothrow) CEfxBeam();
+    // The create-params ctor applies every beam render parameter (endpoints,
+    // colour, length, thickness, UV shift, repeat rate, LOD cutoff, texture, and
+    // blend mode) and runs Reset(); constructing through the default ctor here
+    // would silently drop all of them.
+    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(params);
     if (effect == nullptr) {
       return nullptr;
     }
@@ -596,7 +600,6 @@ namespace moho
       }
     }
 
-    effect->mBlendMode = params.mBlendMode;
     LinkActiveEffect(mActiveEffects, effect);
     return effect;
   }
