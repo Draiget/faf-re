@@ -282,6 +282,60 @@ namespace moho
   {}
 
   /**
+   * Address: 0x00654A70 (FUN_00654A70, Moho::CEfxBeam::CEfxBeam)
+   *
+   * IDA signature:
+   * Moho::CEfxBeam *__thiscall Moho::CEfxBeam::CEfxBeam(
+   *     Moho::CEfxBeam *this, const Moho::SCreateBeamParams *params);
+   *
+   * What it does:
+   * Create-params beam ctor. Chains the default CEffectImpl base ctor, seeds the
+   * detached beam-end attach-info, sizes the param/texture/string lanes, then
+   * applies every beam render parameter from the create-params payload in binary
+   * order: a fixed LOD cutoff of 150, the two endpoints, beam length (from the
+   * texture-scale lane), the shared start/end colour, the beam texture, thickness
+   * (from width), UV shift and repeat rate, and the blend mode -- then Reset().
+   */
+  CEfxBeam::CEfxBeam(const SCreateBeamParams& params)
+    : CEffectImpl()
+    , mBlendMode(0)
+    , mVisible(false)
+    , mPad195{0}
+    , mLastUpdate(0)
+    , mEnd(SEntAttachInfo::MakeDetached())
+    , mBeam{}
+    , mIsNew(true)
+    , mPad295{0}
+  {
+    // Size the effect parameter lanes (params -> 21 floats, textures -> 2 null
+    // slots, strings -> 2 empty), matching the blueprint ctor.
+    mParams.resize(BEAM_LASTPARAM, 0.0f);
+    mParticleTextures.resize(2, nullptr);
+    {
+      const msvc8::string emptyString;
+      mStrings.resize(2, emptyString);
+    }
+
+    // Apply beam parameters from the create-params payload (binary order). The
+    // start/end colour both read the single mSpawnTransform.mOrientation lane, and
+    // the mSpawnTransform.mPosition lane carries UV-shift / repeat-rate.
+    SetFloatParam(BEAM_LODCUTOFF, 150.0f);
+    SetNParam(BEAM_POSITION, static_cast<const float*>(params.mStart), 3);
+    SetNParam(BEAM_ENDPOSITION, static_cast<const float*>(params.mEnd), 3);
+    SetFloatParam(BEAM_LENGTH, params.mTextureScale);
+    SetNParam(BEAM_STARTCOLOR, params.mSpawnTransform.mOrientation.data(), 4);
+    SetNParam(BEAM_ENDCOLOR, params.mSpawnTransform.mOrientation.data(), 4);
+    OnInit(0, params.mTexture.c_str());
+    OnInit(1, nullptr);
+    SetFloatParam(BEAM_THICKNESS, params.mWidth);
+    SetFloatParam(BEAM_USHIFT, params.mSpawnTransform.mPosition[0]);
+    SetFloatParam(BEAM_VSHIFT, params.mSpawnTransform.mPosition[1]);
+    SetFloatParam(BEAM_REPEATRATE, params.mSpawnTransform.mPosition[2]);
+    mBlendMode = params.mBlendMode;
+    Reset();
+  }
+
+  /**
    * Address: 0x006547C0 (FUN_006547C0, Moho::CEfxBeam::CEfxBeam)
    * Mangled: ??0CEfxBeam@Moho@@QAE@PAVCEffectManagerImpl@1@PBVRBeamBlueprint@1@H@Z
    *
