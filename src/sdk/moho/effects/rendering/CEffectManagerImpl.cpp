@@ -6,6 +6,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/CEfxBeam.h"
+#include "moho/effects/rendering/CEfxEmitter.h"
 #include "moho/effects/rendering/CEfxTrailEmitter.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/entity/Entity.h"
@@ -102,43 +103,9 @@ namespace moho
       effect.SetNParam(0, positionValues, 3);
     }
 
-    void ApplyEmitterBlueprintParams(CEffectImpl& effect, const REmitterBlueprint* const blueprint)
-    {
-      effect.SetFloatParam(6, 1.0f);
-      effect.SetFloatParam(3, 0.0f);
-      effect.SetFloatParam(18, 1.0f);
-
-      if (blueprint == nullptr) {
-        effect.Interpolate();
-        return;
-      }
-
-      effect.SetFloatParam(4, blueprint->Lifetime);
-      effect.SetFloatParam(5, blueprint->RepeatTime);
-      effect.SetFloatParam(8, blueprint->TextureFrameCount);
-      effect.SetFloatParam(7, static_cast<float>(blueprint->BlendMode));
-      effect.SetFloatParam(19, blueprint->LODCutoff);
-
-      effect.SetFloatParam(9, blueprint->LocalVelocity ? 1.0f : 0.0f);
-      effect.SetFloatParam(10, blueprint->LocalAcceleration ? 1.0f : 0.0f);
-      effect.SetFloatParam(11, blueprint->Gravity ? 1.0f : 0.0f);
-      effect.SetFloatParam(12, blueprint->AlignRotation ? 1.0f : 0.0f);
-      effect.SetFloatParam(13, blueprint->InterpolateEmission ? 1.0f : 0.0f);
-      effect.SetFloatParam(14, blueprint->TextureStripCount);
-      effect.SetFloatParam(15, blueprint->AlignToBone ? 1.0f : 0.0f);
-      effect.SetFloatParam(16, blueprint->SortOrder);
-      effect.SetFloatParam(17, static_cast<float>(blueprint->Flat));
-      effect.SetFloatParam(20, blueprint->EmitIfVisible ? 1.0f : 0.0f);
-      effect.SetFloatParam(21, blueprint->CatchupEmit ? 1.0f : 0.0f);
-      effect.SetFloatParam(22, blueprint->CreateIfVisible ? 1.0f : 0.0f);
-      effect.SetFloatParam(23, blueprint->SnapToWaterline ? 1.0f : 0.0f);
-      effect.SetFloatParam(24, blueprint->OnlyEmitOnWater ? 1.0f : 0.0f);
-      effect.SetFloatParam(25, blueprint->ParticleResistance ? 1.0f : 0.0f);
-
-      effect.OnInit(0, blueprint->TextureName.c_str());
-      effect.OnInit(1, blueprint->RampTextureName.c_str());
-      effect.Interpolate();
-    }
+    // (The former ApplyEmitterBlueprintParams helper is gone: the emitter blueprint
+    // param seeding now lives in the recovered CEfxEmitter create-params ctor
+    // (0x0065BA80), which the 5 CreateEmitter* factories construct through.)
 
     /**
      * Address: 0x00659390 (FUN_00659390)
@@ -259,8 +226,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -268,13 +233,15 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    // The blueprint emitter ctor seeds the emit position + every blueprint param
+    // (21 curves + 20 scalars + textures) and interpolates; constructing through
+    // the base CEffectImpl ctor here would drop all of it. armyIndex is the
+    // effect's script-object token, forwarded to the base effect.
+    CEffectImpl* const effect =
+      LinkActiveEffect(mActiveEffects, new (std::nothrow) CEfxEmitter(this, position, armyIndex, blueprint));
     if (effect == nullptr) {
       return nullptr;
     }
-
-    SetEffectWorldPosition(*effect, position);
-    ApplyEmitterBlueprintParams(*effect, blueprint);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
@@ -293,8 +260,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -302,13 +267,13 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    CEffectImpl* const effect = LinkActiveEffect(
+      mActiveEffects,
+      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
     if (effect == nullptr) {
       return nullptr;
     }
 
-    SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
-    ApplyEmitterBlueprintParams(*effect, blueprint);
     effect->SetBone(entity, boneIndex);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
@@ -328,8 +293,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -337,13 +300,12 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    CEffectImpl* const effect = LinkActiveEffect(
+      mActiveEffects,
+      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
     if (effect == nullptr) {
       return nullptr;
     }
-
-    SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
-    ApplyEmitterBlueprintParams(*effect, blueprint);
 
     ApplyBoneTransformToEffect(*effect, entity, boneIndex);
 
@@ -363,8 +325,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -372,13 +332,13 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    CEffectImpl* const effect = LinkActiveEffect(
+      mActiveEffects,
+      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
     if (effect == nullptr) {
       return nullptr;
     }
 
-    SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
-    ApplyEmitterBlueprintParams(*effect, blueprint);
     ApplyEntityWorldPositionToEffect(*effect, *entity);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
@@ -397,8 +357,6 @@ namespace moho
     const int armyIndex
   )
   {
-    (void)armyIndex;
-
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -406,13 +364,13 @@ namespace moho
       return nullptr;
     }
 
-    CEffectImpl* const effect = LinkActiveEffect(mActiveEffects, new (std::nothrow) CEffectImpl());
+    CEffectImpl* const effect = LinkActiveEffect(
+      mActiveEffects,
+      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
     if (effect == nullptr) {
       return nullptr;
     }
 
-    SetEffectWorldPosition(*effect, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f));
-    ApplyEmitterBlueprintParams(*effect, blueprint);
     effect->SetEntity(entity);
 
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {

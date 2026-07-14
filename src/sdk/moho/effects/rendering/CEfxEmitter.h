@@ -182,6 +182,27 @@ namespace moho
      */
     CEfxEmitter();
 
+    /**
+     * Address: 0x0065BA80 (FUN_0065BA80, Moho::CEfxEmitter::CEfxEmitter)
+     *
+     * What it does:
+     * Blueprint-driven emitter ctor. Chains the manager-bound `CEffectImpl` base
+     * ctor, binds the inline `mCurves` buffer and fills its 21 default curves,
+     * sizes the param/texture/string lanes, seeds the emit position and three
+     * fixed defaults (tick-increment=1, tick-count=0, scale=1), and -- when a
+     * blueprint is supplied -- rebuilds all 21 emitter curves from the blueprint
+     * and publishes the 20 blueprint scalar parameters plus the two texture
+     * names, then interpolates the initial attachment transform. (In the binary
+     * the manager arrives in ecx and the object/position/token/blueprint are
+     * stack args; IDA mislabels the symbol as the default ctor.)
+     */
+    CEfxEmitter(
+      CEffectManagerImpl* manager,
+      const Wm3::Vector3<float>& position,
+      int scriptObjectToken,
+      const REmitterBlueprint* blueprint
+    );
+
   private:
     friend struct CEfxEmitterLayoutVerifier;
 

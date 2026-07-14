@@ -14,6 +14,7 @@
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/render/EEmitterCurve.h"
 #include "moho/render/EEmitterParam.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -207,6 +208,130 @@ namespace moho
     mCurves.mLast = inlineCurveBase;
     mCurves.mEnd = reinterpret_cast<SEfxCurve*>(&mBlueprint);
     mCurves.mOriginalStorage = inlineCurveBase;
+  }
+
+  /**
+   * Address: 0x0065BA80 (FUN_0065BA80, Moho::CEfxEmitter::CEfxEmitter)
+   *
+   * IDA signature:
+   * Moho::CEfxEmitter *__stdcall Moho::CEfxEmitter::CEfxEmitter(
+   *     Moho::CEfxEmitter *this, _DWORD *position, int scriptObjectToken,
+   *     Moho::REmitterBlueprint *blueprint);   // manager passed in ecx
+   *
+   * What it does:
+   * Blueprint-driven emitter constructor. Chains the manager-bound `CEffectImpl`
+   * base ctor, binds `mCurves` to its inline buffer and fills its 21 default
+   * curves, sizes the param/texture/string lanes, seeds the emit position plus
+   * three fixed defaults, and (when a blueprint is present) rebuilds the 21
+   * emitter curves and publishes the 20 blueprint scalar params + two texture
+   * names. Ends by interpolating the initial attachment transform. The binary's
+   * direct param writes + vtable-slot Invalidate calls are expressed here as the
+   * equivalent SetNParam / SetFloatParam virtual helpers (write + invalidate).
+   */
+  CEfxEmitter::CEfxEmitter(
+    CEffectManagerImpl* const manager,
+    const Wm3::Vector3<float>& position,
+    const int scriptObjectToken,
+    const REmitterBlueprint* const blueprint
+  )
+    : CEffectImpl(manager, scriptObjectToken)
+    , mEmitterType(static_cast<EmitterType>(0))
+    , mPad194{}
+    , mCurves{}
+    , mInlineCurveStorage{}
+    , mBlueprint(nullptr)
+    , mTotalEmissions(0.0f)
+    , mLife(0u)
+    , mParticle()
+    , mValid(false)
+    , mPad6D9{}
+    , mZCurveMask(0u)
+    , mMaxLifetime(0)
+    , mVisible(false)
+    , mPad6E5{}
+    , mLastUpdate(0u)
+    , mPos{0.0f, 0.0f, 0.0f}
+  {
+    // Bind mCurves to the 21-slot inline buffer (mEnd = &mBlueprint sentinel).
+    auto* const inlineCurveBase = reinterpret_cast<SEfxCurve*>(&mInlineCurveStorage[0]);
+    mCurves.mFirst = inlineCurveBase;
+    mCurves.mEnd = reinterpret_cast<SEfxCurve*>(&mBlueprint);
+    mCurves.mOriginalStorage = inlineCurveBase;
+
+    // Fill the inline buffer with 21 default curves (binary: fastvector<SEfxCurve>
+    // resize(21, defaultCurve); capacity is exactly 21 so no heap growth occurs).
+    for (std::size_t i = 0; i < kInlineCurveCapacity; ++i) {
+      new (&inlineCurveBase[i]) SEfxCurve();
+    }
+    mCurves.mLast = inlineCurveBase + kInlineCurveCapacity;
+
+    // Size the effect runtime lanes.
+    mParams.resize(EFFECT_LASTPARAM, 0.0f);   // 26 param floats
+    mParticleTextures.resize(2, nullptr);
+    {
+      const msvc8::string emptyString;
+      mStrings.resize(2, emptyString);
+    }
+
+    // Seed emit position and the three fixed defaults.
+    SetNParam(EFFECT_POSITION, static_cast<const float*>(position), 3);
+    SetFloatParam(EFFECT_TICKINCREMENT, 1.0f);
+    SetFloatParam(EFFECT_TICKCOUNT, 0.0f);
+    SetFloatParam(EFFECT_SCALE, 1.0f);
+
+    mBlueprint = const_cast<REmitterBlueprint*>(blueprint);
+    if (blueprint != nullptr) {
+      SEfxCurve* const curves = mCurves.begin();
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_XDIR_CURVE], blueprint->XDirectionCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_YDIR_CURVE], blueprint->YDirectionCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_ZDIR_CURVE], blueprint->ZDirectionCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_EMITRATE_CURVE], blueprint->EmitRateCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_LIFETIME_CURVE], blueprint->LifetimeCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_VELOCITY_CURVE], blueprint->VelocityCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_X_ACCEL_CURVE], blueprint->XAccelCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_ACCEL_CURVE], blueprint->YAccelCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_ACCEL_CURVE], blueprint->ZAccelCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_RESISTANCE_CURVE], blueprint->ResistanceCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_SIZE_CURVE], blueprint->SizeCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_X_POSITION_CURVE], blueprint->XPosCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_Y_POSITION_CURVE], blueprint->YPosCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_Z_POSITION_CURVE], blueprint->ZPosCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_BEGINSIZE_CURVE], blueprint->StartSizeCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_ENDSIZE_CURVE], blueprint->EndSizeCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_CURVE], blueprint->InitialRotationCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_ROTATION_RATE_CURVE], blueprint->RotationRateCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_FRAMERATE_CURVE], blueprint->FrameRateCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_TEXTURESELECTION_CURVE], blueprint->TextureSelectionCurve);
+      BuildEmitterCurveFromBlueprint(curves[EMITTER_RAMPSELECTION_CURVE], blueprint->RampSelectionCurve);
+
+      SetFloatParam(EFFECT_LIFETIME, blueprint->Lifetime);
+      SetFloatParam(EFFECT_REPEATTIME, blueprint->RepeatTime);
+      SetFloatParam(EFFECT_FRAMECOUNT, blueprint->TextureFrameCount);
+      SetFloatParam(EFFECT_BLENDMODE, static_cast<float>(blueprint->BlendMode));
+      SetFloatParam(EFFECT_LODCUTOFF, blueprint->LODCutoff);
+      SetFloatParam(EFFECT_USE_LOCAL_VELOCITY, blueprint->LocalVelocity ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_USE_LOCAL_ACCELERATION, blueprint->LocalAcceleration ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_USE_GRAVITY, blueprint->Gravity ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_ALIGN_ROTATION, blueprint->AlignRotation ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_INTERPOLATE_EMISSION, blueprint->InterpolateEmission ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_TEXTURE_STRIPCOUNT, blueprint->TextureStripCount);
+      SetFloatParam(EFFECT_ALIGN_TO_BONE, blueprint->AlignToBone ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_SORTORDER, blueprint->SortOrder);
+      SetFloatParam(EFFECT_FLAT, static_cast<float>(blueprint->Flat));
+      SetFloatParam(EFFECT_EMITIFVISIBLE, blueprint->EmitIfVisible ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_CATCHUPEMIT, blueprint->CatchupEmit ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_CREATEIFVISIBLE, blueprint->CreateIfVisible ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_SNAPTOWATERLINE, blueprint->SnapToWaterline ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_ONLYEMITONWATER, blueprint->OnlyEmitOnWater ? 1.0f : 0.0f);
+      SetFloatParam(EFFECT_PARTICLERESISTANCE, blueprint->ParticleResistance ? 1.0f : 0.0f);
+
+      OnInit(0, blueprint->TextureName.c_str());
+      OnInit(1, blueprint->RampTextureName.c_str());
+    }
+
+    mValid = false;
+    mZCurveMask = 0u;
+    Interpolate();
   }
 
   /**
