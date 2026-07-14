@@ -38,7 +38,6 @@ namespace moho
   int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState*) { return 0; }
   int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState*) { return 0; }
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState*) { return 0; }
-  int cfunc_GetRolloverInfoL(LuaPlus::LuaState*) { return 0; }
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState*) { return 0; }
   int cfunc_IssueDockCommandL(LuaPlus::LuaState*) { return 0; }
   int cfunc_OpenURLL(LuaPlus::LuaState*) { return 0; }
