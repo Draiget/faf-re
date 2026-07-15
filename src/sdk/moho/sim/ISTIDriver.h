@@ -149,8 +149,9 @@ namespace moho
     virtual void IncreaseCommandCount(CmdId id, int count) = 0;
 
     // Slot 28. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CD50 (FUN_0073CD50),
-    // ECmdStreamOp::CMDST_DecreaseCommandCount (15)
-    virtual void DecreaseCommandCount(CmdId id, int count) = 0;
+    // ECmdStreamOp::CMDST_DecreaseCommandCount (15). Returns the resulting command cookie
+    // (the binary returns it via an sret out-pointer; modeled here as a by-value CmdId).
+    virtual CmdId DecreaseCommandCount(CmdId id, int count) = 0;
 
     // Slot 29. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CDF0 (FUN_0073CDF0),
     // ECmdStreamOp::CMDST_SetCommandTarget (16)

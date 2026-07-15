@@ -21162,8 +21162,11 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
   }
 
   if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-    activeDriver->DecreaseCommandCount(commandIssue->commandId, 1);
-    QueueCommandIssueDecreaseCountEvent(*commandIssue, commandId, 1);
+    // The driver marshals the decrement and returns the resulting command
+    // cookie; the event is queued with that cookie (FUN_00843FA0 passes the
+    // DecreaseCommandCount result, not the input command id).
+    const CmdId resultCookie = activeDriver->DecreaseCommandCount(commandIssue->commandId, 1);
+    QueueCommandIssueDecreaseCountEvent(*commandIssue, resultCookie, 1);
   }
 
   return 0;
