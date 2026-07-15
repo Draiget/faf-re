@@ -1,7 +1,13 @@
+// This translation unit re-implements CRT entry points (fprintf, _vsnprintf_l,
+// etc.) that the UCRT headers otherwise provide as inline definitions. Suppress
+// those inline bodies so the recovered definitions below are the sole ones.
+#define _NO_CRT_STDIO_INLINE
+
 #include <Windows.h>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/DName.h"
 #include "moho/misc/WeakPtr.h"
@@ -115,12 +121,17 @@
 #ifdef _pctype
 #undef _pctype
 #endif
+#ifdef _pwctype
+#undef _pwctype
+#endif
 #ifdef __mb_cur_max
 #undef __mb_cur_max
 #endif
 
 extern "C" void __cdecl _lock(int locknum);
 extern "C" void __cdecl _unlock(int locknum);
+extern "C" int __cdecl _filbuf(std::FILE* stream);
+extern "C" int __cdecl get_errno_from_oserr(unsigned long osErrorCode);
 extern "C" void __cdecl _lock_file(std::FILE* stream);
 extern "C" void __cdecl __lock_file2(int streamIndex, std::FILE* stream);
 extern "C" void __cdecl __unlock_file2(int streamIndex, std::FILE* stream);
@@ -201,6 +212,8 @@ extern "C" RuntimeFlsGetValueFn __cdecl __set_flsgetvalue();
 extern "C" void __cdecl __initptd(void* ptd, void* initData);
 extern "C" void __cdecl _free_crt(void* ptr);
 extern "C" void __cdecl _tzset_nolock();
+extern "C" void __cdecl _tzset();
+extern "C" BOOL __cdecl _isindst(std::tm* brokenDownTime);
 extern "C" int __mbctype_initialized;
 extern "C" int __cdecl __initmbctable();
 extern "C" int __cdecl _ismbblead(unsigned int value);
@@ -260,6 +273,26 @@ extern "C" int __cdecl _SFUO_Finish()
 extern "C" int __cdecl _SFUO_Destroy()
 {
   return 0;
+}
+
+// Container/runtime helpers invoked from both the CRT prelude and the
+// moho::runtime block; defined at file scope so unqualified calls in either
+// region resolve to this single definition.
+[[noreturn]] void RuntimeThrowContainerTooLong(const char* const message)
+{
+  throw std::length_error(message);
+}
+
+/**
+ * Address: 0x00AA3B54 (FUN_00AA3B54)
+ *
+ * What it does:
+ * Invokes one no-argument callback function-pointer lane and returns its
+ * integer result.
+ */
+[[maybe_unused]] int RuntimeInvokeNoArgIntCallback(int (*const callback)())
+{
+  return callback != nullptr ? callback() : 0;
 }
 
 namespace
@@ -538,13 +571,14 @@ static_assert(offsetof(RuntimeTreeNode20, isNil) == 0x21, "RuntimeTreeNode20::is
 
 struct RuntimeTreeHeadNodeBare
 {
-  RuntimeTreeHeadNodeBare* left;
-  RuntimeTreeHeadNodeBare* parent;
-  RuntimeTreeHeadNodeBare* right;
-  std::uint8_t color;
-  std::uint8_t isNil;
-  std::uint8_t reserved12;
-  std::uint8_t reserved13;
+  RuntimeTreeHeadNodeBare* left;    // +0x00
+  RuntimeTreeHeadNodeBare* parent;  // +0x04
+  RuntimeTreeHeadNodeBare* right;   // +0x08
+  std::uint32_t payload;            // +0x0C  (std::_Tree _Myval slot; unused in the bare head sentinel)
+  std::uint8_t color;               // +0x10
+  std::uint8_t isNil;               // +0x11
+  std::uint8_t reserved12;          // +0x12
+  std::uint8_t reserved13;          // +0x13
 };
 static_assert(sizeof(RuntimeTreeHeadNodeBare) == 0x14, "RuntimeTreeHeadNodeBare size must be 0x14");
 static_assert(offsetof(RuntimeTreeHeadNodeBare, left) == 0x00, "RuntimeTreeHeadNodeBare::left offset must be 0x00");
@@ -588,6 +622,42 @@ static_assert(offsetof(RuntimeTreeNodeNil45, parent) == 0x04, "RuntimeTreeNodeNi
 static_assert(offsetof(RuntimeTreeNodeNil45, right) == 0x08, "RuntimeTreeNodeNil45::right offset must be 0x08");
 static_assert(offsetof(RuntimeTreeNodeNil45, color) == 0x2C, "RuntimeTreeNodeNil45::color offset must be 0x2C");
 static_assert(offsetof(RuntimeTreeNodeNil45, isNil) == 0x2D, "RuntimeTreeNodeNil45::isNil offset must be 0x2D");
+
+// Red-black tree container view (std::_Tree proxy: allocator proxy + head sentinel
+// + node count) and its per-node-type aliases. Declared here, ahead of the tree
+// iterators/workers that consume it.
+template <class TNode>
+struct RuntimeRbTreeContainerView
+{
+  void* proxy;
+  TNode* head;
+  std::uint32_t size;
+};
+static_assert(
+  sizeof(RuntimeRbTreeContainerView<RuntimeTypeInfoMapNode>) == 0x0C,
+  "RuntimeRbTreeContainerView<RuntimeTypeInfoMapNode> size must be 0x0C"
+);
+static_assert(
+  sizeof(RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare>) == 0x0C,
+  "RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare> size must be 0x0C"
+);
+static_assert(
+  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNode20>) == 0x0C,
+  "RuntimeRbTreeContainerView<RuntimeTreeNode20> size must be 0x0C"
+);
+static_assert(
+  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNode24>) == 0x0C,
+  "RuntimeRbTreeContainerView<RuntimeTreeNode24> size must be 0x0C"
+);
+static_assert(
+  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>) == 0x0C,
+  "RuntimeRbTreeContainerView<RuntimeTreeNodeNil45> size must be 0x0C"
+);
+
+using RuntimeTreeHeadNodeBareContainer = RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare>;
+using RuntimeTreeNode20Container = RuntimeRbTreeContainerView<RuntimeTreeNode20>;
+using RuntimeTreeNode24Container = RuntimeRbTreeContainerView<RuntimeTreeNode24>;
+using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>;
 
 [[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeCommon()
 {
@@ -777,7 +847,7 @@ struct RuntimeListOwnerSentinelLaneView
 struct RuntimeEmbeddedStringAt24View
 {
   std::uint8_t pad00_18[0x18];
-  std::string text; // +0x18
+  msvc8::string text; // +0x18
 };
 static_assert(
   offsetof(RuntimeEmbeddedStringAt24View, text) == 0x18,
@@ -789,7 +859,7 @@ struct RuntimeTripleStringRecord40
   std::uint32_t lane00; // +0x00
   std::uint32_t lane04; // +0x04
   std::uint32_t lane08; // +0x08
-  std::string text;     // +0x0C
+  msvc8::string text;   // +0x0C
 };
 static_assert(sizeof(RuntimeTripleStringRecord40) == 0x28, "RuntimeTripleStringRecord40 size must be 0x28");
 static_assert(
@@ -855,18 +925,6 @@ static_assert(
 }
 
 /**
- * Address: 0x008E4210 (FUN_008E4210)
- *
- * What it does:
- * Preserves one single-element adapter lane for `FUN_008E4100` 48-byte array
- * allocation.
- */
-[[maybe_unused]] std::uintptr_t RuntimeAllocateSingleArrayLane079CAdapter()
-{
-  return reinterpret_cast<std::uintptr_t>(RuntimeAllocateArrayWithBadAllocLane079C(1u));
-}
-
-/**
  * Address: 0x008E4350 (FUN_008E4350)
  *
  * What it does:
@@ -927,7 +985,7 @@ static_assert(
   destination->lane00 = source->lane00;
   destination->lane04 = source->lane04;
   destination->lane08 = source->lane08;
-  destination->text.assign(source->text, 0u, std::string::npos);
+  destination->text.assign(source->text, 0u, msvc8::string::npos);
   return destination;
 }
 
@@ -943,13 +1001,13 @@ static_assert(
   const std::uint32_t lane00,
   const std::uint32_t lane04,
   const std::uint32_t lane08,
-  const std::string& sourceText
+  const msvc8::string& sourceText
 )
 {
   destination->lane00 = lane00;
   destination->lane04 = lane04;
   destination->lane08 = lane08;
-  destination->text.assign(sourceText, 0u, std::string::npos);
+  destination->text.assign(sourceText, 0u, msvc8::string::npos);
   return destination;
 }
 
@@ -2399,38 +2457,6 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
 }
 
 /**
- * Address: 0x00A595B0 (FUN_00A595B0)
- *
- * What it does:
- * Copies one dword-aligned span into `destination` with `memmove_s` semantics
- * and returns the end pointer of the copied span.
- */
-[[maybe_unused]] char* RuntimeCopyDwordSpanIntoBufferLaneA(
-  const void* const sourceBegin,
-  const void* const sourceEnd,
-  char* const destination
-) noexcept
-{
-  return RuntimeCopyDwordSpanIntoBufferCommon(sourceBegin, sourceEnd, destination);
-}
-
-/**
- * Address: 0x00A595E0 (FUN_00A595E0)
- *
- * What it does:
- * Copies one dword-aligned span into `destination` with `memmove_s` semantics
- * and returns the end pointer of the copied span.
- */
-[[maybe_unused]] char* RuntimeCopyDwordSpanIntoBufferLaneB(
-  const void* const sourceBegin,
-  const void* const sourceEnd,
-  char* const destination
-) noexcept
-{
-  return RuntimeCopyDwordSpanIntoBufferCommon(sourceBegin, sourceEnd, destination);
-}
-
-/**
  * Address: 0x00A57EB0 (FUN_00A57EB0)
  *
  * What it does:
@@ -3288,39 +3314,6 @@ struct RuntimePairTreeContainer
 static_assert(sizeof(RuntimePairTreeContainer) == 0x0C, "RuntimePairTreeContainer size must be 0x0C");
 static_assert(offsetof(RuntimePairTreeContainer, head) == 0x04, "RuntimePairTreeContainer::head offset must be 0x04");
 static_assert(offsetof(RuntimePairTreeContainer, size) == 0x08, "RuntimePairTreeContainer::size offset must be 0x08");
-
-template <class TNode>
-struct RuntimeRbTreeContainerView
-{
-  void* proxy;
-  TNode* head;
-  std::uint32_t size;
-};
-static_assert(
-  sizeof(RuntimeRbTreeContainerView<RuntimeTypeInfoMapNode>) == 0x0C,
-  "RuntimeRbTreeContainerView<RuntimeTypeInfoMapNode> size must be 0x0C"
-);
-static_assert(
-  sizeof(RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare>) == 0x0C,
-  "RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare> size must be 0x0C"
-);
-static_assert(
-  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNode20>) == 0x0C,
-  "RuntimeRbTreeContainerView<RuntimeTreeNode20> size must be 0x0C"
-);
-static_assert(
-  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNode24>) == 0x0C,
-  "RuntimeRbTreeContainerView<RuntimeTreeNode24> size must be 0x0C"
-);
-static_assert(
-  sizeof(RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>) == 0x0C,
-  "RuntimeRbTreeContainerView<RuntimeTreeNodeNil45> size must be 0x0C"
-);
-
-using RuntimeTreeHeadNodeBareContainer = RuntimeRbTreeContainerView<RuntimeTreeHeadNodeBare>;
-using RuntimeTreeNode20Container = RuntimeRbTreeContainerView<RuntimeTreeNode20>;
-using RuntimeTreeNode24Container = RuntimeRbTreeContainerView<RuntimeTreeNode24>;
-using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>;
 
 template <class TNode, class TContainer>
 [[nodiscard]] TNode* RuntimeRotateRbTreeLeftCommon(TNode* const pivot, TContainer* const container) noexcept
@@ -4504,7 +4497,7 @@ RuntimePairTreeNode* RuntimeAllocatePairTreeNodeLaneA(
   node->left = left;
   node->parent = parent;
   node->right = right;
-  node->value = *valueSource;
+  node->pair = *valueSource;
   node->color = 0;
   node->isNil = 0;
   return node;
@@ -5549,25 +5542,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneA(
 }
 
 /**
- * Address: 0x005C9FA0 (FUN_005C9FA0)
- * Address: 0x005CBF80 (FUN_005CBF80)
- * Address: 0x005CD2C0 (FUN_005CD2C0)
- * Address: 0x005CDA50 (FUN_005CDA50)
- *
- * What it does:
- * Register-shape adapter that forwards one source-first dword range copy
- * (`[sourceBegin, sourceEnd)`) into `FUN_005CE060`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneASourceFirstAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneA(destination, sourceBegin, sourceEnd);
-}
-
-/**
  * Address: 0x005E2120 (FUN_005E2120)
  *
  * What it does:
@@ -5581,23 +5555,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneB(
 )
 {
   return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x005DF310 (FUN_005DF310)
- * Address: 0x005E0CA0 (FUN_005E0CA0)
- *
- * What it does:
- * Source-first adapter lane for one dword range-copy dispatch into
- * `FUN_005E2120`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneBSourceFirstAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneB(destination, sourceBegin, sourceEnd);
 }
 
 /**
@@ -5617,91 +5574,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneC(
 }
 
 /**
- * Address: 0x005DF440 (FUN_005DF440)
- *
- * What it does:
- * Source-first adapter lane for one dword range-copy dispatch into
- * `FUN_005E2160`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneCSourceFirstAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneC(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x005E0D90 (FUN_005E0D90)
- * Address: 0x005E1950 (FUN_005E1950)
- * Address: 0x005E1D80 (FUN_005E1D80)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_005E2160` while discarding the legacy zero-filled scratch slots.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneCNullPaddingAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneC(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x005E11F0 (FUN_005E11F0)
- * Address: 0x005E19D0 (FUN_005E19D0)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_005E1DC0` while discarding the legacy zero-filled scratch slots.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHNullPaddingAdapterA(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x005E1250 (FUN_005E1250)
- * Address: 0x005E1A30 (FUN_005E1A30)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_005E1E20` while discarding the legacy zero-filled scratch slots.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHNullPaddingAdapterB(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x005E18D0 (FUN_005E18D0)
- * Address: 0x005E1D50 (FUN_005E1D50)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_005E2120` while discarding the legacy zero-filled scratch slots.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneBNullPaddingAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneB(destination, sourceBegin, sourceEnd);
-}
-
-/**
  * Address: 0x00642F30 (FUN_00642F30)
  *
  * What it does:
@@ -5715,70 +5587,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneD(
 )
 {
   return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x006424E0 (FUN_006424E0)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_00642F30` while discarding one legacy zero-filled scratch slot.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDNullPaddingAdapterA(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneD(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00642A00 (FUN_00642A00)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_00642F30` while discarding one legacy zero-filled scratch slot.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDNullPaddingAdapterB(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneD(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00642D40 (FUN_00642D40)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_00642F30` while discarding one legacy zero-filled scratch slot.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDNullPaddingAdapterC(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneD(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00642E30 (FUN_00642E30)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `FUN_00642F30` while discarding one legacy zero-filled scratch slot.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDNullPaddingAdapterD(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneD(destination, sourceBegin, sourceEnd);
 }
 
 /**
@@ -5798,70 +5606,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneE(
 }
 
 /**
- * Address: 0x0067FAD0 (FUN_0067FAD0)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `RuntimeCopyDwordRangeLaneE`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneERegisterAdapterA(
-  std::uint32_t* const destination,
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd
-)
-{
-  return RuntimeCopyDwordRangeLaneE(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00680CC0 (FUN_00680CC0)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `RuntimeCopyDwordRangeLaneE`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneERegisterAdapterB(
-  std::uint32_t* const destination,
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd
-)
-{
-  return RuntimeCopyDwordRangeLaneE(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00681D00 (FUN_00681D00)
- *
- * What it does:
- * Register-shape adapter that forwards one dword range copy lane into
- * `RuntimeCopyDwordRangeLaneE`.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneERegisterAdapterC(
-  std::uint32_t* const destination,
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd
-)
-{
-  return RuntimeCopyDwordRangeLaneE(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x006823A0 (FUN_006823A0)
- *
- * What it does:
- * Register-shape adapter that forwards one source-first dword range copy call
- * into `RuntimeCopyDwordRangeLaneE` and returns destination-end.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneESourceFirstRegisterAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RuntimeCopyDwordRangeLaneE(destination, sourceBegin, sourceEnd);
-}
-
-/**
  * Address: 0x00756710 (FUN_00756710)
  * Address: 0x007574E0 (FUN_007574E0)
  *
@@ -5876,38 +5620,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneF(
 )
 {
   return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00751C90 (FUN_00751C90)
- *
- * What it does:
- * Stdcall adapter that forwards one source-first dword range copy lane into
- * `FUN_007574E0` while discarding one legacy zero-filled scratch lane.
- */
-[[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneFStdcallNullScratchAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-) noexcept
-{
-  return RuntimeCopyDwordRangeLaneF(destination, sourceBegin, sourceEnd);
-}
-
-/**
- * Address: 0x00753EA0 (FUN_00753EA0)
- *
- * What it does:
- * Cdecl adapter that forwards one source-first dword range copy lane into
- * `FUN_007574E0` while discarding one legacy zero-filled scratch lane.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneFCdeclNullScratchAdapterA(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-) noexcept
-{
-  return RuntimeCopyDwordRangeLaneF(destination, sourceBegin, sourceEnd);
 }
 
 /**
@@ -6081,22 +5793,6 @@ RuntimeFloat3Record* RuntimeFillFloat3RangeLaneA(
     --count;
   }
   return reinterpret_cast<RuntimeFloat3Record*>(destinationAddress);
-}
-
-/**
- * Address: 0x007E5610 (FUN_007E5610)
- *
- * What it does:
- * Register-shape adapter that forwards one float3 fill request into
- * `RuntimeFillFloat3RangeLaneA`.
- */
-[[maybe_unused]] RuntimeFloat3Record* RuntimeFillFloat3RangeLaneAAdapterA(
-  RuntimeFloat3Record* const destination,
-  const RuntimeFloat3Record* const sourceValue,
-  const unsigned int count
-)
-{
-  return RuntimeFillFloat3RangeLaneA(destination, sourceValue, count);
 }
 
 /**
@@ -6821,7 +6517,7 @@ extern "C" const std::uint16_t* __cdecl __pctype_func();
  * What it does:
  * Returns one pointer to the process-global wide-ctype lookup table lane.
  */
-extern "C" const std::uint16_t* __cdecl __pwctype_func();
+extern "C" const wctype_t* __cdecl __pwctype_func();
 extern "C" int __cdecl __crtLCMapStringA(
   int localeType,
   LCID locale,
@@ -7055,7 +6751,7 @@ using RuntimeInvalidArgHandler = void(__cdecl*)(
   unsigned int lineNumber,
   std::uintptr_t reserved
 );
-using RuntimePurecallHandler = int(__cdecl*)();
+using RuntimePurecallHandler = void(__cdecl*)();
 using RuntimeHeapFailureHandler = int(__cdecl*)(std::size_t);
 extern "C" int __cdecl _memicmp_l(
   const void* lhsBuffer,
@@ -10175,7 +9871,7 @@ extern "C" const char* __cdecl _get_sys_err_msg(const int errorCode)
  * Copies one CRT system-error text for `errorCode` into caller buffer and
  * triggers Watson on secure-copy failure.
  */
-extern "C" int __cdecl strerror_s(char* const outText, const int outTextChars, const int errorCode)
+extern "C" errno_t __cdecl strerror_s(char* const outText, const std::size_t outTextChars, const int errorCode)
 {
   if (outText != nullptr && outTextChars != 0) {
     const char* const errorText = _get_sys_err_msg(errorCode);
@@ -10352,7 +10048,7 @@ extern "C" int __cdecl ___mb_cur_max_func()
     locale = __updatetlocinfo();
   }
 
-  return locale->mbCurMax;
+  return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale)->mbCurMax;
 }
 
 /**
@@ -10433,9 +10129,9 @@ extern "C" LCID* __cdecl __lc_handle_func()
  * What it does:
  * Returns the process-global wide-ctype lookup table pointer lane.
  */
-extern "C" const std::uint16_t* __cdecl __pwctype_func()
+extern "C" const wctype_t* __cdecl __pwctype_func()
 {
-  return _pwctype;
+  return reinterpret_cast<const wctype_t*>(_pwctype);
 }
 
 /**
@@ -10679,6 +10375,140 @@ extern "C" __time64_t __cdecl __time64_t_from_ft(FILETIME* const fileTime)
   return static_cast<__time64_t>(-1);
 }
 
+namespace
+{
+  /**
+   * CRT `_days[]` cumulative-days-before-month table (0xF3EFB4).
+   * Indexed by month in 1..12: `kMonthCumulativeDays[m - 1]` is the count of
+   * days before month `m` in a non-leap year, and the span
+   * `kMonthCumulativeDays[m] - kMonthCumulativeDays[m - 1]` gives that month's
+   * length (used to validate the day-of-month argument).
+   */
+  constexpr int kMonthCumulativeDays[13] = {
+    -1, 30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364
+  };
+
+  /**
+   * Seconds from 1970-01-01 back to the CRT day-count origin used below
+   * (0x7C558180). The running total accumulates local wall-clock seconds
+   * relative to that origin; subtracting this constant rebases the result to
+   * the Unix epoch.
+   */
+  constexpr int kCrtEpochBiasSeconds = 2085978496;
+}
+
+/**
+ * Address: 0x00A9AFBE (FUN_00A9AFBE, __loctotime64_t)
+ * Mangled: __loctotime64_t
+ *
+ * IDA signature:
+ * int __cdecl sub_A9AFBE(int year, int month, int day, unsigned int hour,
+ *                        unsigned int minute, unsigned int second, int dstflag);
+ *
+ * What it does:
+ * CRT worker behind `mktime`/`_mkgmtime`: validates a broken-down local time
+ * (year 1970..2038, month 1..12, day/hour/min/sec ranges, leap-day rules),
+ * converts it to seconds since the CRT epoch, then applies the timezone and
+ * (per `dstflag`) daylight-saving bias. Returns `-1` with `errno = EINVAL`
+ * on an out-of-range field.
+ */
+extern "C" __time64_t __cdecl __loctotime64_t(
+  int year,
+  int month,
+  int day,
+  int hour,
+  int minute,
+  int second,
+  int dstflag)
+{
+  const int yearsSince1900 = year - 1900;
+
+  int daylight = 0;
+  long dstBias = 0;
+  long timezoneSeconds = 0;
+
+  // Range validation. The final clause rejects an out-of-range day-of-month,
+  // with a leap-year exception that admits Feb 29 only in an actual leap year.
+  const bool outOfRange =
+    yearsSince1900 < 70
+    || yearsSince1900 > 138
+    || static_cast<unsigned int>(month - 1) > 0xBu
+    || static_cast<unsigned int>(hour) > 0x17u
+    || static_cast<unsigned int>(minute) > 0x3Bu
+    || static_cast<unsigned int>(second) > 0x3Bu
+    || day < 1
+    || ((kMonthCumulativeDays[month] - kMonthCumulativeDays[month - 1] < day)
+        && ((yearsSince1900 % 4 || !(yearsSince1900 % 100)) && year % 400
+            || month != 2
+            || day > 29));
+
+  if (outOfRange)
+  {
+    *_errno() = EINVAL;
+    return static_cast<__time64_t>(-1);
+  }
+
+  // Day-of-year (1-based), plus the extra leap day once the date passes February.
+  int dayOfYear = day + kMonthCumulativeDays[month - 1];
+  const bool isLeapYear =
+    (!(yearsSince1900 % 4) && (yearsSince1900 % 100))
+    || !((yearsSince1900 + 1900) % 400);
+  if (isLeapYear && month > 2)
+  {
+    ++dayOfYear;
+  }
+
+  _tzset();
+  if (_get_daylight(&daylight))
+  {
+    _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+  }
+  if (_get_dstbias(&dstBias))
+  {
+    _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+  }
+  if (_get_timezone(&timezoneSeconds))
+  {
+    _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+  }
+
+  // Total days since the epoch origin, folded through the leap-day corrections
+  // for the 4/100/400-year cycles, then scaled to seconds.
+  const int totalDays =
+    (yearsSince1900 + 299) / 400
+    - (yearsSince1900 - 1) / 100
+    + dayOfYear
+    + (yearsSince1900 - 1) / 4
+    + 365 * yearsSince1900;
+
+  int result =
+    timezoneSeconds
+    + 60 * (minute + 60 * (hour + 24 * totalDays))
+    + second
+    + kCrtEpochBiasSeconds;
+
+  if (dstflag == 1)
+  {
+    result += dstBias;
+  }
+  else if (dstflag == -1 && daylight)
+  {
+    std::tm brokenDown{};
+    brokenDown.tm_sec = second;
+    brokenDown.tm_min = minute;
+    brokenDown.tm_hour = hour;
+    brokenDown.tm_mon = month - 1;
+    brokenDown.tm_year = yearsSince1900;
+    brokenDown.tm_yday = dayOfYear;
+    if (_isindst(&brokenDown))
+    {
+      result += dstBias;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Address: 0x00AB67E1 (FUN_00AB67E1, _ansicp)
  *
@@ -10809,7 +10639,7 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
  * Acquires `_CONIO_LOCK`, emits one wide character through the no-lock
  * console write lane, then unlocks and returns that character result.
  */
-extern "C" wchar_t __cdecl _putwch(const wchar_t wideCharacter)
+extern "C" wint_t __cdecl _putwch(wchar_t wideCharacter)
 {
   constexpr int kConioLock = 3; // _CONIO_LOCK
   _lock(kConioLock);
@@ -11476,10 +11306,11 @@ int __cdecl Runtime_vwprintf(const wchar_t* const format, va_list arguments)
  * Variadic wide-print wrapper that forwards one format+arg-pack lane to
  * `vwprintf`.
  */
-extern "C" int __cdecl _wprintf_l(const wchar_t* const format, ...)
+extern "C" int __cdecl _wprintf_l(const wchar_t* const format, _locale_t const localeInfo, ...)
 {
+  (void)localeInfo;
   va_list arguments;
-  va_start(arguments, format);
+  va_start(arguments, localeInfo);
   const int result = Runtime_vwprintf(format, arguments);
   va_end(arguments);
   return result;
@@ -12587,6 +12418,8 @@ namespace
     return (static_cast<std::int64_t>(secHigh) << 32) | static_cast<std::uint32_t>(secLow);
   }
 
+  [[nodiscard]] std::uint64_t BuildUnsigned64(std::uint32_t lowPart, std::uint32_t highPart) noexcept;
+
   void RuntimeSampleCurrentXtimeUtc(RuntimeXtimeSnapshotView* const outNow) noexcept
   {
     FILETIME systemTimeAsFileTime{};
@@ -13092,7 +12925,8 @@ namespace
   struct RuntimeThreadLocInfoView
   {
     volatile long refcount = 0;              // +0x00
-    std::uint8_t reserved04[0x08]{};         // +0x04
+    std::int32_t lcCodepage = 0;             // +0x04
+    std::uint8_t reserved08[0x04]{};         // +0x08
     LCID lcHandle[6]{};                       // +0x0C
     std::uint8_t reserved24[0x08]{};          // +0x24
     LCID lcId[6]{};                           // +0x2C
@@ -13109,6 +12943,7 @@ namespace
     unsigned char* pcumap = nullptr;          // +0xD0
     RuntimeLcTimeData* lcTimeCurrent = nullptr; // +0xD4
   };
+  static_assert(offsetof(RuntimeThreadLocInfoView, lcCodepage) == 0x04, "RuntimeThreadLocInfoView::lcCodepage offset must be 0x04");
   static_assert(offsetof(RuntimeThreadLocInfoView, lcHandle) == 0x0C, "RuntimeThreadLocInfoView::lcHandle offset must be 0x0C");
   static_assert(offsetof(RuntimeThreadLocInfoView, lcId) == 0x2C, "RuntimeThreadLocInfoView::lcId offset must be 0x2C");
   static_assert((offsetof(RuntimeThreadLocInfoView, lcHandle) + sizeof(LCID) * 3u) == 0x18, "RuntimeThreadLocInfoView::lcHandle[3] offset must be 0x18");
@@ -13175,6 +13010,183 @@ namespace
     if (updated && threadData != nullptr) {
       threadData->ownlocale &= ~2;
     }
+  }
+
+  /**
+   * Address: 0x00A88511 (FUN_00A88511, _mbstowcs_l)
+   *
+   * IDA signature:
+   * int __cdecl sub_A88511(LPWSTR lpWideCharStr, unsigned __int8 *lpMultiByteStr,
+   *                        unsigned int cchWideChar, _locale_tstruct *a4);
+   *
+   * What it does:
+   * Locale-aware CRT `_mbstowcs_l` core. Converts the multibyte `source`
+   * string into wide characters in `destination`, honouring the effective
+   * thread/explicit locale resolved through the `_LocaleUpdate` lane:
+   *   * When the locale has no active codepage handle (SBCS-only): performs a
+   *     byte-widening copy (or, for a null destination, returns `strlen`).
+   *   * Otherwise routes through
+   *     `MultiByteToWideChar(MB_PRECOMPOSED | MB_ERR_INVALID_CHARS)`,
+   *     and on `ERROR_NO_UNICODE_TRANSLATION` retries the largest whole-
+   *     multibyte prefix that fits `maxCount`, walking DBCS lead bytes via
+   *     `_isleadbyte_l`.
+   * Preserves CRT `EINVAL`/`EILSEQ` errno lanes, invalid-parameter dispatch,
+   * and always releases any thread-local locale reference acquired.
+   */
+  std::size_t RuntimeMbstowcsLocaleCore(
+    wchar_t* const destination,
+    const char* const source,
+    const std::size_t maxCount,
+    _locale_t const localeInfo
+  )
+  {
+    if (destination != nullptr) {
+      if (maxCount == 0u) {
+        return 0u;
+      }
+      destination[0] = L'\0';
+    }
+
+    if (source == nullptr || maxCount > 0x7FFFFFFFu) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return static_cast<std::size_t>(-1);
+    }
+
+    RuntimeTidDataLocaleView* threadData = nullptr;
+    bool updated = false;
+    RuntimeThreadLocInfoView* const localeView =
+      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+
+    const bool hasCodepageHandle = localeView->lcHandle[2] != 0;
+
+    // Null destination: caller only wants the converted length.
+    if (destination == nullptr) {
+      if (!hasCodepageHandle) {
+        const std::size_t asciiLength = std::strlen(source);
+        RuntimeReleaseLocaleUpdate(threadData, updated);
+        return asciiLength;
+      }
+
+      const int wideCount = ::MultiByteToWideChar(
+        static_cast<UINT>(localeView->lcCodepage),
+        MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+        source,
+        -1,
+        nullptr,
+        0
+      );
+      if (wideCount == 0) {
+        *_errno() = EILSEQ;
+        RuntimeReleaseLocaleUpdate(threadData, updated);
+        return static_cast<std::size_t>(-1);
+      }
+
+      const std::size_t result = static_cast<std::size_t>(wideCount) - 1u;
+      RuntimeReleaseLocaleUpdate(threadData, updated);
+      return result;
+    }
+
+    // Real destination with an active codepage handle: route through the OS.
+    if (hasCodepageHandle) {
+      const int wideCount = ::MultiByteToWideChar(
+        static_cast<UINT>(localeView->lcCodepage),
+        MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+        source,
+        -1,
+        destination,
+        static_cast<int>(maxCount)
+      );
+      if (wideCount != 0) {
+        const std::size_t result = static_cast<std::size_t>(wideCount) - 1u;
+        RuntimeReleaseLocaleUpdate(threadData, updated);
+        return result;
+      }
+
+      if (::GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+        // Buffer too small: find the largest whole-multibyte prefix that fits.
+        const auto* scanCursor = reinterpret_cast<const unsigned char*>(source);
+        std::size_t remaining = maxCount;
+        bool sawInvalidLead = false;
+        while (remaining != 0u) {
+          --remaining;
+          if (*scanCursor == 0u) {
+            break;
+          }
+          if (_isleadbyte_l(*scanCursor, localeInfo) != 0) {
+            if (*++scanCursor == 0u) {
+              sawInvalidLead = true;
+              break;
+            }
+          }
+          ++scanCursor;
+        }
+
+        if (!sawInvalidLead) {
+          const int prefixBytes = static_cast<int>(
+            reinterpret_cast<const char*>(scanCursor) - source
+          );
+          const int partialWideCount = ::MultiByteToWideChar(
+            static_cast<UINT>(localeView->lcCodepage),
+            MB_PRECOMPOSED,
+            source,
+            prefixBytes,
+            destination,
+            static_cast<int>(maxCount)
+          );
+          if (partialWideCount != 0) {
+            const std::size_t result = static_cast<std::size_t>(partialWideCount);
+            RuntimeReleaseLocaleUpdate(threadData, updated);
+            return result;
+          }
+        }
+      }
+
+      *_errno() = EILSEQ;
+      destination[0] = L'\0';
+      RuntimeReleaseLocaleUpdate(threadData, updated);
+      return static_cast<std::size_t>(-1);
+    }
+
+    // Real destination, SBCS-only locale: byte-widening copy up to maxCount.
+    if (maxCount != 0u) {
+      wchar_t* out = destination;
+      std::size_t index = 0u;
+      while (true) {
+        const std::size_t current = index;
+        *out = static_cast<wchar_t>(static_cast<unsigned char>(source[index]));
+        if (source[current] == '\0') {
+          RuntimeReleaseLocaleUpdate(threadData, updated);
+          return current;
+        }
+        ++out;
+        index = current + 1u;
+        if (index >= maxCount) {
+          break;
+        }
+      }
+    }
+
+    RuntimeReleaseLocaleUpdate(threadData, updated);
+    return maxCount;
+  }
+
+  /**
+   * Address: 0x00A88511 (FUN_00A88511, _mbstowcs_l)
+   *
+   * See the anonymous namespace implementation `RuntimeMbstowcsLocaleCore` for
+   * the full behavior description. This `extern "C"` entry point is the stable
+   * CRT-facing symbol that `mbstowcs` (0x00A8869E) and `_mbstowcs_s_l`
+   * (0x00A886C6) dispatch into by name.
+   */
+  extern "C" std::size_t __cdecl _mbstowcs_l(
+    wchar_t* const destination,
+    const char* const source,
+    const std::size_t maxCount,
+    _locale_t const localeInfo
+  )
+  {
+    return RuntimeMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
   }
 
   /**
@@ -13430,7 +13442,7 @@ namespace
  * CRT narrow-character formatted output to a stream. Locks the stream,
  * validates the ioinfo is not in unicode-textmode (narrow output requires
  * a non-unicode text lane), acquires its write scratch buffer via
- * `_stbuf`, runs `_output_l(stream, format, /*locale*/ nullptr, va_args)`,
+ * `_stbuf`, runs `_output_l(stream, format, nullptr-locale, va_args)`,
  * flushes scratch via `_ftbuf`, and unlocks.
  *
  * Returns the `_output_l` byte count on success, `-1` on argument/stream
@@ -13694,7 +13706,8 @@ namespace
   [[maybe_unused]] BOOL RuntimeIsTopSehRegistrationEh3UnwindFilter() noexcept
   {
     auto* const top =
-      reinterpret_cast<RuntimeEh3TopRegistrationProbeView*>(NtCurrentTeb()->NtTib.ExceptionList);
+      reinterpret_cast<RuntimeEh3TopRegistrationProbeView*>(
+        reinterpret_cast<NT_TIB*>(NtCurrentTeb())->ExceptionList);
     if (top == nullptr) {
       return FALSE;
     }
@@ -15551,21 +15564,6 @@ namespace moho::runtime
     } while (writeCursor < reverseCursor);
   }
 
-  /**
-   * Address: 0x00B57C8C (FUN_00B57C8C)
-   *
-   * What it does:
-   * Signed-int `to_chars` helper that only applies sign handling for base 10.
-   */
-  void LegacyToCharsSigned32Dispatch(int value, char* destination, unsigned int base)
-  {
-    if (base == 10 && value < 0) {
-      LegacyToCharsReverseUnsigned32(static_cast<unsigned int>(value), destination, 10u, true);
-      return;
-    }
-
-    LegacyToCharsReverseUnsigned32(static_cast<unsigned int>(value), destination, base, false);
-  }
 
   /**
    * Address: 0x00B57CB4 (FUN_00B57CB4)
@@ -15584,30 +15582,7 @@ namespace moho::runtime
     return destination;
   }
 
-  /**
-   * Address: 0x007BF450 (FUN_007BF450)
-   *
-   * What it does:
-   * Base-10 adapter lane that formats one signed integer and returns the
-   * passthrough destination pointer.
-   */
-  [[maybe_unused]] char* LegacyToCharsSigned32Base10Adapter(const int value, char* const destination)
-  {
-    (void)LegacyToCharsSigned32(value, destination, 10u);
-    return destination;
-  }
 
-  /**
-   * Address: 0x00B57CD9 (FUN_00B57CD9)
-   *
-   * What it does:
-   * Returns destination pointer after formatting one unsigned integer.
-   */
-  char* LegacyToCharsUnsigned32(unsigned int value, char* destination, unsigned int base)
-  {
-    LegacyToCharsReverseUnsigned32(value, destination, base, false);
-    return destination;
-  }
 
   /**
    * Address: 0x00B57CF1 (FUN_00B57CF1)
@@ -15661,49 +15636,7 @@ namespace moho::runtime
     return result;
   }
 
-  /**
-   * Address: 0x00B57D5E (FUN_00B57D5E)
-   *
-   * What it does:
-   * Signed 64-bit formatting entry that returns the passthrough destination
-   * pointer lane expected by the caller.
-   */
-  char* LegacyToCharsSigned64Parts(
-    std::uint32_t lowPart,
-    std::int32_t highPart,
-    char* destination,
-    unsigned int base
-  )
-  {
-    bool isNegative = false;
-    if (base == 10u && highPart <= 0) {
-      isNegative = (highPart < 0) || (highPart == 0 && static_cast<std::int32_t>(lowPart) < 0);
-    }
 
-    const std::uint64_t rawValue =
-      (static_cast<std::uint64_t>(static_cast<std::uint32_t>(highPart)) << 32u) | static_cast<std::uint64_t>(lowPart);
-    LegacyToCharsUnsigned64Worker(destination, rawValue, base, isNegative);
-    return destination;
-  }
-
-  /**
-   * Address: 0x00B57D8F (FUN_00B57D8F)
-   *
-   * What it does:
-   * Unsigned 64-bit formatting entry that returns the passthrough destination
-   * pointer lane expected by the caller.
-   */
-  char* LegacyToCharsUnsigned64Parts(
-    std::uint32_t lowPart,
-    std::uint32_t highPart,
-    char* destination,
-    unsigned int base
-  )
-  {
-    const std::uint64_t rawValue = (static_cast<std::uint64_t>(highPart) << 32u) | static_cast<std::uint64_t>(lowPart);
-    LegacyToCharsUnsigned64Worker(destination, rawValue, base, false);
-    return destination;
-  }
 
   /**
    * Address: 0x00A96AF8 (FUN_00A96AF8, _mtinitlocks)
@@ -15781,57 +15714,9 @@ namespace moho::runtime
     }
   }
 
-  /**
-   * Address: 0x00A96B96 (FUN_00A96B96, _unlock)
-   *
-   * What it does:
-   * Releases one CRT lock-table lane.
-   */
-  void RuntimeUnlock(const int lockNumber)
-  {
-    ::_unlock(lockNumber);
-  }
 
-  /**
-   * Address: 0x00A89F95 (FUN_00A89F95, __unlock_file)
-   *
-   * What it does:
-   * Releases one CRT FILE lock lane for callers that use the CRT internal
-   * `__unlock_file` helper contract.
-   */
-  void RuntimeUnlockFile(std::FILE* stream)
-  {
-    ::_unlock_file(stream);
-  }
 
-  /**
-   * Address: 0x00B57DAA (FUN_00B57DAA)
-   *
-   * What it does:
-   * `_eof` runtime helper lane for one CRT file descriptor.
-   */
-  int RuntimeFileDescriptorEof(int fileDescriptor)
-  {
-    return ::_eof(fileDescriptor);
-  }
 
-  /**
-   * Address: 0x00A9BC49 (FUN_00A9BC49, _close)
-   *
-   * What it does:
-   * Handles the special pseudo-handle lane (`-2`) and otherwise forwards to
-   * CRT `_close` semantics.
-   */
-  int RuntimeClose(const int fileHandle)
-  {
-    if (fileHandle == -2) {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EBADF;
-      return -1;
-    }
-
-    return ::_close(fileHandle);
-  }
 
   /**
    * Address: 0x00A9BD16 (FUN_00A9BD16, _freebuf)
@@ -15978,48 +15863,7 @@ namespace moho::runtime
     return fileDescriptor;
   }
 
-  /**
-   * Address: 0x00AA1807 (FUN_00AA1807, __read)
-   *
-   * What it does:
-   * Handles the special pseudo-handle lane (`-2`), validates max byte count,
-   * and forwards to CRT `_read` for normal descriptor processing.
-   */
-  int RuntimeRead(const int fileHandle, void* const destinationBuffer, const unsigned int maxCharCount)
-  {
-    if (fileHandle == -2) {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EBADF;
-      return -1;
-    }
 
-    if (maxCharCount > 0x7FFFFFFFu) {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
-
-    return ::_read(fileHandle, destinationBuffer, maxCharCount);
-  }
-
-  /**
-   * Address: 0x00AB631D (FUN_00AB631D, _lseeki64)
-   *
-   * What it does:
-   * Handles the special pseudo-handle lane (`-2`) and otherwise forwards to
-   * CRT `_lseeki64` semantics.
-   */
-  __int64 RuntimeLseekI64(const int fileHandle, const __int64 position, const int moveMethod)
-  {
-    if (fileHandle == -2) {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EBADF;
-      return -1;
-    }
-
-    return ::_lseeki64(fileHandle, position, moveMethod);
-  }
 
   /**
    * Address: 0x00A8548B (FUN_00A8548B, _fsopen)
@@ -16114,34 +15958,6 @@ namespace moho::runtime
     return 0;
   }
 
-  /**
-   * Address: 0x00A958E3 (FUN_00A958E3, use_encode_pointer)
-   *
-   * What it does:
-   * Returns true on NT-class Windows, or on older systems that do not expose
-   * a `.mixcrt` section in the current module image.
-   */
-  [[nodiscard]] bool RuntimeShouldUseEncodedPointers()
-  {
-    unsigned int platformMajorVersion = 0;
-    _get_winmajor(&platformMajorVersion);
-    if (platformMajorVersion > 5u) {
-      return true;
-    }
-
-    const auto* const moduleBase = reinterpret_cast<const std::uint8_t*>(::GetModuleHandleA(nullptr));
-    const auto* const dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER*>(moduleBase);
-    const auto* const ntHeaders = reinterpret_cast<const IMAGE_NT_HEADERS*>(moduleBase + dosHeader->e_lfanew);
-    const auto* sectionHeader = IMAGE_FIRST_SECTION(ntHeaders);
-
-    for (unsigned short index = 0; index < ntHeaders->FileHeader.NumberOfSections; ++index, ++sectionHeader) {
-      if (std::strcmp(reinterpret_cast<const char*>(sectionHeader->Name), ".mixcrt") == 0) {
-        return false;
-      }
-    }
-
-    return true;
-  }
 
   /**
    * Address: 0x00A959BD (FUN_00A959BD, encoded_null)
@@ -16169,22 +15985,6 @@ namespace moho::runtime
     return gRuntimeMathErrorActionEncoded;
   }
 
-  /**
-   * Address: 0x00A9A9AB (FUN_00A9A9AB)
-   *
-   * What it does:
-   * Enables the user math-error callback lane when `handler` is non-null, or
-   * clears the active-flag lane when no handler is supplied.
-   */
-  [[maybe_unused]] void RuntimeSetMathErrorHandlerIfPresent(RuntimeMathErrorHandler const handler)
-  {
-    if (handler != nullptr) {
-      (void)RuntimeSetEncodedMathErrorHandler(handler);
-      return;
-    }
-
-    gRuntimeMathErrorActionEnabled = 0;
-  }
 
   [[nodiscard]] RuntimeSignalHandler RuntimeDecodeSignalAction(void*& encodedActionSlot)
   {
@@ -16578,53 +16378,8 @@ namespace moho::runtime
     frameStateSlot = nullptr;
   }
 
-  /**
-   * Address: 0x00A8243C (FUN_00A8243C, ??1type_info@@QAE@@Z [type_info::~type_info])
-   *
-   * What it does:
-   * Restores one `std::type_info` base vtable lane and releases its
-   * associated type-info frame state through the frame cleanup helper.
-   */
-  void RuntimeTypeInfoDestructorWrapper(std::type_info* const typeInfo)
-  {
-    auto* const typeInfoView = reinterpret_cast<RuntimeTypeInfoView*>(typeInfo);
-    typeInfoView->vtable = RuntimeTypeInfoBaseVtableLane();
-    RuntimeFreeTypeInfoFrame(typeInfo);
-  }
 
-  /**
-   * Address: 0x00A824D7 (FUN_00A824D7)
-   *
-   * What it does:
-   * Constructor-lane helper that rebinds one `std::type_info` object to the
-   * base type-info vtable and returns the same object pointer.
-   */
-  [[maybe_unused]] std::type_info* __cdecl RuntimeTypeInfoConstructVtableOnly(
-    std::type_info* const typeInfo,
-    int /*unused*/
-  ) noexcept
-  {
-    auto* const typeInfoView = reinterpret_cast<RuntimeTypeInfoView*>(typeInfo);
-    typeInfoView->vtable = RuntimeTypeInfoBaseVtableLane();
-    return typeInfo;
-  }
 
-  /**
-   * Address: 0x00A82498 (FUN_00A82498)
-   *
-   * What it does:
-   * Compares two raw `type_info` storage lanes by their decorated-name text
-   * starting at byte offset `+0x09`; returns `TRUE` when names differ.
-   */
-  [[maybe_unused]] BOOL RuntimeTypeInfoStorageNameNotEqual(
-    const void* const lhsTypeInfoStorage,
-    const void* const rhsTypeInfoStorage
-  ) noexcept
-  {
-    const auto* const lhsName = static_cast<const char*>(lhsTypeInfoStorage) + 9;
-    const auto* const rhsName = static_cast<const char*>(rhsTypeInfoStorage) + 9;
-    return std::strcmp(rhsName, lhsName) != 0 ? TRUE : FALSE;
-  }
 
   /**
    * Address: 0x00ABFAA0 (FUN_00ABFAA0, std::_Xfsopen)
@@ -16709,16 +16464,6 @@ namespace moho::runtime
     return file;
   }
 
-  /**
-   * Address: 0x00ABFC0A (FUN_00ABFC0A, j_std::_Fiopen(wchar_t const*,int,int))
-   *
-   * What it does:
-   * Thunk lane that forwards directly to wide `_Fiopen`.
-   */
-  std::FILE* RuntimeFiopenWideThunk(const wchar_t* const filePath, const int openMode, const int shareFlag)
-  {
-    return RuntimeFiopenWide(filePath, openMode, shareFlag);
-  }
 
   /**
    * Address: 0x00ABFC0F (FUN_00ABFC0F, std::_Fiopen(char const*,int,int))
@@ -16825,87 +16570,11 @@ namespace moho::runtime
   RuntimeLocaleLocimpView* RuntimeGetGlobalLocale();
   RuntimeLocaleLocimpView* RuntimeLocaleInit();
 
-  /**
-   * Address: 0x004C52F0 (FUN_004C52F0, nullsub_802)
-   *
-   * What it does:
-   * Legacy no-op CRT hook.
-   */
-  [[maybe_unused]] void RuntimeNoOpCrtHookA()
-  {
-  }
 
-  /**
-   * Address: 0x004C53A0 (FUN_004C53A0, nullsub_803)
-   *
-   * What it does:
-   * Legacy no-op CRT hook.
-   */
-  [[maybe_unused]] void RuntimeNoOpCrtHookB()
-  {
-  }
 
-  /**
-   * Address: 0x004C53E0 (FUN_004C53E0, sub_4C53E0)
-   * Address: 0x005249A0 (FUN_005249A0)
-   *
-   * What it does:
-   * Fills one dword range with a repeated source dword and returns one-past-end
-   * destination pointer.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeFillDwordRangeFromSource(
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination,
-    const std::int32_t count
-  )
-  {
-    std::uint32_t* writeCursor = destination;
-    for (std::int32_t remaining = count; remaining > 0; --remaining) {
-      *writeCursor++ = *sourceWord;
-    }
-    return destination + count;
-  }
 
-  /**
-   * Address: 0x004C5410 (FUN_004C5410, nullsub_804)
-   *
-   * What it does:
-   * Legacy stdcall no-op hook.
-   */
-  [[maybe_unused]] void __stdcall RuntimeNoOpStdcallInt(const int /*unused*/)
-  {
-  }
 
-  /**
-   * Address: 0x004C5420 (FUN_004C5420, nullsub_805)
-   *
-   * What it does:
-   * Legacy no-op CRT hook.
-   */
-  [[maybe_unused]] void RuntimeNoOpCrtHookC()
-  {
-  }
 
-  /**
-   * Address: 0x004C5430 (FUN_004C5430, std::basic_filebuf<char,std::char_traits<char>>::_Init)
-   *
-   * What it does:
-   * Initializes filebuf file-pointer lanes from one optional `FILE*` and resets
-   * conversion state/cache words.
-   */
-  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
-  {
-    filebuf->closeOnClose = 0;
-    filebuf->wroteSome = 0;
-    RuntimeFilebufResetIoLanes(filebuf);
-    if (file != nullptr) {
-      RuntimeFilebufBindFileIoLanes(filebuf, file);
-    }
-    filebuf->myFile = file;
-    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
-    filebuf->codecvtFacet = nullptr;
-    return filebuf;
-  }
 
   bool RuntimeFilebufEndWrite(RuntimeFilebufCharView* const filebuf)
   {
@@ -16954,94 +16623,8 @@ namespace moho::runtime
     }
   }
 
-  /**
-   * Address: 0x004C54A0 (FUN_004C54A0, std::basic_filebuf<char,std::char_traits<char>>::open)
-   *
-   * What it does:
-   * Opens one narrow path via `_Fiopen`, binds `FILE` lane pointers into the
-   * filebuf runtime view, and refreshes codecvt lane when conversion is needed.
-   */
-  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufOpen(
-    RuntimeFilebufCharView* const filebuf,
-    const char* const filename,
-    const std::int32_t openMode,
-    const std::int32_t shareMode
-  )
-  {
-    if (filebuf->myFile != nullptr) {
-      return nullptr;
-    }
 
-    std::FILE* const file = RuntimeFiopenNarrow(filename, openMode, shareMode);
-    if (file == nullptr) {
-      return nullptr;
-    }
 
-    filebuf->closeOnClose = 1;
-    filebuf->wroteSome = 0;
-    RuntimeFilebufResetIoLanes(filebuf);
-    RuntimeFilebufBindFileIoLanes(filebuf, file);
-    filebuf->myFile = file;
-    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
-    filebuf->codecvtFacet = nullptr;
-
-    const std::locale locale = std::locale();
-    auto& codecvtFacet = std::use_facet<RuntimeCodecvtCharFacet>(locale);
-    (void)RuntimeFilebufApplyCodecvtFacet(filebuf, &codecvtFacet);
-
-    return filebuf;
-  }
-
-  /**
-   * Address: 0x004C55A0 (FUN_004C55A0, std::basic_filebuf<char,std::char_traits<char>>::close)
-   *
-   * What it does:
-   * Flushes pending conversion output lane, closes bound `FILE*`, then resets
-   * filebuf file-pointer/conversion state lanes.
-   */
-  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufClose(RuntimeFilebufCharView* const filebuf)
-  {
-    RuntimeFilebufCharView* result = filebuf;
-    if (filebuf->myFile != nullptr) {
-      if (!RuntimeFilebufEndWrite(filebuf)) {
-        result = nullptr;
-      }
-      if (std::fclose(filebuf->myFile) != 0) {
-        result = nullptr;
-      }
-    } else {
-      result = nullptr;
-    }
-
-    filebuf->closeOnClose = 0;
-    filebuf->wroteSome = 0;
-    RuntimeFilebufResetIoLanes(filebuf);
-    filebuf->myFile = nullptr;
-    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
-    filebuf->codecvtFacet = nullptr;
-    return result;
-  }
-
-  /**
-   * Address: 0x004F2C30 (FUN_004F2C30)
-   *
-   * What it does:
-   * Executes the non-deleting `basic_ofstream<char>` teardown lane that
-   * destroys the embedded `basic_filebuf<char>` subobject.
-   */
-  void RuntimeDestroyBasicOfstreamFilebufLane(void* const iosSubobject)
-  {
-    if (iosSubobject == nullptr) {
-      return;
-    }
-
-    constexpr std::ptrdiff_t kOfstreamFilebufOffsetFromIosSubobject = -0x50;
-    auto* const iosBytes = static_cast<std::uint8_t*>(iosSubobject);
-    auto* const filebuf = reinterpret_cast<std::basic_filebuf<char, std::char_traits<char>>*>(
-      iosBytes + kOfstreamFilebufOffsetFromIosSubobject
-    );
-    filebuf->~basic_filebuf();
-  }
 
   /**
    * Address: 0x004C57B0 (FUN_004C57B0, sub_4C57B0)
@@ -17065,71 +16648,11 @@ namespace moho::runtime
     return reinterpret_cast<std::intptr_t>(filebuf);
   }
 
-  /**
-   * Address: 0x004C5880 (FUN_004C5880, nullsub_806)
-   *
-   * What it does:
-   * Legacy stdcall no-op hook.
-   */
-  [[maybe_unused]] void __stdcall RuntimeNoOpStdcallInt2(const int /*unused*/)
-  {
-  }
 
-  /**
-   * Address: 0x004C5890 (FUN_004C5890, sub_4C5890)
-   *
-   * What it does:
-   * Returns one dword from indirect pointer lane.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReadIndirectDwordA(const std::int32_t* const valuePointer)
-  {
-    return *valuePointer;
-  }
 
-  /**
-   * Address: 0x004C58B0 (FUN_004C58B0, sub_4C58B0)
-   *
-   * What it does:
-   * Writes one dword through indirect pointer lane and returns that pointer.
-   */
-  [[maybe_unused]] std::int32_t* RuntimeWriteIndirectDword(std::int32_t* const outValuePointer, const std::int32_t value)
-  {
-    *outValuePointer = value;
-    return outValuePointer;
-  }
 
-  /**
-   * Address: 0x004C58E0 (FUN_004C58E0, sub_4C58E0)
-   *
-   * What it does:
-   * Returns one dword from indirect pointer lane.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReadIndirectDwordB(const std::int32_t* const valuePointer)
-  {
-    return *valuePointer;
-  }
 
-  /**
-   * Address: 0x004F2D00 (FUN_004F2D00)
-   *
-   * What it does:
-   * Returns one 16-bit value from an indirect word lane.
-   */
-  [[maybe_unused]] std::uint16_t RuntimeReadIndirectWordA(const std::uint16_t* const valuePointer) noexcept
-  {
-    return *valuePointer;
-  }
 
-  /**
-   * Address: 0x004F2D10 (FUN_004F2D10)
-   *
-   * What it does:
-   * Returns one 16-bit value from an indirect word lane.
-   */
-  [[maybe_unused]] std::uint16_t RuntimeReadIndirectWordB(const std::uint16_t* const valuePointer) noexcept
-  {
-    return *valuePointer;
-  }
 
   struct RuntimeStreamPositionStateView
   {
@@ -17145,51 +16668,8 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeStreamPositionStateView, stateTag) == 0x10, "RuntimeStreamPositionStateView::stateTag offset must be 0x10");
   static_assert(sizeof(RuntimeStreamPositionStateView) == 0x14, "RuntimeStreamPositionStateView size must be 0x14");
 
-  /**
-   * Address: 0x004C5900 (FUN_004C5900, sub_4C5900)
-   *
-   * What it does:
-   * Initializes one stream-position state lane triplet (`stateTag`, 64-bit
-   * position split high/low) and clears status lane.
-   */
-  [[maybe_unused]] RuntimeStreamPositionStateView* RuntimeStreamPositionInitialize(
-    RuntimeStreamPositionStateView* const positionState,
-    const std::int32_t stateTag,
-    const std::int32_t positionLow,
-    const std::int32_t positionHigh
-  )
-  {
-    positionState->positionLow = positionLow;
-    positionState->statusWord = 0;
-    positionState->positionHigh = positionHigh;
-    positionState->stateTag = stateTag;
-    return positionState;
-  }
 
-  /**
-   * Address: 0x004C5920 (FUN_004C5920, sub_4C5920)
-   *
-   * What it does:
-   * Returns stream-position state-tag lane.
-   */
-  [[maybe_unused]] std::int32_t RuntimeStreamPositionGetStateTag(const RuntimeStreamPositionStateView* const positionState)
-  {
-    return positionState->stateTag;
-  }
 
-  /**
-   * Address: 0x004C5930 (FUN_004C5930, sub_4C5930)
-   *
-   * What it does:
-   * Returns 64-bit stream-position payload from low/high dword lanes.
-   */
-  [[maybe_unused]] std::int64_t RuntimeStreamPositionGetOffset(const RuntimeStreamPositionStateView* const positionState)
-  {
-    const std::uint32_t low = static_cast<std::uint32_t>(positionState->positionLow);
-    const std::uint32_t high = static_cast<std::uint32_t>(positionState->positionHigh);
-    const std::uint64_t combined = low | (static_cast<std::uint64_t>(high) << 32u);
-    return static_cast<std::int64_t>(combined);
-  }
 
   class RuntimeFacetBaseVtableProbe final : public std::locale::facet
   {
@@ -17226,86 +16706,9 @@ namespace moho::runtime
     return facet;
   }
 
-  /**
-   * Address: 0x004C5970 (FUN_004C5970, std::codecvt::do_in)
-   *
-   * What it does:
-   * Reports `noconv`, copying input/output next-pointer lanes to begin pointers.
-   */
-  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoInNoConversion(
-    const void* const /*codecvtSelf*/,
-    const char* const fromBegin,
-    const char* const /*fromEnd*/,
-    const char** const fromNext,
-    char* const toBegin,
-    char* const /*toEnd*/,
-    char** const toNext
-  )
-  {
-    *fromNext = fromBegin;
-    *toNext = toBegin;
-    return std::codecvt_base::noconv;
-  }
 
-  /**
-   * Address: 0x004C5990 (FUN_004C5990, std::codecvt::do_out)
-   *
-   * What it does:
-   * Reports `noconv`, copying input/output next-pointer lanes to begin pointers.
-   */
-  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoOutNoConversion(
-    const void* const /*codecvtSelf*/,
-    const char* const fromBegin,
-    const char* const /*fromEnd*/,
-    const char** const fromNext,
-    char* const toBegin,
-    char* const /*toEnd*/,
-    char** const toNext
-  )
-  {
-    *fromNext = fromBegin;
-    *toNext = toBegin;
-    return std::codecvt_base::noconv;
-  }
 
-  /**
-   * Address: 0x004C59B0 (FUN_004C59B0, std::codecvt::do_unshift)
-   *
-   * What it does:
-   * Reports `noconv` and keeps output-next lane at output begin.
-   */
-  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoUnshiftNoConversion(
-    const void* const /*codecvtSelf*/,
-    char* const toBegin,
-    char* const /*toEnd*/,
-    char** const toNext
-  )
-  {
-    *toNext = toBegin;
-    return std::codecvt_base::noconv;
-  }
 
-  /**
-   * Address: 0x004C59D0 (FUN_004C59D0, std::codecvt::do_length)
-   *
-   * What it does:
-   * Returns min(maxCount, byte-span between begin/end input pointers).
-   */
-  [[maybe_unused]] std::uint32_t RuntimeCodecvtDoLengthNoConversion(
-    const void* const /*codecvtSelf*/,
-    const char* const fromBegin,
-    const char* const fromEnd,
-    const std::uint32_t maxCount
-  )
-  {
-    const std::uint32_t spanBytes = static_cast<std::uint32_t>(
-      reinterpret_cast<std::uintptr_t>(fromEnd) - reinterpret_cast<std::uintptr_t>(fromBegin)
-    );
-    if (maxCount < spanBytes) {
-      return maxCount;
-    }
-    return spanBytes;
-  }
 
   /**
    * Address: 0x004C59F0 (FUN_004C59F0, sub_4C59F0)
@@ -17326,32 +16729,7 @@ namespace moho::runtime
     return facet;
   }
 
-  /**
-   * Address: 0x009398E0 (FUN_009398E0)
-   *
-   * What it does:
-   * Rebinds one facet object to the base `std::locale::facet` vtable lane.
-   */
-  [[maybe_unused]] void RuntimeRebindLocaleFacetBaseVtableLane(std::locale::facet* const facet)
-  {
-    (void)RuntimeLocaleFacetBindBaseVtable(facet);
-  }
 
-  /**
-   * Address: 0x009398F0 (FUN_009398F0,
-   * std::num_get<char,std::istreambuf_iterator<char,std::char_traits<char>>>::dtr)
-   *
-   * What it does:
-   * Applies deleting-dtor semantics for one num_get facet instance by rebinding
-   * the base `std::locale::facet` vtable and conditionally freeing storage.
-   */
-  [[maybe_unused]] std::locale::facet* RuntimeDestroyNumGetCharFacetDeleting(
-    std::locale::facet* const facet,
-    const std::uint8_t deleteFlag
-  )
-  {
-    return RuntimeLocaleFacetDestroyMaybeDelete(facet, deleteFlag);
-  }
 
   /**
    * Address: 0x00479CC0 (FUN_00479CC0, std::locale::locale)
@@ -17472,27 +16850,6 @@ namespace moho::runtime
     return streambuf->lane2Begin;
   }
 
-  /**
-   * Address: 0x004F8820 (FUN_004F8820, std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::basic_streambuf)
-   *
-   * What it does:
-   * Installs `wstreambuf` vtable, constructs mutex/locale lanes, and initializes
-   * internal pointer-lane storage.
-   */
-  [[maybe_unused]] RuntimeBasicWstreambufView* RuntimeBasicWstreambufConstruct(RuntimeBasicWstreambufView* const streambuf)
-  {
-    streambuf->vtable = RuntimeGetWstreambufBaseVtable();
-    RuntimeMutexConstruct(&streambuf->mutex);
-
-    auto* const localeStorage = static_cast<RuntimeStdLocaleObject*>(::operator new(sizeof(RuntimeStdLocaleObject), std::nothrow));
-    if (localeStorage != nullptr) {
-      RuntimeLocaleDefaultConstruct(localeStorage);
-    }
-    streambuf->localeObject = localeStorage;
-
-    (void)RuntimeBasicWstreambufInit(streambuf);
-    return streambuf;
-  }
 
   struct RuntimeBasicStreambufLocaleView
   {
@@ -17502,29 +16859,6 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeBasicStreambufLocaleView, localeObject) == 0x38, "RuntimeBasicStreambufLocaleView::localeObject offset must be 0x38");
   static_assert(sizeof(RuntimeBasicStreambufLocaleView) == 0x3C, "RuntimeBasicStreambufLocaleView size must be 0x3C");
 
-  /**
-   * Address: 0x004C5A10 (FUN_004C5A10, std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::getloc)
-   *
-   * What it does:
-   * Returns one locale object copied from streambuf locale lane and increments
-   * `_Locimp::_Refs` under `_Lockit(0)` unless refs is `-1`.
-   */
-  [[maybe_unused]] RuntimeStdLocaleObject* RuntimeBasicStreambufGetLocale(
-    const RuntimeBasicStreambufLocaleView* const streambuf,
-    RuntimeStdLocaleObject* const outLocale
-  )
-  {
-    RuntimeLocaleLocimpView* const localeImpl = streambuf->localeObject->ptr;
-    outLocale->ptr = localeImpl;
-
-    RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
-    if (localeImpl->refs != -1) {
-      ++localeImpl->refs;
-    }
-    RuntimeLockitDestroy(&lockit);
-    return outLocale;
-  }
 
   struct RuntimeStreambufPointerTripletView
   {
@@ -17546,87 +16880,8 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2End) == 0x34, "RuntimeStreambufPointerTripletView::lane2End offset must be 0x34");
   static_assert(sizeof(RuntimeStreambufPointerTripletView) == 0x38, "RuntimeStreambufPointerTripletView size must be 0x38");
 
-  /**
-   * Address: 0x004C5A50 (FUN_004C5A50, sub_4C5A50)
-   *
-   * What it does:
-   * Stores three begin/end pointer pairs into streambuf pointer-lane triplet
-   * and returns the third begin pointer lane.
-   */
-  [[maybe_unused]] void* RuntimeStreambufSetPointerTriplets(
-    RuntimeStreambufPointerTripletView* const streambuf,
-    void* const lane0Begin,
-    void* const lane1Begin,
-    void* const lane2Begin,
-    void* const lane0End,
-    void* const lane1End,
-    void* const lane2End
-  )
-  {
-    streambuf->lane0Begin = lane0Begin;
-    streambuf->lane0End = lane0End;
-    streambuf->lane1Begin = lane1Begin;
-    streambuf->lane1End = lane1End;
-    streambuf->lane2Begin = lane2Begin;
-    streambuf->lane2End = lane2End;
-    return lane2Begin;
-  }
 
-  /**
-   * Address: 0x004F7E80 (FUN_004F7E80, std::wstreambuf::_Xsgetn_s helper)
-   *
-   * What it does:
-   * Returns the active input word-count lane when the input pointer-lane
-   * guard is non-zero.
-   */
-  [[maybe_unused]] std::int32_t RuntimeWstreambufGetInputWordCount(
-    const RuntimeStreambufPointerTripletView* const streambuf
-  ) noexcept
-  {
-    if (streambuf == nullptr || streambuf->lane1Begin == nullptr) {
-      return 0;
-    }
 
-    const auto* const inputGuard = static_cast<const std::int32_t*>(streambuf->lane1Begin);
-    if (*inputGuard == 0) {
-      return 0;
-    }
-
-    if (streambuf->lane2Begin == nullptr) {
-      return 0;
-    }
-
-    const auto* const inputCount = static_cast<const std::int32_t*>(streambuf->lane2Begin);
-    return *inputCount;
-  }
-
-  /**
-   * Address: 0x004F7F10 (FUN_004F7F10, std::wstreambuf::xsputn helper)
-   *
-   * What it does:
-   * Returns the active output word-count lane when the output pointer-lane
-   * guard is non-zero.
-   */
-  [[maybe_unused]] std::int32_t RuntimeWstreambufGetOutputWordCount(
-    const RuntimeStreambufPointerTripletView* const streambuf
-  ) noexcept
-  {
-    if (streambuf == nullptr || streambuf->lane1End == nullptr) {
-      return 0;
-    }
-
-    const auto* const outputGuard = static_cast<const std::int32_t*>(streambuf->lane1End);
-    if (*outputGuard == 0) {
-      return 0;
-    }
-
-    if (streambuf->lane2End == nullptr) {
-      return 0;
-    }
-
-    const auto* const outputCount = static_cast<const std::int32_t*>(streambuf->lane2End);
-    return *outputCount;
-  }
 
   struct RuntimeWstreambufSeekAdjustView
   {
@@ -17670,93 +16925,6 @@ namespace moho::runtime
   };
   static_assert(sizeof(RuntimeSeekResultLane) == 0x14, "RuntimeSeekResultLane size must be 0x14");
 
-  /**
-   * Address: 0x004F79F0 (FUN_004F79F0)
-   *
-   * What it does:
-   * Adjusts the seek pointer lanes for one wchar streambuf state block and
-   * writes the resulting seek status payload.
-   */
-  [[maybe_unused]] RuntimeSeekResultLane* RuntimeWstreambufAdjustSeekLanes(
-    RuntimeWstreambufSeekAdjustView* const streambuf,
-    RuntimeSeekResultLane* const outResult,
-    const std::int32_t seekBase,
-    const std::int32_t,
-    const std::int32_t seekDelta,
-    const std::int32_t,
-    const std::int32_t,
-    const std::int32_t,
-    const std::uint8_t adjustFlags
-  ) noexcept
-  {
-    if (outResult == nullptr) {
-      return nullptr;
-    }
-
-    std::int32_t seekWordOffset = seekBase + seekDelta;
-    if (streambuf != nullptr && streambuf->lane1End != nullptr) {
-      const std::uint32_t lane1EndValue = *streambuf->lane1End;
-      if (lane1EndValue != 0u && streambuf->seekHighWater < lane1EndValue) {
-        streambuf->seekHighWater = lane1EndValue;
-      }
-    }
-
-    if (streambuf != nullptr && seekWordOffset != -1) {
-      bool adjusted = false;
-
-      if ((adjustFlags & 1u) != 0u && streambuf->lane1Begin != nullptr && *streambuf->lane1Begin != 0u) {
-        if (seekWordOffset >= 0 && streambuf->lane0Begin != nullptr) {
-          const std::int32_t lane0Value = static_cast<std::int32_t>(*streambuf->lane0Begin);
-          const std::int32_t lane1Value = static_cast<std::int32_t>(*streambuf->lane1Begin);
-          const std::int32_t rangeLimit = static_cast<std::int32_t>((streambuf->seekHighWater - static_cast<std::uint32_t>(lane0Value)) >> 1u);
-          if (seekWordOffset <= rangeLimit) {
-            const std::int32_t shift = seekWordOffset + ((lane0Value - lane1Value) >> 1);
-            if (streambuf->lane2Begin != nullptr) {
-              *streambuf->lane2Begin -= static_cast<std::uint32_t>(shift);
-            }
-            *streambuf->lane1Begin += static_cast<std::uint32_t>(2 * shift);
-
-            if ((adjustFlags & 2u) != 0u && streambuf->lane1End != nullptr) {
-              const std::uint32_t lane1EndValue = *streambuf->lane1End;
-              if (lane1EndValue != 0u && streambuf->lane2End != nullptr) {
-                const std::int32_t lane2EndValue = static_cast<std::int32_t>(*streambuf->lane2End);
-                const std::int32_t lane1BeginNow = static_cast<std::int32_t>(*streambuf->lane1Begin);
-                *streambuf->lane1End = static_cast<std::uint32_t>(lane1BeginNow);
-                *streambuf->lane2End =
-                  static_cast<std::uint32_t>((static_cast<std::int32_t>(lane1EndValue) + (2 * lane2EndValue) - lane1BeginNow) >> 1);
-              }
-            }
-
-            adjusted = true;
-          }
-        }
-      } else if ((adjustFlags & 2u) != 0u && streambuf->lane1End != nullptr && *streambuf->lane1End != 0u) {
-        if (seekWordOffset >= 0 && streambuf->lane0Begin != nullptr) {
-          const std::int32_t lane0Value = static_cast<std::int32_t>(*streambuf->lane0Begin);
-          const std::int32_t lane1EndValue = static_cast<std::int32_t>(*streambuf->lane1End);
-          const std::int32_t rangeLimit = static_cast<std::int32_t>((streambuf->seekHighWater - static_cast<std::uint32_t>(lane0Value)) >> 1u);
-          if (seekWordOffset <= rangeLimit) {
-            const std::int32_t shift = seekWordOffset + ((lane0Value - lane1EndValue) >> 1);
-            if (streambuf->lane2End != nullptr) {
-              *streambuf->lane2End -= static_cast<std::uint32_t>(shift);
-            }
-            *streambuf->lane1End += static_cast<std::uint32_t>(2 * shift);
-            adjusted = true;
-          }
-        }
-      }
-
-      if (!adjusted) {
-        seekWordOffset = -1;
-      }
-    }
-
-    outResult->position = seekWordOffset;
-    outResult->status08 = 0;
-    outResult->status0C = 0;
-    outResult->status10 = 0;
-    return outResult;
-  }
 
   struct RuntimeBasicWstringbufView : RuntimeBasicWstreambufView
   {
@@ -17767,103 +16935,8 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeBasicWstringbufView, stateFlags) == 0x40, "RuntimeBasicWstringbufView::stateFlags offset must be 0x40");
   static_assert(sizeof(RuntimeBasicWstringbufView) == 0x44, "RuntimeBasicWstringbufView size must be 0x44");
 
-  /**
-   * Address: 0x004F8550 (FUN_004F8550, std::basic_stringbuf<wchar_t>::_Tidy)
-   *
-   * What it does:
-   * Releases heap-backed stringbuf storage when the dynamic-buffer flag is set,
-   * then clears all pointer-word lanes and state flags.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeBasicWstringbufTidy(
-    RuntimeBasicWstringbufView* const stringbuf
-  )
-  {
-    if ((stringbuf->stateFlags & 1u) != 0u && stringbuf->lane0Begin != nullptr) {
-      ::operator delete(reinterpret_cast<void*>(static_cast<std::uintptr_t>(*stringbuf->lane0Begin)));
-    }
 
-    if (stringbuf->lane0Begin != nullptr) {
-      *stringbuf->lane0Begin = 0;
-    }
-    if (stringbuf->lane1Begin != nullptr) {
-      *stringbuf->lane1Begin = 0;
-    }
-    if (stringbuf->lane2Begin != nullptr) {
-      *stringbuf->lane2Begin = 0;
-    }
-    if (stringbuf->lane0End != nullptr) {
-      *stringbuf->lane0End = 0;
-    }
 
-    std::uint32_t* const result = stringbuf->lane1End;
-    if (result != nullptr) {
-      *result = 0;
-    }
-    if (stringbuf->lane2End != nullptr) {
-      *stringbuf->lane2End = 0;
-    }
-
-    stringbuf->stateFlags &= ~1u;
-    stringbuf->stateWord3C = 0;
-    return result;
-  }
-
-  /**
-   * Address: 0x00A99754 (FUN_00A99754, HandlerRoutine)
-   *
-   * What it does:
-   * Dispatches console Ctrl-C / Ctrl-Break events through encoded signal
-   * handlers under `_SIGNAL_LOCK`, clearing one-shot user handlers after decode.
-   */
-  BOOL __stdcall RuntimeConsoleControlHandler(const DWORD controlType)
-  {
-    _lock(kRuntimeSignalLock);
-
-    void** encodedActionSlot = nullptr;
-    RuntimeSignalHandler decodedHandler = nullptr;
-    int signalNumber = 0;
-
-    if (controlType == CTRL_C_EVENT) {
-      encodedActionSlot = &gRuntimeCtrlCActionEncoded;
-      decodedHandler = RuntimeDecodeSignalAction(gRuntimeCtrlCActionEncoded);
-      signalNumber = 2;
-    } else {
-      encodedActionSlot = &gRuntimeCtrlBreakActionEncoded;
-      decodedHandler = RuntimeDecodeSignalAction(gRuntimeCtrlBreakActionEncoded);
-      signalNumber = 21;
-    }
-
-    if (decodedHandler != nullptr && decodedHandler != reinterpret_cast<RuntimeSignalHandler>(1)) {
-      *encodedActionSlot = RuntimeEncodedNullPointer();
-    }
-
-    _unlock(kRuntimeSignalLock);
-
-    if (decodedHandler == nullptr) {
-      return FALSE;
-    }
-
-    if (decodedHandler != reinterpret_cast<RuntimeSignalHandler>(1)) {
-      decodedHandler(signalNumber);
-    }
-    return TRUE;
-  }
-
-  /**
-   * Address: 0x00ABF81C (FUN_00ABF81C, _Init_locks::_Init_locks)
-   *
-   * What it does:
-   * Initializes one shared 4-slot CRT lock table on first init epoch.
-   */
-  void* RuntimeInitStdLocks(void* const object)
-  {
-    if (::InterlockedIncrement(&gRuntimeStdLockInit) == 0) {
-      for (CRITICAL_SECTION& lock : gRuntimeStdLockSlots) {
-        RuntimeMtxInit(&lock);
-      }
-    }
-    return object;
-  }
 
   /**
    * Address: 0x00ABF8DB (FUN_00ABF8DB, std::_Lockit::_Lockit)
@@ -17904,109 +16977,14 @@ namespace moho::runtime
     return object;
   }
 
-  /**
-   * Address: 0x00ABF993 (FUN_00ABF993, std::_Mutex::~_Mutex)
-   *
-   * What it does:
-   * Destroys and frees one heap-allocated `CRITICAL_SECTION`.
-   */
-  void RuntimeMutexDestroy(RuntimeMutexHandle* const object)
-  {
-    if (object->criticalSection != nullptr) {
-      RuntimeMtxDestroy(object->criticalSection);
-      ::operator delete(object->criticalSection);
-      object->criticalSection = nullptr;
-    }
-  }
 
-  /**
-   * Address: 0x00AC50C0 (FUN_00AC50C0)
-   *
-   * What it does:
-   * Destroys one heap-owned critical-section object and releases its storage.
-   */
-  [[maybe_unused]] void RuntimeDestroyHeapCriticalSection(LPCRITICAL_SECTION const criticalSection) noexcept
-  {
-    ::DeleteCriticalSection(criticalSection);
-    ::operator delete(static_cast<void*>(criticalSection));
-  }
 
-  /**
-   * Address: 0x00AC1DF0 (FUN_00AC1DF0)
-   *
-   * What it does:
-   * Releases one kernel mutex lane referenced by a handle slot.
-   */
-  [[maybe_unused]] BOOL RuntimeReleaseMutexFromHandleSlot(HANDLE* const handleSlot)
-  {
-    return ::ReleaseMutex(*handleSlot);
-  }
 
-  /**
-   * Address: 0x00AC50E0 (FUN_00AC50E0)
-   *
-   * What it does:
-   * Closes one kernel handle lane.
-   */
-  [[maybe_unused]] BOOL RuntimeCloseHandleDirect(const HANDLE handle)
-  {
-    return ::CloseHandle(handle);
-  }
 
-  /**
-   * Address: 0x00AC50F0 (FUN_00AC50F0)
-   *
-   * What it does:
-   * Enters one Win32 critical section lane.
-   */
-  [[maybe_unused]] void RuntimeEnterCriticalSectionDirect(LPCRITICAL_SECTION const criticalSection)
-  {
-    ::EnterCriticalSection(criticalSection);
-  }
 
-  /**
-   * Address: 0x00AC5120 (FUN_00AC5120)
-   *
-   * What it does:
-   * Waits on one synchronization handle for `dwMilliseconds`.
-   */
-  [[maybe_unused]] DWORD RuntimeWaitForSingleObjectDirect(const HANDLE handle, const DWORD dwMilliseconds)
-  {
-    return ::WaitForSingleObject(handle, dwMilliseconds);
-  }
 
-  /**
-   * Address: 0x00AC5140 (FUN_00AC5140)
-   *
-   * What it does:
-   * Leaves one Win32 critical section lane.
-   */
-  [[maybe_unused]] void RuntimeLeaveCriticalSectionDirect(LPCRITICAL_SECTION const criticalSection)
-  {
-    ::LeaveCriticalSection(criticalSection);
-  }
 
-  /**
-   * Address: 0x00AC5150 (FUN_00AC5150)
-   *
-   * What it does:
-   * Releases one kernel mutex handle lane.
-   */
-  [[maybe_unused]] BOOL RuntimeReleaseMutexDirect(const HANDLE mutex)
-  {
-    return ::ReleaseMutex(mutex);
-  }
 
-  /**
-   * Address: 0x00ABF9A8 (FUN_00ABF9A8, std::_Mutex::_Lock)
-   *
-   * What it does:
-   * Enters the mutex critical section.
-   */
-  int RuntimeMutexLock(RuntimeMutexHandle* const object)
-  {
-    return RuntimeMtxLock(object->criticalSection);
-  }
 
   /**
    * Address: 0x00ABF9B1 (FUN_00ABF9B1, std::_Mutex::_Unlock)
@@ -18025,41 +17003,7 @@ namespace moho::runtime
     RuntimeMutexHandle mutexLane{};
   };
 
-  /**
-   * Address: 0x004F7DC0 (FUN_004F7DC0)
-   *
-   * What it does:
-   * Unlocks one embedded `_Mutex` lane located at `this + 1`.
-   */
-  [[maybe_unused]] int RuntimeUnlockEmbeddedMutexLane(
-    RuntimeMutexGuardUnlockView* const guardRuntime
-  )
-  {
-    if (guardRuntime == nullptr) {
-      return 0;
-    }
 
-    return RuntimeMutexUnlock(&guardRuntime->mutexLane);
-  }
-
-  /**
-   * Address: 0x004F7D40 (FUN_004F7D40)
-   *
-   * What it does:
-   * Applies `badbit` when the stream buffer lane is null, then clears stream
-   * state with the resulting mask.
-   */
-  [[maybe_unused]] void RuntimeClearIosStateWithNullBufferGuard(
-    std::ios& stream,
-    std::ios_base::iostate stateMask
-  )
-  {
-    if (stream.rdbuf() == nullptr) {
-      stateMask |= std::ios_base::badbit;
-    }
-
-    stream.clear(stateMask);
-  }
 
   /**
    * Runtime projection of one `std::basic_ostream<wchar_t>::sentry` object as
@@ -18150,280 +17094,12 @@ namespace moho::runtime
     return stream;
   }
 
-  /**
-   * Address: 0x004F85E0 (FUN_004F85E0)
-   *
-   * What it does:
-   * Acquires the `std::basic_ostream<wchar_t>::sentry` on `stream`: stores the
-   * target stream pointer in the sentry, locks the stream's `rdbuf()->_Mutex`
-   * lane when a buffer is present, walks any tied stream's flush (when tie()
-   * is set and no pending output is buffered) via the recovered
-   * `RuntimeWideOstreamFlushTiedStream` lane, and records the result as the
-   * sentry's boolean `ok` flag (`true` iff `!(rdstate() != goodbit)`).
-   *
-   * IDA signature:
-   * int __userpurge sub_4F85E0@<eax>(int a1@<edi>, int a2);
-   */
-  [[maybe_unused]] RuntimeWideOstreamSentryView* RuntimeWideOstreamSentryConstruct(
-    std::wostream* const stream,
-    RuntimeWideOstreamSentryView* const outSentry
-  )
-  {
-    if (outSentry == nullptr) {
-      return nullptr;
-    }
 
-    outSentry->stream = stream;
 
-    if (stream == nullptr) {
-      outSentry->ok = 0;
-      return outSentry;
-    }
 
-    auto* const buffer = stream->rdbuf();
-    if (buffer != nullptr) {
-      // In the MSVC8 CRT the `_Mutex` subobject of `basic_streambuf` is
-      // unconditionally locked by the sentry ctor. We route through the
-      // public `pubsync(..)` / `sentry` semantics by invoking the
-      // standard sentry so the locked buffer mutex is acquired identically.
-      auto* const tiedStream = stream->tie();
-      if (tiedStream != nullptr) {
-        // Match the binary's tied-stream flush via the recovered
-        // `RuntimeWideOstreamFlushTiedStream` helper, which inlines the
-        // exact `pubsync` + `clear(badbit)` fallback lane the CRT used.
-        (void)RuntimeWideOstreamFlushTiedStream(tiedStream);
-      }
-    }
 
-    outSentry->ok = static_cast<std::uint8_t>(stream->good());
-    return outSentry;
-  }
 
-  /**
-   * Address: 0x004F8660 (FUN_004F8660)
-   *
-   * What it does:
-   * Releases one `std::basic_ostream<wchar_t>::sentry`: when no C++ exception
-   * is currently propagating, runs the sentry's `osfx()` finalization on the
-   * stream; then regardless of exception state, releases the stream buffer's
-   * `_Mutex` lane (when a buffer is present). Preserves the MSVC8 ordering
-   * where the `osfx` call is skipped during unwinding to avoid re-entering
-   * locale/facet logic that may already be torn down.
-   *
-   * IDA signature:
-   * int __stdcall sub_4F8660(_DWORD *a1);
-   */
-  [[maybe_unused]] void RuntimeWideOstreamSentryDestroy(
-    RuntimeWideOstreamSentryView* const sentry
-  ) noexcept
-  {
-    if (sentry == nullptr || sentry->stream == nullptr) {
-      return;
-    }
 
-    if (!std::uncaught_exceptions()) {
-      RuntimeWideOstreamSentryOsfxIfUnitbuf(sentry->stream);
-    }
-
-    // The streambuf `_Mutex` lane unlock is performed by the CRT's real sentry
-    // destructor when the standard library object goes out of scope; the
-    // recovered sentry view only models the bookkeeping fields.
-    sentry->stream = nullptr;
-    sentry->ok = 0;
-  }
-
-  /**
-   * Address: 0x004F7440 (FUN_004F7440)
-   *
-   * What it does:
-   * MSVC8-generated `std::wstringstream::~wstringstream()` destructor body:
-   * rebinds the `wios` vtable of the `wstringstream` subobject back to the
-   * `basic_stringstream` secondary vtable slot, destroys the embedded
-   * `wstringbuf` member, then finalizes the base `wiostream`, `wostream`, and
-   * `wistream` vtable slots in that exact order. All offsets come from the
-   * MSVC8 multiple-inheritance layout tables referenced by the first `[ecx -
-   * 0x54]` indirect lookup in the binary (the `wstringstream -> wios` offset
-   * embedded in the adjusted this pointer).
-   *
-   * The recovered body forwards to the standard `std::wstringstream`
-   * destructor which is guaranteed to produce the same vtable-rebind +
-   * `wstringbuf` destroy order by the ABI.
-   *
-   * IDA signature:
-   * int __thiscall sub_4F7440(_DWORD *this);
-   */
-  [[maybe_unused]] void RuntimeWideStringStreamDestroy(
-    std::wstringstream* const stream
-  )
-  {
-    if (stream == nullptr) {
-      return;
-    }
-    stream->~wstringstream();
-  }
-
-  /**
-   * Address: 0x004F97D0 (FUN_004F97D0)
-   *
-   * What it does:
-   * MSVC8 STL `std::use_facet<std::ctype<wchar_t>>(loc)` template instantiation.
-   * Walks the locale's facet-id vector to find the registered `ctype<wchar_t>`
-   * instance, falling back to the global locale's facets and allocating a new
-   * facet via `_Getfacet` when neither slot holds one. Throws `std::bad_cast`
-   * when no facet can be registered.
-   *
-   * The recovered body forwards to `std::use_facet<std::ctype<wchar_t>>` which
-   * has the same semantics against the same thread-local locale in the MSVC
-   * STL. Preserves the lazy registration + bad_cast throw behavior of the
-   * original binary via the standard library implementation.
-   *
-   * IDA signature:
-   * struct std::locale::facet *__cdecl sub_4F97D0(int *arg0);
-   */
-  [[maybe_unused]] const std::ctype<wchar_t>* RuntimeUseWideCtypeFacetFromLocale(
-    const std::locale* const locale
-  )
-  {
-    if (locale == nullptr) {
-      return &std::use_facet<std::ctype<wchar_t>>(std::locale{});
-    }
-    return &std::use_facet<std::ctype<wchar_t>>(*locale);
-  }
-
-  /**
-   * Address: 0x00AAACB0 (FUN_00AAACB0, __crtGetEnvironmentStringsA)
-   *
-   * What it does:
-   * Returns one heap-copied ANSI environment block, preferring the
-   * wide-environment lane with explicit `WideCharToMultiByte` conversion when
-   * available, and falling back to `GetEnvironmentStringsA` when required.
-   */
-  char* RuntimeGetEnvironmentStringsA()
-  {
-    wchar_t* environmentStringsWide = nullptr;
-    char* environmentStringsAnsi = nullptr;
-    int mode = gRuntimeGetEnvironmentStringsEncodingMode;
-
-    if (mode == 0) {
-      environmentStringsWide = ::GetEnvironmentStringsW();
-      if (environmentStringsWide != nullptr) {
-        gRuntimeGetEnvironmentStringsEncodingMode = 1;
-        mode = 1;
-      } else if (::GetLastError() == ERROR_CALL_NOT_IMPLEMENTED) {
-        gRuntimeGetEnvironmentStringsEncodingMode = 2;
-        mode = 2;
-      }
-    }
-
-    if (mode == 1) {
-      if (environmentStringsWide == nullptr) {
-        environmentStringsWide = ::GetEnvironmentStringsW();
-        if (environmentStringsWide == nullptr) {
-          return nullptr;
-        }
-      }
-
-      const wchar_t* scan = environmentStringsWide;
-      while (*scan != L'\0') {
-        while (*scan != L'\0') {
-          ++scan;
-        }
-        ++scan;
-      }
-      const int wideCharCount = static_cast<int>(scan - environmentStringsWide + 1);
-
-      const int byteCount = ::WideCharToMultiByte(0, 0, environmentStringsWide, wideCharCount, nullptr, 0, nullptr, nullptr);
-      if (byteCount > 0) {
-        environmentStringsAnsi = static_cast<char*>(std::malloc(static_cast<std::size_t>(byteCount)));
-        if (environmentStringsAnsi != nullptr) {
-          if (::WideCharToMultiByte(0, 0, environmentStringsWide, wideCharCount, environmentStringsAnsi, byteCount, nullptr, nullptr)
-              == 0) {
-            _free_crt(environmentStringsAnsi);
-            environmentStringsAnsi = nullptr;
-          }
-        }
-      }
-
-      ::FreeEnvironmentStringsW(environmentStringsWide);
-      return environmentStringsAnsi;
-    }
-
-    if (mode != 2 && mode != 0) {
-      return nullptr;
-    }
-
-    char* const systemBlock = ::GetEnvironmentStringsA();
-    if (systemBlock == nullptr) {
-      return nullptr;
-    }
-
-    char* scan = systemBlock;
-    while (*scan != '\0') {
-      while (*scan != '\0') {
-        ++scan;
-      }
-      ++scan;
-    }
-
-    const std::size_t byteCount = static_cast<std::size_t>(scan - systemBlock + 1);
-    environmentStringsAnsi = static_cast<char*>(std::malloc(byteCount));
-    if (environmentStringsAnsi == nullptr) {
-      ::FreeEnvironmentStringsA(systemBlock);
-      return nullptr;
-    }
-
-    std::memcpy(environmentStringsAnsi, systemBlock, byteCount);
-    ::FreeEnvironmentStringsA(systemBlock);
-    return environmentStringsAnsi;
-  }
-
-  /**
-   * Address: 0x00A86718 (FUN_00A86718, fseek)
-   *
-   * What it does:
-   * Validates stream/origin and forwards to CRT `fseek`; invalid arguments
-   * route through CRT invalid-parameter handling and return `-1`.
-   */
-  int RuntimeFseek(std::FILE* const stream, const long offset, const int origin)
-  {
-    if (stream != nullptr && static_cast<unsigned int>(origin) <= 2u) {
-      return std::fseek(stream, offset, origin);
-    }
-
-    *RuntimeDosErrno() = 0;
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return -1;
-  }
-
-  /**
-   * Address: 0x00A89B60 (FUN_00A89B60, strncpy)
-   *
-   * What it does:
-   * Copies up to `count` chars from `source` into `destination`, stopping at
-   * the first source NUL and zero-filling remaining destination bytes.
-   */
-  char* RuntimeStrncpy(char* const destination, const char* const source, const std::size_t count)
-  {
-    if (count == 0u) {
-      return destination;
-    }
-
-    std::size_t writeIndex = 0u;
-    while (writeIndex < count) {
-      destination[writeIndex] = source[writeIndex];
-      if (source[writeIndex] == '\0') {
-        ++writeIndex;
-        while (writeIndex < count) {
-          destination[writeIndex++] = '\0';
-        }
-        return destination;
-      }
-      ++writeIndex;
-    }
-
-    return destination;
-  }
 
   /**
    * Address: 0x00A82D30 (FUN_00A82D30, strchr)
@@ -18496,16 +17172,6 @@ namespace moho::runtime
     return dividend % divisor;
   }
 
-  /**
-   * Address: 0x00A8E0E0 (FUN_00A8E0E0, __CIpow)
-   *
-   * What it does:
-   * Computes one power lane (`base^exponent`) for CRT inline-fpu callsites.
-   */
-  double RuntimeCIPow(const double base, const double exponent)
-  {
-    return std::pow(base, exponent);
-  }
 
   /**
    * Address: 0x00AA93C0 (FUN_00AA93C0, __CIpow_pentium4)
@@ -18552,388 +17218,15 @@ namespace moho::runtime
   };
   static_assert(sizeof(gRuntimeFpuIndefiniteValue80) == 0x0A, "gRuntimeFpuIndefiniteValue80 size must be 0x0A");
 
-  /**
-   * Address: 0x00AA7990 (FUN_00AA7990)
-   *
-   * What it does:
-   * Runs one x87 unary-class dispatch lane: captures `fxam` status for `st(0)`
-   * and tail-jumps through the per-operation callback table at `EDX+0x10`.
-   */
-  extern "C" __declspec(naked) int __cdecl RuntimeDispatchFpuUnaryClassLane()
-  {
-    __asm
-    {
-      cmp     byte ptr [edx+0Eh], 5
-      jnz     short use_default_control
-      mov     bx, [ebp-0A4h]
-      or      bh, 2
-      and     bh, 0FEh
-      mov     bl, 3Fh
-      jmp     short control_word_ready
 
-    use_default_control:
-      mov     bx, 133Fh
 
-    control_word_ready:
-      mov     [ebp-0A2h], bx
-      fldcw   word ptr [ebp-0A2h]
-      mov     ebx, offset gRuntimeFpuClassDispatchOffsetByFxamClass
-      fxam
-      mov     [ebp-94h], edx
-      fstsw   word ptr [ebp-0A0h]
-      mov     byte ptr [ebp-90h], 0
-      wait
-      mov     cl, [ebp-9Fh]
-      shl     cl, 1
-      sar     cl, 1
-      rol     cl, 1
-      mov     al, cl
-      and     al, 0Fh
-      xlat
-      movsx   eax, al
-      and     ecx, 404h
-      mov     ebx, edx
-      add     ebx, eax
-      add     ebx, 10h
-      jmp     dword ptr [ebx]
-    }
-  }
 
-  /**
-   * Address: 0x00AA79F7 (FUN_00AA79F7)
-   *
-   * What it does:
-   * Runs one x87 binary-class dispatch lane: captures `fxam` classes for
-   * `st(0)` and `st(1)`, then tail-jumps through `EDX+0x10` with the combined
-   * class index.
-   */
-  extern "C" __declspec(naked) int __cdecl RuntimeDispatchFpuBinaryClassLane()
-  {
-    __asm
-    {
-      cmp     byte ptr [edx+0Eh], 5
-      jnz     short use_default_control
-      mov     bx, [ebp-0A4h]
-      or      bh, 2
-      and     bh, 0FEh
-      mov     bl, 3Fh
-      jmp     short control_word_ready
 
-    use_default_control:
-      mov     bx, 133Fh
 
-    control_word_ready:
-      mov     [ebp-0A2h], bx
-      fldcw   word ptr [ebp-0A2h]
-      mov     ebx, offset gRuntimeFpuClassDispatchOffsetByFxamClass
-      fxam
-      mov     [ebp-94h], edx
-      fstsw   word ptr [ebp-0A0h]
-      mov     byte ptr [ebp-90h], 0
-      fxch    st(1)
-      mov     cl, [ebp-9Fh]
-      fxam
-      fstsw   word ptr [ebp-0A0h]
-      fxch    st(1)
-      mov     ch, [ebp-9Fh]
-      shl     ch, 1
-      sar     ch, 1
-      rol     ch, 1
-      mov     al, ch
-      and     al, 0Fh
-      xlat
-      mov     ah, al
-      shl     cl, 1
-      sar     cl, 1
-      rol     cl, 1
-      mov     al, cl
-      and     al, 0Fh
-      xlat
-      shl     ah, 1
-      shl     ah, 1
-      or      al, ah
-      movsx   eax, al
-      and     ecx, 404h
-      mov     ebx, edx
-      add     ebx, eax
-      add     ebx, 10h
-      jmp     dword ptr [ebx]
-    }
-  }
 
-  /**
-   * Address: 0x00A9A83A (FUN_00A9A83A)
-   *
-   * What it does:
-   * Triggers caller-selected x87 exception/status lanes from a bit-mask input,
-   * matching the original `fistp/fstsw/fldpi/fdiv` side-effect sequence.
-   */
-  extern "C" __declspec(naked) void __cdecl RuntimeTriggerFpuExceptionsByMask(const unsigned char /*mask*/)
-  {
-    __asm
-    {
-      push    ecx
-      push    ecx
-      mov     cl, byte ptr [esp+0Ch]
 
-      test    cl, 1
-      jz      short skip_mask_01
-      fld     tbyte ptr [gRuntimeFpuExceptionTriggerConstantA80]
-      fistp   dword ptr [esp+0Ch]
-      wait
 
-    skip_mask_01:
-      test    cl, 8
-      jz      short skip_mask_08
-      fstsw   ax
-      fld     tbyte ptr [gRuntimeFpuExceptionTriggerConstantA80]
-      fstp    qword ptr [esp]
-      wait
-      fstsw   ax
 
-    skip_mask_08:
-      test    cl, 10h
-      jz      short skip_mask_10
-      fld     tbyte ptr [gRuntimeFpuExceptionTriggerConstantB80]
-      fstp    qword ptr [esp]
-      wait
-
-    skip_mask_10:
-      test    cl, 4
-      jz      short skip_mask_04
-      fldz
-      fld1
-      fdivrp  st(1), st
-      fstp    st
-      wait
-
-    skip_mask_04:
-      test    cl, 20h
-      jz      short done
-      fldpi
-      fstp    qword ptr [esp]
-      wait
-
-    done:
-      pop     ecx
-      pop     ecx
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AAA0C1 (FUN_00AAA0C1)
-   *
-   * What it does:
-   * Classifies `st(0)` exponent parity shape for one x87 lane and returns
-   * status code `0/1/2` in `EAX` while preserving the x87 value lane.
-   */
-  extern "C" __declspec(naked) int __cdecl RuntimeClassifyFpuExponentLane()
-  {
-    __asm
-    {
-      fld     st
-      frndint
-      fcomp   st(1)
-      fstsw   ax
-      sahf
-      jnz     short not_integral
-      fld     st
-      fmul    qword ptr [gRuntimeHalfScaleDouble]
-      fld     st
-      frndint
-      fcompp
-      fstsw   ax
-      sahf
-      jz      short integral_even
-      mov     eax, 1
-      ret
-
-    not_integral:
-      mov     eax, 0
-      jmp     short done
-
-    integral_even:
-      mov     eax, 2
-
-    done:
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA7B36 (FUN_00AA7B36)
-   *
-   * What it does:
-   * Drops two x87 lanes, loads the canonical 80-bit indefinite value, and
-   * ensures the local status byte at `[EBP-0x90]` is set when it was non-positive.
-   */
-  extern "C" __declspec(naked) void __cdecl RuntimeLoadIndefiniteAndSetStatusIfNeeded()
-  {
-    __asm
-    {
-      fstp    st
-      fstp    st
-      fld     tbyte ptr [gRuntimeFpuIndefiniteValue80]
-      cmp     byte ptr [ebp-90h], 0
-      jg      short done
-      mov     byte ptr [ebp-90h], 1
-
-    done:
-      or      cl, cl
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA7B49 (FUN_00AA7B49)
-   *
-   * What it does:
-   * Marks one local status flag (`[EBP-0x90] = 1`) and returns, preserving the
-   * original `or cl, cl` condition-code side effect.
-   */
-  extern "C" __declspec(naked) void __cdecl RuntimeMarkFpuStatusAndReturn()
-  {
-    __asm
-    {
-      mov     byte ptr [ebp-90h], 1
-      or      cl, cl
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA85F4 (FUN_00AA85F4)
-   *
-   * What it does:
-   * Loads a normal IEEE-754 double unchanged, but for `NaN/Inf` lanes rebuilds
-   * and loads the legacy 80-bit extended-value representation.
-   */
-  extern "C" __declspec(naked) double __cdecl RuntimeLoadDoubleOrExtendedNanInf(const double /*value*/)
-  {
-    __asm
-    {
-      push    ebp
-      mov     ebp, esp
-      add     esp, 0FFFFFFF4h
-      push    ebx
-      mov     ax, word ptr [ebp+0Eh]
-      mov     bx, ax
-      and     ax, 7FF0h
-      cmp     ax, 7FF0h
-      jnz     short load_qword
-      or      bx, 7FFFh
-      mov     [ebp-2], bx
-      mov     eax, [ebp+0Ch]
-      mov     ebx, [ebp+8]
-      shld    eax, ebx, 0Bh
-      mov     [ebp-6], eax
-      mov     [ebp-0Ah], ebx
-      fld     tbyte ptr [ebp-0Ah]
-      jmp     short done
-
-    load_qword:
-      fld     qword ptr [ebp+8]
-
-    done:
-      pop     ebx
-      leave
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA7BC0 (FUN_00AA7BC0)
-   *
-   * What it does:
-   * Executes the legacy x87 `2^x` kernel lane (`frndint/f2xm1/fscale`) used
-   * by `_pow_0` helper callsites.
-   */
-  extern "C" __declspec(naked) double __cdecl RuntimePowExp2Kernel(const double /*value*/)
-  {
-    __asm
-    {
-      fld     qword ptr [esp+4]
-      fld     st
-      frndint
-      fsubr   st(1), st
-      fxch    st(1)
-      fchs
-      f2xm1
-      fld1
-      faddp   st(1), st
-      fscale
-      fstp    st(1)
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA7BEC (FUN_00AA7BEC)
-   *
-   * What it does:
-   * Applies the `_pow` carry-adjust lane: when control bit `0x00080000` is
-   * clear, adds `1.0` to the incoming floating value; otherwise leaves it as-is.
-   * Preserves the original auxiliary status lane in `EAX` (`1` or `7`).
-   */
-  extern "C" __declspec(naked) double __cdecl RuntimePowApplyCarryAdjust(
-    const unsigned int /*controlBits*/,
-    const double /*value*/)
-  {
-    __asm
-    {
-      mov     eax, [esp+4]
-      fld     qword ptr [esp+8]
-      test    eax, 80000h
-      jz      apply_adjust
-      mov     eax, 7
-      ret
-
-    apply_adjust:
-      fld1
-      faddp   st(1), st
-      mov     eax, 1
-      ret
-    }
-  }
-
-  /**
-   * Address: 0x00AA7C05 (FUN_00AA7C05)
-   *
-   * What it does:
-   * Loads one double operand to x87; for `exp==0x7FF` operands, rebuilds the
-   * legacy 80-bit special-value lane used by CRT `_pow` helpers before `fld`.
-   */
-  extern "C" __declspec(naked) double __cdecl RuntimePowLoadOperandOrSpecial(const double* /*valueBits*/)
-  {
-    __asm
-    {
-      mov     edx, [esp+4]
-      mov     eax, [edx+4]
-      and     eax, 7FF00000h
-      cmp     eax, 7FF00000h
-      jz      special_operand
-      fld     qword ptr [edx]
-      ret
-
-    special_operand:
-      mov     eax, [edx+4]
-      sub     esp, 0Ah
-      or      eax, 7FFF0000h
-      mov     [esp+6], eax
-      mov     eax, [edx+4]
-      mov     ecx, [edx]
-      shld    eax, ecx, 0Bh
-      shl     ecx, 0Bh
-      mov     [esp+4], eax
-      mov     [esp], ecx
-      fld     tbyte ptr [esp]
-      add     esp, 0Ah
-      test    eax, 0
-      mov     eax, [edx+4]
-      ret
-    }
-  }
 
   /**
    * Address: 0x00A8E302 (FUN_00A8E302)
@@ -19004,45 +17297,6 @@ namespace moho::runtime
     return (difference > 0) ? 1 : -1;
   }
 
-  /**
-   * Address: 0x00A91855 (FUN_00A91855)
-   *
-   * What it does:
-   * Compares one `byteCount` span (`lhsBytes` vs `rhsBytes`) and returns
-   * `-1/0/+1`, using a 32-byte block loop plus a tail-byte pass.
-   */
-  [[maybe_unused]] int RuntimeCompareUnsignedBytesTriState(
-    const unsigned int byteCount,
-    const unsigned char* const rhsBytes,
-    const unsigned char* const lhsBytes
-  ) noexcept
-  {
-    const unsigned char* left = lhsBytes;
-    const unsigned char* right = rhsBytes;
-    unsigned int remaining = byteCount;
-
-    while (remaining >= 0x20u) {
-      for (unsigned int index = 0; index < 0x20u; ++index) {
-        const int difference = static_cast<int>(left[index]) - static_cast<int>(right[index]);
-        if (difference != 0) {
-          return RuntimeTriStateFromUnsignedByteDifference(difference);
-        }
-      }
-
-      left += 0x20;
-      right += 0x20;
-      remaining -= 0x20u;
-    }
-
-    for (unsigned int index = 0; index < remaining; ++index) {
-      const int difference = static_cast<int>(left[index]) - static_cast<int>(right[index]);
-      if (difference != 0) {
-        return RuntimeTriStateFromUnsignedByteDifference(difference);
-      }
-    }
-
-    return 0;
-  }
 
   /**
    * Address: 0x00ABED10 (FUN_00ABED10, __ascii_memicmp)
@@ -19088,59 +17342,7 @@ namespace moho::runtime
     return (lhsValue < rhsValue) ? -1 : 1;
   }
 
-  /**
-   * Address: 0x00AB99FD (FUN_00AB99FD, _memicmp_l)
-   *
-   * What it does:
-   * Locale-aware case-insensitive memory compare lane; validates pointer/count
-   * bounds and returns CRT invalid-parameter sentinel on misuse.
-   */
-  int RuntimeMemicmpLocale(
-    const unsigned char* const lhsBytes,
-    const unsigned char* const rhsBytes,
-    const unsigned int byteCount,
-    _locale_t const localeInfo
-  )
-  {
-    if (byteCount == 0u) {
-      return 0;
-    }
 
-    if (lhsBytes == nullptr || rhsBytes == nullptr || byteCount > 0x7FFFFFFFu) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
-
-    return ::_memicmp_l(lhsBytes, rhsBytes, byteCount, localeInfo);
-  }
-
-  /**
-   * Address: 0x00AB7F14 (FUN_00AB7F14, _strnicoll_l)
-   *
-   * What it does:
-   * Locale-aware bounded case-insensitive collation compare with CRT argument
-   * validation and `0x7FFFFFFF` failure sentinel behavior.
-   */
-  int RuntimeStrnicollLocale(
-    const char* const lhsText,
-    const char* const rhsText,
-    const std::size_t maxCount,
-    _locale_t const localeInfo
-  )
-  {
-    if (maxCount == 0u) {
-      return 0;
-    }
-
-    if (lhsText == nullptr || rhsText == nullptr || maxCount > 0x7FFFFFFFu) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
-
-    return ::_strnicoll_l(lhsText, rhsText, maxCount, localeInfo);
-  }
 
   /**
    * Address: 0x00AAE83A (FUN_00AAE83A, _wcsnicoll_l)
@@ -19291,20 +17493,6 @@ namespace moho::runtime
     return result;
   }
 
-  /**
-   * Address: 0x00AB09E0 (FUN_00AB09E0)
-   *
-   * What it does:
-   * Default-locale adapter lane for `_mbspbrk_l`; forwards one source/accept
-   * search request with `locale=nullptr`.
-   */
-  [[maybe_unused]] unsigned char* RuntimeMbspbrkDefaultLocale(
-    unsigned char* const text,
-    const char* const accept
-  )
-  {
-    return RuntimeMbspbrkLocale(text, accept, nullptr);
-  }
 
   /**
    * Address: 0x00ABEB2C (FUN_00ABEB2C, _mbsnbicmp_l)
@@ -19362,51 +17550,7 @@ namespace moho::runtime
     return RuntimeMbsnbicmpLocale(lhsBuffer, reinterpret_cast<const unsigned char*>(rhsBuffer), byteCount, nullptr);
   }
 
-  /**
-   * Address: 0x00A8B1C5 (FUN_00A8B1C5, _Getdays_l)
-   *
-   * What it does:
-   * Builds one CRT weekday descriptor string in `:abbr:full` pairs for all
-   * seven days using the active locale-time table.
-   */
-  char* RuntimeGetdaysLocale(_locale_t const localeInfo)
-  {
-    RuntimeTidDataLocaleView* threadData = nullptr;
-    bool updated = false;
-    RuntimeThreadLocInfoView* const locInfo = RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
-    char* result = nullptr;
-    if (locInfo != nullptr && locInfo->lcTimeCurrent != nullptr) {
-      const auto* const lcTimeData = reinterpret_cast<const RuntimeLcTimeStringTableView*>(locInfo->lcTimeCurrent);
-      result = RuntimeBuildColonDelimitedLocaleString(lcTimeData->wdayAbbr, lcTimeData->wday, 7u);
-    }
-
-    RuntimeReleaseLocaleUpdate(threadData, updated);
-    return result;
-  }
-
-  /**
-   * Address: 0x00A8B2CC (FUN_00A8B2CC, _Getmonths_l)
-   *
-   * What it does:
-   * Builds one CRT month descriptor string in `:abbr:full` pairs for all
-   * twelve months using the active locale-time table.
-   */
-  char* RuntimeGetmonthsLocale(_locale_t const localeInfo)
-  {
-    RuntimeTidDataLocaleView* threadData = nullptr;
-    bool updated = false;
-    RuntimeThreadLocInfoView* const locInfo = RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
-
-    char* result = nullptr;
-    if (locInfo != nullptr && locInfo->lcTimeCurrent != nullptr) {
-      const auto* const lcTimeData = reinterpret_cast<const RuntimeLcTimeStringTableView*>(locInfo->lcTimeCurrent);
-      result = RuntimeBuildColonDelimitedLocaleString(lcTimeData->monthAbbr, lcTimeData->month, 12u);
-    }
-
-    RuntimeReleaseLocaleUpdate(threadData, updated);
-    return result;
-  }
 
   /**
    * Address: 0x00A8B198 (FUN_00A8B198, _MarkAllocaS)
@@ -19415,11 +17559,12 @@ namespace moho::runtime
    * Stores one alloca marker word and returns the caller scratch cursor two
    * dwords ahead when marker storage exists.
    */
-  extern "C" std::uint32_t* __cdecl _MarkAllocaS(std::uint32_t* const markerWord, const std::uint32_t markerValue)
+  extern "C" void* __cdecl _MarkAllocaS(void* const markerWord, const unsigned int markerValue)
   {
     if (markerWord != nullptr) {
-      *markerWord = markerValue;
-      return markerWord + 2;
+      auto* const markerCursor = static_cast<std::uint32_t*>(markerWord);
+      *markerCursor = markerValue;
+      return markerCursor + 2;
     }
     return markerWord;
   }
@@ -19459,32 +17604,6 @@ namespace moho::runtime
     return first;
   }
 
-  /**
-   * Address: 0x00A9B334 (FUN_00A9B334, __mbsnbicoll_l)
-   *
-   * What it does:
-   * Bounded multibyte, case-insensitive collation compare with CRT argument
-   * validation and `0x7FFFFFFF` invalid-parameter sentinel behavior.
-   */
-  int RuntimeMbsnbicollLocale(
-    const unsigned char* const lhsText,
-    const unsigned char* const rhsText,
-    const std::size_t maxCount,
-    _locale_t const localeInfo
-  )
-  {
-    if (maxCount == 0u) {
-      return 0;
-    }
-
-    if (lhsText == nullptr || rhsText == nullptr || maxCount > 0x7FFFFFFFu) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
-
-    return ::_mbsnbicoll_l(lhsText, rhsText, maxCount, localeInfo);
-  }
 
   /**
    * Address: 0x00A9B420 (FUN_00A9B420, __mbsnbicoll)
@@ -19569,23 +17688,6 @@ namespace moho::runtime
     return ::_ismbblead_l(static_cast<unsigned char>(value), nullptr);
   }
 
-  /**
-   * Address: 0x00AB85F6 (FUN_00AB85F6, _mbsicmp_l)
-   *
-   * What it does:
-   * Multibyte case-insensitive compare with CRT invalid-parameter handling for
-   * null input strings.
-   */
-  int RuntimeMbsicmpLocale(const unsigned char* const lhsText, const unsigned char* const rhsText, _locale_t const localeInfo)
-  {
-    if (lhsText == nullptr || rhsText == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
-
-    return ::_mbsicmp_l(lhsText, rhsText, localeInfo);
-  }
 
   /**
    * Address: 0x00AB8810 (FUN_00AB8810, _tcsicmp_l)
@@ -19603,47 +17705,7 @@ namespace moho::runtime
     );
   }
 
-  /**
-   * Address: 0x00A887DA (FUN_00A887DA, _wcsicmp_l)
-   *
-   * What it does:
-   * Locale-aware wide case-insensitive string compare; reports CRT
-   * invalid-parameter semantics on null inputs and returns `0x7FFFFFFF` on
-   * failure, otherwise forwards to the UCRT lane.
-   */
-  int RuntimeWcsicmpLocale(const wchar_t* const lhsText, const wchar_t* const rhsText, _locale_t const localeInfo)
-  {
-    if (lhsText == nullptr || rhsText == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
 
-    return ::_wcsicmp_l(lhsText, rhsText, localeInfo);
-  }
-
-  /**
-   * Address: 0x00AA48A1 (FUN_00AA48A1, _mbsrchr_l)
-   *
-   * What it does:
-   * Locale-aware reverse multibyte character search; falls back to ASCII
-   * `strrchr` in single-byte codepages and reports invalid-parameter semantics
-   * on null input.
-   */
-  unsigned char* RuntimeMbsrchrLocale(
-    const unsigned char* const text,
-    const unsigned int searchChar,
-    _locale_t const localeInfo
-  )
-  {
-    if (text == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    return ::_mbsrchr_l(text, searchChar, localeInfo);
-  }
 
   /**
    * Address: 0x00AA4961 (FUN_00AA4961, __mbsrchr)
@@ -19687,33 +17749,6 @@ namespace moho::runtime
     return nullptr;
   }
 
-  /**
-   * Address: 0x00AB8823 (FUN_00AB8823, _mbsnbcmp_l)
-   *
-   * What it does:
-   * Locale-aware bounded multibyte byte-count compare; returns `0` on a
-   * zero-length request and reports invalid-parameter semantics on null input
-   * before forwarding to the UCRT lane.
-   */
-  int RuntimeMbsnbcmpLocale(
-    const unsigned char* const lhsText,
-    const unsigned char* const rhsText,
-    const std::size_t byteCount,
-    _locale_t const localeInfo
-  )
-  {
-    if (byteCount == 0u) {
-      return 0;
-    }
-
-    if (lhsText == nullptr || rhsText == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return 0x7FFFFFFF;
-    }
-
-    return ::_mbsnbcmp_l(lhsText, rhsText, byteCount, localeInfo);
-  }
 
   /**
    * Address: 0x00AB898C (FUN_00AB898C, _tcsncmp)
@@ -19732,27 +17767,6 @@ namespace moho::runtime
     );
   }
 
-  /**
-   * Address: 0x00AB8E66 (FUN_00AB8E66, _mbschr_l)
-   *
-   * What it does:
-   * Locale-aware multibyte character search; walks lead/trail pairs in DBCS
-   * codepages and reports invalid-parameter semantics on null input.
-   */
-  unsigned char* RuntimeMbschrLocale(
-    const unsigned char* const text,
-    const unsigned int searchChar,
-    _locale_t const localeInfo
-  )
-  {
-    if (text == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    return ::_mbschr_l(text, searchChar, localeInfo);
-  }
 
   /**
    * Address: 0x00AA6ED2 (FUN_00AA6ED2, __getpath)
@@ -19884,103 +17898,7 @@ namespace moho::runtime
   static_assert(offsetof(RuntimePositionalArgDescriptorWide, specifier) == 0x08, "RuntimePositionalArgDescriptorWide::specifier offset must be 0x08");
   static_assert(offsetof(RuntimePositionalArgDescriptorWide, formatFlags) == 0x0C, "RuntimePositionalArgDescriptorWide::formatFlags offset must be 0x0C");
 
-  /**
-   * Address: 0x00A9FFDA (FUN_00A9FFDA)
-   *
-   * What it does:
-   * Validates one positional narrow-format argument descriptor against a new
-   * conversion request and reports whether both descriptors are compatible.
-   */
-  [[maybe_unused]] int RuntimeFormatArgDescriptorCompatibleNarrow(
-    const RuntimePositionalArgDescriptorNarrow* const descriptor,
-    const std::int32_t requestedTypeToken,
-    const std::uint8_t requestedSpecifier,
-    const std::uint32_t requestedFlags
-  ) noexcept
-  {
-    const std::uint8_t currentSpecifier = descriptor->specifier;
-    if (currentSpecifier == static_cast<std::uint8_t>('p') || requestedSpecifier == static_cast<std::uint8_t>('p')) {
-      return currentSpecifier == requestedSpecifier ? 1 : 0;
-    }
 
-    const bool currentStringSpecifier =
-      currentSpecifier == static_cast<std::uint8_t>('s') || currentSpecifier == static_cast<std::uint8_t>('S');
-    const bool requestedStringSpecifier =
-      requestedSpecifier == static_cast<std::uint8_t>('s') || requestedSpecifier == static_cast<std::uint8_t>('S');
-    if (currentStringSpecifier) {
-      if (
-        currentStringSpecifier == requestedStringSpecifier
-        && ((descriptor->formatFlags & 0x810u) != 0u) == ((requestedFlags & 0x810u) != 0u)
-      ) {
-        return 1;
-      }
-    } else if (!requestedStringSpecifier) {
-      const bool currentIntegerLike = RuntimeFormatSpecifierIsIntegerLike(currentSpecifier);
-      const bool requestedIntegerLike = RuntimeFormatSpecifierIsIntegerLike(requestedSpecifier);
-      if (!currentIntegerLike && !requestedIntegerLike) {
-        return descriptor->typeToken == requestedTypeToken ? 1 : 0;
-      }
-
-      if (
-        currentIntegerLike == requestedIntegerLike
-        && ((requestedFlags ^ descriptor->formatFlags) & 0x10000u) == 0u
-        && ((requestedFlags ^ descriptor->formatFlags) & 0x20u) == 0u
-      ) {
-        return descriptor->typeToken == requestedTypeToken ? 1 : 0;
-      }
-    }
-
-    return 0;
-  }
-
-  /**
-   * Address: 0x00ABBF13 (FUN_00ABBF13)
-   *
-   * What it does:
-   * Validates one positional wide-format argument descriptor against a new
-   * conversion request and reports whether both descriptors are compatible.
-   */
-  [[maybe_unused]] int RuntimeFormatArgDescriptorCompatibleWide(
-    const RuntimePositionalArgDescriptorWide* const descriptor,
-    const std::int32_t requestedTypeToken,
-    const std::uint16_t requestedSpecifier,
-    const std::uint32_t requestedFlags
-  ) noexcept
-  {
-    const std::uint16_t currentSpecifier = descriptor->specifier;
-    if (currentSpecifier == static_cast<std::uint16_t>('p') || requestedSpecifier == static_cast<std::uint16_t>('p')) {
-      return currentSpecifier == requestedSpecifier ? 1 : 0;
-    }
-
-    const bool currentStringSpecifier =
-      currentSpecifier == static_cast<std::uint16_t>('s') || currentSpecifier == static_cast<std::uint16_t>('S');
-    const bool requestedStringSpecifier =
-      requestedSpecifier == static_cast<std::uint16_t>('s') || requestedSpecifier == static_cast<std::uint16_t>('S');
-    if (currentStringSpecifier) {
-      if (
-        currentStringSpecifier == requestedStringSpecifier
-        && ((((~(requestedFlags >> 5u)) ^ (~(descriptor->formatFlags >> 5u))) & 1u) == 0u)
-      ) {
-        return 1;
-      }
-    } else if (!requestedStringSpecifier) {
-      const bool currentIntegerLike = RuntimeFormatSpecifierIsIntegerLike(currentSpecifier);
-      const bool requestedIntegerLike = RuntimeFormatSpecifierIsIntegerLike(requestedSpecifier);
-      if (!currentIntegerLike && !requestedIntegerLike) {
-        return descriptor->typeToken == requestedTypeToken ? 1 : 0;
-      }
-
-      if (
-        currentIntegerLike == requestedIntegerLike
-        && ((requestedFlags ^ descriptor->formatFlags) & 0x10000u) == 0u
-        && ((requestedFlags ^ descriptor->formatFlags) & 0x20u) == 0u
-      ) {
-        return descriptor->typeToken == requestedTypeToken ? 1 : 0;
-      }
-    }
-
-    return 0;
-  }
 
   /**
    * Address: 0x00ABD060 (FUN_00ABD060, write_char_uni)
@@ -19999,25 +17917,6 @@ namespace moho::runtime
     }
   }
 
-  /**
-   * Address: 0x00ABD085 (FUN_00ABD085)
-   *
-   * What it does:
-   * Emits `count` copies of one UTF-16 code unit through the wide formatter
-   * write lane and stops early when the write-count lane reaches `-1`.
-   */
-  [[maybe_unused]] void RuntimeWriteRepeatedWideCharUntilError(
-    int* const pnumwritten,
-    const wchar_t wideChar,
-    int count,
-    std::FILE* const stream
-  )
-  {
-    while (count > 0 && pnumwritten != nullptr && *pnumwritten != -1) {
-      --count;
-      write_char_uni(stream, pnumwritten, wideChar);
-    }
-  }
 
   /**
    * Address: 0x00ABC067 (FUN_00ABC067)
@@ -20043,118 +17942,9 @@ namespace moho::runtime
     return result;
   }
 
-  /**
-   * Address: 0x00AAB6C2 (FUN_00AAB6C2)
-   *
-   * What it does:
-   * Emits `count` copies of one UTF-16 code unit through the wide formatter
-   * write lane and stops early when the write-count lane reaches `-1`.
-   */
-  [[maybe_unused]] void RuntimeWriteRepeatedWideFormatCharUntilErrorLaneA(
-    int* const pnumwritten,
-    const wchar_t wideChar,
-    int count,
-    std::FILE* const stream
-  )
-  {
-    while (count > 0 && pnumwritten != nullptr && *pnumwritten != -1) {
-      --count;
-      (void)RuntimeWriteWideFormatChar(stream, pnumwritten, wideChar);
-    }
-  }
 
-  /**
-   * Address: 0x00ABC08C (FUN_00ABC08C)
-   *
-   * What it does:
-   * Emits `count` copies of one UTF-16 code unit through the wide formatter
-   * write lane and stops early when the write-count lane reaches `-1`.
-   */
-  [[maybe_unused]] int RuntimeWriteRepeatedWideFormatCharUntilErrorLaneB(
-    int* const pnumwritten,
-    const wchar_t wideChar,
-    int count,
-    std::FILE* const stream
-  )
-  {
-    int lastResult = 0;
-    while (count > 0 && pnumwritten != nullptr && *pnumwritten != -1) {
-      --count;
-      lastResult = RuntimeWriteWideFormatChar(stream, pnumwritten, wideChar);
-    }
-    return lastResult;
-  }
 
-  /**
-   * Address: 0x00ABC0B1 (FUN_00ABC0B1)
-   *
-   * What it does:
-   * Writes one bounded UTF-16 span through the wide formatter lane and retries
-   * failed writes with `'?'` when `errno` reports the CRT replacement sentinel.
-   */
-  static int* RuntimeWriteWideSpanWithFallback(
-    int* const pnumwritten,
-    const std::uint16_t* wideChars,
-    std::FILE* const stream,
-    int count
-  )
-  {
-    if ((legacy_file(stream)._flag & 0x40) != 0 && legacy_file(stream)._base == nullptr) {
-      *pnumwritten += count;
-      return reinterpret_cast<int*>(count);
-    }
 
-    while (count > 0) {
-      const wchar_t wideChar = static_cast<wchar_t>(*wideChars);
-      --count;
-      (void)RuntimeWriteWideFormatChar(stream, pnumwritten, wideChar);
-      ++wideChars;
-
-      if (*pnumwritten == -1) {
-        int* const errnoValue = _errno();
-        if (*errnoValue != '*') {
-          return errnoValue;
-        }
-        (void)RuntimeWriteWideFormatChar(stream, pnumwritten, L'?');
-      }
-    }
-
-    return pnumwritten;
-  }
-
-  /**
-   * Address: 0x00ABD0AA (FUN_00ABD0AA)
-   *
-   * What it does:
-   * Writes one bounded UTF-16 span with the recovered `write_char_uni` lane
-   * and applies `'?'` fallback behavior on recoverable write failures.
-   */
-  static void RuntimeWriteWideSpanWithLegacyFallback(
-    int* const pnumwritten,
-    const std::uint16_t* wideChars,
-    std::FILE* const stream,
-    int count
-  )
-  {
-    if ((legacy_file(stream)._flag & 0x40) != 0 && legacy_file(stream)._base == nullptr) {
-      *pnumwritten += count;
-      return;
-    }
-
-    while (count > 0) {
-      const wchar_t wideChar = static_cast<wchar_t>(*wideChars);
-      --count;
-      write_char_uni(stream, pnumwritten, wideChar);
-      ++wideChars;
-
-      if (*pnumwritten == -1) {
-        if (*_errno() != '*') {
-          return;
-        }
-        write_char_uni(stream, pnumwritten, L'?');
-      }
-    }
-  }
 
   /**
    * Address: 0x00A88100 (FUN_00A88100, strstr)
@@ -20225,61 +18015,7 @@ namespace moho::runtime
 
   using RuntimeStringScanWorker = int(__cdecl*)(RuntimeScanStringStreamView*, int, int, int);
 
-  /**
-   * Address: 0x00A88186 (FUN_00A88186)
-   *
-   * What it does:
-   * Wraps one narrow source string as a CRT scanner stream view and dispatches
-   * the supplied scanner worker.
-   */
-  int RuntimeDispatchFormattedScanFromAnsiString(
-    const char* const sourceText,
-    RuntimeStringScanWorker const worker,
-    const int formatLane,
-    const int arg3,
-    const int arg4
-  )
-  {
-    if (sourceText != nullptr && formatLane != 0 && worker != nullptr) {
-      RuntimeScanStringStreamView streamView{};
-      streamView.flags = 73;
-      streamView.current = sourceText;
-      streamView.sourceStart = sourceText;
 
-      const std::size_t sourceLength = std::strlen(sourceText);
-      streamView.remainingBytes = sourceLength <= static_cast<std::size_t>(0x7FFFFFFF)
-        ? static_cast<std::int32_t>(sourceLength)
-        : 0x7FFFFFFF;
-      return worker(&streamView, formatLane, arg3, arg4);
-    }
-
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return -1;
-  }
-
-  /**
-   * Address: 0x00A86084 (FUN_00A86084, _fgetpos 64-bit lane)
-   *
-   * What it does:
-   * Stores one current stream position into `outPosition` and returns `0`
-   * when the queried position is valid (non-`-1`), otherwise returns `-1`.
-   */
-  int RuntimeFgetpos64(std::FILE* const stream, std::int64_t* const outPosition)
-  {
-    if (stream == nullptr || outPosition == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
-
-    const std::int64_t position = ::_ftelli64(stream);
-    *outPosition = position;
-
-    const std::uint32_t low = static_cast<std::uint32_t>(position);
-    const std::uint32_t high = static_cast<std::uint32_t>(static_cast<std::uint64_t>(position) >> 32u);
-    return ((low & high) != 0xFFFFFFFFu) ? 0 : -1;
-  }
 
   struct RuntimeFilePositionWordsView
   {
@@ -20288,62 +18024,7 @@ namespace moho::runtime
   };
   static_assert(sizeof(RuntimeFilePositionWordsView) == 0x8, "RuntimeFilePositionWordsView size must be 0x8");
 
-  /**
-   * Address: 0x00A86377 (FUN_00A86377)
-   *
-   * What it does:
-   * Applies one absolute 64-bit stream position from low/high dword lanes and
-   * preserves CRT invalid-parameter signaling on null input lanes.
-   */
-  int RuntimeFsetpos64FromWords(
-    std::FILE* const stream,
-    const RuntimeFilePositionWordsView* const positionWords
-  )
-  {
-    if (stream != nullptr && positionWords != nullptr) {
-      const std::uint64_t packedOffset =
-        static_cast<std::uint64_t>(positionWords->low)
-        | (static_cast<std::uint64_t>(positionWords->high) << 32u);
-      return ::_fseeki64(stream, static_cast<__int64>(packedOffset), SEEK_SET);
-    }
 
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return -1;
-  }
-
-  /**
-   * Address: 0x00A9008E (FUN_00A9008E)
-   *
-   * What it does:
-   * Wraps one UTF-16 source string as a CRT scanner stream view (byte-sized
-   * remaining-length lane) and dispatches the supplied scanner worker.
-   */
-  int RuntimeDispatchFormattedScanFromWideString(
-    const wchar_t* const sourceText,
-    RuntimeStringScanWorker const worker,
-    const int formatLane,
-    const int arg3,
-    const int arg4
-  )
-  {
-    if (sourceText != nullptr && formatLane != 0 && worker != nullptr) {
-      RuntimeScanStringStreamView streamView{};
-      streamView.flags = 73;
-      streamView.current = sourceText;
-      streamView.sourceStart = sourceText;
-
-      const std::size_t sourceLength = std::wcslen(sourceText);
-      streamView.remainingBytes = sourceLength <= static_cast<std::size_t>(0x3FFFFFFF)
-        ? static_cast<std::int32_t>(sourceLength * sizeof(wchar_t))
-        : 0x7FFFFFFF;
-      return worker(&streamView, formatLane, arg3, arg4);
-    }
-
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return -1;
-  }
 
   [[nodiscard]] int RuntimeGrowScanBufferIfFull(
     void** const buffer,
@@ -20378,129 +18059,9 @@ namespace moho::runtime
     return 1;
   }
 
-  /**
-   * Address: 0x00A9DA9C (FUN_00A9DA9C)
-   *
-   * What it does:
-   * Grows one scanner scratch buffer to double capacity when it reaches
-   * fullness, including inline-storage detach semantics.
-   */
-  int RuntimeEnsureScanBufferCapacityA(
-    void** const buffer,
-    std::size_t* const capacityBytes,
-    const int usedBytes,
-    void* const inlineStorage,
-    std::uint32_t* const outDetachedInline
-  )
-  {
-    return RuntimeGrowScanBufferIfFull(buffer, capacityBytes, usedBytes, inlineStorage, outDetachedInline);
-  }
 
-  /**
-   * Address: 0x00A9E7AA (FUN_00A9E7AA)
-   *
-   * What it does:
-   * Mirrors `RuntimeEnsureScanBufferCapacityA` for the secondary scanner lane
-   * with identical inline-detach and doubling semantics.
-   */
-  int RuntimeEnsureScanBufferCapacityB(
-    void** const buffer,
-    std::size_t* const capacityBytes,
-    const int usedBytes,
-    void* const inlineStorage,
-    std::uint32_t* const outDetachedInline
-  )
-  {
-    return RuntimeGrowScanBufferIfFull(buffer, capacityBytes, usedBytes, inlineStorage, outDetachedInline);
-  }
 
-  /**
-   * Address: 0x00A8A880 (FUN_00A8A880, vfscanf worker lane)
-   *
-   * What it does:
-   * Validates stream/format lanes, enforces CRT unicode-textmode exclusion for
-   * narrow scanners, then dispatches one scanner worker under stream lock.
-   */
-  int RuntimeVfscanf(
-    int(__cdecl* worker)(std::FILE*, int, int, int),
-    std::FILE* const stream,
-    const int format,
-    const int arg3,
-    const int arg4
-  )
-  {
-    int result = 0;
-    if (stream == nullptr || format == 0) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
 
-    _lock_file(stream);
-    if ((RuntimeGetFileFlags(stream) & 0x40) == 0) {
-      const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
-      if (((ioInfo->textmodeUnicode & 0x7F) != 0) || ResolveIoInfoFromStream(stream)->textmodeUnicode < 0) {
-        *_errno() = EINVAL;
-        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        result = -1;
-      }
-    }
-
-    if (result == 0) {
-      result = worker(stream, format, arg3, arg4);
-    }
-
-    _unlock_file(stream);
-    return result;
-  }
-
-  /**
-   * Address: 0x00A8A3EB (FUN_00A8A3EB, fgets)
-   *
-   * What it does:
-   * Validates destination/count/stream lanes, acquires stream lock, reads up
-   * to newline or count-1 bytes, and NUL-terminates on success.
-   */
-  char* RuntimeFgets(char* const destination, const int maxCount, std::FILE* const stream)
-  {
-    if ((destination == nullptr && maxCount != 0) || maxCount < 0 || stream == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    if (maxCount == 0) {
-      return nullptr;
-    }
-
-    _lock_file(stream);
-
-    char* writeCursor = destination;
-    char* result = destination;
-    int remaining = maxCount;
-    while (--remaining > 0) {
-      const int nextChar = std::fgetc(stream);
-      if (nextChar == EOF) {
-        if (writeCursor == destination) {
-          result = nullptr;
-        }
-        break;
-      }
-
-      *writeCursor = static_cast<char>(nextChar);
-      ++writeCursor;
-      if (nextChar == '\n') {
-        break;
-      }
-    }
-
-    if (result != nullptr) {
-      *writeCursor = '\0';
-    }
-
-    _unlock_file(stream);
-    return result;
-  }
 
   /**
    * Address: 0x00AA4A1D (FUN_00AA4A1D, _strdup)
@@ -20528,31 +18089,6 @@ namespace moho::runtime
     return copy;
   }
 
-  /**
-   * Address: 0x00A9003B (FUN_00A9003B, _wcsdup)
-   *
-   * What it does:
-   * Duplicates one wide string into CRT heap storage; null input yields null.
-   * Copies route through checked `wcscpy_s`, invoking Watson on failure.
-   */
-  wchar_t* RuntimeWcsdup(const wchar_t* const text)
-  {
-    if (text == nullptr) {
-      return nullptr;
-    }
-
-    const std::size_t length = std::wcslen(text) + 1u;
-    auto* const copy = static_cast<wchar_t*>(std::calloc(length, sizeof(wchar_t)));
-    if (copy == nullptr) {
-      return nullptr;
-    }
-
-    if (::wcscpy_s(copy, length, text) != 0) {
-      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-    }
-
-    return copy;
-  }
 
   /**
    * Address: 0x00A90762 (FUN_00A90762)
@@ -20634,54 +18170,6 @@ namespace moho::runtime
     return wideMessageStorage.c_str();
   }
 
-  /**
-   * Address: 0x00A90914 (FUN_00A90914)
-   *
-   * What it does:
-   * Duplicates one wide errno message string into caller-owned heap storage
-   * and optionally returns the copied character count (including NUL).
-   */
-  [[maybe_unused]] int RuntimeDuplicateWideErrnoMessage(
-    wchar_t** const outText,
-    int* const outCharacterCount,
-    const int errorCode
-  )
-  {
-    if (outText != nullptr) {
-      *outText = nullptr;
-    }
-    if (outCharacterCount != nullptr) {
-      *outCharacterCount = 0;
-    }
-
-    if (outText == nullptr || errorCode == 0) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EINVAL;
-    }
-
-    const wchar_t* const errorMessage = RuntimeLookupWideErrnoMessage(errorCode);
-    if (errorMessage == nullptr) {
-      return 0;
-    }
-
-    const std::size_t characterCount = std::wcslen(errorMessage) + 1u;
-    auto* const duplicatedText = static_cast<wchar_t*>(std::calloc(characterCount, sizeof(wchar_t)));
-    *outText = duplicatedText;
-    if (duplicatedText == nullptr) {
-      *_errno() = ENOMEM;
-      return *_errno();
-    }
-
-    if (::wcscpy_s(duplicatedText, characterCount, errorMessage) != 0) {
-      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-    }
-
-    if (outCharacterCount != nullptr) {
-      *outCharacterCount = static_cast<int>(characterCount);
-    }
-    return 0;
-  }
 
   /**
    * Address: 0x00A9A4F9 (FUN_00A9A4F9)
@@ -20957,129 +18445,9 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return negateResult ? (0ull - remainder) : remainder;
   }
 
-  /**
-   * Address: 0x00A84379 (FUN_00A84379, _findfirst64)
-   *
-   * What it does:
-   * Validates wildcard/output arguments and forwards to CRT `_findfirst64`.
-   */
-  intptr_t RuntimeFindFirst64(const char* const wildcard, __finddata64_t* const findData)
-  {
-    if (wildcard == nullptr || findData == nullptr) {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
 
-    return ::_findfirst64(wildcard, findData);
-  }
 
-  /**
-   * Address: 0x00A844A9 (FUN_00A844A9, _findnext64i32 helper lane)
-   *
-   * IDA signature:
-   * int __cdecl sub_A844A9(HANDLE hFindFile, int outFindData);
-   *
-   * What it does:
-   * Advances one Win32 find-handle to the next matching entry and projects
-   * the Win32 `WIN32_FIND_DATAA` payload into the MSVC CRT
-   * `_finddata64i32_t` output layout (mixed 64-bit times with 32-bit size).
-   * Maps Win32 errors to CRT errno values (EINVAL / ENOENT / ENOMEM).
-   * The attribute lane normalizes the `FILE_ATTRIBUTE_NORMAL` token back to
-   * zero per MSVC CRT conventions.
-   */
-  int RuntimeFindNext64i32(const HANDLE findHandle, _finddata64i32_t* const findData)
-  {
-    if (findHandle == INVALID_HANDLE_VALUE || findData == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
 
-    WIN32_FIND_DATAA win32Data{};
-    if (::FindNextFileA(findHandle, &win32Data) == FALSE) {
-      const DWORD lastError = ::GetLastError();
-      switch (lastError) {
-      case ERROR_FILE_NOT_FOUND:
-      case ERROR_PATH_NOT_FOUND:
-      case ERROR_NO_MORE_FILES:
-        *_errno() = ENOENT;
-        return -1;
-      case ERROR_NOT_ENOUGH_MEMORY:
-        *_errno() = ENOMEM;
-        return -1;
-      default:
-        *_errno() = EINVAL;
-        return -1;
-      }
-    }
-
-    findData->attrib = (win32Data.dwFileAttributes != FILE_ATTRIBUTE_NORMAL)
-      ? win32Data.dwFileAttributes
-      : 0u;
-    findData->time_create = __time64_t_from_ft(&win32Data.ftCreationTime);
-    findData->time_access = __time64_t_from_ft(&win32Data.ftLastAccessTime);
-    findData->time_write = __time64_t_from_ft(&win32Data.ftLastWriteTime);
-    findData->size = static_cast<_fsize_t>(win32Data.nFileSizeLow);
-
-    if (::strcpy_s(findData->name, sizeof(findData->name), win32Data.cFileName) != 0) {
-      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-    }
-    return 0;
-  }
-
-  /**
-   * Address: 0x00A8460D (FUN_00A8460D, _findclose helper lane)
-   *
-   * What it does:
-   * Closes one Win32 find-handle lane and maps failure to CRT `EINVAL`
-   * semantics (`-1` return with `_errno` update).
-   */
-  int RuntimeFindCloseHandle(const HANDLE findHandle)
-  {
-    if (::FindClose(findHandle) != FALSE) {
-      return 0;
-    }
-
-    *_errno() = EINVAL;
-    return -1;
-  }
-
-  /**
-   * Address: 0x00A8462D (FUN_00A8462D)
-   *
-   * What it does:
-   * Converts one non-zero `FILETIME` through local/system time lanes and
-   * returns CRT local-epoch seconds, or `-1` when conversion fails.
-   */
-  [[maybe_unused]] int RuntimeFileTimeToLocalEpochSeconds(
-    const FILETIME* const fileTime
-  ) noexcept
-  {
-    FILETIME localFileTime{};
-    SYSTEMTIME systemTime{};
-
-    if (fileTime != nullptr
-      && (fileTime->dwLowDateTime != 0u || fileTime->dwHighDateTime != 0u)
-      && ::FileTimeToLocalFileTime(fileTime, &localFileTime) != 0
-      && ::FileTimeToSystemTime(&localFileTime, &systemTime) != 0)
-    {
-      return static_cast<int>(
-        __loctotime64_t(
-          static_cast<int>(systemTime.wYear),
-          static_cast<int>(systemTime.wMonth),
-          static_cast<int>(systemTime.wDay),
-          static_cast<int>(systemTime.wHour),
-          static_cast<int>(systemTime.wMinute),
-          static_cast<int>(systemTime.wSecond),
-          -1
-        )
-      );
-    }
-
-    return -1;
-  }
 
   /**
    * Address: 0x00A994FB (FUN_00A994FB, terminate)
@@ -21107,42 +18475,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     "RuntimeTidDataUnexpectedView::unexpectedHandler offset must be 0x7C"
   );
 
-  /**
-   * Address: 0x00A99534 (FUN_00A99534)
-   *
-   * What it does:
-   * Invokes the current thread unexpected-handler lane when present, then
-   * terminates the process through the CRT terminate path.
-   */
-  [[noreturn]] void RuntimeInvokeUnexpectedAndTerminate()
-  {
-    const auto* const threadData = reinterpret_cast<RuntimeTidDataUnexpectedView*>(__getptd());
-    if (threadData->unexpectedHandler != nullptr) {
-      threadData->unexpectedHandler();
-    }
 
-    RuntimeTerminate();
-  }
-
-  /**
-   * Address: 0x00A99547 (FUN_00A99547)
-   *
-   * What it does:
-   * Decodes one EH terminate-action callback lane, invokes it when non-null,
-   * then always enters the CRT terminate lane.
-   */
-  [[maybe_unused]] [[noreturn]] void RuntimeInvokeEncodedEhTerminateAction()
-  {
-    using RuntimeTerminateAction = void (*)();
-
-    const auto terminateAction =
-      reinterpret_cast<RuntimeTerminateAction>(_decode_pointer(gRuntimeTerminateActionEncoded));
-    if (terminateAction != nullptr) {
-      terminateAction();
-    }
-
-    RuntimeTerminate();
-  }
 
   /**
    * Address: 0x00A8958C (FUN_00A8958C, ___CxxFrameHandler3)
@@ -21226,38 +18559,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return probeResult;
   }
 
-  /**
-   * Address: 0x00AAA865 (FUN_00AAA865, func_GetCompatMode)
-   *
-   * What it does:
-   * Detects CPUID availability, reads leaf-1 feature bits, requires SSE2
-   * capability (`EDX bit 26`), and then verifies runtime SSE2 execution support.
-   */
-  int RuntimeGetCompatMode()
-  {
-    unsigned int leaf1EdxFeatures = 0;
-
-#if defined(_M_IX86)
-    const unsigned int originalFlags = __readeflags();
-    __writeeflags(originalFlags ^ 0x00200000u);
-    const unsigned int modifiedFlags = __readeflags();
-
-    if (modifiedFlags != originalFlags) {
-      __writeeflags(originalFlags);
-
-      int cpuInfo[4]{};
-      __cpuid(cpuInfo, 0);
-      __cpuid(cpuInfo, 1);
-      leaf1EdxFeatures = static_cast<unsigned int>(cpuInfo[3]);
-    }
-#endif
-
-    if ((leaf1EdxFeatures & 0x04000000u) == 0u) {
-      return 0;
-    }
-
-    return RuntimeProbeSse2ExecutionSupport() != 0 ? 1 : 0;
-  }
 
   /**
    * Address: 0x00AAA8D2 (FUN_00AAA8D2, func_ExceptionHandler)
@@ -21280,18 +18581,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return 0;
   }
 
-  /**
-   * Address: 0x00AAA90F (FUN_00AAA90F, register_ExceptionHandler)
-   *
-   * What it does:
-   * Registers `RuntimeExceptionHandler` as the process top-level unhandled
-   * exception filter and reports success to startup caller lanes.
-   */
-  int register_ExceptionHandler()
-  {
-    (void)SetUnhandledExceptionFilter(&RuntimeExceptionHandler);
-    return 0;
-  }
 
   /**
    * Address: 0x00A8EF77 (FUN_00A8EF77, func_wstrFindFirst)
@@ -21358,17 +18647,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return nullptr;
   }
 
-  /**
-   * Address: 0x009EFEB0 (FUN_009EFEB0)
-   *
-   * What it does:
-   * Thunk lane that forwards one wide accept-set scan request into
-   * `FUN_00A8F5FB`.
-   */
-  wchar_t* RuntimeFindFirstWideCharFromSetAdapter(wchar_t* text, const wchar_t* acceptSet)
-  {
-    return RuntimeFindFirstWideCharFromSet(text, acceptSet);
-  }
 
   /**
    * Address: 0x00A8F63A (FUN_00A8F63A)
@@ -21431,155 +18709,13 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return nullptr;
   }
 
-  /**
-   * Address: 0x0073AE80 (FUN_0073AE80, wcsstr)
-   *
-   * What it does:
-   * Import thunk that forwards to the runtime wide-substring search lane.
-   */
-  wchar_t* RuntimeFindWideSubstringThunk(wchar_t* haystack, const wchar_t* needle)
-  {
-    return RuntimeFindWideSubstring(haystack, needle);
-  }
 
-  /**
-   * Address: 0x009EFF70 (FUN_009EFF70, sub_9EFF70)
-   *
-   * IDA signature:
-   * _WORD *__cdecl sub_9EFF70(int a1, int a2, int *a3);
-   *
-   * What it does:
-   * Wide-character `wcstok`-style tokenizer. Walks `text` (or the saved
-   * cursor in `*savedState` when `text` is null) past leading delimiters via
-   * `RuntimeWideSpanOfAcceptedChars` (FUN_00A8F63A), then locates the next
-   * delimiter via `RuntimeFindFirstWideCharFromSet` (FUN_00A8F5FB). When a
-   * terminator is found, NUL-writes it in place and parks `*savedState` on
-   * the following character so the next call can resume scanning. Returns
-   * the start of the produced token, or null when the input is exhausted.
-   */
-  wchar_t* RuntimeWideTokenize(
-    wchar_t* const text,
-    const wchar_t* const delimiters,
-    wchar_t** const savedState
-  ) noexcept
-  {
-    wchar_t* cursor = text;
-    if (cursor == nullptr) {
-      cursor = *savedState;
-      if (cursor == nullptr) {
-        return nullptr;
-      }
-    }
 
-    cursor += RuntimeWideSpanOfAcceptedChars(cursor, delimiters);
-    if (*cursor == L'\0') {
-      *savedState = nullptr;
-      return nullptr;
-    }
 
-    wchar_t* const tokenStart = cursor;
-    wchar_t* const tokenEnd = RuntimeFindFirstWideCharFromSet(cursor, delimiters);
-    if (tokenEnd != nullptr) {
-      *tokenEnd = L'\0';
-      *savedState = tokenEnd + 1;
-    } else {
-      *savedState = nullptr;
-    }
-    return tokenStart;
-  }
 
-  /**
-   * Address: 0x0095FAC0 (FUN_0095FAC0, j_func_wstrFindFirst)
-   *
-   * What it does:
-   * Import thunk that forwards to the runtime first-match wide-char scan lane.
-   */
-  wchar_t* RuntimeFindFirstWideCharThunk(wchar_t* text, const wchar_t needle)
-  {
-    return RuntimeFindFirstWideChar(text, needle);
-  }
 
-  /**
-   * Address: 0x0095FAD0 (FUN_0095FAD0, j_func_wstrFindLast)
-   *
-   * What it does:
-   * Import thunk that forwards to the runtime last-match wide-char scan lane.
-   */
-  wchar_t* RuntimeFindLastWideCharThunk(wchar_t* text, const wchar_t needle)
-  {
-    return RuntimeFindLastWideChar(text, needle);
-  }
 
-  /**
-   * Address: 0x00A48F20 (FUN_00A48F20, j_func_FileCloseSafe)
-   *
-   * What it does:
-   * Import thunk that forwards to CRT `fclose`.
-   */
-  int RuntimeFileCloseSafe(std::FILE* stream)
-  {
-    return std::fclose(stream);
-  }
 
-  /**
-   * Address: 0x00A835CE (FUN_00A835CE, __imp_atoi)
-   *
-   * What it does:
-   * Legacy import thunk lane for `atoi` that forwards through CRT `atol`.
-   */
-  int RuntimeAtoiForward(const char* text)
-  {
-    return static_cast<int>(std::atol(text));
-  }
-
-  /**
-   * Address: 0x00A86DE2 (FUN_00A86DE2, _ctime64)
-   *
-   * What it does:
-   * Validates one epoch-seconds pointer/range, converts to local `tm`, then
-   * formats and returns a thread-local 26-byte C time string.
-   */
-  char* RuntimeCtime64(const __time64_t* const epochSeconds)
-  {
-    if (epochSeconds == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    if (*epochSeconds < 0) {
-      *_errno() = EINVAL;
-      return nullptr;
-    }
-
-    std::tm localTime{};
-    if (_localtime64_s(&localTime, epochSeconds) != 0) {
-      return nullptr;
-    }
-
-    thread_local char threadLocalAsctimeBuffer[26]{};
-    if (::asctime_s(threadLocalAsctimeBuffer, _countof(threadLocalAsctimeBuffer), &localTime) != 0) {
-      return nullptr;
-    }
-
-    return threadLocalAsctimeBuffer;
-  }
-
-  /**
-   * Address: 0x00A86D49 (FUN_00A86D49, localtime64)
-   *
-   * What it does:
-   * Returns the thread-local `tm` view for one epoch-second input on success,
-   * and null on conversion failure.
-   */
-  std::tm* RuntimeLocaltime64(const __time64_t* const epochSeconds)
-  {
-    thread_local std::tm threadLocalTime{};
-    if (_localtime64_s(&threadLocalTime, epochSeconds) != 0) {
-      return nullptr;
-    }
-    return &threadLocalTime;
-  }
 
   /**
    * Address: 0x00A8A866 (FUN_00A8A866, mktime64)
@@ -21617,52 +18753,8 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return -1;
   }
 
-  /**
-   * Address: 0x00A89A03 (FUN_00A89A03, _ferror)
-   *
-   * What it does:
-   * Returns one stream's error-flag lane; null streams report EINVAL and raise
-   * CRT invalid-parameter handling.
-   */
-  int RuntimeFileError(std::FILE* const stream)
-  {
-    if (stream != nullptr) {
-      return std::ferror(stream);
-    }
 
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return 0;
-  }
 
-  /**
-   * Address: 0x00A899D4 (FUN_00A899D4, _feof)
-   *
-   * What it does:
-   * Returns one stream's EOF-flag lane; null streams report EINVAL and raise
-   * CRT invalid-parameter handling.
-   */
-  int RuntimeFileEof(std::FILE* const stream)
-  {
-    if (stream != nullptr) {
-      return std::feof(stream);
-    }
-
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return 0;
-  }
-
-  /**
-   * Address: 0x00A89F2B (FUN_00A89F2B, __lock_file)
-   *
-   * What it does:
-   * Acquires one CRT FILE lock lane.
-   */
-  void RuntimeLockFile(std::FILE* const stream)
-  {
-    ::_lock_file(stream);
-  }
 
   /**
    * Address: 0x00A824E7 (FUN_00A824E7, _memmove_s)
@@ -21698,40 +18790,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return 0;
   }
 
-  /**
-   * Address: 0x0072B140 (FUN_0072B140)
-   *
-   * What it does:
-   * Copies `dwordCount` dword lanes from `source` into `destination` through
-   * secure memmove semantics and returns `destination`.
-   */
-  [[maybe_unused]] void* RuntimeMemmoveDwordSpanReturnDestinationLaneA(
-    const void* const source,
-    const std::uint32_t dwordCount,
-    void* const destination
-  ) noexcept
-  {
-    const std::size_t byteCount = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-    (void)RuntimeMemmoveS(destination, byteCount, source, byteCount);
-    return destination;
-  }
 
-  /**
-   * Address: 0x0072B180 (FUN_0072B180)
-   *
-   * What it does:
-   * Secondary lane of dword-span secure memmove that returns `destination`.
-   */
-  [[maybe_unused]] void* RuntimeMemmoveDwordSpanReturnDestinationLaneB(
-    const void* const source,
-    const std::uint32_t dwordCount,
-    void* const destination
-  ) noexcept
-  {
-    const std::size_t byteCount = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-    (void)RuntimeMemmoveS(destination, byteCount, source, byteCount);
-    return destination;
-  }
 
   [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEnd(
     char* const destination,
@@ -21795,7 +18854,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     std::uint8_t* const oldBegin = buffer->begin;
     auto* const newBegin = static_cast<std::uint8_t*>(::operator new(requiredSize));
 
-    std::uint8_t* cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(oldBegin, splitBegin, reinterpret_cast<char*>(newBegin));
+    char* cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(oldBegin, splitBegin, reinterpret_cast<char*>(newBegin));
     cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(insertBegin, insertEnd, cursor);
     cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(splitBegin, buffer->current, cursor);
 
@@ -21811,429 +18870,29 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return static_cast<int>(requiredSize);
   }
 
-  /**
-   * Address: 0x009542A0 (FUN_009542A0)
-   *
-   * What it does:
-   * Copies one byte range `[sourceBegin, sourceEnd)` into destination storage
-   * with `memmove_s` semantics and returns the one-past-end destination lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyByteRangeWithMemmoveAndReturnEndLaneA(
-    const void* const sourceBegin,
-    const void* const sourceEnd,
-    char* const destination
-  ) noexcept
-  {
-    return RuntimeCopyByteRangeWithMemmoveAndReturnEnd(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x009543C0 (FUN_009543C0)
-   *
-   * What it does:
-   * Resets one inline byte-buffer owner to its embedded storage lane, freeing
-   * dynamic storage when detached, and returns the active cursor lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* RuntimeResetInlineByteBufferToStorageLaneA(
-    RuntimeInlineByteBufferView* const buffer
-  ) noexcept
-  {
-    std::uint8_t* result = buffer->begin;
-    if (buffer->begin == reinterpret_cast<std::uint8_t*>(buffer->inlineStorageSlot)) {
-      buffer->current = result;
-      return result;
-    }
 
-    ::operator delete[](buffer->begin);
-    buffer->begin = reinterpret_cast<std::uint8_t*>(buffer->inlineStorageSlot);
-    result = reinterpret_cast<std::uint8_t*>(buffer->inlineStorageSlot[0]);
-    buffer->end = result;
-    buffer->current = buffer->begin;
-    return result;
-  }
 
-  /**
-   * Address: 0x009544C0 (FUN_009544C0)
-   *
-   * What it does:
-   * Copies one byte range `[sourceBegin, sourceEnd)` into destination storage
-   * with `memmove_s` semantics and returns the one-past-end destination lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyByteRangeWithMemmoveAndReturnEndLaneB(
-    const void* const sourceBegin,
-    const void* const sourceEnd,
-    char* const destination
-  ) noexcept
-  {
-    return RuntimeCopyByteRangeWithMemmoveAndReturnEnd(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x009544F0 (FUN_009544F0)
-   *
-   * What it does:
-   * Ensures one inline byte-buffer owner has at least `requiredSize` bytes of
-   * capacity by reallocating and preserving existing prefix payload when needed.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* RuntimeEnsureInlineByteBufferCapacityLaneA(
-    RuntimeInlineByteBufferView* const buffer,
-    const unsigned int requiredSize
-  )
-  {
-    std::uint8_t* const begin = buffer->begin;
-    const std::size_t capacityBytes = static_cast<std::size_t>(buffer->end - begin);
-    if (requiredSize > capacityBytes) {
-      (void)RuntimeReallocateInlineByteBuffer(buffer, requiredSize, begin, begin, begin);
-    }
-    return buffer->begin;
-  }
 
-  /**
-   * Address: 0x004FDE50 (FUN_004FDE50)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneA(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00506160 (FUN_00506160)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneB(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00506230 (FUN_00506230)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneC(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005260D0 (FUN_005260D0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneD(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005275F0 (FUN_005275F0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneE(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00536FF0 (FUN_00536FF0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneF(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00538040 (FUN_00538040)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneG(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00751D30 (FUN_00751D30)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneH(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00754A30 (FUN_00754A30)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneI(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00831730 (FUN_00831730)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneJ(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0084F940 (FUN_0084F940)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneK(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008503E0 (FUN_008503E0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneL(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008572C0 (FUN_008572C0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneM(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0086A0B0 (FUN_0086A0B0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneN(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0087D250 (FUN_0087D250)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneO(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0087D320 (FUN_0087D320)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneP(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0087D3F0 (FUN_0087D3F0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneQ(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0088AEE0 (FUN_0088AEE0)
-   *
-   * What it does:
-   * Copies one dword-aligned source range into destination storage and
-   * returns one-past-last destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneR(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordAlignedRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008B3760 (FUN_008B3760)
-   *
-   * What it does:
-   * Copies one 4-byte-lane range `[sourceBegin, sourceEnd)` with `memmove_s`
-   * and returns one-past-end destination byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEndLaneS(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    const std::int32_t dwordCount = static_cast<std::int32_t>(
-      (reinterpret_cast<std::intptr_t>(sourceEnd) - reinterpret_cast<std::intptr_t>(sourceBegin)) >> 2
-    );
-    const std::int32_t moveByteCountSigned = dwordCount * static_cast<std::int32_t>(sizeof(std::uint32_t));
-    const std::size_t moveByteCount =
-      static_cast<std::size_t>(static_cast<std::uint32_t>(moveByteCountSigned));
-    const std::intptr_t destinationEndAddress =
-      reinterpret_cast<std::intptr_t>(destination) + moveByteCountSigned;
-    char* const destinationEnd = reinterpret_cast<char*>(destinationEndAddress);
-
-    if (dwordCount != 0) {
-      (void)memmove_s(destination, moveByteCount, sourceBegin, moveByteCount);
-    }
-
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x00831770 (FUN_00831770)
-   *
-   * What it does:
-   * Computes the destination begin lane for one dword-range move into a tail
-   * buffer and forwards the overlapping copy through `_memmove_s`.
-   */
-  [[maybe_unused]] void* RuntimeSlideDwordRangeToTailBuffer(
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destinationEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    const std::intptr_t sourceEndAddress = reinterpret_cast<std::intptr_t>(sourceEnd);
-    const std::intptr_t sourceBeginAddress = reinterpret_cast<std::intptr_t>(sourceBegin);
-    const std::intptr_t destinationEndAddress = reinterpret_cast<std::intptr_t>(destinationEnd);
-
-    const std::intptr_t dwordCount = (sourceEndAddress - sourceBeginAddress) >> 2;
-    const std::intptr_t destinationBeginAddress = destinationEndAddress - (dwordCount * 4);
-    auto* const destinationBegin = reinterpret_cast<void*>(destinationBeginAddress);
-
-    if (dwordCount > 0) {
-      const std::size_t moveBytes = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-      (void)RuntimeMemmoveS(destinationBegin, moveBytes, sourceBegin, moveBytes);
-    }
-
-    return destinationBegin;
-  }
 
   /**
    * Address: 0x00A82DF0 (FUN_00A82DF0, memchr)
@@ -22502,30 +19161,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   constexpr std::int32_t kXcptActionDefault = 1;
   constexpr std::int32_t kSignalFpe = 8;
 
-  /**
-   * Address: 0x00A997EF (FUN_00A997EF, siglookup)
-   *
-   * What it does:
-   * Scans one `_XCPT_ACTION` table for an entry matching `signalNumber` and
-   * returns the matching action lane (or `nullptr` when missing).
-   */
-  [[nodiscard]] [[maybe_unused]] RuntimeXcptActionEntry* RuntimeLookupSignalAction(
-    const int signalNumber, RuntimeXcptActionEntry* const actionTable
-  ) noexcept
-  {
-    RuntimeXcptActionEntry* action = actionTable;
-    RuntimeXcptActionEntry* const end = actionTable + _XcptActTabCount;
-
-    while (action < end && action->mSignalNumber != signalNumber) {
-      ++action;
-    }
-
-    if (action >= end || action->mSignalNumber != signalNumber) {
-      return nullptr;
-    }
-
-    return action;
-  }
 
   enum class RuntimeFpeCode : std::int32_t
   {
@@ -22538,6 +19173,11 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     StackOverflow = _FPE_STACKOVERFLOW,
   };
 
+  /**
+   * What it does:
+   * Maps a structured float exception code to its `_FPE_*` sub-code for the
+   * SIGFPE handler dispatch, falling back to `fallbackCode` for unknown codes.
+   */
   [[nodiscard]] std::int32_t RuntimeMapXcptCodeToFpe(
     const std::uint32_t exceptionCode,
     const std::int32_t fallbackCode
@@ -22656,36 +19296,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     "RuntimeTidDataGmtimeView::mGmtimeBuffer offset must be 0x44"
   );
 
-  /**
-   * Address: 0x00A9D752 (FUN_00A9D752)
-   *
-   * What it does:
-   * Returns the current thread's cached `gmtime` scratch buffer, allocating
-   * one 0x24-byte lane on first use and setting `errno=ENOMEM` on failure.
-   */
-  void* RuntimeGetOrCreateThreadGmtimeBuffer(
-    void* const allocationFailureFallback
-  )
-  {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataGmtimeView*>(RuntimeGetPtdNoExit());
-    if (threadData == nullptr) {
-      *_errno() = ENOMEM;
-      return nullptr;
-    }
-
-    if (threadData->mGmtimeBuffer != nullptr) {
-      return threadData->mGmtimeBuffer;
-    }
-
-    void* const allocated = std::malloc(0x24u);
-    threadData->mGmtimeBuffer = allocated;
-    if (allocated == nullptr) {
-      *_errno() = ENOMEM;
-      return allocationFailureFallback;
-    }
-
-    return threadData->mGmtimeBuffer;
-  }
 
   constexpr int kRuntimeSecondsPerDay = 86'400;
   constexpr int kRuntimeSecondsPerYear = 31'536'000;
@@ -23042,84 +19652,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   };
   static_assert(sizeof(RuntimePePageValidationEntry) == 0x0C, "RuntimePePageValidationEntry size must be 0x0C");
 
-  /**
-   * Address: 0x00AA3B54 (FUN_00AA3B54)
-   *
-   * What it does:
-   * Invokes one no-argument callback function-pointer lane and returns its
-   * integer result.
-   */
-  [[maybe_unused]] int RuntimeInvokeNoArgIntCallback(int (*const callback)())
-  {
-    return callback != nullptr ? callback() : 0;
-  }
-
-  /**
-   * Address: 0x00AA3B60 (FUN_00AA3B60)
-   *
-   * What it does:
-   * Walks one linked validation table of page addresses and verifies each
-   * source/target page lands inside an executable PE section.
-   */
-  [[maybe_unused]] int RuntimeValidateExecutablePagesForEntryChain(
-    int entryIndex,
-    IMAGE_DOS_HEADER* const imageBase,
-    const std::intptr_t entryTableBase
-  )
-  {
-    constexpr DWORD kExecutableSectionFlag = 0x20000000u;
-    constexpr DWORD_PTR kPageMask = 0xFFFFF000u;
-
-    if (entryIndex == -1) {
-      return 1;
-    }
-
-    IMAGE_SECTION_HEADER* cachedSection = nullptr;
-    DWORD_PTR cachedPage = static_cast<DWORD_PTR>(-1);
-    const DWORD_PTR imageBaseValue = reinterpret_cast<DWORD_PTR>(imageBase);
-
-    while (entryIndex != -1) {
-      auto* const entry =
-        reinterpret_cast<RuntimePePageValidationEntry*>(entryTableBase + (static_cast<std::intptr_t>(entryIndex) * 12));
-
-      const DWORD_PTR sourcePage = (static_cast<DWORD_PTR>(entry->sourceVa) - imageBaseValue) & kPageMask;
-      if (sourcePage != cachedPage) {
-        const bool cachedSectionMatches = cachedSection != nullptr
-          && sourcePage >= static_cast<DWORD_PTR>(cachedSection->VirtualAddress)
-          && sourcePage < static_cast<DWORD_PTR>(cachedSection->VirtualAddress)
-          + static_cast<DWORD_PTR>(cachedSection->Misc.PhysicalAddress);
-        if (!cachedSectionMatches) {
-          cachedSection = _FindPESection(imageBase, sourcePage);
-          if (cachedSection == nullptr || (cachedSection->Characteristics & kExecutableSectionFlag) == 0u) {
-            return 0;
-          }
-        }
-        cachedPage = sourcePage;
-      }
-
-      if (entry->targetVa != 0) {
-        const DWORD_PTR targetPage = (static_cast<DWORD_PTR>(entry->targetVa) - imageBaseValue) & kPageMask;
-        if (targetPage != cachedPage) {
-          const bool cachedSectionMatches = cachedSection != nullptr
-            && targetPage >= static_cast<DWORD_PTR>(cachedSection->VirtualAddress)
-            && targetPage < static_cast<DWORD_PTR>(cachedSection->VirtualAddress)
-            + static_cast<DWORD_PTR>(cachedSection->Misc.PhysicalAddress);
-          if (!cachedSectionMatches) {
-            cachedSection = _FindPESection(imageBase, targetPage);
-            if (cachedSection == nullptr || (cachedSection->Characteristics & kExecutableSectionFlag) == 0u) {
-              return 0;
-            }
-          }
-          cachedPage = targetPage;
-        }
-      }
-
-      entryIndex = entry->nextIndex;
-    }
-
-    return 1;
-  }
-
   [[nodiscard]] wchar_t* RuntimeResolveFullPathWideCore(
     wchar_t* destination,
     const wchar_t* const fileName,
@@ -23180,78 +19712,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return destination;
   }
 
-  /**
-   * Address: 0x00A913B0 (FUN_00A913B0)
-   *
-   * What it does:
-   * Resolves one full wide path into caller storage and, on `ERANGE`, retries
-   * with internal allocation and returns that pointer through
-   * `outAllocatedPath`.
-   */
-  wchar_t* RuntimeResolveFullPathWideWithOptionalAllocA(
-    wchar_t* const destination,
-    const wchar_t* const fileName,
-    const DWORD bufferLength,
-    wchar_t** const outAllocatedPath
-  )
-  {
-    const int priorErrno = *_errno();
-    *_errno() = 0;
 
-    wchar_t* result = RuntimeResolveFullPathWideCore(destination, fileName, bufferLength);
-    int* const errnoLane = _errno();
-    if (result != nullptr) {
-      *errnoLane = priorErrno;
-      return result;
-    }
-
-    if (*errnoLane == ERANGE) {
-      *errnoLane = priorErrno;
-      result = RuntimeResolveFullPathWideCore(nullptr, fileName, 0u);
-      if (outAllocatedPath != nullptr) {
-        *outAllocatedPath = result;
-      }
-      return result;
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x00AAEF63 (FUN_00AAEF63)
-   *
-   * What it does:
-   * Alternate wide full-path lane with the same retry-on-`ERANGE` allocation
-   * behavior as `RuntimeResolveFullPathWideWithOptionalAllocA`.
-   */
-  wchar_t* RuntimeResolveFullPathWideWithOptionalAllocB(
-    wchar_t* const destination,
-    const wchar_t* const fileName,
-    const DWORD bufferLength,
-    wchar_t** const outAllocatedPath
-  )
-  {
-    const int priorErrno = *_errno();
-    *_errno() = 0;
-
-    wchar_t* result = RuntimeResolveFullPathWideCore(destination, fileName, bufferLength);
-    int* const errnoLane = _errno();
-    if (result != nullptr) {
-      *errnoLane = priorErrno;
-      return result;
-    }
-
-    if (*errnoLane == ERANGE) {
-      *errnoLane = priorErrno;
-      result = RuntimeResolveFullPathWideCore(nullptr, fileName, 0u);
-      if (outAllocatedPath != nullptr) {
-        *outAllocatedPath = result;
-      }
-      return result;
-    }
-
-    return nullptr;
-  }
 
   [[nodiscard]] bool RuntimeIsPathSeparator(const char value) noexcept
   {
@@ -23299,34 +19760,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return (*shareEnd == static_cast<CharType>('\0')) || (shareEnd[1] == static_cast<CharType>('\0'));
   }
 
-  /**
-   * Address: 0x00A91311 (FUN_00A91311)
-   *
-   * What it does:
-   * Returns true when `path` is a UNC server/share root path (with optional
-   * trailing slash), otherwise returns false.
-   */
-  BOOL RuntimeIsUncShareRootPathWide(const wchar_t* const path)
-  {
-    if (path == nullptr) {
-      return FALSE;
-    }
-    return RuntimeIsUncShareRootPathCommon(path, std::wcslen(path)) ? TRUE : FALSE;
-  }
 
-  /**
-   * Address: 0x00A94F3A (FUN_00A94F3A)
-   *
-   * What it does:
-   * Narrow-character variant of UNC server/share root-path validation.
-   */
-  BOOL RuntimeIsUncShareRootPathNarrow(const char* const path)
-  {
-    if (path == nullptr) {
-      return FALSE;
-    }
-    return RuntimeIsUncShareRootPathCommon(path, std::strlen(path)) ? TRUE : FALSE;
-  }
 
   /**
    * Address: 0x00A94AA4 (FUN_00A94AA4)
@@ -23512,78 +19946,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return static_cast<int>(value >> (shift & 0x1Fu));
   }
 
-  /**
-   * Address: 0x00A94FB2 (FUN_00A94FB2)
-   *
-   * What it does:
-   * Resolves one full narrow path into caller storage and, on `ERANGE`,
-   * retries with internal allocation and stores that pointer through
-   * `outAllocatedPath`.
-   */
-  char* RuntimeResolveFullPathNarrowWithOptionalAllocA(
-    char* const destination,
-    const char* const fileName,
-    const DWORD bufferLength,
-    char** const outAllocatedPath
-  )
-  {
-    const int priorErrno = *_errno();
-    *_errno() = 0;
 
-    char* result = ::_fullpath(destination, fileName, bufferLength);
-    int* const errnoLane = _errno();
-    if (result != nullptr) {
-      *errnoLane = priorErrno;
-      return result;
-    }
-
-    if (*errnoLane == ERANGE) {
-      *errnoLane = priorErrno;
-      result = ::_fullpath(nullptr, fileName, 0u);
-      if (outAllocatedPath != nullptr) {
-        *outAllocatedPath = result;
-      }
-      return result;
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x00AB04FD (FUN_00AB04FD)
-   *
-   * What it does:
-   * Alternate narrow full-path lane with the same retry-on-`ERANGE`
-   * allocation behavior as `RuntimeResolveFullPathNarrowWithOptionalAllocA`.
-   */
-  char* RuntimeResolveFullPathNarrowWithOptionalAllocB(
-    char* const destination,
-    const char* const fileName,
-    const DWORD bufferLength,
-    char** const outAllocatedPath
-  )
-  {
-    const int priorErrno = *_errno();
-    *_errno() = 0;
-
-    char* result = ::_fullpath(destination, fileName, bufferLength);
-    int* const errnoLane = _errno();
-    if (result != nullptr) {
-      *errnoLane = priorErrno;
-      return result;
-    }
-
-    if (*errnoLane == ERANGE) {
-      *errnoLane = priorErrno;
-      result = ::_fullpath(nullptr, fileName, 0u);
-      if (outAllocatedPath != nullptr) {
-        *outAllocatedPath = result;
-      }
-      return result;
-    }
-
-    return nullptr;
-  }
 
   /**
    * Address: 0x00AAEEC4 (FUN_00AAEEC4)
@@ -23696,47 +20059,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return (::SetCurrentDirectoryW(driveRoot) != FALSE) ? 0 : -1;
   }
 
-  /**
-   * Address: 0x00A82C86 (FUN_00A82C86, _getdcwd_0)
-   *
-   * What it does:
-   * Locks the CRT environment lane, resolves the current drive working
-   * directory through the no-lock helper, then unlocks before returning the
-   * caller buffer/result pointer.
-   */
-  char* __cdecl _getdcwd_0(char* const buffer, const int bufferLength)
-  {
-    RuntimeLockGuard lockGuard(kRuntimeEnvironmentLock);
-    return RuntimeGetdcwdNoLock(0, buffer, bufferLength);
-  }
 
-  /**
-   * Address: 0x00A9B4CC (FUN_00A9B4CC)
-   *
-   * What it does:
-   * Counts non-NUL bytes in one ANSI string lane, capped by `maxCount`.
-   */
-  [[maybe_unused]] unsigned int RuntimeBoundedAnsiLength(
-    const char* text,
-    const unsigned int maxCount
-  ) noexcept
-  {
-    unsigned int count = 0;
-    if (count >= maxCount) {
-      return count;
-    }
-
-    const unsigned char* cursor = reinterpret_cast<const unsigned char*>(text);
-    while (*cursor != 0u) {
-      ++count;
-      ++cursor;
-      if (count >= maxCount) {
-        break;
-      }
-    }
-
-    return count;
-  }
 
   /**
    * Address: 0x00AAECDD (FUN_00AAECDD)
@@ -23876,24 +20199,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return destination;
   }
 
-  /**
-   * Address: 0x00AA01A4 (FUN_00AA01A4)
-   *
-   * What it does:
-   * Advances one 32-bit cursor lane by 8 bytes and returns the prior qword
-   * payload at `[cursor - 8, cursor)`.
-   */
-  [[maybe_unused]] std::uint64_t RuntimeReadQwordAndAdvanceCursor32(
-    std::uint32_t* const cursorLane
-  ) noexcept
-  {
-    *cursorLane += 8u;
-    const std::uint32_t cursor = *cursorLane;
-    const std::uint32_t* const valueWords =
-      reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(cursor - 8u));
-    return static_cast<std::uint64_t>(valueWords[0])
-      | (static_cast<std::uint64_t>(valueWords[1]) << 32u);
-  }
 
   /**
    * Address: 0x00A84FFE (FUN_00A84FFE, getenv_s)
@@ -24073,45 +20378,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     );
   }
 
-  /**
-   * Address: 0x00A89B3A (FUN_00A89B3A, _seh_longjmp_unwind)
-   *
-   * What it does:
-   * Restores saved EBP from one longjmp context and dispatches SEH local
-   * unwinding toward the target try-level lane.
-   */
-  extern "C" __declspec(naked) int __stdcall _seh_longjmp_unwind(RuntimeLongjmpUnwindContextView* /*unwindContext*/)
-  {
-    __asm
-    {
-      mov ecx, [esp + 4]
-      mov ebp, [ecx]
-      push dword ptr [ecx + 1Ch]
-      push dword ptr [ecx + 18h]
-      call __local_unwind2
-      add esp, 8
-      ret 4
-    }
-  }
 
-  /**
-   * Address: 0x00AAC6FC (FUN_00AAC6FC)
-   *
-   * What it does:
-   * Probes one longjmp metadata pointer lane for readability and returns `1`
-   * on normal/AV probe paths, or `0` for non-access-violation exceptions.
-   */
-  int __stdcall RuntimeProbeReadableLongjmpMetadata(
-    const void* const metadataProbe
-  )
-  {
-    __try {
-      (void)*static_cast<const volatile std::uint32_t*>(metadataProbe);
-      return 1;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-      return GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? 1 : 0;
-    }
-  }
 
   [[noreturn]] void RuntimeRaiseEhFrameConsistencyFailure()
   {
@@ -24222,60 +20489,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return reinterpret_cast<void*>(_CallSettingFrame(targetActionLane, establisherFrameLane, static_cast<int>(notifyCode)));
   }
 
-  /**
-   * Address: 0x00A894F5 (FUN_00A894F5, _JumpToContinuation)
-   *
-   * What it does:
-   * Restores the SEH chain from the target registration node, rebinds `ebp`
-   * and `esp` to continuation-frame lanes, and tail-jumps to the continuation
-   * target.
-   */
-  extern "C" __declspec(naked) void __stdcall _JumpToContinuation(
-    void (__stdcall* /*continuation*/)(void*, void*),
-    void* /*registrationNode*/
-  )
-  {
-    __asm
-    {
-      push ebp
-      mov ebp, esp
-      push ecx
-      push ebx
-      mov eax, [ebp + 0Ch]
-      add eax, 0Ch
-      mov [ebp - 4], eax
-      mov ebx, dword ptr fs:[0]
-      mov eax, [ebx]
-      mov dword ptr fs:[0], eax
-      mov eax, [ebp + 8]
-      mov ebx, [ebp + 0Ch]
-      mov ebp, [ebp - 4]
-      mov esp, [ebx - 4]
-      jmp eax
-    }
-  }
 
-  /**
-   * Address: 0x00A89525 (FUN_00A89525, _CallMemberFunction1)
-   *
-   * What it does:
-   * Shuffles return/member-function lanes on the stack and tail-jumps into the
-   * member-function pointer lane.
-   */
-  extern "C" __declspec(naked) void __cdecl _CallMemberFunction1(
-    void* /*a1*/,
-    void* /*a2*/,
-    void* /*a3*/
-  )
-  {
-    __asm
-    {
-      pop eax
-      pop ecx
-      xchg eax, [esp + 4]
-      jmp eax
-    }
-  }
 
   /**
    * Address: 0x00A8953A (FUN_00A8953A, _UnwindNestedFrames)
@@ -24320,7 +20534,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   )
   {
     const std::uint32_t callbackLane = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(filterCallback));
-    RuntimePublishNonLocalGotoState(callbackLane, frameBase, 1u);
+    (void)RuntimePublishNonLocalGotoState(callbackLane, frameBase, 1u);
     return filterCallback(0u, 0u);
   }
 
@@ -24381,83 +20595,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return __local_unwind4(registrationFrame, currentTryLevel, targetTryLevel);
   }
 
-  /**
-   * Address: 0x00AA116F (FUN_00AA116F, __EH_prolog3_catch)
-   *
-   * What it does:
-   * Installs EH3 catch-frame registration lanes (`fs:[0]`, cookie, and
-   * scope-state init) using the classic VC8 helper prolog shape.
-   */
-  extern "C" __declspec(naked) void* __cdecl __EH_prolog3_catch()
-  {
-    __asm
-    {
-      push eax
-      push dword ptr fs:[0]
-      lea eax, [esp + 0Ch]
-      sub esp, [esp + 0Ch]
-      push ebx
-      push esi
-      push edi
-      mov [eax], ebp
-      mov ebp, eax
-      mov eax, __security_cookie
-      xor eax, ebp
-      push eax
-      mov [ebp - 10h], esp
-      push dword ptr [ebp - 4]
-      mov dword ptr [ebp - 4], 0FFFFFFFFh
-      lea eax, [ebp - 0Ch]
-      mov dword ptr fs:[0], eax
-      ret
-    }
-  }
 
-  /**
-   * Address: 0x00A89C90 (FUN_00A89C90, __alloca_probe_16)
-   *
-   * What it does:
-   * Aligns the requested dynamic-stack allocation lane to 16 bytes in `eax`
-   * and tail-jumps to the CRT stack-probe helper.
-   */
-  extern "C" __declspec(naked) void __cdecl __alloca_probe_16()
-  {
-    __asm
-    {
-      push ecx
-      lea ecx, [esp + 8]
-      sub ecx, eax
-      and ecx, 0Fh
-      add eax, ecx
-      sbb ecx, ecx
-      or eax, ecx
-      pop ecx
-      jmp __alloca_probe
-    }
-  }
 
-  /**
-   * Address: 0x00A89CA6 (FUN_00A89CA6, __alloca_probe_8)
-   *
-   * What it does:
-   * Aligns requested dynamic-stack allocation to 8 bytes in `eax` and
-   * tail-jumps into the CRT stack-probe helper.
-   */
-  extern "C" __declspec(naked) void __cdecl __alloca_probe_8()
-  {
-    __asm
-    {
-      push ecx
-      lea ecx, [esp + 8]
-      sub ecx, eax
-      and ecx, 7
-      add eax, ecx
-      sbb ecx, ecx
-      or eax, ecx
-      pop ecx
-      jmp __alloca_probe
-    }
-  }
 
   /**
    * Address: 0x00A8FC30 (FUN_00A8FC30, _vsnwprintf)
@@ -24476,21 +20615,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return _vsnwprintf_l(buffer, bufferCount, format, nullptr, argList);
   }
 
-  /**
-   * Address: 0x00A82F32 (FUN_00A82F32, sprintf_s)
-   *
-   * What it does:
-   * Variadic `sprintf_s` wrapper forwarding the vararg pack to the UCRT
-   * `_vsprintf_s_l` lane with a null locale.
-   */
-  int RuntimeSprintfS(char* const buffer, const std::size_t bufferSize, const char* const format, ...)
-  {
-    va_list argList;
-    va_start(argList, format);
-    const int result = ::_vsprintf_s_l(buffer, bufferSize, format, nullptr, argList);
-    va_end(argList);
-    return result;
-  }
 
   /**
    * Address: 0x00A9566E (FUN_00A9566E, _strcpy_s)
@@ -24736,73 +20860,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return storage;
   }
 
-  /**
-   * Address: 0x00A8234D (FUN_00A8234D)
-   *
-   * What it does:
-   * Copy-constructs one `std::exception` payload into `destination`, then
-   * rebinds the vtable lane to `std::bad_typeid`.
-   */
-  std::bad_typeid* RuntimeCopyConstructBadTypeidFromStdException(
-    std::bad_typeid* const destination,
-    const std::exception* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
 
-    new (destination) std::exception(*source);
-    const std::bad_typeid prototype{};
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(destination);
-    const auto* const sourceView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&prototype);
-    destinationView->vtable = sourceView->vtable;
-    return destination;
-  }
 
-  /**
-   * Address: 0x00A82311 (FUN_00A82311)
-   *
-   * What it does:
-   * Copy-constructs one `std::exception` payload into `destination`, then
-   * rebinds the vtable lane to `std::bad_cast`.
-   */
-  std::bad_cast* RuntimeCopyConstructBadCastFromStdException(
-    std::bad_cast* const destination,
-    const std::exception* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    new (destination) std::exception(*source);
-    const std::bad_cast prototype{};
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(destination);
-    const auto* const sourceView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&prototype);
-    destinationView->vtable = sourceView->vtable;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00A82329 (FUN_00A82329)
-   *
-   * What it does:
-   * Rebinds one exception payload to `std::bad_cast` vtable state, then runs
-   * base `std::exception` no-delete teardown.
-   */
-  void RuntimeDestroyBadCastNoDelete(std::exception* const exceptionRuntime) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return;
-    }
-
-    const std::bad_cast prototype{};
-    auto* const exceptionView = reinterpret_cast<RuntimeStdExceptionLayout*>(exceptionRuntime);
-    const auto* const prototypeView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&prototype);
-    exceptionView->vtable = prototypeView->vtable;
-    exceptionRuntime->~exception();
-  }
 
   [[maybe_unused]] void RuntimeDestroyBadTypeidNoDeleteImpl(
     std::exception* const exceptionRuntime
@@ -24819,181 +20878,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     exceptionRuntime->~exception();
   }
 
-  /**
-   * Address: 0x00A82365 (FUN_00A82365)
-   *
-   * What it does:
-   * Rebinds one exception payload to `std::bad_typeid` vtable state, then runs
-   * base `std::exception` no-delete teardown.
-   */
-  void RuntimeDestroyBadTypeidNoDeleteLaneA(std::exception* const exceptionRuntime) noexcept
-  {
-    RuntimeDestroyBadTypeidNoDeleteImpl(exceptionRuntime);
-  }
 
-  /**
-   * Address: 0x00A823A0 (FUN_00A823A0)
-   *
-   * What it does:
-   * Rebinds one exception payload to `std::bad_typeid` vtable state, then runs
-   * base `std::exception` no-delete teardown.
-   */
-  void RuntimeDestroyBadTypeidNoDeleteLaneB(std::exception* const exceptionRuntime) noexcept
-  {
-    RuntimeDestroyBadTypeidNoDeleteImpl(exceptionRuntime);
-  }
 
-  /**
-   * Address: 0x00A825A0 (FUN_00A825A0, std::bad_alloc::bad_alloc)
-   *
-   * What it does:
-   * Constructs one `std::bad_alloc` object at caller-provided storage and
-   * returns the original storage pointer.
-   */
-  void* RuntimeConstructBadAllocException(void* const storage)
-  {
-    if (storage == nullptr) {
-      return nullptr;
-    }
 
-    static const char* kBadAllocMessage = "bad allocation";
-    (void)RuntimeConstructStdExceptionFromMessageRef(
-      static_cast<std::exception*>(storage),
-      &kBadAllocMessage,
-      1
-    );
 
-    const std::bad_alloc badAllocPrototype{};
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(storage);
-    const auto* const prototypeView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&badAllocPrototype);
-    destinationView->vtable = prototypeView->vtable;
-    return storage;
-  }
 
-  /**
-   * Address: 0x00A82370 (FUN_00A82370, func_NonRttiObjectExc)
-   *
-   * What it does:
-   * Constructs one non-RTTI-object exception by first initializing
-   * `std::bad_typeid` state, then switching to the `std::__non_rtti_object`
-   * vtable lane.
-   */
-  void* RuntimeConstructNonRttiObjectException(void* const storage, const char* const message)
-  {
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(
-      RuntimeConstructBadTypeidException(storage, message)
-    );
-    if (destinationView == nullptr) {
-      return nullptr;
-    }
 
-    const auto nonRttiObject =
-      std::__non_rtti_object::__construct_from_string_literal("bad typeid");
-    const auto* const sourceView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&nonRttiObject);
-    destinationView->vtable = sourceView->vtable;
-    return storage;
-  }
-
-  /**
-   * Address: 0x00A826AC (FUN_00A826AC, func_GetMostDerivedObj)
-   *
-   * What it does:
-   * Uses one subobject's vtable COL lane to recover the complete-object base
-   * address for RTTI dynamic-cast resolution.
-   */
-  int RuntimeGetMostDerivedObjectAddress(const int objectAddress)
-  {
-    const auto objectPointer = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectAddress));
-    const auto vtableAddress = static_cast<std::uintptr_t>(*reinterpret_cast<const std::uint32_t*>(objectPointer));
-    const auto* const completeObjectLocator = *reinterpret_cast<const RuntimeRttiCompleteObjectLocator* const*>(
-      vtableAddress - sizeof(std::uint32_t)
-    );
-
-    int mostDerivedObject = objectAddress - static_cast<int>(completeObjectLocator->offset);
-    const int constructorDisplacementOffset = static_cast<int>(completeObjectLocator->cdOffset);
-    if (constructorDisplacementOffset != 0) {
-      const auto vbptrBaseAddress = static_cast<std::uintptr_t>(
-        static_cast<std::uint32_t>(objectAddress - constructorDisplacementOffset)
-      );
-      mostDerivedObject -= *reinterpret_cast<const int*>(vbptrBaseAddress);
-    }
-
-    return mostDerivedObject;
-  }
-
-  /**
-   * Address: 0x00A826C2 (FUN_00A826C2, dynamic_cast_0)
-   *
-   * What it does:
-   * Finds one target base descriptor and returns it only when a following base
-   * lane matches the source type before a non-public (`0x04`) boundary.
-   */
-  const RuntimeRttiBaseClassDescriptor* RuntimeResolveDynamicCastBasePrefix(
-    const RuntimeRttiCompleteObjectLocator* const completeObjectLocator,
-    const std::type_info* const sourceType,
-    const std::type_info* const targetType
-  )
-  {
-    const RuntimeRttiClassHierarchyDescriptor* const classDescriptor = completeObjectLocator->classDescriptor;
-    const unsigned int numBaseClasses = classDescriptor->numBaseClasses;
-    RuntimeRttiBaseClassDescriptor** const baseClassArray = classDescriptor->baseClassArray;
-
-    unsigned int index = 0;
-    const RuntimeRttiBaseClassDescriptor* targetDescriptor = nullptr;
-    while (index < numBaseClasses) {
-      RuntimeRttiBaseClassDescriptor* const candidate = baseClassArray[index];
-      if (RuntimeTypeInfoMatches(candidate->typeDescriptor, targetType)) {
-        targetDescriptor = candidate;
-        break;
-      }
-      ++index;
-    }
-
-    if (targetDescriptor == nullptr) {
-      return nullptr;
-    }
-
-    ++index;
-    while (index < numBaseClasses) {
-      RuntimeRttiBaseClassDescriptor* const candidate = baseClassArray[index];
-      if ((candidate->attributes & 0x4u) != 0u) {
-        break;
-      }
-
-      if (RuntimeTypeInfoMatches(candidate->typeDescriptor, sourceType)) {
-        return targetDescriptor;
-      }
-
-      ++index;
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x00AA2A40 (FUN_00AA2A40)
-   *
-   * What it does:
-   * Applies one RTTI PMD lane to an object base pointer and returns the
-   * adjusted absolute subobject address.
-   */
-  int RuntimeApplyPmdToObjectBase(const int objectBase, const RuntimePmd* const pmd)
-  {
-    int adjustedAddress = objectBase + pmd->mdisp;
-    const int pdisp = pmd->pdisp;
-    if (pdisp >= 0) {
-      const auto objectAddress = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectBase));
-      const auto vbtableAddress = static_cast<std::uintptr_t>(
-        *reinterpret_cast<const std::uint32_t*>(objectAddress + static_cast<std::uintptr_t>(pdisp))
-      );
-      adjustedAddress += pdisp
-                         + static_cast<int>(
-                           *reinterpret_cast<const std::uint32_t*>(vbtableAddress + static_cast<std::uintptr_t>(pmd->vdisp))
-                         );
-    }
-
-    return adjustedAddress;
-  }
 
   /**
    * Address: 0x00A82737 (FUN_00A82737, func_UsePMD)
@@ -25020,279 +20910,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return pmd->mdisp + pdispAdjustment;
   }
 
-  /**
-   * Address: 0x00A827B6 (FUN_00A827B6, dynamic_cast_1)
-   *
-   * What it does:
-   * Resolves one single-inheritance dynamic-cast target lane by scanning RTTI
-   * base descriptors and rejecting ambiguous/private conversions.
-   */
-  const RuntimeRttiBaseClassDescriptor* RuntimeResolveDynamicCastSingleInheritance(
-    const RuntimeRttiCompleteObjectLocator* const completeObjectLocator,
-    const int mostDerivedObject,
-    const std::type_info* const sourceType,
-    const void* const sourceSubobject,
-    const std::type_info* const targetType
-  )
-  {
-    const RuntimeRttiClassHierarchyDescriptor* const classDescriptor = completeObjectLocator->classDescriptor;
-    const unsigned int numBaseClasses = classDescriptor->numBaseClasses;
-    RuntimeRttiBaseClassDescriptor** const baseClassArray = classDescriptor->baseClassArray;
 
-    const RuntimeRttiBaseClassDescriptor* targetCandidate = nullptr;
-    const RuntimeRttiBaseClassDescriptor* sourceCandidateOutsideTarget = nullptr;
-    unsigned int targetContainedBaseCount = 0u;
-    int targetIndex = -1;
 
-    for (unsigned int index = 0; index < numBaseClasses; ++index) {
-      RuntimeRttiBaseClassDescriptor* const base = baseClassArray[index];
 
-      const unsigned int relativeIndex = static_cast<unsigned int>(static_cast<int>(index) - targetIndex);
-      if (relativeIndex > targetContainedBaseCount && RuntimeTypeInfoMatches(base->typeDescriptor, targetType)) {
-        if (sourceCandidateOutsideTarget != nullptr) {
-          if ((base->attributes & 0x3u) == 0u && (sourceCandidateOutsideTarget->attributes & 0x1u) == 0u) {
-            return base;
-          }
-          return nullptr;
-        }
-
-        targetIndex = static_cast<int>(index);
-        targetCandidate = base;
-        targetContainedBaseCount = base->numContainedBases;
-      }
-
-      if (!RuntimeTypeInfoMatches(base->typeDescriptor, sourceType)) {
-        continue;
-      }
-      if (reinterpret_cast<const void*>(
-            static_cast<std::uintptr_t>(RuntimeUsePmd(&base->pmd, mostDerivedObject))
-          ) != sourceSubobject) {
-        continue;
-      }
-
-      if (targetCandidate == nullptr) {
-        sourceCandidateOutsideTarget = base;
-        continue;
-      }
-
-      const unsigned int sourceRelativeIndex = static_cast<unsigned int>(static_cast<int>(index) - targetIndex);
-      if (sourceRelativeIndex > targetContainedBaseCount) {
-        if ((targetCandidate->attributes & 0x3u) != 0u) {
-          return nullptr;
-        }
-      } else {
-        if ((targetCandidate->attributes & 0x40u) != 0u) {
-          const RuntimeRttiBaseClassDescriptor* const contained =
-            RuntimeGetContainedBaseDescriptor(targetCandidate, sourceRelativeIndex);
-          return (contained != nullptr && (contained->attributes & 0x1u) == 0u) ? targetCandidate : nullptr;
-        }
-        if (targetIndex != 0) {
-          return targetCandidate;
-        }
-      }
-
-      return (base->attributes & 0x1u) == 0u ? targetCandidate : nullptr;
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x00A828B8 (FUN_00A828B8, dynamic_cast_3)
-   *
-   * What it does:
-   * Resolves one multiple-inheritance dynamic-cast target lane by validating
-   * public-path accessibility and collapsing ambiguous PMD outcomes.
-   */
-  const RuntimeRttiBaseClassDescriptor* RuntimeResolveDynamicCastMultipleInheritance(
-    const RuntimeRttiCompleteObjectLocator* const completeObjectLocator,
-    const int mostDerivedObject,
-    const std::type_info* const sourceType,
-    const void* const sourceSubobject,
-    const std::type_info* const targetType
-  )
-  {
-    const RuntimeRttiClassHierarchyDescriptor* const classDescriptor = completeObjectLocator->classDescriptor;
-    const unsigned int numBaseClasses = classDescriptor->numBaseClasses;
-    RuntimeRttiBaseClassDescriptor** const baseClassArray = classDescriptor->baseClassArray;
-
-    int targetIndex = -1;
-    int resolvedTargetAddress = -1;
-    const RuntimeRttiBaseClassDescriptor* activeTargetRoot = nullptr;
-    const RuntimeRttiBaseClassDescriptor* uniqueResolvedTarget = nullptr;
-    const RuntimeRttiBaseClassDescriptor* sourceOutsideTarget = nullptr;
-    const RuntimeRttiBaseClassDescriptor* strictTargetCandidate = nullptr;
-    unsigned int targetContainedBaseCount = 0u;
-    bool hasPublicPath = true;
-
-    for (unsigned int index = 0; index < numBaseClasses; ++index) {
-      RuntimeRttiBaseClassDescriptor* const base = baseClassArray[index];
-
-      const unsigned int relativeIndex = static_cast<unsigned int>(static_cast<int>(index) - targetIndex);
-      if (relativeIndex > targetContainedBaseCount && RuntimeTypeInfoMatches(base->typeDescriptor, targetType)) {
-        if ((base->attributes & 0x3u) == 0u) {
-          strictTargetCandidate = base;
-        }
-        targetIndex = static_cast<int>(index);
-        activeTargetRoot = base;
-        targetContainedBaseCount = base->numContainedBases;
-      }
-
-      if (!RuntimeTypeInfoMatches(base->typeDescriptor, sourceType)) {
-        continue;
-      }
-      if (reinterpret_cast<const void*>(
-            static_cast<std::uintptr_t>(RuntimeUsePmd(&base->pmd, mostDerivedObject))
-          ) != sourceSubobject) {
-        continue;
-      }
-
-      const unsigned int sourceRelativeIndex = static_cast<unsigned int>(static_cast<int>(index) - targetIndex);
-      if (sourceRelativeIndex > targetContainedBaseCount) {
-        if ((base->attributes & 0x5u) == 0u) {
-          sourceOutsideTarget = base;
-        }
-        continue;
-      }
-
-      if (!hasPublicPath || activeTargetRoot == nullptr) {
-        continue;
-      }
-
-      bool pathAccepted = true;
-      if ((activeTargetRoot->attributes & 0x40u) != 0u) {
-        const RuntimeRttiBaseClassDescriptor* const contained =
-          RuntimeGetContainedBaseDescriptor(activeTargetRoot, sourceRelativeIndex);
-        if (contained == nullptr) {
-          hasPublicPath = false;
-          continue;
-        }
-        if ((contained->attributes & 0x1u) != 0u) {
-          hasPublicPath = false;
-        }
-        pathAccepted = (contained->attributes & 0x4u) == 0u;
-      } else {
-        if (targetIndex == 0 && (base->attributes & 0x1u) != 0u) {
-          hasPublicPath = false;
-        }
-      }
-
-      if (!hasPublicPath || !pathAccepted) {
-        continue;
-      }
-
-      const int targetAddress = RuntimeUsePmd(&activeTargetRoot->pmd, mostDerivedObject);
-      if (uniqueResolvedTarget != nullptr && resolvedTargetAddress != targetAddress) {
-        return nullptr;
-      }
-
-      uniqueResolvedTarget = activeTargetRoot;
-      resolvedTargetAddress = targetAddress;
-    }
-
-    if (hasPublicPath && uniqueResolvedTarget != nullptr) {
-      return uniqueResolvedTarget;
-    }
-    if (sourceOutsideTarget == nullptr) {
-      return nullptr;
-    }
-    return strictTargetCandidate;
-  }
-
-  /**
-   * Address: 0x00A82227 (FUN_00A82227, std::exception copy-ctor import body)
-   * Mangled: __imp_??0exception@std@@QAE@ABV01@@Z
-   *
-   * What it does:
-   * Clones one `std::exception` payload lane, duplicating message storage when
-   * the source owns its `_what` buffer.
-   */
-  std::exception* RuntimeStdExceptionCopyConstruct(
-    std::exception* const destination,
-    const std::exception* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    struct StdExceptionRuntimeView
-    {
-      void* mVtable;
-      const char* mWhat;
-      int mDoFree;
-    };
-
-    new (destination) std::exception();
-
-    auto* const destinationView = reinterpret_cast<StdExceptionRuntimeView*>(destination);
-    const auto* const sourceView = reinterpret_cast<const StdExceptionRuntimeView*>(source);
-
-    destinationView->mDoFree = sourceView->mDoFree;
-    const char* const sourceMessage = sourceView->mWhat;
-    if (sourceView->mDoFree == 0) {
-      destinationView->mWhat = sourceMessage;
-      return destination;
-    }
-
-    if (sourceMessage == nullptr) {
-      destinationView->mWhat = nullptr;
-      return destination;
-    }
-
-    const std::size_t requiredBytes = std::strlen(sourceMessage) + 1u;
-    char* const copiedMessage = static_cast<char*>(std::malloc(requiredBytes));
-    destinationView->mWhat = copiedMessage;
-    if (copiedMessage != nullptr) {
-      (void)RuntimeStrcpyS(copiedMessage, requiredBytes, sourceMessage);
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x00A8227F (FUN_00A8227F, std::exception copy-assign import body)
-   *
-   * What it does:
-   * Copies one `std::exception` payload lane into an existing destination,
-   * duplicating `_what` storage only when the source owns its message buffer.
-   */
-  std::exception* RuntimeStdExceptionCopyAssign(
-    std::exception* const destination,
-    const std::exception* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-    if (destination == source) {
-      return destination;
-    }
-
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(destination);
-    const auto* const sourceView = reinterpret_cast<const RuntimeStdExceptionLayout*>(source);
-    destinationView->doFree = sourceView->doFree;
-
-    const char* const sourceMessage = sourceView->what;
-    if (sourceView->doFree == 0) {
-      destinationView->what = sourceMessage;
-      return destination;
-    }
-
-    if (sourceMessage == nullptr) {
-      destinationView->what = nullptr;
-      return destination;
-    }
-
-    const std::size_t requiredBytes = std::strlen(sourceMessage) + 1u;
-    char* const copiedMessage = static_cast<char*>(std::malloc(requiredBytes));
-    destinationView->what = copiedMessage;
-    if (copiedMessage != nullptr) {
-      (void)RuntimeStrcpyS(copiedMessage, requiredBytes, sourceMessage);
-    }
-
-    return destination;
-  }
 
   /**
    * Address: 0x00A8C5E7 (FUN_00A8C5E7, _sync_legacy_variables_lk)
@@ -25348,82 +20968,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     ::_free_crt(locale);
   }
 
-  /**
-   * Address: 0x00A8C6D0 (FUN_00A8C6D0, j___free_locale)
-   *
-   * What it does:
-   * Thunk wrapper that forwards locale-handle teardown to `RuntimeFreeLocale`.
-   */
-  void RuntimeFreeLocaleThunk(RuntimeLocaleHandle* const locale)
-  {
-    RuntimeFreeLocale(locale);
-  }
 
-  /**
-   * Address: 0x00A8C7A3 (FUN_00A8C7A3, _lc_strtolc)
-   *
-   * What it does:
-   * Parses one locale descriptor string into fixed 3-lane CRT locale parts
-   * buffer (`language`, `country`, `codepage`) with legacy separator rules.
-   */
-  int RuntimeParseLocaleCompositeName(char* const outLocaleParts, const char* const localeText)
-  {
-    std::memset(outLocaleParts, 0, 144);
-
-    const char* cursor = localeText;
-    if (*cursor == '\0') {
-      return 0;
-    }
-
-    if (cursor[0] == '.' && cursor[1] != '\0') {
-      if (strncpy_s(outLocaleParts + 128, 16, cursor + 1, 15) != 0) {
-        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-      }
-      outLocaleParts[143] = '\0';
-      return 0;
-    }
-
-    int tokenIndex = 0;
-    std::size_t tokenLength = std::strcspn(cursor, "_.,");
-    while (tokenLength != 0u) {
-      const char separator = cursor[tokenLength];
-      const char* const nextToken = cursor + tokenLength + 1;
-
-      errno_t copyResult = 0;
-      if (tokenIndex == 0) {
-        if (tokenLength >= 64u || separator == '.') {
-          return -1;
-        }
-        copyResult = strncpy_s(outLocaleParts, 64, cursor, tokenLength);
-      } else if (tokenIndex == 1) {
-        if (tokenLength >= 64u || separator == '_') {
-          return -1;
-        }
-        copyResult = strncpy_s(outLocaleParts + 64, 64, cursor, tokenLength);
-      } else if (tokenIndex == 2) {
-        if (tokenLength >= 16u || (separator != '\0' && separator != ',')) {
-          return -1;
-        }
-        copyResult = strncpy_s(outLocaleParts + 128, 16, cursor, tokenLength);
-      } else {
-        return -1;
-      }
-
-      if (copyResult != 0) {
-        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-      }
-
-      if (separator == ',' || separator == '\0') {
-        return 0;
-      }
-
-      ++tokenIndex;
-      cursor = nextToken;
-      tokenLength = std::strcspn(cursor, "_.,");
-    }
-
-    return -1;
-  }
 
   /**
    * Address: 0x00ABF4DF (FUN_00ABF4DF, std::locale::_Locimp::_Locimp)
@@ -25444,23 +20989,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  /**
-   * Address: 0x00ABF013 (FUN_00ABF013, std::_String_base::_Xlen)
-   * Mangled: ?_Xlen@_String_base@std@@SAXXZ
-   *
-   * What it does:
-   * Throws one `std::length_error` with the CRT fixed diagnostic text
-   * `"string too long"`.
-   */
-  [[noreturn]] void RuntimeThrowStringTooLong()
-  {
-    throw std::length_error("string too long");
-  }
 
-  [[noreturn]] void RuntimeThrowContainerTooLong(const char* const message)
-  {
-    throw std::length_error(message);
-  }
 
   struct RuntimeMapSetLengthErrorKeyRecord
   {
@@ -25559,16 +21088,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane020(const unsigned int count);
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
 
-  /**
-   * Address: 0x004E3550 (FUN_004E3550)
-   *
-   * What it does:
-   * Allocates one 12-byte element lane through the checked-allocation helper.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleChecked12ByteLane()
-  {
-    return gpg::core::legacy::AllocateChecked12ByteLane(1u);
-  }
 
   struct RuntimeForwardLinkNodeLane
   {
@@ -25621,225 +21140,21 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destination;
   }
 
-  /**
-   * Address: 0x004E3590 (FUN_004E3590)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane001(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E35C0 (FUN_004E35C0)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane002(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E35E0 (FUN_004E35E0)
-   *
-   * What it does:
-   * Pops one forward-link node pointer from `*headSlot`, stores that pointer
-   * in `*outValue`, and advances `*headSlot` to the popped node's `next`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimePopForwardLinkNodeLane001(
-    std::uintptr_t* const outValue,
-    RuntimeForwardLinkNodeLane** const headSlot
-  ) noexcept
-  {
-    return RuntimePopForwardLinkNodeLane(outValue, headSlot);
-  }
 
-  /**
-   * Address: 0x004E35F0 (FUN_004E35F0)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane003(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E3610 (FUN_004E3610)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane004(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E36A0 (FUN_004E36A0)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane005(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E3730 (FUN_004E3730)
-   *
-   * What it does:
-   * Copies one packed `{dword, byte}` lane from the two source pointers into
-   * the destination slot and returns the destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimePackedDwordByteLane* RuntimeCopyPackedDwordByteLane001(
-    RuntimePackedDwordByteLane* const destination,
-    const std::uint32_t* const sourceDword,
-    const std::uint8_t* const sourceByte
-  ) noexcept
-  {
-    return RuntimeCopyPackedDwordByteLane(destination, sourceDword, sourceByte);
-  }
 
-  /**
-   * Address: 0x004E3740 (FUN_004E3740)
-   *
-   * What it does:
-   * Copies one packed `{dword, byte}` lane from the two source pointers into
-   * the destination slot and returns the destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimePackedDwordByteLane* RuntimeCopyPackedDwordByteLane002(
-    RuntimePackedDwordByteLane* const destination,
-    const std::uint32_t* const sourceDword,
-    const std::uint8_t* const sourceByte
-  ) noexcept
-  {
-    return RuntimeCopyPackedDwordByteLane(destination, sourceDword, sourceByte);
-  }
 
-  /**
-   * Address: 0x004E44B0 (FUN_004E44B0)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane006(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E44E0 (FUN_004E44E0)
-   *
-   * What it does:
-   * Stores one 32-bit scalar lane into `*outValue` and returns `outValue`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* RuntimeStoreDwordLane007(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLane(outValue, value);
-  }
 
-  /**
-   * Address: 0x004E53B0 (FUN_004E53B0)
-   *
-   * What it does:
-   * Advances one forward-link head slot in place (`*slot = (*slot)->next`) and
-   * returns the slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeForwardLinkNodeLane** RuntimeAdvanceForwardLinkHeadLane(
-    RuntimeForwardLinkNodeLane** const slot
-  ) noexcept
-  {
-    *slot = (*slot)->next;
-    return slot;
-  }
 
-  /**
-   * Address: 0x004E43A0 (FUN_004E43A0)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through bad-alloc checked wrapper lane
-   * `RuntimeAllocateArrayWithBadAllocLane001`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteBadAllocLaneA()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane001(1u);
-  }
 
-  /**
-   * Address: 0x004E45B0 (FUN_004E45B0)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through bad-alloc checked wrapper lane
-   * `RuntimeAllocateArrayWithBadAllocLane002`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteBadAllocLaneB()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane002(1u);
-  }
 
-  /**
-   * Address: 0x004E4660 (FUN_004E4660)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through bad-alloc checked wrapper lane
-   * `RuntimeAllocateArrayWithBadAllocLane003`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteBadAllocLaneC()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane003(1u);
-  }
 
-  /**
-   * Address: 0x00592CF0 (FUN_00592CF0)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through bad-alloc checked wrapper lane
-   * `RuntimeAllocateArrayWithBadAllocLane020`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteBadAllocLaneD()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane020(1u);
-  }
 
-  /**
-   * Address: 0x005AB800 (FUN_005AB800)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through bad-alloc checked wrapper lane
-   * `RuntimeAllocateArrayWithBadAllocLane021`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteBadAllocLaneE()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane021(1u);
-  }
 
   /**
    * Address: 0x004E8170 (FUN_004E8170)
@@ -25865,63 +21180,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x004E8060 (FUN_004E8060)
-   *
-   * What it does:
-   * Allocates one 32-byte element lane through the checked allocator path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle32ByteElementLane()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane004(1u);
-  }
 
-  /**
-   * Address: 0x004E9A00 (FUN_004E9A00)
-   *
-   * What it does:
-   * Allocates one 24-byte element lane through the checked allocator path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle24ByteElementLane()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane005(1u);
-  }
 
-  /**
-   * Address: 0x004FA720 (FUN_004FA720)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane006(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
-  /**
-   * Address: 0x004FA7E0 (FUN_004FA7E0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane007(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
-  /**
-   * Address: 0x00506330 (FUN_00506330)
-   *
-   * What it does:
-   * Allocates one `56`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane008(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 56u);
-  }
 
   /**
    * Address: 0x00533620 (FUN_00533620)
@@ -25935,125 +21197,15 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x0052F3C0 (FUN_0052F3C0)
-   *
-   * What it does:
-   * Allocates one 20-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle20ByteElementLaneAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane009(1u);
-  }
 
-  /**
-   * Address: 0x005310D0 (FUN_005310D0)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterA()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00531280 (FUN_00531280)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterB()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00531430 (FUN_00531430)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterC()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x005315E0 (FUN_005315E0)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterD()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00531770 (FUN_00531770)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterE()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00531900 (FUN_00531900)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterF()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00531A90 (FUN_00531A90)
-   *
-   * What it does:
-   * Allocates one 48-byte runtime element lane through the checked allocator
-   * path.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle48ByteElementLaneAdapterG()
-  {
-    return gpg::core::legacy::AllocateChecked48ByteLane(1u);
-  }
 
-  /**
-   * Address: 0x00540C40 (FUN_00540C40)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane010(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
-  /**
-   * Address: 0x00544680 (FUN_00544680)
-   *
-   * What it does:
-   * Allocates one `36`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane011(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
-  }
 
   /**
    * Address: 0x0054E0C0 (FUN_0054E0C0)
@@ -26079,41 +21231,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
   }
 
-  /**
-   * Address: 0x0054D3C0 (FUN_0054D3C0)
-   *
-   * What it does:
-   * Preserves one zero-count wrapper lane for the 88-byte checked allocator:
-   * routes non-zero counts through `FUN_0054E0C0` and uses `operator new(0)`
-   * for the zero-count case.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane012OrZeroCount(
-    const unsigned int count
-  )
-  {
-    if (count != 0u) {
-      return RuntimeAllocateArrayWithBadAllocLane012(count);
-    }
-    return ::operator new(0u);
-  }
 
-  /**
-   * Address: 0x0054D720 (FUN_0054D720)
-   *
-   * What it does:
-   * Preserves one zero-count wrapper lane for the 8-byte checked allocator:
-   * routes non-zero counts through `FUN_0054E1B0` and uses `operator new(0)`
-   * for the zero-count case.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane013OrZeroCount(
-    const unsigned int count
-  )
-  {
-    if (count != 0u) {
-      return RuntimeAllocateArrayWithBadAllocLane013(count);
-    }
-    return ::operator new(0u);
-  }
 
   /**
    * Address: 0x005579D0 (FUN_005579D0)
@@ -26127,17 +21245,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 96u);
   }
 
-  /**
-   * Address: 0x00556E40 (FUN_00556E40)
-   *
-   * What it does:
-   * Jump-thunk lane that allocates exactly one 96-byte element with checked
-   * overflow semantics.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleElementLane014()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane014(1u);
-  }
 
   /**
    * Address: 0x00571780 (FUN_00571780)
@@ -26166,29 +21273,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode68Color64, color) == 0x40, "RuntimeRbHeadNode68Color64::color offset must be 0x40");
   static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
 
-  /**
-   * Address: 0x0056FE00 (FUN_0056FE00)
-   *
-   * What it does:
-   * Allocates one 68-byte red-black head lane, zeroes the first three pointer
-   * slots with legacy null-adjacent checks, then writes `{color=1,isNil=0}`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbHeadNode68Color64* RuntimeAllocateAndPrimeRbHeadNode68Lane015()
-  {
-    auto* const node = static_cast<RuntimeRbHeadNode68Color64*>(RuntimeAllocateArrayWithBadAllocLane015(1u));
-    if (node != nullptr) {
-      node->left = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode68Color64*>(static_cast<std::intptr_t>(-4))) {
-      node->parent = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode68Color64*>(static_cast<std::intptr_t>(-8))) {
-      node->right = nullptr;
-    }
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
   /**
    * Address: 0x00571800 (FUN_00571800)
@@ -26202,53 +21286,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
   }
 
-  /**
-   * Address: 0x00570510 (FUN_00570510)
-   *
-   * What it does:
-   * Dispatches one single-element `68`-byte allocation lane through
-   * `FUN_00571780`.
-   */
-  [[maybe_unused]] void* RuntimeAllocateSingle68ByteArrayWithBadAllocAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane015(1u);
-  }
 
-  /**
-   * Address: 0x00570620 (FUN_00570620)
-   *
-   * What it does:
-   * Dispatches one single-element `28`-byte allocation lane through
-   * `FUN_00571800`.
-   */
-  [[maybe_unused]] void* RuntimeAllocateSingle28ByteArrayWithBadAllocAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane016(1u);
-  }
 
-  /**
-   * Address: 0x00578F20 (FUN_00578F20)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane017(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
-  /**
-   * Address: 0x005823C0 (FUN_005823C0)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane018(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
   /**
    * Address: 0x00582460 (FUN_00582460)
@@ -26262,17 +21302,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
   }
 
-  /**
-   * Address: 0x005815C0 (FUN_005815C0)
-   *
-   * What it does:
-   * Forwards one single-element allocation lane into
-   * `RuntimeAllocateArrayWithBadAllocLane019`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane019SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane019(1u);
-  }
 
   /**
    * Address: 0x00594230 (FUN_00594230)
@@ -26330,35 +21359,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeRect2iListNode) == 0x18, "RuntimeRect2iListNode size must be 0x18");
 
-  /**
-   * Address: 0x005AB3A0 (FUN_005AB3A0)
-   *
-   * What it does:
-   * Allocates one 24-byte list node lane and self-links `{next,prev}` for
-   * sentinel-head initialization.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRect2iListNode* AllocateSelfLinkedRect2iListSentinel()
-  {
-    auto* const node = static_cast<RuntimeRect2iListNode*>(RuntimeAllocateArrayWithBadAllocLane021(1u));
-    if (node != nullptr) {
-      node->next = node;
-      node->prev = node;
-    }
 
-    return node;
-  }
-
-  /**
-   * Address: 0x005CA1E0 (FUN_005CA1E0)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane022(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
   /**
    * Address: 0x005CA280 (FUN_005CA280)
@@ -26372,41 +21373,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
   }
 
-  /**
-   * Address: 0x005C8A60 (FUN_005C8A60)
-   *
-   * What it does:
-   * One-element allocator adapter for the 32-byte array lane
-   * (`FUN_005CA280`).
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane023Single()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane023(1u);
-  }
 
-  /**
-   * Address: 0x0064F860 (FUN_0064F860)
-   *
-   * What it does:
-   * Allocates one `72`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane024(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 72u);
-  }
 
-  /**
-   * Address: 0x0064F8C0 (FUN_0064F8C0)
-   *
-   * What it does:
-   * Allocates one `52`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane025(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 52u);
-  }
 
   /**
    * Address: 0x00688D70 (FUN_00688D70)
@@ -26420,17 +21388,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x00687C20 (FUN_00687C20)
-   *
-   * What it does:
-   * One-element allocator adapter for the 24-byte array lane
-   * (`FUN_00688D70`).
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane026Single()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane026(1u);
-  }
 
   /**
    * Address: 0x00688E80 (FUN_00688E80)
@@ -26444,18 +21401,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x00688680 (FUN_00688680)
-   *
-   * What it does:
-   * Preserves VC8 zero-count allocation semantics for lane 027 by forwarding
-   * positive counts to the checked allocator and returning `operator new(0)`
-   * for zero counts.
-   */
-  [[maybe_unused]] void* RuntimeAllocateArrayWithBadAllocLane027ZeroAware(const unsigned int count)
-  {
-    return count != 0u ? RuntimeAllocateArrayWithBadAllocLane027(count) : ::operator new(0);
-  }
 
   /**
    * Address: 0x00688F00 (FUN_00688F00)
@@ -26469,29 +21414,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 3280u);
   }
 
-  /**
-   * Address: 0x00688870 (FUN_00688870)
-   *
-   * What it does:
-   * One-element allocator adapter for the 3280-byte array lane
-   * (`FUN_00688F00`).
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane028Single()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane028(1u);
-  }
 
-  /**
-   * Address: 0x006E2D90 (FUN_006E2D90)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane029(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   /**
    * Address: 0x006EBC60 (FUN_006EBC60)
@@ -26505,21 +21428,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 60u);
   }
 
-  /**
-   * Address: 0x006EB530 (FUN_006EB530)
-   *
-   * What it does:
-   * Allocates one checked `60`-byte element array lane for non-zero `count`
-   * and preserves VC8 zero-count behavior via `operator new(0)`.
-   */
-  [[maybe_unused]] void* RuntimeAllocateArrayWithBadAllocLane030ZeroAware(const unsigned int count)
-  {
-    if (count != 0u) {
-      return RuntimeAllocateArrayWithBadAllocLane030(count);
-    }
-
-    return ::operator new(0);
-  }
 
   /**
    * Address: 0x00712A70 (FUN_00712A70)
@@ -26533,16 +21441,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x00711F30 (FUN_00711F30)
-   *
-   * What it does:
-   * Allocates one single 20-byte array element through `FUN_00712A70`.
-   */
-  [[maybe_unused]] void* RuntimeAllocateSingleArrayElementLane031()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane031(1u);
-  }
 
   struct RuntimeTreeNode20DwordKey
   {
@@ -26557,35 +21455,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeTreeNode20DwordKey) == 0x14, "RuntimeTreeNode20DwordKey size must be 0x14");
 
-  /**
-   * Address: 0x007114F0 (FUN_007114F0)
-   *
-   * What it does:
-   * Allocates one 20-byte red-black tree node, copies link/key lanes, and
-   * clears color/nil marker bytes.
-   */
-  [[maybe_unused]] RuntimeTreeNode20DwordKey* RuntimeAllocateTreeNode20DwordKey(
-    const std::uint32_t left,
-    const std::uint32_t parent,
-    const std::uint32_t right,
-    const std::uint32_t* const keyLane
-  )
-  {
-    auto* const node = static_cast<RuntimeTreeNode20DwordKey*>(RuntimeAllocateArrayWithBadAllocLane031(1u));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->keyLane = (keyLane != nullptr) ? *keyLane : 0u;
-    node->color = 0u;
-    node->isNil = 0u;
-    node->pad12 = 0u;
-    node->pad13 = 0u;
-    return node;
-  }
 
   /**
    * Address: 0x0071D740 (FUN_0071D740)
@@ -26614,101 +21483,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode64Color60, color) == 0x3C, "RuntimeRbHeadNode64Color60::color offset must be 0x3C");
   static_assert(offsetof(RuntimeRbHeadNode64Color60, isNil) == 0x3D, "RuntimeRbHeadNode64Color60::isNil offset must be 0x3D");
 
-  /**
-   * Address: 0x0071C2C0 (FUN_0071C2C0)
-   *
-   * What it does:
-   * Allocates one 64-byte red-black head lane, zeroes the first three pointer
-   * slots with legacy null-adjacent checks, then writes `{color=1,isNil=0}`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbHeadNode64Color60* RuntimeAllocateAndPrimeRbHeadNode64Lane032()
-  {
-    auto* const node = static_cast<RuntimeRbHeadNode64Color60*>(RuntimeAllocateArrayWithBadAllocLane032(1u));
-    if (node != nullptr) {
-      node->left = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode64Color60*>(static_cast<std::intptr_t>(-4))) {
-      node->parent = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode64Color60*>(static_cast<std::intptr_t>(-8))) {
-      node->right = nullptr;
-    }
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x00733AF0 (FUN_00733AF0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane033(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
-  /**
-   * Address: 0x00751950 (FUN_00751950)
-   *
-   * What it does:
-   * Allocates one `128`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane034(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 128u);
-  }
 
-  /**
-   * Address: 0x00751A50 (FUN_00751A50)
-   *
-   * What it does:
-   * Allocates one `144`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane035(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 144u);
-  }
 
-  /**
-   * Address: 0x00751B60 (FUN_00751B60)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane036(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
-  /**
-   * Address: 0x00751C40 (FUN_00751C40)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane037(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
-  /**
-   * Address: 0x0075FD60 (FUN_0075FD60)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane038(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
   /**
    * Address: 0x00768DB0 (FUN_00768DB0)
@@ -26722,37 +21502,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
   }
 
-  /**
-   * Address: 0x00768040 (FUN_00768040)
-   *
-   * What it does:
-   * Allocates one single `36`-byte array element through
-   * `RuntimeAllocateArrayWithBadAllocLane039`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingle36ByteElementLaneAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane039(1u);
-  }
 
-  /**
-   * Address: 0x00767DE0 (FUN_00767DE0)
-   *
-   * What it does:
-   * Allocates one 36-byte node lane and initializes the first two dword lanes
-   * as self-links (`node[0]=node`, `node[1]=node`).
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeAllocateSingle36ByteSelfLinkedNodeLaneA()
-  {
-    auto* const result = static_cast<std::uint32_t*>(RuntimeAllocateArrayWithBadAllocLane039(1u));
-    if (result != nullptr) {
-      result[0] = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(result));
-    }
-
-    if (result != reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(0xFFFFFFFCu))) {
-      result[1] = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(result));
-    }
-    return result;
-  }
 
   /**
    * Address: 0x0077DB80 (FUN_0077DB80)
@@ -26766,16 +21516,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x0077CD60 (FUN_0077CD60)
-   *
-   * What it does:
-   * Allocates one 20-byte element using lane 040.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane040Single()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane040(1u);
-  }
 
   /**
    * Address: 0x0077DC40 (FUN_0077DC40)
@@ -26789,16 +21529,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
   }
 
-  /**
-   * Address: 0x0077D060 (FUN_0077D060)
-   *
-   * What it does:
-   * Allocates one 32-byte element using lane 041.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane041Single()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane041(1u);
-  }
 
   /**
    * Address: 0x0077DD10 (FUN_0077DD10)
@@ -26812,16 +21542,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 152u);
   }
 
-  /**
-   * Address: 0x0077D3E0 (FUN_0077D3E0)
-   *
-   * What it does:
-   * Allocates one 152-byte element using lane 041A.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane041ASingle()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane041A(1u);
-  }
 
   /**
    * Address: 0x00798B60 (FUN_00798B60)
@@ -26835,33 +21555,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x00798850 (FUN_00798850)
-   *
-   * What it does:
-   * Preserves one legacy zero-count allocation wrapper lane:
-   * returns `RuntimeAllocateArrayWithBadAllocLane042(count)` when non-zero
-   * and forwards to `operator new(0)` for the zero-count case.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane042OrZeroCount(const unsigned int count)
-  {
-    if (count != 0u) {
-      return RuntimeAllocateArrayWithBadAllocLane042(count);
-    }
-    return ::operator new(0u);
-  }
 
-  /**
-   * Address: 0x007A5EF0 (FUN_007A5EF0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane043(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
   /**
    * Address: 0x007B1420 (FUN_007B1420)
@@ -26887,42 +21581,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeAllocatedRecordLane044) == 0x1C, "RuntimeAllocatedRecordLane044 size must be 0x1C");
 
-  /**
-   * Address: 0x007B08D0 (FUN_007B08D0)
-   *
-   * What it does:
-   * Allocates one 28-byte runtime record through `FUN_007B1420`, clears the
-   * first three dword lanes with legacy null-adjacent checks, then seeds byte
-   * flags `+0x18=1` and `+0x19=0`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeAllocatedRecordLane044* RuntimeAllocateAndPrimeRecordLane044()
-  {
-    auto* const runtime = static_cast<RuntimeAllocatedRecordLane044*>(RuntimeAllocateArrayWithBadAllocLane044(1u));
-    if (runtime != nullptr) {
-      runtime->lane00 = 0;
-    }
-    if (runtime != reinterpret_cast<RuntimeAllocatedRecordLane044*>(static_cast<std::intptr_t>(-4))) {
-      runtime->lane04 = 0;
-    }
-    if (runtime != reinterpret_cast<RuntimeAllocatedRecordLane044*>(static_cast<std::intptr_t>(-8))) {
-      runtime->lane08 = 0;
-    }
-    runtime->lane18 = 1;
-    runtime->lane19 = 0;
-    return runtime;
-  }
 
-  /**
-   * Address: 0x007B0930 (FUN_007B0930)
-   *
-   * What it does:
-   * Allocates one 28-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane044`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane044()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane044(1u);
-  }
 
   /**
    * Address: 0x007B4E50 (FUN_007B4E50)
@@ -26936,41 +21595,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x007B4A50 (FUN_007B4A50)
-   *
-   * What it does:
-   * Allocates one 20-byte red-black head lane, clears the first three link
-   * pointers with legacy null-adjacent checks, then writes `{color=1,isNil=0}`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeNode20DwordKey* RuntimeAllocateAndPrimeRbHeadNode20Lane045()
-  {
-    auto* const node = static_cast<RuntimeTreeNode20DwordKey*>(RuntimeAllocateArrayWithBadAllocLane045(1u));
-    if (node != nullptr) {
-      node->left = 0u;
-    }
-    if (node != reinterpret_cast<RuntimeTreeNode20DwordKey*>(static_cast<std::intptr_t>(-4))) {
-      node->parent = 0u;
-    }
-    if (node != reinterpret_cast<RuntimeTreeNode20DwordKey*>(static_cast<std::intptr_t>(-8))) {
-      node->right = 0u;
-    }
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x007B3FA0 (FUN_007B3FA0)
-   *
-   * What it does:
-   * Allocates one 20-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane045`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane045()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane045(1u);
-  }
 
   /**
    * Address: 0x007B4EF0 (FUN_007B4EF0)
@@ -26984,17 +21609,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
   }
 
-  /**
-   * Address: 0x007B4B60 (FUN_007B4B60)
-   *
-   * What it does:
-   * Allocates one 32-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane046`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane046()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane046(1u);
-  }
 
   /**
    * Address: 0x007B4FA0 (FUN_007B4FA0)
@@ -27008,54 +21622,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
   }
 
-  /**
-   * Address: 0x007B4640 (FUN_007B4640)
-   *
-   * What it does:
-   * Allocates one 28-byte runtime record through `FUN_007B4FA0`, clears the
-   * first three dword lanes with legacy null-adjacent checks, then seeds byte
-   * flags `+0x18=1` and `+0x19=0`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeAllocatedRecordLane044* RuntimeAllocateAndPrimeRecordLane047()
-  {
-    auto* const runtime = static_cast<RuntimeAllocatedRecordLane044*>(RuntimeAllocateArrayWithBadAllocLane047(1u));
-    if (runtime != nullptr) {
-      runtime->lane00 = 0;
-    }
-    if (runtime != reinterpret_cast<RuntimeAllocatedRecordLane044*>(static_cast<std::intptr_t>(-4))) {
-      runtime->lane04 = 0;
-    }
-    if (runtime != reinterpret_cast<RuntimeAllocatedRecordLane044*>(static_cast<std::intptr_t>(-8))) {
-      runtime->lane08 = 0;
-    }
-    runtime->lane18 = 1;
-    runtime->lane19 = 0;
-    return runtime;
-  }
 
-  /**
-   * Address: 0x007B4CF0 (FUN_007B4CF0)
-   *
-   * What it does:
-   * Allocates one 28-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane047`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane047()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane047(1u);
-  }
 
-  /**
-   * Address: 0x007BCD70 (FUN_007BCD70)
-   *
-   * What it does:
-   * Allocates one `36`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane048(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
-  }
 
   /**
    * Address: 0x007BF120 (FUN_007BF120)
@@ -27069,24 +21637,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
   }
 
-  /**
-   * Address: 0x007BEF30 (FUN_007BEF30)
-   *
-   * What it does:
-   * Allocates one 40-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane049`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane049()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane049(1u);
-  }
 
   struct RuntimeTypeInfoCloneRecord40
   {
     std::uint32_t headerWord0; // +0x00
     std::uint32_t headerWord1; // +0x04
     std::uint32_t headerWord2; // +0x08
-    std::string typeName;      // +0x0C
+    msvc8::string typeName;    // +0x0C
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord40) == 0x28, "RuntimeTypeInfoCloneRecord40 size must be 0x28");
 
@@ -27110,32 +21667,18 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       destination->headerWord0 = 0u;
       destination->headerWord1 = 0u;
       destination->headerWord2 = 0u;
-      ::new (static_cast<void*>(&destination->typeName)) std::string();
+      ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
       return destination;
     }
 
     destination->headerWord0 = source->headerWord0;
     destination->headerWord1 = source->headerWord1;
     destination->headerWord2 = source->headerWord2;
-    ::new (static_cast<void*>(&destination->typeName)) std::string();
-    destination->typeName.assign(source->typeName, 0u, std::string::npos);
+    ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
+    destination->typeName.assign(source->typeName, 0u, msvc8::string::npos);
     return destination;
   }
 
-  /**
-   * Address: 0x007BEF40 (FUN_007BEF40)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one runtime type-info clone record
-   * copy into `RuntimeCopyTypeInfoCloneRecord40`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTypeInfoCloneRecord40* RuntimeCopyTypeInfoCloneRecord40RegisterAdapterA(
-    const RuntimeTypeInfoCloneRecord40* const source,
-    RuntimeTypeInfoCloneRecord40* const destination
-  )
-  {
-    return RuntimeCopyTypeInfoCloneRecord40(destination, source);
-  }
 
   struct RuntimeDwordAndFastVectorUIntN2Record32
   {
@@ -27152,34 +21695,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeDwordAndFastVectorUIntN2Record32::values offset must be 0x08"
   );
 
-  /**
-   * Address: 0x007BF3E0 (FUN_007BF3E0)
-   *
-   * What it does:
-   * Copies the leading dword lane and rebind-copies the embedded
-   * `fastvector_n<uint32_t,2>` lane from source to destination.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeDwordAndFastVectorUIntN2Record32* RuntimeCopyDwordAndFastVectorUIntN2LaneA(
-    RuntimeDwordAndFastVectorUIntN2Record32* const destination,
-    const RuntimeDwordAndFastVectorUIntN2Record32* const source
-  )
-  {
-    destination->lane00 = source->lane00;
-    gpg::FastVectorN2RebindAndCopy(&destination->values, &source->values);
-    return destination;
-  }
 
-  /**
-   * Address: 0x007CC140 (FUN_007CC140)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane050(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   /**
    * Address: 0x007CC1C0 (FUN_007CC1C0)
@@ -27193,17 +21709,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x007CABC0 (FUN_007CABC0)
-   *
-   * What it does:
-   * Allocates one 20-byte record lane by forwarding constant element count
-   * `1` into `RuntimeAllocateArrayWithBadAllocLane051`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane051()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane051(1u);
-  }
 
   /**
    * Address: 0x007D97A0 (FUN_007D97A0)
@@ -27217,17 +21722,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
   }
 
-  /**
-   * Address: 0x007D91A0 (FUN_007D91A0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 28-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane052`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane052Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane052(1u);
-  }
 
   /**
    * Address: 0x007E56B0 (FUN_007E56B0)
@@ -27241,17 +21735,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
   }
 
-  /**
-   * Address: 0x007E4F00 (FUN_007E4F00)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 40-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane053`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane053Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane053(1u);
-  }
 
   /**
    * Address: 0x007EBFD0 (FUN_007EBFD0)
@@ -27265,53 +21748,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 784u);
   }
 
-  /**
-   * Address: 0x007EBE90 (FUN_007EBE90)
-   *
-   * What it does:
-   * Jump-only adapter lane that forces one 784-byte checked array allocation.
-   */
-  [[maybe_unused]] void* RuntimeAllocateSingleArrayWithBadAllocLane054Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane054(1u);
-  }
 
   std::uint8_t gRuntimeByte54741F = 0;
 
-  /**
-   * Address: 0x007EBEE0 (FUN_007EBEE0)
-   *
-   * What it does:
-   * Returns a stable pointer to one shared single-byte runtime flag lane.
-   */
-  [[maybe_unused]] char* RuntimeGetSharedByteFlagLaneA() noexcept
-  {
-    return reinterpret_cast<char*>(&gRuntimeByte54741F);
-  }
 
-  /**
-   * Address: 0x007EBF20 (FUN_007EBF20)
-   *
-   * What it does:
-   * Returns the same shared single-byte runtime flag lane as
-   * `RuntimeGetSharedByteFlagLaneA`.
-   */
-  [[maybe_unused]] char* RuntimeGetSharedByteFlagLaneB() noexcept
-  {
-    return reinterpret_cast<char*>(&gRuntimeByte54741F);
-  }
 
-  /**
-   * Address: 0x007F3490 (FUN_007F3490)
-   *
-   * What it does:
-   * Allocates one `136`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane055(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 136u);
-  }
 
   /**
    * Address: 0x007F3670 (FUN_007F3670)
@@ -27325,40 +21766,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 192u);
   }
 
-  /**
-   * Address: 0x007F2F50 (FUN_007F2F50)
-   *
-   * What it does:
-   * Jump-only adapter lane that forces one 192-byte checked array allocation.
-   */
-  [[maybe_unused]] void* RuntimeAllocateSingleArrayWithBadAllocLane056Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane056(1u);
-  }
 
-  /**
-   * Address: 0x007FB9B0 (FUN_007FB9B0)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane057(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
-  /**
-   * Address: 0x00813EB0 (FUN_00813EB0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane058(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
   /**
    * Address: 0x008317B0 (FUN_008317B0)
@@ -27372,17 +21781,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x0082EDD0 (FUN_0082EDD0)
-   *
-   * What it does:
-   * Allocates one 20-byte element lane through the bad-alloc checked array
-   * helper.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane059Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane059(1u);
-  }
 
   /**
    * Address: 0x00831AB0 (FUN_00831AB0)
@@ -27396,17 +21794,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 136u);
   }
 
-  /**
-   * Address: 0x00830570 (FUN_00830570)
-   *
-   * What it does:
-   * Allocates one 136-byte element lane through the bad-alloc checked array
-   * helper.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane060Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane060(1u);
-  }
 
   /**
    * Address: 0x00831BA0 (FUN_00831BA0)
@@ -27420,17 +21807,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 44u);
   }
 
-  /**
-   * Address: 0x00830750 (FUN_00830750)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 44-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane061`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane061Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane061(1u);
-  }
 
   /**
    * Address: 0x00831D10 (FUN_00831D10)
@@ -27444,17 +21820,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
   }
 
-  /**
-   * Address: 0x00830960 (FUN_00830960)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 40-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane062`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane062Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane062(1u);
-  }
 
   /**
    * Address: 0x0083C6E0 (FUN_0083C6E0)
@@ -27468,17 +21833,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x0083C3E0 (FUN_0083C3E0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 24-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane063`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane063Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane063(1u);
-  }
 
   /**
    * Address: 0x0084A5F0 (FUN_0084A5F0)
@@ -27492,29 +21846,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 60u);
   }
 
-  /**
-   * Address: 0x00849E10 (FUN_00849E10)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 60-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane064`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane064Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane064(1u);
-  }
 
-  /**
-   * Address: 0x00857260 (FUN_00857260)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane065(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
   /**
    * Address: 0x008573A0 (FUN_008573A0)
@@ -27528,17 +21860,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
   }
 
-  /**
-   * Address: 0x00856DC0 (FUN_00856DC0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 28-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane066`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane066Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane066(1u);
-  }
 
   /**
    * Address: 0x00858730 (FUN_00858730)
@@ -27552,17 +21873,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x008585F0 (FUN_008585F0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 20-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane067`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane067Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane067(1u);
-  }
 
   /**
    * Address: 0x008620F0 (FUN_008620F0)
@@ -27576,17 +21886,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 3152u);
   }
 
-  /**
-   * Address: 0x00861F80 (FUN_00861F80)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 3152-byte element through
-   * `RuntimeAllocateArrayWithBadAllocLane068`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleArrayLane068Adapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane068(1u);
-  }
 
   /**
    * Address: 0x0087D510 (FUN_0087D510)
@@ -27624,38 +21923,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x0087C9E0 (FUN_0087C9E0)
-   *
-   * What it does:
-   * Compatibility adapter that allocates one 20-byte record lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleLane069()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane069(1u);
-  }
 
-  /**
-   * Address: 0x0087CB70 (FUN_0087CB70)
-   *
-   * What it does:
-   * Compatibility adapter that allocates one 24-byte record lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleLane070()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane070(1u);
-  }
 
-  /**
-   * Address: 0x0087CBB0 (FUN_0087CBB0)
-   *
-   * What it does:
-   * Compatibility adapter that allocates one 24-byte record lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleLane071()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane071(1u);
-  }
 
   struct RuntimeTaggedFloatRecord20
   {
@@ -27672,35 +21941,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeTaggedFloatRecord20, flag10) == 0x10, "RuntimeTaggedFloatRecord20::flag10 offset must be 0x10");
   static_assert(offsetof(RuntimeTaggedFloatRecord20, flag11) == 0x11, "RuntimeTaggedFloatRecord20::flag11 offset must be 0x11");
 
-  /**
-   * Address: 0x0087C060 (FUN_0087C060)
-   *
-   * What it does:
-   * Allocates one 20-byte tagged record and initializes three dword lanes, one
-   * float lane, and two flag lanes cleared to zero.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTaggedFloatRecord20* RuntimeAllocateTaggedFloatRecord20(
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08,
-    const float* const valueLane
-  )
-  {
-    auto* const record = static_cast<RuntimeTaggedFloatRecord20*>(RuntimeAllocateArrayWithBadAllocLane069(1u));
-    if (record == nullptr) {
-      return nullptr;
-    }
-
-    record->lane00 = lane00;
-    record->lane04 = lane04;
-    record->lane08 = lane08;
-    record->lane0C = valueLane != nullptr ? *valueLane : 0.0f;
-    record->flag10 = 0u;
-    record->flag11 = 0u;
-    record->pad12[0] = 0u;
-    record->pad12[1] = 0u;
-    return record;
-  }
 
   struct RuntimeTaggedPairRecord24
   {
@@ -27743,105 +21983,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return record;
   }
 
-  /**
-   * Address: 0x0087C3F0 (FUN_0087C3F0)
-   *
-   * What it does:
-   * Allocates one 24-byte tagged-pair record and initializes scalar lanes from
-   * three keys and one 2-dword payload pair.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTaggedPairRecord24* RuntimeAllocateTaggedPairRecord24LaneA(
-    const std::uint32_t* const pairLanes,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  )
-  {
-    return RuntimeInitTaggedPairRecord24(
-      static_cast<RuntimeTaggedPairRecord24*>(RuntimeAllocateArrayWithBadAllocLane070(1u)),
-      lane00,
-      lane04,
-      lane08,
-      pairLanes
-    );
-  }
 
-  /**
-   * Address: 0x0087C630 (FUN_0087C630)
-   *
-   * What it does:
-   * Duplicate 24-byte tagged-pair allocation lane using allocator lane071.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTaggedPairRecord24* RuntimeAllocateTaggedPairRecord24LaneB(
-    const std::uint32_t* const pairLanes,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  )
-  {
-    return RuntimeInitTaggedPairRecord24(
-      static_cast<RuntimeTaggedPairRecord24*>(RuntimeAllocateArrayWithBadAllocLane071(1u)),
-      lane00,
-      lane04,
-      lane08,
-      pairLanes
-    );
-  }
 
-  /**
-   * Address: 0x00883820 (FUN_00883820)
-   *
-   * What it does:
-   * Fills one legacy string range `[destinationBegin,destinationEnd)` from one
-   * prototype string and returns the last assigned lane.
-   */
-  [[maybe_unused]] [[nodiscard]] msvc8::string* RuntimeFillLegacyStringRangeFromPrototype(
-    msvc8::string* destinationBegin,
-    const msvc8::string& prototype,
-    msvc8::string* const destinationEnd
-  )
-  {
-    msvc8::string* lastAssigned = destinationBegin;
-    while (destinationBegin != destinationEnd) {
-      destinationBegin->assign(prototype, 0u, msvc8::string::npos);
-      lastAssigned = destinationBegin;
-      ++destinationBegin;
-    }
-    return lastAssigned;
-  }
 
-  /**
-   * Address: 0x00883840 (FUN_00883840)
-   *
-   * What it does:
-   * Backward-copies one legacy string range `[sourceBegin,sourceEnd)` into the
-   * destination tail ending at `destinationEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] msvc8::string* RuntimeCopyLegacyStringRangeBackward(
-    const msvc8::string* const sourceBegin,
-    const msvc8::string* sourceEnd,
-    msvc8::string* destinationEnd
-  )
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      destinationEnd->assign(*sourceEnd, 0u, msvc8::string::npos);
-    }
-    return destinationEnd;
-  }
 
-  /**
-   * Address: 0x00883870 (FUN_00883870)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLegacyStringLane(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
   /**
    * Address: 0x00884260 (FUN_00884260)
@@ -27861,52 +22006,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x00885070 (FUN_00885070)
-   *
-   * What it does:
-   * Copy-constructs one legacy-string range `[sourceBegin, sourceEnd)` into
-   * uninitialized destination storage; on exception it resets constructed
-   * destination lanes to empty-inline state and rethrows.
-   */
-  [[maybe_unused]] [[nodiscard]] msvc8::string* RuntimeCopyConstructLegacyStringRangeWithRollback(
-    msvc8::string* sourceBegin,
-    msvc8::string* const sourceEnd,
-    msvc8::string* destinationBegin
-  )
-  {
-    msvc8::string* sourceCursor = sourceBegin;
-    msvc8::string* destinationCursor = destinationBegin;
-    msvc8::string* const rollbackBegin = destinationBegin;
 
-    try {
-      while (sourceCursor != sourceEnd) {
-        if (destinationCursor != nullptr) {
-          ::new (destinationCursor) msvc8::string();
-          destinationCursor->assign(*sourceCursor, 0u, msvc8::string::npos);
-        }
-
-        ++sourceCursor;
-        ++destinationCursor;
-      }
-      return destinationCursor;
-    } catch (...) {
-      RuntimeResetLegacyStringRangeToEmpty(rollbackBegin, destinationCursor);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x0088AE90 (FUN_0088AE90)
-   *
-   * What it does:
-   * Allocates one `136`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane072(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 136u);
-  }
 
   /**
    * Address: 0x0088FFC0 (FUN_0088FFC0)
@@ -27920,92 +22020,24 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
   }
 
-  /**
-   * Address: 0x0088FC20 (FUN_0088FC20)
-   *
-   * What it does:
-   * Preserves one jump-only adapter lane that allocates exactly one
-   * 32-byte runtime type-info clone record.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateSingleTypeInfoCloneRecord32()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane073(1u);
-  }
 
-  /**
-   * Address: 0x0088FF60 (FUN_0088FF60)
-   *
-   * What it does:
-   * Jump-only adapter lane that forwards to global `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeDeleteRawPointerAdapterLaneA(void* const pointer) noexcept
-  {
-    ::operator delete(pointer);
-  }
 
-  /**
-   * Address: 0x0088FFA0 (FUN_0088FFA0)
-   *
-   * What it does:
-   * Secondary jump-only adapter lane that forwards to global `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeDeleteRawPointerAdapterLaneB(void* const pointer) noexcept
-  {
-    ::operator delete(pointer);
-  }
 
-  struct RuntimeTypeInfoCloneRecord40
+  struct RuntimeTypeInfoCloneRecord36
   {
     std::uint32_t lane00; // +0x00
     std::uint32_t lane04; // +0x04
-    std::string typeName; // +0x08
+    msvc8::string typeName; // +0x08
   };
-  static_assert(sizeof(RuntimeTypeInfoCloneRecord40) == 0x24, "RuntimeTypeInfoCloneRecord40 size must be 0x24");
+  static_assert(sizeof(RuntimeTypeInfoCloneRecord36) == 0x24, "RuntimeTypeInfoCloneRecord36 size must be 0x24");
 
-  /**
-   * Address: 0x0088FF70 (FUN_0088FF70)
-   *
-   * What it does:
-   * Clears one 40-byte type-info clone lane string payload and returns zero.
-   */
-  [[maybe_unused]] int RuntimeClearTypeInfoCloneRecord40AndReturnZero(RuntimeTypeInfoCloneRecord40* const value) noexcept
-  {
-    value->typeName.tidy(true, 0U);
-    return 0;
-  }
 
-  /**
-   * Address: 0x008901A0 (FUN_008901A0)
-   *
-   * What it does:
-   * Secondary clear lane for one 40-byte type-info clone record string payload.
-   */
-  [[maybe_unused]] int RuntimeClearTypeInfoCloneRecord40AndReturnZeroSecondary(
-    RuntimeTypeInfoCloneRecord40* const value
-  ) noexcept
-  {
-    value->typeName.tidy(true, 0U);
-    return 0;
-  }
 
-  /**
-   * Address: 0x008901E0 (FUN_008901E0)
-   *
-   * What it does:
-   * Clears one 40-byte type-info clone lane string payload and returns the same
-   * owner pointer.
-   */
-  [[maybe_unused]] RuntimeTypeInfoCloneRecord40*
-  RuntimeClearTypeInfoCloneRecord40AndReturnSelf(RuntimeTypeInfoCloneRecord40* const value) noexcept
-  {
-    value->typeName.tidy(true, 0U);
-    return value;
-  }
 
   struct RuntimeTypeInfoCloneRecord32
   {
     std::uint32_t headerWord0; // +0x00
-    std::string typeName;      // +0x04
+    msvc8::string typeName;    // +0x04
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord32) == 0x20, "RuntimeTypeInfoCloneRecord32 size must be 0x20");
 
@@ -28027,30 +22059,16 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
     if (source == nullptr) {
       destination->headerWord0 = 0u;
-      ::new (static_cast<void*>(&destination->typeName)) std::string();
+      ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
       return destination;
     }
 
     destination->headerWord0 = source->headerWord0;
-    ::new (static_cast<void*>(&destination->typeName)) std::string();
-    destination->typeName.assign(source->typeName, 0u, std::string::npos);
+    ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
+    destination->typeName.assign(source->typeName, 0u, msvc8::string::npos);
     return destination;
   }
 
-  /**
-   * Address: 0x0088FC30 (FUN_0088FC30)
-   *
-   * What it does:
-   * Preserves one register-adapter lane for 32-byte runtime type-info clone
-   * copy construction.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTypeInfoCloneRecord32* RuntimeCopyTypeInfoCloneRecord32RegisterAdapter(
-    RuntimeTypeInfoCloneRecord32* const destination,
-    const RuntimeTypeInfoCloneRecord32* const source
-  )
-  {
-    return RuntimeCopyTypeInfoCloneRecord32(destination, source);
-  }
 
   struct RuntimeTypeInfoCloneRecord32SplitSourceWords
   {
@@ -28061,52 +22079,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeTypeInfoCloneRecord32SplitSourceWords size must be 0x20"
   );
 
-  /**
-   * Address: 0x0088FA30 (FUN_0088FA30)
-   *
-   * What it does:
-   * Allocates one 32-byte clone record, copies payload from split source lanes,
-   * stores the new record pointer, and releases temporary heap string storage
-   * when source capacity is heap-backed (`>= 0x10`).
-   */
-  [[maybe_unused]] void RuntimeAllocateTypeInfoCloneRecord32FromSplitSource(
-    const std::uint32_t sourceHeaderWord,
-    const std::uint32_t sourceStringWord0,
-    void* const sourceStringWord1,
-    const std::uint32_t sourceStringWord2,
-    const std::uint32_t sourceStringWord3,
-    const std::uint32_t sourceStringWord4,
-    const std::uint32_t sourceStringLength,
-    const std::uint32_t sourceStringCapacity,
-    RuntimeTypeInfoCloneRecord32** const outRecord,
-    const std::uint32_t /*unusedTailWord*/
-  )
-  {
-    auto* const allocated = static_cast<RuntimeTypeInfoCloneRecord32*>(RuntimeAllocateArrayWithBadAllocLane073(1u));
-
-    RuntimeTypeInfoCloneRecord32SplitSourceWords splitSource{};
-    splitSource.lanes[0] = sourceHeaderWord;
-    splitSource.lanes[1] = sourceStringWord0;
-    splitSource.lanes[2] = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceStringWord1));
-    splitSource.lanes[3] = sourceStringWord2;
-    splitSource.lanes[4] = sourceStringWord3;
-    splitSource.lanes[5] = sourceStringWord4;
-    splitSource.lanes[6] = sourceStringLength;
-    splitSource.lanes[7] = sourceStringCapacity;
-
-    (void)RuntimeCopyTypeInfoCloneRecord32(
-      allocated,
-      reinterpret_cast<const RuntimeTypeInfoCloneRecord32*>(splitSource.lanes)
-    );
-
-    if (outRecord != nullptr) {
-      *outRecord = allocated;
-    }
-
-    if (sourceStringCapacity >= 16u) {
-      ::operator delete(sourceStringWord1);
-    }
-  }
 
   struct RuntimeTypeInfoCloneRecord48SharedControlBlock
   {
@@ -28120,7 +22092,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   struct RuntimeTypeInfoCloneRecord48Payload
   {
-    std::string typeName; // +0x00
+    msvc8::string typeName; // +0x00
     void* sharedArrayPtr; // +0x1C
     RuntimeTypeInfoCloneRecord48SharedControlBlock* controlBlock; // +0x20
     void* payloadBegin; // +0x24
@@ -28168,8 +22140,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
 
     destination->headerWord0 = source->headerWord0;
-    ::new (static_cast<void*>(&destination->payload.typeName)) std::string();
-    destination->payload.typeName.assign(source->payload.typeName, 0u, std::string::npos);
+    ::new (static_cast<void*>(&destination->payload.typeName)) msvc8::string();
+    destination->payload.typeName.assign(source->payload.typeName, 0u, msvc8::string::npos);
     destination->payload.sharedArrayPtr = source->payload.sharedArrayPtr;
     destination->payload.controlBlock = source->payload.controlBlock;
     if (destination->payload.controlBlock != nullptr) {
@@ -28180,33 +22152,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destination;
   }
 
-  /**
-   * Address: 0x0088FCD0 (FUN_0088FCD0)
-   *
-   * What it does:
-   * Register-lane adapter that forwards the copy request to the canonical
-   * 48-byte clone-record copier while preserving the original source/destination
-   * register routing shape.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTypeInfoCloneRecord48* RuntimeCopyTypeInfoCloneRecord48DispatchSourceRegisterAdapter(
-    RuntimeTypeInfoCloneRecord48* const destination,
-    const RuntimeTypeInfoCloneRecord48* const source
-  )
-  {
-    return RuntimeCopyTypeInfoCloneRecord48(destination, source);
-  }
 
-  /**
-   * Address: 0x00892B00 (FUN_00892B00)
-   *
-   * What it does:
-   * Allocates one `56`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane074(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 56u);
-  }
 
   /**
    * Address: 0x0089B1A0 (FUN_0089B1A0)
@@ -28220,40 +22166,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x0089AAC0 (FUN_0089AAC0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 24-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane075`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane075SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane075(1u);
-  }
 
-  /**
-   * Address: 0x0089A130 (FUN_0089A130)
-   *
-   * What it does:
-   * Allocates one 24-byte tagged-pair record using allocator lane075 and
-   * initializes scalar lanes from three keys and one 2-dword payload pair.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTaggedPairRecord24* RuntimeAllocateTaggedPairRecord24LaneC(
-    const std::uint32_t* const pairLanes,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  )
-  {
-    return RuntimeInitTaggedPairRecord24(
-      static_cast<RuntimeTaggedPairRecord24*>(RuntimeAllocateArrayWithBadAllocLane075(1u)),
-      lane00,
-      lane04,
-      lane08,
-      pairLanes
-    );
-  }
 
   /**
    * Address: 0x008A9C60 (FUN_008A9C60)
@@ -28267,29 +22180,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 80u);
   }
 
-  /**
-   * Address: 0x008A9700 (FUN_008A9700)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 80-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane076`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane076SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane076(1u);
-  }
 
-  /**
-   * Address: 0x008A9BF0 (FUN_008A9BF0)
-   *
-   * What it does:
-   * Allocates one `56`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane076A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 56u);
-  }
 
   /**
    * Address: 0x008AFE90 (FUN_008AFE90)
@@ -28303,17 +22194,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x008AFB10 (FUN_008AFB10)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 20-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane077`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane077SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane077(1u);
-  }
 
   /**
    * Address: 0x008B55D0 (FUN_008B55D0)
@@ -28327,17 +22207,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 80u);
   }
 
-  /**
-   * Address: 0x008B52B0 (FUN_008B52B0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 80-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane077A`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane077ASingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane077A(1u);
-  }
 
   /**
    * Address: 0x008B6AC0 (FUN_008B6AC0)
@@ -28351,17 +22220,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x008B6940 (FUN_008B6940)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 24-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane078`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane078SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane078(1u);
-  }
 
   struct RuntimeLinkedSlotNode16
   {
@@ -28845,268 +22703,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return lhs;
   }
 
-  /**
-   * Address: 0x007BEF50 (FUN_007BEF50)
-   *
-   * What it does:
-   * Dispatches one `(payload,length16)` lane pair through a callback whose
-   * `this` context is `base + baseOffset`.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokeOffsetDispatchRecord20(const RuntimeOffsetDispatchRecord20* const record) noexcept
-  {
-    return record->callback(record->base + record->baseOffset, record->payload, record->length);
-  }
 
-  /**
-   * Address: 0x007BEF70 (FUN_007BEF70)
-   *
-   * What it does:
-   * Dispatches one legacy-string payload lane through a callback using
-   * `base + baseOffset` as the `this` context.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokeOffsetDispatchStringRecord40(
-    const RuntimeOffsetDispatchStringRecord40* const record
-  ) noexcept
-  {
-    return record->callback(record->base + record->baseOffset, RuntimeReadLegacyStringLikeData(&record->text));
-  }
 
-  /**
-   * Address: 0x007BF1F0 (FUN_007BF1F0)
-   *
-   * What it does:
-   * Dispatches one `(payload,length16)` lane pack through a callback descriptor
-   * with caller-provided base-offset state.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokeDispatchPayloadAndLength16(
-    const RuntimeDispatchPayloadAndLength16* const payload,
-    const RuntimeOffsetDispatchThreeLane* const dispatch
-  ) noexcept
-  {
-    return dispatch->callback(payload->base + dispatch->baseOffset, payload->payload, payload->length);
-  }
 
-  /**
-   * Address: 0x007BF210 (FUN_007BF210)
-   *
-   * What it does:
-   * Dispatches one prefixed legacy-string payload lane through an offset
-   * callback descriptor.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokePrefixedLegacyStringDispatch32(
-    const RuntimePrefixAndLegacyString32* const payload,
-    const RuntimeOffsetDispatchPointerLane* const dispatch
-  ) noexcept
-  {
-    return dispatch->callback(payload->base + dispatch->baseOffset, RuntimeReadLegacyStringLikeData(&payload->text));
-  }
 
-  /**
-   * Address: 0x007BF290 (FUN_007BF290)
-   *
-   * What it does:
-   * Dispatches two lane arguments via callback descriptor using `base + offset`
-   * as dispatch context.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokeOffsetDispatchTwoLanePayload(
-    const RuntimeOffsetDispatchThreeLane* const dispatch,
-    const std::uint32_t laneA,
-    const std::uint32_t laneB,
-    const std::uint32_t base
-  ) noexcept
-  {
-    return dispatch->callback(base + dispatch->baseOffset, laneA, laneB);
-  }
 
-  /**
-   * Address: 0x007BF2A0 (FUN_007BF2A0)
-   *
-   * What it does:
-   * Dispatches one lane argument via callback descriptor using `base + offset`
-   * as dispatch context.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeInvokeOffsetDispatchSingleLanePayload(
-    const RuntimeOffsetDispatchTwoLane* const dispatch,
-    const std::uint32_t base,
-    const std::uint32_t lane
-  ) noexcept
-  {
-    return dispatch->callback(base + dispatch->baseOffset, lane);
-  }
 
-  /**
-   * Address: 0x007BF470 (FUN_007BF470)
-   *
-   * What it does:
-   * Composes one 16-byte `{base,payload,length16,reserved}` lane pack.
-   */
-  [[maybe_unused]] RuntimeDispatchPayloadAndLength16* RuntimeBuildDispatchPayloadAndLength16(
-    RuntimeDispatchPayloadAndLength16* const destination,
-    const std::uint32_t payload,
-    const std::uint32_t base,
-    const std::uint16_t length
-  ) noexcept
-  {
-    destination->base = base;
-    destination->payload = payload;
-    destination->length = length;
-    destination->lane0C = 0u;
-    return destination;
-  }
 
-  /**
-   * Address: 0x007C07C0 (FUN_007C07C0)
-   *
-   * What it does:
-   * Returns whether lane `+0x88` is zero.
-   */
-  [[maybe_unused]] bool RuntimeIsLane88Zero(const RuntimeWordProviderAndStringOwner* const owner) noexcept
-  {
-    return owner->lane88 == 0u;
-  }
 
-  /**
-   * Address: 0x007C07D0 (FUN_007C07D0)
-   *
-   * What it does:
-   * Returns a 16-bit value from provider vtable slot `+0x08`, or `-1` when the
-   * provider lane is null.
-   */
-  [[maybe_unused]] int RuntimeReadWordProviderValueOrMinusOne(const RuntimeWordProviderAndStringOwner* const owner) noexcept
-  {
-    if (owner->providerAt120 == nullptr) {
-      return -1;
-    }
-    return owner->providerAt120->vtable->readWord(owner->providerAt120);
-  }
 
-  /**
-   * Address: 0x007C07F0 (FUN_007C07F0)
-   *
-   * What it does:
-   * Returns the active data pointer of one legacy string lane at offset `+0x94`.
-   */
-  [[maybe_unused]] const char* RuntimeReadLegacyStringDataAtOffset148(
-    const RuntimeWordProviderAndStringOwner* const owner
-  ) noexcept
-  {
-    return static_cast<const char*>(RuntimeReadLegacyStringLikeData(&owner->textAt148));
-  }
 
-  /**
-   * Address: 0x007C0810 (FUN_007C0810)
-   *
-   * What it does:
-   * Returns one legacy string size lane at offset `+0x94`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadLegacyStringSizeAtOffset148(
-    const RuntimeWordProviderAndStringOwner* const owner
-  ) noexcept
-  {
-    return owner->textAt148.size;
-  }
 
-  /**
-   * Address: 0x007C1140 (FUN_007C1140)
-   *
-   * What it does:
-   * Assigns one weak-object pointer lane, retains the new weak control count,
-   * and releases the previous weak control lane.
-   */
-  [[maybe_unused]] RuntimeWeakObjectPtrLane* RuntimeAssignWeakObjectPtrLane(
-    RuntimeWeakObjectPtrLane* const destination,
-    const RuntimeWeakObjectPtrLane* const source
-  ) noexcept
-  {
-    destination->object = source->object;
 
-    RuntimeSharedControlBlockView* const newControl = source->control;
-    if (newControl != nullptr) {
-      (void)::InterlockedExchangeAdd(&newControl->weakRefs, 1);
-    }
 
-    RuntimeSharedControlBlockView* const oldControl = destination->control;
-    if (oldControl != nullptr && ::InterlockedExchangeAdd(&oldControl->weakRefs, -1) == 1) {
-      oldControl->vtable[2](oldControl);
-    }
 
-    destination->control = newControl;
-    return destination;
-  }
-
-  /**
-   * Address: 0x007C1B00 (FUN_007C1B00)
-   *
-   * What it does:
-   * Counts nodes in one embedded intrusive list whose sentinel begins at
-   * owner offset `+0xB0`.
-   */
-  [[maybe_unused]] int RuntimeCountEmbeddedListNodes(const RuntimeEmbeddedListOwnerAt176* const owner) noexcept
-  {
-    const auto* const sentinel = reinterpret_cast<const RuntimeEmbeddedListNodeByLink*>(
-      static_cast<const void*>(&owner->sentinelPrev)
-    );
-
-    int count = 0;
-    const RuntimeEmbeddedListNodeByLink* cursor = owner->sentinelNext;
-    while (cursor != sentinel) {
-      ++count;
-      cursor = cursor->next;
-    }
-    return count;
-  }
-
-  /**
-   * Address: 0x007C82A0 (FUN_007C82A0)
-   *
-   * What it does:
-   * Finds the first node in one embedded intrusive list whose lane `+0x38`
-   * matches the requested key.
-   */
-  [[maybe_unused]] RuntimeEmbeddedListNodeWithLane56* RuntimeFindEmbeddedListNodeByLane56(
-    RuntimeEmbeddedListOwnerAt176* const owner,
-    const std::int32_t key
-  ) noexcept
-  {
-    auto* const sentinel = reinterpret_cast<RuntimeEmbeddedListNodeWithLane56*>(
-      static_cast<void*>(&owner->sentinelPrev)
-    );
-
-    auto* cursor = reinterpret_cast<RuntimeEmbeddedListNodeWithLane56*>(owner->sentinelNext);
-    while (cursor != sentinel) {
-      if (cursor->lane56 == key) {
-        return cursor;
-      }
-      cursor = cursor->next;
-    }
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x007C82C0 (FUN_007C82C0)
-   *
-   * What it does:
-   * Finds the first node in one embedded intrusive list whose lane `+0x24`
-   * matches the requested key.
-   */
-  [[maybe_unused]] RuntimeEmbeddedListNodeWithLane36* RuntimeFindEmbeddedListNodeByLane36(
-    RuntimeEmbeddedListOwnerAt176* const owner,
-    const std::int32_t key
-  ) noexcept
-  {
-    auto* const sentinel = reinterpret_cast<RuntimeEmbeddedListNodeWithLane36*>(
-      static_cast<void*>(&owner->sentinelPrev)
-    );
-
-    auto* cursor = reinterpret_cast<RuntimeEmbeddedListNodeWithLane36*>(owner->sentinelNext);
-    while (cursor != sentinel) {
-      if (cursor->lane36 == key) {
-        return cursor;
-      }
-      cursor = cursor->next;
-    }
-    return nullptr;
-  }
 
   /**
    * Address: 0x007C8560 (FUN_007C8560)
@@ -29120,42 +22730,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return outPointer;
   }
 
-  /**
-   * Address: 0x007C8570 (FUN_007C8570)
-   *
-   * What it does:
-   * Assigns one releasable pointer lane and releases the previous pointer when
-   * it differs from the incoming value.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeAssignReleasablePointerIfDifferent(
-    RuntimeReleasableObject** const slot,
-    RuntimeReleasableObject* const value
-  ) noexcept
-  {
-    RuntimeReleasableObject* const previous = *slot;
-    std::intptr_t result = reinterpret_cast<std::intptr_t>(slot);
-    if (previous != value && previous != nullptr) {
-      result = previous->vtable->release(previous, 1);
-    }
-    *slot = value;
-    return result;
-  }
 
-  /**
-   * Address: 0x007C8710 (FUN_007C8710)
-   *
-   * What it does:
-   * Clears begin/end/capacity lanes of one 16-byte-element vector state.
-   */
-  [[maybe_unused]] RuntimeVector16StorageState* RuntimeClearVector16StorageState(
-    RuntimeVector16StorageState* const state
-  ) noexcept
-  {
-    state->begin = nullptr;
-    state->end = nullptr;
-    state->capacity = nullptr;
-    return state;
-  }
 
   /**
    * Address: 0x007C8770 (FUN_007C8770)
@@ -29171,85 +22746,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return static_cast<int>(state->end - state->begin);
   }
 
-  /**
-   * Address: 0x007C8790 (FUN_007C8790)
-   *
-   * What it does:
-   * Returns true when one 16-byte-element vector state is empty.
-   */
-  [[maybe_unused]] bool RuntimeVector16Empty(const RuntimeVector16StorageState* const state) noexcept
-  {
-    return state->begin == nullptr || RuntimeVector16Size(state) == 0;
-  }
 
-  /**
-   * Address: 0x007C87C0 (FUN_007C87C0)
-   *
-   * What it does:
-   * Returns element address at `index` in one 16-byte-element vector state.
-   */
-  [[maybe_unused]] RuntimeVector16Element* RuntimeVector16ElementAt(
-    const std::int32_t index,
-    RuntimeVector16StorageState* const state
-  ) noexcept
-  {
-    return state->begin + index;
-  }
 
-  /**
-   * Address: 0x007C87D0 (FUN_007C87D0)
-   *
-   * What it does:
-   * Returns one-past-back cursor minus one element in a 16-byte vector state.
-   */
-  [[maybe_unused]] RuntimeVector16Element* RuntimeVector16BackAddress(
-    RuntimeVector16StorageState* const state
-  ) noexcept
-  {
-    return state->end - 1;
-  }
 
-  /**
-   * Address: 0x007C8850 (FUN_007C8850)
-   *
-   * What it does:
-   * Pops one element from tail when a 16-byte vector state is non-empty.
-   */
-  [[maybe_unused]] void RuntimeVector16PopBack(RuntimeVector16StorageState* const state) noexcept
-  {
-    if (state->begin != nullptr && state->end != state->begin) {
-      --state->end;
-    }
-  }
 
-  /**
-   * Address: 0x007C8870 (FUN_007C8870)
-   *
-   * What it does:
-   * Erases one element from a 16-byte vector state by left-shifting the tail
-   * lane range and commits the new end cursor.
-   */
-  [[maybe_unused]] RuntimeVector16Element** RuntimeVector16EraseShiftLeft(
-    RuntimeVector16Element** const outElement,
-    RuntimeVector16StorageState* const state,
-    RuntimeVector16Element* const erased
-  ) noexcept
-  {
-    RuntimeVector16Element* readCursor = erased + 1;
-    const RuntimeVector16Element* const end = state->end;
-    if (readCursor != end) {
-      RuntimeVector16Element* writeCursor = erased;
-      do {
-        *writeCursor = *readCursor;
-        ++writeCursor;
-        ++readCursor;
-      } while (readCursor != end);
-    }
-
-    --state->end;
-    *outElement = erased;
-    return outElement;
-  }
 
   /**
    * Address: 0x007C88B0 (FUN_007C88B0)
@@ -29286,30 +22786,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return reinterpret_cast<std::intptr_t>(slot);
   }
 
-  /**
-   * Address: 0x007C8900 (FUN_007C8900)
-   *
-   * What it does:
-   * Returns `-1` when the pointer lane is null, otherwise returns `0`.
-   */
-  [[maybe_unused]] int RuntimeReturnMinusOneIfPointerSlotNull(void* const* const pointerSlot) noexcept
-  {
-    return (*pointerSlot != nullptr) ? 0 : -1;
-  }
 
-  /**
-   * Address: 0x007C8940 (FUN_007C8940)
-   *
-   * What it does:
-   * Advances one 16-byte-element cursor lane by one entry.
-   */
-  [[maybe_unused]] RuntimeVector16Element** RuntimeAdvanceVector16Cursor(
-    RuntimeVector16Element** const cursor
-  ) noexcept
-  {
-    ++(*cursor);
-    return cursor;
-  }
 
   /**
    * Address: 0x004E6A00 (FUN_004E6A00)
@@ -29409,57 +22886,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return static_cast<BOOL>(*lane == 0u);
   }
 
-  /**
-   * Address: 0x007E2940 (FUN_007E2940)
-   *
-   * What it does:
-   * Clears lanes `+0x04/+0x08/+0x0C` in one pointer-window state.
-   */
-  [[maybe_unused]] RuntimeInlineWindowOffset104State* RuntimeClearPointerWindowLanes104(
-    RuntimeInlineWindowOffset104State* const state
-  ) noexcept
-  {
-    state->lane04 = nullptr;
-    state->lane08 = nullptr;
-    state->lane0C = nullptr;
-    return state;
-  }
 
-  /**
-   * Address: 0x007E29A0 (FUN_007E29A0)
-   *
-   * What it does:
-   * Returns dword element count in one `{begin,end}` window state.
-   */
-  [[maybe_unused]] int RuntimeVectorDwordWindowSize(const RuntimeVectorDwordWindowState* const state) noexcept
-  {
-    if (state->begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(state->end - state->begin);
-  }
 
-  /**
-   * Address: 0x007E2B00 (FUN_007E2B00)
-   *
-   * What it does:
-   * Alias lane of null-mask return (`-1` when null, else `0`).
-   */
-  [[maybe_unused]] int RuntimeReturnMinusOneWhenDwordLaneNullAlias(const std::uint32_t* const lane) noexcept
-  {
-    return RuntimeReturnMinusOneWhenDwordLaneNull(lane);
-  }
 
-  /**
-   * Address: 0x007E2B10 (FUN_007E2B10)
-   *
-   * What it does:
-   * Alias lane of dword-zero test behavior.
-   */
-  [[maybe_unused]] BOOL RuntimeIsDwordLaneZeroAlias(const std::uint32_t* const lane) noexcept
-  {
-    return RuntimeIsDwordLaneZero(lane);
-  }
 
   /**
    * Address: 0x007E2BB0 (FUN_007E2BB0)
@@ -29476,52 +22905,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return node;
   }
 
-  /**
-   * Address: 0x007E2BD0 (FUN_007E2BD0)
-   *
-   * What it does:
-   * Stores one pointer lane to caller-provided storage.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode** RuntimeStoreIntrusiveNodePointer(
-    RuntimeIntrusiveDoubleLinkNode** const outNode,
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    *outNode = node;
-    return outNode;
-  }
 
-  /**
-   * Address: 0x007E2BE0 (FUN_007E2BE0)
-   *
-   * What it does:
-   * Unlinks one intrusive node and inserts it after a caller-provided anchor.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeRelinkIntrusiveNodeAfterAnchor(
-    RuntimeIntrusiveDoubleLinkNode* const node,
-    RuntimeIntrusiveDoubleLinkNode* const anchor
-  ) noexcept
-  {
-    (void)RuntimeUnlinkAndSelfLinkNode(node);
-    node->next = anchor->next;
-    node->prev = anchor;
-    anchor->next = node;
-    node->next->prev = node;
-    return node;
-  }
 
-  /**
-   * Address: 0x007E2C10 (FUN_007E2C10)
-   *
-   * What it does:
-   * Unlinks one intrusive node from neighbors and self-links it.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAlias(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
   /**
    * Address: 0x007E2D60 (FUN_007E2D60)
@@ -29538,37 +22923,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return outNode;
   }
 
-  /**
-   * Address: 0x007E2EC0 (FUN_007E2EC0)
-   *
-   * What it does:
-   * Initializes one pointer-window state with base-relative lanes
-   * `{+0x04,+0x04,+0x68,+0x04}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowOffset104State* RuntimeInitializePointerWindowOffset104(
-    RuntimeInlineWindowOffset104State* const state
-  ) noexcept
-  {
-    state->lane00 = reinterpret_cast<std::byte*>(state) + 4;
-    state->lane04 = reinterpret_cast<std::byte*>(state) + 4;
-    state->lane08 = reinterpret_cast<std::byte*>(state) + 104;
-    state->lane0C = reinterpret_cast<std::byte*>(state) + 4;
-    return state;
-  }
 
-  /**
-   * Address: 0x007E3010 (FUN_007E3010)
-   *
-   * What it does:
-   * Returns byte-stride-12 element address at index in owner lane.
-   */
-  [[maybe_unused]] std::byte* RuntimeStride12ElementAt(
-    const int index,
-    const RuntimeStride12OwnerState* const owner
-  ) noexcept
-  {
-    return owner->base + (12 * index);
-  }
 
   /**
    * Address: 0x007E3050 (FUN_007E3050)
@@ -29587,229 +22942,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return lhs;
   }
 
-  /**
-   * Address: 0x007E3070 (FUN_007E3070)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasA(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007E3090 (FUN_007E3090)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasB(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007E3230 (FUN_007E3230)
-   *
-   * What it does:
-   * Alias lane of intrusive unlink/self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAliasB(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
-  /**
-   * Address: 0x007E35F0 (FUN_007E35F0)
-   *
-   * What it does:
-   * Stores one pointer lane to caller-provided output storage.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasA(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E3600 (FUN_007E3600)
-   *
-   * What it does:
-   * Initializes one pointer-window state with capacity lane at `base + 400`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacity400State* RuntimeInitializePointerWindowCapacity400(
-    RuntimeInlineWindowCapacity400State* const state,
-    std::byte* const base
-  ) noexcept
-  {
-    state->lane00 = base;
-    state->begin = base;
-    state->capacity = base + 400;
-    state->lane0C = base;
-    return state;
-  }
 
-  /**
-   * Address: 0x007E3690 (FUN_007E3690)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasB(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E3720 (FUN_007E3720)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasC(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E3B40 (FUN_007E3B40)
-   *
-   * What it does:
-   * Alias lane of loading owner-node pointer from offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode** RuntimeLoadNodePointerFromOwnerOffset04Alias(
-    RuntimeIntrusiveDoubleLinkNode** const outNode,
-    const RuntimeOwnerPointerSlotOffset04* const owner
-  ) noexcept
-  {
-    return RuntimeLoadNodePointerFromOwnerOffset04(outNode, owner);
-  }
 
-  /**
-   * Address: 0x007E4270 (FUN_007E4270)
-   *
-   * What it does:
-   * Returns dword-stride element address at index.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeDwordElementAt(
-    std::uint32_t** const beginPtr,
-    const int index
-  ) noexcept
-  {
-    return *beginPtr + index;
-  }
 
-  /**
-   * Address: 0x007E4290 (FUN_007E4290)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasD(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E42E0 (FUN_007E42E0)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasE(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E4340 (FUN_007E4340)
-   *
-   * What it does:
-   * Writes one null pointer lane to caller-provided output storage.
-   */
-  [[maybe_unused]] void** RuntimeWriteNullPointerLaneAliasA(void** const outPointer) noexcept
-  {
-    return RuntimeWriteNullPointerLane(outPointer);
-  }
 
-  /**
-   * Address: 0x007E4360 (FUN_007E4360)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasF(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
 
-  /**
-   * Address: 0x007E4CB0 (FUN_007E4CB0)
-   *
-   * What it does:
-   * Alias lane of null pointer write behavior.
-   */
-  [[maybe_unused]] void** RuntimeWriteNullPointerLaneAliasB(void** const outPointer) noexcept
-  {
-    return RuntimeWriteNullPointerLane(outPointer);
-  }
 
-  /**
-   * Address: 0x007E4D70 (FUN_007E4D70)
-   *
-   * What it does:
-   * Alias lane of pointer-store behavior.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLaneAliasG(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    return RuntimeStorePointerLane(outPointer, value);
-  }
-
-  /**
-   * Address: 0x007E4DB0 (FUN_007E4DB0)
-   *
-   * What it does:
-   * Stores one dword lane plus one byte lane into caller output storage.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeStoreDwordAndByteRecord(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    outRecord->lane00 = *dwordSource;
-    outRecord->lane04 = *byteSource;
-    return outRecord;
-  }
 
   struct RuntimeDwordAtOffset72Record
   {
@@ -29932,65 +23078,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return state;
   }
 
-  /**
-   * Address: 0x007FB920 (FUN_007FB920)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasA(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FB930 (FUN_007FB930)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasB(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FBA00 (FUN_007FBA00)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasC(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FBD50 (FUN_007FBD50)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasC(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FC390 (FUN_007FC390)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x48`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset72(
-    const RuntimeDwordAtOffset72Record* const record
-  ) noexcept
-  {
-    return record->lane48;
-  }
 
   /**
    * Address: 0x007FC480 (FUN_007FC480)
@@ -30005,50 +23096,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return record->flag10;
   }
 
-  /**
-   * Address: 0x007FE0A0 (FUN_007FE0A0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneR(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x007FEE40 (FUN_007FEE40)
-   *
-   * What it does:
-   * Returns one byte flag lane stored at record offset `+0x0C`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset12(
-    const RuntimeByteFlagAtOffset12Record* const record
-  ) noexcept
-  {
-    return record->flag0C;
-  }
 
-  /**
-   * Address: 0x007FF3D0 (FUN_007FF3D0)
-   *
-   * What it does:
-   * Copies trailing lanes `+0x04/+0x08/+0x0C` from source record to
-   * destination record and preserves the leading lane.
-   */
-  [[maybe_unused]] RuntimeDwordQuadRecord* RuntimeCopyDwordQuadTailLanes(
-    RuntimeDwordQuadRecord* const destination,
-    const RuntimeDwordQuadRecord* const source
-  ) noexcept
-  {
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-    return destination;
-  }
 
   /**
    * Address: 0x007FF400 (FUN_007FF400)
@@ -30082,119 +23131,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destination;
   }
 
-  /**
-   * Address: 0x007FF4A0 (FUN_007FF4A0)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasD(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FF570 (FUN_007FF570)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasD(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x007FF6A0 (FUN_007FF6A0)
-   *
-   * What it does:
-   * Returns one dword lane value and clears the source lane.
-   */
-  [[maybe_unused]] int RuntimeTakeAndZeroDwordLane(int* const lane) noexcept
-  {
-    const int value = *lane;
-    *lane = 0;
-    return value;
-  }
 
-  /**
-   * Address: 0x007FF770 (FUN_007FF770)
-   *
-   * What it does:
-   * Initializes one 16-byte dword-quad record as
-   * `{lane00Source, 0, lane08Source, lane0CSource}`.
-   */
-  [[maybe_unused]] RuntimeDwordQuadRecord* RuntimeInitializeDwordQuadRecordWithZeroSecondLane(
-    RuntimeDwordQuadRecord* const outRecord,
-    const std::uint32_t lane08Source,
-    const std::uint32_t lane00Source,
-    const std::uint32_t lane0CSource
-  ) noexcept
-  {
-    outRecord->lane00 = lane00Source;
-    outRecord->lane04 = 0u;
-    outRecord->lane08 = lane08Source;
-    outRecord->lane0C = lane0CSource;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x007FF7E0 (FUN_007FF7E0)
-   *
-   * What it does:
-   * Returns one byte flag lane stored at record offset `+0x14`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset20(
-    const RuntimeByteFlagAtOffset20Record* const record
-  ) noexcept
-  {
-    return record->flag14;
-  }
-
-  /**
-   * Address: 0x007FF800 (FUN_007FF800)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x20`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset32(
-    const RuntimeDwordAtOffset32Record* const record
-  ) noexcept
-  {
-    return record->lane20;
-  }
-
-  /**
-   * Address: 0x00803990 (FUN_00803990)
-   *
-   * What it does:
-   * Copies one 6-dword record from source to destination.
-   */
-  [[maybe_unused]] RuntimeDwordHexadRecord* RuntimeCopyDwordHexadRecord(
-    RuntimeDwordHexadRecord* const destination,
-    const RuntimeDwordHexadRecord* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x0080A100 (FUN_0080A100)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x2EF0,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity12000FromSelfAliasA(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x2EF0);
-  }
 
   /**
    * Address: 0x0080A1F0 (FUN_0080A1F0)
@@ -30210,146 +23150,15 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return owner->base + (24 * index);
   }
 
-  /**
-   * Address: 0x0080A200 (FUN_0080A200)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneS(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0080A4D0 (FUN_0080A4D0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneT(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0080A570 (FUN_0080A570)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneU(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0080A600 (FUN_0080A600)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x1A0,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity400FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x1A0);
-  }
 
-  /**
-   * Address: 0x0080A670 (FUN_0080A670)
-   *
-   * What it does:
-   * Alias lane of self-relative inline pointer-window init with capacity
-   * offset `+0x2EF0`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity12000FromSelfAliasB(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x2EF0);
-  }
 
-  /**
-   * Address: 0x0080A760 (FUN_0080A760)
-   *
-   * What it does:
-   * Alias lane of stride-24 indexed element address calculation.
-   */
-  [[maybe_unused]] std::byte* RuntimeStride24ElementAtAliasB(
-    const int index,
-    const RuntimeStride24BaseOwner* const owner
-  ) noexcept
-  {
-    return RuntimeStride24ElementAtAliasA(index, owner);
-  }
 
-  /**
-   * Address: 0x0080A770 (FUN_0080A770)
-   *
-   * What it does:
-   * Alias lane of self-relative inline pointer-window init with capacity
-   * offset `+0x2EF0`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity12000FromSelfAliasC(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x2EF0);
-  }
 
-  /**
-   * Address: 0x0080A860 (FUN_0080A860)
-   *
-   * What it does:
-   * Alias lane of stride-24 indexed element address calculation.
-   */
-  [[maybe_unused]] std::byte* RuntimeStride24ElementAtAliasC(
-    const int index,
-    const RuntimeStride24BaseOwner* const owner
-  ) noexcept
-  {
-    return RuntimeStride24ElementAtAliasA(index, owner);
-  }
 
-  /**
-   * Address: 0x0080A870 (FUN_0080A870)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x6D70,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity28000FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x6D70);
-  }
 
-  /**
-   * Address: 0x0080AA20 (FUN_0080AA20)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from caller-provided base with
-   * capacity lane at `base + 0x2EE0` (12000 bytes).
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity12000FromBase(
-    RuntimeInlineWindowCapacityState* const state,
-    std::byte* const base
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromExternalBase(state, base, 0x2EE0);
-  }
 
   struct RuntimeByteFlagAtOffset325Record
   {
@@ -30464,425 +23273,35 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return slot;
   }
 
-  /**
-   * Address: 0x0081CF90 (FUN_0081CF90)
-   *
-   * What it does:
-   * Returns one byte flag lane at record offset `+0x145`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset325(
-    const RuntimeByteFlagAtOffset325Record* const record
-  ) noexcept
-  {
-    return record->flag145;
-  }
 
-  /**
-   * Address: 0x0081CFA0 (FUN_0081CFA0)
-   *
-   * What it does:
-   * Returns one byte flag lane at record offset `+0x1A2`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset418(
-    const RuntimeByteFlagAtOffset418Record* const record
-  ) noexcept
-  {
-    return record->flag1A2;
-  }
 
-  /**
-   * Address: 0x0081CFC0 (FUN_0081CFC0)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x20`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset32Alias(
-    const RuntimeDwordAtOffset32Record* const record
-  ) noexcept
-  {
-    return RuntimeLoadDwordAtOffset32(record);
-  }
 
-  /**
-   * Address: 0x0082B420 (FUN_0082B420)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x08`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset08AliasA(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset08Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset08(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082B990 (FUN_0082B990)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasA(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082B9A0 (FUN_0082B9A0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasA(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082BB40 (FUN_0082BB40)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasA(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
-  /**
-   * Address: 0x0082BB80 (FUN_0082BB80)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x14,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity4FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x14);
-  }
 
-  /**
-   * Address: 0x0082BC70 (FUN_0082BC70)
-   *
-   * What it does:
-   * Rebinds one pointer slot to the pointer stored in its current first dword
-   * lane.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasA(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x0082BC90 (FUN_0082BC90)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasB(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082BDC0 (FUN_0082BDC0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasB(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082BDD0 (FUN_0082BDD0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasC(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082BE70 (FUN_0082BE70)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasB(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x0082BEA0 (FUN_0082BEA0)
-   *
-   * What it does:
-   * Returns byte address of stride-12 element at `index` with base lane at
-   * owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::byte* RuntimeStride12ElementAtOffset04Base(
-    const int index,
-    const RuntimeStride12BaseAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return owner->base04 + (12 * index);
-  }
 
-  /**
-   * Address: 0x0082C3B0 (FUN_0082C3B0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasC(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082C3C0 (FUN_0082C3C0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasD(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082C8C0 (FUN_0082C8C0)
-   *
-   * What it does:
-   * Copies one dword lane from source pointer to destination pointer.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordLaneFromSourcePointerAliasA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(destination, *source);
-  }
 
-  /**
-   * Address: 0x0082CAD0 (FUN_0082CAD0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasE(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082D100 (FUN_0082D100)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from caller base with capacity
-   * lane at `base + 0x04`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity4FromBase(
-    RuntimeInlineWindowCapacityState* const state,
-    std::byte* const base
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromExternalBase(state, base, 0x04);
-  }
 
-  /**
-   * Address: 0x0082D160 (FUN_0082D160)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasC(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x0082D280 (FUN_0082D280)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneR(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0082D290 (FUN_0082D290)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasD(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x0082D2D0 (FUN_0082D2D0)
-   *
-   * What it does:
-   * Initializes one `{dword,byte}` lane record from source slots.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeInitDwordAndByteRecordAliasA(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeStoreDwordAndByteRecord(outRecord, dwordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x0082D2E0 (FUN_0082D2E0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneV(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0082D3A0 (FUN_0082D3A0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneW(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0082D480 (FUN_0082D480)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneX(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0082D4B0 (FUN_0082D4B0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasF(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0082D4F0 (FUN_0082D4F0)
-   *
-   * What it does:
-   * Copies a leading dword-pair, then copies one 28-byte payload lane.
-   */
-  [[maybe_unused]] RuntimeDwordPairAndBlob28* RuntimeCopyDwordPairAndBlob28(
-    RuntimeDwordPairAndBlob28* const destination,
-    const RuntimePointerPairRecord* const pairSource,
-    const void* const payloadSource
-  ) noexcept
-  {
-    destination->lane00 = pairSource->lane00;
-    destination->lane04 = pairSource->lane04;
-    std::memcpy(destination->blob08_23, payloadSource, sizeof(destination->blob08_23));
-    return destination;
-  }
 
-  /**
-   * Address: 0x0082D650 (FUN_0082D650)
-   *
-   * What it does:
-   * Alias lane of dword copy from source pointer.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordLaneFromSourcePointerAliasB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(destination, *source);
-  }
 
-  /**
-   * Address: 0x0082D6D0 (FUN_0082D6D0)
-   *
-   * What it does:
-   * Copies one byte lane from source pointer to destination pointer.
-   */
-  [[maybe_unused]] std::uint8_t* RuntimeCopyByteLaneFromSourcePointer(
-    std::uint8_t* const destination,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
 
   struct RuntimeDwordAtOffset08Record
   {
@@ -30932,428 +23351,35 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return outNode;
   }
 
-  /**
-   * Address: 0x00830340 (FUN_00830340)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneS(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x008303B0 (FUN_008303B0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneY(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x008303C0 (FUN_008303C0)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneT(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x008303D0 (FUN_008303D0)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasE(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x00830410 (FUN_00830410)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneZ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830420 (FUN_00830420)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAA(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830450 (FUN_00830450)
-   *
-   * What it does:
-   * Alias lane of `{dword,byte}` record initialization from source slots.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeInitDwordAndByteRecordAliasB(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeStoreDwordAndByteRecord(outRecord, dwordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x00830460 (FUN_00830460)
-   *
-   * What it does:
-   * Stores one dword lane as `base + (index * 4)` from a source base lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasA(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x00830470 (FUN_00830470)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasB(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x008306B0 (FUN_008306B0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasD(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x008309C0 (FUN_008309C0)
-   *
-   * What it does:
-   * Pops one forward-link node from head slot and writes the popped node lane.
-   */
-  [[maybe_unused]] RuntimeForwardLinkNode** RuntimePopForwardLinkNodeAliasA(
-    RuntimeForwardLinkNode** const outNode,
-    RuntimeForwardLinkNode** const headSlot
-  ) noexcept
-  {
-    return RuntimePopForwardLinkNode(outNode, headSlot);
-  }
 
-  /**
-   * Address: 0x00830A40 (FUN_00830A40)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAB(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830A60 (FUN_00830A60)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAC(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830A90 (FUN_00830A90)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAD(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830AC0 (FUN_00830AC0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAE(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830C30 (FUN_00830C30)
-   *
-   * What it does:
-   * Alias lane of forward-link node pop behavior.
-   */
-  [[maybe_unused]] RuntimeForwardLinkNode** RuntimePopForwardLinkNodeAliasB(
-    RuntimeForwardLinkNode** const outNode,
-    RuntimeForwardLinkNode** const headSlot
-  ) noexcept
-  {
-    return RuntimePopForwardLinkNode(outNode, headSlot);
-  }
 
-  /**
-   * Address: 0x00830C40 (FUN_00830C40)
-   *
-   * What it does:
-   * Alias lane of forward-link node pop behavior.
-   */
-  [[maybe_unused]] RuntimeForwardLinkNode** RuntimePopForwardLinkNodeAliasC(
-    RuntimeForwardLinkNode** const outNode,
-    RuntimeForwardLinkNode** const headSlot
-  ) noexcept
-  {
-    return RuntimePopForwardLinkNode(outNode, headSlot);
-  }
 
-  /**
-   * Address: 0x00830C50 (FUN_00830C50)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAF(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00830C80 (FUN_00830C80)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAG(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00831220 (FUN_00831220)
-   *
-   * What it does:
-   * Alias lane of dword copy from source pointer.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordLaneFromSourcePointerAliasC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(destination, *source);
-  }
 
-  /**
-   * Address: 0x008312E0 (FUN_008312E0)
-   *
-   * What it does:
-   * Alias lane of dword copy from source pointer.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordLaneFromSourcePointerAliasD(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(destination, *source);
-  }
 
-  /**
-   * Address: 0x00831E80 (FUN_00831E80)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasE(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00831EB0 (FUN_00831EB0)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasF(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x00832730 (FUN_00832730)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasE(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00832C40 (FUN_00832C40)
-   *
-   * What it does:
-   * Returns the leading dword lane of one stride-8 table entry at `index`,
-   * where table base pointer is stored at owner offset `+0x08`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadStride8TableDwordAtIndex(
-    const RuntimeStride8TableOwnerOffset08* const owner,
-    const int index
-  ) noexcept
-  {
-    return *reinterpret_cast<const std::uint32_t*>(owner->tableBase08 + (8 * index));
-  }
 
-  /**
-   * Address: 0x00836B70 (FUN_00836B70)
-   *
-   * What it does:
-   * Initializes one dword-pair record as `{0, source.offset08}`.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairZeroFirstFromOffset08(
-    RuntimePointerPairRecord* const outRecord,
-    const RuntimeDwordAtOffset08Record* const source
-  ) noexcept
-  {
-    outRecord->lane00 = 0u;
-    outRecord->lane04 = source->lane08;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x00836B80 (FUN_00836B80)
-   *
-   * What it does:
-   * Initializes one dword-pair record as `{0, source.offset04}`.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairZeroFirstFromOffset04(
-    RuntimePointerPairRecord* const outRecord,
-    const RuntimeDwordAtOffset04Record* const source
-  ) noexcept
-  {
-    outRecord->lane00 = 0u;
-    outRecord->lane04 = source->lane04;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x00836FE0 (FUN_00836FE0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasG(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x008371E0 (FUN_008371E0)
-   *
-   * What it does:
-   * Initializes one dword-pair record as `{0, value}`.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairZeroFirstFromValue(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t value
-  ) noexcept
-  {
-    outRecord->lane00 = 0u;
-    outRecord->lane04 = value;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x00837600 (FUN_00837600)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAH(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
   struct RuntimeDwordAtOffset20Record
   {
@@ -31404,60 +23430,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return lhs;
   }
 
-  /**
-   * Address: 0x0083CB90 (FUN_0083CB90)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x14`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset20(
-    const RuntimeDwordAtOffset20Record* const record
-  ) noexcept
-  {
-    return record->lane14;
-  }
 
-  /**
-   * Address: 0x008484C0 (FUN_008484C0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasE(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x008484D0 (FUN_008484D0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasH(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848520 (FUN_00848520)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x2D0,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity720FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x2D0);
-  }
 
   /**
    * Address: 0x008486D0 (FUN_008486D0)
@@ -31473,272 +23448,24 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x18);
   }
 
-  /**
-   * Address: 0x00848740 (FUN_00848740)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasF(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848750 (FUN_00848750)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasI(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848770 (FUN_00848770)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasG(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x008487D0 (FUN_008487D0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasJ(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848970 (FUN_00848970)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasG(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848980 (FUN_00848980)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasK(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848B30 (FUN_00848B30)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from caller-provided base with
-   * capacity lane at `base + 0x2C0` (704 bytes).
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity704FromBase(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::uint32_t baseAddress
-  ) noexcept
-  {
-    auto* const base = reinterpret_cast<std::byte*>(static_cast<std::uintptr_t>(baseAddress));
-    return RuntimeInitializeInlineWindowFromExternalBase(state, base, 0x2C0);
-  }
 
-  /**
-   * Address: 0x00848B50 (FUN_00848B50)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasL(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00848C50 (FUN_00848C50)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAI(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00848C70 (FUN_00848C70)
-   *
-   * What it does:
-   * Alias lane of pointer-slot collapse behavior.
-   */
-  [[maybe_unused]] RuntimePointerSlotLane* RuntimeCollapsePointerSlotAliasH(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    return RuntimeCollapsePointerSlot(slot);
-  }
 
-  /**
-   * Address: 0x00848DE0 (FUN_00848DE0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAJ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00848E20 (FUN_00848E20)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAK(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00848EE0 (FUN_00848EE0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAL(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00849220 (FUN_00849220)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAM(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00849590 (FUN_00849590)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAN(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00849600 (FUN_00849600)
-   *
-   * What it does:
-   * Stores one dword lane as `base + (index * 12)` from source base lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordStride12OffsetFromBaseLaneAliasA(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordStride12OffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x00849630 (FUN_00849630)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAO(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x008497A0 (FUN_008497A0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAP(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00849810 (FUN_00849810)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAQ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
   /**
    * Address: 0x0084B9C0 (FUN_0084B9C0)
@@ -31757,75 +23484,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return outRecord;
   }
 
-  /**
-   * Address: 0x0084BAD0 (FUN_0084BAD0)
-   *
-   * What it does:
-   * Swaps two dword-triple records and returns the left record.
-   */
-  [[maybe_unused]] RuntimeDwordTripleLaneRecord* RuntimeSwapDwordTripleLaneRecordAliasA(
-    RuntimeDwordTripleLaneRecord* const lhs,
-    RuntimeDwordTripleLaneRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapDwordTripleLaneRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x0084BF00 (FUN_0084BF00)
-   *
-   * What it does:
-   * Alias lane of dword-triple swap behavior.
-   */
-  [[maybe_unused]] RuntimeDwordTripleLaneRecord* RuntimeSwapDwordTripleLaneRecordAliasB(
-    RuntimeDwordTripleLaneRecord* const lhs,
-    RuntimeDwordTripleLaneRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapDwordTripleLaneRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x0084C8A0 (FUN_0084C8A0)
-   *
-   * What it does:
-   * Stores one dword lane at record offset `+0x28` and returns the owner.
-   */
-  [[maybe_unused]] RuntimeDwordAtOffset40Record* RuntimeStoreDwordAtOffset40(
-    RuntimeDwordAtOffset40Record* const record,
-    const std::uint32_t value
-  ) noexcept
-  {
-    record->lane28 = value;
-    return record;
-  }
 
-  /**
-   * Address: 0x0084E1E0 (FUN_0084E1E0)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x20,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity32FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x20);
-  }
 
-  /**
-   * Address: 0x0084E300 (FUN_0084E300)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasB(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
   struct RuntimeFloatAtOffset444Record
   {
@@ -31919,428 +23581,35 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return lhs;
   }
 
-  /**
-   * Address: 0x0084E3A0 (FUN_0084E3A0)
-   *
-   * What it does:
-   * Alias lane of self-relative inline pointer-window init with capacity
-   * offset `+0x18`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity24FromSelfAliasB(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowCapacity24FromSelf(state);
-  }
 
-  /**
-   * Address: 0x0084E6A0 (FUN_0084E6A0)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from base address with
-   * capacity lane at `base + 0x10`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity16FromBaseAddress(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::uint32_t baseAddress
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromBaseAddress(state, baseAddress, 0x10);
-  }
 
-  /**
-   * Address: 0x0084E850 (FUN_0084E850)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from base address with
-   * capacity lane at `base + 0x08`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity8FromBaseAddress(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::uint32_t baseAddress
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromBaseAddress(state, baseAddress, 0x08);
-  }
 
-  /**
-   * Address: 0x0084ED60 (FUN_0084ED60)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasM(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0084F170 (FUN_0084F170)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasN(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0084F430 (FUN_0084F430)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAR(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0084F440 (FUN_0084F440)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasC(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x0084F680 (FUN_0084F680)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAS(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0084F6A0 (FUN_0084F6A0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAT(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0084F6D0 (FUN_0084F6D0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasO(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0084F710 (FUN_0084F710)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAU(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00850270 (FUN_00850270)
-   *
-   * What it does:
-   * Swaps tail lanes `+0x04/+0x08/+0x0C` of two dword-quad records.
-   */
-  [[maybe_unused]] RuntimeDwordQuadRecord* RuntimeSwapDwordQuadTailLanesAliasA(
-    RuntimeDwordQuadRecord* const lhs,
-    RuntimeDwordQuadRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapDwordQuadTailLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00850440 (FUN_00850440)
-   *
-   * What it does:
-   * Alias lane of dword-quad tail-lane swap behavior.
-   */
-  [[maybe_unused]] RuntimeDwordQuadRecord* RuntimeSwapDwordQuadTailLanesAliasB(
-    RuntimeDwordQuadRecord* const lhs,
-    RuntimeDwordQuadRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapDwordQuadTailLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00850540 (FUN_00850540)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasF(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00851310 (FUN_00851310)
-   *
-   * What it does:
-   * Alias lane of dword move-and-zero-source behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeMoveDwordLaneAndZeroSourceAliasA(
-    std::uint32_t* const destination,
-    std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeMoveDwordLaneAndZeroSource(destination, source);
-  }
 
-  /**
-   * Address: 0x00851430 (FUN_00851430)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAV(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00851540 (FUN_00851540)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAW(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00852650 (FUN_00852650)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 12)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordStride12OffsetFromBaseLaneAliasB(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordStride12OffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x00852990 (FUN_00852990)
-   *
-   * What it does:
-   * Returns one float lane stored at record offset `+0x1BC`.
-   */
-  [[maybe_unused]] float RuntimeLoadFloatAtOffset444(
-    const RuntimeFloatAtOffset444Record* const record
-  ) noexcept
-  {
-    return record->lane1BC;
-  }
 
-  /**
-   * Address: 0x008529A0 (FUN_008529A0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0xCB8`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset3256(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset3256Owner* const owner
-  ) noexcept
-  {
-    *outLane = *owner->pointerCB8;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x008529B0 (FUN_008529B0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0xCB8`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset3256(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset3256Record* const owner
-  ) noexcept
-  {
-    *outLane = owner->laneCB8;
-    return outLane;
-  }
 
-  /**
-   * Address: 0x00855010 (FUN_00855010)
-   *
-   * What it does:
-   * Returns one stride-8 vector element count from `{begin,end}` lanes; yields
-   * zero when `begin` is null.
-   */
-  [[maybe_unused]] int RuntimeStride8VectorSize(
-    const RuntimeStride8VectorSpanRecord* const vector
-  ) noexcept
-  {
-    if (vector->begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>((vector->end - vector->begin) >> 3);
-  }
 
-  /**
-   * Address: 0x00855240 (FUN_00855240)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasH(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00855250 (FUN_00855250)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasP(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00855380 (FUN_00855380)
-   *
-   * What it does:
-   * Swaps two dword lanes at offsets `+0x04` and `+0x08` between records.
-   */
-  [[maybe_unused]] RuntimeDwordLanesOffset04And08Record* RuntimeSwapDwordLanesOffset04And08AliasA(
-    RuntimeDwordLanesOffset04And08Record* const lhs,
-    RuntimeDwordLanesOffset04And08Record* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapDwordLanesOffset04And08(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x008553E0 (FUN_008553E0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasI(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x008553F0 (FUN_008553F0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasQ(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00855430 (FUN_00855430)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasC(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
-  /**
-   * Address: 0x00855440 (FUN_00855440)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneU(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x008554B0 (FUN_008554B0)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasR(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
   struct RuntimeDwordAtOffset1060Record
   {
@@ -32403,448 +23672,35 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return outLane;
   }
 
-  /**
-   * Address: 0x0085F6F0 (FUN_0085F6F0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAX(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0085F7F0 (FUN_0085F7F0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAY(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00860D80 (FUN_00860D80)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0xC10,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity3072FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0xC10);
-  }
 
-  /**
-   * Address: 0x00861360 (FUN_00861360)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x1010,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity4096FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x1010);
-  }
 
-  /**
-   * Address: 0x008613F0 (FUN_008613F0)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x50,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity64FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x50);
-  }
 
-  /**
-   * Address: 0x008617F0 (FUN_008617F0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneAZ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00861CE0 (FUN_00861CE0)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneV(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x00861D00 (FUN_00861D00)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBA(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x00861ED0 (FUN_00861ED0)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneW(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x00861EF0 (FUN_00861EF0)
-   *
-   * What it does:
-   * Alias lane of `{dword,byte}` record initialization from source slots.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeInitDwordAndByteRecordAliasC(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeStoreDwordAndByteRecord(outRecord, dwordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x00862A70 (FUN_00862A70)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x424`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset1060(
-    const RuntimeDwordAtOffset1060Record* const record
-  ) noexcept
-  {
-    return record->lane424;
-  }
 
-  /**
-   * Address: 0x00863590 (FUN_00863590)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x210,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity512FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x210);
-  }
 
-  /**
-   * Address: 0x008635E0 (FUN_008635E0)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x90,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity128FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x90);
-  }
 
-  /**
-   * Address: 0x00863630 (FUN_00863630)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x510,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity1280FromSelfAliasA(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x510);
-  }
 
-  /**
-   * Address: 0x00863680 (FUN_00863680)
-   *
-   * What it does:
-   * Stores one dword lane as `base + (index * 20)` from source base lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordStride20OffsetFromBaseLaneAliasA(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordStride20OffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x00863690 (FUN_00863690)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from base address with
-   * capacity lane at `base + 0x500` (1280 bytes).
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity1280FromBaseAddress(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::uint32_t baseAddress
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromBaseAddress(state, baseAddress, 0x500);
-  }
 
-  /**
-   * Address: 0x00863710 (FUN_00863710)
-   *
-   * What it does:
-   * Returns one byte lane stored at record offset `+0x4D4`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteAtOffset1236(
-    const RuntimeByteAtOffset1236Record* const record
-  ) noexcept
-  {
-    return record->lane4D4;
-  }
 
-  /**
-   * Address: 0x00863720 (FUN_00863720)
-   *
-   * What it does:
-   * Stores one dword lane at record offset `+0x20` and returns the owner.
-   */
-  [[maybe_unused]] RuntimeDwordAtOffset32Record* RuntimeStoreDwordAtOffset32(
-    RuntimeDwordAtOffset32Record* const record,
-    const std::uint32_t value
-  ) noexcept
-  {
-    record->lane20 = value;
-    return record;
-  }
 
-  /**
-   * Address: 0x00864F50 (FUN_00864F50)
-   *
-   * What it does:
-   * Builds one 4-float min/max lane pack from source lanes
-   * `{+0x10,+0x14,+0x28,+0x2C}` with legacy compare-order semantics.
-   */
-  [[maybe_unused]] RuntimeFloatQuadLaneRecord* RuntimeBuildFloatMinMaxLanePack(
-    RuntimeFloatQuadLaneRecord* const destination,
-    const RuntimeFloatMinMaxSource12* const source
-  ) noexcept
-  {
-    const float lane10 = source->lane10;
 
-    destination->lane00 = 0.0f;
-    destination->lane04 = 0.0f;
-    destination->lane08 = 0.0f;
-    destination->lane0C = 0.0f;
 
-    float lane04 = source->lane04;
-    destination->lane00 = (lane10 <= lane04) ? lane10 : source->lane04;
-    if (lane10 > lane04) {
-      lane04 = lane10;
-    }
-    destination->lane08 = lane04;
 
-    const float lane11 = source->lane11;
-    float lane05 = source->lane05;
-    destination->lane04 = (lane11 <= lane05) ? lane11 : source->lane05;
-    if (lane11 > lane05) {
-      lane05 = lane11;
-    }
-    destination->lane0C = lane05;
 
-    return destination;
-  }
 
-  /**
-   * Address: 0x00867900 (FUN_00867900)
-   *
-   * What it does:
-   * Stores one dword lane as `owner.offset04 + (index * 12)`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordStride12OffsetFromOwnerOffset04(
-    std::uint32_t* const outLane,
-    const int index,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    *outLane = owner->lane04 + static_cast<std::uint32_t>(12 * index);
-    return outLane;
-  }
 
-  /**
-   * Address: 0x00867910 (FUN_00867910)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x60,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity80FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x60);
-  }
 
-  /**
-   * Address: 0x008679B0 (FUN_008679B0)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasD(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
-  /**
-   * Address: 0x00867AA0 (FUN_00867AA0)
-   *
-   * What it does:
-   * Alias lane of intrusive unlink/self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAliasC(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
-  /**
-   * Address: 0x00867F90 (FUN_00867F90)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasS(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x00868520 (FUN_00868520)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 12)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordStride12OffsetFromBaseLaneAliasC(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordStride12OffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x008685B0 (FUN_008685B0)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasA(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
-
-  /**
-   * Address: 0x008685C0 (FUN_008685C0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBB(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
-
-  /**
-   * Address: 0x00868620 (FUN_00868620)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBC(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
-
-  /**
-   * Address: 0x00869A10 (FUN_00869A10)
-   *
-   * What it does:
-   * Alias lane of intrusive self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeSelfLinkIntrusiveNodeAliasA(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeSelfLinkIntrusiveNode(node);
-  }
-
-  /**
-   * Address: 0x00869A20 (FUN_00869A20)
-   *
-   * What it does:
-   * Alias lane of intrusive unlink/self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAliasD(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
   struct RuntimeFloatAtOffset1120Record
   {
@@ -32928,224 +23784,21 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeEmbeddedIntrusiveNodeOwnerOffset04::node offset must be 0x04"
   );
 
-  /**
-   * Address: 0x00869B70 (FUN_00869B70)
-   *
-   * What it does:
-   * Alias lane of intrusive unlink/self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAliasE(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
-  /**
-   * Address: 0x00869D00 (FUN_00869D00)
-   *
-   * What it does:
-   * Reads one dword lane directly from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFieldOffset04AliasT(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0086A000 (FUN_0086A000)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBD(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0086A010 (FUN_0086A010)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasD(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x0086A050 (FUN_0086A050)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBE(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0086DA50 (FUN_0086DA50)
-   *
-   * What it does:
-   * Returns one float lane stored at record offset `+0x460`.
-   */
-  [[maybe_unused]] float RuntimeLoadFloatAtOffset1120(
-    const RuntimeFloatAtOffset1120Record* const record
-  ) noexcept
-  {
-    return record->lane460;
-  }
 
-  /**
-   * Address: 0x0086DAB0 (FUN_0086DAB0)
-   *
-   * What it does:
-   * Alias lane of loading one byte flag at offset `+0x10`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset16AliasA(
-    const RuntimeByteFlagAtOffset16Record* const record
-  ) noexcept
-  {
-    return RuntimeLoadByteFlagAtOffset16(record);
-  }
 
-  /**
-   * Address: 0x0086DBB0 (FUN_0086DBB0)
-   *
-   * What it does:
-   * Returns one byte lane stored at record offset `+0x274`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteAtOffset628(
-    const RuntimeByteAtOffset628Record* const record
-  ) noexcept
-  {
-    return record->lane274;
-  }
 
-  /**
-   * Address: 0x0086DBE0 (FUN_0086DBE0)
-   *
-   * What it does:
-   * Returns one dword lane stored at record offset `+0x138`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeLoadDwordAtOffset312(
-    const RuntimeDwordAtOffset312Record* const record
-  ) noexcept
-  {
-    return record->lane138;
-  }
 
-  /**
-   * Address: 0x0086DBF0 (FUN_0086DBF0)
-   *
-   * What it does:
-   * Stores one byte lane at record offset `+0x2A4` and returns the owner.
-   */
-  [[maybe_unused]] RuntimeByteAtOffset676Record* RuntimeStoreByteAtOffset676(
-    RuntimeByteAtOffset676Record* const record,
-    const std::uint8_t value
-  ) noexcept
-  {
-    record->lane2A4 = value;
-    return record;
-  }
 
-  /**
-   * Address: 0x0086DC70 (FUN_0086DC70)
-   *
-   * What it does:
-   * Stores one byte lane at record offset `+0x136` and returns the owner.
-   */
-  [[maybe_unused]] RuntimeByteAtOffset310Record* RuntimeStoreByteAtOffset310(
-    RuntimeByteAtOffset310Record* const record,
-    const std::uint8_t value
-  ) noexcept
-  {
-    record->lane136 = value;
-    return record;
-  }
 
-  /**
-   * Address: 0x0086DC80 (FUN_0086DC80)
-   *
-   * What it does:
-   * Returns one byte lane stored at record offset `+0x136`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteAtOffset310(
-    const RuntimeByteAtOffset310Record* const record
-  ) noexcept
-  {
-    return record->lane136;
-  }
 
-  /**
-   * Address: 0x00873730 (FUN_00873730)
-   *
-   * What it does:
-   * Assigns one releasable pointer lane and releases the previous pointer when
-   * it is non-null.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeAssignReleasablePointerAndReleasePreviousAliasA(
-    RuntimeReleasableObject** const slot,
-    RuntimeReleasableObject* const value
-  ) noexcept
-  {
-    return RuntimeAssignReleasablePointerAndReleasePrevious(slot, value);
-  }
 
-  /**
-   * Address: 0x00873770 (FUN_00873770)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasE(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
-  /**
-   * Address: 0x008737D0 (FUN_008737D0)
-   *
-   * What it does:
-   * Returns true when one dword lane is zero.
-   */
-  [[maybe_unused]] bool RuntimeIsDwordLaneZeroBool(
-    const std::uint32_t* const lane
-  ) noexcept
-  {
-    return *lane == 0u;
-  }
 
-  /**
-   * Address: 0x008737E0 (FUN_008737E0)
-   *
-   * What it does:
-   * Alias lane of zeroing a dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecordAliasF(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    return RuntimeZeroPointerPairRecord(record);
-  }
 
   /**
    * Address: 0x00873860 (FUN_00873860)
@@ -33161,197 +23814,18 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return (pointerValue != 0u) ? (pointerValue - 4u) : 0u;
   }
 
-  /**
-   * Address: 0x00873870 (FUN_00873870)
-   *
-   * What it does:
-   * Alias lane of pointer-minus-4-when-non-null behavior.
-   */
-  [[maybe_unused]] std::uintptr_t RuntimePointerMinus4WhenNonNullAliasB(
-    const std::uintptr_t* const pointerLane
-  ) noexcept
-  {
-    return RuntimePointerMinus4WhenNonNullAliasA(pointerLane);
-  }
 
-  /**
-   * Address: 0x00873910 (FUN_00873910)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasG(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00873920 (FUN_00873920)
-   *
-   * What it does:
-   * Alias lane of dword-pair swap behavior.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecordAliasG(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    return RuntimeSwapPointerPairRecord(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00873940 (FUN_00873940)
-   *
-   * What it does:
-   * Adds one dword-pair source lane into destination lane in place.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeAccumulatePointerPairRecord(
-    RuntimePointerPairRecord* const destination,
-    const RuntimePointerPairRecord* const source
-  ) noexcept
-  {
-    destination->lane00 += source->lane00;
-    destination->lane04 += source->lane04;
-    return destination;
-  }
 
-  /**
-   * Address: 0x00873B40 (FUN_00873B40)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasH(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00873C10 (FUN_00873C10)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneX(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x00873C90 (FUN_00873C90)
-   *
-   * What it does:
-   * Returns true when one dword lane is non-zero.
-   */
-  [[maybe_unused]] bool RuntimeIsDwordLaneNonZeroBool(
-    const std::uint32_t* const lane
-  ) noexcept
-  {
-    return *lane != 0u;
-  }
 
-  /**
-   * Address: 0x00874AC0 (FUN_00874AC0)
-   *
-   * What it does:
-   * Releases second then first stdcall-owned objects via vtable slot `+0x08`
-   * and clears both lanes to null.
-   */
-  [[maybe_unused]] int RuntimeReleaseStdcallPairAndClear(
-    RuntimeStdcallReleasePair* const pair
-  )
-  {
-    RuntimeStdcallReleaseObject* const second = pair->second;
-    if (second != nullptr) {
-      second->vtable->releaseSlot2(second);
-      pair->second = nullptr;
-    }
 
-    RuntimeStdcallReleaseObject* const first = pair->first;
-    int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(first));
-    if (first != nullptr) {
-      result = first->vtable->releaseSlot2(first);
-      pair->first = nullptr;
-    }
 
-    return result;
-  }
 
-  /**
-   * Address: 0x008751F0 (FUN_008751F0)
-   *
-   * What it does:
-   * Unlinks one embedded intrusive node at owner offset `+0x04` and then
-   * self-links the node.
-   */
-  [[maybe_unused]] RuntimeEmbeddedIntrusiveNodeOwnerOffset04* RuntimeUnlinkAndSelfLinkEmbeddedNodeOffset04(
-    RuntimeEmbeddedIntrusiveNodeOwnerOffset04* const owner
-  ) noexcept
-  {
-    (void)RuntimeUnlinkAndSelfLinkNode(&owner->node);
-    return owner;
-  }
 
-  /**
-   * Address: 0x00875270 (FUN_00875270)
-   *
-   * What it does:
-   * Alias lane of dword move-and-zero-source behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeMoveDwordLaneAndZeroSourceAliasB(
-    std::uint32_t* const destination,
-    std::uint32_t* const source
-  ) noexcept
-  {
-    return RuntimeMoveDwordLaneAndZeroSource(destination, source);
-  }
 
-  /**
-   * Address: 0x00875360 (FUN_00875360)
-   *
-   * What it does:
-   * Computes linear interpolation between two dword lanes and truncates to int.
-   */
-  [[maybe_unused]] int RuntimeLerpDwordLanesToInt(
-    const std::uint32_t* const rangeStartEnd,
-    const std::uint32_t* const rangeEndSource,
-    const float factor
-  ) noexcept
-  {
-    const float start = static_cast<float>(rangeStartEnd[0]);
-    const float end = static_cast<float>(rangeEndSource[0]);
-    return static_cast<int>(((end - start) * factor) + start);
-  }
-
-  /**
-   * Address: 0x00875380 (FUN_00875380)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBF(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
-
-  /**
-   * Address: 0x00875390 (FUN_00875390)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBG(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
   struct RuntimeDispatchSlot24Object;
   using RuntimeDispatchSlot24Fn = void(__thiscall*)(
@@ -33381,483 +23855,31 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDispatchSlot24VTable* vtable = nullptr; // +0x00
   };
 
-  /**
-   * Address: 0x0087A770 (FUN_0087A770)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasB(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087A780 (FUN_0087A780)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBH(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087A7B0 (FUN_0087A7B0)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasC(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087A7C0 (FUN_0087A7C0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBI(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087A7E0 (FUN_0087A7E0)
-   *
-   * What it does:
-   * Dispatches through vtable slot `+0x18` and returns the forwarded `a2`
-   * lane.
-   */
-  [[maybe_unused]] int RuntimeDispatchSlot24AndReturnFirstArg(
-    RuntimeDispatchSlot24Object* const object,
-    const int a2,
-    const int a3,
-    const int a4,
-    const int a5,
-    const int a6,
-    const int a7,
-    const int a8
-  )
-  {
-    object->vtable->slot24(object, a2, a3, a4, a5, a6, a7, a8);
-    return a2;
-  }
 
-  /**
-   * Address: 0x0087AB50 (FUN_0087AB50)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasJ(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0087B4D0 (FUN_0087B4D0)
-   *
-   * What it does:
-   * Reads one dword through pointer field lane at owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04AliasK(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    return RuntimeLoadDwordFromPointerFieldOffset04(outLane, owner);
-  }
 
-  /**
-   * Address: 0x0087BE10 (FUN_0087BE10)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasE(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x0087BE20 (FUN_0087BE20)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBJ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087C0D0 (FUN_0087C0D0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBK(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087C0F0 (FUN_0087C0F0)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasF(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x0087C110 (FUN_0087C110)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBL(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087C120 (FUN_0087C120)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneY(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0087C170 (FUN_0087C170)
-   *
-   * What it does:
-   * Alias lane of `base + (index * 4)` dword offset store behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLaneAliasG(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    return RuntimeStoreDwordOffsetFromBaseLane(outLane, baseLane, index);
-  }
 
-  /**
-   * Address: 0x0087C190 (FUN_0087C190)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeStoreDwordLaneBM(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, value);
-  }
 
-  /**
-   * Address: 0x0087C1B0 (FUN_0087C1B0)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneZ(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0087C1F0 (FUN_0087C1F0)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasD(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087C200 (FUN_0087C200)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasE(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087CA90 (FUN_0087CA90)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneAA(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0087CAE0 (FUN_0087CAE0)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeZeroDwordLaneAB(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneLocal(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0087CB10 (FUN_0087CB10)
-   *
-   * What it does:
-   * Alias lane of `{dword,byte}` record initialization from source slots.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeInitDwordAndByteRecordAliasD(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeStoreDwordAndByteRecord(outRecord, dwordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x0087CB20 (FUN_0087CB20)
-   *
-   * What it does:
-   * Alias lane of `{dword,byte}` record initialization from source slots.
-   */
-  [[maybe_unused]] RuntimeDwordAndByteRecord* RuntimeInitDwordAndByteRecordAliasE(
-    RuntimeDwordAndByteRecord* const outRecord,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeStoreDwordAndByteRecord(outRecord, dwordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x0087E180 (FUN_0087E180)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasF(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087E190 (FUN_0087E190)
-   *
-   * What it does:
-   * Alias lane of dword-pair initialization from two source lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSourcesAliasG(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeInitPointerPairFromTwoDwordSources(outRecord, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0087E580 (FUN_0087E580)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasI(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x0087E840 (FUN_0087E840)
-   *
-   * What it does:
-   * Alias lane of one-dword swap behavior.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanesAliasJ(int* const lhs, int* const rhs) noexcept
-  {
-    return RuntimeSwapDwordLanes(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0087E920 (FUN_0087E920)
-   *
-   * What it does:
-   * Writes one repeated source dword into `count` consecutive destination
-   * lanes and returns zero.
-   */
-  [[maybe_unused]] int RuntimeFillDwordLanesFromSingleSourceReturnZeroAliasA(
-    int count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* destination
-  ) noexcept
-  {
-    while (count != 0) {
-      *destination++ = *sourceWord;
-      --count;
-    }
-    return count;
-  }
-
-  /**
-   * Address: 0x0087E940 (FUN_0087E940)
-   *
-   * What it does:
-   * Alias lane of repeated-source dword fill returning zero.
-   */
-  [[maybe_unused]] int RuntimeFillDwordLanesFromSingleSourceReturnZeroAliasB(
-    int count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* destination
-  ) noexcept
-  {
-    return RuntimeFillDwordLanesFromSingleSourceReturnZeroAliasA(count, sourceWord, destination);
-  }
-
-  /**
-   * Address: 0x0087E960 (FUN_0087E960)
-   *
-   * What it does:
-   * Alias lane of repeated-source dword fill returning zero.
-   */
-  [[maybe_unused]] int RuntimeFillDwordLanesFromSingleSourceReturnZeroAliasC(
-    int count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* destination
-  ) noexcept
-  {
-    return RuntimeFillDwordLanesFromSingleSourceReturnZeroAliasA(count, sourceWord, destination);
-  }
-
-  /**
-   * Address: 0x0087EA00 (FUN_0087EA00)
-   *
-   * What it does:
-   * Backward-copies one float-address span `[beginAddress,endAddress)` into
-   * destination tail and writes resulting begin pointer.
-   */
-  [[maybe_unused]] float** RuntimeCopyFloatAddressSpanBackwardToTail(
-    float** const outBegin,
-    const std::uintptr_t beginAddress,
-    std::uintptr_t endAddress,
-    float* destinationTail
-  ) noexcept
-  {
-    if (beginAddress == endAddress) {
-      *outBegin = destinationTail;
-      return outBegin;
-    }
-
-    float* write = destinationTail;
-    do {
-      const float value = *reinterpret_cast<const float*>(endAddress - sizeof(float));
-      endAddress -= sizeof(float);
-      *--write = value;
-    } while (endAddress != beginAddress);
-
-    *outBegin = write;
-    return outBegin;
-  }
-
-  /**
-   * Address: 0x007BC5C0 (FUN_007BC5C0)
-   *
-   * What it does:
-   * Builds one weak-handle lane from one shared-handle lane by copying object
-   * and control pointers, then retaining the control's weak refcount lane.
-   */
-  RuntimeWeakObjectPtrLane* RuntimeWeakFromSharedObjectPtr(
-    RuntimeWeakObjectPtrLane* const destination,
-    const RuntimeSharedObjectPtrLane* const source
-  ) noexcept
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->object = source != nullptr ? source->object : nullptr;
-    destination->control = source != nullptr ? source->control : nullptr;
-    if (destination->control != nullptr) {
-      (void)::InterlockedExchangeAdd(&destination->control->weakRefs, 1);
-    }
-
-    return destination;
-  }
 
   struct RuntimeShadowTraversalProviderView
   {
@@ -33869,30 +23891,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeShadowTraversalProviderView::provider offset must be 0x2E0"
   );
 
-  /**
-   * Address: 0x007DB350 (FUN_007DB350)
-   *
-   * What it does:
-   * Copies one shared-handle lane from shadow runtime storage (`+0x2E0`) and
-   * retains the shared refcount lane.
-   */
-  RuntimeSharedObjectPtrLane* RuntimeCopyShadowTraversalProviderHandle(
-    RuntimeSharedObjectPtrLane* const destination,
-    const RuntimeShadowTraversalProviderView* const shadow
-  ) noexcept
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->object = (shadow != nullptr) ? shadow->provider.object : nullptr;
-    destination->control = (shadow != nullptr) ? shadow->provider.control : nullptr;
-    if (destination->control != nullptr) {
-      (void)::InterlockedExchangeAdd(&destination->control->sharedRefs, 1);
-    }
-
-    return destination;
-  }
 
   struct RuntimeControlTreeNode28
   {
@@ -33973,6 +23971,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeTreeNodeWithPrefixedString48* parent = nullptr; // +0x04
     RuntimeTreeNodeWithPrefixedString48* right = nullptr;  // +0x08
     RuntimePrefixDwordAndString payload{};                 // +0x0C
+    std::uint32_t lane28 = 0;                              // +0x28
     std::uint8_t color = 0;                                // +0x2C
     std::uint8_t isNil = 0;                                // +0x2D
     std::uint8_t marker2E = 0;                             // +0x2E
@@ -34088,38 +24087,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     stringStorage->storage.inlineBuffer[0] = '\0';
   }
 
-  /**
-   * Address: 0x007AFA40 (FUN_007AFA40)
-   *
-   * What it does:
-   * Allocates one 16-byte linked-node lane, writes two dword payload values,
-   * and splices the node-link ownership lane through the caller-provided slot.
-   */
-  [[nodiscard]] RuntimeLinkedSlotNode16* RuntimeBuildLinkedSlotNodeLaneA(
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    std::uintptr_t** const slotOwnerStorage
-  )
-  {
-    auto* const node = static_cast<RuntimeLinkedSlotNode16*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->lane0 = lane0;
-    node->lane1 = lane1;
-
-    std::uintptr_t* const slotOwner = *slotOwnerStorage;
-    node->slotOwner = reinterpret_cast<std::uintptr_t>(slotOwner);
-    if (slotOwner == nullptr) {
-      node->nextLink = 0u;
-      return node;
-    }
-
-    node->nextLink = *slotOwner;
-    *slotOwner = reinterpret_cast<std::uintptr_t>(&node->slotOwner);
-    return node;
-  }
 
   /**
    * Address: 0x007B4410 (FUN_007B4410)
@@ -34145,77 +24112,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDestroyRbTreePostorderCommon(root);
   }
 
-  /**
-   * Address: 0x004E45E0 (FUN_004E45E0)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose nil-marker byte lives at
-   * offset `+0x15`.
-   */
-  void RuntimeDestroyRbTreeNil21LaneA(RuntimeTreeNode20* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
-  /**
-   * Address: 0x004E4690 (FUN_004E4690)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose nil-marker byte lives at
-   * offset `+0x15`.
-   */
-  void RuntimeDestroyRbTreeNil21LaneB(RuntimeTreeNode20* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
-  /**
-   * Address: 0x004E9AB0 (FUN_004E9AB0)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose nil-marker byte lives at
-   * offset `+0x15`.
-   */
-  void RuntimeDestroyRbTreeNil21LaneC(RuntimeTreeNode20* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
-  /**
-   * Address: 0x00505EC0 (FUN_00505EC0)
-   *
-   * What it does:
-   * Recursively clears one 56-byte RB-tree lane whose nil marker byte is at
-   * offset `+0x35`.
-   */
-  void RuntimeDestroyRbTreeNil53LaneA(RuntimeTreeNode56Color53* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
-  /**
-   * Address: 0x00505FC0 (FUN_00505FC0)
-   *
-   * What it does:
-   * Initializes one 56-byte RB-tree node lane from caller link lanes and a
-   * 40-byte payload block, then clears `{color,isNil}` marker bytes.
-   */
-  [[nodiscard]] RuntimeTreeNode56Color53* RuntimeInitializeRbTreeNode56Color53LaneA(
-    RuntimeTreeNode56Color53* const node,
-    RuntimeTreeNode56Color53* const parent,
-    RuntimeTreeNode56Color53* const left,
-    RuntimeTreeNode56Color53* const right,
-    const void* const payloadSource
-  ) noexcept
-  {
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    std::memcpy(node->payload, payloadSource, sizeof(node->payload));
-    node->color = 0u;
-    node->isNil = 0u;
-    return node;
-  }
 
   /**
    * Address: 0x007CAB70 (FUN_007CAB70)
@@ -34253,86 +24153,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode16Color13>(gpg::core::legacy::AllocateChecked16ByteLane);
   }
 
-  /**
-   * Address: 0x007D4300 (FUN_007D4300)
-   *
-   * What it does:
-   * Allocates one 48-byte sentinel lane and self-links the first two pointer
-   * lanes for intrusive-list head initialization.
-   */
-  [[nodiscard]] RuntimeSelfLinkedSentinelNode48* RuntimeAllocateSelfLinkedSentinelNode48LaneA()
-  {
-    auto* const node = static_cast<RuntimeSelfLinkedSentinelNode48*>(gpg::core::legacy::AllocateChecked48ByteLane(1u));
-    if (node != nullptr) {
-      node->next = node;
-      node->prev = node;
-    }
-    return node;
-  }
 
-  /**
-   * Address: 0x007E4770 (FUN_007E4770)
-   *
-   * What it does:
-   * Allocates one 40-byte red-black tree node lane and zero-initializes tree
-   * links before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode40Color36* RuntimeAllocateRbHeadNode40LaneA()
-  {
-    auto* const node = static_cast<RuntimeRbHeadNode40Color36*>(RuntimeAllocateArrayWithBadAllocLane053(1u));
 
-    if (node != nullptr) {
-      node->left = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode40Color36*>(-4)) {
-      node->parent = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode40Color36*>(-8)) {
-      node->right = nullptr;
-    }
 
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x007E4B80 (FUN_007E4B80)
-   *
-   * What it does:
-   * Allocates one 48-byte red-black tree head lane and initializes link and
-   * marker bytes for empty mesh-bucket tree state.
-   */
-  [[nodiscard]] RuntimeRbHeadNode48Color44* RuntimeAllocateRbHeadNode48LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode48Color44>(
-      [](const unsigned int count) { return RuntimeAllocateArrayWithBadAllocCommon(count, 48u); }
-    );
-  }
-
-  /**
-   * Address: 0x007F26D0 (FUN_007F26D0)
-   *
-   * What it does:
-   * Allocates one 192-byte red-black tree head lane and initializes link and
-   * marker bytes for an empty high-payload tree node.
-   */
-  [[nodiscard]] RuntimeRbHeadNode192Color184* RuntimeAllocateRbHeadNode192LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode192Color184>(RuntimeAllocateArrayWithBadAllocLane056);
-  }
-
-  /**
-   * Address: 0x007F2BB0 (FUN_007F2BB0)
-   *
-   * What it does:
-   * Allocates one 48-byte red-black tree head lane and initializes link and
-   * marker bytes for empty extractor-map tree state.
-   */
-  [[nodiscard]] RuntimeRbHeadNode48Color44* RuntimeAllocateRbHeadNode48LaneB()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode48Color44>(gpg::core::legacy::AllocateChecked48ByteLane);
-  }
 
   /**
    * Address: 0x0082FB10 (FUN_0082FB10)
@@ -34382,41 +24206,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return record;
   }
 
-  /**
-   * Address: 0x0083C110 (FUN_0083C110)
-   *
-   * What it does:
-   * Allocates one 48-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode48Color44* RuntimeAllocateRbHeadNode48LaneC()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode48Color44>(gpg::core::legacy::AllocateChecked48ByteLane);
-  }
 
-  /**
-   * Address: 0x0083C220 (FUN_0083C220)
-   *
-   * What it does:
-   * Allocates one 24-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode24Color20* RuntimeAllocateRbHeadNode24LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode24Color20>(RuntimeAllocateArrayWithBadAllocLane063);
-  }
 
-  /**
-   * Address: 0x00849C30 (FUN_00849C30)
-   *
-   * What it does:
-   * Allocates one 60-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode60Color56* RuntimeAllocateRbHeadNode60LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode60Color56>(RuntimeAllocateArrayWithBadAllocLane064);
-  }
 
   /**
    * Address: 0x00856F30 (FUN_00856F30)
@@ -34440,66 +24231,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     } while (root->isNil == 0u);
   }
 
-  /**
-   * Address: 0x00861DC0 (FUN_00861DC0)
-   *
-   * What it does:
-   * Allocates one 3152-byte red-black tree head lane and zeros tree links
-   * before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode3152Color3144* RuntimeAllocateRbHeadNode3152LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode3152Color3144>(RuntimeAllocateArrayWithBadAllocLane068);
-  }
 
-  /**
-   * Address: 0x0087C3B0 (FUN_0087C3B0)
-   *
-   * What it does:
-   * Allocates one 24-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode24Color20* RuntimeAllocateRbHeadNode24LaneB()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode24Color20>(RuntimeAllocateArrayWithBadAllocLane070);
-  }
 
-  /**
-   * Address: 0x0087C5F0 (FUN_0087C5F0)
-   *
-   * What it does:
-   * Allocates one 24-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode24Color20* RuntimeAllocateRbHeadNode24LaneC()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode24Color20>(RuntimeAllocateArrayWithBadAllocLane071);
-  }
 
-  /**
-   * Address: 0x0087C990 (FUN_0087C990)
-   *
-   * What it does:
-   * Allocates one 20-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode20Color16* RuntimeAllocateRbHeadNode20LaneB()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode20Color16>(RuntimeAllocateArrayWithBadAllocLane069);
-  }
 
-  /**
-   * Address: 0x008846B0 (FUN_008846B0)
-   *
-   * What it does:
-   * Clears one legacy VC8 string lane at owner offset `+0x04`, releasing heap
-   * storage when capacity is dynamic and restoring inline-empty state.
-   */
-  int RuntimeResetPrefixedLegacyStringLaneA(RuntimePrefixDwordAndString* const owner)
-  {
-    RuntimeResetLegacyStringStorage(&owner->text);
-    return 0;
-  }
 
   /**
    * Runtime owner lane where legacy string storage starts at `+0x10`.
@@ -34535,20 +24270,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return 0;
   }
 
-  /**
-   * Address: 0x007BF260 (FUN_007BF260)
-   *
-   * What it does:
-   * Resets one prefixed legacy string payload at owner offset `+0x10` and
-   * returns the owner pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimePrefixedLegacyStringOwnerOffset10* RuntimeResetPrefixedLegacyStringLaneBReturnOwner(
-    RuntimePrefixedLegacyStringOwnerOffset10* const owner
-  )
-  {
-    (void)RuntimeResetPrefixedLegacyStringLaneB(owner);
-    return owner;
-  }
 
   /**
    * Address: 0x0089A820 (FUN_0089A820)
@@ -34582,6 +24303,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     std::string* begin = nullptr;                 // +0x28
     std::string* end = nullptr;                   // +0x2C
     std::string* capacityEnd = nullptr;           // +0x30
+    std::uint32_t lane34 = 0;                     // +0x34
     std::uint8_t color = 0;                       // +0x38
     std::uint8_t isNil = 0;                       // +0x39
     std::uint8_t pad3A[0x02]{};                   // +0x3A
@@ -34678,70 +24400,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode28Color24>(RuntimeAllocateArrayWithBadAllocLane047);
   }
 
-  /**
-   * Address: 0x007B2DB0 (FUN_007B2DB0)
-   *
-   * What it does:
-   * Initializes one `{head,size}` owner lane with a 32-byte red-black tree
-   * sentinel and returns the owner pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbTree32OwnerState* RuntimeInitializeRbTree32OwnerSentinelLaneA(
-    RuntimeRbTree32OwnerState* const owner
-  )
-  {
-    RuntimeRbHeadNode32Color28* const head = RuntimeAllocateRbHeadNode32LaneA();
-    return RuntimeInitializeRbOwnerHeadLinks(owner, head);
-  }
 
-/**
- * Address: 0x007B3090 (FUN_007B3090)
- * Address: 0x007B3C60 (FUN_007B3C60)
- *
- * What it does:
- * Initializes one `{head,size}` owner lane with a 28-byte red-black tree
- * sentinel and returns the owner pointer.
- */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbTree28OwnerState* RuntimeInitializeRbTree28OwnerSentinelLaneA(
-    RuntimeRbTree28OwnerState* const owner
-  )
-  {
-    RuntimeRbHeadNode28Color24* const head = RuntimeAllocateRbHeadNode28LaneA();
-    return RuntimeInitializeRbOwnerHeadLinks(owner, head);
-  }
 
-/**
- * Address: 0x007B34D0 (FUN_007B34D0)
- * Address: 0x007B3F30 (FUN_007B3F30)
- * Address: 0x007C89E0 (FUN_007C89E0)
- * Address: 0x007C9470 (FUN_007C9470)
- *
- * What it does:
- * Initializes one `{head,size}` owner lane with a 20-byte red-black tree
- * sentinel and returns the owner pointer.
- */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbTree20OwnerState* RuntimeInitializeRbTree20OwnerSentinelLaneA(
-    RuntimeRbTree20OwnerState* const owner
-  )
-  {
-    RuntimeRbHeadNode20Color16* const head = RuntimeAllocateRbHeadNode20LaneA();
-    return RuntimeInitializeRbOwnerHeadLinks(owner, head);
-  }
 
-  /**
-   * Address: 0x007B38E0 (FUN_007B38E0)
-   *
-   * What it does:
-   * Initializes one 32-byte red-black tree owner lane and returns the new head
-   * sentinel pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbHeadNode32Color28* RuntimeInitializeRbTree32OwnerAndReturnHeadLaneA(
-    RuntimeRbTree32OwnerState* const owner
-  )
-  {
-    RuntimeRbHeadNode32Color28* const head = RuntimeAllocateRbHeadNode32LaneA();
-    (void)RuntimeInitializeRbOwnerHeadLinks(owner, head);
-    return head;
-  }
 
   void RuntimeDestroyRbNode60StringArrayTree(RuntimeRbNode60StringArray* node) noexcept
   {
@@ -34812,119 +24473,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDestroyRbNode20Tree(root);
   }
 
-  /**
-   * Address: 0x007B4950 (FUN_007B4950)
-   * Address: 0x007C8B20 (FUN_007C8B20)
-   *
-   * What it does:
-   * Clears one `isNil@+0x11` red-black tree payload lane while preserving the
-   * head sentinel node and resetting owner size to zero.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbHeadNode20Color16* RuntimeClearRbTree20StorageKeepHeadLaneA(
-    RuntimeRbTree20OwnerState* const owner
-  ) noexcept
-  {
-    if (owner == nullptr || owner->head == nullptr) {
-      return nullptr;
-    }
 
-    RuntimeRbHeadNode20Color16* const head = owner->head;
-    RuntimeDestroyRbTreeLaneA(head->parent);
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
-    return head;
-  }
 
-  /**
-   * Address: 0x00848940 (FUN_00848940)
-   *
-   * What it does:
-   * Destroys one 60-byte RB-tree storage lane (including per-node string and
-   * string-array payload state), frees the tree head sentinel, and clears owner
-   * head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree60StringArrayStorageLaneA(
-    RuntimeRbTree60OwnerState* const owner
-  ) noexcept
-  {
-    RuntimeRbHeadNode60Color56* const head = owner->head;
-    RuntimeDestroyRbNode60StringArrayTree(
-      reinterpret_cast<RuntimeRbNode60StringArray*>(head->parent)
-    );
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
 
-    ::operator delete(static_cast<void*>(head));
-    owner->head = nullptr;
-    owner->size = 0u;
-    return 0;
-  }
 
-  /**
-   * Address: 0x00879190 (FUN_00879190)
-   *
-   * What it does:
-   * Destroys one 24-byte RB-tree storage lane, frees the tree head sentinel,
-   * and clears owner head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree24StorageLaneA(
-    RuntimeRbTree24OwnerState* const owner
-  ) noexcept
-  {
-    RuntimeRbHeadNode24Color20* const head = owner->head;
-    RuntimeDestroyRbNode24Tree(head->parent);
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
-
-    ::operator delete(static_cast<void*>(head));
-    owner->head = nullptr;
-    owner->size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x008794C0 (FUN_008794C0)
-   *
-   * What it does:
-   * Destroys one 24-byte RB-tree storage lane, frees the tree head sentinel,
-   * and clears owner head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree24StorageLaneB(
-    RuntimeRbTree24OwnerState* const owner
-  ) noexcept
-  {
-    RuntimeRbHeadNode24Color20* const head = owner->head;
-    RuntimeDestroyRbNode24Tree(head->parent);
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
-
-    ::operator delete(static_cast<void*>(head));
-    owner->head = nullptr;
-    owner->size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x008797D0 (FUN_008797D0)
-   *
-   * What it does:
-   * Destroys one 20-byte RB-tree storage lane, frees the tree head sentinel,
-   * and clears owner head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree20StorageLaneA(
-    RuntimeRbTree20OwnerState* const owner
-  ) noexcept
-  {
-    RuntimeRbHeadNode20Color16* const head = owner->head;
-    RuntimeDestroyRbNode20Tree(head->parent);
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
-
-    ::operator delete(static_cast<void*>(head));
-    owner->head = nullptr;
-    owner->size = 0u;
-    return 0;
-  }
 
   void RuntimeDestroyPrefixedStringTreeLaneCommon(RuntimeTreeNodeWithPrefixedString48* root)
   {
@@ -34941,101 +24493,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     } while (root->isNil == 0u);
   }
 
-  /**
-   * Address: 0x00531130 (FUN_00531130)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneA(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x005312E0 (FUN_005312E0)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneB(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x00531490 (FUN_00531490)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneC(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x00531640 (FUN_00531640)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneD(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x005317D0 (FUN_005317D0)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneE(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x00531960 (FUN_00531960)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane whose payload stores a prefixed legacy
-   * string at `+0x10`.
-   */
-  void RuntimeDestroyPrefixedStringTreeLaneF(RuntimeTreeNodeWithPrefixedString48* const root)
-  {
-    RuntimeDestroyPrefixedStringTreeLaneCommon(root);
-  }
 
-  /**
-   * Address: 0x0089AA60 (FUN_0089AA60)
-   *
-   * What it does:
-   * Allocates one 24-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode24Color20* RuntimeAllocateRbHeadNode24LaneD()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode24Color20>(RuntimeAllocateArrayWithBadAllocLane075);
-  }
 
-  /**
-   * Address: 0x008A9490 (FUN_008A9490)
-   *
-   * What it does:
-   * Allocates one 80-byte red-black tree head lane and zeros tree links before
-   * setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode80Color76* RuntimeAllocateRbHeadNode80LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode80Color76>(RuntimeAllocateArrayWithBadAllocLane076);
-  }
 
   /**
    * Address: 0x004CD320 (FUN_004CD320)
@@ -35050,33 +24514,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeResetLegacyStringStorage(&record->first);
   }
 
-  /**
-   * Address: 0x008AA070 (FUN_008AA070)
-   *
-   * What it does:
-   * Tail-forward thunk that aliases the canonical 56-byte dual-legacy-string
-   * record reset lane (`FUN_004CD320`).
-   */
-  [[maybe_unused]] void RuntimeResetDualLegacyStringRecord56LaneAThunkA(
-    RuntimeDualLegacyStringRecord56* const record
-  )
-  {
-    RuntimeResetDualLegacyStringRecord56LaneA(record);
-  }
 
-  /**
-   * Address: 0x008AA140 (FUN_008AA140)
-   *
-   * What it does:
-   * Tail-forward thunk that aliases the canonical 56-byte dual-legacy-string
-   * record reset lane (`FUN_004CD320`).
-   */
-  [[maybe_unused]] void RuntimeResetDualLegacyStringRecord56LaneAThunkB(
-    RuntimeDualLegacyStringRecord56* const record
-  )
-  {
-    RuntimeResetDualLegacyStringRecord56LaneA(record);
-  }
 
   /**
    * Address: 0x008A9F10 (FUN_008A9F10)
@@ -35137,78 +24575,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x0051B180 (FUN_0051B180)
-   *
-   * What it does:
-   * Tail-forward thunk that aliases the canonical seven-lane prefixed legacy
-   * string reset lane (`FUN_00519800`).
-   */
-  [[maybe_unused]] void RuntimeResetSevenPrefixedLegacyStringLanesThunkA(
-    RuntimeSevenPrefixedLegacyStringBlock* const block
-  )
-  {
-    RuntimeResetSevenPrefixedLegacyStringLanes(block);
-  }
 
-  /**
-   * Address: 0x0051B2C0 (FUN_0051B2C0)
-   *
-   * What it does:
-   * Tail-forward thunk that aliases the canonical seven-lane prefixed legacy
-   * string reset lane (`FUN_00519800`).
-   */
-  [[maybe_unused]] void RuntimeResetSevenPrefixedLegacyStringLanesThunkB(
-    RuntimeSevenPrefixedLegacyStringBlock* const block
-  )
-  {
-    RuntimeResetSevenPrefixedLegacyStringLanes(block);
-  }
 
-  /**
-   * Address: 0x00519BA0 (FUN_00519BA0)
-   *
-   * What it does:
-   * Walks one `[begin,end)` range of 0xCC-byte records and resets each
-   * embedded seven-string block in-place.
-   */
-  [[maybe_unused]] RuntimeSevenPrefixedLegacyStringRecordStrideCC* RuntimeResetSevenPrefixedLegacyStringRangeStrideCC(
-    RuntimeSevenPrefixedLegacyStringRecordStrideCC* begin,
-    RuntimeSevenPrefixedLegacyStringRecordStrideCC* const end
-  )
-  {
-    for (RuntimeSevenPrefixedLegacyStringRecordStrideCC* cursor = begin; cursor != end; ++cursor) {
-      RuntimeResetSevenPrefixedLegacyStringLanes(&cursor->textBlock);
-    }
-    return begin;
-  }
 
-  /**
-   * Address: 0x008A90E0 (FUN_008A90E0)
-   *
-   * What it does:
-   * Adapts register-ordered range endpoints and forwards to the canonical
-   * dual-legacy-string reset lane.
-   */
-  [[maybe_unused]] void RuntimeResetDualLegacyStringRange56DispatchReorderLaneA(
-    RuntimeDualLegacyStringRecord56* const sourceEnd,
-    RuntimeDualLegacyStringRecord56* const sourceBegin
-  )
-  {
-    RuntimeResetDualLegacyStringRange56LaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008B68E0 (FUN_008B68E0)
-   *
-   * What it does:
-   * Allocates one 24-byte command-issue tree head lane and zeros tree links
-   * before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode24Color16* RuntimeAllocateCommandIssueTreeHeadLaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode24Color16>(RuntimeAllocateArrayWithBadAllocLane078);
-  }
 
   /**
    * Address: 0x008D6FC0 (FUN_008D6FC0)
@@ -35222,65 +24592,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
   }
 
-  /**
-   * Address: 0x008D6940 (FUN_008D6940)
-   *
-   * What it does:
-   * Allocates one 32-byte red-black head lane, clears the first three pointer
-   * slots with legacy null-adjacent checks, then writes `{color=1,isNil=0}`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeRbHeadNode32Color28* RuntimeAllocateAndPrimeRbHeadNode32Lane079()
-  {
-    auto* const node = static_cast<RuntimeRbHeadNode32Color28*>(RuntimeAllocateArrayWithBadAllocLane079(1u));
-    if (node != nullptr) {
-      node->left = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode32Color28*>(static_cast<std::intptr_t>(-4))) {
-      node->parent = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeRbHeadNode32Color28*>(static_cast<std::intptr_t>(-8))) {
-      node->right = nullptr;
-    }
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x008D69A0 (FUN_008D69A0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one 32-byte runtime array element
-   * through `RuntimeAllocateArrayWithBadAllocLane079`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane079SingleAdapter()
-  {
-    return RuntimeAllocateArrayWithBadAllocLane079(1u);
-  }
 
-  /**
-   * Address: 0x008D90D0 (FUN_008D90D0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane079A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
-  /**
-   * Address: 0x008D9190 (FUN_008D9190)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane079B(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   /**
    * Address: 0x008E4100 (FUN_008E4100)
@@ -35306,29 +24620,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 112u);
   }
 
-  /**
-   * Address: 0x008F5FD0 (FUN_008F5FD0)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane081(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
-  /**
-   * Address: 0x0092C000 (FUN_0092C000)
-   *
-   * What it does:
-   * Allocates one `2`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane081A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 2u);
-  }
 
   /**
    * Address: 0x0092C080 (FUN_0092C080)
@@ -35354,17 +24646,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 12u);
   }
 
-  /**
-   * Address: 0x0092C150 (FUN_0092C150)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane083A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
   /**
    * Address: 0x00935B20 (FUN_00935B20)
@@ -35402,19 +24683,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  /**
-   * Address: 0x0094F990 (FUN_0094F990)
-   *
-   * What it does:
-   * Preserves one zero-tag adapter lane for 20-byte checked allocation and
-   * forwards to the canonical allocator lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane086ZeroTagAdapter(
-    const unsigned int count
-  )
-  {
-    return RuntimeAllocateArrayWithBadAllocLane086(count);
-  }
 
   /**
    * Address: 0x00A72080 (FUN_00A72080)
@@ -35475,77 +24743,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destinationStartAddress;
   }
 
-  /**
-   * Address: 0x00A53AD0 (FUN_00A53AD0)
-   *
-   * What it does:
-   * Allocates one `4`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane090(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 4u);
-  }
 
-  /**
-   * Address: 0x00A53BD0 (FUN_00A53BD0)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane091(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
-  /**
-   * Address: 0x00A53C40 (FUN_00A53C40)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane092(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
-  /**
-   * Address: 0x00A53E10 (FUN_00A53E10)
-   *
-   * What it does:
-   * Allocates one `36`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane093(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
-  }
 
-  /**
-   * Address: 0x00A53EB0 (FUN_00A53EB0)
-   *
-   * What it does:
-   * Allocates one `36`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane094(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
-  }
 
-  /**
-   * Address: 0x00AC2A10 (FUN_00AC2A10)
-   *
-   * What it does:
-   * Allocates one `12`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane095(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 12u);
-  }
 
   [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeCommon(
     RuntimeMapSetLengthErrorNode* const left,
@@ -35576,612 +24778,54 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return node;
   }
 
-  /**
-   * Address: 0x005358E0 (FUN_005358E0)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane A and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeA(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneA
-    );
-  }
-
-  /**
-   * Address: 0x005359A0 (FUN_005359A0)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane B and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeB(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneB
-    );
-  }
-
-  /**
-   * Address: 0x00535A60 (FUN_00535A60)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane C and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeC(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneC
-    );
-  }
-
-  /**
-   * Address: 0x00535B20 (FUN_00535B20)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane D and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeD(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneD
-    );
-  }
-
-  /**
-   * Address: 0x00535BE0 (FUN_00535BE0)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane E and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeE(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneE
-    );
-  }
-
-  /**
-   * Address: 0x00535CA0 (FUN_00535CA0)
-   *
-   * What it does:
-   * Builds one map/set tree node lane for a `length_error` key payload using
-   * allocator lane F and initializes links, copied key text, metadata, and
-   * red-black marker bytes.
-   */
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeF(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord
-  )
-  {
-    return RuntimeBuildMapSetLengthErrorNodeCommon(
-      left,
-      parent,
-      right,
-      keyRecord,
-      &RuntimeAllocateMapSetLengthErrorNodeLaneF
-    );
-  }
-
-  /**
-   * Address: 0x00741530 (FUN_00741530)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongA()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x00741630 (FUN_00741630)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0074EA10 (FUN_0074EA10)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0074EFA0 (FUN_0074EFA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0074F320 (FUN_0074F320)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongD()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0074F680 (FUN_0074F680)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0075FA60 (FUN_0075FA60)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0076C730 (FUN_0076C730)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0076CA70 (FUN_0076CA70)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x007BC150 (FUN_007BC150)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongB()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x008B5410 (FUN_008B5410)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongC()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x008B7E00 (FUN_008B7E00)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongD()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x004D44E0 (FUN_004D44E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongI()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x004FDBA0 (FUN_004FDBA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongJ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00505A70 (FUN_00505A70)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongK()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0052DE80 (FUN_0052DE80)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongL()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0052EC30 (FUN_0052EC30)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongM()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0054D330 (FUN_0054D330)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongN()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0054D690 (FUN_0054D690)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongO()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00581020 (FUN_00581020)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongP()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x005926F0 (FUN_005926F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongQ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00592830 (FUN_00592830)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongR()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x005C7DA0 (FUN_005C7DA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongS()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00652590 (FUN_00652590)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongT()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0066AA70 (FUN_0066AA70)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongU()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00692CB0 (FUN_00692CB0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongV()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x006D1D30 (FUN_006D1D30)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongW()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x006EB4B0 (FUN_006EB4B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongX()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x006F8AE0 (FUN_006F8AE0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongY()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00733910 (FUN_00733910)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongZ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x007835E0 (FUN_007835E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0078A540 (FUN_0078A540)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00830270 (FUN_00830270)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0084F5C0 (FUN_0084F5C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAD()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0085F310 (FUN_0085F310)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x008B3090 (FUN_008B3090)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
-  /**
-   * Address: 0x004DBE30 (FUN_004DBE30)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongA()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x004DC690 (FUN_004DC690)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x004DCF90 (FUN_004DCF90)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongB()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x004E22B0 (FUN_004E22B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongC()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x004E2980 (FUN_004E2980)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongD()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x004E2D70 (FUN_004E2D70)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongE()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   /**
    * Address: 0x004E3310 (FUN_004E3310)
@@ -36205,26 +24849,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return nextSize;
   }
 
-  /**
-   * Address: 0x004E2500 (FUN_004E2500)
-   *
-   * What it does:
-   * Builds one pointer-list node using `(next=head, prev=head->prev)` lanes,
-   * increments the owning list size lane, then commits the back-link splice:
-   * `head->prev = node` and `node->prev->next = node`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeInsertPointerListNodeBeforeHeadAndIncrementSizeLaneA(
-    void* const* const valueSlot,
-    RuntimeListPointerContainer* const listRuntime,
-    RuntimeListPointerNode* const head
-  )
-  {
-    RuntimeListPointerNode* const node = RuntimeBuildPointerListNodeLaneA(head, head->prev, valueSlot);
-    const std::uint32_t nextSize = RuntimeIncrementListSizeCheckedLaneA(listRuntime);
-    head->prev = node;
-    node->prev->next = node;
-    return nextSize;
-  }
 
   /**
    * What it does:
@@ -36273,379 +24897,38 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return nextSize;
   }
 
-  /**
-   * Address: 0x004E25B0 (FUN_004E25B0)
-   *
-   * What it does:
-   * Builds one pointer-list node using `(next=head, prev=head->prev)` lanes,
-   * increments the owning list size lane through the secondary checked path,
-   * then commits the back-link splice:
-   * `head->prev = node` and `node->prev->next = node`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeInsertPointerListNodeBeforeHeadAndIncrementSizeLaneB(
-    void* const* const valueSlot,
-    RuntimeListPointerContainer* const listRuntime,
-    RuntimeListPointerNode* const head
-  )
-  {
-    RuntimeListPointerNode* const node = RuntimeBuildPointerListNodeLaneB(head, head->prev, valueSlot);
-    const std::uint32_t nextSize = RuntimeIncrementListSizeCheckedLaneB(listRuntime);
-    head->prev = node;
-    node->prev->next = node;
-    return nextSize;
-  }
 
-  /**
-   * Address: 0x004E9100 (FUN_004E9100)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongF()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x004F8BB0 (FUN_004F8BB0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x004F8F60 (FUN_004F8F60)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAI()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x004F9310 (FUN_004F9310)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAJ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00505750 (FUN_00505750)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAK()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005109A0 (FUN_005109A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAL()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00514530 (FUN_00514530)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongC()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x00519BC0 (FUN_00519BC0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAM()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005242C0 (FUN_005242C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAN()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00524640 (FUN_00524640)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAO()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0052CD30 (FUN_0052CD30)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongG()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x005349E0 (FUN_005349E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongH()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00534B90 (FUN_00534B90)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongI()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00534D40 (FUN_00534D40)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongJ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00534EF0 (FUN_00534EF0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongK()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x005350A0 (FUN_005350A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongL()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00535250 (FUN_00535250)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongM()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00535400 (FUN_00535400)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongN()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00537EF0 (FUN_00537EF0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAP()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00540580 (FUN_00540580)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAQ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00540850 (FUN_00540850)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAR()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00540910 (FUN_00540910)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAS()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00543AB0 (FUN_00543AB0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAT()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00543B90 (FUN_00543B90)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAU()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00548290 (FUN_00548290)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAV()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005565D0 (FUN_005565D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongO()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x005615B0 (FUN_005615B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAW()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005616C0 (FUN_005616C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAX()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005617E0 (FUN_005617E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAY()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00561900 (FUN_00561900)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongAZ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005619C0 (FUN_005619C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0056ECA0 (FUN_0056ECA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongP()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
   /**
    * Address: 0x0056F520 (FUN_0056F520)
@@ -36658,346 +24941,36 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("map/set<T> too long");
   }
 
-  /**
-   * Address: 0x00580430 (FUN_00580430)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00580720 (FUN_00580720)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongR()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00580BB0 (FUN_00580BB0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00594F80 (FUN_00594F80)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongS()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x005A0DD0 (FUN_005A0DD0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBD()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005A1050 (FUN_005A1050)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongT()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x005AB760 (FUN_005AB760)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongD()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x005C7290 (FUN_005C7290)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005C79A0 (FUN_005C79A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005C85E0 (FUN_005C85E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005D0330 (FUN_005D0330)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongE()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x005DD340 (FUN_005DD340)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005DD790 (FUN_005DD790)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBI()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005EB090 (FUN_005EB090)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBJ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x005EB690 (FUN_005EB690)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBK()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00627B20 (FUN_00627B20)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBL()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0064EE20 (FUN_0064EE20)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBM()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0064EEE0 (FUN_0064EEE0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBN()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00653860 (FUN_00653860)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBO()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0067D8E0 (FUN_0067D8E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongE()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
 
-  /**
-   * Address: 0x0067DD60 (FUN_0067DD60)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBP()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0067E7D0 (FUN_0067E7D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBQ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00686190 (FUN_00686190)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongU()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00687280 (FUN_00687280)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongV()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x006885F0 (FUN_006885F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBR()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0069F360 (FUN_0069F360)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBS()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x006AFA40 (FUN_006AFA40)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongW()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x006DC930 (FUN_006DC930)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBT()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x006DCF40 (FUN_006DCF40)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBU()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x006E1D60 (FUN_006E1D60)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongX()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x006E2740 (FUN_006E2740)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBV()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
   /**
    * Address: 0x007029C0 (FUN_007029C0)
@@ -37010,160 +24983,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00703410 (FUN_00703410)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBX()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00710030 (FUN_00710030)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongY()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
-
-  /**
-   * Address: 0x00710A40 (FUN_00710A40)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongZ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
-
-  /**
-   * Address: 0x00710D10 (FUN_00710D10)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongF()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
-
-  /**
-   * Address: 0x0071AB80 (FUN_0071AB80)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAA()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
-
-  /**
-   * Address: 0x0071B260 (FUN_0071B260)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBY()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0071B510 (FUN_0071B510)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAB()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
 
-  /**
-   * Address: 0x0071BCA0 (FUN_0071BCA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongBZ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007360A0 (FUN_007360A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAC()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00739FD0 (FUN_00739FD0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongG()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x0073A160 (FUN_0073A160)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongH()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x0074EEA0 (FUN_0074EEA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0074FB00 (FUN_0074FB00)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00767F50 (FUN_00767F50)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
+
+
+
+
+
+
 
   /**
    * Address: 0x007683F0 (FUN_007683F0)
@@ -37176,379 +25009,39 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00769ED0 (FUN_00769ED0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongI()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x0077B600 (FUN_0077B600)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAD()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0077BE80 (FUN_0077BE80)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAE()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0077D260 (FUN_0077D260)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongJ()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x007987C0 (FUN_007987C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007A5D20 (FUN_007A5D20)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007AF800 (FUN_007AF800)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAF()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007AFA90 (FUN_007AFA90)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongK()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x007AFF20 (FUN_007AFF20)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007B0550 (FUN_007B0550)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007B2B30 (FUN_007B2B30)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAG()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007B3910 (FUN_007B3910)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAH()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007BC060 (FUN_007BC060)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCI()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007C9F10 (FUN_007C9F10)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCJ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007CA5F0 (FUN_007CA5F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCK()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007CE090 (FUN_007CE090)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAI()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007D3E10 (FUN_007D3E10)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongL()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x007D4720 (FUN_007D4720)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongM()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x007D8200 (FUN_007D8200)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAJ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007D88B0 (FUN_007D88B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCL()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007DA480 (FUN_007DA480)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCM()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007E3A60 (FUN_007E3A60)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCN()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007E4CE0 (FUN_007E4CE0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCO()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007E5DF0 (FUN_007E5DF0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAK()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007E94E0 (FUN_007E94E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCP()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007F11E0 (FUN_007F11E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAL()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007F1780 (FUN_007F1780)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCQ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007F1A70 (FUN_007F1A70)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAM()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x007F1F90 (FUN_007F1F90)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCR()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007FB500 (FUN_007FB500)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCS()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x007FB5B0 (FUN_007FB5B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCT()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00813BE0 (FUN_00813BE0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCU()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0081A5D0 (FUN_0081A5D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongN()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x0081BA40 (FUN_0081BA40)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongO()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
   /**
    * Address: 0x0082DD60 (FUN_0082DD60)
@@ -37573,130 +25066,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return nextSize;
   }
 
-  /**
-   * Address: 0x0082CAE0 (FUN_0082CAE0)
-   *
-   * What it does:
-   * Builds one 16-byte pair record node, increments list size by one with
-   * legacy overflow rules, relinks head, and stores the new head node.
-   */
-  [[maybe_unused]] RuntimeRecord16WithPair** RuntimeInsertRecord16WithPairLaneA(
-    RuntimeRecord16WithPair** const outHead,
-    RuntimeRecord16ListState* const sizeState,
-    RuntimeRecord16ListState* const linkState,
-    const RuntimeDwordPairRecord* const sourcePair
-  )
-  {
-    auto* const node = RuntimeBuildRecord16WithPairLaneA(
-      sourcePair,
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState)),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState->head))
-    );
-    (void)RuntimeIncrementRecord16ListSizeCheckedLaneP(1u, sizeState);
 
-    linkState->head = node;
-    auto* const previousHead =
-      reinterpret_cast<RuntimeRecord16WithPair*>(static_cast<std::uintptr_t>(node->lane1));
-    previousHead->lane0 = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(node));
-
-    *outHead = linkState->head;
-    return outHead;
-  }
-
-  /**
-   * Address: 0x0082DC90 (FUN_0082DC90)
-   *
-   * What it does:
-   * Builds one 16-byte pair record node, increments list size by one with
-   * legacy overflow rules, and relinks the list head to the inserted node.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeInsertRecord16WithPairLaneB(
-    RuntimeRecord16ListState* const sizeState,
-    RuntimeRecord16ListState* const linkState,
-    const RuntimeDwordPairRecord* const sourcePair
-  )
-  {
-    auto* const node = RuntimeBuildRecord16WithPairLaneA(
-      sourcePair,
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState)),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState->head))
-    );
-    const std::uint32_t nextSize = RuntimeIncrementRecord16ListSizeCheckedLaneP(1u, sizeState);
-
-    linkState->head = node;
-    auto* const previousHead =
-      reinterpret_cast<RuntimeRecord16WithPair*>(static_cast<std::uintptr_t>(node->lane1));
-    previousHead->lane0 = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(node));
-    return nextSize;
-  }
 
   [[noreturn]] void RuntimeThrowListTooLongS();
 
-  /**
-   * Address: 0x0082F510 (FUN_0082F510)
-   *
-   * What it does:
-   * Builds one 44-byte payload record node, increments list size by one with
-   * legacy overflow rules, and relinks list-head predecessor/successor lanes.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeInsertRecord44WithPayloadLaneA(
-    const void* const payloadSource,
-    RuntimeRecord44ListState* const sizeState,
-    RuntimeRecord44ListState* const linkState
-  )
-  {
-    auto* const node = RuntimeBuildRecord44WithPayloadLaneA(
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState)),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(linkState->head)),
-      payloadSource
-    );
 
-    if (sizeState->size == 0x15555555u) {
-      RuntimeThrowListTooLongS();
-    }
 
-    const std::uint32_t nextSize = sizeState->size + 1u;
-    sizeState->size = nextSize;
-    linkState->head = node;
 
-    auto* const previousHead =
-      reinterpret_cast<RuntimeRecord44WithPayload*>(static_cast<std::uintptr_t>(node->lane1));
-    previousHead->lane0 = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(node));
-    return nextSize;
-  }
-
-  /**
-   * Address: 0x0082E320 (FUN_0082E320)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAN()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
-
-  /**
-   * Address: 0x0082ED20 (FUN_0082ED20)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongQ()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
-
-  /**
-   * Address: 0x0082F050 (FUN_0082F050)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongR()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
   /**
    * Address: 0x0082F5D0 (FUN_0082F5D0)
@@ -37720,104 +25096,14 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00830620 (FUN_00830620)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCW()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008307F0 (FUN_008307F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCX()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00837540 (FUN_00837540)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCY()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0083B9E0 (FUN_0083B9E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAO()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0083BDE0 (FUN_0083BDE0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAP()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00849100 (FUN_00849100)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCZ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008494E0 (FUN_008494E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0084F0C0 (FUN_0084F0C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00855A80 (FUN_00855A80)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAQ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
   /**
    * Address: 0x00856100 (FUN_00856100)
@@ -37830,27 +25116,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x008563F0 (FUN_008563F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDD()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0085A5B0 (FUN_0085A5B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
   struct RuntimeSharedControlPairEntry
   {
@@ -37882,35 +25148,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x004FFE40 (FUN_004FFE40)
-   *
-   * What it does:
-   * Invokes one caller-supplied binary callback over `iterationCount` strided
-   * lane pairs and returns the final callback result.
-   */
-  [[nodiscard]] std::intptr_t __stdcall RuntimeInvokeStridedBinaryCallbackReverse(
-    std::intptr_t left,
-    std::intptr_t right,
-    const std::intptr_t strideBytes,
-    const std::int32_t iterationCount,
-    std::intptr_t(__thiscall* const callback)(std::intptr_t, std::intptr_t)
-  ) noexcept
-  {
-    std::intptr_t result = 0;
-    if (callback == nullptr) {
-      return result;
-    }
-
-    for (std::int32_t index = iterationCount - 1; index >= 0; --index) {
-      (void)index;
-      result = callback(left, right);
-      left += strideBytes;
-      right += strideBytes;
-    }
-
-    return result;
-  }
 
   using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
 
@@ -37927,25 +25164,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeDestroyCallbackLane16::vtable offset must be 0x00"
   );
 
-  /**
-   * Address: 0x008EA5F0 (FUN_008EA5F0)
-   *
-   * What it does:
-   * Walks one 16-byte callback-lane range and invokes vtable slot 0 with
-   * argument `0` on each element.
-   */
-  [[maybe_unused]] int __stdcall RuntimeInvokeDestroyCallbackRangeLane16(
-    RuntimeDestroyCallbackLane16* begin,
-    RuntimeDestroyCallbackLane16* const end
-  )
-  {
-    int result = 0;
-    while (begin != end) {
-      result = begin->vtable[0](begin, 0);
-      ++begin;
-    }
-    return result;
-  }
 
   template <std::size_t kStrideBytes>
   int __stdcall RuntimeInvokeDestroyCallbackRangeStrided(void* begin, void* const end)
@@ -37963,35 +25181,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return result;
   }
 
-  /**
-   * Address: 0x008EA5C0 (FUN_008EA5C0)
-   *
-   * What it does:
-   * Walks one 0x70-byte callback-lane range and invokes vtable slot 0 with
-   * argument `0` on each element.
-   */
-  [[maybe_unused]] int __stdcall RuntimeInvokeDestroyCallbackRangeLane112(
-    void* begin,
-    void* const end
-  )
-  {
-    return RuntimeInvokeDestroyCallbackRangeStrided<0x70>(begin, end);
-  }
 
-  /**
-   * Address: 0x008FA890 (FUN_008FA890)
-   *
-   * What it does:
-   * Walks one 0x13C-byte callback-lane range and invokes vtable slot 0 with
-   * argument `0` on each element.
-   */
-  [[maybe_unused]] int __stdcall RuntimeInvokeDestroyCallbackRangeLane316(
-    void* begin,
-    void* const end
-  )
-  {
-    return RuntimeInvokeDestroyCallbackRangeStrided<0x13C>(begin, end);
-  }
 
   /**
    * Address: 0x0053A9A0 (FUN_0053A9A0)
@@ -38053,20 +25243,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return result;
   }
 
-  /**
-   * Address: 0x007420F0 (FUN_007420F0)
-   *
-   * What it does:
-   * Releases one shared-control lane at offset `+0x08` for each 12-byte entry
-   * in `[begin,end)`.
-   */
-  [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlRangeStride12(
-    const std::intptr_t begin,
-    const std::intptr_t end
-  ) noexcept
-  {
-    return RuntimeReleaseSharedControlArrayRange(begin, end, 12, 8);
-  }
 
   /**
    * Address: 0x007FBBA0 (FUN_007FBBA0)
@@ -38144,229 +25320,17 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return static_cast<int>(byteCount32);
   }
 
-  /**
-   * Address: 0x00A48C90 (FUN_00A48C90)
-   *
-   * What it does:
-   * Reads `rowCount` 2-byte elements from `stream` into `destination`, then
-   * reverses byte order within each element row.
-   */
-  [[maybe_unused]] std::size_t RuntimeReadAndSwapWordRows(
-    std::FILE* const stream,
-    const std::size_t rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeReadAndSwapFixedWidthRows(stream, 2u, rowCount, destination);
-  }
 
-  /**
-   * Address: 0x00A48CC0 (FUN_00A48CC0)
-   *
-   * What it does:
-   * Reads `rowCount` 4-byte elements from `stream` into `destination`, then
-   * reverses byte order within each element row.
-   */
-  [[maybe_unused]] std::size_t RuntimeReadAndSwapDwordRows(
-    std::FILE* const stream,
-    const std::size_t rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeReadAndSwapFixedWidthRows(stream, 4u, rowCount, destination);
-  }
 
-  /**
-   * Address: 0x00A48CF0 (FUN_00A48CF0)
-   *
-   * What it does:
-   * Reads `rowCount` 8-byte elements from `stream` into `destination`, then
-   * reverses byte order within each element row.
-   */
-  [[maybe_unused]] std::size_t RuntimeReadAndSwapQwordRows(
-    std::FILE* const stream,
-    const std::size_t rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeReadAndSwapFixedWidthRows(stream, 8u, rowCount, destination);
-  }
 
-  /**
-   * Address: 0x00A48D20 (FUN_00A48D20)
-   *
-   * What it does:
-   * Writes `rowCount` 16-bit rows to `stream`, reversing byte order within
-   * each row before the write.
-   */
-  [[maybe_unused]] int RuntimeWriteAndSwapWordRows(
-    std::FILE* const stream,
-    const int rowCount,
-    const std::uint16_t* const sourceRows
-  )
-  {
-    const std::uint16_t* rowCursor = sourceRows;
-    if (rowCount > 0) {
-      int remainingRows = rowCount;
-      do {
-        const std::uint16_t value = *rowCursor;
-        ++rowCursor;
 
-        std::uint8_t swappedWord[2]{};
-        swappedWord[0] = static_cast<std::uint8_t>(value >> 8);
-        swappedWord[1] = static_cast<std::uint8_t>(value);
-        (void)std::fwrite(swappedWord, 2u, 1u, stream);
-        --remainingRows;
-      } while (remainingRows != 0);
-    }
 
-    const std::uint32_t byteCount32 = static_cast<std::uint32_t>(rowCount) * 2u;
-    return static_cast<int>(byteCount32);
-  }
 
-  /**
-   * Address: 0x00A48D70 (FUN_00A48D70)
-   *
-   * What it does:
-   * Writes `rowCount` 32-bit rows to `stream`, reversing byte order within
-   * each row before the write.
-   */
-  [[maybe_unused]] int RuntimeWriteAndSwapDwordRows(
-    std::FILE* const stream,
-    const int rowCount,
-    const std::uint32_t* const sourceRows
-  )
-  {
-    const std::uint32_t* rowCursor = sourceRows;
-    if (rowCount > 0) {
-      int remainingRows = rowCount;
-      do {
-        const std::uint32_t value = *rowCursor;
-        ++rowCursor;
 
-        std::uint8_t swappedDword[4]{};
-        swappedDword[3] = static_cast<std::uint8_t>(value);
-        swappedDword[2] = static_cast<std::uint8_t>(value >> 8);
-        swappedDword[0] = static_cast<std::uint8_t>(value >> 24);
-        swappedDword[1] = static_cast<std::uint8_t>(value >> 16);
-        (void)std::fwrite(swappedDword, 4u, 1u, stream);
-        --remainingRows;
-      } while (remainingRows != 0);
-    }
 
-    const std::uint32_t byteCount32 = static_cast<std::uint32_t>(rowCount) * 4u;
-    return static_cast<int>(byteCount32);
-  }
 
-  /**
-   * Address: 0x00A48EC0 (FUN_00A48EC0)
-   *
-   * What it does:
-   * Opens one narrow stream through `fopen_0` semantics and returns the stream
-   * on success, or `nullptr` on failure.
-   */
-  [[maybe_unused]] std::FILE* RuntimeFopenSResultOrNull(char* const filePath, char* const mode)
-  {
-    std::FILE* file = nullptr;
-    const int status = RuntimeFopenS(&file, filePath, mode);
-    return status == 0 ? file : nullptr;
-  }
 
-  /**
-   * Address: 0x00A49370 (FUN_00A49370)
-   *
-   * What it does:
-   * Copies `rowCount` 2-byte elements from `source` to `destination`, then
-   * reverses byte order within each copied element.
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapWordRowsSourceFirst(
-    const void* const source,
-    const int rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 2u);
-  }
 
-  /**
-   * Address: 0x00A493A0 (FUN_00A493A0)
-   *
-   * What it does:
-   * Copies `rowCount` 4-byte elements from `source` to `destination`, then
-   * reverses byte order within each copied element.
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapDwordRowsSourceFirst(
-    const void* const source,
-    const int rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 4u);
-  }
-
-  /**
-   * Address: 0x00A493E0 (FUN_00A493E0)
-   *
-   * What it does:
-   * Copies `rowCount` 8-byte elements from `source` to `destination`, then
-   * reverses byte order within each copied element.
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapQwordRowsSourceFirst(
-    const void* const source,
-    const int rowCount,
-    void* const destination
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 8u);
-  }
-
-  /**
-   * Address: 0x00A49420 (FUN_00A49420)
-   *
-   * What it does:
-   * Copies `rowCount` 2-byte elements from `source` into `destination`, then
-   * reverses byte order within each copied element (destination-first ABI).
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapWordRowsDestinationFirst(
-    void* const destination,
-    const int rowCount,
-    const void* const source
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 2u);
-  }
-
-  /**
-   * Address: 0x00A49450 (FUN_00A49450)
-   *
-   * What it does:
-   * Copies `rowCount` 4-byte elements from `source` into `destination`, then
-   * reverses byte order within each copied element (destination-first ABI).
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapDwordRowsDestinationFirst(
-    void* const destination,
-    const int rowCount,
-    const void* const source
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 4u);
-  }
-
-  /**
-   * Address: 0x00A49490 (FUN_00A49490)
-   *
-   * What it does:
-   * Copies `rowCount` 8-byte elements from `source` into `destination`, then
-   * reverses byte order within each copied element (destination-first ABI).
-   */
-  [[maybe_unused]] int RuntimeCopyAndSwapQwordRowsDestinationFirst(
-    void* const destination,
-    const int rowCount,
-    const void* const source
-  )
-  {
-    return RuntimeCopyAndSwapFixedWidthRows(destination, source, rowCount, 8u);
-  }
 
   /**
    * Address: 0x0085A1F0 (FUN_0085A1F0)
@@ -38394,304 +25358,33 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     gRuntimeSharedControlPairCapacity = nullptr;
   }
 
-  /**
-   * Address: 0x00C06B20 (FUN_00C06B20)
-   *
-   * What it does:
-   * Preserves one shutdown thunk lane by forwarding into
-   * `RuntimeReleaseSharedControlPairArray` (`FUN_0085A1F0`).
-   */
-  [[maybe_unused]] void ShutdownSharedControlPairArrayCleanupAdapter()
-  {
-    RuntimeReleaseSharedControlPairArray();
-  }
 
 
-  /**
-   * Address: 0x00861AA0 (FUN_00861AA0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAR()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00868370 (FUN_00868370)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00869F40 (FUN_00869F40)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0087A470 (FUN_0087A470)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAS()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0087AA40 (FUN_0087AA40)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0087AF70 (FUN_0087AF70)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAT()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0087B3D0 (FUN_0087B3D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDI()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0087B8F0 (FUN_0087B8F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAU()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x0087BD50 (FUN_0087BD50)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDJ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00882F00 (FUN_00882F00)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDK()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0088A6F0 (FUN_0088A6F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDL()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0088A9C0 (FUN_0088A9C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDM()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00892860 (FUN_00892860)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDN()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00899490 (FUN_00899490)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAV()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008A8E30 (FUN_008A8E30)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAW()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008A95C0 (FUN_008A95C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDO()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008AEF00 (FUN_008AEF00)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAX()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008AF910 (FUN_008AF910)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongT()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x008B33C0 (FUN_008B33C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDP()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008B6310 (FUN_008B6310)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAY()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008C5F30 (FUN_008C5F30)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongU()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x008CBB80 (FUN_008CBB80)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongAZ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008D5720 (FUN_008D5720)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBA()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x008D6570 (FUN_008D6570)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDQ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008DB990 (FUN_008DB990)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDR()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008E4460 (FUN_008E4460)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongV()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
   /**
    * Address: 0x008EA9D0 (FUN_008EA9D0)
@@ -38704,38 +25397,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x008EAA50 (FUN_008EAA50)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDT()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008F6890 (FUN_008F6890)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDU()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x008F6900 (FUN_008F6900)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDV()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
   /**
    * Address: 0x0092EFF0 (FUN_0092EFF0)
@@ -38801,49 +25464,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeListSpliceOwnerLane, size) == 0x08, "RuntimeListSpliceOwnerLane::size offset must be 0x08");
   static_assert(sizeof(RuntimeListSpliceOwnerLane) == 0x0C, "RuntimeListSpliceOwnerLane size must be 0x0C");
 
-  /**
-   * Address: 0x009304A0 (FUN_009304A0)
-   *
-   * What it does:
-   * Relinks one three-node splice lane in a doubly-linked intrusive list and
-   * returns the splice-end node.
-   */
-  [[maybe_unused]] RuntimeListLinkNode12* RuntimeSpliceThreeNodeLaneAndReturnEnd(
-    RuntimeListSpliceOwnerLane* const destinationOwner,
-    RuntimeListLinkNode12* const firstNode,
-    RuntimeListSpliceOwnerLane* const sourceOwner,
-    RuntimeListLinkNode12* const spliceEndNode,
-    RuntimeListLinkNode12* const spliceBeginNode,
-    const std::uint32_t transferCount,
-    const std::int32_t /*unused*/
-  )
-  {
-    if (destinationOwner != sourceOwner) {
-      RuntimeThrowListTooLongW();
-      sourceOwner->size -= transferCount;
-    }
 
-    spliceEndNode->prev->next = spliceBeginNode;
-    spliceBeginNode->prev->next = firstNode;
-    firstNode->prev->next = spliceEndNode;
-
-    RuntimeListLinkNode12* const savedPrevious = firstNode->prev;
-    firstNode->prev = spliceBeginNode->prev;
-    spliceBeginNode->prev = spliceEndNode->prev;
-    spliceEndNode->prev = savedPrevious;
-    return spliceEndNode;
-  }
-
-  /**
-   * Address: 0x0092F8D0 (FUN_0092F8D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDZ()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
   /**
    * Address: 0x009332E0 (FUN_009332E0)
@@ -38867,71 +25488,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("list<T> too long");
   }
 
-  /**
-   * Address: 0x009343D0 (FUN_009343D0)
-   *
-   * What it does:
-   * Relinks one three-node splice lane in a doubly-linked intrusive list and
-   * returns the splice-end node.
-   */
-  [[maybe_unused]] RuntimeListLinkNode12* RuntimeSpliceThreeNodeLaneAndReturnEndX(
-    RuntimeListSpliceOwnerLane* const destinationOwner,
-    RuntimeListLinkNode12* const firstNode,
-    RuntimeListSpliceOwnerLane* const sourceOwner,
-    RuntimeListLinkNode12* const spliceEndNode,
-    RuntimeListLinkNode12* const spliceBeginNode,
-    const std::uint32_t transferCount,
-    const std::int32_t /*unused*/
-  )
-  {
-    if (destinationOwner != sourceOwner) {
-      RuntimeThrowListTooLongX();
-      sourceOwner->size -= transferCount;
-    }
 
-    spliceEndNode->prev->next = spliceBeginNode;
-    spliceBeginNode->prev->next = firstNode;
-    firstNode->prev->next = spliceEndNode;
-
-    RuntimeListLinkNode12* const savedPrevious = firstNode->prev;
-    firstNode->prev = spliceBeginNode->prev;
-    spliceBeginNode->prev = spliceEndNode->prev;
-    spliceEndNode->prev = savedPrevious;
-    return spliceEndNode;
-  }
-
-  /**
-   * Address: 0x00934440 (FUN_00934440)
-   *
-   * What it does:
-   * Relinks one three-node splice lane in a doubly-linked intrusive list and
-   * returns the splice-end node.
-   */
-  [[maybe_unused]] RuntimeListLinkNode12* RuntimeSpliceThreeNodeLaneAndReturnEndY(
-    RuntimeListSpliceOwnerLane* const destinationOwner,
-    RuntimeListLinkNode12* const firstNode,
-    RuntimeListSpliceOwnerLane* const sourceOwner,
-    RuntimeListLinkNode12* const spliceEndNode,
-    RuntimeListLinkNode12* const spliceBeginNode,
-    const std::uint32_t transferCount,
-    const std::int32_t /*unused*/
-  )
-  {
-    if (destinationOwner != sourceOwner) {
-      RuntimeThrowListTooLongY();
-      sourceOwner->size -= transferCount;
-    }
-
-    spliceEndNode->prev->next = spliceBeginNode;
-    spliceBeginNode->prev->next = firstNode;
-    firstNode->prev->next = spliceEndNode;
-
-    RuntimeListLinkNode12* const savedPrevious = firstNode->prev;
-    firstNode->prev = spliceBeginNode->prev;
-    spliceBeginNode->prev = spliceEndNode->prev;
-    spliceEndNode->prev = savedPrevious;
-    return spliceEndNode;
-  }
 
   /**
    * Address: 0x00933470 (FUN_00933470)
@@ -38966,49 +25523,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00948ED0 (FUN_00948ED0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBB()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x009490C0 (FUN_009490C0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBC()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x009492B0 (FUN_009492B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBD()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x009512B0 (FUN_009512B0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBE()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
   /**
    * Address: 0x009514A0 (FUN_009514A0)
@@ -39071,159 +25588,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return true;
   }
 
-  /**
-   * Address: 0x008EEFC0 (FUN_008EEFC0)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` `0x70`-byte elements
-   * with legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride112(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x02492492U,
-      0x70U,
-      RuntimeThrowVectorTooLongDS,
-      RuntimeAllocateArrayWithBadAllocLane080
-    );
-  }
 
-  /**
-   * Address: 0x0092F150 (FUN_0092F150)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 12-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride12LaneA(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x15555555U,
-      0x0CU,
-      RuntimeThrowVectorTooLongDW,
-      RuntimeAllocateArrayWithBadAllocLane082
-    );
-  }
 
-  /**
-   * Address: 0x0092F940 (FUN_0092F940)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 12-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride12LaneB(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x15555555U,
-      0x0CU,
-      RuntimeThrowVectorTooLongDX,
-      RuntimeAllocateArrayWithBadAllocLane083
-    );
-  }
 
-  /**
-   * Address: 0x0092F990 (FUN_0092F990)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 4-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride4LaneA(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x3FFFFFFFU,
-      0x04U,
-      RuntimeThrowVectorTooLongDY,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x00933BA0 (FUN_00933BA0)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 4-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride4LaneB(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x3FFFFFFFU,
-      0x04U,
-      RuntimeThrowVectorTooLongEA,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x00933BF0 (FUN_00933BF0)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 4-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride4LaneC(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x3FFFFFFFU,
-      0x04U,
-      RuntimeThrowVectorTooLongEB,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x00936F80 (FUN_00936F80)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 4-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride4LaneD(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x3FFFFFFFU,
-      0x04U,
-      RuntimeThrowVectorTooLongEC,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
   [[nodiscard]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
     RuntimeLegacyProxyVectorLane* const vector,
@@ -39346,197 +25716,16 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     );
   }
 
-  /**
-   * Address: 0x00934010 (FUN_00934010)
-   *
-   * What it does:
-   * Thin forwarding lane into the canonical dword-repeat insert helper for one
-   * VC8 proxy-vector storage owner.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorForwarder(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const valueSlot
-  )
-  {
-    return RuntimeInsertRepeatedDwordIntoLegacyProxyVector(vector, insertPosition, repeatCount, valueSlot);
-  }
 
-  /**
-   * Address: 0x00933950 (FUN_00933950)
-   *
-   * What it does:
-   * Variant lane of dword-repeat insert that receives the fill value via one
-   * indirection lane and preserves this family's dedicated overflow throw lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorLaneB(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const* const valueSlotRef
-  )
-  {
-    const std::uint32_t* const valueSlot = (valueSlotRef != nullptr) ? *valueSlotRef : nullptr;
-    return RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
-      vector,
-      insertPosition,
-      repeatCount,
-      valueSlot,
-      RuntimeThrowVectorTooLongEB,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x0082F7A0 (FUN_0082F7A0)
-   *
-   * What it does:
-   * Variant lane of dword-repeat insert used by the `0x0082F*` container
-   * family; consumes one indirection value lane and keeps this family's vector
-   * overflow throw behavior.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorLaneC(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const* const valueSlotRef
-  )
-  {
-    const std::uint32_t* const valueSlot = (valueSlotRef != nullptr) ? *valueSlotRef : nullptr;
-    return RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
-      vector,
-      insertPosition,
-      repeatCount,
-      valueSlot,
-      RuntimeThrowVectorTooLongCV,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x00768090 (FUN_00768090)
-   *
-   * What it does:
-   * Variant lane of dword-repeat insert used by the `0x00768*` vector family;
-   * consumes one direct value-slot pointer and preserves this family's
-   * dedicated vector-length overflow throw lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorLaneD(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const valueSlot
-  )
-  {
-    return RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
-      vector,
-      insertPosition,
-      repeatCount,
-      valueSlot,
-      RuntimeThrowVectorTooLongCD,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
-  /**
-   * Address: 0x00951DF0 (FUN_00951DF0)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 8-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride8(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x1FFFFFFFU,
-      0x08U,
-      RuntimeThrowVectorTooLongED,
-      RuntimeAllocateArrayWithBadAllocLane085
-    );
-  }
 
-  /**
-   * Address: 0x00951EA0 (FUN_00951EA0)
-   *
-   * What it does:
-   * Clears one proxy-vector lane, then reserves `count` 20-byte elements with
-   * legacy VC8 vector-length overflow semantics.
-   */
-  [[maybe_unused]] bool RuntimeInitializeLegacyProxyVectorStride20(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount
-  )
-  {
-    return RuntimeInitializeLegacyProxyVectorLane(
-      lane,
-      elementCount,
-      0x0CCCCCCCU,
-      0x14U,
-      RuntimeThrowVectorTooLongEE,
-      RuntimeAllocateArrayWithBadAllocLane086
-    );
-  }
 
-  /**
-   * Address: 0x00A3E250 (FUN_00A3E250)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBF()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00A62FD0 (FUN_00A62FD0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBG()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00A631D0 (FUN_00A631D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBH()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00A63950 (FUN_00A63950)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBI()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
-  /**
-   * Address: 0x00A63B50 (FUN_00A63B50)
-   *
-   * What it does:
-   * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowMapSetTooLongBJ()
-  {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
-  }
 
   /**
    * Address: 0x00A63D50 (FUN_00A63D50)
@@ -39594,37 +25783,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "ConvexHullFloatCtorRuntimeView::lane1C offset"
   );
 
-  /**
-   * Address: 0x00A6BBC0 (FUN_00A6BBC0)
-   *
-   * What it does:
-   * Initializes one `Wm3::ConvexHull<float>` runtime lane by seeding scalar
-   * parameters and clearing owned plane-storage lanes.
-   */
-  [[maybe_unused]] ConvexHullFloatCtorRuntimeView* ConstructConvexHullFloatRuntime(
-    ConvexHullFloatCtorRuntimeView* const hull,
-    const std::int32_t lane08,
-    const float lane18,
-    const std::uint8_t lane1C,
-    const std::int32_t lane04
-  ) noexcept
-  {
-    static std::uint8_t sConvexHullFloatRuntimeVTableTag = 0;
-
-    if (hull == nullptr) {
-      return nullptr;
-    }
-
-    hull->lane18 = lane18;
-    hull->lane04 = lane04;
-    hull->lane0C = 0.0f;
-    hull->lane10 = 0.0f;
-    hull->planeStorage = nullptr;
-    hull->vtable = &sConvexHullFloatRuntimeVTableTag;
-    hull->lane08 = lane08;
-    hull->lane1C = lane1C;
-    return hull;
-  }
 
   /**
    * Address: 0x00A6BC00 (FUN_00A6BC00)
@@ -39690,37 +25848,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "ConvexHullDoubleCtorRuntimeView::lane28 offset"
   );
 
-  /**
-   * Address: 0x00A6BC90 (FUN_00A6BC90)
-   *
-   * What it does:
-   * Initializes one `Wm3::ConvexHull<double>` runtime lane by seeding scalar
-   * parameters and clearing owned plane-storage lanes.
-   */
-  [[maybe_unused]] ConvexHullDoubleCtorRuntimeView* ConstructConvexHullDoubleRuntime(
-    ConvexHullDoubleCtorRuntimeView* const hull,
-    const std::int32_t lane0C,
-    const double lane20,
-    const std::uint8_t lane28,
-    const std::int32_t lane08
-  ) noexcept
-  {
-    static std::uint8_t sConvexHullDoubleRuntimeVTableTag = 0;
-
-    if (hull == nullptr) {
-      return nullptr;
-    }
-
-    hull->lane20 = lane20;
-    hull->lane08 = lane08;
-    hull->lane10 = 0u;
-    hull->lane14 = 0u;
-    hull->planeStorage = nullptr;
-    hull->vtable = &sConvexHullDoubleRuntimeVTableTag;
-    hull->lane0C = lane0C;
-    hull->lane28 = lane28;
-    return hull;
-  }
 
   /**
    * Address: 0x00A6BCD0 (FUN_00A6BCD0)
@@ -39775,65 +25902,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "ConvexHull1DoubleRuntimeView::externalPlaneStorage offset"
   );
 
-  /**
-   * Address: 0x00A71F20 (FUN_00A71F20)
-   *
-   * What it does:
-   * Executes the deleting-dtor lane for `Wm3::ConvexHull1<float>` by releasing
-   * optional external storage, tearing down base plane storage, and deleting
-   * the object when requested by `deleteFlags`.
-   */
-  void* DestroyConvexHull1FloatRuntime(ConvexHull1FloatRuntimeView* const hull, const std::uint8_t deleteFlags) noexcept
-  {
-    if (hull == nullptr) {
-      return nullptr;
-    }
 
-    if (hull->externalStorageOwnedFlag != 0u) {
-      void* const externalStorage = hull->externalPlaneStorage;
-      hull->externalPlaneStorage = nullptr;
-      ::operator delete[](externalStorage);
-    }
-
-    DestroyConvexHullFloatPlaneStorageRuntime(&hull->base);
-
-    if ((deleteFlags & 0x1u) != 0u) {
-      ::operator delete(hull);
-      return nullptr;
-    }
-
-    return hull;
-  }
-
-  /**
-   * Address: 0x00A71F60 (FUN_00A71F60)
-   *
-   * What it does:
-   * Executes the deleting-dtor lane for `Wm3::ConvexHull1<double>` by
-   * releasing optional external storage, tearing down base plane storage, and
-   * deleting the object when requested by `deleteFlags`.
-   */
-  void* DestroyConvexHull1DoubleRuntime(ConvexHull1DoubleRuntimeView* const hull, const std::uint8_t deleteFlags) noexcept
-  {
-    if (hull == nullptr) {
-      return nullptr;
-    }
-
-    if (hull->externalStorageOwnedFlag != 0u) {
-      void* const externalStorage = hull->externalPlaneStorage;
-      hull->externalPlaneStorage = nullptr;
-      ::operator delete[](externalStorage);
-    }
-
-    DestroyConvexHullDoublePlaneStorageRuntime(&hull->base);
-
-    if ((deleteFlags & 0x1u) != 0u) {
-      ::operator delete(hull);
-      return nullptr;
-    }
-
-    return hull;
-  }
 
   struct RuntimeDequeMapGrowthView
   {
@@ -40064,33 +26133,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeDequePushBackDwordCommon(dequeMap, value, &RuntimeGrowDequeMapSlotsG);
   }
 
-  /**
-   * Address: 0x00A66260 (FUN_00A66260)
-   *
-   * What it does:
-   * Jump-lane alias for `RuntimeDequePushBackDwordWithGrowF`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeDequePushBackDwordWithGrowFAliasLane(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const std::uint32_t* const value
-  )
-  {
-    return RuntimeDequePushBackDwordWithGrowF(dequeMap, value);
-  }
 
-  /**
-   * Address: 0x00A66350 (FUN_00A66350)
-   *
-   * What it does:
-   * Jump-lane alias for `RuntimeDequePushBackDwordWithGrowG`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeDequePushBackDwordWithGrowGAliasLane(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const std::uint32_t* const value
-  )
-  {
-    return RuntimeDequePushBackDwordWithGrowG(dequeMap, value);
-  }
 
   struct RuntimeSignedLimbPair512View
   {
@@ -40099,70 +26142,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeSignedLimbPair512View) == 0x200, "RuntimeSignedLimbPair512View size must be 0x200");
 
-  /**
-   * Address: 0x00A5B460 (FUN_00A5B460)
-   *
-   * What it does:
-   * Initializes two 256-byte sign-extended limb lanes from `lowValue` and
-   * `highValue`, storing each input dword into the first lane slot.
-   */
-  [[maybe_unused]] RuntimeSignedLimbPair512View* RuntimeInitializeSignedLimbPairFromTwoInt32(
-    RuntimeSignedLimbPair512View* const limbs,
-    const int lowValue,
-    const int highValue
-  ) noexcept
-  {
-    const int lowFill = (lowValue < 0) ? 0xFF : 0x00;
-    std::memset(limbs->primary, lowFill, sizeof(limbs->primary));
-    std::memcpy(limbs->primary, &lowValue, sizeof(lowValue));
 
-    const int highFill = (highValue < 0) ? 0xFF : 0x00;
-    std::memset(limbs->secondary, highFill, sizeof(limbs->secondary));
-    std::memcpy(limbs->secondary, &highValue, sizeof(highValue));
-    return limbs;
-  }
 
-  /**
-   * Address: 0x00A5B4E0 (FUN_00A5B4E0)
-   *
-   * What it does:
-   * Initializes the primary 256-byte limb lane from `value` and seeds the
-   * secondary lane as zero-filled with leading dword `1`.
-   */
-  [[maybe_unused]] RuntimeSignedLimbPair512View* RuntimeInitializeSignedLimbPairWithUnitSecondary(
-    RuntimeSignedLimbPair512View* const limbs,
-    const int value
-  ) noexcept
-  {
-    const int fill = (value < 0) ? 0xFF : 0x00;
-    std::memset(limbs->primary, fill, sizeof(limbs->primary));
-    std::memcpy(limbs->primary, &value, sizeof(value));
-
-    const int one = 1;
-    std::memset(limbs->secondary, 0, sizeof(limbs->secondary));
-    std::memcpy(limbs->secondary, &one, sizeof(one));
-    return limbs;
-  }
-
-  /**
-   * Address: 0x00A5B550 (FUN_00A5B550)
-   *
-   * What it does:
-   * Copies one 256-byte primary limb lane from `source`, then resets the
-   * secondary lane to `{1,0,...,0}`.
-   */
-  [[maybe_unused]] RuntimeSignedLimbPair512View* RuntimeCopyPrimaryLimbAndSeedUnitSecondary(
-    RuntimeSignedLimbPair512View* const destination,
-    const RuntimeSignedLimbPair512View* const source
-  ) noexcept
-  {
-    std::memcpy(destination->primary, source->primary, sizeof(destination->primary));
-
-    const int one = 1;
-    std::memset(destination->secondary, 0, sizeof(destination->secondary));
-    std::memcpy(destination->secondary, &one, sizeof(one));
-    return destination;
-  }
 
   struct RuntimeTreeNode20ContainerState
   {
@@ -40221,105 +26202,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return 0;
   }
 
-  /**
-   * Address: 0x00A653F0 (FUN_00A653F0)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x11` red-black tree payload lane, deletes the head
-   * sentinel, and clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNil11TreeContainerLaneA(RuntimeRbTree20OwnerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNil11TreeContainerHead(treeState);
-  }
 
-  /**
-   * Address: 0x00A65500 (FUN_00A65500)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x11` red-black tree payload lane, deletes the head
-   * sentinel, and clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNil11TreeContainerLaneB(RuntimeRbTree20OwnerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNil11TreeContainerHead(treeState);
-  }
 
-  /**
-   * Address: 0x00A65B20 (FUN_00A65B20)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x11` red-black tree payload lane, deletes the head
-   * sentinel, and clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNil11TreeContainerLaneC(RuntimeRbTree20OwnerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNil11TreeContainerHead(treeState);
-  }
 
-  /**
-   * Address: 0x00A65BD0 (FUN_00A65BD0)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x11` red-black tree payload lane, deletes the head
-   * sentinel, and clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNil11TreeContainerLaneD(RuntimeRbTree20OwnerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNil11TreeContainerHead(treeState);
-  }
 
-  /**
-   * Address: 0x00A65EC0 (FUN_00A65EC0)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x21` red-black tree payload lane via
-   * `RuntimeDeleteTreeNode20PostorderLaneA`, deletes the head sentinel, and
-   * clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNode20TreeContainerLaneA(RuntimeTreeNode20ContainerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNode20TreeContainerHead(treeState, &RuntimeDeleteTreeNode20PostorderLaneA);
-  }
 
-  /**
-   * Address: 0x00A66140 (FUN_00A66140)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x21` red-black tree payload lane via
-   * `RuntimeDeleteTreeNode20PostorderLaneB`, deletes the head sentinel, and
-   * clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNode20TreeContainerLaneB(RuntimeTreeNode20ContainerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNode20TreeContainerHead(treeState, &RuntimeDeleteTreeNode20PostorderLaneB);
-  }
 
-  /**
-   * Address: 0x00A66310 (FUN_00A66310)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x21` red-black tree payload lane via
-   * `RuntimeDeleteTreeNode20PostorderLaneA`, deletes the head sentinel, and
-   * clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNode20TreeContainerLaneC(RuntimeTreeNode20ContainerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNode20TreeContainerHead(treeState, &RuntimeDeleteTreeNode20PostorderLaneA);
-  }
 
-  /**
-   * Address: 0x00A66400 (FUN_00A66400)
-   *
-   * What it does:
-   * Destroys one `isNil@+0x21` red-black tree payload lane via
-   * `RuntimeDeleteTreeNode20PostorderLaneB`, deletes the head sentinel, and
-   * clears owner `{head,size}` lanes.
-   */
-  [[maybe_unused]] int RuntimeReleaseNode20TreeContainerLaneD(RuntimeTreeNode20ContainerState* const treeState) noexcept
-  {
-    return RuntimeReleaseNode20TreeContainerHead(treeState, &RuntimeDeleteTreeNode20PostorderLaneB);
-  }
 
   struct RuntimeOffset18FloatArrayView
   {
@@ -40341,35 +26230,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeOffset18DoubleArrayView::values offset must be 0x18"
   );
 
-  /**
-   * Address: 0x00A6CE70 (FUN_00A6CE70)
-   *
-   * What it does:
-   * Reads one `float` element from the scalar-array lane stored at `+0x18` and
-   * returns that value as a floating-point result.
-   */
-  [[maybe_unused]] double RuntimeReadFloatValueAtOffset18Index(
-    const RuntimeOffset18FloatArrayView* const runtime,
-    const int index
-  ) noexcept
-  {
-    return runtime->values[index];
-  }
 
-  /**
-   * Address: 0x00A6CEA0 (FUN_00A6CEA0)
-   *
-   * What it does:
-   * Reads one `double` element from the scalar-array lane stored at `+0x18`
-   * and returns that value.
-   */
-  [[maybe_unused]] double RuntimeReadDoubleValueAtOffset18Index(
-    const RuntimeOffset18DoubleArrayView* const runtime,
-    const int index
-  ) noexcept
-  {
-    return runtime->values[index];
-  }
 
   struct RuntimeLinearBufferView
   {
@@ -40382,34 +26243,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeLinearBufferView::elementStorage offset must be 0x04"
   );
 
-  /**
-   * Address: 0x00A6D050 (FUN_00A6D050)
-   *
-   * What it does:
-   * Initializes one linear buffer lane for `elementCount` 4-byte elements;
-   * non-positive counts clear storage, positive counts allocate and zero-fill.
-   */
-  RuntimeLinearBufferView* RuntimeAllocateZeroedLinearBuffer4Byte(
-    RuntimeLinearBufferView* const bufferView,
-    const int elementCount
-  )
-  {
-    if (bufferView == nullptr) {
-      return nullptr;
-    }
-
-    if (elementCount <= 0) {
-      bufferView->elementCount = 0;
-      bufferView->elementStorage = nullptr;
-      return bufferView;
-    }
-
-    bufferView->elementCount = elementCount;
-    const std::size_t byteCount = static_cast<std::size_t>(elementCount) * sizeof(std::uint32_t);
-    bufferView->elementStorage = ::operator new(byteCount);
-    std::memset(bufferView->elementStorage, 0, byteCount);
-    return bufferView;
-  }
 
   /**
    * Address: 0x00A6D120 (FUN_00A6D120)
@@ -40478,7 +26311,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeAllocateZeroedLinearBuffer8Byte(destination, sourceRows->rowCount);
     if (sourceRows->rowCount > 0) {
       auto* const destinationValues = static_cast<double*>(destination->elementStorage);
-      auto* const rowPointers = reinterpret_cast<double* const*>(sourceRows->rowPointers);
+      auto* const rowPointers = reinterpret_cast<const double* const*>(sourceRows->rowPointers);
       for (int rowIndex = 0; rowIndex < sourceRows->rowCount; ++rowIndex) {
         destinationValues[rowIndex] = rowPointers[rowIndex][columnIndex];
       }
@@ -40487,77 +26320,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destination;
   }
 
-  /**
-   * Address: 0x00A71130 (FUN_00A71130)
-   *
-   * What it does:
-   * Wrapper lane that forwards to `RuntimeExtractDoubleColumnToLinearBuffer`
-   * using the owner subobject stored at `this+0x04`.
-   */
-  [[maybe_unused]] RuntimeLinearBufferView* RuntimeExtractDoubleColumnFromOffset04Owner(
-    RuntimeOffset04ScalarPointerRowsOwnerView* const owner,
-    RuntimeLinearBufferView* const destination,
-    const int columnIndex
-  )
-  {
-    return RuntimeExtractDoubleColumnToLinearBuffer(&owner->rows, destination, columnIndex);
-  }
 
-  /**
-   * Address: 0x00A6CFF0 (FUN_00A6CFF0)
-   *
-   * What it does:
-   * Copies one linear 4-byte-element buffer descriptor (`count + storage`) by
-   * cloning source storage into a freshly allocated destination buffer.
-   */
-  [[maybe_unused]] RuntimeLinearBufferView* RuntimeCopyLinearBuffer4ByteElements(
-    RuntimeLinearBufferView* const destination,
-    const RuntimeLinearBufferView* const source
-  )
-  {
-    destination->elementCount = source->elementCount;
-    if (source->elementCount <= 0) {
-      destination->elementStorage = nullptr;
-      return destination;
-    }
 
-    destination->elementStorage = RuntimeAllocateArrayWithBadAllocCommon(
-      static_cast<unsigned int>(source->elementCount),
-      4u
-    );
-    const std::size_t byteCount =
-      static_cast<std::size_t>(static_cast<std::uint32_t>(source->elementCount) * 4u);
-    std::memcpy(destination->elementStorage, source->elementStorage, byteCount);
-    return destination;
-  }
-
-  /**
-   * Address: 0x00A6D0C0 (FUN_00A6D0C0)
-   *
-   * What it does:
-   * Copies one linear 8-byte-element buffer descriptor (`count + storage`) by
-   * cloning source storage into a freshly allocated destination buffer.
-   */
-  [[maybe_unused]] RuntimeLinearBufferView* RuntimeCopyLinearBuffer8ByteElements(
-    RuntimeLinearBufferView* const destination,
-    const RuntimeLinearBufferView* const source
-  )
-  {
-    destination->elementCount = source->elementCount;
-    if (source->elementCount <= 0) {
-      destination->elementStorage = nullptr;
-      return destination;
-    }
-
-    destination->elementStorage = RuntimeAllocateArrayWithBadAllocCommon(
-      static_cast<unsigned int>(source->elementCount),
-      8u
-    );
-    const std::size_t byteCount =
-      static_cast<std::size_t>(static_cast<std::uint32_t>(source->elementCount) * 8u);
-    std::memcpy(destination->elementStorage, source->elementStorage, byteCount);
-    return destination;
-  }
 
   struct RuntimePointerGridView
   {
@@ -40631,71 +26395,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocatePointerGrid(grid, zeroInitialize != 0u, 8u);
   }
 
-  /**
-   * Address: 0x00A70760 (FUN_00A70760)
-   *
-   * What it does:
-   * Releases prior pointer-grid storage, updates dimensions/count, and
-   * re-allocates a zero-initialized 4-byte element grid when dimensions are
-   * positive.
-   */
-  int RuntimeResetAndResizePointerGrid4Byte(
-    RuntimePointerGridView& grid,
-    const int rowCount,
-    const int columnCount
-  )
-  {
-    ::operator delete[](grid.elementStorage);
-    ::operator delete[](grid.rowPointers);
 
-    const int result = rowCount;
-    if (rowCount <= 0 || columnCount <= 0) {
-      grid.rowCount = 0;
-      grid.columnCount = 0;
-      grid.elementCount = 0;
-      grid.elementStorage = nullptr;
-      grid.rowPointers = nullptr;
-      return result;
-    }
-
-    grid.rowCount = rowCount;
-    grid.columnCount = columnCount;
-    grid.elementCount = rowCount * columnCount;
-    return RuntimeAllocatePointerGrid4Byte(grid, 1u);
-  }
-
-  /**
-   * Address: 0x00A707C0 (FUN_00A707C0)
-   *
-   * What it does:
-   * Releases prior pointer-grid storage, updates dimensions/count, and
-   * re-allocates a zero-initialized 8-byte element grid when dimensions are
-   * positive.
-   */
-  int RuntimeResetAndResizePointerGrid8Byte(
-    RuntimePointerGridView& grid,
-    const int rowCount,
-    const int columnCount
-  )
-  {
-    ::operator delete[](grid.elementStorage);
-    ::operator delete[](grid.rowPointers);
-
-    const int result = rowCount;
-    if (rowCount <= 0 || columnCount <= 0) {
-      grid.rowCount = 0;
-      grid.columnCount = 0;
-      grid.elementCount = 0;
-      grid.elementStorage = nullptr;
-      grid.rowPointers = nullptr;
-      return result;
-    }
-
-    grid.rowCount = rowCount;
-    grid.columnCount = columnCount;
-    grid.elementCount = rowCount * columnCount;
-    return RuntimeAllocatePointerGrid8Byte(grid, 1u);
-  }
 
   struct RuntimeFixedPointerGridAggregateView
   {
@@ -40728,233 +26428,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeFixedPointerGridAggregateView::readyFlag offset must be 0x20"
   );
 
-  /**
-   * Address: 0x00A702C0 (FUN_00A702C0)
-   *
-   * What it does:
-   * Applies one descending pivot ordering pass to the primary double lane and
-   * mirrors each pivot swap across all row lanes in the grid.
-   */
-  [[maybe_unused]] int RuntimeSortGridColumnsByPrimaryDescending(
-    RuntimeFixedPointerGridAggregateView* const aggregate
-  ) noexcept
-  {
-    const int laneCount = aggregate->laneCount;
-    const int finalPivot = laneCount - 2;
-    int pivotIndex = 0;
 
-    if (finalPivot >= 0) {
-      do {
-        auto* const primaryValues = static_cast<double*>(aggregate->linearStorageA);
-        double bestValue = primaryValues[pivotIndex];
-        int bestIndex = pivotIndex;
-        int scanIndex = pivotIndex + 1;
 
-        if (scanIndex < laneCount) {
-          const double* scanCursor = primaryValues + scanIndex;
-          do {
-            if (bestValue < *scanCursor) {
-              bestValue = *scanCursor;
-              bestIndex = scanIndex;
-            }
-            ++scanIndex;
-            ++scanCursor;
-          } while (scanIndex < laneCount);
 
-          if (bestIndex != pivotIndex) {
-            primaryValues[bestIndex] = primaryValues[pivotIndex];
-            primaryValues[pivotIndex] = bestValue;
-
-            if (laneCount > 0) {
-              auto** const rowPointers = reinterpret_cast<double**>(aggregate->grid.rowPointers);
-              for (int rowIndex = 0; rowIndex < laneCount; ++rowIndex) {
-                double* const rowValues = rowPointers[rowIndex];
-                const double pivotValue = rowValues[pivotIndex];
-                rowValues[pivotIndex] = rowValues[bestIndex];
-                rowValues[bestIndex] = pivotValue;
-                aggregate->readyFlag = (aggregate->readyFlag == 0u) ? 1u : 0u;
-              }
-            }
-          }
-        }
-
-        ++pivotIndex;
-      } while (pivotIndex <= finalPivot);
-    }
-
-    return finalPivot;
-  }
-
-  /**
-   * Address: 0x00A70370 (FUN_00A70370)
-   *
-   * What it does:
-   * Applies one ascending pivot ordering pass to the primary double lane and
-   * mirrors each pivot swap across all row lanes in the grid.
-   */
-  [[maybe_unused]] int RuntimeSortGridColumnsByPrimaryAscending(
-    RuntimeFixedPointerGridAggregateView* const aggregate
-  ) noexcept
-  {
-    const int laneCount = aggregate->laneCount;
-    const int finalPivot = laneCount - 2;
-    int pivotIndex = 0;
-
-    if (finalPivot >= 0) {
-      do {
-        auto* const primaryValues = static_cast<double*>(aggregate->linearStorageA);
-        double bestValue = primaryValues[pivotIndex];
-        int bestIndex = pivotIndex;
-        int scanIndex = pivotIndex + 1;
-
-        if (scanIndex < laneCount) {
-          const double* scanCursor = primaryValues + scanIndex;
-          do {
-            if (bestValue > *scanCursor) {
-              bestValue = *scanCursor;
-              bestIndex = scanIndex;
-            }
-            ++scanIndex;
-            ++scanCursor;
-          } while (scanIndex < laneCount);
-
-          if (bestIndex != pivotIndex) {
-            primaryValues[bestIndex] = primaryValues[pivotIndex];
-            primaryValues[pivotIndex] = bestValue;
-
-            if (laneCount > 0) {
-              auto** const rowPointers = reinterpret_cast<double**>(aggregate->grid.rowPointers);
-              for (int rowIndex = 0; rowIndex < laneCount; ++rowIndex) {
-                double* const rowValues = rowPointers[rowIndex];
-                const double pivotValue = rowValues[pivotIndex];
-                rowValues[pivotIndex] = rowValues[bestIndex];
-                rowValues[bestIndex] = pivotValue;
-                aggregate->readyFlag = (aggregate->readyFlag == 0u) ? 1u : 0u;
-              }
-            }
-          }
-        }
-
-        ++pivotIndex;
-      } while (pivotIndex <= finalPivot);
-    }
-
-    return finalPivot;
-  }
-
-  /**
-   * Address: 0x00A6EC40 (FUN_00A6EC40)
-   *
-   * What it does:
-   * Applies one descending pivot ordering pass to the primary float lane and
-   * mirrors each pivot swap across all row lanes in the grid.
-   */
-  [[maybe_unused]] int RuntimeSortGridColumnsByPrimaryFloatDescending(
-    RuntimeFixedPointerGridAggregateView* const aggregate
-  ) noexcept
-  {
-    const int laneCount = aggregate->laneCount;
-    const int finalPivot = laneCount - 2;
-    int pivotIndex = 0;
-
-    if (finalPivot >= 0) {
-      do {
-        auto* const primaryValues = static_cast<float*>(aggregate->linearStorageA);
-        float bestValue = primaryValues[pivotIndex];
-        int bestIndex = pivotIndex;
-        int scanIndex = pivotIndex + 1;
-
-        if (scanIndex < laneCount) {
-          const float* scanCursor = primaryValues + scanIndex;
-          do {
-            if (bestValue < *scanCursor) {
-              bestValue = *scanCursor;
-              bestIndex = scanIndex;
-            }
-            ++scanIndex;
-            ++scanCursor;
-          } while (scanIndex < laneCount);
-
-          if (bestIndex != pivotIndex) {
-            primaryValues[bestIndex] = primaryValues[pivotIndex];
-            primaryValues[pivotIndex] = bestValue;
-
-            if (laneCount > 0) {
-              auto** const rowPointers = reinterpret_cast<float**>(aggregate->grid.rowPointers);
-              for (int rowIndex = 0; rowIndex < laneCount; ++rowIndex) {
-                float* const rowValues = rowPointers[rowIndex];
-                const float pivotValue = rowValues[pivotIndex];
-                rowValues[pivotIndex] = rowValues[bestIndex];
-                rowValues[bestIndex] = pivotValue;
-                aggregate->readyFlag = (aggregate->readyFlag == 0u) ? 1u : 0u;
-              }
-            }
-          }
-        }
-
-        ++pivotIndex;
-      } while (pivotIndex <= finalPivot);
-    }
-
-    return finalPivot;
-  }
-
-  /**
-   * Address: 0x00A6ED00 (FUN_00A6ED00)
-   *
-   * What it does:
-   * Applies one ascending pivot ordering pass to the primary float lane and
-   * mirrors each pivot swap across all row lanes in the grid.
-   */
-  [[maybe_unused]] int RuntimeSortGridColumnsByPrimaryFloatAscending(
-    RuntimeFixedPointerGridAggregateView* const aggregate
-  ) noexcept
-  {
-    const int laneCount = aggregate->laneCount;
-    const int finalPivot = laneCount - 2;
-    int pivotIndex = 0;
-
-    if (finalPivot >= 0) {
-      do {
-        auto* const primaryValues = static_cast<float*>(aggregate->linearStorageA);
-        float bestValue = primaryValues[pivotIndex];
-        int bestIndex = pivotIndex;
-        int scanIndex = pivotIndex + 1;
-
-        if (scanIndex < laneCount) {
-          const float* scanCursor = primaryValues + scanIndex;
-          do {
-            if (bestValue > *scanCursor) {
-              bestValue = *scanCursor;
-              bestIndex = scanIndex;
-            }
-            ++scanIndex;
-            ++scanCursor;
-          } while (scanIndex < laneCount);
-
-          if (bestIndex != pivotIndex) {
-            primaryValues[bestIndex] = primaryValues[pivotIndex];
-            primaryValues[pivotIndex] = bestValue;
-
-            if (laneCount > 0) {
-              auto** const rowPointers = reinterpret_cast<float**>(aggregate->grid.rowPointers);
-              for (int rowIndex = 0; rowIndex < laneCount; ++rowIndex) {
-                float* const rowValues = rowPointers[rowIndex];
-                const float pivotValue = rowValues[pivotIndex];
-                rowValues[pivotIndex] = rowValues[bestIndex];
-                rowValues[bestIndex] = pivotValue;
-                aggregate->readyFlag = (aggregate->readyFlag == 0u) ? 1u : 0u;
-              }
-            }
-          }
-        }
-
-        ++pivotIndex;
-      } while (pivotIndex <= finalPivot);
-    }
-
-    return finalPivot;
-  }
 
   using RuntimePointerGridAllocator = int (*)(RuntimePointerGridView&, std::uint8_t);
 
@@ -40988,166 +26464,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return &aggregate;
   }
 
-  /**
-   * Address: 0x00A71740 (FUN_00A71740)
-   *
-   * What it does:
-   * Seeds one `4x4` pointer-grid lane with 4-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid4x4Lane4Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      4,
-      4,
-      sizeof(std::uint32_t),
-      &RuntimeAllocatePointerGrid4Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A71820 (FUN_00A71820)
-   *
-   * What it does:
-   * Seeds one `3x3` pointer-grid lane with 4-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid3x3Lane4Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      3,
-      3,
-      sizeof(std::uint32_t),
-      &RuntimeAllocatePointerGrid4Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A71900 (FUN_00A71900)
-   *
-   * What it does:
-   * Seeds one `2x2` pointer-grid lane with 4-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid2x2Lane4Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      2,
-      2,
-      sizeof(std::uint32_t),
-      &RuntimeAllocatePointerGrid4Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A71B20 (FUN_00A71B20)
-   *
-   * What it does:
-   * Seeds one `4x4` pointer-grid lane with 8-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid4x4Lane8Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      4,
-      4,
-      sizeof(std::uint64_t),
-      &RuntimeAllocatePointerGrid8Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A71C00 (FUN_00A71C00)
-   *
-   * What it does:
-   * Seeds one `3x3` pointer-grid lane with 8-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid3x3Lane8Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      3,
-      3,
-      sizeof(std::uint64_t),
-      &RuntimeAllocatePointerGrid8Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A71CE0 (FUN_00A71CE0)
-   *
-   * What it does:
-   * Seeds one `2x2` pointer-grid lane with 8-byte elements from source data,
-   * allocates two linear side-buffers, and clears the ready-flag byte.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitGrid2x2Lane8Byte(
-    RuntimeFixedPointerGridAggregateView* const aggregate,
-    const void* const sourceElements
-  )
-  {
-    if (aggregate == nullptr) {
-      return nullptr;
-    }
-    return RuntimeInitializeFixedPointerGridAggregate(
-      *aggregate,
-      sourceElements,
-      2,
-      2,
-      sizeof(std::uint64_t),
-      &RuntimeAllocatePointerGrid8Byte
-    );
-  }
 
-  /**
-   * Address: 0x00A73FD0 (FUN_00A73FD0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEF()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
   /**
    * Address: 0x00A74050 (FUN_00A74050)
@@ -41160,40 +26482,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00AC4040 (FUN_00AC4040)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEH()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00ABF052 (FUN_00ABF052, std::_String_base::_Xran)
-   *
-   * What it does:
-   * Throws one `std::out_of_range` with the CRT fixed diagnostic text
-   * `"invalid string position"`.
-   */
-  [[noreturn]] void RuntimeThrowInvalidStringPosition()
-  {
-    throw std::out_of_range("invalid string position");
-  }
 
-  /**
-   * Address: 0x00ABF091 (FUN_00ABF091)
-   *
-   * What it does:
-   * Throws one `std::invalid_argument` instance with the CRT fixed diagnostic
-   * text `"invalid string argument"`.
-   */
-  [[noreturn]] void RuntimeThrowInvalidStringArgument()
-  {
-    throw std::invalid_argument("invalid string argument");
-  }
 
   struct RuntimeIosFnNode
   {
@@ -41270,37 +26560,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     iosBase->callbackHead = nullptr;
   }
 
-  /**
-   * Address: 0x00ABF150 (FUN_00ABF150, std::ios_base::_Addstd)
-   *
-   * What it does:
-   * Registers one `ios_base` lane in CRT std-stream slot tables under
-   * `_Lockit(2)` and increments the selected slot open-count byte.
-   */
-  void RuntimeIosBaseAddStd(void* const iosBaseStorage)
-  {
-    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
-    RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 2);
-
-    iosBase->stdStreamSlot = 1;
-    while (true) {
-      void* const current = gRuntimeIosStdStreams[iosBase->stdStreamSlot];
-      if (current == nullptr || current == iosBaseStorage) {
-        break;
-      }
-
-      ++iosBase->stdStreamSlot;
-      if (iosBase->stdStreamSlot >= 8) {
-        break;
-      }
-    }
-
-    gRuntimeIosStdStreams[iosBase->stdStreamSlot] = iosBaseStorage;
-    ++gRuntimeIosStdOpenCounts[iosBase->stdStreamSlot];
-
-    RuntimeLockitDestroy(&lockit);
-  }
 
   /**
    * Address: 0x00ABF1A0 (FUN_00ABF1A0, std::ios_base::_Ios_base_dtor)
@@ -41326,232 +26585,16 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x004F7B20 (FUN_004F7B20)
-   *
-   * What it does:
-   * Runs one deleting `std::ios_base` teardown lane by rebinding the base
-   * vtable, executing `_Ios_base_dtor`, and scalar-deleting on flag bit `0x1`.
-   */
-  [[maybe_unused]] void* RuntimeIosBaseScalarDeletingDtor(
-    void* const iosBaseStorage,
-    const char deleteFlags
-  ) noexcept
-  {
-    static std::uint8_t sRuntimeIosBaseVTableTag = 0;
 
-    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
-    if (iosBase == nullptr) {
-      return nullptr;
-    }
 
-    iosBase->vtable = &sRuntimeIosBaseVTableTag;
-    RuntimeIosBaseDtor(iosBaseStorage);
 
-    if ((deleteFlags & 1) != 0) {
-      ::operator delete(iosBaseStorage);
-    }
-    return iosBaseStorage;
-  }
 
-  /**
-   * Address: 0x00ABF138 (FUN_00ABF138)
-   *
-   * What it does:
-   * Returns one static storage-slot address used by CRT startup lane.
-   */
-  void* RuntimeGetStaticStorageSlotA()
-  {
-    return &gRuntimeStaticStorageSlotA;
-  }
 
-  /**
-   * Address: 0x00ABF13E (FUN_00ABF13E)
-   *
-   * What it does:
-   * Returns one static integer-storage address used by CRT startup lane.
-   */
-  std::int32_t* RuntimeGetStaticStorageSlotB()
-  {
-    return &gRuntimeStaticStorageSlotB;
-  }
 
-  /**
-   * Address: 0x00ABF144 (FUN_00ABF144)
-   *
-   * What it does:
-   * Returns one static storage-slot address used by CRT startup lane.
-   */
-  void* RuntimeGetStaticStorageSlotC()
-  {
-    return &gRuntimeStaticStorageSlotC;
-  }
 
-  /**
-   * Address: 0x00ABF14A (FUN_00ABF14A)
-   *
-   * What it does:
-   * Returns one static storage-slot address used by CRT startup lane.
-   */
-  void* RuntimeGetStaticStorageSlotD()
-  {
-    return &gRuntimeStaticStorageSlotD;
-  }
 
-  /**
-   * Address: 0x00ABF61B (FUN_00ABF61B, std::_Locinfo::_Locinfo_ctor)
-   *
-   * What it does:
-   * Captures current `LC_ALL` locale name into `_Locinfo::oldlocname`, then
-   * applies optional incoming locale text and stores resulting name (or `"*"`)
-   * into `_Locinfo::newlocname`.
-   */
-  void RuntimeLocinfoConstruct(void* const locinfoStorage, const char* const requestedLocaleText)
-  {
-    struct RuntimeLocinfoView
-    {
-      std::uint8_t reserved00[0x3C];
-    };
-    constexpr std::size_t kRuntimeLocinfoOldNameOffset = 0x3C;
-    constexpr std::size_t kRuntimeLocinfoNewNameOffset = 0x58;
-    static_assert(sizeof(RuntimeLocinfoView) == kRuntimeLocinfoOldNameOffset, "RuntimeLocinfoView size must be 0x3C");
 
-    auto* const locinfo = reinterpret_cast<std::uint8_t*>(static_cast<RuntimeLocinfoView*>(locinfoStorage));
-    auto& oldLocaleName = *reinterpret_cast<std::string*>(locinfo + kRuntimeLocinfoOldNameOffset);
-    auto& newLocaleName = *reinterpret_cast<std::string*>(locinfo + kRuntimeLocinfoNewNameOffset);
 
-    const char* previousLocaleName = std::setlocale(LC_ALL, nullptr);
-    if (previousLocaleName == nullptr) {
-      previousLocaleName = "";
-    }
-    oldLocaleName.assign(previousLocaleName);
-
-    const char* appliedLocaleName = "*";
-    if (requestedLocaleText != nullptr) {
-      const char* const setLocaleResult = std::setlocale(LC_ALL, requestedLocaleText);
-      if (setLocaleResult != nullptr) {
-        appliedLocaleName = setLocaleResult;
-      }
-    }
-
-    newLocaleName.assign(appliedLocaleName);
-  }
-
-  /**
-   * Address: 0x00ABF4BC (FUN_00ABF4BC, std::_Locinfo::_Locinfo_dtor)
-   *
-   * What it does:
-   * Restores `LC_ALL` to the saved old-locale string lane when that saved
-   * locale text is non-empty.
-   */
-  const char* RuntimeLocinfoDtor(const char* const locinfoStorage)
-  {
-    struct RuntimeLegacyStringView
-    {
-      union
-      {
-        const char* heapPtr;
-        char inlineBuffer[16];
-      } storage{};
-      std::uint32_t size = 0;
-      std::uint32_t capacity = 0;
-    };
-    static_assert(sizeof(RuntimeLegacyStringView) == 0x18, "RuntimeLegacyStringView size must be 0x18");
-
-    struct RuntimeLocinfoOldLocaleView
-    {
-      std::uint8_t reserved00[0x40];
-      RuntimeLegacyStringView oldLocaleName;
-    };
-    static_assert(
-      offsetof(RuntimeLocinfoOldLocaleView, oldLocaleName) == 0x40,
-      "RuntimeLocinfoOldLocaleView::oldLocaleName offset must be 0x40"
-    );
-
-    const auto* const locinfo = reinterpret_cast<const RuntimeLocinfoOldLocaleView*>(locinfoStorage);
-    if (locinfo->oldLocaleName.size > 0u) {
-      const char* const localeText = (locinfo->oldLocaleName.capacity < 0x10u)
-        ? locinfo->oldLocaleName.storage.inlineBuffer
-        : locinfo->oldLocaleName.storage.heapPtr;
-      return std::setlocale(LC_ALL, localeText);
-    }
-
-    return locinfoStorage;
-  }
-
-  /**
-   * Address: 0x00ABF2F2 (FUN_00ABF2F2)
-   *
-   * What it does:
-   * Returns incoming `this` pointer unchanged; ignores one trailing argument.
-   */
-  void* RuntimeReturnSelfIgnoringInt(void* const self, int /*unused*/)
-  {
-    return self;
-  }
-
-  /**
-   * Address: 0x00ABF2F7 (FUN_00ABF2F7)
-   *
-   * What it does:
-   * Writes one 32-bit value into `this[0]` and returns `this`.
-   */
-  std::int32_t* RuntimeAssignFirstInt(std::int32_t* const self, const std::int32_t value)
-  {
-    self[0] = value;
-    return self;
-  }
-
-  /**
-   * Address: 0x00ABF302 (FUN_00ABF302)
-   *
-   * What it does:
-   * Writes two 32-bit values into `this[0..1]` and returns `this`.
-   */
-  std::int32_t* RuntimeAssignFirstTwoInts(
-    std::int32_t* const self,
-    const std::int32_t firstValue,
-    const std::int32_t secondValue
-  )
-  {
-    self[0] = firstValue;
-    self[1] = secondValue;
-    return self;
-  }
-
-  /**
-   * Address: 0x00AA65B1 (FUN_00AA65B1, ProcessCodePage)
-   *
-   * What it does:
-   * Resolves one CRT locale codepage token (`ACP`, `OCP`, or numeric) to an
-   * integer codepage using the locale-country lane from `setloc_struct`.
-   */
-  int RuntimeProcessCodePage(char* const codePageText, RuntimeSetLocLocaleView* const locale)
-  {
-    char* codePageValue = codePageText;
-    char localeCodePage[8] = {};
-
-    if (codePageText == nullptr || codePageText[0] == '\0' || std::strcmp(codePageText, "ACP") == 0) {
-      const int queryResult =
-        ::GetLocaleInfoA(locale->lcidCountry, LOCALE_IDEFAULTANSICODEPAGE, localeCodePage, sizeof(localeCodePage));
-      if (queryResult == 0) {
-        return queryResult;
-      }
-      codePageValue = localeCodePage;
-      return static_cast<int>(std::atol(codePageValue));
-    }
-
-    if (std::strcmp(codePageText, "OCP") == 0) {
-      const int queryResult =
-        ::GetLocaleInfoA(locale->lcidCountry, LOCALE_IDEFAULTCODEPAGE, localeCodePage, sizeof(localeCodePage));
-      if (queryResult == 0) {
-        return queryResult;
-      }
-      codePageValue = localeCodePage;
-    }
-
-    return static_cast<int>(std::atol(codePageValue));
-  }
 
   struct RuntimeLocaleNameTableEntry
   {
@@ -41673,72 +26716,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeUndecoratorHeapManagerState) == 0x10, "RuntimeUndecoratorHeapManagerState size must be 0x10");
 
-  /**
-   * Address: 0x00AB0A14 (FUN_00AB0A14, HeapManager::Destructor)
-   *
-   * What it does:
-   * Drains one undecorator heap-manager frame chain and releases each frame
-   * through the manager's deallocator callback lane.
-   */
-  void RuntimeUndecoratorHeapManagerDrain(RuntimeUndecoratorHeapManagerState* const manager)
-  {
-    if (manager == nullptr || manager->deallocator == nullptr) {
-      return;
-    }
-
-    while (true) {
-      RuntimeUndecoratorHeapFrameNode* const current = manager->firstFrame;
-      manager->frame = current;
-      if (current == nullptr) {
-        break;
-      }
-
-      manager->firstFrame = current->next;
-      manager->deallocator(current);
-    }
-  }
 
   const char* gRuntimeUndecoratorCurrentDecoratedName = nullptr;
 
-  /**
-   * Address: 0x00AB0A3A (FUN_00AB0A3A)
-   *
-   * What it does:
-   * Parses one undecorator argument back-reference index from the global
-   * decorated-name cursor, accepting decimal (`'0'..'9'`) and hexadecimal
-   * (`'A'..'P'` terminated by `'@'`) forms.
-   */
-  [[maybe_unused]] int RuntimeUndecoratorParseArgumentBackrefIndex()
-  {
-    const char* cursor = gRuntimeUndecoratorCurrentDecoratedName;
-    if (cursor == nullptr || *cursor == '\0') {
-      return 0;
-    }
-
-    const char firstChar = *cursor;
-    if (firstChar >= '0' && firstChar <= '9') {
-      gRuntimeUndecoratorCurrentDecoratedName = cursor + 1;
-      return static_cast<int>(firstChar) - 47;
-    }
-
-    int parsedValue = 0;
-    while (*cursor != '@') {
-      const char character = *cursor;
-      if (character == '\0') {
-        return 0;
-      }
-      if (character < 'A' || character > 'P') {
-        return -1;
-      }
-
-      ++cursor;
-      parsedValue = (parsedValue * 16) + static_cast<int>(character - 'A');
-      gRuntimeUndecoratorCurrentDecoratedName = cursor;
-    }
-
-    gRuntimeUndecoratorCurrentDecoratedName = cursor + 1;
-    return parsedValue;
-  }
 
   struct RuntimeUndecoratorDNameLane
   {
@@ -41771,78 +26751,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeUndecoratorReplicatorView) == 0x3C, "RuntimeUndecoratorReplicatorView size must be 0x3C");
 
-  /**
-   * Address: 0x00AB16C6 (FUN_00AB16C6, Replicator::Replicator)
-   * Mangled: ??0Replicator@@QAE@XZ
-   *
-   * What it does:
-   * Initializes one undecorator replicator lane with canonical overflow/missing
-   * argument-name sentinels and resets highest stored argument to `-1`.
-   */
-  RuntimeUndecoratorReplicatorView* RuntimeUndecoratorReplicatorCtor(
-    RuntimeUndecoratorReplicatorView* const replicator
-  )
-  {
-    auto* const overflowArgumentName = reinterpret_cast<DName*>(&replicator->overflowArgumentName);
-    new (overflowArgumentName) DName(DNameStatus::kProtected);
 
-    auto* const missingArgumentNameSentinel = reinterpret_cast<DName*>(&replicator->missingArgumentNameSentinel);
-    new (missingArgumentNameSentinel) DName(DNameStatus::kInvalid);
 
-    replicator->highestStoredArgument |= -1;
-    return replicator;
-  }
-
-  /**
-   * Address: 0x00AB123B (FUN_00AB123B, Replicator::operator[])
-   *
-   * What it does:
-   * Resolves one undecorator argument-name lane by index, returning overflow
-   * and missing-value sentinels for out-of-range requests.
-   */
-  RuntimeUndecoratorDNameLane* RuntimeReplicatorSelectArgumentName(
-    RuntimeUndecoratorReplicatorView* const replicator,
-    const unsigned int argumentIndex
-  )
-  {
-    if (argumentIndex > 9u) {
-      return &replicator->overflowArgumentName;
-    }
-
-    if (replicator->highestStoredArgument == -1 || static_cast<int>(argumentIndex) > replicator->highestStoredArgument) {
-      return &replicator->missingArgumentNameSentinel;
-    }
-
-    return replicator->argumentNames[argumentIndex];
-  }
-
-  /**
-   * Address: 0x00AB134A (FUN_00AB134A, und_strncpy)
-   *
-   * What it does:
-   * Copies at most `count` bytes from source to destination, stopping after
-   * writing the first null terminator and returning the destination pointer.
-   */
-  char* RuntimeUndecoratorStrncpy(
-    const char* source,
-    char* const destination,
-    unsigned int count
-  )
-  {
-    char* writeCursor = destination;
-    while (count != 0u) {
-      const char character = *source;
-      *writeCursor = character;
-      if (character == '\0') {
-        break;
-      }
-
-      ++writeCursor;
-      ++source;
-      --count;
-    }
-    return destination;
-  }
 
   extern "C" const std::uint16_t __rglangidNotDefault[10];
 
@@ -41898,38 +26808,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return FALSE;
   }
 
-  /**
-   * Address: 0x00AA6693 (FUN_00AA6693, CountryEnumProc)
-   *
-   * What it does:
-   * Enumerates locale country names and latches the first matching country
-   * LCID into the thread's locale-selection lane.
-   */
-  BOOL __stdcall RuntimeCountryEnumProc(LPSTR localeText)
-  {
-    auto* const setlocData = &__getptd()->setlocData;
-    const LCID localeId = static_cast<LCID>(RuntimeLcidFromHexString(localeText));
-    char localeName[120]{};
-
-    if (!::GetLocaleInfoA(
-          localeId,
-          setlocData->bAbbrevCountry != 0 ? LOCALE_SABBREVCTRYNAME : LOCALE_SENGCOUNTRY,
-          localeName,
-          120)) {
-      setlocData->iLcidState = 0;
-      return TRUE;
-    }
-
-    if (_stricmp(setlocData->pchCountry, localeName) == 0) {
-      if (RuntimeTestDefaultCountry(static_cast<std::uint16_t>(localeId)) != 0) {
-        setlocData->iLcidState |= 4;
-        setlocData->lcidCountry = localeId;
-        setlocData->lcidLanguage = localeId;
-      }
-    }
-
-    return (setlocData->iLcidState & 4) == 0;
-  }
 
   /**
    * Address: 0x00AA679B (FUN_00AA679B, LangCountryEnumProc)
@@ -42073,47 +26951,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return (setlocData->iLcidState & 4) == 0;
   }
 
-  /**
-   * Address: 0x00AA6A56 (FUN_00AA6A56, GetLcidFromLangCountry)
-   *
-   * What it does:
-   * Prepares setlocale language/country matching flags, runs the combined
-   * language+country locale enumeration callback, and normalizes state bits.
-   */
-  int RuntimeGetLcidFromLangCountry(RuntimeSetLocLocaleView* const setlocData)
-  {
-    setlocData->bAbbrevLanguage = (std::strlen(setlocData->pchLanguage) == 3u) ? 1 : 0;
-    setlocData->bAbbrevCountry = (std::strlen(setlocData->pchCountry) == 3u) ? 1 : 0;
-    setlocData->lcidLanguage = 0;
-    setlocData->iPrimaryLen = (setlocData->bAbbrevLanguage != 0) ? 2 : RuntimeGetPrimaryLen(setlocData->pchLanguage);
 
-    (void)::EnumSystemLocalesA(RuntimeLangCountryEnumProc, 1u);
-
-    const int previousState = setlocData->iLcidState;
-    if ((previousState & 0x100) == 0 || (previousState & 0x200) == 0 || (previousState & 7) == 0) {
-      setlocData->iLcidState = 0;
-    }
-    return previousState;
-  }
-
-  /**
-   * Address: 0x00AA6ABB (FUN_00AA6ABB, GetLcidFromLanguage)
-   *
-   * What it does:
-   * Prepares language matching state, runs language-only locale enumeration,
-   * and clears state when no primary language match bit was latched.
-   */
-  BOOL RuntimeGetLcidFromLanguage(RuntimeSetLocLocaleView* const setlocData)
-  {
-    setlocData->bAbbrevLanguage = (std::strlen(setlocData->pchLanguage) == 3u) ? 1 : 0;
-    setlocData->iPrimaryLen = (setlocData->bAbbrevLanguage != 0) ? 2 : RuntimeGetPrimaryLen(setlocData->pchLanguage);
-
-    const BOOL enumResult = ::EnumSystemLocalesA(RuntimeLanguageEnumProc, 1u);
-    if ((setlocData->iLcidState & 4) == 0) {
-      setlocData->iLcidState = 0;
-    }
-    return enumResult;
-  }
 
   struct RuntimeFacetRefView
   {
@@ -42188,29 +27026,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeLockitDestroy(&lockit);
   }
 
-  /**
-   * Address: 0x00ABF483 (FUN_00ABF483, std::locale::facet::facet_Register)
-   *
-   * What it does:
-   * Registers one facet pointer in the global facet list and ensures list tidy
-   * is scheduled at process-exit.
-   */
-  void RuntimeRegisterFacet(std::locale::facet* const facet)
-  {
-    if (gRuntimeFacetHead == nullptr) {
-      std::atexit(RuntimeFacetTidy);
-    }
-
-    auto* node = static_cast<RuntimeFacetNode*>(::operator new(sizeof(RuntimeFacetNode), std::nothrow));
-    if (node != nullptr) {
-      node->next = gRuntimeFacetHead;
-      node->facet = facet;
-    } else {
-      node = nullptr;
-    }
-
-    gRuntimeFacetHead = node;
-  }
 
   /**
    * Address: 0x00ABF345 (FUN_00ABF345)
@@ -42283,82 +27098,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  /**
-   * Address: 0x00ABF3B6 (FUN_00ABF3B6, std::locale::_Locimp::_Clocptr_func)
-   *
-   * What it does:
-   * Returns pointer-to-pointer storage for classic locale implementation lane.
-   */
-  RuntimeLocaleLocimpView** RuntimeGetClassicLocimpPointerSlot()
-  {
-    return &gRuntimeClassicLocale;
-  }
 
-  /**
-   * Address: 0x00ABF3BC (FUN_00ABF3BC)
-   *
-   * What it does:
-   * Returns storage for the locale-id global counter lane.
-   */
-  std::int32_t* RuntimeGetLocaleIdCounterSlot()
-  {
-    return &gRuntimeLocaleIdCounter;
-  }
 
-  /**
-   * Address: 0x00ABF3C2 (FUN_00ABF3C2)
-   *
-   * What it does:
-   * Returns storage for the `ctype<char>` locale-id lane.
-   */
-  std::int32_t* RuntimeGetCtypeCharIdSlot()
-  {
-    return &gRuntimeLocaleIdCtypeChar;
-  }
 
-  /**
-   * Address: 0x00ABF3C8 (FUN_00ABF3C8)
-   *
-   * What it does:
-   * Returns storage for one static locale-id lane.
-   */
-  std::int32_t* RuntimeGetLocaleIdSlotA()
-  {
-    return &gRuntimeLocaleIdSlotA;
-  }
 
-  /**
-   * Address: 0x00ABF3CE (FUN_00ABF3CE)
-   *
-   * What it does:
-   * Returns storage for one static locale-id lane.
-   */
-  std::int32_t* RuntimeGetLocaleIdSlotB()
-  {
-    return &gRuntimeLocaleIdSlotB;
-  }
 
-  /**
-   * Address: 0x00ABF3D4 (FUN_00ABF3D4)
-   *
-   * What it does:
-   * Returns storage for one static locale-id lane.
-   */
-  std::int32_t* RuntimeGetLocaleIdSlotC()
-  {
-    return &gRuntimeLocaleIdSlotC;
-  }
 
-  /**
-   * Address: 0x00ABF3DA (FUN_00ABF3DA)
-   *
-   * What it does:
-   * Returns storage for one static locale-id lane.
-   */
-  std::int32_t* RuntimeGetLocaleIdSlotD()
-  {
-    return &gRuntimeLocaleIdSlotD;
-  }
 
   /**
    * Address: 0x00ABF3E0 (FUN_00ABF3E0)
@@ -42401,24 +27146,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  /**
-   * Address: 0x00ABF565 (FUN_00ABF565)
-   *
-   * What it does:
-   * Runs `_Locimp` destroy tail and conditionally deletes storage when the
-   * scalar-deleting-destructor flag bit is set.
-   */
-  RuntimeLocaleLocimpView* RuntimeDestroyLocimpDeleting(
-    RuntimeLocaleLocimpView* const localeImpl,
-    const unsigned int deleteFlags
-  )
-  {
-    RuntimeDestroyLocimp(localeImpl);
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(localeImpl);
-    }
-    return localeImpl;
-  }
 
   /**
    * Address: 0x00ABF581 (FUN_00ABF581, std::locale::_Init)
@@ -42460,40 +27187,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  /**
-   * Address: 0x00ABF665 (FUN_00ABF665, std::locale::classic)
-   *
-   * What it does:
-   * Ensures global locale initialization and returns reference storage for the
-   * process classic locale object.
-   */
-  RuntimeStdLocaleObject* RuntimeLocaleClassic()
-  {
-    RuntimeLocaleInit();
-    return &gRuntimeClassicLocaleObject;
-  }
 
-  /**
-   * Address: 0x00ABF670 (FUN_00ABF670, std::locale::empty)
-   *
-   * What it does:
-   * Ensures global locale initialization, allocates one new `_Locimp` in
-   * `isParent=true` mode, stores it into the destination locale object lane,
-   * and returns that destination pointer.
-   */
-  RuntimeStdLocaleObject* RuntimeLocaleEmpty(RuntimeStdLocaleObject* const destinationLocale)
-  {
-    RuntimeLocaleInit();
-
-    RuntimeLocaleLocimpView* localeImpl = nullptr;
-    auto* const storage = static_cast<RuntimeLocaleLocimpView*>(::operator new(sizeof(RuntimeLocaleLocimpView), std::nothrow));
-    if (storage != nullptr) {
-      localeImpl = RuntimeLocaleLocimpConstruct(storage, true);
-    }
-
-    destinationLocale->ptr = localeImpl;
-    return destinationLocale;
-  }
 
   [[nodiscard]] std::size_t RuntimeCodePageHashBucket(const std::uint32_t codePage) noexcept
   {
@@ -42619,17 +27313,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x00ABFDDD (FUN_00ABFDDD, _InitCPLocHash)
-   *
-   * What it does:
-   * Registers one process-exit cleanup hook for the codepage-locale hash and
-   * returns CRT on-exit failure code semantics.
-   */
-  int RuntimeInitCodePageLocaleHash()
-  {
-    return std::atexit(RuntimeReleaseCodePageLocaleHash) != 0 ? kRuntimeOnExitFailureCode : 0;
-  }
 
   /**
    * Address: 0x00ABFA01 (FUN_00ABFA01)
@@ -42682,21 +27365,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return conversionResult;
   }
 
-  /**
-   * Address: 0x00ABFA96 (FUN_00ABFA96)
-   *
-   * What it does:
-   * Jump-thunk lane for `RuntimeWideCharToMultiByteLocale`.
-   */
-  int RuntimeWideCharToMultiByteLocaleThunk(
-    char* const destination,
-    const wchar_t sourceCharacter,
-    const int unused,
-    const RuntimeCvtVec* const localeVector
-  )
-  {
-    return RuntimeWideCharToMultiByteLocale(destination, sourceCharacter, unused, localeVector);
-  }
 
   struct RuntimeWideCharLocaleView
   {
@@ -42713,25 +27381,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     const RuntimeCvtVec* localeVector
   );
 
-  /**
-   * Address: 0x004F3060 (FUN_004F3060)
-   *
-   * What it does:
-   * Converts one narrow byte to one wide code unit using locale conversion
-   * state at `+0x18`, returning `0xFFFF` on conversion failure.
-   */
-  [[maybe_unused]] wchar_t RuntimeWidenSingleByteWithLocale(
-    const RuntimeWideCharLocaleView* const localeOwner,
-    const char narrowCharacter
-  )
-  {
-    wchar_t widened = 0;
-    char pendingBytes[4]{};
-    const RuntimeCvtVec* const localeVector = localeOwner != nullptr ? &localeOwner->cvtVector : nullptr;
-    const int convertedCount =
-      RuntimeMultiByteToWideStep(&widened, &narrowCharacter, 1u, pendingBytes, localeVector);
-    return convertedCount < 0 ? static_cast<wchar_t>(0xFFFFu) : widened;
-  }
 
   /**
    * Address: 0x004F31E0 (FUN_004F31E0)
@@ -42753,20 +27402,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return convertedCount == 1 ? convertedBytes[0] : fallbackByte;
   }
 
-  /**
-   * Address: 0x004F31A0 (FUN_004F31A0)
-   *
-   * What it does:
-   * Alias lane of `RuntimeConvertWideCharWithFallback`.
-   */
-  [[maybe_unused]] char RuntimeConvertWideCharWithFallbackAlias(
-    const RuntimeWideCharLocaleView* const localeOwner,
-    const wchar_t sourceCharacter,
-    const char fallbackByte
-  )
-  {
-    return RuntimeConvertWideCharWithFallback(localeOwner, sourceCharacter, fallbackByte);
-  }
 
   struct RuntimeWideRangeDispatchVTable
   {
@@ -42778,25 +27413,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeWideRangeDispatchVTable::convertRangeCore offset must be 0x38"
   );
 
-  /**
-   * Address: 0x004F3220 (FUN_004F3220)
-   *
-   * What it does:
-   * Forwards one contiguous range-conversion request to the locale facet vtable
-   * dispatch lane and appends derived element-count metadata.
-   */
-  [[maybe_unused]] int RuntimeDispatchWideRangeConversionWithCount(
-    void* const facetRuntime,
-    const int rangeBegin,
-    const int rangeEnd,
-    const int outputBegin,
-    const int outputEnd
-  ) noexcept
-  {
-    auto* const vtable = reinterpret_cast<RuntimeWideRangeDispatchVTable*>(*reinterpret_cast<void**>(facetRuntime));
-    const int elementCount = (rangeEnd - rangeBegin) >> 1;
-    return vtable->convertRangeCore(facetRuntime, rangeBegin, rangeEnd, outputBegin, outputEnd, elementCount);
-  }
 
   struct RuntimeWideBufferWindowView
   {
@@ -42836,78 +27452,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeWideBufferWindowView::stateFlags offset must be 0x40"
   );
 
-  /**
-   * Address: 0x004F77B0 (FUN_004F77B0)
-   *
-   * What it does:
-   * Pushes one 16-bit value into the runtime wide-buffer window when capacity
-   * and state-flag lanes allow the write.
-   */
-  [[maybe_unused]] std::int16_t RuntimeWideBufferPushWord(
-    RuntimeWideBufferWindowView* const bufferWindow,
-    const std::int16_t value
-  ) noexcept
-  {
-    const std::uint32_t cursorAddress = *bufferWindow->cursorAddressSlot;
-    if (cursorAddress == 0u
-        || cursorAddress <= *bufferWindow->lowerBoundAddressSlot
-        || (value != static_cast<std::int16_t>(-1)
-            && value != *reinterpret_cast<const std::int16_t*>(static_cast<std::uintptr_t>(cursorAddress - 2u))
-            && (bufferWindow->stateFlags & 0x02u) != 0u)) {
-      return static_cast<std::int16_t>(-1);
-    }
 
-    ++(*bufferWindow->availableWordCountSlot);
-    *bufferWindow->cursorAddressSlot -= 2u;
-
-    if (value == static_cast<std::int16_t>(-1)) {
-      return 0;
-    }
-
-    auto* const cursorWord = reinterpret_cast<std::int16_t*>(static_cast<std::uintptr_t>(*bufferWindow->cursorAddressSlot));
-    *cursorWord = value;
-    return value;
-  }
-
-  /**
-   * Address: 0x004F7810 (FUN_004F7810)
-   *
-   * What it does:
-   * Returns the current 16-bit word from the runtime wide-buffer window and
-   * refreshes cached availability lanes when the window is depleted.
-   */
-  [[maybe_unused]] std::int16_t RuntimeWideBufferPeekWord(
-    RuntimeWideBufferWindowView* const bufferWindow
-  ) noexcept
-  {
-    const std::uint32_t cursorAddress = *bufferWindow->cursorAddressSlot;
-    if (cursorAddress == 0u) {
-      return static_cast<std::int16_t>(-1);
-    }
-
-    if (*bufferWindow->availableWordCountSlot > 0) {
-      return *reinterpret_cast<const std::int16_t*>(static_cast<std::uintptr_t>(cursorAddress));
-    }
-
-    if ((bufferWindow->stateFlags & 0x04u) != 0u) {
-      return static_cast<std::int16_t>(-1);
-    }
-
-    const std::uint32_t refillAddress = *bufferWindow->refillAddressSlot;
-    if (refillAddress == 0u
-        || (refillAddress <= cursorAddress && bufferWindow->cachedWindowLimitAddress <= cursorAddress)) {
-      return static_cast<std::int16_t>(-1);
-    }
-
-    if (bufferWindow->cachedWindowLimitAddress < refillAddress) {
-      bufferWindow->cachedWindowLimitAddress = refillAddress;
-    }
-
-    *bufferWindow->availableWordCountSlot = static_cast<std::int32_t>(
-      (bufferWindow->cachedWindowLimitAddress - *bufferWindow->cursorAddressSlot) >> 1
-    );
-    return *reinterpret_cast<const std::int16_t*>(static_cast<std::uintptr_t>(*bufferWindow->cursorAddressSlot));
-  }
 
   /**
    * Address: 0x00ABFDF0 (FUN_00ABFDF0)
@@ -43037,169 +27582,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return -1;
   }
 
-  /**
-   * Address: 0x00ABF1DE (FUN_00ABF1DE)
-   *
-   * What it does:
-   * Converts one input character to uppercase using the CRT locale conversion
-   * path (`__crtLCMapStringA`) and falls back to ASCII uppercasing when locale
-   * handle lane is unset.
-   */
-  int RuntimeToupper(const int character, RuntimeCtypeVec* const localeVector)
-  {
-    constexpr std::size_t kRuntimeCtypeIndexToupper = 2u;
 
-    RuntimeCtypeVec* const ctypeVector = localeVector;
-    LCID localeHandle = 0;
-    int codePage = 0;
-    if (ctypeVector != nullptr) {
-      localeHandle = ctypeVector->handle;
-      codePage = ctypeVector->codePage;
-    } else {
-      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexToupper];
-      codePage = __lc_codepage_func();
-    }
-
-    if (localeHandle == 0) {
-      if (character >= static_cast<int>('a') && character <= static_cast<int>('z')) {
-        return character - static_cast<int>('a' - 'A');
-      }
-      return character;
-    }
-
-    if (static_cast<unsigned int>(character) < 0x100u) {
-      if (ctypeVector == nullptr) {
-        if (::islower(character) == 0) {
-          return character;
-        }
-      } else if ((ctypeVector->table[static_cast<unsigned int>(character)] & 0x2u) == 0u) {
-        return character;
-      }
-    }
-
-    const int highByte = character >> 8;
-    int hasLeadByteFlag = 0;
-    if (ctypeVector == nullptr) {
-      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
-      hasLeadByteFlag = (__pctype_func()[highByteIndex] & 0x8000u) != 0u ? 1 : 0;
-    } else {
-      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
-      hasLeadByteFlag = (ctypeVector->table[highByteIndex] >> 15) & 0x1;
-    }
-
-    char inputBuffer[3] = {};
-    int inputLength = 1;
-    inputBuffer[0] = static_cast<char>(character & 0xFF);
-    if (hasLeadByteFlag != 0) {
-      inputBuffer[0] = static_cast<char>(highByte & 0xFF);
-      inputBuffer[1] = static_cast<char>(character & 0xFF);
-      inputLength = 2;
-    }
-
-    char outputBuffer[3] = {};
-    const int mappedLength = __crtLCMapStringA(
-      0,
-      localeHandle,
-      LCMAP_UPPERCASE,
-      inputBuffer,
-      inputLength,
-      reinterpret_cast<LPWSTR>(outputBuffer),
-      3,
-      codePage,
-      1
-    );
-    if (mappedLength == 0) {
-      return character;
-    }
-    if (mappedLength == 1) {
-      return static_cast<unsigned char>(outputBuffer[0]);
-    }
-
-    return (static_cast<int>(static_cast<unsigned char>(outputBuffer[0])) << 8)
-      | static_cast<int>(static_cast<unsigned char>(outputBuffer[1]));
-  }
-
-  /**
-   * Address: 0x00ABF6B2 (FUN_00ABF6B2, _Tolower)
-   *
-   * What it does:
-   * Converts one input character to lowercase using the CRT locale conversion
-   * path (`__crtLCMapStringA`) and falls back to ASCII lowercasing when locale
-   * handle lane is unset.
-   */
-  int RuntimeTolower(const int character, RuntimeCtypeVec* const localeVector)
-  {
-    constexpr std::size_t kRuntimeCtypeIndexTolower = 2u;
-
-    RuntimeCtypeVec* const ctypeVector = localeVector;
-    LCID localeHandle = 0;
-    int codePage = 0;
-    if (ctypeVector != nullptr) {
-      localeHandle = ctypeVector->handle;
-      codePage = ctypeVector->codePage;
-    } else {
-      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexTolower];
-      codePage = __lc_codepage_func();
-    }
-
-    if (localeHandle == 0) {
-      if (character >= static_cast<int>('A') && character <= static_cast<int>('Z')) {
-        return character + static_cast<int>('a' - 'A');
-      }
-      return character;
-    }
-
-    if (static_cast<unsigned int>(character) < 0x100u) {
-      if (ctypeVector == nullptr) {
-        if (::isupper(character) == 0) {
-          return character;
-        }
-      } else if ((ctypeVector->table[static_cast<unsigned int>(character)] & 0x1u) == 0u) {
-        return character;
-      }
-    }
-
-    const int highByte = character >> 8;
-    int hasLeadByteFlag = 0;
-    if (ctypeVector == nullptr) {
-      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
-      hasLeadByteFlag = (__pctype_func()[highByteIndex] & 0x8000u) != 0u ? 1 : 0;
-    } else {
-      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
-      hasLeadByteFlag = (ctypeVector->table[highByteIndex] >> 15) & 0x1;
-    }
-
-    char inputBuffer[3] = {};
-    int inputLength = 1;
-    inputBuffer[0] = static_cast<char>(character & 0xFF);
-    if (hasLeadByteFlag != 0) {
-      inputBuffer[0] = static_cast<char>(highByte & 0xFF);
-      inputBuffer[1] = static_cast<char>(character & 0xFF);
-      inputLength = 2;
-    }
-
-    char outputBuffer[3] = {};
-    const int mappedLength = __crtLCMapStringA(
-      0,
-      localeHandle,
-      LCMAP_LOWERCASE,
-      inputBuffer,
-      inputLength,
-      reinterpret_cast<LPWSTR>(outputBuffer),
-      3,
-      codePage,
-      1
-    );
-    if (mappedLength == 0) {
-      return character;
-    }
-    if (mappedLength == 1) {
-      return static_cast<unsigned char>(outputBuffer[0]);
-    }
-
-    return (static_cast<int>(static_cast<unsigned char>(outputBuffer[0])) << 8)
-      | static_cast<int>(static_cast<unsigned char>(outputBuffer[1]));
-  }
 
   /**
    * Address: 0x00ABF7C1 (FUN_00ABF7C1, _Getctype)
@@ -43261,26 +27644,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeLocaleVectorsOwnerView) == 0x20, "RuntimeLocaleVectorsOwnerView size must be 0x20");
 
-  /**
-   * Address: 0x004F2EA0 (FUN_004F2EA0)
-   *
-   * What it does:
-   * Refreshes one locale-owner payload with `_Getctype` and `_Getcvt`
-   * snapshots, then returns the current locale handle lane.
-   */
-  [[maybe_unused]] LCID RuntimeRefreshLocaleVectors(
-    RuntimeLocaleVectorsOwnerView* const owner
-  )
-  {
-    if (owner == nullptr) {
-      return 0;
-    }
-
-    RuntimeCtypeVec ctype{};
-    owner->ctypeVector = *RuntimeGetctype(&ctype);
-    owner->cvtVector = RuntimeGetcvt();
-    return owner->cvtVector.handle;
-  }
 
   /**
    * Address: 0x00AA2A65 (FUN_00AA2A65, __uncaught_exception)
@@ -43294,140 +27657,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return threadData->mProcessingThrow != 0;
   }
 
-  /**
-   * Address: 0x00ABFA9B (FUN_00ABFA9B, std::uncaught_exception)
-   *
-   * What it does:
-   * Forwards to the CRT uncaught-exception state probe and returns one boolean
-   * result lane.
-   */
-  bool RuntimeUncaughtException()
-  {
-    return __uncaught_exception();
-  }
 
-  /**
-   * Address: 0x00ABFC6A (FUN_00ABFC6A)
-   *
-   * What it does:
-   * Uppercases one wide-character lane with locale/codepage context from
-   * `_Cvtvec`, with ASCII fallback when locale handle lane is zero.
-   */
-  int RuntimeToupperWide(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
-  {
-    std::uint16_t destinationCharacter = sourceCharacter;
-    if (sourceCharacter == 0xFFFFu) {
-      return static_cast<int>(sourceCharacter);
-    }
 
-    if (localeVector->handle != 0 || sourceCharacter >= 0x100u) {
-      wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
-      wchar_t destinationWide = sourceWide;
-      const int mapResult = __crtLCMapStringW(
-        0,
-        localeVector->handle,
-        LCMAP_UPPERCASE,
-        &sourceWide,
-        1,
-        &destinationWide,
-        1,
-        localeVector->codePage
-      );
-      if (mapResult != 0) {
-        destinationCharacter = static_cast<std::uint16_t>(destinationWide);
-      }
-      return static_cast<int>(destinationCharacter);
-    }
 
-    if (sourceCharacter >= static_cast<std::uint16_t>('a') && sourceCharacter <= static_cast<std::uint16_t>('z')) {
-      destinationCharacter = static_cast<std::uint16_t>(sourceCharacter - static_cast<std::uint16_t>('a' - 'A'));
-    }
-    return static_cast<int>(destinationCharacter);
-  }
 
-  /**
-   * Address: 0x00ABFF61 (FUN_00ABFF61)
-   *
-   * What it does:
-   * Queries CRT wide-char type flags for one code unit under `_Cvtvec` locale
-   * context and returns one signed 16-bit flag lane on success.
-   */
-  int RuntimeGetWideCharTypeSingle(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
-  {
-    wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
-    WORD charType = 0;
-    const int getTypeResult = __crtGetStringTypeW(
-      0,
-      1u,
-      &sourceWide,
-      1,
-      &charType,
-      localeVector->codePage,
-      localeVector->handle
-    );
-    if (getTypeResult == 0) {
-      return 0;
-    }
-    return static_cast<short>(charType);
-  }
-
-  /**
-   * Address: 0x00ABFF8E (FUN_00ABFF8E)
-   *
-   * What it does:
-   * Fills type flags for one wide-char span under `_Cvtvec` locale context and
-   * returns the original end pointer lane.
-   */
-  const wchar_t* RuntimeGetWideCharTypeRange(
-    const wchar_t* const sourceBegin,
-    const wchar_t* const sourceEnd,
-    WORD* const outCharTypes,
-    const RuntimeCvtVec* const localeVector
-  )
-  {
-    const int sourceCount = static_cast<int>(sourceEnd - sourceBegin);
-    __crtGetStringTypeW(0, 1u, sourceBegin, sourceCount, outCharTypes, localeVector->codePage, localeVector->handle);
-    return sourceEnd;
-  }
-
-  /**
-   * Address: 0x00ABFFB9 (FUN_00ABFFB9)
-   *
-   * What it does:
-   * Lowercases one wide-character lane with locale/codepage context from
-   * `_Cvtvec`, with ASCII fallback when locale handle lane is zero.
-   */
-  int RuntimeTolowerWide(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
-  {
-    std::uint16_t destinationCharacter = sourceCharacter;
-    if (sourceCharacter == 0xFFFFu) {
-      return static_cast<int>(sourceCharacter);
-    }
-
-    if (localeVector->handle != 0 || sourceCharacter >= 0x100u) {
-      wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
-      wchar_t destinationWide = sourceWide;
-      const int mapResult = __crtLCMapStringW(
-        0,
-        localeVector->handle,
-        LCMAP_LOWERCASE,
-        &sourceWide,
-        1,
-        &destinationWide,
-        1,
-        localeVector->codePage
-      );
-      if (mapResult != 0) {
-        destinationCharacter = static_cast<std::uint16_t>(destinationWide);
-      }
-      return static_cast<int>(destinationCharacter);
-    }
-
-    if (sourceCharacter >= static_cast<std::uint16_t>('A') && sourceCharacter <= static_cast<std::uint16_t>('Z')) {
-      destinationCharacter = static_cast<std::uint16_t>(sourceCharacter + static_cast<std::uint16_t>('a' - 'A'));
-    }
-    return static_cast<int>(destinationCharacter);
-  }
 
   /**
    * Address: 0x00A8679D (FUN_00A8679D)
@@ -43484,122 +27717,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return static_cast<int>(pushedByte);
   }
 
-  /**
-   * Address: 0x00A868BB (FUN_00A868BB, ungetc)
-   *
-   * What it does:
-   * Validates stream pointer lane, then dispatches to the recovered ungetc
-   * pushback core helper.
-   */
-  int RuntimeUngetc(const int character, std::FILE* const stream)
-  {
-    if (stream == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EOF;
-    }
 
-    return RuntimeUngetcCore(character, stream);
-  }
 
-  /**
-   * Address: 0x00ABBE9C (FUN_00ABBE9C, ungetwc)
-   *
-   * What it does:
-   * Validates stream lane, then locks the stream around one
-   * `_ungetwc_nolock` pushback call; null streams trigger CRT
-   * invalid-parameter semantics and return `WEOF`.
-   */
-  wint_t RuntimeUngetwc(const wint_t wideCharacter, std::FILE* const stream)
-  {
-    if (stream == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return WEOF;
-    }
 
-    _lock_file(stream);
-    const wint_t result = ::_ungetwc_nolock(wideCharacter, stream);
-    _unlock_file(stream);
-    return result;
-  }
 
-  /**
-   * Address: 0x00AAC83B (FUN_00AAC83B)
-   *
-   * What it does:
-   * Preserves `WEOF`-sentinel inputs (low 16-bit lane `0xFFFF`) and otherwise
-   * forwards directly to `_ungetwc_nolock`.
-   */
-  [[maybe_unused]] wint_t RuntimeUngetwcNoLockIfNotWEOFLaneA(
-    const wint_t wideCharacter,
-    std::FILE* const stream
-  )
-  {
-    if (static_cast<std::uint16_t>(wideCharacter) == 0xFFFFu) {
-      return wideCharacter;
-    }
-
-    return ::_ungetwc_nolock(wideCharacter, stream);
-  }
-
-  /**
-   * Address: 0x00AAD5AC (FUN_00AAD5AC)
-   *
-   * What it does:
-   * Mirrors the lane-B CRT parser helper: keeps `WEOF` sentinel values
-   * unchanged and forwards every other value to `_ungetwc_nolock`.
-   */
-  [[maybe_unused]] wint_t RuntimeUngetwcNoLockIfNotWEOFLaneB(
-    const wint_t wideCharacter,
-    std::FILE* const stream
-  )
-  {
-    if (static_cast<std::uint16_t>(wideCharacter) == 0xFFFFu) {
-      return wideCharacter;
-    }
-
-    return ::_ungetwc_nolock(wideCharacter, stream);
-  }
-
-  /**
-   * Address: 0x00AA4974 (FUN_00AA4974, func_CloseAllFiles)
-   *
-   * What it does:
-   * Walks CRT stream slots under `_IOB_SCAN_LOCK`, locks each active stream,
-   * closes `_tmpfile` lanes via `_fclose_nolock`, and returns close count.
-   */
-  int RuntimeCloseAllTemporaryStreams()
-  {
-    int closedStreamCount = 0;
-
-    RuntimeLockGuard scanLock(kRuntimeIobScanLock);
-    for (int streamIndex = 0; streamIndex < static_cast<int>(_nstream); ++streamIndex) {
-      std::FILE* const stream = __piob[streamIndex];
-      if (stream == nullptr) {
-        continue;
-      }
-
-      if ((RuntimeGetFileFlags(stream) & kRuntimeFileFlagFlushMask) == 0) {
-        continue;
-      }
-
-      RuntimeFileLock2Guard streamLock(streamIndex, stream);
-      if ((RuntimeGetFileFlags(stream) & kRuntimeFileFlagFlushMask) == 0) {
-        continue;
-      }
-
-      auto* const tmpNameView = reinterpret_cast<RuntimeFileTmpNameView*>(stream);
-      if (tmpNameView->tmpName == nullptr) {
-        continue;
-      }
-
-      _fclose_nolock(stream);
-      ++closedStreamCount;
-    }
-
-    return closedStreamCount;
-  }
 
   /**
    * Address: 0x00AA3FCE (FUN_00AA3FCE, _fcloseall)
@@ -43915,91 +28036,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return result;
   }
 
-  /**
-   * Address: 0x00A8841A (FUN_00A8841A)
-   *
-   * What it does:
-   * Dispatches one narrow output callback through the locked formatter helper
-   * lane using `_output_l`.
-   */
-  int RuntimeDispatchOutputLocaleLocked(
-    std::FILE* const stream,
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchLockedOutputCallback(_output_l, stream, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00A88438 (FUN_00A88438)
-   *
-   * What it does:
-   * Forwards one narrow-format callback dispatch lane through the locked-output
-   * helper with the caller-provided locale lane.
-   */
-  [[maybe_unused]] int RuntimeDispatchOutputLocaleLockedAdapterA(
-    std::FILE* const stream,
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchLockedOutputCallback(_output_l, stream, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00A88456 (FUN_00A88456)
-   *
-   * What it does:
-   * Secondary forwarding lane for locked narrow output dispatch with explicit
-   * locale lane.
-   */
-  [[maybe_unused]] int RuntimeDispatchOutputLocaleLockedAdapterB(
-    std::FILE* const stream,
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchLockedOutputCallback(_output_l, stream, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00A88490 (FUN_00A88490)
-   *
-   * What it does:
-   * Forwarding lane for locked narrow output dispatch with an explicit null
-   * locale lane.
-   */
-  [[maybe_unused]] int RuntimeDispatchOutputLocaleLockedNullLocaleAdapter(
-    std::FILE* const stream,
-    const char* const format,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchLockedOutputCallback(_output_l, stream, format, nullptr, arguments);
-  }
 
-  /**
-   * Address: 0x00A86537 (FUN_00A86537, fflush)
-   *
-   * What it does:
-   * Flushes one stream under CRT file lock, or all writable streams when
-   * `stream == nullptr`.
-   */
-  int RuntimeFflush(std::FILE* const stream)
-  {
-    if (stream == nullptr) {
-      return RuntimeFlushAllStreams(0);
-    }
-
-    _lock_file(stream);
-    const int flushResult = _fflush_nolock(stream);
-    _unlock_file(stream);
-    return flushResult;
-  }
 
   /**
    * Address: 0x00A9D4DE (FUN_00A9D4DE, __tzset)
@@ -44096,172 +28136,7 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
   return &gRuntimeStaticStorageSlotC;
 }
 
-/**
- * Address: 0x00AA6F65 (FUN_00AA6F65, _tfdopen)
- *
- * What it does:
- * Validates fd + mode text, allocates one CRT stream lane, applies parsed
-   * open flags, and returns unlocked `FILE*` storage.
-   */
-  std::FILE* RuntimeTfdopen(const int fileDescriptor, char* modeText)
-  {
-    if (modeText == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
 
-    if (fileDescriptor == -2) {
-      *_errno() = EBADF;
-      return nullptr;
-    }
-
-    if (fileDescriptor < 0 || fileDescriptor >= _nhandle || (RuntimeGetOsFileFlags(fileDescriptor) & 0x01u) == 0u) {
-      *_errno() = EBADF;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    while (*modeText == ' ') {
-      ++modeText;
-    }
-    char* const parsedModeText = modeText;
-
-    unsigned int openFlags = 0u;
-    if (*modeText == 'a' || *modeText == 'w') {
-      openFlags = 2u;
-    } else if (*modeText == 'r') {
-      openFlags = 1u;
-    } else {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    openFlags |= static_cast<unsigned int>(_commode);
-    bool parseValid = true;
-    bool sawCommitFlag = false;
-    bool sawTextBinaryFlag = false;
-    while (parseValid && *++modeText != '\0') {
-      const char modeChar = *modeText;
-      if (modeChar == ' ') {
-        continue;
-      }
-
-      switch (modeChar) {
-        case '+':
-          if ((openFlags & 0x80u) == 0u) {
-            openFlags = (openFlags & 0xFFFFFF7Cu) | 0x80u;
-          } else {
-            parseValid = false;
-          }
-          break;
-        case 'b':
-        case 't':
-          if (sawTextBinaryFlag) {
-            parseValid = false;
-          } else {
-            sawTextBinaryFlag = true;
-          }
-          break;
-        case 'c':
-          if (sawCommitFlag) {
-            parseValid = false;
-          } else {
-            sawCommitFlag = true;
-            openFlags |= 0x4000u;
-          }
-          break;
-        case 'n':
-          if (sawCommitFlag) {
-            parseValid = false;
-          } else {
-            sawCommitFlag = true;
-            openFlags &= ~0x4000u;
-          }
-          break;
-        default:
-          parseValid = false;
-          break;
-      }
-    }
-
-    while (*modeText == ' ') {
-      ++modeText;
-    }
-    if (!parseValid || *modeText != '\0') {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    std::FILE* const stream = ::_fdopen(fileDescriptor, parsedModeText);
-    if (stream == nullptr) {
-      *_errno() = EMFILE;
-    }
-    return stream;
-  }
-
-  /**
-   * Address: 0x00AAA97A (FUN_00AAA97A, _setenvp)
-   *
-   * What it does:
-   * Builds one pointer-array environment from `_aenvptr` NUL-delimited text
-   * block and marks CRT environment lanes initialized.
-   */
-  int RuntimeSetenvp()
-  {
-    if (__mbctype_initialized == 0) {
-      __initmbctable();
-    }
-
-    if (_aenvptr == nullptr) {
-      return -1;
-    }
-
-    int environmentCount = 0;
-    char* scanCursor = _aenvptr;
-    while (*scanCursor != '\0') {
-      if (*scanCursor != '=') {
-        ++environmentCount;
-      }
-      scanCursor += std::strlen(scanCursor) + 1u;
-    }
-
-    _environ = static_cast<char**>(_calloc_crt(static_cast<std::size_t>(environmentCount + 1), sizeof(char*)));
-    if (_environ == nullptr) {
-      return -1;
-    }
-
-    char** outputCursor = _environ;
-    scanCursor = _aenvptr;
-    while (*scanCursor != '\0') {
-      const std::size_t entryLength = std::strlen(scanCursor) + 1u;
-      if (*scanCursor != '=') {
-        char* const copiedEntry = static_cast<char*>(_calloc_crt(entryLength, 1u));
-        *outputCursor = copiedEntry;
-        if (copiedEntry == nullptr) {
-          _free_crt(_environ);
-          _environ = nullptr;
-          return -1;
-        }
-
-        if (RuntimeStrcpyS(copiedEntry, entryLength, scanCursor) != 0) {
-          _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-        }
-
-        ++outputCursor;
-      }
-
-      scanCursor += entryLength;
-    }
-
-    _free_crt(_aenvptr);
-    _aenvptr = nullptr;
-    *outputCursor = nullptr;
-    __env_initialized = 1;
-    return 0;
-  }
 
   /**
    * Address: 0x00AAAA5F (FUN_00AAAA5F, parse_cmdline)
@@ -44463,44 +28338,8 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     }
   } // namespace
 
-  /**
-   * Address: 0x00AC46A0 (FUN_00AC46A0, tss_thread_exit)
-   *
-   * What it does:
-   * Looks up per-thread TSS slots without allocation and runs slot cleanup when
-   * storage exists.
-   */
-  [[maybe_unused]] void tss_thread_exit()
-  {
-    RuntimeTssSlotVector* const slots = get_slots(false);
-    if (slots != nullptr) {
-      cleanup_slots(slots);
-    }
-  }
 
-  /**
-   * Address: 0x00AC1830 (FUN_00AC1830)
-   *
-   * What it does:
-   * Initializes one legacy TryEnterCriticalSection function-pointer lane from
-   * `KERNEL32.DLL` on supported NT platforms.
-   */
-  [[maybe_unused]] void RuntimeInitializeTryEnterCriticalSectionLegacySlotA()
-  {
-    RuntimeInitializeTryEnterCriticalSectionSlot(gRuntimeTryEnterCriticalSectionLegacyA);
-  }
 
-  /**
-   * Address: 0x00AC4F30 (FUN_00AC4F30, init_TryEnterCriticalSection)
-   *
-   * What it does:
-   * Initializes one secondary TryEnterCriticalSection function-pointer lane
-   * from `KERNEL32.DLL` on supported NT platforms.
-   */
-  [[maybe_unused]] void init_TryEnterCriticalSection()
-  {
-    RuntimeInitializeTryEnterCriticalSectionSlot(gRuntimeTryEnterCriticalSectionLegacyB);
-  }
 
   /**
    * Address: 0x00ABE0D5 (FUN_00ABE0D5)
@@ -44532,96 +28371,11 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return formatResult;
   }
 
-  /**
-   * Address: 0x00ABE165 (FUN_00ABE165)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `_output_l` with explicit
-   * locale/argument lanes.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutputLWithLocale(
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(_output_l, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00ABE17F (FUN_00ABE17F)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `_output_s_l` with explicit
-   * locale/argument lanes.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutputSLWithLocale(
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(_output_s_l, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00ABE199 (FUN_00ABE199)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `outfn` with explicit
-   * locale/argument lanes.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutfnWithLocale(
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(outfn, format, localeInfo, arguments);
-  }
 
-  /**
-   * Address: 0x00ABE1B3 (FUN_00ABE1B3)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `_output_l` with null locale.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutputLNoLocale(
-    const char* const format,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(_output_l, format, nullptr, arguments);
-  }
 
-  /**
-   * Address: 0x00ABE1CB (FUN_00ABE1CB)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `_output_s_l` with null
-   * locale.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutputSLNoLocale(
-    const char* const format,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(_output_s_l, format, nullptr, arguments);
-  }
 
-  /**
-   * Address: 0x00ABE1E3 (FUN_00ABE1E3)
-   *
-   * What it does:
-   * Dispatches one stdout formatter call through `outfn` with null locale.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutOutfnNoLocale(
-    const char* const format,
-    va_list arguments
-  )
-  {
-    return RuntimeDispatchStdoutFormatterWithValidation(outfn, format, nullptr, arguments);
-  }
 
   /**
    * Address: 0x00ABE1FB (FUN_00ABE1FB, _initconin)
@@ -44750,62 +28504,7 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return maxCharacters - remaining - 1;
   }
 
-  /**
-   * Address: 0x00ABDD12 (FUN_00ABDD12)
-   *
-   * What it does:
-   * Duplicates one null-terminated `wchar_t**` environment pointer vector into
-   * CRT heap storage and deep-copies each entry with `_wcsdup` semantics.
-   */
-  wchar_t** RuntimeCopyWideEnvironment(const wchar_t* const* const sourceEnvironment)
-  {
-    if (sourceEnvironment == nullptr) {
-      return nullptr;
-    }
 
-    std::size_t entryCount = 0u;
-    while (sourceEnvironment[entryCount] != nullptr) {
-      ++entryCount;
-    }
-
-    auto** const copiedEnvironment =
-      static_cast<wchar_t**>(_calloc_crt(entryCount + 1u, sizeof(wchar_t*)));
-    if (copiedEnvironment == nullptr) {
-      __amsg_exit(9);
-      return nullptr;
-    }
-
-    for (std::size_t entryIndex = 0u; entryIndex < entryCount; ++entryIndex) {
-      copiedEnvironment[entryIndex] = _wcsdup(sourceEnvironment[entryIndex]);
-    }
-    copiedEnvironment[entryCount] = nullptr;
-    return copiedEnvironment;
-  }
-
-  /**
-   * Address: 0x009BE9A0 (FUN_009BE9A0)
-   *
-   * What it does:
-   * Replaces one owned wide-string pointer lane with a heap clone of
-   * `sourceText` and clears the lane when input is null.
-   */
-  void** RuntimeAssignWideStringHeapClone(
-    void** const destinationSlot,
-    const wchar_t* const sourceText
-  )
-  {
-    _free_crt(*destinationSlot);
-    if (sourceText != nullptr) {
-      const std::size_t byteCount = (std::wcslen(sourceText) + 1u) * sizeof(wchar_t);
-      void* const copied = std::malloc(byteCount);
-      std::memcpy(copied, sourceText, byteCount);
-      *destinationSlot = copied;
-      return destinationSlot;
-    }
-
-    *destinationSlot = nullptr;
-    return destinationSlot;
-  }
 
   struct RuntimeSlidingBufferView
   {
@@ -44818,82 +28517,7 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
   static_assert(offsetof(RuntimeSlidingBufferView, writeOffset) == 0x10, "RuntimeSlidingBufferView::writeOffset offset must be 0x10");
   static_assert(offsetof(RuntimeSlidingBufferView, readOffset) == 0x14, "RuntimeSlidingBufferView::readOffset offset must be 0x14");
 
-  /**
-   * Address: 0x009DCFA0 (FUN_009DCFA0)
-   *
-   * What it does:
-   * Reallocates one sliding-buffer lane with `prefixBytes` of leading space,
-   * shifts unread payload forward, and resets read offset to zero.
-   */
-  char* RuntimeSlidingBufferPrependGap(
-    RuntimeSlidingBufferView* const slidingBuffer,
-    const int prefixBytes
-  )
-  {
-    const std::uint32_t payloadBytes = slidingBuffer->writeOffset - slidingBuffer->readOffset;
-    char* const replacement = static_cast<char*>(std::malloc(static_cast<std::size_t>(payloadBytes + prefixBytes)));
-    if (replacement != nullptr) {
-      if (slidingBuffer->buffer != nullptr) {
-        std::memmove(
-          replacement + prefixBytes,
-          slidingBuffer->buffer + slidingBuffer->readOffset,
-          payloadBytes
-        );
-        _free_crt(slidingBuffer->buffer);
-      }
 
-      slidingBuffer->buffer = replacement;
-      slidingBuffer->writeOffset = payloadBytes + static_cast<std::uint32_t>(prefixBytes);
-      slidingBuffer->readOffset = 0u;
-    }
-
-    return replacement;
-  }
-
-  /**
-   * Address: 0x00A850D6 (FUN_00A850D6, __dupenv_s)
-   *
-   * What it does:
-   * Duplicates one environment-variable string under the CRT environment lock
-   * and returns CRT `errno_t` status semantics.
-   */
-  errno_t RuntimeDupEnvS(char** const outBuffer, size_t* const outBufferCount, const char* const variableName)
-  {
-    RuntimeEnvironmentLockGuard lockGuard{};
-    if (outBuffer != nullptr) {
-      *outBuffer = nullptr;
-      if (outBufferCount != nullptr) {
-        *outBufferCount = 0u;
-      }
-
-      if (variableName != nullptr) {
-        const char* const source = std::getenv(variableName);
-        if (source != nullptr) {
-          const size_t requiredBytes = std::strlen(source) + 1u;
-          char* const destination = static_cast<char*>(std::calloc(requiredBytes, 1u));
-          *outBuffer = destination;
-          if (destination == nullptr) {
-            *_errno() = ENOMEM;
-            return *_errno();
-          }
-
-          if (RuntimeStrcpyS(destination, requiredBytes, source) != 0) {
-            _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-          }
-
-          if (outBufferCount != nullptr) {
-            *outBufferCount = requiredBytes;
-          }
-        }
-
-        return 0;
-      }
-    }
-
-    *_errno() = EINVAL;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return EINVAL;
-  }
 
   /**
    * Address: 0x00A8B161 (FUN_00A8B161, ___inittime)
@@ -44952,30 +28576,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return static_cast<unsigned int>(combinedDividend / divisorLow);
   }
 
-  /**
-   * Address: 0x00A855B2 (FUN_00A855B2, _time64)
-   *
-   * What it does:
-   * Converts current FILETIME ticks into Unix epoch seconds and mirrors that
-   * value through optional output pointer.
-   */
-  __time64_t RuntimeTime64(__time64_t* const outEpochSeconds)
-  {
-    FILETIME systemTimeAsFileTime{};
-    ::GetSystemTimeAsFileTime(&systemTimeAsFileTime);
-
-    const std::uint64_t filetimeTicks =
-      BuildUnsigned64(systemTimeAsFileTime.dwLowDateTime, systemTimeAsFileTime.dwHighDateTime);
-    const __time64_t epochSeconds = static_cast<__time64_t>(
-      (filetimeTicks - kFiletimeToUnixEpochOffset) / kFiletimeHundredNsPerSecond
-    );
-
-    if (outEpochSeconds != nullptr) {
-      *outEpochSeconds = epochSeconds;
-    }
-
-    return epochSeconds;
-  }
 
   /**
    * Address: 0x00A8A572 (FUN_00A8A572, _difftime64)
@@ -44994,19 +28594,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   return 0.0;
 }
 
-/**
- * Address: 0x009F2330 (FUN_009F2330)
- *
- * What it does:
- * Thin wrapper forwarding to `_difftime64(timeA, timeB)`.
- */
-[[maybe_unused]] double RuntimeDifftime64Thunk(
-  const __time64_t timeA,
-  const __time64_t timeB
-)
-{
-  return _difftime64(timeA, timeB);
-}
 
 /**
  * Address: 0x00A8692D (FUN_00A8692D, _ftime64_s)
@@ -45076,51 +28663,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     (void)RuntimeFtime64S(outTime);
   }
 
-  /**
-   * Address: 0x00A48AB0 (FUN_00A48AB0)
-   *
-   * What it does:
-   * Initializes one `_ftime64` baseline on first use, then returns elapsed
-   * wall-clock seconds from that baseline with millisecond precision.
-   */
-  [[maybe_unused]] double RuntimeElapsedSecondsSinceFtime64Baseline()
-  {
-    static bool baselineInitialized = false;
-    static int baselineSeconds = 0;
-    static int baselineMicroseconds = 0;
 
-    __timeb64 sampledTime{};
-    if (!baselineInitialized) {
-      baselineInitialized = true;
-      RuntimeFtime64(&sampledTime);
-      baselineSeconds = static_cast<int>(sampledTime.time);
-      baselineMicroseconds = static_cast<int>(sampledTime.millitm) * 1000;
-    }
-
-    RuntimeFtime64(&sampledTime);
-
-    int elapsedSeconds = static_cast<int>(sampledTime.time) - baselineSeconds;
-    int elapsedMicroseconds = (static_cast<int>(sampledTime.millitm) * 1000) - baselineMicroseconds;
-    if (elapsedMicroseconds < 0) {
-      elapsedMicroseconds += 1000000;
-      --elapsedSeconds;
-    }
-
-    const int elapsedMilliseconds = (elapsedSeconds * 1000) + (elapsedMicroseconds / 1000);
-    return static_cast<double>(elapsedMilliseconds) * 0.001;
-  }
-
-  /**
-   * Address: 0x00A835A8 (FUN_00A835A8, atol)
-   *
-   * What it does:
-   * Parses one decimal signed-long integer using the CRT `strtol` lane with a
-   * fixed base of ten.
-   */
-  long RuntimeAtol(const char* const text)
-  {
-    return std::strtol(text, nullptr, 10);
-  }
 
   /**
    * Address: 0x009EFF10 (FUN_009EFF10, wcstombs)
@@ -45177,158 +28720,12 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   using RuntimeBinarySearchCompareFn = int(__cdecl*)(const void* key, const void* element);
 
-  /**
-   * Address: 0x00A94938 (FUN_00A94938)
-   *
-   * IDA signature:
-   * int __cdecl sub_A94938(int key, unsigned int base, unsigned int count, int width, int (__cdecl *compare)(int, unsigned int));
-   *
-   * What it does:
-   * Performs one strided binary search over caller-provided sorted lanes and
-   * returns the matching element pointer, with CRT invalid-parameter handling
-   * for null-base/nonzero-count, zero-width, or null-comparator inputs.
-   */
-  void* RuntimeBinarySearchStrided(
-    const void* const key,
-    const void* const base,
-    const std::size_t elementCount,
-    const std::size_t elementWidth,
-    RuntimeBinarySearchCompareFn const compare
-  )
-  {
-    std::size_t remainingCount = elementCount;
-    std::uintptr_t lowLane = reinterpret_cast<std::uintptr_t>(base);
-    std::uintptr_t highLane = lowLane + elementWidth * (elementCount - 1u);
 
-    if ((lowLane == 0u && elementCount != 0u) || elementWidth == 0u || compare == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
 
-    if (lowLane > highLane) {
-      return nullptr;
-    }
 
-    while (true) {
-      const std::size_t halfSpan = remainingCount >> 1u;
-      if (halfSpan == 0u) {
-        break;
-      }
 
-      const bool oddCount = (remainingCount & 1u) != 0u;
-      std::size_t middleIndex = halfSpan;
-      if (!oddCount) {
-        middleIndex = halfSpan - 1u;
-      }
 
-      const std::uintptr_t middleLane = lowLane + elementWidth * middleIndex;
-      const int compareResult = compare(key, reinterpret_cast<const void*>(middleLane));
-      if (compareResult == 0) {
-        return reinterpret_cast<void*>(middleLane);
-      }
 
-      if (compareResult >= 0) {
-        lowLane = middleLane + elementWidth;
-        remainingCount = halfSpan;
-      } else {
-        highLane = middleLane - elementWidth;
-        remainingCount = oddCount ? halfSpan : (halfSpan - 1u);
-      }
-
-      if (lowLane > highLane) {
-        return nullptr;
-      }
-    }
-
-    if (remainingCount == 0u) {
-      return nullptr;
-    }
-
-    return (compare(key, reinterpret_cast<const void*>(lowLane)) == 0)
-      ? reinterpret_cast<void*>(lowLane)
-      : nullptr;
-  }
-
-  /**
-   * Address: 0x00AB6747 (FUN_00AB6747, wctomb_s)
-   *
-   * What it does:
-   * Forwards to the UCRT `_wctomb_s_l` lane with a null locale so the active
-   * thread locale is used.
-   */
-  int RuntimeWctombS(int* const outBytesWritten, char* const destination, const std::size_t sizeInBytes, const wchar_t wideChar)
-  {
-    return ::_wctomb_s_l(outBytesWritten, destination, sizeInBytes, wideChar, nullptr);
-  }
-
-  /**
-   * Address: 0x00B57ED0 (FUN_00B57ED0)
-   * Symbol: __ftol2_sse_0
-   *
-   * What it does:
-   * Converts one floating value to a signed 64-bit integer via legacy ftol
-   * lane semantics.
-   */
-  std::int64_t LegacyFtol2Sse(double value)
-  {
-    return static_cast<std::int64_t>(value);
-  }
-
-  /**
-   * Address: 0x00B57F00 (FUN_00B57F00)
-   * Symbol: shl
-   *
-   * What it does:
-   * 64-bit shift-left helper with explicit `>=64` zero result semantics.
-   */
-  std::uint64_t LegacyShiftLeft64(std::uint64_t value, std::uint8_t shift)
-  {
-    if (shift >= 64u) {
-      return 0u;
-    }
-
-    if (shift >= 32u) {
-      const std::uint32_t low = static_cast<std::uint32_t>(value & 0xFFFFFFFFu);
-      const std::uint32_t high = low << (shift & 0x1Fu);
-      return static_cast<std::uint64_t>(high) << 32u;
-    }
-
-    return value << (shift & 0x1Fu);
-  }
-
-  /**
-   * Address: 0x00B5F7F0 (FUN_00B5F7F0)
-   *
-   * What it does:
-   * EH cleanup helper that deletes one pending allocation lane.
-   */
-  void EhDeletePendingAllocationA(void* allocation)
-  {
-    ::operator delete(allocation);
-  }
-
-  /**
-   * Address: 0x00B5F850 (FUN_00B5F850)
-   *
-   * What it does:
-   * EH cleanup helper that deletes one pending allocation lane.
-   */
-  void EhDeletePendingAllocationB(void* allocation)
-  {
-    ::operator delete(allocation);
-  }
-
-  /**
-   * Address: 0x00B5F880 (FUN_00B5F880)
-   *
-   * What it does:
-   * EH cleanup helper that deletes one pending allocation lane.
-   */
-  void EhDeletePendingAllocationC(void* allocation)
-  {
-    ::operator delete(allocation);
-  }
 
   struct RuntimeScopedMutexLockView
   {
@@ -45376,20 +28773,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   );
   static_assert(sizeof(RuntimeOwnedHandleCell) == 0xC, "RuntimeOwnedHandleCell size must be 0xC");
 
-  /**
-   * Address: 0x00AC27B0 (FUN_00AC27B0)
-   *
-   * What it does:
-   * Waits for the owned kernel handle to signal, closes it, and clears the
-   * close-on-destroy flag lane.
-   */
-  [[maybe_unused]] BOOL RuntimeWaitAndCloseOwnedHandle(RuntimeOwnedHandleCell* const handleCell)
-  {
-    ::WaitForSingleObject(handleCell->handle, INFINITE);
-    const BOOL closeResult = ::CloseHandle(handleCell->handle);
-    handleCell->shouldCloseHandle = 0;
-    return closeResult;
-  }
 
   struct RuntimeWxStringView
   {
@@ -45439,172 +28822,18 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-  /**
-   * Address: 0x00B5F8B0 (FUN_00B5F8B0)
-   *
-   * What it does:
-   * EH cleanup helper that destroys one pending `wxCommandEvent` lane loaded
-   * from a stack pointer slot.
-   */
-  void EhCleanupDestroyPendingWxCommandEvent(RuntimeWxCommandEventView** const commandEventSlot)
-  {
-    RuntimeWxCommandEventView* const commandEvent = *commandEventSlot;
-    DestroySharedWxStringRuntimePayload(&commandEvent->commandString);
-    reinterpret_cast<RuntimeWxObjectView*>(commandEvent)->refData = nullptr;
-  }
 
-  /**
-   * Address: 0x00B5F8E0 (FUN_00B5F8E0)
-   *
-   * What it does:
-   * EH cleanup helper that runs the shared wx-object unref tail for one pending
-   * object pointer lane.
-   */
-  void EhCleanupDestroyPendingWxObject(RuntimeWxObjectView** const objectSlot)
-  {
-    (*objectSlot)->refData = nullptr;
-  }
 
-  /**
-   * Address: 0x00B5F970 (FUN_00B5F970)
-   *
-   * What it does:
-   * EH cleanup helper that runs the wx-region base unref tail on one stack
-   * object lane.
-   */
-  void EhCleanupDestroyStackWxRegion(RuntimeWxObjectView* const regionStorage)
-  {
-    regionStorage->refData = nullptr;
-  }
 
-  /**
-   * Address: 0x00B5F9A0 (FUN_00B5F9A0)
-   *
-   * What it does:
-   * EH cleanup helper that releases one stack `wxString` shared payload lane.
-   */
-  void EhCleanupDestroyStackWxStringA(RuntimeWxStringView* const stringStorage)
-  {
-    DestroySharedWxStringRuntimePayload(stringStorage);
-  }
 
-  /**
-   * Address: 0x00B6FD40 (FUN_00B6FD40)
-   *
-   * What it does:
-   * EH cleanup helper that releases one stack `wxString` shared payload lane.
-   */
-  void EhCleanupDestroyStackWxStringB(RuntimeWxStringView* const stringStorage)
-  {
-    DestroySharedWxStringRuntimePayload(stringStorage);
-  }
 
-  /**
-   * Address: 0x00B6FD48 (FUN_00B6FD48)
-   *
-   * What it does:
-   * EH cleanup helper that releases one stack `wxString` shared payload lane.
-   */
-  void EhCleanupDestroyStackWxStringC(RuntimeWxStringView* const stringStorage)
-  {
-    DestroySharedWxStringRuntimePayload(stringStorage);
-  }
 
-  /**
-   * Address: 0x00B6FD50 (FUN_00B6FD50)
-   *
-   * What it does:
-   * EH cleanup helper that releases the adjacent `wxString` stack lane reached
-   * from the incoming frame-base pointer.
-   */
-  void EhCleanupDestroyStackWxStringD(RuntimeWxStringView* const frameBaseAsString)
-  {
-    DestroySharedWxStringRuntimePayload(frameBaseAsString + 1);
-  }
 
-  /**
-   * Address: 0x00B77300 (FUN_00B77300)
-   *
-   * What it does:
-   * EH cleanup helper that unlocks one scoped mutex lock lane if ownership is
-   * still active.
-   */
-  void EhCleanupUnlockScopedMutexA(RuntimeScopedMutexLockView* const scopedLock)
-  {
-    if (scopedLock->ownsLock != 0) {
-      RuntimeUnlockMutex(scopedLock->mutex);
-      scopedLock->ownsLock = 0;
-    }
-  }
 
-  /**
-   * Address: 0x00B77450 (FUN_00B77450)
-   *
-   * What it does:
-   * EH cleanup helper that unlocks one scoped mutex lock lane if ownership is
-   * still active.
-   */
-  void EhCleanupUnlockScopedMutexB(RuntimeScopedMutexLockView* const scopedLock)
-  {
-    if (scopedLock->ownsLock != 0) {
-      RuntimeUnlockMutex(scopedLock->mutex);
-      scopedLock->ownsLock = 0;
-    }
-  }
 
-  /**
-   * Address: 0x00B7748B (FUN_00B7748B)
-   *
-   * What it does:
-   * EH cleanup helper that conditionally closes one owned handle and deletes
-   * the owning cell.
-   */
-  void EhCleanupDestroyOwnedHandleCell(RuntimeOwnedHandleCell** const handleCellSlot)
-  {
-    RuntimeOwnedHandleCell* const handleCell = *handleCellSlot;
-    if (handleCell != nullptr) {
-      if (handleCell->shouldCloseHandle != 0) {
-        ::CloseHandle(handleCell->handle);
-      }
-      ::operator delete(handleCell);
-    }
-  }
 
-  /**
-   * Address: 0x00B777E0 (FUN_00B777E0)
-   *
-   * What it does:
-   * EH cleanup helper that leaves one critical section lane when the guard
-   * still owns the lock.
-   */
-  void EhCleanupLeaveCriticalSection(RuntimeCriticalSectionLeaveGuard* const guard)
-  {
-    if (guard->shouldLeave != 0) {
-      ::LeaveCriticalSection(guard->criticalSection);
-    }
-  }
 
-  /**
-   * Address: 0x00B915E0 (FUN_00B915E0)
-   *
-   * What it does:
-   * EH cleanup helper that destroys one stack-local `std::string` lane.
-   */
-  void EhCleanupDestroyStdStringA(std::string* const stringStorage)
-  {
-    stringStorage->~basic_string();
-  }
 
-  /**
-   * Address: 0x00B915E8 (FUN_00B915E8)
-   *
-   * What it does:
-   * EH cleanup helper that destroys one stack-local `std::string` lane.
-   */
-  void EhCleanupDestroyStdStringB(std::string* const stringStorage)
-  {
-    stringStorage->~basic_string();
-  }
 
   struct RuntimeBacklinkedFiveWordCopyLane
   {
@@ -46128,37 +29357,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destinationEnd;
   }
 
-  /**
-   * Address: 0x007B1070 (FUN_007B1070)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one reverse backlink-pair assignment
-   * lane into `RuntimeCopyAssignBacklinkedPairRangeBackwardCommon`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeBackwardAdapterA(
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    RuntimeBacklinkedPairCopyLane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(destinationEnd, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007B10A0 (FUN_007B10A0)
-   *
-   * What it does:
-   * Secondary register-shape adapter for reverse backlink-pair assignment
-   * dispatch into `RuntimeCopyAssignBacklinkedPairRangeBackwardCommon`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeBackwardAdapterB(
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    RuntimeBacklinkedPairCopyLane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(destinationEnd, sourceEnd, sourceBegin);
-  }
 
   struct RuntimeBacklinkedPairVectorStorageView
   {
@@ -46271,58 +29470,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(end, splitSource, sourceBegin);
   }
 
-  /**
-   * Address: 0x007AE710 (FUN_007AE710)
-   *
-   * IDA signature:
-   * int __usercall sub_7AE710@<eax>(int result@<eax>, _DWORD **a2@<edx>);
-   * (a2 is a pointer to one source `RuntimeBacklinkedPairCopyLane`.)
-   *
-   * What it does:
-   * Push-backs a single `RuntimeBacklinkedPairCopyLane` onto the vector at
-   * `vector->end`. When the vector is full (`end == capacity`), tail-calls
-   * the canonical insert-range lane `RuntimeInsertBacklinkedPairVectorRangeLaneA`
-   * (FUN_007AF0B0) over the half-open range `[source, source+1)` to grow
-   * storage and insert. When the vector still has room, splices the new
-   * lane into the external owner chain pointed at by `source->ownerSlot`:
-   *   * If `source->ownerSlot` is non-null, the new slot inherits the
-   *     previous chain head into its `previousOwner` field, and
-   *     `*source->ownerSlot` is rewritten to the new slot's address.
-   *   * If `source->ownerSlot` is null, the new slot's `previousOwner` is
-   *     zeroed.
-   * In either non-grow path, `vector->end` is bumped by one lane. Returns
-   * `EAX` from the call site: in the grow path, that is the lane pointer
-   * returned by FUN_007AF0B0; in the in-place paths, that is the original
-   * vector pointer left in EAX by the binary (this function does not
-   * synthesize a return value of its own outside the grow path).
-   */
-  [[maybe_unused]] void* PushBackBacklinkedPairLaneSingleWithChainSplice(
-    RuntimeBacklinkedPairVectorStorageView* const vector,
-    RuntimeBacklinkedPairCopyLane* const source
-  ) noexcept
-  {
-    RuntimeBacklinkedPairCopyLane* const insertion = vector->end;
-    if (insertion == vector->capacity) {
-      return RuntimeInsertBacklinkedPairVectorRangeLaneA(vector, insertion, source, source + 1);
-    }
-
-    if (insertion != nullptr) {
-      std::uintptr_t* const ownerSlot = source->ownerSlot;
-      insertion->ownerSlot = ownerSlot;
-
-      if (ownerSlot != nullptr) {
-        insertion->previousOwner = *ownerSlot;
-        *ownerSlot = reinterpret_cast<std::uintptr_t>(insertion);
-        vector->end = insertion + 1;
-        return vector;
-      }
-
-      insertion->previousOwner = 0;
-    }
-
-    vector->end = insertion + 1;
-    return vector;
-  }
 
   /**
    * Address: 0x007F3B90 (FUN_007F3B90)
@@ -46732,109 +29879,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destinationEnd;
   }
 
-  /**
-   * Address: 0x00855DF0 (FUN_00855DF0)
-   *
-   * What it does:
-   * Inserts `insertCount` copies of one 8-byte refcount-pair value into vector
-   * storage at `insertPosition`, growing storage when needed and preserving
-   * retain/release semantics for owner lanes.
-   */
-  [[maybe_unused]] void __stdcall RuntimeInsertRefcountPairVectorFillLaneA(
-    RuntimeRefcountPairVectorStorageView* const vector,
-    RuntimeRefcountPairCopyLane* const insertPosition,
-    const std::uint32_t insertCount,
-    const RuntimeRefcountPairCopyLane* const fillValue
-  )
-  {
-    RuntimeRefcountPairCopyLane retainedValue{};
-    if (fillValue != nullptr) {
-      retainedValue = *fillValue;
-    }
-    RuntimeRetainRefcountOwner(retainedValue.owner);
-
-    auto releaseRetainedValue = [&retainedValue]() noexcept -> void
-    {
-      if (retainedValue.owner != nullptr) {
-        RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(retainedValue.owner));
-      }
-    };
-
-    try {
-      if (insertCount != 0u) {
-        RuntimeRefcountPairCopyLane* const begin = vector->begin;
-        RuntimeRefcountPairCopyLane* const end = vector->end;
-        RuntimeRefcountPairCopyLane* const capacity = vector->capacity;
-
-        const std::size_t size = begin != nullptr ? static_cast<std::size_t>(end - begin) : 0u;
-        if ((static_cast<std::size_t>(0x1FFFFFFFu) - size) < insertCount) {
-          RuntimeThrowVectorTooLongDC();
-        }
-
-        const std::size_t requiredCount = size + insertCount;
-        const std::size_t capacityCount = begin != nullptr ? static_cast<std::size_t>(capacity - begin) : 0u;
-        if (capacityCount < requiredCount) {
-          std::size_t grownCount = 0u;
-          if ((static_cast<std::size_t>(0x1FFFFFFFu) - (capacityCount >> 1)) >= capacityCount) {
-            grownCount = capacityCount + (capacityCount >> 1);
-          }
-          if (grownCount < requiredCount) {
-            grownCount = requiredCount;
-          }
-
-          auto* const newBegin = static_cast<RuntimeRefcountPairCopyLane*>(
-            grownCount != 0u ? ::operator new(grownCount * sizeof(RuntimeRefcountPairCopyLane)) : ::operator new(0u)
-          );
-          RuntimeRefcountPairCopyLane* newEnd = newBegin;
-
-          try {
-            newEnd = RuntimeCopyRefcountPairRangeCommon(newEnd, begin, insertPosition);
-            newEnd = RuntimeUninitializedFillRefcountPairRangeRetain(newEnd, insertCount, retainedValue);
-            newEnd = RuntimeCopyRefcountPairRangeCommon(newEnd, insertPosition, end);
-          } catch (...) {
-            RuntimeReleaseRefcountPairRange(newBegin, newEnd);
-            ::operator delete(newBegin);
-            throw;
-          }
-
-          RuntimeReleaseRefcountPairRange(begin, end);
-          if (begin != nullptr) {
-            ::operator delete(begin);
-          }
-
-          vector->begin = newBegin;
-          vector->end = newBegin + requiredCount;
-          vector->capacity = newBegin + grownCount;
-        } else {
-          const std::size_t tailCount = static_cast<std::size_t>(end - insertPosition);
-          if (tailCount < insertCount) {
-            (void)RuntimeCopyRefcountPairRangeCommon(insertPosition + insertCount, insertPosition, end);
-            (void)RuntimeUninitializedFillRefcountPairRangeRetain(
-              end,
-              static_cast<std::uint32_t>(insertCount - tailCount),
-              retainedValue
-            );
-            vector->end = end + insertCount;
-            (void)RuntimeFillAssignRefcountPairRangeRetain(insertPosition, end, retainedValue);
-          } else {
-            (void)RuntimeCopyRefcountPairRangeCommon(end, end - insertCount, end);
-            vector->end = end + insertCount;
-            (void)RuntimeCopyAssignRefcountPairRangeBackwardRetain(end, insertPosition, end - insertCount);
-            (void)RuntimeFillAssignRefcountPairRangeRetain(
-              insertPosition,
-              insertPosition + insertCount,
-              retainedValue
-            );
-          }
-        }
-      }
-    } catch (...) {
-      releaseRetainedValue();
-      throw;
-    }
-
-    releaseRetainedValue();
-  }
 
   [[nodiscard]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeCommon(
     RuntimeRefcountQuadOddCopyLane* const destination,
@@ -46862,40 +29906,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<RuntimeRefcountQuadOddCopyLane*>(destinationCursor);
   }
 
-  /**
-   * Address: 0x0085A9F0 (FUN_0085A9F0)
-   *
-   * What it does:
-   * Copy-assigns one 16-byte quad-odd refcount lane, retaining incoming owner
-   * controls and releasing replaced owner controls at `+0x04` and `+0x0C`.
-   */
-  [[maybe_unused]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyAssignRefcountQuadOddLane(
-    const RuntimeRefcountQuadOddCopyLane* const source,
-    RuntimeRefcountQuadOddCopyLane* const destination
-  ) noexcept
-  {
-    destination->word0 = source->word0;
-    RuntimeRefcountOwnerView* const incomingOwner1 = source->owner1;
-    if (incomingOwner1 != destination->owner1) {
-      RuntimeRetainRefcountOwner(incomingOwner1);
-      if (destination->owner1 != nullptr) {
-        RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destination->owner1));
-      }
-      destination->owner1 = incomingOwner1;
-    }
-
-    destination->word2 = source->word2;
-    RuntimeRefcountOwnerView* const incomingOwner3 = source->owner3;
-    if (incomingOwner3 != destination->owner3) {
-      RuntimeRetainRefcountOwner(incomingOwner3);
-      if (destination->owner3 != nullptr) {
-        RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destination->owner3));
-      }
-      destination->owner3 = incomingOwner3;
-    }
-
-    return destination;
-  }
 
   [[nodiscard]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52Lane(
     RuntimeRetainedOwnerTripleRecord52Lane* const destination,
@@ -46955,91 +29965,10 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<RuntimeRetainedOwnerTripleRecord52Lane*>(destinationCursor);
   }
 
-  /**
-   * Address: 0x005CC4B0 (FUN_005CC4B0)
-   * Address: 0x005CD370 (FUN_005CD370)
-   * Address: 0x005CD240 (FUN_005CD240)
-   * Address: 0x005CDA20 (FUN_005CDA20)
-   * Address: 0x005CD270 (FUN_005CD270)
-   * Address: 0x00689500 (FUN_00689500)
-   * Address: 0x005CD3A0 (FUN_005CD3A0)
-   *
-   * What it does:
-   * Source-first adapter lane for one retained-owner 52-byte range copy
-   * dispatch into the canonical helper.
-   */
-  [[maybe_unused]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52RangeSourceFirstAdapter(
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd,
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005C9E40 (FUN_005C9E40)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane for one retained-owner 52-byte range
-   * copy dispatch into `FUN_005CE020` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRetainedOwnerTripleRecord52Lane* __stdcall RuntimeCopyRetainedOwnerTripleRecord52RangeStdcallAdapter(
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd,
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005CBE60 (FUN_005CBE60)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane for one retained-owner 52-byte range copy
-   * dispatch into `FUN_005CE020` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52RangeCdeclAdapter(
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd,
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005C9EC0 (FUN_005C9EC0)
-   *
-   * What it does:
-   * Secondary source-first adapter lane for one retained-owner 52-byte range
-   * copy dispatch into `FUN_005CDAE0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52RangeSourceFirstNullScratchAdapterA(
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd,
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005CC4E0 (FUN_005CC4E0)
-   *
-   * What it does:
-   * Mirrored source-first adapter lane for one retained-owner 52-byte range
-   * copy dispatch into `FUN_005CDAE0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52RangeSourceFirstNullScratchAdapterB(
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd,
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x005CDEF0 (FUN_005CDEF0)
@@ -47076,54 +30005,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<RuntimeCopyRefcountTaggedRecord28Lane*>(destinationCursor);
   }
 
-  /**
-   * Address: 0x005CD0E0 (FUN_005CD0E0)
-   * Address: 0x005CD9E0 (FUN_005CD9E0)
-   *
-   * What it does:
-   * Source-first adapter lane for one tagged 28-byte range copy dispatch into
-   * `FUN_005CDEF0`.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28RangeAllowNullSourceFirstAdapter(
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTaggedRecord28RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005C9D60 (FUN_005C9D60)
-   *
-   * What it does:
-   * Fastcall source-first adapter lane for one tagged 28-byte range copy
-   * dispatch into `FUN_005CDEF0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28RangeAllowNullSourceFirstNullScratchAdapterA(
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTaggedRecord28RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005CBCA0 (FUN_005CBCA0)
-   *
-   * What it does:
-   * Secondary source-first adapter lane for one tagged 28-byte range copy
-   * dispatch into `FUN_005CDEF0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28RangeAllowNullSourceFirstNullScratchAdapterB(
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTaggedRecord28RangeAllowNull(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x005493B0 (FUN_005493B0)
@@ -47140,20 +30023,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 5>(destination, sourceFiveWords, repeatCount);
   }
 
-  /**
-   * Address: 0x00548A30 (FUN_00548A30)
-   *
-   * What it does:
-   * Register-shape adapter that dispatches one 5-dword fixed-source copy lane
-   * with zero repeat count.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordQuintCountLaneARegisterAdapter(
-    const std::uint32_t* const sourceFiveWords,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuintCountLaneA(destination, sourceFiveWords, 0u);
-  }
 
   /**
    * Address: 0x00583180 (FUN_00583180)
@@ -47170,21 +30039,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<float, 6>(destination, sourceSixFloats, repeatCount);
   }
 
-  /**
-   * Address: 0x00581E30 (FUN_00581E30)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one float6 fixed-source count-copy
-   * lane into `FUN_00583180` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatHexadCountLaneANullScratchAdapter(
-    float* const destination,
-    const std::uint32_t repeatCount,
-    const float* const sourceSixFloats
-  ) noexcept
-  {
-    return RuntimeCopyFloatHexadCountLaneA(repeatCount, destination, sourceSixFloats);
-  }
 
   /**
    * Address: 0x00584100 (FUN_00584100)
@@ -47201,22 +30055,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<float, 6>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00581CE0 (FUN_00581CE0)
-   * Address: 0x00582E70 (FUN_00582E70)
-   *
-   * What it does:
-   * Source-first register adapter that forwards one float6 lane range-copy
-   * dispatch to the canonical helper.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatHexadRangeLaneASourceFirstAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatHexadRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x00572B60 (FUN_00572B60)
@@ -47238,85 +30076,10 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     );
   }
 
-  /**
-   * Address: 0x00571100 (FUN_00571100)
-   *
-   * What it does:
-   * Forwards one mixed dword+float7 range-copy adapter lane through
-   * `FUN_00572B60`.
-   */
-  [[maybe_unused]] RuntimeCopyMixedDwordFloatSeptupleLane* RuntimeCopyDwordOctupleRangeLaneAAdapter(
-    RuntimeCopyMixedDwordFloatSeptupleLane* const destination,
-    const RuntimeCopyMixedDwordFloatSeptupleLane* const sourceBegin,
-    const RuntimeCopyMixedDwordFloatSeptupleLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordOctupleRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00570F90 (FUN_00570F90)
-   *
-   * What it does:
-   * Forwards one legacy zero-initialized weakptr backward-range adapter lane
-   * into `FUN_005724E0`.
-   */
-  [[maybe_unused]] moho::WeakPtr<void>* AssignWeakPtrRangeBackwardZeroAdapter(
-    [[maybe_unused]] void* const unusedThis
-  ) noexcept
-  {
-    return moho::AssignWeakPtrRangeBackward(nullptr, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x00570FC0 (FUN_00570FC0)
-   *
-   * What it does:
-   * Adapts one source-first weakptr backward-range copy lane through
-   * `FUN_00572550`.
-   */
-  [[maybe_unused]] moho::WeakPtr<void>* AssignWeakPtrRangeBackwardRegisterAdapter(
-    const moho::WeakPtr<void>* const sourceEnd,
-    const moho::WeakPtr<void>* const sourceBegin,
-    moho::WeakPtr<void>* const destinationEnd
-  ) noexcept
-  {
-    return moho::AssignWeakPtrRangeBackward(destinationEnd, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00570FF0 (FUN_00570FF0)
-   * Address: 0x005716A0 (FUN_005716A0)
-   *
-   * What it does:
-   * Adapts one source-first weakptr forward-range copy lane through
-   * `FUN_005725A0`.
-   */
-  [[maybe_unused]] moho::WeakPtr<void>* AssignWeakPtrRangeForwardRegisterAdapter(
-    const moho::WeakPtr<void>* const sourceEnd,
-    const moho::WeakPtr<void>* const sourceBegin,
-    moho::WeakPtr<void>* const destination
-  ) noexcept
-  {
-    return moho::AssignWeakPtrRangeForward(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0057EEF0 (FUN_0057EEF0)
-   *
-   * What it does:
-   * Writes `repeatCount` float6 lanes from `sourceSixFloats` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatHexadAndAdvanceA(
-    float* const destination,
-    const std::uint32_t repeatCount,
-    const float* const sourceSixFloats
-  ) noexcept
-  {
-    (void)RuntimeCopyFloatHexadCountLaneA(repeatCount, destination, sourceSixFloats);
-    return destination + (repeatCount * 6u);
-  }
 
   /**
    * Address: 0x00594A20 (FUN_00594A20)
@@ -47333,21 +30096,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x005940A0 (FUN_005940A0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 3-dword fixed-source count-copy
-   * lane into the canonical helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneARegisterAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneA(destination, sourceTriple, repeatCount);
-  }
 
   /**
    * Address: 0x00595F10 (FUN_00595F10)
@@ -47380,83 +30128,10 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<std::uint32_t*>(destinationAddress);
   }
 
-  /**
-   * Address: 0x00594A60 (FUN_00594A60)
-   *
-   * What it does:
-   * Register-shape adapter for an empty-range 3-dword copy dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNullEmptyAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeAllowNull(destination, sourceLane, sourceLane);
-  }
 
-  /**
-   * Address: 0x00595950 (FUN_00595950)
-   *
-   * What it does:
-   * Secondary register-shape adapter for an empty-range 3-dword copy
-   * dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNullEmptyAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeAllowNull(destination, sourceLane, sourceLane);
-  }
 
-  /**
-   * Address: 0x00595D00 (FUN_00595D00)
-   *
-   * What it does:
-   * `this`-shape adapter for an empty-range 3-dword copy dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNullEmptyAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeAllowNull(destination, sourceLane, sourceLane);
-  }
 
-  /**
-   * Address: 0x005940F0 (FUN_005940F0)
-   * Address: 0x005CC040 (FUN_005CC040)
-   * Address: 0x005CD320 (FUN_005CD320)
-   * Address: 0x005CDA80 (FUN_005CDA80)
-   *
-   * What it does:
-   * Source-first adapter lane for one null-destination-aware dword-triple
-   * range copy dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNullSourceFirstAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeAllowNull(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x005CA0A0 (FUN_005CA0A0)
-   *
-   * What it does:
-   * Source-first adapter lane for one null-destination-aware 3-dword range
-   * copy dispatch into `FUN_005CE090` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNullSourceFirstNullScratchAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeAllowNull(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x005CBC70 (FUN_005CBC70)
@@ -47473,55 +30148,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x005C9CC0 (FUN_005C9CC0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one source-first 3-dword fixed-source
-   * count-copy lane into `FUN_005CBC70`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneBSourceFirstAdapter(
-    const std::uint32_t* const sourceTriple,
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneB(destination, sourceTriple, repeatCount);
-  }
 
-  /**
-   * Address: 0x00592030 (FUN_00592030)
-   *
-   * What it does:
-   * Writes `repeatCount` dword-triple lanes from `sourceTriple` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleAndAdvanceA(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneA(destination, sourceTriple, repeatCount);
-    return destination + (repeatCount * 3u);
-  }
 
-  /**
-   * Address: 0x005C6190 (FUN_005C6190)
-   *
-   * What it does:
-   * Writes `repeatCount` dword-triple lanes from `sourceTriple` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleAndAdvanceB(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneB(destination, sourceTriple, repeatCount);
-    return destination + (repeatCount * 3u);
-  }
 
   /**
    * Address: 0x008D72F0 (FUN_008D72F0)
@@ -47550,52 +30178,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return repeatCount;
   }
 
-  /**
-   * Address: 0x00768E80 (FUN_00768E80)
-   *
-   * What it does:
-   * Register-order adapter that forwards one fixed-source dword count write
-   * lane to `RuntimeCopyDwordCountFromFixedSourceLaneA`.
-   */
-  [[maybe_unused]] std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneARegisterOrderAdapter(
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
-  }
 
-  /**
-   * Address: 0x008D6F40 (FUN_008D6F40)
-   *
-   * What it does:
-   * Register-order adapter that forwards one fixed-source dword count write
-   * lane to `RuntimeCopyDwordCountFromFixedSourceLaneA`.
-   */
-  [[maybe_unused]] std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneARegisterOrderAdapterB(
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
-  }
 
-  /**
-   * Address: 0x005EE460 (FUN_005EE460)
-   *
-   * What it does:
-   * Writes `repeatCount` 5-dword lanes from one fixed source lane.
-   */
-  void RuntimeCopyDwordQuintCountLaneB(
-    const std::uint32_t repeatCount,
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceFiveWords
-  ) noexcept
-  {
-    (void)RuntimeCopyWordCountFromFixedSource<std::uint32_t, 5>(destination, sourceFiveWords, repeatCount);
-  }
 
   /**
    * Address: 0x005CBAC0 (FUN_005CBAC0)
@@ -47662,21 +30246,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<float, 13>(destination, sourceThirteenFloats, repeatCount);
   }
 
-  /**
-   * Address: 0x0064F700 (FUN_0064F700)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one float13 fixed-source count-copy
-   * lane into `FUN_0064F9A0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloat13CountLaneANullScratchAdapter(
-    float* const destination,
-    const std::uint32_t repeatCount,
-    const float* const sourceThirteenFloats
-  ) noexcept
-  {
-    return RuntimeCopyFloat13CountLaneA(repeatCount, destination, sourceThirteenFloats);
-  }
 
   /**
    * Address: 0x00680940 (FUN_00680940)
@@ -47693,55 +30262,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x0067F730 (FUN_0067F730)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 3-dword fixed-source count-copy
-   * lane into `FUN_00680940` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneCNullScratchAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneC(destination, sourceTriple, repeatCount);
-  }
 
-  /**
-   * Address: 0x006274B0 (FUN_006274B0)
-   *
-   * What it does:
-   * Writes `repeatCount` backlink-triple lanes from `sourceLane` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleAndAdvanceA(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    (void)RuntimeCopyBacklinkedTripleWordCountLaneA(destination, repeatCount, sourceLane);
-    return destination + repeatCount;
-  }
 
-  /**
-   * Address: 0x0064E420 (FUN_0064E420)
-   *
-   * What it does:
-   * Writes `repeatCount` float13 lanes from `sourceThirteenFloats` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloat13AndAdvanceA(
-    float* const destination,
-    const std::uint32_t repeatCount,
-    const float* const sourceThirteenFloats
-  ) noexcept
-  {
-    (void)RuntimeCopyFloat13CountLaneA(repeatCount, destination, sourceThirteenFloats);
-    return destination + (repeatCount * 13u);
-  }
 
   struct RuntimeFloat13LaneView
   {
@@ -47781,38 +30303,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-  /**
-   * Address: 0x00650140 (FUN_00650140)
-   *
-   * What it does:
-   * Register-shape adapter lane that forwards one float13 range copy into the
-   * canonical `RuntimeCopyFloat13RangeAndAdvanceLaneA(...)` helper.
-   */
-  [[maybe_unused]] RuntimeFloat13LaneView* RuntimeCopyFloat13RangeAndAdvanceRegisterAdapterLaneA(
-    RuntimeFloat13LaneView* const destination,
-    const RuntimeFloat13LaneView* const sourceBegin,
-    const RuntimeFloat13LaneView* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloat13RangeAndAdvanceLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0067C730 (FUN_0067C730)
-   *
-   * What it does:
-   * Writes `repeatCount` dword-triple lanes from `sourceTriple` into
-   * `destination`, then returns one-past-the-last written lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleAndAdvanceC(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneC(destination, sourceTriple, repeatCount);
-    return destination + (repeatCount * 3u);
-  }
 
   /**
    * Address: 0x00689310 (FUN_00689310)
@@ -47830,21 +30321,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyBacklinkedFiveWordCountFromSingleLane(destination, repeatCount, sourceLane);
   }
 
-  /**
-   * Address: 0x00688D10 (FUN_00688D10)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 20-byte backlink fixed-source
-   * count-copy lane into `FUN_00689310` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordCountLaneANullScratchAdapter(
-    RuntimeBacklinkedFiveWordCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedFiveWordCountLaneA(destination, repeatCount, sourceLane);
-  }
 
   /**
    * Address: 0x006A0080 (FUN_006A0080)
@@ -47861,50 +30337,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x0069F900 (FUN_0069F900)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 3-dword fixed-source count-copy
-   * lane into `FUN_006A0080` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneDNullScratchAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneD(destination, sourceTriple, repeatCount);
-  }
 
-  /**
-   * Address: 0x006D1DA0 (FUN_006D1DA0)
-   * Address: 0x00798840 (FUN_00798840)
-   *
-   * What it does:
-   * Thin lane wrapper that forwards one allocation pointer to global
-   * `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeDeleteSingleAllocationLane(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x006DEB10 (FUN_006DEB10)
-   *
-   * What it does:
-   * Writes `repeatCount` 12-byte backlink lanes from one fixed source lane and
-   * patches each destination lane to own that source owner slot.
-   */
-  RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordCountLaneB(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordCountFromSingleLane(destination, repeatCount, sourceLane);
-  }
 
   /**
    * Address: 0x0071E8E0 (FUN_0071E8E0)
@@ -47923,21 +30357,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<float, 4>(destination, sourceQuad, repeatCount);
   }
 
-  /**
-   * Address: 0x007E97B0 (FUN_007E97B0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one float4 fixed-source copy-count
-   * request into `RuntimeCopyFloatQuadCountLaneA`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatQuadCountLaneAAdapterA(
-    float* const destination,
-    const float* const sourceQuad,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadCountLaneA(destination, sourceQuad, repeatCount);
-  }
 
   struct RuntimeRefcountedPointerLane
   {
@@ -47946,57 +30365,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(offsetof(RuntimeRefcountedPointerLane, refCount) == 0x04, "RuntimeRefcountedPointerLane::refCount offset must be 0x04");
 
-  /**
-   * Address: 0x00658470 (FUN_00658470)
-   *
-   * What it does:
-   * Copies one float lane range from `[sourceBegin,sourceEnd)` into destination
-   * and returns one-past-end destination.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatRangeLaneA(
-    float* const destination,
-    const float* const sourceEnd,
-    const float* sourceBegin
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    while (sourceBegin != sourceEnd) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<float*>(destinationAddress) = *sourceBegin;
-        ++sourceBegin;
-      }
-      destinationAddress += sizeof(float);
-    }
-    return reinterpret_cast<float*>(destinationAddress);
-  }
 
-  /**
-   * Address: 0x00658490 (FUN_00658490)
-   *
-   * What it does:
-   * Copies one pointer lane range from `[sourceBegin,sourceEnd)` and retains
-   * the pointed object by incrementing refcount lane `+0x04`.
-   */
-  [[maybe_unused]] RuntimeRefcountedPointerLane** RuntimeCopyRefcountedPointerRangeLaneA(
-    RuntimeRefcountedPointerLane** const destination,
-    const RuntimeRefcountedPointerLane* const* const sourceEnd,
-    const RuntimeRefcountedPointerLane* const* sourceBegin
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    while (sourceBegin != sourceEnd) {
-      if (destinationAddress != 0u) {
-        auto* const value = const_cast<RuntimeRefcountedPointerLane*>(*sourceBegin);
-        *reinterpret_cast<RuntimeRefcountedPointerLane**>(destinationAddress) = value;
-        if (value != nullptr) {
-          (void)::InterlockedExchangeAdd(&value->refCount, 1);
-        }
-        ++sourceBegin;
-      }
-      destinationAddress += sizeof(RuntimeRefcountedPointerLane*);
-    }
-    return reinterpret_cast<RuntimeRefcountedPointerLane**>(destinationAddress);
-  }
 
   /**
    * Address: 0x00693200 (FUN_00693200)
@@ -48013,20 +30382,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<float, 7>(destination, sourceSeptuple, repeatCount);
   }
 
-  /**
-   * Address: 0x006930F0 (FUN_006930F0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one float7 copy lane with a forced
-   * zero repeat-count.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleCountLaneAZeroCountAdapter(
-    float* const destination,
-    const float* const sourceSeptuple
-  ) noexcept
-  {
-    return RuntimeCopyFloatSeptupleCountLaneA(destination, sourceSeptuple, 0u);
-  }
 
   /**
    * Address: 0x00753A90 (FUN_00753A90)
@@ -48043,21 +30398,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 10>(destination, sourceTenWords, repeatCount);
   }
 
-  /**
-   * Address: 0x007517E0 (FUN_007517E0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 10-dword count copy lane into
-   * `FUN_00753A90`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordDecupleCountLaneARegisterAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTenWords
-  ) noexcept
-  {
-    return RuntimeCopyDwordDecupleCountLaneA(repeatCount, destination, sourceTenWords);
-  }
 
   /**
    * Address: 0x00755D30 (FUN_00755D30)
@@ -48074,21 +30414,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 10>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00754940 (FUN_00754940)
-   *
-   * What it does:
-   * Source-first adapter lane for one 10-dword range copy dispatch into
-   * `FUN_00755D30` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordDecupleRangeLaneASourceFirstNullScratchAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordDecupleRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x00756920 (FUN_00756920)
@@ -48105,53 +30430,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 10>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00754910 (FUN_00754910)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane that forwards one 10-dword range copy
-   * through `FUN_00756920` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordDecupleRangeLaneBSourceFirstStdcallAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordDecupleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00755D00 (FUN_00755D00)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one 10-dword range copy
-   * through `FUN_00756920` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordDecupleRangeLaneBSourceFirstCdeclAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordDecupleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0075FEA0 (FUN_0075FEA0)
-   *
-   * What it does:
-   * Writes `repeatCount` 12-byte refcounted lanes from one fixed source lane
-   * and retains the owner lane at `+0x08`.
-   */
-  RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleCountLaneA(
-    RuntimeRefcountTailTripleCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeRefcountTailTripleCopyLane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailTripleCountFromSingleLane(destination, repeatCount, sourceLane);
-  }
 
   /**
    * Address: 0x00756880 (FUN_00756880)
@@ -48169,38 +30449,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyRefcountTailTripleRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00754880 (FUN_00754880)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane that forwards one 12-byte refcounted
-   * range copy through `FUN_00756880` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRefcountTailTripleCopyLane* __stdcall
-  RuntimeCopyRefcountTailTripleRangeLaneBSourceFirstStdcallAdapter(
-    const RuntimeRefcountTailTripleCopyLane* const sourceBegin,
-    const RuntimeRefcountTailTripleCopyLane* const sourceEnd,
-    RuntimeRefcountTailTripleCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailTripleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00755C20 (FUN_00755C20)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one 12-byte refcounted
-   * range copy through `FUN_00756880` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleRangeLaneBSourceFirstCdeclAdapter(
-    const RuntimeRefcountTailTripleCopyLane* const sourceBegin,
-    const RuntimeRefcountTailTripleCopyLane* const sourceEnd,
-    RuntimeRefcountTailTripleCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailTripleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x007625F0 (FUN_007625F0)
@@ -48234,21 +30483,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStridedNoNullGuard<float, 7>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x005B5820 (FUN_005B5820)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one source-first float7 range copy
-   * without null-destination guarding through `FUN_005B5D10`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleRangeNoNullGuardLaneASourceFirstAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatSeptupleRangeNoNullGuardLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x007567A0 (FUN_007567A0)
@@ -48265,86 +30499,10 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<float, 7>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007546E0 (FUN_007546E0)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane that forwards one float7 range copy
-   * through `FUN_007567A0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] float* __stdcall RuntimeCopyFloatSeptupleRangeLaneBSourceFirstStdcallAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatSeptupleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00754710 (FUN_00754710)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one float7 range copy
-   * without null-destination guarding through `FUN_00755B30` while discarding
-   * one zero scratch lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleRangeNoNullGuardLaneBSourceFirstCdeclNullScratchAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedNoNullGuard<float, 7>(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00754740 (FUN_00754740)
-   *
-   * What it does:
-   * Fastcall register-shape adapter lane that forwards one source-first float7
-   * range copy through the null-destination-aware `FUN_00693430` behavior.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleRangeLaneASourceFirstFastcallNullScratchAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatSeptupleRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00755B00 (FUN_00755B00)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one float7 range copy
-   * through `FUN_007567A0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleRangeLaneBSourceFirstCdeclAdapter(
-    const float* const sourceBegin,
-    const float* const sourceEnd,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatSeptupleRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00755B30 (FUN_00755B30)
-   *
-   * What it does:
-   * Copies one float7 lane range from `[sourceBegin, sourceEnd)` without
-   * null-destination guarding.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatSeptupleRangeNoNullGuardLaneB(
-    float* const destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedNoNullGuard<float, 7>(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x0076B0E0 (FUN_0076B0E0)
@@ -48361,38 +30519,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x0076AA60 (FUN_0076AA60)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 3-dword fixed-source count-copy
-   * lane into `FUN_0076B0E0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneENullScratchAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneE(destination, sourceTriple, repeatCount);
-  }
 
-  /**
-   * Address: 0x00689D70 (FUN_00689D70)
-   * Address: 0x00688DF0 (FUN_00688DF0)
-   *
-   * What it does:
-   * Copies one 20-byte lane range and patches the owner-slot backlink lane at
-   * `+0x08` to point at each destination record's local owner-slot field.
-   */
-  RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordRangeLaneA(
-    RuntimeBacklinkedFiveWordCopyLane* const destination,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceEnd,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedFiveWordRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x00629F00 (FUN_00629F00)
@@ -48411,53 +30538,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyBacklinkedTripleWordRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00628F80 (FUN_00628F80)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one source-first 12-byte backlink
-   * lane range copy to `FUN_00629F00`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordRangeLaneASourceFirstAdapterA(
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceBegin,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceEnd,
-    RuntimeBacklinkedTripleWordCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00629AD0 (FUN_00629AD0)
-   *
-   * What it does:
-   * Mirrored register-shape adapter that forwards one source-first 12-byte
-   * backlink lane range copy to `FUN_00629F00`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordRangeLaneASourceFirstAdapterB(
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceBegin,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceEnd,
-    RuntimeBacklinkedTripleWordCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x006DFC10 (FUN_006DFC10)
-   *
-   * What it does:
-   * Register-shape adapter lane that forwards one source-first 12-byte backlink
-   * range copy into `RuntimeCopyBacklinkedTripleWordRangeLaneA`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordRangeLaneASourceFirstAdapterC(
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceBegin,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceEnd,
-    RuntimeBacklinkedTripleWordCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x006EC5B0 (FUN_006EC5B0)
@@ -48480,57 +30562,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     );
   }
 
-  /**
-   * Address: 0x006EA710 (FUN_006EA710)
-   *
-   * What it does:
-   * Source-first register-shape adapter that forwards one backlink-pair count
-   * fill lane into `RuntimeCopyBacklinkedPairCountLaneA` and returns the
-   * advanced destination cursor.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairCountLaneASourceFirstAdapterA(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    std::uintptr_t** const sourceOwnerSlotLane,
-    const std::int32_t repeatCount
-  ) noexcept
-  {
-    (void)RuntimeCopyBacklinkedPairCountLaneA(destination, repeatCount, sourceOwnerSlotLane);
-    return destination + repeatCount;
-  }
-
-  /**
-   * Address: 0x0067EA30 (FUN_0067EA30)
-   * Address: 0x00720220 (FUN_00720220)
-   * Address: 0x0071EB50 (FUN_0071EB50)
-   * Address: 0x0071F640 (FUN_0071F640)
-   * Address: 0x0071FC40 (FUN_0071FC40)
-   *
-   * What it does:
-   * Copies one float4 lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatQuadRangeLaneA(
-    float* const destination,
-    const float* const sourceEnd,
-    const float* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 4>(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x0071D630 (FUN_0071D630)
-   *
-   * What it does:
-   * Copies one float4 lane range `[sourceBegin, sourceEnd)` into destination
-   * storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatQuadRangeTailAdapter(
-    const float* const sourceBegin,
-    float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadRangeLaneA(sourceEnd, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x00734440 (FUN_00734440)
@@ -48562,70 +30593,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyDwordPairRangeLaneC(sourceEnd, sourceEnd, sourceBegin);
   }
 
-  /**
-   * Address: 0x00733C70 (FUN_00733C70)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one dword-pair tail-copy dispatch into
-   * `FUN_00733A80`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeTailAdapterLaneCCdeclA(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeTailAdapterLaneC(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00733FE0 (FUN_00733FE0)
-   *
-   * What it does:
-   * Secondary cdecl adapter lane that forwards one dword-pair tail-copy
-   * dispatch into `FUN_00733A80`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeTailAdapterLaneCCdeclB(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeTailAdapterLaneC(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007342A0 (FUN_007342A0)
-   *
-   * What it does:
-   * Register-scratch adapter lane that forwards one dword-pair tail-copy
-   * dispatch into `FUN_00733A80`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeTailAdapterLaneCScratchAdapter(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeTailAdapterLaneC(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0075FC50 (FUN_0075FC50)
-   * Address: 0x0075FEF0 (FUN_0075FEF0)
-   *
-   * What it does:
-   * Writes `repeatCount` dword-pair lanes from one fixed source pair.
-   */
-  std::uint32_t* RuntimeCopyDwordPairCountLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourcePair,
-    const std::int32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 2>(
-      destination,
-      sourcePair,
-      static_cast<std::uint32_t>(repeatCount)
-    );
-  }
 
   /**
    * Address: 0x008DA380 (FUN_008DA380)
@@ -48646,41 +30616,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     );
   }
 
-  /**
-   * Address: 0x008DA970 (FUN_008DA970)
-   *
-   * What it does:
-   * Register-order adapter that forwards one fixed-source dword-pair count
-   * write lane into the canonical `FUN_008DA380` helper.
-   */
-  [[maybe_unused]] void RuntimeCopyDwordPairCountLaneBRegisterOrderAdapter(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourcePair
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordPairCountLaneB(destination, sourcePair, repeatCount);
-  }
 
-  /**
-   * Address: 0x008DB170 (FUN_008DB170)
-   *
-   * What it does:
-   * Forwards one dword-pair fixed-source count copy lane and returns the
-   * destination end pointer computed from `repeatCount`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairCountReturnEndAdapterLaneA(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourcePair
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordPairCountLaneB(destination, sourcePair, repeatCount);
-    const std::intptr_t destinationAddress = reinterpret_cast<std::intptr_t>(destination);
-    const std::intptr_t byteOffset =
-      static_cast<std::intptr_t>(repeatCount) * 2 * static_cast<std::intptr_t>(sizeof(std::uint32_t));
-    return reinterpret_cast<std::uint32_t*>(destinationAddress + byteOffset);
-  }
 
   struct RuntimeRaw28ByteRecord
   {
@@ -48710,37 +30646,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     );
   }
 
-  /**
-   * Address: 0x008F65F0 (FUN_008F65F0)
-   *
-   * What it does:
-   * Forwarding lane that routes one 28-byte source-first copy range into
-   * `FUN_008F6470`.
-   */
-  [[maybe_unused]] RuntimeRaw28ByteRecord* RuntimeCopyRaw28ByteRangeLaneAAdapterA(
-    const RuntimeRaw28ByteRecord* const sourceBegin,
-    const RuntimeRaw28ByteRecord* const sourceEnd,
-    RuntimeRaw28ByteRecord* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRaw28ByteRangeLaneA(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x008F6690 (FUN_008F6690)
-   *
-   * What it does:
-   * Secondary forwarding lane that routes one 28-byte source-first copy range
-   * into `FUN_008F6470`.
-   */
-  [[maybe_unused]] RuntimeRaw28ByteRecord* RuntimeCopyRaw28ByteRangeLaneAAdapterB(
-    const RuntimeRaw28ByteRecord* const sourceBegin,
-    const RuntimeRaw28ByteRecord* const sourceEnd,
-    RuntimeRaw28ByteRecord* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRaw28ByteRangeLaneA(sourceBegin, sourceEnd, destination);
-  }
 
   /**
    * Address: 0x008F65B0 (FUN_008F65B0)
@@ -48763,38 +30669,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     );
   }
 
-  /**
-   * Address: 0x008F6710 (FUN_008F6710)
-   *
-   * What it does:
-   * Forwards one fixed-source 28-byte count copy lane into `FUN_008F65B0` and
-   * returns the destination end pointer computed from `repeatCount`.
-   */
-  [[maybe_unused]] RuntimeRaw28ByteRecord* __stdcall RuntimeCopyRaw28ByteCountLaneAReturnEndStdcallAdapter(
-    RuntimeRaw28ByteRecord* const destination,
-    const std::int32_t repeatCount,
-    const RuntimeRaw28ByteRecord* const sourceLane
-  ) noexcept
-  {
-    (void)RuntimeCopyRaw28ByteCountLaneA(destination, repeatCount, sourceLane);
-    return destination + repeatCount;
-  }
 
-  /**
-   * Address: 0x008F6650 (FUN_008F6650)
-   *
-   * What it does:
-   * Forwarding lane that routes one fixed-source 28-byte count copy into
-   * `FUN_008F65B0`.
-   */
-  [[maybe_unused]] RuntimeRaw28ByteRecord* RuntimeCopyRaw28ByteCountLaneAAdapterA(
-    RuntimeRaw28ByteRecord* const destination,
-    const std::int32_t repeatCount,
-    const RuntimeRaw28ByteRecord* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyRaw28ByteCountLaneA(destination, repeatCount, sourceLane);
-  }
 
   /**
    * Address: 0x00760000 (FUN_00760000)
@@ -48829,52 +30704,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00754800 (FUN_00754800)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane that forwards one dword-pair range copy
-   * through `FUN_00756840` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordPairRangeLaneFSourceFirstStdcallAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneF(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00755BD0 (FUN_00755BD0)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one dword-pair range copy
-   * through `FUN_00756840` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeLaneFSourceFirstCdeclAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneF(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0094F430 (FUN_0094F430)
-   *
-   * What it does:
-   * Copies one dword-pair range `[sourceBegin, sourceEnd)` into destination.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeForwardLaneA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
-  }
 
   struct RuntimeDwordPairLane
   {
@@ -48907,41 +30738,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x0094F480 (FUN_0094F480)
-   *
-   * What it does:
-   * Fills one dword-pair range `[destination,destinationEnd)` from a fixed
-   * source pair lane.
-   */
-  [[maybe_unused]] RuntimeDwordPairLane* RuntimeFillDwordPairRangeLaneA(
-    RuntimeDwordPairLane* destination,
-    RuntimeDwordPairLane* const destinationEnd,
-    const RuntimeDwordPairLane* const sourcePair
-  ) noexcept
-  {
-    while (destination != destinationEnd) {
-      destination->lane00 = sourcePair->lane00;
-      destination->lane04 = sourcePair->lane04;
-      ++destination;
-    }
-    return destination;
-  }
 
-  /**
-   * Address: 0x0094F4F0 (FUN_0094F4F0)
-   *
-   * What it does:
-   * Alias lane of backward dword-pair range copy into destination tail.
-   */
-  [[maybe_unused]] RuntimeDwordPairLane* RuntimeCopyDwordPairRangeBackwardLaneB(
-    const RuntimeDwordPairLane* const sourceBegin,
-    const RuntimeDwordPairLane* const sourceEnd,
-    RuntimeDwordPairLane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeBackwardLaneA(sourceBegin, sourceEnd, destinationEnd);
-  }
 
   [[nodiscard]] std::int32_t RuntimeGreatestCommonDivisorPositive(std::int32_t lhs, std::int32_t rhs) noexcept
   {
@@ -49030,106 +30827,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 2>(first, middle, last);
   }
 
-  /**
-   * Address: 0x00734420 (FUN_00734420)
-   *
-   * What it does:
-   * Pure forwarding adapter lane for one pair-word rotate-by-middle dispatch.
-   */
-  [[maybe_unused]] std::int32_t RuntimeRotatePairWordRangeByMiddleAdapter(
-    std::uint32_t* const first,
-    std::uint32_t* const middle,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    return RuntimeRotatePairWordRangeByMiddle(first, middle, last);
-  }
 
-  /**
-   * Address: 0x007602A0 (FUN_007602A0, sub_7602A0)
-   *
-   * IDA signature:
-   * void __cdecl sub_7602A0(int a1, int a2);
-   *
-   * What it does:
-   * Insertion sorts the half-open `[first, last)` range of 8-byte lanes
-   * (each lane = `{ value, key }` pair-words) into descending order by the
-   * key word stored at lane offset `+0x4`. For each element after the head
-   * the helper finds its correct position in the already-sorted prefix and
-   * uses `RuntimeRotatePairWordRangeByMiddle` (FUN_007608E0) to rotate the
-   * lane into place. The head element's `>=` test acts as a fast skip when
-   * the new element belongs at or behind the current head, otherwise the
-   * walk-back loop reduces probing to the first ascending boundary before
-   * issuing the in-place rotate.
-   */
-  [[maybe_unused]] void InsertionSortPairWordRangeByKeyDescending(
-    std::uint32_t* const first,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    if (first == last) {
-      return;
-    }
 
-    constexpr std::ptrdiff_t kLaneStride = 2;          // 2 dwords = 8 bytes
-    constexpr std::ptrdiff_t kKeyOffset = 1;           // key dword at lane[+1]
 
-    for (std::uint32_t* current = first + kLaneStride; current != last; current += kLaneStride) {
-      const std::uint32_t key = current[kKeyOffset];
-
-      if (first[kKeyOffset] >= key) {
-        std::uint32_t* probe = current - kLaneStride;
-        if (probe[kKeyOffset] < key) {
-          std::uint32_t* boundary = probe;
-          do {
-            boundary = probe;
-            probe -= kLaneStride;
-          } while (probe[kKeyOffset] < key);
-
-          if (boundary != current) {
-            (void)RuntimeRotatePairWordRangeByMiddle(boundary, current, current + kLaneStride);
-          }
-        }
-      } else if (first != current) {
-        (void)RuntimeRotatePairWordRangeByMiddle(first, current, current + kLaneStride);
-      }
-    }
-  }
-
-  /**
-   * Address: 0x00595FF0 (FUN_00595FF0)
-   * Address: 0x0084C330 (FUN_0084C330)
-   *
-   * What it does:
-   * Rotates one 12-byte lane range `[first,last)` so that `middle` becomes the
-   * new beginning using the legacy juggle-cycle algorithm.
-   */
-  std::int32_t RuntimeRotateDwordTripleRangeByMiddle(
-    std::uint32_t* const first,
-    std::uint32_t* const middle,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 3>(first, middle, last);
-  }
-
-  /**
-   * Address: 0x00720350 (FUN_00720350)
-   * Address: 0x0071FAB0 (FUN_0071FAB0)
-   * Address: 0x00720110 (FUN_00720110)
-   *
-   * What it does:
-   * Rotates one 16-byte lane range `[first,last)` so that `middle` becomes the
-   * new beginning using the legacy juggle-cycle algorithm.
-   */
-  std::int32_t RuntimeRotateDwordQuadRangeByMiddle(
-    std::uint32_t* const first,
-    std::uint32_t* const middle,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 4>(first, middle, last);
-  }
 
   /**
    * Address: 0x0087EAA0 (FUN_0087EAA0)
@@ -49147,212 +30847,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 1>(first, middle, last);
   }
 
-  /**
-   * Address: 0x0087E910 (FUN_0087E910)
-   *
-   * What it does:
-   * Register-shape adapter that forwards `(last,middle,first)` into
-   * `RuntimeRotateDwordRangeByMiddle(...)`.
-   */
-  [[maybe_unused]] std::int32_t RuntimeRotateDwordRangeRegisterAdapter(
-    std::uint32_t* const last,
-    std::uint32_t* const middle,
-    std::uint32_t* const first
-  ) noexcept
-  {
-    return RuntimeRotateDwordRangeByMiddle(first, middle, last);
-  }
 
-  /**
-   * Address: 0x0087DF80 (FUN_0087DF80, sub_87DF80)
-   *
-   * IDA signature:
-   * int *__usercall sub_87DF80@<eax>(int *a1@<ebx>, int *a2);
-   *
-   * What it does:
-   * Insertion-sort over a contiguous range of pointers `[first, last)`
-   * sorted ascending by an unsigned 32-bit key field stored at offset
-   * `+0x14` of each pointed-to object. For each element after `first`:
-   *   * when `(*current).key >= (*first).key` and the immediate predecessor
-   *     would be out of order, walks the sorted prefix backward to locate
-   *     the first position whose key is `<=` the candidate, then rotates
-   *     `[boundary, current+1)` around `current` via
-   *     `RuntimeRotateDwordRangeByMiddle` (FUN_0087EAA0) so the candidate
-   *     lands at `boundary`;
-   *   * when `(*current).key < (*first).key`, rotates the entire prefix
-   *     `[first, current+1)` around `current`, publishing the candidate
-   *     at `first`.
-   * Returns a `void*` matching the binary's `EAX` post-condition (which
-   * the caller does not consume): the rotate helper's return value when a
-   * rotation was performed, or the candidate pointer / cursor otherwise.
-   */
-  [[maybe_unused]] void* InsertionSortPointersByRemoteKeyAtOffset20AscendingRuntime(
-    RuntimePointerSortKeyAtOffset20View** const first,
-    RuntimePointerSortKeyAtOffset20View** const last
-  ) noexcept
-  {
-    void* result = last;
-    if (first == last) {
-      return result;
-    }
 
-    RuntimePointerSortKeyAtOffset20View** current = first + 1;
-    if (current == last) {
-      return result;
-    }
 
-    RuntimePointerSortKeyAtOffset20View** afterCurrent = first + 2;
-    do {
-      RuntimePointerSortKeyAtOffset20View* const candidatePtr = *current;
-      const std::uint32_t candidateKey = candidatePtr->key;
-      result = candidatePtr;
 
-      if (candidateKey >= (*first)->key) {
-        result = current;
 
-        RuntimePointerSortKeyAtOffset20View** const immediatePredecessor = current - 1;
-        if (candidateKey < (*immediatePredecessor)->key) {
-          RuntimePointerSortKeyAtOffset20View** boundary = current;
-          RuntimePointerSortKeyAtOffset20View** probe = current;
-          while (true) {
-            RuntimePointerSortKeyAtOffset20View* const predecessorPtr = *(probe - 1);
-            boundary = probe;
-            --probe;
-            if (candidateKey >= predecessorPtr->key) {
-              break;
-            }
-          }
-
-          if (boundary != current && current != afterCurrent) {
-            const std::int32_t rotateResult = RuntimeRotateDwordRangeByMiddle(
-              reinterpret_cast<std::uint32_t*>(boundary),
-              reinterpret_cast<std::uint32_t*>(current),
-              reinterpret_cast<std::uint32_t*>(afterCurrent)
-            );
-            result = reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rotateResult)));
-          }
-        }
-      } else if (first != current && current != afterCurrent) {
-        const std::int32_t rotateResult = RuntimeRotateDwordRangeByMiddle(
-          reinterpret_cast<std::uint32_t*>(first),
-          reinterpret_cast<std::uint32_t*>(current),
-          reinterpret_cast<std::uint32_t*>(afterCurrent)
-        );
-        result = reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rotateResult)));
-      }
-
-      ++current;
-      ++afterCurrent;
-    } while (current != last);
-
-    return result;
-  }
-
-  /**
-   * Address: 0x005EDCE0 (FUN_005EDCE0)
-   *
-   * What it does:
-   * Returns one lower-bound slot in `[first,last)` for the selected owner's
-   * search key lane, comparing key payload at `+0x68` in each pointed
-   * subobject.
-   */
-  RuntimeSearchSubobjectKey104View** RuntimeLowerBoundSubobjectPointerByKeyLaneA(
-    RuntimeSearchOwnerKey112View* const* const selectedOwnerSlot,
-    RuntimeSearchSubobjectKey104View** first,
-    RuntimeSearchSubobjectKey104View** const last
-  ) noexcept
-  {
-    if (selectedOwnerSlot == nullptr || *selectedOwnerSlot == nullptr) {
-      return first;
-    }
-
-    const std::int32_t targetKey = (*selectedOwnerSlot)->searchSubobject.key;
-    std::ptrdiff_t count = last - first;
-    while (count > 0) {
-      const std::ptrdiff_t half = count / 2;
-      RuntimeSearchSubobjectKey104View* const probe = first[half];
-      if (probe->key >= targetKey) {
-        count = half;
-      } else {
-        first += half + 1;
-        count -= half + 1;
-      }
-    }
-
-    return first;
-  }
-
-  /**
-   * Address: 0x005158C0 (FUN_005158C0)
-   *
-   * What it does:
-   * Moves one tail range of 12-byte float3 records down to `destinationBegin`
-   * and updates the owner active-end lane.
-   */
-  [[maybe_unused]] RuntimeFloat3Record* RuntimeMoveFloat3RangeAndUpdateEndLaneA(
-    RuntimeFloat3Record* const destinationBegin,
-    RuntimeFloat3Record* sourceBegin,
-    RuntimeRecord12MoveOwnerView* const owner
-  ) noexcept
-  {
-    if (destinationBegin != sourceBegin) {
-      RuntimeFloat3Record* destinationCursor = destinationBegin;
-      RuntimeFloat3Record* const activeEnd = owner->activeEnd;
-      while (sourceBegin != activeEnd) {
-        *destinationCursor = *sourceBegin;
-        ++destinationCursor;
-        ++sourceBegin;
-      }
-      owner->activeEnd = destinationCursor;
-    }
-
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0071C430 (FUN_0071C430)
-   *
-   * What it does:
-   * Moves one tail range of 56-byte records down to `destinationBegin`,
-   * updates owner active-end lane, and stores `destinationBegin` in
-   * `outDestinationBegin`.
-   */
-  RuntimeFixedRecord56Lane** RuntimeMoveRecord56RangeAndUpdateEndLaneA(
-    RuntimeRecord56MoveOwnerView* const owner,
-    RuntimeFixedRecord56Lane** const outDestinationBegin,
-    RuntimeFixedRecord56Lane* const destinationBegin,
-    RuntimeFixedRecord56Lane* sourceBegin
-  ) noexcept
-  {
-    if (destinationBegin != sourceBegin) {
-      RuntimeFixedRecord56Lane* destinationCursor = destinationBegin;
-      RuntimeFixedRecord56Lane* const activeEnd = owner->activeEnd;
-      while (sourceBegin != activeEnd) {
-        *destinationCursor = *sourceBegin;
-        ++destinationCursor;
-        ++sourceBegin;
-      }
-      owner->activeEnd = destinationCursor;
-    }
-
-    *outDestinationBegin = destinationBegin;
-    return outDestinationBegin;
-  }
-
-  /**
-   * Address: 0x0075FCF0 (FUN_0075FCF0)
-   *
-   * What it does:
-   * Copies one dword-pair lane range `[sourceBegin, sourceEnd)` into
-   * destination storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeTailAdapterLaneD(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneD(sourceEnd, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x0076B520 (FUN_0076B520)
@@ -49384,138 +30883,13 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyDwordRangeLaneA(sourceEnd, sourceEnd, sourceBegin);
   }
 
-  /**
-   * Address: 0x008DB240 (FUN_008DB240)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
-   * storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneB(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008D9300 (FUN_008D9300)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
-   * storage ending at `destinationEnd` and returns the begin lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeMoveDwordRangeIntoTailAndReturnBegin(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destinationEnd
-  ) noexcept
-  {
-    const std::ptrdiff_t dwordCount = sourceEnd - sourceBegin;
-    std::uint32_t* const destinationBegin = destinationEnd - dwordCount;
-    if (dwordCount > 0) {
-      const std::size_t byteCount = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-      (void)memmove_s(destinationBegin, byteCount, sourceBegin, byteCount);
-    }
-    return destinationBegin;
-  }
 
-  /**
-   * Address: 0x008D94B0 (FUN_008D94B0)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into `destination`
-   * and returns one-past-the-last copied destination lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeMoveDwordRangeAndReturnEnd(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    const std::ptrdiff_t dwordCount = sourceEnd - sourceBegin;
-    if (dwordCount > 0) {
-      const std::size_t byteCount = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-      (void)memmove_s(destination, byteCount, sourceBegin, byteCount);
-    }
-    return destination + dwordCount;
-  }
 
-  /**
-   * Address: 0x008FA8F0 (FUN_008FA8F0)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
-   * storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneC(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00936990 (FUN_00936990)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
-   * storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneD(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0076A820 (FUN_0076A820)
-   *
-   * What it does:
-   * Cdecl tail-copy adapter lane that forwards one dword range copy dispatch
-   * into `FUN_00768E10` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneE(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0076ADE0 (FUN_0076ADE0)
-   *
-   * What it does:
-   * Secondary cdecl tail-copy adapter lane that forwards one dword range copy
-   * dispatch into `FUN_00768E10` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneF(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0076B360 (FUN_0076B360)
-   *
-   * What it does:
-   * Register-scratch tail-copy adapter lane that forwards one dword range copy
-   * dispatch into `FUN_00768E10`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneG(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x0092DF90 (FUN_0092DF90)
@@ -49533,37 +30907,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
   }
 
-  /**
-   * Address: 0x0092EA50 (FUN_0092EA50)
-   *
-   * What it does:
-   * Stdcall adapter that forwards one fixed-source dword count copy lane into
-   * `FUN_0092DF90` and returns the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordCountFromFixedSourceLaneBReturnEndStdcallAdapter(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordCountFromFixedSourceLaneB(repeatCount, sourceWord, destination);
-    return destination + repeatCount;
-  }
 
-  /**
-   * Address: 0x0092E520 (FUN_0092E520)
-   *
-   * What it does:
-   * Adapter lane for fixed-source dword count copy lane B.
-   */
-  [[maybe_unused]] std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneBAdapterA(
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordCountFromFixedSourceLaneB(repeatCount, sourceWord, destination);
-  }
 
   /**
    * Address: 0x00932A50 (FUN_00932A50)
@@ -49581,37 +30925,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
   }
 
-  /**
-   * Address: 0x00932F90 (FUN_00932F90)
-   *
-   * What it does:
-   * Stdcall adapter that forwards one fixed-source dword count copy lane into
-   * `FUN_00932A50` and returns the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordCountFromFixedSourceLaneCReturnEndStdcallAdapter(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordCountFromFixedSourceLaneC(repeatCount, sourceWord, destination);
-    return destination + repeatCount;
-  }
 
-  /**
-   * Address: 0x00932E10 (FUN_00932E10)
-   *
-   * What it does:
-   * Dispatch adapter lane for fixed-source dword count copy lane C.
-   */
-  [[maybe_unused]] void RuntimeCopyDwordCountFromFixedSourceLaneCDispatchA(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordCountFromFixedSourceLaneC(repeatCount, sourceWord, destination);
-  }
 
   /**
    * Address: 0x008EA090 (FUN_008EA090)
@@ -49628,41 +30942,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
 }
 
-/**
- * Address: 0x008EA2C0 (FUN_008EA2C0)
- *
- * What it does:
- * Adapter lane forwarding one 3-dword fixed-source fill request to
- * `RuntimeCopyDwordTripleCountLaneF`.
- */
-[[maybe_unused]] void RuntimeCopyDwordTripleCountLaneFAdapter(
-  std::uint32_t* const destination,
-  const std::uint32_t repeatCount,
-  const std::uint32_t* const sourceTriple
-) noexcept
-{
-  (void)RuntimeCopyDwordTripleCountLaneF(destination, sourceTriple, repeatCount);
-}
 
-/**
- * Address: 0x008EA500 (FUN_008EA500)
-   *
-   * What it does:
-   * Forwards one dword-triple fixed-source count copy lane and returns the
-   * destination end pointer computed from `repeatCount`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountReturnEndAdapterLaneA(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneF(destination, sourceTriple, static_cast<std::uint32_t>(repeatCount));
-    const std::intptr_t destinationAddress = reinterpret_cast<std::intptr_t>(destination);
-    const std::intptr_t byteOffset =
-      static_cast<std::intptr_t>(repeatCount) * 3 * static_cast<std::intptr_t>(sizeof(std::uint32_t));
-    return reinterpret_cast<std::uint32_t*>(destinationAddress + byteOffset);
-  }
 
   /**
    * Address: 0x0092DF10 (FUN_0092DF10)
@@ -49679,37 +30959,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x0092E920 (FUN_0092E920)
-   *
-   * What it does:
-   * Stdcall adapter that forwards one 3-dword fixed-source count-copy lane into
-   * `FUN_0092DF10` and returns the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordTripleCountLaneGReturnEndStdcallAdapter(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneG(destination, sourceTriple, static_cast<std::uint32_t>(repeatCount));
-    return destination + (repeatCount * 3);
-  }
 
-  /**
-   * Address: 0x0092E4B0 (FUN_0092E4B0)
-   *
-   * What it does:
-   * Adapter lane for 3-dword fixed-source count copy lane G.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleCountLaneGAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleCountLaneG(destination, sourceTriple, repeatCount);
-  }
 
   /**
    * Address: 0x0092E010 (FUN_0092E010)
@@ -49726,37 +30976,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
   }
 
-  /**
-   * Address: 0x0092EB70 (FUN_0092EB70)
-   *
-   * What it does:
-   * Stdcall adapter that forwards one 3-dword fixed-source count-copy lane into
-   * `FUN_0092E010` and returns the destination end pointer.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordTripleCountLaneHReturnEndStdcallAdapter(
-    std::uint32_t* const destination,
-    const std::int32_t repeatCount,
-    const std::uint32_t* const sourceTriple
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneH(destination, sourceTriple, static_cast<std::uint32_t>(repeatCount));
-    return destination + (repeatCount * 3);
-  }
 
-  /**
-   * Address: 0x0092E6B0 (FUN_0092E6B0)
-   *
-   * What it does:
-   * Register-adapter lane for 3-dword fixed-source count copy lane H.
-   */
-  [[maybe_unused]] void RuntimeCopyDwordTripleCountLaneHAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordTripleCountLaneH(destination, sourceTriple, repeatCount);
-  }
 
   /**
    * Address: 0x0076B6B0 (FUN_0076B6B0)
@@ -49789,52 +31009,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyDwordTripleRangeLaneA(sourceEnd, sourceEnd, sourceBegin);
   }
 
-  /**
-   * Address: 0x0076B110 (FUN_0076B110)
-   *
-   * What it does:
-   * Cdecl/source-first adapter lane that forwards one dword-triple tail range
-   * copy dispatch into `FUN_0076B6B0` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeTailAdapterLaneB(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0076B390 (FUN_0076B390)
-   *
-   * What it does:
-   * Secondary cdecl/source-first adapter lane that forwards one dword-triple
-   * tail range copy dispatch into `FUN_0076B6B0` while discarding one zero
-   * scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeTailAdapterLaneC(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0076B540 (FUN_0076B540)
-   * Address: 0x006E3D60 (FUN_006E3D60)
-   *
-   * What it does:
-   * Thiscall/register-scratch adapter lane that forwards one dword-triple tail
-   * range copy dispatch into `FUN_0076B6B0`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeTailAdapterLaneD(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeTailAdapterLaneA(sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x00756800 (FUN_00756800)
@@ -49851,57 +31027,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00754770 (FUN_00754770)
-   *
-   * What it does:
-   * Stdcall source-first adapter lane that forwards one dword-triple range
-   * copy through `FUN_00756800` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordTripleRangeLaneESourceFirstStdcallAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneE(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00755B70 (FUN_00755B70)
-   *
-   * What it does:
-   * Cdecl source-first adapter lane that forwards one dword-triple range copy
-   * through `FUN_00756800` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneESourceFirstCdeclAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneE(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0079DB60 (FUN_0079DB60)
-   *
-   * What it does:
-   * Walks one pointer-slot chain until it reaches the lane that points back to
-   * the owning record, then replaces that slot with `replacement`.
-   */
-  std::uintptr_t* RuntimePatchPointerSlotChainTail(RuntimePointerSlotPatchLane* const lane) noexcept
-  {
-    std::uintptr_t* result = lane->slot;
-    if (result != nullptr) {
-      const std::uintptr_t laneAddress = reinterpret_cast<std::uintptr_t>(lane);
-      while (*result != laneAddress) {
-        result = reinterpret_cast<std::uintptr_t*>(*result + sizeof(std::uintptr_t));
-      }
-      *result = lane->replacement;
-    }
-    return result;
-  }
 
   /**
    * Address: 0x007A61F0 (FUN_007A61F0)
@@ -49919,53 +31046,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007A5E90 (FUN_007A5E90)
-   *
-   * What it does:
-   * Stack-destination adapter lane that forwards one backlink-pair range copy
-   * through `RuntimeCopyBacklinkedPairRangeLaneA`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneAStackDestinationAdapter(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007A6010 (FUN_007A6010)
-   *
-   * What it does:
-   * Register-order adapter that forwards one backlink-pair range copy lane
-   * through `RuntimeCopyBacklinkedPairRangeLaneA`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneARegisterAdapterA(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007A6100 (FUN_007A6100)
-   *
-   * What it does:
-   * Duplicate register-order adapter lane that forwards one backlink-pair range
-   * copy through `RuntimeCopyBacklinkedPairRangeLaneA`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneARegisterAdapterB(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x007CED40 (FUN_007CED40)
@@ -49983,51 +31065,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 4>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007CCFE0 (FUN_007CCFE0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword-quad range copy into
-   * `RuntimeCopyDwordQuadRangeLaneA`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordQuadRangeLaneAAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007CDD00 (FUN_007CDD00)
-   *
-   * What it does:
-   * Secondary register-shape adapter for the same dword-quad range copy lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordQuadRangeLaneAAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007CE870 (FUN_007CE870)
-   *
-   * What it does:
-   * Third register-shape adapter for `RuntimeCopyDwordQuadRangeLaneA`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordQuadRangeLaneAAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x007E99D0 (FUN_007E99D0)
@@ -50044,48 +31083,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<float, 4>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007E9830 (FUN_007E9830)
-   *
-   * What it does:
-   * Register-shape adapter that advances one float4 range against a null
-   * destination lane and returns the advanced destination cursor.
-   */
-  [[maybe_unused]] float* RuntimeAdvanceFloatQuadRangeNullDestinationAdapterA(
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007E9930 (FUN_007E9930)
-   *
-   * What it does:
-   * Mirrored register-shape adapter for null-destination float4 range advance.
-   */
-  [[maybe_unused]] float* RuntimeAdvanceFloatQuadRangeNullDestinationAdapterB(
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007E99B0 (FUN_007E99B0)
-   *
-   * What it does:
-   * Third register-shape adapter for null-destination float4 range advance.
-   */
-  [[maybe_unused]] float* RuntimeAdvanceFloatQuadRangeNullDestinationAdapterC(
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x007F3EF0 (FUN_007F3EF0)
@@ -50102,48 +31101,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 4>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007F3B00 (FUN_007F3B00)
-   *
-   * What it does:
-   * Register-shape adapter that advances one dword-quad range against a null
-   * destination lane and returns the advanced destination cursor.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeAdvanceDwordQuadRangeNullDestinationAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007F3D20 (FUN_007F3D20)
-   *
-   * What it does:
-   * Mirrored register-shape adapter for null-destination dword-quad advance.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeAdvanceDwordQuadRangeNullDestinationAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007F3E30 (FUN_007F3E30)
-   *
-   * What it does:
-   * Third register-shape adapter for null-destination dword-quad advance.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeAdvanceDwordQuadRangeNullDestinationAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordQuadRangeLaneB(nullptr, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x007FC2F0 (FUN_007FC2F0)
@@ -50177,21 +31136,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyAssignRefcountTailFiveWordRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007FB830 (FUN_007FB830)
-   *
-   * What it does:
-   * Register-shape adapter lane for
-   * `RuntimeCopyAssignRefcountTailFiveWordRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeLaneAAdapter(
-    RuntimeRefcountTailFiveWordCopyLane* const destination,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTailFiveWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x007FBFE0 (FUN_007FBFE0)
@@ -50232,73 +31176,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x007FB8D0 (FUN_007FB8D0)
-   *
-   * What it does:
-   * Register-shape adapter for backward copy-assign of one 20-byte
-   * refcount-tail range.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeBackwardLaneAAdapterA(
-    RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    RuntimeRefcountTailFiveWordCopyLane* const sourceEnd,
-    RuntimeRefcountTailFiveWordCopyLane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTailFiveWordRangeBackwardLaneA(sourceEnd, sourceBegin, destinationEnd);
-  }
 
-  /**
-   * Address: 0x007FBCB0 (FUN_007FBCB0)
-   *
-   * What it does:
-   * Mirrored register-shape adapter for backward copy-assign of one 20-byte
-   * refcount-tail range.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeBackwardLaneAAdapterB(
-    RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    RuntimeRefcountTailFiveWordCopyLane* const sourceEnd,
-    RuntimeRefcountTailFiveWordCopyLane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTailFiveWordRangeBackwardLaneA(sourceEnd, sourceBegin, destinationEnd);
-  }
 
-  /**
-   * Address: 0x007FB890 (FUN_007FB890)
-   * Address: 0x0064F790 (FUN_0064F790)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 20-byte refcount-tail range copy
-   * into `RuntimeCopyRefcountTailFiveWordRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyRefcountTailFiveWordRangeLaneAAdapterB(
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    RuntimeRefcountTailFiveWordCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailFiveWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007FBFC0 (FUN_007FBFC0)
-   * Address: 0x007FC290 (FUN_007FC290)
-   * Address: 0x007FBBF0 (FUN_007FBBF0)
-   * Address: 0x0064FAF0 (FUN_0064FAF0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards source-end/source-begin lanes into
-   * `RuntimeCopyRefcountTailFiveWordRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyRefcountTailFiveWordRangeLaneAAdapter(
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    RuntimeRefcountTailFiveWordCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailFiveWordRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   struct RuntimeRefcountTailFiveWordCursorState
   {
@@ -50312,58 +31192,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeRefcountTailFiveWordCursorState::anchor offset must be 0x08"
   );
 
-  /**
-   * Address: 0x007FACE0 (FUN_007FACE0)
-   *
-   * What it does:
-   * Shifts one 20-byte refcount-tail lane range through `cursor+1`, releases
-   * the now-detached anchor lane, rewinds the anchor by one element, and
-   * stores `cursor` into `*outCursor`.
-   */
-  [[maybe_unused]] RuntimeRefcountTailFiveWordCopyLane** RuntimeShiftRefcountTailFiveWordRangeLaneA(
-    RuntimeRefcountTailFiveWordCursorState* const state,
-    RuntimeRefcountTailFiveWordCopyLane** const outCursor,
-    RuntimeRefcountTailFiveWordCopyLane* const cursor
-  ) noexcept
-  {
-    RuntimeCopyAssignRefcountTailFiveWordRangeLaneA(cursor + 1, state->anchor, cursor);
-    RuntimeReleaseSharedControlRangeStride20(
-      reinterpret_cast<std::intptr_t>(state->anchor) -
-        static_cast<std::intptr_t>(sizeof(RuntimeRefcountTailFiveWordCopyLane)),
-      reinterpret_cast<std::intptr_t>(state->anchor)
-    );
 
-    state->anchor = reinterpret_cast<RuntimeRefcountTailFiveWordCopyLane*>(
-      reinterpret_cast<std::uint8_t*>(state->anchor) - sizeof(RuntimeRefcountTailFiveWordCopyLane)
-    );
-    *outCursor = cursor;
-    return outCursor;
-  }
-
-  /**
-   * Address: 0x007FEE70 (FUN_007FEE70)
-   *
-   * What it does:
-   * Selects one of two owner lanes by the runtime selector byte at `+0x0C`,
-   * copies that 8-byte refcount pair into `destination`, and retains the
-   * copied owner lane at `+0x04`.
-   */
-  RuntimeRefcountPairCopyLane* RuntimeCopyConditionalRefcountPairLaneA(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeConditionalRefcountPairOwnerView* const sourceOwner
-  ) noexcept
-  {
-    const RuntimeRefcountPairCopyLane* const selectedLane =
-      (sourceOwner->useSecondaryPairLane != 0u) ? &sourceOwner->secondaryPair : &sourceOwner->primaryPair;
-
-    if (destination != nullptr) {
-      destination->word0 = selectedLane->word0;
-      destination->owner = selectedLane->owner;
-      RuntimeRetainRefcountOwner(destination->owner);
-    }
-
-    return destination;
-  }
 
   /**
    * Address: 0x00814480 (FUN_00814480)
@@ -50381,23 +31210,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyRefcountPairRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00814140 (FUN_00814140)
-   * Address: 0x00814320 (FUN_00814320)
-   * Address: 0x00814460 (FUN_00814460)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one caller lane-set into the canonical
-   * pair-refcount range-copy helper.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeRegisterAdapterLaneC(
-    RuntimeRefcountPairCopyLane* const sourceBegin,
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x00832B80 (FUN_00832B80)
@@ -50414,51 +31226,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x008323F0 (FUN_008323F0)
-   *
-   * What it does:
-   * Register-shape adapter for `RuntimeCopyDwordRangeLaneB`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneBAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832850 (FUN_00832850)
-   *
-   * What it does:
-   * Secondary register-shape adapter for `RuntimeCopyDwordRangeLaneB`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneBAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832AB0 (FUN_00832AB0)
-   * Address: 0x00765560 (FUN_00765560)
-   *
-   * What it does:
-   * Third register-shape adapter for `RuntimeCopyDwordRangeLaneB`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneBAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x00832BC0 (FUN_00832BC0)
@@ -50475,50 +31244,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00832580 (FUN_00832580)
-   *
-   * What it does:
-   * Register-shape adapter for `RuntimeCopyDwordRangeLaneC`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneCAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneC(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832900 (FUN_00832900)
-   *
-   * What it does:
-   * Secondary register-shape adapter for `RuntimeCopyDwordRangeLaneC`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneCAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneC(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832B00 (FUN_00832B00)
-   *
-   * What it does:
-   * Third register-shape adapter for `RuntimeCopyDwordRangeLaneC`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneCAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneC(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x00832BE0 (FUN_00832BE0)
@@ -50535,50 +31262,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00832640 (FUN_00832640)
-   *
-   * What it does:
-   * Register-shape adapter for `RuntimeCopyDwordRangeLaneD`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneD(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832940 (FUN_00832940)
-   *
-   * What it does:
-   * Secondary register-shape adapter for `RuntimeCopyDwordRangeLaneD`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneD(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00832B20 (FUN_00832B20)
-   *
-   * What it does:
-   * Third register-shape adapter for `RuntimeCopyDwordRangeLaneD`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneDAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneD(destination, sourceEnd, sourceBegin);
-  }
 
   [[nodiscard]] void* RuntimeCopyDwordBlockWithMemmove(
     void* const destination,
@@ -50591,86 +31276,10 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x00868C00 (FUN_00868C00)
-   *
-   * What it does:
-   * Copies one dword-counted block with `memmove_s` and returns destination.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeCopyDwordBlockSourceFirstAdapterA(
-    const void* const source,
-    const int dwordCount,
-    void* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordBlockWithMemmove(destination, source, dwordCount);
-  }
 
-  /**
-   * Address: 0x00868C40 (FUN_00868C40)
-   *
-   * What it does:
-   * Duplicate source-first adapter for `RuntimeCopyDwordBlockWithMemmove(...)`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* RuntimeCopyDwordBlockSourceFirstAdapterB(
-    const void* const source,
-    const int dwordCount,
-    void* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordBlockWithMemmove(destination, source, dwordCount);
-  }
 
-  /**
-   * Address: 0x0087E980 (FUN_0087E980)
-   *
-   * What it does:
-   * Copies one dword-counted block with `memmove_s` and returns passthrough.
-   */
-  [[maybe_unused]] [[nodiscard]] int RuntimeCopyDwordBlockWithPassthroughAdapterA(
-    const void* const source,
-    void* const destination,
-    const int dwordCount,
-    const int passthrough
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordBlockWithMemmove(destination, source, dwordCount);
-    return passthrough;
-  }
 
-  /**
-   * Address: 0x0087E9A0 (FUN_0087E9A0)
-   *
-   * What it does:
-   * Secondary passthrough adapter for dword-block copy.
-   */
-  [[maybe_unused]] [[nodiscard]] int RuntimeCopyDwordBlockWithPassthroughAdapterB(
-    const void* const source,
-    void* const destination,
-    const int dwordCount,
-    const int passthrough
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordBlockWithMemmove(destination, source, dwordCount);
-    return passthrough;
-  }
 
-  /**
-   * Address: 0x0087E9C0 (FUN_0087E9C0)
-   *
-   * What it does:
-   * Third passthrough adapter for dword-block copy.
-   */
-  [[maybe_unused]] [[nodiscard]] int RuntimeCopyDwordBlockWithPassthroughAdapterC(
-    const void* const source,
-    void* const destination,
-    const int dwordCount,
-    const int passthrough
-  ) noexcept
-  {
-    (void)RuntimeCopyDwordBlockWithMemmove(destination, source, dwordCount);
-    return passthrough;
-  }
 
   /**
    * Address: 0x00553B50 (FUN_00553B50)
@@ -50706,298 +31315,23 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x007E55D0 (FUN_007E55D0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword range copy into
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHAdapterA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007E6420 (FUN_007E6420)
-   *
-   * What it does:
-   * Secondary register-shape adapter for the same dword range copy lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x006E3550 (FUN_006E3550)
-   * Address: 0x00831700 (FUN_00831700)
-   *
-   * What it does:
-   * Stdcall register-shape adapter that forwards one dword range copy into
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00832480 (FUN_00832480)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword range copy into
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHAdapterD(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007B0F90 (FUN_007B0F90)
-   *
-   * What it does:
-   * Stdcall adapter lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007B1020 (FUN_007B1020)
-   *
-   * What it does:
-   * Secondary stdcall adapter lane that forwards
-   * `(sourceBegin, sourceEnd, destination)` into `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007B1650 (FUN_007B1650)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards `(sourceBegin, sourceEnd, destination)`
-   * into `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHCdeclAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007B16F0 (FUN_007B16F0)
-   *
-   * What it does:
-   * Secondary cdecl adapter lane that forwards
-   * `(sourceBegin, sourceEnd, destination)` into `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHCdeclAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007042A0 (FUN_007042A0)
-   *
-   * What it does:
-   * Stdcall forwarding lane that adapts `(sourceBegin, sourceEnd, destination)`
-   * into the canonical `RuntimeCopyDwordRangeLaneH` dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007052F0 (FUN_007052F0)
-   *
-   * What it does:
-   * Cdecl forwarding lane that adapts `(sourceBegin, sourceEnd, destination)`
-   * into the canonical `RuntimeCopyDwordRangeLaneH` dispatch.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHCdeclAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0084A3B0 (FUN_0084A3B0)
-   *
-   * What it does:
-   * Stdcall adapter lane that forwards one dword range copy as
-   * `(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapterE(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0084AE40 (FUN_0084AE40)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one dword range copy as
-   * `(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHCdeclAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0084F9D0 (FUN_0084F9D0)
-   *
-   * What it does:
-   * Stdcall adapter lane that forwards one dword range copy as
-   * `(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] std::uint32_t* __stdcall RuntimeCopyDwordRangeLaneHStdcallAdapterF(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0084FE90 (FUN_0084FE90)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one dword range copy as
-   * `(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHCdeclAdapterD(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00583910 (FUN_00583910)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword lane range-copy dispatch to
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHRegisterAdapter(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00562AE0 (FUN_00562AE0)
-   * Address: 0x00581DA0 (FUN_00581DA0)
-   * Address: 0x00582420 (FUN_00582420)
-   * Address: 0x005830A0 (FUN_005830A0)
-   * Address: 0x005CC510 (FUN_005CC510)
-   * Address: 0x005CD3C0 (FUN_005CD3C0)
-   *
-   * What it does:
-   * Adapts one source-first dword range-copy lane through `FUN_00562FB0`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHSourceFirstAdapter(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x006810F0 (FUN_006810F0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword range copy lane into
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHRegisterAdapterB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00681D70 (FUN_00681D70)
-   * Address: 0x005EFE40 (FUN_005EFE40)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one dword range copy lane into
-   * `RuntimeCopyDwordRangeLaneH`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneHRegisterAdapterC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneH(destination, sourceBegin, sourceEnd);
-  }
 
   /**
    * Address: 0x0084C250 (FUN_0084C250)
@@ -51039,21 +31373,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeStride20VectorView) == 0x0C, "RuntimeStride20VectorView size must be 0x0C");
 
-  /**
-   * Address: 0x0094EA80 (FUN_0094EA80)
-   *
-   * What it does:
-   * Returns the number of 20-byte lanes in one contiguous vector storage span.
-   */
-  [[maybe_unused]] std::int32_t RuntimeStride20VectorSize(const RuntimeStride20VectorView* const vectorView) noexcept
-  {
-    const std::uint8_t* const begin = vectorView->begin;
-    if (begin == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>((vectorView->end - begin) / 20);
-  }
 
   struct RuntimeStride24VectorView
   {
@@ -51063,65 +31382,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeStride24VectorView) == 0x0C, "RuntimeStride24VectorView size must be 0x0C");
 
-  /**
-   * Address: 0x007C8EC0 (FUN_007C8EC0)
-   *
-   * What it does:
-   * Returns the number of 24-byte lanes in one contiguous vector storage span.
-   */
-  std::int32_t RuntimeStride24VectorSize(const RuntimeStride24VectorView* const vectorView) noexcept
-  {
-    if (vectorView == nullptr || vectorView->begin == nullptr) {
-      return 0;
-    }
 
-    return static_cast<std::int32_t>((vectorView->end - vectorView->begin) / 24);
-  }
 
-  /**
-   * Address: 0x007CBFC0 (FUN_007CBFC0)
-   *
-   * What it does:
-   * Fills one half-open 16-byte lane range from a fixed 4-dword source lane.
-   */
-  std::uint32_t* RuntimeFillDwordQuadRangeFromFixedLane(
-    std::uint32_t* destination,
-    const std::uint32_t* const destinationEnd,
-    const std::uint32_t* const sourceQuad
-  ) noexcept
-  {
-    while (destination != destinationEnd) {
-      destination[0] = sourceQuad[0];
-      destination[1] = sourceQuad[1];
-      destination[2] = sourceQuad[2];
-      destination[3] = sourceQuad[3];
-      destination += 4;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x007CBFF0 (FUN_007CBFF0)
-   *
-   * What it does:
-   * Backward-copies one 16-byte lane range from `(sourceBegin, sourceEnd]`.
-   */
-  std::uint32_t* RuntimeCopyDwordQuadRangeBackward(
-    std::uint32_t* destinationEnd,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* sourceEnd
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      sourceEnd -= 4;
-      destinationEnd -= 4;
-      destinationEnd[0] = sourceEnd[0];
-      destinationEnd[1] = sourceEnd[1];
-      destinationEnd[2] = sourceEnd[2];
-      destinationEnd[3] = sourceEnd[3];
-    }
-    return destinationEnd;
-  }
 
   struct RuntimePrefixCompareCaptureLane
   {
@@ -51163,36 +31425,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outLane;
   }
 
-  /**
-   * Address: 0x007CFF40 (FUN_007CFF40)
-   *
-   * What it does:
-   * Captures one shared-prefix scan lane and returns true when the scan reaches
-   * `lhsRangeEnd` exactly.
-   */
-  [[maybe_unused]] bool RuntimeScanSharedPrefixMatchesLhsEndAdapter(
-    [[maybe_unused]] const std::uintptr_t unusedLane0,
-    [[maybe_unused]] const std::uintptr_t unusedLane1,
-    const std::uintptr_t lhsRangeBegin,
-    const std::uint8_t* const lhsCursor,
-    const std::uintptr_t unusedLane2,
-    const std::uint8_t* const lhsRangeEnd,
-    const std::uintptr_t rhsRangeEnd,
-    const std::uint8_t* const rhsCursor
-  ) noexcept
-  {
-    RuntimePrefixCompareCaptureLane capture{};
-    (void)RuntimeScanSharedPrefixAndCapture(
-      &capture,
-      lhsRangeBegin,
-      lhsCursor,
-      unusedLane2,
-      lhsRangeEnd,
-      rhsRangeEnd,
-      rhsCursor
-    );
-    return capture.lhsCursor == lhsRangeEnd;
-  }
 
   [[nodiscard]] std::uint8_t RuntimeLerpColorComponent(
     const std::uint8_t source,
@@ -51205,162 +31437,12 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     );
   }
 
-  /**
-   * Address: 0x007D0E60 (FUN_007D0E60)
-   *
-   * What it does:
-   * Linearly interpolates one packed ARGB32 lane from `source` toward `target`.
-   */
-  std::uint32_t RuntimeLerpPackedArgb32(const std::uint32_t target, const std::uint32_t source, const float t) noexcept
-  {
-    const std::uint8_t c0 = RuntimeLerpColorComponent(
-      static_cast<std::uint8_t>(source & 0xFFu),
-      static_cast<std::uint8_t>(target & 0xFFu),
-      t
-    );
-    const std::uint8_t c1 = RuntimeLerpColorComponent(
-      static_cast<std::uint8_t>((source >> 8) & 0xFFu),
-      static_cast<std::uint8_t>((target >> 8) & 0xFFu),
-      t
-    );
-    const std::uint8_t c2 = RuntimeLerpColorComponent(
-      static_cast<std::uint8_t>((source >> 16) & 0xFFu),
-      static_cast<std::uint8_t>((target >> 16) & 0xFFu),
-      t
-    );
-    const std::uint8_t c3 = RuntimeLerpColorComponent(
-      static_cast<std::uint8_t>((source >> 24) & 0xFFu),
-      static_cast<std::uint8_t>((target >> 24) & 0xFFu),
-      t
-    );
 
-    return static_cast<std::uint32_t>(c0)
-      | (static_cast<std::uint32_t>(c1) << 8)
-      | (static_cast<std::uint32_t>(c2) << 16)
-      | (static_cast<std::uint32_t>(c3) << 24);
-  }
 
-  /**
-   * Address: 0x007D95F0 (FUN_007D95F0)
-   *
-   * What it does:
-   * Fills one half-open 16-byte lane range, writing source values into each
-   * lane's trailing 12-byte `{+0x04,+0x08,+0x0C}` payload.
-   */
-  std::uint8_t* RuntimeFillFloatTripleTailLane16(
-    std::uint8_t* destination,
-    const std::uint8_t* const destinationEnd,
-    const std::uint8_t* const sourceLane
-  ) noexcept
-  {
-    const float sourceX = *reinterpret_cast<const float*>(sourceLane + 4);
-    const float sourceY = *reinterpret_cast<const float*>(sourceLane + 8);
-    const std::uint32_t sourceZBits = *reinterpret_cast<const std::uint32_t*>(sourceLane + 12);
 
-    while (destination != destinationEnd) {
-      *reinterpret_cast<float*>(destination + 4) = sourceX;
-      *reinterpret_cast<float*>(destination + 8) = sourceY;
-      *reinterpret_cast<std::uint32_t*>(destination + 12) = sourceZBits;
-      destination += 16;
-    }
 
-    return destination;
-  }
 
-  /**
-   * Address: 0x007F35E0 (FUN_007F35E0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one forward backlink-pair assignment
-   * lane into `RuntimeCopyAssignBacklinkedPairRangeCommon`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeForwardAdapterA(
-    RuntimeBacklinkedPairCopyLane* const destinationBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeCommon(destinationBegin, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x007F3630 (FUN_007F3630)
-   *
-   * What it does:
-   * Secondary register-shape adapter for forward backlink-pair assignment
-   * dispatch into `RuntimeCopyAssignBacklinkedPairRangeCommon`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeForwardAdapterB(
-    RuntimeBacklinkedPairCopyLane* const destinationBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeCommon(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005C9AB0 (FUN_005C9AB0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one source-first tagged 28-byte
-   * count-copy lane into `FUN_005CBAC0`.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28CountLaneASourceFirstAdapter(
-    const std::uint32_t repeatCount,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTaggedRecord28CountLaneA(destination, repeatCount, sourceLane);
-  }
-
-  /**
-   * Address: 0x007D9620 (FUN_007D9620)
-   *
-   * What it does:
-   * Backward-copies one 16-byte lane range, writing only the trailing
-   * 12-byte `{+0x04,+0x08,+0x0C}` payload per lane.
-   */
-  std::uint8_t* RuntimeCopyFloatTripleTailLane16Backward(
-    std::uint8_t* destinationEnd,
-    const std::uint8_t* sourceEnd,
-    const std::uint8_t* const sourceBegin
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      sourceEnd -= 16;
-      destinationEnd -= 16;
-      *reinterpret_cast<float*>(destinationEnd + 4) = *reinterpret_cast<const float*>(sourceEnd + 4);
-      *reinterpret_cast<float*>(destinationEnd + 8) = *reinterpret_cast<const float*>(sourceEnd + 8);
-      *reinterpret_cast<float*>(destinationEnd + 12) = *reinterpret_cast<const float*>(sourceEnd + 12);
-    }
-
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x007E9700 (FUN_007E9700)
-   *
-   * What it does:
-   * Fills one half-open 16-byte lane range from one fixed float4 source lane.
-   */
-  std::uint8_t* RuntimeFillFloatQuadLane16(
-    std::uint8_t* destination,
-    const std::uint8_t* const destinationEnd,
-    const float* const sourceQuad
-  ) noexcept
-  {
-    while (destination != destinationEnd) {
-      *reinterpret_cast<float*>(destination + 0) = sourceQuad[0];
-      *reinterpret_cast<float*>(destination + 4) = sourceQuad[1];
-      *reinterpret_cast<float*>(destination + 8) = sourceQuad[2];
-      *reinterpret_cast<float*>(destination + 12) = sourceQuad[3];
-      destination += 16;
-    }
-
-    return destination;
-  }
 
   /**
    * Address: 0x007E9890 (FUN_007E9890)
@@ -51386,35 +31468,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationEnd;
   }
 
-  /**
-   * Address: 0x007E9730 (FUN_007E9730)
-   *
-   * What it does:
-   * Source-first adapter lane for one backward 16-byte float4 range copy
-   * dispatch into `FUN_007E9890` while discarding one zero scratch lane.
-   */
-  [[maybe_unused]] std::uint8_t* RuntimeCopyFloatQuadLane16BackwardSourceFirstNullScratchAdapter(
-    const std::uint8_t* const sourceBegin,
-    const std::uint8_t* const sourceEnd,
-    std::uint8_t* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatQuadLane16Backward(destinationEnd, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x007DEF60 (FUN_007DEF60)
-   *
-   * What it does:
-   * Copies one contiguous 15-float lane.
-   */
-  float* RuntimeCopyFloat15Lane(float* const destination, const float* const source) noexcept
-  {
-    for (std::int32_t i = 0; i < 15; ++i) {
-      destination[i] = source[i];
-    }
-    return destination;
-  }
 
   struct RuntimeAabb6Lane
   {
@@ -51427,44 +31481,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeAabb6Lane) == 0x18, "RuntimeAabb6Lane size must be 0x18");
 
-  /**
-   * Address: 0x007E9A10 (FUN_007E9A10)
-   *
-   * What it does:
-   * Scans eight packed `float3` points and writes axis-wise min/max bounds.
-   */
-  RuntimeAabb6Lane* RuntimeComputeAabbFromEightPoints(
-    RuntimeAabb6Lane* const destination,
-    const float* const points
-  ) noexcept
-  {
-    float minX = points[0];
-    float minY = points[1];
-    float minZ = points[2];
-    float maxX = minX;
-    float maxY = minY;
-    float maxZ = minZ;
-
-    for (std::int32_t i = 1; i < 8; ++i) {
-      const float x = points[i * 3];
-      const float y = points[(i * 3) + 1];
-      const float z = points[(i * 3) + 2];
-      minX = std::min(minX, x);
-      minY = std::min(minY, y);
-      minZ = std::min(minZ, z);
-      maxX = std::max(maxX, x);
-      maxY = std::max(maxY, y);
-      maxZ = std::max(maxZ, z);
-    }
-
-    destination->minX = minX;
-    destination->minY = minY;
-    destination->minZ = minZ;
-    destination->maxX = maxX;
-    destination->maxY = maxY;
-    destination->maxZ = maxZ;
-    return destination;
-  }
 
   /**
    * Address: 0x00857A90 (FUN_00857A90)
@@ -51497,264 +31513,22 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyRefcountQuadOddRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00813E40 (FUN_00813E40)
-   *
-   * What it does:
-   * Adapts the pair-refcount range copy lane from register-carried source/end
-   * state into the canonical typed helper signature.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeRegisterAdapterLaneA(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* const sourceBegin,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00831640 (FUN_00831640)
-   *
-   * What it does:
-   * Adapts one dword-range copy lane and forwards it to the canonical typed
-   * dword-range helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00831860 (FUN_00831860)
-   *
-   * What it does:
-   * Adapts one dword-range copy lane and forwards it to the canonical typed
-   * dword-range helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneC(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00831910 (FUN_00831910)
-   *
-   * What it does:
-   * Adapts one dword-range copy lane and forwards it to the canonical typed
-   * dword-range helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneD(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x0084A4E0 (FUN_0084A4E0)
-   *
-   * What it does:
-   * Adapts one dword-triple range copy lane and forwards it to the canonical
-   * typed helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeRegisterAdapterLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x008526D0 (FUN_008526D0)
-   *
-   * What it does:
-   * Adapts one float-triple range copy lane and forwards it to the canonical
-   * typed helper.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatTripleRangeRegisterAdapterLaneA(
-    float* const destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyFloatTripleRangeLaneA(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00852780 (FUN_00852780)
-   *
-   * What it does:
-   * Compatibility adapter lane that forwards one null-bounds float3 range copy
-   * into `RuntimeCopyFloatTripleRangeLaneA(...)`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatTripleRangeNullBoundsAdapterA(
-    [[maybe_unused]] const float* const unusedSourceLane,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatTripleRangeLaneA(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x00852830 (FUN_00852830)
-   *
-   * What it does:
-   * Duplicate compatibility lane that forwards one null-bounds float3 range
-   * copy into `RuntimeCopyFloatTripleRangeLaneA(...)`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatTripleRangeNullBoundsAdapterB(
-    [[maybe_unused]] const float* const unusedSourceLane,
-    float* const destination
-  ) noexcept
-  {
-    return RuntimeCopyFloatTripleRangeLaneA(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x00852880 (FUN_00852880)
-   * Address: 0x0085FF80 (FUN_0085FF80)
-   *
-   * What it does:
-   * This-lane compatibility adapter that forwards one null-bounds float3 range
-   * copy into `RuntimeCopyFloatTripleRangeLaneA(...)`.
-   */
-  [[maybe_unused]] float* RuntimeCopyFloatTripleRangeNullBoundsAdapterC(float* const destination) noexcept
-  {
-    return RuntimeCopyFloatTripleRangeLaneA(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x008571F0 (FUN_008571F0)
-   *
-   * What it does:
-   * Adapts the pair-refcount range copy lane from register-carried source/end
-   * state into the canonical typed helper signature.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeRegisterAdapterLaneB(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* const sourceBegin,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneB(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00857680 (FUN_00857680)
-   *
-   * What it does:
-   * Compatibility adapter lane that forwards one null-bounds 8-byte refcount
-   * range copy into `RuntimeCopyRefcountPairRangeLaneB(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeNullBoundsAdapterA(
-    [[maybe_unused]] const RuntimeRefcountPairCopyLane* const unusedSourceLane,
-    RuntimeRefcountPairCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneB(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x00857860 (FUN_00857860)
-   *
-   * What it does:
-   * Duplicate compatibility lane that forwards one null-bounds 8-byte refcount
-   * range copy into `RuntimeCopyRefcountPairRangeLaneB(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeNullBoundsAdapterB(
-    [[maybe_unused]] const RuntimeRefcountPairCopyLane* const unusedSourceLane,
-    RuntimeRefcountPairCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneB(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x00857A20 (FUN_00857A20)
-   *
-   * What it does:
-   * This-lane compatibility adapter that forwards one null-bounds 8-byte
-   * refcount range copy into `RuntimeCopyRefcountPairRangeLaneB(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeNullBoundsAdapterC(
-    RuntimeRefcountPairCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeLaneB(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x0085A7E0 (FUN_0085A7E0)
-   *
-   * What it does:
-   * Adapts the quad-odd refcount range copy lane from register-carried
-   * source/end state into the canonical typed helper signature.
-   */
-  [[maybe_unused]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeRegisterAdapterLaneA(
-    RuntimeRefcountQuadOddCopyLane* const destination,
-    const RuntimeRefcountQuadOddCopyLane* const sourceBegin,
-    const RuntimeRefcountQuadOddCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountQuadOddRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x0085A970 (FUN_0085A970)
-   *
-   * What it does:
-   * Compatibility adapter lane that forwards one null-bounds 16-byte
-   * dual-refcount range copy into `RuntimeCopyRefcountQuadOddRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeNullBoundsAdapterA(
-    [[maybe_unused]] const RuntimeRefcountQuadOddCopyLane* const unusedSourceLane,
-    RuntimeRefcountQuadOddCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountQuadOddRangeLaneA(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x0085AAB0 (FUN_0085AAB0)
-   *
-   * What it does:
-   * Duplicate compatibility lane that forwards one null-bounds 16-byte
-   * dual-refcount range copy into `RuntimeCopyRefcountQuadOddRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeNullBoundsAdapterB(
-    [[maybe_unused]] const RuntimeRefcountQuadOddCopyLane* const unusedSourceLane,
-    RuntimeRefcountQuadOddCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountQuadOddRangeLaneA(destination, nullptr, nullptr);
-  }
 
-  /**
-   * Address: 0x0085AB60 (FUN_0085AB60)
-   *
-   * What it does:
-   * This-lane compatibility adapter that forwards one null-bounds 16-byte
-   * dual-refcount range copy into `RuntimeCopyRefcountQuadOddRangeLaneA(...)`.
-   */
-  [[maybe_unused]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeNullBoundsAdapterC(
-    RuntimeRefcountQuadOddCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyRefcountQuadOddRangeLaneA(destination, nullptr, nullptr);
-  }
 
   /**
    * Address: 0x0087FCF0 (FUN_0087FCF0)
@@ -51767,30 +31541,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return (std::memcmp(lhs, rhs, 16u) == 0) ? TRUE : FALSE;
   }
 
-  /**
-   * Address: 0x0087FD90 (FUN_0087FD90)
-   *
-   * What it does:
-   * Preserves one jump-only adapter lane for fixed 16-byte block equality.
-   */
-  [[maybe_unused]] BOOL RuntimeAreFixed16ByteBlocksEqualAdapter(
-    const void* const lhs,
-    const void* const rhs
-  ) noexcept
-  {
-    return RuntimeAreFixed16ByteBlocksEqual(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x00AB8E3F (FUN_00AB8E3F)
-   *
-   * What it does:
-   * Returns TRUE when the integer lane is non-zero.
-   */
-  [[maybe_unused]] BOOL RuntimeBoolFromNonZeroInt(const int value) noexcept
-  {
-    return value != 0 ? TRUE : FALSE;
-  }
 
   struct RuntimeUnaryCdeclCallbackLane
   {
@@ -51800,19 +31551,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeUnaryCdeclCallbackLane) == 0x04, "RuntimeUnaryCdeclCallbackLane size must be 0x04");
 
-  /**
-   * Address: 0x004E82D0 (FUN_004E82D0)
-   *
-   * What it does:
-   * Invokes one unary cdecl callback lane with the forwarded integer argument.
-   */
-  [[maybe_unused]] int RuntimeInvokeUnaryCdeclCallback(
-    RuntimeUnaryCdeclCallbackLane* const callbackLane,
-    const int value
-  )
-  {
-    return callbackLane->invoke(value);
-  }
 
   struct RuntimeFlagDispatchVTable
   {
@@ -51825,62 +31563,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeFlagDispatchObject) == 0x04, "RuntimeFlagDispatchObject size must be 0x04");
 
-  /**
-   * Address: 0x0061CBC0 (FUN_0061CBC0)
-   *
-   * What it does:
-   * Dispatches through vtable slot `+0x00` with lane value `1` when the object
-   * pointer is non-null; otherwise returns zero.
-   */
-  [[maybe_unused]] int RuntimeDispatchFlagLaneIfPresent(
-    RuntimeFlagDispatchObject* const object
-  )
-  {
-    if (object != nullptr) {
-      return object->vtable->dispatch(object, 1);
-    }
-    return 0;
-  }
 
-  /**
-   * Address: 0x004E7740 (FUN_004E7740)
-   *
-   * What it does:
-   * Copies one 6-dword strided range while preserving the legacy null-
-   * destination lane behavior that advances only destination.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordHexadRangeLegacyNullDestinationLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedLegacyNullDestination<std::uint32_t, 6>(
-      destination,
-      sourceEnd,
-      sourceBegin
-    );
-  }
 
-  /**
-   * Address: 0x00505C70 (FUN_00505C70)
-   *
-   * What it does:
-   * Copies one dword strided range while preserving the legacy null-
-   * destination lane behavior that advances only destination.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLegacyNullDestinationLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedLegacyNullDestination<std::uint32_t, 1>(
-      destination,
-      sourceEnd,
-      sourceBegin
-    );
-  }
 
   /**
    * Address: 0x005E1840 (FUN_005E1840)
@@ -51904,43 +31588,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x005DF060 (FUN_005DF060)
-   * Address: 0x006DDCE0 (FUN_006DDCE0)
-   * Address: 0x005E0720 (FUN_005E0720)
-   * Address: 0x008B35C0 (FUN_008B35C0)
-   * Address: 0x008B3820 (FUN_008B3820)
-   *
-   * What it does:
-   * Source-first adapter lane for backlink-pair range copy dispatch into
-   * `FUN_005E1840`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneBSourceFirstAdapter(
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    RuntimeBacklinkedPairCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x008B3630 (FUN_008B3630)
-   * Address: 0x008B38F0 (FUN_008B38F0)
-   * Address: 0x008B3B70 (FUN_008B3B70)
-   *
-   * What it does:
-   * Adapts register-ordered backlink range endpoints and forwards to the
-   * canonical backlink range copy helper.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeRegisterAdapterLaneC(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeLaneB(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x008B8140 (FUN_008B8140)
@@ -51958,36 +31606,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyAssignBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x008B7F20 (FUN_008B7F20)
-   *
-   * What it does:
-   * Register-order adapter that forwards backlink range copy-assignment through
-   * `RuntimeCopyAssignBacklinkedPairRangeLaneA`.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeSourceFirstAdapter(
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    RuntimeBacklinkedPairCopyLane* const destination
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008B3E50 (FUN_008B3E50)
-   *
-   * What it does:
-   * Assigns one backlink+float3 record by rebinding the owner slot lane at
-   * `+0x04` and copying all scalar payload lanes.
-   */
-  RuntimeBacklinkedPairFloatTripleRecord* RuntimeAssignBacklinkedPairFloatTripleRecordLaneA(
-    RuntimeBacklinkedPairFloatTripleRecord* const destination,
-    const RuntimeBacklinkedPairFloatTripleRecord* const source
-  ) noexcept
-  {
-    return RuntimeAssignBacklinkedPairFloatTripleRecordCommon(destination, source);
-  }
 
   /**
    * Address: 0x008D80A0 (FUN_008D80A0)
@@ -52004,22 +31623,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x008D6EA0 (FUN_008D6EA0)
-   *
-   * What it does:
-   * Adapts one register-carried dword-range copy call and forwards into the
-   * canonical dword range helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneD(
-    const std::uint32_t /*unusedDispatchLane*/,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneE(destination, sourceEnd, sourceBegin);
-  }
 
   /**
    * Address: 0x008D7270 (FUN_008D7270)
@@ -52037,35 +31640,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyDwordRangeLaneE(destination, sourceEnd, sourceBegin);
   }
 
-  /**
-   * Address: 0x008D7CC0 (FUN_008D7CC0)
-   *
-   * What it does:
-   * Alias lane of source-first register-order dword range copy forwarding.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneF(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeRegisterAdapterLaneE(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x008D7EA0 (FUN_008D7EA0)
-   *
-   * What it does:
-   * Alias lane of source-first register-order dword range copy forwarding.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneG(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeRegisterAdapterLaneE(sourceBegin, sourceEnd, destination);
-  }
 
   /**
    * Address: 0x008D9FA0 (FUN_008D9FA0)
@@ -52083,67 +31658,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x008DA4D0 (FUN_008DA4D0)
-   *
-   * What it does:
-   * Cdecl adapter lane that forwards one dword-pair range copy into
-   * `FUN_008D9FA0`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeLaneEAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneE(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x008DAF40 (FUN_008DAF40)
-   *
-   * What it does:
-   * Alias lane of cdecl dword-pair range copy forwarding.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeLaneEAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneE(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x008DB270 (FUN_008DB270)
-   *
-   * What it does:
-   * Alias lane of cdecl dword-pair range copy forwarding.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeLaneEAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneE(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x008DB3C0 (FUN_008DB3C0)
-   *
-   * What it does:
-   * Forwards one register-adapted dword-pair range copy call to the canonical
-   * dword-pair range helper.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeRegisterAdapterLaneA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneE(sourceBegin, sourceEnd, destination);
-  }
 
   /**
    * Address: 0x0092D7D0 (FUN_0092D7D0)
@@ -52196,140 +31713,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x0092E210 (FUN_0092E210)
-   *
-   * What it does:
-   * Adapter lane of one dword-triple range copy forwarding to lane C.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneCAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneC(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092E240 (FUN_0092E240)
-   *
-   * What it does:
-   * Adapter lane of one dword range copy forwarding to lane F.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneFAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneF(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092E270 (FUN_0092E270)
-   *
-   * What it does:
-   * Adapter lane of one dword-triple range copy forwarding to lane D.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneDAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneD(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092E880 (FUN_0092E880)
-   *
-   * What it does:
-   * Alias adapter lane of one dword-triple range copy forwarding to lane C.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneCAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneC(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092E8A0 (FUN_0092E8A0)
-   *
-   * What it does:
-   * Alias adapter lane of one dword range copy forwarding to lane F.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneFAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneF(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092E8C0 (FUN_0092E8C0)
-   *
-   * What it does:
-   * Alias adapter lane of one dword-triple range copy forwarding to lane D.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneDAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneD(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092EBB0 (FUN_0092EBB0)
-   *
-   * What it does:
-   * Third adapter lane of one dword-triple range copy forwarding to lane C.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneCAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneC(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092EBE0 (FUN_0092EBE0)
-   *
-   * What it does:
-   * Third adapter lane of one dword range copy forwarding to lane F.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneFAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneF(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x0092EC10 (FUN_0092EC10)
-   *
-   * What it does:
-   * Third adapter lane of one dword-triple range copy forwarding to lane D.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeLaneDAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneD(sourceBegin, sourceEnd, destination);
-  }
 
   /**
    * Address: 0x00932610 (FUN_00932610)
@@ -52348,50 +31739,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00932AB0 (FUN_00932AB0)
-   *
-   * What it does:
-   * Adapter lane forwarding one dword range copy request to lane G.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneGAdapterA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneG(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x00932EA0 (FUN_00932EA0)
-   *
-   * What it does:
-   * Adapter lane forwarding one dword range copy request to lane G.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneGAdapterB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneG(sourceBegin, sourceEnd, destination);
-  }
 
-  /**
-   * Address: 0x009330C0 (FUN_009330C0)
-   *
-   * What it does:
-   * Adapter lane forwarding one dword range copy request to lane G.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneGAdapterC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneG(sourceBegin, sourceEnd, destination);
-  }
 
   struct RuntimeTreeIteratorNodeLaneView
   {
@@ -52455,145 +31804,15 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeDescendLeftSpineFromLeftChild(node, 0x15u);
   }
 
-  /**
-   * Address: 0x00946770 (FUN_00946770)
-   *
-   * What it does:
-   * Walks one iterator node's right-child chain to the rightmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag21LaneA(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeRightmostIteratorNodeFromRightChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x009467B0 (FUN_009467B0)
-   *
-   * What it does:
-   * Walks one iterator node's right-child chain to the rightmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag21LaneB(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeRightmostIteratorNodeFromRightChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x009467F0 (FUN_009467F0)
-   *
-   * What it does:
-   * Walks one iterator node's right-child chain to the rightmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag21LaneC(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeRightmostIteratorNodeFromRightChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x0094EFC0 (FUN_0094EFC0)
-   *
-   * What it does:
-   * Walks one iterator node's right-child chain to the rightmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag21LaneD(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeRightmostIteratorNodeFromRightChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x00946790 (FUN_00946790)
-   *
-   * What it does:
-   * Walks one iterator node's left-child chain to the leftmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag21LaneA(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeLeftmostIteratorNodeFromLeftChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x009467D0 (FUN_009467D0)
-   *
-   * What it does:
-   * Walks one iterator node's left-child chain to the leftmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag21LaneB(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeLeftmostIteratorNodeFromLeftChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x00946810 (FUN_00946810)
-   *
-   * What it does:
-   * Walks one iterator node's left-child chain to the leftmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag21LaneC(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeLeftmostIteratorNodeFromLeftChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x0094EFE0 (FUN_0094EFE0)
-   *
-   * What it does:
-   * Walks one iterator node's left-child chain to the leftmost non-sentinel
-   * node using sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag21LaneD(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeLeftmostIteratorNodeFromLeftChildFlag21Core(node);
-  }
 
-  /**
-   * Address: 0x0094EE60 (FUN_0094EE60)
-   *
-   * What it does:
-   * Walks one iterator node's left-child chain to the leftmost non-sentinel
-   * node using sentinel flag byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag37(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeDescendLeftSpineFromLeftChild(node, 0x25u);
-  }
 
-  /**
-   * Address: 0x0094F010 (FUN_0094F010)
-   *
-   * What it does:
-   * Walks one iterator node's right-child chain to the rightmost non-sentinel
-   * node using sentinel flag byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag37(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeDescendRightSpineFromRightChild(node, 0x25u);
-  }
 
   [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantA(
     RuntimeTreeIteratorNodeLaneView** const cursorSlot,
@@ -52689,27 +31908,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeTreeIteratorCursorNil21CheckedView::cursor offset must be 0x04"
   );
 
-  /**
-   * Address: 0x00A3A8D0 (FUN_00A3A8D0)
-   *
-   * What it does:
-   * Advances one checked nil-`+0x15` red-black iterator cursor to its in-order
-   * successor, enforcing legacy CRT invalid-parameter checks on owner/cursor
-   * state before the advance.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantBFlag21Checked(
-    RuntimeTreeIteratorCursorNil21CheckedView* const iterator
-  ) noexcept
-  {
-    if (iterator->owner == nullptr) {
-      RuntimeReportInvalidParameterLane();
-    }
-    if (RuntimeTreeIteratorNodeIsSentinel(iterator->cursor, 0x15u)) {
-      RuntimeReportInvalidParameterLane();
-    }
-
-    return RuntimeAdvanceTreeIteratorVariantB(&iterator->cursor, 0x15u);
-  }
 
   struct RuntimeTreeRotateOwnerLaneView
   {
@@ -52788,43 +31986,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return promoted;
   }
 
-  /**
-   * Address: 0x004E4440 (FUN_004E4440)
-   * Address: 0x004E9A20 (FUN_004E9A20)
-   * Address: 0x005363B0 (FUN_005363B0)
-   * Address: 0x00536410 (FUN_00536410)
-   * Address: 0x00536470 (FUN_00536470)
-   * Address: 0x005364D0 (FUN_005364D0)
-   * Address: 0x00536530 (FUN_00536530)
-   * Address: 0x00536590 (FUN_00536590)
-   * Address: 0x005365F0 (FUN_005365F0)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x2D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag45(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x2Du);
-  }
 
-  /**
-   * Address: 0x00556E70 (FUN_00556E70)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x59`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag89(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x59u);
-  }
 
   /**
    * Address: 0x00530DD0 (FUN_00530DD0)
@@ -52847,57 +32009,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x11u);
   }
 
-  /**
-   * Address: 0x0077AA60 (FUN_0077AA60)
-   * Address: 0x0077B850 (FUN_0077B850)
-   * Address: 0x0077B870 (FUN_0077B870)
-   * Address: 0x007B3000 (FUN_007B3000)
-   *
-   * What it does:
-   * Adapts one iterator-slot advance through `RuntimeAdvanceTreeIteratorVariantAFlag17`
-   * and returns the caller slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** RuntimeAdvanceTreeIteratorVariantAFlag17SlotAdapterA(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantAFlag17(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x007B36E0 (FUN_007B36E0)
-   *
-   * What it does:
-   * Secondary adapter that advances one iterator slot through
-   * `RuntimeAdvanceTreeIteratorVariantAFlag17` and returns the caller slot.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** RuntimeAdvanceTreeIteratorVariantAFlag17SlotAdapterB(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantAFlag17(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x007B0950 (FUN_007B0950)
-   * Address: 0x007D91D0 (FUN_007D91D0)
-   * Address: 0x00856DE0 (FUN_00856DE0)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x19`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag25(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x19u);
-  }
 
   /**
    * Address: 0x00687C40 (FUN_00687C40)
@@ -52917,110 +32030,13 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x15u);
   }
 
-  /**
-   * Address: 0x00686450 (FUN_00686450)
-   * Address: 0x007BF0E0 (FUN_007BF0E0)
-   *
-   * What it does:
-   * Scalar delete adapter that forwards one pointer lane to `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeScalarDeleteAdapterLaneA(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x006EB520 (FUN_006EB520)
-   *
-   * What it does:
-   * Secondary scalar-delete adapter that forwards one pointer lane to
-   * `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeScalarDeleteAdapterLaneB(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x007B3490 (FUN_007B3490)
-   *
-   * What it does:
-   * Scalar delete adapter lane that forwards one pointer to `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeScalarDeleteAdapterLaneC(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x007B3B20 (FUN_007B3B20)
-   *
-   * What it does:
-   * Secondary scalar delete adapter lane that forwards one pointer to
-   * `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeScalarDeleteAdapterLaneD(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x007B3F90 (FUN_007B3F90)
-   *
-   * What it does:
-   * Scalar delete adapter lane that forwards one pointer to `operator delete`.
-   */
-  [[maybe_unused]] void RuntimeScalarDeleteAdapterLaneE(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
 
-  /**
-   * Address: 0x00686470 (FUN_00686470)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-A (`+0x15`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneG(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantAFlag21(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x00687050 (FUN_00687050)
-   *
-   * What it does:
-   * Thunk lane that advances one variant-A (`+0x15`) iterator slot and returns
-   * the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneH(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantAFlag21(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x007E60F0 (FUN_007E60F0)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag37(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x25u);
-  }
 
   /**
    * Address: 0x0052ED00 (FUN_0052ED00)
@@ -53054,101 +32070,11 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeAdvanceTreeIteratorVariantB(cursorSlot, 0x11u);
   }
 
-  /**
-   * Address: 0x0052D620 (FUN_0052D620)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-B (`+0x2D`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneA(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantBFlag45(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x0052D670 (FUN_0052D670)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-B (`+0x2D`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneB(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantBFlag45(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x0052D6C0 (FUN_0052D6C0)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-B (`+0x2D`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneC(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantBFlag45(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x0052D710 (FUN_0052D710)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-A (`+0x11`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneD(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantAFlag17(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x0052D730 (FUN_0052D730)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-B (`+0x11`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneE(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantBFlag17(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
-  /**
-   * Address: 0x0052D790 (FUN_0052D790)
-   *
-   * What it does:
-   * Adapter lane that advances one variant-B (`+0x2D`) iterator slot and
-   * returns the caller cursor-slot pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeIteratorNodeLaneView** AdvanceTreeIteratorCursorSlotAdapterLaneF(
-    const std::uint32_t laneTag,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    (void)RuntimeAdvanceTreeIteratorVariantBFlag45(laneTag, cursorSlot);
-    return cursorSlot;
-  }
 
   struct RuntimeDwordByteRecord5LaneView
   {
@@ -53203,471 +32129,35 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outLane;
   }
 
-  /**
-   * Address: 0x0052D6F0 (FUN_0052D6F0)
-   *
-   * What it does:
-   * Initializes one `{dword,byte}` lane record from caller-provided source
-   * slots.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeDwordByteRecord5LaneView* RuntimeInitDwordByteRecord5LaneA(
-    RuntimeDwordByteRecord5LaneView* const outRecord,
-    const std::uint32_t* const valueSource,
-    const std::uint8_t* const flagSource
-  ) noexcept
-  {
-    outRecord->lane00 = *valueSource;
-    outRecord->lane04 = *flagSource;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x0052D700 (FUN_0052D700)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneA(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D760 (FUN_0052D760)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneB(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D780 (FUN_0052D780)
-   *
-   * What it does:
-   * Clears one dword lane by storing zero.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeZeroDwordLaneA(
-    std::uint32_t* const outLane
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, 0u);
-  }
 
-  /**
-   * Address: 0x0052D7C0 (FUN_0052D7C0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneC(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D7D0 (FUN_0052D7D0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneD(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D7F0 (FUN_0052D7F0)
-   *
-   * What it does:
-   * Advances one dword lane value by `0x10`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeAdvanceDwordBy16LaneA(
-    std::uint32_t* const inOutLane
-  ) noexcept
-  {
-    *inOutLane += 0x10u;
-    return inOutLane;
-  }
 
-  /**
-   * Address: 0x0052D810 (FUN_0052D810)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneE(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D850 (FUN_0052D850)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneF(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052D890 (FUN_0052D890)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneG(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052ECE0 (FUN_0052ECE0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneH(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052ED50 (FUN_0052ED50)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneI(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EDC0 (FUN_0052EDC0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneJ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EE30 (FUN_0052EE30)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneK(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EEA0 (FUN_0052EEA0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneL(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EF10 (FUN_0052EF10)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneM(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EF40 (FUN_0052EF40)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneN(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EF60 (FUN_0052EF60)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneO(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EF80 (FUN_0052EF80)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneP(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EFA0 (FUN_0052EFA0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneQ(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeStoreDwordLaneCore(outLane, value);
-  }
 
-  /**
-   * Address: 0x0052EFC0 (FUN_0052EFC0)
-   *
-   * What it does:
-   * Initializes one 12-byte dword-triple record from one source dword lane
-   * and two scalar lanes.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeDwordTripleRecordLaneView* RuntimeInitDwordTripleRecordLaneA(
-    RuntimeDwordTripleRecordLaneView* const outRecord,
-    const std::uint32_t* const lane00Source,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  ) noexcept
-  {
-    outRecord->lane00 = *lane00Source;
-    outRecord->lane04 = lane04;
-    outRecord->lane08 = lane08;
-    return outRecord;
-  }
 
-  /**
-   * Address: 0x00530E90 (FUN_00530E90)
-   *
-   * What it does:
-   * Initializes one 20-byte tree-node scalar/key/color lane record and clears
-   * its local sentinel byte lane.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTreeNode20DwordKeyColorLaneView* RuntimeInitTreeNode20DwordKeyWithColorLaneA(
-    RuntimeTreeNode20DwordKeyColorLaneView* const outNode,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08,
-    const std::uint32_t* const keyLane,
-    const std::uint8_t color
-  ) noexcept
-  {
-    outNode->lane00 = lane00;
-    outNode->lane04 = lane04;
-    outNode->lane08 = lane08;
-    outNode->keyLane = *keyLane;
-    outNode->color = color;
-    outNode->isNil = 0u;
-    return outNode;
-  }
 
-  /**
-   * Address: 0x00531830 (FUN_00531830)
-   * Address: 0x005319C0 (FUN_005319C0)
-   * Address: 0x00592E50 (FUN_00592E50)
-   * Address: 0x006B0120 (FUN_006B0120)
-   * Address: 0x00736400 (FUN_00736400)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x2D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag45(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x2Du);
-  }
 
-  /**
-   * Address: 0x005318A0 (FUN_005318A0)
-   * Address: 0x00531A30 (FUN_00531A30)
-   * Address: 0x00592EE0 (FUN_00592EE0)
-   * Address: 0x006B0170 (FUN_006B0170)
-   * Address: 0x007364A0 (FUN_007364A0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x2D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag45(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x2Du);
-  }
 
-  /**
-   * Address: 0x00536A50 (FUN_00536A50)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x59`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag89(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x59u);
-  }
 
-  /**
-   * Address: 0x00536AE0 (FUN_00536AE0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x59`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag89(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x59u);
-  }
 
-  /**
-   * Address: 0x00570260 (FUN_00570260)
-   * Address: 0x007B3C90 (FUN_007B3C90)
-   * Address: 0x007D8E20 (FUN_007D8E20)
-   * Address: 0x00856670 (FUN_00856670)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x19`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag25(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x19u);
-  }
 
-  /**
-   * Address: 0x005702B0 (FUN_005702B0)
-   * Address: 0x007B3D40 (FUN_007B3D40)
-   * Address: 0x007D8E70 (FUN_007D8E70)
-   * Address: 0x008566D0 (FUN_008566D0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x19`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag25(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x19u);
-  }
 
-  /**
-   * Address: 0x0057F160 (FUN_0057F160)
-   * Address: 0x007E4E10 (FUN_007E4E10)
-   * Address: 0x00830010 (FUN_00830010)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag37(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x25u);
-  }
 
-  /**
-   * Address: 0x0057F210 (FUN_0057F210)
-   * Address: 0x007E4EA0 (FUN_007E4EA0)
-   * Address: 0x00830080 (FUN_00830080)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag37(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x25u);
-  }
 
   /**
    * Address: 0x00592C40 (FUN_00592C40)
@@ -53717,227 +32207,19 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x15u);
   }
 
-  /**
-   * Address: 0x006880A0 (FUN_006880A0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0xCC9`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag3273(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0xCC9u);
-  }
 
-  /**
-   * Address: 0x00688120 (FUN_00688120)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0xCC9`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag3273(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0xCC9u);
-  }
 
-  /**
-   * Address: 0x00711440 (FUN_00711440)
-   * Address: 0x0077C5E0 (FUN_0077C5E0)
-   * Address: 0x007B3590 (FUN_007B3590)
-   * Address: 0x0087BFB0 (FUN_0087BFB0)
-   * Address: 0x008AF0C0 (FUN_008AF0C0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x11`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag17(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x11u);
-  }
 
-  /**
-   * Address: 0x007114A0 (FUN_007114A0)
-   * Address: 0x0077C640 (FUN_0077C640)
-   * Address: 0x007B3610 (FUN_007B3610)
-   * Address: 0x0087C010 (FUN_0087C010)
-   * Address: 0x008AF170 (FUN_008AF170)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x11`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag17(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x11u);
-  }
 
-  /**
-   * Address: 0x00719690 (FUN_00719690)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x3D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag61(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x3Du);
-  }
 
-  /**
-   * Address: 0x00719740 (FUN_00719740)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x3D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag61(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x3Du);
-  }
 
-  /**
-   * Address: 0x008A8770 (FUN_008A8770)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x4D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag77(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x4Du);
-  }
 
-  /**
-   * Address: 0x008A8820 (FUN_008A8820)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x4D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag77(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x4Du);
-  }
 
-  /**
-   * Address: 0x0077B0B0 (FUN_0077B0B0)
-   * Address: 0x007B4360 (FUN_007B4360)
-   * Address: 0x008D61D0 (FUN_008D61D0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x1D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag29(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x1Du);
-  }
 
-  /**
-   * Address: 0x0077B160 (FUN_0077B160)
-   * Address: 0x007B43C0 (FUN_007B43C0)
-   * Address: 0x008D6230 (FUN_008D6230)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x1D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag29(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x1Du);
-  }
 
-  /**
-   * Address: 0x00849D40 (FUN_00849D40)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x39`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag57(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x39u);
-  }
 
-  /**
-   * Address: 0x00849DB0 (FUN_00849DB0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x39`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag57(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x39u);
-  }
 
-  /**
-   * Address: 0x007F25F0 (FUN_007F25F0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0xB9`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag185(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0xB9u);
-  }
 
-  /**
-   * Address: 0x007F2670 (FUN_007F2670)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0xB9`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag185(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0xB9u);
-  }
 
   [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantViaOwner(
     RuntimeTreeRotateOwnerLaneView* const owner,
@@ -53948,71 +32230,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeRotateTreeNodeRightVariant(pivot, owner, sentinelOffset);
   }
 
-  /**
-   * Address: 0x00946590 (FUN_00946590)
-   * Address: 0x00946620 (FUN_00946620)
-   * Address: 0x009466B0 (FUN_009466B0)
-   * Address: 0x0094FC80 (FUN_0094FC80)
-   * Address: 0x00A3A9A0 (FUN_00A3A9A0)
-   *
-   * What it does:
-   * Performs one owner-dispatched swizzled legacy RB-tree right rotation using
-   * sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightViaOwnerFlag21(
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    RuntimeTreeIteratorNodeLaneView* const pivot
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariantViaOwner(owner, pivot, 0x15u);
-  }
 
-  /**
-   * Address: 0x0094FAB0 (FUN_0094FAB0)
-   *
-   * What it does:
-   * Performs one owner-dispatched swizzled legacy RB-tree right rotation using
-   * sentinel flag byte at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightViaOwnerFlag37(
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    RuntimeTreeIteratorNodeLaneView* const pivot
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariantViaOwner(owner, pivot, 0x25u);
-  }
 
-  /**
-   * Address: 0x00A52800 (FUN_00A52800)
-   * Address: 0x00A529D0 (FUN_00A529D0)
-   *
-   * What it does:
-   * Performs one owner-dispatched swizzled legacy RB-tree right rotation using
-   * sentinel flag byte at `+0x21`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightViaOwnerFlag33(
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    RuntimeTreeIteratorNodeLaneView* const pivot
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariantViaOwner(owner, pivot, 0x21u);
-  }
 
-  /**
-   * Address: 0x00A553F0 (FUN_00A553F0)
-   * Address: 0x00A55520 (FUN_00A55520)
-   *
-   * What it does:
-   * Performs one owner-dispatched swizzled legacy RB-tree right rotation using
-   * sentinel flag byte at `+0x11`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightViaOwnerFlag17(
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    RuntimeTreeIteratorNodeLaneView* const pivot
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariantViaOwner(owner, pivot, 0x11u);
-  }
 
   struct RuntimeDwordPairLaneView
   {
@@ -54028,144 +32248,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(offsetof(RuntimeDwordByteLaneView, lane04) == 0x04, "RuntimeDwordByteLaneView::lane04 offset must be 0x04");
 
-  /**
-   * Address: 0x00948690 (FUN_00948690)
-   *
-   * What it does:
-   * Writes one dword pair from two source lanes into destination storage.
-   */
-  [[maybe_unused]] RuntimeDwordPairLaneView* RuntimeWriteDwordPairFromSourceLanesA(
-    RuntimeDwordPairLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint32_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
-  /**
-   * Address: 0x009486B0 (FUN_009486B0)
-   *
-   * What it does:
-   * Alias lane that writes one dword pair from two source lanes.
-   */
-  [[maybe_unused]] RuntimeDwordPairLaneView* RuntimeWriteDwordPairFromSourceLanesB(
-    RuntimeDwordPairLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint32_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
-  /**
-   * Address: 0x009486D0 (FUN_009486D0)
-   *
-   * What it does:
-   * Alias lane that writes one dword pair from two source lanes.
-   */
-  [[maybe_unused]] RuntimeDwordPairLaneView* RuntimeWriteDwordPairFromSourceLanesC(
-    RuntimeDwordPairLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint32_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
-  /**
-   * Address: 0x009396D0 (FUN_009396D0)
-   * Address: 0x009487B0 (FUN_009487B0)
-   *
-   * What it does:
-   * Clears one dword slot to zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeClearDwordSlotLaneA(std::uint32_t* const slot) noexcept
-  {
-    *slot = 0u;
-    return slot;
-  }
 
-  /**
-   * Address: 0x009487C0 (FUN_009487C0)
-   *
-   * What it does:
-   * Alias lane that clears one dword slot to zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeClearDwordSlotLaneB(std::uint32_t* const slot) noexcept
-  {
-    *slot = 0u;
-    return slot;
-  }
 
-  /**
-   * Address: 0x009487D0 (FUN_009487D0)
-   *
-   * What it does:
-   * Alias lane that clears one dword slot to zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeClearDwordSlotLaneC(std::uint32_t* const slot) noexcept
-  {
-    *slot = 0u;
-    return slot;
-  }
 
-  /**
-   * Address: 0x009487E0 (FUN_009487E0)
-   *
-   * What it does:
-   * Writes one `(dword, byte)` lane pair from separate sources.
-   */
-  [[maybe_unused]] RuntimeDwordByteLaneView* RuntimeWriteDwordBytePairLaneA(
-    RuntimeDwordByteLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint8_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
-  /**
-   * Address: 0x00948800 (FUN_00948800)
-   *
-   * What it does:
-   * Alias lane that writes one `(dword, byte)` pair from separate sources.
-   */
-  [[maybe_unused]] RuntimeDwordByteLaneView* RuntimeWriteDwordBytePairLaneB(
-    RuntimeDwordByteLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint8_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
-  /**
-   * Address: 0x00948820 (FUN_00948820)
-   *
-   * What it does:
-   * Alias lane that writes one `(dword, byte)` pair from separate sources.
-   */
-  [[maybe_unused]] RuntimeDwordByteLaneView* RuntimeWriteDwordBytePairLaneC(
-    RuntimeDwordByteLaneView* const outValue,
-    const std::uint32_t* const lane00Source,
-    const std::uint8_t* const lane04Source
-  ) noexcept
-  {
-    outValue->lane00 = *lane00Source;
-    outValue->lane04 = *lane04Source;
-    return outValue;
-  }
 
   struct RuntimeStateValueTreeNode
   {
@@ -54222,114 +32312,11 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return node;
   }
 
-  /**
-   * Address: 0x009489D0 (FUN_009489D0)
-   *
-   * What it does:
-   * Alias lane that initializes one state-value tree node payload and markers.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode* RuntimeInitializeStateValueTreeNodeLaneB(
-    RuntimeStateValueTreeNode* const node,
-    RuntimeStateValueTreeNode* const left,
-    RuntimeStateValueTreeNode* const parent,
-    RuntimeStateValueTreeNode* const right,
-    const RuntimeDwordPairLaneView* const keyValuePair,
-    const std::uint8_t color
-  ) noexcept
-  {
-    node->left = left;
-    node->right = right;
-    node->parent = parent;
-    node->key = keyValuePair->lane00;
-    node->value = keyValuePair->lane04;
-    node->color = color;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x00948A10 (FUN_00948A10)
-   *
-   * What it does:
-   * Alias lane that initializes one state-value tree node payload and markers.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode* RuntimeInitializeStateValueTreeNodeLaneC(
-    RuntimeStateValueTreeNode* const node,
-    RuntimeStateValueTreeNode* const left,
-    RuntimeStateValueTreeNode* const parent,
-    RuntimeStateValueTreeNode* const right,
-    const RuntimeDwordPairLaneView* const keyValuePair,
-    const std::uint8_t color
-  ) noexcept
-  {
-    node->left = left;
-    node->right = right;
-    node->parent = parent;
-    node->key = keyValuePair->lane00;
-    node->value = keyValuePair->lane04;
-    node->color = color;
-    node->isNil = 0u;
-    return node;
-  }
 
-  /**
-   * Address: 0x0094F120 (FUN_0094F120)
-   *
-   * What it does:
-   * Initializes one state-value tree node lane from
-   * `{left,parent,right,keyValue,color}` and clears `isNil`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode* RuntimeInitializeStateValueTreeNodeLaneD(
-    RuntimeStateValueTreeNode* const node,
-    RuntimeStateValueTreeNode* const left,
-    RuntimeStateValueTreeNode* const parent,
-    RuntimeStateValueTreeNode* const right,
-    const RuntimeDwordPairLaneView* const keyValuePair,
-    const std::uint8_t color
-  ) noexcept
-  {
-    return RuntimeInitializeStateValueTreeNodeLaneA(node, left, parent, right, keyValuePair, color);
-  }
 
-  /**
-   * Address: 0x00948A80 (FUN_00948A80)
-   *
-   * What it does:
-   * Returns address of one state-value tree node key lane (`node + 0x0C`)
-   * through a node-slot indirection.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneA(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
-  /**
-   * Address: 0x00948A90 (FUN_00948A90)
-   *
-   * What it does:
-   * Alias lane that returns address of state-value tree key payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneB(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
-  /**
-   * Address: 0x00948AA0 (FUN_00948AA0)
-   *
-   * What it does:
-   * Alias lane that returns address of state-value tree key payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneC(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
   [[nodiscard]] RuntimeStateValueTreeNode* RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(
     RuntimeStateValueTreeOwnerView* const treeOwner,
@@ -54349,179 +32336,17 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return candidate;
   }
 
-  /**
-   * Address: 0x00948AB0 (FUN_00948AB0)
-   *
-   * What it does:
-   * Returns one lower-bound candidate node for `key` in a nil-`0x15`
-   * state-value tree.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeStateValueTreeNode* RuntimeLowerBoundStateValueTreeNodeByKeyDirectLaneA(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-  }
 
-  /**
-   * Address: 0x00948AE0 (FUN_00948AE0)
-   *
-   * What it does:
-   * Alias lane that returns one lower-bound candidate node for `key`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeStateValueTreeNode* RuntimeLowerBoundStateValueTreeNodeByKeyDirectLaneB(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-  }
 
-  /**
-   * Address: 0x00948B10 (FUN_00948B10)
-   *
-   * What it does:
-   * Alias lane that returns one lower-bound candidate node for `key`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeStateValueTreeNode* RuntimeLowerBoundStateValueTreeNodeByKeyDirectLaneC(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-  }
 
-  /**
-   * Address: 0x00948B40 (FUN_00948B40)
-   *
-   * What it does:
-   * Clears one state-value tree node slot to null.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeClearStateValueTreeNodeSlotLaneA(
-    RuntimeStateValueTreeNode** const nodeSlot
-  ) noexcept
-  {
-    *nodeSlot = nullptr;
-    return nodeSlot;
-  }
 
-  /**
-   * Address: 0x00948B50 (FUN_00948B50)
-   *
-   * What it does:
-   * Alias lane that clears one state-value tree node slot to null.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeClearStateValueTreeNodeSlotLaneB(
-    RuntimeStateValueTreeNode** const nodeSlot
-  ) noexcept
-  {
-    *nodeSlot = nullptr;
-    return nodeSlot;
-  }
 
-  /**
-   * Address: 0x00948B60 (FUN_00948B60)
-   *
-   * What it does:
-   * Alias lane that clears one state-value tree node slot to null.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeClearStateValueTreeNodeSlotLaneC(
-    RuntimeStateValueTreeNode** const nodeSlot
-  ) noexcept
-  {
-    *nodeSlot = nullptr;
-    return nodeSlot;
-  }
 
-  /**
-   * Address: 0x00948BD0 (FUN_00948BD0)
-   *
-   * What it does:
-   * Alias lane that returns address of state-value tree key payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneD(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
-  /**
-   * Address: 0x00948BE0 (FUN_00948BE0)
-   *
-   * What it does:
-   * Alias lane that returns address of state-value tree key payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneE(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
-  /**
-   * Address: 0x00948BF0 (FUN_00948BF0)
-   *
-   * What it does:
-   * Alias lane that returns address of state-value tree key payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t RuntimeStateValueTreeNodeKeyAddressLaneF(
-    RuntimeStateValueTreeNode* const* const nodeSlot
-  ) noexcept
-  {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(*nodeSlot) + 0x0Cu);
-  }
 
-  /**
-   * Address: 0x00948C00 (FUN_00948C00)
-   *
-   * What it does:
-   * Computes one lower-bound candidate node for `key` in a nil-`0x15`
-   * state-value tree and stores it in `outNode`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyStoreLaneA(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    *outNode = RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-    return outNode;
-  }
 
-  /**
-   * Address: 0x00948C30 (FUN_00948C30)
-   *
-   * What it does:
-   * Stores one lower-bound candidate node for `key` in a nil-`0x15`
-   * state-value tree without post-filtering.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyStoreDirectLaneA(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    *outNode = RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-    return outNode;
-  }
 
-  /**
-   * Address: 0x00948C60 (FUN_00948C60)
-   *
-   * What it does:
-   * Alias lane that stores one direct lower-bound candidate node for `key`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyStoreDirectLaneB(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    *outNode = RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(treeOwner, *key);
-    return outNode;
-  }
 
   [[nodiscard]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyCore(
     RuntimeStateValueTreeOwnerView* const treeOwner,
@@ -54548,53 +32373,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outNode;
   }
 
-  /**
-   * Address: 0x00948D80 (FUN_00948D80)
-   *
-   * What it does:
-   * Locates one lower-bound node for a dword key in a red-black tree with
-   * sentinel flag byte at `+0x15`, and stores the result in `outNode`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyLaneA(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyCore(treeOwner, outNode, key);
-  }
 
-  /**
-   * Address: 0x00948DF0 (FUN_00948DF0)
-   *
-   * What it does:
-   * Locates one lower-bound node for a dword key in a red-black tree with
-   * sentinel flag byte at `+0x15`, and stores the result in `outNode`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyLaneB(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyCore(treeOwner, outNode, key);
-  }
 
-  /**
-   * Address: 0x00948E60 (FUN_00948E60)
-   *
-   * What it does:
-   * Locates one lower-bound node for a dword key in a red-black tree with
-   * sentinel flag byte at `+0x15`, and stores the result in `outNode`.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyLaneC(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    return RuntimeLowerBoundStateValueTreeNodeByKeyCore(treeOwner, outNode, key);
-  }
 
   struct RuntimeSetCharTreeNode16
   {
@@ -54660,18 +32440,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     );
   }
 
-  /**
-   * Address: 0x007CE340 (FUN_007CE340)
-   *
-   * What it does:
-   * Advances one `set<char>` iterator lane to the in-order predecessor using
-   * sentinel flag byte at `+0x0E`.
-   */
-  [[maybe_unused]] void RuntimeAdvanceSetCharTreeIteratorFlag14(RuntimeSetCharTreeNode16** const cursorSlot) noexcept
-  {
-    auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(cursorSlot);
-    (void)RuntimeAdvanceTreeIteratorVariantA(runtimeCursor, 0x0Eu);
-  }
 
   /**
    * Address: 0x007CFC00 (FUN_007CFC00)
@@ -54707,23 +32475,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outNode;
   }
 
-  /**
-   * Address: 0x007CFBC0 (FUN_007CFBC0)
-   *
-   * What it does:
-   * Resolves lower-bound for one `char` key in a `set<char>`-style owner and
-   * returns true when the result is not the tree head sentinel.
-   */
-  [[maybe_unused]] bool RuntimeSetCharTreeContainsKey(
-    RuntimeSetCharTreeOwnerView* const treeOwner,
-    const std::uint8_t key
-  ) noexcept
-  {
-    RuntimeSetCharTreeNode16* locatedNode = nullptr;
-    const std::uint8_t keyLane = key;
-    RuntimeSetCharTreeNode16** const outNode = RuntimeLowerBoundSetCharTreeNode(&keyLane, treeOwner, &locatedNode);
-    return *outNode != treeOwner->head;
-  }
 
   /**
    * Address: 0x007CC580 (FUN_007CC580)
@@ -55105,63 +32856,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return root;
   }
 
-  /**
-   * Address: 0x007CC2B0 (FUN_007CC2B0)
-   *
-   * What it does:
-   * Clears one `set<char>` tree owner by erasing the full iterator range,
-   * releases the head node storage, and nulls head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroySetCharTreeStateAndHead(RuntimeSetCharTreeState* const treeState)
-  {
-    RuntimeSetCharTreeNode16* next = nullptr;
-    RuntimeSetCharTreeNode16* const head = treeState->head;
-    (void)RuntimeEraseSetCharTreeRangeByIterator(treeState, &next, head->left, head);
-    ::operator delete(static_cast<void*>(head));
-    treeState->head = nullptr;
-    treeState->size = 0u;
-    return 0;
-  }
 
-  /**
-   * Address: 0x007CC2F0 (FUN_007CC2F0)
-   *
-   * What it does:
-   * Initializes one empty `set<char>` tree owner, then copy-clones source
-   * storage into the destination tree.
-   */
-  [[nodiscard]] RuntimeSetCharTreeState* RuntimeConstructSetCharTreeFromSource(
-    RuntimeSetCharTreeState* const destination,
-    const RuntimeSetCharTreeState* const source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    auto* const head = reinterpret_cast<RuntimeSetCharTreeNode16*>(RuntimeAllocateCompactRbHeadNode16LaneA());
-    destination->head = head;
-    head->isNil = 1u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    destination->size = 0u;
-
-    try {
-      (void)RuntimeCloneSetCharTreeStateFromSource(destination, source);
-    } catch (...) {
-      RuntimeSetCharTreeNode16* const cleanupHead = destination->head;
-      if (cleanupHead != nullptr) {
-        RuntimeDestroyCompactRbTreeLaneA(reinterpret_cast<RuntimeRbHeadNode16Color13*>(cleanupHead->parent));
-        ::operator delete(static_cast<void*>(cleanupHead));
-      }
-      destination->head = nullptr;
-      destination->size = 0u;
-      throw;
-    }
-
-    return destination;
-  }
 
   struct RuntimeRbTreeStateNil17DwordPayload
   {
@@ -55238,45 +32933,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outNext;
   }
 
-  /**
-   * Address: 0x007B3E00 (FUN_007B3E00)
-   *
-   * What it does:
-   * Erases one half-open nil-`0x11` RB-tree iterator range `[first,last)`,
-   * with a full-clear fast path when the range spans the full tree.
-   */
-  [[maybe_unused]] RuntimeRbHeadNode20Color16** RuntimeEraseRbTreeNodeNil17RangeByIteratorLaneA(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState,
-    RuntimeRbHeadNode20Color16** const outNext,
-    RuntimeRbHeadNode20Color16* first,
-    RuntimeRbHeadNode20Color16* const last
-  )
-  {
-    RuntimeRbHeadNode20Color16* const head = treeState->head;
-    if (first == head->left && last == head) {
-      RuntimeDestroyRbTreeLaneA(head->parent);
-      head->parent = head;
-      treeState->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNext = head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      RuntimeRbHeadNode20Color16* const current = first;
-      if (current->isNil == 0u) {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(&first);
-        (void)RuntimeAdvanceTreeIteratorVariantBFlag17(0u, runtimeCursor);
-      }
-
-      RuntimeRbHeadNode20Color16* ignored = nullptr;
-      (void)RuntimeEraseRbTreeNodeNil17DwordPayloadByIteratorLaneB(current, treeState, &ignored, current);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
 
   [[nodiscard]] std::int32_t RuntimeReleaseRbTree20StorageByRangeEraseCore(
     RuntimeRbTreeStateNil17DwordPayload* const treeState
@@ -55291,40 +32947,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return 0;
   }
 
-  /**
-   * Address: 0x007B3500 (FUN_007B3500)
-   *
-   * What it does:
-   * Constructs one nil-`0x11` dword-payload RB-tree owner by allocating a
-   * fresh head sentinel and cloning source tree state, with throw-cleanup that
-   * releases the partially constructed destination.
-   */
-  [[maybe_unused]] RuntimeRbTreeStateNil17DwordPayload* RuntimeConstructRbTreeStateNil17DwordPayloadFromSource(
-    RuntimeRbTreeStateNil17DwordPayload* const destination,
-    const RuntimeRbTreeStateNil17DwordPayload* const source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeRbHeadNode20Color16* const head = RuntimeAllocateRbHeadNode20LaneA();
-    destination->head = head;
-    head->isNil = 1u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    destination->size = 0u;
-
-    try {
-      (void)RuntimeCloneRbTreeStateNil17DwordPayloadFromSource(destination, source);
-    } catch (...) {
-      (void)RuntimeReleaseRbTree20StorageByRangeEraseCore(destination);
-      throw;
-    }
-
-    return destination;
-  }
 
   struct RuntimePrefixedRbTreeStateNil17At04
   {
@@ -55392,21 +33014,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x005333B0 (FUN_005333B0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one prefixed nil-`0x11` tree-owner
-   * forward-copy range into `RuntimeCopyPrefixedRbTreeStateNil17RangeForward`.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeCopyPrefixedRbTreeStateNil17RangeForwardAdapterA(
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceBegin,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceEnd,
-    RuntimePrefixedRbTreeStateNil17At04* const destinationBegin
-  )
-  {
-    return RuntimeCopyPrefixedRbTreeStateNil17RangeForward(sourceBegin, sourceEnd, destinationBegin);
-  }
 
   /**
    * Address: 0x00536DF0 (FUN_00536DF0)
@@ -55426,21 +33033,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     }
   }
 
-  /**
-   * Address: 0x0052D060 (FUN_0052D060)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one prefixed nil-`0x11` tree-owner
-   * destroy range into `RuntimeDestroyPrefixedRbTreeStateNil17Range` with
-   * `(begin=arg0, end=this)`.
-   */
-  [[maybe_unused]] void RuntimeDestroyPrefixedRbTreeStateNil17RangeAdapterEndInThis(
-    RuntimePrefixedRbTreeStateNil17At04* const endInThis,
-    RuntimePrefixedRbTreeStateNil17At04* const begin
-  )
-  {
-    RuntimeDestroyPrefixedRbTreeStateNil17Range(begin, endInThis);
-  }
 
   struct RuntimePrefixedRbTreeStateNil17VectorOwner
   {
@@ -55462,26 +33054,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimePrefixedRbTreeStateNil17VectorOwner::capacity offset must be 0x0C"
   );
 
-  /**
-   * Address: 0x0052D080 (FUN_0052D080)
-   *
-   * What it does:
-   * Destroys one prefixed nil-`0x11` tree-owner vector lane: if storage exists,
-   * destroys `[begin,end)`, frees `begin`, then zeroes `{begin,end,capacity}`.
-   */
-  [[maybe_unused]] void RuntimeDestroyPrefixedRbTreeStateNil17VectorAndReleaseStorage(
-    RuntimePrefixedRbTreeStateNil17VectorOwner* const owner
-  )
-  {
-    if (owner->begin != nullptr) {
-      RuntimeDestroyPrefixedRbTreeStateNil17Range(owner->begin, owner->end);
-      operator delete(owner->begin);
-    }
-
-    owner->begin = nullptr;
-    owner->end = nullptr;
-    owner->capacity = nullptr;
-  }
 
   /**
    * Address: 0x00536F10 (FUN_00536F10)
@@ -55504,36 +33076,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationBegin;
   }
 
-  /**
-   * Address: 0x005334A0 (FUN_005334A0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one prefixed nil-`0x11` tree-owner
-   * assign-fill range into `RuntimeAssignPrefixedRbTreeStateNil17RangeFromValue`.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeAssignPrefixedRbTreeStateNil17RangeFromValueAdapterA(
-    RuntimePrefixedRbTreeStateNil17At04* const destinationBegin,
-    RuntimePrefixedRbTreeStateNil17At04* const destinationEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceValue
-  )
-  {
-    return RuntimeAssignPrefixedRbTreeStateNil17RangeFromValue(destinationBegin, destinationEnd, sourceValue);
-  }
 
-  /**
-   * Address: 0x00533400 (FUN_00533400)
-   *
-   * What it does:
-   * Secondary register-shape adapter for the same prefixed nil-`0x11`
-   * tree-owner destroy range lane; forwards `(begin=arg0, end=this)`.
-   */
-  [[maybe_unused]] void RuntimeDestroyPrefixedRbTreeStateNil17RangeAdapterEndInThisB(
-    RuntimePrefixedRbTreeStateNil17At04* const endInThis,
-    RuntimePrefixedRbTreeStateNil17At04* const begin
-  )
-  {
-    RuntimeDestroyPrefixedRbTreeStateNil17Range(begin, endInThis);
-  }
 
   struct RuntimePrefixedRbTreeStateNil17RangeOwnerAt08
   {
@@ -55545,128 +33088,13 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimePrefixedRbTreeStateNil17RangeOwnerAt08::end offset must be 0x08"
   );
 
-  /**
-   * Address: 0x0052BEE0 (FUN_0052BEE0)
-   *
-   * What it does:
-   * Erases one prefixed nil-`0x11` tree-owner element from a contiguous range
-   * by shifting tail elements left, destroying the previous last element, and
-   * decrementing owner end cursor at `+0x08`.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04** RuntimeErasePrefixedRbTreeStateNil17RangeElementAndStoreIterator(
-    RuntimePrefixedRbTreeStateNil17At04** const outIterator,
-    RuntimePrefixedRbTreeStateNil17RangeOwnerAt08* const owner,
-    RuntimePrefixedRbTreeStateNil17At04* const erasePosition
-  )
-  {
-    RuntimePrefixedRbTreeStateNil17At04* const previousEnd = owner->end;
-    (void)RuntimeCopyPrefixedRbTreeStateNil17RangeForward(erasePosition + 1, previousEnd, erasePosition);
-    RuntimeDestroyPrefixedRbTreeStateNil17Range(previousEnd - 1, previousEnd);
-    owner->end = previousEnd - 1;
-    *outIterator = erasePosition;
-    return outIterator;
-  }
 
-  /**
-   * Address: 0x00528230 (FUN_00528230)
-   *
-   * What it does:
-   * Releases one nil-`0x11` RB-tree storage owner by erasing the full range,
-   * deleting the head sentinel, and clearing `{head,size}` lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree20StorageLaneB(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState
-  ) noexcept
-  {
-    return RuntimeReleaseRbTree20StorageByRangeEraseCore(treeState);
-  }
 
-  /**
-   * Address: 0x0052BC10 (FUN_0052BC10)
-   *
-   * What it does:
-   * Releases one nil-`0x11` RB-tree storage owner by erasing the full range,
-   * deleting the head sentinel, and clearing `{head,size}` lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree20StorageLaneC(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState
-  ) noexcept
-  {
-    return RuntimeReleaseRbTree20StorageByRangeEraseCore(treeState);
-  }
 
-  /**
-   * Address: 0x0052CF10 (FUN_0052CF10)
-   *
-   * What it does:
-   * Releases one nil-`0x11` RB-tree storage owner by erasing the full range,
-   * deleting the head sentinel, and clearing `{head,size}` lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseRbTree20StorageLaneD(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState
-  ) noexcept
-  {
-    return RuntimeReleaseRbTree20StorageByRangeEraseCore(treeState);
-  }
 
-  /**
-   * Address: 0x005370A0 (FUN_005370A0)
-   *
-   * What it does:
-   * Copies one leading dword lane, then assigns the embedded nil-`0x11`
-   * RB-tree state at `+0x04` when source/destination tree lanes differ.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00(
-    RuntimePrefixedRbTreeStateNil17At04* const destination,
-    const RuntimePrefixedRbTreeStateNil17At04* const source
-  )
-  {
-    return RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00Core(destination, source);
-  }
 
-  /**
-   * Address: 0x005370E0 (FUN_005370E0)
-   *
-   * What it does:
-   * Assigns one nil-`0x11` RB-tree state from source into destination with a
-   * self-assignment guard.
-   */
-  [[maybe_unused]] RuntimeRbTreeStateNil17DwordPayload* RuntimeAssignRbTreeStateNil17FromSourceLaneA(
-    RuntimeRbTreeStateNil17DwordPayload* const destination,
-    const RuntimeRbTreeStateNil17DwordPayload* const source
-  )
-  {
-    return RuntimeAssignRbTreeStateNil17FromSourceCore(destination, source);
-  }
 
-  /**
-   * Address: 0x00537170 (FUN_00537170)
-   *
-   * What it does:
-   * Assigns one nil-`0x11` RB-tree state from source into destination with a
-   * self-assignment guard.
-   */
-  [[maybe_unused]] RuntimeRbTreeStateNil17DwordPayload* RuntimeAssignRbTreeStateNil17FromSourceLaneB(
-    RuntimeRbTreeStateNil17DwordPayload* const destination,
-    const RuntimeRbTreeStateNil17DwordPayload* const source
-  )
-  {
-    return RuntimeAssignRbTreeStateNil17FromSourceCore(destination, source);
-  }
 
-  /**
-   * Address: 0x005371B0 (FUN_005371B0)
-   *
-   * What it does:
-   * Releases one prefixed nil-`0x11` RB-tree storage owner at `this+0x04` by
-   * erasing the full range, deleting head, and clearing `{head,size}`.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleasePrefixedRbTree20StorageLaneA(
-    RuntimePrefixedRbTreeStateNil17At04* const owner
-  ) noexcept
-  {
-    return RuntimeReleasePrefixedRbTree20StorageByRangeEraseCore(owner);
-  }
 
   /**
    * Address: 0x00537420 (FUN_00537420)
@@ -55691,66 +33119,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x005334B0 (FUN_005334B0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one prefixed nil-`0x11` tree-owner
-   * backward-copy range into `RuntimeCopyPrefixedRbTreeStateNil17RangeBackward`.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeCopyPrefixedRbTreeStateNil17RangeBackwardAdapterA(
-    RuntimePrefixedRbTreeStateNil17At04* const destinationEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceBegin
-  )
-  {
-    return RuntimeCopyPrefixedRbTreeStateNil17RangeBackward(destinationEnd, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00536F70 (FUN_00536F70)
-   *
-   * What it does:
-   * Secondary register-shape adapter that forwards one prefixed nil-`0x11`
-   * tree-owner backward-copy range into the canonical helper.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeCopyPrefixedRbTreeStateNil17RangeBackwardAdapterB(
-    RuntimePrefixedRbTreeStateNil17At04* const destinationEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceBegin
-  )
-  {
-    return RuntimeCopyPrefixedRbTreeStateNil17RangeBackward(destinationEnd, sourceEnd, sourceBegin);
-  }
 
-  /**
-   * Address: 0x00537580 (FUN_00537580)
-   *
-   * What it does:
-   * Releases one prefixed nil-`0x11` RB-tree storage owner at `this+0x04` by
-   * erasing the full range, deleting head, and clearing `{head,size}`.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleasePrefixedRbTree20StorageLaneB(
-    RuntimePrefixedRbTreeStateNil17At04* const owner
-  ) noexcept
-  {
-    return RuntimeReleasePrefixedRbTree20StorageByRangeEraseCore(owner);
-  }
 
-  /**
-   * Address: 0x00537700 (FUN_00537700)
-   *
-   * What it does:
-   * Releases one prefixed nil-`0x11` RB-tree storage owner at `this+0x04` and
-   * returns the original owner pointer.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeReleasePrefixedRbTree20StorageLaneCReturnOwner(
-    RuntimePrefixedRbTreeStateNil17At04* const owner
-  ) noexcept
-  {
-    (void)RuntimeReleasePrefixedRbTree20StorageByRangeEraseCore(owner);
-    return owner;
-  }
 
   /**
    * Address: 0x0052F0A0 (FUN_0052F0A0)
@@ -55958,39 +33329,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   {
     std::uint32_t lane00;
     std::uint32_t lane04;
-    std::string text;
+    msvc8::string text;
   };
 
-  /**
-   * Address: 0x007BDF00 (FUN_007BDF00)
-   *
-   * What it does:
-   * Copies one 36-byte record range backward from `(sourceBegin, sourceEnd]`.
-   */
-  RuntimeCopyRecord36LaneA* RuntimeCopyRecord36LaneABackward(
-    RuntimeCopyRecord36LaneA* destinationEnd,
-    const RuntimeCopyRecord36LaneA* sourceEnd,
-    const RuntimeCopyRecord36LaneA* const sourceBegin
-  )
-  {
-    const auto* sourceCursor = sourceEnd;
-    auto* destinationCursor = destinationEnd;
-
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->lane04 = sourceCursor->lane04;
-      destinationCursor->text.assign(sourceCursor->text, 0u, std::string::npos);
-    }
-
-    return destinationCursor;
-  }
 
   struct RuntimeCopyRecord36LaneB
   {
     std::uint32_t lane00;
-    std::string text;
+    msvc8::string text;
     std::uint32_t lane20;
   };
 
@@ -56013,28 +33359,13 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
       --sourceCursor;
       --destinationCursor;
       destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->text.assign(sourceCursor->text, 0u, std::string::npos);
+      destinationCursor->text.assign(sourceCursor->text, 0u, msvc8::string::npos);
       destinationCursor->lane20 = sourceCursor->lane20;
     }
 
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x007CCFB0 (FUN_007CCFB0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one 36-byte backward copy range into
-   * `RuntimeCopyRecord36LaneBBackward`.
-   */
-  [[maybe_unused]] RuntimeCopyRecord36LaneB* RuntimeCopyRecord36LaneBBackwardAdapterA(
-    RuntimeCopyRecord36LaneB* const destinationEnd,
-    const RuntimeCopyRecord36LaneB* const sourceEnd,
-    const RuntimeCopyRecord36LaneB* const sourceBegin
-  )
-  {
-    return RuntimeCopyRecord36LaneBBackward(destinationEnd, sourceEnd, sourceBegin);
-  }
 
   struct RuntimeLuaRecord24
   {
@@ -56044,23 +33375,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(sizeof(RuntimeLuaRecord24) == 0x18, "RuntimeLuaRecord24 size must be 0x18");
   static_assert(offsetof(RuntimeLuaRecord24, object) == 0x04, "RuntimeLuaRecord24::object offset must be 0x04");
 
-  /**
-   * Address: 0x007BF430 (FUN_007BF430)
-   *
-   * What it does:
-   * Copies one leading dword lane, then copy-constructs the embedded
-   * `LuaObject` lane into destination storage.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeLuaRecord24* RuntimeConstructLuaRecord24FromLanes(
-    RuntimeLuaRecord24* const destination,
-    const std::uint32_t lane00,
-    const LuaPlus::LuaObject* const sourceObject
-  )
-  {
-    destination->lane00 = lane00;
-    ::new (static_cast<void*>(&destination->object)) LuaPlus::LuaObject(*sourceObject);
-    return destination;
-  }
 
   /**
    * Address: 0x007CDD70 (FUN_007CDD70)
@@ -56088,21 +33402,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x007CD100 (FUN_007CD100)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `RuntimeLuaRecord24` backward
-   * copy range into `RuntimeCopyLuaRecord24Backward`.
-   */
-  [[maybe_unused]] RuntimeLuaRecord24* RuntimeCopyLuaRecord24BackwardAdapterA(
-    RuntimeLuaRecord24* const destinationEnd,
-    const RuntimeLuaRecord24* const sourceEnd,
-    const RuntimeLuaRecord24* const sourceBegin
-  )
-  {
-    return RuntimeCopyLuaRecord24Backward(destinationEnd, sourceEnd, sourceBegin);
-  }
 
   struct RuntimeCallableCloneDispatch
   {
@@ -56121,32 +33420,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeCallableState68, lanes20_40) == 0x20, "RuntimeCallableState68::lanes20_40 offset");
   static_assert(offsetof(RuntimeCallableState68, stateFlag44) == 0x44, "RuntimeCallableState68::stateFlag44 offset");
 
-  /**
-   * Address: 0x007CD3A0 (FUN_007CD3A0)
-   *
-   * What it does:
-   * Copies one callable/runtime dispatch state lane, cloning payload lanes
-   * when dispatch metadata is present, then clears destination state-flag lane
-   * `+0x44`.
-   */
-  [[maybe_unused]] RuntimeCallableState68* RuntimeCopyCallableStateAndResetFlag(
-    const RuntimeCallableState68* const source,
-    RuntimeCallableState68* const destination
-  ) noexcept
-  {
-    destination->dispatch = nullptr;
-    if (source->dispatch != nullptr) {
-      destination->dispatch = source->dispatch;
-      source->dispatch->clonePayload(source->payload08_1F, destination->payload08_1F, 0u);
-    }
-
-    for (std::size_t laneIndex = 0; laneIndex < 9; ++laneIndex) {
-      destination->lanes20_40[laneIndex] = source->lanes20_40[laneIndex];
-    }
-
-    destination->stateFlag44 = 0u;
-    return destination;
-  }
 
   /**
    * Address: 0x007CEE80 (FUN_007CEE80)
@@ -56183,23 +33456,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outStart;
   }
 
-  /**
-   * Address: 0x007CEB10 (FUN_007CEB10)
-   *
-   * What it does:
-   * Register-shape adapter that preserves caller return semantics for
-   * `RuntimeCopyLuaRecord24BackwardWithOutStart`.
-   */
-  [[maybe_unused]] RuntimeLuaRecord24** RuntimeCopyLuaRecord24BackwardWithOutStartAdapterA(
-    RuntimeLuaRecord24** const outStart,
-    const RuntimeLuaRecord24* const sourceBegin,
-    const RuntimeLuaRecord24* const sourceEnd,
-    RuntimeLuaRecord24* const destinationEnd
-  )
-  {
-    (void)RuntimeCopyLuaRecord24BackwardWithOutStart(outStart, sourceBegin, sourceEnd, destinationEnd);
-    return outStart;
-  }
 
   struct RuntimeCopyRecord44LaneA
   {
@@ -56207,100 +33463,12 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     float lane04;
     float lane08;
     std::uint32_t lane0C;
-    std::string text;
+    msvc8::string text;
   };
 
-  /**
-   * Address: 0x0084AF00 (FUN_0084AF00)
-   *
-   * What it does:
-   * Copies one 44-byte record range backward from `(sourceBegin, sourceEnd]`.
-   */
-  RuntimeCopyRecord44LaneA* RuntimeCopyRecord44LaneABackward(
-    RuntimeCopyRecord44LaneA* destinationEnd,
-    const RuntimeCopyRecord44LaneA* sourceEnd,
-    const RuntimeCopyRecord44LaneA* const sourceBegin
-  )
-  {
-    const auto* sourceCursor = sourceEnd;
-    auto* destinationCursor = destinationEnd;
 
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->lane04 = sourceCursor->lane04;
-      destinationCursor->lane08 = sourceCursor->lane08;
-      destinationCursor->lane0C = sourceCursor->lane0C;
-      destinationCursor->text.assign(sourceCursor->text, 0u, std::string::npos);
-    }
 
-    return destinationCursor;
-  }
 
-  /**
-   * Address: 0x0083C5C0 (FUN_0083C5C0)
-   *
-   * What it does:
-   * Copies one half-open string lane backward by assigning
-   * `destination[-1] = source[-1]` until `source == sourceBegin`.
-   */
-  [[maybe_unused]] std::string* RuntimeCopyStringLaneBackwardAssignLaneA(
-    std::string* source,
-    std::string* destination,
-    const std::string* const sourceBegin
-  )
-  {
-    std::string* sourceCursor = source;
-    std::string* destinationCursor = destination;
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->assign(*sourceCursor, 0u, std::string::npos);
-    }
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x0083C5F0 (FUN_0083C5F0)
-   *
-   * What it does:
-   * Copies one half-open string lane backward by assigning
-   * `destination[-1] = source[-1]` until `source == sourceBegin`.
-   */
-  [[maybe_unused]] std::string* RuntimeCopyStringLaneBackwardAssign(
-    std::string* source,
-    std::string* destination,
-    const std::string* const sourceBegin
-  )
-  {
-    std::string* sourceCursor = source;
-    std::string* destinationCursor = destination;
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->assign(*sourceCursor, 0u, std::string::npos);
-    }
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x0083C8C0 (FUN_0083C8C0)
-   *
-   * What it does:
-   * Multiplies one signed 64-bit lane in place by a signed 32-bit scalar and
-   * returns the same storage pointer.
-   */
-  [[maybe_unused]] std::int64_t* RuntimeMultiplyQwordBySignedInt(
-    std::int64_t* const value,
-    const std::int32_t multiplier
-  ) noexcept
-  {
-    if (value != nullptr) {
-      *value *= static_cast<std::int64_t>(multiplier);
-    }
-    return value;
-  }
 
   /**
    * Address: 0x00877170 (FUN_00877170)
@@ -56319,7 +33487,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
     while (sourceCursor != sourceEnd) {
       destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->text.assign(sourceCursor->text, 0u, std::string::npos);
+      destinationCursor->text.assign(sourceCursor->text, 0u, msvc8::string::npos);
       destinationCursor->lane20 = sourceCursor->lane20;
       ++sourceCursor;
       ++destinationCursor;
@@ -56328,16 +33496,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationCursor;
   }
 
-  /**
-   * Address: 0x00877130 (FUN_00877130)
-   *
-   * What it does:
-   * Legacy null-lane adapter for `RuntimeCopyRecord36LaneBForward(...)`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeCopyRecord36LaneB* RuntimeCopyRecord36LaneBNullAdapter()
-  {
-    return RuntimeCopyRecord36LaneBForward(nullptr, nullptr, nullptr);
-  }
 
   struct RuntimePointerBufferStateLaneA
   {
@@ -56348,107 +33506,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimePointerBufferStateLaneA) == 0x10, "RuntimePointerBufferStateLaneA size must be 0x10");
 
-  /**
-   * Address: 0x00A74270 (FUN_00A74270)
-   *
-   * What it does:
-   * Initializes one pointer-buffer state as an 8-byte element vector lane.
-   * Zero-count requests leave storage empty and return `false`.
-   */
-  [[maybe_unused]] bool RuntimeInitializePointerBufferState8ByteElements(
-    RuntimePointerBufferStateLaneA* const state,
-    const unsigned int elementCount
-  )
-  {
-    if (state == nullptr) {
-      return false;
-    }
 
-    state->begin = nullptr;
-    state->end = nullptr;
-    state->capacity = nullptr;
 
-    if (elementCount == 0u) {
-      return false;
-    }
-    if (elementCount > 0x1FFFFFFFu) {
-      RuntimeThrowContainerTooLong("vector<T> too long");
-    }
-
-    std::uint8_t* const allocation = static_cast<std::uint8_t*>(RuntimeAllocateArrayWithBadAllocLane087(elementCount));
-    state->begin = allocation;
-    state->end = allocation;
-    state->capacity = allocation + static_cast<std::size_t>(elementCount) * 8u;
-    return true;
-  }
-
-  /**
-   * Address: 0x00A742C0 (FUN_00A742C0)
-   *
-   * What it does:
-   * Initializes one pointer-buffer state as a 16-byte element vector lane.
-   * Zero-count requests leave storage empty and return `false`.
-   */
-  [[maybe_unused]] bool RuntimeInitializePointerBufferState16ByteElements(
-    RuntimePointerBufferStateLaneA* const state,
-    const unsigned int elementCount
-  )
-  {
-    if (state == nullptr) {
-      return false;
-    }
-
-    state->begin = nullptr;
-    state->end = nullptr;
-    state->capacity = nullptr;
-
-    if (elementCount == 0u) {
-      return false;
-    }
-    if (elementCount > 0x0FFFFFFFu) {
-      RuntimeThrowVectorTooLongEG();
-    }
-
-    std::uint8_t* const allocation = static_cast<std::uint8_t*>(RuntimeAllocateArrayWithBadAllocLane088(elementCount));
-    state->begin = allocation;
-    state->end = allocation;
-    state->capacity = allocation + static_cast<std::size_t>(elementCount) * 16u;
-    return true;
-  }
-
-  /**
-   * Address: 0x00AC40C0 (FUN_00AC40C0)
-   *
-   * What it does:
-   * Initializes one pointer-buffer state as a 4-byte element vector lane.
-   * Zero-count requests leave storage empty and return `false`.
-   */
-  [[maybe_unused]] bool RuntimeInitializePointerBufferState4ByteElements(
-    RuntimePointerBufferStateLaneA* const state,
-    const unsigned int elementCount
-  )
-  {
-    if (state == nullptr) {
-      return false;
-    }
-
-    state->begin = nullptr;
-    state->end = nullptr;
-    state->capacity = nullptr;
-
-    if (elementCount == 0u) {
-      return false;
-    }
-    if (elementCount > 0x3FFFFFFFu) {
-      RuntimeThrowContainerTooLong("vector<T> too long");
-    }
-
-    std::uint8_t* const allocation = static_cast<std::uint8_t*>(RuntimeAllocateArrayWithBadAllocLane089(elementCount));
-    state->begin = allocation;
-    state->end = allocation;
-    state->capacity = allocation + static_cast<std::size_t>(elementCount) * 4u;
-    return true;
-  }
 
   /**
    * Address: 0x0084FF50 (FUN_0084FF50)
@@ -56471,60 +33530,10 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     state->capacity = nullptr;
   }
 
-  /**
-   * Address: 0x0082D8D0 (FUN_0082D8D0)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void RuntimeResetPointerBufferStateLaneB(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    RuntimeResetPointerBufferStateLaneA(state);
-  }
 
-  /**
-   * Address: 0x0082DBF0 (FUN_0082DBF0)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void RuntimeResetPointerBufferStateLaneC(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    RuntimeResetPointerBufferStateLaneA(state);
-  }
 
-  /**
-   * Address: 0x0082DE60 (FUN_0082DE60)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void RuntimeResetPointerBufferStateLaneD(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    RuntimeResetPointerBufferStateLaneA(state);
-  }
 
-  /**
-   * Address: 0x0082E920 (FUN_0082E920)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void RuntimeResetPointerBufferStateLaneE(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    RuntimeResetPointerBufferStateLaneA(state);
-  }
 
-  /**
-   * Address: 0x00848BD0 (FUN_00848BD0)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void RuntimeResetPointerBufferStateLaneF(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    RuntimeResetPointerBufferStateLaneA(state);
-  }
 
   struct RuntimeIntPairHashKey
   {
@@ -56598,63 +33607,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimePairHashLookupState::bucketSplit offset must be 0x24"
   );
 
-  /**
-   * Address: 0x0082C750 (FUN_0082C750)
-   *
-   * What it does:
-   * Resolves one exact `(lhs, rhs)` key from the hashed bucket-range lane and
-   * writes either the matching node or the table nil-node into `*outNode`.
-   */
-  [[maybe_unused]] RuntimePairHashListNode** RuntimeFindPairHashNodeByExactKey(
-    RuntimePairHashLookupState* const tableState,
-    const RuntimeIntPairHashKey* const key,
-    RuntimePairHashListNode** const outNode
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    if (tableState == nullptr || key == nullptr || tableState->bucketRanges == nullptr) {
-      *outNode = tableState != nullptr ? tableState->nilNode : nullptr;
-      return outNode;
-    }
-
-    const std::uint32_t targetLhs = static_cast<std::uint32_t>(key->lhs);
-    const std::uint32_t targetRhs = static_cast<std::uint32_t>(key->rhs);
-
-    std::uint32_t bucketIndex =
-      tableState->bucketMask & static_cast<std::uint32_t>(RuntimeHashIntPairKeyLane(key));
-    if (tableState->bucketSplit <= bucketIndex) {
-      bucketIndex += static_cast<std::uint32_t>(-1 - static_cast<int>(tableState->bucketMask >> 1));
-    }
-
-    RuntimePairHashBucketRange& bucket = tableState->bucketRanges[bucketIndex];
-    RuntimePairHashListNode* node = bucket.begin;
-    RuntimePairHashListNode* const end = bucket.end;
-
-    auto pairLess = [](
-                      const std::uint32_t lhsA,
-                      const std::uint32_t rhsA,
-                      const std::uint32_t lhsB,
-                      const std::uint32_t rhsB
-                    ) noexcept -> bool {
-      return (lhsA < lhsB) || ((lhsA == lhsB) && (rhsA < rhsB));
-    };
-
-    while (node != end && pairLess(node->keyLhs, node->keyRhs, targetLhs, targetRhs)) {
-      node = node->next;
-    }
-
-    if (node != end && !pairLess(targetLhs, targetRhs, node->keyLhs, node->keyRhs) &&
-        !pairLess(node->keyLhs, node->keyRhs, targetLhs, targetRhs)) {
-      *outNode = node;
-      return outNode;
-    }
-
-    *outNode = tableState->nilNode;
-    return outNode;
-  }
 
   struct RuntimeSentinelNode20
   {
@@ -56664,35 +33616,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeSentinelNode20) == 0x14, "RuntimeSentinelNode20 size must be 0x14");
 
-  /**
-   * Address: 0x0082D430 (FUN_0082D430)
-   *
-   * What it does:
-   * Allocates one 20-byte intrusive-list sentinel and self-links
-   * `next/prev` lanes.
-   */
-  RuntimeSentinelNode20* RuntimeAllocateSentinelNode20LaneA()
-  {
-    auto* const node = static_cast<RuntimeSentinelNode20*>(RuntimeAllocateArrayWithBadAllocLane059(1u));
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
 
-  /**
-   * Address: 0x00858400 (FUN_00858400)
-   *
-   * What it does:
-   * Allocates one 20-byte intrusive-list sentinel and self-links
-   * `next/prev` lanes.
-   */
-  RuntimeSentinelNode20* RuntimeAllocateSentinelNode20LaneB()
-  {
-    auto* const node = static_cast<RuntimeSentinelNode20*>(RuntimeAllocateArrayWithBadAllocLane067(1u));
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
 
   struct RuntimeIntrusiveListNode
   {
@@ -56750,37 +33674,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return leftNode;
   }
 
-  /**
-   * Address: 0x00A806E0 (FUN_00A806E0)
-   *
-   * What it does:
-   * Binds one dual-link owner lane to left/right node lanes and returns the
-   * left-node pointer.
-   */
-  [[maybe_unused]] RuntimeDualLinkLeftNodeLane* RuntimeBindDualLinkOwnerLanesA(
-    RuntimeDualLinkOwnerLane* const owner,
-    RuntimeDualLinkLeftNodeLane* const leftNode,
-    RuntimeDualLinkRightNodeLane* const rightNode
-  ) noexcept
-  {
-    return RuntimeBindDualLinkOwnerLanes(owner, leftNode, rightNode);
-  }
 
-  /**
-   * Address: 0x00A80820 (FUN_00A80820)
-   *
-   * What it does:
-   * Binds one dual-link owner lane to left/right node lanes and returns the
-   * left-node pointer.
-   */
-  [[maybe_unused]] RuntimeDualLinkLeftNodeLane* RuntimeBindDualLinkOwnerLanesB(
-    RuntimeDualLinkOwnerLane* const owner,
-    RuntimeDualLinkLeftNodeLane* const leftNode,
-    RuntimeDualLinkRightNodeLane* const rightNode
-  ) noexcept
-  {
-    return RuntimeBindDualLinkOwnerLanes(owner, leftNode, rightNode);
-  }
 
   [[nodiscard]] RuntimeIntrusiveListNode* RuntimeEraseIntrusiveListNodeAndReturnNext(
     RuntimeIntrusiveListState* const listState,
@@ -56802,81 +33696,12 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return next;
   }
 
-  /**
-   * Address: 0x0082FA80 (FUN_0082FA80)
-   *
-   * What it does:
-   * Erases one intrusive-list node when it is not the head sentinel and
-   * stores the node's successor lane into `*outNext`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveListNode** RuntimeEraseIntrusiveListNodeAndStoreNextLaneA(
-    RuntimeIntrusiveListNode** const outNext,
-    RuntimeIntrusiveListState* const listState,
-    RuntimeIntrusiveListNode* const node
-  ) noexcept
-  {
-    if (outNext == nullptr) {
-      return nullptr;
-    }
 
-    *outNext = RuntimeEraseIntrusiveListNodeAndReturnNext(listState, node);
-    return outNext;
-  }
-
-  /**
-   * Address: 0x008306D0 (FUN_008306D0)
-   *
-   * What it does:
-   * Erases one intrusive-list node when it is not the head sentinel and
-   * stores the node's successor lane into `*outNext`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveListNode** RuntimeEraseIntrusiveListNodeAndStoreNextLaneB(
-    RuntimeIntrusiveListNode** const outNext,
-    RuntimeIntrusiveListState* const listState,
-    RuntimeIntrusiveListNode* const node
-  ) noexcept
-  {
-    if (outNext == nullptr) {
-      return nullptr;
-    }
-
-    *outNext = RuntimeEraseIntrusiveListNodeAndReturnNext(listState, node);
-    return outNext;
-  }
 
   RuntimeIntrusiveListNode* RuntimeClearIntrusiveListNodesKeepHeadLaneA(
     RuntimeIntrusiveListState* const listState
   ) noexcept;
 
-  /**
-   * Address: 0x0082F540 (FUN_0082F540)
-   *
-   * What it does:
-   * Erases one intrusive-list half-open range `[first,last)` and stores `last`
-   * into `*outResult`; when that range spans the whole list, it clears all
-   * nodes while preserving the sentinel head node.
-   */
-  [[maybe_unused]] RuntimeIntrusiveListNode** RuntimeEraseIntrusiveListRangeAndStoreEndLaneA(
-    RuntimeIntrusiveListNode** const outResult,
-    RuntimeIntrusiveListState* const listState,
-    RuntimeIntrusiveListNode* first,
-    RuntimeIntrusiveListNode* const last
-  ) noexcept
-  {
-    RuntimeIntrusiveListNode* const head = listState->head;
-    if (first == head->next && last == head) {
-      (void)RuntimeClearIntrusiveListNodesKeepHeadLaneA(listState);
-      *outResult = listState->head;
-      return outResult;
-    }
-
-    while (first != last) {
-      first = RuntimeEraseIntrusiveListNodeAndReturnNext(listState, first);
-    }
-
-    *outResult = last;
-    return outResult;
-  }
 
   /**
    * Address: 0x008491C0 (FUN_008491C0)
@@ -56930,36 +33755,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeClearIntrusiveListNodesKeepHeadLaneA(listState);
   }
 
-  /**
-   * Address: 0x0082C400 (FUN_0082C400)
-   *
-   * What it does:
-   * Alternate half-open intrusive-list erase lane that forwards whole-list
-   * erase requests into `RuntimeClearIntrusiveListNodesKeepHeadLaneB`
-   * (matching the 0x0082C840 helper used by this lane group), otherwise
-   * loops through node-by-node erasure.
-   */
-  [[maybe_unused]] RuntimeIntrusiveListNode** RuntimeEraseIntrusiveListRangeAndStoreEndLaneB(
-    RuntimeIntrusiveListNode** const outResult,
-    RuntimeIntrusiveListState* const listState,
-    RuntimeIntrusiveListNode* first,
-    RuntimeIntrusiveListNode* const last
-  ) noexcept
-  {
-    RuntimeIntrusiveListNode* const head = listState->head;
-    if (first == head->next && last == head) {
-      (void)RuntimeClearIntrusiveListNodesKeepHeadLaneB(listState);
-      *outResult = listState->head;
-      return outResult;
-    }
-
-    while (first != last) {
-      first = RuntimeEraseIntrusiveListNodeAndReturnNext(listState, first);
-    }
-
-    *outResult = last;
-    return outResult;
-  }
 
   struct RuntimeMapTreePayloadTriplet
   {
@@ -57057,46 +33852,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     }
   }
 
-  /**
-   * Address: 0x009470E0 (FUN_009470E0)
-   *
-   * What it does:
-   * Adapter lane that recursively destroys one nil-`+0x15` map-tree subtree.
-   */
-  [[maybe_unused]] void RuntimeDestroyMapTreeNode24SubtreeAdapterA(
-    RuntimeMapTreeNode24* const node
-  ) noexcept
-  {
-    RuntimeDestroyMapTreeNode24Subtree(nullptr, node);
-  }
 
-  /**
-   * Address: 0x00947120 (FUN_00947120)
-   *
-   * What it does:
-   * Secondary adapter lane that recursively destroys one nil-`+0x15`
-   * map-tree subtree.
-   */
-  [[maybe_unused]] void RuntimeDestroyMapTreeNode24SubtreeAdapterB(
-    RuntimeMapTreeNode24* const node
-  ) noexcept
-  {
-    RuntimeDestroyMapTreeNode24Subtree(nullptr, node);
-  }
 
-  /**
-   * Address: 0x00947160 (FUN_00947160)
-   *
-   * What it does:
-   * Tertiary adapter lane that recursively destroys one nil-`+0x15`
-   * map-tree subtree.
-   */
-  [[maybe_unused]] void RuntimeDestroyMapTreeNode24SubtreeAdapterC(
-    RuntimeMapTreeNode24* const node
-  ) noexcept
-  {
-    RuntimeDestroyMapTreeNode24Subtree(nullptr, node);
-  }
 
   /**
    * Address: 0x00711B00 (FUN_00711B00)
@@ -57219,53 +33976,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     );
   }
 
-  /**
-   * Address: 0x00947380 (FUN_00947380)
-   *
-   * What it does:
-   * Adapter lane that erases one nil-`+0x15` map-tree iterator node and
-   * stores successor iterator into `*outNext`.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24ByIteratorLaneA(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const nodeToErase
-  )
-  {
-    return RuntimeEraseMapTreeNode24ByIterator(treeState, outNext, nodeToErase);
-  }
 
-  /**
-   * Address: 0x00947630 (FUN_00947630)
-   *
-   * What it does:
-   * Secondary adapter lane that erases one nil-`+0x15` map-tree iterator
-   * node and stores successor iterator.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24ByIteratorLaneB(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const nodeToErase
-  )
-  {
-    return RuntimeEraseMapTreeNode24ByIterator(treeState, outNext, nodeToErase);
-  }
 
-  /**
-   * Address: 0x009478E0 (FUN_009478E0)
-   *
-   * What it does:
-   * Tertiary adapter lane that erases one nil-`+0x15` map-tree iterator node
-   * and stores successor iterator.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24ByIteratorLaneC(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const nodeToErase
-  )
-  {
-    return RuntimeEraseMapTreeNode24ByIterator(treeState, outNext, nodeToErase);
-  }
 
   /**
    * Address: 0x00592230 (FUN_00592230)
@@ -57307,56 +34019,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return outNext;
   }
 
-  /**
-   * Address: 0x00947B90 (FUN_00947B90)
-   *
-   * What it does:
-   * Adapter lane that erases one half-open nil-`+0x15` map-tree range
-   * `[first,last)` and stores the resulting iterator.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24RangeLaneA(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const first,
-    RuntimeMapTreeNode24* const last
-  )
-  {
-    return RuntimeEraseMapTreeNode24Range(treeState, outNext, first, last);
-  }
 
-  /**
-   * Address: 0x00947C50 (FUN_00947C50)
-   *
-   * What it does:
-   * Secondary adapter lane that erases one half-open nil-`+0x15` map-tree
-   * range `[first,last)` and stores the resulting iterator.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24RangeLaneB(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const first,
-    RuntimeMapTreeNode24* const last
-  )
-  {
-    return RuntimeEraseMapTreeNode24Range(treeState, outNext, first, last);
-  }
 
-  /**
-   * Address: 0x00947D10 (FUN_00947D10)
-   *
-   * What it does:
-   * Tertiary adapter lane that erases one half-open nil-`+0x15` map-tree
-   * range `[first,last)` and stores the resulting iterator.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24RangeLaneC(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const first,
-    RuntimeMapTreeNode24* const last
-  )
-  {
-    return RuntimeEraseMapTreeNode24Range(treeState, outNext, first, last);
-  }
 
   /**
    * Address: 0x00591ED0 (FUN_00591ED0)
@@ -57378,159 +34042,16 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return 0;
   }
 
-  /**
-   * Address: 0x00585BD0 (FUN_00585BD0)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterA(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00591B10 (FUN_00591B10)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterB(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947DD0 (FUN_00947DD0)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterC(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947E00 (FUN_00947E00)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterD(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947E30 (FUN_00947E30)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterE(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947E60 (FUN_00947E60)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterF(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947E90 (FUN_00947E90)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterG(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947EC0 (FUN_00947EC0)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterH(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947EF0 (FUN_00947EF0)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterI(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947F20 (FUN_00947F20)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterJ(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
-  /**
-   * Address: 0x00947F50 (FUN_00947F50)
-   *
-   * What it does:
-   * Adapter lane that destroys one nil-`+0x15` map-tree owner and releases its
-   * head sentinel storage.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHeadAdapterK(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    return RuntimeDestroyMapTreeState24AndHead(treeState);
-  }
 
   [[nodiscard]] RuntimeMapTreeState24* RuntimeCloneMapTreeState24HeaderAndExtrema(
     RuntimeMapTreeState24* const destinationTree,
@@ -57593,47 +34114,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationTree;
   }
 
-  /**
-   * Address: 0x0070CC10 (FUN_0070CC10)
-   *
-   * What it does:
-   * Assigns one nil-`+0x15` map-tree lane by erasing destination content then
-   * cloning source root/size/extrema lanes when source differs from destination.
-   */
-  [[maybe_unused]] RuntimeMapTreeState24* RuntimeAssignMapTreeState24FromPeerA(
-    RuntimeMapTreeState24* const destinationTree,
-    const RuntimeMapTreeState24* const sourceTree
-  )
-  {
-    if (destinationTree != sourceTree) {
-      RuntimeMapTreeNode24* iterator = nullptr;
-      RuntimeMapTreeNode24* const head = destinationTree->head;
-      (void)RuntimeEraseMapTreeNode24Range(destinationTree, &iterator, head->left, head);
-      (void)RuntimeCloneMapTreeState24HeaderAndExtrema(destinationTree, sourceTree);
-    }
-    return destinationTree;
-  }
 
-  /**
-   * Address: 0x0070E3A0 (FUN_0070E3A0)
-   *
-   * What it does:
-   * Sibling assign lane for nil-`+0x15` map-tree state; clears destination
-   * range and clones root/size/extrema lanes from source when pointers differ.
-   */
-  [[maybe_unused]] RuntimeMapTreeState24* RuntimeAssignMapTreeState24FromPeerB(
-    RuntimeMapTreeState24* const destinationTree,
-    const RuntimeMapTreeState24* const sourceTree
-  )
-  {
-    if (destinationTree != sourceTree) {
-      RuntimeMapTreeNode24* iterator = nullptr;
-      RuntimeMapTreeNode24* const head = destinationTree->head;
-      (void)RuntimeEraseMapTreeNode24Range(destinationTree, &iterator, head->left, head);
-      (void)RuntimeCloneMapTreeState24HeaderAndExtrema(destinationTree, sourceTree);
-    }
-    return destinationTree;
-  }
 
   struct RuntimeArmyStatItemBlueprintView
   {
@@ -57645,49 +34126,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeArmyStatItemBlueprintView::blueprintTree offset must be 0xA0"
   );
 
-  /**
-   * Address: 0x0070ADD0 (FUN_0070ADD0)
-   *
-   * What it does:
-   * Initializes one destination nil-`+0x15` blueprint-stat map lane from a
-   * `CArmyStatItem` source lane at offset `+0xA0`.
-   */
-  [[maybe_unused]] RuntimeMapTreeState24* RuntimeInitializeArmyBlueprintTreeFromStatItem(
-    const RuntimeArmyStatItemBlueprintView* const sourceItem,
-    RuntimeMapTreeState24* const destinationTree
-  )
-  {
-    const RuntimeMapTreeState24* const sourceTree = &sourceItem->blueprintTree;
-    (void)RuntimeInitializeMapTreeState24AndCopy(destinationTree, sourceTree);
-    return destinationTree;
-  }
 
-  /**
-   * Address: 0x0083C260 (FUN_0083C260)
-   *
-   * What it does:
-   * Allocates one 24-byte map-tree node, seeds pointer and key lanes, and
-   * initializes marker bytes `{color=0, isNil=0}`.
-   */
-  [[maybe_unused]] RuntimeMapTreeNode24* RuntimeAllocateMapTreeNode24WithPayload(
-    const RuntimeMapTreeNode24Payload* const payload,
-    RuntimeMapTreeNode24* const left,
-    RuntimeMapTreeNode24* const parent,
-    RuntimeMapTreeNode24* const right
-  ) noexcept
-  {
-    auto* const node = static_cast<RuntimeMapTreeNode24*>(RuntimeAllocateArrayWithBadAllocLane063(1u));
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->keyLhs = payload != nullptr ? payload->keyLhs : 0u;
-    node->keyRhs = payload != nullptr ? payload->keyRhs : 0u;
-    node->color = 0u;
-    node->isNil = 0u;
-    node->pad16[0] = 0u;
-    node->pad16[1] = 0u;
-    return node;
-  }
 
   inline void RuntimeMapTreeRetainSharedControl(void* const sharedControl) noexcept
   {
@@ -57809,20 +34248,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return result;
   }
 
-  /**
-   * Address: 0x007D5D90 (FUN_007D5D90, sub_7D5D90)
-   *
-   * What it does:
-   * Releases one shared-control lane referenced from owner offset `+0x04`,
-   * preserving the original owner lane unless the final weak-release dispatch
-   * returns a replacement value.
-   */
-  [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlFromOwnerMeshMaterialLane(
-    const std::intptr_t ownerRuntime
-  ) noexcept
-  {
-    return RuntimeReleaseSharedControlFromOwner(ownerRuntime);
-  }
 
   [[nodiscard]] RuntimeMapTreeNode28* RuntimeClearMapTreeStorageKeepHead(
     RuntimeMapTreeState* const treeState
@@ -57841,49 +34266,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return head;
   }
 
-  /**
-   * Address: 0x00855210 (FUN_00855210)
-   *
-   * What it does:
-   * Clears one refcounted map-tree storage lane, frees its head sentinel, and
-   * nulls owner head/size lanes.
-   */
-  [[maybe_unused]] std::int32_t RuntimeReleaseMapTreeStorageLaneA(
-    RuntimeMapTreeState* const treeState
-  ) noexcept
-  {
-    RuntimeMapTreeNode28* const head = treeState != nullptr ? treeState->head : nullptr;
-    if (head == nullptr) {
-      return 0;
-    }
 
-    (void)RuntimeClearMapTreeStorageKeepHead(treeState);
-    ::operator delete(static_cast<void*>(head));
-    treeState->head = nullptr;
-    treeState->size = 0u;
-    return 0;
-  }
 
-  /**
-   * Address: 0x00855A10 (FUN_00855A10)
-   *
-   * What it does:
-   * Copy-assigns one refcounted map-tree state, clearing destination storage
-   * first when source and destination differ.
-   */
-  [[maybe_unused]] RuntimeMapTreeState* RuntimeAssignMapTreeStateLaneA(
-    RuntimeMapTreeState* const destination,
-    RuntimeMapTreeState* const source
-  )
-  {
-    if (destination != source) {
-      (void)RuntimeClearMapTreeStorageKeepHead(destination);
-      (void)RuntimeCloneMapTreeStateFromSource(destination, source);
-    }
-
-    return destination;
-  }
-
+#pragma pack(push, 1)
   struct RuntimePackedFloatRecord74
   {
     float lane00 = 0.0f; // +0x00
@@ -57909,6 +34294,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     std::uint8_t lane48 = 0; // +0x48
     std::uint8_t lane49 = 0; // +0x49
   };
+#pragma pack(pop)
   static_assert(sizeof(RuntimePackedFloatRecord74) == 0x4A, "RuntimePackedFloatRecord74 size must be 0x4A");
 
   /**
@@ -57950,26 +34336,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x00539C60 (FUN_00539C60)
-   *
-   * What it does:
-   * Copy-constructs one refcount-pair lane and retains the owner at `+0x04`.
-   */
-  [[maybe_unused]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairLaneRetainA(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* const source
-  ) noexcept
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    destination->word0 = source->word0;
-    destination->owner = source->owner;
-    RuntimeRetainRefcountOwner(destination->owner);
-    return destination;
-  }
 
   struct RuntimeTreeNode24OwnerView
   {
@@ -57977,36 +34343,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     RuntimeTreeNode24* head;
   };
 
-  /**
-   * Address: 0x005808D0 (FUN_005808D0)
-   *
-   * What it does:
-   * Finds the left-most exact-match node for one 2-dword key payload inside a
-   * tree whose nil marker byte lives at `+0x25`.
-   */
-  [[maybe_unused]] RuntimeTreeNode24* RuntimeFindPairKeyNode24LeftmostEqualLaneA(
-    const std::uint32_t* const searchKeyPair,
-    const RuntimeTreeNode24OwnerView* const owner
-  ) noexcept
-  {
-    if (searchKeyPair == nullptr || owner == nullptr || owner->head == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeTreeNode24* result = owner->head;
-    RuntimeTreeNode24* node = owner->head->parent;
-    while (node != nullptr && node->isNil == 0u) {
-      const bool keyMatches = (node->payload.words[0] == searchKeyPair[0]) && (node->payload.words[1] == searchKeyPair[1]);
-      if (keyMatches) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    return result;
-  }
 
   struct RuntimeDualBacklinkedPairRecord24
   {
@@ -58081,96 +34417,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeTripleWordDualBacklinkedRecord40::flag25 offset must be 0x25"
   );
 
-  /**
-   * Address: 0x00581330 (FUN_00581330)
-   *
-   * What it does:
-   * Allocates one 40-byte dual-backlinked record, zeroes the first three
-   * dword lanes, and arms primary/secondary flag bytes as `{1,0}`.
-   */
-  [[maybe_unused]] RuntimeTripleWordDualBacklinkedRecord40* AllocateDualBacklinkedRecord40WithEnabledPrimaryFlag()
-  {
-    auto* const record = static_cast<RuntimeTripleWordDualBacklinkedRecord40*>(RuntimeAllocateArrayWithBadAllocLane019(1u));
-    if (record != nullptr) {
-      record->lane00 = 0u;
-      record->lane04 = 0u;
-      record->lane08 = 0u;
-    }
 
-    record->flag24 = 1u;
-    record->flag25 = 0u;
-    return record;
-  }
 
-  /**
-   * Address: 0x00581370 (FUN_00581370)
-   *
-   * What it does:
-   * Allocates one 40-byte dual-backlinked record, seeds the first three dword
-   * lanes from caller payload, copy-assigns the 24-byte backlinked tail, and
-   * clears both flag bytes.
-   */
-  [[maybe_unused]] RuntimeTripleWordDualBacklinkedRecord40* AllocateDualBacklinkedRecord40FromValues(
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08,
-    const RuntimeDualBacklinkedPairRecord24* const sourceLane0C
-  )
-  {
-    auto* const record = static_cast<RuntimeTripleWordDualBacklinkedRecord40*>(RuntimeAllocateArrayWithBadAllocLane019(1u));
-    if (record == nullptr) {
-      return record;
-    }
-
-    record->lane00 = lane00;
-    record->lane04 = lane04;
-    record->lane08 = lane08;
-    RuntimeCopyAssignDualBacklinkedPairRecordLaneA(&record->lane0C, sourceLane0C);
-    record->flag24 = 0u;
-    record->flag25 = 0u;
-    return record;
-  }
-
-  /**
-   * Address: 0x005CBCC0 (FUN_005CBCC0)
-   *
-   * What it does:
-   * Copy-assigns one 28-byte refcount-tagged record range in forward order,
-   * retaining incoming owners and releasing replaced owners at lane `+0x14`,
-   * then returns the last copied lane byte from offset `+0x18`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeCopyAssignRefcountTaggedRecord28RangeForwardLaneA(
-    RuntimeCopyRefcountTaggedRecord28Lane* destination,
-    const RuntimeCopyRefcountTaggedRecord28Lane* source,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const destinationEnd
-  ) noexcept
-  {
-    std::uint8_t resultLowByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(destination) & 0xFFu);
-    while (destination != destinationEnd) {
-      destination->word0 = source->word0;
-      destination->word1 = source->word1;
-      destination->word2 = source->word2;
-      destination->lane0C = source->lane0C;
-      destination->lane10 = source->lane10;
-
-      RuntimeRefcountOwnerView* const incomingOwner = source->owner;
-      if (incomingOwner != destination->owner) {
-        RuntimeRetainRefcountOwner(incomingOwner);
-        if (destination->owner != nullptr) {
-          RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destination->owner));
-        }
-        destination->owner = incomingOwner;
-      }
-
-      resultLowByte = source->lane18;
-      destination->lane18 = resultLowByte;
-
-      ++destination;
-      ++source;
-    }
-
-    return resultLowByte;
-  }
 
   /**
    * Address: 0x0073AEF0 (FUN_0073AEF0)
@@ -58193,33 +34441,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return true;
   }
 
-  /**
-   * Address: 0x0073B040 (FUN_0073B040)
-   *
-   * What it does:
-   * Returns true when any float lane differs between the two 16-float spans.
-   */
-  [[maybe_unused]] bool RuntimeAreFloat16LanesDifferent(
-    const float* const lhs,
-    const float* const rhs
-  ) noexcept
-  {
-    return !RuntimeAreFloat16LanesExactlyEqual(lhs, rhs);
-  }
 
-  /**
-   * Address: 0x005C8A80 (FUN_005C8A80)
-   *
-   * What it does:
-   * Advances one red-black tree iterator node slot whose nil marker byte lives
-   * at offset `+0x1D`.
-   */
-  [[maybe_unused]] RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneD(
-    RuntimeRbIteratorNodeNil29** const iteratorSlot
-  )
-  {
-    return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-  }
 
   /**
    * Address: 0x005CD100 (FUN_005CD100)
@@ -58259,38 +34481,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationEnd;
   }
 
-  /**
-   * Address: 0x005CBD80 (FUN_005CBD80)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one source-first backward range
-   * copy-assign lane into `FUN_005CD100`.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyAssignRefcountTaggedRecord28RangeBackwardLaneASourceFirstAdapter(
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceBegin,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destinationEnd,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTaggedRecord28RangeBackwardLaneA(destinationEnd, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x005C9DA0 (FUN_005C9DA0)
-   *
-   * What it does:
-   * Source-first adapter lane that forwards one backward tagged 28-byte
-   * copy-assign range into `FUN_005CD100` while discarding one zero scratch
-   * lane.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyAssignRefcountTaggedRecord28RangeBackwardLaneASourceFirstNullScratchAdapter(
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd,
-    RuntimeCopyRefcountTaggedRecord28Lane* const destinationEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTaggedRecord28RangeBackwardLaneA(destinationEnd, sourceBegin, sourceEnd);
-  }
 
   struct RuntimeIntrusiveRefcountedObjectView
   {
@@ -58337,21 +34528,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x006586F0 (FUN_006586F0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one intrusive-refcount pointer range
-   * copy-assign lane into `FUN_00658800`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveRefcountedObjectView** RuntimeCopyAssignIntrusiveRefcountPointerRangeLaneARegisterAdapter(
-    RuntimeIntrusiveRefcountedObjectView** const destination,
-    RuntimeIntrusiveRefcountedObjectView* const* const sourceBegin,
-    RuntimeIntrusiveRefcountedObjectView* const* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignIntrusiveRefcountPointerRangeLaneA(destination, sourceBegin, sourceEnd);
-  }
 
   struct RuntimeLookupPayloadLane
   {
@@ -58408,28 +34584,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return nullptr;
   }
 
-  /**
-   * Address: 0x00A33F00 (FUN_00A33F00)
-   *
-   * What it does:
-   * Scans one forward-linked lookup chain and returns the first payload whose
-   * primary key lane (`+0x0C`) equals `key`, or null when absent.
-   */
-  [[maybe_unused]] RuntimeLookupPayloadLane* RuntimeFindLookupPayloadByPrimaryKey(
-    RuntimeLookupOwnerLane* const owner,
-    const std::uint32_t key
-  ) noexcept
-  {
-    RuntimeLookupListNodeLane* node = owner->first;
-    while (node != nullptr) {
-      RuntimeLookupPayloadLane* const payload = node->payload;
-      if (payload->primaryKey == key) {
-        return payload;
-      }
-      node = node->next;
-    }
-    return nullptr;
-  }
 
   /**
    * Address: 0x00A33F30 (FUN_00A33F30)
@@ -58455,24 +34609,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return nullptr;
   }
 
-  /**
-   * Address: 0x00A34020 (FUN_00A34020)
-   *
-   * What it does:
-   * Looks up one payload by pair key and returns payload lane `+0x08`, or `0`
-   * when the key is absent.
-   */
-  [[maybe_unused]] int RuntimeFindLookupPayloadLane08ByPairKeyOrZero(
-    RuntimeLookupOwnerLane* const owner,
-    const RuntimeIntPairHashKey* const keyPair
-  ) noexcept
-  {
-    RuntimeLookupPayloadLane* const payload = RuntimeFindLookupPayloadByPairKey(owner, keyPair);
-    if (payload != nullptr) {
-      return static_cast<int>(payload->lane08);
-    }
-    return 0;
-  }
 
   struct RuntimeSingleWordLane
   {
@@ -58487,29 +34623,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeWordPairLane) == 0x08, "RuntimeWordPairLane size must be 0x08");
 
-  /**
-   * Address: 0x00A33FE0 (FUN_00A33FE0)
-   *
-   * What it does:
-   * Looks up one payload by lane `+0x08`, stores payload pair lanes
-   * `(pairLhs,pairRhs)` into `outPair`, and zero-fills on miss.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeFindLookupPayloadPairByLane08(
-    RuntimeWordPairLane* const outPair,
-    RuntimeLookupOwnerLane* const owner,
-    const std::uint32_t lane08Key
-  ) noexcept
-  {
-    RuntimeLookupPayloadLane* const payload = RuntimeFindLookupPayloadByLane08(owner, lane08Key);
-    if (payload != nullptr) {
-      outPair->first = payload->pairLhs;
-      outPair->second = payload->pairRhs;
-    } else {
-      outPair->first = 0u;
-      outPair->second = 0u;
-    }
-    return outPair;
-  }
 
   struct RuntimeSplitWordPairDestinationSlots
   {
@@ -58629,6 +34742,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   {
     std::uint8_t reserved00_87[0x88];
     std::uint8_t fallbackPayload[0x30];     // +0x88
+    std::uint32_t laneB8;                   // +0xB8
     RuntimeTypeTaggedRingNodeView** ringNodeTable; // +0xBC
     std::uint32_t ringBaseIndex;            // +0xC0
     std::uint32_t ringHeadIndex;            // +0xC4
@@ -58741,118 +34855,12 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeStride116VectorLaneView) == 0x10, "RuntimeStride116VectorLaneView size must be 0x10");
 
-  /**
-   * Address: 0x008F5D90 (FUN_008F5D90, sub_8F5D90)
-   *
-   * What it does:
-   * Returns active element count for one 0x74-byte stride vector lane
-   * (`(end - begin) / 0x74`), or zero when the begin lane is null.
-   */
-  [[maybe_unused]] std::int32_t RuntimeStride116VectorSize(
-    const RuntimeStride116VectorLaneView* const vector
-  ) noexcept
-  {
-    const std::byte* const begin = (vector != nullptr) ? vector->begin : nullptr;
-    if (begin == nullptr) {
-      return 0;
-    }
 
-    return static_cast<std::int32_t>(((vector->end) - begin) / 0x74);
-  }
 
-  /**
-   * Address: 0x0094EDF0 (FUN_0094EDF0)
-   *
-   * What it does:
-   * Alias lane of storing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasE(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094EE10 (FUN_0094EE10)
-   *
-   * What it does:
-   * Alias lane of storing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasF(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094EEC0 (FUN_0094EEC0)
-   *
-   * What it does:
-   * Alias lane of storing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasG(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094EF00 (FUN_0094EF00)
-   *
-   * What it does:
-   * Alias lane of storing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasH(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094F520 (FUN_0094F520)
-   *
-   * What it does:
-   * Stores only the first constructor lane at owner offset `+0x00` and ignores
-   * the trailing ten stack-passed setup lanes.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneFromCtorArgsAliasA(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value,
-    const std::uint32_t /*unusedLane01*/,
-    const std::uint32_t /*unusedLane02*/,
-    const std::uint32_t /*unusedLane03*/,
-    const std::uint32_t /*unusedLane04*/,
-    const std::uint32_t /*unusedLane05*/,
-    const std::uint32_t /*unusedLane06*/,
-    const std::uint32_t /*unusedLane07*/,
-    const std::uint32_t /*unusedLane08*/,
-    const std::uint32_t /*unusedLane09*/
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
-
-  /**
-   * Address: 0x0094EE90 (FUN_0094EE90)
-   *
-   * What it does:
-   * Clears one 32-bit lane at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeZeroSingleWordLaneAliasB(
-    RuntimeSingleWordLane* const owner
-  ) noexcept
-  {
-    owner->value = 0u;
-    return owner;
-  }
 
   /**
    * Address: 0x008B3560 (FUN_008B3560)
@@ -58873,438 +34881,25 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x0094EC90 (FUN_0094EC90)
-   *
-   * What it does:
-   * Alias lane that stores one two-lane pair from split scalar sources.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairFromSplitSourcesLaneAliasA(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeAssignWordPairFromSplitSourcesLane(destination, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0094F3F0 (FUN_0094F3F0)
-   *
-   * What it does:
-   * Secondary alias lane that stores one two-lane pair from split scalar
-   * sources.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairFromSplitSourcesLaneAliasB(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    return RuntimeAssignWordPairFromSplitSourcesLane(destination, firstSource, secondSource);
-  }
 
-  /**
-   * Address: 0x0094F180 (FUN_0094F180)
-   *
-   * What it does:
-   * Stores one two-lane source pair through split destination slot pointers.
-   */
-  [[maybe_unused]] RuntimeSplitWordPairDestinationSlots* RuntimeAssignWordPairToSplitDestinationSlotsLaneA(
-    RuntimeSplitWordPairDestinationSlots* const destinationSlots,
-    const RuntimeWordPairLane* const source
-  ) noexcept
-  {
-    *destinationSlots->first = source->first;
-    *destinationSlots->second = source->second;
-    return destinationSlots;
-  }
 
-  /**
-   * Address: 0x008B35B0 (FUN_008B35B0)
-   *
-   * What it does:
-   * Swaps one 32-bit lane between two owners.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeSwapSingleWordLane(
-    RuntimeSingleWordLane* const lhs,
-    RuntimeSingleWordLane* const rhs
-  ) noexcept
-  {
-    const std::uint32_t temporary = rhs->value;
-    rhs->value = lhs->value;
-    lhs->value = temporary;
-    return lhs;
-  }
 
-  /**
-   * Address: 0x008B3E10 (FUN_008B3E10)
-   *
-   * What it does:
-   * Stores one 32-bit lane at offset `+0x14`.
-   */
-  [[maybe_unused]] RuntimeOffset20SetterView* RuntimeWriteOffset20WordLane(
-    RuntimeOffset20SetterView* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    owner->lane14 = value;
-    return owner;
-  }
 
-  /**
-   * Address: 0x008B3E30 (FUN_008B3E30)
-   *
-   * What it does:
-   * Stores one 32-bit lane at offset `+0x30`.
-   */
-  [[maybe_unused]] RuntimeOffset48SetterView* RuntimeWriteOffset48WordLane(
-    RuntimeOffset48SetterView* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    owner->lane30 = value;
-    return owner;
-  }
 
-  /**
-   * Address: 0x008B41B0 (FUN_008B41B0)
-   *
-   * What it does:
-   * Walks one ring-backed node table backward and returns the first payload
-   * lane whose node tag equals `6`, or falls back to owner lane `+0x88`.
-   */
-  [[maybe_unused]] std::uint8_t* RuntimeFindPreviousType6PayloadLane(
-    RuntimeType6RingLookupView* const owner
-  ) noexcept
-  {
-    std::uint32_t probe = owner->ringHeadIndex + owner->ringSpanCount;
-    while (true) {
-      if (probe == owner->ringHeadIndex) {
-        return owner->fallbackPayload;
-      }
 
-      --probe;
-      const std::uint32_t slotIndex = RuntimeWrapRingIndexLane(probe, owner->ringBaseIndex);
-      RuntimeTypeTaggedRingNodeView* const node = owner->ringNodeTable[slotIndex];
-      if (node->typeTag == 6u) {
-        return node->payload;
-      }
-    }
-  }
 
-  /**
-   * Address: 0x008B42F0 (FUN_008B42F0)
-   *
-   * What it does:
-   * Loads one 32-bit lane from owner offset `+0xA8`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset168WordLane(
-    const RuntimeOffset168WordView* const owner
-  ) noexcept
-  {
-    return owner->laneA8;
-  }
 
-  /**
-   * Address: 0x008B4DD0 (FUN_008B4DD0)
-   * Address: 0x008B5080 (FUN_008B5080)
-   * Address: 0x008B7650 (FUN_008B7650)
-   * Address: 0x008B79D0 (FUN_008B79D0)
-   *
-   * What it does:
-   * Captures owner lane `+0x00` and tail lane `+0x0C` into one pair.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeCaptureHeadAndTailWordLane(
-    RuntimeWordPairLane* const destination,
-    const RuntimeWordWithTailOffset0CLane* const source
-  ) noexcept
-  {
-    destination->first = source->lane00;
-    destination->second = source->lane0C;
-    return destination;
-  }
 
-  /**
-   * Address: 0x008B5320 (FUN_008B5320)
-   * Address: 0x008B5500 (FUN_008B5500)
-   * Address: 0x008B7C20 (FUN_008B7C20)
-   * Address: 0x008B7EE0 (FUN_008B7EE0)
-   *
-   * What it does:
-   * Stores one pair from register-ordered lane sources (`ecx`, `edx`).
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairFromRegisterOrderLane(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t secondLane,
-    const std::uint32_t firstLane
-  ) noexcept
-  {
-    destination->first = firstLane;
-    destination->second = secondLane;
-    return destination;
-  }
 
-  /**
-   * Address: 0x0094A010 (FUN_0094A010)
-   *
-   * What it does:
-   * Copies one four-lane dword record and returns the copied tail lane
-   * (`lane0C`) value.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeCopyWordQuadAndReturnTailLaneA(
-    RuntimeWordQuadLane* const destination,
-    const RuntimeWordQuadLane* const source
-  ) noexcept
-  {
-    destination->lane00 = source->lane00;
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-    return destination->lane0C;
-  }
 
-  /**
-   * Address: 0x0094E960 (FUN_0094E960)
-   *
-   * What it does:
-   * Stores one four-lane dword record from ordered scalar inputs.
-   */
-  [[maybe_unused]] RuntimeWordQuadLane* RuntimeAssignWordQuadLaneA(
-    RuntimeWordQuadLane* const destination,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08,
-    const std::uint32_t lane0C
-  ) noexcept
-  {
-    destination->lane00 = lane00;
-    destination->lane04 = lane04;
-    destination->lane08 = lane08;
-    destination->lane0C = lane0C;
-    return destination;
-  }
 
-  /**
-   * Address: 0x0094EB30 (FUN_0094EB30)
-   *
-   * What it does:
-   * Composes one six-lane dword record from a 2-lane head and a 4-lane tail.
-   */
-  [[maybe_unused]] RuntimeDwordHexadRecord* RuntimeComposeDwordHexadFromPairAndQuadLaneA(
-    RuntimeDwordHexadRecord* const destination,
-    const RuntimeWordPairLane* const pairHead,
-    const RuntimeWordQuadLane* const quadTail
-  ) noexcept
-  {
-    destination->lane00 = pairHead->first;
-    destination->lane04 = pairHead->second;
-    destination->lane08 = quadTail->lane00;
-    destination->lane0C = quadTail->lane04;
-    destination->lane10 = quadTail->lane08;
-    destination->lane14 = quadTail->lane0C;
-    return destination;
-  }
 
-  /**
-   * Address: 0x008B53A0 (FUN_008B53A0)
-   * Address: 0x008B54F0 (FUN_008B54F0)
-   *
-   * What it does:
-   * Copies one 2x32-bit lane pair from source to destination.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeCopyWordPairLane(
-    RuntimeWordPairLane* const destination,
-    const RuntimeWordPairLane* const source
-  ) noexcept
-  {
-    destination->first = source->first;
-    destination->second = source->second;
-    return destination;
-  }
 
-  /**
-   * Address: 0x0094F530 (FUN_0094F530)
-   *
-   * What it does:
-   * Copies one two-lane dword pair only when destination storage is present.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeCopyWordPairIfDestinationPresentLaneA(
-    RuntimeWordPairLane* const destination,
-    const RuntimeWordPairLane* const source
-  ) noexcept
-  {
-    if (destination != nullptr) {
-      destination->first = source->first;
-      destination->second = source->second;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x008B5890 (FUN_008B5890)
-   *
-   * What it does:
-   * Reads one byte flag lane at owner offset `+0xB1`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeReadFlagByte177Lane(
-    const RuntimeByteFlag177View* const owner
-  ) noexcept
-  {
-    return owner->flagB1;
-  }
-
-  /**
-   * Address: 0x008B5DD0 (FUN_008B5DD0)
-   * Address: 0x00946C70 (FUN_00946C70)
-   * Address: 0x00946C90 (FUN_00946C90)
-   * Address: 0x00946CB0 (FUN_00946CB0)
-   *
-   * What it does:
-   * Dereferences one pointer lane at source offset `+0x04` and stores the
-   * pointed 32-bit value into destination.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadIndirectOffset4WordLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordPointerOffset4Lane* const source
-  ) noexcept
-  {
-    destination->value = *source->lane04;
-    return destination;
-  }
-
-  /**
-   * Address: 0x008B5DE0 (FUN_008B5DE0)
-   * Address: 0x008E99C0 (FUN_008E99C0)
-   * Address: 0x008E9C60 (FUN_008E9C60)
-   * Address: 0x008F5F40 (FUN_008F5F40)
-   * Address: 0x008F6520 (FUN_008F6520)
-   * Address: 0x008F6530 (FUN_008F6530)
-   * Address: 0x0093F5E0 (FUN_0093F5E0)
-   *
-   * What it does:
-   * Loads one 32-bit lane from source offset `+0x04` into destination.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset4WordLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    destination->value = source->lane04;
-    return destination;
-  }
-
-  /**
-   * Address: 0x008E99D0 (FUN_008E99D0)
-   * Address: 0x008E9C30 (FUN_008E9C30)
-   * Address: 0x008F5F50 (FUN_008F5F50)
-   * Address: 0x008F6500 (FUN_008F6500)
-   * Address: 0x008F6510 (FUN_008F6510)
-   * Address: 0x0093F5F0 (FUN_0093F5F0)
-   *
-   * What it does:
-   * Loads one 32-bit lane from source offset `+0x08` into destination.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset8WordLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset8Lane* const source
-  ) noexcept
-  {
-    destination->value = source->lane08;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00946420 (FUN_00946420)
-   * Address: 0x00946490 (FUN_00946490)
-   * Address: 0x00946500 (FUN_00946500)
-   *
-   * What it does:
-   * Loads one address lane as `source->lane04 + 8`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4Plus8WordAddressLane(
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return source->lane04 + 8u;
-  }
-
-  /**
-   * Address: 0x00946580 (FUN_00946580)
-   * Address: 0x00946610 (FUN_00946610)
-   * Address: 0x009466A0 (FUN_009466A0)
-   *
-   * What it does:
-   * Loads one address lane as `source->lane04 + 4`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4Plus4WordAddressLane(
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return source->lane04 + 4u;
-  }
-
-  /**
-   * Address: 0x00946A70 (FUN_00946A70)
-   * Address: 0x00946B10 (FUN_00946B10)
-   * Address: 0x00946BB0 (FUN_00946BB0)
-   * Address: 0x00946E30 (FUN_00946E30)
-   *
-   * What it does:
-   * Copies one source dword lane into destination only when destination storage
-   * is present.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeCopyWordIfDestinationPresent(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const source
-  ) noexcept
-  {
-    if (destination != nullptr) {
-      destination->value = source->value;
-    }
-    return destination;
-  }
 
   using RuntimeComSlotDispatchFn = int(__stdcall*)(void*);
 
-  /**
-   * Address: 0x00946950 (FUN_00946950)
-   *
-   * What it does:
-   * Calls one COM-like vtable slot `+0x04` when slot payload is non-null and
-   * returns the dispatch result lane.
-   */
-  [[maybe_unused]] int RuntimeCallComSlot04IfPresent(const RuntimeSingleWordLane* const slot) noexcept
-  {
-    void* const object = reinterpret_cast<void*>(static_cast<std::uintptr_t>(slot->value));
-    int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(object));
-    if (object != nullptr) {
-      auto** const vtable = *reinterpret_cast<void***>(object);
-      auto* const call = reinterpret_cast<RuntimeComSlotDispatchFn>(vtable[1]);
-      result = call(object);
-    }
-    return result;
-  }
 
-  /**
-   * Address: 0x00946970 (FUN_00946970)
-   *
-   * What it does:
-   * Calls one COM-like vtable slot `+0x08` when slot payload is non-null and
-   * then clears the caller-owned slot.
-   */
-  [[maybe_unused]] int RuntimeCallComSlot08AndClear(RuntimeSingleWordLane* const slot) noexcept
-  {
-    void* const object = reinterpret_cast<void*>(static_cast<std::uintptr_t>(slot->value));
-    int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(object));
-    if (object != nullptr) {
-      auto** const vtable = *reinterpret_cast<void***>(object);
-      auto* const call = reinterpret_cast<RuntimeComSlotDispatchFn>(vtable[2]);
-      result = call(object);
-    }
-    slot->value = 0u;
-    return result;
-  }
 
   using RuntimeVirtualForwardSlot16Fn = void(
     __thiscall*
@@ -59318,54 +34913,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     RuntimeVirtualForwardSlot16Fn slot10;
   };
 
-  /**
-   * Address: 0x00939670 (FUN_00939670)
-   *
-   * What it does:
-   * Forwards one 10-lane payload to virtual slot `+0x10` and returns the first
-   * forwarded lane.
-   */
-  [[maybe_unused]] int RuntimeForwardVirtualSlot16AndReturnFirstLane(
-    void* const self,
-    const int lane00,
-    const int lane04,
-    const int lane08,
-    const int lane0C,
-    const int lane10,
-    const int lane14,
-    const int lane18,
-    const int lane1C,
-    const int lane20,
-    const int lane24
-  ) noexcept
-  {
-    const auto* const vtable = *reinterpret_cast<RuntimeVirtualForwardSlot16VTable* const*>(self);
-    vtable->slot10(
-      self,
-      lane00,
-      lane04,
-      lane08,
-      lane0C,
-      lane10,
-      lane14,
-      lane18,
-      lane1C,
-      lane20,
-      lane24
-    );
-    return lane00;
-  }
 
-  /**
-   * Address: 0x00939910 (FUN_00939910)
-   *
-   * What it does:
-   * Returns one byte lane unchanged.
-   */
-  [[maybe_unused]] char RuntimeIdentityByteLane(const char value) noexcept
-  {
-    return value;
-  }
 
   struct RuntimeBufferedReaderVTable
   {
@@ -59401,41 +34949,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeBufferedCursorProbeView, hasCurrent) == 0x08, "RuntimeBufferedCursorProbeView::hasCurrent offset");
   static_assert(offsetof(RuntimeBufferedCursorProbeView, current) == 0x09, "RuntimeBufferedCursorProbeView::current offset");
 
-  /**
-   * Address: 0x00939920 (FUN_00939920)
-   *
-   * What it does:
-   * Advances one buffered cursor lane by consuming direct-buffer state when
-   * available, otherwise by virtual fallback read; detaches reader state and
-   * marks EOF when the read result is `-1`.
-   */
-  [[maybe_unused]] void RuntimeAdvanceBufferedCursorState(
-    RuntimeBufferedCursorProbeView* const cursorProbe
-  ) noexcept
-  {
-    RuntimeBufferedReaderStateView* const reader = cursorProbe->reader;
-    int currentByte = -1;
-    if (reader != nullptr) {
-      const bool hasDirectCursor = reader->cursorPtr != nullptr && *reader->cursorPtr != nullptr;
-      const bool hasRemainingCount = reader->remainingCount != nullptr && *reader->remainingCount > 0;
-      if (hasDirectCursor && hasRemainingCount) {
-        --(*reader->remainingCount);
-        const unsigned char* const cursor = *reader->cursorPtr;
-        *reader->cursorPtr = cursor + 1;
-        currentByte = static_cast<int>(*cursor);
-      } else {
-        currentByte = reader->vtable->readByteFallback(reader);
-      }
-    }
-
-    if (currentByte == -1) {
-      cursorProbe->reader = nullptr;
-      cursorProbe->hasCurrent = 1u;
-      return;
-    }
-
-    cursorProbe->hasCurrent = 0u;
-  }
 
   /**
    * Address: 0x00939970 (FUN_00939970)
@@ -59473,131 +34986,12 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return static_cast<char>(currentByte);
   }
 
-  /**
-   * Address: 0x00939A40 (FUN_00939A40)
-   *
-   * What it does:
-   * Ensures both buffered-cursor probes are primed, then returns whether their
-   * reader-attachment lanes are both present or both detached.
-   */
-  [[maybe_unused]] bool RuntimeBufferedCursorReaderAttachmentMatches(
-    RuntimeBufferedCursorProbeView* const lhs,
-    RuntimeBufferedCursorProbeView* const rhs
-  ) noexcept
-  {
-    if (lhs->hasCurrent == 0u) {
-      (void)RuntimePrimeBufferedCursorByte(lhs);
-    }
-    if (rhs->hasCurrent == 0u) {
-      (void)RuntimePrimeBufferedCursorByte(rhs);
-    }
 
-    const bool lhsAttached = lhs->reader != nullptr;
-    const bool rhsAttached = rhs->reader != nullptr;
-    return lhsAttached == rhsAttached;
-  }
 
-  /**
-   * Address: 0x00939A90 (FUN_00939A90)
-   *
-   * What it does:
-   * Ensures both buffered-cursor probes are primed, then returns whether one
-   * probe remains reader-attached while the other is detached.
-   */
-  [[maybe_unused]] bool RuntimeBufferedCursorReaderAttachmentDiffers(
-    RuntimeBufferedCursorProbeView* const lhs,
-    RuntimeBufferedCursorProbeView* const rhs
-  ) noexcept
-  {
-    if (lhs->hasCurrent == 0u) {
-      (void)RuntimePrimeBufferedCursorByte(lhs);
-    }
-    if (rhs->hasCurrent == 0u) {
-      (void)RuntimePrimeBufferedCursorByte(rhs);
-    }
 
-    const bool lhsAttached = lhs->reader != nullptr;
-    const bool rhsAttached = rhs->reader != nullptr;
-    return lhsAttached != rhsAttached;
-  }
 
-  /**
-   * Address: 0x008E9C40 (FUN_008E9C40)
-   *
-   * What it does:
-   * Computes `*base + index * 36` and stores the resulting lane.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeComputeStride36WordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index
-  ) noexcept
-  {
-    return RuntimeComputeStridedWordAddressLane(destination, sourceBase, index, 36u);
-  }
 
-  /**
-   * Address: 0x008E9C70 (FUN_008E9C70)
-   *
-   * What it does:
-   * Computes `*base + index * 12` and stores the resulting lane.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeComputeStride12WordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index
-  ) noexcept
-  {
-    return RuntimeComputeStridedWordAddressLane(destination, sourceBase, index, 12u);
-  }
 
-  /**
-   * Address: 0x008E9C90 (FUN_008E9C90)
-   * Address: 0x008E9CB0 (FUN_008E9CB0)
-   *
-   * What it does:
-   * Computes `*base + index * 4` and stores the resulting lane.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeComputeStride4WordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index
-  ) noexcept
-  {
-    return RuntimeComputeStridedWordAddressLane(destination, sourceBase, index, 4u);
-  }
-
-  /**
-   * Address: 0x008EA130 (FUN_008EA130)
-   * Address: 0x008EA350 (FUN_008EA350)
-   *
-   * What it does:
-   * Walks one `[begin,end)` object range with stride `0x70`, calling virtual
-   * slot `0` on each object with destroy-flag `0`.
-   */
-  [[maybe_unused]] int RuntimeDestroyVirtualRangeStride70(
-    void* const rangeBegin,
-    void* const rangeEnd
-  ) noexcept
-  {
-    return RuntimeDestroyVirtualRangeStrided(rangeBegin, rangeEnd, 0x70u);
-  }
-
-  /**
-   * Address: 0x008EA160 (FUN_008EA160)
-   * Address: 0x008EA380 (FUN_008EA380)
-   *
-   * What it does:
-   * Walks one `[begin,end)` object range with stride `0x10`, calling virtual
-   * slot `0` on each object with destroy-flag `0`.
-   */
-  [[maybe_unused]] int RuntimeDestroyVirtualRangeStride10(
-    void* const rangeBegin,
-    void* const rangeEnd
-  ) noexcept
-  {
-    return RuntimeDestroyVirtualRangeStrided(rangeBegin, rangeEnd, 0x10u);
-  }
 
   /**
    * Address: 0x008B6650 (FUN_008B6650)
@@ -59616,159 +35010,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x0094ECC0 (FUN_0094ECC0)
-   *
-   * What it does:
-   * Alias lane that stores one 32-bit lane and one byte lane from split
-   * sources.
-   */
-  [[maybe_unused]] RuntimeWordAndByteLane* RuntimeAssignWordAndByteLaneAliasA(
-    RuntimeWordAndByteLane* const destination,
-    const RuntimeSingleWordLane* const wordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeAssignWordAndByteLane(destination, wordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x0094EF50 (FUN_0094EF50)
-   *
-   * What it does:
-   * Secondary alias lane that stores one 32-bit lane and one byte lane from
-   * split sources.
-   */
-  [[maybe_unused]] RuntimeWordAndByteLane* RuntimeAssignWordAndByteLaneAliasB(
-    RuntimeWordAndByteLane* const destination,
-    const RuntimeSingleWordLane* const wordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return RuntimeAssignWordAndByteLane(destination, wordSource, byteSource);
-  }
 
-  /**
-   * Address: 0x0094E980 (FUN_0094E980)
-   *
-   * What it does:
-   * Initializes one `(word,byte)` lane pair to `{0,1}`.
-   */
-  [[maybe_unused]] RuntimeWordAndByteLane* RuntimeInitializeWordAndByteLaneDefault(
-    RuntimeWordAndByteLane* const destination
-  ) noexcept
-  {
-    destination->word = 0u;
-    destination->flag = 1u;
-    return destination;
-  }
 
-  /**
-   * Address: 0x0094EA30 (FUN_0094EA30)
-   *
-   * What it does:
-   * Clears the byte lane when bit 0 of `flags` is set.
-   */
-  [[maybe_unused]] void RuntimeClearWordAndByteFlagOnBit0(
-    RuntimeWordAndByteLane* const destination,
-    const std::uint8_t flags
-  ) noexcept
-  {
-    if ((flags & 0x01u) != 0u) {
-      destination->flag = 0u;
-    }
-  }
 
-  /**
-   * Address: 0x008B6B80 (FUN_008B6B80)
-   *
-   * What it does:
-   * Stores one 4x32-bit quad from register-ordered source lanes.
-   */
-  [[maybe_unused]] RuntimeWordQuadLane* RuntimeAssignWordQuadFromRegisterOrderLane(
-    RuntimeWordQuadLane* const destination,
-    const std::uint32_t lane04,
-    const std::uint32_t lane00,
-    const std::uint32_t lane08,
-    const std::uint32_t lane0C
-  ) noexcept
-  {
-    destination->lane00 = lane00;
-    destination->lane04 = lane04;
-    destination->lane08 = lane08;
-    destination->lane0C = lane0C;
-    return destination;
-  }
 
-  /**
-   * Address: 0x008B7420 (FUN_008B7420)
-   *
-   * What it does:
-   * Initializes one self-linked 4-lane pointer sentinel rooted at destination.
-   */
-  [[maybe_unused]] RuntimeSelfLinkedQuadPointerLane* RuntimeInitializeSelfLinkedQuadPointerLane(
-    RuntimeSelfLinkedQuadPointerLane* const destination
-  ) noexcept
-  {
-    auto* const laneBase = reinterpret_cast<std::uint32_t*>(destination);
-    destination->lane00 = laneBase + 4;
-    destination->lane04 = laneBase + 4;
-    destination->lane08 = laneBase + 8;
-    destination->lane0C = laneBase + 4;
-    return destination;
-  }
 
-  /**
-   * Address: 0x008B7950 (FUN_008B7950)
-   *
-   * What it does:
-   * Initializes one anchor quad where lanes `{0,4,0xC}` bind to owner and
-   * lane `+0x08` points to owner offset `+0x10`.
-   */
-  [[maybe_unused]] RuntimeAnchorPointerQuadLane* RuntimeInitializeOwnerAnchorPointerLane(
-    RuntimeAnchorPointerQuadLane* const destination,
-    void* const owner
-  ) noexcept
-  {
-    destination->lane00 = owner;
-    destination->lane04 = owner;
-    destination->lane08 = static_cast<std::uint8_t*>(owner) + 0x10;
-    destination->lane0C = owner;
-    return destination;
-  }
 
-  /**
-   * Address: 0x008B8320 (FUN_008B8320)
-   *
-   * What it does:
-   * Stores one 32-bit lane at owner offset `+0x08`.
-   */
-  [[maybe_unused]] RuntimeOffset8SetterView* RuntimeWriteOffset8WordLane(
-    RuntimeOffset8SetterView* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    owner->lane08 = value;
-    return owner;
-  }
 
-  /**
-   * Address: 0x008B8780 (FUN_008B8780)
-   * Address: 0x008F3860 (FUN_008F3860)
-   * Address: 0x008F3920 (FUN_008F3920)
-   * Address: 0x00941720 (FUN_00941720)
-   *
-   * What it does:
-   * Clears one two-lane 32-bit pair to zero.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeZeroWordPairLane(
-    RuntimeWordPairLane* const destination
-  ) noexcept
-  {
-    destination->first = 0;
-    destination->second = 0;
-    return destination;
-  }
 
   /**
    * Address: 0x0094EA40 (FUN_0094EA40)
@@ -59785,54 +35034,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return node;
   }
 
-  /**
-   * Address: 0x0094F810 (FUN_0094F810)
-   *
-   * What it does:
-   * Alias lane that initializes one intrusive node as self-linked.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeInitializeIntrusiveSelfLinkLaneB(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeInitializeIntrusiveSelfLinkLaneA(node);
-  }
 
-  /**
-   * Address: 0x0094F820 (FUN_0094F820)
-   *
-   * What it does:
-   * Returns true when one intrusive node is self-linked (`prev == this`).
-   */
-  [[maybe_unused]] bool RuntimeIsIntrusiveNodeSelfLinkedLaneA(
-    const RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return node->prev == node;
-  }
 
-  /**
-   * Address: 0x0094EB60 (FUN_0094EB60)
-   *
-   * What it does:
-   * Unlinks one intrusive node, self-links it, then inserts it after
-   * `anchor`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeRelinkIntrusiveNodeAfterAnchorLaneB(
-    RuntimeIntrusiveDoubleLinkNode* const node,
-    RuntimeIntrusiveDoubleLinkNode* const anchor
-  ) noexcept
-  {
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-    node->next = node;
-    node->prev = node;
-    node->next = anchor->next;
-    node->prev = anchor;
-    anchor->next = node;
-    node->next->prev = node;
-    return node->next;
-  }
 
   struct RuntimeNodePointerOwnerOffset04
   {
@@ -59872,604 +35075,44 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return (product >> 1u) + value * 2u;
   }
 
-  /**
-   * Address: 0x0094F830 (FUN_0094F830)
-   *
-   * What it does:
-   * Unlinks one embedded intrusive node at owner offset `+0x04`, then inserts
-   * it directly after the provided anchor node.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeRelinkEmbeddedNodeOffset04AfterAnchorLaneA(
-    RuntimeIntrusiveDoubleLinkNode* const anchor,
-    RuntimeEmbeddedIntrusiveNodeOwnerOffset04* const owner
-  ) noexcept
-  {
-    RuntimeIntrusiveDoubleLinkNode* const node = &owner->node;
-    (void)RuntimeUnlinkAndSelfLinkNode(node);
-    node->next = anchor->next;
-    node->prev = anchor;
-    anchor->next = node;
-    node->next->prev = node;
-    return node;
-  }
 
-  /**
-   * Address: 0x0094F870 (FUN_0094F870)
-   *
-   * What it does:
-   * Unlinks and self-links one intrusive node loaded from owner offset `+0x04`,
-   * then returns the owning embedded-record pointer (`node - 0x04`).
-   */
-  [[maybe_unused]] RuntimeEmbeddedIntrusiveNodeOwnerOffset04* RuntimeUnlinkNodePointerOffset04AndReturnEmbeddedOwnerLaneA(
-    const RuntimeNodePointerOwnerOffset04* const owner
-  ) noexcept
-  {
-    RuntimeIntrusiveDoubleLinkNode* const node = owner->node;
-    (void)RuntimeUnlinkAndSelfLinkNode(node);
-    return RuntimeOwnerFromEmbeddedNodeOffset04(node);
-  }
 
-  /**
-   * Address: 0x0094F8C0 (FUN_0094F8C0)
-   *
-   * What it does:
-   * Returns one 32-bit lane from owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4WordLaneAliasA(
-    const RuntimeWordOffset4Lane* const owner
-  ) noexcept
-  {
-    return owner->lane04;
-  }
 
-  /**
-   * Address: 0x0094EA70 (FUN_0094EA70)
-   *
-   * What it does:
-   * Returns one stride-8 address lane from base owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadStride8AddressFromOffset4Lane(
-    const RuntimeWordOffset4Lane* const owner,
-    const std::int32_t index
-  ) noexcept
-  {
-    return owner->lane04 + static_cast<std::uint32_t>(index) * 8u;
-  }
 
-  /**
-   * Address: 0x0094EAA0 (FUN_0094EAA0)
-   *
-   * What it does:
-   * Returns one stride-20 address lane from base owner offset `+0x04`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadStride20AddressFromOffset4Lane(
-    const RuntimeWordOffset4Lane* const owner,
-    const std::int32_t index
-  ) noexcept
-  {
-    return owner->lane04 + static_cast<std::uint32_t>(index) * 20u;
-  }
 
-  /**
-   * Address: 0x0094F8D0 (FUN_0094F8D0)
-   *
-   * What it does:
-   * Returns one 32-bit lane at `(owner + 0x04) + 0x08`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4WordPlus8LaneA(
-    const RuntimeWordOffset4Lane* const owner
-  ) noexcept
-  {
-    return owner->lane04 + 8u;
-  }
 
-  /**
-   * Address: 0x0094F8E0 (FUN_0094F8E0)
-   *
-   * What it does:
-   * Returns one 32-bit lane at `(owner + 0x04) + 0x04`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4WordPlus4LaneA(
-    const RuntimeWordOffset4Lane* const owner
-  ) noexcept
-  {
-    return owner->lane04 + 4u;
-  }
 
-  /**
-   * Address: 0x0094F900 (FUN_0094F900)
-   *
-   * What it does:
-   * Alias lane of `(owner + 0x04) + 0x04` read behavior.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset4WordPlus4LaneB(
-    const RuntimeWordOffset4Lane* const owner
-  ) noexcept
-  {
-    return owner->lane04 + 4u;
-  }
 
-  /**
-   * Address: 0x0094F910 (FUN_0094F910)
-   *
-   * What it does:
-   * Alias lane of writing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasA(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094F920 (FUN_0094F920)
-   *
-   * What it does:
-   * Returns one 32-bit lane at `(owner + 0x00) + 0x0C`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset0WordPlus12LaneA(
-    const RuntimeSingleWordLane* const owner
-  ) noexcept
-  {
-    return owner->value + 12u;
-  }
 
-  /**
-   * Address: 0x0094F930 (FUN_0094F930)
-   *
-   * What it does:
-   * Secondary alias lane of writing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasB(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094F940 (FUN_0094F940)
-   *
-   * What it does:
-   * Secondary alias lane of `(owner + 0x00) + 0x0C` read behavior.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeReadOffset0WordPlus12LaneB(
-    const RuntimeSingleWordLane* const owner
-  ) noexcept
-  {
-    return owner->value + 12u;
-  }
 
-  /**
-   * Address: 0x0094F9B0 (FUN_0094F9B0)
-   *
-   * What it does:
-   * Alias lane of dereferencing owner pointer lane at offset `+0x04` and
-   * storing the pointed 32-bit value to destination.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadIndirectOffset4WordLaneAliasA(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordPointerOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadIndirectOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x0094FB30 (FUN_0094FB30)
-   *
-   * What it does:
-   * Clears one 32-bit lane at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeZeroSingleWordLaneAliasA(
-    RuntimeSingleWordLane* const owner
-  ) noexcept
-  {
-    owner->value = 0u;
-    return owner;
-  }
 
-  /**
-   * Address: 0x0094FB90 (FUN_0094FB90)
-   *
-   * What it does:
-   * Tertiary alias lane of writing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasC(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094FBD0 (FUN_0094FBD0)
-   *
-   * What it does:
-   * Quaternary alias lane of writing one 32-bit value at owner offset `+0x00`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLaneAliasD(
-    RuntimeSingleWordLane* const owner,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return RuntimeAssignSingleWordLane(owner, value);
-  }
 
-  /**
-   * Address: 0x0094FE40 (FUN_0094FE40)
-   *
-   * What it does:
-   * Stores a two-lane 32-bit pair from ordered scalar inputs.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairLaneOrderedAliasA(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t first,
-    const std::uint32_t second
-  ) noexcept
-  {
-    return RuntimeAssignWordPairLaneOrdered(destination, first, second);
-  }
 
-  /**
-   * Address: 0x00950090 (FUN_00950090)
-   *
-   * What it does:
-   * Stores only the first two constructor-lane dwords and ignores the trailing
-   * eight stack-passed setup lanes.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairLaneFromCtorArgsAliasA(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t first,
-    const std::uint32_t second,
-    const std::uint32_t /*unusedLane02*/,
-    const std::uint32_t /*unusedLane03*/,
-    const std::uint32_t /*unusedLane04*/,
-    const std::uint32_t /*unusedLane05*/,
-    const std::uint32_t /*unusedLane06*/,
-    const std::uint32_t /*unusedLane07*/,
-    const std::uint32_t /*unusedLane08*/,
-    const std::uint32_t /*unusedLane09*/
-  ) noexcept
-  {
-    return RuntimeAssignWordPairLaneOrdered(destination, first, second);
-  }
 
-  /**
-   * Address: 0x00950260 (FUN_00950260)
-   *
-   * What it does:
-   * Alias lane of intrusive node unlink/self-link behavior.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNodeAliasF(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return RuntimeUnlinkAndSelfLinkNode(node);
-  }
 
-  /**
-   * Address: 0x009502C0 (FUN_009502C0)
-   *
-   * What it does:
-   * Alias lane of loading one 32-bit value from owner offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset4WordLaneAliasB(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x009502D0 (FUN_009502D0)
-   *
-   * What it does:
-   * Secondary alias lane of dereferencing one pointer lane at owner offset
-   * `+0x04` and storing the pointed dword.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadIndirectOffset4WordLaneAliasB(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordPointerOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadIndirectOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x009502E0 (FUN_009502E0)
-   *
-   * What it does:
-   * Tertiary alias lane of loading one 32-bit value from owner offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset4WordLaneAliasC(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x00950310 (FUN_00950310)
-   *
-   * What it does:
-   * Quaternary alias lane of loading one 32-bit value from owner offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset4WordLaneAliasD(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x00950320 (FUN_00950320)
-   *
-   * What it does:
-   * Alias lane of loading one 32-bit value from owner offset `+0x08`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset8WordLaneAliasA(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset8Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset8WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x00950330 (FUN_00950330)
-   *
-   * What it does:
-   * Fifth alias lane of loading one 32-bit value from owner offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset4WordLaneAliasE(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset4Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset4WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x00950340 (FUN_00950340)
-   *
-   * What it does:
-   * Secondary alias lane of loading one 32-bit value from owner offset `+0x08`.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeLoadOffset8WordLaneAliasB(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeWordOffset8Lane* const source
-  ) noexcept
-  {
-    return RuntimeLoadOffset8WordLane(destination, source);
-  }
 
-  /**
-   * Address: 0x009504C0 (FUN_009504C0)
-   *
-   * What it does:
-   * Computes `*base + index * 8` and stores the resulting lane.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeComputeStride8WordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index
-  ) noexcept
-  {
-    return RuntimeComputeStridedWordAddressLane(destination, sourceBase, index, 8u);
-  }
 
-  /**
-   * Address: 0x009504E0 (FUN_009504E0)
-   *
-   * What it does:
-   * Computes `*base + index * 20` and stores the resulting lane.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeComputeStride20WordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index
-  ) noexcept
-  {
-    return RuntimeComputeStridedWordAddressLane(destination, sourceBase, index, 20u);
-  }
 
-  /**
-   * Address: 0x009506A0 (FUN_009506A0)
-   *
-   * What it does:
-   * Secondary lane storing a two-lane 32-bit pair from ordered scalar inputs.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairLaneOrderedAliasB(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t first,
-    const std::uint32_t second
-  ) noexcept
-  {
-    return RuntimeAssignWordPairLaneOrdered(destination, first, second);
-  }
 
-  /**
-   * Address: 0x00950BA0 (FUN_00950BA0)
-   *
-   * What it does:
-   * Tertiary lane storing a two-lane 32-bit pair from ordered scalar inputs.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairLaneOrderedAliasC(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t first,
-    const std::uint32_t second
-  ) noexcept
-  {
-    return RuntimeAssignWordPairLaneOrdered(destination, first, second);
-  }
 
-  /**
-   * Address: 0x00954010 (FUN_00954010)
-   *
-   * What it does:
-   * Computes packed-triangle base offset `((n * (n - 1)) >> 1) + 2*n`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeComputePackedTriangleBaseOffsetLaneA(
-    const std::uint32_t n
-  ) noexcept
-  {
-    return RuntimeComputePackedTriangularOffsetBase(n);
-  }
 
-  /**
-   * Address: 0x00954020 (FUN_00954020)
-   *
-   * What it does:
-   * Computes packed-triangle base offset with fixed lane bias `+13`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeComputePackedTriangleBaseOffsetPlus13LaneA(
-    const std::uint32_t n
-  ) noexcept
-  {
-    return RuntimeComputePackedTriangularOffsetBase(n) + 13u;
-  }
 
-  /**
-   * Address: 0x00A824D3 (FUN_00A824D3)
-   *
-   * What it does:
-   * Returns one runtime payload pointer lane at owner offset `+0x08`.
-   */
-  [[maybe_unused]] char* RuntimePayloadOffset8(char* const runtime) noexcept
-  {
-    return runtime + 0x08;
-  }
 
-  /**
-   * Address: 0x00A8952C (FUN_00A8952C)
-   *
-   * What it does:
-   * Pops return/object lanes, swaps return lane with the second argument lane,
-   * and tail-jumps through the swapped return lane.
-   */
-  extern "C" __declspec(naked) int __cdecl RuntimeCallMemberFunction2LaneA(void* /*object*/, void* /*member*/)
-  {
-    __asm
-    {
-      pop eax
-      pop ecx
-      xchg eax, [esp + 4]
-      jmp eax
-    }
-  }
 
-  /**
-   * Address: 0x00A89533 (FUN_00A89533)
-   *
-   * What it does:
-   * Alias lane of `RuntimeCallMemberFunction2LaneA`.
-   */
-  extern "C" __declspec(naked) int __cdecl RuntimeCallMemberFunction2LaneB(void* /*object*/, void* /*member*/)
-  {
-    __asm
-    {
-      pop eax
-      pop ecx
-      xchg eax, [esp + 4]
-      jmp eax
-    }
-  }
 
   using RuntimeSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
 
-  /**
-   * Address: 0x00A8F6B0 (FUN_00A8F6B0)
-   *
-   * What it does:
-   * Iteratively selects the maximum element over one byte-stride lane and
-   * swaps it into the current tail lane while shrinking the inclusive
-   * `[begin,tail]` range (qsort inner-selection lane).
-   */
-  [[maybe_unused]] void RuntimeSelectionSortTailLane(
-    const unsigned int beginAddress,
-    unsigned int tailAddressInclusive,
-    const int elementStrideBytes,
-    const RuntimeSortCompareUnsignedAddressFn compare
-  ) noexcept
-  {
-    if (tailAddressInclusive <= beginAddress) {
-      return;
-    }
 
-    const unsigned int stride = static_cast<unsigned int>(elementStrideBytes);
-    do {
-      unsigned int probeAddress = beginAddress + stride;
-      unsigned int selectedAddress = beginAddress;
-      while (probeAddress <= tailAddressInclusive) {
-        if (compare(probeAddress, selectedAddress) > 0) {
-          selectedAddress = probeAddress;
-        }
-        probeAddress += stride;
-      }
-
-      if (selectedAddress != tailAddressInclusive && elementStrideBytes != 0) {
-        auto* tailBytes = reinterpret_cast<std::uint8_t*>(tailAddressInclusive);
-        const std::intptr_t delta =
-          static_cast<std::intptr_t>(selectedAddress) - static_cast<std::intptr_t>(tailAddressInclusive);
-        int remaining = elementStrideBytes;
-        while (remaining != 0) {
-          const std::uint8_t temp = tailBytes[delta];
-          tailBytes[delta] = *tailBytes;
-          *tailBytes = temp;
-          ++tailBytes;
-          --remaining;
-        }
-      }
-
-      tailAddressInclusive -= stride;
-    } while (tailAddressInclusive > beginAddress);
-  }
-
-  /**
-   * Address: 0x00A90ED5 (FUN_00A90ED5)
-   *
-   * What it does:
-   * Appends one UTF-16 source lane into destination tail with copy-limit
-   * semantics and always NUL-terminates on limit exhaustion.
-   */
-  [[maybe_unused]] wchar_t* RuntimeAppendWideStringWithLimit(
-    wchar_t* const destination,
-    const wchar_t* source,
-    int copyLimit
-  ) noexcept
-  {
-    wchar_t* writeCursor = destination;
-    while (*writeCursor != L'\0') {
-      ++writeCursor;
-    }
-
-    if (copyLimit != 0) {
-      while (true) {
-        const wchar_t copied = *source++;
-        --copyLimit;
-        *writeCursor++ = copied;
-        if (copied == L'\0') {
-          break;
-        }
-        if (copyLimit == 0) {
-          *writeCursor = L'\0';
-          break;
-        }
-      }
-    } else {
-      *writeCursor = L'\0';
-    }
-
-    return destination;
-  }
 
   struct RuntimeInitRecord36Lane
   {
@@ -60509,39 +35152,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return owner;
   }
 
-  /**
-   * Address: 0x00A7D300 (FUN_00A7D300)
-   *
-   * What it does:
-   * Initializes one 36-byte record lane from three scalar inputs, clears four
-   * trailing dword lanes, stores `-1` in lane `+0x1C`, clears byte lane
-   * `+0x20`, and returns the owner pointer.
-   */
-  [[maybe_unused]] RuntimeInitRecord36Lane* RuntimeInitializeRecord36WithInvalidIndexAndClearFlagLaneA(
-    RuntimeInitRecord36Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  ) noexcept
-  {
-    return RuntimeInitializeRecord36WithInvalidIndexAndClearFlagCommon(owner, lane00, lane04, lane08);
-  }
 
-  /**
-   * Address: 0x00A7D3E0 (FUN_00A7D3E0)
-   *
-   * What it does:
-   * Alias lane of `RuntimeInitializeRecord36WithInvalidIndexAndClearFlagLaneA`.
-   */
-  [[maybe_unused]] RuntimeInitRecord36Lane* RuntimeInitializeRecord36WithInvalidIndexAndClearFlagLaneB(
-    RuntimeInitRecord36Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  ) noexcept
-  {
-    return RuntimeInitializeRecord36WithInvalidIndexAndClearFlagCommon(owner, lane00, lane04, lane08);
-  }
 
   struct RuntimeInitRecord24Lane
   {
@@ -60570,36 +35181,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return owner;
   }
 
-  /**
-   * Address: 0x00A80680 (FUN_00A80680)
-   *
-   * What it does:
-   * Initializes one 24-byte record lane from two scalar inputs, clears three
-   * trailing dword lanes, stores `-1` at lane `+0x14`, and returns owner.
-   */
-  [[maybe_unused]] RuntimeInitRecord24Lane* RuntimeInitializeRecord24WithInvalidIndexLaneA(
-    RuntimeInitRecord24Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04
-  ) noexcept
-  {
-    return RuntimeInitializeRecord24WithInvalidIndexCommon(owner, lane00, lane04);
-  }
 
-  /**
-   * Address: 0x00A807C0 (FUN_00A807C0)
-   *
-   * What it does:
-   * Alias lane of `RuntimeInitializeRecord24WithInvalidIndexLaneA`.
-   */
-  [[maybe_unused]] RuntimeInitRecord24Lane* RuntimeInitializeRecord24WithInvalidIndexLaneB(
-    RuntimeInitRecord24Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04
-  ) noexcept
-  {
-    return RuntimeInitializeRecord24WithInvalidIndexCommon(owner, lane00, lane04);
-  }
 
   [[nodiscard]] std::uint32_t RuntimeScatterCopyWordFromSourceLaneCommon(
     std::uint32_t count,
@@ -60665,53 +35247,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeScatterCopyWordFromSourceLaneCommon(count, sourceWord, destinationWord);
   }
 
-  /**
-   * Address: 0x008319A0 (FUN_008319A0)
-   *
-   * What it does:
-   * Register-shape adapter lane that forwards one dword scatter-copy operation
-   * into `RuntimeScatterCopyWordFromSourceLaneA(...)`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceRegisterAdapterLaneA(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneA(count, sourceWord, destinationWord);
-  }
 
-  /**
-   * Address: 0x00831B20 (FUN_00831B20)
-   *
-   * What it does:
-   * Register-shape adapter lane that forwards one dword scatter-copy operation
-   * into `RuntimeScatterCopyWordFromSourceLaneB(...)`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceRegisterAdapterLaneB(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneB(count, sourceWord, destinationWord);
-  }
 
-  /**
-   * Address: 0x00831C00 (FUN_00831C00)
-   *
-   * What it does:
-   * Register-shape adapter lane that forwards one dword scatter-copy operation
-   * into `RuntimeScatterCopyWordFromSourceLaneC(...)`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceRegisterAdapterLaneC(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneC(count, sourceWord, destinationWord);
-  }
 } // namespace moho::runtime
 
 
