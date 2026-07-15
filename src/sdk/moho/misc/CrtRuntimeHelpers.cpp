@@ -387,22 +387,6 @@ extern "C" std::FILE* __cdecl __iob_func(void)
   return reinterpret_cast<std::FILE*>(LegacyIobFallbackBase());
 }
 
-struct RuntimeStdExceptionLayout
-{
-  void* vtable;
-  const char* what;
-  int doFree;
-};
-static_assert(sizeof(RuntimeStdExceptionLayout) == 0x0C, "RuntimeStdExceptionLayout size must be 0x0C");
-
-struct RuntimeTypeInfoView
-{
-  void* vtable;
-  void* spare;
-  const char* decoratedName;
-};
-static_assert(sizeof(RuntimeTypeInfoView) == 0x0C, "RuntimeTypeInfoView size must be 0x0C");
-
 struct RuntimeTypeInfoMapPair
 {
   const std::type_info* keyTypeInfo;
@@ -428,57 +412,6 @@ static_assert(offsetof(RuntimeTypeInfoMapNode, right) == 0x08, "RuntimeTypeInfoM
 static_assert(offsetof(RuntimeTypeInfoMapNode, pair) == 0x0C, "RuntimeTypeInfoMapNode::pair offset must be 0x0C");
 static_assert(offsetof(RuntimeTypeInfoMapNode, color) == 0x14, "RuntimeTypeInfoMapNode::color offset must be 0x14");
 static_assert(offsetof(RuntimeTypeInfoMapNode, isNil) == 0x15, "RuntimeTypeInfoMapNode::isNil offset must be 0x15");
-
-struct RuntimeListNodePayload24Words
-{
-  std::uint32_t words[6];
-};
-static_assert(sizeof(RuntimeListNodePayload24Words) == 0x18, "RuntimeListNodePayload24Words size must be 0x18");
-
-struct RuntimeListNodePayload32Words
-{
-  std::uint32_t words[8];
-};
-static_assert(sizeof(RuntimeListNodePayload32Words) == 0x20, "RuntimeListNodePayload32Words size must be 0x20");
-
-struct RuntimeListNodePayload40Words
-{
-  std::uint32_t words[10];
-};
-static_assert(sizeof(RuntimeListNodePayload40Words) == 0x28, "RuntimeListNodePayload40Words size must be 0x28");
-
-struct RuntimeListNode24
-{
-  RuntimeListNode24* next;
-  RuntimeListNode24* prev;
-  RuntimeListNodePayload24Words payload;
-};
-static_assert(sizeof(RuntimeListNode24) == 0x20, "RuntimeListNode24 size must be 0x20");
-static_assert(offsetof(RuntimeListNode24, next) == 0x00, "RuntimeListNode24::next offset must be 0x00");
-static_assert(offsetof(RuntimeListNode24, prev) == 0x04, "RuntimeListNode24::prev offset must be 0x04");
-static_assert(offsetof(RuntimeListNode24, payload) == 0x08, "RuntimeListNode24::payload offset must be 0x08");
-
-struct RuntimeListNode32
-{
-  RuntimeListNode32* next;
-  RuntimeListNode32* prev;
-  RuntimeListNodePayload32Words payload;
-};
-static_assert(sizeof(RuntimeListNode32) == 0x28, "RuntimeListNode32 size must be 0x28");
-static_assert(offsetof(RuntimeListNode32, next) == 0x00, "RuntimeListNode32::next offset must be 0x00");
-static_assert(offsetof(RuntimeListNode32, prev) == 0x04, "RuntimeListNode32::prev offset must be 0x04");
-static_assert(offsetof(RuntimeListNode32, payload) == 0x08, "RuntimeListNode32::payload offset must be 0x08");
-
-struct RuntimeListNode40
-{
-  RuntimeListNode40* next;
-  RuntimeListNode40* prev;
-  RuntimeListNodePayload40Words payload;
-};
-static_assert(sizeof(RuntimeListNode40) == 0x30, "RuntimeListNode40 size must be 0x30");
-static_assert(offsetof(RuntimeListNode40, next) == 0x00, "RuntimeListNode40::next offset must be 0x00");
-static_assert(offsetof(RuntimeListNode40, prev) == 0x04, "RuntimeListNode40::prev offset must be 0x04");
-static_assert(offsetof(RuntimeListNode40, payload) == 0x08, "RuntimeListNode40::payload offset must be 0x08");
 
 struct RuntimeTreeNodePayload24Words
 {
@@ -548,24 +481,6 @@ static_assert(offsetof(RuntimeTreeHeadNodeBare, right) == 0x08, "RuntimeTreeHead
 static_assert(offsetof(RuntimeTreeHeadNodeBare, color) == 0x10, "RuntimeTreeHeadNodeBare::color offset must be 0x10");
 static_assert(offsetof(RuntimeTreeHeadNodeBare, isNil) == 0x11, "RuntimeTreeHeadNodeBare::isNil offset must be 0x11");
 
-struct RuntimeTreeNodeNil15
-{
-  RuntimeTreeNodeNil15* left;
-  RuntimeTreeNodeNil15* parent;
-  RuntimeTreeNodeNil15* right;
-  std::uint32_t payloadWords[2];
-  std::uint8_t color;
-  std::uint8_t isNil;
-  std::uint8_t reserved16;
-  std::uint8_t reserved17;
-};
-static_assert(sizeof(RuntimeTreeNodeNil15) == 0x18, "RuntimeTreeNodeNil15 size must be 0x18");
-static_assert(offsetof(RuntimeTreeNodeNil15, left) == 0x00, "RuntimeTreeNodeNil15::left offset must be 0x00");
-static_assert(offsetof(RuntimeTreeNodeNil15, parent) == 0x04, "RuntimeTreeNodeNil15::parent offset must be 0x04");
-static_assert(offsetof(RuntimeTreeNodeNil15, right) == 0x08, "RuntimeTreeNodeNil15::right offset must be 0x08");
-static_assert(offsetof(RuntimeTreeNodeNil15, color) == 0x14, "RuntimeTreeNodeNil15::color offset must be 0x14");
-static_assert(offsetof(RuntimeTreeNodeNil15, isNil) == 0x15, "RuntimeTreeNodeNil15::isNil offset must be 0x15");
-
 struct RuntimeTreeNodeNil45
 {
   RuntimeTreeNodeNil45* left;
@@ -620,78 +535,6 @@ using RuntimeTreeNode20Container = RuntimeRbTreeContainerView<RuntimeTreeNode20>
 using RuntimeTreeNode24Container = RuntimeRbTreeContainerView<RuntimeTreeNode24>;
 using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>;
 
-struct RuntimeListOwnerSentinelLaneView
-{
-  std::uint32_t lane00;       // +0x00
-  RuntimeListNode40* sentinel; // +0x04
-  std::uint32_t count;        // +0x08
-};
-
-struct RuntimeEmbeddedStringAt24View
-{
-  std::uint8_t pad00_18[0x18];
-  msvc8::string text; // +0x18
-};
-static_assert(
-  offsetof(RuntimeEmbeddedStringAt24View, text) == 0x18,
-  "RuntimeEmbeddedStringAt24View::text offset must be 0x18"
-);
-
-struct RuntimeTripleStringRecord40
-{
-  std::uint32_t lane00; // +0x00
-  std::uint32_t lane04; // +0x04
-  std::uint32_t lane08; // +0x08
-  msvc8::string text;   // +0x0C
-};
-static_assert(sizeof(RuntimeTripleStringRecord40) == 0x28, "RuntimeTripleStringRecord40 size must be 0x28");
-static_assert(
-  offsetof(RuntimeTripleStringRecord40, text) == 0x0C,
-  "RuntimeTripleStringRecord40::text offset must be 0x0C"
-);
-
-struct RuntimeListNode32OwnerLane
-{
-  std::uint32_t lane00;         // +0x00
-  RuntimeListNode32* sentinel;  // +0x04
-  std::uint32_t size;           // +0x08
-};
-static_assert(offsetof(RuntimeListNode32OwnerLane, sentinel) == 0x04, "RuntimeListNode32OwnerLane::sentinel offset must be 0x04");
-static_assert(offsetof(RuntimeListNode32OwnerLane, size) == 0x08, "RuntimeListNode32OwnerLane::size offset must be 0x08");
-static_assert(sizeof(RuntimeListNode32OwnerLane) == 0x0C, "RuntimeListNode32OwnerLane size must be 0x0C");
-
-struct RuntimeOwnedPointerTripletOwner
-{
-  void* lane00;         // +0x00
-  void* ownedStorage;   // +0x04
-  std::uint32_t lane08; // +0x08
-  std::uint32_t lane0C; // +0x0C
-};
-static_assert(offsetof(RuntimeOwnedPointerTripletOwner, ownedStorage) == 0x04, "RuntimeOwnedPointerTripletOwner::ownedStorage offset must be 0x04");
-static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane08) == 0x08, "RuntimeOwnedPointerTripletOwner::lane08 offset must be 0x08");
-static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane0C) == 0x0C, "RuntimeOwnedPointerTripletOwner::lane0C offset must be 0x0C");
-static_assert(sizeof(RuntimeOwnedPointerTripletOwner) == 0x10, "RuntimeOwnedPointerTripletOwner size must be 0x10");
-
-struct RuntimeLane12PopOwnerView
-{
-  std::uint32_t lane00; // +0x00
-  std::uint32_t begin;  // +0x04
-  std::uint32_t end;    // +0x08
-};
-static_assert(offsetof(RuntimeLane12PopOwnerView, begin) == 0x04, "RuntimeLane12PopOwnerView::begin offset must be 0x04");
-static_assert(offsetof(RuntimeLane12PopOwnerView, end) == 0x08, "RuntimeLane12PopOwnerView::end offset must be 0x08");
-static_assert(sizeof(RuntimeLane12PopOwnerView) == 0x0C, "RuntimeLane12PopOwnerView size must be 0x0C");
-
-struct RuntimeTypeInfoMapOwnerInitLane
-{
-  std::uint32_t comparatorCookie = 0; // +0x00
-  RuntimeTypeInfoMapNode* head = nullptr; // +0x04
-  std::uint32_t size = 0; // +0x08
-};
-static_assert(sizeof(RuntimeTypeInfoMapOwnerInitLane) == 0x0C, "RuntimeTypeInfoMapOwnerInitLane size must be 0x0C");
-static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, head) == 0x04, "RuntimeTypeInfoMapOwnerInitLane::head offset must be 0x04");
-static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, size) == 0x08, "RuntimeTypeInfoMapOwnerInitLane::size offset must be 0x08");
-
 /**
  * Address: 0x00950380 (FUN_00950380)
  *
@@ -731,83 +574,6 @@ void RuntimeDeleteTreeNode24LaneA(RuntimeTreeNode24* node)
     } while (cursor->isNil == 0u);
   }
 }
-
-struct RuntimeTreeNode24OwnerInitLane
-{
-  std::uint32_t comparatorCookie = 0; // +0x00
-  RuntimeTreeNode24* head = nullptr;  // +0x04
-  std::uint32_t size = 0;             // +0x08
-};
-static_assert(sizeof(RuntimeTreeNode24OwnerInitLane) == 0x0C, "RuntimeTreeNode24OwnerInitLane size must be 0x0C");
-static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, head) == 0x04, "RuntimeTreeNode24OwnerInitLane::head offset must be 0x04");
-static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, size) == 0x08, "RuntimeTreeNode24OwnerInitLane::size offset must be 0x08");
-
-struct RuntimeOwnedPointerArrayView
-{
-  std::uint32_t reserved00 = 0;   // +0x00
-  void** entries = nullptr;       // +0x04
-  std::int32_t entryCount = 0;    // +0x08
-  std::int32_t activeCount = 0;   // +0x0C
-  std::int32_t pendingCount = 0;  // +0x10
-};
-static_assert(sizeof(RuntimeOwnedPointerArrayView) == 0x14, "RuntimeOwnedPointerArrayView size must be 0x14");
-static_assert(offsetof(RuntimeOwnedPointerArrayView, entries) == 0x04, "RuntimeOwnedPointerArrayView::entries offset must be 0x04");
-static_assert(
-  offsetof(RuntimeOwnedPointerArrayView, entryCount) == 0x08,
-  "RuntimeOwnedPointerArrayView::entryCount offset must be 0x08"
-);
-static_assert(
-  offsetof(RuntimeOwnedPointerArrayView, activeCount) == 0x0C,
-  "RuntimeOwnedPointerArrayView::activeCount offset must be 0x0C"
-);
-static_assert(
-  offsetof(RuntimeOwnedPointerArrayView, pendingCount) == 0x10,
-  "RuntimeOwnedPointerArrayView::pendingCount offset must be 0x10"
-);
-
-struct RuntimeTreeIteratorNil11View
-{
-  RuntimeTreeHeadNodeBareContainer* owner = nullptr; // +0x00
-  RuntimeTreeHeadNodeBare* node = nullptr;            // +0x04
-};
-static_assert(sizeof(RuntimeTreeIteratorNil11View) == 0x08, "RuntimeTreeIteratorNil11View size must be 0x08");
-static_assert(offsetof(RuntimeTreeIteratorNil11View, owner) == 0x00, "RuntimeTreeIteratorNil11View::owner offset must be 0x00");
-static_assert(offsetof(RuntimeTreeIteratorNil11View, node) == 0x04, "RuntimeTreeIteratorNil11View::node offset must be 0x04");
-
-struct RuntimeTreeIteratorNil21View
-{
-  RuntimeTreeNode20Container* owner = nullptr; // +0x00
-  RuntimeTreeNode20* node = nullptr;            // +0x04
-};
-static_assert(sizeof(RuntimeTreeIteratorNil21View) == 0x08, "RuntimeTreeIteratorNil21View size must be 0x08");
-static_assert(offsetof(RuntimeTreeIteratorNil21View, owner) == 0x00, "RuntimeTreeIteratorNil21View::owner offset must be 0x00");
-static_assert(offsetof(RuntimeTreeIteratorNil21View, node) == 0x04, "RuntimeTreeIteratorNil21View::node offset must be 0x04");
-
-struct RuntimeTreeIteratorNil15View
-{
-  void* owner = nullptr;                  // +0x00
-  RuntimeTreeNodeNil15* node = nullptr;   // +0x04
-};
-static_assert(sizeof(RuntimeTreeIteratorNil15View) == 0x08, "RuntimeTreeIteratorNil15View size must be 0x08");
-static_assert(offsetof(RuntimeTreeIteratorNil15View, owner) == 0x00, "RuntimeTreeIteratorNil15View::owner offset must be 0x00");
-static_assert(offsetof(RuntimeTreeIteratorNil15View, node) == 0x04, "RuntimeTreeIteratorNil15View::node offset must be 0x04");
-
-struct RuntimeOwnedPointerBucketIteratorView
-{
-  std::uint32_t reserved00 = 0;             // +0x00
-  RuntimeOwnedPointerArrayView* owner = nullptr; // +0x04
-  std::uint32_t position = 0;               // +0x08
-};
-static_assert(sizeof(RuntimeOwnedPointerBucketIteratorView) == 0x0C, "RuntimeOwnedPointerBucketIteratorView size must be 0x0C");
-static_assert(
-  offsetof(RuntimeOwnedPointerBucketIteratorView, owner) == 0x04,
-  "RuntimeOwnedPointerBucketIteratorView::owner offset must be 0x04"
-);
-static_assert(
-  offsetof(RuntimeOwnedPointerBucketIteratorView, position) == 0x08,
-  "RuntimeOwnedPointerBucketIteratorView::position offset must be 0x08"
-);
-
 
 void RuntimeDeleteTreeNode20PostorderLaneA(RuntimeTreeNode20* const node);
 void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
@@ -851,107 +617,11 @@ void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node)
   RuntimeDeleteTreeNode20PostorderCommon(node);
 }
 
-struct RuntimeNamedRecordView
-{
-  std::uint8_t reserved00_07[0x08]{};
-  const char* name = nullptr; // +0x08
-};
-static_assert(sizeof(RuntimeNamedRecordView) == 0x0C, "RuntimeNamedRecordView size must be 0x0C");
-static_assert(offsetof(RuntimeNamedRecordView, name) == 0x08, "RuntimeNamedRecordView::name offset must be 0x08");
-
-struct RuntimeNamedFlagView
-{
-  std::uint8_t flags = 0;                   // +0x00
-  std::uint8_t reserved01_03[0x03]{};
-  RuntimeNamedRecordView* nameRecord = nullptr; // +0x04
-};
-static_assert(sizeof(RuntimeNamedFlagView) == 0x08, "RuntimeNamedFlagView size must be 0x08");
-static_assert(offsetof(RuntimeNamedFlagView, nameRecord) == 0x04, "RuntimeNamedFlagView::nameRecord offset must be 0x04");
-
-struct RuntimeTripleDwordRecord
-{
-  std::uint32_t lane0 = 0;
-  std::uint32_t lane1 = 0;
-  std::uint32_t lane2 = 0;
-};
-static_assert(sizeof(RuntimeTripleDwordRecord) == 0x0C, "RuntimeTripleDwordRecord size must be 0x0C");
-
 using RuntimeThreadExitHandler = void(__cdecl*)();
-
-struct RuntimeThreadExitHandlerNode
-{
-  RuntimeThreadExitHandlerNode* next = nullptr;
-  RuntimeThreadExitHandlerNode* prev = nullptr;
-  RuntimeThreadExitHandler handler = nullptr;
-};
-static_assert(sizeof(RuntimeThreadExitHandlerNode) == 0x0C, "RuntimeThreadExitHandlerNode size must be 0x0C");
-static_assert(offsetof(RuntimeThreadExitHandlerNode, next) == 0x00, "RuntimeThreadExitHandlerNode::next offset must be 0x00");
-static_assert(offsetof(RuntimeThreadExitHandlerNode, prev) == 0x04, "RuntimeThreadExitHandlerNode::prev offset must be 0x04");
-static_assert(
-  offsetof(RuntimeThreadExitHandlerNode, handler) == 0x08,
-  "RuntimeThreadExitHandlerNode::handler offset must be 0x08"
-);
-
-struct RuntimeThreadExitHandlerListRuntimeView
-{
-  std::uint32_t lane00 = 0;                  // +0x00
-  RuntimeThreadExitHandlerNode* head = nullptr; // +0x04
-  std::uint32_t size = 0;                    // +0x08
-  boost::mutex mutex{};                      // +0x0C
-};
-static_assert(
-  offsetof(RuntimeThreadExitHandlerListRuntimeView, head) == 0x04,
-  "RuntimeThreadExitHandlerListRuntimeView::head offset must be 0x04"
-);
-static_assert(
-  offsetof(RuntimeThreadExitHandlerListRuntimeView, size) == 0x08,
-  "RuntimeThreadExitHandlerListRuntimeView::size offset must be 0x08"
-);
-
-struct RuntimeListPointerNode
-{
-  RuntimeListPointerNode* next;
-  RuntimeListPointerNode* prev;
-  void* value;
-};
-static_assert(sizeof(RuntimeListPointerNode) == 0x0C, "RuntimeListPointerNode size must be 0x0C");
-static_assert(offsetof(RuntimeListPointerNode, next) == 0x00, "RuntimeListPointerNode::next offset must be 0x00");
-static_assert(offsetof(RuntimeListPointerNode, prev) == 0x04, "RuntimeListPointerNode::prev offset must be 0x04");
-static_assert(offsetof(RuntimeListPointerNode, value) == 0x08, "RuntimeListPointerNode::value offset must be 0x08");
 
 using RuntimePairSlot = RuntimeTypeInfoMapPair;
 using RuntimePairTreeNode = RuntimeTypeInfoMapNode;
 static_assert(sizeof(RuntimePairSlot) == 0x08, "RuntimePairSlot size must be 0x08");
-
-struct RuntimePairTreeContainer
-{
-  void* proxy;
-  RuntimePairTreeNode* head;
-  std::uint32_t size;
-};
-static_assert(sizeof(RuntimePairTreeContainer) == 0x0C, "RuntimePairTreeContainer size must be 0x0C");
-static_assert(offsetof(RuntimePairTreeContainer, head) == 0x04, "RuntimePairTreeContainer::head offset must be 0x04");
-static_assert(offsetof(RuntimePairTreeContainer, size) == 0x08, "RuntimePairTreeContainer::size offset must be 0x08");
-
-
-
-struct RuntimeListPointerContainer
-{
-  void* proxy;
-  RuntimeListPointerNode* head;
-  std::uint32_t size;
-};
-static_assert(sizeof(RuntimeListPointerContainer) == 0x0C, "RuntimeListPointerContainer size must be 0x0C");
-static_assert(offsetof(RuntimeListPointerContainer, head) == 0x04, "RuntimeListPointerContainer::head offset must be 0x04");
-static_assert(offsetof(RuntimeListPointerContainer, size) == 0x08, "RuntimeListPointerContainer::size offset must be 0x08");
-
-struct RuntimeListIteratorView
-{
-  void* owner;
-  RuntimeListPointerNode* node;
-};
-static_assert(sizeof(RuntimeListIteratorView) == 0x08, "RuntimeListIteratorView size must be 0x08");
-static_assert(offsetof(RuntimeListIteratorView, node) == 0x04, "RuntimeListIteratorView::node offset must be 0x04");
 
 #pragma pack(push, 1)
 struct RuntimeWordByteRecord
@@ -961,13 +631,6 @@ struct RuntimeWordByteRecord
 };
 #pragma pack(pop)
 static_assert(sizeof(RuntimeWordByteRecord) == 0x05, "RuntimeWordByteRecord size must be 0x05");
-
-struct RuntimeDwordPairRecord
-{
-  std::uint32_t first;
-  std::uint32_t second;
-};
-static_assert(sizeof(RuntimeDwordPairRecord) == 0x08, "RuntimeDwordPairRecord size must be 0x08");
 
 struct RuntimeContainerBase;
 
@@ -1029,13 +692,6 @@ static_assert(
   "RuntimeSndParamsCacheSearchNodeView::isNil offset must be 0x15"
 );
 
-struct RuntimeSndParamsCacheBoundPair
-{
-  RuntimeSndParamsCacheSearchNodeView* lowerBoundNode;
-  RuntimeSndParamsCacheSearchNodeView* upperBoundNode;
-};
-static_assert(sizeof(RuntimeSndParamsCacheBoundPair) == 0x08, "RuntimeSndParamsCacheBoundPair size must be 0x08");
-
 RuntimeContainerBase gRuntimeSndParamsCacheStorage{};
 
 [[nodiscard]] inline RuntimeSndParamsCacheSearchNodeView* RuntimeSndParamsCacheHeadNode() noexcept
@@ -1068,8 +724,6 @@ void RuntimeDestroySndParamsCacheSubtree(
   } while (node->isNil == 0u);
 }
 
-
-
 template <std::size_t kIsNilOffset>
 struct RuntimeRbIteratorNodeView
 {
@@ -1095,56 +749,6 @@ using RuntimeRbIteratorNodeNil61 = RuntimeRbIteratorNodeView<0x3D>;
 using RuntimeRbIteratorNodeNil65 = RuntimeRbIteratorNodeView<0x41>;
 using RuntimeRbIteratorNodeNil89 = RuntimeRbIteratorNodeView<0x59>;
 using RuntimeRbIteratorNodeNil3273 = RuntimeRbIteratorNodeView<0xCC9>;
-
-
-
-
-
-struct RuntimeTripleStringRecord48
-{
-  std::uint32_t lane00;      // +0x00
-  std::uint32_t lane04;      // +0x04
-  std::uint32_t lane08;      // +0x08
-  msvc8::string text;        // +0x0C
-  std::uint32_t sourceRes;   // +0x28
-  std::uint8_t flag2C;       // +0x2C
-  std::uint8_t flag2D;       // +0x2D
-  std::uint8_t pad2E[2];     // +0x2E
-};
-static_assert(offsetof(RuntimeTripleStringRecord48, text) == 0x0C, "RuntimeTripleStringRecord48::text offset must be 0x0C");
-static_assert(offsetof(RuntimeTripleStringRecord48, sourceRes) == 0x28, "RuntimeTripleStringRecord48::sourceRes offset must be 0x28");
-static_assert(sizeof(RuntimeTripleStringRecord48) == 0x30, "RuntimeTripleStringRecord48 size must be 0x30");
-
-struct RuntimeFloat3Record
-{
-  float values[3];
-};
-static_assert(sizeof(RuntimeFloat3Record) == 0x0C, "RuntimeFloat3Record size must be 0x0C");
-
-struct RuntimeWeakLinkNode
-{
-  RuntimeWeakLinkNode** ownerSlot;
-  RuntimeWeakLinkNode* nextInOwner;
-};
-static_assert(sizeof(RuntimeWeakLinkNode) == 0x08, "RuntimeWeakLinkNode size must be 0x08");
-static_assert(offsetof(RuntimeWeakLinkNode, ownerSlot) == 0x00, "RuntimeWeakLinkNode::ownerSlot offset must be 0x00");
-static_assert(offsetof(RuntimeWeakLinkNode, nextInOwner) == 0x04, "RuntimeWeakLinkNode::nextInOwner offset must be 0x04");
-
-struct RuntimeWeakLinkPayloadLane48
-{
-  RuntimeWeakLinkNode weak;
-  std::uint32_t lane8;
-  std::uint32_t lane12;
-  std::uint32_t lane16;
-  float lane20;
-  float lane24;
-  float lane28;
-  float lane32;
-  float lane36;
-  float lane40;
-  float lane44;
-};
-static_assert(sizeof(RuntimeWeakLinkPayloadLane48) == 0x30, "RuntimeWeakLinkPayloadLane48 size must be 0x30");
 
 template <class RecordT>
 [[nodiscard]] inline RecordT* RuntimeCopyLinearRangeCommon(
@@ -1313,28 +917,6 @@ static_assert(
 static_assert(
   offsetof(RuntimeRttiClassHierarchyDescriptor, baseClassArray) == 0x0C,
   "RuntimeRttiClassHierarchyDescriptor::baseClassArray offset must be 0x0C"
-);
-
-struct RuntimeRttiCompleteObjectLocator
-{
-  std::uint32_t signature;
-  std::uint32_t offset;
-  std::uint32_t cdOffset;
-  const std::type_info* typeDescriptor;
-  RuntimeRttiClassHierarchyDescriptor* classDescriptor;
-};
-static_assert(sizeof(RuntimeRttiCompleteObjectLocator) == 0x14, "RuntimeRttiCompleteObjectLocator size must be 0x14");
-static_assert(
-  offsetof(RuntimeRttiCompleteObjectLocator, offset) == 0x04,
-  "RuntimeRttiCompleteObjectLocator::offset offset must be 0x04"
-);
-static_assert(
-  offsetof(RuntimeRttiCompleteObjectLocator, cdOffset) == 0x08,
-  "RuntimeRttiCompleteObjectLocator::cdOffset offset must be 0x08"
-);
-static_assert(
-  offsetof(RuntimeRttiCompleteObjectLocator, classDescriptor) == 0x10,
-  "RuntimeRttiCompleteObjectLocator::classDescriptor offset must be 0x10"
 );
 
 /**
@@ -5557,23 +5139,6 @@ extern "C" int __cdecl _vsnprintf_l(
 
 namespace
 {
-  struct RuntimeLegacyStdStringArgView
-  {
-    std::uint32_t proxy; // +0x00
-    union
-    {
-      const char* heapBuffer; // +0x04 when capacity >= 16
-      char inlineBuffer[16];  // +0x04 when capacity < 16
-    };
-    std::uint32_t length;   // +0x14
-    std::uint32_t capacity; // +0x18
-  };
-  static_assert(sizeof(RuntimeLegacyStdStringArgView) == 0x1C, "RuntimeLegacyStdStringArgView size must be 0x1C");
-  static_assert(offsetof(RuntimeLegacyStdStringArgView, length) == 0x14, "RuntimeLegacyStdStringArgView::length offset must be 0x14");
-  static_assert(
-    offsetof(RuntimeLegacyStdStringArgView, capacity) == 0x18,
-    "RuntimeLegacyStdStringArgView::capacity offset must be 0x18"
-  );
 }
 
 /**
@@ -6359,76 +5924,10 @@ namespace
     return 0;
   }
 
-  struct RuntimeXtimeSnapshotView
-  {
-    std::uint32_t secLow = 0;    // +0x00
-    std::int32_t secHigh = 0;    // +0x04
-    std::int32_t nanoseconds = 0; // +0x08
-  };
-  static_assert(sizeof(RuntimeXtimeSnapshotView) == 0x0C, "RuntimeXtimeSnapshotView size must be 0x0C");
-  static_assert(offsetof(RuntimeXtimeSnapshotView, secLow) == 0x0, "RuntimeXtimeSnapshotView::secLow offset must be 0x0");
-  static_assert(offsetof(RuntimeXtimeSnapshotView, secHigh) == 0x4, "RuntimeXtimeSnapshotView::secHigh offset must be 0x4");
-  static_assert(
-    offsetof(RuntimeXtimeSnapshotView, nanoseconds) == 0x8,
-    "RuntimeXtimeSnapshotView::nanoseconds offset must be 0x8"
-  );
-
-  struct RuntimeAbsoluteTimeoutView
-  {
-    std::uint32_t secLow = 0;     // +0x00
-    std::int32_t secHigh = 0;     // +0x04
-    std::int32_t nanoseconds = 0;  // +0x08
-    std::uint32_t reserved0C = 0; // +0x0C
-  };
-  static_assert(sizeof(RuntimeAbsoluteTimeoutView) == 0x10, "RuntimeAbsoluteTimeoutView size must be 0x10");
-  static_assert(
-    offsetof(RuntimeAbsoluteTimeoutView, secLow) == 0x0,
-    "RuntimeAbsoluteTimeoutView::secLow offset must be 0x0"
-  );
-  static_assert(
-    offsetof(RuntimeAbsoluteTimeoutView, secHigh) == 0x4,
-    "RuntimeAbsoluteTimeoutView::secHigh offset must be 0x4"
-  );
-  static_assert(
-    offsetof(RuntimeAbsoluteTimeoutView, nanoseconds) == 0x8,
-    "RuntimeAbsoluteTimeoutView::nanoseconds offset must be 0x8"
-  );
-  static_assert(
-    offsetof(RuntimeAbsoluteTimeoutView, reserved0C) == 0xC,
-    "RuntimeAbsoluteTimeoutView::reserved0C offset must be 0xC"
-  );
-
-  struct RuntimeEhCatchableTypeRecord
-  {
-    std::int32_t properties = 0;                 // +0x00
-    const std::type_info* typeDescriptor = nullptr; // +0x04
-    std::int32_t thisDisplacement = 0;           // +0x08
-    std::int32_t copyFunction = 0;               // +0x0C
-  };
-  static_assert(sizeof(RuntimeEhCatchableTypeRecord) == 0x10, "RuntimeEhCatchableTypeRecord size must be 0x10");
-  static_assert(
-    offsetof(RuntimeEhCatchableTypeRecord, typeDescriptor) == 0x04,
-    "RuntimeEhCatchableTypeRecord::typeDescriptor offset must be 0x04"
-  );
-
-  struct RuntimeEhCatchableTypeArray
-  {
-    std::int32_t count = 0;                        // +0x00
-    RuntimeEhCatchableTypeRecord* records = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeEhCatchableTypeArray) == 0x08, "RuntimeEhCatchableTypeArray size must be 0x08");
-
   [[nodiscard]] CRITICAL_SECTION* RuntimeStdLockSlot(const int slot) noexcept
   {
     return &gRuntimeStdLockSlots[slot & 3];
   }
-
-  struct RuntimeFileTmpNameView
-  {
-    std::uint8_t reserved00[0x1C];
-    char* tmpName;
-  };
-  static_assert(offsetof(RuntimeFileTmpNameView, tmpName) == 0x1C, "RuntimeFileTmpNameView::tmpName offset must be 0x1C");
 
   struct RuntimeFileLockView
   {
@@ -6534,14 +6033,6 @@ namespace
   static_assert(offsetof(RuntimeThreadLocInfoView, pcumap) == 0xD0, "RuntimeThreadLocInfoView::pcumap offset must be 0xD0");
   static_assert(offsetof(RuntimeThreadLocInfoView, lcTimeCurrent) == 0xD4, "RuntimeThreadLocInfoView::lcTimeCurrent offset must be 0xD4");
   static_assert(sizeof(RuntimeThreadLocInfoView) == 0xD8, "RuntimeThreadLocInfoView size must be 0xD8");
-
-  struct RuntimeLcTimeStringTableView
-  {
-    const char* wdayAbbr[7];
-    const char* wday[7];
-    const char* monthAbbr[12];
-    const char* month[12];
-  };
 
   [[nodiscard]] RuntimeThreadLocInfoView* RuntimeResolveLocaleLocInfo(
     _locale_t const localeInfo,
@@ -6784,23 +6275,6 @@ namespace
     return value;
   }
 
-  class RuntimeEnvironmentLockGuard
-  {
-  public:
-    RuntimeEnvironmentLockGuard()
-    {
-      _lock(kRuntimeEnvironmentLock);
-    }
-
-    RuntimeEnvironmentLockGuard(const RuntimeEnvironmentLockGuard&) = delete;
-    RuntimeEnvironmentLockGuard& operator=(const RuntimeEnvironmentLockGuard&) = delete;
-
-    ~RuntimeEnvironmentLockGuard()
-    {
-      _unlock(kRuntimeEnvironmentLock);
-    }
-  };
-
   [[nodiscard]] std::uint64_t BuildUnsigned64(const std::uint32_t lowPart, const std::uint32_t highPart) noexcept
   {
     return (static_cast<std::uint64_t>(highPart) << 32u) | static_cast<std::uint64_t>(lowPart);
@@ -6972,103 +6446,10 @@ namespace
     return eaxValue;
   }
 
-  struct RuntimeEh3ScopeEntryView
-  {
-    std::int32_t nextState;     // +0x00
-    std::int32_t filterOrGuard; // +0x04
-    std::int32_t callback;      // +0x08
-  };
-  static_assert(sizeof(RuntimeEh3ScopeEntryView) == 0x0C, "RuntimeEh3ScopeEntryView size must be 0x0C");
-
-  struct RuntimeEh3FrameView
-  {
-    std::uint8_t pad00[0x08];
-    RuntimeEh3ScopeEntryView* scopeTable; // +0x08
-    std::int32_t currentState;            // +0x0C
-  };
-  static_assert(sizeof(RuntimeEh3FrameView) == 0x10, "RuntimeEh3FrameView size must be 0x10");
-  static_assert(offsetof(RuntimeEh3FrameView, scopeTable) == 0x08, "RuntimeEh3FrameView::scopeTable offset must be 0x08");
-  static_assert(
-    offsetof(RuntimeEh3FrameView, currentState) == 0x0C,
-    "RuntimeEh3FrameView::currentState offset must be 0x0C"
-  );
-
-  struct RuntimeEh3DispatcherContextView
-  {
-    void* establisherFrameOut;       // +0x00
-    std::uint8_t pad04[0x20];
-    RuntimeEh3FrameView* frame;      // +0x24
-    std::int32_t targetTryLevel;     // +0x28
-  };
-  static_assert(
-    offsetof(RuntimeEh3DispatcherContextView, establisherFrameOut) == 0x00,
-    "RuntimeEh3DispatcherContextView::establisherFrameOut offset must be 0x00"
-  );
-  static_assert(offsetof(RuntimeEh3DispatcherContextView, frame) == 0x24, "RuntimeEh3DispatcherContextView::frame offset must be 0x24");
-  static_assert(
-    offsetof(RuntimeEh3DispatcherContextView, targetTryLevel) == 0x28,
-    "RuntimeEh3DispatcherContextView::targetTryLevel offset must be 0x28"
-  );
-
-  struct RuntimeEh3TopRegistrationProbeView
-  {
-    _EXCEPTION_REGISTRATION_RECORD frame; // +0x00
-    void* lane08;                         // +0x08
-    void* lane0C;                         // +0x0C
-  };
-  static_assert(
-    offsetof(RuntimeEh3TopRegistrationProbeView, lane08) == 0x08,
-    "RuntimeEh3TopRegistrationProbeView::lane08 offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeEh3TopRegistrationProbeView, lane0C) == 0x0C,
-    "RuntimeEh3TopRegistrationProbeView::lane0C offset must be 0x0C"
-  );
-
   using ThreadExitHandler = void(__cdecl*)();
   using ThreadExitHandlerList = std::list<ThreadExitHandler>;
 
 }
-
-struct RuntimeRecursiveLockStateView
-{
-  void* nativeHandleOrCriticalSection = nullptr; // +0x00
-  std::uint8_t usesCriticalSection = 0;          // +0x04
-  std::uint8_t reserved05[0x3]{};                // +0x05
-  std::uint32_t recursionDepth = 0;              // +0x08
-};
-static_assert(sizeof(RuntimeRecursiveLockStateView) == 0x0C, "RuntimeRecursiveLockStateView size must be 0x0C");
-static_assert(
-  offsetof(RuntimeRecursiveLockStateView, usesCriticalSection) == 0x4,
-  "RuntimeRecursiveLockStateView::usesCriticalSection offset must be 0x4"
-);
-static_assert(
-  offsetof(RuntimeRecursiveLockStateView, recursionDepth) == 0x8,
-  "RuntimeRecursiveLockStateView::recursionDepth offset must be 0x8"
-);
-
-struct RuntimeRecursiveMutexStateView
-{
-  HANDLE mutexHandle = nullptr;       // +0x00
-  std::uint32_t recursionDepth = 0u;  // +0x04
-};
-static_assert(sizeof(RuntimeRecursiveMutexStateView) == 0x08, "RuntimeRecursiveMutexStateView size must be 0x08");
-static_assert(
-  offsetof(RuntimeRecursiveMutexStateView, recursionDepth) == 0x04,
-  "RuntimeRecursiveMutexStateView::recursionDepth offset must be 0x04"
-);
-
-struct RuntimeCriticalSectionGuardView
-{
-  std::uint8_t isLocked = 0;                     // +0x00
-  std::uint8_t reserved01[0x03]{};               // +0x01
-  LPCRITICAL_SECTION criticalSection = nullptr;  // +0x04
-};
-static_assert(sizeof(RuntimeCriticalSectionGuardView) == 0x08, "RuntimeCriticalSectionGuardView size must be 0x08");
-static_assert(
-  offsetof(RuntimeCriticalSectionGuardView, criticalSection) == 0x04,
-  "RuntimeCriticalSectionGuardView::criticalSection offset must be 0x04"
-);
 
 /**
  * Address: 0x00AC5700 (FUN_00AC5700, init_threadmon_mutex)
@@ -8912,17 +8293,6 @@ namespace moho::runtime
     }
   }
 
-  struct RuntimeLegacyFileIoBufView
-  {
-    char* ptr = nullptr;      // +0x00
-    std::int32_t cnt = 0;     // +0x04
-    char* base = nullptr;     // +0x08
-  };
-  static_assert(offsetof(RuntimeLegacyFileIoBufView, ptr) == 0x00, "RuntimeLegacyFileIoBufView::ptr offset must be 0x00");
-  static_assert(offsetof(RuntimeLegacyFileIoBufView, cnt) == 0x04, "RuntimeLegacyFileIoBufView::cnt offset must be 0x04");
-  static_assert(offsetof(RuntimeLegacyFileIoBufView, base) == 0x08, "RuntimeLegacyFileIoBufView::base offset must be 0x08");
-  static_assert(sizeof(RuntimeLegacyFileIoBufView) == 0x0C, "RuntimeLegacyFileIoBufView size must be 0x0C");
-
   struct RuntimeFilebufCharDispatch
   {
     std::uintptr_t unknown00 = 0;                            // +0x00
@@ -9012,183 +8382,6 @@ namespace moho::runtime
     return reinterpret_cast<std::intptr_t>(filebuf);
   }
 
-  struct RuntimeStreamPositionStateView
-  {
-    std::int32_t statusWord = 0;       // +0x00
-    std::int32_t reservedWord04 = 0;   // +0x04
-    std::int32_t positionLow = 0;      // +0x08
-    std::int32_t positionHigh = 0;     // +0x0C
-    std::int32_t stateTag = 0;         // +0x10
-  };
-  static_assert(offsetof(RuntimeStreamPositionStateView, statusWord) == 0x00, "RuntimeStreamPositionStateView::statusWord offset must be 0x00");
-  static_assert(offsetof(RuntimeStreamPositionStateView, positionLow) == 0x08, "RuntimeStreamPositionStateView::positionLow offset must be 0x08");
-  static_assert(offsetof(RuntimeStreamPositionStateView, positionHigh) == 0x0C, "RuntimeStreamPositionStateView::positionHigh offset must be 0x0C");
-  static_assert(offsetof(RuntimeStreamPositionStateView, stateTag) == 0x10, "RuntimeStreamPositionStateView::stateTag offset must be 0x10");
-  static_assert(sizeof(RuntimeStreamPositionStateView) == 0x14, "RuntimeStreamPositionStateView size must be 0x14");
-
-  class RuntimeFacetBaseVtableProbe final : public std::locale::facet
-  {
-  public:
-    RuntimeFacetBaseVtableProbe()
-      : std::locale::facet(0)
-    {
-    }
-
-    static void* CaptureBaseVtable()
-    {
-      alignas(RuntimeFacetBaseVtableProbe) std::uint8_t storage[sizeof(RuntimeFacetBaseVtableProbe)]{};
-      auto* const probe = new (storage) RuntimeFacetBaseVtableProbe();
-      probe->std::locale::facet::~facet();
-      return *reinterpret_cast<void**>(storage);
-    }
-  };
-
-  class RuntimeWstreambufBaseVtableProbe final : public std::wstreambuf
-  {
-  public:
-    RuntimeWstreambufBaseVtableProbe()
-      : std::wstreambuf()
-    {
-    }
-
-    static void* CaptureBaseVtable()
-    {
-      alignas(RuntimeWstreambufBaseVtableProbe) std::uint8_t storage[sizeof(RuntimeWstreambufBaseVtableProbe)]{};
-      auto* const probe = new (storage) RuntimeWstreambufBaseVtableProbe();
-      probe->std::basic_streambuf<wchar_t>::~basic_streambuf();
-      return *reinterpret_cast<void**>(storage);
-    }
-  };
-
-  struct RuntimeBasicWstreambufView
-  {
-    void* vtable = nullptr;                      // +0x00
-    RuntimeMutexHandle mutex{};                  // +0x04
-    std::uint32_t lane0Value = 0;                // +0x08
-    std::uint32_t lane0Scratch = 0;              // +0x0C
-    std::uint32_t* lane0Begin = nullptr;         // +0x10
-    std::uint32_t* lane0End = nullptr;           // +0x14
-    std::uint32_t lane1Value = 0;                // +0x18
-    std::uint32_t lane1Scratch = 0;              // +0x1C
-    std::uint32_t* lane1Begin = nullptr;         // +0x20
-    std::uint32_t* lane1End = nullptr;           // +0x24
-    std::uint32_t lane2Value = 0;                // +0x28
-    std::uint32_t lane2Scratch = 0;              // +0x2C
-    std::uint32_t* lane2Begin = nullptr;         // +0x30
-    std::uint32_t* lane2End = nullptr;           // +0x34
-    RuntimeStdLocaleObject* localeObject = nullptr; // +0x38
-  };
-  static_assert(offsetof(RuntimeBasicWstreambufView, vtable) == 0x00, "RuntimeBasicWstreambufView::vtable offset must be 0x00");
-  static_assert(offsetof(RuntimeBasicWstreambufView, mutex) == 0x04, "RuntimeBasicWstreambufView::mutex offset must be 0x04");
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane0Begin) == 0x10,
-    "RuntimeBasicWstreambufView::lane0Begin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane0End) == 0x14,
-    "RuntimeBasicWstreambufView::lane0End offset must be 0x14"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane1Begin) == 0x20,
-    "RuntimeBasicWstreambufView::lane1Begin offset must be 0x20"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane1End) == 0x24,
-    "RuntimeBasicWstreambufView::lane1End offset must be 0x24"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane2Begin) == 0x30,
-    "RuntimeBasicWstreambufView::lane2Begin offset must be 0x30"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, lane2End) == 0x34,
-    "RuntimeBasicWstreambufView::lane2End offset must be 0x34"
-  );
-  static_assert(
-    offsetof(RuntimeBasicWstreambufView, localeObject) == 0x38,
-    "RuntimeBasicWstreambufView::localeObject offset must be 0x38"
-  );
-  static_assert(sizeof(RuntimeBasicWstreambufView) == 0x3C, "RuntimeBasicWstreambufView size must be 0x3C");
-
-  struct RuntimeBasicStreambufLocaleView
-  {
-    std::uint8_t reserved00_37[0x38]{};
-    RuntimeStdLocaleObject* localeObject = nullptr; // +0x38
-  };
-  static_assert(offsetof(RuntimeBasicStreambufLocaleView, localeObject) == 0x38, "RuntimeBasicStreambufLocaleView::localeObject offset must be 0x38");
-  static_assert(sizeof(RuntimeBasicStreambufLocaleView) == 0x3C, "RuntimeBasicStreambufLocaleView size must be 0x3C");
-
-  struct RuntimeStreambufPointerTripletView
-  {
-    std::uint8_t reserved00_0F[0x10]{};
-    void* lane0Begin = nullptr;           // +0x10
-    void* lane0End = nullptr;             // +0x14
-    std::uint8_t reserved18_1F[0x08]{};
-    void* lane1Begin = nullptr;           // +0x20
-    void* lane1End = nullptr;             // +0x24
-    std::uint8_t reserved28_2F[0x08]{};
-    void* lane2Begin = nullptr;           // +0x30
-    void* lane2End = nullptr;             // +0x34
-  };
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane0Begin) == 0x10, "RuntimeStreambufPointerTripletView::lane0Begin offset must be 0x10");
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane0End) == 0x14, "RuntimeStreambufPointerTripletView::lane0End offset must be 0x14");
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane1Begin) == 0x20, "RuntimeStreambufPointerTripletView::lane1Begin offset must be 0x20");
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane1End) == 0x24, "RuntimeStreambufPointerTripletView::lane1End offset must be 0x24");
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2Begin) == 0x30, "RuntimeStreambufPointerTripletView::lane2Begin offset must be 0x30");
-  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2End) == 0x34, "RuntimeStreambufPointerTripletView::lane2End offset must be 0x34");
-  static_assert(sizeof(RuntimeStreambufPointerTripletView) == 0x38, "RuntimeStreambufPointerTripletView size must be 0x38");
-
-  struct RuntimeWstreambufSeekAdjustView
-  {
-    std::uint8_t reserved00_0F[0x10]{};
-    std::uint32_t* lane0Begin = nullptr; // +0x10
-    std::uint32_t* lane0End = nullptr;   // +0x14
-    std::uint8_t reserved18_1F[0x08]{};
-    std::uint32_t* lane1Begin = nullptr; // +0x20
-    std::uint32_t* lane1End = nullptr;   // +0x24
-    std::uint8_t reserved28_2F[0x08]{};
-    std::uint32_t* lane2Begin = nullptr; // +0x30
-    std::uint32_t* lane2End = nullptr;   // +0x34
-    std::uint8_t reserved38_3B[0x04]{};
-    std::uint32_t seekHighWater = 0;     // +0x3C
-  };
-  static_assert(
-    offsetof(RuntimeWstreambufSeekAdjustView, lane0Begin) == 0x10,
-    "RuntimeWstreambufSeekAdjustView::lane0Begin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeWstreambufSeekAdjustView, lane1Begin) == 0x20,
-    "RuntimeWstreambufSeekAdjustView::lane1Begin offset must be 0x20"
-  );
-  static_assert(
-    offsetof(RuntimeWstreambufSeekAdjustView, lane2Begin) == 0x30,
-    "RuntimeWstreambufSeekAdjustView::lane2Begin offset must be 0x30"
-  );
-  static_assert(
-    offsetof(RuntimeWstreambufSeekAdjustView, seekHighWater) == 0x3C,
-    "RuntimeWstreambufSeekAdjustView::seekHighWater offset must be 0x3C"
-  );
-  static_assert(sizeof(RuntimeWstreambufSeekAdjustView) == 0x40, "RuntimeWstreambufSeekAdjustView size must be 0x40");
-
-  struct RuntimeSeekResultLane
-  {
-    std::int32_t position = -1; // +0x00
-    std::int32_t reserved04 = 0; // +0x04
-    std::int32_t status08 = 0; // +0x08
-    std::int32_t status0C = 0; // +0x0C
-    std::int32_t status10 = 0; // +0x10
-  };
-  static_assert(sizeof(RuntimeSeekResultLane) == 0x14, "RuntimeSeekResultLane size must be 0x14");
-
-  struct RuntimeBasicWstringbufView : RuntimeBasicWstreambufView
-  {
-    std::uint32_t stateWord3C = 0; // +0x3C
-    std::uint32_t stateFlags = 0;  // +0x40
-  };
-  static_assert(offsetof(RuntimeBasicWstringbufView, stateWord3C) == 0x3C, "RuntimeBasicWstringbufView::stateWord3C offset must be 0x3C");
-  static_assert(offsetof(RuntimeBasicWstringbufView, stateFlags) == 0x40, "RuntimeBasicWstringbufView::stateFlags offset must be 0x40");
-  static_assert(sizeof(RuntimeBasicWstringbufView) == 0x44, "RuntimeBasicWstringbufView size must be 0x44");
-
   /**
    * Address: 0x00ABF8DB (FUN_00ABF8DB, std::_Lockit::_Lockit)
    *
@@ -9227,32 +8420,6 @@ namespace moho::runtime
     RuntimeMtxInit(lock);
     return object;
   }
-
-  struct RuntimeMutexGuardUnlockView
-  {
-    std::uint32_t lane00 = 0;
-    RuntimeMutexHandle mutexLane{};
-  };
-
-  /**
-   * Runtime projection of one `std::basic_ostream<wchar_t>::sentry` object as
-   * it is laid out by the MSVC8 CRT. The sentry stores exactly a pointer to
-   * the owning `std::wostream` so the ctor/dtor helpers below can use typed
-   * field access rather than pointer arithmetic.
-   */
-  struct RuntimeWideOstreamSentryView
-  {
-    std::wostream* stream = nullptr;  // +0x00
-    std::uint8_t ok = 0;              // +0x04 (boolean sentry result)
-  };
-  static_assert(
-    offsetof(RuntimeWideOstreamSentryView, stream) == 0x00,
-    "RuntimeWideOstreamSentryView::stream offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RuntimeWideOstreamSentryView, ok) == 0x04,
-    "RuntimeWideOstreamSentryView::ok offset must be 0x04"
-  );
 
   /**
    * Address: 0x00A82D30 (FUN_00A82D30, strchr)
@@ -9954,28 +9121,6 @@ namespace moho::runtime
     return 0x7FFFFFFF;
   }
 
-  struct RuntimePositionalArgDescriptorNarrow
-  {
-    std::int32_t typeToken = 0;             // +0x00
-    std::uint8_t reserved04_07[0x04]{};     // +0x04
-    std::uint8_t specifier = 0;             // +0x08
-    std::uint8_t reserved09_0B[0x03]{};     // +0x09
-    std::uint32_t formatFlags = 0;          // +0x0C
-  };
-  static_assert(offsetof(RuntimePositionalArgDescriptorNarrow, specifier) == 0x08, "RuntimePositionalArgDescriptorNarrow::specifier offset must be 0x08");
-  static_assert(offsetof(RuntimePositionalArgDescriptorNarrow, formatFlags) == 0x0C, "RuntimePositionalArgDescriptorNarrow::formatFlags offset must be 0x0C");
-
-  struct RuntimePositionalArgDescriptorWide
-  {
-    std::int32_t typeToken = 0;             // +0x00
-    std::uint8_t reserved04_07[0x04]{};     // +0x04
-    std::uint16_t specifier = 0;            // +0x08
-    std::uint16_t reserved0A_0B = 0;        // +0x0A
-    std::uint32_t formatFlags = 0;          // +0x0C
-  };
-  static_assert(offsetof(RuntimePositionalArgDescriptorWide, specifier) == 0x08, "RuntimePositionalArgDescriptorWide::specifier offset must be 0x08");
-  static_assert(offsetof(RuntimePositionalArgDescriptorWide, formatFlags) == 0x0C, "RuntimePositionalArgDescriptorWide::formatFlags offset must be 0x0C");
-
   /**
    * Address: 0x00ABD060 (FUN_00ABD060, write_char_uni)
    *
@@ -10061,13 +9206,6 @@ namespace moho::runtime
   static_assert(sizeof(RuntimeScanStringStreamView) == 0x10, "RuntimeScanStringStreamView size must be 0x10");
 
   using RuntimeStringScanWorker = int(__cdecl*)(RuntimeScanStringStreamView*, int, int, int);
-
-  struct RuntimeFilePositionWordsView
-  {
-    std::uint32_t low = 0;  // +0x00
-    std::uint32_t high = 0; // +0x04
-  };
-  static_assert(sizeof(RuntimeFilePositionWordsView) == 0x8, "RuntimeFilePositionWordsView size must be 0x8");
 
   /**
    * Address: 0x00AA4A1D (FUN_00AA4A1D, _strdup)
@@ -10425,16 +9563,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     std::abort();
   }
 
-  struct RuntimeTidDataUnexpectedView
-  {
-    std::uint8_t reserved00_7B[0x7C];
-    void(__cdecl* unexpectedHandler)() = nullptr; // +0x7C
-  };
-  static_assert(
-    offsetof(RuntimeTidDataUnexpectedView, unexpectedHandler) == 0x7C,
-    "RuntimeTidDataUnexpectedView::unexpectedHandler offset must be 0x7C"
-  );
-
   /**
    * Address: 0x00A8958C (FUN_00A8958C, ___CxxFrameHandler3)
    *
@@ -10521,21 +9649,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
     return -1;
   }
-
-  struct RuntimeInlineByteBufferView
-  {
-    std::uint8_t* begin = nullptr;            // +0x00
-    std::uint8_t* current = nullptr;          // +0x04
-    std::uint8_t* end = nullptr;              // +0x08
-    std::uint8_t** inlineStorageSlot = nullptr; // +0x0C
-  };
-  static_assert(sizeof(RuntimeInlineByteBufferView) == 0x10, "RuntimeInlineByteBufferView size must be 0x10");
-  static_assert(offsetof(RuntimeInlineByteBufferView, current) == 0x04, "RuntimeInlineByteBufferView::current offset must be 0x04");
-  static_assert(offsetof(RuntimeInlineByteBufferView, end) == 0x08, "RuntimeInlineByteBufferView::end offset must be 0x08");
-  static_assert(
-    offsetof(RuntimeInlineByteBufferView, inlineStorageSlot) == 0x0C,
-    "RuntimeInlineByteBufferView::inlineStorageSlot offset must be 0x0C"
-  );
 
   /**
    * Address: 0x00A82DF0 (FUN_00A82DF0, memchr)
@@ -10928,16 +10041,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return threadData;
   }
 
-  struct RuntimeTidDataGmtimeView
-  {
-    std::uint8_t mReserved00_43[0x44];
-    void* mGmtimeBuffer;
-  };
-  static_assert(
-    offsetof(RuntimeTidDataGmtimeView, mGmtimeBuffer) == 0x44,
-    "RuntimeTidDataGmtimeView::mGmtimeBuffer offset must be 0x44"
-  );
-
   constexpr int kRuntimeSecondsPerDay = 86'400;
   constexpr int kRuntimeSecondsPerYear = 31'536'000;
   constexpr int kRuntimeSecondsPerLeapYear = 31'622'400;
@@ -11184,14 +10287,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
     return &gRuntimeDosErrnoFallback;
   }
-
-  struct RuntimePePageValidationEntry
-  {
-    std::int32_t nextIndex;    // +0x00
-    std::int32_t targetVa;     // +0x04
-    std::int32_t sourceVa;     // +0x08
-  };
-  static_assert(sizeof(RuntimePePageValidationEntry) == 0x0C, "RuntimePePageValidationEntry size must be 0x0C");
 
   [[nodiscard]] bool RuntimeIsPathSeparator(const char value) noexcept
   {
@@ -12273,12 +11368,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  struct RuntimeMapSetLengthErrorKeyRecord
-  {
-    std::string keyText;
-    std::uint32_t keyMetadata = 0;
-  };
-
   struct RuntimeMapSetLengthErrorNode
   {
     RuntimeMapSetLengthErrorNode* left = nullptr;
@@ -12303,26 +11392,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
 
-  struct RuntimeForwardLinkNodeLane
-  {
-    RuntimeForwardLinkNodeLane* next = nullptr; // +0x00
-  };
-  static_assert(
-    offsetof(RuntimeForwardLinkNodeLane, next) == 0x00,
-    "RuntimeForwardLinkNodeLane::next offset must be 0x00"
-  );
-  static_assert(sizeof(RuntimeForwardLinkNodeLane) == 0x04, "RuntimeForwardLinkNodeLane size must be 0x04");
-
-  struct RuntimePackedDwordByteLane
-  {
-    std::uint32_t dword = 0;        // +0x00
-    std::uint8_t byte = 0;          // +0x04
-    std::uint8_t padding05_07[3]{}; // +0x05
-  };
-  static_assert(offsetof(RuntimePackedDwordByteLane, dword) == 0x00, "RuntimePackedDwordByteLane::dword offset must be 0x00");
-  static_assert(offsetof(RuntimePackedDwordByteLane, byte) == 0x04, "RuntimePackedDwordByteLane::byte offset must be 0x04");
-  static_assert(sizeof(RuntimePackedDwordByteLane) == 0x08, "RuntimePackedDwordByteLane size must be 0x08");
-
   /**
    * Address: 0x00533620 (FUN_00533620)
    *
@@ -12335,219 +11404,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
-  struct RuntimeRbHeadNode68Color64
-  {
-    RuntimeRbHeadNode68Color64* left = nullptr;   // +0x00
-    RuntimeRbHeadNode68Color64* parent = nullptr; // +0x04
-    RuntimeRbHeadNode68Color64* right = nullptr;  // +0x08
-    std::uint8_t payload0C3F[0x34]{};             // +0x0C
-    std::uint8_t color = 0;                       // +0x40
-    std::uint8_t isNil = 0;                       // +0x41
-    std::uint8_t pad42 = 0;                       // +0x42
-    std::uint8_t pad43 = 0;                       // +0x43
-  };
-  static_assert(sizeof(RuntimeRbHeadNode68Color64) == 0x44, "RuntimeRbHeadNode68Color64 size must be 0x44");
-  static_assert(offsetof(RuntimeRbHeadNode68Color64, color) == 0x40, "RuntimeRbHeadNode68Color64::color offset must be 0x40");
-  static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
-
-
-  struct RuntimeRect2iListNode
-  {
-    RuntimeRect2iListNode* next;      // +0x00
-    RuntimeRect2iListNode* prev;      // +0x04
-    std::uint8_t payload[0x10];       // +0x08
-  };
-  static_assert(sizeof(RuntimeRect2iListNode) == 0x18, "RuntimeRect2iListNode size must be 0x18");
-
-  struct RuntimeTreeNode20DwordKey
-  {
-    std::uint32_t left;    // +0x00
-    std::uint32_t parent;  // +0x04
-    std::uint32_t right;   // +0x08
-    std::uint32_t keyLane; // +0x0C
-    std::uint8_t color;    // +0x10
-    std::uint8_t isNil;    // +0x11
-    std::uint8_t pad12;    // +0x12
-    std::uint8_t pad13;    // +0x13
-  };
-  static_assert(sizeof(RuntimeTreeNode20DwordKey) == 0x14, "RuntimeTreeNode20DwordKey size must be 0x14");
-
-  struct RuntimeRbHeadNode64Color60
-  {
-    RuntimeRbHeadNode64Color60* left = nullptr;   // +0x00
-    RuntimeRbHeadNode64Color60* parent = nullptr; // +0x04
-    RuntimeRbHeadNode64Color60* right = nullptr;  // +0x08
-    std::uint8_t payload0C3B[0x30]{};             // +0x0C
-    std::uint8_t color = 0;                       // +0x3C
-    std::uint8_t isNil = 0;                       // +0x3D
-    std::uint8_t pad3E = 0;                       // +0x3E
-    std::uint8_t pad3F = 0;                       // +0x3F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode64Color60) == 0x40, "RuntimeRbHeadNode64Color60 size must be 0x40");
-  static_assert(offsetof(RuntimeRbHeadNode64Color60, color) == 0x3C, "RuntimeRbHeadNode64Color60::color offset must be 0x3C");
-  static_assert(offsetof(RuntimeRbHeadNode64Color60, isNil) == 0x3D, "RuntimeRbHeadNode64Color60::isNil offset must be 0x3D");
-
-  struct RuntimeAllocatedRecordLane044
-  {
-    std::int32_t lane00 = 0;         // +0x00
-    std::int32_t lane04 = 0;         // +0x04
-    std::int32_t lane08 = 0;         // +0x08
-    std::uint8_t lane0C17[0x0C]{};   // +0x0C
-    std::uint8_t lane18 = 0;         // +0x18
-    std::uint8_t lane19 = 0;         // +0x19
-    std::uint8_t lane1A1B[0x02]{};   // +0x1A
-  };
-  static_assert(sizeof(RuntimeAllocatedRecordLane044) == 0x1C, "RuntimeAllocatedRecordLane044 size must be 0x1C");
-
-  struct RuntimeTypeInfoCloneRecord40
-  {
-    std::uint32_t headerWord0; // +0x00
-    std::uint32_t headerWord1; // +0x04
-    std::uint32_t headerWord2; // +0x08
-    msvc8::string typeName;    // +0x0C
-  };
-  static_assert(sizeof(RuntimeTypeInfoCloneRecord40) == 0x28, "RuntimeTypeInfoCloneRecord40 size must be 0x28");
-
-  struct RuntimeDwordAndFastVectorUIntN2Record32
-  {
-    std::uint32_t lane00 = 0;                        // +0x00
-    std::uint32_t lane04 = 0;                        // +0x04
-    gpg::fastvector_n<std::uint32_t, 2> values{};    // +0x08
-  };
-  static_assert(
-    sizeof(RuntimeDwordAndFastVectorUIntN2Record32) == 0x20,
-    "RuntimeDwordAndFastVectorUIntN2Record32 size must be 0x20"
-  );
-  static_assert(
-    offsetof(RuntimeDwordAndFastVectorUIntN2Record32, values) == 0x08,
-    "RuntimeDwordAndFastVectorUIntN2Record32::values offset must be 0x08"
-  );
-
   std::uint8_t gRuntimeByte54741F = 0;
-
-
-  struct RuntimeTaggedFloatRecord20
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-    float lane0C;         // +0x0C
-    std::uint8_t flag10;  // +0x10
-    std::uint8_t flag11;  // +0x11
-    std::uint8_t pad12[2]; // +0x12
-  };
-  static_assert(sizeof(RuntimeTaggedFloatRecord20) == 0x14, "RuntimeTaggedFloatRecord20 size must be 0x14");
-  static_assert(offsetof(RuntimeTaggedFloatRecord20, lane0C) == 0x0C, "RuntimeTaggedFloatRecord20::lane0C offset must be 0x0C");
-  static_assert(offsetof(RuntimeTaggedFloatRecord20, flag10) == 0x10, "RuntimeTaggedFloatRecord20::flag10 offset must be 0x10");
-  static_assert(offsetof(RuntimeTaggedFloatRecord20, flag11) == 0x11, "RuntimeTaggedFloatRecord20::flag11 offset must be 0x11");
-
-  struct RuntimeTaggedPairRecord24
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-    std::uint32_t lane0C; // +0x0C
-    std::uint32_t lane10; // +0x10
-    std::uint8_t flag14;  // +0x14
-    std::uint8_t flag15;  // +0x15
-    std::uint8_t pad16[2]; // +0x16
-  };
-  static_assert(sizeof(RuntimeTaggedPairRecord24) == 0x18, "RuntimeTaggedPairRecord24 size must be 0x18");
-  static_assert(offsetof(RuntimeTaggedPairRecord24, lane0C) == 0x0C, "RuntimeTaggedPairRecord24::lane0C offset must be 0x0C");
-  static_assert(offsetof(RuntimeTaggedPairRecord24, lane10) == 0x10, "RuntimeTaggedPairRecord24::lane10 offset must be 0x10");
-  static_assert(offsetof(RuntimeTaggedPairRecord24, flag14) == 0x14, "RuntimeTaggedPairRecord24::flag14 offset must be 0x14");
-  static_assert(offsetof(RuntimeTaggedPairRecord24, flag15) == 0x15, "RuntimeTaggedPairRecord24::flag15 offset must be 0x15");
-
-  struct RuntimeTypeInfoCloneRecord36
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    msvc8::string typeName; // +0x08
-  };
-  static_assert(sizeof(RuntimeTypeInfoCloneRecord36) == 0x24, "RuntimeTypeInfoCloneRecord36 size must be 0x24");
-
-  struct RuntimeTypeInfoCloneRecord32
-  {
-    std::uint32_t headerWord0; // +0x00
-    msvc8::string typeName;    // +0x04
-  };
-  static_assert(sizeof(RuntimeTypeInfoCloneRecord32) == 0x20, "RuntimeTypeInfoCloneRecord32 size must be 0x20");
-
-  struct RuntimeTypeInfoCloneRecord32SplitSourceWords
-  {
-    std::uint32_t lanes[8];
-  };
-  static_assert(
-    sizeof(RuntimeTypeInfoCloneRecord32SplitSourceWords) == 0x20,
-    "RuntimeTypeInfoCloneRecord32SplitSourceWords size must be 0x20"
-  );
-
-  struct RuntimeTypeInfoCloneRecord48SharedControlBlock
-  {
-    std::uint32_t lane00; // +0x00
-    volatile LONG strongRefCount; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeTypeInfoCloneRecord48SharedControlBlock, strongRefCount) == 0x04,
-    "RuntimeTypeInfoCloneRecord48SharedControlBlock::strongRefCount offset must be 0x04"
-  );
-
-  struct RuntimeTypeInfoCloneRecord48Payload
-  {
-    msvc8::string typeName; // +0x00
-    void* sharedArrayPtr; // +0x1C
-    RuntimeTypeInfoCloneRecord48SharedControlBlock* controlBlock; // +0x20
-    void* payloadBegin; // +0x24
-    void* payloadEnd; // +0x28
-  };
-  static_assert(
-    offsetof(RuntimeTypeInfoCloneRecord48Payload, sharedArrayPtr) == 0x1C,
-    "RuntimeTypeInfoCloneRecord48Payload::sharedArrayPtr offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(RuntimeTypeInfoCloneRecord48Payload, controlBlock) == 0x20,
-    "RuntimeTypeInfoCloneRecord48Payload::controlBlock offset must be 0x20"
-  );
-  static_assert(
-    sizeof(RuntimeTypeInfoCloneRecord48Payload) == 0x2C,
-    "RuntimeTypeInfoCloneRecord48Payload size must be 0x2C"
-  );
-
-  struct RuntimeTypeInfoCloneRecord48
-  {
-    std::uint32_t headerWord0; // +0x00
-    RuntimeTypeInfoCloneRecord48Payload payload; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeTypeInfoCloneRecord48, payload) == 0x04,
-    "RuntimeTypeInfoCloneRecord48::payload offset must be 0x04"
-  );
-  static_assert(sizeof(RuntimeTypeInfoCloneRecord48) == 0x30, "RuntimeTypeInfoCloneRecord48 size must be 0x30");
-
-  struct RuntimeLinkedSlotNode16
-  {
-    std::uint32_t lane0 = 0;       // +0x00
-    std::uint32_t lane1 = 0;       // +0x04
-    std::uintptr_t slotOwner = 0;  // +0x08
-    std::uintptr_t nextLink = 0;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeLinkedSlotNode16) == 0x10, "RuntimeLinkedSlotNode16 size must be 0x10");
-  static_assert(offsetof(RuntimeLinkedSlotNode16, slotOwner) == 0x08, "RuntimeLinkedSlotNode16::slotOwner offset must be 0x08");
-  static_assert(offsetof(RuntimeLinkedSlotNode16, nextLink) == 0x0C, "RuntimeLinkedSlotNode16::nextLink offset must be 0x0C");
-
-  struct RuntimeRbHeadNode16Color13
-  {
-    RuntimeRbHeadNode16Color13* left = nullptr;   // +0x00
-    RuntimeRbHeadNode16Color13* parent = nullptr; // +0x04
-    RuntimeRbHeadNode16Color13* right = nullptr;  // +0x08
-    std::uint8_t marker12 = 0;                    // +0x0C
-    std::uint8_t color = 0;                       // +0x0D
-    std::uint8_t isNil = 0;                       // +0x0E
-    std::uint8_t marker15 = 0;                    // +0x0F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode16Color13) == 0x10, "RuntimeRbHeadNode16Color13 size must be 0x10");
-  static_assert(offsetof(RuntimeRbHeadNode16Color13, color) == 0x0D, "RuntimeRbHeadNode16Color13::color offset must be 0x0D");
-  static_assert(offsetof(RuntimeRbHeadNode16Color13, isNil) == 0x0E, "RuntimeRbHeadNode16Color13::isNil offset must be 0x0E");
 
   struct RuntimeRbHeadNode20Color16
   {
@@ -12564,25 +11421,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode20Color16, color) == 0x10, "RuntimeRbHeadNode20Color16::color offset must be 0x10");
   static_assert(offsetof(RuntimeRbHeadNode20Color16, isNil) == 0x11, "RuntimeRbHeadNode20Color16::isNil offset must be 0x11");
 
-  struct RuntimeRbHeadNode24Color16
-  {
-    RuntimeRbHeadNode24Color16* left = nullptr;   // +0x00
-    RuntimeRbHeadNode24Color16* parent = nullptr; // +0x04
-    RuntimeRbHeadNode24Color16* right = nullptr;  // +0x08
-    std::uint32_t payload = 0;                    // +0x0C
-    std::uint8_t color = 0;                       // +0x10
-    std::uint8_t isNil = 0;                       // +0x11
-    std::uint8_t marker18 = 0;                    // +0x12
-    std::uint8_t marker19 = 0;                    // +0x13
-    std::uint8_t marker1A = 0;                    // +0x14
-    std::uint8_t marker1B = 0;                    // +0x15
-    std::uint8_t marker1C = 0;                    // +0x16
-    std::uint8_t marker1D = 0;                    // +0x17
-  };
-  static_assert(sizeof(RuntimeRbHeadNode24Color16) == 0x18, "RuntimeRbHeadNode24Color16 size must be 0x18");
-  static_assert(offsetof(RuntimeRbHeadNode24Color16, color) == 0x10, "RuntimeRbHeadNode24Color16::color offset must be 0x10");
-  static_assert(offsetof(RuntimeRbHeadNode24Color16, isNil) == 0x11, "RuntimeRbHeadNode24Color16::isNil offset must be 0x11");
-
   struct RuntimeRbHeadNode24Color20
   {
     RuntimeRbHeadNode24Color20* left = nullptr;   // +0x00
@@ -12598,154 +11436,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode24Color20, color) == 0x14, "RuntimeRbHeadNode24Color20::color offset must be 0x14");
   static_assert(offsetof(RuntimeRbHeadNode24Color20, isNil) == 0x15, "RuntimeRbHeadNode24Color20::isNil offset must be 0x15");
 
-  struct RuntimeRbHeadNode32Color28
-  {
-    RuntimeRbHeadNode32Color28* left = nullptr;   // +0x00
-    RuntimeRbHeadNode32Color28* parent = nullptr; // +0x04
-    RuntimeRbHeadNode32Color28* right = nullptr;  // +0x08
-    std::uint8_t payload[16]{};                   // +0x0C
-    std::uint8_t color = 0;                       // +0x1C
-    std::uint8_t isNil = 0;                       // +0x1D
-    std::uint8_t marker1E = 0;                    // +0x1E
-    std::uint8_t marker1F = 0;                    // +0x1F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode32Color28) == 0x20, "RuntimeRbHeadNode32Color28 size must be 0x20");
-  static_assert(offsetof(RuntimeRbHeadNode32Color28, color) == 0x1C, "RuntimeRbHeadNode32Color28::color offset must be 0x1C");
-  static_assert(offsetof(RuntimeRbHeadNode32Color28, isNil) == 0x1D, "RuntimeRbHeadNode32Color28::isNil offset must be 0x1D");
-
-  struct RuntimeRbHeadNode48Color44
-  {
-    RuntimeRbHeadNode48Color44* left = nullptr;   // +0x00
-    RuntimeRbHeadNode48Color44* parent = nullptr; // +0x04
-    RuntimeRbHeadNode48Color44* right = nullptr;  // +0x08
-    std::uint8_t payload[32]{};                   // +0x0C
-    std::uint8_t color = 0;                       // +0x2C
-    std::uint8_t isNil = 0;                       // +0x2D
-    std::uint8_t marker2E = 0;                    // +0x2E
-    std::uint8_t marker2F = 0;                    // +0x2F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode48Color44) == 0x30, "RuntimeRbHeadNode48Color44 size must be 0x30");
-  static_assert(offsetof(RuntimeRbHeadNode48Color44, color) == 0x2C, "RuntimeRbHeadNode48Color44::color offset must be 0x2C");
-  static_assert(offsetof(RuntimeRbHeadNode48Color44, isNil) == 0x2D, "RuntimeRbHeadNode48Color44::isNil offset must be 0x2D");
-
-  struct RuntimeRbHeadNode60Color56
-  {
-    RuntimeRbHeadNode60Color56* left = nullptr;   // +0x00
-    RuntimeRbHeadNode60Color56* parent = nullptr; // +0x04
-    RuntimeRbHeadNode60Color56* right = nullptr;  // +0x08
-    std::uint8_t payload[44]{};                   // +0x0C
-    std::uint8_t color = 0;                       // +0x38
-    std::uint8_t isNil = 0;                       // +0x39
-    std::uint8_t marker3A = 0;                    // +0x3A
-    std::uint8_t marker3B = 0;                    // +0x3B
-  };
-  static_assert(sizeof(RuntimeRbHeadNode60Color56) == 0x3C, "RuntimeRbHeadNode60Color56 size must be 0x3C");
-  static_assert(offsetof(RuntimeRbHeadNode60Color56, color) == 0x38, "RuntimeRbHeadNode60Color56::color offset must be 0x38");
-  static_assert(offsetof(RuntimeRbHeadNode60Color56, isNil) == 0x39, "RuntimeRbHeadNode60Color56::isNil offset must be 0x39");
-
-  struct RuntimeRbHeadNode80Color76
-  {
-    RuntimeRbHeadNode80Color76* left = nullptr;   // +0x00
-    RuntimeRbHeadNode80Color76* parent = nullptr; // +0x04
-    RuntimeRbHeadNode80Color76* right = nullptr;  // +0x08
-    std::uint8_t payload[64]{};                   // +0x0C
-    std::uint8_t color = 0;                       // +0x4C
-    std::uint8_t isNil = 0;                       // +0x4D
-    std::uint8_t marker4E = 0;                    // +0x4E
-    std::uint8_t marker4F = 0;                    // +0x4F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode80Color76) == 0x50, "RuntimeRbHeadNode80Color76 size must be 0x50");
-  static_assert(offsetof(RuntimeRbHeadNode80Color76, color) == 0x4C, "RuntimeRbHeadNode80Color76::color offset must be 0x4C");
-  static_assert(offsetof(RuntimeRbHeadNode80Color76, isNil) == 0x4D, "RuntimeRbHeadNode80Color76::isNil offset must be 0x4D");
-
-  struct RuntimeRbHeadNode192Color184
-  {
-    RuntimeRbHeadNode192Color184* left = nullptr;   // +0x00
-    RuntimeRbHeadNode192Color184* parent = nullptr; // +0x04
-    RuntimeRbHeadNode192Color184* right = nullptr;  // +0x08
-    std::uint8_t payload[172]{};                    // +0x0C
-    std::uint8_t color = 0;                         // +0xB8
-    std::uint8_t isNil = 0;                         // +0xB9
-    std::uint8_t markerBA = 0;                      // +0xBA
-    std::uint8_t markerBB = 0;                      // +0xBB
-    std::uint8_t markerBC = 0;                      // +0xBC
-    std::uint8_t markerBD = 0;                      // +0xBD
-    std::uint8_t markerBE = 0;                      // +0xBE
-    std::uint8_t markerBF = 0;                      // +0xBF
-  };
-  static_assert(sizeof(RuntimeRbHeadNode192Color184) == 0xC0, "RuntimeRbHeadNode192Color184 size must be 0xC0");
-  static_assert(offsetof(RuntimeRbHeadNode192Color184, color) == 0xB8, "RuntimeRbHeadNode192Color184::color offset must be 0xB8");
-  static_assert(offsetof(RuntimeRbHeadNode192Color184, isNil) == 0xB9, "RuntimeRbHeadNode192Color184::isNil offset must be 0xB9");
-
-  struct RuntimeRbHeadNode3152Color3144
-  {
-    RuntimeRbHeadNode3152Color3144* left = nullptr;   // +0x000
-    RuntimeRbHeadNode3152Color3144* parent = nullptr; // +0x004
-    RuntimeRbHeadNode3152Color3144* right = nullptr;  // +0x008
-    std::uint8_t payload[3132]{};                     // +0x00C
-    std::uint8_t color = 0;                           // +0xC48
-    std::uint8_t isNil = 0;                           // +0xC49
-    std::uint8_t markerC4A = 0;                       // +0xC4A
-    std::uint8_t markerC4B = 0;                       // +0xC4B
-    std::uint8_t markerC4C = 0;                       // +0xC4C
-    std::uint8_t markerC4D = 0;                       // +0xC4D
-    std::uint8_t markerC4E = 0;                       // +0xC4E
-    std::uint8_t markerC4F = 0;                       // +0xC4F
-  };
-  static_assert(sizeof(RuntimeRbHeadNode3152Color3144) == 0xC50, "RuntimeRbHeadNode3152Color3144 size must be 0xC50");
-  static_assert(
-    offsetof(RuntimeRbHeadNode3152Color3144, color) == 0xC48,
-    "RuntimeRbHeadNode3152Color3144::color offset must be 0xC48"
-  );
-  static_assert(
-    offsetof(RuntimeRbHeadNode3152Color3144, isNil) == 0xC49,
-    "RuntimeRbHeadNode3152Color3144::isNil offset must be 0xC49"
-  );
-
-  struct RuntimeSelfLinkedSentinelNode48
-  {
-    RuntimeSelfLinkedSentinelNode48* next = nullptr; // +0x00
-    RuntimeSelfLinkedSentinelNode48* prev = nullptr; // +0x04
-    std::uint8_t payload[40]{};                      // +0x08
-  };
-  static_assert(sizeof(RuntimeSelfLinkedSentinelNode48) == 0x30, "RuntimeSelfLinkedSentinelNode48 size must be 0x30");
-
-  struct RuntimeRecord16WithPair
-  {
-    std::uint32_t lane0 = 0;       // +0x00
-    std::uint32_t lane1 = 0;       // +0x04
-    RuntimeDwordPairRecord pair{}; // +0x08
-  };
-  static_assert(sizeof(RuntimeRecord16WithPair) == 0x10, "RuntimeRecord16WithPair size must be 0x10");
-
-  struct RuntimeRecord44WithPayload
-  {
-    std::uint32_t lane0 = 0;      // +0x00
-    std::uint32_t lane1 = 0;      // +0x04
-    std::uint8_t payload[36]{};   // +0x08
-  };
-  static_assert(sizeof(RuntimeRecord44WithPayload) == 0x2C, "RuntimeRecord44WithPayload size must be 0x2C");
-
-  struct RuntimeRecord16ListState
-  {
-    std::uint32_t comparatorLane = 0;      // +0x00
-    RuntimeRecord16WithPair* head = nullptr; // +0x04
-    std::uint32_t size = 0;                // +0x08
-  };
-  static_assert(sizeof(RuntimeRecord16ListState) == 0x0C, "RuntimeRecord16ListState size must be 0x0C");
-  static_assert(offsetof(RuntimeRecord16ListState, head) == 0x04, "RuntimeRecord16ListState::head offset must be 0x04");
-  static_assert(offsetof(RuntimeRecord16ListState, size) == 0x08, "RuntimeRecord16ListState::size offset must be 0x08");
-
-  struct RuntimeRecord44ListState
-  {
-    std::uint32_t comparatorLane = 0;           // +0x00
-    RuntimeRecord44WithPayload* head = nullptr; // +0x04
-    std::uint32_t size = 0;                     // +0x08
-  };
-  static_assert(sizeof(RuntimeRecord44ListState) == 0x0C, "RuntimeRecord44ListState size must be 0x0C");
-  static_assert(offsetof(RuntimeRecord44ListState, head) == 0x04, "RuntimeRecord44ListState::head offset must be 0x04");
-  static_assert(offsetof(RuntimeRecord44ListState, size) == 0x08, "RuntimeRecord44ListState::size offset must be 0x08");
-
   struct RuntimeSharedControlBlockView;
   using RuntimeSharedControlReleaseFn = void(__thiscall*)(RuntimeSharedControlBlockView*);
 
@@ -12757,191 +11447,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeSharedControlBlockView) == 0x0C, "RuntimeSharedControlBlockView size must be 0x0C");
 
-  struct RuntimeSharedObjectPtrLane
-  {
-    void* object = nullptr; // +0x00
-    RuntimeSharedControlBlockView* control = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeSharedObjectPtrLane) == 0x08, "RuntimeSharedObjectPtrLane size must be 0x08");
-
-  struct RuntimeWeakObjectPtrLane
-  {
-    void* object = nullptr; // +0x00
-    RuntimeSharedControlBlockView* control = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeWeakObjectPtrLane) == 0x08, "RuntimeWeakObjectPtrLane size must be 0x08");
-
   using RuntimeOffsetDispatchThreeLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t, std::uint32_t);
   using RuntimeOffsetDispatchPointerLaneFn = int(__thiscall*)(std::uint32_t, const void*);
   using RuntimeOffsetDispatchTwoLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t);
-
-  struct RuntimeOffsetDispatchThreeLane
-  {
-    RuntimeOffsetDispatchThreeLaneFn callback = nullptr; // +0x00
-    std::uint32_t baseOffset = 0;                        // +0x04
-  };
-  static_assert(sizeof(RuntimeOffsetDispatchThreeLane) == 0x08, "RuntimeOffsetDispatchThreeLane size must be 0x08");
-
-  struct RuntimeOffsetDispatchPointerLane
-  {
-    RuntimeOffsetDispatchPointerLaneFn callback = nullptr; // +0x00
-    std::uint32_t baseOffset = 0;                          // +0x04
-  };
-  static_assert(sizeof(RuntimeOffsetDispatchPointerLane) == 0x08, "RuntimeOffsetDispatchPointerLane size must be 0x08");
-
-  struct RuntimeOffsetDispatchTwoLane
-  {
-    RuntimeOffsetDispatchTwoLaneFn callback = nullptr; // +0x00
-    std::uint32_t baseOffset = 0;                      // +0x04
-  };
-  static_assert(sizeof(RuntimeOffsetDispatchTwoLane) == 0x08, "RuntimeOffsetDispatchTwoLane size must be 0x08");
-
-  struct RuntimeLegacyStringLikeStorage24
-  {
-    union
-    {
-      char* heapBuffer;         // +0x00
-      char inlineBuffer[16];    // +0x00
-    } storage{};
-    std::uint32_t size = 0;     // +0x10
-    std::uint32_t capacity = 0; // +0x14
-  };
-  static_assert(sizeof(RuntimeLegacyStringLikeStorage24) == 0x18, "RuntimeLegacyStringLikeStorage24 size must be 0x18");
-  static_assert(
-    offsetof(RuntimeLegacyStringLikeStorage24, size) == 0x10,
-    "RuntimeLegacyStringLikeStorage24::size offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeLegacyStringLikeStorage24, capacity) == 0x14,
-    "RuntimeLegacyStringLikeStorage24::capacity offset must be 0x14"
-  );
-
-  struct RuntimeOffsetDispatchRecord20
-  {
-    RuntimeOffsetDispatchThreeLaneFn callback = nullptr; // +0x00
-    std::uint32_t baseOffset = 0;                        // +0x04
-    std::uint32_t base = 0;                              // +0x08
-    std::uint32_t payload = 0;                           // +0x0C
-    std::uint16_t length = 0;                            // +0x10
-    std::uint16_t lane12 = 0;                            // +0x12
-  };
-  static_assert(sizeof(RuntimeOffsetDispatchRecord20) == 0x14, "RuntimeOffsetDispatchRecord20 size must be 0x14");
-
-  struct RuntimeOffsetDispatchStringRecord40
-  {
-    RuntimeOffsetDispatchPointerLaneFn callback = nullptr; // +0x00
-    std::uint32_t baseOffset = 0;                          // +0x04
-    std::uint32_t base = 0;                                // +0x08
-    std::uint32_t lane0C = 0;                              // +0x0C
-    RuntimeLegacyStringLikeStorage24 text{};               // +0x10
-  };
-  static_assert(sizeof(RuntimeOffsetDispatchStringRecord40) == 0x28, "RuntimeOffsetDispatchStringRecord40 size must be 0x28");
-  static_assert(
-    offsetof(RuntimeOffsetDispatchStringRecord40, text) == 0x10,
-    "RuntimeOffsetDispatchStringRecord40::text offset must be 0x10"
-  );
-
-  struct RuntimeDispatchPayloadAndLength16
-  {
-    std::uint32_t base = 0;      // +0x00
-    std::uint32_t payload = 0;   // +0x04
-    std::uint16_t length = 0;    // +0x08
-    std::uint16_t lane0A = 0;    // +0x0A
-    std::uint32_t lane0C = 0;    // +0x0C
-  };
-  static_assert(sizeof(RuntimeDispatchPayloadAndLength16) == 0x10, "RuntimeDispatchPayloadAndLength16 size must be 0x10");
-
-  struct RuntimePrefixAndLegacyString32
-  {
-    std::uint32_t base = 0;                      // +0x00
-    std::uint32_t lane04 = 0;                    // +0x04
-    RuntimeLegacyStringLikeStorage24 text{};     // +0x08
-  };
-  static_assert(sizeof(RuntimePrefixAndLegacyString32) == 0x20, "RuntimePrefixAndLegacyString32 size must be 0x20");
-  static_assert(
-    offsetof(RuntimePrefixAndLegacyString32, text) == 0x08,
-    "RuntimePrefixAndLegacyString32::text offset must be 0x08"
-  );
-
-  struct RuntimeWordProviderVTable
-  {
-    void* lane00 = nullptr; // +0x00
-    void* lane04 = nullptr; // +0x04
-    std::uint16_t(__thiscall *readWord)(void*) = nullptr; // +0x08
-  };
-
-  struct RuntimeWordProviderObject
-  {
-    RuntimeWordProviderVTable* vtable = nullptr; // +0x00
-  };
-
-  struct RuntimeWordProviderAndStringOwner
-  {
-    std::byte pad00_77[0x78]{};                    // +0x00
-    RuntimeWordProviderObject* providerAt120 = nullptr; // +0x78
-    std::byte pad7C_87[0x0C]{};                    // +0x7C
-    std::uint32_t lane88 = 0;                      // +0x88
-    std::byte pad8C_93[0x08]{};                    // +0x8C
-    RuntimeLegacyStringLikeStorage24 textAt148{};  // +0x94
-  };
-  static_assert(
-    offsetof(RuntimeWordProviderAndStringOwner, providerAt120) == 0x78,
-    "RuntimeWordProviderAndStringOwner::providerAt120 offset must be 0x78"
-  );
-  static_assert(offsetof(RuntimeWordProviderAndStringOwner, lane88) == 0x88, "RuntimeWordProviderAndStringOwner::lane88 offset must be 0x88");
-  static_assert(
-    offsetof(RuntimeWordProviderAndStringOwner, textAt148) == 0x94,
-    "RuntimeWordProviderAndStringOwner::textAt148 offset must be 0x94"
-  );
-
-  struct RuntimeEmbeddedListNodeByLink
-  {
-    std::uint32_t lane00 = 0;                      // +0x00
-    RuntimeEmbeddedListNodeByLink* next = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeEmbeddedListNodeByLink) == 0x08, "RuntimeEmbeddedListNodeByLink size must be 0x08");
-  static_assert(offsetof(RuntimeEmbeddedListNodeByLink, next) == 0x04, "RuntimeEmbeddedListNodeByLink::next offset must be 0x04");
-
-  struct RuntimeEmbeddedListNodeWithLane56
-  {
-    std::uint32_t lane00 = 0;                        // +0x00
-    RuntimeEmbeddedListNodeWithLane56* next = nullptr; // +0x04
-    std::byte pad08_37[0x30]{};                      // +0x08
-    std::int32_t lane56 = 0;                         // +0x38
-  };
-  static_assert(offsetof(RuntimeEmbeddedListNodeWithLane56, next) == 0x04, "RuntimeEmbeddedListNodeWithLane56::next offset must be 0x04");
-  static_assert(
-    offsetof(RuntimeEmbeddedListNodeWithLane56, lane56) == 0x38,
-    "RuntimeEmbeddedListNodeWithLane56::lane56 offset must be 0x38"
-  );
-
-  struct RuntimeEmbeddedListNodeWithLane36
-  {
-    std::uint32_t lane00 = 0;                        // +0x00
-    RuntimeEmbeddedListNodeWithLane36* next = nullptr; // +0x04
-    std::byte pad08_23[0x1C]{};                      // +0x08
-    std::int32_t lane36 = 0;                         // +0x24
-  };
-  static_assert(offsetof(RuntimeEmbeddedListNodeWithLane36, next) == 0x04, "RuntimeEmbeddedListNodeWithLane36::next offset must be 0x04");
-  static_assert(
-    offsetof(RuntimeEmbeddedListNodeWithLane36, lane36) == 0x24,
-    "RuntimeEmbeddedListNodeWithLane36::lane36 offset must be 0x24"
-  );
-
-  struct RuntimeEmbeddedListOwnerAt176
-  {
-    std::byte pad00_AF[0xB0]{};                           // +0x00
-    RuntimeEmbeddedListNodeByLink* sentinelPrev = nullptr; // +0xB0
-    RuntimeEmbeddedListNodeByLink* sentinelNext = nullptr; // +0xB4
-  };
-  static_assert(
-    offsetof(RuntimeEmbeddedListOwnerAt176, sentinelPrev) == 0xB0,
-    "RuntimeEmbeddedListOwnerAt176::sentinelPrev offset must be 0xB0"
-  );
-  static_assert(
-    offsetof(RuntimeEmbeddedListOwnerAt176, sentinelNext) == 0xB4,
-    "RuntimeEmbeddedListOwnerAt176::sentinelNext offset must be 0xB4"
-  );
 
   struct RuntimeReleasableObject;
   using RuntimeReleaseWithCountFn = std::intptr_t(__thiscall*)(RuntimeReleasableObject*, int);
@@ -12955,456 +11463,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     RuntimeReleasableObjectVTable* vtable = nullptr; // +0x00
   };
-
-  struct RuntimeVector16Element
-  {
-    std::uint32_t lane00 = 0;
-    std::uint32_t lane04 = 0;
-    std::uint32_t lane08 = 0;
-    std::uint32_t lane0C = 0;
-  };
-  static_assert(sizeof(RuntimeVector16Element) == 0x10, "RuntimeVector16Element size must be 0x10");
-
-  struct RuntimeVector16StorageState
-  {
-    std::uint32_t lane00 = 0;           // +0x00
-    RuntimeVector16Element* begin = nullptr;    // +0x04
-    RuntimeVector16Element* end = nullptr;      // +0x08
-    RuntimeVector16Element* capacity = nullptr; // +0x0C
-  };
-  static_assert(sizeof(RuntimeVector16StorageState) == 0x10, "RuntimeVector16StorageState size must be 0x10");
-  static_assert(offsetof(RuntimeVector16StorageState, begin) == 0x04, "RuntimeVector16StorageState::begin offset must be 0x04");
-  static_assert(offsetof(RuntimeVector16StorageState, end) == 0x08, "RuntimeVector16StorageState::end offset must be 0x08");
-  static_assert(offsetof(RuntimeVector16StorageState, capacity) == 0x0C, "RuntimeVector16StorageState::capacity offset must be 0x0C");
-
-  struct RuntimeIntrusiveDoubleLinkNode
-  {
-    RuntimeIntrusiveDoubleLinkNode* next = nullptr; // +0x00
-    RuntimeIntrusiveDoubleLinkNode* prev = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeIntrusiveDoubleLinkNode) == 0x08, "RuntimeIntrusiveDoubleLinkNode size must be 0x08");
-
-  struct RuntimeVectorDwordWindowState
-  {
-    std::uint32_t lane00 = 0;       // +0x00
-    std::uint32_t* begin = nullptr; // +0x04
-    std::uint32_t* end = nullptr;   // +0x08
-  };
-  static_assert(sizeof(RuntimeVectorDwordWindowState) == 0x0C, "RuntimeVectorDwordWindowState size must be 0x0C");
-
-  struct RuntimeOwnerPointerSlotOffset04
-  {
-    std::uint32_t lane00 = 0;                           // +0x00
-    RuntimeIntrusiveDoubleLinkNode** pointerSlot = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeOwnerPointerSlotOffset04, pointerSlot) == 0x04,
-    "RuntimeOwnerPointerSlotOffset04::pointerSlot offset must be 0x04"
-  );
-
-  struct RuntimeStride12OwnerState
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::byte* base = nullptr; // +0x04
-  };
-  static_assert(offsetof(RuntimeStride12OwnerState, base) == 0x04, "RuntimeStride12OwnerState::base offset must be 0x04");
-
-  struct RuntimeInlineWindowOffset104State
-  {
-    std::byte* lane00 = nullptr;   // +0x00
-    std::byte* lane04 = nullptr;   // +0x04
-    std::byte* lane08 = nullptr;   // +0x08
-    std::byte* lane0C = nullptr;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeInlineWindowOffset104State) == 0x10, "RuntimeInlineWindowOffset104State size must be 0x10");
-
-  struct RuntimePointerPairRecord
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint32_t lane04 = 0; // +0x04
-  };
-  static_assert(sizeof(RuntimePointerPairRecord) == 0x08, "RuntimePointerPairRecord size must be 0x08");
-
-  struct RuntimeInlineWindowCapacity400State
-  {
-    std::byte* lane00 = nullptr;    // +0x00
-    std::byte* begin = nullptr;     // +0x04
-    std::byte* capacity = nullptr;  // +0x08
-    std::byte* lane0C = nullptr;    // +0x0C
-  };
-  static_assert(sizeof(RuntimeInlineWindowCapacity400State) == 0x10, "RuntimeInlineWindowCapacity400State size must be 0x10");
-
-  struct RuntimeDwordAndByteRecord
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint8_t lane04 = 0;  // +0x04
-  };
-  static_assert(offsetof(RuntimeDwordAndByteRecord, lane04) == 0x04, "RuntimeDwordAndByteRecord::lane04 offset must be 0x04");
-
-  struct RuntimeDwordAtOffset72Record
-  {
-    std::uint8_t reserved00_47[0x48]{};
-    std::uint32_t lane48 = 0u; // +0x48
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset72Record, lane48) == 0x48,
-    "RuntimeDwordAtOffset72Record::lane48 offset must be 0x48"
-  );
-
-  struct RuntimeByteFlagAtOffset12Record
-  {
-    std::uint8_t reserved00_0B[0x0C]{};
-    std::uint8_t flag0C = 0u; // +0x0C
-  };
-  static_assert(
-    offsetof(RuntimeByteFlagAtOffset12Record, flag0C) == 0x0C,
-    "RuntimeByteFlagAtOffset12Record::flag0C offset must be 0x0C"
-  );
-
-  struct RuntimeByteFlagAtOffset16Record
-  {
-    std::uint8_t reserved00_0F[0x10]{};
-    std::uint8_t flag10 = 0u; // +0x10
-  };
-  static_assert(
-    offsetof(RuntimeByteFlagAtOffset16Record, flag10) == 0x10,
-    "RuntimeByteFlagAtOffset16Record::flag10 offset must be 0x10"
-  );
-
-  struct RuntimeByteFlagAtOffset20Record
-  {
-    std::uint8_t reserved00_13[0x14]{};
-    std::uint8_t flag14 = 0u; // +0x14
-  };
-  static_assert(
-    offsetof(RuntimeByteFlagAtOffset20Record, flag14) == 0x14,
-    "RuntimeByteFlagAtOffset20Record::flag14 offset must be 0x14"
-  );
-
-  struct RuntimeDwordAtOffset32Record
-  {
-    std::uint8_t reserved00_1F[0x20]{};
-    std::uint32_t lane20 = 0u; // +0x20
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset32Record, lane20) == 0x20,
-    "RuntimeDwordAtOffset32Record::lane20 offset must be 0x20"
-  );
-
-  struct RuntimeDwordQuadRecord
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-    std::uint32_t lane0C = 0u; // +0x0C
-  };
-  static_assert(sizeof(RuntimeDwordQuadRecord) == 0x10, "RuntimeDwordQuadRecord size must be 0x10");
-
-  struct RuntimeDwordHexadRecord
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-    std::uint32_t lane0C = 0u; // +0x0C
-    std::uint32_t lane10 = 0u; // +0x10
-    std::uint32_t lane14 = 0u; // +0x14
-  };
-  static_assert(sizeof(RuntimeDwordHexadRecord) == 0x18, "RuntimeDwordHexadRecord size must be 0x18");
-
-  struct RuntimeInlineWindowCapacityState
-  {
-    std::byte* lane00 = nullptr;   // +0x00
-    std::byte* begin = nullptr;    // +0x04
-    std::byte* capacity = nullptr; // +0x08
-    std::byte* lane0C = nullptr;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeInlineWindowCapacityState) == 0x10, "RuntimeInlineWindowCapacityState size must be 0x10");
-
-  struct RuntimeStride24BaseOwner
-  {
-    std::byte* base = nullptr; // +0x00
-  };
-  static_assert(sizeof(RuntimeStride24BaseOwner) == 0x04, "RuntimeStride24BaseOwner size must be 0x04");
-
-  struct RuntimeByteFlagAtOffset325Record
-  {
-    std::uint8_t reserved00_144[0x145]{};
-    std::uint8_t flag145 = 0u; // +0x145
-  };
-  static_assert(
-    offsetof(RuntimeByteFlagAtOffset325Record, flag145) == 0x145,
-    "RuntimeByteFlagAtOffset325Record::flag145 offset must be 0x145"
-  );
-
-  struct RuntimeByteFlagAtOffset418Record
-  {
-    std::uint8_t reserved00_1A1[0x1A2]{};
-    std::uint8_t flag1A2 = 0u; // +0x1A2
-  };
-  static_assert(
-    offsetof(RuntimeByteFlagAtOffset418Record, flag1A2) == 0x1A2,
-    "RuntimeByteFlagAtOffset418Record::flag1A2 offset must be 0x1A2"
-  );
-
-  struct RuntimeDwordPointerAtOffset04Owner
-  {
-    std::uint32_t lane00 = 0u;      // +0x00
-    std::uint32_t* pointer04 = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeDwordPointerAtOffset04Owner, pointer04) == 0x04,
-    "RuntimeDwordPointerAtOffset04Owner::pointer04 offset must be 0x04"
-  );
-
-  struct RuntimeDwordPointerAtOffset08Owner
-  {
-    std::uint8_t reserved00_07[0x08]{};
-    std::uint32_t* pointer08 = nullptr; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimeDwordPointerAtOffset08Owner, pointer08) == 0x08,
-    "RuntimeDwordPointerAtOffset08Owner::pointer08 offset must be 0x08"
-  );
-
-  struct RuntimeDwordAtOffset04Record
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset04Record, lane04) == 0x04,
-    "RuntimeDwordAtOffset04Record::lane04 offset must be 0x04"
-  );
-
-  struct RuntimeStride12BaseAtOffset04Owner
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::byte* base04 = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeStride12BaseAtOffset04Owner, base04) == 0x04,
-    "RuntimeStride12BaseAtOffset04Owner::base04 offset must be 0x04"
-  );
-
-  struct RuntimePointerSlotLane
-  {
-    std::uint32_t* pointer = nullptr; // +0x00
-  };
-  static_assert(sizeof(RuntimePointerSlotLane) == 0x04, "RuntimePointerSlotLane size must be 0x04");
-
-  struct RuntimeDwordPairAndBlob28
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint8_t blob08_23[0x1C]{}; // +0x08
-  };
-  static_assert(sizeof(RuntimeDwordPairAndBlob28) == 0x24, "RuntimeDwordPairAndBlob28 size must be 0x24");
-  static_assert(
-    offsetof(RuntimeDwordPairAndBlob28, blob08_23) == 0x08,
-    "RuntimeDwordPairAndBlob28::blob08_23 offset must be 0x08"
-  );
-
-  struct RuntimeDwordAtOffset08Record
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset08Record, lane08) == 0x08,
-    "RuntimeDwordAtOffset08Record::lane08 offset must be 0x08"
-  );
-
-  struct RuntimeStride8TableOwnerOffset08
-  {
-    std::uint8_t reserved00_07[0x08]{};
-    std::byte* tableBase08 = nullptr; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimeStride8TableOwnerOffset08, tableBase08) == 0x08,
-    "RuntimeStride8TableOwnerOffset08::tableBase08 offset must be 0x08"
-  );
-
-  struct RuntimeForwardLinkNode
-  {
-    RuntimeForwardLinkNode* next = nullptr; // +0x00
-  };
-  static_assert(sizeof(RuntimeForwardLinkNode) == 0x04, "RuntimeForwardLinkNode size must be 0x04");
-
-  struct RuntimeDwordAtOffset20Record
-  {
-    std::uint8_t reserved00_13[0x14]{};
-    std::uint32_t lane14 = 0u; // +0x14
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset20Record, lane14) == 0x14,
-    "RuntimeDwordAtOffset20Record::lane14 offset must be 0x14"
-  );
-
-  struct RuntimeDwordAtOffset40Record
-  {
-    std::uint8_t reserved00_27[0x28]{};
-    std::uint32_t lane28 = 0u; // +0x28
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset40Record, lane28) == 0x28,
-    "RuntimeDwordAtOffset40Record::lane28 offset must be 0x28"
-  );
-
-  struct RuntimeDwordTripleLaneRecord
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-  };
-  static_assert(sizeof(RuntimeDwordTripleLaneRecord) == 0x0C, "RuntimeDwordTripleLaneRecord size must be 0x0C");
-
-  struct RuntimeFloatAtOffset444Record
-  {
-    std::uint8_t reserved00_1BB[0x1BC]{};
-    float lane1BC = 0.0f; // +0x1BC
-  };
-  static_assert(
-    offsetof(RuntimeFloatAtOffset444Record, lane1BC) == 0x1BC,
-    "RuntimeFloatAtOffset444Record::lane1BC offset must be 0x1BC"
-  );
-
-  struct RuntimeDwordPointerAtOffset3256Owner
-  {
-    std::uint8_t reserved00_CB7[0xCB8]{};
-    std::uint32_t* pointerCB8 = nullptr; // +0xCB8
-  };
-  static_assert(
-    offsetof(RuntimeDwordPointerAtOffset3256Owner, pointerCB8) == 0xCB8,
-    "RuntimeDwordPointerAtOffset3256Owner::pointerCB8 offset must be 0xCB8"
-  );
-
-  struct RuntimeDwordAtOffset3256Record
-  {
-    std::uint8_t reserved00_CB7[0xCB8]{};
-    std::uint32_t laneCB8 = 0u; // +0xCB8
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset3256Record, laneCB8) == 0xCB8,
-    "RuntimeDwordAtOffset3256Record::laneCB8 offset must be 0xCB8"
-  );
-
-  struct RuntimeStride8VectorSpanRecord
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::byte* begin = nullptr; // +0x04
-    std::byte* end = nullptr;   // +0x08
-  };
-  static_assert(sizeof(RuntimeStride8VectorSpanRecord) == 0x0C, "RuntimeStride8VectorSpanRecord size must be 0x0C");
-
-  struct RuntimeDwordLanesOffset04And08Record
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-  };
-  static_assert(sizeof(RuntimeDwordLanesOffset04And08Record) == 0x0C, "RuntimeDwordLanesOffset04And08Record size must be 0x0C");
-
-  struct RuntimeDwordAtOffset1060Record
-  {
-    std::uint8_t reserved00_423[0x424]{};
-    std::uint32_t lane424 = 0u; // +0x424
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset1060Record, lane424) == 0x424,
-    "RuntimeDwordAtOffset1060Record::lane424 offset must be 0x424"
-  );
-
-  struct RuntimeByteAtOffset1236Record
-  {
-    std::uint8_t reserved00_4D3[0x4D4]{};
-    std::uint8_t lane4D4 = 0u; // +0x4D4
-  };
-  static_assert(
-    offsetof(RuntimeByteAtOffset1236Record, lane4D4) == 0x4D4,
-    "RuntimeByteAtOffset1236Record::lane4D4 offset must be 0x4D4"
-  );
-
-  struct RuntimeFloatMinMaxSource12
-  {
-    float reserved00_03[4]{}; // +0x00
-    float lane04 = 0.0f;      // +0x10
-    float lane05 = 0.0f;      // +0x14
-    float reserved06_09[4]{}; // +0x18
-    float lane10 = 0.0f;      // +0x28
-    float lane11 = 0.0f;      // +0x2C
-  };
-  static_assert(
-    offsetof(RuntimeFloatMinMaxSource12, lane04) == 0x10,
-    "RuntimeFloatMinMaxSource12::lane04 offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeFloatMinMaxSource12, lane10) == 0x28,
-    "RuntimeFloatMinMaxSource12::lane10 offset must be 0x28"
-  );
-  static_assert(
-    offsetof(RuntimeFloatMinMaxSource12, lane11) == 0x2C,
-    "RuntimeFloatMinMaxSource12::lane11 offset must be 0x2C"
-  );
-
-  struct RuntimeFloatQuadLaneRecord
-  {
-    float lane00 = 0.0f; // +0x00
-    float lane04 = 0.0f; // +0x04
-    float lane08 = 0.0f; // +0x08
-    float lane0C = 0.0f; // +0x0C
-  };
-  static_assert(sizeof(RuntimeFloatQuadLaneRecord) == 0x10, "RuntimeFloatQuadLaneRecord size must be 0x10");
-
-  struct RuntimeFloatAtOffset1120Record
-  {
-    std::uint8_t reserved00_45F[0x460]{};
-    float lane460 = 0.0f; // +0x460
-  };
-  static_assert(
-    offsetof(RuntimeFloatAtOffset1120Record, lane460) == 0x460,
-    "RuntimeFloatAtOffset1120Record::lane460 offset must be 0x460"
-  );
-
-  struct RuntimeByteAtOffset628Record
-  {
-    std::uint8_t reserved00_273[0x274]{};
-    std::uint8_t lane274 = 0u; // +0x274
-  };
-  static_assert(
-    offsetof(RuntimeByteAtOffset628Record, lane274) == 0x274,
-    "RuntimeByteAtOffset628Record::lane274 offset must be 0x274"
-  );
-
-  struct RuntimeDwordAtOffset312Record
-  {
-    std::uint8_t reserved00_137[0x138]{};
-    std::uint32_t lane138 = 0u; // +0x138
-  };
-  static_assert(
-    offsetof(RuntimeDwordAtOffset312Record, lane138) == 0x138,
-    "RuntimeDwordAtOffset312Record::lane138 offset must be 0x138"
-  );
-
-  struct RuntimeByteAtOffset310Record
-  {
-    std::uint8_t reserved00_135[0x136]{};
-    std::uint8_t lane136 = 0u; // +0x136
-  };
-  static_assert(
-    offsetof(RuntimeByteAtOffset310Record, lane136) == 0x136,
-    "RuntimeByteAtOffset310Record::lane136 offset must be 0x136"
-  );
-
-  struct RuntimeByteAtOffset676Record
-  {
-    std::uint8_t reserved00_2A3[0x2A4]{};
-    std::uint8_t lane2A4 = 0u; // +0x2A4
-  };
-  static_assert(
-    offsetof(RuntimeByteAtOffset676Record, lane2A4) == 0x2A4,
-    "RuntimeByteAtOffset676Record::lane2A4 offset must be 0x2A4"
-  );
 
   struct RuntimeStdcallReleaseObject;
   using RuntimeStdcallReleaseSlot2Fn = int(__stdcall*)(RuntimeStdcallReleaseObject*);
@@ -13420,23 +11478,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     RuntimeStdcallReleaseVTable* vtable = nullptr; // +0x00
   };
-
-  struct RuntimeStdcallReleasePair
-  {
-    RuntimeStdcallReleaseObject* first = nullptr;  // +0x00
-    RuntimeStdcallReleaseObject* second = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeStdcallReleasePair) == 0x08, "RuntimeStdcallReleasePair size must be 0x08");
-
-  struct RuntimeEmbeddedIntrusiveNodeOwnerOffset04
-  {
-    std::uint32_t lane00 = 0u;            // +0x00
-    RuntimeIntrusiveDoubleLinkNode node{}; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeEmbeddedIntrusiveNodeOwnerOffset04, node) == 0x04,
-    "RuntimeEmbeddedIntrusiveNodeOwnerOffset04::node offset must be 0x04"
-  );
 
   struct RuntimeDispatchSlot24Object;
   using RuntimeDispatchSlot24Fn = void(__thiscall*)(
@@ -13465,16 +11506,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     RuntimeDispatchSlot24VTable* vtable = nullptr; // +0x00
   };
-
-  struct RuntimeShadowTraversalProviderView
-  {
-    std::uint8_t pad0000_02DF[0x2E0]{}; // +0x0000
-    RuntimeSharedObjectPtrLane provider; // +0x02E0
-  };
-  static_assert(
-    offsetof(RuntimeShadowTraversalProviderView, provider) == 0x2E0,
-    "RuntimeShadowTraversalProviderView::provider offset must be 0x2E0"
-  );
 
   struct RuntimeControlTreeNode28
   {
@@ -13532,23 +11563,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeTreeNodeWithString48, key) == 0x14, "RuntimeTreeNodeWithString48::key offset must be 0x14");
   static_assert(offsetof(RuntimeTreeNodeWithString48, isNil) == 0x2D, "RuntimeTreeNodeWithString48::isNil offset must be 0x2D");
 
-  struct RuntimeDualLegacyStringRecord56
-  {
-    std::uint32_t prefix = 0;                  // +0x00
-    RuntimeLegacyStringStorage first{};        // +0x04
-    std::uint32_t middle = 0;                  // +0x1C
-    RuntimeLegacyStringStorage second{};       // +0x20
-  };
-  static_assert(sizeof(RuntimeDualLegacyStringRecord56) == 0x38, "RuntimeDualLegacyStringRecord56 size must be 0x38");
-  static_assert(
-    offsetof(RuntimeDualLegacyStringRecord56, first) == 0x04,
-    "RuntimeDualLegacyStringRecord56::first offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeDualLegacyStringRecord56, second) == 0x20,
-    "RuntimeDualLegacyStringRecord56::second offset must be 0x20"
-  );
-
   struct RuntimeTreeNodeWithPrefixedString48
   {
     RuntimeTreeNodeWithPrefixedString48* left = nullptr;   // +0x00
@@ -13576,44 +11590,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(
     offsetof(RuntimeTreeNodeWithPrefixedString48, isNil) == 0x2D,
     "RuntimeTreeNodeWithPrefixedString48::isNil offset must be 0x2D"
-  );
-
-  struct RuntimeTreeNode56Color53
-  {
-    RuntimeTreeNode56Color53* left = nullptr;   // +0x00
-    RuntimeTreeNode56Color53* parent = nullptr; // +0x04
-    RuntimeTreeNode56Color53* right = nullptr;  // +0x08
-    std::byte payload[0x28]{};                  // +0x0C
-    std::uint8_t color = 0;                     // +0x34
-    std::uint8_t isNil = 0;                     // +0x35
-    std::uint8_t marker36 = 0;                  // +0x36
-    std::uint8_t marker37 = 0;                  // +0x37
-  };
-  static_assert(sizeof(RuntimeTreeNode56Color53) == 0x38, "RuntimeTreeNode56Color53 size must be 0x38");
-  static_assert(
-    offsetof(RuntimeTreeNode56Color53, isNil) == 0x35,
-    "RuntimeTreeNode56Color53::isNil offset must be 0x35"
-  );
-
-  struct RuntimeRbHeadNode40Color36
-  {
-    RuntimeRbHeadNode40Color36* left = nullptr;   // +0x00
-    RuntimeRbHeadNode40Color36* parent = nullptr; // +0x04
-    RuntimeRbHeadNode40Color36* right = nullptr;  // +0x08
-    std::byte payload[0x18]{};                    // +0x0C
-    std::uint8_t color = 0;                       // +0x24
-    std::uint8_t isNil = 0;                       // +0x25
-    std::uint8_t marker26 = 0;                    // +0x26
-    std::uint8_t marker27 = 0;                    // +0x27
-  };
-  static_assert(sizeof(RuntimeRbHeadNode40Color36) == 0x28, "RuntimeRbHeadNode40Color36 size must be 0x28");
-  static_assert(
-    offsetof(RuntimeRbHeadNode40Color36, color) == 0x24,
-    "RuntimeRbHeadNode40Color36::color offset must be 0x24"
-  );
-  static_assert(
-    offsetof(RuntimeRbHeadNode40Color36, isNil) == 0x25,
-    "RuntimeRbHeadNode40Color36::isNil offset must be 0x25"
   );
 
   template<typename NodeType>
@@ -13678,26 +11654,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
   /**
-   * Runtime owner lane where legacy string storage starts at `+0x10`.
-   */
-  struct RuntimePrefixedLegacyStringOwnerOffset10
-  {
-    std::uint32_t prefixLane00 = 0;   // +0x00
-    std::uint32_t prefixLane04 = 0;   // +0x04
-    std::uint32_t prefixLane08 = 0;   // +0x08
-    std::uint32_t prefixLane0C = 0;   // +0x0C
-    RuntimeLegacyStringStorage text{}; // +0x10
-  };
-  static_assert(
-    sizeof(RuntimePrefixedLegacyStringOwnerOffset10) == 0x28,
-    "RuntimePrefixedLegacyStringOwnerOffset10 size must be 0x28"
-  );
-  static_assert(
-    offsetof(RuntimePrefixedLegacyStringOwnerOffset10, text) == 0x10,
-    "RuntimePrefixedLegacyStringOwnerOffset10::text offset must be 0x10"
-  );
-
-  /**
    * Address: 0x0089A820 (FUN_0089A820)
    *
    * What it does:
@@ -13744,61 +11700,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeRbNode60StringArray, isNil) == 0x39,
     "RuntimeRbNode60StringArray::isNil offset must be 0x39"
   );
-
-  struct RuntimeRbTree60OwnerState
-  {
-    std::uint32_t comparatorCookie = 0;      // +0x00
-    RuntimeRbHeadNode60Color56* head = nullptr; // +0x04
-    std::uint32_t size = 0;                  // +0x08
-  };
-  static_assert(sizeof(RuntimeRbTree60OwnerState) == 0x0C, "RuntimeRbTree60OwnerState size must be 0x0C");
-
-  struct RuntimeRbTree24OwnerState
-  {
-    std::uint32_t comparatorCookie = 0;      // +0x00
-    RuntimeRbHeadNode24Color20* head = nullptr; // +0x04
-    std::uint32_t size = 0;                  // +0x08
-  };
-  static_assert(sizeof(RuntimeRbTree24OwnerState) == 0x0C, "RuntimeRbTree24OwnerState size must be 0x0C");
-
-  struct RuntimeRbTree20OwnerState
-  {
-    std::uint32_t comparatorCookie = 0;      // +0x00
-    RuntimeRbHeadNode20Color16* head = nullptr; // +0x04
-    std::uint32_t size = 0;                  // +0x08
-  };
-  static_assert(sizeof(RuntimeRbTree20OwnerState) == 0x0C, "RuntimeRbTree20OwnerState size must be 0x0C");
-
-  struct RuntimeRbHeadNode28Color24
-  {
-    RuntimeRbHeadNode28Color24* left = nullptr;   // +0x00
-    RuntimeRbHeadNode28Color24* parent = nullptr; // +0x04
-    RuntimeRbHeadNode28Color24* right = nullptr;  // +0x08
-    std::uint8_t payload[12]{};                   // +0x0C
-    std::uint8_t color = 0;                       // +0x18
-    std::uint8_t isNil = 0;                       // +0x19
-    std::uint8_t marker1A = 0;                    // +0x1A
-    std::uint8_t marker1B = 0;                    // +0x1B
-  };
-  static_assert(sizeof(RuntimeRbHeadNode28Color24) == 0x1C, "RuntimeRbHeadNode28Color24 size must be 0x1C");
-  static_assert(offsetof(RuntimeRbHeadNode28Color24, color) == 0x18, "RuntimeRbHeadNode28Color24::color offset must be 0x18");
-  static_assert(offsetof(RuntimeRbHeadNode28Color24, isNil) == 0x19, "RuntimeRbHeadNode28Color24::isNil offset must be 0x19");
-
-  struct RuntimeRbTree32OwnerState
-  {
-    std::uint32_t comparatorCookie = 0;         // +0x00
-    RuntimeRbHeadNode32Color28* head = nullptr; // +0x04
-    std::uint32_t size = 0;                     // +0x08
-  };
-  static_assert(sizeof(RuntimeRbTree32OwnerState) == 0x0C, "RuntimeRbTree32OwnerState size must be 0x0C");
-
-  struct RuntimeRbTree28OwnerState
-  {
-    std::uint32_t comparatorCookie = 0;         // +0x00
-    RuntimeRbHeadNode28Color24* head = nullptr; // +0x04
-    std::uint32_t size = 0;                     // +0x08
-  };
-  static_assert(sizeof(RuntimeRbTree28OwnerState) == 0x0C, "RuntimeRbTree28OwnerState size must be 0x0C");
 
   void RuntimeDestroyRbNode60StringArrayTree(RuntimeRbNode60StringArray* node) noexcept
   {
@@ -13886,16 +11787,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeSevenPrefixedLegacyStringBlock, entries[6].text) == 0xAC,
     "RuntimeSevenPrefixedLegacyStringBlock final text offset must be 0xAC"
   );
-  struct RuntimeSevenPrefixedLegacyStringRecordStrideCC
-  {
-    RuntimeSevenPrefixedLegacyStringBlock textBlock; // +0x00
-    std::uint8_t tailC4CB[0x08]{};                   // +0xC4
-  };
-  static_assert(
-    sizeof(RuntimeSevenPrefixedLegacyStringRecordStrideCC) == 0xCC,
-    "RuntimeSevenPrefixedLegacyStringRecordStrideCC size must be 0xCC"
-  );
-
   /**
    * Address: 0x00519800 (FUN_00519800)
    *
@@ -13983,263 +11874,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
 
-  struct RuntimeDestroyCallbackLane16
-  {
-    RuntimeDestroyCallbackFn* vtable; // +0x00
-    std::uint32_t lane04;             // +0x04
-    std::uint32_t lane08;             // +0x08
-    std::uint32_t lane0C;             // +0x0C
-  };
-  static_assert(sizeof(RuntimeDestroyCallbackLane16) == 0x10, "RuntimeDestroyCallbackLane16 size must be 0x10");
-  static_assert(
-    offsetof(RuntimeDestroyCallbackLane16, vtable) == 0x00,
-    "RuntimeDestroyCallbackLane16::vtable offset must be 0x00"
-  );
-
-  struct RuntimeListLinkNode12
-  {
-    RuntimeListLinkNode12* next; // +0x00
-    RuntimeListLinkNode12* prev; // +0x04
-    std::uint32_t lane08;        // +0x08
-  };
-  static_assert(offsetof(RuntimeListLinkNode12, next) == 0x00, "RuntimeListLinkNode12::next offset must be 0x00");
-  static_assert(offsetof(RuntimeListLinkNode12, prev) == 0x04, "RuntimeListLinkNode12::prev offset must be 0x04");
-  static_assert(sizeof(RuntimeListLinkNode12) == 0x0C, "RuntimeListLinkNode12 size must be 0x0C");
-
-  struct RuntimeListSpliceOwnerLane
-  {
-    std::uint32_t lane00;      // +0x00
-    RuntimeListLinkNode12* head; // +0x04
-    std::uint32_t size;        // +0x08
-  };
-  static_assert(offsetof(RuntimeListSpliceOwnerLane, head) == 0x04, "RuntimeListSpliceOwnerLane::head offset must be 0x04");
-  static_assert(offsetof(RuntimeListSpliceOwnerLane, size) == 0x08, "RuntimeListSpliceOwnerLane::size offset must be 0x08");
-  static_assert(sizeof(RuntimeListSpliceOwnerLane) == 0x0C, "RuntimeListSpliceOwnerLane size must be 0x0C");
-
-  struct RuntimeLegacyProxyVectorLane final
-  {
-    void* proxy = nullptr;          // +0x00
-    std::uint8_t* first = nullptr;  // +0x04
-    std::uint8_t* last = nullptr;   // +0x08
-    std::uint8_t* end = nullptr;    // +0x0C
-  };
-  static_assert(sizeof(RuntimeLegacyProxyVectorLane) == 0x10, "RuntimeLegacyProxyVectorLane size must be 0x10");
-
   using RuntimeLegacyProxyVectorThrowFn = void (*)();
   using RuntimeLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
 
-  struct ConvexHullFloatRuntimeView
-  {
-    void* vtable = nullptr;                 // +0x00
-    std::uint8_t reserved04_13[0x10]{};     // +0x04 .. +0x13
-    void* planeStorage = nullptr;           // +0x14
-  };
-  static_assert(offsetof(ConvexHullFloatRuntimeView, planeStorage) == 0x14, "ConvexHullFloatRuntimeView::planeStorage offset");
-  static_assert(sizeof(ConvexHullFloatRuntimeView) == 0x18, "ConvexHullFloatRuntimeView size must be 0x18");
-
-  struct ConvexHullFloatCtorRuntimeView
-  {
-    void* vtable = nullptr;              // +0x00
-    std::int32_t lane04 = 0;             // +0x04
-    std::int32_t lane08 = 0;             // +0x08
-    float lane0C = 0.0f;                 // +0x0C
-    float lane10 = 0.0f;                 // +0x10
-    void* planeStorage = nullptr;        // +0x14
-    float lane18 = 0.0f;                 // +0x18
-    std::uint8_t lane1C = 0;             // +0x1C
-    std::uint8_t padding1D_1F[3]{};      // +0x1D
-  };
-  static_assert(
-    offsetof(ConvexHullFloatCtorRuntimeView, planeStorage) == 0x14,
-    "ConvexHullFloatCtorRuntimeView::planeStorage offset"
-  );
-  static_assert(
-    offsetof(ConvexHullFloatCtorRuntimeView, lane18) == 0x18,
-    "ConvexHullFloatCtorRuntimeView::lane18 offset"
-  );
-  static_assert(
-    offsetof(ConvexHullFloatCtorRuntimeView, lane1C) == 0x1C,
-    "ConvexHullFloatCtorRuntimeView::lane1C offset"
-  );
-
-  struct ConvexHullDoubleRuntimeView
-  {
-    void* vtable = nullptr;                  // +0x00
-    std::uint8_t reserved04_17[0x14]{};      // +0x04 .. +0x17
-    void* planeStorage = nullptr;            // +0x18
-  };
-  static_assert(
-    offsetof(ConvexHullDoubleRuntimeView, planeStorage) == 0x18,
-    "ConvexHullDoubleRuntimeView::planeStorage offset"
-  );
-  static_assert(sizeof(ConvexHullDoubleRuntimeView) == 0x1C, "ConvexHullDoubleRuntimeView size must be 0x1C");
-
-  struct ConvexHullDoubleCtorRuntimeView
-  {
-    void* vtable = nullptr;               // +0x00
-    std::uint8_t reserved04_07[0x04]{};   // +0x04
-    std::int32_t lane08 = 0;              // +0x08
-    std::int32_t lane0C = 0;              // +0x0C
-    std::uint32_t lane10 = 0;             // +0x10
-    std::uint32_t lane14 = 0;             // +0x14
-    void* planeStorage = nullptr;         // +0x18
-    double lane20 = 0.0;                  // +0x20
-    std::uint8_t lane28 = 0;              // +0x28
-    std::uint8_t padding29_2F[7]{};       // +0x29
-  };
-  static_assert(
-    offsetof(ConvexHullDoubleCtorRuntimeView, lane08) == 0x08,
-    "ConvexHullDoubleCtorRuntimeView::lane08 offset"
-  );
-  static_assert(
-    offsetof(ConvexHullDoubleCtorRuntimeView, lane0C) == 0x0C,
-    "ConvexHullDoubleCtorRuntimeView::lane0C offset"
-  );
-  static_assert(
-    offsetof(ConvexHullDoubleCtorRuntimeView, planeStorage) == 0x18,
-    "ConvexHullDoubleCtorRuntimeView::planeStorage offset"
-  );
-  static_assert(
-    offsetof(ConvexHullDoubleCtorRuntimeView, lane20) == 0x20,
-    "ConvexHullDoubleCtorRuntimeView::lane20 offset"
-  );
-  static_assert(
-    offsetof(ConvexHullDoubleCtorRuntimeView, lane28) == 0x28,
-    "ConvexHullDoubleCtorRuntimeView::lane28 offset"
-  );
-
-  struct ConvexHull1FloatRuntimeView
-  {
-    ConvexHullFloatRuntimeView base;                     // +0x00
-    std::uint8_t reserved18_1B[0x04]{};                 // +0x18 .. +0x1B
-    std::uint8_t externalStorageOwnedFlag = 0u;         // +0x1C
-    std::uint8_t reserved1D_1F[0x03]{};                 // +0x1D .. +0x1F
-    void* externalPlaneStorage = nullptr;               // +0x20
-  };
-  static_assert(
-    offsetof(ConvexHull1FloatRuntimeView, externalStorageOwnedFlag) == 0x1C,
-    "ConvexHull1FloatRuntimeView::externalStorageOwnedFlag offset"
-  );
-  static_assert(
-    offsetof(ConvexHull1FloatRuntimeView, externalPlaneStorage) == 0x20,
-    "ConvexHull1FloatRuntimeView::externalPlaneStorage offset"
-  );
-
-  struct ConvexHull1DoubleRuntimeView
-  {
-    ConvexHullDoubleRuntimeView base;                   // +0x00
-    std::uint8_t reserved1C_27[0x0C]{};                // +0x1C .. +0x27
-    std::uint8_t externalStorageOwnedFlag = 0u;        // +0x28
-    std::uint8_t reserved29_2F[0x07]{};                // +0x29 .. +0x2F
-    void* externalPlaneStorage = nullptr;              // +0x30
-  };
-  static_assert(
-    offsetof(ConvexHull1DoubleRuntimeView, externalStorageOwnedFlag) == 0x28,
-    "ConvexHull1DoubleRuntimeView::externalStorageOwnedFlag offset"
-  );
-  static_assert(
-    offsetof(ConvexHull1DoubleRuntimeView, externalPlaneStorage) == 0x30,
-    "ConvexHull1DoubleRuntimeView::externalPlaneStorage offset"
-  );
-
-  struct RuntimeDequeMapGrowthView
-  {
-    std::uint8_t reserved00_03[0x04]{};      // +0x00
-    std::uint32_t* blockMap = nullptr;       // +0x04
-    std::uint32_t mapSlotCount = 0u;         // +0x08
-    std::uint32_t startBlockOffset = 0u;     // +0x0C (in dword lanes)
-    std::uint32_t activeElementCount = 0u;   // +0x10
-  };
-  static_assert(offsetof(RuntimeDequeMapGrowthView, blockMap) == 0x04, "RuntimeDequeMapGrowthView::blockMap offset");
-  static_assert(
-    offsetof(RuntimeDequeMapGrowthView, mapSlotCount) == 0x08, "RuntimeDequeMapGrowthView::mapSlotCount offset"
-  );
-  static_assert(
-    offsetof(RuntimeDequeMapGrowthView, startBlockOffset) == 0x0C, "RuntimeDequeMapGrowthView::startBlockOffset offset"
-  );
-  static_assert(
-    offsetof(RuntimeDequeMapGrowthView, activeElementCount) == 0x10,
-    "RuntimeDequeMapGrowthView::activeElementCount offset"
-  );
-  static_assert(sizeof(RuntimeDequeMapGrowthView) == 0x14, "RuntimeDequeMapGrowthView size must be 0x14");
-
   using DequeMapThrowTooLongFn = void (*)();
-
-  struct RuntimeSignedLimbPair512View
-  {
-    std::uint8_t primary[0x100]{};
-    std::uint8_t secondary[0x100]{};
-  };
-  static_assert(sizeof(RuntimeSignedLimbPair512View) == 0x200, "RuntimeSignedLimbPair512View size must be 0x200");
-
-  struct RuntimeTreeNode20ContainerState
-  {
-    std::uint32_t comparatorCookie = 0; // +0x00
-    RuntimeTreeNode20* head = nullptr;  // +0x04
-    std::uint32_t size = 0;             // +0x08
-  };
-  static_assert(sizeof(RuntimeTreeNode20ContainerState) == 0x0C, "RuntimeTreeNode20ContainerState size must be 0x0C");
-  static_assert(
-    offsetof(RuntimeTreeNode20ContainerState, head) == 0x04,
-    "RuntimeTreeNode20ContainerState::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeTreeNode20ContainerState, size) == 0x08,
-    "RuntimeTreeNode20ContainerState::size offset must be 0x08"
-  );
-
-  struct RuntimeOffset18FloatArrayView
-  {
-    std::uint8_t reserved00_17[0x18]{};
-    const float* values = nullptr; // +0x18
-  };
-  static_assert(
-    offsetof(RuntimeOffset18FloatArrayView, values) == 0x18,
-    "RuntimeOffset18FloatArrayView::values offset must be 0x18"
-  );
-
-  struct RuntimeOffset18DoubleArrayView
-  {
-    std::uint8_t reserved00_17[0x18]{};
-    const double* values = nullptr; // +0x18
-  };
-  static_assert(
-    offsetof(RuntimeOffset18DoubleArrayView, values) == 0x18,
-    "RuntimeOffset18DoubleArrayView::values offset must be 0x18"
-  );
-
-  struct RuntimeLinearBufferView
-  {
-    std::int32_t elementCount = 0; // +0x00
-    void* elementStorage = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeLinearBufferView) == 0x08, "RuntimeLinearBufferView size must be 0x08");
-  static_assert(
-    offsetof(RuntimeLinearBufferView, elementStorage) == 0x04,
-    "RuntimeLinearBufferView::elementStorage offset must be 0x04"
-  );
-
-  struct RuntimeOffset10ScalarPointerRowsView
-  {
-    std::int32_t rowCount = 0; // +0x00
-    std::uint8_t reserved04_0F[0x0C]{};
-    const void** rowPointers = nullptr; // +0x10
-  };
-  static_assert(
-    offsetof(RuntimeOffset10ScalarPointerRowsView, rowPointers) == 0x10,
-    "RuntimeOffset10ScalarPointerRowsView::rowPointers offset must be 0x10"
-  );
-  static_assert(sizeof(RuntimeOffset10ScalarPointerRowsView) == 0x14, "RuntimeOffset10ScalarPointerRowsView size must be 0x14");
-
-  struct RuntimeOffset04ScalarPointerRowsOwnerView
-  {
-    std::uint8_t reserved00_03[0x04]{};
-    RuntimeOffset10ScalarPointerRowsView rows; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeOffset04ScalarPointerRowsOwnerView, rows) == 0x04,
-    "RuntimeOffset04ScalarPointerRowsOwnerView::rows offset must be 0x04"
-  );
 
   struct RuntimePointerGridView
   {
@@ -14260,67 +11898,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimePointerGridView::rowPointers offset must be 0x10"
   );
 
-  struct RuntimeFixedPointerGridAggregateView
-  {
-    std::int32_t laneCount = 0;       // +0x00
-    RuntimePointerGridView grid{};    // +0x04
-    void* linearStorageA = nullptr;   // +0x18
-    void* linearStorageB = nullptr;   // +0x1C
-    std::uint8_t readyFlag = 0u;      // +0x20
-    std::uint8_t reserved21_23[3]{};  // +0x21
-  };
-  static_assert(sizeof(RuntimeFixedPointerGridAggregateView) == 0x24, "RuntimeFixedPointerGridAggregateView size must be 0x24");
-  static_assert(
-    offsetof(RuntimeFixedPointerGridAggregateView, laneCount) == 0x00,
-    "RuntimeFixedPointerGridAggregateView::laneCount offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RuntimeFixedPointerGridAggregateView, grid) == 0x04,
-    "RuntimeFixedPointerGridAggregateView::grid offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeFixedPointerGridAggregateView, linearStorageA) == 0x18,
-    "RuntimeFixedPointerGridAggregateView::linearStorageA offset must be 0x18"
-  );
-  static_assert(
-    offsetof(RuntimeFixedPointerGridAggregateView, linearStorageB) == 0x1C,
-    "RuntimeFixedPointerGridAggregateView::linearStorageB offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(RuntimeFixedPointerGridAggregateView, readyFlag) == 0x20,
-    "RuntimeFixedPointerGridAggregateView::readyFlag offset must be 0x20"
-  );
-
   using RuntimePointerGridAllocator = int (*)(RuntimePointerGridView&, std::uint8_t);
-
-  struct RuntimeIosFnNode
-  {
-    RuntimeIosFnNode* next = nullptr;               // +0x00
-    std::int32_t index = 0;                         // +0x04
-    void(__cdecl* callback)(int, void*, int) = nullptr; // +0x08
-  };
-  static_assert(sizeof(RuntimeIosFnNode) == 0xC, "RuntimeIosFnNode size must be 0xC");
-
-  struct RuntimeIosArrayNode
-  {
-    RuntimeIosArrayNode* next = nullptr; // +0x00
-  };
-  static_assert(sizeof(RuntimeIosArrayNode) == 0x4, "RuntimeIosArrayNode size must be 0x4");
-
-  struct RuntimeIosBaseView
-  {
-    void* vtable = nullptr;                    // +0x00
-    std::int32_t stdStreamSlot = 0;            // +0x04
-    std::uint8_t reserved08[0x14]{};           // +0x08
-    RuntimeIosArrayNode* arrayHead = nullptr;  // +0x1C
-    RuntimeIosFnNode* callbackHead = nullptr;  // +0x20
-    std::locale* localePtr = nullptr;          // +0x24
-  };
-  static_assert(offsetof(RuntimeIosBaseView, stdStreamSlot) == 0x4, "RuntimeIosBaseView::stdStreamSlot offset must be 0x4");
-  static_assert(offsetof(RuntimeIosBaseView, arrayHead) == 0x1C, "RuntimeIosBaseView::arrayHead offset must be 0x1C");
-  static_assert(offsetof(RuntimeIosBaseView, callbackHead) == 0x20, "RuntimeIosBaseView::callbackHead offset must be 0x20");
-  static_assert(offsetof(RuntimeIosBaseView, localePtr) == 0x24, "RuntimeIosBaseView::localePtr offset must be 0x24");
-  static_assert(sizeof(RuntimeIosBaseView) == 0x28, "RuntimeIosBaseView size must be 0x28");
 
   struct RuntimeLocaleNameTableEntry
   {
@@ -14373,59 +11951,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimeUndecoratorFrameFreeFn = void(__cdecl*)(RuntimeUndecoratorHeapFrameNode* frame);
 
-  struct RuntimeUndecoratorHeapManagerState
-  {
-    void* reserved00 = nullptr;                            // +0x00
-    RuntimeUndecoratorFrameFreeFn deallocator = nullptr;  // +0x04
-    RuntimeUndecoratorHeapFrameNode* firstFrame = nullptr; // +0x08
-    RuntimeUndecoratorHeapFrameNode* frame = nullptr;     // +0x0C
-  };
-  static_assert(
-    offsetof(RuntimeUndecoratorHeapManagerState, deallocator) == 0x04,
-    "RuntimeUndecoratorHeapManagerState::deallocator offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeUndecoratorHeapManagerState, firstFrame) == 0x08,
-    "RuntimeUndecoratorHeapManagerState::firstFrame offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeUndecoratorHeapManagerState, frame) == 0x0C,
-    "RuntimeUndecoratorHeapManagerState::frame offset must be 0x0C"
-  );
-  static_assert(sizeof(RuntimeUndecoratorHeapManagerState) == 0x10, "RuntimeUndecoratorHeapManagerState size must be 0x10");
-
   const char* gRuntimeUndecoratorCurrentDecoratedName = nullptr;
-
-  struct RuntimeUndecoratorDNameLane
-  {
-    std::uint8_t storage[0x8]{};
-  };
-  static_assert(sizeof(RuntimeUndecoratorDNameLane) == 0x8, "RuntimeUndecoratorDNameLane size must be 0x8");
-
-  struct RuntimeUndecoratorReplicatorView
-  {
-    std::int32_t highestStoredArgument = -1;                   // +0x00
-    RuntimeUndecoratorDNameLane* argumentNames[10]{};          // +0x04
-    RuntimeUndecoratorDNameLane overflowArgumentName{};        // +0x2C
-    RuntimeUndecoratorDNameLane missingArgumentNameSentinel{}; // +0x34
-  };
-  static_assert(
-    offsetof(RuntimeUndecoratorReplicatorView, highestStoredArgument) == 0x00,
-    "RuntimeUndecoratorReplicatorView::highestStoredArgument offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RuntimeUndecoratorReplicatorView, argumentNames) == 0x04,
-    "RuntimeUndecoratorReplicatorView::argumentNames offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeUndecoratorReplicatorView, overflowArgumentName) == 0x2C,
-    "RuntimeUndecoratorReplicatorView::overflowArgumentName offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(RuntimeUndecoratorReplicatorView, missingArgumentNameSentinel) == 0x34,
-    "RuntimeUndecoratorReplicatorView::missingArgumentNameSentinel offset must be 0x34"
-  );
-  static_assert(sizeof(RuntimeUndecoratorReplicatorView) == 0x3C, "RuntimeUndecoratorReplicatorView size must be 0x3C");
 
   extern "C" const std::uint16_t __rglangidNotDefault[10];
 
@@ -14671,67 +12197,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  struct RuntimeWideCharLocaleView
-  {
-    std::uint8_t reserved00[0x18]{};
-    RuntimeCvtVec cvtVector{}; // +0x18
-  };
-  static_assert(offsetof(RuntimeWideCharLocaleView, cvtVector) == 0x18, "RuntimeWideCharLocaleView::cvtVector offset must be 0x18");
-
   int RuntimeMultiByteToWideStep(
     wchar_t* destinationWideChar,
     const char* sourceBytes,
     const unsigned int sourceByteCount,
     char* pendingStateBytes,
     const RuntimeCvtVec* localeVector
-  );
-
-  struct RuntimeWideRangeDispatchVTable
-  {
-    void* lanes00_37[0x0E]{};
-    int(__thiscall* convertRangeCore)(void*, int, int, int, int, int) = nullptr; // +0x38
-  };
-  static_assert(
-    offsetof(RuntimeWideRangeDispatchVTable, convertRangeCore) == 0x38,
-    "RuntimeWideRangeDispatchVTable::convertRangeCore offset must be 0x38"
-  );
-
-  struct RuntimeWideBufferWindowView
-  {
-    std::uint8_t reserved00_0F[0x10]{};
-    std::uint32_t* lowerBoundAddressSlot = nullptr;  // +0x10
-    std::uint8_t reserved14_1F[0x0C]{};
-    std::uint32_t* cursorAddressSlot = nullptr;      // +0x20
-    std::uint32_t* refillAddressSlot = nullptr;      // +0x24
-    std::uint8_t reserved28_2F[0x08]{};
-    std::int32_t* availableWordCountSlot = nullptr;  // +0x30
-    std::uint8_t reserved34_3B[0x08]{};
-    std::uint32_t cachedWindowLimitAddress = 0;      // +0x3C
-    std::uint8_t stateFlags = 0;                     // +0x40
-  };
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, lowerBoundAddressSlot) == 0x10,
-    "RuntimeWideBufferWindowView::lowerBoundAddressSlot offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, cursorAddressSlot) == 0x20,
-    "RuntimeWideBufferWindowView::cursorAddressSlot offset must be 0x20"
-  );
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, refillAddressSlot) == 0x24,
-    "RuntimeWideBufferWindowView::refillAddressSlot offset must be 0x24"
-  );
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, availableWordCountSlot) == 0x30,
-    "RuntimeWideBufferWindowView::availableWordCountSlot offset must be 0x30"
-  );
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, cachedWindowLimitAddress) == 0x3C,
-    "RuntimeWideBufferWindowView::cachedWindowLimitAddress offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(RuntimeWideBufferWindowView, stateFlags) == 0x40,
-    "RuntimeWideBufferWindowView::stateFlags offset must be 0x40"
   );
 
   /**
@@ -14861,22 +12332,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     *_errno() = EILSEQ;
     return -1;
   }
-
-  struct RuntimeLocaleVectorsOwnerView
-  {
-    std::uint8_t reserved00_07[0x08]{};
-    RuntimeCtypeVec ctypeVector{}; // +0x08
-    RuntimeCvtVec cvtVector{};     // +0x18
-  };
-  static_assert(
-    offsetof(RuntimeLocaleVectorsOwnerView, ctypeVector) == 0x8,
-    "RuntimeLocaleVectorsOwnerView::ctypeVector offset must be 0x8"
-  );
-  static_assert(
-    offsetof(RuntimeLocaleVectorsOwnerView, cvtVector) == 0x18,
-    "RuntimeLocaleVectorsOwnerView::cvtVector offset must be 0x18"
-  );
-  static_assert(sizeof(RuntimeLocaleVectorsOwnerView) == 0x20, "RuntimeLocaleVectorsOwnerView size must be 0x20");
 
   /**
    * Address: 0x00AA2A65 (FUN_00AA2A65, __uncaught_exception)
@@ -15462,17 +12917,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return maxCharacters - remaining - 1;
   }
 
-  struct RuntimeSlidingBufferView
-  {
-    std::uint8_t reserved00_0B[0x0C]{}; // +0x00
-    char* buffer = nullptr;             // +0x0C
-    std::uint32_t writeOffset = 0;      // +0x10
-    std::uint32_t readOffset = 0;       // +0x14
-  };
-  static_assert(offsetof(RuntimeSlidingBufferView, buffer) == 0x0C, "RuntimeSlidingBufferView::buffer offset must be 0x0C");
-  static_assert(offsetof(RuntimeSlidingBufferView, writeOffset) == 0x10, "RuntimeSlidingBufferView::writeOffset offset must be 0x10");
-  static_assert(offsetof(RuntimeSlidingBufferView, readOffset) == 0x14, "RuntimeSlidingBufferView::readOffset offset must be 0x14");
-
   /**
    * Address: 0x00A8B161 (FUN_00A8B161, ___inittime)
    *
@@ -15602,93 +13046,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   using RuntimeBinarySearchCompareFn = int(__cdecl*)(const void* key, const void* element);
 
-  struct RuntimeScopedMutexLockView
-  {
-    struct RuntimeMutexView* mutex = nullptr; // +0x00
-    std::uint8_t ownsLock = 0;            // +0x04
-    std::uint8_t reserved05[0x3]{};       // +0x05
-  };
-  static_assert(
-    offsetof(RuntimeScopedMutexLockView, ownsLock) == 0x4,
-    "RuntimeScopedMutexLockView::ownsLock offset must be 0x4"
-  );
-  static_assert(sizeof(RuntimeScopedMutexLockView) == 0x8, "RuntimeScopedMutexLockView size must be 0x8");
-
-  struct RuntimeMutexView
-  {
-    void* nativeHandleOrCriticalSection = nullptr; // +0x00
-    std::uint8_t lockMode = 0;                     // +0x04
-    std::uint8_t reserved05[0x3]{};                // +0x05
-  };
-  static_assert(sizeof(RuntimeMutexView) == 0x8, "RuntimeMutexView size must be 0x8");
-
-  struct RuntimeOwnedHandleCell
-  {
-    HANDLE handle = nullptr;              // +0x00
-    std::uint32_t reserved04 = 0;         // +0x04
-    std::uint8_t shouldCloseHandle = 0;   // +0x08
-    std::uint8_t reserved09[0x3]{};       // +0x09
-  };
-  static_assert(
-    offsetof(RuntimeOwnedHandleCell, shouldCloseHandle) == 0x8,
-    "RuntimeOwnedHandleCell::shouldCloseHandle offset must be 0x8"
-  );
-  static_assert(sizeof(RuntimeOwnedHandleCell) == 0xC, "RuntimeOwnedHandleCell size must be 0xC");
-
-  struct RuntimeWxStringView
-  {
-    wchar_t* m_pchData = nullptr; // +0x00
-  };
-  static_assert(sizeof(RuntimeWxStringView) == 0x4, "RuntimeWxStringView size must be 0x4");
-
-  struct RuntimeWxObjectView
-  {
-    void* vtable = nullptr;  // +0x00
-    void* refData = nullptr; // +0x04
-  };
-  static_assert(offsetof(RuntimeWxObjectView, refData) == 0x4, "RuntimeWxObjectView::refData offset must be 0x4");
-  static_assert(sizeof(RuntimeWxObjectView) == 0x8, "RuntimeWxObjectView size must be 0x8");
-
-  struct RuntimeWxCommandEventView
-  {
-    std::uint8_t reserved00[0x20]{};
-    RuntimeWxStringView commandString; // +0x20
-  };
-  static_assert(
-    offsetof(RuntimeWxCommandEventView, commandString) == 0x20,
-    "RuntimeWxCommandEventView::commandString offset must be 0x20"
-  );
-
-  struct RuntimeCriticalSectionLeaveGuard
-  {
-    std::uint8_t shouldLeave = 0;         // +0x00
-    std::uint8_t reserved01[0x3]{};       // +0x01
-    CRITICAL_SECTION* criticalSection = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeCriticalSectionLeaveGuard, criticalSection) == 0x4,
-    "RuntimeCriticalSectionLeaveGuard::criticalSection offset must be 0x4"
-  );
-  static_assert(sizeof(RuntimeCriticalSectionLeaveGuard) == 0x8, "RuntimeCriticalSectionLeaveGuard size must be 0x8");
-
-  struct RuntimeBacklinkedFiveWordCopyLane
-  {
-    std::uint32_t word0 = 0;        // +0x00
-    std::uint32_t word1 = 0;        // +0x04
-    std::uintptr_t* ownerSlot = nullptr; // +0x08
-    std::uintptr_t previousOwner = 0;     // +0x0C
-    std::uint32_t word4 = 0;        // +0x10
-  };
-  static_assert(sizeof(RuntimeBacklinkedFiveWordCopyLane) == 0x14, "RuntimeBacklinkedFiveWordCopyLane size must be 0x14");
-  static_assert(
-    offsetof(RuntimeBacklinkedFiveWordCopyLane, ownerSlot) == 0x8,
-    "RuntimeBacklinkedFiveWordCopyLane::ownerSlot offset must be 0x8"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedFiveWordCopyLane, previousOwner) == 0xC,
-    "RuntimeBacklinkedFiveWordCopyLane::previousOwner offset must be 0xC"
-  );
-
   struct RuntimeBacklinkedPairCopyLane
   {
     std::uintptr_t* ownerSlot = nullptr; // +0x00
@@ -15696,278 +13053,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeBacklinkedPairCopyLane) == 0x8, "RuntimeBacklinkedPairCopyLane size must be 0x8");
 
-  struct RuntimeBacklinkedPairFloatTripleRecord
-  {
-    std::uint32_t word0 = 0;                 // +0x00
-    std::uintptr_t* ownerSlot = nullptr;     // +0x04
-    std::uintptr_t previousOwner = 0;        // +0x08
-    float laneC = 0.0f;                      // +0x0C
-    float laneD = 0.0f;                      // +0x10
-    float laneE = 0.0f;                      // +0x14
-  };
-  static_assert(
-    sizeof(RuntimeBacklinkedPairFloatTripleRecord) == 0x18,
-    "RuntimeBacklinkedPairFloatTripleRecord size must be 0x18"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedPairFloatTripleRecord, ownerSlot) == 0x04,
-    "RuntimeBacklinkedPairFloatTripleRecord::ownerSlot offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedPairFloatTripleRecord, previousOwner) == 0x08,
-    "RuntimeBacklinkedPairFloatTripleRecord::previousOwner offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedPairFloatTripleRecord, laneC) == 0x0C,
-    "RuntimeBacklinkedPairFloatTripleRecord::laneC offset must be 0x0C"
-  );
-
-  struct RuntimeBacklinkedTripleWordCopyLane
-  {
-    std::uintptr_t* ownerSlot = nullptr; // +0x00
-    std::uintptr_t previousOwner = 0;    // +0x04
-    std::uint32_t word2 = 0;             // +0x08
-  };
-  static_assert(sizeof(RuntimeBacklinkedTripleWordCopyLane) == 0xC, "RuntimeBacklinkedTripleWordCopyLane size must be 0xC");
-  static_assert(
-    offsetof(RuntimeBacklinkedTripleWordCopyLane, ownerSlot) == 0x0,
-    "RuntimeBacklinkedTripleWordCopyLane::ownerSlot offset must be 0x0"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedTripleWordCopyLane, previousOwner) == 0x4,
-    "RuntimeBacklinkedTripleWordCopyLane::previousOwner offset must be 0x4"
-  );
-  static_assert(
-    offsetof(RuntimeBacklinkedTripleWordCopyLane, word2) == 0x8,
-    "RuntimeBacklinkedTripleWordCopyLane::word2 offset must be 0x8"
-  );
-
-  struct RuntimeRefcountOwnerView
-  {
-    std::uintptr_t reserved00 = 0; // +0x00
-    volatile long refcount = 0;    // +0x04
-  };
-  static_assert(sizeof(RuntimeRefcountOwnerView) == 0x8, "RuntimeRefcountOwnerView size must be 0x8");
-  static_assert(offsetof(RuntimeRefcountOwnerView, refcount) == 0x4, "RuntimeRefcountOwnerView::refcount offset must be 0x4");
-
-  struct RuntimeRefcountTailFiveWordCopyLane
-  {
-    std::uint32_t word0 = 0;                 // +0x00
-    std::uint32_t word1 = 0;                 // +0x04
-    std::uint32_t word2 = 0;                 // +0x08
-    std::uint32_t word3 = 0;                 // +0x0C
-    RuntimeRefcountOwnerView* owner = nullptr; // +0x10
-  };
-  static_assert(sizeof(RuntimeRefcountTailFiveWordCopyLane) == 0x14, "RuntimeRefcountTailFiveWordCopyLane size must be 0x14");
-  static_assert(
-    offsetof(RuntimeRefcountTailFiveWordCopyLane, owner) == 0x10,
-    "RuntimeRefcountTailFiveWordCopyLane::owner offset must be 0x10"
-  );
-
-  struct RuntimeRefcountPairCopyLane
-  {
-    std::uint32_t word0 = 0;                 // +0x00
-    RuntimeRefcountOwnerView* owner = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeRefcountPairCopyLane) == 0x8, "RuntimeRefcountPairCopyLane size must be 0x8");
-  static_assert(
-    offsetof(RuntimeRefcountPairCopyLane, owner) == 0x4,
-    "RuntimeRefcountPairCopyLane::owner offset must be 0x4"
-  );
-
-  struct RuntimeConditionalRefcountPairOwnerView
-  {
-    std::uint8_t pad00[0x0C];                // +0x00
-    std::uint8_t useSecondaryPairLane;       // +0x0C
-    std::uint8_t pad0D[0x2D3];               // +0x0D
-    RuntimeRefcountPairCopyLane primaryPair; // +0x2E0
-    std::uint8_t pad2E8[0x08];               // +0x2E8
-    RuntimeRefcountPairCopyLane secondaryPair; // +0x2F0
-  };
-  static_assert(
-    offsetof(RuntimeConditionalRefcountPairOwnerView, useSecondaryPairLane) == 0x0C,
-    "RuntimeConditionalRefcountPairOwnerView::useSecondaryPairLane offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RuntimeConditionalRefcountPairOwnerView, primaryPair) == 0x2E0,
-    "RuntimeConditionalRefcountPairOwnerView::primaryPair offset must be 0x2E0"
-  );
-  static_assert(
-    offsetof(RuntimeConditionalRefcountPairOwnerView, secondaryPair) == 0x2F0,
-    "RuntimeConditionalRefcountPairOwnerView::secondaryPair offset must be 0x2F0"
-  );
-
-  struct RuntimeRefcountTailTripleCopyLane
-  {
-    std::uint32_t word0 = 0;                 // +0x00
-    std::uint32_t word1 = 0;                 // +0x04
-    RuntimeRefcountOwnerView* owner = nullptr; // +0x08
-  };
-  static_assert(sizeof(RuntimeRefcountTailTripleCopyLane) == 0xC, "RuntimeRefcountTailTripleCopyLane size must be 0xC");
-  static_assert(
-    offsetof(RuntimeRefcountTailTripleCopyLane, owner) == 0x8,
-    "RuntimeRefcountTailTripleCopyLane::owner offset must be 0x8"
-  );
-
-  struct RuntimeRefcountQuadOddCopyLane
-  {
-    std::uint32_t word0 = 0;                      // +0x00
-    RuntimeRefcountOwnerView* owner1 = nullptr;   // +0x04
-    std::uint32_t word2 = 0;                      // +0x08
-    RuntimeRefcountOwnerView* owner3 = nullptr;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeRefcountQuadOddCopyLane) == 0x10, "RuntimeRefcountQuadOddCopyLane size must be 0x10");
-  static_assert(
-    offsetof(RuntimeRefcountQuadOddCopyLane, owner1) == 0x4,
-    "RuntimeRefcountQuadOddCopyLane::owner1 offset must be 0x4"
-  );
-  static_assert(
-    offsetof(RuntimeRefcountQuadOddCopyLane, owner3) == 0xC,
-    "RuntimeRefcountQuadOddCopyLane::owner3 offset must be 0xC"
-  );
-
-  struct RuntimeCopyMixedDwordFloatSeptupleLane
-  {
-    std::uint32_t word0 = 0;  // +0x00
-    float lane1 = 0.0f;       // +0x04
-    float lane2 = 0.0f;       // +0x08
-    float lane3 = 0.0f;       // +0x0C
-    float lane4 = 0.0f;       // +0x10
-    float lane5 = 0.0f;       // +0x14
-    float lane6 = 0.0f;       // +0x18
-    float lane7 = 0.0f;       // +0x1C
-  };
-  static_assert(
-    sizeof(RuntimeCopyMixedDwordFloatSeptupleLane) == 0x20,
-    "RuntimeCopyMixedDwordFloatSeptupleLane size must be 0x20"
-  );
-
-  struct RuntimeCopyRefcountTaggedRecord28Lane
-  {
-    std::uint32_t word0 = 0;                    // +0x00
-    std::uint32_t word1 = 0;                    // +0x04
-    std::uint32_t word2 = 0;                    // +0x08
-    std::uint8_t lane0C = 0;                    // +0x0C
-    std::uint8_t pad0D = 0;                     // +0x0D
-    std::uint8_t pad0E = 0;                     // +0x0E
-    std::uint8_t pad0F = 0;                     // +0x0F
-    std::uint32_t lane10 = 0;                   // +0x10
-    RuntimeRefcountOwnerView* owner = nullptr;  // +0x14
-    std::uint8_t lane18 = 0;                    // +0x18
-    std::uint8_t pad19 = 0;                     // +0x19
-    std::uint8_t pad1A = 0;                     // +0x1A
-    std::uint8_t pad1B = 0;                     // +0x1B
-  };
-  static_assert(sizeof(RuntimeCopyRefcountTaggedRecord28Lane) == 0x1C, "RuntimeCopyRefcountTaggedRecord28Lane size must be 0x1C");
-  static_assert(
-    offsetof(RuntimeCopyRefcountTaggedRecord28Lane, owner) == 0x14,
-    "RuntimeCopyRefcountTaggedRecord28Lane::owner offset must be 0x14"
-  );
-
-  struct RuntimeRetainedOwnerTripleRecord52Lane
-  {
-    std::uint8_t lane00 = 0;                    // +0x00
-    std::uint8_t pad01 = 0;                     // +0x01
-    std::uint8_t pad02 = 0;                     // +0x02
-    std::uint8_t pad03 = 0;                     // +0x03
-    std::uint32_t lane04 = 0;                   // +0x04
-    std::uint32_t lane08 = 0;                   // +0x08
-    std::uint32_t lane0C = 0;                   // +0x0C
-    RuntimeRefcountOwnerView* owner10 = nullptr; // +0x10
-    std::uint32_t lane14 = 0;                   // +0x14
-    RuntimeRefcountOwnerView* owner18 = nullptr; // +0x18
-    std::uint32_t lane1C = 0;                   // +0x1C
-    RuntimeRefcountOwnerView* owner20 = nullptr; // +0x20
-    float lane24 = 0.0f;                        // +0x24
-    float lane28 = 0.0f;                        // +0x28
-    float lane2C = 0.0f;                        // +0x2C
-    std::uint8_t lane30 = 0;                    // +0x30
-    std::uint8_t pad31 = 0;                     // +0x31
-    std::uint8_t pad32 = 0;                     // +0x32
-    std::uint8_t pad33 = 0;                     // +0x33
-  };
-  static_assert(
-    sizeof(RuntimeRetainedOwnerTripleRecord52Lane) == 0x34,
-    "RuntimeRetainedOwnerTripleRecord52Lane size must be 0x34"
-  );
-  static_assert(
-    offsetof(RuntimeRetainedOwnerTripleRecord52Lane, owner10) == 0x10,
-    "RuntimeRetainedOwnerTripleRecord52Lane::owner10 offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeRetainedOwnerTripleRecord52Lane, owner18) == 0x18,
-    "RuntimeRetainedOwnerTripleRecord52Lane::owner18 offset must be 0x18"
-  );
-  static_assert(
-    offsetof(RuntimeRetainedOwnerTripleRecord52Lane, owner20) == 0x20,
-    "RuntimeRetainedOwnerTripleRecord52Lane::owner20 offset must be 0x20"
-  );
-
-  struct RuntimeSearchSubobjectKey104View
-  {
-    std::uint8_t pad00_67[0x68]{};
-    std::int32_t key = 0; // +0x68
-  };
-  static_assert(
-    offsetof(RuntimeSearchSubobjectKey104View, key) == 0x68,
-    "RuntimeSearchSubobjectKey104View::key offset must be 0x68"
-  );
-
   // Placeholder typed view for insertion-sort lanes whose pointed-to objects
   // expose a 32-bit ascending key at byte offset +0x14.
-  struct RuntimePointerSortKeyAtOffset20View
-  {
-    std::uint8_t pad00_13[0x14]{};
-    std::uint32_t key = 0; // +0x14
-  };
-  static_assert(
-    offsetof(RuntimePointerSortKeyAtOffset20View, key) == 0x14,
-    "RuntimePointerSortKeyAtOffset20View::key offset must be 0x14"
-  );
-
-  struct RuntimeSearchOwnerKey112View
-  {
-    std::uint8_t pad00_07[0x08]{};
-    RuntimeSearchSubobjectKey104View searchSubobject; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimeSearchOwnerKey112View, searchSubobject) == 0x08,
-    "RuntimeSearchOwnerKey112View::searchSubobject offset must be 0x08"
-  );
-
-  struct RuntimeFixedRecord56Lane
-  {
-    std::uint32_t words[14]{};
-  };
-  static_assert(sizeof(RuntimeFixedRecord56Lane) == 0x38, "RuntimeFixedRecord56Lane size must be 0x38");
-
-  struct RuntimeRecord56MoveOwnerView
-  {
-    std::uint8_t pad00_07[0x08]{};
-    RuntimeFixedRecord56Lane* activeEnd = nullptr; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimeRecord56MoveOwnerView, activeEnd) == 0x08,
-    "RuntimeRecord56MoveOwnerView::activeEnd offset must be 0x08"
-  );
-
-  struct RuntimeRecord12MoveOwnerView
-  {
-    std::uint8_t pad00_03[0x04]{};
-    RuntimeFloat3Record* activeEnd = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeRecord12MoveOwnerView, activeEnd) == 0x04,
-    "RuntimeRecord12MoveOwnerView::activeEnd offset must be 0x04"
-  );
-
-  struct RuntimePointerSlotPatchLane
-  {
-    std::uintptr_t* slot = nullptr; // +0x00
-    std::uintptr_t replacement = 0; // +0x04
-  };
-  static_assert(sizeof(RuntimePointerSlotPatchLane) == 0x8, "RuntimePointerSlotPatchLane size must be 0x8");
-
   template <typename TWord, std::size_t kWordStride>
   [[nodiscard]] TWord* RuntimeCopyWordRangeStrided(
     TWord* const destination,
@@ -16054,66 +13141,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-  struct RuntimeBacklinkedPairVectorStorageView
-  {
-    RuntimeBacklinkedPairCopyLane* begin = nullptr; // +0x00
-    RuntimeBacklinkedPairCopyLane* end = nullptr; // +0x04
-    RuntimeBacklinkedPairCopyLane* capacity = nullptr; // +0x08
-    RuntimeBacklinkedPairCopyLane** inlineStorageBeginSlot = nullptr; // +0x0C
-  };
-  static_assert(sizeof(RuntimeBacklinkedPairVectorStorageView) == 0x10, "RuntimeBacklinkedPairVectorStorageView size must be 0x10");
-  static_assert(
-    offsetof(RuntimeBacklinkedPairVectorStorageView, inlineStorageBeginSlot) == 0x0C,
-    "RuntimeBacklinkedPairVectorStorageView::inlineStorageBeginSlot offset must be 0x0C"
-  );
-
-  struct RuntimeRefcountPairVectorStorageView
-  {
-    std::uint32_t reserved00 = 0;                 // +0x00
-    RuntimeRefcountPairCopyLane* begin = nullptr; // +0x04
-    RuntimeRefcountPairCopyLane* end = nullptr;   // +0x08
-    RuntimeRefcountPairCopyLane* capacity = nullptr; // +0x0C
-  };
-  static_assert(sizeof(RuntimeRefcountPairVectorStorageView) == 0x10, "RuntimeRefcountPairVectorStorageView size must be 0x10");
-  static_assert(
-    offsetof(RuntimeRefcountPairVectorStorageView, begin) == 0x04,
-    "RuntimeRefcountPairVectorStorageView::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimeRefcountPairVectorStorageView, end) == 0x08,
-    "RuntimeRefcountPairVectorStorageView::end offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeRefcountPairVectorStorageView, capacity) == 0x0C,
-    "RuntimeRefcountPairVectorStorageView::capacity offset must be 0x0C"
-  );
-
-  struct RuntimeFloat13LaneView
-  {
-    float lanes[13]{};
-  };
-  static_assert(sizeof(RuntimeFloat13LaneView) == 0x34, "RuntimeFloat13LaneView size must be 0x34");
-
-  struct RuntimeRefcountedPointerLane
-  {
-    void* vtable = nullptr;         // +0x00
-    volatile long refCount = 0;     // +0x04
-  };
-  static_assert(offsetof(RuntimeRefcountedPointerLane, refCount) == 0x04, "RuntimeRefcountedPointerLane::refCount offset must be 0x04");
-
-  struct RuntimeRaw28ByteRecord
-  {
-    std::uint32_t words[7];
-  };
-  static_assert(sizeof(RuntimeRaw28ByteRecord) == 0x1C, "RuntimeRaw28ByteRecord size must be 0x1C");
-
-  struct RuntimeDwordPairLane
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-  };
-  static_assert(sizeof(RuntimeDwordPairLane) == 0x08, "RuntimeDwordPairLane size must be 0x08");
-
   /**
    * Address: 0x0076B520 (FUN_0076B520)
    *
@@ -16128,18 +13155,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
-
-  struct RuntimeRefcountTailFiveWordCursorState
-  {
-    std::uint32_t lane00 = 0;                    // +0x00
-    std::uint32_t lane04 = 0;                    // +0x04
-    RuntimeRefcountTailFiveWordCopyLane* anchor; // +0x08
-  };
-  static_assert(sizeof(RuntimeRefcountTailFiveWordCursorState) == 0x0C, "RuntimeRefcountTailFiveWordCursorState size must be 0x0C");
-  static_assert(
-    offsetof(RuntimeRefcountTailFiveWordCursorState, anchor) == 0x08,
-    "RuntimeRefcountTailFiveWordCursorState::anchor offset must be 0x08"
-  );
 
   /**
    * Address: 0x00832B80 (FUN_00832B80)
@@ -16186,61 +13201,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  struct RuntimeStride20VectorView
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint8_t* begin = nullptr; // +0x04
-    std::uint8_t* end = nullptr; // +0x08
-  };
-  static_assert(sizeof(RuntimeStride20VectorView) == 0x0C, "RuntimeStride20VectorView size must be 0x0C");
-
-  struct RuntimeStride24VectorView
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint8_t* begin = nullptr; // +0x04
-    std::uint8_t* end = nullptr; // +0x08
-  };
-  static_assert(sizeof(RuntimeStride24VectorView) == 0x0C, "RuntimeStride24VectorView size must be 0x0C");
-
-  struct RuntimePrefixCompareCaptureLane
-  {
-    std::uintptr_t lhsRangeBegin = 0; // +0x00
-    const std::uint8_t* lhsCursor = nullptr; // +0x04
-    std::uintptr_t rhsRangeEnd = 0; // +0x08
-    const std::uint8_t* rhsCursor = nullptr; // +0x0C
-  };
-  static_assert(sizeof(RuntimePrefixCompareCaptureLane) == 0x10, "RuntimePrefixCompareCaptureLane size must be 0x10");
-
-  struct RuntimeAabb6Lane
-  {
-    float minX = 0.0f;
-    float minY = 0.0f;
-    float minZ = 0.0f;
-    float maxX = 0.0f;
-    float maxY = 0.0f;
-    float maxZ = 0.0f;
-  };
-  static_assert(sizeof(RuntimeAabb6Lane) == 0x18, "RuntimeAabb6Lane size must be 0x18");
-
-  struct RuntimeUnaryCdeclCallbackLane
-  {
-    using InvokeFn = int(__cdecl*)(int value);
-
-    InvokeFn invoke; // +0x00
-  };
-  static_assert(sizeof(RuntimeUnaryCdeclCallbackLane) == 0x04, "RuntimeUnaryCdeclCallbackLane size must be 0x04");
-
-  struct RuntimeFlagDispatchVTable
-  {
-    int(__thiscall* dispatch)(void* self, int lane);
-  };
-
-  struct RuntimeFlagDispatchObject
-  {
-    RuntimeFlagDispatchVTable* vtable; // +0x00
-  };
-  static_assert(sizeof(RuntimeFlagDispatchObject) == 0x04, "RuntimeFlagDispatchObject size must be 0x04");
-
   /**
    * Address: 0x008D80A0 (FUN_008D80A0)
    *
@@ -16272,132 +13232,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
-
-  struct RuntimeTreeIteratorNodeLaneView
-  {
-    RuntimeTreeIteratorNodeLaneView* lane0; // +0x00
-    RuntimeTreeIteratorNodeLaneView* lane1; // +0x04
-    RuntimeTreeIteratorNodeLaneView* lane2; // +0x08
-  };
-  static_assert(sizeof(RuntimeTreeIteratorNodeLaneView) == 0x0C, "RuntimeTreeIteratorNodeLaneView size must be 0x0C");
-
-
-
-  struct RuntimeTreeIteratorCursorNil21CheckedView
-  {
-    void* owner = nullptr;                          // +0x00
-    RuntimeTreeIteratorNodeLaneView* cursor = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeTreeIteratorCursorNil21CheckedView) == 0x08, "RuntimeTreeIteratorCursorNil21CheckedView size must be 0x08");
-  static_assert(
-    offsetof(RuntimeTreeIteratorCursorNil21CheckedView, cursor) == 0x04,
-    "RuntimeTreeIteratorCursorNil21CheckedView::cursor offset must be 0x04"
-  );
-
-  struct RuntimeTreeRotateOwnerLaneView
-  {
-    std::uint32_t lane00;                     // +0x00
-    RuntimeTreeIteratorNodeLaneView* head;    // +0x04
-  };
-  static_assert(sizeof(RuntimeTreeRotateOwnerLaneView) == 0x08, "RuntimeTreeRotateOwnerLaneView size must be 0x08");
-  static_assert(
-    offsetof(RuntimeTreeRotateOwnerLaneView, head) == 0x04,
-    "RuntimeTreeRotateOwnerLaneView::head offset must be 0x04"
-  );
-
-
-  struct RuntimeDwordByteRecord5LaneView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint8_t lane04 = 0u;  // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeDwordByteRecord5LaneView, lane04) == 0x04,
-    "RuntimeDwordByteRecord5LaneView::lane04 offset must be 0x04"
-  );
-
-  struct RuntimeDwordTripleRecordLaneView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-  };
-  static_assert(sizeof(RuntimeDwordTripleRecordLaneView) == 0x0C, "RuntimeDwordTripleRecordLaneView size must be 0x0C");
-  static_assert(
-    offsetof(RuntimeDwordTripleRecordLaneView, lane08) == 0x08,
-    "RuntimeDwordTripleRecordLaneView::lane08 offset must be 0x08"
-  );
-
-  struct RuntimeTreeNode20DwordKeyColorLaneView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-    std::uint32_t keyLane = 0u; // +0x0C
-    std::uint8_t color = 0u;   // +0x10
-    std::uint8_t isNil = 0u;   // +0x11
-  };
-  static_assert(
-    offsetof(RuntimeTreeNode20DwordKeyColorLaneView, keyLane) == 0x0C,
-    "RuntimeTreeNode20DwordKeyColorLaneView::keyLane offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RuntimeTreeNode20DwordKeyColorLaneView, color) == 0x10,
-    "RuntimeTreeNode20DwordKeyColorLaneView::color offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RuntimeTreeNode20DwordKeyColorLaneView, isNil) == 0x11,
-    "RuntimeTreeNode20DwordKeyColorLaneView::isNil offset must be 0x11"
-  );
-
-  struct RuntimeDwordPairLaneView
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-  };
-  static_assert(sizeof(RuntimeDwordPairLaneView) == 0x08, "RuntimeDwordPairLaneView size must be 0x08");
-
-  struct RuntimeDwordByteLaneView
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint8_t lane04;  // +0x04
-  };
-  static_assert(offsetof(RuntimeDwordByteLaneView, lane04) == 0x04, "RuntimeDwordByteLaneView::lane04 offset must be 0x04");
-
-  struct RuntimeStateValueTreeNode
-  {
-    RuntimeStateValueTreeNode* left;    // +0x00
-    RuntimeStateValueTreeNode* parent;  // +0x04
-    RuntimeStateValueTreeNode* right;   // +0x08
-    std::uint32_t key;                  // +0x0C
-    std::uint32_t value;                // +0x10
-    std::uint8_t color;                 // +0x14
-    std::uint8_t isNil;                 // +0x15
-    std::uint8_t reserved16;            // +0x16
-    std::uint8_t reserved17;            // +0x17
-  };
-  static_assert(sizeof(RuntimeStateValueTreeNode) == 0x18, "RuntimeStateValueTreeNode size must be 0x18");
-  static_assert(offsetof(RuntimeStateValueTreeNode, key) == 0x0C, "RuntimeStateValueTreeNode::key offset must be 0x0C");
-  static_assert(offsetof(RuntimeStateValueTreeNode, value) == 0x10, "RuntimeStateValueTreeNode::value offset must be 0x10");
-  static_assert(offsetof(RuntimeStateValueTreeNode, color) == 0x14, "RuntimeStateValueTreeNode::color offset must be 0x14");
-  static_assert(offsetof(RuntimeStateValueTreeNode, isNil) == 0x15, "RuntimeStateValueTreeNode::isNil offset must be 0x15");
-
-  struct RuntimeStateValueTreeOwnerView
-  {
-    std::uint32_t lane00;               // +0x00
-    RuntimeStateValueTreeNode* head;    // +0x04
-  };
-  static_assert(sizeof(RuntimeStateValueTreeOwnerView) == 0x08, "RuntimeStateValueTreeOwnerView size must be 0x08");
-  static_assert(
-    offsetof(RuntimeStateValueTreeOwnerView, head) == 0x04,
-    "RuntimeStateValueTreeOwnerView::head offset must be 0x04"
-  );
-
-
-
-
-
-
 
   struct RuntimeRbTreeStateNil17DwordPayload
   {
@@ -16433,49 +13267,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     RuntimeRbTreeStateNil17DwordPayload* const destination,
     const RuntimeRbTreeStateNil17DwordPayload* const source
   );
-
-  struct RuntimePrefixedRbTreeStateNil17At04
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    RuntimeRbTreeStateNil17DwordPayload tree{}; // +0x04
-  };
-  static_assert(sizeof(RuntimePrefixedRbTreeStateNil17At04) == 0x10, "RuntimePrefixedRbTreeStateNil17At04 size must be 0x10");
-  static_assert(
-    offsetof(RuntimePrefixedRbTreeStateNil17At04, tree) == 0x04,
-    "RuntimePrefixedRbTreeStateNil17At04::tree offset must be 0x04"
-  );
-
-  struct RuntimePrefixedRbTreeStateNil17VectorOwner
-  {
-    std::uint32_t lane00 = 0;
-    RuntimePrefixedRbTreeStateNil17At04* begin = nullptr;    // +0x04
-    RuntimePrefixedRbTreeStateNil17At04* end = nullptr;      // +0x08
-    RuntimePrefixedRbTreeStateNil17At04* capacity = nullptr; // +0x0C
-  };
-  static_assert(
-    offsetof(RuntimePrefixedRbTreeStateNil17VectorOwner, begin) == 0x04,
-    "RuntimePrefixedRbTreeStateNil17VectorOwner::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RuntimePrefixedRbTreeStateNil17VectorOwner, end) == 0x08,
-    "RuntimePrefixedRbTreeStateNil17VectorOwner::end offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimePrefixedRbTreeStateNil17VectorOwner, capacity) == 0x0C,
-    "RuntimePrefixedRbTreeStateNil17VectorOwner::capacity offset must be 0x0C"
-  );
-
-  struct RuntimePrefixedRbTreeStateNil17RangeOwnerAt08
-  {
-    std::uint8_t lane00_07[0x08]{};
-    RuntimePrefixedRbTreeStateNil17At04* end = nullptr; // +0x08
-  };
-  static_assert(
-    offsetof(RuntimePrefixedRbTreeStateNil17RangeOwnerAt08, end) == 0x08,
-    "RuntimePrefixedRbTreeStateNil17RangeOwnerAt08::end offset must be 0x08"
-  );
-
-
 
   /**
    * Address: 0x0052DB50 (FUN_0052DB50)
@@ -16577,121 +13368,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return rightmost;
   }
 
-  struct RuntimeCopyRecord36LaneA
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    msvc8::string text;
-  };
-
-  struct RuntimeCopyRecord36LaneB
-  {
-    std::uint32_t lane00;
-    msvc8::string text;
-    std::uint32_t lane20;
-  };
-
-  struct RuntimeLuaRecord24
-  {
-    std::uint32_t lane00;
-    LuaPlus::LuaObject object;
-  };
-  static_assert(sizeof(RuntimeLuaRecord24) == 0x18, "RuntimeLuaRecord24 size must be 0x18");
-  static_assert(offsetof(RuntimeLuaRecord24, object) == 0x04, "RuntimeLuaRecord24::object offset must be 0x04");
-
-  struct RuntimeCallableCloneDispatch
-  {
-    void(__cdecl* clonePayload)(const void* sourcePayload, void* destinationPayload, std::uint32_t flags);
-  };
-
-  struct RuntimeCallableState68
-  {
-    RuntimeCallableCloneDispatch* dispatch = nullptr; // +0x00
-    std::uint8_t lane04_07[0x04]{};
-    std::uint8_t payload08_1F[0x18]{};
-    std::uint32_t lanes20_40[9]{};
-    std::uint8_t stateFlag44 = 0; // +0x44
-  };
-  static_assert(offsetof(RuntimeCallableState68, payload08_1F) == 0x08, "RuntimeCallableState68::payload08_1F offset");
-  static_assert(offsetof(RuntimeCallableState68, lanes20_40) == 0x20, "RuntimeCallableState68::lanes20_40 offset");
-  static_assert(offsetof(RuntimeCallableState68, stateFlag44) == 0x44, "RuntimeCallableState68::stateFlag44 offset");
-
-  struct RuntimeCopyRecord44LaneA
-  {
-    float lane00;
-    float lane04;
-    float lane08;
-    std::uint32_t lane0C;
-    msvc8::string text;
-  };
-
-  struct RuntimePointerBufferStateLaneA
-  {
-    std::uint32_t lane00; // +0x00
-    void* begin;          // +0x04
-    void* end;            // +0x08
-    void* capacity;       // +0x0C
-  };
-  static_assert(sizeof(RuntimePointerBufferStateLaneA) == 0x10, "RuntimePointerBufferStateLaneA size must be 0x10");
-
-  struct RuntimeIntPairHashKey
-  {
-    int lhs;
-    int rhs;
-  };
-  static_assert(sizeof(RuntimeIntPairHashKey) == 0x08, "RuntimeIntPairHashKey size must be 0x08");
-
-  struct RuntimePairHashListNode
-  {
-    RuntimePairHashListNode* next; // +0x00
-    RuntimePairHashListNode* prev; // +0x04
-    std::uint32_t keyLhs;          // +0x08
-    std::uint32_t keyRhs;          // +0x0C
-  };
-  static_assert(sizeof(RuntimePairHashListNode) == 0x10, "RuntimePairHashListNode size must be 0x10");
-
-  struct RuntimePairHashBucketRange
-  {
-    RuntimePairHashListNode* begin; // +0x00
-    RuntimePairHashListNode* end;   // +0x04
-  };
-  static_assert(sizeof(RuntimePairHashBucketRange) == 0x08, "RuntimePairHashBucketRange size must be 0x08");
-
-  struct RuntimePairHashLookupState
-  {
-    std::uint32_t lane00;                     // +0x00
-    std::uint32_t lane04;                     // +0x04
-    RuntimePairHashListNode* nilNode;         // +0x08
-    std::uint32_t lane0C;                     // +0x0C
-    std::uint32_t lane10;                     // +0x10
-    RuntimePairHashBucketRange* bucketRanges; // +0x14
-    std::uint32_t lane18;                     // +0x18
-    std::uint32_t lane1C;                     // +0x1C
-    std::uint32_t bucketMask;                 // +0x20
-    std::uint32_t bucketSplit;                // +0x24
-  };
-  static_assert(sizeof(RuntimePairHashLookupState) == 0x28, "RuntimePairHashLookupState size must be 0x28");
-  static_assert(
-    offsetof(RuntimePairHashLookupState, bucketRanges) == 0x14,
-    "RuntimePairHashLookupState::bucketRanges offset must be 0x14"
-  );
-  static_assert(
-    offsetof(RuntimePairHashLookupState, bucketMask) == 0x20,
-    "RuntimePairHashLookupState::bucketMask offset must be 0x20"
-  );
-  static_assert(
-    offsetof(RuntimePairHashLookupState, bucketSplit) == 0x24,
-    "RuntimePairHashLookupState::bucketSplit offset must be 0x24"
-  );
-
-  struct RuntimeSentinelNode20
-  {
-    RuntimeSentinelNode20* next; // +0x00
-    RuntimeSentinelNode20* prev; // +0x04
-    std::uint8_t payload[0x0C];  // +0x08
-  };
-  static_assert(sizeof(RuntimeSentinelNode20) == 0x14, "RuntimeSentinelNode20 size must be 0x14");
-
   struct RuntimeIntrusiveListNode
   {
     RuntimeIntrusiveListNode* next; // +0x00
@@ -16706,34 +13382,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint32_t size;            // +0x08
   };
   static_assert(sizeof(RuntimeIntrusiveListState) == 0x0C, "RuntimeIntrusiveListState size must be 0x0C");
-
-  struct RuntimeDualLinkOwnerLane
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    void* leftNode;       // +0x08
-    void* rightNode;      // +0x0C
-  };
-  static_assert(sizeof(RuntimeDualLinkOwnerLane) == 0x10, "RuntimeDualLinkOwnerLane size must be 0x10");
-  static_assert(offsetof(RuntimeDualLinkOwnerLane, leftNode) == 0x08, "RuntimeDualLinkOwnerLane::leftNode offset must be 0x08");
-  static_assert(offsetof(RuntimeDualLinkOwnerLane, rightNode) == 0x0C, "RuntimeDualLinkOwnerLane::rightNode offset must be 0x0C");
-
-  struct RuntimeDualLinkLeftNodeLane
-  {
-    std::uint8_t pad00_0B[0x0C]; // +0x00
-    RuntimeDualLinkOwnerLane* owner; // +0x0C
-  };
-  static_assert(sizeof(RuntimeDualLinkLeftNodeLane) == 0x10, "RuntimeDualLinkLeftNodeLane size must be 0x10");
-  static_assert(offsetof(RuntimeDualLinkLeftNodeLane, owner) == 0x0C, "RuntimeDualLinkLeftNodeLane::owner offset must be 0x0C");
-
-  struct RuntimeDualLinkRightNodeLane
-  {
-    std::uint8_t pad00_07[0x08]; // +0x00
-    RuntimeDualLinkOwnerLane* owner; // +0x08
-    std::uint32_t lane0C; // +0x0C
-  };
-  static_assert(sizeof(RuntimeDualLinkRightNodeLane) == 0x10, "RuntimeDualLinkRightNodeLane size must be 0x10");
-  static_assert(offsetof(RuntimeDualLinkRightNodeLane, owner) == 0x08, "RuntimeDualLinkRightNodeLane::owner offset must be 0x08");
 
   RuntimeIntrusiveListNode* RuntimeClearIntrusiveListNodesKeepHeadLaneA(
     RuntimeIntrusiveListState* const listState
@@ -16767,12 +13415,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     return head;
   }
-
-
-
-
-
-
 
 #pragma pack(push, 1)
   struct RuntimePackedFloatRecord74
@@ -16842,263 +13484,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-  struct RuntimeTreeNode24OwnerView
-  {
-    std::uint32_t lane00;
-    RuntimeTreeNode24* head;
-  };
-
-  struct RuntimeDualBacklinkedPairRecord24
-  {
-    std::uint32_t word0 = 0; // +0x00
-    std::uint32_t word1 = 0; // +0x04
-    RuntimeBacklinkedPairCopyLane laneA; // +0x08
-    RuntimeBacklinkedPairCopyLane laneB; // +0x10
-  };
-  static_assert(sizeof(RuntimeDualBacklinkedPairRecord24) == 0x18, "RuntimeDualBacklinkedPairRecord24 size must be 0x18");
-  static_assert(
-    offsetof(RuntimeDualBacklinkedPairRecord24, laneA) == 0x08,
-    "RuntimeDualBacklinkedPairRecord24::laneA offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeDualBacklinkedPairRecord24, laneB) == 0x10,
-    "RuntimeDualBacklinkedPairRecord24::laneB offset must be 0x10"
-  );
-
-  struct RuntimeTripleWordDualBacklinkedRecord40
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint32_t lane04 = 0; // +0x04
-    std::uint32_t lane08 = 0; // +0x08
-    RuntimeDualBacklinkedPairRecord24 lane0C; // +0x0C
-    std::uint8_t flag24 = 0; // +0x24
-    std::uint8_t flag25 = 0; // +0x25
-    std::uint8_t pad26[2] = {};
-  };
-  static_assert(sizeof(RuntimeTripleWordDualBacklinkedRecord40) == 0x28, "RuntimeTripleWordDualBacklinkedRecord40 size must be 0x28");
-  static_assert(
-    offsetof(RuntimeTripleWordDualBacklinkedRecord40, lane0C) == 0x0C,
-    "RuntimeTripleWordDualBacklinkedRecord40::lane0C offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RuntimeTripleWordDualBacklinkedRecord40, flag24) == 0x24,
-    "RuntimeTripleWordDualBacklinkedRecord40::flag24 offset must be 0x24"
-  );
-  static_assert(
-    offsetof(RuntimeTripleWordDualBacklinkedRecord40, flag25) == 0x25,
-    "RuntimeTripleWordDualBacklinkedRecord40::flag25 offset must be 0x25"
-  );
-
-  struct RuntimeIntrusiveRefcountedObjectView
-  {
-    void** vtable;           // +0x00
-    volatile long refCount;  // +0x04
-  };
-  static_assert(sizeof(RuntimeIntrusiveRefcountedObjectView) == 0x08, "RuntimeIntrusiveRefcountedObjectView size must be 0x08");
-
-  struct RuntimeLookupPayloadLane
-  {
-    std::uint32_t lane00;     // +0x00
-    std::uint32_t lane04;     // +0x04
-    std::uint32_t lane08;     // +0x08
-    std::uint32_t primaryKey; // +0x0C
-    std::uint32_t pairLhs;    // +0x10
-    std::uint32_t pairRhs;    // +0x14
-  };
-  static_assert(sizeof(RuntimeLookupPayloadLane) == 0x18, "RuntimeLookupPayloadLane size must be 0x18");
-  static_assert(offsetof(RuntimeLookupPayloadLane, primaryKey) == 0x0C, "RuntimeLookupPayloadLane::primaryKey offset must be 0x0C");
-  static_assert(offsetof(RuntimeLookupPayloadLane, pairLhs) == 0x10, "RuntimeLookupPayloadLane::pairLhs offset must be 0x10");
-  static_assert(offsetof(RuntimeLookupPayloadLane, pairRhs) == 0x14, "RuntimeLookupPayloadLane::pairRhs offset must be 0x14");
-
-  struct RuntimeLookupListNodeLane
-  {
-    std::uint32_t lane00;             // +0x00
-    std::uint32_t lane04;             // +0x04
-    RuntimeLookupPayloadLane* payload; // +0x08
-    RuntimeLookupListNodeLane* next;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeLookupListNodeLane) == 0x10, "RuntimeLookupListNodeLane size must be 0x10");
-  static_assert(offsetof(RuntimeLookupListNodeLane, payload) == 0x08, "RuntimeLookupListNodeLane::payload offset must be 0x08");
-  static_assert(offsetof(RuntimeLookupListNodeLane, next) == 0x0C, "RuntimeLookupListNodeLane::next offset must be 0x0C");
-
-  struct RuntimeLookupOwnerLane
-  {
-    std::uint8_t reserved00_0F[0x10]{};
-    RuntimeLookupListNodeLane* first = nullptr; // +0x10
-  };
-  static_assert(offsetof(RuntimeLookupOwnerLane, first) == 0x10, "RuntimeLookupOwnerLane::first offset must be 0x10");
-
-  struct RuntimeSingleWordLane
-  {
-    std::uint32_t value; // +0x00
-  };
-  static_assert(sizeof(RuntimeSingleWordLane) == 0x04, "RuntimeSingleWordLane size must be 0x04");
-
-  struct RuntimeWordPairLane
-  {
-    std::uint32_t first;  // +0x00
-    std::uint32_t second; // +0x04
-  };
-  static_assert(sizeof(RuntimeWordPairLane) == 0x08, "RuntimeWordPairLane size must be 0x08");
-
-  struct RuntimeSplitWordPairDestinationSlots
-  {
-    std::uint32_t* first = nullptr;  // +0x00
-    std::uint32_t* second = nullptr; // +0x04
-  };
-  static_assert(sizeof(RuntimeSplitWordPairDestinationSlots) == 0x08, "RuntimeSplitWordPairDestinationSlots size must be 0x08");
-
-  struct RuntimeWordQuadLane
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-    std::uint32_t lane0C; // +0x0C
-  };
-  static_assert(sizeof(RuntimeWordQuadLane) == 0x10, "RuntimeWordQuadLane size must be 0x10");
-
-  struct RuntimeWordAndByteLane
-  {
-    std::uint32_t word; // +0x00
-    std::uint8_t flag;  // +0x04
-  };
-  static_assert(offsetof(RuntimeWordAndByteLane, flag) == 0x04, "RuntimeWordAndByteLane::flag offset must be 0x04");
-
-  struct RuntimeWordOffset4Lane
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-  };
-  static_assert(offsetof(RuntimeWordOffset4Lane, lane04) == 0x04, "RuntimeWordOffset4Lane::lane04 offset must be 0x04");
-
-  struct RuntimeWordOffset8Lane
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-  };
-  static_assert(offsetof(RuntimeWordOffset8Lane, lane08) == 0x08, "RuntimeWordOffset8Lane::lane08 offset must be 0x08");
-
-  struct RuntimeWordPointerOffset4Lane
-  {
-    std::uint32_t lane00;      // +0x00
-    std::uint32_t* lane04;     // +0x04
-  };
-  static_assert(offsetof(RuntimeWordPointerOffset4Lane, lane04) == 0x04, "RuntimeWordPointerOffset4Lane::lane04 offset must be 0x04");
-
-  struct RuntimeWordWithTailOffset0CLane
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-    std::uint32_t lane0C; // +0x0C
-  };
-  static_assert(offsetof(RuntimeWordWithTailOffset0CLane, lane0C) == 0x0C, "RuntimeWordWithTailOffset0CLane::lane0C offset must be 0x0C");
-
-  struct RuntimeOffset20SetterView
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    std::uint32_t lane08;
-    std::uint32_t lane0C;
-    std::uint32_t lane10;
-    std::uint32_t lane14;
-  };
-  static_assert(offsetof(RuntimeOffset20SetterView, lane14) == 0x14, "RuntimeOffset20SetterView::lane14 offset must be 0x14");
-
-  struct RuntimeOffset48SetterView
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    std::uint32_t lane08;
-    std::uint32_t lane0C;
-    std::uint32_t lane10;
-    std::uint32_t lane14;
-    std::uint32_t lane18;
-    std::uint32_t lane1C;
-    std::uint32_t lane20;
-    std::uint32_t lane24;
-    std::uint32_t lane28;
-    std::uint32_t lane2C;
-    std::uint32_t lane30;
-  };
-  static_assert(offsetof(RuntimeOffset48SetterView, lane30) == 0x30, "RuntimeOffset48SetterView::lane30 offset must be 0x30");
-
-  struct RuntimeOffset8SetterView
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    std::uint32_t lane08; // +0x08
-  };
-  static_assert(offsetof(RuntimeOffset8SetterView, lane08) == 0x08, "RuntimeOffset8SetterView::lane08 offset must be 0x08");
-
-  struct RuntimeOffset168WordView
-  {
-    std::uint8_t reserved00_A7[0xA8];
-    std::uint32_t laneA8; // +0xA8
-  };
-  static_assert(offsetof(RuntimeOffset168WordView, laneA8) == 0xA8, "RuntimeOffset168WordView::laneA8 offset must be 0xA8");
-
-  struct RuntimeByteFlag177View
-  {
-    std::uint8_t reserved00_B0[0xB1];
-    std::uint8_t flagB1; // +0xB1
-  };
-  static_assert(offsetof(RuntimeByteFlag177View, flagB1) == 0xB1, "RuntimeByteFlag177View::flagB1 offset must be 0xB1");
-
-  struct RuntimeTypeTaggedRingNodeView
-  {
-    std::uint32_t lane00;           // +0x00
-    std::uint32_t typeTag;          // +0x04
-    std::uint8_t reserved08_37[0x30];
-    std::uint8_t payload[1];        // +0x38
-  };
-  static_assert(offsetof(RuntimeTypeTaggedRingNodeView, payload) == 0x38, "RuntimeTypeTaggedRingNodeView::payload offset must be 0x38");
-
-  struct RuntimeType6RingLookupView
-  {
-    std::uint8_t reserved00_87[0x88];
-    std::uint8_t fallbackPayload[0x30];     // +0x88
-    std::uint32_t laneB8;                   // +0xB8
-    RuntimeTypeTaggedRingNodeView** ringNodeTable; // +0xBC
-    std::uint32_t ringBaseIndex;            // +0xC0
-    std::uint32_t ringHeadIndex;            // +0xC4
-    std::uint32_t ringSpanCount;            // +0xC8
-  };
-  static_assert(offsetof(RuntimeType6RingLookupView, fallbackPayload) == 0x88, "RuntimeType6RingLookupView::fallbackPayload offset must be 0x88");
-  static_assert(offsetof(RuntimeType6RingLookupView, ringNodeTable) == 0xBC, "RuntimeType6RingLookupView::ringNodeTable offset must be 0xBC");
-  static_assert(offsetof(RuntimeType6RingLookupView, ringBaseIndex) == 0xC0, "RuntimeType6RingLookupView::ringBaseIndex offset must be 0xC0");
-  static_assert(offsetof(RuntimeType6RingLookupView, ringHeadIndex) == 0xC4, "RuntimeType6RingLookupView::ringHeadIndex offset must be 0xC4");
-  static_assert(offsetof(RuntimeType6RingLookupView, ringSpanCount) == 0xC8, "RuntimeType6RingLookupView::ringSpanCount offset must be 0xC8");
-
-  struct RuntimeSelfLinkedQuadPointerLane
-  {
-    std::uint32_t* lane00; // +0x00
-    std::uint32_t* lane04; // +0x04
-    std::uint32_t* lane08; // +0x08
-    std::uint32_t* lane0C; // +0x0C
-  };
-  static_assert(sizeof(RuntimeSelfLinkedQuadPointerLane) == 0x10, "RuntimeSelfLinkedQuadPointerLane size must be 0x10");
-
-  struct RuntimeAnchorPointerQuadLane
-  {
-    void* lane00;          // +0x00
-    void* lane04;          // +0x04
-    std::uint8_t* lane08;  // +0x08
-    void* lane0C;          // +0x0C
-  };
-  static_assert(sizeof(RuntimeAnchorPointerQuadLane) == 0x10, "RuntimeAnchorPointerQuadLane size must be 0x10");
-
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
-
-  struct RuntimeStride116VectorLaneView
-  {
-    void* allocatorCookie; // +0x00
-    std::byte* begin;      // +0x04
-    std::byte* end;        // +0x08
-    std::byte* capacity;   // +0x0C
-  };
-  static_assert(sizeof(RuntimeStride116VectorLaneView) == 0x10, "RuntimeStride116VectorLaneView size must be 0x10");
 
   using RuntimeComSlotDispatchFn = int(__stdcall*)(void*);
 
@@ -17106,90 +13492,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     __thiscall*
   )(void*, int, int, int, int, int, int, int, int, int, int);
 
-  struct RuntimeVirtualForwardSlot16VTable
-  {
-    void* slot00;
-    void* slot04;
-    void* slot08;
-    RuntimeVirtualForwardSlot16Fn slot10;
-  };
-
-  struct RuntimeBufferedReaderVTable
-  {
-    void* slot00 = nullptr;
-    void* slot04 = nullptr;
-    void* slot08 = nullptr;
-    void* slot0C = nullptr;
-    int(__thiscall* readByteFallback)(void* self) = nullptr; // +0x10
-  };
-
-  struct RuntimeBufferedReaderStateView
-  {
-    RuntimeBufferedReaderVTable* vtable = nullptr; // +0x00
-    std::uint8_t lane04_1F[0x1C]{};
-    const unsigned char** cursorPtr = nullptr; // +0x20
-    std::uint8_t lane24_2F[0x0C]{};
-    int* remainingCount = nullptr; // +0x30
-  };
-  static_assert(offsetof(RuntimeBufferedReaderStateView, cursorPtr) == 0x20, "RuntimeBufferedReaderStateView::cursorPtr offset");
-  static_assert(
-    offsetof(RuntimeBufferedReaderStateView, remainingCount) == 0x30,
-    "RuntimeBufferedReaderStateView::remainingCount offset"
-  );
-
-  struct RuntimeBufferedCursorProbeView
-  {
-    std::uint8_t lane00_03[0x04]{};
-    RuntimeBufferedReaderStateView* reader = nullptr; // +0x04
-    std::uint8_t hasCurrent = 0;                     // +0x08
-    unsigned char current = 0;                       // +0x09
-  };
-  static_assert(offsetof(RuntimeBufferedCursorProbeView, reader) == 0x04, "RuntimeBufferedCursorProbeView::reader offset");
-  static_assert(offsetof(RuntimeBufferedCursorProbeView, hasCurrent) == 0x08, "RuntimeBufferedCursorProbeView::hasCurrent offset");
-  static_assert(offsetof(RuntimeBufferedCursorProbeView, current) == 0x09, "RuntimeBufferedCursorProbeView::current offset");
-
-  struct RuntimeNodePointerOwnerOffset04
-  {
-    std::uint32_t lane00 = 0u;                   // +0x00
-    RuntimeIntrusiveDoubleLinkNode* node = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(RuntimeNodePointerOwnerOffset04, node) == 0x04,
-    "RuntimeNodePointerOwnerOffset04::node offset must be 0x04"
-  );
-
   using RuntimeSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
-
-  struct RuntimeInitRecord36Lane
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint32_t lane04 = 0; // +0x04
-    std::uint32_t lane08 = 0; // +0x08
-    std::uint32_t lane0C = 0; // +0x0C
-    std::uint32_t lane10 = 0; // +0x10
-    std::uint32_t lane14 = 0; // +0x14
-    std::uint32_t lane18 = 0; // +0x18
-    std::int32_t lane1C = 0;  // +0x1C
-    std::uint8_t lane20 = 0;  // +0x20
-    std::uint8_t reserved21 = 0;
-    std::uint8_t reserved22 = 0;
-    std::uint8_t reserved23 = 0;
-  };
-  static_assert(sizeof(RuntimeInitRecord36Lane) == 0x24, "RuntimeInitRecord36Lane size must be 0x24");
-  static_assert(offsetof(RuntimeInitRecord36Lane, lane1C) == 0x1C, "RuntimeInitRecord36Lane::lane1C offset must be 0x1C");
-  static_assert(offsetof(RuntimeInitRecord36Lane, lane20) == 0x20, "RuntimeInitRecord36Lane::lane20 offset must be 0x20");
-
-  struct RuntimeInitRecord24Lane
-  {
-    std::uint32_t lane00 = 0; // +0x00
-    std::uint32_t lane04 = 0; // +0x04
-    std::uint32_t lane08 = 0; // +0x08
-    std::uint32_t lane0C = 0; // +0x0C
-    std::uint32_t lane10 = 0; // +0x10
-    std::int32_t lane14 = 0;  // +0x14
-  };
-  static_assert(sizeof(RuntimeInitRecord24Lane) == 0x18, "RuntimeInitRecord24Lane size must be 0x18");
-  static_assert(offsetof(RuntimeInitRecord24Lane, lane14) == 0x14, "RuntimeInitRecord24Lane::lane14 offset must be 0x14");
 
 } // namespace moho::runtime
 
