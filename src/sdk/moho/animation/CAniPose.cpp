@@ -746,6 +746,33 @@ namespace moho
   }
 
   /**
+   * Address: 0x0054EC50 (FUN_0054EC50, Moho::CAniPoseBone::operator=)
+   *
+   * What it does:
+   * Copy-assigns one pose-bone lane field-by-field (mirroring the copy-ctor,
+   * including the alignment pad bytes), emitting the FST/FLD per-field copy the
+   * release binary uses. Drives the per-element copy in
+   * CAniPoseBoneTypeInfo's range copy-assign helper.
+   */
+  CAniPoseBone& CAniPoseBone::operator=(const CAniPoseBone& copy) noexcept
+  {
+    mCompositeTransform = copy.mCompositeTransform;
+    mCompositeDirty = copy.mCompositeDirty;
+    mCompositeIsLocal = copy.mCompositeIsLocal;
+    pad_1E_1F[0] = copy.pad_1E_1F[0];
+    pad_1E_1F[1] = copy.pad_1E_1F[1];
+    mLocalTransform = copy.mLocalTransform;
+    mIdx = copy.mIdx;
+    mPose = copy.mPose;
+    mParent = copy.mParent;
+    mVisible = copy.mVisible;
+    mSkipNextInterp = copy.mSkipNextInterp;
+    pad_4A_4B[0] = copy.pad_4A_4B[0];
+    pad_4A_4B[1] = copy.pad_4A_4B[1];
+    return *this;
+  }
+
+  /**
    * Address: 0x0054BC00 (FUN_0054BC00, Moho::CAniPoseBone::Rotate)
    *
    * What it does:
