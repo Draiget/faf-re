@@ -48,7 +48,6 @@ namespace moho
   // ===== Unrecovered func_*_LuaFuncDef binder factories =====
   CScrLuaInitForm* func_CAiBrainCanBuildStructureAt_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainCheckBlockingTerrain_LuaFuncDef() { return nullptr; }
-  CScrLuaInitForm* func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainGetThreatsAroundPosition_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CAiBrainPickBestAttackVector_LuaFuncDef() { return nullptr; }
   CScrLuaInitForm* func_CreateUnit2_LuaFuncDef() { return nullptr; }
