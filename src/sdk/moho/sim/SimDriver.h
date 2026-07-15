@@ -484,7 +484,7 @@ namespace moho
     /**
      * Address: 0x0073CD50 (FUN_0073CD50)
      */
-    void DecreaseCommandCount(CmdId id, int count) override;
+    CmdId DecreaseCommandCount(CmdId id, int count) override;
     /**
      * Address: 0x0073CDF0 (FUN_0073CDF0)
      */

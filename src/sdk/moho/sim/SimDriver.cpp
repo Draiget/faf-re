@@ -1776,14 +1776,15 @@ void CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
 
 /**
  * Address: 0x0073CD50 (FUN_0073CD50), ISTIDriver slot 28
- * Marshals CMDST_DecreaseCommandCount and reports command-cookie result.
+ * Marshals CMDST_DecreaseCommandCount and returns the resulting command cookie
+ * (the binary writes `mCommandCookie` into a caller-provided out pointer).
  */
-void CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
+CmdId CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->DecreaseCommandCount(id, count);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mCommandCookie;
 }
 
 /**
