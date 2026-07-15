@@ -283,7 +283,6 @@ extern "C" int __cdecl _SFUO_Destroy()
   throw std::length_error(message);
 }
 
-
 namespace
 {
   int gRuntimeErrorMode = 0;
@@ -429,7 +428,6 @@ static_assert(offsetof(RuntimeTypeInfoMapNode, right) == 0x08, "RuntimeTypeInfoM
 static_assert(offsetof(RuntimeTypeInfoMapNode, pair) == 0x0C, "RuntimeTypeInfoMapNode::pair offset must be 0x0C");
 static_assert(offsetof(RuntimeTypeInfoMapNode, color) == 0x14, "RuntimeTypeInfoMapNode::color offset must be 0x14");
 static_assert(offsetof(RuntimeTypeInfoMapNode, isNil) == 0x15, "RuntimeTypeInfoMapNode::isNil offset must be 0x15");
-
 
 struct RuntimeListNodePayload24Words
 {
@@ -622,19 +620,6 @@ using RuntimeTreeNode20Container = RuntimeRbTreeContainerView<RuntimeTreeNode20>
 using RuntimeTreeNode24Container = RuntimeRbTreeContainerView<RuntimeTreeNode24>;
 using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct RuntimeListOwnerSentinelLaneView
 {
   std::uint32_t lane00;       // +0x00
@@ -665,18 +650,6 @@ static_assert(
   "RuntimeTripleStringRecord40::text offset must be 0x0C"
 );
 
-
-
-
-
-
-
-
-
-
-
-
-
 struct RuntimeListNode32OwnerLane
 {
   std::uint32_t lane00;         // +0x00
@@ -686,7 +659,6 @@ struct RuntimeListNode32OwnerLane
 static_assert(offsetof(RuntimeListNode32OwnerLane, sentinel) == 0x04, "RuntimeListNode32OwnerLane::sentinel offset must be 0x04");
 static_assert(offsetof(RuntimeListNode32OwnerLane, size) == 0x08, "RuntimeListNode32OwnerLane::size offset must be 0x08");
 static_assert(sizeof(RuntimeListNode32OwnerLane) == 0x0C, "RuntimeListNode32OwnerLane size must be 0x0C");
-
 
 struct RuntimeOwnedPointerTripletOwner
 {
@@ -700,8 +672,6 @@ static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane08) == 0x08, "Runtim
 static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane0C) == 0x0C, "RuntimeOwnedPointerTripletOwner::lane0C offset must be 0x0C");
 static_assert(sizeof(RuntimeOwnedPointerTripletOwner) == 0x10, "RuntimeOwnedPointerTripletOwner size must be 0x10");
 
-
-
 struct RuntimeLane12PopOwnerView
 {
   std::uint32_t lane00; // +0x00
@@ -712,16 +682,6 @@ static_assert(offsetof(RuntimeLane12PopOwnerView, begin) == 0x04, "RuntimeLane12
 static_assert(offsetof(RuntimeLane12PopOwnerView, end) == 0x08, "RuntimeLane12PopOwnerView::end offset must be 0x08");
 static_assert(sizeof(RuntimeLane12PopOwnerView) == 0x0C, "RuntimeLane12PopOwnerView size must be 0x0C");
 
-
-
-
-
-
-
-
-
-
-
 struct RuntimeTypeInfoMapOwnerInitLane
 {
   std::uint32_t comparatorCookie = 0; // +0x00
@@ -731,16 +691,6 @@ struct RuntimeTypeInfoMapOwnerInitLane
 static_assert(sizeof(RuntimeTypeInfoMapOwnerInitLane) == 0x0C, "RuntimeTypeInfoMapOwnerInitLane size must be 0x0C");
 static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, head) == 0x04, "RuntimeTypeInfoMapOwnerInitLane::head offset must be 0x04");
 static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, size) == 0x08, "RuntimeTypeInfoMapOwnerInitLane::size offset must be 0x08");
-
-
-
-
-
-
-
-
-
-
 
 /**
  * Address: 0x00950380 (FUN_00950380)
@@ -782,7 +732,6 @@ void RuntimeDeleteTreeNode24LaneA(RuntimeTreeNode24* node)
   }
 }
 
-
 struct RuntimeTreeNode24OwnerInitLane
 {
   std::uint32_t comparatorCookie = 0; // +0x00
@@ -792,12 +741,6 @@ struct RuntimeTreeNode24OwnerInitLane
 static_assert(sizeof(RuntimeTreeNode24OwnerInitLane) == 0x0C, "RuntimeTreeNode24OwnerInitLane size must be 0x0C");
 static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, head) == 0x04, "RuntimeTreeNode24OwnerInitLane::head offset must be 0x04");
 static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, size) == 0x08, "RuntimeTreeNode24OwnerInitLane::size offset must be 0x08");
-
-
-
-
-
-
 
 struct RuntimeOwnedPointerArrayView
 {
@@ -821,11 +764,6 @@ static_assert(
   offsetof(RuntimeOwnedPointerArrayView, pendingCount) == 0x10,
   "RuntimeOwnedPointerArrayView::pendingCount offset must be 0x10"
 );
-
-
-
-
-
 
 struct RuntimeTreeIteratorNil11View
 {
@@ -870,16 +808,6 @@ static_assert(
   "RuntimeOwnedPointerBucketIteratorView::position offset must be 0x08"
 );
 
-
-
-
-
-
-
-
-
-
-
 void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
 {
   RuntimeTreeHeadNodeBare* cursor = node;
@@ -893,58 +821,8 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void RuntimeDeleteTreeNode20PostorderLaneA(RuntimeTreeNode20* const node);
 void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
-
-
-
-
-
-
 
 void RuntimeDeleteTreeNode20PostorderCommon(RuntimeTreeNode20* node)
 {
@@ -1002,7 +880,6 @@ struct RuntimeNamedFlagView
 static_assert(sizeof(RuntimeNamedFlagView) == 0x08, "RuntimeNamedFlagView size must be 0x08");
 static_assert(offsetof(RuntimeNamedFlagView, nameRecord) == 0x04, "RuntimeNamedFlagView::nameRecord offset must be 0x04");
 
-
 struct RuntimeTripleDwordRecord
 {
   std::uint32_t lane0 = 0;
@@ -1010,7 +887,6 @@ struct RuntimeTripleDwordRecord
   std::uint32_t lane2 = 0;
 };
 static_assert(sizeof(RuntimeTripleDwordRecord) == 0x0C, "RuntimeTripleDwordRecord size must be 0x0C");
-
 
 using RuntimeThreadExitHandler = void(__cdecl*)();
 
@@ -1028,11 +904,6 @@ static_assert(
   "RuntimeThreadExitHandlerNode::handler offset must be 0x08"
 );
 
-
-
-
-
-
 struct RuntimeThreadExitHandlerListRuntimeView
 {
   std::uint32_t lane00 = 0;                  // +0x00
@@ -1048,18 +919,6 @@ static_assert(
   offsetof(RuntimeThreadExitHandlerListRuntimeView, size) == 0x08,
   "RuntimeThreadExitHandlerListRuntimeView::size offset must be 0x08"
 );
-
-
-
-
-
-
-
-
-
-
-
-
 
 struct RuntimeListPointerNode
 {
@@ -1243,16 +1102,10 @@ static_assert(sizeof(RuntimeSndParamsCacheBoundPair) == 0x08, "RuntimeSndParamsC
 
 RuntimeContainerBase gRuntimeSndParamsCacheStorage{};
 
-
-
-
-
-
 [[nodiscard]] inline RuntimeSndParamsCacheSearchNodeView* RuntimeSndParamsCacheHeadNode() noexcept
 {
   return reinterpret_cast<RuntimeSndParamsCacheSearchNodeView*>(gRuntimeSndParamsCacheStorage.firstIterator);
 }
-
 
 /**
  * Address: 0x004E4530 (FUN_004E4530)
@@ -1278,38 +1131,6 @@ void RuntimeDestroySndParamsCacheSubtree(
     node = left;
   } while (node->isNil == 0u);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /**
  * Address: 0x0052DAB0 (FUN_0052DAB0)
@@ -1339,30 +1160,6 @@ RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareRightLaneA(
   return RuntimeRotateRbTreeRightCommon(pivot, container);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 template <std::size_t kIsNilOffset>
 struct RuntimeRbIteratorNodeView
 {
@@ -1388,7 +1185,6 @@ using RuntimeRbIteratorNodeNil61 = RuntimeRbIteratorNodeView<0x3D>;
 using RuntimeRbIteratorNodeNil65 = RuntimeRbIteratorNodeView<0x41>;
 using RuntimeRbIteratorNodeNil89 = RuntimeRbIteratorNodeView<0x59>;
 using RuntimeRbIteratorNodeNil3273 = RuntimeRbIteratorNodeView<0xCC9>;
-
 
 template <std::size_t kIsNilOffset>
 [[nodiscard]] inline RuntimeRbIteratorNodeView<kIsNilOffset>* RuntimeFindRbSubtreeLeftmostCommon(
@@ -1434,16 +1230,6 @@ template <std::size_t kIsNilOffset>
   return node;
 }
 
-
-
-
-
-
-
-
-
-
-
 /**
  * Address: 0x0052F350 (FUN_0052F350)
  *
@@ -1472,33 +1258,6 @@ template <std::size_t kIsNilOffset>
   return RuntimeFindRbSubtreeRightmostCommon(node);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct RuntimeTripleStringRecord48
 {
   std::uint32_t lane00;      // +0x00
@@ -1513,18 +1272,6 @@ struct RuntimeTripleStringRecord48
 static_assert(offsetof(RuntimeTripleStringRecord48, text) == 0x0C, "RuntimeTripleStringRecord48::text offset must be 0x0C");
 static_assert(offsetof(RuntimeTripleStringRecord48, sourceRes) == 0x28, "RuntimeTripleStringRecord48::sourceRes offset must be 0x28");
 static_assert(sizeof(RuntimeTripleStringRecord48) == 0x30, "RuntimeTripleStringRecord48 size must be 0x30");
-
-
-
-
-
-
-
-
-
-
-
-
 
 struct RuntimeFloat3Record
 {
@@ -1574,8 +1321,6 @@ template <class RecordT>
   }
   return reinterpret_cast<RecordT*>(destinationAddress);
 }
-
-
 
 /**
  * Address: 0x005CE060 (FUN_005CE060)
@@ -1674,51 +1419,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneF(
   return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct RuntimePmd
 {
   int mdisp;
@@ -1795,8 +1495,6 @@ static_assert(
   "RuntimeRttiCompleteObjectLocator::classDescriptor offset must be 0x10"
 );
 
-
-
 /**
  * Address: 0x008D8590 (FUN_008D8590, func_StringGreater)
  *
@@ -1808,7 +1506,6 @@ extern "C" bool __stdcall RuntimeTypeInfoStringLess(const char* const lhsText, c
 {
   return std::strcmp(lhsText, rhsText) < 0;
 }
-
 
 struct RuntimeIoInfo
 {
@@ -2519,7 +2216,6 @@ double RuntimeStrtodScaledByPowerOfTen(
 
   return parsedValue;
 }
-
 
 /**
  * Address: 0x00AC0398 (FUN_00AC0398)
@@ -3489,9 +3185,6 @@ extern "C" int __cdecl isdigit(const int character)
   return RuntimeClassifyInitialOrLocaleChanged(character, 0x004u, &_isdigit_l);
 }
 
-
-
-
 /**
  * Address: 0x00A857D5 (FUN_00A857D5, _isxdigit_l)
  *
@@ -3754,7 +3447,6 @@ extern "C" int __cdecl atoi(const char* const text)
   ));
 }
 
-
 /**
  * Address: 0x00A8A38B (FUN_00A8A38B, _strtol_l wrapper lane)
  *
@@ -3777,7 +3469,6 @@ extern "C" long __cdecl RuntimeStrtolLocaleForward(
     0
   ));
 }
-
 
 /**
  * Address: 0x00AAC2F6 (FUN_00AAC2F6, _wcstoi64)
@@ -3974,8 +3665,6 @@ mbstowcs(wchar_t* const destination, const char* const source, const std::size_t
   RuntimeLocaleInfoStruct* localeInfo = (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return ::_mbstowcs_l(destination, source, maxCount, reinterpret_cast<_locale_t>(localeInfo));
 }
-
-
 
 /**
  * Address: 0x00A886C6 (FUN_00A886C6, _mbstowcs_s_l)
@@ -4355,8 +4044,6 @@ extern "C" int __cdecl _set_sbh_threshold(const std::size_t threshold)
   _sbh_threshold = threshold;
   return 1;
 }
-
-
 
 /**
  * Address: 0x00ABA82B (FUN_00ABA82B, __sbh_verify)
@@ -5244,7 +4931,6 @@ extern "C" int __cdecl ___mb_cur_max_func()
   return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale)->mbCurMax;
 }
 
-
 /**
  * Address: 0x00AA64C8 (FUN_00AA64C8, ___lc_codepage_func)
  *
@@ -5738,10 +5424,6 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
   return EINVAL;
 }
 
-
-
-
-
 /**
  * Address: 0x00AB8486 (FUN_00AB8486, _putwch)
  *
@@ -5841,12 +5523,6 @@ static void RuntimeWriteBufferedCharImpl(std::FILE* const f, int ch, int* const 
     ++*pnumwritten;
   }
 }
-
-
-
-
-
-
 
 /**
  * Address: 0x00A9F589 (FUN_00A9F589, write_char)
@@ -6058,7 +5734,6 @@ namespace
   );
 }
 
-
 /**
  * Address: 0x00A954E1 (FUN_00A954E1)
  *
@@ -6075,7 +5750,6 @@ extern "C" int __cdecl RuntimeVsprintfSecureNoLocale(
 {
   return ::_vsprintf_s_l(buffer, sizeInBytes, format, nullptr, arguments);
 }
-
 
 /**
  * Address: 0x00A9B437 (FUN_00A9B437, ___wtomb_environ)
@@ -6189,8 +5863,6 @@ int __cdecl Runtime_vwprintf(const wchar_t* const format, va_list arguments)
   return vwprintf_helper(woutput_l, format, nullptr, arguments);
 }
 
-
-
 /**
  * Address: 0x00A90485 (FUN_00A90485, _wprintf_l)
  *
@@ -6208,8 +5880,6 @@ extern "C" int __cdecl _wprintf_l(const wchar_t* const format, _locale_t const l
   return result;
 }
 
-
-
 /**
  * Address: 0x00AAB19C (FUN_00AAB19C, is_wctype)
  *
@@ -6221,10 +5891,6 @@ extern "C" int __cdecl is_wctype(const wint_t character, const wctype_t characte
 {
   return ::iswctype(character, characterClass);
 }
-
-
-
-
 
 /**
  * Address: 0x00A8FB50 (FUN_00A8FB50)
@@ -6494,17 +6160,12 @@ namespace
   };
 }
 
-
-
 namespace
 {
   CRITICAL_SECTION gAllocatorSentinel{};
   volatile LONG gAllocatorSentinelInitState = 0;
 
 }
-
-
-
 
 /**
  * Address: 0x00A95F48 (FUN_00A95F48)
@@ -6826,8 +6487,6 @@ namespace
     return 0;
   }
 
-
-
   /**
    * Address: 0x00A99EAA (FUN_00A99EAA)
    *
@@ -6857,7 +6516,6 @@ namespace
 
     return 0;
   }
-
 
   struct RuntimeXtimeSnapshotView
   {
@@ -6898,25 +6556,6 @@ namespace
     "RuntimeAbsoluteTimeoutView::reserved0C offset must be 0xC"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeEhCatchableTypeRecord
   {
     std::int32_t properties = 0;                 // +0x00
@@ -6936,10 +6575,6 @@ namespace
     RuntimeEhCatchableTypeRecord* records = nullptr; // +0x04
   };
   static_assert(sizeof(RuntimeEhCatchableTypeArray) == 0x08, "RuntimeEhCatchableTypeArray size must be 0x08");
-
-
-
-
 
   [[nodiscard]] CRITICAL_SECTION* RuntimeStdLockSlot(const int slot) noexcept
   {
@@ -7286,10 +6921,6 @@ namespace
     return RuntimeMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
   }
 
-
-
-
-
   [[nodiscard]] RuntimeIoInfo* ResolveIoInfoFromStream(std::FILE* const stream) noexcept
   {
     const int fileDescriptor = ::_fileno(stream);
@@ -7303,7 +6934,6 @@ namespace
     );
   }
 
-
   [[nodiscard]] constexpr unsigned char RuntimeAsciiToLower(const unsigned char value) noexcept
   {
     if (value >= 'A' && value <= 'Z') {
@@ -7311,7 +6941,6 @@ namespace
     }
     return value;
   }
-
 
   class RuntimeEnvironmentLockGuard
   {
@@ -7501,7 +7130,6 @@ namespace
     return eaxValue;
   }
 
-
   struct RuntimeEh3ScopeEntryView
   {
     std::int32_t nextState;     // +0x00
@@ -7540,8 +7168,6 @@ namespace
     "RuntimeEh3DispatcherContextView::targetTryLevel offset must be 0x28"
   );
 
-
-
   struct RuntimeEh3TopRegistrationProbeView
   {
     _EXCEPTION_REGISTRATION_RECORD frame; // +0x00
@@ -7557,11 +7183,8 @@ namespace
     "RuntimeEh3TopRegistrationProbeView::lane0C offset must be 0x0C"
   );
 
-
   using ThreadExitHandler = void(__cdecl*)();
   using ThreadExitHandlerList = std::list<ThreadExitHandler>;
-
-
 
 }
 
@@ -7582,11 +7205,6 @@ static_assert(
   "RuntimeRecursiveLockStateView::recursionDepth offset must be 0x8"
 );
 
-
-
-
-
-
 struct RuntimeRecursiveMutexStateView
 {
   HANDLE mutexHandle = nullptr;       // +0x00
@@ -7597,12 +7215,6 @@ static_assert(
   offsetof(RuntimeRecursiveMutexStateView, recursionDepth) == 0x04,
   "RuntimeRecursiveMutexStateView::recursionDepth offset must be 0x04"
 );
-
-
-
-
-
-
 
 struct RuntimeCriticalSectionGuardView
 {
@@ -7615,8 +7227,6 @@ static_assert(
   offsetof(RuntimeCriticalSectionGuardView, criticalSection) == 0x04,
   "RuntimeCriticalSectionGuardView::criticalSection offset must be 0x04"
 );
-
-
 
 /**
  * Address: 0x00AC5700 (FUN_00AC5700, init_threadmon_mutex)
@@ -7961,14 +7571,6 @@ extern "C" int __cdecl __set_app_type(const int appType)
 namespace
 {
 }
-
-
-
-
-
-
-
-
 
 /**
  * Address: 0x00A96878 (FUN_00A96878, __FF_MSGBANNER)
@@ -8668,8 +8270,6 @@ extern "C" std::int64_t __cdecl __ftol2(const double value)
   return static_cast<std::int64_t>(resultBits);
 }
 
-
-
 /**
  * Address: 0x00A9A813 (FUN_00A9A813)
  *
@@ -8791,7 +8391,6 @@ extern "C" int __cdecl _UTY_MulDivRound(const int value, const int multiplier, c
   return static_cast<int>(signedResult);
 }
 
-
 /**
  * Address: 0x00A89E5A (FUN_00A89E5A, ___initstdio)
  *
@@ -8847,14 +8446,6 @@ namespace moho::runtime
   int RuntimeMemicmp(const void* lhsBuffer, const void* rhsBuffer, std::size_t byteCount);
   [[nodiscard]] unsigned long* RuntimeDosErrno();
   extern "C" unsigned int __cdecl div64_0(unsigned __int64 dividend, __int64 divisor);
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00A96AF8 (FUN_00A96AF8, _mtinitlocks)
@@ -8931,10 +8522,6 @@ namespace moho::runtime
       lockCursor += 2;
     }
   }
-
-
-
-
 
   /**
    * Address: 0x00A9BD16 (FUN_00A9BD16, _freebuf)
@@ -9081,9 +8668,6 @@ namespace moho::runtime
     return fileDescriptor;
   }
 
-
-
-
   /**
    * Address: 0x00A88E8F (FUN_00A88E8F, _wfsopen)
    *
@@ -9143,12 +8727,6 @@ namespace moho::runtime
   {
     return RuntimeWfsopen(filePath, mode, 0x40);
   }
-
-
-
-
-
-
 
   [[noreturn]] void RuntimeTerminate();
 
@@ -9492,16 +9070,6 @@ namespace moho::runtime
     }
   }
 
-
-
-
-
-
-
-
-
-
-
   struct RuntimeLegacyFileIoBufView
   {
     char* ptr = nullptr;      // +0x00
@@ -9569,7 +9137,6 @@ namespace moho::runtime
     filebuf->outputCount = nullptr;
   }
 
-
   std::intptr_t RuntimeFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* filebuf,
     const RuntimeCodecvtCharFacet* codecvtFacet
@@ -9580,16 +9147,6 @@ namespace moho::runtime
   RuntimeMutexHandle* RuntimeMutexConstruct(RuntimeMutexHandle* object);
   RuntimeLocaleLocimpView* RuntimeGetGlobalLocale();
   RuntimeLocaleLocimpView* RuntimeLocaleInit();
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x004C57B0 (FUN_004C57B0, sub_4C57B0)
@@ -9613,12 +9170,6 @@ namespace moho::runtime
     return reinterpret_cast<std::intptr_t>(filebuf);
   }
 
-
-
-
-
-
-
   struct RuntimeStreamPositionStateView
   {
     std::int32_t statusWord = 0;       // +0x00
@@ -9632,9 +9183,6 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeStreamPositionStateView, positionHigh) == 0x0C, "RuntimeStreamPositionStateView::positionHigh offset must be 0x0C");
   static_assert(offsetof(RuntimeStreamPositionStateView, stateTag) == 0x10, "RuntimeStreamPositionStateView::stateTag offset must be 0x10");
   static_assert(sizeof(RuntimeStreamPositionStateView) == 0x14, "RuntimeStreamPositionStateView size must be 0x14");
-
-
-
 
   class RuntimeFacetBaseVtableProbe final : public std::locale::facet
   {
@@ -9653,16 +9201,6 @@ namespace moho::runtime
     }
   };
 
-
-
-
-
-
-
-
-
-
-
   class RuntimeWstreambufBaseVtableProbe final : public std::wstreambuf
   {
   public:
@@ -9679,7 +9217,6 @@ namespace moho::runtime
       return *reinterpret_cast<void**>(storage);
     }
   };
-
 
   struct RuntimeBasicWstreambufView
   {
@@ -9731,8 +9268,6 @@ namespace moho::runtime
   );
   static_assert(sizeof(RuntimeBasicWstreambufView) == 0x3C, "RuntimeBasicWstreambufView size must be 0x3C");
 
-
-
   struct RuntimeBasicStreambufLocaleView
   {
     std::uint8_t reserved00_37[0x38]{};
@@ -9740,7 +9275,6 @@ namespace moho::runtime
   };
   static_assert(offsetof(RuntimeBasicStreambufLocaleView, localeObject) == 0x38, "RuntimeBasicStreambufLocaleView::localeObject offset must be 0x38");
   static_assert(sizeof(RuntimeBasicStreambufLocaleView) == 0x3C, "RuntimeBasicStreambufLocaleView size must be 0x3C");
-
 
   struct RuntimeStreambufPointerTripletView
   {
@@ -9761,9 +9295,6 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2Begin) == 0x30, "RuntimeStreambufPointerTripletView::lane2Begin offset must be 0x30");
   static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2End) == 0x34, "RuntimeStreambufPointerTripletView::lane2End offset must be 0x34");
   static_assert(sizeof(RuntimeStreambufPointerTripletView) == 0x38, "RuntimeStreambufPointerTripletView size must be 0x38");
-
-
-
 
   struct RuntimeWstreambufSeekAdjustView
   {
@@ -9807,7 +9338,6 @@ namespace moho::runtime
   };
   static_assert(sizeof(RuntimeSeekResultLane) == 0x14, "RuntimeSeekResultLane size must be 0x14");
 
-
   struct RuntimeBasicWstringbufView : RuntimeBasicWstreambufView
   {
     std::uint32_t stateWord3C = 0; // +0x3C
@@ -9816,9 +9346,6 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeBasicWstringbufView, stateWord3C) == 0x3C, "RuntimeBasicWstringbufView::stateWord3C offset must be 0x3C");
   static_assert(offsetof(RuntimeBasicWstringbufView, stateFlags) == 0x40, "RuntimeBasicWstringbufView::stateFlags offset must be 0x40");
   static_assert(sizeof(RuntimeBasicWstringbufView) == 0x44, "RuntimeBasicWstringbufView size must be 0x44");
-
-
-
 
   /**
    * Address: 0x00ABF8DB (FUN_00ABF8DB, std::_Lockit::_Lockit)
@@ -9859,23 +9386,11 @@ namespace moho::runtime
     return object;
   }
 
-
-
-
-
-
-
-
-
-
-
   struct RuntimeMutexGuardUnlockView
   {
     std::uint32_t lane00 = 0;
     RuntimeMutexHandle mutexLane{};
   };
-
-
 
   /**
    * Runtime projection of one `std::basic_ostream<wchar_t>::sentry` object as
@@ -9896,15 +9411,6 @@ namespace moho::runtime
     offsetof(RuntimeWideOstreamSentryView, ok) == 0x04,
     "RuntimeWideOstreamSentryView::ok offset must be 0x04"
   );
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00A82D30 (FUN_00A82D30, strchr)
@@ -9977,7 +9483,6 @@ namespace moho::runtime
     return dividend % divisor;
   }
 
-
   /**
    * Address: 0x00AA93C0 (FUN_00AA93C0, __CIpow_pentium4)
    *
@@ -10022,16 +9527,6 @@ namespace moho::runtime
     0x00, 0x00, 0xC0, 0xFF, 0xFF
   };
   static_assert(sizeof(gRuntimeFpuIndefiniteValue80) == 0x0A, "gRuntimeFpuIndefiniteValue80 size must be 0x0A");
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00A8E302 (FUN_00A8E302)
@@ -10094,8 +9589,6 @@ namespace moho::runtime
     // Intentionally empty: VC8 CRT lane is a stub.
   }
 
-
-
   /**
    * Address: 0x00ABED10 (FUN_00ABED10, __ascii_memicmp)
    *
@@ -10139,8 +9632,6 @@ namespace moho::runtime
     }
     return (lhsValue < rhsValue) ? -1 : 1;
   }
-
-
 
   /**
    * Address: 0x00AAE83A (FUN_00AAE83A, _wcsnicoll_l)
@@ -10262,8 +9753,6 @@ namespace moho::runtime
     return static_cast<int>(lhsValue) - static_cast<int>(rhsValue);
   }
 
-
-
   /**
    * Address: 0x00ABEB2C (FUN_00ABEB2C, _mbsnbicmp_l)
    *
@@ -10320,8 +9809,6 @@ namespace moho::runtime
     return RuntimeMbsnbicmpLocale(lhsBuffer, reinterpret_cast<const unsigned char*>(rhsBuffer), byteCount, nullptr);
   }
 
-
-
   /**
    * Address: 0x00A8B198 (FUN_00A8B198, _MarkAllocaS)
    *
@@ -10373,7 +9860,6 @@ namespace moho::runtime
     }
     return first;
   }
-
 
   /**
    * Address: 0x00A9B420 (FUN_00A9B420, __mbsnbicoll)
@@ -10458,7 +9944,6 @@ namespace moho::runtime
     return ::_ismbblead_l(static_cast<unsigned char>(value), nullptr);
   }
 
-
   /**
    * Address: 0x00AB8810 (FUN_00AB8810, _tcsicmp_l)
    *
@@ -10474,8 +9959,6 @@ namespace moho::runtime
       nullptr
     );
   }
-
-
 
   /**
    * Address: 0x00AA4961 (FUN_00AA4961, __mbsrchr)
@@ -10519,7 +10002,6 @@ namespace moho::runtime
     return nullptr;
   }
 
-
   /**
    * Address: 0x00AB898C (FUN_00AB898C, _tcsncmp)
    *
@@ -10536,7 +10018,6 @@ namespace moho::runtime
       nullptr
     );
   }
-
 
   /**
    * Address: 0x00AA6ED2 (FUN_00AA6ED2, __getpath)
@@ -10631,7 +10112,6 @@ namespace moho::runtime
     return 0x7FFFFFFF;
   }
 
-
   struct RuntimePositionalArgDescriptorNarrow
   {
     std::int32_t typeToken = 0;             // +0x00
@@ -10654,8 +10134,6 @@ namespace moho::runtime
   static_assert(offsetof(RuntimePositionalArgDescriptorWide, specifier) == 0x08, "RuntimePositionalArgDescriptorWide::specifier offset must be 0x08");
   static_assert(offsetof(RuntimePositionalArgDescriptorWide, formatFlags) == 0x0C, "RuntimePositionalArgDescriptorWide::formatFlags offset must be 0x0C");
 
-
-
   /**
    * Address: 0x00ABD060 (FUN_00ABD060, write_char_uni)
    *
@@ -10672,12 +10150,6 @@ namespace moho::runtime
       ++*pnumwritten;
     }
   }
-
-
-
-
-
-
 
   /**
    * Address: 0x00A88100 (FUN_00A88100, strstr)
@@ -10748,21 +10220,12 @@ namespace moho::runtime
 
   using RuntimeStringScanWorker = int(__cdecl*)(RuntimeScanStringStreamView*, int, int, int);
 
-
-
   struct RuntimeFilePositionWordsView
   {
     std::uint32_t low = 0;  // +0x00
     std::uint32_t high = 0; // +0x04
   };
   static_assert(sizeof(RuntimeFilePositionWordsView) == 0x8, "RuntimeFilePositionWordsView size must be 0x8");
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00AA4A1D (FUN_00AA4A1D, _strdup)
@@ -10789,7 +10252,6 @@ namespace moho::runtime
 
     return copy;
   }
-
 
   /**
    * Address: 0x00A90762 (FUN_00A90762)
@@ -10830,8 +10292,6 @@ namespace moho::runtime
   {
     return RuntimeWcsftimeLocaleLane(lpWideCharStr, maxSize, format, timeData, nullptr);
   }
-
-
 
   /**
    * Address: 0x00A9A4F9 (FUN_00A9A4F9)
@@ -11107,10 +10567,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return negateResult ? (0ull - remainder) : remainder;
   }
 
-
-
-
-
   /**
    * Address: 0x00A994FB (FUN_00A994FB, terminate)
    *
@@ -11136,8 +10592,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     offsetof(RuntimeTidDataUnexpectedView, unexpectedHandler) == 0x7C,
     "RuntimeTidDataUnexpectedView::unexpectedHandler offset must be 0x7C"
   );
-
-
 
   /**
    * Address: 0x00A8958C (FUN_00A8958C, ___CxxFrameHandler3)
@@ -11190,25 +10644,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     ));
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00A8A866 (FUN_00A8A866, mktime64)
    *
@@ -11245,14 +10680,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return -1;
   }
 
-
-
-
-
-
-
-
-
   struct RuntimeInlineByteBufferView
   {
     std::uint8_t* begin = nullptr;            // +0x00
@@ -11267,31 +10694,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     offsetof(RuntimeInlineByteBufferView, inlineStorageSlot) == 0x0C,
     "RuntimeInlineByteBufferView::inlineStorageSlot offset must be 0x0C"
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00A82DF0 (FUN_00A82DF0, memchr)
@@ -11560,7 +10962,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   constexpr std::int32_t kXcptActionDefault = 1;
   constexpr std::int32_t kSignalFpe = 8;
 
-
   enum class RuntimeFpeCode : std::int32_t
   {
     Invalid = _FPE_INVALID,
@@ -11694,7 +11095,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     offsetof(RuntimeTidDataGmtimeView, mGmtimeBuffer) == 0x44,
     "RuntimeTidDataGmtimeView::mGmtimeBuffer offset must be 0x44"
   );
-
 
   constexpr int kRuntimeSecondsPerDay = 86'400;
   constexpr int kRuntimeSecondsPerYear = 31'536'000;
@@ -11943,8 +11343,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return &gRuntimeDosErrnoFallback;
   }
 
-
-
   struct RuntimePePageValidationEntry
   {
     std::int32_t nextIndex;    // +0x00
@@ -11952,9 +11350,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     std::int32_t sourceVa;     // +0x08
   };
   static_assert(sizeof(RuntimePePageValidationEntry) == 0x0C, "RuntimePePageValidationEntry size must be 0x0C");
-
-
-
 
   [[nodiscard]] bool RuntimeIsPathSeparator(const char value) noexcept
   {
@@ -11965,9 +11360,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   {
     return value == L'\\' || value == L'/';
   }
-
-
-
 
   /**
    * Address: 0x00A94AA4 (FUN_00A94AA4)
@@ -12153,8 +11545,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return static_cast<int>(value >> (shift & 0x1Fu));
   }
 
-
-
   /**
    * Address: 0x00AAEEC4 (FUN_00AAEEC4)
    *
@@ -12265,8 +11655,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     };
     return (::SetCurrentDirectoryW(driveRoot) != FALSE) ? 0 : -1;
   }
-
-
 
   /**
    * Address: 0x00AAECDD (FUN_00AAECDD)
@@ -12405,7 +11793,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
     return destination;
   }
-
 
   /**
    * Address: 0x00A84FFE (FUN_00A84FFE, getenv_s)
@@ -12585,8 +11972,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     );
   }
 
-
-
   [[noreturn]] void RuntimeRaiseEhFrameConsistencyFailure()
   {
     _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
@@ -12696,8 +12081,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return reinterpret_cast<void*>(_CallSettingFrame(targetActionLane, establisherFrameLane, static_cast<int>(notifyCode)));
   }
 
-
-
   /**
    * Address: 0x00A8953A (FUN_00A8953A, _UnwindNestedFrames)
    *
@@ -12802,9 +12185,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return __local_unwind4(registrationFrame, currentTryLevel, targetTryLevel);
   }
 
-
-
-
   /**
    * Address: 0x00A8FC30 (FUN_00A8FC30, _vsnwprintf)
    *
@@ -12821,8 +12201,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     return _vsnwprintf_l(buffer, bufferCount, format, nullptr, argList);
   }
-
-
 
   /**
    * Address: 0x00AAC747 (FUN_00AAC747, wstrcpy)
@@ -12980,24 +12358,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     va_end(sourceList);
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00A8C5E7 (FUN_00A8C5E7, _sync_legacy_variables_lk)
    *
@@ -13052,8 +12412,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     ::_free_crt(locale);
   }
 
-
-
   /**
    * Address: 0x00ABF4DF (FUN_00ABF4DF, std::locale::_Locimp::_Locimp)
    * Mangled: ??0_Locimp@locale@std@@AAE@_N@Z
@@ -13072,8 +12430,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     new (&localeImpl->name) std::string("*");
     return localeImpl;
   }
-
-
 
   struct RuntimeMapSetLengthErrorKeyRecord
   {
@@ -13094,12 +12450,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimeMapSetLengthErrorNodeAllocator = RuntimeMapSetLengthErrorNode* (*)();
 
-
-
-
-
-
-
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocCommon(const unsigned int count, const unsigned int elementSize)
   {
     if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < elementSize) {
@@ -13109,12 +12459,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return ::operator new(static_cast<std::size_t>(elementSize) * count);
   }
 
-
-
-
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane020(const unsigned int count);
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
-
 
   struct RuntimeForwardLinkNodeLane
   {
@@ -13136,32 +12482,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimePackedDwordByteLane, byte) == 0x04, "RuntimePackedDwordByteLane::byte offset must be 0x04");
   static_assert(sizeof(RuntimePackedDwordByteLane) == 0x08, "RuntimePackedDwordByteLane size must be 0x08");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00533620 (FUN_00533620)
    *
@@ -13173,23 +12493,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeRbHeadNode68Color64
   {
@@ -13206,14 +12509,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode68Color64, color) == 0x40, "RuntimeRbHeadNode68Color64::color offset must be 0x40");
   static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
 
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00594230 (FUN_00594230)
    *
@@ -13225,7 +12520,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
-
 
   /**
    * Address: 0x005ABB00 (FUN_005ABB00)
@@ -13247,23 +12541,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeRect2iListNode) == 0x18, "RuntimeRect2iListNode size must be 0x18");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeTreeNode20DwordKey
   {
     std::uint32_t left;    // +0x00
@@ -13276,8 +12553,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     std::uint8_t pad13;    // +0x13
   };
   static_assert(sizeof(RuntimeTreeNode20DwordKey) == 0x14, "RuntimeTreeNode20DwordKey size must be 0x14");
-
-
 
   struct RuntimeRbHeadNode64Color60
   {
@@ -13294,26 +12569,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode64Color60, color) == 0x3C, "RuntimeRbHeadNode64Color60::color offset must be 0x3C");
   static_assert(offsetof(RuntimeRbHeadNode64Color60, isNil) == 0x3D, "RuntimeRbHeadNode64Color60::isNil offset must be 0x3D");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeAllocatedRecordLane044
   {
     std::int32_t lane00 = 0;         // +0x00
@@ -13326,19 +12581,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeAllocatedRecordLane044) == 0x1C, "RuntimeAllocatedRecordLane044 size must be 0x1C");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeTypeInfoCloneRecord40
   {
     std::uint32_t headerWord0; // +0x00
@@ -13347,8 +12589,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     msvc8::string typeName;    // +0x0C
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord40) == 0x28, "RuntimeTypeInfoCloneRecord40 size must be 0x28");
-
-
 
   struct RuntimeDwordAndFastVectorUIntN2Record32
   {
@@ -13365,37 +12605,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeDwordAndFastVectorUIntN2Record32::values offset must be 0x08"
   );
 
-
-
-
-
-
-
-
-
-
-
   std::uint8_t gRuntimeByte54741F = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x008573A0 (FUN_008573A0)
@@ -13408,17 +12618,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
   }
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeTaggedFloatRecord20
   {
@@ -13434,7 +12633,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeTaggedFloatRecord20, lane0C) == 0x0C, "RuntimeTaggedFloatRecord20::lane0C offset must be 0x0C");
   static_assert(offsetof(RuntimeTaggedFloatRecord20, flag10) == 0x10, "RuntimeTaggedFloatRecord20::flag10 offset must be 0x10");
   static_assert(offsetof(RuntimeTaggedFloatRecord20, flag11) == 0x11, "RuntimeTaggedFloatRecord20::flag11 offset must be 0x11");
-
 
   struct RuntimeTaggedPairRecord24
   {
@@ -13453,19 +12651,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeTaggedPairRecord24, flag14) == 0x14, "RuntimeTaggedPairRecord24::flag14 offset must be 0x14");
   static_assert(offsetof(RuntimeTaggedPairRecord24, flag15) == 0x15, "RuntimeTaggedPairRecord24::flag15 offset must be 0x15");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeTypeInfoCloneRecord36
   {
     std::uint32_t lane00; // +0x00
@@ -13474,17 +12659,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord36) == 0x24, "RuntimeTypeInfoCloneRecord36 size must be 0x24");
 
-
-
-
   struct RuntimeTypeInfoCloneRecord32
   {
     std::uint32_t headerWord0; // +0x00
     msvc8::string typeName;    // +0x04
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord32) == 0x20, "RuntimeTypeInfoCloneRecord32 size must be 0x20");
-
-
 
   struct RuntimeTypeInfoCloneRecord32SplitSourceWords
   {
@@ -13494,7 +12674,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     sizeof(RuntimeTypeInfoCloneRecord32SplitSourceWords) == 0x20,
     "RuntimeTypeInfoCloneRecord32SplitSourceWords size must be 0x20"
   );
-
 
   struct RuntimeTypeInfoCloneRecord48SharedControlBlock
   {
@@ -13537,21 +12716,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeTypeInfoCloneRecord48::payload offset must be 0x04"
   );
   static_assert(sizeof(RuntimeTypeInfoCloneRecord48) == 0x30, "RuntimeTypeInfoCloneRecord48 size must be 0x30");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeLinkedSlotNode16
   {
@@ -14013,37 +13177,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeIntrusiveDoubleLinkNode) == 0x08, "RuntimeIntrusiveDoubleLinkNode size must be 0x08");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeVectorDwordWindowState
   {
     std::uint32_t lane00 = 0;       // +0x00
@@ -14100,35 +13233,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     std::uint8_t lane04 = 0;  // +0x04
   };
   static_assert(offsetof(RuntimeDwordAndByteRecord, lane04) == 0x04, "RuntimeDwordAndByteRecord::lane04 offset must be 0x04");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeDwordAtOffset72Record
   {
@@ -14215,36 +13319,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeStride24BaseOwner) == 0x04, "RuntimeStride24BaseOwner size must be 0x04");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeByteFlagAtOffset325Record
   {
     std::uint8_t reserved00_144[0x145]{};
@@ -14323,40 +13397,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeDwordPairAndBlob28::blob08_23 offset must be 0x08"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeDwordAtOffset08Record
   {
     std::uint32_t lane00 = 0u; // +0x00
@@ -14383,38 +13423,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeForwardLinkNode* next = nullptr; // +0x00
   };
   static_assert(sizeof(RuntimeForwardLinkNode) == 0x04, "RuntimeForwardLinkNode size must be 0x04");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeDwordAtOffset20Record
   {
@@ -14443,38 +13451,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     std::uint32_t lane08 = 0u; // +0x08
   };
   static_assert(sizeof(RuntimeDwordTripleLaneRecord) == 0x0C, "RuntimeDwordTripleLaneRecord size must be 0x0C");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeFloatAtOffset444Record
   {
@@ -14521,39 +13497,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     std::uint32_t lane08 = 0u; // +0x08
   };
   static_assert(sizeof(RuntimeDwordLanesOffset04And08Record) == 0x0C, "RuntimeDwordLanesOffset04And08Record size must be 0x0C");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeDwordAtOffset1060Record
   {
@@ -14605,37 +13548,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     float lane0C = 0.0f; // +0x0C
   };
   static_assert(sizeof(RuntimeFloatQuadLaneRecord) == 0x10, "RuntimeFloatQuadLaneRecord size must be 0x10");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeFloatAtOffset1120Record
   {
@@ -14719,36 +13631,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeEmbeddedIntrusiveNodeOwnerOffset04::node offset must be 0x04"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeDispatchSlot24Object;
   using RuntimeDispatchSlot24Fn = void(__thiscall*)(
     RuntimeDispatchSlot24Object*,
@@ -14777,32 +13659,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDispatchSlot24VTable* vtable = nullptr; // +0x00
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeShadowTraversalProviderView
   {
     std::uint8_t pad0000_02DF[0x2E0]{}; // +0x0000
@@ -14812,7 +13668,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeShadowTraversalProviderView, provider) == 0x2E0,
     "RuntimeShadowTraversalProviderView::provider offset must be 0x2E0"
   );
-
 
   struct RuntimeControlTreeNode28
   {
@@ -14954,7 +13809,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeRbHeadNode40Color36::isNil offset must be 0x25"
   );
 
-
   template<typename NodeType>
   void RuntimeDestroyRbTreePostorderCommon(NodeType* node)
   {
@@ -14994,27 +13848,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     stringStorage->storage.inlineBuffer[0] = '\0';
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00856F30 (FUN_00856F30)
    *
@@ -15037,11 +13870,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     } while (root->isNil == 0u);
   }
 
-
-
-
-
-
   /**
    * Runtime owner lane where legacy string storage starts at `+0x10`.
    */
@@ -15061,8 +13889,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimePrefixedLegacyStringOwnerOffset10, text) == 0x10,
     "RuntimePrefixedLegacyStringOwnerOffset10::text offset must be 0x10"
   );
-
-
 
   /**
    * Address: 0x0089A820 (FUN_0089A820)
@@ -15167,13 +13993,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeRbTree28OwnerState) == 0x0C, "RuntimeRbTree28OwnerState size must be 0x0C");
 
-
-
-
-
-
-
-
   void RuntimeDestroyRbNode60StringArrayTree(RuntimeRbNode60StringArray* node) noexcept
   {
     if (node == nullptr || node->isNil != 0u) {
@@ -15229,12 +14048,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     } while (node->isNil == 0u);
   }
 
-
-
-
-
-
-
   void RuntimeDestroyPrefixedStringTreeLaneCommon(RuntimeTreeNodeWithPrefixedString48* root)
   {
     if (root == nullptr || root->isNil != 0u) {
@@ -15249,18 +14062,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       ::operator delete(current);
     } while (root->isNil == 0u);
   }
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeSevenPrefixedLegacyStringBlock
   {
@@ -15302,30 +14103,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00AC3BE0 (FUN_00AC3BE0)
    *
@@ -15349,99 +14126,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return destinationStartAddress;
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x0056F520 (FUN_0056F520)
    *
@@ -15452,37 +14136,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     RuntimeThrowContainerTooLong("map/set<T> too long");
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x007029C0 (FUN_007029C0)
@@ -15495,64 +14148,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   [[noreturn]] void RuntimeThrowListTooLongS();
-
-
-
-
 
   /**
    * Address: 0x0082F5D0 (FUN_0082F5D0)
@@ -15564,19 +14160,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   {
     RuntimeThrowContainerTooLong("list<T> too long");
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeSharedControlPairEntry
   {
@@ -15590,8 +14173,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   RuntimeSharedControlPairEntry* gRuntimeSharedControlPairBegin = nullptr;
   RuntimeSharedControlPairEntry* gRuntimeSharedControlPairEnd = nullptr;
   RuntimeSharedControlPairEntry* gRuntimeSharedControlPairCapacity = nullptr;
-
-
 
   using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
 
@@ -15607,66 +14188,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeDestroyCallbackLane16, vtable) == 0x00,
     "RuntimeDestroyCallbackLane16::vtable offset must be 0x00"
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeListLinkNode12
   {
@@ -15688,21 +14209,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeListSpliceOwnerLane, size) == 0x08, "RuntimeListSpliceOwnerLane::size offset must be 0x08");
   static_assert(sizeof(RuntimeListSpliceOwnerLane) == 0x0C, "RuntimeListSpliceOwnerLane size must be 0x0C");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeLegacyProxyVectorLane final
   {
     void* proxy = nullptr;          // +0x00
@@ -15714,29 +14220,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimeLegacyProxyVectorThrowFn = void (*)();
   using RuntimeLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct ConvexHullFloatRuntimeView
   {
@@ -15771,8 +14254,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(ConvexHullFloatCtorRuntimeView, lane1C) == 0x1C,
     "ConvexHullFloatCtorRuntimeView::lane1C offset"
   );
-
-
 
   struct ConvexHullDoubleRuntimeView
   {
@@ -15820,8 +14301,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "ConvexHullDoubleCtorRuntimeView::lane28 offset"
   );
 
-
-
   struct ConvexHull1FloatRuntimeView
   {
     ConvexHullFloatRuntimeView base;                     // +0x00
@@ -15856,8 +14335,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "ConvexHull1DoubleRuntimeView::externalPlaneStorage offset"
   );
 
-
-
   struct RuntimeDequeMapGrowthView
   {
     std::uint8_t reserved00_03[0x04]{};      // +0x00
@@ -15881,24 +14358,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using DequeMapThrowTooLongFn = void (*)();
 
-
-
-
-
-
-
-
-
-
   struct RuntimeSignedLimbPair512View
   {
     std::uint8_t primary[0x100]{};
     std::uint8_t secondary[0x100]{};
   };
   static_assert(sizeof(RuntimeSignedLimbPair512View) == 0x200, "RuntimeSignedLimbPair512View size must be 0x200");
-
-
-
 
   struct RuntimeTreeNode20ContainerState
   {
@@ -15915,16 +14380,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeTreeNode20ContainerState, size) == 0x08,
     "RuntimeTreeNode20ContainerState::size offset must be 0x08"
   );
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeOffset18FloatArrayView
   {
@@ -15946,8 +14401,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeOffset18DoubleArrayView::values offset must be 0x18"
   );
 
-
-
   struct RuntimeLinearBufferView
   {
     std::int32_t elementCount = 0; // +0x00
@@ -15958,8 +14411,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeLinearBufferView, elementStorage) == 0x04,
     "RuntimeLinearBufferView::elementStorage offset must be 0x04"
   );
-
-
 
   struct RuntimeOffset10ScalarPointerRowsView
   {
@@ -15983,10 +14434,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeOffset04ScalarPointerRowsOwnerView::rows offset must be 0x04"
   );
 
-
-
-
-
   struct RuntimePointerGridView
   {
     std::int32_t rowCount = 0;       // +0x00
@@ -16005,11 +14452,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimePointerGridView, rowPointers) == 0x10,
     "RuntimePointerGridView::rowPointers offset must be 0x10"
   );
-
-
-
-
-
 
   struct RuntimeFixedPointerGridAggregateView
   {
@@ -16042,23 +14484,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeFixedPointerGridAggregateView::readyFlag offset must be 0x20"
   );
 
-
-
-
-
   using RuntimePointerGridAllocator = int (*)(RuntimePointerGridView&, std::uint8_t);
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeIosFnNode
   {
@@ -16088,21 +14514,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeIosBaseView, callbackHead) == 0x20, "RuntimeIosBaseView::callbackHead offset must be 0x20");
   static_assert(offsetof(RuntimeIosBaseView, localePtr) == 0x24, "RuntimeIosBaseView::localePtr offset must be 0x24");
   static_assert(sizeof(RuntimeIosBaseView) == 0x28, "RuntimeIosBaseView size must be 0x28");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeLocaleNameTableEntry
   {
@@ -16147,7 +14558,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return (compareResult == 0) ? TRUE : FALSE;
   }
 
-
   struct RuntimeUndecoratorHeapFrameNode
   {
     RuntimeUndecoratorHeapFrameNode* next = nullptr; // +0x00
@@ -16177,9 +14587,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeUndecoratorHeapManagerState) == 0x10, "RuntimeUndecoratorHeapManagerState size must be 0x10");
 
-
   const char* gRuntimeUndecoratorCurrentDecoratedName = nullptr;
-
 
   struct RuntimeUndecoratorDNameLane
   {
@@ -16212,17 +14620,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeUndecoratorReplicatorView) == 0x3C, "RuntimeUndecoratorReplicatorView size must be 0x3C");
 
-
-
-
   extern "C" const std::uint16_t __rglangidNotDefault[10];
-
-
-
-
-
-
-
 
   struct RuntimeFacetRefView
   {
@@ -16251,9 +14649,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
     return nullptr;
   }
-
-
-
 
   /**
    * Address: 0x00ABF345 (FUN_00ABF345)
@@ -16326,16 +14721,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00ABF581 (FUN_00ABF581, std::locale::_Init)
    *
@@ -16375,8 +14760,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeLockitDestroy(&lockit);
     return localeImpl;
   }
-
-
 
   [[nodiscard]] std::size_t RuntimeCodePageHashBucket(const std::uint32_t codePage) noexcept
   {
@@ -16481,10 +14864,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-
-
-
-
   struct RuntimeWideCharLocaleView
   {
     std::uint8_t reserved00[0x18]{};
@@ -16500,9 +14879,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     const RuntimeCvtVec* localeVector
   );
 
-
-
-
   struct RuntimeWideRangeDispatchVTable
   {
     void* lanes00_37[0x0E]{};
@@ -16512,7 +14888,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeWideRangeDispatchVTable, convertRangeCore) == 0x38,
     "RuntimeWideRangeDispatchVTable::convertRangeCore offset must be 0x38"
   );
-
 
   struct RuntimeWideBufferWindowView
   {
@@ -16551,8 +14926,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     offsetof(RuntimeWideBufferWindowView, stateFlags) == 0x40,
     "RuntimeWideBufferWindowView::stateFlags offset must be 0x40"
   );
-
-
 
   /**
    * Address: 0x00ABFDF0 (FUN_00ABFDF0)
@@ -16682,10 +15055,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return -1;
   }
 
-
-
-
-
   struct RuntimeLocaleVectorsOwnerView
   {
     std::uint8_t reserved00_07[0x08]{};
@@ -16702,7 +15071,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeLocaleVectorsOwnerView) == 0x20, "RuntimeLocaleVectorsOwnerView size must be 0x20");
 
-
   /**
    * Address: 0x00AA2A65 (FUN_00AA2A65, __uncaught_exception)
    *
@@ -16714,17 +15082,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     const auto* const threadData = reinterpret_cast<const RuntimeTidDataProcessingThrowView*>(__getptd());
     return threadData->mProcessingThrow != 0;
   }
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00AA3FCE (FUN_00AA3FCE, _fcloseall)
@@ -16910,15 +15267,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     char* gRuntimeStdTerminalBuffers[2] = {nullptr, nullptr};
   }
 
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00A8C1F2 (FUN_00A8C1F2, _strftime_l)
    *
@@ -16993,8 +15341,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
 {
   return &gRuntimeStaticStorageSlotC;
 }
-
-
 
   /**
    * Address: 0x00AAAA5F (FUN_00AAAA5F, parse_cmdline)
@@ -17182,16 +15528,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
 
   } // namespace
 
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00ABE1FB (FUN_00ABE1FB, _initconin)
    *
@@ -17319,8 +15655,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return maxCharacters - remaining - 1;
   }
 
-
-
   struct RuntimeSlidingBufferView
   {
     std::uint8_t reserved00_0B[0x0C]{}; // +0x00
@@ -17331,8 +15665,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
   static_assert(offsetof(RuntimeSlidingBufferView, buffer) == 0x0C, "RuntimeSlidingBufferView::buffer offset must be 0x0C");
   static_assert(offsetof(RuntimeSlidingBufferView, writeOffset) == 0x10, "RuntimeSlidingBufferView::writeOffset offset must be 0x10");
   static_assert(offsetof(RuntimeSlidingBufferView, readOffset) == 0x14, "RuntimeSlidingBufferView::readOffset offset must be 0x14");
-
-
 
   /**
    * Address: 0x00A8B161 (FUN_00A8B161, ___inittime)
@@ -17391,7 +15723,6 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     return static_cast<unsigned int>(combinedDividend / divisorLow);
   }
 
-
   /**
    * Address: 0x00A8A572 (FUN_00A8A572, _difftime64)
    *
@@ -17408,11 +15739,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   *_errno() = EINVAL;
   return 0.0;
 }
-
-
-
-
-
 
   /**
    * Address: 0x009EFF10 (FUN_009EFF10, wcstombs)
@@ -17469,13 +15795,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   using RuntimeBinarySearchCompareFn = int(__cdecl*)(const void* key, const void* element);
 
-
-
-
-
-
-
-
   struct RuntimeScopedMutexLockView
   {
     struct RuntimeMutexView* mutex = nullptr; // +0x00
@@ -17496,7 +15815,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeMutexView) == 0x8, "RuntimeMutexView size must be 0x8");
 
-
   struct RuntimeOwnedHandleCell
   {
     HANDLE handle = nullptr;              // +0x00
@@ -17509,7 +15827,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeOwnedHandleCell::shouldCloseHandle offset must be 0x8"
   );
   static_assert(sizeof(RuntimeOwnedHandleCell) == 0xC, "RuntimeOwnedHandleCell size must be 0xC");
-
 
   struct RuntimeWxStringView
   {
@@ -17546,20 +15863,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeCriticalSectionLeaveGuard::criticalSection offset must be 0x4"
   );
   static_assert(sizeof(RuntimeCriticalSectionLeaveGuard) == 0x8, "RuntimeCriticalSectionLeaveGuard size must be 0x8");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeBacklinkedFiveWordCopyLane
   {
@@ -17883,10 +16186,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<TWord*>(destinationCursor);
   }
 
-
-
-
-
   [[nodiscard]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot(
     RuntimeBacklinkedPairCopyLane* const destination,
     std::uint32_t repeatCount,
@@ -17930,7 +16229,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     *ownerSlot = lane.previousOwner;
   }
 
-
   /**
    * Address: 0x007AF240 (FUN_007AF240)
    *
@@ -17949,9 +16247,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-
-
-
   struct RuntimeBacklinkedPairVectorStorageView
   {
     RuntimeBacklinkedPairCopyLane* begin = nullptr; // +0x00
@@ -17964,21 +16259,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimeBacklinkedPairVectorStorageView, inlineStorageBeginSlot) == 0x0C,
     "RuntimeBacklinkedPairVectorStorageView::inlineStorageBeginSlot offset must be 0x0C"
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeRefcountPairVectorStorageView
   {
@@ -18001,76 +16281,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeRefcountPairVectorStorageView::capacity offset must be 0x0C"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeFloat13LaneView
   {
     float lanes[13]{};
   };
   static_assert(sizeof(RuntimeFloat13LaneView) == 0x34, "RuntimeFloat13LaneView size must be 0x34");
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeRefcountedPointerLane
   {
@@ -18079,64 +16294,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(offsetof(RuntimeRefcountedPointerLane, refCount) == 0x04, "RuntimeRefcountedPointerLane::refCount offset must be 0x04");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeRaw28ByteRecord
   {
     std::uint32_t words[7];
   };
   static_assert(sizeof(RuntimeRaw28ByteRecord) == 0x1C, "RuntimeRaw28ByteRecord size must be 0x1C");
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeDwordPairLane
   {
@@ -18144,23 +16306,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint32_t lane04;
   };
   static_assert(sizeof(RuntimeDwordPairLane) == 0x08, "RuntimeDwordPairLane size must be 0x08");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x0076B520 (FUN_0076B520)
@@ -18177,63 +16322,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeRefcountTailFiveWordCursorState
   {
     std::uint32_t lane00 = 0;                    // +0x00
@@ -18245,10 +16333,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimeRefcountTailFiveWordCursorState, anchor) == 0x08,
     "RuntimeRefcountTailFiveWordCursorState::anchor offset must be 0x08"
   );
-
-
-
-
 
   /**
    * Address: 0x00832B80 (FUN_00832B80)
@@ -18265,9 +16349,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-
-
-
   /**
    * Address: 0x00832BC0 (FUN_00832BC0)
    *
@@ -18282,9 +16363,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
-
-
-
 
   /**
    * Address: 0x00832BE0 (FUN_00832BE0)
@@ -18301,36 +16379,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeStride20VectorView
   {
     std::uint32_t lane00 = 0; // +0x00
@@ -18338,7 +16386,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint8_t* end = nullptr; // +0x08
   };
   static_assert(sizeof(RuntimeStride20VectorView) == 0x0C, "RuntimeStride20VectorView size must be 0x0C");
-
 
   struct RuntimeStride24VectorView
   {
@@ -18348,9 +16395,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeStride24VectorView) == 0x0C, "RuntimeStride24VectorView size must be 0x0C");
 
-
-
-
   struct RuntimePrefixCompareCaptureLane
   {
     std::uintptr_t lhsRangeBegin = 0; // +0x00
@@ -18359,19 +16403,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     const std::uint8_t* rhsCursor = nullptr; // +0x0C
   };
   static_assert(sizeof(RuntimePrefixCompareCaptureLane) == 0x10, "RuntimePrefixCompareCaptureLane size must be 0x10");
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeAabb6Lane
   {
@@ -18384,29 +16415,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeAabb6Lane) == 0x18, "RuntimeAabb6Lane size must be 0x18");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeUnaryCdeclCallbackLane
   {
     using InvokeFn = int(__cdecl*)(int value);
@@ -18414,7 +16422,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     InvokeFn invoke; // +0x00
   };
   static_assert(sizeof(RuntimeUnaryCdeclCallbackLane) == 0x04, "RuntimeUnaryCdeclCallbackLane size must be 0x04");
-
 
   struct RuntimeFlagDispatchVTable
   {
@@ -18426,15 +16433,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     RuntimeFlagDispatchVTable* vtable; // +0x00
   };
   static_assert(sizeof(RuntimeFlagDispatchObject) == 0x04, "RuntimeFlagDispatchObject size must be 0x04");
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x008D80A0 (FUN_008D80A0)
@@ -18450,16 +16448,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x0092D810 (FUN_0092D810)
@@ -18477,20 +16465,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   struct RuntimeTreeIteratorNodeLaneView
   {
@@ -18511,21 +16485,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(node);
     return nodeBytes[sentinelOffset] != 0u;
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantB(
     RuntimeTreeIteratorNodeLaneView** const cursorSlot,
@@ -18578,7 +16537,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeTreeIteratorCursorNil21CheckedView::cursor offset must be 0x04"
   );
 
-
   struct RuntimeTreeRotateOwnerLaneView
   {
     std::uint32_t lane00;                     // +0x00
@@ -18589,24 +16547,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimeTreeRotateOwnerLaneView, head) == 0x04,
     "RuntimeTreeRotateOwnerLaneView::head offset must be 0x04"
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x0052EE50 (FUN_0052EE50)
@@ -18622,12 +16562,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   {
     return RuntimeAdvanceTreeIteratorVariantB(cursorSlot, 0x11u);
   }
-
-
-
-
-
-
 
   struct RuntimeDwordByteRecord5LaneView
   {
@@ -18673,58 +16607,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeTreeNode20DwordKeyColorLaneView::isNil offset must be 0x11"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeDwordPairLaneView
   {
     std::uint32_t lane00; // +0x00
@@ -18738,15 +16620,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint8_t lane04;  // +0x04
   };
   static_assert(offsetof(RuntimeDwordByteLaneView, lane04) == 0x04, "RuntimeDwordByteLaneView::lane04 offset must be 0x04");
-
-
-
-
-
-
-
-
-
 
   struct RuntimeStateValueTreeNode
   {
@@ -18777,30 +16650,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeStateValueTreeOwnerView::head offset must be 0x04"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeSetCharTreeNode16
   {
     RuntimeSetCharTreeNode16* left;   // +0x00
@@ -18822,11 +16671,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeSetCharTreeOwnerView) == 0x08, "RuntimeSetCharTreeOwnerView size must be 0x08");
   static_assert(offsetof(RuntimeSetCharTreeOwnerView, head) == 0x04, "RuntimeSetCharTreeOwnerView::head offset must be 0x04");
-
-
-
-
-
 
   /**
    * Address: 0x007CC580 (FUN_007CC580)
@@ -19054,8 +16898,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return outNext;
   }
 
-
-
   /**
    * Address: 0x007CC470 (FUN_007CC470)
    *
@@ -19086,9 +16928,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     return result;
   }
-
-
-
 
   struct RuntimeRbTreeStateNil17DwordPayload
   {
@@ -19125,10 +16964,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     const RuntimeRbTreeStateNil17DwordPayload* const source
   );
 
-
-
-
-
   struct RuntimePrefixedRbTreeStateNil17At04
   {
     std::uint32_t lane00 = 0u; // +0x00
@@ -19139,13 +16974,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimePrefixedRbTreeStateNil17At04, tree) == 0x04,
     "RuntimePrefixedRbTreeStateNil17At04::tree offset must be 0x04"
   );
-
-
-
-
-
-
-
 
   struct RuntimePrefixedRbTreeStateNil17VectorOwner
   {
@@ -19167,10 +16995,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimePrefixedRbTreeStateNil17VectorOwner::capacity offset must be 0x0C"
   );
 
-
-
-
-
   struct RuntimePrefixedRbTreeStateNil17RangeOwnerAt08
   {
     std::uint8_t lane00_07[0x08]{};
@@ -19180,19 +17004,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimePrefixedRbTreeStateNil17RangeOwnerAt08, end) == 0x08,
     "RuntimePrefixedRbTreeStateNil17RangeOwnerAt08::end offset must be 0x08"
   );
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x0052F0A0 (FUN_0052F0A0)
@@ -19403,15 +17214,12 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     msvc8::string text;
   };
 
-
   struct RuntimeCopyRecord36LaneB
   {
     std::uint32_t lane00;
     msvc8::string text;
     std::uint32_t lane20;
   };
-
-
 
   struct RuntimeLuaRecord24
   {
@@ -19420,9 +17228,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeLuaRecord24) == 0x18, "RuntimeLuaRecord24 size must be 0x18");
   static_assert(offsetof(RuntimeLuaRecord24, object) == 0x04, "RuntimeLuaRecord24::object offset must be 0x04");
-
-
-
 
   struct RuntimeCallableCloneDispatch
   {
@@ -19441,9 +17246,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(offsetof(RuntimeCallableState68, lanes20_40) == 0x20, "RuntimeCallableState68::lanes20_40 offset");
   static_assert(offsetof(RuntimeCallableState68, stateFlag44) == 0x44, "RuntimeCallableState68::stateFlag44 offset");
 
-
-
-
   struct RuntimeCopyRecord44LaneA
   {
     float lane00;
@@ -19452,12 +17254,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint32_t lane0C;
     msvc8::string text;
   };
-
-
-
-
-
-
 
   struct RuntimePointerBufferStateLaneA
   {
@@ -19468,22 +17264,12 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimePointerBufferStateLaneA) == 0x10, "RuntimePointerBufferStateLaneA size must be 0x10");
 
-
-
-
-
-
-
-
-
-
   struct RuntimeIntPairHashKey
   {
     int lhs;
     int rhs;
   };
   static_assert(sizeof(RuntimeIntPairHashKey) == 0x08, "RuntimeIntPairHashKey size must be 0x08");
-
 
   struct RuntimePairHashListNode
   {
@@ -19528,7 +17314,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimePairHashLookupState::bucketSplit offset must be 0x24"
   );
 
-
   struct RuntimeSentinelNode20
   {
     RuntimeSentinelNode20* next; // +0x00
@@ -19536,8 +17321,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint8_t payload[0x0C];  // +0x08
   };
   static_assert(sizeof(RuntimeSentinelNode20) == 0x14, "RuntimeSentinelNode20 size must be 0x14");
-
-
 
   struct RuntimeIntrusiveListNode
   {
@@ -19582,16 +17365,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(sizeof(RuntimeDualLinkRightNodeLane) == 0x10, "RuntimeDualLinkRightNodeLane size must be 0x10");
   static_assert(offsetof(RuntimeDualLinkRightNodeLane, owner) == 0x08, "RuntimeDualLinkRightNodeLane::owner offset must be 0x08");
 
-
-
-
-
-
-
   RuntimeIntrusiveListNode* RuntimeClearIntrusiveListNodesKeepHeadLaneA(
     RuntimeIntrusiveListState* const listState
   ) noexcept;
-
 
   /**
    * Address: 0x008491C0 (FUN_008491C0)
@@ -19621,8 +17397,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     return head;
   }
-
-
 
   struct RuntimeMapTreePayloadTriplet
   {
@@ -19720,9 +17494,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-
-
-
   /**
    * Address: 0x00711B00 (FUN_00711B00)
    *
@@ -19793,30 +17564,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return result;
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeArmyStatItemBlueprintView
   {
     std::byte pad00A0[0xA0];
@@ -19826,8 +17573,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimeArmyStatItemBlueprintView, blueprintTree) == 0xA0,
     "RuntimeArmyStatItemBlueprintView::blueprintTree offset must be 0xA0"
   );
-
-
 
   inline void RuntimeMapTreeRetainSharedControl(void* const sharedControl) noexcept
   {
@@ -19905,11 +17650,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return result;
   }
 
-
-
-
-
-
 #pragma pack(push, 1)
   struct RuntimePackedFloatRecord74
   {
@@ -19978,13 +17718,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-
   struct RuntimeTreeNode24OwnerView
   {
     std::uint32_t lane00;
     RuntimeTreeNode24* head;
   };
-
 
   struct RuntimeDualBacklinkedPairRecord24
   {
@@ -20002,7 +17740,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     offsetof(RuntimeDualBacklinkedPairRecord24, laneB) == 0x10,
     "RuntimeDualBacklinkedPairRecord24::laneB offset must be 0x10"
   );
-
 
   struct RuntimeTripleWordDualBacklinkedRecord40
   {
@@ -20028,23 +17765,12 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeTripleWordDualBacklinkedRecord40::flag25 offset must be 0x25"
   );
 
-
-
-
-
-
-
-
-
-
   struct RuntimeIntrusiveRefcountedObjectView
   {
     void** vtable;           // +0x00
     volatile long refCount;  // +0x04
   };
   static_assert(sizeof(RuntimeIntrusiveRefcountedObjectView) == 0x08, "RuntimeIntrusiveRefcountedObjectView size must be 0x08");
-
-
 
   struct RuntimeLookupPayloadLane
   {
@@ -20078,10 +17804,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(offsetof(RuntimeLookupOwnerLane, first) == 0x10, "RuntimeLookupOwnerLane::first offset must be 0x10");
 
-
-
-
-
   struct RuntimeSingleWordLane
   {
     std::uint32_t value; // +0x00
@@ -20094,7 +17816,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint32_t second; // +0x04
   };
   static_assert(sizeof(RuntimeWordPairLane) == 0x08, "RuntimeWordPairLane size must be 0x08");
-
 
   struct RuntimeSplitWordPairDestinationSlots
   {
@@ -20246,10 +17967,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
 
-
-
-
-
   struct RuntimeStride116VectorLaneView
   {
     void* allocatorCookie; // +0x00
@@ -20259,33 +17976,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeStride116VectorLaneView) == 0x10, "RuntimeStride116VectorLaneView size must be 0x10");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   using RuntimeComSlotDispatchFn = int(__stdcall*)(void*);
-
-
 
   using RuntimeVirtualForwardSlot16Fn = void(
     __thiscall*
@@ -20298,8 +17989,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     void* slot08;
     RuntimeVirtualForwardSlot16Fn slot10;
   };
-
-
 
   struct RuntimeBufferedReaderVTable
   {
@@ -20335,29 +18024,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(offsetof(RuntimeBufferedCursorProbeView, hasCurrent) == 0x08, "RuntimeBufferedCursorProbeView::hasCurrent offset");
   static_assert(offsetof(RuntimeBufferedCursorProbeView, current) == 0x09, "RuntimeBufferedCursorProbeView::current offset");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   struct RuntimeNodePointerOwnerOffset04
   {
     std::uint32_t lane00 = 0u;                   // +0x00
@@ -20368,47 +18034,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeNodePointerOwnerOffset04::node offset must be 0x04"
   );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   using RuntimeSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
-
-
 
   struct RuntimeInitRecord36Lane
   {
@@ -20429,9 +18055,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(offsetof(RuntimeInitRecord36Lane, lane1C) == 0x1C, "RuntimeInitRecord36Lane::lane1C offset must be 0x1C");
   static_assert(offsetof(RuntimeInitRecord36Lane, lane20) == 0x20, "RuntimeInitRecord36Lane::lane20 offset must be 0x20");
 
-
-
-
   struct RuntimeInitRecord24Lane
   {
     std::uint32_t lane00 = 0; // +0x00
@@ -20444,15 +18067,5 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(sizeof(RuntimeInitRecord24Lane) == 0x18, "RuntimeInitRecord24Lane size must be 0x18");
   static_assert(offsetof(RuntimeInitRecord24Lane, lane14) == 0x14, "RuntimeInitRecord24Lane::lane14 offset must be 0x14");
 
-
-
-
-
-
-
-
-
-
 } // namespace moho::runtime
-
 
