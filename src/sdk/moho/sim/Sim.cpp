@@ -8643,6 +8643,11 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   SavePointerByRType(
     archive, mCommandDB, {"CCommandDB", "CCommandDb", "Moho::CCommandDB"}, gpg::TrackedPointerState::Owned, ownerRef
   );
+
+  // Persist the sim's Lua globals table as (key, value) entries + nil terminator
+  // (binary tail: mLuaState->GetGlobals() + func_ArchiveWriteLuaObj).
+  LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+  (void)func_ArchiveWriteLuaObj(archive, &globals);
 }
 
 /**
