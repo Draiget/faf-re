@@ -12,6 +12,43 @@
 namespace Wm3
 {
   /**
+   * Address: 0x004FE130 (FUN_004FE130, ??0Segment3f@Wm3@@QAE@@Z)
+   *
+   * IDA signature:
+   * Wm3::Segment3f *__usercall Segment3::Segment3@<eax>(
+   *     Wm3::Vector3f *end@<eax>, Wm3::Vector3f *start@<ecx>, Wm3::Segment3f *this@<esi>);
+   *
+   * What it does:
+   * FA two-endpoint segment constructor: Origin = midpoint(start,end),
+   * Direction = normalize(end - start) (zero when degenerate),
+   * Extent = half the endpoint distance.
+   */
+  [[nodiscard]] Segment3f MakeSegment3fFromEndpoints(const Vector3f& start, const Vector3f& end) noexcept
+  {
+    const float halfDx = (end.x - start.x) * 0.5f;
+    const float halfDy = (end.y - start.y) * 0.5f;
+    const float halfDz = (end.z - start.z) * 0.5f;
+    const float extent = std::sqrt((halfDy * halfDy) + (halfDz * halfDz) + (halfDx * halfDx));
+
+    Segment3f segment{};
+    segment.Origin.x = start.x + halfDx;
+    segment.Origin.y = start.y + halfDy;
+    segment.Origin.z = start.z + halfDz;
+    if (extent <= 0.0f) {
+      segment.Direction.x = 0.0f;
+      segment.Direction.y = 0.0f;
+      segment.Direction.z = 0.0f;
+    } else {
+      const float inverseExtent = 1.0f / extent;
+      segment.Direction.x = halfDx * inverseExtent;
+      segment.Direction.y = halfDy * inverseExtent;
+      segment.Direction.z = halfDz * inverseExtent;
+    }
+    segment.Extent = extent;
+    return segment;
+  }
+
+  /**
    * Address: 0x00A57240 (FUN_00A57240, fn)
    *
    * What it does:

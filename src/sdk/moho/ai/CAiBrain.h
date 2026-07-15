@@ -1918,6 +1918,32 @@ namespace moho
   int cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00591020 (FUN_00591020, cfunc_CAiBrainCheckBlockingTerrain)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainCheckBlockingTerrainL`.
+   */
+  int cfunc_CAiBrainCheckBlockingTerrain(lua_State* luaContext);
+
+  /**
+   * Address: 0x00591040 (FUN_00591040, func_CAiBrainCheckBlockingTerrain_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:CheckBlockingTerrain()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainCheckBlockingTerrain_LuaFuncDef();
+
+  /**
+   * Address: 0x005910A0 (FUN_005910A0, cfunc_CAiBrainCheckBlockingTerrainL)
+   *
+   * What it does:
+   * Returns whether terrain blocks a straight or arced trajectory between two
+   * points, raycasting the map height field per sub-segment.
+   */
+  int cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0058C490 (FUN_0058C490, cfunc_CAiBrainBuildPlatoon)
    *
    * What it does:
