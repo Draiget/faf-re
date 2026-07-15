@@ -8408,6 +8408,44 @@ void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
   }
 }
 
+namespace
+{
+  /**
+   * Address: 0x00744E50 (FUN_00744E50, sub_744E50)
+   *
+   * IDA signature:
+   * void __usercall sub_744E50(gpg::ReadArchive* archive@<esi>, LuaPlus::LuaObject table);
+   *
+   * What it does:
+   * Reads (key, value) LuaObject pairs from `archive` and assigns each into
+   * `table` until a nil-key sentinel is read. Used to restore the sim's Lua
+   * globals table at the end of the load-serialization pass. `table` is taken by
+   * value (an owned copy destroyed on return), matching the binary.
+   */
+  void ReadLuaTableEntriesFromArchive(gpg::ReadArchive* const archive, LuaPlus::LuaObject table)
+  {
+    gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
+    if (!luaObjectType) {
+      luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+      LuaPlus::LuaObject::sType = luaObjectType;
+    }
+
+    while (true) {
+      LuaPlus::LuaObject key;
+      gpg::RRef keyRef{};
+      archive->Read(luaObjectType, &key, keyRef);
+      if (key.IsNil()) {
+        break;
+      }
+
+      LuaPlus::LuaObject value;
+      gpg::RRef valueRef{};
+      archive->Read(luaObjectType, &value, valueRef);
+      table.SetObject(key, value);
+    }
+  }
+} // namespace
+
 /**
   * Alias of FUN_00754C60 (non-canonical helper lane).
  *
@@ -8456,6 +8494,11 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
 
   mCommandDB =
     static_cast<CCommandDb*>(LoadPointerByRType(archive, {"CCommandDB", "CCommandDb", "Moho::CCommandDB"}, ownerRef));
+
+  // Restore the sim's Lua globals table: read (key, value) pairs into the globals
+  // until a nil-key sentinel (binary tail: mLuaState->GetGlobals() + FUN_00744E50).
+  LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+  ReadLuaTableEntriesFromArchive(archive, globals);
 }
 
 /**
