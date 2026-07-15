@@ -283,17 +283,6 @@ extern "C" int __cdecl _SFUO_Destroy()
   throw std::length_error(message);
 }
 
-/**
- * Address: 0x00AA3B54 (FUN_00AA3B54)
- *
- * What it does:
- * Invokes one no-argument callback function-pointer lane and returns its
- * integer result.
- */
-[[maybe_unused]] int RuntimeInvokeNoArgIntCallback(int (*const callback)())
-{
-  return callback != nullptr ? callback() : 0;
-}
 
 namespace
 {
@@ -441,32 +430,6 @@ static_assert(offsetof(RuntimeTypeInfoMapNode, pair) == 0x0C, "RuntimeTypeInfoMa
 static_assert(offsetof(RuntimeTypeInfoMapNode, color) == 0x14, "RuntimeTypeInfoMapNode::color offset must be 0x14");
 static_assert(offsetof(RuntimeTypeInfoMapNode, isNil) == 0x15, "RuntimeTypeInfoMapNode::isNil offset must be 0x15");
 
-/**
- * Address: 0x008DA230 (FUN_008DA230, _Tree::_Buynode)
- *
- * What it does:
- * Allocates one red-black tree node for the `type_info* -> value` map and
- * initializes linkage, payload, and color/nil marker lanes.
- */
-RuntimeTypeInfoMapNode* RuntimeTypeInfoMapAllocateNode(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const RuntimeTypeInfoMapPair* const value,
-  const std::uint8_t color
-)
-{
-  auto* const node = static_cast<RuntimeTypeInfoMapNode*>(::operator new(sizeof(RuntimeTypeInfoMapNode)));
-  if (node != nullptr) {
-    node->left = left;
-    node->right = right;
-    node->parent = parent;
-    node->pair = *value;
-    node->color = color;
-    node->isNil = 0;
-  }
-  return node;
-}
 
 struct RuntimeListNodePayload24Words
 {
@@ -659,166 +622,18 @@ using RuntimeTreeNode20Container = RuntimeRbTreeContainerView<RuntimeTreeNode20>
 using RuntimeTreeNode24Container = RuntimeRbTreeContainerView<RuntimeTreeNode24>;
 using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNodeNil45>;
 
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeCommon()
-{
-  auto* const node = static_cast<RuntimeTypeInfoMapNode*>(::operator new(sizeof(RuntimeTypeInfoMapNode)));
-  if (node != nullptr) {
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->pair.keyTypeInfo = nullptr;
-    node->pair.valueTypeInfo = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapNodeFromRawPair(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const std::uint32_t* const rawPairWords,
-  const std::uint8_t color
-)
-{
-  RuntimeTypeInfoMapPair pair{};
-  pair.keyTypeInfo = reinterpret_cast<const std::type_info*>(static_cast<std::uintptr_t>(rawPairWords[0]));
-  pair.valueTypeInfo = reinterpret_cast<void*>(static_cast<std::uintptr_t>(rawPairWords[1]));
-  return RuntimeTypeInfoMapAllocateNode(left, parent, right, &pair, color);
-}
-
-[[nodiscard]] RuntimeListNode40* RuntimeAllocateListNode40SentinelCommon()
-{
-  auto* const node = static_cast<RuntimeListNode40*>(::operator new(sizeof(RuntimeListNode40)));
-  if (node != nullptr) {
-    node->next = node;
-    node->prev = node;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeListNode32* RuntimeAllocateListNode32SentinelCommon()
-{
-  auto* const node = static_cast<RuntimeListNode32*>(::operator new(sizeof(RuntimeListNode32)));
-  if (node != nullptr) {
-    node->next = node;
-    node->prev = node;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeListNode32* RuntimeAllocateListNode32WithPayloadCommon(
-  RuntimeListNode32* const next,
-  RuntimeListNode32* const prev,
-  const RuntimeListNodePayload32Words* const payload
-)
-{
-  auto* const node = static_cast<RuntimeListNode32*>(::operator new(sizeof(RuntimeListNode32)));
-  if (node != nullptr) {
-    node->next = next;
-    node->prev = prev;
-    node->payload = *payload;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeListNode24* RuntimeAllocateListNode24SentinelCommon()
-{
-  auto* const node = static_cast<RuntimeListNode24*>(::operator new(sizeof(RuntimeListNode24)));
-  if (node != nullptr) {
-    node->next = node;
-    node->prev = node;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeListNode24* RuntimeAllocateListNode24WithPayloadCommon(
-  RuntimeListNode24* const next,
-  RuntimeListNode24* const prev,
-  const RuntimeListNodePayload24Words* const payload
-)
-{
-  auto* const node = static_cast<RuntimeListNode24*>(::operator new(sizeof(RuntimeListNode24)));
-  if (node != nullptr) {
-    node->next = next;
-    node->prev = prev;
-    node->payload = *payload;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeTreeNode24* RuntimeAllocateTreeNode24WithPayloadCommon(
-  RuntimeTreeNode24* const left,
-  RuntimeTreeNode24* const parent,
-  RuntimeTreeNode24* const right,
-  const RuntimeTreeNodePayload24Words* const payload,
-  const std::uint8_t color
-)
-{
-  auto* const node = static_cast<RuntimeTreeNode24*>(::operator new(sizeof(RuntimeTreeNode24)));
-  if (node != nullptr) {
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->payload = *payload;
-    node->color = color;
-    node->isNil = 0u;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeTreeNode24* RuntimeAllocateTreeNode24HeadCommon()
-{
-  auto* const node = static_cast<RuntimeTreeNode24*>(::operator new(sizeof(RuntimeTreeNode24)));
-  if (node != nullptr) {
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeAllocateTreeHeadNodeBareCommon()
-{
-  auto* const node = static_cast<RuntimeTreeHeadNodeBare*>(::operator new(sizeof(RuntimeTreeHeadNodeBare)));
-  if (node != nullptr) {
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-  }
-  return node;
-}
-
-[[nodiscard]] RuntimeTreeNode20* RuntimeAllocateTreeNode20HeadCommon()
-{
-  auto* const node = static_cast<RuntimeTreeNode20*>(::operator new(sizeof(RuntimeTreeNode20)));
-  if (node != nullptr) {
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-  }
-  return node;
-}
 
 
-/**
- * Address: 0x008E42C0 (FUN_008E42C0)
- *
- * What it does:
- * Allocates one 48-byte intrusive list sentinel node and self-links the
- * `next/prev` lanes.
- */
-[[nodiscard]] RuntimeListNode40* RuntimeAllocateListNode40SentinelLaneA()
-{
-  return RuntimeAllocateListNode40SentinelCommon();
-}
+
+
+
+
+
+
+
+
+
+
 
 struct RuntimeListOwnerSentinelLaneView
 {
@@ -861,17 +676,6 @@ static_assert(
 
 
 
-/**
- * Address: 0x0092DC30 (FUN_0092DC30)
- *
- * What it does:
- * Allocates one 40-byte intrusive list sentinel node and self-links the
- * `next/prev` lanes.
- */
-[[nodiscard]] RuntimeListNode32* RuntimeAllocateListNode32SentinelLaneA()
-{
-  return RuntimeAllocateListNode32SentinelCommon();
-}
 
 struct RuntimeListNode32OwnerLane
 {
@@ -896,18 +700,6 @@ static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane08) == 0x08, "Runtim
 static_assert(offsetof(RuntimeOwnedPointerTripletOwner, lane0C) == 0x0C, "RuntimeOwnedPointerTripletOwner::lane0C offset must be 0x0C");
 static_assert(sizeof(RuntimeOwnedPointerTripletOwner) == 0x10, "RuntimeOwnedPointerTripletOwner size must be 0x10");
 
-[[nodiscard]] RuntimeOwnedPointerTripletOwner* RuntimeReleaseOwnedPointerTripletStorage(
-  RuntimeOwnedPointerTripletOwner* const owner
-) noexcept
-{
-  if (owner->ownedStorage != nullptr) {
-    ::operator delete(owner->ownedStorage);
-  }
-  owner->ownedStorage = nullptr;
-  owner->lane08 = 0u;
-  owner->lane0C = 0u;
-  return owner;
-}
 
 
 struct RuntimeLane12PopOwnerView
@@ -927,41 +719,8 @@ static_assert(sizeof(RuntimeLane12PopOwnerView) == 0x0C, "RuntimeLane12PopOwnerV
 
 
 
-/**
- * Address: 0x00946F90 (FUN_00946F90)
- *
- * What it does:
- * Allocates one 24-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeLaneA()
-{
-  return RuntimeAllocateTypeInfoMapHeadNodeCommon();
-}
 
-/**
- * Address: 0x00946FE0 (FUN_00946FE0)
- *
- * What it does:
- * Allocates one 24-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeLaneB()
-{
-  return RuntimeAllocateTypeInfoMapHeadNodeCommon();
-}
 
-/**
- * Address: 0x00947030 (FUN_00947030)
- *
- * What it does:
- * Allocates one 24-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeLaneC()
-{
-  return RuntimeAllocateTypeInfoMapHeadNodeCommon();
-}
 
 struct RuntimeTypeInfoMapOwnerInitLane
 {
@@ -973,20 +732,6 @@ static_assert(sizeof(RuntimeTypeInfoMapOwnerInitLane) == 0x0C, "RuntimeTypeInfoM
 static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, head) == 0x04, "RuntimeTypeInfoMapOwnerInitLane::head offset must be 0x04");
 static_assert(offsetof(RuntimeTypeInfoMapOwnerInitLane, size) == 0x08, "RuntimeTypeInfoMapOwnerInitLane::size offset must be 0x08");
 
-template <typename TOwner, typename THead>
-[[nodiscard]] TOwner* RuntimeInitializeRbOwnerHeadSentinelLane(
-  TOwner* const owner,
-  THead* const head
-) noexcept
-{
-  owner->head = head;
-  head->isNil = 1u;
-  head->left = head;
-  head->parent = head;
-  head->right = head;
-  owner->size = 0u;
-  return owner;
-}
 
 
 
@@ -996,17 +741,6 @@ template <typename TOwner, typename THead>
 
 
 
-/**
- * Address: 0x00950540 (FUN_00950540)
- *
- * What it does:
- * Allocates one 24-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeLaneD()
-{
-  return RuntimeAllocateTypeInfoMapHeadNodeCommon();
-}
 
 /**
  * Address: 0x00950380 (FUN_00950380)
@@ -1048,17 +782,6 @@ void RuntimeDeleteTreeNode24LaneA(RuntimeTreeNode24* node)
   }
 }
 
-/**
- * Address: 0x009505D0 (FUN_009505D0)
- *
- * What it does:
- * Allocates one 40-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTreeNode24* RuntimeAllocateTreeNode24HeadLaneA()
-{
-  return RuntimeAllocateTreeNode24HeadCommon();
-}
 
 struct RuntimeTreeNode24OwnerInitLane
 {
@@ -1072,31 +795,7 @@ static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, size) == 0x08, "RuntimeTr
 
 
 
-/**
- * Address: 0x00A58370 (FUN_00A58370)
- * Address: 0x00A583C0 (FUN_00A583C0)
- *
- * What it does:
- * Allocates one 20-byte bare red-black tree head node with null links and
- * marker bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeAllocateTreeHeadNodeBareLaneA()
-{
-  return RuntimeAllocateTreeHeadNodeBareCommon();
-}
 
-/**
- * Address: 0x00A58410 (FUN_00A58410)
- * Address: 0x00A584E0 (FUN_00A584E0)
- *
- * What it does:
- * Allocates one 36-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTreeNode20* RuntimeAllocateTreeNode20HeadLaneA()
-{
-  return RuntimeAllocateTreeNode20HeadCommon();
-}
 
 
 
@@ -1123,62 +822,9 @@ static_assert(
   "RuntimeOwnedPointerArrayView::pendingCount offset must be 0x10"
 );
 
-void RuntimeResetOwnedPointerArrayCommon(
-  RuntimeOwnedPointerArrayView* const view
-)
-{
-  while (view->pendingCount != 0) {
-    const std::int32_t currentPending = view->pendingCount;
-    if (currentPending != 0) {
-      const std::int32_t nextPending = currentPending - 1;
-      view->pendingCount = nextPending;
-      if (nextPending == 0) {
-        view->activeCount = 0;
-      }
-    }
-  }
-
-  std::int32_t index = view->entryCount;
-  while (index != 0) {
-    --index;
-    void* const entry = view->entries[index];
-    if (entry != nullptr) {
-      ::operator delete(entry);
-    }
-  }
-
-  if (view->entries != nullptr) {
-    ::operator delete(view->entries);
-  }
-
-  view->entries = nullptr;
-  view->entryCount = 0;
-}
-
-/**
- * Address: 0x00A57F70 (FUN_00A57F70)
- *
- * What it does:
- * Drains pending references, deletes each owned pointer lane in reverse index
- * order, and clears array storage/count lanes.
- */
-void RuntimeResetOwnedPointerArrayLaneA(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayCommon(view);
-}
 
 
-/**
- * Address: 0x00A58050 (FUN_00A58050)
- *
- * What it does:
- * Drains pending references, deletes each owned pointer lane in reverse index
- * order, and clears array storage/count lanes.
- */
-void RuntimeResetOwnedPointerArrayLaneB(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayCommon(view);
-}
+
 
 
 struct RuntimeTreeIteratorNil11View
@@ -1224,199 +870,14 @@ static_assert(
   "RuntimeOwnedPointerBucketIteratorView::position offset must be 0x08"
 );
 
-inline void RuntimeReportInvalidParameterLane() noexcept
-{
-  _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-}
 
-[[nodiscard]] inline std::uint32_t RuntimeOwnedPointerBucketBegin(
-  const RuntimeOwnedPointerArrayView* const owner
-) noexcept
-{
-  return static_cast<std::uint32_t>(owner->activeCount);
-}
 
-[[nodiscard]] inline std::uint32_t RuntimeOwnedPointerBucketEnd(
-  const RuntimeOwnedPointerArrayView* const owner
-) noexcept
-{
-  return static_cast<std::uint32_t>(owner->activeCount + owner->pendingCount);
-}
 
-[[nodiscard]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11Common(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  iterator->owner = nullptr;
-  iterator->node = node;
-  if (owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-  iterator->owner = owner;
-  return iterator;
-}
 
-[[nodiscard]] bool RuntimeTreeIteratorNodeNotEqualCheckedCommon(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  if (left->owner == nullptr || left->owner != right->owner) {
-    RuntimeReportInvalidParameterLane();
-  }
-  return left->node != right->node;
-}
 
-[[nodiscard]] bool RuntimeTreeIteratorNodeEqualCheckedCommon(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  if (left->owner == nullptr || left->owner != right->owner) {
-    RuntimeReportInvalidParameterLane();
-  }
-  return left->node == right->node;
-}
 
-[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeAdvanceTreeIteratorNil11CheckedCommon(
-  RuntimeTreeIteratorNil11View* const iterator
-) noexcept
-{
-  if (iterator->owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
 
-  RuntimeTreeHeadNodeBare* current = iterator->node;
-  if (current->isNil != 0u) {
-    RuntimeReportInvalidParameterLane();
-  }
 
-  RuntimeTreeHeadNodeBare* right = current->right;
-  if (right->isNil != 0u) {
-    RuntimeTreeHeadNodeBare* parent = current->parent;
-    while (parent->isNil == 0u && iterator->node == parent->right) {
-      iterator->node = parent;
-      parent = parent->parent;
-    }
-    iterator->node = parent;
-    return parent;
-  }
-
-  RuntimeTreeHeadNodeBare* cursor = right;
-  RuntimeTreeHeadNodeBare* left = cursor->left;
-  while (left->isNil == 0u) {
-    cursor = left;
-    left = cursor->left;
-  }
-  iterator->node = cursor;
-  return cursor;
-}
-
-[[nodiscard]] RuntimeTreeNode20* RuntimeAdvanceTreeIteratorNil21CheckedCommon(
-  RuntimeTreeIteratorNil21View* const iterator
-) noexcept
-{
-  if (iterator->owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  RuntimeTreeNode20* current = iterator->node;
-  if (current->isNil != 0u) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  RuntimeTreeNode20* right = current->right;
-  if (right->isNil != 0u) {
-    RuntimeTreeNode20* parent = current->parent;
-    while (parent->isNil == 0u && iterator->node == parent->right) {
-      iterator->node = parent;
-      parent = parent->parent;
-    }
-    iterator->node = parent;
-    return parent;
-  }
-
-  RuntimeTreeNode20* cursor = right;
-  RuntimeTreeNode20* left = cursor->left;
-  while (left->isNil == 0u) {
-    cursor = left;
-    left = cursor->left;
-  }
-  iterator->node = cursor;
-  return left;
-}
-
-/**
- * Address: 0x00A526D0 (FUN_00A526D0, sub_A526D0)
- * Address: 0x00A528A0 (FUN_00A528A0, sub_A528A0)
- *
- * IDA signature:
- * int __thiscall sub_A526D0(_DWORD *this);
- *
- * What it does:
- * Tree-iterator predecessor (`operator--`) for the `Nil11` node shape
- * (`isNil` byte at `+0x11`, total node size `0x14`). Implements the standard
- * red-black tree decrement walk:
- *   * Throws via `_invalid_parameter` when the iterator's owner pointer is
- *     null.
- *   * From the past-end sentinel (`isNil` set), descends `right` to land on
- *     the rightmost element and returns it; throws when the tree is empty.
- *   * Otherwise, when the current node has a non-nil left subtree, walks
- *     right from `left` to find its rightmost descendant and parks the
- *     iterator there.
- *   * When the left subtree is nil, walks up via `parent` while the cursor
- *     is still a `parent->left` child, stopping (and parking the iterator)
- *     at the first ancestor we reached as a `parent->right` child.
- *
- * Both `0x00A526D0` and `0x00A528A0` are separate compiler emissions of the
- * same template instantiation with identical bodies.
- */
-[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeRecedeTreeIteratorNil11CheckedCommon(
-  RuntimeTreeIteratorNil11View* const iterator
-) noexcept
-{
-  if (iterator->owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  RuntimeTreeHeadNodeBare* const current = iterator->node;
-  if (current->isNil != 0u) {
-    RuntimeTreeHeadNodeBare* const rightmost = current->right;
-    iterator->node = rightmost;
-    if (rightmost->isNil != 0u) {
-      RuntimeReportInvalidParameterLane();
-    }
-    return rightmost;
-  }
-
-  RuntimeTreeHeadNodeBare* const left = current->left;
-  if (left->isNil != 0u) {
-    RuntimeTreeHeadNodeBare* parent = current->parent;
-    while (parent->isNil == 0u) {
-      if (iterator->node != parent->left) {
-        break;
-      }
-      iterator->node = parent;
-      parent = parent->parent;
-    }
-    if (iterator->node->isNil != 0u) {
-      RuntimeReportInvalidParameterLane();
-    }
-    iterator->node = parent;
-    return parent;
-  }
-
-  RuntimeTreeHeadNodeBare* cursor = left;
-  RuntimeTreeHeadNodeBare* descendant = cursor->right;
-  while (descendant->isNil == 0u) {
-    cursor = descendant;
-    descendant = cursor->right;
-  }
-  iterator->node = cursor;
-  return descendant;
-}
 
 
 void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
@@ -1432,165 +893,6 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   }
 }
 
-[[nodiscard]] RuntimeTreeHeadNodeBareContainer* RuntimeClearTreeHeadNodeBareContainerCommon(
-  RuntimeTreeHeadNodeBareContainer* const container,
-  void (*const destroyTree)(RuntimeTreeHeadNodeBare*)
-) noexcept
-{
-  RuntimeTreeHeadNodeBare* const head = container->head;
-  destroyTree(head->parent);
-  head->parent = head;
-  container->size = 0u;
-  head->left = head;
-  head->right = head;
-  return container;
-}
-
-[[nodiscard]] RuntimeTreeHeadNodeBare* RuntimeInitializeTreeHeadNodeBareContainerCommon(
-  RuntimeTreeHeadNodeBareContainer* const container,
-  RuntimeTreeHeadNodeBare* (*const allocateHead)()
-) noexcept
-{
-  RuntimeTreeHeadNodeBare* const head = allocateHead();
-  container->head = head;
-  head->isNil = 1u;
-  head->parent = head;
-  head->left = head;
-  head->right = head;
-  container->size = 0u;
-  return head;
-}
-
-[[nodiscard]] RuntimeTreeNode20* RuntimeInitializeTreeNode20ContainerCommon(
-  RuntimeTreeNode20Container* const container,
-  RuntimeTreeNode20* (*const allocateHead)()
-) noexcept
-{
-  RuntimeTreeNode20* const head = allocateHead();
-  container->head = head;
-  head->isNil = 1u;
-  head->parent = head;
-  head->left = head;
-  head->right = head;
-  container->size = 0u;
-  return head;
-}
-
-[[nodiscard]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketIteratorCommon(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const std::uint32_t position,
-  RuntimeOwnedPointerArrayView* const owner
-) noexcept
-{
-  iterator->reserved00 = 0u;
-  if (
-    owner == nullptr ||
-    RuntimeOwnedPointerBucketBegin(owner) > position ||
-    position > RuntimeOwnedPointerBucketEnd(owner)
-  ) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  iterator->owner = owner;
-  iterator->position = position;
-  return iterator;
-}
-
-[[nodiscard]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketEndIteratorCommon(
-  RuntimeOwnedPointerArrayView* const owner,
-  RuntimeOwnedPointerBucketIteratorView* const outIterator
-) noexcept
-{
-  const std::uint32_t begin = RuntimeOwnedPointerBucketBegin(owner);
-  const std::uint32_t end = RuntimeOwnedPointerBucketEnd(owner);
-  outIterator->reserved00 = 0u;
-  if (begin > end) {
-    RuntimeReportInvalidParameterLane();
-  }
-  outIterator->owner = owner;
-  outIterator->position = end;
-  return outIterator;
-}
-
-[[nodiscard]] RuntimeOwnedPointerBucketIteratorView* RuntimeRetreatOwnedPointerBucketIteratorCommon(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const int delta
-) noexcept
-{
-  if (iterator->owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  const RuntimeOwnedPointerArrayView* const owner = iterator->owner;
-  const std::uint32_t begin = RuntimeOwnedPointerBucketBegin(owner);
-  const std::uint32_t end = RuntimeOwnedPointerBucketEnd(owner);
-  const std::int64_t nextPosition = static_cast<std::int64_t>(iterator->position) - static_cast<std::int64_t>(delta);
-  if (
-    nextPosition < static_cast<std::int64_t>(begin) ||
-    nextPosition > static_cast<std::int64_t>(end)
-  ) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  iterator->position = static_cast<std::uint32_t>(nextPosition);
-  return iterator;
-}
-
-[[nodiscard]] std::uint32_t* RuntimeResolveOwnedPointerBucketIteratorCommon(
-  const RuntimeOwnedPointerBucketIteratorView* const iterator
-) noexcept
-{
-  const RuntimeOwnedPointerArrayView* const owner = iterator->owner;
-  if (owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  const std::uint32_t position = iterator->position;
-  if (position >= RuntimeOwnedPointerBucketEnd(owner)) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  std::uint32_t bucketIndex = position >> 2u;
-  const std::uint32_t lane = position & 0x3u;
-  const std::uint32_t baseBucket = static_cast<std::uint32_t>(owner->entryCount);
-  if (baseBucket <= bucketIndex) {
-    bucketIndex -= baseBucket;
-  }
-
-  auto* const bucketBase = reinterpret_cast<std::uint32_t*>(owner->entries[bucketIndex]);
-  return bucketBase + lane;
-}
-
-
-
-
-/**
- * Address: 0x00A52760 (FUN_00A52760)
- *
- * What it does:
- * Advances one nil-`0x11` tree iterator to the next in-order node with
- * iterator-owner and sentinel validity checks.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBare* RuntimeAdvanceTreeIteratorNil11CheckedLaneA(
-  RuntimeTreeIteratorNil11View* const iterator
-) noexcept
-{
-  return RuntimeAdvanceTreeIteratorNil11CheckedCommon(iterator);
-}
-
-/**
- * Address: 0x00A52930 (FUN_00A52930)
- *
- * What it does:
- * Advances one nil-`0x11` tree iterator to the next in-order node with
- * iterator-owner and sentinel validity checks.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBare* RuntimeAdvanceTreeIteratorNil11CheckedLaneB(
-  RuntimeTreeIteratorNil11View* const iterator
-) noexcept
-{
-  return RuntimeAdvanceTreeIteratorNil11CheckedCommon(iterator);
-}
 
 
 
@@ -1610,29 +912,6 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
 
 
 
-/**
- * Address: 0x00A57EB0 (FUN_00A57EB0)
- *
- * What it does:
- * Recursively deletes one nil-`0x11` red-black tree by erasing each right
- * subtree, then walking/deleting the left spine.
- */
-[[maybe_unused]] void RuntimeDeleteTreeHeadNodeBarePostorderLaneA(RuntimeTreeHeadNodeBare* const node)
-{
-  RuntimeDeleteTreeHeadNodeBarePostorderCommon(node);
-}
-
-/**
- * Address: 0x00A57EF0 (FUN_00A57EF0)
- *
- * What it does:
- * Recursively deletes one nil-`0x11` red-black tree by erasing each right
- * subtree, then walking/deleting the left spine.
- */
-[[maybe_unused]] void RuntimeDeleteTreeHeadNodeBarePostorderLaneB(RuntimeTreeHeadNodeBare* const node)
-{
-  RuntimeDeleteTreeHeadNodeBarePostorderCommon(node);
-}
 
 
 
@@ -1644,39 +923,18 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
 
 
 
-/**
- * Address: 0x00A5A0C0 (FUN_00A5A0C0)
- *
- * What it does:
- * Builds one shifted copy of an owned-pointer bucket iterator by subtracting
- * `delta` from the source position with bounds checks.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeCopyAndRetreatOwnedPointerBucketIteratorLaneA(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  RuntimeOwnedPointerBucketIteratorView* const outIterator,
-  const int delta
-) noexcept
-{
-  const RuntimeOwnedPointerArrayView* const owner = iterator->owner;
-  if (owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
 
-  const std::uint32_t begin = RuntimeOwnedPointerBucketBegin(owner);
-  const std::uint32_t end = RuntimeOwnedPointerBucketEnd(owner);
-  const std::int64_t nextPosition = static_cast<std::int64_t>(iterator->position) - static_cast<std::int64_t>(delta);
-  if (
-    nextPosition < static_cast<std::int64_t>(begin) ||
-    nextPosition > static_cast<std::int64_t>(end)
-  ) {
-    RuntimeReportInvalidParameterLane();
-  }
 
-  outIterator->position = static_cast<std::uint32_t>(nextPosition);
-  outIterator->owner = iterator->owner;
-  outIterator->reserved00 = 0u;
-  return outIterator;
-}
+
+
+
+
+
+
+
+
+
+
 
 
 void RuntimeDeleteTreeNode20PostorderLaneA(RuntimeTreeNode20* const node);
@@ -1684,73 +942,7 @@ void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
 
 
 
-/**
- * Address: 0x00A598A0 (FUN_00A598A0)
- *
- * What it does:
- * Advances one nil-`0x11` iterator lane until `node == endNode`, incrementing
- * `outStepCount` for every step and validating owner identity each iteration.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeCountIteratorAdvanceToEndLaneA(
-  RuntimeTreeHeadNodeBareContainer* const owner,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const expectedOwner,
-  RuntimeTreeHeadNodeBare* const endNode,
-  std::uint32_t* const outStepCount
-) noexcept
-{
-  RuntimeTreeIteratorNil11View iterator{};
-  iterator.owner = owner;
-  iterator.node = node;
-  while (true) {
-    if (owner == nullptr || owner != expectedOwner) {
-      RuntimeReportInvalidParameterLane();
-    }
 
-    if (iterator.node == endNode) {
-      break;
-    }
-
-    ++(*outStepCount);
-    (void)RuntimeAdvanceTreeIteratorNil11CheckedLaneA(&iterator);
-  }
-
-  return owner;
-}
-
-/**
- * Address: 0x00A598E0 (FUN_00A598E0)
- *
- * What it does:
- * Advances one nil-`0x11` iterator lane until `node == endNode`, incrementing
- * `outStepCount` for every step and validating owner identity each iteration.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeCountIteratorAdvanceToEndLaneB(
-  RuntimeTreeHeadNodeBareContainer* const owner,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const expectedOwner,
-  RuntimeTreeHeadNodeBare* const endNode,
-  std::uint32_t* const outStepCount
-) noexcept
-{
-  RuntimeTreeIteratorNil11View iterator{};
-  iterator.owner = owner;
-  iterator.node = node;
-  while (true) {
-    if (owner == nullptr || owner != expectedOwner) {
-      RuntimeReportInvalidParameterLane();
-    }
-
-    if (iterator.node == endNode) {
-      break;
-    }
-
-    ++(*outStepCount);
-    (void)RuntimeAdvanceTreeIteratorNil11CheckedLaneB(&iterator);
-  }
-
-  return owner;
-}
 
 
 
@@ -1819,25 +1011,6 @@ struct RuntimeTripleDwordRecord
 };
 static_assert(sizeof(RuntimeTripleDwordRecord) == 0x0C, "RuntimeTripleDwordRecord size must be 0x0C");
 
-/**
- * Address: 0x00AC2D10 (FUN_00AC2D10)
- *
- * What it does:
- * Allocates one 12-byte record lane and copies two direct dword inputs plus
- * one sourced dword payload lane.
- */
-[[nodiscard]] RuntimeTripleDwordRecord* RuntimeAllocateTripleDwordRecord(
-  const std::uint32_t lane0,
-  const std::uint32_t lane1,
-  const std::uint32_t* const lane2Source
-)
-{
-  auto* const record = static_cast<RuntimeTripleDwordRecord*>(::operator new(sizeof(RuntimeTripleDwordRecord)));
-  record->lane0 = lane0;
-  record->lane1 = lane1;
-  record->lane2 = *lane2Source;
-  return record;
-}
 
 using RuntimeThreadExitHandler = void(__cdecl*)();
 
@@ -1855,60 +1028,10 @@ static_assert(
   "RuntimeThreadExitHandlerNode::handler offset must be 0x08"
 );
 
-[[nodiscard]] RuntimeThreadExitHandlerNode* RuntimeAllocateSelfLinkedThreadExitSentinelCommon()
-{
-  auto* const node = static_cast<RuntimeThreadExitHandlerNode*>(::operator new(sizeof(RuntimeThreadExitHandlerNode)));
-  if (node != nullptr) {
-    node->next = node;
-    node->prev = node;
-  }
-  return node;
-}
-
-/**
- * Address: 0x00AC2CA0 (FUN_00AC2CA0)
- *
- * What it does:
- * Allocates one 12-byte intrusive-list sentinel lane and self-links
- * `{next,prev}`.
- */
-[[nodiscard]] RuntimeThreadExitHandlerNode* RuntimeAllocateSelfLinkedThreadExitSentinelLaneA()
-{
-  return RuntimeAllocateSelfLinkedThreadExitSentinelCommon();
-}
 
 
-/**
- * Address: 0x00AC5A70 (FUN_00AC5A70)
- *
- * What it does:
- * Allocates one 12-byte intrusive-list sentinel lane and self-links
- * `{next,prev}`.
- */
-[[nodiscard]] RuntimeThreadExitHandlerNode* RuntimeAllocateSelfLinkedThreadExitSentinelLaneB()
-{
-  return RuntimeAllocateSelfLinkedThreadExitSentinelCommon();
-}
 
-/**
- * Address: 0x00AC5AD0 (FUN_00AC5AD0, std::list_thread_exit_handler::push_front)
- *
- * What it does:
- * Allocates one thread-exit list node lane and initializes next/prev links
- * plus the stored callback payload.
- */
-[[nodiscard]] RuntimeThreadExitHandlerNode* RuntimeThreadExitHandlerPushFrontNode(
-  RuntimeThreadExitHandlerNode* const next,
-  RuntimeThreadExitHandlerNode* const prev,
-  const RuntimeThreadExitHandler* const handlerSource
-)
-{
-  auto* const node = static_cast<RuntimeThreadExitHandlerNode*>(::operator new(sizeof(RuntimeThreadExitHandlerNode)));
-  node->next = next;
-  node->prev = prev;
-  node->handler = *handlerSource;
-  return node;
-}
+
 
 struct RuntimeThreadExitHandlerListRuntimeView
 {
@@ -1930,50 +1053,8 @@ static_assert(
 
 
 
-[[nodiscard]] std::uint32_t RuntimeIncrementThreadExitHandlerListSizeCheckedCommon(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const std::uint32_t increment
-)
-{
-  const std::uint32_t currentSize = listRuntime->size;
-  if (0x3FFFFFFFu - currentSize < increment) {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  const std::uint32_t nextSize = currentSize + increment;
-  listRuntime->size = nextSize;
-  return nextSize;
-}
 
-/**
- * Address: 0x00AC3140 (FUN_00AC3140)
- *
- * What it does:
- * Increments one thread-exit list size lane by `increment` and raises the
- * legacy VC8 list overflow diagnostic when `0x3FFFFFFF` would be exceeded.
- */
-[[maybe_unused]] [[nodiscard]] std::uint32_t RuntimeIncrementThreadExitHandlerListSizeCheckedLaneA(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const std::uint32_t increment
-)
-{
-  return RuntimeIncrementThreadExitHandlerListSizeCheckedCommon(listRuntime, increment);
-}
-
-/**
- * Address: 0x00AC5D90 (FUN_00AC5D90)
- *
- * What it does:
- * Duplicate lane of checked thread-exit list size increment with VC8
- * `list<T>` overflow semantics.
- */
-[[maybe_unused]] [[nodiscard]] std::uint32_t RuntimeIncrementThreadExitHandlerListSizeCheckedLaneB(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const std::uint32_t increment
-)
-{
-  return RuntimeIncrementThreadExitHandlerListSizeCheckedCommon(listRuntime, increment);
-}
 
 
 
@@ -2162,81 +1243,9 @@ static_assert(sizeof(RuntimeSndParamsCacheBoundPair) == 0x08, "RuntimeSndParamsC
 
 RuntimeContainerBase gRuntimeSndParamsCacheStorage{};
 
-[[nodiscard]] RuntimeSndParamsCacheHeadNode* AllocateRuntimeSndParamsCacheHeadNode()
-{
-  auto* const node = static_cast<RuntimeSndParamsCacheHeadNode*>(gpg::core::legacy::AllocateChecked24ByteLane(1u));
-  if (node != nullptr) {
-    node->container = nullptr;
-  }
-  if (node != reinterpret_cast<RuntimeSndParamsCacheHeadNode*>(-4)) {
-    node->next = nullptr;
-  }
-  if (node != reinterpret_cast<RuntimeSndParamsCacheHeadNode*>(-8)) {
-    node->previous = nullptr;
-  }
-  node->color = 1u;
-  node->isNil = 0u;
-  return node;
-}
 
 
-/**
- * Address: 0x004E2030 (FUN_004E2030)
- *
- * What it does:
- * Performs one lower-bound walk on the static sound-parameter cache tree
- * using the node key lane at `+0x0C`, then stores the located iterator-node
- * (or head sentinel) into the output slot.
- */
-RuntimeSndParamsCacheSearchNodeView** RuntimeLowerBoundSndParamsCacheNodeByKey(
-  RuntimeSndParamsCacheSearchNodeView** const outNode,
-  const void* const* const keySlot
-)
-{
-  auto* located = reinterpret_cast<RuntimeSndParamsCacheSearchNodeView*>(gRuntimeSndParamsCacheStorage.firstIterator);
-  auto* cursor = located->parent;
-  const std::uintptr_t key = reinterpret_cast<std::uintptr_t>(*keySlot);
-  while (cursor->isNil == 0u) {
-    if (reinterpret_cast<std::uintptr_t>(cursor->key) >= key) {
-      located = cursor;
-      cursor = cursor->left;
-    } else {
-      cursor = cursor->right;
-    }
-  }
 
-  *outNode = located;
-  return outNode;
-}
-
-/**
- * Address: 0x004E2060 (FUN_004E2060)
- *
- * What it does:
- * Performs one upper-bound walk on the static sound-parameter cache tree
- * using the node key lane at `+0x0C`, then stores the located iterator-node
- * (or head sentinel) into the output slot.
- */
-RuntimeSndParamsCacheSearchNodeView** RuntimeUpperBoundSndParamsCacheNodeByKey(
-  RuntimeSndParamsCacheSearchNodeView** const outNode,
-  const void* const* const keySlot
-)
-{
-  auto* located = reinterpret_cast<RuntimeSndParamsCacheSearchNodeView*>(gRuntimeSndParamsCacheStorage.firstIterator);
-  auto* cursor = located->parent;
-  const std::uintptr_t key = reinterpret_cast<std::uintptr_t>(*keySlot);
-  while (cursor->isNil == 0u) {
-    if (key >= reinterpret_cast<std::uintptr_t>(cursor->key)) {
-      cursor = cursor->right;
-    } else {
-      located = cursor;
-      cursor = cursor->left;
-    }
-  }
-
-  *outNode = located;
-  return outNode;
-}
 
 
 [[nodiscard]] inline RuntimeSndParamsCacheSearchNodeView* RuntimeSndParamsCacheHeadNode() noexcept
@@ -2244,33 +1253,6 @@ RuntimeSndParamsCacheSearchNodeView** RuntimeUpperBoundSndParamsCacheNodeByKey(
   return reinterpret_cast<RuntimeSndParamsCacheSearchNodeView*>(gRuntimeSndParamsCacheStorage.firstIterator);
 }
 
-[[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane002(const unsigned int count);
-[[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane003(const unsigned int count);
-
-[[nodiscard]] RuntimeSndParamsCacheSearchNodeView* RuntimeAllocateSndParamsCacheNodeFromPairCore(
-  const std::uintptr_t* const keyValuePair,
-  RuntimeSndParamsCacheSearchNodeView* const left,
-  RuntimeSndParamsCacheSearchNodeView* const parent,
-  RuntimeSndParamsCacheSearchNodeView* const right,
-  void* (*const allocateFn)(const unsigned int)
-)
-{
-  auto* const node = static_cast<RuntimeSndParamsCacheSearchNodeView*>(allocateFn(1u));
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->left = left;
-  node->parent = parent;
-  node->right = right;
-  node->key = reinterpret_cast<const void*>(keyValuePair[0]);
-  node->value = reinterpret_cast<const void*>(keyValuePair[1]);
-  node->color = 0u;
-  node->isNil = 0u;
-  node->pad16[0] = 0u;
-  node->pad16[1] = 0u;
-  return node;
-}
 
 /**
  * Address: 0x004E4530 (FUN_004E4530)
@@ -2302,62 +1284,15 @@ void RuntimeDestroySndParamsCacheSubtree(
 
 
 
-[[nodiscard]] RuntimeSndParamsCacheSearchNodeView* RuntimeStepSndParamsCacheIteratorToPreviousCore(
-  RuntimeSndParamsCacheSearchNodeView** const iteratorNodeSlot
-)
-{
-  RuntimeSndParamsCacheSearchNodeView* node = *iteratorNodeSlot;
-  if (node->isNil != 0u) {
-    node = node->right;
-    *iteratorNodeSlot = node;
-    return node;
-  }
-
-  RuntimeSndParamsCacheSearchNodeView* scan = node->left;
-  if (scan->isNil == 0u) {
-    RuntimeSndParamsCacheSearchNodeView* right = scan->right;
-    while (right->isNil == 0u) {
-      scan = right;
-      right = scan->right;
-    }
-    *iteratorNodeSlot = scan;
-    return right;
-  }
-
-  RuntimeSndParamsCacheSearchNodeView* parent = node->parent;
-  while (parent->isNil == 0u && *iteratorNodeSlot == parent->left) {
-    *iteratorNodeSlot = parent;
-    parent = parent->parent;
-  }
-  if ((*iteratorNodeSlot)->isNil == 0u) {
-    *iteratorNodeSlot = parent;
-  }
-  return parent;
-}
-
-
-
-[[nodiscard]] inline void** RuntimeAssignPointerCommon(void** const outSlot, void* const value) noexcept
-{
-  *outSlot = value;
-  return outSlot;
-}
 
 
 
 
 
 
-[[nodiscard]] inline RuntimeDwordPairRecord* RuntimeCopyDwordPairRecordCommon(
-  RuntimeDwordPairRecord* const outRecord,
-  const std::uint32_t* const firstSource,
-  const std::uint32_t* const secondSource
-) noexcept
-{
-  outRecord->first = *firstSource;
-  outRecord->second = *secondSource;
-  return outRecord;
-}
+
+
+
 
 
 
@@ -2454,46 +1389,6 @@ using RuntimeRbIteratorNodeNil65 = RuntimeRbIteratorNodeView<0x41>;
 using RuntimeRbIteratorNodeNil89 = RuntimeRbIteratorNodeView<0x59>;
 using RuntimeRbIteratorNodeNil3273 = RuntimeRbIteratorNodeView<0xCC9>;
 
-template <std::size_t kIsNilOffset>
-[[nodiscard]] inline RuntimeRbIteratorNodeView<kIsNilOffset>* RuntimeAdvanceRbIteratorSlotCommon(
-  RuntimeRbIteratorNodeView<kIsNilOffset>** const iteratorSlot
-) noexcept
-{
-  auto* node = *iteratorSlot;
-  if (node->isNil != 0u) {
-    return node;
-  }
-
-  auto* right = node->right;
-  if (right->isNil == 0u) {
-    node = right->left;
-    if (node->isNil == 0u) {
-      do {
-        right = node;
-        node = node->left;
-      } while (node->isNil == 0u);
-    }
-    *iteratorSlot = right;
-    return node;
-  }
-
-  node = node->parent;
-  if (node->isNil != 0u) {
-    *iteratorSlot = node;
-    return node;
-  }
-
-  while (*iteratorSlot == node->right) {
-    *iteratorSlot = node;
-    node = node->parent;
-    if (node->isNil != 0u) {
-      break;
-    }
-  }
-
-  *iteratorSlot = node;
-  return node;
-}
 
 template <std::size_t kIsNilOffset>
 [[nodiscard]] inline RuntimeRbIteratorNodeView<kIsNilOffset>* RuntimeFindRbSubtreeLeftmostCommon(
@@ -2539,46 +1434,7 @@ template <std::size_t kIsNilOffset>
   return node;
 }
 
-/**
- * Address: 0x004E3F50 (FUN_004E3F50)
- * Address: 0x004E46F0 (FUN_004E46F0)
- * Address: 0x004E9980 (FUN_004E9980)
- * Address: 0x00592320 (FUN_00592320)
- * Address: 0x005A0AC0 (FUN_005A0AC0)
- * Address: 0x005C8A20 (FUN_005C8A20)
- * Address: 0x0066AC90 (FUN_0066AC90)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x15`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil21* RuntimeFindRbSubtreeLeftmostNil21LaneA(
-  RuntimeRbIteratorNodeNil21* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x004E4570 (FUN_004E4570)
- * Address: 0x004E4620 (FUN_004E4620)
- * Address: 0x004E46D0 (FUN_004E46D0)
- * Address: 0x004E9AF0 (FUN_004E9AF0)
- * Address: 0x00592300 (FUN_00592300)
- * Address: 0x005A0AA0 (FUN_005A0AA0)
- * Address: 0x0066AC70 (FUN_0066AC70)
- * Address: 0x00686390 (FUN_00686390)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x15`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil21* RuntimeFindRbSubtreeRightmostNil21LaneA(
-  RuntimeRbIteratorNodeNil21* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
 
 
@@ -2634,48 +1490,10 @@ template <std::size_t kIsNilOffset>
 
 
 
-/**
- * Address: 0x007CB130 (FUN_007CB130)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x0E`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil14* RuntimeFindRbSubtreeLeftmostNil14LaneA(
-  RuntimeRbIteratorNodeNil14* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
-
-/**
- * Address: 0x007CB110 (FUN_007CB110)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x0E`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil14* RuntimeFindRbSubtreeRightmostNil14LaneA(
-  RuntimeRbIteratorNodeNil14* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
 
 
-/**
- * Address: 0x00570640 (FUN_00570640)
- * Address: 0x007B4D90 (FUN_007B4D90, std::map_uint_WeakPtr_UserEntity::_Node::Iterator::inc)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x19`.
- */
-RuntimeRbIteratorNodeNil25* RuntimeAdvanceRbIteratorNil25LaneA(RuntimeRbIteratorNodeNil25** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
+
 
 
 
@@ -2698,19 +1516,6 @@ static_assert(sizeof(RuntimeTripleStringRecord48) == 0x30, "RuntimeTripleStringR
 
 
 
-/**
- * Address: 0x006888E0 (FUN_006888E0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0xCC9`.
- */
-RuntimeRbIteratorNodeNil3273* RuntimeAdvanceRbIteratorNil3273LaneA(
-  RuntimeRbIteratorNodeNil3273** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 
 
@@ -2719,17 +1524,6 @@ RuntimeRbIteratorNodeNil3273* RuntimeAdvanceRbIteratorNil3273LaneA(
 
 
 
-/**
- * Address: 0x00736700 (FUN_00736700)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x2D`.
- */
-RuntimeRbIteratorNodeNil45* RuntimeAdvanceRbIteratorNil45LaneD(RuntimeRbIteratorNodeNil45** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 
 struct RuntimeFloat3Record
@@ -2781,20 +1575,6 @@ template <class RecordT>
   return reinterpret_cast<RecordT*>(destinationAddress);
 }
 
-inline void RuntimeLinkWeakNodeToOwnerHead(
-  RuntimeWeakLinkNode* const destination,
-  const RuntimeWeakLinkNode* const source
-) noexcept
-{
-  destination->ownerSlot = source->ownerSlot;
-  if (source->ownerSlot == nullptr) {
-    destination->nextInOwner = nullptr;
-    return;
-  }
-
-  destination->nextInOwner = *source->ownerSlot;
-  *source->ownerSlot = destination;
-}
 
 
 /**
@@ -2895,134 +1675,25 @@ std::uint32_t* RuntimeCopyDwordRangeLaneF(
 }
 
 
-/**
- * Address: 0x0077CE50 (FUN_0077CE50)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x1D`.
- */
-RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneA(RuntimeRbIteratorNodeNil29** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
-
-
-
-
-/**
- * Address: 0x007B2D40 (FUN_007B2D40)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x11`.
- */
-RuntimeRbIteratorNodeNil17* RuntimeAdvanceRbIteratorNil17LaneA(RuntimeRbIteratorNodeNil17** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
-
-
-
-/**
- * Address: 0x007B4C40 (FUN_007B4C40)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x1D`.
- */
-RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneB(RuntimeRbIteratorNodeNil29** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
-
-
-/**
- * Address: 0x007E6460 (FUN_007E6460)
- *
- * What it does:
- * Fills `count` destination records with one repeated 3-float source record
- * and returns one-past-end destination.
- */
-RuntimeFloat3Record* RuntimeFillFloat3RangeLaneA(
-  RuntimeFloat3Record* destination,
-  const RuntimeFloat3Record* const sourceValue,
-  unsigned int count
-)
-{
-  std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-  while (count != 0u) {
-    auto* const outRecord = reinterpret_cast<RuntimeFloat3Record*>(destinationAddress);
-    if (outRecord != nullptr) {
-      *outRecord = *sourceValue;
-    }
-    destinationAddress += sizeof(RuntimeFloat3Record);
-    --count;
-  }
-  return reinterpret_cast<RuntimeFloat3Record*>(destinationAddress);
-}
 
 
 
 
 
 
-/**
- * Address: 0x008D9B50 (FUN_008D9B50)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x15`.
- */
-RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneE(RuntimeRbIteratorNodeNil21** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeInitializePairTreeHeadCommon(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* (*const allocateHead)()
-)
-{
-  RuntimeTypeInfoMapNode* const head = allocateHead();
-  container->head = head;
-  head->isNil = 1u;
-  head->parent = head;
-  head->left = head;
-  head->right = head;
-  container->size = 0u;
-  return head;
-}
 
-[[nodiscard]] RuntimePairTreeContainer* RuntimeClearPairTreeKeepHeadCommon(
-  RuntimePairTreeContainer* const container
-) noexcept
-{
-  RuntimeDeleteTypeInfoMapTreeLaneA(container->head->parent);
-  container->head->parent = container->head;
-  container->size = 0u;
-  container->head->left = container->head;
-  container->head->right = container->head;
-  return container;
-}
 
-[[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotCommon(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil21LaneE(iteratorSlot);
-  return iteratorSlot;
-}
 
-[[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyAndAdvanceRbIteratorNil21SlotCommon(
-  RuntimeRbIteratorNodeNil21** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil21** const destinationIteratorSlot
-)
-{
-  *destinationIteratorSlot = *sourceIteratorSlot;
-  (void)RuntimeAdvanceRbIteratorNil21LaneE(sourceIteratorSlot);
-  return destinationIteratorSlot;
-}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3124,18 +1795,6 @@ static_assert(
   "RuntimeRttiCompleteObjectLocator::classDescriptor offset must be 0x10"
 );
 
-[[nodiscard]] inline const char* RuntimeTypeInfoDecoratedName(const std::type_info* const type) noexcept
-{
-  if (type == nullptr) {
-    return nullptr;
-  }
-
-  const auto* const view = reinterpret_cast<const RuntimeTypeInfoView*>(type);
-  if (view->decoratedName != nullptr) {
-    return view->decoratedName;
-  }
-  return type->name();
-}
 
 
 /**
@@ -4830,16 +3489,6 @@ extern "C" int __cdecl isdigit(const int character)
   return RuntimeClassifyInitialOrLocaleChanged(character, 0x004u, &_isdigit_l);
 }
 
-[[nodiscard]] inline std::uint16_t RuntimeNormalizeHexDigitCharacterCommon(
-  const std::uint16_t character
-) noexcept
-{
-  if ((character & 0xFF00u) == 0u && isdigit(static_cast<unsigned char>(character)) != 0) {
-    return character;
-  }
-
-  return static_cast<std::uint16_t>((character & 0xFFDFu) - 7u);
-}
 
 
 
@@ -5326,33 +3975,6 @@ mbstowcs(wchar_t* const destination, const char* const source, const std::size_t
   return ::_mbstowcs_l(destination, source, maxCount, reinterpret_cast<_locale_t>(localeInfo));
 }
 
-/**
- * Address: 0x009EFEC0 (FUN_009EFEC0)
- *
- * What it does:
- * Returns multibyte length when `destination` is null; otherwise converts into
- * `destination` when non-empty source is provided and null-terminates empty
- * input.
- */
-[[maybe_unused]] std::size_t RuntimeMbstowcsCountOrConvert(
-  wchar_t* const destination,
-  const char* const source,
-  const std::size_t destinationCount
-)
-{
-  if (destination == nullptr) {
-    return mbstowcs(nullptr, source, 0u);
-  }
-
-  if (destinationCount != 0u) {
-    if (*source != '\0') {
-      return mbstowcs(destination, source, destinationCount);
-    }
-    *destination = L'\0';
-  }
-
-  return 0u;
-}
 
 
 /**
@@ -7116,28 +5738,6 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
   return EINVAL;
 }
 
-[[nodiscard]] static bool RuntimeWriteByteBufferToFilePathWithMode(
-  const char* const filePath,
-  const void* const buffer,
-  const int byteCount,
-  const char* const mode
-)
-{
-  if (filePath == nullptr || buffer == nullptr || byteCount <= 0 || mode == nullptr) {
-    return false;
-  }
-
-  std::FILE* file = nullptr;
-  const int openStatus = RuntimeFopenS(&file, const_cast<char*>(filePath), const_cast<char*>(mode));
-  if (openStatus != 0 || file == nullptr) {
-    return false;
-  }
-
-  const std::size_t expectedWriteCount = static_cast<std::size_t>(byteCount);
-  const std::size_t writtenCount = std::fwrite(buffer, 1u, expectedWriteCount, file);
-  const int closeStatus = std::fclose(file);
-  return closeStatus == 0 && writtenCount == expectedWriteCount;
-}
 
 
 
@@ -7242,51 +5842,9 @@ static void RuntimeWriteBufferedCharImpl(std::FILE* const f, int ch, int* const 
   }
 }
 
-/**
- * Address: 0x00A96E17 (FUN_00A96E17, write_char_0)
- *
- * What it does:
- * Writes one buffered character into a legacy CRT stream and updates the
- * written-count lane with buffered-output fallback semantics.
- */
-static void RuntimeWriteBufferedChar(std::FILE* const f, int ch, int* const pnumwritten)
-{
-  RuntimeWriteBufferedCharImpl(f, ch, pnumwritten);
-}
 
 
 
-/**
- * Address: 0x00AA0103 (FUN_00AA0103)
- *
- * What it does:
- * Emits one format character through a legacy `FILE` lane, honoring buffered
- * write rules and marking `*pnumwritten = -1` when the write fails.
- */
-static int RuntimeWriteFormatChar(std::FILE* const stream, const int character, int* const pnumwritten)
-{
-  int result = character;
-  if ((legacy_file(stream)._flag & 0x40) == 0 || legacy_file(stream)._base != nullptr) {
-    int& counter = legacy_file(stream)._cnt;
-    if (--counter < 0) {
-      result = _flsbuf(static_cast<signed char>(character), stream);
-    } else {
-      *legacy_file(stream)._ptr = static_cast<char>(character);
-      ++legacy_file(stream)._ptr;
-      result = static_cast<unsigned char>(character);
-    }
-
-    if (result == -1) {
-      *pnumwritten = -1;
-    } else {
-      ++*pnumwritten;
-    }
-    return result;
-  }
-
-  ++*pnumwritten;
-  return result;
-}
 
 
 
@@ -7631,36 +6189,7 @@ int __cdecl Runtime_vwprintf(const wchar_t* const format, va_list arguments)
   return vwprintf_helper(woutput_l, format, nullptr, arguments);
 }
 
-/**
- * Address: 0x00AAE4AD (FUN_00AAE4AD)
- *
- * What it does:
- * Legacy varargs adapter that forwards one wide-format print lane through
- * `vwprintf_helper` with the default locale lane.
- */
-[[maybe_unused]] int __cdecl RuntimeVwprintfDefaultLocaleAdapter(
-  const wchar_t* const format,
-  va_list arguments
-)
-{
-  return vwprintf_helper(woutput_l, format, nullptr, arguments);
-}
 
-/**
- * Address: 0x00AAE4C5 (FUN_00AAE4C5)
- *
- * What it does:
- * Legacy varargs adapter that forwards one wide-format print lane through
- * `vwprintf_helper` with the caller-provided locale lane.
- */
-[[maybe_unused]] int __cdecl RuntimeVwprintfLocaleAdapter(
-  const wchar_t* const format,
-  _locale_t const localeInfo,
-  va_list arguments
-)
-{
-  return vwprintf_helper(woutput_l, format, localeInfo, arguments);
-}
 
 /**
  * Address: 0x00A90485 (FUN_00A90485, _wprintf_l)
@@ -7972,18 +6501,6 @@ namespace
   CRITICAL_SECTION gAllocatorSentinel{};
   volatile LONG gAllocatorSentinelInitState = 0;
 
-  void EnsureAllocatorSentinelInitialized() noexcept
-  {
-    if (::InterlockedCompareExchange(&gAllocatorSentinelInitState, 1, 0) == 0) {
-      ::InitializeCriticalSection(&gAllocatorSentinel);
-      (void)::InterlockedExchange(&gAllocatorSentinelInitState, 2);
-      return;
-    }
-
-    while (::InterlockedCompareExchange(&gAllocatorSentinelInitState, 2, 2) != 2) {
-      ::Sleep(0u);
-    }
-  }
 }
 
 
@@ -8381,73 +6898,6 @@ namespace
     "RuntimeAbsoluteTimeoutView::reserved0C offset must be 0xC"
   );
 
-  [[nodiscard]] std::int64_t RuntimeComposeSignedSeconds(
-    const std::uint32_t secLow,
-    const std::int32_t secHigh
-  ) noexcept
-  {
-    return (static_cast<std::int64_t>(secHigh) << 32) | static_cast<std::uint32_t>(secLow);
-  }
-
-  [[nodiscard]] std::uint64_t BuildUnsigned64(std::uint32_t lowPart, std::uint32_t highPart) noexcept;
-
-  void RuntimeSampleCurrentXtimeUtc(RuntimeXtimeSnapshotView* const outNow) noexcept
-  {
-    FILETIME systemTimeAsFileTime{};
-    ::GetSystemTimeAsFileTime(&systemTimeAsFileTime);
-
-    const std::uint64_t filetimeTicks =
-      BuildUnsigned64(systemTimeAsFileTime.dwLowDateTime, systemTimeAsFileTime.dwHighDateTime);
-    const std::uint64_t unixEpochTicks = filetimeTicks - kFiletimeToUnixEpochOffset;
-    const std::uint64_t currentSeconds = unixEpochTicks / kFiletimeHundredNsPerSecond;
-
-    outNow->secLow = static_cast<std::uint32_t>(currentSeconds & 0xFFFFFFFFull);
-    outNow->secHigh = static_cast<std::int32_t>(currentSeconds >> 32u);
-    outNow->nanoseconds = static_cast<std::int32_t>((unixEpochTicks % kFiletimeHundredNsPerSecond) * 100ull);
-  }
-
-  /**
-   * Address: 0x00AC1790 (FUN_00AC1790)
-   *
-   * What it does:
-   * Converts one absolute UTC xtime deadline lane into a relative millisecond
-   * wait timeout, rounding nanoseconds to the nearest millisecond and clamping
-   * expired deadlines to zero.
-   */
-  int RuntimeComputeWaitMillisecondsFromAbsoluteTimeout(
-    const std::uint32_t deadlineSecLow,
-    const std::int32_t deadlineSecHigh,
-    const std::int32_t deadlineNanoseconds,
-    const std::uint32_t,
-    int* const outMilliseconds
-  )
-  {
-    RuntimeXtimeSnapshotView now{};
-    RuntimeSampleCurrentXtimeUtc(&now);
-
-    const std::int64_t deadlineSeconds = RuntimeComposeSignedSeconds(deadlineSecLow, deadlineSecHigh);
-    const std::int64_t nowSeconds = RuntimeComposeSignedSeconds(now.secLow, now.secHigh);
-
-    int result = deadlineNanoseconds;
-    if (deadlineSeconds < nowSeconds || (deadlineSeconds == nowSeconds && deadlineNanoseconds <= now.nanoseconds)) {
-      *outMilliseconds = 0;
-      return result;
-    }
-
-    std::int64_t adjustedDeadlineSeconds = deadlineSeconds;
-    if (now.nanoseconds > deadlineNanoseconds) {
-      result = deadlineNanoseconds + 1000000000;
-      --adjustedDeadlineSeconds;
-    }
-
-    const std::int64_t secondDelta = adjustedDeadlineSeconds - nowSeconds;
-    const std::int64_t millisecondDelta =
-      (secondDelta * 1000ll) + static_cast<std::int64_t>((result - now.nanoseconds + 500000) / 1000000);
-
-    result = static_cast<int>(millisecondDelta);
-    *outMilliseconds = result;
-    return result;
-  }
 
 
 
@@ -8455,17 +6905,8 @@ namespace
 
 
 
-  [[nodiscard]] boost::thread_exception* RuntimeDestroyBoostThreadExceptionNoDelete(
-    boost::thread_exception* const exceptionRuntime
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
 
-    exceptionRuntime->~thread_exception();
-    return exceptionRuntime;
-  }
+
 
 
 
@@ -8845,50 +7286,6 @@ namespace
     return RuntimeMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
   }
 
-  /**
-   * Address: 0x00AA1B90 (FUN_00AA1B90)
-   *
-   * What it does:
-   * Forces one locale decimal-point character into a floating-text lane by
-   * rotating the trailing suffix rightward at the exponent split.
-   */
-  char RuntimeForceDecimalPointLocaleAware(
-    char* const text,
-    _locale_t const localeInfo
-  )
-  {
-    RuntimeTidDataLocaleView* threadData = nullptr;
-    bool updated = false;
-    RuntimeThreadLocInfoView* const localeView = RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
-
-    char* cursor = text;
-    while (tolower(static_cast<unsigned char>(*cursor)) != 'e'
-           && isdigit(static_cast<unsigned char>(*cursor)) != 0) {
-      ++cursor;
-    }
-
-    if (tolower(static_cast<unsigned char>(*cursor)) == 'x') {
-      cursor += 2;
-    }
-
-    const char decimalPoint =
-      (localeView != nullptr && localeView->localeConv != nullptr && localeView->localeConv->decimal_point != nullptr)
-      ? *localeView->localeConv->decimal_point
-      : '.';
-
-    char carried = *cursor;
-    *cursor = decimalPoint;
-
-    char* shiftCursor = cursor + 1;
-    do {
-      const char next = *shiftCursor;
-      *shiftCursor = carried;
-      carried = next;
-    } while (*shiftCursor++ != '\0');
-
-    RuntimeReleaseLocaleUpdate(threadData, updated);
-    return carried;
-  }
 
 
 
@@ -9143,76 +7540,7 @@ namespace
     "RuntimeEh3DispatcherContextView::targetTryLevel offset must be 0x28"
   );
 
-  /**
-   * Address: 0x00AA3A85 (FUN_00AA3A85)
-   *
-   * What it does:
-   * Walks one EH3 scope-state chain downward until `targetTryLevel` and runs
-   * pending cleanup callbacks for state entries whose guard lane is zero.
-   */
-  [[maybe_unused]] RuntimeEh3FrameView* RuntimeEh3LocalUnwindToTarget(
-    RuntimeEh3FrameView* const frame,
-    const std::int32_t targetTryLevel
-  ) noexcept
-  {
-    if (frame == nullptr) {
-      return nullptr;
-    }
 
-    while (true) {
-      const std::int32_t state = frame->currentState;
-      if (state == -1 || (targetTryLevel != -1 && state <= targetTryLevel)) {
-        break;
-      }
-
-      RuntimeEh3ScopeEntryView* const scopeTable = frame->scopeTable;
-      if (scopeTable == nullptr) {
-        break;
-      }
-
-      const RuntimeEh3ScopeEntryView& scope = scopeTable[state];
-      frame->currentState = scope.nextState;
-      if (scope.filterOrGuard == 0) {
-        const auto callbackLane = static_cast<std::uint32_t>(scope.callback);
-        (void)RuntimePublishNonLocalGotoState(
-          callbackLane,
-          static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame)),
-          0x101u
-        );
-        (void)RuntimeInvokeNoArgIntCallback(
-          reinterpret_cast<int (*)()>(static_cast<std::uintptr_t>(callbackLane))
-        );
-      }
-    }
-
-    return frame;
-  }
-
-  /**
-   * Address: 0x00AA3A40 (FUN_00AA3A40)
-   *
-   * What it does:
-   * EH3 filter lane for unwind notifications: when unwind flags are present it
-   * runs local-unwind processing for the dispatcher-selected try-level and
-   * stores the establisher-frame pointer into dispatcher context lane `+0x00`.
-   */
-  [[maybe_unused]] EXCEPTION_DISPOSITION __cdecl RuntimeEh3UnwindFilter(
-    EXCEPTION_RECORD* const exceptionRecord,
-    void* const establisherFrame,
-    CONTEXT* const /*contextRecord*/,
-    RuntimeEh3DispatcherContextView* const dispatcherContext
-  ) noexcept
-  {
-    if (exceptionRecord != nullptr && (exceptionRecord->ExceptionFlags & 0x6u) != 0u) {
-      if (dispatcherContext != nullptr) {
-        (void)RuntimeEh3LocalUnwindToTarget(dispatcherContext->frame, dispatcherContext->targetTryLevel);
-        dispatcherContext->establisherFrameOut = establisherFrame;
-      }
-      return ExceptionCollidedUnwind;
-    }
-
-    return ExceptionContinueSearch;
-  }
 
   struct RuntimeEh3TopRegistrationProbeView
   {
@@ -9233,22 +7561,6 @@ namespace
   using ThreadExitHandler = void(__cdecl*)();
   using ThreadExitHandlerList = std::list<ThreadExitHandler>;
 
-  /**
-   * Address: 0x00AC5B70 (FUN_00AC5B70, std::list_thread_exit_handler::~list_thread_exit_handler)
-   * Mangled: ??1list_thread_exit_handler@std@@QAE@@Z
-   *
-   * What it does:
-   * Runs one thread-exit handler list destructor lane (node chain + sentinel
-   * node teardown) and leaves the list object in a null-head state.
-   */
-  void RuntimeThreadExitHandlerListDestructor(ThreadExitHandlerList* const handlers)
-  {
-    if (handlers == nullptr) {
-      return;
-    }
-
-    handlers->~ThreadExitHandlerList();
-  }
 
 
 }
@@ -9648,10 +7960,6 @@ extern "C" int __cdecl __set_app_type(const int appType)
 
 namespace
 {
-  [[nodiscard]] constexpr int RuntimeLegacyVectorMaxElementCountStride4() noexcept
-  {
-    return 0x3FFFFFFF;
-  }
 }
 
 
@@ -10540,48 +8848,6 @@ namespace moho::runtime
   [[nodiscard]] unsigned long* RuntimeDosErrno();
   extern "C" unsigned int __cdecl div64_0(unsigned __int64 dividend, __int64 divisor);
 
-  /**
-   * Address: 0x00B57C4C (FUN_00B57C4C)
-   *
-   * What it does:
-   * Emits base-N digits in reverse order, then in-place reverses the emitted
-   * span (optional leading minus).
-   */
-  void LegacyToCharsReverseUnsigned32(unsigned int value, char* destination, unsigned int base, bool prependMinus)
-  {
-    if (prependMinus) {
-      *destination = '-';
-      ++destination;
-      value = static_cast<unsigned int>(-static_cast<int>(value));
-    }
-
-    char* writeCursor = destination;
-    do {
-      const unsigned int digit = value % base;
-      value /= base;
-
-      char digitChar = '\0';
-      if (digit <= 9) {
-        digitChar = static_cast<char>(digit + static_cast<unsigned int>('0'));
-      } else {
-        digitChar = static_cast<char>(digit + static_cast<unsigned int>('W'));
-      }
-
-      *destination = digitChar;
-      ++destination;
-    } while (value != 0);
-
-    *destination = '\0';
-
-    char* reverseCursor = destination - 1;
-    do {
-      const char tail = *reverseCursor;
-      *reverseCursor = *writeCursor;
-      --reverseCursor;
-      *writeCursor = tail;
-      ++writeCursor;
-    } while (writeCursor < reverseCursor);
-  }
 
 
 
@@ -10817,24 +9083,6 @@ namespace moho::runtime
 
 
 
-  /**
-   * Address: 0x00A8548B (FUN_00A8548B, _fsopen)
-   *
-   * What it does:
-   * Validates narrow file path/mode arguments, then forwards to CRT `_fsopen`
-   * for stream allocation/open semantics.
-   */
-  std::FILE* RuntimeFsopen(const char* const filePath, const char* const mode, const int shareFlag)
-  {
-    if (filePath == nullptr || mode == nullptr || mode[0] == '\0') {
-      *RuntimeDosErrno() = 0;
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    return ::_fsopen(filePath, mode, shareFlag);
-  }
 
   /**
    * Address: 0x00A88E8F (FUN_00A88E8F, _wfsopen)
@@ -10896,32 +9144,8 @@ namespace moho::runtime
     return RuntimeWfsopen(filePath, mode, 0x40);
   }
 
-  [[nodiscard]] int RuntimeGetOsPlatform(int* const outPlatform)
-  {
-    if (outPlatform == nullptr) {
-      return EINVAL;
-    }
-
-    #pragma warning(push)
-    #pragma warning(disable:4996)
-    const DWORD version = ::GetVersion();
-    #pragma warning(pop)
-    *outPlatform = ((version & 0x80000000u) != 0u) ? 1 : 2;
-    return 0;
-  }
 
 
-  /**
-   * Address: 0x00A959BD (FUN_00A959BD, encoded_null)
-   *
-   * What it does:
-   * Returns one encoded null pointer through the CRT encode-pointer lane, used
-   * as the sentinel value for unset signal/exit action slots.
-   */
-  [[nodiscard]] void* RuntimeEncodedNullPointer()
-  {
-    return ::EncodePointer(nullptr);
-  }
 
 
 
@@ -11268,98 +9492,13 @@ namespace moho::runtime
     }
   }
 
-  [[nodiscard]] inline void*& RuntimeTypeInfoFrameStateSlot(std::type_info* const typeInfo) noexcept
-  {
-    return reinterpret_cast<RuntimeTypeInfoView*>(typeInfo)->spare;
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x00ABFAA0 (FUN_00ABFAA0, std::_Xfsopen)
-   *
-   * What it does:
-   * Opens one wide path with fallback conversion on Win9x platform lanes:
-   * uses `_wfsopen` on NT-class systems and `wcstombs_s` + `_fsopen` on Win9x.
-   */
-  std::FILE* RuntimeXfsopen(const wchar_t* const filePath, const wchar_t* const mode, const int shareFlag)
-  {
-    int osPlatform = 0;
-    if (RuntimeGetOsPlatform(&osPlatform) != 0) {
-      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-    }
 
-    if (osPlatform != 1) {
-      return RuntimeWfsopen(filePath, mode, shareFlag);
-    }
-
-    char narrowFilePath[0x104]{};
-    char narrowMode[0x14]{};
-    if (::wcstombs_s(nullptr, narrowFilePath, 0x104u, filePath, 0x103u) != 0
-        || ::wcstombs_s(nullptr, narrowMode, 0x14u, mode, 0x13u) != 0) {
-      return nullptr;
-    }
-
-    return RuntimeFsopen(narrowFilePath, narrowMode, shareFlag);
-  }
-
-  /**
-   * Address: 0x00ABFB55 (FUN_00ABFB55, std::_Fiopen(wchar_t const*,int,int))
-   *
-   * What it does:
-   * Normalizes iostream openmode flags, resolves one CRT fopen mode string,
-   * performs noreplace probe when requested, and opens the stream.
-   */
-  std::FILE* RuntimeFiopenWide(const wchar_t* const filePath, const int openMode, const int shareFlag)
-  {
-    static constexpr int kFiopenValidModes[] = {
-      0x01, 0x02, 0x12, 0x0A, 0x21, 0x22, 0x32, 0x2A, 0x03, 0x13, 0x0B, 0x23, 0x33, 0x2B, 0x00
-    };
-    static constexpr const wchar_t* kFiopenModeStrings[] = {
-      L"r",   L"w",   L"w",   L"a",   L"rb",  L"wb",  L"wb",
-      L"ab",  L"r+",  L"w+",  L"a+",  L"r+b", L"w+b", L"a+b"
-    };
-
-    int normalizedMode = openMode;
-    if ((openMode & 0x40) != 0) {
-      normalizedMode |= 0x01;
-    }
-    if ((normalizedMode & 0x08) != 0) {
-      normalizedMode |= 0x02;
-    }
-
-    const unsigned int fiopenMode = static_cast<unsigned int>(normalizedMode) & 0xFFFFFF3Bu;
-
-    int modeIndex = 0;
-    while (kFiopenValidModes[modeIndex] != 0 && static_cast<unsigned int>(kFiopenValidModes[modeIndex]) != fiopenMode) {
-      ++modeIndex;
-    }
-    if (kFiopenValidModes[modeIndex] == 0) {
-      return nullptr;
-    }
-
-    if ((openMode & 0x80) != 0 && (fiopenMode & 0x01u) != 0u) {
-      if (std::FILE* const existing = RuntimeXfsopen(filePath, L"r", shareFlag); existing != nullptr) {
-        std::fclose(existing);
-        return nullptr;
-      }
-    }
-
-    std::FILE* const file = RuntimeXfsopen(filePath, kFiopenModeStrings[modeIndex], shareFlag);
-    if (file == nullptr) {
-      return nullptr;
-    }
-
-    if ((openMode & 0x04) != 0 && std::fseek(file, 0, SEEK_END) != 0) {
-      std::fclose(file);
-      return nullptr;
-    }
-
-    return file;
-  }
 
 
 
@@ -11514,23 +9653,7 @@ namespace moho::runtime
     }
   };
 
-  [[nodiscard]] void* RuntimeGetLocaleFacetBaseVtable()
-  {
-    static void* const baseVtable = RuntimeFacetBaseVtableProbe::CaptureBaseVtable();
-    return baseVtable;
-  }
 
-  /**
-   * Address: 0x004C5960 (FUN_004C5960, sub_4C5960)
-   *
-   * What it does:
-   * Rebinds one locale facet object to the base `std::locale::facet` vtable.
-   */
-  [[maybe_unused]] std::locale::facet* RuntimeLocaleFacetBindBaseVtable(std::locale::facet* const facet)
-  {
-    *reinterpret_cast<void**>(facet) = RuntimeGetLocaleFacetBaseVtable();
-    return facet;
-  }
 
 
 
@@ -13067,13 +11190,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     ));
   }
 
-  [[nodiscard]] int RuntimeSseProbeExceptionFilter(const unsigned int exceptionCode) noexcept
-  {
-    if (exceptionCode == EXCEPTION_ACCESS_VIOLATION || exceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) {
-      return EXCEPTION_EXECUTE_HANDLER;
-    }
-    return EXCEPTION_CONTINUE_SEARCH;
-  }
 
 
 
@@ -13132,58 +11248,10 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
 
 
-  /**
-   * Address: 0x00A824E7 (FUN_00A824E7, _memmove_s)
-   *
-   * What it does:
-   * Validates secure-move arguments, reports CRT invalid-parameter errors, and
-   * performs byte-wise overlapping move when bounds are valid.
-   */
-  errno_t RuntimeMemmoveS(
-    void* const destination,
-    const std::size_t destinationSize,
-    const void* const source,
-    const std::size_t sourceSize
-  )
-  {
-    if (sourceSize == 0u) {
-      return 0;
-    }
-
-    if (destination == nullptr || source == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EINVAL;
-    }
-
-    if (destinationSize < sourceSize) {
-      *_errno() = ERANGE;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return ERANGE;
-    }
-
-    std::memmove(destination, source, sourceSize);
-    return 0;
-  }
 
 
 
 
-  [[nodiscard]] char* RuntimeCopyByteRangeWithMemmoveAndReturnEnd(
-    const void* const sourceBegin,
-    const void* const sourceEnd,
-    char* const destination
-  ) noexcept
-  {
-    const std::intptr_t moveByteCountSigned =
-      reinterpret_cast<std::intptr_t>(sourceEnd) - reinterpret_cast<std::intptr_t>(sourceBegin);
-    char* const destinationEnd = destination + moveByteCountSigned;
-    if (moveByteCountSigned > 0) {
-      const std::size_t moveByteCount = static_cast<std::size_t>(moveByteCountSigned);
-      (void)RuntimeMemmoveS(destination, moveByteCount, sourceBegin, moveByteCount);
-    }
-    return destinationEnd;
-  }
 
   struct RuntimeInlineByteBufferView
   {
@@ -13875,28 +11943,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return &gRuntimeDosErrnoFallback;
   }
 
-  /**
-   * Address: 0x00A82B1A (FUN_00A82B1A, _validdrive)
-   *
-   * What it does:
-   * Validates one 1-based DOS drive index by probing `X:\\` root type and
-   * returns true only for mounted/usable drive types.
-   */
-  bool RuntimeValidDrive(const int drive)
-  {
-    if (drive == 0) {
-      return true;
-    }
-
-    char driveIndicator[4]{};
-    driveIndicator[0] = static_cast<char>(drive + '@');
-    driveIndicator[1] = ':';
-    driveIndicator[2] = '\\';
-    driveIndicator[3] = '\0';
-
-    const UINT driveType = ::GetDriveTypeA(driveIndicator);
-    return driveType != DRIVE_UNKNOWN && driveType != DRIVE_NO_ROOT_DIR;
-  }
 
 
   struct RuntimePePageValidationEntry
@@ -15064,29 +13110,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x004E5160 (FUN_004E5160)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane002(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
-  /**
-   * Address: 0x004E51F0 (FUN_004E51F0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane003(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane020(const unsigned int count);
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
@@ -15202,29 +13226,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
   }
 
-  /**
-   * Address: 0x00592360 (FUN_00592360)
-   *
-   * What it does:
-   * Allocates one 24-byte red-black head lane, clears the first three link
-   * pointers with legacy null-adjacent checks, then writes `{color=1,isNil=0}`.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateAndPrimeRbHeadNode24Lane020()
-  {
-    auto* const node = static_cast<RuntimeTypeInfoMapNode*>(RuntimeAllocateArrayWithBadAllocLane020(1u));
-    if (node != nullptr) {
-      node->left = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeTypeInfoMapNode*>(static_cast<std::intptr_t>(-4))) {
-      node->parent = nullptr;
-    }
-    if (node != reinterpret_cast<RuntimeTypeInfoMapNode*>(static_cast<std::intptr_t>(-8))) {
-      node->right = nullptr;
-    }
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
   /**
    * Address: 0x005ABB00 (FUN_005ABB00)
@@ -15330,30 +13331,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007B4EF0 (FUN_007B4EF0)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane046(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
 
-  /**
-   * Address: 0x007B4FA0 (FUN_007B4FA0)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane047(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
 
 
@@ -15388,17 +13367,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007CC1C0 (FUN_007CC1C0)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane051(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
 
@@ -15420,17 +13388,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00831BA0 (FUN_00831BA0)
-   *
-   * What it does:
-   * Allocates one `44`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane061(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 44u);
-  }
 
 
 
@@ -16259,32 +14216,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(sizeof(RuntimeStride24BaseOwner) == 0x04, "RuntimeStride24BaseOwner size must be 0x04");
 
 
-  [[nodiscard]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowFromSelfOffset(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::ptrdiff_t beginOffsetBytes,
-    const std::ptrdiff_t capacityOffsetBytes
-  ) noexcept
-  {
-    auto* const base = reinterpret_cast<std::byte*>(state);
-    state->lane00 = base + beginOffsetBytes;
-    state->begin = base + beginOffsetBytes;
-    state->capacity = base + capacityOffsetBytes;
-    state->lane0C = base + beginOffsetBytes;
-    return state;
-  }
 
-  [[nodiscard]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowFromExternalBase(
-    RuntimeInlineWindowCapacityState* const state,
-    std::byte* const base,
-    const std::ptrdiff_t capacityOffsetBytes
-  ) noexcept
-  {
-    state->lane00 = base;
-    state->begin = base;
-    state->capacity = base + capacityOffsetBytes;
-    state->lane0C = base;
-    return state;
-  }
 
 
 
@@ -17022,21 +14954,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeRbHeadNode40Color36::isNil offset must be 0x25"
   );
 
-  template<typename NodeType, typename AllocateLaneFn>
-  [[nodiscard]] NodeType* RuntimeAllocateRbHeadNodeCommon(const AllocateLaneFn& allocateLane)
-  {
-    auto* const node = static_cast<NodeType*>(allocateLane(1u));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
 
   template<typename NodeType>
   void RuntimeDestroyRbTreePostorderCommon(NodeType* node)
@@ -17079,17 +14996,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007B4D10 (FUN_007B4D10)
-   *
-   * What it does:
-   * Recursively clears one RB-tree lane by walking right-subtrees first, then
-   * deleting each current node while advancing along the left-link chain.
-   */
-  void RuntimeDestroyRbTreeLaneA(RuntimeRbHeadNode20Color16* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
 
 
@@ -17097,17 +15003,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007CB080 (FUN_007CB080)
-   *
-   * What it does:
-   * Recursively clears one compact RB-tree lane that uses marker byte
-   * `{isNil}` at offset `+0x0E`.
-   */
-  void RuntimeDestroyCompactRbTreeLaneA(RuntimeRbHeadNode16Color13* const root)
-  {
-    RuntimeDestroyRbTreePostorderCommon(root);
-  }
 
 
 
@@ -17272,13 +15167,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeRbTree28OwnerState) == 0x0C, "RuntimeRbTree28OwnerState size must be 0x0C");
 
-  template <typename TNode>
-  void RuntimeResetRbHeadNodeLinks(TNode* const head) noexcept
-  {
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-  }
 
 
 
@@ -17341,19 +15229,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     } while (node->isNil == 0u);
   }
 
-  /**
-   * Address: 0x0052CCF0 (FUN_0052CCF0)
-   *
-   * What it does:
-   * Recursively destroys one `isNil@+0x11` red-black subtree by deleting each
-   * node's right branch before walking left and freeing the current node.
-   */
-  [[maybe_unused]] void RuntimeDestroyRbNode20TreeLaneA(
-    RuntimeRbHeadNode20Color16* const root
-  ) noexcept
-  {
-    RuntimeDestroyRbNode20Tree(root);
-  }
 
 
 
@@ -17383,18 +15258,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x004CD320 (FUN_004CD320)
-   *
-   * What it does:
-   * Resets both legacy string lanes in one 56-byte record, releasing heap
-   * storage when either lane is heap-backed and restoring inline-empty state.
-   */
-  void RuntimeResetDualLegacyStringRecord56LaneA(RuntimeDualLegacyStringRecord56* const record)
-  {
-    RuntimeResetLegacyStringStorage(&record->second);
-    RuntimeResetLegacyStringStorage(&record->first);
-  }
 
 
 
@@ -17456,17 +15319,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00935B20 (FUN_00935B20)
-   *
-   * What it does:
-   * Allocates one `4`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane084(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 4u);
-  }
 
 
 
@@ -17739,22 +15591,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   RuntimeSharedControlPairEntry* gRuntimeSharedControlPairEnd = nullptr;
   RuntimeSharedControlPairEntry* gRuntimeSharedControlPairCapacity = nullptr;
 
-  void RuntimeReleaseSharedControlLane(volatile long* const control) noexcept
-  {
-    if (control == nullptr) {
-      return;
-    }
-
-    using ReleaseFn = int(__thiscall*)(volatile long*);
-    auto* const vtable = reinterpret_cast<ReleaseFn*>(*reinterpret_cast<void**>(const_cast<long*>(control)));
-
-    if (::InterlockedExchangeAdd(control + 1, -1) == 0) {
-      (void)vtable[1](control);
-      if (::InterlockedExchangeAdd(control + 2, -1) == 0) {
-        (void)vtable[2](control);
-      }
-    }
-  }
 
 
   using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
@@ -17777,67 +15613,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlArrayRange(
-    const std::intptr_t begin,
-    const std::intptr_t end,
-    const std::int32_t strideBytes,
-    const std::int32_t sharedControlOffsetBytes
-  ) noexcept
-  {
-    std::intptr_t result = begin;
-    for (std::intptr_t cursor = begin; cursor != end; cursor += strideBytes) {
-      auto* const entryBytes = reinterpret_cast<std::uint8_t*>(cursor);
-      volatile long* const control = *reinterpret_cast<volatile long**>(entryBytes + sharedControlOffsetBytes);
-      if (control == nullptr) {
-        continue;
-      }
-
-      result = reinterpret_cast<std::intptr_t>(control + 1);
-      if (::InterlockedExchangeAdd(control + 1, -1) == 0) {
-        using ReleaseFn = std::intptr_t(__thiscall*)(volatile long*);
-        auto* const vtable = reinterpret_cast<ReleaseFn*>(*reinterpret_cast<void**>(const_cast<long*>(control)));
-        result = vtable[1](control);
-        if (::InterlockedExchangeAdd(control + 2, -1) == 0) {
-          result = vtable[2](control);
-        }
-      }
-    }
-
-    return result;
-  }
 
 
 
-  /**
-   * Address: 0x00A48A40 (FUN_00A48A40)
-   *
-   * What it does:
-   * Reverses byte order of each fixed-width element in every row of the caller
-   * buffer (`elementWidthBytes * rowCount` bytes total).
-   */
-  void RuntimeReverseBytesPerElementRows(
-    const std::int32_t elementWidthBytes,
-    const std::int32_t rowCount,
-    void* rowBuffer
-  ) noexcept
-  {
-    if (rowBuffer == nullptr || rowCount <= 0 || elementWidthBytes <= 1) {
-      return;
-    }
-
-    auto* rowBytes = static_cast<std::uint8_t*>(rowBuffer);
-    const std::int32_t halfWidth = elementWidthBytes / 2;
-    for (std::int32_t row = 0; row < rowCount; ++row) {
-      std::uint8_t* left = rowBytes;
-      std::uint8_t* right = rowBytes + elementWidthBytes - 1;
-      for (std::int32_t lane = 0; lane < halfWidth; ++lane) {
-        std::swap(*left, *right);
-        ++left;
-        --right;
-      }
-      rowBytes += elementWidthBytes;
-    }
-  }
 
 
 
@@ -17916,16 +15694,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00933470 (FUN_00933470)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEA()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
@@ -17955,101 +15723,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  [[nodiscard]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const valueSlot,
-    RuntimeLegacyProxyVectorThrowFn const throwTooLong,
-    RuntimeLegacyProxyVectorAllocateFn const allocateStorage
-  )
-  {
-    if (vector == nullptr) {
-      return insertPosition;
-    }
-
-    std::uint32_t* begin = reinterpret_cast<std::uint32_t*>(vector->first);
-    std::uint32_t* end = reinterpret_cast<std::uint32_t*>(vector->last);
-    std::uint32_t* capacityEnd = reinterpret_cast<std::uint32_t*>(vector->end);
-
-    const std::size_t size =
-      (begin != nullptr && end != nullptr && end >= begin) ? static_cast<std::size_t>(end - begin) : 0u;
-    const std::size_t capacity =
-      (begin != nullptr && capacityEnd != nullptr && capacityEnd >= begin)
-        ? static_cast<std::size_t>(capacityEnd - begin)
-        : 0u;
-    const std::size_t clampedCapacity = capacity < size ? size : capacity;
-
-    if (repeatCount == 0u) {
-      return insertPosition;
-    }
-
-    if (0x3FFFFFFFu - static_cast<unsigned int>(size) < repeatCount) {
-      throwTooLong();
-    }
-
-    if (begin == nullptr || insertPosition == nullptr) {
-      insertPosition = end;
-    } else {
-      if (insertPosition < begin) {
-        insertPosition = begin;
-      }
-      if (insertPosition > end) {
-        insertPosition = end;
-      }
-    }
-
-    const std::size_t insertionIndex =
-      (begin != nullptr && insertPosition != nullptr) ? static_cast<std::size_t>(insertPosition - begin) : 0u;
-    const std::uint32_t fillValue = (valueSlot != nullptr) ? *valueSlot : 0u;
-
-    if (clampedCapacity - size >= repeatCount) {
-      begin = reinterpret_cast<std::uint32_t*>(vector->first);
-      end = reinterpret_cast<std::uint32_t*>(vector->last);
-      insertPosition = begin + insertionIndex;
-      std::memmove(
-        insertPosition + repeatCount,
-        insertPosition,
-        static_cast<std::size_t>(end - insertPosition) * sizeof(std::uint32_t)
-      );
-      std::fill_n(insertPosition, repeatCount, fillValue);
-      vector->last = reinterpret_cast<std::uint8_t*>(end + repeatCount);
-      return insertPosition;
-    }
-
-    const unsigned int sizeU32 = static_cast<unsigned int>(size);
-    const unsigned int capacityU32 = static_cast<unsigned int>(clampedCapacity);
-    unsigned int grownCapacityU32 = 0u;
-    if (0x3FFFFFFFu - (capacityU32 >> 1u) >= capacityU32) {
-      grownCapacityU32 = capacityU32 + (capacityU32 >> 1u);
-    }
-
-    const unsigned int requiredU32 = sizeU32 + repeatCount;
-    if (grownCapacityU32 < requiredU32) {
-      grownCapacityU32 = requiredU32;
-    }
-
-    auto* const newBegin = static_cast<std::uint32_t*>(allocateStorage(grownCapacityU32));
-    std::uint32_t* const newInsertPosition = newBegin + insertionIndex;
-
-    if (begin != nullptr && insertionIndex != 0u) {
-      std::memcpy(newBegin, begin, insertionIndex * sizeof(std::uint32_t));
-    }
-
-    std::fill_n(newInsertPosition, repeatCount, fillValue);
-
-    const std::size_t tailCount = size - insertionIndex;
-    if (begin != nullptr && tailCount != 0u) {
-      std::memcpy(newInsertPosition + repeatCount, begin + insertionIndex, tailCount * sizeof(std::uint32_t));
-    }
-
-    ::operator delete(static_cast<void*>(begin));
-
-    vector->first = reinterpret_cast<std::uint8_t*>(newBegin);
-    vector->last = reinterpret_cast<std::uint8_t*>(newBegin + requiredU32);
-    vector->end = reinterpret_cast<std::uint8_t*>(newBegin + grownCapacityU32);
-    return newInsertPosition;
-  }
 
 
 
@@ -18063,27 +15736,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00A63D50 (FUN_00A63D50)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongF()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
 
-  /**
-   * Address: 0x00A64090 (FUN_00A64090)
-   *
-   * What it does:
-   * Throws the legacy VC8 deque growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowDequeTooLongG()
-  {
-    RuntimeThrowContainerTooLong("deque<T> too long");
-  }
 
   struct ConvexHullFloatRuntimeView
   {
@@ -18228,181 +15881,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using DequeMapThrowTooLongFn = void (*)();
 
-  [[nodiscard]] std::uint32_t* AllocateDequeMapSlots(const std::size_t slotCount)
-  {
-    if (slotCount == 0u) {
-      return nullptr;
-    }
 
-    if (slotCount > ((std::numeric_limits<std::size_t>::max)() / sizeof(std::uint32_t))) {
-      throw std::bad_alloc();
-    }
 
-    return static_cast<std::uint32_t*>(::operator new(slotCount * sizeof(std::uint32_t)));
-  }
 
-  [[nodiscard]] std::uint32_t* GrowDequeMapSlotsRuntime(
-    RuntimeDequeMapGrowthView& dequeMap,
-    unsigned int requestedGrow,
-    const DequeMapThrowTooLongFn throwTooLong
-  )
-  {
-    const unsigned int currentMapSlots = dequeMap.mapSlotCount;
-    if ((0x0FFFFFFFu - currentMapSlots) < requestedGrow) {
-      throwTooLong();
-    }
 
-    unsigned int growBy = currentMapSlots >> 1u;
-    if (growBy < 8u) {
-      growBy = 8u;
-    }
-    if (requestedGrow < growBy && currentMapSlots <= (0x0FFFFFFFu - growBy)) {
-      requestedGrow = growBy;
-    }
-
-    const unsigned int startBlockIndex = dequeMap.startBlockOffset >> 2u;
-    auto* const replacementMap = AllocateDequeMapSlots(static_cast<std::size_t>(requestedGrow + currentMapSlots));
-    auto* const priorMap = dequeMap.blockMap;
-
-    const unsigned int tailSlotCount = currentMapSlots - startBlockIndex;
-    auto* const tailDestination = replacementMap + startBlockIndex;
-    if (tailSlotCount != 0u && priorMap != nullptr) {
-      std::memmove(
-        tailDestination,
-        priorMap + startBlockIndex,
-        static_cast<std::size_t>(tailSlotCount) * sizeof(std::uint32_t)
-      );
-    }
-
-    auto* writeCursor = tailDestination + tailSlotCount;
-    unsigned int committedGrow = requestedGrow;
-
-    if (startBlockIndex > requestedGrow) {
-      const unsigned int trailingHeadSlotCount = startBlockIndex - requestedGrow;
-      if (requestedGrow != 0u && priorMap != nullptr) {
-        std::memmove(
-          writeCursor,
-          priorMap,
-          static_cast<std::size_t>(requestedGrow) * sizeof(std::uint32_t)
-        );
-      }
-      if (trailingHeadSlotCount != 0u && priorMap != nullptr) {
-        std::memmove(
-          replacementMap,
-          priorMap + requestedGrow,
-          static_cast<std::size_t>(trailingHeadSlotCount) * sizeof(std::uint32_t)
-        );
-      }
-      if (requestedGrow != 0u) {
-        std::memset(
-          replacementMap + trailingHeadSlotCount,
-          0,
-          static_cast<std::size_t>(requestedGrow) * sizeof(std::uint32_t)
-        );
-      }
-    } else {
-      if (startBlockIndex != 0u && priorMap != nullptr) {
-        std::memmove(
-          writeCursor,
-          priorMap,
-          static_cast<std::size_t>(startBlockIndex) * sizeof(std::uint32_t)
-        );
-      }
-
-      if (requestedGrow != startBlockIndex) {
-        std::memset(
-          writeCursor + startBlockIndex,
-          0,
-          static_cast<std::size_t>(requestedGrow - startBlockIndex) * sizeof(std::uint32_t)
-        );
-      }
-
-      if (startBlockIndex != 0u) {
-        std::memset(
-          replacementMap,
-          0,
-          static_cast<std::size_t>(startBlockIndex) * sizeof(std::uint32_t)
-        );
-      }
-    }
-
-    if (priorMap != nullptr) {
-      ::operator delete(priorMap);
-    }
-
-    dequeMap.mapSlotCount += committedGrow;
-    dequeMap.blockMap = replacementMap;
-    return priorMap;
-  }
-
-  /**
-   * Address: 0x00A65540 (FUN_00A65540)
-   *
-   * What it does:
-   * Grows one deque map-of-blocks lane, preserves wrapped head/tail slot
-   * ordering, zeroes newly inserted block-pointer lanes, and installs the
-   * replacement map storage.
-   */
-  std::uint32_t* RuntimeGrowDequeMapSlotsF(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const unsigned int requestedGrow
-  )
-  {
-    return GrowDequeMapSlotsRuntime(dequeMap, requestedGrow, &RuntimeThrowDequeTooLongF);
-  }
-
-  /**
-   * Address: 0x00A65830 (FUN_00A65830)
-   *
-   * What it does:
-   * Alternate deque map growth lane with the same block-map rotation and
-   * zero-fill semantics as `RuntimeGrowDequeMapSlotsF`.
-   */
-  std::uint32_t* RuntimeGrowDequeMapSlotsG(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const unsigned int requestedGrow
-  )
-  {
-    return GrowDequeMapSlotsRuntime(dequeMap, requestedGrow, &RuntimeThrowDequeTooLongG);
-  }
-
-  [[nodiscard]] std::uint32_t* RuntimeDequePushBackDwordCommon(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const std::uint32_t* const value,
-    std::uint32_t* (*const growMap)(
-      RuntimeDequeMapGrowthView&,
-      const unsigned int
-    )
-  )
-  {
-    const std::uint32_t alignedIndex = dequeMap.activeElementCount + dequeMap.startBlockOffset;
-    if (((alignedIndex & 0x3u) == 0u) && dequeMap.mapSlotCount <= ((dequeMap.activeElementCount + 4u) >> 2u)) {
-      (void)growMap(dequeMap, 1u);
-    }
-
-    const std::uint32_t logicalIndex = dequeMap.activeElementCount + dequeMap.startBlockOffset;
-    std::uint32_t blockIndex = logicalIndex >> 2u;
-    if (dequeMap.mapSlotCount <= blockIndex) {
-      blockIndex -= dequeMap.mapSlotCount;
-    }
-
-    if (dequeMap.blockMap == nullptr) {
-      return nullptr;
-    }
-
-    auto* const blockPointers = reinterpret_cast<std::uintptr_t*>(dequeMap.blockMap);
-    if (blockPointers[blockIndex] == 0u) {
-      blockPointers[blockIndex] = reinterpret_cast<std::uintptr_t>(::operator new(0x10u));
-    }
-
-    auto* const writeLane = reinterpret_cast<std::uint32_t*>(blockPointers[blockIndex]) + (logicalIndex & 0x3u);
-    if (writeLane != nullptr && value != nullptr) {
-      *writeLane = *value;
-    }
-
-    ++dequeMap.activeElementCount;
-    return writeLane;
-  }
 
 
 
@@ -18478,34 +15960,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
 
 
-  /**
-   * Address: 0x00A6D120 (FUN_00A6D120)
-   *
-   * What it does:
-   * Initializes one linear buffer lane for `elementCount` 8-byte elements;
-   * non-positive counts clear storage, positive counts allocate and zero-fill.
-   */
-  RuntimeLinearBufferView* RuntimeAllocateZeroedLinearBuffer8Byte(
-    RuntimeLinearBufferView* const bufferView,
-    const int elementCount
-  )
-  {
-    if (bufferView == nullptr) {
-      return nullptr;
-    }
-
-    if (elementCount <= 0) {
-      bufferView->elementCount = 0;
-      bufferView->elementStorage = nullptr;
-      return bufferView;
-    }
-
-    bufferView->elementCount = elementCount;
-    const std::size_t byteCount = static_cast<std::size_t>(elementCount) * sizeof(std::uint64_t);
-    bufferView->elementStorage = ::operator new(byteCount);
-    std::memset(bufferView->elementStorage, 0, byteCount);
-    return bufferView;
-  }
 
   struct RuntimeOffset10ScalarPointerRowsView
   {
@@ -18552,28 +16006,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimePointerGridView::rowPointers offset must be 0x10"
   );
 
-  [[nodiscard]] int RuntimeAllocatePointerGrid(
-    RuntimePointerGridView& grid,
-    const bool zeroInitialize,
-    const std::size_t elementStride
-  )
-  {
-    const std::size_t elementBytes = static_cast<std::size_t>(grid.elementCount) * elementStride;
-    grid.elementStorage = ::operator new(elementBytes);
-    if (zeroInitialize) {
-      std::memset(grid.elementStorage, 0, elementBytes);
-    }
-
-    grid.rowPointers = static_cast<void**>(::operator new(static_cast<std::size_t>(grid.rowCount) * sizeof(void*)));
-    int rowIndex = 0;
-    auto* const rowStartBytes = static_cast<std::byte*>(grid.elementStorage);
-    for (; rowIndex < grid.rowCount; ++rowIndex) {
-      grid.rowPointers[rowIndex] = rowStartBytes
-        + static_cast<std::size_t>(rowIndex * grid.columnCount) * elementStride;
-    }
-
-    return rowIndex;
-  }
 
 
 
@@ -18657,51 +16089,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeIosBaseView, localePtr) == 0x24, "RuntimeIosBaseView::localePtr offset must be 0x24");
   static_assert(sizeof(RuntimeIosBaseView) == 0x28, "RuntimeIosBaseView size must be 0x28");
 
-  /**
-   * Address: 0x00ABF0D0 (FUN_00ABF0D0, std::ios_base::_Callfns)
-   *
-   * What it does:
-   * Walks one `ios_base` callback-node chain and invokes each callback with
-   * `(event, ios_base, index)` parameters.
-   */
-  void RuntimeIosBaseCallFns(void* const iosBaseStorage, const int event)
-  {
-    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
-    for (RuntimeIosFnNode* node = iosBase->callbackHead; node != nullptr; node = node->next) {
-      node->callback(event, iosBaseStorage, node->index);
-    }
-  }
 
-  /**
-   * Address: 0x00ABF0F2 (FUN_00ABF0F2, std::ios_base::_Tidy)
-   *
-   * What it does:
-   * Emits `erase_event` callbacks, then deletes linked ios-array and callback
-   * nodes, clearing both head pointers.
-   */
-  void RuntimeIosBaseTidy(void* const iosBaseStorage)
-  {
-    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
-    RuntimeIosBaseCallFns(iosBaseStorage, 0);
-
-    RuntimeIosArrayNode* arrayNode = iosBase->arrayHead;
-    while (arrayNode != nullptr) {
-      RuntimeIosArrayNode* const nextNode = arrayNode->next;
-      ::operator delete(arrayNode);
-      arrayNode = nextNode;
-    }
-
-    iosBase->arrayHead = nullptr;
-
-    RuntimeIosFnNode* callbackNode = iosBase->callbackHead;
-    while (callbackNode != nullptr) {
-      RuntimeIosFnNode* const nextNode = callbackNode->next;
-      ::operator delete(callbackNode);
-      callbackNode = nextNode;
-    }
-
-    iosBase->callbackHead = nullptr;
-  }
 
 
 
@@ -18759,54 +16147,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return (compareResult == 0) ? TRUE : FALSE;
   }
 
-  /**
-   * Address: 0x00AA6646 (FUN_00AA6646, LcidFromHexString)
-   *
-   * What it does:
-   * Parses one null-terminated hexadecimal LCID token by folding ASCII hex
-   * digits into a 16-based accumulator.
-   */
-  int RuntimeLcidFromHexString(const char* const hexText)
-  {
-    int value = 0;
-    for (const char* cursor = hexText;;) {
-      const unsigned char digit = static_cast<unsigned char>(*cursor);
-      if (digit == 0u) {
-        break;
-      }
 
-      ++cursor;
-      unsigned char normalizedDigit = digit;
-      if (normalizedDigit >= static_cast<unsigned char>('a') && normalizedDigit <= static_cast<unsigned char>('f')) {
-        normalizedDigit = static_cast<unsigned char>(normalizedDigit - 39u);
-      } else if (normalizedDigit >= static_cast<unsigned char>('A') && normalizedDigit <= static_cast<unsigned char>('F')) {
-        normalizedDigit = static_cast<unsigned char>(normalizedDigit - 7u);
-      }
-
-      value = (value << 4) + static_cast<int>(normalizedDigit - static_cast<unsigned char>('0'));
-    }
-    return value;
-  }
-
-  /**
-   * Address: 0x00AA6678 (FUN_00AA6678, GetPrimaryLen)
-   *
-   * What it does:
-   * Counts the leading alphabetic run of one locale token until a non-letter
-   * byte ends the prefix.
-   */
-  int RuntimeGetPrimaryLen(const char* const text)
-  {
-    int length = 0;
-    for (const char* cursor = text;; ++length) {
-      const unsigned char character = static_cast<unsigned char>(*cursor++);
-      if (!((character >= static_cast<unsigned char>('A') && character <= static_cast<unsigned char>('Z')) ||
-            (character >= static_cast<unsigned char>('a') && character <= static_cast<unsigned char>('z')))) {
-        break;
-      }
-    }
-    return length;
-  }
   struct RuntimeUndecoratorHeapFrameNode
   {
     RuntimeUndecoratorHeapFrameNode* next = nullptr; // +0x00
@@ -18876,57 +16217,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   extern "C" const std::uint16_t __rglangidNotDefault[10];
 
-  /**
-   * Address: 0x00AA6628 (FUN_00AA6628, TestDefaultCountry)
-   *
-   * What it does:
-   * Returns false for locale IDs that are explicitly listed as non-default
-   * country/language matches and true otherwise.
-   */
-  int RuntimeTestDefaultCountry(const std::uint16_t languageId)
-  {
-    for (std::size_t index = 0; index < 10u; ++index) {
-      if (languageId == __rglangidNotDefault[index]) {
-        return 0;
-      }
-    }
-    return 1;
-  }
 
-  /**
-   * Address: 0x00AA6729 (FUN_00AA6729, TestDefaultLanguage)
-   *
-   * What it does:
-   * Validates a locale against the current thread locale-name lane and only
-   * accepts the exact primary-language match when the caller requests it.
-   */
-  BOOL RuntimeTestDefaultLanguage(
-    RuntimeSetLocLocaleView* const setlocData,
-    const LCID localeId,
-    const int requireExactPrimaryMatch
-  )
-  {
-    char localeName[120]{};
-    if (!::GetLocaleInfoA((localeId & 0x3FFu) | 0x400u, LOCALE_ILANGUAGE, localeName, 120)) {
-      return FALSE;
-    }
-
-    if (localeId == RuntimeLcidFromHexString(localeName)) {
-      return TRUE;
-    }
-
-    if (!requireExactPrimaryMatch) {
-      return TRUE;
-    }
-
-    const char* const languageName = setlocData->pchLanguage;
-    const int primaryLength = RuntimeGetPrimaryLen(languageName);
-    if (primaryLength != static_cast<int>(std::strlen(languageName))) {
-      return TRUE;
-    }
-
-    return FALSE;
-  }
 
 
 
@@ -18961,28 +16252,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return nullptr;
   }
 
-  /**
-   * Address: 0x00ABF314 (FUN_00ABF314)
-   *
-   * What it does:
-   * Decrements the facet reference count stored in the second pointer lane of a
-   * two-pointer record and deletes the facet when it reaches zero.
-   */
-  std::locale::facet* RuntimeReleaseSecondFacetInPair(void* const pairStorage)
-  {
-    auto** const pair = static_cast<std::locale::facet**>(pairStorage);
-    std::locale::facet* const facet = pair[1];
-    if (facet == nullptr) {
-      return nullptr;
-    }
-
-    std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
-    if (releasedFacet != nullptr) {
-      RuntimeDestroyFacetPolymorphic(releasedFacet);
-      return releasedFacet;
-    }
-    return nullptr;
-  }
 
 
 
@@ -19064,32 +16333,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00ABF3E0 (FUN_00ABF3E0)
-   *
-   * What it does:
-   * Under `_Lockit(0)`, decrements refs/deletes each facet in one `_Locimp`
-   * facet vector lane, then frees the facet vector storage.
-   */
-  void RuntimeReleaseLocimpFacetVector(RuntimeLocaleLocimpView* const localeImpl)
-  {
-    RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
-
-    auto** const facets = static_cast<std::locale::facet**>(localeImpl->facetVector);
-    for (int index = localeImpl->facetCount - 1; index >= 0; --index) {
-      std::locale::facet* const facet = facets[index];
-      if (facet != nullptr) {
-        std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
-        if (releasedFacet != nullptr) {
-          RuntimeDestroyFacetPolymorphic(releasedFacet);
-        }
-      }
-    }
-
-    _free_crt(localeImpl->facetVector);
-    RuntimeLockitDestroy(&lockit);
-  }
 
 
 
@@ -19240,56 +16483,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00ABFA01 (FUN_00ABFA01)
-   *
-   * What it does:
-   * Converts one wide character to multibyte using `_Cvtvec` locale/codepage
-   * lanes, reporting `EILSEQ` for conversion failure/default-char substitution.
-   */
-  int RuntimeWideCharToMultiByteLocale(
-    char* const destination,
-    const wchar_t sourceCharacter,
-    int /*unused*/,
-    const RuntimeCvtVec* const localeVector
-  )
-  {
-    constexpr std::size_t kRuntimeCtypeIndexWideConvert = 2u;
-
-    LCID localeHandle = 0;
-    UINT codePage = 0;
-    if (localeVector != nullptr) {
-      localeHandle = localeVector->handle;
-      codePage = static_cast<UINT>(localeVector->codePage);
-    } else {
-      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexWideConvert];
-      codePage = static_cast<UINT>(__lc_codepage_func());
-    }
-
-    if (localeHandle == 0) {
-      if (static_cast<unsigned int>(sourceCharacter) <= 0xFFu) {
-        *destination = static_cast<char>(sourceCharacter);
-        return 1;
-      }
-
-      *_errno() = EILSEQ;
-      return -1;
-    }
-
-    BOOL usedDefaultChar = FALSE;
-    RuntimeLocaleHandle* const codePageLocale = RuntimeGetCachedCodePageLocale(codePage);
-    const int destinationBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
-
-    wchar_t sourceWide = sourceCharacter;
-    const int conversionResult =
-      ::WideCharToMultiByte(codePage, 0, &sourceWide, 1, destination, destinationBytes, nullptr, &usedDefaultChar);
-    if (conversionResult == 0 || usedDefaultChar != FALSE) {
-      *_errno() = EILSEQ;
-      return -1;
-    }
-
-    return conversionResult;
-  }
 
 
   struct RuntimeWideCharLocaleView
@@ -19717,92 +16910,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     char* gRuntimeStdTerminalBuffers[2] = {nullptr, nullptr};
   }
 
-  /**
-   * Address: 0x00A9C267 (FUN_00A9C267, _stbuf)
-   *
-   * What it does:
-   * Enables line-buffered terminal buffering for stdout/stderr TTY streams,
-   * lazily allocating one 4 KiB buffer per lane and falling back to FILE
-   * charbuf storage when allocation fails.
-   */
-  int RuntimeStbuf(std::FILE* const stream)
-  {
-    if (stream == nullptr) {
-      return 0;
-    }
-
-    const int fileDescriptor = ::_fileno(stream);
-    if (::_isatty(fileDescriptor) == 0) {
-      return 0;
-    }
-
-    int stdbufSlot = -1;
-    if (stream == stdout) {
-      stdbufSlot = 0;
-    } else if (stream == stderr) {
-      stdbufSlot = 1;
-    } else {
-      return 0;
-    }
-
-    ++_cflush;
-    if ((legacy_file(stream)._flag & 0x10C) != 0) {
-      return 0;
-    }
-
-    char*& bufferSlot = gRuntimeStdTerminalBuffers[stdbufSlot];
-    if (bufferSlot == nullptr) {
-      bufferSlot = static_cast<char*>(std::malloc(4096u));
-    }
-
-    // Modern MSVC <_iobuf> hides legacy fields (_cnt/_flag/_base/_ptr/
-    // _bufsiz/_charbuf/_tmpfname) behind opaque storage. Reach the same
-    // legacy slots through a struct view that mirrors the legacy 32-byte
-    // FILE layout (matches the binary's assumption that std::FILE is the
-    // legacy `_iobuf`).
-    struct LegacyFileView
-    {
-      char* _ptr;
-      int   _cnt;
-      char* _base;
-      int   _flag;
-      int   _file;
-      int   _charbuf;
-      int   _bufsiz;
-      char* _tmpfname;
-    };
-    auto* const legacyView = reinterpret_cast<LegacyFileView*>(stream);
-    if (bufferSlot != nullptr) {
-      legacyView->_base = bufferSlot;
-      legacyView->_ptr = bufferSlot;
-      legacyView->_bufsiz = 4096;
-      legacyView->_cnt = 4096;
-    } else {
-      legacyView->_base = reinterpret_cast<char*>(&legacyView->_charbuf);
-      legacyView->_ptr = reinterpret_cast<char*>(&legacyView->_charbuf);
-      legacyView->_bufsiz = 2;
-      legacyView->_cnt = 2;
-    }
-
-    legacyView->_flag |= 0x1102;
-    return 1;
-  }
-
-  [[nodiscard]] int RuntimeFinalizeStreamBuffering(const int stbufState, std::FILE* const stream)
-  {
-    int status = 0;
-    if (stbufState != 0 && stream != nullptr) {
-      LegacyFileView& fileView = legacy_file(stream);
-      if ((fileView._flag & 0x1000) != 0) {
-        status = _flush(stream);
-        fileView._flag &= ~0x1100;
-        fileView._bufsiz = 0;
-        fileView._ptr = nullptr;
-        fileView._base = nullptr;
-      }
-    }
-    return status;
-  }
 
 
 
@@ -19810,25 +16917,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00A9D4DE (FUN_00A9D4DE, __tzset)
-   *
-   * What it does:
-   * Performs one-time timezone initialization under `_TIME_LOCK` and calls
-   * `_tzset_nolock` on the first entry.
-   */
-  void RuntimeTzset()
-  {
-    if (gRuntimeTzsetFirstTime != 0) {
-      return;
-    }
 
-    RuntimeLockGuard timeLock(kRuntimeTimeLock);
-    if (gRuntimeTzsetFirstTime == 0) {
-      _tzset_nolock();
-      ++gRuntimeTzsetFirstTime;
-    }
-  }
 
   /**
    * Address: 0x00A8C1F2 (FUN_00A8C1F2, _strftime_l)
@@ -20321,61 +17410,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 }
 
 
-/**
- * Address: 0x00A8692D (FUN_00A8692D, _ftime64_s)
-   *
-   * What it does:
-   * Populates `_timeb64` from FILETIME ticks, refreshes cached DST state once
-   * per elapsed minute, and returns CRT `errno_t` status semantics.
-   */
-  errno_t RuntimeFtime64S(__timeb64* const outTime)
-  {
-    if (outTime == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EINVAL;
-    }
-
-    RuntimeTzset();
-
-    long timezoneSeconds = 0;
-    if (_get_timezone(&timezoneSeconds) != 0) {
-      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-    }
-
-    outTime->timezone = static_cast<short>(timezoneSeconds / 60L);
-
-    FILETIME systemTimeAsFileTime{};
-    ::GetSystemTimeAsFileTime(&systemTimeAsFileTime);
-
-    const std::uint64_t filetimeTicks =
-      BuildUnsigned64(systemTimeAsFileTime.dwLowDateTime, systemTimeAsFileTime.dwHighDateTime);
-    const std::int64_t elapsedMinutes = static_cast<std::int64_t>(filetimeTicks / kFiletimeHundredNsPerMinute);
-
-    if (elapsedMinutes != gRuntimeElapsedMinutesCache) {
-      TIME_ZONE_INFORMATION timeZoneInfo{};
-      const DWORD timezoneState = ::GetTimeZoneInformation(&timeZoneInfo);
-      if (timezoneState == TIME_ZONE_ID_INVALID) {
-        gRuntimeDstFlagCache = -1;
-      } else {
-        const bool daylightActive = timezoneState == TIME_ZONE_ID_DAYLIGHT && timeZoneInfo.DaylightDate.wMonth != 0u
-          && timeZoneInfo.DaylightBias != 0L;
-        gRuntimeDstFlagCache = daylightActive ? 1 : 0;
-      }
-
-      gRuntimeElapsedMinutesCache = elapsedMinutes;
-    }
-
-    outTime->dstflag = static_cast<short>(gRuntimeDstFlagCache);
-
-    const std::uint64_t millisecondsSinceFiletimeEpoch = filetimeTicks / kFiletimeHundredNsPerMillisecond;
-    outTime->millitm = static_cast<unsigned short>(millisecondsSinceFiletimeEpoch % 1000u);
-
-    const std::uint64_t secondsSinceUnixEpoch =
-      (filetimeTicks - kFiletimeToUnixEpochOffset) / kFiletimeHundredNsPerSecond;
-    outTime->time = static_cast<__time64_t>(secondsSinceUnixEpoch);
-    return 0;
-  }
 
 
 
@@ -20849,78 +17883,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return reinterpret_cast<TWord*>(destinationCursor);
   }
 
-  template <typename TWord, std::size_t kWordStride>
-  [[nodiscard]] TWord* RuntimeCopyWordRangeStridedNoNullGuard(
-    TWord* destination,
-    const TWord* sourceBegin,
-    const TWord* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      for (std::size_t wordIndex = 0; wordIndex < kWordStride; ++wordIndex) {
-        destination[wordIndex] = sourceBegin[wordIndex];
-      }
-
-      sourceBegin += kWordStride;
-      destination += kWordStride;
-    }
-
-    return destination;
-  }
 
 
-  template <typename TWord, std::size_t kWordStride>
-  [[nodiscard]] TWord* RuntimeCopyWordCountFromFixedSource(
-    TWord* const destination,
-    const TWord* const source,
-    std::uint32_t repeatCount
-  ) noexcept
-  {
-    constexpr std::size_t kStrideBytes = sizeof(TWord) * kWordStride;
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
 
-    while (repeatCount != 0u) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<TWord*>(destinationCursor);
-        for (std::size_t wordIndex = 0; wordIndex < kWordStride; ++wordIndex) {
-          output[wordIndex] = source[wordIndex];
-        }
-      }
-
-      destinationCursor += kStrideBytes;
-      --repeatCount;
-    }
-
-    return reinterpret_cast<TWord*>(destinationCursor);
-  }
-
-  [[nodiscard]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeCommon(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeBacklinkedPairCopyLane*>(destinationCursor);
-        std::uintptr_t* const ownerSlot = sourceBegin->ownerSlot;
-        output->ownerSlot = ownerSlot;
-        if (ownerSlot == nullptr) {
-          output->previousOwner = 0u;
-        } else {
-          output->previousOwner = *ownerSlot;
-          *ownerSlot = destinationCursor;
-        }
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeBacklinkedPairCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeBacklinkedPairCopyLane*>(destinationCursor);
-  }
 
   [[nodiscard]] RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot(
     RuntimeBacklinkedPairCopyLane* const destination,
@@ -20965,20 +17930,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     *ownerSlot = lane.previousOwner;
   }
 
-  void RuntimeAttachBacklinkedPairLane(
-    RuntimeBacklinkedPairCopyLane& destination,
-    const RuntimeBacklinkedPairCopyLane& source
-  ) noexcept
-  {
-    destination.ownerSlot = source.ownerSlot;
-    if (destination.ownerSlot == nullptr) {
-      destination.previousOwner = 0u;
-      return;
-    }
-
-    destination.previousOwner = *destination.ownerSlot;
-    *destination.ownerSlot = reinterpret_cast<std::uintptr_t>(&destination);
-  }
 
   /**
    * Address: 0x007AF240 (FUN_007AF240)
@@ -20998,31 +17949,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-  /**
-   * Address: 0x007B1740 (FUN_007B1740)
-   * Address: 0x007B17B0 (FUN_007B17B0)
-   *
-   * What it does:
-   * Copy-assigns backlink-pair lanes in reverse order, detaching destination
-   * lanes and reattaching incoming owner-slot links when bindings differ.
-   */
-  [[nodiscard]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(
-    RuntimeBacklinkedPairCopyLane* destinationEnd,
-    const RuntimeBacklinkedPairCopyLane* sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      --destinationEnd;
-      --sourceEnd;
-      if (sourceEnd->ownerSlot != destinationEnd->ownerSlot) {
-        RuntimeDetachBacklinkedPairLane(*destinationEnd);
-        RuntimeAttachBacklinkedPairLane(*destinationEnd, *sourceEnd);
-      }
-    }
-
-    return destinationEnd;
-  }
 
 
 
@@ -21039,284 +17965,20 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeBacklinkedPairVectorStorageView::inlineStorageBeginSlot offset must be 0x0C"
   );
 
-  /**
-   * Address: 0x007AFBB0 (FUN_007AFBB0)
-   *
-   * What it does:
-   * Reallocates one backlink-pair vector storage lane, copies prefix/insert/
-   * suffix ranges into new storage, detaches old lane links, and swaps vector
-   * begin/end/capacity pointers to the new allocation.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeReallocateBacklinkedPairVectorForInsertRangeLaneA(
-    RuntimeBacklinkedPairVectorStorageView* const vector,
-    const std::uint32_t newCapacityCount,
-    const RuntimeBacklinkedPairCopyLane* const insertPosition,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  )
-  {
-    const std::size_t newStorageBytes =
-      static_cast<std::size_t>(newCapacityCount) * sizeof(RuntimeBacklinkedPairCopyLane);
-    auto* const newBegin = static_cast<RuntimeBacklinkedPairCopyLane*>(::operator new(newStorageBytes));
-    RuntimeBacklinkedPairCopyLane* newEnd = newBegin;
-
-    try {
-      newEnd = RuntimeCopyBacklinkedPairRangeCommon(newEnd, vector->begin, insertPosition);
-      newEnd = RuntimeCopyBacklinkedPairRangeCommon(newEnd, sourceBegin, sourceEnd);
-      newEnd = RuntimeCopyBacklinkedPairRangeCommon(newEnd, insertPosition, vector->end);
-    } catch (...) {
-      RuntimeDetachBacklinkedPairRangeLaneA(newBegin, newEnd);
-      ::operator delete[](newBegin);
-      throw;
-    }
-
-    RuntimeDetachBacklinkedPairRangeLaneA(vector->begin, vector->end);
-    if (vector->begin == reinterpret_cast<RuntimeBacklinkedPairCopyLane*>(vector->inlineStorageBeginSlot)) {
-      *vector->inlineStorageBeginSlot = vector->capacity;
-    } else {
-      ::operator delete[](vector->begin);
-    }
-
-    vector->begin = newBegin;
-    vector->end = newEnd;
-    vector->capacity = newBegin + newCapacityCount;
-    return vector->capacity;
-  }
 
 
 
-  /**
-   * Address: 0x007F3B90 (FUN_007F3B90)
-   * Address: 0x007F3BE0 (FUN_007F3BE0)
-   *
-   * What it does:
-   * Copy-assigns one backlink-pair lane range and, for each changed owner-slot
-   * binding, detaches the destination lane from its previous owner chain and
-   * attaches it to the incoming owner chain.
-   */
-  [[nodiscard]] RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeCommon(
-    RuntimeBacklinkedPairCopyLane* destination,
-    const RuntimeBacklinkedPairCopyLane* sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (sourceBegin->ownerSlot != destination->ownerSlot) {
-        RuntimeDetachBacklinkedPairLane(*destination);
-        RuntimeAttachBacklinkedPairLane(*destination, *sourceBegin);
-      }
-
-      ++sourceBegin;
-      ++destination;
-    }
-
-    return destination;
-  }
 
 
 
-  [[nodiscard]] RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordCountFromSingleLane(
-    RuntimeBacklinkedFiveWordCopyLane* const destination,
-    std::uint32_t repeatCount,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (repeatCount != 0u) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeBacklinkedFiveWordCopyLane*>(destinationCursor);
-        output->word0 = sourceLane->word0;
-        output->word1 = sourceLane->word1;
-        std::uintptr_t* const ownerSlot = sourceLane->ownerSlot;
-        output->ownerSlot = ownerSlot;
-        if (ownerSlot == nullptr) {
-          output->previousOwner = 0u;
-        } else {
-          output->previousOwner = *ownerSlot;
-          *ownerSlot = destinationCursor + offsetof(RuntimeBacklinkedFiveWordCopyLane, ownerSlot);
-        }
-        output->word4 = sourceLane->word4;
-      }
-
-      destinationCursor += sizeof(RuntimeBacklinkedFiveWordCopyLane);
-      --repeatCount;
-    }
-
-    return reinterpret_cast<RuntimeBacklinkedFiveWordCopyLane*>(destinationCursor);
-  }
-
-  [[nodiscard]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordRangeCommon(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    const RuntimeBacklinkedTripleWordCopyLane* sourceBegin,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeBacklinkedTripleWordCopyLane*>(destinationCursor);
-        std::uintptr_t* const ownerSlot = sourceBegin->ownerSlot;
-        output->ownerSlot = ownerSlot;
-        if (ownerSlot == nullptr) {
-          output->previousOwner = 0u;
-        } else {
-          output->previousOwner = *ownerSlot;
-          *ownerSlot = destinationCursor;
-        }
-        output->word2 = sourceBegin->word2;
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeBacklinkedTripleWordCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeBacklinkedTripleWordCopyLane*>(destinationCursor);
-  }
-
-  [[nodiscard]] RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordCountFromSingleLane(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    std::uint32_t repeatCount,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (repeatCount != 0u) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeBacklinkedTripleWordCopyLane*>(destinationCursor);
-        std::uintptr_t* const ownerSlot = sourceLane->ownerSlot;
-        output->ownerSlot = ownerSlot;
-        if (ownerSlot == nullptr) {
-          output->previousOwner = 0u;
-        } else {
-          output->previousOwner = *ownerSlot;
-          *ownerSlot = destinationCursor;
-        }
-        output->word2 = sourceLane->word2;
-      }
-
-      destinationCursor += sizeof(RuntimeBacklinkedTripleWordCopyLane);
-      --repeatCount;
-    }
-
-    return reinterpret_cast<RuntimeBacklinkedTripleWordCopyLane*>(destinationCursor);
-  }
-
-  inline void RuntimeRetainRefcountOwner(RuntimeRefcountOwnerView* const owner) noexcept
-  {
-    if (owner != nullptr) {
-      (void)::InterlockedExchangeAdd(&owner->refcount, 1);
-    }
-  }
 
 
-  [[nodiscard]] RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleRangeCommon(
-    RuntimeRefcountTailTripleCopyLane* const destination,
-    const RuntimeRefcountTailTripleCopyLane* sourceBegin,
-    const RuntimeRefcountTailTripleCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
 
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountTailTripleCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->word1 = sourceBegin->word1;
-        output->owner = sourceBegin->owner;
-        RuntimeRetainRefcountOwner(output->owner);
-      }
 
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRefcountTailTripleCopyLane);
-    }
 
-    return reinterpret_cast<RuntimeRefcountTailTripleCopyLane*>(destinationCursor);
-  }
 
-  [[nodiscard]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyRefcountTailFiveWordRangeCommon(
-    RuntimeRefcountTailFiveWordCopyLane* const destination,
-    const RuntimeRefcountTailFiveWordCopyLane* sourceBegin,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
 
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountTailFiveWordCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->word1 = sourceBegin->word1;
-        output->word2 = sourceBegin->word2;
-        output->word3 = sourceBegin->word3;
-        output->owner = sourceBegin->owner;
-        RuntimeRetainRefcountOwner(output->owner);
-      }
 
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRefcountTailFiveWordCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeRefcountTailFiveWordCopyLane*>(destinationCursor);
-  }
-
-  [[nodiscard]] RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeCommon(
-    RuntimeRefcountTailFiveWordCopyLane* const destination,
-    const RuntimeRefcountTailFiveWordCopyLane* sourceBegin,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountTailFiveWordCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->word1 = sourceBegin->word1;
-        output->word2 = sourceBegin->word2;
-        output->word3 = sourceBegin->word3;
-
-        RuntimeRefcountOwnerView* const incomingOwner = sourceBegin->owner;
-        if (incomingOwner != output->owner) {
-          RuntimeRetainRefcountOwner(incomingOwner);
-          if (output->owner != nullptr) {
-            RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(output->owner));
-          }
-          output->owner = incomingOwner;
-        }
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRefcountTailFiveWordCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeRefcountTailFiveWordCopyLane*>(destinationCursor);
-  }
-
-  [[nodiscard]] RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeCommon(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* sourceBegin,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountPairCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->owner = sourceBegin->owner;
-        RuntimeRetainRefcountOwner(output->owner);
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRefcountPairCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeRefcountPairCopyLane*>(destinationCursor);
-  }
 
   struct RuntimeRefcountPairVectorStorageView
   {
@@ -21344,59 +18006,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  [[nodiscard]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeCommon(
-    RuntimeRefcountQuadOddCopyLane* const destination,
-    const RuntimeRefcountQuadOddCopyLane* sourceBegin,
-    const RuntimeRefcountQuadOddCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountQuadOddCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->owner1 = sourceBegin->owner1;
-        RuntimeRetainRefcountOwner(output->owner1);
-        output->word2 = sourceBegin->word2;
-        output->owner3 = sourceBegin->owner3;
-        RuntimeRetainRefcountOwner(output->owner3);
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRefcountQuadOddCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeRefcountQuadOddCopyLane*>(destinationCursor);
-  }
-
-
-  [[nodiscard]] RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52Lane(
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const source
-  ) noexcept
-  {
-    destination->lane00 = source->lane00;
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-
-    destination->owner10 = source->owner10;
-    RuntimeRetainRefcountOwner(destination->owner10);
-    destination->lane14 = source->lane14;
-
-    destination->owner18 = source->owner18;
-    RuntimeRetainRefcountOwner(destination->owner18);
-    destination->lane1C = source->lane1C;
-
-    destination->owner20 = source->owner20;
-    RuntimeRetainRefcountOwner(destination->owner20);
-    destination->lane24 = source->lane24;
-    destination->lane28 = source->lane28;
-    destination->lane2C = source->lane2C;
-    destination->lane30 = source->lane30;
-    return destination;
-  }
 
 
 
@@ -21432,32 +18041,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x008D72F0 (FUN_008D72F0)
-   * Address: 0x0076A890 (FUN_0076A890)
-   *
-   * What it does:
-   * Writes `repeatCount` dwords from one fixed source word into a contiguous
-   * destination lane and returns the remaining count (always zero on exit).
-   */
-  std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneA(
-    std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-    while (repeatCount != 0) {
-      if (destinationCursor != 0u) {
-        *reinterpret_cast<std::uint32_t*>(destinationCursor) = *sourceWord;
-      }
 
-      destinationCursor += sizeof(std::uint32_t);
-      --repeatCount;
-    }
 
-    return repeatCount;
-  }
 
 
 
@@ -21527,20 +18112,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x00734440 (FUN_00734440)
-   *
-   * What it does:
-   * Copies one dword-pair lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordPairRangeLaneC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -21577,74 +18148,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  [[nodiscard]] std::int32_t RuntimeGreatestCommonDivisorPositive(std::int32_t lhs, std::int32_t rhs) noexcept
-  {
-    std::int32_t result = lhs;
-    if (rhs != 0) {
-      std::int32_t divisor = rhs;
-      while (true) {
-        const std::int32_t remainder = result % divisor;
-        result = divisor;
-        divisor = remainder;
-        if (remainder == 0) {
-          break;
-        }
-      }
-    }
-    return result;
-  }
 
-  template <typename TWord, std::size_t kWordStride>
-  [[nodiscard]] std::int32_t RuntimeRotateRangeByMiddleJuggle(
-    TWord* const first,
-    TWord* const middle,
-    TWord* const last
-  ) noexcept
-  {
-    const std::int32_t leftDistance = static_cast<std::int32_t>((middle - first) / static_cast<std::ptrdiff_t>(kWordStride));
-    const std::int32_t totalDistance = static_cast<std::int32_t>((last - first) / static_cast<std::ptrdiff_t>(kWordStride));
-    std::int32_t cycleCount = RuntimeGreatestCommonDivisorPositive(totalDistance, leftDistance);
-
-    if (cycleCount < totalDistance && cycleCount > 0) {
-      while (cycleCount > 0) {
-        TWord* const cycleStart = first + (cycleCount * static_cast<std::int32_t>(kWordStride));
-        TWord carry[kWordStride]{};
-        for (std::size_t lane = 0; lane < kWordStride; ++lane) {
-          carry[lane] = cycleStart[lane];
-        }
-
-        TWord* destination = cycleStart;
-        TWord* source = cycleStart + (leftDistance * static_cast<std::int32_t>(kWordStride));
-        if (source == last) {
-          source = first;
-        }
-
-        while (source != cycleStart) {
-          for (std::size_t lane = 0; lane < kWordStride; ++lane) {
-            destination[lane] = source[lane];
-          }
-
-          const std::int32_t remainingDistance = static_cast<std::int32_t>(
-            (last - source) / static_cast<std::ptrdiff_t>(kWordStride)
-          );
-          destination = source;
-          if (leftDistance >= remainingDistance) {
-            source = first + ((leftDistance - remainingDistance) * static_cast<std::int32_t>(kWordStride));
-          } else {
-            source += leftDistance * static_cast<std::int32_t>(kWordStride);
-          }
-        }
-
-        for (std::size_t lane = 0; lane < kWordStride; ++lane) {
-          destination[lane] = carry[lane];
-        }
-
-        --cycleCount;
-      }
-    }
-
-    return cycleCount;
-  }
 
 
 
@@ -21697,20 +18201,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x0076B6B0 (FUN_0076B6B0)
-   *
-   * What it does:
-   * Copies one dword-triple lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleRangeLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -22022,33 +18512,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return nodeBytes[sentinelOffset] != 0u;
   }
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeDescendRightSpineFromRightChild(
-    RuntimeTreeIteratorNodeLaneView* const node,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    RuntimeTreeIteratorNodeLaneView* result = node;
-    for (RuntimeTreeIteratorNodeLaneView* cursor = node->lane2;
-         !RuntimeTreeIteratorNodeIsSentinel(cursor, sentinelOffset);
-         cursor = cursor->lane2) {
-      result = cursor;
-    }
-    return result;
-  }
-
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeDescendLeftSpineFromLeftChild(
-    RuntimeTreeIteratorNodeLaneView* const node,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    RuntimeTreeIteratorNodeLaneView* result = node;
-    for (RuntimeTreeIteratorNodeLaneView* cursor = node->lane0;
-         !RuntimeTreeIteratorNodeIsSentinel(cursor, sentinelOffset);
-         cursor = cursor->lane0) {
-      result = cursor;
-    }
-    return result;
-  }
 
 
 
@@ -22062,48 +18525,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantA(
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    if (cursorSlot == nullptr || *cursorSlot == nullptr) {
-      return nullptr;
-    }
 
-    RuntimeTreeIteratorNodeLaneView* current = *cursorSlot;
-    if (RuntimeTreeIteratorNodeIsSentinel(current, sentinelOffset)) {
-      current = current->lane2;
-      *cursorSlot = current;
-      return current;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* node = current->lane0;
-    if (RuntimeTreeIteratorNodeIsSentinel(node, sentinelOffset)) {
-      RuntimeTreeIteratorNodeLaneView* parent = current->lane1;
-      while (!RuntimeTreeIteratorNodeIsSentinel(parent, sentinelOffset)) {
-        if (*cursorSlot != parent->lane0) {
-          break;
-        }
-        *cursorSlot = parent;
-        parent = parent->lane1;
-      }
-
-      if (!RuntimeTreeIteratorNodeIsSentinel(*cursorSlot, sentinelOffset)) {
-        *cursorSlot = parent;
-      }
-      return *cursorSlot;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* scan = node->lane2;
-    while (!RuntimeTreeIteratorNodeIsSentinel(scan, sentinelOffset)) {
-      node = scan;
-      scan = scan->lane2;
-    }
-
-    *cursorSlot = node;
-    return node;
-  }
 
   [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantB(
     RuntimeTreeIteratorNodeLaneView** const cursorSlot,
@@ -22168,71 +18590,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeTreeRotateOwnerLaneView::head offset must be 0x04"
   );
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariant(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    RuntimeTreeIteratorNodeLaneView* const promoted = pivot->lane2;
-    pivot->lane2 = promoted->lane0;
-    if (!RuntimeTreeIteratorNodeIsSentinel(promoted->lane0, sentinelOffset)) {
-      promoted->lane0->lane1 = pivot;
-    }
 
-    promoted->lane1 = pivot->lane1;
-    RuntimeTreeIteratorNodeLaneView* const head = owner->head;
-    if (pivot == head->lane1) {
-      head->lane1 = promoted;
-      promoted->lane0 = pivot;
-      pivot->lane1 = promoted;
-      return promoted;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* const pivotParent = pivot->lane1;
-    if (pivot == pivotParent->lane0) {
-      pivotParent->lane0 = promoted;
-    } else {
-      pivotParent->lane2 = promoted;
-    }
-
-    promoted->lane0 = pivot;
-    pivot->lane1 = promoted;
-    return promoted;
-  }
-
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariant(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    RuntimeTreeIteratorNodeLaneView* const promoted = pivot->lane0;
-    pivot->lane0 = promoted->lane2;
-    if (!RuntimeTreeIteratorNodeIsSentinel(promoted->lane2, sentinelOffset)) {
-      promoted->lane2->lane1 = pivot;
-    }
-
-    promoted->lane1 = pivot->lane1;
-    RuntimeTreeIteratorNodeLaneView* const head = owner->head;
-    if (pivot == head->lane1) {
-      head->lane1 = promoted;
-      promoted->lane2 = pivot;
-      pivot->lane1 = promoted;
-      return promoted;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* const pivotParent = pivot->lane1;
-    if (pivot == pivotParent->lane2) {
-      pivotParent->lane2 = promoted;
-    } else {
-      pivotParent->lane0 = promoted;
-    }
-
-    promoted->lane2 = pivot;
-    pivot->lane1 = promoted;
-    return promoted;
-  }
 
 
 
@@ -22346,53 +18704,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x00592C40 (FUN_00592C40)
-   * Address: 0x005A0A50 (FUN_005A0A50)
-   * Address: 0x0066AC20 (FUN_0066AC20)
-   * Address: 0x00686340 (FUN_00686340)
-   * Address: 0x006E1F20 (FUN_006E1F20)
-   * Address: 0x00719C50 (FUN_00719C50)
-   * Address: 0x0087C290 (FUN_0087C290)
-   * Address: 0x0087C4D0 (FUN_0087C4D0)
-   * Address: 0x00899640 (FUN_00899640)
-   * Address: 0x008B64C0 (FUN_008B64C0)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree left rotation using sentinel flag
-   * byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeLeftVariantFlag21(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeLeftVariant(pivot, owner, 0x15u);
-  }
 
-  /**
-   * Address: 0x00592C90 (FUN_00592C90)
-   * Address: 0x005A0B00 (FUN_005A0B00)
-   * Address: 0x0066ACD0 (FUN_0066ACD0)
-   * Address: 0x006863C0 (FUN_006863C0)
-   * Address: 0x006E1FD0 (FUN_006E1FD0)
-   * Address: 0x00719D00 (FUN_00719D00)
-   * Address: 0x0087C330 (FUN_0087C330)
-   * Address: 0x0087C570 (FUN_0087C570)
-   * Address: 0x008996D0 (FUN_008996D0)
-   * Address: 0x008B6550 (FUN_008B6550)
-   *
-   * What it does:
-   * Performs one swizzled legacy RB-tree right rotation using sentinel flag
-   * byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantFlag21(
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    RuntimeTreeRotateOwnerLaneView* const owner
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, 0x15u);
-  }
 
 
 
@@ -22511,47 +18823,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(sizeof(RuntimeSetCharTreeOwnerView) == 0x08, "RuntimeSetCharTreeOwnerView size must be 0x08");
   static_assert(offsetof(RuntimeSetCharTreeOwnerView, head) == 0x04, "RuntimeSetCharTreeOwnerView::head offset must be 0x04");
 
-  /**
-   * Address: 0x007CB0C0 (FUN_007CB0C0)
-   *
-   * What it does:
-   * Performs one `set<char>`-style RB-tree left rotation using sentinel flag
-   * byte at `+0x0E`.
-   */
-  [[maybe_unused]] RuntimeSetCharTreeNode16* RuntimeRotateSetCharTreeNodeLeft(
-    RuntimeSetCharTreeNode16* const pivot,
-    RuntimeSetCharTreeOwnerView* const owner
-  ) noexcept
-  {
-    return reinterpret_cast<RuntimeSetCharTreeNode16*>(
-      RuntimeRotateTreeNodeLeftVariant(
-        reinterpret_cast<RuntimeTreeIteratorNodeLaneView*>(pivot),
-        reinterpret_cast<RuntimeTreeRotateOwnerLaneView*>(owner),
-        0x0Eu
-      )
-    );
-  }
 
-  /**
-   * Address: 0x007CB170 (FUN_007CB170)
-   *
-   * What it does:
-   * Performs one `set<char>`-style RB-tree right rotation using sentinel flag
-   * byte at `+0x0E`.
-   */
-  [[maybe_unused]] RuntimeSetCharTreeNode16* RuntimeRotateSetCharTreeNodeRight(
-    RuntimeSetCharTreeNode16* const pivot,
-    RuntimeSetCharTreeOwnerView* const owner
-  ) noexcept
-  {
-    return reinterpret_cast<RuntimeSetCharTreeNode16*>(
-      RuntimeRotateTreeNodeRightVariant(
-        reinterpret_cast<RuntimeTreeIteratorNodeLaneView*>(pivot),
-        reinterpret_cast<RuntimeTreeRotateOwnerLaneView*>(owner),
-        0x0Eu
-      )
-    );
-  }
 
 
 
@@ -22782,46 +19054,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return outNext;
   }
 
-  /**
-   * Address: 0x007CAC80 (FUN_007CAC80)
-   *
-   * What it does:
-   * Erases one `set<char>` iterator node, updates head min/max/root links, and
-   * runs red-black delete fixup with nil marker byte at `+0x0E`.
-   */
-  [[maybe_unused]] RuntimeSetCharTreeNode16** RuntimeEraseSetCharTreeNodeByIterator(
-    RuntimeSetCharTreeNode16* const /*iteratorHint*/,
-    RuntimeSetCharTreeState* const treeState,
-    RuntimeSetCharTreeNode16** const outNext,
-    RuntimeSetCharTreeNode16* const nodeToErase
-  )
-  {
-    return RuntimeEraseRbIteratorNodeCore(
-      treeState,
-      outNext,
-      nodeToErase,
-      [](RuntimeSetCharTreeNode16** const cursorSlot) noexcept {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(cursorSlot);
-        (void)RuntimeAdvanceTreeIteratorVariantB(runtimeCursor, 0x0Eu);
-      },
-      [](RuntimeSetCharTreeNode16* const node) noexcept -> RuntimeSetCharTreeNode16* {
-        return reinterpret_cast<RuntimeSetCharTreeNode16*>(
-          RuntimeFindRbSubtreeLeftmostNil14LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil14*>(node))
-        );
-      },
-      [](RuntimeSetCharTreeNode16* const node) noexcept -> RuntimeSetCharTreeNode16* {
-        return reinterpret_cast<RuntimeSetCharTreeNode16*>(
-          RuntimeFindRbSubtreeRightmostNil14LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil14*>(node))
-        );
-      },
-      [](RuntimeSetCharTreeNode16* const pivot, RuntimeSetCharTreeState* const owner) noexcept -> RuntimeSetCharTreeNode16* {
-        return RuntimeRotateSetCharTreeNodeLeft(pivot, reinterpret_cast<RuntimeSetCharTreeOwnerView*>(owner));
-      },
-      [](RuntimeSetCharTreeNode16* const pivot, RuntimeSetCharTreeState* const owner) noexcept -> RuntimeSetCharTreeNode16* {
-        return RuntimeRotateSetCharTreeNodeRight(pivot, reinterpret_cast<RuntimeSetCharTreeOwnerView*>(owner));
-      }
-    );
-  }
 
 
   /**
@@ -22893,59 +19125,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     const RuntimeRbTreeStateNil17DwordPayload* const source
   );
 
-  /**
-   * Address: 0x0052D9C0 (FUN_0052D9C0)
-   *
-   * What it does:
-   * Erases one half-open nil-`0x11` RB-tree iterator range `[first,last)`,
-   * with a full-clear fast path when the range spans the full tree.
-   */
-  [[maybe_unused]] RuntimeRbHeadNode20Color16** RuntimeEraseRbTreeNodeNil17RangeByIterator(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState,
-    RuntimeRbHeadNode20Color16** const outNext,
-    RuntimeRbHeadNode20Color16* first,
-    RuntimeRbHeadNode20Color16* const last
-  )
-  {
-    RuntimeRbHeadNode20Color16* const head = treeState->head;
-    if (first == head->left && last == head) {
-      RuntimeDestroyRbNode20TreeLaneA(head->parent);
-      head->parent = head;
-      treeState->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNext = head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      RuntimeRbHeadNode20Color16* const current = first;
-      if (current->isNil == 0u) {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(&first);
-        (void)RuntimeAdvanceTreeIteratorVariantBFlag17(0u, runtimeCursor);
-      }
-
-      RuntimeRbHeadNode20Color16* ignored = nullptr;
-      (void)RuntimeEraseRbTreeNodeNil17DwordPayloadByIterator(current, treeState, &ignored, current);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
 
 
-  [[nodiscard]] std::int32_t RuntimeReleaseRbTree20StorageByRangeEraseCore(
-    RuntimeRbTreeStateNil17DwordPayload* const treeState
-  ) noexcept
-  {
-    RuntimeRbHeadNode20Color16* const head = treeState->head;
-    RuntimeRbHeadNode20Color16* outNext = nullptr;
-    (void)RuntimeEraseRbTreeNodeNil17RangeByIterator(treeState, &outNext, head->left, head);
-    ::operator delete(static_cast<void*>(head));
-    treeState->head = nullptr;
-    treeState->size = 0u;
-    return 0;
-  }
 
 
   struct RuntimePrefixedRbTreeStateNil17At04
@@ -22960,30 +19141,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   );
 
 
-  [[nodiscard]] RuntimeRbTreeStateNil17DwordPayload* RuntimeAssignRbTreeStateNil17FromSourceCore(
-    RuntimeRbTreeStateNil17DwordPayload* const destination,
-    const RuntimeRbTreeStateNil17DwordPayload* const source
-  )
-  {
-    if (destination != source) {
-      RuntimeRbHeadNode20Color16* outNext = nullptr;
-      (void)RuntimeEraseRbTreeNodeNil17RangeByIterator(destination, &outNext, destination->head->left, destination->head);
-      (void)RuntimeCloneRbTreeStateNil17DwordPayloadFromSource(destination, source);
-    }
-    return destination;
-  }
 
-  [[nodiscard]] RuntimePrefixedRbTreeStateNil17At04* RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00Core(
-    RuntimePrefixedRbTreeStateNil17At04* const destination,
-    const RuntimePrefixedRbTreeStateNil17At04* const source
-  )
-  {
-    destination->lane00 = source->lane00;
-    if (&destination->tree != &source->tree) {
-      (void)RuntimeAssignRbTreeStateNil17FromSourceCore(&destination->tree, &source->tree);
-    }
-    return destination;
-  }
 
 
 
@@ -23635,122 +19793,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return result;
   }
 
-  /**
-   * Address: 0x00592920 (FUN_00592920)
-   *
-   * What it does:
-   * Erases one nil-`+0x15` map-tree iterator node, updates sentinel
-   * root/min/max links, performs red-black delete fixup, and stores successor
-   * iterator into `*outNext`.
-   */
-  [[nodiscard]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24ByIterator(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* const nodeToErase
-  )
-  {
-    return RuntimeEraseRbIteratorNodeCore(
-      treeState,
-      outNext,
-      nodeToErase,
-      [](RuntimeMapTreeNode24** const cursorSlot) noexcept {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(cursorSlot);
-        (void)RuntimeAdvanceTreeIteratorVariantB(runtimeCursor, 0x15u);
-      },
-      [](RuntimeMapTreeNode24* const node) noexcept -> RuntimeMapTreeNode24* {
-        return reinterpret_cast<RuntimeMapTreeNode24*>(
-          RuntimeFindRbSubtreeLeftmostNil21LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil21*>(node))
-        );
-      },
-      [](RuntimeMapTreeNode24* const node) noexcept -> RuntimeMapTreeNode24* {
-        return reinterpret_cast<RuntimeMapTreeNode24*>(
-          RuntimeFindRbSubtreeRightmostNil21LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil21*>(node))
-        );
-      },
-      [](RuntimeMapTreeNode24* const pivot, RuntimeMapTreeState24* const owner) noexcept -> RuntimeMapTreeNode24* {
-        return reinterpret_cast<RuntimeMapTreeNode24*>(
-          RuntimeRotateTreeNodeLeftVariantFlag21(
-            reinterpret_cast<RuntimeTreeIteratorNodeLaneView*>(pivot),
-            reinterpret_cast<RuntimeTreeRotateOwnerLaneView*>(owner)
-          )
-        );
-      },
-      [](RuntimeMapTreeNode24* const pivot, RuntimeMapTreeState24* const owner) noexcept -> RuntimeMapTreeNode24* {
-        return reinterpret_cast<RuntimeMapTreeNode24*>(
-          RuntimeRotateTreeNodeRightVariantFlag21(
-            reinterpret_cast<RuntimeTreeIteratorNodeLaneView*>(pivot),
-            reinterpret_cast<RuntimeTreeRotateOwnerLaneView*>(owner)
-          )
-        );
-      }
-    );
-  }
-
-
-
-
-  /**
-   * Address: 0x00592230 (FUN_00592230)
-   *
-   * What it does:
-   * Erases one half-open nil-`+0x15` map-tree iterator range `[first,last)`,
-   * with a full-clear fast path when the range covers the whole tree.
-   */
-  [[nodiscard]] RuntimeMapTreeNode24** RuntimeEraseMapTreeNode24Range(
-    RuntimeMapTreeState24* const treeState,
-    RuntimeMapTreeNode24** const outNext,
-    RuntimeMapTreeNode24* first,
-    RuntimeMapTreeNode24* const last
-  )
-  {
-    RuntimeMapTreeNode24* const head = treeState->head;
-    if (first == head->left && last == head) {
-      RuntimeDestroyMapTreeNode24Subtree(treeState, head->parent);
-      head->parent = head;
-      treeState->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNext = head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      RuntimeMapTreeNode24* const current = first;
-      if (current->isNil == 0u) {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(&first);
-        (void)RuntimeAdvanceTreeIteratorVariantB(runtimeCursor, 0x15u);
-      }
-
-      RuntimeMapTreeNode24* ignored = nullptr;
-      (void)RuntimeEraseMapTreeNode24ByIterator(treeState, &ignored, current);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
-
-
-
-
-  /**
-   * Address: 0x00591ED0 (FUN_00591ED0)
-   *
-   * What it does:
-   * Clears one nil-`+0x15` map-tree owner, releases the head sentinel node, and
-   * resets `{head,size}` to zero.
-   */
-  [[maybe_unused]] std::int32_t RuntimeDestroyMapTreeState24AndHead(
-    RuntimeMapTreeState24* const treeState
-  ) noexcept
-  {
-    RuntimeMapTreeNode24* iterator = nullptr;
-    RuntimeMapTreeNode24* const head = treeState->head;
-    (void)RuntimeEraseMapTreeNode24Range(treeState, &iterator, head->left, head);
-    ::operator delete(head);
-    treeState->head = nullptr;
-    treeState->size = 0u;
-    return 0;
-  }
 
 
 
@@ -23763,36 +19805,14 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  [[nodiscard]] RuntimeMapTreeState24* RuntimeCloneMapTreeState24HeaderAndExtrema(
-    RuntimeMapTreeState24* const destinationTree,
-    const RuntimeMapTreeState24* const sourceTree
-  )
-  {
-    RuntimeMapTreeNode24* const destinationHead = destinationTree->head;
-    RuntimeMapTreeNode24* sourceRoot = sourceTree->head->parent;
-    sourceRoot = RuntimeCloneMapTreeNode24SubtreeWithParent(destinationTree, sourceRoot, destinationHead);
-    destinationHead->parent = sourceRoot;
-    destinationTree->size = sourceTree->size;
 
-    if (sourceRoot->isNil != 0u) {
-      destinationHead->left = destinationHead;
-      destinationHead->right = destinationHead;
-      return destinationTree;
-    }
 
-    RuntimeMapTreeNode24* leftmost = sourceRoot;
-    while (leftmost->left->isNil == 0u) {
-      leftmost = leftmost->left;
-    }
-    destinationHead->left = leftmost;
 
-    RuntimeMapTreeNode24* rightmost = sourceRoot;
-    while (rightmost->right->isNil == 0u) {
-      rightmost = rightmost->right;
-    }
-    destinationHead->right = rightmost;
-    return destinationTree;
-  }
+
+
+
+
+
 
 
 
@@ -24427,39 +20447,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  [[nodiscard]] std::uint32_t RuntimeScatterCopyWordFromSourceLaneCommon(
-    std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* destinationWord
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destinationWord);
-    while (count != 0u) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<std::uint32_t*>(destinationAddress) = *sourceWord;
-      }
-      --count;
-      destinationAddress += sizeof(std::uint32_t);
-    }
-    return count;
-  }
 
-  /**
-   * Address: 0x008326C0 (FUN_008326C0)
-   *
-   * What it does:
-   * Repeats `count` dword-lane stores from one source word into one advancing
-   * destination lane (`+4` stride), skipping stores when destination lane is
-   * zero at each step.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceLaneA(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneCommon(count, sourceWord, destinationWord);
-  }
 
 
 
