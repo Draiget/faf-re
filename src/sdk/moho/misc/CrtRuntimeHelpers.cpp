@@ -808,18 +808,6 @@ static_assert(
   "RuntimeOwnedPointerBucketIteratorView::position offset must be 0x08"
 );
 
-void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
-{
-  RuntimeTreeHeadNodeBare* cursor = node;
-  if (cursor->isNil == 0u) {
-    do {
-      RuntimeDeleteTreeHeadNodeBarePostorderCommon(cursor->right);
-      RuntimeTreeHeadNodeBare* const next = cursor->left;
-      ::operator delete(cursor);
-      cursor = next;
-    } while (cursor->isNil == 0u);
-  }
-}
 
 void RuntimeDeleteTreeNode20PostorderLaneA(RuntimeTreeNode20* const node);
 void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
@@ -945,59 +933,7 @@ static_assert(sizeof(RuntimePairTreeContainer) == 0x0C, "RuntimePairTreeContaine
 static_assert(offsetof(RuntimePairTreeContainer, head) == 0x04, "RuntimePairTreeContainer::head offset must be 0x04");
 static_assert(offsetof(RuntimePairTreeContainer, size) == 0x08, "RuntimePairTreeContainer::size offset must be 0x08");
 
-template <class TNode, class TContainer>
-[[nodiscard]] TNode* RuntimeRotateRbTreeLeftCommon(TNode* const pivot, TContainer* const container) noexcept
-{
-  TNode* const promoted = pivot->right;
-  pivot->right = promoted->left;
-  if (promoted->left->isNil == 0u) {
-    promoted->left->parent = pivot;
-  }
 
-  promoted->parent = pivot->parent;
-  TNode* const head = container->head;
-  if (pivot == head->parent) {
-    head->parent = promoted;
-  } else {
-    TNode* const pivotParent = pivot->parent;
-    if (pivot == pivotParent->left) {
-      pivotParent->left = promoted;
-    } else {
-      pivotParent->right = promoted;
-    }
-  }
-
-  promoted->left = pivot;
-  pivot->parent = promoted;
-  return promoted;
-}
-
-template <class TNode, class TContainer>
-[[nodiscard]] TNode* RuntimeRotateRbTreeRightCommon(TNode* const pivot, TContainer* const container) noexcept
-{
-  TNode* const promoted = pivot->left;
-  pivot->left = promoted->right;
-  if (promoted->right->isNil == 0u) {
-    promoted->right->parent = pivot;
-  }
-
-  promoted->parent = pivot->parent;
-  TNode* const head = container->head;
-  if (pivot == head->parent) {
-    head->parent = promoted;
-  } else {
-    TNode* const pivotParent = pivot->parent;
-    if (pivot == pivotParent->right) {
-      pivotParent->right = promoted;
-    } else {
-      pivotParent->left = promoted;
-    }
-  }
-
-  promoted->right = pivot;
-  pivot->parent = promoted;
-  return promoted;
-}
 
 struct RuntimeListPointerContainer
 {
@@ -1132,33 +1068,7 @@ void RuntimeDestroySndParamsCacheSubtree(
   } while (node->isNil == 0u);
 }
 
-/**
- * Address: 0x0052DAB0 (FUN_0052DAB0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x11` red-black tree lane.
- */
-RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareLeftLaneA(
-  RuntimeTreeHeadNodeBare* const pivot,
-  RuntimeTreeHeadNodeBareContainer* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x0052DB00 (FUN_0052DB00)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x11` red-black tree lane.
- */
-RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareRightLaneA(
-  RuntimeTreeHeadNodeBare* const pivot,
-  RuntimeTreeHeadNodeBareContainer* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
 template <std::size_t kIsNilOffset>
 struct RuntimeRbIteratorNodeView
@@ -1186,77 +1096,9 @@ using RuntimeRbIteratorNodeNil65 = RuntimeRbIteratorNodeView<0x41>;
 using RuntimeRbIteratorNodeNil89 = RuntimeRbIteratorNodeView<0x59>;
 using RuntimeRbIteratorNodeNil3273 = RuntimeRbIteratorNodeView<0xCC9>;
 
-template <std::size_t kIsNilOffset>
-[[nodiscard]] inline RuntimeRbIteratorNodeView<kIsNilOffset>* RuntimeFindRbSubtreeLeftmostCommon(
-  RuntimeRbIteratorNodeView<kIsNilOffset>* node
-) noexcept
-{
-  if (node == nullptr) {
-    return nullptr;
-  }
 
-  auto* cursor = node->left;
-  if (cursor == nullptr || cursor->isNil != 0u) {
-    return node;
-  }
 
-  do {
-    node = cursor;
-    cursor = cursor->left;
-  } while (cursor != nullptr && cursor->isNil == 0u);
 
-  return node;
-}
-
-template <std::size_t kIsNilOffset>
-[[nodiscard]] inline RuntimeRbIteratorNodeView<kIsNilOffset>* RuntimeFindRbSubtreeRightmostCommon(
-  RuntimeRbIteratorNodeView<kIsNilOffset>* node
-) noexcept
-{
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  auto* cursor = node->right;
-  if (cursor == nullptr || cursor->isNil != 0u) {
-    return node;
-  }
-
-  do {
-    node = cursor;
-    cursor = cursor->right;
-  } while (cursor != nullptr && cursor->isNil == 0u);
-
-  return node;
-}
-
-/**
- * Address: 0x0052F350 (FUN_0052F350)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x11`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil17* RuntimeFindRbSubtreeLeftmostNil17LaneA(
-  RuntimeRbIteratorNodeNil17* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
-
-/**
- * Address: 0x00530F50 (FUN_00530F50)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x11`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil17* RuntimeFindRbSubtreeRightmostNil17LaneA(
-  RuntimeRbIteratorNodeNil17* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
 struct RuntimeTripleStringRecord48
 {
@@ -12508,17 +12350,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode68Color64, color) == 0x40, "RuntimeRbHeadNode68Color64::color offset must be 0x40");
   static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
 
-  /**
-   * Address: 0x005ABB00 (FUN_005ABB00)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   struct RuntimeRect2iListNode
   {
@@ -12594,17 +12425,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   std::uint8_t gRuntimeByte54741F = 0;
 
-  /**
-   * Address: 0x008573A0 (FUN_008573A0)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane066(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
   struct RuntimeTaggedFloatRecord20
   {
@@ -16461,57 +16281,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeTreeIteratorNodeLaneView) == 0x0C, "RuntimeTreeIteratorNodeLaneView size must be 0x0C");
 
-  [[nodiscard]] bool RuntimeTreeIteratorNodeIsSentinel(
-    const RuntimeTreeIteratorNodeLaneView* const node,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return true;
-    }
-    const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(node);
-    return nodeBytes[sentinelOffset] != 0u;
-  }
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantB(
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    if (cursorSlot == nullptr || *cursorSlot == nullptr) {
-      return nullptr;
-    }
-
-    if (RuntimeTreeIteratorNodeIsSentinel(*cursorSlot, sentinelOffset)) {
-      return *cursorSlot;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* node = (*cursorSlot)->lane2;
-    if (RuntimeTreeIteratorNodeIsSentinel(node, sentinelOffset)) {
-      RuntimeTreeIteratorNodeLaneView* parent = (*cursorSlot)->lane1;
-      while (!RuntimeTreeIteratorNodeIsSentinel(parent, sentinelOffset)) {
-        if (*cursorSlot != parent->lane2) {
-          break;
-        }
-        *cursorSlot = parent;
-        parent = parent->lane1;
-      }
-
-      *cursorSlot = parent;
-      return *cursorSlot;
-    }
-
-    RuntimeTreeIteratorNodeLaneView* scan = node->lane0;
-    if (!RuntimeTreeIteratorNodeIsSentinel(scan, sentinelOffset)) {
-      do {
-        node = scan;
-        scan = scan->lane0;
-      } while (!RuntimeTreeIteratorNodeIsSentinel(scan, sentinelOffset));
-    }
-
-    *cursorSlot = node;
-    return node;
-  }
 
   struct RuntimeTreeIteratorCursorNil21CheckedView
   {
@@ -16535,20 +16305,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeTreeRotateOwnerLaneView::head offset must be 0x04"
   );
 
-  /**
-   * Address: 0x0052EE50 (FUN_0052EE50)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-B lane
-   * ordering with sentinel flag byte at `+0x11`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantBFlag17(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantB(cursorSlot, 0x11u);
-  }
 
   struct RuntimeDwordByteRecord5LaneView
   {
@@ -16659,31 +16415,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(sizeof(RuntimeSetCharTreeOwnerView) == 0x08, "RuntimeSetCharTreeOwnerView size must be 0x08");
   static_assert(offsetof(RuntimeSetCharTreeOwnerView, head) == 0x04, "RuntimeSetCharTreeOwnerView::head offset must be 0x04");
 
-  /**
-   * Address: 0x007CC580 (FUN_007CC580)
-   *
-   * What it does:
-   * Allocates one 16-byte `set<char>`-style red-black node and seeds linkage,
-   * value, and color/nil lanes.
-   */
-  [[nodiscard]] RuntimeSetCharTreeNode16* RuntimeAllocateSetCharTreeNode(
-    RuntimeSetCharTreeNode16* const left,
-    RuntimeSetCharTreeNode16* const parent,
-    RuntimeSetCharTreeNode16* const right,
-    const char* const valueLane,
-    const std::uint8_t color
-  )
-  {
-    auto* const node = static_cast<RuntimeSetCharTreeNode16*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->value = valueLane != nullptr ? *valueLane : '\0';
-    node->color = color;
-    node->isNil = 0u;
-    node->pad0F = 0u;
-    return node;
-  }
 
   struct RuntimeSetCharTreeState
   {
@@ -16695,226 +16426,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   static_assert(offsetof(RuntimeSetCharTreeState, head) == 0x04, "RuntimeSetCharTreeState::head offset must be 0x04");
   static_assert(offsetof(RuntimeSetCharTreeState, size) == 0x08, "RuntimeSetCharTreeState::size offset must be 0x08");
 
-  template <typename TNode, typename TTreeState, typename TAdvanceNext, typename TFindLeftmost, typename TFindRightmost, typename TRotateLeft, typename TRotateRight>
-  [[nodiscard]] TNode** RuntimeEraseRbIteratorNodeCore(
-    TTreeState* const treeState,
-    TNode** const outNext,
-    TNode* const nodeToErase,
-    TAdvanceNext&& advanceNext,
-    TFindLeftmost&& findLeftmost,
-    TFindRightmost&& findRightmost,
-    TRotateLeft&& rotateLeft,
-    TRotateRight&& rotateRight
-  )
-  {
-    constexpr std::uint8_t kRed = 0u;
-    constexpr std::uint8_t kBlack = 1u;
 
-    if (nodeToErase->isNil != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    TNode* const erasedNode = nodeToErase;
-    TNode* nextIterator = nodeToErase;
-    advanceNext(&nextIterator);
-
-    TNode* fixupNode = nullptr;
-    TNode* fixupParent = nullptr;
-    TNode* const head = treeState->head;
-
-    if (erasedNode->left->isNil != 0u) {
-      fixupNode = erasedNode->right;
-      fixupParent = erasedNode->parent;
-      if (fixupNode->isNil == 0u) {
-        fixupNode->parent = fixupParent;
-      }
-      if (head->parent == erasedNode) {
-        head->parent = fixupNode;
-      } else if (fixupParent->left == erasedNode) {
-        fixupParent->left = fixupNode;
-      } else {
-        fixupParent->right = fixupNode;
-      }
-    } else if (erasedNode->right->isNil != 0u) {
-      fixupNode = erasedNode->left;
-      fixupParent = erasedNode->parent;
-      if (fixupNode->isNil == 0u) {
-        fixupNode->parent = fixupParent;
-      }
-      if (head->parent == erasedNode) {
-        head->parent = fixupNode;
-      } else if (fixupParent->left == erasedNode) {
-        fixupParent->left = fixupNode;
-      } else {
-        fixupParent->right = fixupNode;
-      }
-    } else {
-      TNode* const successor = nextIterator;
-      fixupNode = successor->right;
-      if (successor == erasedNode) {
-        fixupParent = erasedNode->parent;
-        if (fixupNode->isNil == 0u) {
-          fixupNode->parent = fixupParent;
-        }
-        if (head->parent == erasedNode) {
-          head->parent = fixupNode;
-        } else if (fixupParent->left == erasedNode) {
-          fixupParent->left = fixupNode;
-        } else {
-          fixupParent->right = fixupNode;
-        }
-      } else {
-        erasedNode->left->parent = successor;
-        successor->left = erasedNode->left;
-
-        if (successor == erasedNode->right) {
-          fixupParent = successor;
-        } else {
-          fixupParent = successor->parent;
-          if (fixupNode->isNil == 0u) {
-            fixupNode->parent = fixupParent;
-          }
-          fixupParent->left = fixupNode;
-          successor->right = erasedNode->right;
-          erasedNode->right->parent = successor;
-        }
-
-        if (head->parent == erasedNode) {
-          head->parent = successor;
-        } else if (erasedNode->parent->left == erasedNode) {
-          erasedNode->parent->left = successor;
-        } else {
-          erasedNode->parent->right = successor;
-        }
-
-        successor->parent = erasedNode->parent;
-        const std::uint8_t oldSuccessorColor = successor->color;
-        successor->color = erasedNode->color;
-        erasedNode->color = oldSuccessorColor;
-      }
-    }
-
-    if (head->left == erasedNode) {
-      head->left = (fixupNode->isNil != 0u) ? fixupParent : findLeftmost(fixupNode);
-    }
-    if (head->right == erasedNode) {
-      head->right = (fixupNode->isNil != 0u) ? fixupParent : findRightmost(fixupNode);
-    }
-
-    if (erasedNode->color == kBlack) {
-      while (fixupNode != head->parent && fixupNode->color == kBlack) {
-        if (fixupNode == fixupParent->left) {
-          TNode* sibling = fixupParent->right;
-          if (sibling->color == kRed) {
-            sibling->color = kBlack;
-            fixupParent->color = kRed;
-            (void)rotateLeft(fixupParent, treeState);
-            sibling = fixupParent->right;
-          }
-
-          if (sibling->isNil != 0u) {
-            fixupNode = fixupParent;
-            fixupParent = fixupParent->parent;
-            continue;
-          }
-
-          if (sibling->left->color == kBlack && sibling->right->color == kBlack) {
-            sibling->color = kRed;
-            fixupNode = fixupParent;
-            fixupParent = fixupParent->parent;
-            continue;
-          }
-
-          if (sibling->right->color == kBlack) {
-            sibling->left->color = kBlack;
-            sibling->color = kRed;
-            (void)rotateRight(sibling, treeState);
-            sibling = fixupParent->right;
-          }
-
-          sibling->color = fixupParent->color;
-          fixupParent->color = kBlack;
-          sibling->right->color = kBlack;
-          (void)rotateLeft(fixupParent, treeState);
-          break;
-        }
-
-        TNode* sibling = fixupParent->left;
-        if (sibling->color == kRed) {
-          sibling->color = kBlack;
-          fixupParent->color = kRed;
-          (void)rotateRight(fixupParent, treeState);
-          sibling = fixupParent->left;
-        }
-
-        if (sibling->isNil != 0u) {
-          fixupNode = fixupParent;
-          fixupParent = fixupParent->parent;
-          continue;
-        }
-
-        if (sibling->right->color == kBlack && sibling->left->color == kBlack) {
-          sibling->color = kRed;
-          fixupNode = fixupParent;
-          fixupParent = fixupParent->parent;
-          continue;
-        }
-
-        if (sibling->left->color == kBlack) {
-          sibling->right->color = kBlack;
-          sibling->color = kRed;
-          (void)rotateLeft(sibling, treeState);
-          sibling = fixupParent->left;
-        }
-
-        sibling->color = fixupParent->color;
-        fixupParent->color = kBlack;
-        sibling->left->color = kBlack;
-        (void)rotateRight(fixupParent, treeState);
-        break;
-      }
-
-      fixupNode->color = kBlack;
-    }
-
-    ::operator delete(static_cast<void*>(erasedNode));
-    if (treeState->size != 0u) {
-      --treeState->size;
-    }
-    *outNext = nextIterator;
-    return outNext;
-  }
-
-  /**
-   * Address: 0x007CC470 (FUN_007CC470)
-   *
-   * What it does:
-   * Recursively clones one `set<char>` subtree into destination ownership
-   * lanes, preserving the source key and color fields.
-   */
-  [[nodiscard]] RuntimeSetCharTreeNode16* RuntimeCloneSetCharTreeSubtree(
-    RuntimeSetCharTreeState* const destinationTree,
-    RuntimeSetCharTreeNode16* const sourceNode,
-    RuntimeSetCharTreeNode16* const parentNode
-  )
-  {
-    RuntimeSetCharTreeNode16* const destinationHead = destinationTree != nullptr ? destinationTree->head : nullptr;
-    RuntimeSetCharTreeNode16* result = destinationHead;
-
-    if (destinationHead != nullptr && sourceNode != nullptr && sourceNode->isNil == 0u) {
-      RuntimeSetCharTreeNode16* const clonedNode =
-        RuntimeAllocateSetCharTreeNode(destinationHead, parentNode, destinationHead, &sourceNode->value, sourceNode->color);
-
-      if (destinationHead->isNil != 0u) {
-        result = clonedNode;
-      }
-
-      clonedNode->left = RuntimeCloneSetCharTreeSubtree(destinationTree, sourceNode->left, clonedNode);
-      clonedNode->right = RuntimeCloneSetCharTreeSubtree(destinationTree, sourceNode->right, clonedNode);
-    }
-
-    return result;
-  }
 
   struct RuntimeRbTreeStateNil17DwordPayload
   {
@@ -16992,107 +16504,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimePrefixedRbTreeStateNil17RangeOwnerAt08::end offset must be 0x08"
   );
 
-  /**
-   * Address: 0x0052F0A0 (FUN_0052F0A0)
-   *
-   * What it does:
-   * Erases one nil-`0x11` red-black iterator node from a dword-payload tree
-   * state, then applies delete-fixup and updates head links.
-   */
-  [[maybe_unused]] RuntimeRbHeadNode20Color16** RuntimeEraseRbTreeNodeNil17DwordPayloadByIterator(
-    RuntimeRbHeadNode20Color16* const /*iteratorHint*/,
-    RuntimeRbTreeStateNil17DwordPayload* const treeState,
-    RuntimeRbHeadNode20Color16** const outNext,
-    RuntimeRbHeadNode20Color16* const nodeToErase
-  )
-  {
-    return RuntimeEraseRbIteratorNodeCore(
-      treeState,
-      outNext,
-      nodeToErase,
-      [](RuntimeRbHeadNode20Color16** const cursorSlot) noexcept {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(cursorSlot);
-        (void)RuntimeAdvanceTreeIteratorVariantBFlag17(0u, runtimeCursor);
-      },
-      [](RuntimeRbHeadNode20Color16* const node) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeFindRbSubtreeLeftmostNil17LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil17*>(node))
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const node) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeFindRbSubtreeRightmostNil17LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil17*>(node))
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const pivot, RuntimeRbTreeStateNil17DwordPayload* const owner) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeRotateTreeHeadNodeBareLeftLaneA(
-            reinterpret_cast<RuntimeTreeHeadNodeBare*>(pivot),
-            reinterpret_cast<RuntimeTreeHeadNodeBareContainer*>(owner)
-          )
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const pivot, RuntimeRbTreeStateNil17DwordPayload* const owner) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeRotateTreeHeadNodeBareRightLaneA(
-            reinterpret_cast<RuntimeTreeHeadNodeBare*>(pivot),
-            reinterpret_cast<RuntimeTreeHeadNodeBareContainer*>(owner)
-          )
-        );
-      }
-    );
-  }
 
-  /**
-   * Address: 0x007B46A0 (FUN_007B46A0)
-   *
-   * What it does:
-   * Erases one nil-`0x11` red-black iterator node from a dword-payload tree
-   * state, then applies delete-fixup and updates head links.
-   */
-  [[maybe_unused]] RuntimeRbHeadNode20Color16** RuntimeEraseRbTreeNodeNil17DwordPayloadByIteratorLaneB(
-    RuntimeRbHeadNode20Color16* const /*iteratorHint*/,
-    RuntimeRbTreeStateNil17DwordPayload* const treeState,
-    RuntimeRbHeadNode20Color16** const outNext,
-    RuntimeRbHeadNode20Color16* const nodeToErase
-  )
-  {
-    return RuntimeEraseRbIteratorNodeCore(
-      treeState,
-      outNext,
-      nodeToErase,
-      [](RuntimeRbHeadNode20Color16** const cursorSlot) noexcept {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(cursorSlot);
-        (void)RuntimeAdvanceTreeIteratorVariantBFlag17(0u, runtimeCursor);
-      },
-      [](RuntimeRbHeadNode20Color16* const node) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeFindRbSubtreeLeftmostNil17LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil17*>(node))
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const node) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeFindRbSubtreeRightmostNil17LaneA(reinterpret_cast<RuntimeRbIteratorNodeNil17*>(node))
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const pivot, RuntimeRbTreeStateNil17DwordPayload* const owner) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeRotateTreeHeadNodeBareLeftLaneA(
-            reinterpret_cast<RuntimeTreeHeadNodeBare*>(pivot),
-            reinterpret_cast<RuntimeTreeHeadNodeBareContainer*>(owner)
-          )
-        );
-      },
-      [](RuntimeRbHeadNode20Color16* const pivot, RuntimeRbTreeStateNil17DwordPayload* const owner) noexcept -> RuntimeRbHeadNode20Color16* {
-        return reinterpret_cast<RuntimeRbHeadNode20Color16*>(
-          RuntimeRotateTreeHeadNodeBareRightLaneA(
-            reinterpret_cast<RuntimeTreeHeadNodeBare*>(pivot),
-            reinterpret_cast<RuntimeTreeHeadNodeBareContainer*>(owner)
-          )
-        );
-      }
-    );
-  }
 
   /**
    * Address: 0x0052DB50 (FUN_0052DB50)
@@ -17425,81 +16837,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeMapTreeState) == 0x0C, "RuntimeMapTreeState size must be 0x0C");
 
-  inline void RuntimeMapTreeRetainSharedControl(void* const sharedControl) noexcept
-  {
-    if (sharedControl == nullptr) {
-      return;
-    }
 
-    auto* const referenceCount =
-      reinterpret_cast<volatile long*>(reinterpret_cast<std::uint8_t*>(sharedControl) + 4);
-    ::InterlockedExchangeAdd(referenceCount, 1);
-  }
 
-  /**
-   * Address: 0x00856720 (FUN_00856720)
-   *
-   * What it does:
-   * Allocates one 28-byte map-tree node, copies payload lanes, and retains the
-   * shared-control lane at `+0x14`.
-   */
-  [[nodiscard]] RuntimeMapTreeNode28* RuntimeAllocateMapTreeNode(
-    const RuntimeMapTreePayloadTriplet* const payload,
-    RuntimeMapTreeNode28* const left,
-    RuntimeMapTreeNode28* const parent,
-    RuntimeMapTreeNode28* const right,
-    const std::uint8_t color
-  )
-  {
-    auto* const node = static_cast<RuntimeMapTreeNode28*>(RuntimeAllocateArrayWithBadAllocLane066(1u));
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->lane0C = payload != nullptr ? payload->lane0C : 0u;
-    node->lane10 = payload != nullptr ? payload->lane10 : 0u;
-    node->sharedControl = payload != nullptr ? payload->sharedControl : nullptr;
-    RuntimeMapTreeRetainSharedControl(node->sharedControl);
-    node->color = color;
-    node->isNil = 0u;
-    node->pad1A[0] = 0u;
-    node->pad1A[1] = 0u;
-    return node;
-  }
-
-  /**
-   * Address: 0x00856C70 (FUN_00856C70)
-   *
-   * What it does:
-   * Recursively clones one map-tree subtree into destination-tree storage.
-   */
-  [[nodiscard]] RuntimeMapTreeNode28* RuntimeCloneMapTreeSubtree(
-    RuntimeMapTreeState* const destinationTree,
-    RuntimeMapTreeNode28* const sourceNode,
-    RuntimeMapTreeNode28* const parentNode
-  )
-  {
-    RuntimeMapTreeNode28* const destinationHead = destinationTree->head;
-    RuntimeMapTreeNode28* result = destinationHead;
-
-    if (sourceNode != nullptr && sourceNode->isNil == 0u) {
-      RuntimeMapTreePayloadTriplet payload{};
-      payload.lane0C = sourceNode->lane0C;
-      payload.lane10 = sourceNode->lane10;
-      payload.sharedControl = sourceNode->sharedControl;
-
-      RuntimeMapTreeNode28* const clonedNode =
-        RuntimeAllocateMapTreeNode(&payload, destinationHead, parentNode, destinationHead, sourceNode->color);
-
-      if (destinationHead->isNil != 0u) {
-        result = clonedNode;
-      }
-
-      clonedNode->left = RuntimeCloneMapTreeSubtree(destinationTree, sourceNode->left, clonedNode);
-      clonedNode->right = RuntimeCloneMapTreeSubtree(destinationTree, sourceNode->right, clonedNode);
-    }
-
-    return result;
-  }
 
 #pragma pack(push, 1)
   struct RuntimePackedFloatRecord74
