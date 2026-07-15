@@ -130,6 +130,8 @@ namespace
   constexpr const char* kAiBrainGetAttackVectorsName = "GetAttackVectors";
   constexpr const char* kAiBrainGetUnitsAroundPointHelpText = "CAiBrain:GetUnitsAroundPoint()";
   constexpr const char* kAiBrainGetUnitsAroundPointName = "GetUnitsAroundPoint";
+  constexpr const char* kAiBrainGetNumUnitsAroundPointHelpText = "CAiBrain:GetNumUnitsAroundPoint()";
+  constexpr const char* kAiBrainGetNumUnitsAroundPointName = "GetNumUnitsAroundPoint";
   constexpr const char* kAiBrainGetEconomyStoredHelpText = "CAiBrain:GetEconomyStored()";
   constexpr const char* kAiBrainGetEconomyStoredName = "GetEconomyStored";
   constexpr const char* kAiBrainGetEconomyIncomeHelpText = "CAiBrain:GetEconomyIncome()";
@@ -814,6 +816,41 @@ namespace
 
     const auto* const view = reinterpret_cast<const UnitBuilderSubsystemView*>(unit);
     return view->mBuilderSubsystem != nullptr;
+  }
+
+  /**
+   * Address: 0x0057B0C0 (FUN_0057B0C0, sub_57B0C0)
+   * Mangled: (file-static; no external linkage)
+   *
+   * IDA signature:
+   * char __userpurge sub_57B0C0@<al>(Moho::Unit *builder@<ecx>, int count@<edx>,
+   *                                  Moho::RUnitBlueprint *blueprint@<edi>,
+   *                                  Moho::CAiBrain *brain);
+   *
+   * What it does:
+   * Verifies `builder` owns a builder subsystem and `blueprint` is non-null,
+   * builds a single-element selected-unit set from `builder`, then issues one
+   * `UNITCOMMAND_BuildFactory` command carrying `blueprint` `count` times
+   * against `brain->mSim`. Returns false when the builder/blueprint gate fails.
+   */
+  [[nodiscard]] bool IssueBuildFactoryCommands(
+    Unit* const builder, const int count, RUnitBlueprint* const blueprint, CAiBrain* const brain
+  )
+  {
+    if (!UnitHasBuilderSubsystem(builder) || blueprint == nullptr) {
+      return false;
+    }
+
+    SEntitySetTemplateUnit selectedUnits{};
+    (void)selectedUnits.AddUnit(builder);
+
+    for (int issueIndex = 0; issueIndex < count; ++issueIndex) {
+      SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_BuildFactory);
+      issueData.mBlueprint = blueprint;
+      (void)IssueCommandToSelectedUnits(brain->mSim, selectedUnits, issueData, false);
+    }
+
+    return true;
   }
 
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
@@ -1748,6 +1785,64 @@ namespace moho
 
     return outUnits;
   }
+
+  /**
+   * Address: 0x0057B480 (FUN_0057B480, func_GetNumUnitsAroundPoint)
+   *
+   * IDA signature:
+   * int __stdcall sub_57B480(CAiBrain* this, EntityCategory* cat, Vector3f* pos,
+   *                          float dist, EAlliance ally);
+   *
+   * What it does:
+   * Counting twin of `CollectUnitsAroundPointFiltered`: gathers unit entities
+   * within `dist` of `position` and returns how many pass the
+   * liveness / destroy-queue / alliance / recon-visibility / category filters.
+   * Backs the `CAiBrain:GetNumUnitsAroundPoint()` Lua binding.
+   */
+  int CountUnitsAroundPointFiltered(
+    CAiBrain* const brain,
+    const EntityCategorySet* const categorySet,
+    const Wm3::Vector3f& position,
+    const float dist,
+    const EAlliance alliance)
+  {
+    int matchCount = 0;
+
+    CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
+
+    CollisionResultFastVectorN10 gatheredEntities{};
+    EntitiesAroundPoint(gatheredEntities, dist, *brain->mSim->mOGrid, ENTITYTYPE_Unit, position);
+
+    for (const CollisionResult& hit : gatheredEntities) {
+      Entity* const candidateEntity = hit.sourceEntity;
+      if (candidateEntity == nullptr || candidateEntity->Dead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
+        continue;
+      }
+
+      if (static_cast<int>(alliance) != kAiBrainAllianceAnySentinel) {
+        const IArmy* const candidateArmy =
+          (candidateEntity->ArmyRef != nullptr) ? static_cast<const IArmy*>(candidateEntity->ArmyRef) : nullptr;
+        if (brain->mArmy->GetAllianceWith(candidateArmy) != alliance) {
+          continue;
+        }
+      }
+
+      Unit* const candidateUnit = candidateEntity->IsUnit();
+      if (candidateUnit == nullptr) {
+        continue;
+      }
+
+      if (brain->mArmy != candidateEntity->ArmyRef && reconDb->ReconGetBlip(candidateUnit) == nullptr) {
+        continue;
+      }
+
+      if (EntityCategory::HasBlueprint(candidateEntity->BluePrint, categorySet)) {
+        ++matchCount;
+      }
+    }
+
+    return matchCount;
+  }
 } // namespace moho
 
 gpg::RType* CAiBrain::sType = nullptr;
@@ -2055,36 +2150,21 @@ bool CAiBrain::CanBuildUnit(const char* const blueprintId, CAiBrain* const brain
  * Address: 0x0057B1E0 (FUN_0057B1E0, Moho::CAiBrain::BuildUnit)
  *
  * What it does:
- * Resolves one blueprint id, validates builder capability lane, and emits
- * `UNITCOMMAND_BuildFactory` commands for the builder `count` times.
+ * Resolves one blueprint id through `brain->mSim->mRules` and, when it maps to
+ * a real blueprint, delegates to `IssueBuildFactoryCommands` (0x0057B0C0) which
+ * validates the builder lane and emits `UNITCOMMAND_BuildFactory` `count` times.
  */
 bool CAiBrain::BuildUnit(const char* const blueprintId, CAiBrain* const brain, Unit* const builder, const int count)
 {
-  if (brain == nullptr || brain->mSim == nullptr || brain->mSim->mRules == nullptr) {
-    return false;
-  }
-
   RResId lookupId{};
   gpg::STR_InitFilename(&lookupId.name, blueprintId);
+
   RUnitBlueprint* const blueprint = brain->mSim->mRules->GetUnitBlueprint(lookupId);
-  if (!UnitHasBuilderSubsystem(builder) || blueprint == nullptr) {
+  if (blueprint == nullptr) {
     return false;
   }
 
-  if (count <= 0) {
-    return true;
-  }
-
-  BVSet<EntId, EntIdUniverse> selectedUnits{};
-  (void)selectedUnits.mBits.Add(static_cast<unsigned int>(builder->id_));
-
-  for (int issueIndex = 0; issueIndex < count; ++issueIndex) {
-    SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_BuildFactory);
-    issueData.mBlueprint = blueprint;
-    brain->mSim->IssueCommand(selectedUnits, issueData, false);
-  }
-
-  return true;
+  return IssueBuildFactoryCommands(builder, count, blueprint, brain);
 }
 
 /**
@@ -6559,6 +6639,94 @@ CScrLuaInitForm* moho::func_CAiBrainGetUnitsAroundPoint_LuaFuncDef()
     kAiBrainGetUnitsAroundPointHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0058E140 (FUN_0058E140, cfunc_CAiBrainGetNumUnitsAroundPoint)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainGetNumUnitsAroundPointL`.
+ */
+int moho::cfunc_CAiBrainGetNumUnitsAroundPoint(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainGetNumUnitsAroundPointL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058E160 (FUN_0058E160, func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:GetNumUnitsAroundPoint()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainGetNumUnitsAroundPointName,
+    &moho::cfunc_CAiBrainGetNumUnitsAroundPoint,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainGetNumUnitsAroundPointHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058E1C0 (FUN_0058E1C0, cfunc_CAiBrainGetNumUnitsAroundPointL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CAiBrainGetNumUnitsAroundPointL@<eax>(LuaPlus::LuaState* state@<ebx>);
+ *
+ * What it does:
+ * Implements `CAiBrain:GetNumUnitsAroundPoint(category, position, radius[, allianceState])`.
+ * Reads the brain, category set, query point and radius from the Lua stack,
+ * optionally a filter alliance, then returns the count from
+ * `CountUnitsAroundPointFiltered`.
+ */
+int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 4 || argumentCount > 5) {
+    LuaPlus::LuaState::Error(
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetNumUnitsAroundPointHelpText, 4, 5, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 3));
+  Wm3::Vector3f point{};
+  (void)SCR_FromLuaCopy<Wm3::Vector3<float>>(&positionObject, &point);
+
+  LuaPlus::LuaStackObject radiusArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    radiusArg.TypeError("number");
+  }
+  const float radius = static_cast<float>(lua_tonumber(rawState, 4));
+
+  EAlliance requestedAlliance = static_cast<EAlliance>(kAiBrainAllianceAnySentinel);
+  if (lua_gettop(rawState) == 5) {
+    gpg::RRef allianceRef{};
+    (void)gpg::RRef_EAlliance(&allianceRef, &requestedAlliance);
+
+    LuaPlus::LuaStackObject allianceArg(state, 5);
+    const char* const allianceName = lua_tostring(rawState, 5);
+    if (!allianceName) {
+      allianceArg.TypeError("string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+  }
+
+  const int unitCount = CountUnitsAroundPointFiltered(brain, categorySet, point, radius, requestedAlliance);
+
+  lua_pushnumber(rawState, static_cast<float>(unitCount));
+  (void)lua_gettop(rawState);
+  return 1;
 }
 
 /**

@@ -279,6 +279,21 @@ namespace moho
     const Wm3::Vector3f& position,
     float dist,
     EAlliance alliance);
+
+  /**
+   * Address: 0x0057B480 (FUN_0057B480, func_GetNumUnitsAroundPoint)
+   *
+   * What it does:
+   * Counting twin of `CollectUnitsAroundPointFiltered`: gathers unit entities
+   * within `dist` of `position` and returns how many pass the liveness /
+   * destroy-queue / alliance / recon-visibility / category filters.
+   */
+  int CountUnitsAroundPointFiltered(
+    CAiBrain* brain,
+    const EntityCategorySet* categorySet,
+    const Wm3::Vector3f& position,
+    float dist,
+    EAlliance alliance);
 } // namespace moho
 
 /**
@@ -1875,6 +1890,32 @@ namespace moho
    * of a point that match a category (and optionally an alliance state).
    */
   int cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058E140 (FUN_0058E140, cfunc_CAiBrainGetNumUnitsAroundPoint)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetNumUnitsAroundPointL`.
+   */
+  int cfunc_CAiBrainGetNumUnitsAroundPoint(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058E160 (FUN_0058E160, func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetNumUnitsAroundPoint()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef();
+
+  /**
+   * Address: 0x0058E1C0 (FUN_0058E1C0, cfunc_CAiBrainGetNumUnitsAroundPointL)
+   *
+   * What it does:
+   * Returns the number of units within `radius` of a point that match a
+   * category (and optionally an alliance state).
+   */
+  int cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0058C490 (FUN_0058C490, cfunc_CAiBrainBuildPlatoon)
