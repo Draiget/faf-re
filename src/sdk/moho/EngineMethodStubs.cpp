@@ -32,7 +32,10 @@ CFactoryBuildTask* CFactoryBuildTask::Create(
 }
 
 // ===== Unit serialization static helpers =====
-void Unit::MemberConstruct(gpg::ReadArchive&, int, const gpg::RRef&, gpg::SerConstructResult&) {}
+// Unit::MemberConstruct recovered in src/sdk/moho/unit/core/Unit.cpp
+// (FUN_006AD3C0) — reads the owning Sim from the archive, allocates + constructs
+// a Unit via the recovered private Unit(Sim*) ctor (FUN_006A5050), and publishes
+// it through SerConstructResult::SetUnowned. Stub removed.
 void Unit::MemberDeserialize(gpg::ReadArchive*, Unit*, int) {}
 void Unit::MemberSerialize(gpg::WriteArchive*, Unit*, int) {}
 
