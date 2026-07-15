@@ -21,6 +21,7 @@
 #include "moho/ai/CAiPersonality.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -68,14 +69,114 @@ namespace moho
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* luaContext);
   int cfunc_CAiBrainFindPlaceToBuild(lua_State* luaContext);
 
+  // Recovered in CUnitCallTeleport.cpp; forward-declared here so the build-order
+  // helper below can invoke it by name (matches the binary's cross-TU call).
+  [[nodiscard]] bool TryBuildStructureAt(
+    SCoordsVec2* tryPos, const RUnitBlueprint* blueprint, Sim* sim,
+    int border, bool wholeMap, bool doCoerce, bool useSkirt);
+
+  /**
+   * Address: 0x0057A790 (FUN_0057A790, func_OrderBuildStructure)
+   *
+   * IDA signature:
+   * Moho::CUnitCommand *__thiscall func_OrderBuildStructure(Wm3::Vector3f *ori,
+   *   Moho::CAiBrain *brain, Moho::Unit *builder, const char *bpName,
+   *   Wm3::Vector3f *pos, float angle);
+   *
+   * What it does:
+   * Resolves `bpName` to a unit blueprint, coerces the build cell to a free
+   * footprint around `pos` (TryBuildStructureAt), then issues a
+   * UNITCOMMAND_BuildMobile command to `builder`: builds a Y-axis build
+   * orientation from `angle`, samples terrain elevation for the target height,
+   * assembles a single-cell cell-list and a ground target/secondary target, and
+   * dispatches through IssueCommandToSelectedUnits. Returns the created
+   * CUnitCommand* (or nullptr when the blueprint is unknown or no free placement
+   * exists).
+   */
   CUnitCommand* func_OrderBuildStructure(
-    Wm3::Vector3f* ori,
-    CAiBrain* brain,
-    Unit* builder,
-    const char* bpName,
-    Wm3::Vector3f* pos,
-    float angle
-  );
+    Wm3::Vector3f* const ori,
+    CAiBrain* const brain,
+    Unit* const builder,
+    const char* const bpName,
+    Wm3::Vector3f* const pos,
+    const float angle)
+  {
+    STIMap* const mapData = brain->mSim->mMapData;
+
+    // Y-axis half-angle build orientation.
+    const float halfAngleRad = angle * 0.017453292f * -0.5f;
+    const float sinHalf = std::sin(halfAngleRad);
+    const float cosHalf = std::cos(halfAngleRad);
+
+    SCoordsVec2 cellPos{};
+    cellPos.x = pos->x;
+    cellPos.z = pos->z;
+
+    RResId lookupId{};
+    gpg::STR_InitFilename(&lookupId.name, bpName);
+    RUnitBlueprint* const blueprint = brain->mSim->mRules->GetUnitBlueprint(lookupId);
+    if (blueprint == nullptr) {
+      return nullptr;
+    }
+
+    // Largest footprint side, clamped to a minimum of 8, is the placement border.
+    int maxSide = static_cast<int>(blueprint->mFootprint.mSizeX);
+    if (maxSide < static_cast<int>(blueprint->mFootprint.mSizeZ)) {
+      maxSide = static_cast<int>(blueprint->mFootprint.mSizeZ);
+    }
+    int border = 8;
+    if (maxSide > 8) {
+      border = maxSide;
+    }
+
+    const bool useWholeMap = builder->ArmyRef->UseWholeMap();
+    if (!TryBuildStructureAt(&cellPos, blueprint, brain->mSim, border, useWholeMap, false, false)) {
+      return nullptr;
+    }
+
+    const float elevation = mapData->GetHeightField()->GetElevation(cellPos.x, cellPos.z);
+
+    SEntitySetTemplateUnit selectedUnits{};
+    (void)selectedUnits.AddUnit(builder);
+
+    const Wm3::Vector3f orientation = *ori;
+
+    SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_BuildMobile);
+
+    // Primary target: ground at the resolved cell (Y from terrain elevation).
+    commandData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    commandData.mTarget.mEntityId = 0xF0000000u;
+    commandData.mTarget.mPos.x = cellPos.x;
+    commandData.mTarget.mPos.y = elevation;
+    commandData.mTarget.mPos.z = cellPos.z;
+
+    // Build orientation quaternion about the Y axis (W=cos, Y=sin, X=Z=0). The
+    // sin*0 stores match the binary's exact writes at +0x40/+0x48.
+    commandData.mOri[0] = cosHalf;
+    commandData.mOri[1] = sinHalf * 0.0f;
+    commandData.mOri[2] = sinHalf;
+    commandData.mOri[3] = sinHalf * 0.0f;
+
+    // Single-cell cell-list at the footprint origin.
+    const SOCellPos cell{
+      static_cast<std::int16_t>(
+        static_cast<int>(cellPos.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f)),
+      static_cast<std::int16_t>(
+        static_cast<int>(cellPos.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f)),
+    };
+    commandData.mCells.PushBack(cell);
+
+    commandData.mBlueprint = blueprint;
+
+    // Secondary target: ground at the caller-provided orientation vector.
+    commandData.mTarget2.mType = EAiTargetType::AITARGET_Ground;
+    commandData.mTarget2.mEntityId = 0xF0000000u;
+    commandData.mTarget2.mPos.x = orientation.x;
+    commandData.mTarget2.mPos.y = orientation.y;
+    commandData.mTarget2.mPos.z = orientation.z;
+
+    return IssueCommandToSelectedUnits(brain->mSim, selectedUnits, commandData, false);
+  }
 
   /**
    * Address: 0x0057CA20 (FUN_0057CA20, func_ScheduleBuildStructure)
