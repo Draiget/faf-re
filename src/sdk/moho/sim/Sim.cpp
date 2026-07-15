@@ -28442,5 +28442,101 @@ namespace moho
     UI_OnCommandIssued(units, data, true);
     session->DirtyCommandGraph();
   }
+
+/**
+ * Address: 0x0062DA50 (FUN_0062DA50, ?LocationIsFree@Sim@Moho@@SA_NPAV12@PAVUnit@2@PAV?$Rect2@H@gpg@@D@Z)
+ *
+ * IDA signature:
+ * bool __cdecl Moho::Sim::LocationIsFree(Moho::Sim *sim, Moho::Unit *ignore,
+ *   gpg::Rect2i *loc, char requireIdle);
+ *
+ * What it does:
+ * Returns true when the ogrid cell rectangle `loc` is clear of live blocking
+ * units (see header).
+ */
+bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const loc, const char requireIdle)
+{
+  // Identity-oriented query box centered on the rect, Y half-extent 100.
+  Wm3::Vector3f boxCenter{};
+  boxCenter.x = static_cast<float>(loc->x0 + loc->x1) * 0.5f;
+  boxCenter.y = 0.0f;
+  boxCenter.z = static_cast<float>(loc->z0 + loc->z1) * 0.5f;
+
+  Wm3::Vector3f boxExtents{};
+  boxExtents.x = static_cast<float>(loc->x1 - loc->x0) * 0.5f;
+  boxExtents.y = 100.0f;
+  boxExtents.z = static_cast<float>(loc->z1 - loc->z0) * 0.5f;
+
+  const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
+  const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
+
+  CollisionResultFastVectorN10 hits{};
+  sim->mOGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
+
+  for (const CollisionResult& hit : hits) {
+    Unit* const unit = hit.sourceEntity->IsUnit();
+    if (unit == nullptr) {
+      continue;
+    }
+    if (unit->IsDead() || unit == ignore) {
+      continue;
+    }
+
+    // requireIdle gate: only idle units (no active head command) count as
+    // blockers. Idle = null queue, empty queue, or a null/sentinel head weak-ptr.
+    if (requireIdle) {
+      CUnitCommandQueue* const queue = unit->CommandQueue;
+      bool idle = (queue == nullptr);
+      if (!idle) {
+        const msvc8::vector<WeakPtr<CUnitCommand>>& commands = queue->mCommandVec;
+        if (commands.empty()) {
+          idle = true;
+        } else {
+          const WeakPtr<CUnitCommand>& head = commands.data()[0];
+          idle = (head.ownerLinkSlot == nullptr) || head.IsSentinel();
+        }
+      }
+      if (!idle) {
+        continue;
+      }
+    }
+
+    if (unit->mCurrentLayer == LAYER_Air) {
+      continue;
+    }
+
+    bool blocks;
+    if (unit->IsMobile()) {
+      blocks = true;
+    } else {
+      // Static unit: blocks only when its blueprint skirt rect overlaps `loc`.
+      const Wm3::Vec3f& unitPos = unit->GetPosition();
+      SCoordsVec2 unitCoords{};
+      unitCoords.x = unitPos.x;
+      unitCoords.z = unitPos.z;
+      const gpg::Rect2f skirt = unit->GetBlueprint()->GetSkirtRect(unitCoords);
+
+      const float locX1 = static_cast<float>(loc->x1);
+      const float locX0 = static_cast<float>(loc->x0);
+      const float locZ0 = static_cast<float>(loc->z0);
+      const float locZ1 = static_cast<float>(loc->z1);
+      blocks = locX1 > skirt.x0 && skirt.x1 > locX0 && locZ1 > skirt.z0 && skirt.z1 > locZ0 &&
+        skirt.x1 > skirt.x0 && skirt.z0 < skirt.z1 && locX1 > locX0 && locZ0 < locZ1;
+    }
+
+    if (blocks) {
+      // Blocking unit found. Exempt it only if it is stored in `ignore`'s transport.
+      if (ignore == nullptr) {
+        return false;
+      }
+      IAiTransport* const transport = ignore->AiTransport;
+      if (transport == nullptr || !transport->TransportIsStoredUnit(unit)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 } // namespace moho
 

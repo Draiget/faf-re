@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitCallTeleport.h"
 
+#include <cmath>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -12,13 +13,16 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
@@ -27,22 +31,151 @@
 
 namespace moho
 {
+  namespace
+  {
+    // Round a skirt-rect (Rect2f) outward by 1 into an ogrid cell rect:
+    // floor(low-1) / ceil(high+1). Mirrors the frndint sequences in FUN_0062B200
+    // (exactly floor/ceil after the +/-1 bias).
+    [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(const gpg::Rect2f& skirt) noexcept
+    {
+      gpg::Rect2i out{};
+      out.x0 = static_cast<int>(std::floor(skirt.x0 - 1.0f));
+      out.x1 = static_cast<int>(std::ceil(skirt.x1 + 1.0f));
+      out.z0 = static_cast<int>(std::floor(skirt.z0 - 1.0f));
+      out.z1 = static_cast<int>(std::ceil(skirt.z1 + 1.0f));
+      return out;
+    }
+
+    // Footprint cell rect centered on `posXZ`, truncating to int16 as the binary's
+    // WORD casts do. Mirrors FUN_0062B200 0x62B64B..0x62B6DB.
+    [[nodiscard]] gpg::Rect2i FootprintCellRect(const RUnitBlueprint& blueprint, const SCoordsVec2& posXZ) noexcept
+    {
+      const int fx0 =
+        static_cast<std::int16_t>(static_cast<int>(posXZ.x - static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f));
+      const int fz0 =
+        static_cast<std::int16_t>(static_cast<int>(posXZ.z - static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f));
+      gpg::Rect2i out{};
+      out.x0 = static_cast<std::int16_t>(fx0);
+      out.z0 = static_cast<std::int16_t>(fz0);
+      out.x1 = static_cast<std::int16_t>(fx0) + static_cast<int>(blueprint.mFootprint.mSizeX);
+      out.z1 = static_cast<std::int16_t>(fz0) + static_cast<int>(blueprint.mFootprint.mSizeZ);
+      return out;
+    }
+  } // namespace
+
   /**
    * Address: 0x0062B200 (FUN_0062B200, func_TryBuildStructureAt)
    *
+   * IDA signature:
+   * bool __usercall func_TryBuildStructureAt@<al>(Moho::SCoordsVec2 *tryPos@<ebx>,
+   *   Moho::RUnitBlueprint *bp@<edi>, Moho::Sim *sim, int border, char wholeMap,
+   *   char doCoerce, char useSkirt);
+   *
    * What it does:
-   * Validates one structure footprint placement around `tryPos` against map
-   * bounds and occupancy constraints and optionally coerces to nearby cells.
+   * Validates one structure footprint placement around `tryPos` against map bounds
+   * (STIMap::IsWithin) and occupancy (func_LocationIsFree; and, when `doCoerce`, the
+   * coerced footprint/skirt cell rect via Sim::LocationIsFree). If the initial cell is
+   * out of bounds or occupied, spirals outward over an expanding square ring (up to
+   * 900 probes) for the first in-bounds, free cell, writing the resolved position
+   * (from the occupancy result) back into `tryPos`. Returns true on a valid placement.
    */
   [[nodiscard]] bool TryBuildStructureAt(
-    SCoordsVec2* tryPos,
-    const RUnitBlueprint* blueprint,
-    Sim* sim,
-    int border,
-    bool wholeMap,
-    bool doCoerce,
-    bool useSkirt
-  );
+    SCoordsVec2* const tryPos,
+    const RUnitBlueprint* const blueprint,
+    Sim* const sim,
+    const int border,
+    const bool wholeMap,
+    const bool doCoerce,
+    const bool useSkirt
+  )
+  {
+    const float borderf = static_cast<float>(border);
+    COGrid* const grid = sim->mOGrid;
+    SOccupationResult occupation{};
+
+    Wm3::Vector3f initialProbe{};
+    initialProbe.x = tryPos->x;
+    initialProbe.y = 0.0f;
+    initialProbe.z = tryPos->z;
+
+    bool needSpiral = false;
+    if (!sim->mMapData->IsWithin(initialProbe, borderf, wholeMap) ||
+        !func_LocationIsFree(*blueprint, *grid, *tryPos, occupation)) {
+      needSpiral = true;
+    } else if (doCoerce) {
+      gpg::Rect2i loc{};
+      if (useSkirt) {
+        loc = SkirtRectToCellRect(blueprint->GetSkirtRect(*tryPos));
+      } else {
+        COORDS_ToGridRect(&loc, *tryPos, blueprint->mFootprint);
+      }
+      if (!Sim::LocationIsFree(sim, nullptr, &loc, 0)) {
+        needSpiral = true;
+      }
+    }
+
+    if (needSpiral) {
+      // Expanding square-ring spiral. Edge rows probe every column (dj=1); interior
+      // rows probe only the two ring endpoints (dj=2*upper). The in-bounds test uses
+      // the ORIGINAL tryPos (a binary quirk), so it is constant across the search.
+      int attempts = 0;
+      int lower = -1;
+      int upper = 1;
+      int curAdj1 = -border;
+      const int nBorder = -border;
+      bool found = false;
+
+      while (!found) {
+        int curAdj2 = curAdj1;
+        for (int i = lower; i <= upper && !found; ++i) {
+          const int dj = (i == lower || i == upper) ? 1 : (2 * upper);
+          const float curX = static_cast<float>(curAdj2);
+          for (int j = lower; j <= upper; j += dj) {
+            ++attempts;
+
+            SCoordsVec2 candidate{};
+            candidate.x = curX + tryPos->x;
+            candidate.z = static_cast<float>(border * j) + tryPos->z;
+
+            Wm3::Vector3f probe{};
+            probe.x = tryPos->x;
+            probe.y = 0.0f;
+            probe.z = tryPos->z;
+
+            if (sim->mMapData->IsWithin(probe, borderf, wholeMap) &&
+                func_LocationIsFree(*blueprint, *grid, candidate, occupation)) {
+              if (!doCoerce) {
+                found = true;
+                break;
+              }
+              gpg::Rect2i cellRect =
+                useSkirt ? SkirtRectToCellRect(blueprint->GetSkirtRect(candidate))
+                         : FootprintCellRect(*blueprint, candidate);
+              if (Sim::LocationIsFree(sim, nullptr, &cellRect, 0)) {
+                found = true;
+                break;
+              }
+            }
+          }
+          curAdj2 += border;
+        }
+        if (found) {
+          break;
+        }
+
+        curAdj1 += nBorder;
+        ++upper;
+        --lower;
+        if (attempts >= 900) {
+          return false;
+        }
+      }
+    }
+
+    tryPos->x = occupation.pos.x;
+    tryPos->z = occupation.pos.z;
+    return true;
+  }
 
   [[nodiscard]]
   bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);

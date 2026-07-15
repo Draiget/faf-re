@@ -136,6 +136,24 @@ namespace moho
     virtual ~Sim();
 
     /**
+     * Address: 0x0062DA50 (FUN_0062DA50, ?LocationIsFree@Sim@Moho@@SA_NPAV12@PAVUnit@2@PAV?$Rect2@H@gpg@@D@Z)
+     *
+     * IDA signature:
+     * bool __cdecl Moho::Sim::LocationIsFree(Moho::Sim *sim, Moho::Unit *ignore,
+     *   gpg::Rect2i *loc, char requireIdle);
+     *
+     * What it does:
+     * Tests whether the ogrid cell rectangle `loc` is clear of live blocking
+     * units. Builds an identity-oriented box (Y half-extent 100) over the rect,
+     * gathers unit entities in it, and returns false if any live, non-ignored
+     * unit blocks: mobile units always block; static units block only when their
+     * blueprint skirt rect overlaps `loc`. `ignore` and units stored in
+     * `ignore`'s transport are exempt; when `requireIdle` is set, only idle units
+     * (no active head command) are treated as blockers.
+     */
+    [[nodiscard]] static bool LocationIsFree(Sim* sim, Unit* ignore, gpg::Rect2i* loc, char requireIdle);
+
+    /**
      * Address: 0x00748650
      * @param sourceId
      */

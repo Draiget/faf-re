@@ -41,7 +41,6 @@ namespace moho
 namespace moho
 {
   // ===== Unrecovered free functions =====
-  bool TryBuildStructureAt(struct moho::SCoordsVec2 *,struct moho::RUnitBlueprint const *,class moho::Sim *,int,bool,bool,bool) { return false; }
   // REMOVED: preregister_SSTIUnitVariableDataTypeInfo and
   // preregister_UnitWeaponInfoTypeInfo were here as stubs returning nullptr,
   // shadowing the real recovered RTTI registration in moho/unit/core/Unit.cpp.
@@ -51,7 +50,6 @@ namespace moho
   // InitializeSSTIUnitWeaponInfoVector (FUN_005C3850) — the real body in
   // moho/unit/core/Unit.cpp is now wrapped in `namespace moho { ... }`
   // matching the Unit.h:485 declaration, so the no-op stub here is gone.
-  class moho::CUnitCommand * func_OrderBuildStructure(class Wm3::Vector3<float> *,class moho::CAiBrain *,class moho::Unit *,char const *,class Wm3::Vector3<float> *,float) { return nullptr; }
   class moho::IWldTerrainRes * WLD_CreateTerrainRes(void) { return nullptr; }
   // REN_CreateGameViewport now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
   // (FUN_007FA230). Replaces the no-op stub.
