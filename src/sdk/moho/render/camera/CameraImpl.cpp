@@ -1294,8 +1294,8 @@ namespace
    * walks the owner's chain (starting at `*mOwnerLinkSlot`) until finding the
    * slot that points back to this lane and rewires that slot to skip over us
    * by storing this lane's saved `mNextOwnerRef` value. This is the typed
-   * mirror of FUN_007AF240 / `RuntimeDetachBacklinkedPairRangeLaneA` operating
-   * over `CameraImpl`'s 8-byte inline weak-ref pair lanes.
+   * mirror of FUN_007AF240 operating over `CameraImpl`'s 8-byte inline
+   * weak-ref pair lanes.
    */
   void DetachCameraFrustumWeakRefRange(
     moho::CameraUserEntityWeakRef* begin, moho::CameraUserEntityWeakRef* const end

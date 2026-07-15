@@ -140,10 +140,9 @@ namespace moho
    * past the last written lane.
    *
    * This is the `WeakPtr<CUnitCommand>`-typed twin of the ICF-folded generic
-   * single-owner-slot fill lane (recovered byte-erased as
-   * `RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot` in CrtRuntimeHelpers).
-   * It is the canonical typed body the VC8 `vector<WeakPtr<CUnitCommand>>`
-   * insert/grow path reaches; behavior is identical to the folded lane.
+   * single-owner-slot fill lane at FUN_006EC5B0 / FUN_007A5FE0. It is the
+   * canonical typed body the VC8 `vector<WeakPtr<CUnitCommand>>` insert/grow
+   * path reaches; behavior is identical to the folded lane.
    */
   [[nodiscard]] WeakPtr<CUnitCommand>* FillConstructWeakPtrCUnitCommandLanes(
     WeakPtr<CUnitCommand>* destination,
