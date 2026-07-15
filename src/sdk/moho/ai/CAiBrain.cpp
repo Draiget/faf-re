@@ -51,6 +51,8 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/STIMap.h"
+#include "moho/math/Vector3f.h"
+#include "moho/math/Wm3DistanceFafExtras.h"
 #include "platform/Platform.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -132,6 +134,20 @@ namespace
   constexpr const char* kAiBrainGetUnitsAroundPointName = "GetUnitsAroundPoint";
   constexpr const char* kAiBrainGetNumUnitsAroundPointHelpText = "CAiBrain:GetNumUnitsAroundPoint()";
   constexpr const char* kAiBrainGetNumUnitsAroundPointName = "GetNumUnitsAroundPoint";
+  constexpr const char* kAiBrainCheckBlockingTerrainHelpText =
+    "CAiBrain:CheckBlockingTerrain( startPos, endPos, arcType )";
+  constexpr const char* kAiBrainCheckBlockingTerrainName = "CheckBlockingTerrain";
+  constexpr const char* kAiBrainCheckBlockingTerrainArcNone = "none";
+  constexpr const char* kAiBrainCheckBlockingTerrainArcLow = "low";
+  // flt_F6A1D4: 4 arc-sample step multipliers (offset 0x00F6A1D4; the loop bound
+  // 0x00F6A1E4 is where the table ends, at the Moho::Unit RTTI descriptor). The
+  // cumulative sum {0.707, 1.0, 0.707, 0.0} is a half-sine arc-height profile.
+  constexpr float kAiBrainCheckBlockingTerrainArcSteps[] = {0.707f, 0.293f, -0.293f, -0.707f};
+  constexpr float kAiBrainCheckBlockingTerrainStartYLift = 1.0f;
+  constexpr float kAiBrainCheckBlockingTerrainEndYLift = 0.5f;
+  constexpr float kAiBrainCheckBlockingTerrainQuarterStep = 0.25f;
+  constexpr float kAiBrainCheckBlockingTerrainArcHighScale = 2.0f;
+  constexpr float kAiBrainCheckBlockingTerrainArcLowScale = 0.5f;
   constexpr const char* kAiBrainGetEconomyStoredHelpText = "CAiBrain:GetEconomyStored()";
   constexpr const char* kAiBrainGetEconomyStoredName = "GetEconomyStored";
   constexpr const char* kAiBrainGetEconomyIncomeHelpText = "CAiBrain:GetEconomyIncome()";
@@ -6726,6 +6742,158 @@ int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* const state)
 
   lua_pushnumber(rawState, static_cast<float>(unitCount));
   (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x00591020 (FUN_00591020, cfunc_CAiBrainCheckBlockingTerrain)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainCheckBlockingTerrainL`.
+ */
+int moho::cfunc_CAiBrainCheckBlockingTerrain(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainCheckBlockingTerrainL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00591040 (FUN_00591040, func_CAiBrainCheckBlockingTerrain_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:CheckBlockingTerrain()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainCheckBlockingTerrain_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainCheckBlockingTerrainName,
+    &moho::cfunc_CAiBrainCheckBlockingTerrain,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainCheckBlockingTerrainHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005910A0 (FUN_005910A0, cfunc_CAiBrainCheckBlockingTerrainL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * Implements `CAiBrain:CheckBlockingTerrain(startPos, endPos, arcType)`. Lifts
+ * `startPos.y` by 1.0 and `endPos.y` by 0.5, then terrain-raycasts. When
+ * `arcType == "none"` a single straight segment start->end is cast; otherwise a
+ * 4-sample arc (`kAiBrainCheckBlockingTerrainArcSteps`) is walked between the
+ * endpoints, each sub-segment lifted on Y by (stepMul * quarterLength) scaled by
+ * 0.5 for `"low"` arcs or 2.0 otherwise. Each segment is intersected against the
+ * map height field via `CHeightField::Intersection`; the query returns `true`
+ * (terrain blocks) when a valid hit lies within the segment span.
+ */
+int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(
+      state, kLuaExpectedArgsWarning, kAiBrainCheckBlockingTerrainHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject startObject(LuaPlus::LuaStackObject(state, 2));
+  Wm3::Vector3f startPosition{};
+  (void)SCR_FromLuaCopy<Wm3::Vector3<float>>(&startObject, &startPosition);
+
+  const LuaPlus::LuaObject endObject(LuaPlus::LuaStackObject(state, 3));
+  Wm3::Vector3f endPosition{};
+  (void)SCR_FromLuaCopy<Wm3::Vector3<float>>(&endObject, &endPosition);
+
+  LuaPlus::LuaStackObject arcTypeArg(state, 4);
+  const char* const arcTypeCStr = lua_tostring(rawState, 4);
+  if (!arcTypeCStr) {
+    arcTypeArg.TypeError("string");
+  }
+  const std::string arcType(arcTypeCStr, std::strlen(arcTypeCStr));
+
+  // Lift the endpoints just above the surface (matches the binary's
+  // startPos.y += 1.0 / endPos.y += 0.5 before any raycast).
+  startPosition.y += kAiBrainCheckBlockingTerrainStartYLift;
+  endPosition.y += kAiBrainCheckBlockingTerrainEndYLift;
+
+  const float nanSentinel = std::numeric_limits<float>::quiet_NaN();
+  CHeightField* const heightField = brain->mSim->mMapData->mHeightField.get();
+
+  // Shared helper: cast one sub-segment and report whether a valid terrain hit
+  // falls within the segment span. `hitResult.distance` is seeded to NaN so a
+  // segment with no recorded distance never reports blockage.
+  const auto segmentBlocked =
+    [&](const Wm3::Vector3f& segStart, const Wm3::Vector3f& segEnd) -> bool {
+      const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(segStart, segEnd);
+
+      GeomLine3 line{};
+      line.pos.x = segment.Origin.x - (segment.Direction.x * segment.Extent);
+      line.pos.y = segment.Origin.y - (segment.Direction.y * segment.Extent);
+      line.pos.z = segment.Origin.z - (segment.Direction.z * segment.Extent);
+      line.dir = segment.Direction;
+      line.closest = 0.0f;
+      line.farthest = segment.Extent * kAiBrainCheckBlockingTerrainArcHighScale;
+
+      CGeomHitResult hitResult{};
+      hitResult.distance = nanSentinel;
+      hitResult.v1 = nanSentinel;
+      const Wm3::Vector3f hitPoint = heightField->Intersection(line, &hitResult);
+
+      const float spanDx = segStart.x - segEnd.x;
+      const float spanDy = segStart.y - segEnd.y;
+      const float spanDz = segStart.z - segEnd.z;
+      const float segmentLength =
+        std::sqrt((spanDx * spanDx) + (spanDz * spanDz) + (spanDy * spanDy));
+
+      return IsValidVector3f(hitPoint) && segmentLength >= hitResult.distance;
+    };
+
+  bool blocked = false;
+
+  if (_stricmp(arcType.c_str(), kAiBrainCheckBlockingTerrainArcNone) != 0) {
+    // Arc mode: sample four sub-segments between start and end, each lifted on Y.
+    const Wm3::Vector3f quarterStep{
+      (endPosition.x - startPosition.x) * kAiBrainCheckBlockingTerrainQuarterStep,
+      (endPosition.y - startPosition.y) * kAiBrainCheckBlockingTerrainQuarterStep,
+      (endPosition.z - startPosition.z) * kAiBrainCheckBlockingTerrainQuarterStep,
+    };
+    const float quarterLength = std::sqrt(
+      (quarterStep.z * quarterStep.z) + (quarterStep.y * quarterStep.y) + (quarterStep.x * quarterStep.x));
+
+    const bool isLowArc = (_stricmp(arcType.c_str(), kAiBrainCheckBlockingTerrainArcLow) == 0);
+    const float arcScale =
+      isLowArc ? kAiBrainCheckBlockingTerrainArcLowScale : kAiBrainCheckBlockingTerrainArcHighScale;
+
+    Wm3::Vector3f previousPoint = startPosition;
+    Wm3::Vector3f currentPoint = startPosition;
+    for (const float stepMultiplier : kAiBrainCheckBlockingTerrainArcSteps) {
+      currentPoint.x += quarterStep.x;
+      currentPoint.y += quarterStep.y;
+      currentPoint.z += quarterStep.z;
+      currentPoint.y += (stepMultiplier * quarterLength) * arcScale;
+
+      if (segmentBlocked(previousPoint, currentPoint)) {
+        blocked = true;
+        break;
+      }
+
+      previousPoint = currentPoint;
+    }
+  } else {
+    // Straight mode: a single segment from start to end.
+    blocked = segmentBlocked(startPosition, endPosition);
+  }
+
+  lua_pushboolean(rawState, blocked ? 1 : 0);
+  lua_gettop(rawState);
   return 1;
 }
 
