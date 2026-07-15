@@ -12459,7 +12459,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return ::operator new(static_cast<std::size_t>(elementSize) * count);
   }
 
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane020(const unsigned int count);
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
 
   struct RuntimeForwardLinkNodeLane
@@ -12508,18 +12507,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(sizeof(RuntimeRbHeadNode68Color64) == 0x44, "RuntimeRbHeadNode68Color64 size must be 0x44");
   static_assert(offsetof(RuntimeRbHeadNode68Color64, color) == 0x40, "RuntimeRbHeadNode68Color64::color offset must be 0x40");
   static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
-
-  /**
-   * Address: 0x00594230 (FUN_00594230)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane020(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   /**
    * Address: 0x005ABB00 (FUN_005ABB00)
@@ -17437,147 +17424,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     std::uint32_t size;             // +0x08
   };
   static_assert(sizeof(RuntimeMapTreeState) == 0x0C, "RuntimeMapTreeState size must be 0x0C");
-
-  // std::_Tree node for the per-army unit-stat registry:
-  // std::map<RUnitBlueprint* (stored as a 4-byte id), float count>.
-  // Owner: army statistics (FUN_00711B00 / FUN_00710990). See the container-map
-  // reconstruction note. mapKey = the blueprint-id key; mapValue = the mapped
-  // float count (bit-pattern copied as a dword by the emitted _Buynode/_Copy).
-  struct RuntimeMapTreeNode24
-  {
-    RuntimeMapTreeNode24* left;   // +0x00
-    RuntimeMapTreeNode24* parent; // +0x04
-    RuntimeMapTreeNode24* right;  // +0x08
-    std::uint32_t mapKey;         // +0x0C  std::map key (blueprint id)
-    std::uint32_t mapValue;       // +0x10  std::map mapped value (float count bits)
-    std::uint8_t color;           // +0x14
-    std::uint8_t isNil;           // +0x15
-    std::uint8_t pad16[0x02];     // +0x16
-  };
-  static_assert(sizeof(RuntimeMapTreeNode24) == 0x18, "RuntimeMapTreeNode24 size must be 0x18");
-  static_assert(offsetof(RuntimeMapTreeNode24, mapKey) == 0x0C, "RuntimeMapTreeNode24::mapKey offset must be 0x0C");
-  static_assert(offsetof(RuntimeMapTreeNode24, mapValue) == 0x10, "RuntimeMapTreeNode24::mapValue offset must be 0x10");
-  static_assert(offsetof(RuntimeMapTreeNode24, color) == 0x14, "RuntimeMapTreeNode24::color offset must be 0x14");
-  static_assert(offsetof(RuntimeMapTreeNode24, isNil) == 0x15, "RuntimeMapTreeNode24::isNil offset must be 0x15");
-
-  struct RuntimeMapTreeState24
-  {
-    std::uint32_t comparatorCookie; // +0x00
-    RuntimeMapTreeNode24* head;     // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(sizeof(RuntimeMapTreeState24) == 0x0C, "RuntimeMapTreeState24 size must be 0x0C");
-  static_assert(offsetof(RuntimeMapTreeState24, head) == 0x04, "RuntimeMapTreeState24::head offset must be 0x04");
-
-  struct RuntimeMapTreeNode24Payload
-  {
-    std::uint32_t mapKey;   // blueprint-id key
-    std::uint32_t mapValue; // mapped float-count bits
-  };
-  static_assert(sizeof(RuntimeMapTreeNode24Payload) == 0x08, "RuntimeMapTreeNode24Payload size must be 0x08");
-
-  /**
-   * Address: 0x00592C00 (FUN_00592C00)
-   *
-   * What it does:
-   * Recursively destroys one nil-`+0x15` map-tree subtree by erasing each
-   * node's right branch, then deleting nodes while walking the left spine.
-   */
-  [[maybe_unused]] void RuntimeDestroyMapTreeNode24Subtree(
-    RuntimeMapTreeState24* const owner,
-    RuntimeMapTreeNode24* const node
-  ) noexcept
-  {
-    RuntimeMapTreeNode24* cursor = node;
-    if (cursor->isNil == 0u) {
-      do {
-        RuntimeDestroyMapTreeNode24Subtree(owner, cursor->right);
-        RuntimeMapTreeNode24* const next = cursor->left;
-        ::operator delete(cursor);
-        cursor = next;
-      } while (cursor->isNil == 0u);
-    }
-  }
-
-  /**
-   * Address: 0x00711B00 (FUN_00711B00)
-   *
-   * What it does:
-   * Allocates one 24-byte map-tree node, copies 2-dword key lanes from source
-   * storage, writes caller-provided link lanes, and initializes `{isNil=0}`.
-   */
-  [[nodiscard]] RuntimeMapTreeNode24* RuntimeAllocateMapTreeNode24FromSourceKeyLanes(
-    const RuntimeMapTreeNode24Payload* const payloadSource,
-    RuntimeMapTreeNode24* const left,
-    RuntimeMapTreeNode24* const parent,
-    RuntimeMapTreeNode24* const right,
-    const std::uint8_t color
-  )
-  {
-    auto* const node = static_cast<RuntimeMapTreeNode24*>(RuntimeAllocateArrayWithBadAllocLane020(1u));
-    if (node != nullptr) {
-      node->left = left;
-      node->parent = parent;
-      node->right = right;
-      node->mapKey = payloadSource->mapKey;
-      node->mapValue = payloadSource->mapValue;
-      node->color = color;
-      node->isNil = 0u;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x00710990 (FUN_00710990)
-   *
-   * What it does:
-   * Clones one nil-`+0x15` map-tree subtree into destination storage by
-   * recursively copying left/right child lanes and preserving sentinel links.
-   */
-  [[nodiscard]] RuntimeMapTreeNode24* RuntimeCloneMapTreeNode24SubtreeWithParent(
-    RuntimeMapTreeState24* const destinationTree,
-    RuntimeMapTreeNode24* const sourceNode,
-    RuntimeMapTreeNode24* const parentNode
-  )
-  {
-    RuntimeMapTreeNode24* result = destinationTree->head;
-
-    if (sourceNode->isNil == 0u) {
-      const RuntimeMapTreeNode24Payload* const payloadSource =
-        reinterpret_cast<const RuntimeMapTreeNode24Payload*>(&sourceNode->mapKey);
-      RuntimeMapTreeNode24* const clonedNode = RuntimeAllocateMapTreeNode24FromSourceKeyLanes(
-        payloadSource,
-        result,
-        parentNode,
-        result,
-        sourceNode->color
-      );
-
-      if (result->isNil != 0u) {
-        result = clonedNode;
-      }
-
-      try {
-        clonedNode->left = RuntimeCloneMapTreeNode24SubtreeWithParent(destinationTree, sourceNode->left, clonedNode);
-        clonedNode->right = RuntimeCloneMapTreeNode24SubtreeWithParent(destinationTree, sourceNode->right, clonedNode);
-      } catch (...) {
-        RuntimeDestroyMapTreeNode24Subtree(destinationTree, result);
-        throw;
-      }
-    }
-
-    return result;
-  }
-
-  struct RuntimeArmyStatItemBlueprintView
-  {
-    std::byte pad00A0[0xA0];
-    RuntimeMapTreeState24 blueprintTree;
-  };
-  static_assert(
-    offsetof(RuntimeArmyStatItemBlueprintView, blueprintTree) == 0xA0,
-    "RuntimeArmyStatItemBlueprintView::blueprintTree offset must be 0xA0"
-  );
 
   inline void RuntimeMapTreeRetainSharedControl(void* const sharedControl) noexcept
   {
