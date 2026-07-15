@@ -16393,38 +16393,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeStateValueTreeOwnerView::head offset must be 0x04"
   );
 
-  struct RuntimeSetCharTreeNode16
-  {
-    RuntimeSetCharTreeNode16* left;   // +0x00
-    RuntimeSetCharTreeNode16* parent; // +0x04
-    RuntimeSetCharTreeNode16* right;  // +0x08
-    char value;                       // +0x0C
-    std::uint8_t color;               // +0x0D
-    std::uint8_t isNil;               // +0x0E
-    std::uint8_t pad0F;               // +0x0F
-  };
-  static_assert(sizeof(RuntimeSetCharTreeNode16) == 0x10, "RuntimeSetCharTreeNode16 size must be 0x10");
-  static_assert(offsetof(RuntimeSetCharTreeNode16, color) == 0x0D, "RuntimeSetCharTreeNode16::color offset must be 0x0D");
-  static_assert(offsetof(RuntimeSetCharTreeNode16, isNil) == 0x0E, "RuntimeSetCharTreeNode16::isNil offset must be 0x0E");
-
-  struct RuntimeSetCharTreeOwnerView
-  {
-    std::uint32_t lane00;             // +0x00
-    RuntimeSetCharTreeNode16* head;   // +0x04
-  };
-  static_assert(sizeof(RuntimeSetCharTreeOwnerView) == 0x08, "RuntimeSetCharTreeOwnerView size must be 0x08");
-  static_assert(offsetof(RuntimeSetCharTreeOwnerView, head) == 0x04, "RuntimeSetCharTreeOwnerView::head offset must be 0x04");
 
 
-  struct RuntimeSetCharTreeState
-  {
-    std::uint32_t lane00 = 0u;       // +0x00
-    RuntimeSetCharTreeNode16* head = nullptr; // +0x04
-    std::uint32_t size = 0u;         // +0x08
-  };
-  static_assert(sizeof(RuntimeSetCharTreeState) == 0x0C, "RuntimeSetCharTreeState size must be 0x0C");
-  static_assert(offsetof(RuntimeSetCharTreeState, head) == 0x04, "RuntimeSetCharTreeState::head offset must be 0x04");
-  static_assert(offsetof(RuntimeSetCharTreeState, size) == 0x08, "RuntimeSetCharTreeState::size offset must be 0x08");
+
 
 
 
@@ -16797,45 +16768,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return head;
   }
 
-  struct RuntimeMapTreePayloadTriplet
-  {
-    std::uint32_t lane0C; // +0x00
-    std::uint32_t lane10; // +0x04
-    void* sharedControl;  // +0x08
-  };
-  static_assert(sizeof(RuntimeMapTreePayloadTriplet) == 0x0C, "RuntimeMapTreePayloadTriplet size must be 0x0C");
 
-  struct RuntimeMapTreeNode28
-  {
-    RuntimeMapTreeNode28* left;   // +0x00
-    RuntimeMapTreeNode28* parent; // +0x04
-    RuntimeMapTreeNode28* right;  // +0x08
-    std::uint32_t lane0C;         // +0x0C
-    std::uint32_t lane10;         // +0x10
-    void* sharedControl;          // +0x14
-    std::uint8_t color;           // +0x18
-    std::uint8_t isNil;           // +0x19
-    std::uint8_t pad1A[0x02];     // +0x1A
-  };
-  static_assert(sizeof(RuntimeMapTreeNode28) == 0x1C, "RuntimeMapTreeNode28 size must be 0x1C");
-  static_assert(offsetof(RuntimeMapTreeNode28, left) == 0x00, "RuntimeMapTreeNode28::left offset must be 0x00");
-  static_assert(offsetof(RuntimeMapTreeNode28, parent) == 0x04, "RuntimeMapTreeNode28::parent offset must be 0x04");
-  static_assert(offsetof(RuntimeMapTreeNode28, right) == 0x08, "RuntimeMapTreeNode28::right offset must be 0x08");
-  static_assert(offsetof(RuntimeMapTreeNode28, lane0C) == 0x0C, "RuntimeMapTreeNode28::lane0C offset must be 0x0C");
-  static_assert(
-    offsetof(RuntimeMapTreeNode28, sharedControl) == 0x14,
-    "RuntimeMapTreeNode28::sharedControl offset must be 0x14"
-  );
-  static_assert(offsetof(RuntimeMapTreeNode28, color) == 0x18, "RuntimeMapTreeNode28::color offset must be 0x18");
-  static_assert(offsetof(RuntimeMapTreeNode28, isNil) == 0x19, "RuntimeMapTreeNode28::isNil offset must be 0x19");
 
-  struct RuntimeMapTreeState
-  {
-    std::uint32_t comparatorCookie; // +0x00
-    RuntimeMapTreeNode28* head;     // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(sizeof(RuntimeMapTreeState) == 0x0C, "RuntimeMapTreeState size must be 0x0C");
 
 
 
