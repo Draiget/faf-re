@@ -41,7 +41,6 @@ namespace moho
 namespace moho
 {
   // ===== Unrecovered free functions =====
-  bool COORDS_CanMoveAt(struct moho::SOCellPos *,class moho::COGrid *,class moho::Unit *,bool,class moho::Unit *) { return false; }
   bool TryBuildStructureAt(struct moho::SCoordsVec2 *,struct moho::RUnitBlueprint const *,class moho::Sim *,int,bool,bool,bool) { return false; }
   // REMOVED: preregister_SSTIUnitVariableDataTypeInfo and
   // preregister_UnitWeaponInfoTypeInfo were here as stubs returning nullptr,
