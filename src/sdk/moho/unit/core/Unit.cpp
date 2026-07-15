@@ -84,6 +84,18 @@
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
 #include "moho/unit/core/UserUnit.h"
 
+namespace gpg
+{
+  // Minimal local view of gpg::SerConstructResult sufficient to invoke the
+  // recovered Unit::MemberConstruct publish path (mirrors the local declaration
+  // used by the other recovered *Construct translation units).
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -12875,6 +12887,155 @@ namespace
     DeleteAndNull(unit.AniActor);
   }
 } // namespace
+
+/**
+ * Address: 0x006A5050 (FUN_006A5050, ??0Unit@Moho@@AAE@PAVSim@1@@Z)
+ * Mangled: ??0Unit@Moho@@AAE@PAVSim@1@@Z
+ *
+ * IDA signature:
+ * Moho::Unit *__thiscall Moho::Unit::Unit(Moho::Unit *this, Moho::Sim *sim);
+ *
+ * What it does:
+ * Deserialization-construct constructor (private; invoked only by
+ * Unit::MemberConstruct). Constructs the IUnit/Entity bases on `sim`, bumps the
+ * live-Unit instance counter, default-constructs the const/variable stat-data
+ * subobjects, and zero-initializes every runtime lane: AI sidecars, weak-ref
+ * slots, the guarded-by list, the armor-multiplier map head, the economy-event
+ * list, the info cache, the occupancy rect, and the recon/blip vectors.
+ */
+Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
+{
+  // The binary bumps the live-instance counter here (between the base ctors and
+  // the stat-data member ctors). Its ordering relative to the member ctors is
+  // unobservable because none of them read the counter.
+  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
+  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), 1L);
+
+  // mConstDat is a real member and default-constructs automatically. The
+  // variable stat-data subobject at +0x288 is flattened into Unit's field list
+  // (see VarDat()), so construct it in place through the typed accessor.
+  new (&VarDat()) SSTIUnitVariableData();
+
+  UnitMotion = nullptr;
+  CommandQueue = nullptr;
+  CreatorRef = {};
+  TransportedByRef = {};
+  AssignedTransportRef = {};
+  FocusEntityRef = {};
+  TargetBlipEntityRef = {};
+  GuardedUnitRef = {};
+  GuardedPos.x = 0.0f;
+  GuardedPos.y = 0.0f;
+  GuardedPos.z = 0.0f;
+
+  // GuardedByList.mOwnerNode self-links via its TDatListItem ctor (member init).
+  // Point the fastvector runtime view at its own inline small-buffer: empty
+  // (begin == end) with capacity for four slots ending at GuardFormation.
+  GuardedByList.mSlots.begin = GuardedByList.mInlineSlots;
+  GuardedByList.mSlots.end = GuardedByList.mInlineSlots;
+  GuardedByList.mSlots.capacityEnd = GuardedByList.mInlineSlots + 4;
+  GuardedByList.mSlots.metadata = GuardedByList.mInlineSlots;
+
+  GuardFormation = nullptr;
+  mNeedsKillCleanup = false;
+  mCreationTick = 0;
+  mExtraStorage = nullptr;
+  PriorityBoost = 1;
+  mConsumptionData = nullptr;
+  ConsumptionActive = false;
+  ProductionActive = false;
+  ResourceConsumed = 0.0f;
+  AniActor = nullptr;
+  AiAttacker = nullptr;
+  AiCommandDispatch = nullptr;
+  AiNavigator = nullptr;
+  AiSteering = nullptr;
+  AiBuilder = nullptr;
+  AiSiloBuild = nullptr;
+  AiTransport = nullptr;
+  FootprintDown = false;
+  TransportLoadFactor = -1.0f;
+
+  // Armor-multiplier map: allocate the sentinel head node and self-link it.
+  SArmorMultiplierMapNode* const armorHead = AllocateArmorMultiplierMapNodeRaw();
+  ArmorMultipliers.head = armorHead;
+  armorHead->isNil = 1;
+  armorHead->parent = armorHead;
+  armorHead->left = armorHead;
+  armorHead->right = armorHead;
+  ArmorMultipliers.size = 0;
+
+  // mEconomyEventListHead self-links via its TDatListItem ctor (member init).
+
+  CurrentTerrainType = 0;
+  mDebugAIStates = false;
+
+  mInfoCache.mFormationLayer = nullptr;
+  mInfoCache.mFormationLeadRef = {};
+  mInfoCache.mFormationPriorityOrder = 0;
+  mInfoCache.mHasFormationSpeedData = false;
+  mInfoCache.mFormationTopSpeed = 0.0f;
+  mInfoCache.mFormationDistanceMetric = 0.0f;
+  mInfoCache.mFormationHeadingHint.x = 0.0f;
+  mInfoCache.mFormationHeadingHint.y = 0.0f;
+  mInfoCache.mFormationHeadingHint.z = 0.0f;
+
+  ReservedOgridRectMinX = 0;
+  ReservedOgridRectMinZ = 0;
+  ReservedOgridRectMaxX = 0;
+  ReservedOgridRectMaxZ = 0;
+
+  // mBlipsInRange (FastVectorN<SWeakRefSlot,20>) and mReconBlips
+  // (FastVectorN<ReconBlip*,2>) bind to their inline buffers as members.
+  mBlipLastUpdateTick = 0;
+
+  mIsNotPod = false;
+  mIsEngineer = false;
+  mIsNaval = false;
+  mIsAir = false;
+  mUsesGridBasedMotion = false;
+  mIsMelee = false;
+  CaptorCount = 0;
+  NeedSyncGameData = true;
+}
+
+/**
+ * Address: 0x006AD3C0 (FUN_006AD3C0,
+ * ?MemberConstruct@Unit@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+ *
+ * What it does:
+ * Reflection construct-callback. Reads the owning `Sim*` from the archive,
+ * allocates and constructs a fresh `Unit` on it, then publishes the constructed
+ * object (paired with its owning Sim) to the `SerConstructResult` as unowned.
+ */
+void Unit::MemberConstruct(
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
+)
+{
+  Sim* sim = nullptr;
+  gpg::RRef nullOwner{};
+  archive.ReadPointer_Sim(&sim, &nullOwner);
+
+  Unit* unit = nullptr;
+  void* const storage = ::operator new(sizeof(Unit));
+  if (storage != nullptr) {
+    unit = new (storage) Unit(sim);
+  }
+
+  gpg::RRef unitRef{};
+  gpg::RRef_Unit(&unitRef, unit);
+
+  // SetUnowned records the constructed object paired with its owning Sim: the
+  // binary keeps RRef_Unit's base-adjusted object pointer but stores the Sim in
+  // the ref's second slot rather than the Unit RType.
+  gpg::RRef constructed{};
+  constructed.mObj = unitRef.mObj;
+  constructed.mType = reinterpret_cast<gpg::RType*>(sim);
+  result.SetUnowned(constructed, 0u);
+}
 
 /**
  * Address: 0x006A6BF0 (FUN_006A6BF0, ??1Unit@Moho@@UAE@XZ)

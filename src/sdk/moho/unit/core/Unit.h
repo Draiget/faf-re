@@ -688,6 +688,19 @@ namespace moho
      */
     ~Unit() override;
 
+  private:
+    /**
+     * Address: 0x006A5050 (FUN_006A5050, ??0Unit@Moho@@AAE@PAVSim@1@@Z)
+     * Mangled: ??0Unit@Moho@@AAE@PAVSim@1@@Z
+     *
+     * What it does:
+     * Private deserialization-construct constructor. Zero-initializes every
+     * runtime lane on `sim`; invoked only by Unit::MemberConstruct.
+     */
+    explicit Unit(Sim* sim);
+
+  public:
+
     /**
      * Address: 0x006AD3C0 (FUN_006AD3C0, Moho::Unit::MemberConstruct)
      *
