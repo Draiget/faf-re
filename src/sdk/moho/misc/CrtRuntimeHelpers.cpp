@@ -807,23 +807,6 @@ using RuntimeTreeNodeNil45Container = RuntimeRbTreeContainerView<RuntimeTreeNode
   return node;
 }
 
-/**
- * Address: 0x008DA0D0 (FUN_008DA0D0)
- *
- * What it does:
- * Allocates one 24-byte red-black node and initializes links, pair payload,
- * and marker lanes from caller-provided raw pair words.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapNodeLaneB(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const std::uint32_t* const rawPairWords,
-  const std::uint8_t color
-)
-{
-  return RuntimeAllocateTypeInfoMapNodeFromRawPair(left, parent, right, rawPairWords, color);
-}
 
 /**
  * Address: 0x008E42C0 (FUN_008E42C0)
@@ -867,174 +850,16 @@ static_assert(
   "RuntimeTripleStringRecord40::text offset must be 0x0C"
 );
 
-/**
- * Address: 0x0077B1F0 (FUN_0077B1F0)
- * Address: 0x008E4030 (FUN_008E4030)
- *
- * What it does:
- * Jump-only adapter lane that forwards to global `operator delete`.
- */
-[[maybe_unused]] void RuntimeDeleteRawPointerAdapterLaneE(void* const pointer) noexcept
-{
-  ::operator delete(pointer);
-}
 
-/**
- * Address: 0x00946440 (FUN_00946440)
- *
- * What it does:
- * Scalar-deleting adapter lane that forwards to global `operator delete` and
- * ignores the legacy delete-flags lane.
- */
-[[maybe_unused]] void RuntimeDeleteRawPointerScalarAdapterLaneA(
-  void* const pointer,
-  const std::uint32_t /*deleteFlags*/
-) noexcept
-{
-  ::operator delete(pointer);
-}
 
-/**
- * Address: 0x009464B0 (FUN_009464B0)
- *
- * What it does:
- * Secondary scalar-deleting adapter lane that forwards to global
- * `operator delete`.
- */
-[[maybe_unused]] void RuntimeDeleteRawPointerScalarAdapterLaneB(
-  void* const pointer,
-  const std::uint32_t /*deleteFlags*/
-) noexcept
-{
-  ::operator delete(pointer);
-}
 
-/**
- * Address: 0x00946520 (FUN_00946520)
- *
- * What it does:
- * Tertiary scalar-deleting adapter lane that forwards to global
- * `operator delete`.
- */
-[[maybe_unused]] void RuntimeDeleteRawPointerScalarAdapterLaneC(
-  void* const pointer,
-  const std::uint32_t /*deleteFlags*/
-) noexcept
-{
-  ::operator delete(pointer);
-}
 
-/**
- * Address: 0x008E4350 (FUN_008E4350)
- *
- * What it does:
- * Initializes one list-owner lane by allocating/saving one 48-byte list
- * sentinel and clearing the item-count lane.
- */
-[[maybe_unused]] RuntimeListOwnerSentinelLaneView* RuntimeInitializeListOwnerSentinelLane(
-  RuntimeListOwnerSentinelLaneView* const owner
-)
-{
-  owner->sentinel = RuntimeAllocateListNode40SentinelLaneA();
-  owner->count = 0u;
-  return owner;
-}
 
-/**
- * Address: 0x008E4370 (FUN_008E4370)
- *
- * What it does:
- * Clears one embedded legacy string lane at `+0x18` and returns zero.
- */
-[[maybe_unused]] int RuntimeClearEmbeddedStringAt24ReturnZero(RuntimeEmbeddedStringAt24View* const value) noexcept
-{
-  value->text.tidy(true, 0U);
-  return 0;
-}
 
-/**
- * Address: 0x008E43A0 (FUN_008E43A0)
- *
- * What it does:
- * Clears one embedded legacy string lane at `+0x18` and optionally deletes the
- * owner when `flags & 1` is set.
- */
-[[maybe_unused]] RuntimeEmbeddedStringAt24View* RuntimeClearEmbeddedStringAt24WithDeleteFlag(
-  RuntimeEmbeddedStringAt24View* const value,
-  const std::uint8_t flags
-) noexcept
-{
-  value->text.tidy(true, 0U);
-  if ((flags & 1u) != 0u) {
-    ::operator delete(value);
-  }
-  return value;
-}
 
-/**
- * Address: 0x008E43E0 (FUN_008E43E0)
- *
- * What it does:
- * Copy-assigns one 40-byte triple-dword+string record.
- */
-[[maybe_unused]] RuntimeTripleStringRecord40* RuntimeCopyTripleStringRecord40(
-  RuntimeTripleStringRecord40* const destination,
-  const RuntimeTripleStringRecord40* const source
-)
-{
-  destination->lane00 = source->lane00;
-  destination->lane04 = source->lane04;
-  destination->lane08 = source->lane08;
-  destination->text.assign(source->text, 0u, msvc8::string::npos);
-  return destination;
-}
 
-/**
- * Address: 0x008E4420 (FUN_008E4420)
- *
- * What it does:
- * Initializes one 40-byte triple-dword+string record from scalar lanes and one
- * source string.
- */
-[[maybe_unused]] RuntimeTripleStringRecord40* RuntimeInitializeTripleStringRecord40(
-  RuntimeTripleStringRecord40* const destination,
-  const std::uint32_t lane00,
-  const std::uint32_t lane04,
-  const std::uint32_t lane08,
-  const msvc8::string& sourceText
-)
-{
-  destination->lane00 = lane00;
-  destination->lane04 = lane04;
-  destination->lane08 = lane08;
-  destination->text.assign(sourceText, 0u, msvc8::string::npos);
-  return destination;
-}
 
-/**
- * Address: 0x008E4500 (FUN_008E4500)
- *
- * What it does:
- * Secondary clear lane for one embedded legacy string at `+0x18`, returning
- * zero.
- */
-[[maybe_unused]] int RuntimeClearEmbeddedStringAt24ReturnZeroLaneB(RuntimeEmbeddedStringAt24View* const value) noexcept
-{
-  value->text.tidy(true, 0U);
-  return 0;
-}
 
-/**
- * Address: 0x008E45B0 (FUN_008E45B0)
- *
- * What it does:
- * Third clear lane for one embedded legacy string at `+0x18`, returning zero.
- */
-[[maybe_unused]] int RuntimeClearEmbeddedStringAt24ReturnZeroLaneC(RuntimeEmbeddedStringAt24View* const value) noexcept
-{
-  value->text.tidy(true, 0U);
-  return 0;
-}
 
 /**
  * Address: 0x0092DC30 (FUN_0092DC30)
@@ -1058,22 +883,6 @@ static_assert(offsetof(RuntimeListNode32OwnerLane, sentinel) == 0x04, "RuntimeLi
 static_assert(offsetof(RuntimeListNode32OwnerLane, size) == 0x08, "RuntimeListNode32OwnerLane::size offset must be 0x08");
 static_assert(sizeof(RuntimeListNode32OwnerLane) == 0x0C, "RuntimeListNode32OwnerLane size must be 0x0C");
 
-/**
- * Address: 0x0092E980 (FUN_0092E980)
- *
- * What it does:
- * Initializes one list-owner lane by allocating a 40-byte sentinel node and
- * resetting the tracked size lane to zero.
- */
-[[maybe_unused]] RuntimeListNode32OwnerLane* RuntimeInitializeListNode32OwnerSentinelLaneB(
-  RuntimeListNode32OwnerLane* const owner,
-  const std::int32_t /*unused*/
-)
-{
-  owner->sentinel = RuntimeAllocateListNode32SentinelLaneA();
-  owner->size = 0u;
-  return owner;
-}
 
 struct RuntimeOwnedPointerTripletOwner
 {
@@ -1100,19 +909,6 @@ static_assert(sizeof(RuntimeOwnedPointerTripletOwner) == 0x10, "RuntimeOwnedPoin
   return owner;
 }
 
-/**
- * Address: 0x0092EB10 (FUN_0092EB10)
- *
- * What it does:
- * Releases one optional owned storage lane and clears the two trailing dword
- * metadata lanes.
- */
-[[maybe_unused]] RuntimeOwnedPointerTripletOwner* RuntimeReleaseOwnedPointerTripletStorageLaneA(
-  RuntimeOwnedPointerTripletOwner* const owner
-) noexcept
-{
-  return RuntimeReleaseOwnedPointerTripletStorage(owner);
-}
 
 struct RuntimeLane12PopOwnerView
 {
@@ -1124,110 +920,12 @@ static_assert(offsetof(RuntimeLane12PopOwnerView, begin) == 0x04, "RuntimeLane12
 static_assert(offsetof(RuntimeLane12PopOwnerView, end) == 0x08, "RuntimeLane12PopOwnerView::end offset must be 0x08");
 static_assert(sizeof(RuntimeLane12PopOwnerView) == 0x0C, "RuntimeLane12PopOwnerView size must be 0x0C");
 
-/**
- * Address: 0x0092EB40 (FUN_0092EB40)
- *
- * What it does:
- * Computes the current element count in one 12-byte lane `[begin,end)` span
- * and pops one trailing element by decrementing `end` when the span is non-empty.
- */
-[[maybe_unused]] std::int32_t RuntimePop12ByteLaneCountAndDecrement(RuntimeLane12PopOwnerView* const owner) noexcept
-{
-  const std::uint32_t begin = owner->begin;
-  if (begin == 0u) {
-    return 0;
-  }
 
-  const std::int32_t byteSpan = static_cast<std::int32_t>(owner->end - begin);
-  const std::int32_t laneCount = byteSpan / 12;
-  if (laneCount != 0) {
-    owner->end -= 12u;
-  }
-  return laneCount;
-}
 
-/**
- * Address: 0x0092EC90 (FUN_0092EC90)
- *
- * What it does:
- * Alias lane of owned-pointer triplet storage release.
- */
-[[maybe_unused]] RuntimeOwnedPointerTripletOwner* RuntimeReleaseOwnedPointerTripletStorageLaneB(
-  RuntimeOwnedPointerTripletOwner* const owner
-) noexcept
-{
-  return RuntimeReleaseOwnedPointerTripletStorage(owner);
-}
 
-/**
- * Address: 0x0092ECC0 (FUN_0092ECC0)
- *
- * What it does:
- * Alias lane of owned-pointer triplet storage release.
- */
-[[maybe_unused]] RuntimeOwnedPointerTripletOwner* RuntimeReleaseOwnedPointerTripletStorageLaneC(
-  RuntimeOwnedPointerTripletOwner* const owner
-) noexcept
-{
-  return RuntimeReleaseOwnedPointerTripletStorage(owner);
-}
 
-/**
- * Address: 0x0092EF50 (FUN_0092EF50)
- *
- * What it does:
- * Alias lane of owned-pointer triplet storage release.
- */
-[[maybe_unused]] RuntimeOwnedPointerTripletOwner* RuntimeReleaseOwnedPointerTripletStorageLaneD(
-  RuntimeOwnedPointerTripletOwner* const owner
-) noexcept
-{
-  return RuntimeReleaseOwnedPointerTripletStorage(owner);
-}
 
-/**
- * Address: 0x0092DED0 (FUN_0092DED0)
- *
- * What it does:
- * Allocates one 40-byte intrusive list node, writes the caller-provided
- * `next/prev` links, and copies eight payload dwords.
- */
-[[nodiscard]] RuntimeListNode32* RuntimeAllocateListNode32WithPayloadLaneA(
-  RuntimeListNode32* const next,
-  RuntimeListNode32* const prev,
-  const RuntimeListNodePayload32Words* const payload
-)
-{
-  return RuntimeAllocateListNode32WithPayloadCommon(next, prev, payload);
-}
 
-/**
- * Address: 0x009327A0 (FUN_009327A0)
- *
- * What it does:
- * Allocates one 32-byte intrusive list sentinel node and self-links the
- * `next/prev` lanes.
- */
-[[nodiscard]] RuntimeListNode24* RuntimeAllocateListNode24SentinelLaneA()
-{
-  return RuntimeAllocateListNode24SentinelCommon();
-}
-
-/**
- * Address: 0x009328C0 (FUN_009328C0)
- *
- * What it does:
- * Allocates one 32-byte intrusive list node, writes the caller-provided
- * `next/prev` links, and copies six payload dwords.
- */
-[[nodiscard]] RuntimeListNode24* RuntimeAllocateListNode24WithPayloadLaneA(
-  RuntimeListNode24* const next,
-  RuntimeListNode24* const prev,
-  const RuntimeListNodePayload24Words* const payload
-)
-{
-  return RuntimeAllocateListNode24WithPayloadCommon(next, prev, payload);
-}
 
 /**
  * Address: 0x00946F90 (FUN_00946F90)
@@ -1290,135 +988,13 @@ template <typename TOwner, typename THead>
   return owner;
 }
 
-/**
- * Address: 0x00947350 (FUN_00947350)
- *
- * What it does:
- * Initializes one type-info RB-tree owner lane from head allocator lane C and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapOwnerInitLane* RuntimeInitializeTypeInfoMapOwnerHeadLaneCWithCtorArgs(
-  RuntimeTypeInfoMapOwnerInitLane* const owner,
-  const std::int32_t /*unusedA*/,
-  const std::int32_t /*unusedB*/
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTypeInfoMapHeadNodeLaneC());
-}
 
-/**
- * Address: 0x00947F80 (FUN_00947F80)
- *
- * What it does:
- * Initializes one type-info RB-tree owner lane from head allocator lane A and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapOwnerInitLane* RuntimeInitializeTypeInfoMapOwnerHeadLaneA(
-  RuntimeTypeInfoMapOwnerInitLane* const owner
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTypeInfoMapHeadNodeLaneA());
-}
 
-/**
- * Address: 0x00947FB0 (FUN_00947FB0)
- *
- * What it does:
- * Initializes one type-info RB-tree owner lane from head allocator lane B and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapOwnerInitLane* RuntimeInitializeTypeInfoMapOwnerHeadLaneB(
-  RuntimeTypeInfoMapOwnerInitLane* const owner
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTypeInfoMapHeadNodeLaneB());
-}
 
-/**
- * Address: 0x00947FE0 (FUN_00947FE0)
- *
- * What it does:
- * Initializes one type-info RB-tree owner lane from head allocator lane C and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapOwnerInitLane* RuntimeInitializeTypeInfoMapOwnerHeadLaneC(
-  RuntimeTypeInfoMapOwnerInitLane* const owner
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTypeInfoMapHeadNodeLaneC());
-}
 
-/**
- * Address: 0x00948CC0 (FUN_00948CC0)
- *
- * What it does:
- * Allocates one 24-byte red-black node and initializes links, pair payload,
- * and color/isNil marker bytes.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapNodeLaneC(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const std::uint32_t* const rawPairWords,
-  const std::uint8_t color
-)
-{
-  return RuntimeAllocateTypeInfoMapNodeFromRawPair(left, parent, right, rawPairWords, color);
-}
 
-/**
- * Address: 0x00948D00 (FUN_00948D00)
- *
- * What it does:
- * Allocates one 24-byte red-black node and initializes links, pair payload,
- * and color/isNil marker bytes.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapNodeLaneD(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const std::uint32_t* const rawPairWords,
-  const std::uint8_t color
-)
-{
-  return RuntimeAllocateTypeInfoMapNodeFromRawPair(left, parent, right, rawPairWords, color);
-}
 
-/**
- * Address: 0x00948D40 (FUN_00948D40)
- *
- * What it does:
- * Allocates one 24-byte red-black node and initializes links, pair payload,
- * and color/isNil marker bytes.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapNodeLaneE(
-  RuntimeTypeInfoMapNode* const left,
-  RuntimeTypeInfoMapNode* const parent,
-  RuntimeTypeInfoMapNode* const right,
-  const std::uint32_t* const rawPairWords,
-  const std::uint8_t color
-)
-{
-  return RuntimeAllocateTypeInfoMapNodeFromRawPair(left, parent, right, rawPairWords, color);
-}
 
-/**
- * Address: 0x00950430 (FUN_00950430)
- *
- * What it does:
- * Allocates one 40-byte red-black node, stores link lanes and six payload
- * dwords, then writes color/isNil marker bytes.
- */
-[[nodiscard]] RuntimeTreeNode24* RuntimeAllocateTreeNode24WithPayloadLaneA(
-  RuntimeTreeNode24* const left,
-  RuntimeTreeNode24* const parent,
-  RuntimeTreeNode24* const right,
-  const RuntimeTreeNodePayload24Words* const payload,
-  const std::uint8_t color
-)
-{
-  return RuntimeAllocateTreeNode24WithPayloadCommon(left, parent, right, payload, color);
-}
 
 /**
  * Address: 0x00950540 (FUN_00950540)
@@ -1494,33 +1070,7 @@ static_assert(sizeof(RuntimeTreeNode24OwnerInitLane) == 0x0C, "RuntimeTreeNode24
 static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, head) == 0x04, "RuntimeTreeNode24OwnerInitLane::head offset must be 0x04");
 static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, size) == 0x08, "RuntimeTreeNode24OwnerInitLane::size offset must be 0x08");
 
-/**
- * Address: 0x009536A0 (FUN_009536A0)
- *
- * What it does:
- * Initializes one type-info RB-tree owner lane from head allocator lane D and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapOwnerInitLane* RuntimeInitializeTypeInfoMapOwnerHeadLaneD(
-  RuntimeTypeInfoMapOwnerInitLane* const owner
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTypeInfoMapHeadNodeLaneD());
-}
 
-/**
- * Address: 0x009536D0 (FUN_009536D0)
- *
- * What it does:
- * Initializes one 40-byte RB-tree owner lane from head allocator lane A and
- * seeds sentinel self-links with zero active-size metadata.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTreeNode24OwnerInitLane* RuntimeInitializeTreeNode24OwnerHeadLaneA(
-  RuntimeTreeNode24OwnerInitLane* const owner
-) noexcept
-{
-  return RuntimeInitializeRbOwnerHeadSentinelLane(owner, RuntimeAllocateTreeNode24HeadLaneA());
-}
 
 /**
  * Address: 0x00A58370 (FUN_00A58370)
@@ -1548,29 +1098,7 @@ static_assert(offsetof(RuntimeTreeNode24OwnerInitLane, size) == 0x08, "RuntimeTr
   return RuntimeAllocateTreeNode20HeadCommon();
 }
 
-/**
- * Address: 0x00A3CEE0 (FUN_00A3CEE0)
- *
- * What it does:
- * Allocates one 24-byte red-black tree head node with null links and marker
- * bytes initialized to `{color=1, isNil=0}`.
- */
-[[nodiscard]] RuntimeTypeInfoMapNode* RuntimeAllocateTypeInfoMapHeadNodeLaneE()
-{
-  return RuntimeAllocateTypeInfoMapHeadNodeCommon();
-}
 
-/**
- * Address: 0x00A3CF30 (FUN_00A3CF30)
- *
- * What it does:
- * Recursively deletes one 24-byte red-black tree lane by erasing each node's
- * right subtree, then walking the left spine and deleting each visited node.
- */
-void RuntimeDeleteTypeInfoMapTreeLaneB(RuntimeTypeInfoMapNode* const node)
-{
-  RuntimeDeleteTypeInfoMapTreeLaneA(node);
-}
 
 struct RuntimeOwnedPointerArrayView
 {
@@ -1639,16 +1167,6 @@ void RuntimeResetOwnedPointerArrayLaneA(RuntimeOwnedPointerArrayView* const view
   RuntimeResetOwnedPointerArrayCommon(view);
 }
 
-/**
- * Address: 0x00A5D7D0 (FUN_00A5D7D0)
- *
- * What it does:
- * Tail-forwards one pointer-array reset thunk lane into reset helper lane A.
- */
-void RuntimeResetOwnedPointerArrayThunkLaneA(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayLaneA(view);
-}
 
 /**
  * Address: 0x00A58050 (FUN_00A58050)
@@ -1662,16 +1180,6 @@ void RuntimeResetOwnedPointerArrayLaneB(RuntimeOwnedPointerArrayView* const view
   RuntimeResetOwnedPointerArrayCommon(view);
 }
 
-/**
- * Address: 0x00A5D7E0 (FUN_00A5D7E0)
- *
- * What it does:
- * Tail-forwards one pointer-array reset thunk lane into reset helper lane B.
- */
-void RuntimeResetOwnedPointerArrayThunkLaneB(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayLaneB(view);
-}
 
 struct RuntimeTreeIteratorNil11View
 {
@@ -1910,62 +1418,6 @@ inline void RuntimeReportInvalidParameterLane() noexcept
   return descendant;
 }
 
-/**
- * Address: 0x00A3AA30 (FUN_00A3AA30, sub_A3AA30)
- *
- * IDA signature:
- * int __thiscall sub_A3AA30(_DWORD *this);
- *
- * What it does:
- * Tree-iterator predecessor (`operator--`) for the `Nil15` node shape
- * (`isNil` byte at `+0x15`, total node size `0x18`, two-dword payload at
- * `+0x0C`). Behavior is identical to `RuntimeRecedeTreeIteratorNil11CheckedCommon`
- * but operates on the wider `RuntimeTreeNodeNil15` node type.
- */
-[[nodiscard]] RuntimeTreeNodeNil15* RuntimeRecedeTreeIteratorNil15CheckedCommon(
-  RuntimeTreeIteratorNil15View* const iterator
-) noexcept
-{
-  if (iterator->owner == nullptr) {
-    RuntimeReportInvalidParameterLane();
-  }
-
-  RuntimeTreeNodeNil15* const current = iterator->node;
-  if (current->isNil != 0u) {
-    RuntimeTreeNodeNil15* const rightmost = current->right;
-    iterator->node = rightmost;
-    if (rightmost->isNil != 0u) {
-      RuntimeReportInvalidParameterLane();
-    }
-    return rightmost;
-  }
-
-  RuntimeTreeNodeNil15* const left = current->left;
-  if (left->isNil != 0u) {
-    RuntimeTreeNodeNil15* parent = current->parent;
-    while (parent->isNil == 0u) {
-      if (iterator->node != parent->left) {
-        break;
-      }
-      iterator->node = parent;
-      parent = parent->parent;
-    }
-    if (iterator->node->isNil != 0u) {
-      RuntimeReportInvalidParameterLane();
-    }
-    iterator->node = parent;
-    return parent;
-  }
-
-  RuntimeTreeNodeNil15* cursor = left;
-  RuntimeTreeNodeNil15* descendant = cursor->right;
-  while (descendant->isNil == 0u) {
-    cursor = descendant;
-    descendant = cursor->right;
-  }
-  iterator->node = cursor;
-  return descendant;
-}
 
 void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
 {
@@ -2109,52 +1561,8 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   return bucketBase + lane;
 }
 
-[[nodiscard]] char* RuntimeCopyDwordSpanIntoBufferCommon(
-  const void* const sourceBegin,
-  const void* const sourceEnd,
-  char* const destination
-) noexcept
-{
-  const std::intptr_t byteDelta =
-    reinterpret_cast<const std::uint8_t*>(sourceEnd) - reinterpret_cast<const std::uint8_t*>(sourceBegin);
-  const std::intptr_t dwordCount = byteDelta >> 2;
-  const std::size_t byteCount =
-    static_cast<std::size_t>(dwordCount * static_cast<std::intptr_t>(sizeof(std::uint32_t)));
-  if (dwordCount != 0) {
-    (void)memmove_s(destination, byteCount, sourceBegin, byteCount);
-  }
-  return destination + byteCount;
-}
 
-/**
- * Address: 0x00A52170 (FUN_00A52170)
- *
- * What it does:
- * Returns whether two nil-`0x11` tree iterators point to the same node after
- * validating shared owner identity.
- */
-[[maybe_unused]] bool RuntimeTreeIteratorNodeEqualCheckedLaneA(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  return RuntimeTreeIteratorNodeEqualCheckedCommon(left, right);
-}
 
-/**
- * Address: 0x00A52260 (FUN_00A52260)
- *
- * What it does:
- * Returns whether two nil-`0x11` tree iterators point to the same node after
- * validating shared owner identity.
- */
-[[maybe_unused]] bool RuntimeTreeIteratorNodeEqualCheckedLaneB(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  return RuntimeTreeIteratorNodeEqualCheckedCommon(left, right);
-}
 
 /**
  * Address: 0x00A52760 (FUN_00A52760)
@@ -2184,277 +1592,23 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   return RuntimeAdvanceTreeIteratorNil11CheckedCommon(iterator);
 }
 
-/**
- * Address: 0x00A52CB0 (FUN_00A52CB0)
- *
- * What it does:
- * Advances one nil-`0x21` tree iterator to the next in-order node with
- * iterator-owner and sentinel validity checks.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeAdvanceTreeIteratorNil21CheckedLaneA(
-  RuntimeTreeIteratorNil21View* const iterator
-) noexcept
-{
-  return RuntimeAdvanceTreeIteratorNil21CheckedCommon(iterator);
-}
 
-/**
- * Address: 0x00A52E00 (FUN_00A52E00)
- *
- * What it does:
- * Advances one nil-`0x21` tree iterator to the next in-order node with
- * iterator-owner and sentinel validity checks.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeAdvanceTreeIteratorNil21CheckedLaneB(
-  RuntimeTreeIteratorNil21View* const iterator
-) noexcept
-{
-  return RuntimeAdvanceTreeIteratorNil21CheckedCommon(iterator);
-}
 
-/**
- * Address: 0x00A55150 (FUN_00A55150)
- *
- * What it does:
- * Returns whether two nil-`0x11` tree iterators point to different nodes
- * after validating shared owner identity.
- */
-[[maybe_unused]] bool RuntimeTreeIteratorNodeNotEqualCheckedLaneA(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  return RuntimeTreeIteratorNodeNotEqualCheckedCommon(left, right);
-}
 
-/**
- * Address: 0x00A55190 (FUN_00A55190)
- *
- * What it does:
- * Returns whether two nil-`0x11` tree iterators point to different nodes
- * after validating shared owner identity.
- */
-[[maybe_unused]] bool RuntimeTreeIteratorNodeNotEqualCheckedLaneB(
-  const RuntimeTreeIteratorNil11View* const left,
-  const RuntimeTreeIteratorNil11View* const right
-) noexcept
-{
-  return RuntimeTreeIteratorNodeNotEqualCheckedCommon(left, right);
-}
 
-/**
- * Address: 0x00A55210 (FUN_00A55210)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneA(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A552D0 (FUN_00A552D0)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneB(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A55670 (FUN_00A55670)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneC(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A55720 (FUN_00A55720)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneD(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A57FE0 (FUN_00A57FE0)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneE(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A580C0 (FUN_00A580C0)
- *
- * What it does:
- * Initializes one nil-`0x11` tree iterator from `(owner,node)` with owner
- * validity checks.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeInitializeTreeIteratorNil11CheckedLaneF(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const owner
-) noexcept
-{
-  return RuntimeInitializeTreeIteratorNil11Common(iterator, node, owner);
-}
 
-/**
- * Address: 0x00A55750 (FUN_00A55750)
- *
- * What it does:
- * Resolves one dword bucket-element pointer from an owned-pointer bucket
- * iterator lane with owner/range validation.
- */
-[[maybe_unused]] std::uint32_t* RuntimeResolveOwnedPointerBucketIteratorLaneA(
-  const RuntimeOwnedPointerBucketIteratorView* const iterator
-) noexcept
-{
-  return RuntimeResolveOwnedPointerBucketIteratorCommon(iterator);
-}
 
-/**
- * Address: 0x00A557A0 (FUN_00A557A0)
- *
- * What it does:
- * Resolves one dword bucket-element pointer from an owned-pointer bucket
- * iterator lane with owner/range validation.
- */
-[[maybe_unused]] std::uint32_t* RuntimeResolveOwnedPointerBucketIteratorLaneB(
-  const RuntimeOwnedPointerBucketIteratorView* const iterator
-) noexcept
-{
-  return RuntimeResolveOwnedPointerBucketIteratorCommon(iterator);
-}
 
-/**
- * Address: 0x00A55A50 (FUN_00A55A50)
- *
- * What it does:
- * Initializes one owned-pointer bucket iterator at an explicit position,
- * validating inclusive `[activeBegin,activeEnd]` range.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketIteratorLaneA(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const std::uint32_t position,
-  RuntimeOwnedPointerArrayView* const owner
-) noexcept
-{
-  return RuntimeInitializeOwnedPointerBucketIteratorCommon(iterator, position, owner);
-}
 
-/**
- * Address: 0x00A55AB0 (FUN_00A55AB0)
- *
- * What it does:
- * Initializes one owned-pointer bucket iterator at an explicit position,
- * validating inclusive `[activeBegin,activeEnd]` range.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketIteratorLaneB(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const std::uint32_t position,
-  RuntimeOwnedPointerArrayView* const owner
-) noexcept
-{
-  return RuntimeInitializeOwnedPointerBucketIteratorCommon(iterator, position, owner);
-}
 
-/**
- * Address: 0x00A58270 (FUN_00A58270)
- *
- * What it does:
- * Builds one owned-pointer bucket end iterator (`position = active + pending`)
- * with monotonic range validation.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketEndIteratorLaneA(
-  RuntimeOwnedPointerArrayView* const owner,
-  RuntimeOwnedPointerBucketIteratorView* const outIterator
-) noexcept
-{
-  return RuntimeInitializeOwnedPointerBucketEndIteratorCommon(owner, outIterator);
-}
 
-/**
- * Address: 0x00A582D0 (FUN_00A582D0)
- *
- * What it does:
- * Builds one owned-pointer bucket end iterator (`position = active + pending`)
- * with monotonic range validation.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeInitializeOwnedPointerBucketEndIteratorLaneB(
-  RuntimeOwnedPointerArrayView* const owner,
-  RuntimeOwnedPointerBucketIteratorView* const outIterator
-) noexcept
-{
-  return RuntimeInitializeOwnedPointerBucketEndIteratorCommon(owner, outIterator);
-}
 
-/**
- * Address: 0x00A585B0 (FUN_00A585B0)
- *
- * What it does:
- * Retreats one owned-pointer bucket iterator by `delta` with bounds checks.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeRetreatOwnedPointerBucketIteratorLaneA(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const int delta
-) noexcept
-{
-  return RuntimeRetreatOwnedPointerBucketIteratorCommon(iterator, delta);
-}
 
-/**
- * Address: 0x00A585F0 (FUN_00A585F0)
- *
- * What it does:
- * Retreats one owned-pointer bucket iterator by `delta` with bounds checks.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeRetreatOwnedPointerBucketIteratorLaneB(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  const int delta
-) noexcept
-{
-  return RuntimeRetreatOwnedPointerBucketIteratorCommon(iterator, delta);
-}
 
 /**
  * Address: 0x00A57EB0 (FUN_00A57EB0)
@@ -2480,151 +1634,15 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   RuntimeDeleteTreeHeadNodeBarePostorderCommon(node);
 }
 
-/**
- * Address: 0x00A59CE0 (FUN_00A59CE0)
- *
- * What it does:
- * Clears one nil-`0x11` red-black tree container lane and resets head
- * self-links plus size metadata.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeClearTreeHeadNodeBareContainerLaneA(
-  RuntimeTreeHeadNodeBareContainer* const container
-) noexcept
-{
-  return RuntimeClearTreeHeadNodeBareContainerCommon(container, &RuntimeDeleteTreeHeadNodeBarePostorderLaneA);
-}
 
-/**
- * Address: 0x00A59D10 (FUN_00A59D10)
- *
- * What it does:
- * Clears one nil-`0x11` red-black tree container lane and resets head
- * self-links plus size metadata.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeClearTreeHeadNodeBareContainerLaneB(
-  RuntimeTreeHeadNodeBareContainer* const container
-) noexcept
-{
-  return RuntimeClearTreeHeadNodeBareContainerCommon(container, &RuntimeDeleteTreeHeadNodeBarePostorderLaneB);
-}
 
-/**
- * Address: 0x00A59D40 (FUN_00A59D40)
- *
- * What it does:
- * Copies one nil-`0x11` tree iterator lane to `outIterator`, then advances the
- * source iterator.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeCopyAndAdvanceTreeIteratorLaneA(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeIteratorNil11View* const outIterator,
-  const int unusedArg
-) noexcept
-{
-  (void)unusedArg;
-  outIterator->owner = iterator->owner;
-  outIterator->node = iterator->node;
-  (void)RuntimeAdvanceTreeIteratorNil11CheckedLaneA(iterator);
-  return outIterator;
-}
 
-/**
- * Address: 0x00A59DB0 (FUN_00A59DB0)
- *
- * What it does:
- * Copies one nil-`0x11` tree iterator lane to `outIterator`, then advances the
- * source iterator.
- */
-[[maybe_unused]] RuntimeTreeIteratorNil11View* RuntimeCopyAndAdvanceTreeIteratorLaneB(
-  RuntimeTreeIteratorNil11View* const iterator,
-  RuntimeTreeIteratorNil11View* const outIterator,
-  const int unusedArg
-) noexcept
-{
-  (void)unusedArg;
-  outIterator->owner = iterator->owner;
-  outIterator->node = iterator->node;
-  (void)RuntimeAdvanceTreeIteratorNil11CheckedLaneB(iterator);
-  return outIterator;
-}
 
-/**
- * Address: 0x00A59D80 (FUN_00A59D80)
- *
- * What it does:
- * Thunk lane that forwards owned-pointer array reset semantics.
- */
-[[maybe_unused]] void RuntimeResetOwnedPointerArrayAliasLaneA(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayLaneA(view);
-}
 
-/**
- * Address: 0x00A59DF0 (FUN_00A59DF0)
- *
- * What it does:
- * Thunk lane that forwards owned-pointer array reset semantics.
- */
-[[maybe_unused]] void RuntimeResetOwnedPointerArrayAliasLaneB(RuntimeOwnedPointerArrayView* const view)
-{
-  RuntimeResetOwnedPointerArrayLaneB(view);
-}
 
-/**
- * Address: 0x00A59FC0 (FUN_00A59FC0)
- *
- * What it does:
- * Initializes one nil-`0x11` red-black tree container with a fresh head
- * sentinel and zero size.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBare* RuntimeInitializeTreeHeadNodeBareContainerLaneA(
-  RuntimeTreeHeadNodeBareContainer* const container
-) noexcept
-{
-  return RuntimeInitializeTreeHeadNodeBareContainerCommon(container, &RuntimeAllocateTreeHeadNodeBareLaneA);
-}
 
-/**
- * Address: 0x00A5A000 (FUN_00A5A000)
- *
- * What it does:
- * Initializes one nil-`0x11` red-black tree container with a fresh head
- * sentinel and zero size.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBare* RuntimeInitializeTreeHeadNodeBareContainerLaneB(
-  RuntimeTreeHeadNodeBareContainer* const container
-) noexcept
-{
-  return RuntimeInitializeTreeHeadNodeBareContainerCommon(container, &RuntimeAllocateTreeHeadNodeBareLaneA);
-}
 
-/**
- * Address: 0x00A5A040 (FUN_00A5A040)
- *
- * What it does:
- * Initializes one nil-`0x21` red-black tree container with a fresh head
- * sentinel and zero size.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeInitializeTreeNode20ContainerLaneA(
-  RuntimeTreeNode20Container* const container
-) noexcept
-{
-  return RuntimeInitializeTreeNode20ContainerCommon(container, &RuntimeAllocateTreeNode20HeadLaneA);
-}
 
-/**
- * Address: 0x00A5A080 (FUN_00A5A080)
- *
- * What it does:
- * Initializes one nil-`0x21` red-black tree container with a fresh head
- * sentinel and zero size.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeInitializeTreeNode20ContainerLaneB(
-  RuntimeTreeNode20Container* const container
-) noexcept
-{
-  return RuntimeInitializeTreeNode20ContainerCommon(container, &RuntimeAllocateTreeNode20HeadLaneA);
-}
 
 /**
  * Address: 0x00A5A0C0 (FUN_00A5A0C0)
@@ -2660,64 +1678,11 @@ void RuntimeDeleteTreeHeadNodeBarePostorderCommon(RuntimeTreeHeadNodeBare* node)
   return outIterator;
 }
 
-/**
- * Address: 0x00A5A110 (FUN_00A5A110)
- *
- * What it does:
- * Builds one shifted copy of an owned-pointer bucket iterator by subtracting
- * `delta` from the source position with bounds checks.
- */
-[[maybe_unused]] RuntimeOwnedPointerBucketIteratorView* RuntimeCopyAndRetreatOwnedPointerBucketIteratorLaneB(
-  RuntimeOwnedPointerBucketIteratorView* const iterator,
-  RuntimeOwnedPointerBucketIteratorView* const outIterator,
-  const int delta
-) noexcept
-{
-  return RuntimeCopyAndRetreatOwnedPointerBucketIteratorLaneA(iterator, outIterator, delta);
-}
 
 void RuntimeDeleteTreeNode20PostorderLaneA(RuntimeTreeNode20* const node);
 void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
 
-/**
- * Address: 0x00A5A160 (FUN_00A5A160)
- *
- * What it does:
- * Clears one nil-`0x21` tree container lane by destroying the payload tree and
- * resetting head links plus owner size.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeClearTreeNode20ContainerLaneA(
-  RuntimeTreeNode20Container* const container
-) noexcept
-{
-  RuntimeTreeNode20* const head = container->head;
-  RuntimeDeleteTreeNode20PostorderLaneA(head->parent);
-  head->parent = head;
-  container->size = 0u;
-  head->left = head;
-  head->right = head;
-  return head;
-}
 
-/**
- * Address: 0x00A5A190 (FUN_00A5A190)
- *
- * What it does:
- * Clears one nil-`0x21` tree container lane by destroying the payload tree and
- * resetting head links plus owner size.
- */
-[[maybe_unused]] RuntimeTreeNode20* RuntimeClearTreeNode20ContainerLaneB(
-  RuntimeTreeNode20Container* const container
-) noexcept
-{
-  RuntimeTreeNode20* const head = container->head;
-  RuntimeDeleteTreeNode20PostorderLaneB(head->parent);
-  head->parent = head;
-  container->size = 0u;
-  head->left = head;
-  head->right = head;
-  return head;
-}
 
 /**
  * Address: 0x00A598A0 (FUN_00A598A0)
@@ -2787,39 +1752,7 @@ void RuntimeDeleteTreeNode20PostorderLaneB(RuntimeTreeNode20* const node);
   return owner;
 }
 
-/**
- * Address: 0x00A5C0B0 (FUN_00A5C0B0)
- *
- * What it does:
- * Forwarding wrapper for `RuntimeCountIteratorAdvanceToEndLaneA`.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeCountIteratorAdvanceToEndLaneAForwarder(
-  RuntimeTreeHeadNodeBareContainer* const owner,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const expectedOwner,
-  RuntimeTreeHeadNodeBare* const endNode,
-  std::uint32_t* const outStepCount
-) noexcept
-{
-  return RuntimeCountIteratorAdvanceToEndLaneA(owner, node, expectedOwner, endNode, outStepCount);
-}
 
-/**
- * Address: 0x00A5C0E0 (FUN_00A5C0E0)
- *
- * What it does:
- * Forwarding wrapper for `RuntimeCountIteratorAdvanceToEndLaneB`.
- */
-[[maybe_unused]] RuntimeTreeHeadNodeBareContainer* RuntimeCountIteratorAdvanceToEndLaneBForwarder(
-  RuntimeTreeHeadNodeBareContainer* const owner,
-  RuntimeTreeHeadNodeBare* const node,
-  RuntimeTreeHeadNodeBareContainer* const expectedOwner,
-  RuntimeTreeHeadNodeBare* const endNode,
-  std::uint32_t* const outStepCount
-) noexcept
-{
-  return RuntimeCountIteratorAdvanceToEndLaneB(owner, node, expectedOwner, endNode, outStepCount);
-}
 
 void RuntimeDeleteTreeNode20PostorderCommon(RuntimeTreeNode20* node)
 {
@@ -2877,37 +1810,6 @@ struct RuntimeNamedFlagView
 static_assert(sizeof(RuntimeNamedFlagView) == 0x08, "RuntimeNamedFlagView size must be 0x08");
 static_assert(offsetof(RuntimeNamedFlagView, nameRecord) == 0x04, "RuntimeNamedFlagView::nameRecord offset must be 0x04");
 
-/**
- * Address: 0x00AA2826 (FUN_00AA2826)
- *
- * What it does:
- * Validates one named-flag record against a peer record and required-bit mask
- * lanes, including optional case-sensitive name equality when names exist.
- */
-bool RuntimeNamedFlagRecordMatches(
-  const RuntimeNamedFlagView* const left,
-  const RuntimeNamedFlagView* const right,
-  const std::uint32_t* const requiredFlags
-)
-{
-  RuntimeNamedRecordView* const leftNameRecord = left->nameRecord;
-  if (leftNameRecord != nullptr && leftNameRecord->name != nullptr) {
-    RuntimeNamedRecordView* const rightNameRecord = right->nameRecord;
-    if (leftNameRecord != rightNameRecord) {
-      if (std::strcmp(leftNameRecord->name, rightNameRecord->name) != 0) {
-        return false;
-      }
-    }
-
-    if (((right->flags & 0x02u) != 0u && (left->flags & 0x08u) == 0u)
-        || ((*requiredFlags & 0x01u) != 0u && (left->flags & 0x01u) == 0u)
-        || ((*requiredFlags & 0x02u) != 0u && (left->flags & 0x02u) == 0u)) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 struct RuntimeTripleDwordRecord
 {
@@ -2975,17 +1877,6 @@ static_assert(
   return RuntimeAllocateSelfLinkedThreadExitSentinelCommon();
 }
 
-/**
- * Address: 0x00AC5850 (FUN_00AC5850)
- *
- * What it does:
- * Releases one thread-exit list node lane through `operator delete`; the
- * second stdcall lane is ignored.
- */
-[[maybe_unused]] void __stdcall RuntimeDeleteThreadExitHandlerNodeStorage(void* const nodeMemory, int /*unused*/)
-{
-  ::operator delete(nodeMemory);
-}
 
 /**
  * Address: 0x00AC5A70 (FUN_00AC5A70)
@@ -3035,94 +1926,9 @@ static_assert(
   "RuntimeThreadExitHandlerListRuntimeView::size offset must be 0x08"
 );
 
-/**
- * Address: 0x00AC5A90 (FUN_00AC5A90)
- *
- * What it does:
- * Clears one thread-exit handler list by resetting sentinel links, zeroing the
- * size lane, and deleting every non-sentinel node.
- */
-[[maybe_unused]] RuntimeThreadExitHandlerNode* RuntimeClearThreadExitHandlerList(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime
-)
-{
-  RuntimeThreadExitHandlerNode* const sentinel = listRuntime->head;
-  RuntimeThreadExitHandlerNode* node = sentinel->next;
 
-  sentinel->next = sentinel;
-  sentinel->prev = sentinel;
-  listRuntime->size = 0u;
 
-  while (node != sentinel) {
-    RuntimeThreadExitHandlerNode* const next = node->next;
-    ::operator delete(node);
-    node = next;
-  }
 
-  return node;
-}
-
-/**
- * Address: 0x00AC5B30 (FUN_00AC5B30)
- *
- * What it does:
- * Erases one node when it is not the list sentinel and returns the erased
- * node's successor through `outNext`.
- */
-[[maybe_unused]] RuntimeThreadExitHandlerNode** RuntimeEraseThreadExitHandlerNodeAndReturnNext(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  RuntimeThreadExitHandlerNode** const outNext,
-  RuntimeThreadExitHandlerNode* const node
-)
-{
-  RuntimeThreadExitHandlerNode* const next = node->next;
-  if (node != listRuntime->head) {
-    node->prev->next = next;
-    next->prev = node->prev;
-    ::operator delete(node);
-    --listRuntime->size;
-  }
-
-  *outNext = next;
-  return outNext;
-}
-
-/**
- * Address: 0x00AC5BD0 (FUN_00AC5BD0)
- *
- * What it does:
- * Initializes one thread-exit list runtime view by allocating its sentinel and
- * zeroing the element-count lane.
- */
-[[maybe_unused]] RuntimeThreadExitHandlerListRuntimeView* RuntimeInitializeThreadExitHandlerList(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime
-)
-{
-  listRuntime->head = RuntimeAllocateSelfLinkedThreadExitSentinelLaneB();
-  listRuntime->size = 0u;
-  return listRuntime;
-}
-
-/**
- * Address: 0x00AC5C00 (FUN_00AC5C00)
- *
- * What it does:
- * Erases the first non-sentinel node from one thread-exit handler list when
- * present.
- */
-[[maybe_unused]] void RuntimePopFrontThreadExitHandlerNode(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime
-)
-{
-  RuntimeThreadExitHandlerNode* const sentinel = listRuntime->head;
-  RuntimeThreadExitHandlerNode* const node = sentinel->next;
-  if (node != sentinel) {
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-    ::operator delete(node);
-    --listRuntime->size;
-  }
-}
 
 [[nodiscard]] std::uint32_t RuntimeIncrementThreadExitHandlerListSizeCheckedCommon(
   RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
@@ -3169,126 +1975,10 @@ static_assert(
   return RuntimeIncrementThreadExitHandlerListSizeCheckedCommon(listRuntime, increment);
 }
 
-/**
- * Address: 0x00AC31E0 (FUN_00AC31E0)
- *
- * What it does:
- * Allocates one 12-byte list node from `sourceValue`, increments list size
- * with legacy VC8 overflow rules, then relinks the list head to the inserted
- * node.
- */
-[[maybe_unused]] std::uint32_t RuntimeThreadExitHandlerListInsertFrontChecked(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const std::uint32_t* const sourceValue
-)
-{
-  auto* const node = reinterpret_cast<RuntimeThreadExitHandlerNode*>(
-    RuntimeAllocateTripleDwordRecord(
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(listRuntime)),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(listRuntime->head)),
-      sourceValue
-    )
-  );
 
-  const std::uint32_t nextSize = RuntimeIncrementThreadExitHandlerListSizeCheckedLaneA(listRuntime, 1u);
-  listRuntime->head = node;
-  node->prev->next = node;
-  return nextSize;
-}
 
-/**
- * Address: 0x00AC3220 (FUN_00AC3220)
- *
- * What it does:
- * Builds one thread-exit list node from `handlerSource`, inserts it before the
- * list sentinel (`tail` position), and increments list size with checked VC8
- * overflow semantics.
- */
-[[maybe_unused]] std::uint32_t RuntimeThreadExitHandlerListInsertBeforeSentinelLaneA(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const RuntimeThreadExitHandler* const handlerSource
-)
-{
-  RuntimeThreadExitHandlerNode* const sentinel = listRuntime->head;
-  auto* const node = reinterpret_cast<RuntimeThreadExitHandlerNode*>(
-    RuntimeAllocateTripleDwordRecord(
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sentinel)),
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sentinel->prev)),
-      reinterpret_cast<const std::uint32_t*>(handlerSource)
-    )
-  );
 
-  const std::uint32_t nextSize = RuntimeIncrementThreadExitHandlerListSizeCheckedLaneA(listRuntime, 1u);
-  sentinel->prev = node;
-  node->prev->next = node;
-  return nextSize;
-}
 
-/**
- * Address: 0x00AC5E30 (FUN_00AC5E30)
- *
- * What it does:
- * Inserts one thread-exit callback node before `insertionPoint`, updates both
- * intrusive links, and increments list size using the duplicate checked lane.
- */
-[[maybe_unused]] std::uint32_t RuntimeThreadExitHandlerListInsertBeforeNodeLaneA(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  RuntimeThreadExitHandlerNode* const insertionPoint,
-  const RuntimeThreadExitHandler* const handlerSource
-)
-{
-  RuntimeThreadExitHandlerNode* const node =
-    RuntimeThreadExitHandlerPushFrontNode(insertionPoint, insertionPoint->prev, handlerSource);
-
-  const std::uint32_t nextSize = RuntimeIncrementThreadExitHandlerListSizeCheckedLaneB(listRuntime, 1u);
-  insertionPoint->prev = node;
-  node->prev->next = node;
-  return nextSize;
-}
-
-/**
- * Address: 0x00AC5E70 (FUN_00AC5E70)
- *
- * What it does:
- * Inserts one thread-exit callback node before the current front node and
- * returns the previous-link node lane after relinking.
- */
-[[maybe_unused]] RuntimeThreadExitHandlerNode* RuntimeThreadExitHandlerListInsertFrontLaneB(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime,
-  const RuntimeThreadExitHandler* const handlerSource
-)
-{
-  RuntimeThreadExitHandlerNode* const first = listRuntime->head->next;
-  RuntimeThreadExitHandlerNode* const node =
-    RuntimeThreadExitHandlerPushFrontNode(first, first->prev, handlerSource);
-
-  (void)RuntimeIncrementThreadExitHandlerListSizeCheckedLaneB(listRuntime, 1u);
-  first->prev = node;
-  RuntimeThreadExitHandlerNode* const previous = node->prev;
-  previous->next = node;
-  return previous;
-}
-
-/**
- * Address: 0x00AC30E0 (FUN_00AC30E0)
- *
- * What it does:
- * Initializes one thread-exit handler list owner by allocating its intrusive
- * sentinel node, clearing list size, and constructing the embedded mutex lane.
- */
-[[maybe_unused]] RuntimeThreadExitHandlerListRuntimeView* RuntimeInitializeThreadExitHandlerListWithMutex(
-  RuntimeThreadExitHandlerListRuntimeView* const listRuntime
-)
-{
-  if (listRuntime == nullptr) {
-    return nullptr;
-  }
-
-  listRuntime->head = RuntimeAllocateSelfLinkedThreadExitSentinelLaneA();
-  listRuntime->size = 0u;
-  new (&listRuntime->mutex) boost::mutex();
-  return listRuntime;
-}
 
 struct RuntimeListPointerNode
 {
@@ -3489,25 +2179,6 @@ RuntimeContainerBase gRuntimeSndParamsCacheStorage{};
   return node;
 }
 
-/**
- * Address: 0x004E1670 (FUN_004E1670)
- *
- * What it does:
- * Initializes static sound-parameter cache container storage by allocating one
- * 24-byte sentinel head node, wiring self-links/container lanes, and clearing
- * the runtime tree-size lane.
- */
-[[maybe_unused]] [[nodiscard]] void* InitializeRuntimeSndParamsCacheStorage()
-{
-  auto* const head = AllocateRuntimeSndParamsCacheHeadNode();
-  gRuntimeSndParamsCacheStorage.firstIterator = reinterpret_cast<RuntimeIteratorBase*>(head);
-  head->isNil = 1u;
-  head->next = head;
-  head->container = &gRuntimeSndParamsCacheStorage;
-  head->previous = head;
-  gRuntimeSndParamsCacheStorage.treeSize = 0u;
-  return &gRuntimeSndParamsCacheStorage;
-}
 
 /**
  * Address: 0x004E2030 (FUN_004E2030)
@@ -3567,28 +2238,6 @@ RuntimeSndParamsCacheSearchNodeView** RuntimeUpperBoundSndParamsCacheNodeByKey(
   return outNode;
 }
 
-/**
- * Address: 0x004E1710 (FUN_004E1710)
- *
- * What it does:
- * Resolves upper/lower bound iterator-node pointers for one sound-parameter
- * cache key and stores both lanes into the destination pair.
- */
-RuntimeSndParamsCacheBoundPair* RuntimeFindSndParamsCacheBoundPairByKey(
-  const void* const* const keySlot,
-  RuntimeSndParamsCacheBoundPair* const outPair
-)
-{
-  RuntimeSndParamsCacheSearchNodeView* upperBoundNode = nullptr;
-  (void)RuntimeUpperBoundSndParamsCacheNodeByKey(&upperBoundNode, keySlot);
-
-  RuntimeSndParamsCacheSearchNodeView* lowerBoundNode = nullptr;
-  (void)RuntimeLowerBoundSndParamsCacheNodeByKey(&lowerBoundNode, keySlot);
-
-  outPair->lowerBoundNode = lowerBoundNode;
-  outPair->upperBoundNode = upperBoundNode;
-  return outPair;
-}
 
 [[nodiscard]] inline RuntimeSndParamsCacheSearchNodeView* RuntimeSndParamsCacheHeadNode() noexcept
 {
@@ -3648,139 +2297,10 @@ void RuntimeDestroySndParamsCacheSubtree(
   } while (node->isNil == 0u);
 }
 
-/**
- * Address: 0x004E3A30 (FUN_004E3A30)
- *
- * What it does:
- * Clears the sound-parameter cache tree payload, restores head self-links,
- * and resets the cached tree-size lane to zero.
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeResetSndParamsCacheTreeStorage()
-{
-  RuntimeSndParamsCacheSearchNodeView* const head = RuntimeSndParamsCacheHeadNode();
-  RuntimeDestroySndParamsCacheSubtree(&gRuntimeSndParamsCacheStorage, head->parent);
-  head->parent = head;
-  gRuntimeSndParamsCacheStorage.treeSize = 0u;
-  head->left = head;
-  head->right = head;
-  return head;
-}
 
-/**
- * Address: 0x004E3A80 (FUN_004E3A80)
- *
- * What it does:
- * Performs one left rotation around a sound-parameter cache tree node and
- * updates parent/head links.
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeRotateSndParamsCacheNodeLeft(
-  RuntimeSndParamsCacheSearchNodeView* const node
-)
-{
-  RuntimeSndParamsCacheSearchNodeView* const promoted = node->right;
-  node->right = promoted->left;
-  if (promoted->left->isNil == 0u) {
-    promoted->left->parent = node;
-  }
 
-  promoted->parent = node->parent;
-  RuntimeSndParamsCacheSearchNodeView* const head = RuntimeSndParamsCacheHeadNode();
-  if (node == head->parent) {
-    head->parent = promoted;
-  } else {
-    RuntimeSndParamsCacheSearchNodeView* const parent = node->parent;
-    if (node == parent->left) {
-      parent->left = promoted;
-    } else {
-      parent->right = promoted;
-    }
-  }
 
-  promoted->left = node;
-  node->parent = promoted;
-  return promoted;
-}
 
-/**
- * Address: 0x004E3B00 (FUN_004E3B00)
- *
- * What it does:
- * Performs one right rotation around a sound-parameter cache tree node and
- * updates parent/head links.
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeRotateSndParamsCacheNodeRight(
-  RuntimeSndParamsCacheSearchNodeView* const node
-)
-{
-  RuntimeSndParamsCacheSearchNodeView* const promoted = node->left;
-  node->left = promoted->right;
-  if (promoted->right->isNil == 0u) {
-    promoted->right->parent = node;
-  }
-
-  promoted->parent = node->parent;
-  RuntimeSndParamsCacheSearchNodeView* const head = RuntimeSndParamsCacheHeadNode();
-  if (node == head->parent) {
-    head->parent = promoted;
-  } else {
-    RuntimeSndParamsCacheSearchNodeView* const parent = node->parent;
-    if (node == parent->right) {
-      parent->right = promoted;
-    } else {
-      parent->left = promoted;
-    }
-  }
-
-  promoted->right = node;
-  node->parent = promoted;
-  return promoted;
-}
-
-/**
- * Address: 0x004E3B90 (FUN_004E3B90)
- *
- * What it does:
- * Allocates one 24-byte sound-parameter cache node lane via allocator lane002
- * and seeds `{left,parent,right,key,value,color,isNil}` from call arguments.
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeAllocateSndParamsCacheNodeLaneA(
-  const std::uintptr_t* const keyValuePair,
-  RuntimeSndParamsCacheSearchNodeView* const left,
-  RuntimeSndParamsCacheSearchNodeView* const parent,
-  RuntimeSndParamsCacheSearchNodeView* const right
-)
-{
-  return RuntimeAllocateSndParamsCacheNodeFromPairCore(
-    keyValuePair,
-    left,
-    parent,
-    right,
-    &RuntimeAllocateArrayWithBadAllocLane002
-  );
-}
-
-/**
- * Address: 0x004E4010 (FUN_004E4010)
- *
- * What it does:
- * Allocates one 24-byte sound-parameter cache node lane via allocator lane003
- * and seeds `{left,parent,right,key,value,color,isNil}` from call arguments.
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeAllocateSndParamsCacheNodeLaneB(
-  const std::uintptr_t* const keyValuePair,
-  RuntimeSndParamsCacheSearchNodeView* const left,
-  RuntimeSndParamsCacheSearchNodeView* const parent,
-  RuntimeSndParamsCacheSearchNodeView* const right
-)
-{
-  return RuntimeAllocateSndParamsCacheNodeFromPairCore(
-    keyValuePair,
-    left,
-    parent,
-    right,
-    &RuntimeAllocateArrayWithBadAllocLane003
-  );
-}
 
 [[nodiscard]] RuntimeSndParamsCacheSearchNodeView* RuntimeStepSndParamsCacheIteratorToPreviousCore(
   RuntimeSndParamsCacheSearchNodeView** const iteratorNodeSlot
@@ -3815,33 +2335,7 @@ RuntimeSndParamsCacheSearchNodeView* RuntimeAllocateSndParamsCacheNodeLaneB(
   return parent;
 }
 
-/**
- * Address: 0x004E4770 (FUN_004E4770)
- *
- * What it does:
- * Steps one sound-parameter cache tree iterator backward to its in-order
- * predecessor (or to rightmost when starting from sentinel).
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeStepSndParamsCacheIteratorToPreviousLaneA(
-  RuntimeSndParamsCacheSearchNodeView** const iteratorNodeSlot
-)
-{
-  return RuntimeStepSndParamsCacheIteratorToPreviousCore(iteratorNodeSlot);
-}
 
-/**
- * Address: 0x004E47D0 (FUN_004E47D0)
- *
- * What it does:
- * Steps one sound-parameter cache tree iterator backward to its in-order
- * predecessor (or to rightmost when starting from sentinel).
- */
-RuntimeSndParamsCacheSearchNodeView* RuntimeStepSndParamsCacheIteratorToPreviousLaneB(
-  RuntimeSndParamsCacheSearchNodeView** const iteratorNodeSlot
-)
-{
-  return RuntimeStepSndParamsCacheIteratorToPreviousCore(iteratorNodeSlot);
-}
 
 [[nodiscard]] inline void** RuntimeAssignPointerCommon(void** const outSlot, void* const value) noexcept
 {
@@ -3849,67 +2343,10 @@ RuntimeSndParamsCacheSearchNodeView* RuntimeStepSndParamsCacheIteratorToPrevious
   return outSlot;
 }
 
-/**
- * Address: 0x004E2680 (FUN_004E2680)
- *
- * What it does:
- * Stores one pointer payload into the destination slot and returns that slot.
- */
-void** RuntimeAssignPointerLaneA(void** const outSlot, void* const value)
-{
-  return RuntimeAssignPointerCommon(outSlot, value);
-}
 
-/**
- * Address: 0x004E26D0 (FUN_004E26D0)
- *
- * What it does:
- * Stores one pointer payload into the destination slot and returns that slot.
- */
-void** RuntimeAssignPointerLaneB(void** const outSlot, void* const value)
-{
-  return RuntimeAssignPointerCommon(outSlot, value);
-}
 
-/**
- * Address: 0x004E26E0 (FUN_004E26E0)
- *
- * What it does:
- * Stores one pointer payload into the destination slot and returns that slot.
- */
-void** RuntimeAssignPointerLaneC(void** const outSlot, void* const value)
-{
-  return RuntimeAssignPointerCommon(outSlot, value);
-}
 
-/**
- * Address: 0x004E2700 (FUN_004E2700)
- *
- * What it does:
- * Advances one node-slot pointer to the next intrusive list link.
- */
-RuntimeListPointerNode** RuntimeAdvanceListNodeSlot(RuntimeListPointerNode** const nodeSlot)
-{
-  *nodeSlot = (*nodeSlot)->next;
-  return nodeSlot;
-}
 
-/**
- * Address: 0x004E2720 (FUN_004E2720)
- *
- * What it does:
- * Copies one 4-byte value and trailing 1-byte flag record.
- */
-RuntimeWordByteRecord* RuntimeCopyWordByteRecordLaneA(
-  RuntimeWordByteRecord* const outRecord,
-  const std::uint32_t* const wordSource,
-  const std::uint8_t* const flagSource
-)
-{
-  outRecord->word = *wordSource;
-  outRecord->flag = *flagSource;
-  return outRecord;
-}
 
 [[nodiscard]] inline RuntimeDwordPairRecord* RuntimeCopyDwordPairRecordCommon(
   RuntimeDwordPairRecord* const outRecord,
@@ -3922,240 +2359,22 @@ RuntimeWordByteRecord* RuntimeCopyWordByteRecordLaneA(
   return outRecord;
 }
 
-/**
- * Address: 0x004E2730 (FUN_004E2730)
- *
- * What it does:
- * Copies one 8-byte pair record from separate dword sources.
- */
-RuntimeDwordPairRecord* RuntimeCopyDwordPairRecordLaneA(
-  RuntimeDwordPairRecord* const outRecord,
-  const std::uint32_t* const firstSource,
-  const std::uint32_t* const secondSource
-)
-{
-  return RuntimeCopyDwordPairRecordCommon(outRecord, firstSource, secondSource);
-}
 
-/**
- * Address: 0x004E2770 (FUN_004E2770)
- *
- * What it does:
- * Copies one 8-byte pair record from separate dword sources.
- */
-RuntimeDwordPairRecord* RuntimeCopyDwordPairRecordLaneB(
-  RuntimeDwordPairRecord* const outRecord,
-  const std::uint32_t* const firstSource,
-  const std::uint32_t* const secondSource
-)
-{
-  return RuntimeCopyDwordPairRecordCommon(outRecord, firstSource, secondSource);
-}
 
-/**
- * Address: 0x004E2880 (FUN_004E2880)
- *
- * What it does:
- * Publishes the owning container pointer of the first debug iterator in the
- * static sound-parameter cache container lane.
- */
-RuntimeContainerBase** RuntimeGetSndParamsCacheIteratorContainer(RuntimeContainerBase** const outContainer)
-{
-  *outContainer = gRuntimeSndParamsCacheStorage.firstIterator->container;
-  return outContainer;
-}
 
-/**
- * Address: 0x004E2890 (FUN_004E2890)
- *
- * What it does:
- * Publishes the first debug-iterator link from the static sound-parameter
- * cache container lane.
- */
-RuntimeIteratorBase** RuntimeGetSndParamsCacheFirstIterator(RuntimeIteratorBase** const outIterator)
-{
-  *outIterator = gRuntimeSndParamsCacheStorage.firstIterator;
-  return outIterator;
-}
 
-/**
- * Address: 0x004E2BC0 (FUN_004E2BC0)
- *
- * What it does:
- * Returns the address of the static sound-parameter cache container storage.
- */
-void* RuntimeGetSndParamsCacheStorageAddress(const int /*unused*/)
-{
-  return &gRuntimeSndParamsCacheStorage;
-}
 
-/**
- * Address: 0x004E3BD0 (FUN_004E3BD0)
- *
- * What it does:
- * Returns the address of the static sound-parameter cache storage through one
- * stdcall-compatible alias lane.
- */
-[[maybe_unused]] void* __stdcall RuntimeGetSndParamsCacheStorageAddressAliasA(const int /*unused*/)
-{
-  return &gRuntimeSndParamsCacheStorage;
-}
 
-/**
- * Address: 0x004E4590 (FUN_004E4590)
- *
- * What it does:
- * Returns the address of the static sound-parameter cache storage through one
- * stdcall-compatible alias lane.
- */
-[[maybe_unused]] void* __stdcall RuntimeGetSndParamsCacheStorageAddressAliasB(const int /*unused*/)
-{
-  return &gRuntimeSndParamsCacheStorage;
-}
 
-/**
- * Address: 0x004E4890 (FUN_004E4890)
- *
- * What it does:
- * Returns the address of the static sound-parameter cache storage through one
- * stdcall-compatible alias lane.
- */
-[[maybe_unused]] void* __stdcall RuntimeGetSndParamsCacheStorageAddressAliasC(const int /*unused*/)
-{
-  return &gRuntimeSndParamsCacheStorage;
-}
 
-/**
- * Address: 0x004E3A70 (FUN_004E3A70)
- *
- * What it does:
- * Returns the first debug iterator lane from the static sound-parameter cache
- * container storage.
- */
-[[maybe_unused]] RuntimeIteratorBase* RuntimeGetSndParamsCacheFirstIteratorLane()
-{
-  return gRuntimeSndParamsCacheStorage.firstIterator;
-}
 
-/**
- * Address: 0x004E2C60 (FUN_004E2C60)
- *
- * What it does:
- * Reads one list-iterator node and returns its `next` link.
- */
-RuntimeListPointerNode** RuntimeReadListIteratorNext(
-  RuntimeListPointerNode** const outNode,
-  const RuntimeListIteratorView* const iterator
-)
-{
-  *outNode = iterator->node->next;
-  return outNode;
-}
 
-/**
- * Address: 0x004E2C70 (FUN_004E2C70)
- *
- * What it does:
- * Reads one list-iterator node pointer into the destination slot.
- */
-RuntimeListPointerNode** RuntimeReadListIteratorNode(
-  RuntimeListPointerNode** const outNode,
-  const RuntimeListIteratorView* const iterator
-)
-{
-  *outNode = iterator->node;
-  return outNode;
-}
 
-/**
- * Address: 0x004E3140 (FUN_004E3140)
- *
- * What it does:
- * Performs one left rotation around a red-black tree pivot node and updates
- * parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeLeft(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E31A0 (FUN_004E31A0)
- *
- * What it does:
- * Performs one right rotation around a red-black tree pivot node and updates
- * parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeRight(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E3F00 (FUN_004E3F00)
- *
- * What it does:
- * Performs one left rotation around a runtime pair-tree pivot node and
- * updates parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeLeftLaneB(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E3F80 (FUN_004E3F80)
- *
- * What it does:
- * Performs one right rotation around a runtime pair-tree pivot node and
- * updates parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeRightLaneB(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E94F0 (FUN_004E94F0)
- *
- * What it does:
- * Performs one left rotation around a runtime pair-tree pivot node and
- * updates parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeLeftLaneC(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E9550 (FUN_004E9550)
- *
- * What it does:
- * Performs one right rotation around a runtime pair-tree pivot node and
- * updates parent/head links.
- */
-RuntimePairTreeNode* RuntimeRotatePairTreeRightLaneC(
-  RuntimePairTreeNode* const pivot,
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
 /**
  * Address: 0x0052DAB0 (FUN_0052DAB0)
@@ -4185,385 +2404,29 @@ RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareRightLaneA(
   return RuntimeRotateRbTreeRightCommon(pivot, container);
 }
 
-/**
- * Address: 0x00531000 (FUN_00531000)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45LeftLaneA(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531070 (FUN_00531070)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45RightLaneA(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531190 (FUN_00531190)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45LeftLaneB(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531220 (FUN_00531220)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45RightLaneB(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531340 (FUN_00531340)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45LeftLaneC(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x005313D0 (FUN_005313D0)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45RightLaneC(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x005314F0 (FUN_005314F0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45LeftLaneD(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531580 (FUN_00531580)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45RightLaneD(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x005316A0 (FUN_005316A0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45LeftLaneE(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00531710 (FUN_00531710)
- *
- * What it does:
- * Performs one right rotation on a nil-`0x2D` red-black tree lane.
- */
-RuntimeTreeNodeNil45* RuntimeRotateTreeNodeNil45RightLaneE(
-  RuntimeTreeNodeNil45* const pivot,
-  RuntimeTreeNodeNil45Container* const container
-)
-{
-  return RuntimeRotateRbTreeRightCommon(pivot, container);
-}
 
-/**
- * Address: 0x00946CD0 (FUN_00946CD0)
- *
- * What it does:
- * Performs one left rotation on a type-info map tree where the container is
- * passed as `this`.
- */
-RuntimeTypeInfoMapNode* RuntimeRotateTypeInfoMapTreeLeftLaneA(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00946D20 (FUN_00946D20)
- *
- * What it does:
- * Performs one left rotation on a type-info map tree where the container is
- * passed as `this`.
- */
-RuntimeTypeInfoMapNode* RuntimeRotateTypeInfoMapTreeLeftLaneB(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00946D70 (FUN_00946D70)
- *
- * What it does:
- * Performs one left rotation on a type-info map tree where the container is
- * passed as `this`.
- */
-RuntimeTypeInfoMapNode* RuntimeRotateTypeInfoMapTreeLeftLaneC(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x0094FA60 (FUN_0094FA60)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x25` red-black tree lane where the
- * container is passed as `this`.
- */
-RuntimeTreeNode24* RuntimeRotateTreeNode24LeftOnContainerLaneA(
-  RuntimeTreeNode24Container* const container,
-  RuntimeTreeNode24* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x0094FC30 (FUN_0094FC30)
- *
- * What it does:
- * Performs one left rotation on a type-info map tree where the container is
- * passed as `this`.
- */
-RuntimeTypeInfoMapNode* RuntimeRotateTypeInfoMapTreeLeftLaneD(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00A3A950 (FUN_00A3A950)
- *
- * What it does:
- * Performs one left rotation on a type-info map tree where the container is
- * passed as `this`.
- */
-RuntimeTypeInfoMapNode* RuntimeRotateTypeInfoMapTreeLeftLaneE(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00A553A0 (FUN_00A553A0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x11` red-black tree lane where the
- * container is passed as `this`.
- */
-RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareLeftOnContainerLaneB(
-  RuntimeTreeHeadNodeBareContainer* const container,
-  RuntimeTreeHeadNodeBare* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00A554D0 (FUN_00A554D0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x11` red-black tree lane where the
- * container is passed as `this`.
- */
-RuntimeTreeHeadNodeBare* RuntimeRotateTreeHeadNodeBareLeftOnContainerLaneC(
-  RuntimeTreeHeadNodeBareContainer* const container,
-  RuntimeTreeHeadNodeBare* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00A55930 (FUN_00A55930)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x21` red-black tree lane where the
- * container is passed as `this`.
- */
-RuntimeTreeNode20* RuntimeRotateTreeNode20LeftOnContainerLaneA(
-  RuntimeTreeNode20Container* const container,
-  RuntimeTreeNode20* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x00A559E0 (FUN_00A559E0)
- *
- * What it does:
- * Performs one left rotation on a nil-`0x21` red-black tree lane where the
- * container is passed as `this`.
- */
-RuntimeTreeNode20* RuntimeRotateTreeNode20LeftOnContainerLaneB(
-  RuntimeTreeNode20Container* const container,
-  RuntimeTreeNode20* const pivot
-)
-{
-  return RuntimeRotateRbTreeLeftCommon(pivot, container);
-}
 
-/**
- * Address: 0x004E31F0 (FUN_004E31F0)
- *
- * What it does:
- * Allocates one 24-byte red-black tree node and initializes links, payload
- * pair, and marker bytes.
- */
-RuntimePairTreeNode* RuntimeAllocatePairTreeNodeLaneA(
-  const RuntimePairSlot* const valueSource,
-  RuntimePairTreeNode* const left,
-  RuntimePairTreeNode* const parent,
-  RuntimePairTreeNode* const right
-)
-{
-  auto* const node = static_cast<RuntimePairTreeNode*>(::operator new(sizeof(RuntimePairTreeNode)));
-  if (node == nullptr) {
-    return nullptr;
-  }
 
-  node->left = left;
-  node->parent = parent;
-  node->right = right;
-  node->pair = *valueSource;
-  node->color = 0;
-  node->isNil = 0;
-  return node;
-}
 
-/**
- * Address: 0x004E3290 (FUN_004E3290)
- * Address: 0x008D63B0 (FUN_008D63B0)
- *
- * What it does:
- * Clears one intrusive pointer-list lane, resets the sentinel links, and
- * deletes each detached node.
- */
-RuntimeListPointerNode* RuntimeClearPointerListLaneA(RuntimeListPointerContainer* const container)
-{
-  RuntimeListPointerNode* const head = container->head;
-  RuntimeListPointerNode* node = head->next;
-  head->next = head;
-  head->prev = head;
-  container->size = 0;
 
-  if (node != head) {
-    do {
-      RuntimeListPointerNode* const nextNode = node->next;
-      ::operator delete(node);
-      node = nextNode;
-    } while (node != head);
-  }
-
-  return node;
-}
-
-/**
- * Address: 0x004E32D0 (FUN_004E32D0)
- * Address: 0x0081BA00 (FUN_0081BA00)
- * Address: 0x008C5EF0 (FUN_008C5EF0)
- *
- * What it does:
- * Allocates one 12-byte intrusive list node and initializes next/prev/value
- * links from caller-provided slots.
- */
-RuntimeListPointerNode* RuntimeBuildPointerListNodeLaneA(
-  RuntimeListPointerNode* const next,
-  RuntimeListPointerNode* const prev,
-  void* const* const valueSlot
-)
-{
-  auto* const node = static_cast<RuntimeListPointerNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
-  if (node != nullptr) {
-    node->next = next;
-    node->prev = prev;
-    node->value = *valueSlot;
-  }
-  return node;
-}
-
-/**
- * Address: 0x004E33C0 (FUN_004E33C0)
- *
- * What it does:
- * Allocates one raw 12-byte intrusive node lane.
- */
-void* RuntimeAllocatePointerListNodeLaneA()
-{
-  return gpg::core::legacy::AllocateChecked12ByteLane(1u);
-}
 
 template <std::size_t kIsNilOffset>
 struct RuntimeRbIteratorNodeView
@@ -4717,117 +2580,13 @@ template <std::size_t kIsNilOffset>
   return RuntimeFindRbSubtreeRightmostCommon(node);
 }
 
-/**
- * Address: 0x00504C80 (FUN_00504C80)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x35`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil53* RuntimeFindRbSubtreeLeftmostNil53LaneA(
-  RuntimeRbIteratorNodeNil53* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x00504C60 (FUN_00504C60)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x35`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil53* RuntimeFindRbSubtreeRightmostNil53LaneA(
-  RuntimeRbIteratorNodeNil53* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x0052D960 (FUN_0052D960)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x59`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil89* RuntimeFindRbSubtreeLeftmostNil89LaneA(
-  RuntimeRbIteratorNodeNil89* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x00536AA0 (FUN_00536AA0)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x59`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil89* RuntimeFindRbSubtreeRightmostNil89LaneA(
-  RuntimeRbIteratorNodeNil89* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x005705E0 (FUN_005705E0)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x19`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil25* RuntimeFindRbSubtreeLeftmostNil25LaneA(
-  RuntimeRbIteratorNodeNil25* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x005705C0 (FUN_005705C0)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x19`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil25* RuntimeFindRbSubtreeRightmostNil25LaneA(
-  RuntimeRbIteratorNodeNil25* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x0057F1D0 (FUN_0057F1D0)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x25`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil37* RuntimeFindRbSubtreeLeftmostNil37LaneA(
-  RuntimeRbIteratorNodeNil37* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x0057F1B0 (FUN_0057F1B0)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x25`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil37* RuntimeFindRbSubtreeRightmostNil37LaneA(
-  RuntimeRbIteratorNodeNil37* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
 /**
  * Address: 0x0052F350 (FUN_0052F350)
@@ -4857,266 +2616,23 @@ template <std::size_t kIsNilOffset>
   return RuntimeFindRbSubtreeRightmostCommon(node);
 }
 
-/**
- * Address: 0x0052F700 (FUN_0052F700)
- * Address: 0x00530590 (FUN_00530590)
- * Address: 0x00530940 (FUN_00530940)
- * Address: 0x00530CF0 (FUN_00530CF0)
- * Address: 0x00531200 (FUN_00531200)
- * Address: 0x005313B0 (FUN_005313B0)
- * Address: 0x00899F60 (FUN_00899F60)
- * Address: 0x00531560 (FUN_00531560)
- * Address: 0x00592EC0 (FUN_00592EC0)
- * Address: 0x006B0370 (FUN_006B0370)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x2D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil45* RuntimeFindRbSubtreeLeftmostNil45LaneA(
-  RuntimeRbIteratorNodeNil45* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x00531050 (FUN_00531050)
- * Address: 0x005311E0 (FUN_005311E0)
- * Address: 0x00531390 (FUN_00531390)
- * Address: 0x00531540 (FUN_00531540)
- * Address: 0x0089ABB0 (FUN_0089ABB0)
- * Address: 0x005316F0 (FUN_005316F0)
- * Address: 0x00531880 (FUN_00531880)
- * Address: 0x00531A10 (FUN_00531A10)
- * Address: 0x00592EA0 (FUN_00592EA0)
- * Address: 0x006B0350 (FUN_006B0350)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x2D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil45* RuntimeFindRbSubtreeRightmostNil45LaneA(
-  RuntimeRbIteratorNodeNil45* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x006880F0 (FUN_006880F0)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0xCC9`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil3273* RuntimeFindRbSubtreeLeftmostNil3273LaneA(
-  RuntimeRbIteratorNodeNil3273* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x00688830 (FUN_00688830)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0xCC9`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil3273* RuntimeFindRbSubtreeRightmostNil3273LaneA(
-  RuntimeRbIteratorNodeNil3273* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007B3D00 (FUN_007B3D00)
- * Address: 0x007D90E0 (FUN_007D90E0)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x19`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil25* RuntimeFindRbSubtreeLeftmostNil25LaneB(
-  RuntimeRbIteratorNodeNil25* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x007B3CE0 (FUN_007B3CE0)
- * Address: 0x007D90C0 (FUN_007D90C0)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x19`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil25* RuntimeFindRbSubtreeRightmostNil25LaneB(
-  RuntimeRbIteratorNodeNil25* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007CAB50 (FUN_007CAB50)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x11`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil17* RuntimeFindRbSubtreeLeftmostNil17LaneB(
-  RuntimeRbIteratorNodeNil17* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x007B4A30 (FUN_007B4A30)
- * Address: 0x007CB010 (FUN_007CB010)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x11`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil17* RuntimeFindRbSubtreeRightmostNil17LaneB(
-  RuntimeRbIteratorNodeNil17* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007E4E80 (FUN_007E4E80)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x25`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil37* RuntimeFindRbSubtreeLeftmostNil37LaneB(
-  RuntimeRbIteratorNodeNil37* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x007E4E60 (FUN_007E4E60)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x25`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil37* RuntimeFindRbSubtreeRightmostNil37LaneB(
-  RuntimeRbIteratorNodeNil37* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007E4B10 (FUN_007E4B10)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x2D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil45* RuntimeFindRbSubtreeLeftmostNil45LaneB(
-  RuntimeRbIteratorNodeNil45* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x007E4F30 (FUN_007E4F30)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x2D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil45* RuntimeFindRbSubtreeRightmostNil45LaneB(
-  RuntimeRbIteratorNodeNil45* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007B4B20 (FUN_007B4B20)
- *
- * What it does:
- * Returns the left-most node in one red-black subtree that uses nil marker
- * byte offset `+0x1D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil29* RuntimeFindRbSubtreeLeftmostNil29LaneA(
-  RuntimeRbIteratorNodeNil29* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeLeftmostCommon(node);
-}
 
-/**
- * Address: 0x007B4B00 (FUN_007B4B00)
- *
- * What it does:
- * Returns the right-most node in one red-black subtree that uses nil marker
- * byte offset `+0x1D`.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil29* RuntimeFindRbSubtreeRightmostNil29LaneA(
-  RuntimeRbIteratorNodeNil29* const node
-) noexcept
-{
-  return RuntimeFindRbSubtreeRightmostCommon(node);
-}
 
-/**
- * Address: 0x007BF340 (FUN_007BF340)
- *
- * What it does:
- * Returns the base pointer of the shared comma literal.
- */
-[[maybe_unused]] const char* RuntimeCommaLiteralPointerLaneA()
-{
-  return ",";
-}
 
-/**
- * Address: 0x007BF350 (FUN_007BF350)
- *
- * What it does:
- * Returns the terminator pointer of the comma literal (`"," + strlen(",")`).
- */
-[[maybe_unused]] const char* RuntimeCommaLiteralTerminatorLaneA()
-{
-  return "," + std::strlen(",");
-}
 
-/**
- * Address: 0x007BF370 (FUN_007BF370)
- *
- * What it does:
- * Returns the terminator pointer of the comma literal (`"," + strlen(",")`).
- */
-[[maybe_unused]] const char* RuntimeCommaLiteralTerminatorLaneB()
-{
-  return "," + std::strlen(",");
-}
 
-/**
- * Address: 0x007CD960 (FUN_007CD960)
- *
- * What it does:
- * Returns the base pointer of the shared comma literal.
- */
-[[maybe_unused]] const char* RuntimeCommaLiteralPointerLaneB()
-{
-  return ",";
-}
 
 /**
  * Address: 0x007CB130 (FUN_007CB130)
@@ -5146,29 +2662,7 @@ template <std::size_t kIsNilOffset>
   return RuntimeFindRbSubtreeRightmostCommon(node);
 }
 
-/**
- * Address: 0x00531D30 (FUN_00531D30)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x2D`.
- */
-RuntimeRbIteratorNodeNil45* RuntimeAdvanceRbIteratorNil45LaneA(RuntimeRbIteratorNodeNil45** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00570530 (FUN_00570530)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x41`.
- */
-RuntimeRbIteratorNodeNil65* RuntimeAdvanceRbIteratorNil65LaneA(RuntimeRbIteratorNodeNil65** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 /**
  * Address: 0x00570640 (FUN_00570640)
@@ -5183,61 +2677,9 @@ RuntimeRbIteratorNodeNil25* RuntimeAdvanceRbIteratorNil25LaneA(RuntimeRbIterator
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x007B4500 (FUN_007B4500)
- * Address: 0x007B4BC0 (FUN_007B4BC0)
- *
- * What it does:
- * Adapts one nil-25 iterator advance and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil25** RuntimeAdvanceRbIteratorNil25SlotAdapterA(
-  RuntimeRbIteratorNodeNil25** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil25LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
-/**
- * Address: 0x007B4510 (FUN_007B4510)
- *
- * What it does:
- * Copies one nil-25 iterator slot and then advances the source iterator slot.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil25** RuntimeCopyAndAdvanceRbIteratorNil25Slot(
-  RuntimeRbIteratorNodeNil25** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil25** const destinationIteratorSlot
-)
-{
-  *destinationIteratorSlot = *sourceIteratorSlot;
-  (void)RuntimeAdvanceRbIteratorNil25LaneA(sourceIteratorSlot);
-  return destinationIteratorSlot;
-}
 
-/**
- * Address: 0x00581620 (FUN_00581620)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x25`.
- */
-RuntimeRbIteratorNodeNil37* RuntimeAdvanceRbIteratorNil37LaneB(RuntimeRbIteratorNodeNil37** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x005952C0 (FUN_005952C0)
- * Address: 0x0089ACA0 (FUN_0089ACA0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x2D`.
- */
-RuntimeRbIteratorNodeNil45* RuntimeAdvanceRbIteratorNil45LaneB(RuntimeRbIteratorNodeNil45** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 struct RuntimeTripleStringRecord48
 {
@@ -5254,52 +2696,7 @@ static_assert(offsetof(RuntimeTripleStringRecord48, text) == 0x0C, "RuntimeTripl
 static_assert(offsetof(RuntimeTripleStringRecord48, sourceRes) == 0x28, "RuntimeTripleStringRecord48::sourceRes offset must be 0x28");
 static_assert(sizeof(RuntimeTripleStringRecord48) == 0x30, "RuntimeTripleStringRecord48 size must be 0x30");
 
-/**
- * Address: 0x00595320 (FUN_00595320)
- *
- * What it does:
- * Initializes one 48-byte record with three dword lanes, copies one legacy
- * string payload, snapshots source reserve value, and clears two trailing
- * flags.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTripleStringRecord48* RuntimeInitTripleStringRecord48LaneA(
-  const std::uint32_t lane00,
-  const std::uint32_t lane08,
-  const std::uint32_t lane04,
-  RuntimeTripleStringRecord48* const out,
-  const msvc8::string& sourceText
-)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
 
-  out->lane04 = lane04;
-  out->lane00 = lane00;
-  out->lane08 = lane08;
-
-  out->text.myRes = 15u;
-  out->text.mySize = 0u;
-  out->text.bx.buf[0] = '\0';
-  out->text.assign(sourceText, 0u, msvc8::string::npos);
-
-  out->sourceRes = static_cast<std::uint32_t>(sourceText.capacity());
-  out->flag2C = 0u;
-  out->flag2D = 0u;
-  return out;
-}
-
-/**
- * Address: 0x005A19B0 (FUN_005A19B0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x15`.
- */
-RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneB(RuntimeRbIteratorNodeNil21** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 /**
  * Address: 0x006888E0 (FUN_006888E0)
@@ -5315,97 +2712,12 @@ RuntimeRbIteratorNodeNil3273* RuntimeAdvanceRbIteratorNil3273LaneA(
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x00687880 (FUN_00687880)
- *
- * What it does:
- * Thunk lane that advances one `+0xCC9` iterator slot and returns the caller
- * iterator-slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil3273** RuntimeAdvanceRbIteratorNil3273SlotAdapterLaneA(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil3273** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil3273LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
-/**
- * Address: 0x006886C0 (FUN_006886C0)
- *
- * What it does:
- * Secondary thunk lane that advances one `+0xCC9` iterator slot and returns
- * the caller iterator-slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil3273** RuntimeAdvanceRbIteratorNil3273SlotAdapterLaneB(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil3273** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil3273LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
-/**
- * Address: 0x006B03D0 (FUN_006B03D0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x2D`.
- */
-RuntimeRbIteratorNodeNil45* RuntimeAdvanceRbIteratorNil45LaneC(RuntimeRbIteratorNodeNil45** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00711580 (FUN_00711580)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x11`.
- */
-RuntimeRbIteratorNodeNil17* RuntimeAdvanceRbIteratorNil17LaneB(RuntimeRbIteratorNodeNil17** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00712030 (FUN_00712030)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x15`.
- */
-RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneC(RuntimeRbIteratorNodeNil21** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x0071C7D0 (FUN_0071C7D0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x15`.
- */
-RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneD(RuntimeRbIteratorNodeNil21** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x0071C830 (FUN_0071C830)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x3D`.
- */
-RuntimeRbIteratorNodeNil61* RuntimeAdvanceRbIteratorNil61LaneA(RuntimeRbIteratorNodeNil61** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 /**
  * Address: 0x00736700 (FUN_00736700)
@@ -5419,21 +2731,6 @@ RuntimeRbIteratorNodeNil45* RuntimeAdvanceRbIteratorNil45LaneD(RuntimeRbIterator
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x00736340 (FUN_00736340)
- *
- * What it does:
- * Adapter lane that advances one `+0x2D` iterator slot and returns the caller
- * slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil45** RuntimeAdvanceRbIteratorNil45SlotAdapterLaneA(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil45** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil45LaneD(iteratorSlot);
-  return iteratorSlot;
-}
 
 struct RuntimeFloat3Record
 {
@@ -5499,31 +2796,6 @@ inline void RuntimeLinkWeakNodeToOwnerHead(
   *source->ownerSlot = destination;
 }
 
-/**
- * Address: 0x005683F0 (FUN_005683F0)
- *
- * What it does:
- * Copies one 48-byte weak-link payload lane and inserts the destination weak
- * node at the source owner-slot head.
- */
-RuntimeWeakLinkPayloadLane48* RuntimeAssignWeakLinkPayloadLane48(
-  RuntimeWeakLinkPayloadLane48* const destination,
-  const RuntimeWeakLinkPayloadLane48* const source
-)
-{
-  RuntimeLinkWeakNodeToOwnerHead(&destination->weak, &source->weak);
-  destination->lane8 = source->lane8;
-  destination->lane12 = source->lane12;
-  destination->lane16 = source->lane16;
-  destination->lane20 = source->lane20;
-  destination->lane24 = source->lane24;
-  destination->lane28 = source->lane28;
-  destination->lane32 = source->lane32;
-  destination->lane36 = source->lane36;
-  destination->lane40 = source->lane40;
-  destination->lane44 = source->lane44;
-  return destination;
-}
 
 /**
  * Address: 0x005CE060 (FUN_005CE060)
@@ -5622,21 +2894,6 @@ std::uint32_t* RuntimeCopyDwordRangeLaneF(
   return RuntimeCopyLinearRangeCommon(destination, sourceBegin, sourceEnd);
 }
 
-/**
- * Address: 0x00755A30 (FUN_00755A30)
- *
- * What it does:
- * Secondary cdecl adapter that forwards one source-first dword range copy lane
- * into `FUN_007574E0` while discarding one legacy zero-filled scratch lane.
- */
-[[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeLaneFCdeclNullScratchAdapterB(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-) noexcept
-{
-  return RuntimeCopyDwordRangeLaneF(destination, sourceBegin, sourceEnd);
-}
 
 /**
  * Address: 0x0077CE50 (FUN_0077CE50)
@@ -5650,54 +2907,8 @@ RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneA(RuntimeRbIterator
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x0077B8C0 (FUN_0077B8C0)
- *
- * What it does:
- * Register-shape adapter that advances one nil-29 RB iterator slot and
- * returns the slot pointer.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil29** RuntimeAdvanceRbIteratorNil29SlotAdapterA(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil29** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil29LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
-/**
- * Address: 0x0077C7D0 (FUN_0077C7D0)
- *
- * What it does:
- * Secondary register-shape adapter for the same nil-29 iterator-advance lane.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil29** RuntimeAdvanceRbIteratorNil29SlotAdapterB(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil29** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil29LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
-/**
- * Address: 0x0077CE10 (FUN_0077CE10)
- * Address: 0x007B4540 (FUN_007B4540)
- *
- * What it does:
- * Copies one iterator-slot lane and then advances the source nil-29 iterator
- * slot.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil29** RuntimeCopyAndAdvanceRbIteratorNil29Slot(
-  RuntimeRbIteratorNodeNil29** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil29** const destinationIteratorSlot
-)
-{
-  *destinationIteratorSlot = *sourceIteratorSlot;
-  (void)RuntimeAdvanceRbIteratorNil29LaneA(sourceIteratorSlot);
-  return destinationIteratorSlot;
-}
 
 /**
  * Address: 0x007B2D40 (FUN_007B2D40)
@@ -5711,35 +2922,7 @@ RuntimeRbIteratorNodeNil17* RuntimeAdvanceRbIteratorNil17LaneA(RuntimeRbIterator
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x007B4BD0 (FUN_007B4BD0)
- *
- * What it does:
- * Copies one nil-17 iterator slot and then advances the source iterator slot.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil17** RuntimeCopyAndAdvanceRbIteratorNil17Slot(
-  RuntimeRbIteratorNodeNil17** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil17** const destinationIteratorSlot
-)
-{
-  *destinationIteratorSlot = *sourceIteratorSlot;
-  (void)RuntimeAdvanceRbIteratorNil17LaneA(sourceIteratorSlot);
-  return destinationIteratorSlot;
-}
 
-/**
- * Address: 0x007B4DE0 (FUN_007B4DE0)
- *
- * What it does:
- * Adapts one nil-17 iterator advance and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil17** RuntimeAdvanceRbIteratorNil17SlotAdapterA(
-  RuntimeRbIteratorNodeNil17** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil17LaneA(iteratorSlot);
-  return iteratorSlot;
-}
 
 /**
  * Address: 0x007B4C40 (FUN_007B4C40)
@@ -5753,22 +2936,6 @@ RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneB(RuntimeRbIterator
   return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
 }
 
-/**
- * Address: 0x007B3BB0 (FUN_007B3BB0)
- * Address: 0x007B4570 (FUN_007B4570)
- *
- * What it does:
- * Adapts one nil-29 iterator advance through `RuntimeAdvanceRbIteratorNil29LaneB`
- * and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil29** RuntimeAdvanceRbIteratorNil29LaneBSlotAdapter(
-  const std::uint32_t /*laneTag*/,
-  RuntimeRbIteratorNodeNil29** const iteratorSlot
-)
-{
-  (void)RuntimeAdvanceRbIteratorNil29LaneB(iteratorSlot);
-  return iteratorSlot;
-}
 
 /**
  * Address: 0x007E6460 (FUN_007E6460)
@@ -5795,72 +2962,10 @@ RuntimeFloat3Record* RuntimeFillFloat3RangeLaneA(
   return reinterpret_cast<RuntimeFloat3Record*>(destinationAddress);
 }
 
-/**
- * Address: 0x007E43D0 (FUN_007E43D0)
- *
- * What it does:
- * Alias lane of `RuntimeFillFloat3RangeLaneA`; writes one repeated 3-float
- * source record into `count` destination slots and returns one-past-end.
- */
-[[maybe_unused]] RuntimeFloat3Record* RuntimeFillFloat3RangeLaneB(
-  RuntimeFloat3Record* const destination,
-  const RuntimeFloat3Record& sourceValue,
-  const unsigned int count
-)
-{
-  return RuntimeFillFloat3RangeLaneA(destination, &sourceValue, count);
-}
 
-/**
- * Address: 0x0082EC10 (FUN_0082EC10)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x25`.
- */
-RuntimeRbIteratorNodeNil37* RuntimeAdvanceRbIteratorNil37LaneA(RuntimeRbIteratorNodeNil37** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x0083C2E0 (FUN_0083C2E0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x15`.
- */
-RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneA(RuntimeRbIteratorNodeNil21** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x004E9650 (FUN_004E9650)
- *
- * What it does:
- * Fastcall-shaped adapter lane that advances one red-black iterator slot with
- * nil marker byte at `+0x15`; the first register lane is unused.
- */
-[[maybe_unused]] RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21FastcallAdapter(
-  RuntimeRbIteratorNodeNil21* const /*unusedRegisterLane*/,
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-) noexcept
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x008D69D0 (FUN_008D69D0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x1D`.
- */
-RuntimeRbIteratorNodeNil29* RuntimeAdvanceRbIteratorNil29LaneC(RuntimeRbIteratorNodeNil29** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 /**
  * Address: 0x008D9B50 (FUN_008D9B50)
@@ -5919,361 +3024,29 @@ RuntimeRbIteratorNodeNil21* RuntimeAdvanceRbIteratorNil21LaneE(RuntimeRbIterator
   return destinationIteratorSlot;
 }
 
-/**
- * Address: 0x00946DC0 (FUN_00946DC0)
- *
- * What it does:
- * Adapter lane that advances one nil-`0x15` red-black iterator slot and
- * returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneA(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00946DD0 (FUN_00946DD0)
- *
- * What it does:
- * Secondary adapter lane that advances one nil-`0x15` red-black iterator slot
- * and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneB(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00946DE0 (FUN_00946DE0)
- *
- * What it does:
- * Tertiary adapter lane that advances one nil-`0x15` red-black iterator slot
- * and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneC(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00946E90 (FUN_00946E90)
- *
- * What it does:
- * Copies one iterator slot value into `outSlot` when the destination slot is
- * non-null.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyIteratorSlotIfPresentLaneA(
-  RuntimeRbIteratorNodeNil21** const outSlot,
-  RuntimeRbIteratorNodeNil21* const* const sourceSlot
-) noexcept
-{
-  if (outSlot != nullptr) {
-    *outSlot = *sourceSlot;
-  }
-  return outSlot;
-}
 
-/**
- * Address: 0x00946EF0 (FUN_00946EF0)
- *
- * What it does:
- * Alias lane that copies one iterator slot value into `outSlot` when
- * destination storage is non-null.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyIteratorSlotIfPresentLaneB(
-  RuntimeRbIteratorNodeNil21** const outSlot,
-  RuntimeRbIteratorNodeNil21* const* const sourceSlot
-) noexcept
-{
-  if (outSlot != nullptr) {
-    *outSlot = *sourceSlot;
-  }
-  return outSlot;
-}
 
-/**
- * Address: 0x00946F30 (FUN_00946F30)
- *
- * What it does:
- * Writes one pair-tree head node slot (`this+0x04`) into caller output
- * storage.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode** RuntimeStorePairTreeHeadSlotLaneA(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode** const outHeadSlot
-)
-{
-  *outHeadSlot = container->head;
-  return outHeadSlot;
-}
 
-/**
- * Address: 0x00946F40 (FUN_00946F40)
- *
- * What it does:
- * Alias lane that writes one pair-tree head node slot into caller output
- * storage.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode** RuntimeStorePairTreeHeadSlotLaneB(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode** const outHeadSlot
-)
-{
-  *outHeadSlot = container->head;
-  return outHeadSlot;
-}
 
-/**
- * Address: 0x00946F50 (FUN_00946F50)
- *
- * What it does:
- * Alias lane that writes one pair-tree head node slot into caller output
- * storage.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode** RuntimeStorePairTreeHeadSlotLaneC(
-  RuntimePairTreeContainer* const container,
-  RuntimeTypeInfoMapNode** const outHeadSlot
-)
-{
-  *outHeadSlot = container->head;
-  return outHeadSlot;
-}
 
-/**
- * Address: 0x00946F60 (FUN_00946F60)
- *
- * What it does:
- * Legacy thiscall adapter lane that advances one nil-`0x15` red-black
- * iterator slot and returns the caller slot pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneD(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00946F70 (FUN_00946F70)
- *
- * What it does:
- * Secondary legacy thiscall adapter lane for nil-`0x15` iterator-slot
- * advance.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneE(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00946F80 (FUN_00946F80)
- *
- * What it does:
- * Tertiary legacy thiscall adapter lane for nil-`0x15` iterator-slot
- * advance.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeAdvanceRbIteratorNil21SlotAdapterLaneF(
-  RuntimeRbIteratorNodeNil21** const iteratorSlot
-)
-{
-  return RuntimeAdvanceRbIteratorNil21SlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x00947080 (FUN_00947080)
- *
- * What it does:
- * Copies one nil-`0x15` iterator slot into caller output storage and advances
- * the source slot.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyAndAdvanceRbIteratorNil21SlotLaneA(
-  RuntimeRbIteratorNodeNil21** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil21** const destinationIteratorSlot,
-  const std::uint32_t /*unused*/
-)
-{
-  return RuntimeCopyAndAdvanceRbIteratorNil21SlotCommon(sourceIteratorSlot, destinationIteratorSlot);
-}
 
-/**
- * Address: 0x009470A0 (FUN_009470A0)
- *
- * What it does:
- * Secondary copy-and-advance lane for nil-`0x15` iterator slots.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyAndAdvanceRbIteratorNil21SlotLaneB(
-  RuntimeRbIteratorNodeNil21** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil21** const destinationIteratorSlot,
-  const std::uint32_t /*unused*/
-)
-{
-  return RuntimeCopyAndAdvanceRbIteratorNil21SlotCommon(sourceIteratorSlot, destinationIteratorSlot);
-}
 
-/**
- * Address: 0x009470C0 (FUN_009470C0)
- *
- * What it does:
- * Tertiary copy-and-advance lane for nil-`0x15` iterator slots.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeRbIteratorNodeNil21** RuntimeCopyAndAdvanceRbIteratorNil21SlotLaneC(
-  RuntimeRbIteratorNodeNil21** const sourceIteratorSlot,
-  RuntimeRbIteratorNodeNil21** const destinationIteratorSlot,
-  const std::uint32_t /*unused*/
-)
-{
-  return RuntimeCopyAndAdvanceRbIteratorNil21SlotCommon(sourceIteratorSlot, destinationIteratorSlot);
-}
 
-/**
- * Address: 0x009471A0 (FUN_009471A0)
- *
- * What it does:
- * Initializes one type-info pair-tree owner with a lane-A head sentinel and
- * returns that head node pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode* RuntimeInitializePairTreeHeadAndReturnLaneA(
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeInitializePairTreeHeadCommon(container, &RuntimeAllocateTypeInfoMapHeadNodeLaneA);
-}
 
-/**
- * Address: 0x009471E0 (FUN_009471E0)
- *
- * What it does:
- * Initializes one type-info pair-tree owner with a lane-B head sentinel and
- * returns that head node pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode* RuntimeInitializePairTreeHeadAndReturnLaneB(
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeInitializePairTreeHeadCommon(container, &RuntimeAllocateTypeInfoMapHeadNodeLaneB);
-}
 
-/**
- * Address: 0x00947220 (FUN_00947220)
- *
- * What it does:
- * Initializes one type-info pair-tree owner with a lane-C head sentinel and
- * returns that head node pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimeTypeInfoMapNode* RuntimeInitializePairTreeHeadAndReturnLaneC(
-  RuntimePairTreeContainer* const container
-)
-{
-  return RuntimeInitializePairTreeHeadCommon(container, &RuntimeAllocateTypeInfoMapHeadNodeLaneC);
-}
 
-/**
- * Address: 0x00947260 (FUN_00947260)
- *
- * What it does:
- * Clears one type-info pair-tree payload lane while preserving the head
- * sentinel and zeroing the element-count lane.
- */
-[[maybe_unused]] [[nodiscard]] RuntimePairTreeContainer* RuntimeClearPairTreeStorageKeepHeadLaneA(
-  RuntimePairTreeContainer* const container
-) noexcept
-{
-  return RuntimeClearPairTreeKeepHeadCommon(container);
-}
 
-/**
- * Address: 0x00947290 (FUN_00947290)
- *
- * What it does:
- * Secondary lane that clears one type-info pair-tree payload while preserving
- * the head sentinel.
- */
-[[maybe_unused]] [[nodiscard]] RuntimePairTreeContainer* RuntimeClearPairTreeStorageKeepHeadLaneB(
-  RuntimePairTreeContainer* const container
-) noexcept
-{
-  return RuntimeClearPairTreeKeepHeadCommon(container);
-}
 
-/**
- * Address: 0x009472C0 (FUN_009472C0)
- *
- * What it does:
- * Tertiary lane that clears one type-info pair-tree payload while preserving
- * the head sentinel.
- */
-[[maybe_unused]] [[nodiscard]] RuntimePairTreeContainer* RuntimeClearPairTreeStorageKeepHeadLaneC(
-  RuntimePairTreeContainer* const container
-) noexcept
-{
-  return RuntimeClearPairTreeKeepHeadCommon(container);
-}
 
-/**
- * Address: 0x009472F0 (FUN_009472F0)
- *
- * What it does:
- * Initializes one type-info pair-tree owner with a lane-A head sentinel and
- * returns the owner pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimePairTreeContainer* RuntimeConstructPairTreeOwnerWithHeadLaneA(
-  RuntimePairTreeContainer* const container,
-  const std::uint32_t /*unusedA2*/,
-  const std::uint32_t /*unusedA3*/
-)
-{
-  (void)RuntimeInitializePairTreeHeadCommon(container, &RuntimeAllocateTypeInfoMapHeadNodeLaneA);
-  return container;
-}
 
-/**
- * Address: 0x00947320 (FUN_00947320)
- *
- * What it does:
- * Initializes one type-info pair-tree owner with a lane-B head sentinel and
- * returns the owner pointer.
- */
-[[maybe_unused]] [[nodiscard]] RuntimePairTreeContainer* RuntimeConstructPairTreeOwnerWithHeadLaneB(
-  RuntimePairTreeContainer* const container,
-  const std::uint32_t /*unusedA2*/,
-  const std::uint32_t /*unusedA3*/
-)
-{
-  (void)RuntimeInitializePairTreeHeadCommon(container, &RuntimeAllocateTypeInfoMapHeadNodeLaneB);
-  return container;
-}
 
-/**
- * Address: 0x0094FD20 (FUN_0094FD20)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x25`.
- */
-RuntimeRbIteratorNodeNil37* RuntimeAdvanceRbIteratorNil37LaneC(RuntimeRbIteratorNodeNil37** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
-/**
- * Address: 0x008497C0 (FUN_008497C0)
- *
- * What it does:
- * Advances one red-black tree iterator node slot whose nil marker byte lives
- * at offset `+0x39`.
- */
-RuntimeRbIteratorNodeNil57* RuntimeAdvanceRbIteratorNil57LaneA(RuntimeRbIteratorNodeNil57** const iteratorSlot)
-{
-  return RuntimeAdvanceRbIteratorSlotCommon(iteratorSlot);
-}
 
 struct RuntimePmd
 {
@@ -6364,22 +3137,6 @@ static_assert(
   return type->name();
 }
 
-[[nodiscard]] inline bool RuntimeTypeInfoMatches(
-  const std::type_info* const lhs,
-  const std::type_info* const rhs
-) noexcept
-{
-  if (lhs == rhs) {
-    return true;
-  }
-  if (lhs == nullptr || rhs == nullptr) {
-    return false;
-  }
-
-  const char* const lhsName = RuntimeTypeInfoDecoratedName(lhs);
-  const char* const rhsName = RuntimeTypeInfoDecoratedName(rhs);
-  return lhsName != nullptr && rhsName != nullptr && std::strcmp(lhsName, rhsName) == 0;
-}
 
 /**
  * Address: 0x008D8590 (FUN_008D8590, func_StringGreater)
@@ -6393,17 +3150,6 @@ extern "C" bool __stdcall RuntimeTypeInfoStringLess(const char* const lhsText, c
   return std::strcmp(lhsText, rhsText) < 0;
 }
 
-[[nodiscard]] inline const RuntimeRttiBaseClassDescriptor*
-RuntimeGetContainedBaseDescriptor(const RuntimeRttiBaseClassDescriptor* const root, const unsigned int relativeIndex) noexcept
-{
-  if (root == nullptr || root->classHierarchyDescriptor == nullptr || root->classHierarchyDescriptor->baseClassArray == nullptr) {
-    return nullptr;
-  }
-  if (relativeIndex >= root->classHierarchyDescriptor->numBaseClasses) {
-    return nullptr;
-  }
-  return root->classHierarchyDescriptor->baseClassArray[relativeIndex];
-}
 
 struct RuntimeIoInfo
 {
@@ -7115,22 +3861,6 @@ double RuntimeStrtodScaledByPowerOfTen(
   return parsedValue;
 }
 
-/**
- * Address: 0x00AC0558 (FUN_00AC0558)
- *
- * What it does:
- * Thin wrapper over `RuntimeStrtodScaledByPowerOfTen` that supplies a local
- * parse-errno capture lane.
- */
-double RuntimeStrtodScaledByPowerOfTenWithCapturedErrno(
-  const char* const text,
-  char** const endPtr,
-  const int decimalScale
-)
-{
-  int parseErrno = 0;
-  return RuntimeStrtodScaledByPowerOfTen(text, endPtr, decimalScale, &parseErrno);
-}
 
 /**
  * Address: 0x00AC0398 (FUN_00AC0398)
@@ -7645,38 +4375,6 @@ namespace
 {
   using RuntimeEhVectorStepFn = void(__thiscall*)(void* element);
 
-  /**
-   * Address: 0x00A83A4E (FUN_00A83A4E)
-   *
-   * What it does:
-   * Runs reverse-order EH vector cleanup by stepping backward one element at a
-   * time and invoking the element callback; C++ EH exceptions trigger
-   * `terminate`, while non-C++ SEH exceptions continue search.
-   */
-  int __stdcall RuntimeEhVectorReverseIteratorCore(
-    char* currentElement,
-    const unsigned int elementSize,
-    int elementCount,
-    const RuntimeEhVectorStepFn stepFn
-  )
-  {
-    constexpr unsigned long kRuntimeMsvcCppExceptionCode = 0xE06D7363u;
-
-    __try {
-      while (--elementCount >= 0) {
-        currentElement -= elementSize;
-        stepFn(currentElement);
-      }
-    } __except (
-      (GetExceptionCode() == static_cast<long>(kRuntimeMsvcCppExceptionCode))
-        ? EXCEPTION_EXECUTE_HANDLER
-        : EXCEPTION_CONTINUE_SEARCH
-    ) {
-      std::terminate();
-    }
-
-    return 0;
-  }
 }
 
 /**
@@ -8143,33 +4841,7 @@ extern "C" int __cdecl isdigit(const int character)
   return static_cast<std::uint16_t>((character & 0xFFDFu) - 7u);
 }
 
-/**
- * Address: 0x00AAC80A (FUN_00AAC80A)
- *
- * What it does:
- * Normalizes one ASCII hex digit so decimal digits remain unchanged and
- * alphabetic hex digits map into the caller's nibble decode lane.
- */
-[[maybe_unused]] std::uint16_t RuntimeNormalizeHexDigitCharacterLaneA(
-  const std::uint16_t character
-) noexcept
-{
-  return RuntimeNormalizeHexDigitCharacterCommon(character);
-}
 
-/**
- * Address: 0x00AAD57B (FUN_00AAD57B)
- *
- * What it does:
- * Normalizes one ASCII hex digit so decimal digits remain unchanged and
- * alphabetic hex digits map into the caller's nibble decode lane.
- */
-[[maybe_unused]] std::uint16_t RuntimeNormalizeHexDigitCharacterLaneB(
-  const std::uint16_t character
-) noexcept
-{
-  return RuntimeNormalizeHexDigitCharacterCommon(character);
-}
 
 /**
  * Address: 0x00A857D5 (FUN_00A857D5, _isxdigit_l)
@@ -8433,28 +5105,6 @@ extern "C" int __cdecl atoi(const char* const text)
   ));
 }
 
-/**
- * Address: 0x00A8EAC4 (FUN_00A8EAC4, _strtol_l)
- *
- * What it does:
- * Locale-explicit byte-string signed parse lane that forwards directly to
- * `strtoxl` with signed conversion mode.
- */
-long __cdecl Runtime_strtol_l(
-  const unsigned char* const text,
-  unsigned char** const endPointer,
-  const int radix,
-  RuntimeLocaleInfoStruct* const localeInfo
-)
-{
-  return static_cast<long>(strtoxl(
-    localeInfo,
-    reinterpret_cast<const char*>(text),
-    reinterpret_cast<char**>(endPointer),
-    radix,
-    0
-  ));
-}
 
 /**
  * Address: 0x00A8A38B (FUN_00A8A38B, _strtol_l wrapper lane)
@@ -8479,29 +5129,6 @@ extern "C" long __cdecl RuntimeStrtolLocaleForward(
   ));
 }
 
-/**
- * Address: 0x00A8EADF (FUN_00A8EADF, strtoul_0)
- *
- * What it does:
- * Byte-string variant of the unsigned `strtoul` lane used by parser callsites
- * that carry `unsigned char*` text/end pointers.
- */
-unsigned long RuntimeStrtoulByteString(
-  const unsigned char* const text,
-  unsigned char** const endPointer,
-  const int radix
-)
-{
-  RuntimeLocaleInfoStruct* localeInfo =
-    (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
-  return strtoxl(
-    localeInfo,
-    reinterpret_cast<const char*>(text),
-    reinterpret_cast<char**>(endPointer),
-    radix,
-    1
-  );
-}
 
 /**
  * Address: 0x00AAC2F6 (FUN_00AAC2F6, _wcstoi64)
@@ -8727,24 +5354,6 @@ mbstowcs(wchar_t* const destination, const char* const source, const std::size_t
   return 0u;
 }
 
-/**
- * Address: 0x0097F7C0 (FUN_0097F7C0)
- *
- * What it does:
- * Stdcall thunk lane forwarding to `RuntimeMbstowcsCountOrConvert`.
- */
-int __stdcall MbstowcsCountOrConvertStdCall(
-  wchar_t* const destination,
-  const char* const source,
-  const int destinationCount
-)
-{
-  return static_cast<int>(RuntimeMbstowcsCountOrConvert(
-    destination,
-    source,
-    static_cast<std::size_t>(destinationCount)
-  ));
-}
 
 /**
  * Address: 0x00A886C6 (FUN_00A886C6, _mbstowcs_s_l)
@@ -9125,45 +5734,7 @@ extern "C" int __cdecl _set_sbh_threshold(const std::size_t threshold)
   return 1;
 }
 
-/**
- * Address: 0x00AB9E9F (FUN_00AB9E9F)
- *
- * What it does:
- * Returns the active small-block-heap threshold when CRT heap state is
- * initialized and the V6 SBH backend is selected; otherwise returns `0`.
- */
-[[maybe_unused]] std::size_t RuntimeQueryActiveSbhThreshold() noexcept
-{
-  constexpr int kV6Heap = 3;
-  if (_crtheap == nullptr) {
-    return 0u;
-  }
 
-  return _active_heap == kV6Heap ? _sbh_threshold : 0u;
-}
-
-/**
- * Address: 0x00AB9F8A (FUN_00AB9F8A)
- *
- * What it does:
- * Finds the owning SBH header whose 1MB heap window contains
- * `allocationAddress`, or returns null when no header matches.
- */
-[[maybe_unused]] tagHeader* RuntimeFindSbhHeaderForAddress(const std::uintptr_t allocationAddress) noexcept
-{
-  tagHeader* header = _sbh_pHeaderList;
-  const tagHeader* const end = _sbh_pHeaderList + _sbh_cntHeaderList;
-  while (header < end) {
-    const std::uintptr_t heapBase = reinterpret_cast<std::uintptr_t>(header->pHeapData);
-    if ((allocationAddress - heapBase) < 0x100000u) {
-      return header;
-    }
-
-    ++header;
-  }
-
-  return nullptr;
-}
 
 /**
  * Address: 0x00ABA82B (FUN_00ABA82B, __sbh_verify)
@@ -10051,23 +6622,6 @@ extern "C" int __cdecl ___mb_cur_max_func()
   return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale)->mbCurMax;
 }
 
-/**
- * Address: 0x00AA64B2 (FUN_00AA64B2)
- *
- * What it does:
- * Returns `mb_cur_max` from one explicit CRT locale handle when provided;
- * otherwise falls back to the current-thread locale lane via
- * `___mb_cur_max_func`.
- */
-[[maybe_unused]] int RuntimeGetMbCurMaxFromLocaleOrCurrent(const RuntimeLocaleHandle* const localeHandle)
-{
-  if (localeHandle == nullptr || localeHandle->locinfo == nullptr) {
-    return ___mb_cur_max_func();
-  }
-
-  const auto* const localeView = reinterpret_cast<const RuntimeLocaleLegacySyncView*>(localeHandle->locinfo);
-  return localeView->mbCurMax;
-}
 
 /**
  * Address: 0x00AA64C8 (FUN_00AA64C8, ___lc_codepage_func)
@@ -10585,52 +7139,8 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
   return closeStatus == 0 && writtenCount == expectedWriteCount;
 }
 
-/**
- * Address: 0x00A49150 (FUN_00A49150)
- *
- * What it does:
- * Writes one byte buffer into `filePath` using binary overwrite mode (`"wb"`),
- * then returns true only when both write-count and close status succeed.
- */
-[[maybe_unused]] bool RuntimeWriteBufferToBinaryFile(
-  const char* const filePath,
-  const void* const buffer,
-  const int byteCount
-)
-{
-  return RuntimeWriteByteBufferToFilePathWithMode(filePath, buffer, byteCount, "wb");
-}
 
-/**
- * Address: 0x00A491C0 (FUN_00A491C0)
- *
- * What it does:
- * Appends one byte buffer into `filePath` using binary append mode (`"ab"`),
- * then returns true only when both write-count and close status succeed.
- */
-[[maybe_unused]] bool RuntimeAppendBufferToBinaryFile(
-  const char* const filePath,
-  const void* const buffer,
-  const int byteCount
-)
-{
-  return RuntimeWriteByteBufferToFilePathWithMode(filePath, buffer, byteCount, "ab");
-}
 
-/**
- * Address: 0x00A9D52D (FUN_00A9D52D)
- *
- * What it does:
- * Acquires `_TIME_LOCK`, runs one `_tzset_nolock` update, and then releases
- * the lock lane.
- */
-[[maybe_unused]] void RuntimeRefreshTimezoneLocked()
-{
-  constexpr int kTimeLock = 6; // _TIME_LOCK
-  _lock(kTimeLock);
-  _tzset_nolock();
-  _unlock(kTimeLock);
-}
 
 /**
  * Address: 0x00AB8486 (FUN_00AB8486, _putwch)
@@ -10744,62 +7254,7 @@ static void RuntimeWriteBufferedChar(std::FILE* const f, int ch, int* const pnum
   RuntimeWriteBufferedCharImpl(f, ch, pnumwritten);
 }
 
-/**
- * Address: 0x00A96E4A (FUN_00A96E4A)
- *
- * What it does:
- * Emits `count` copies of one narrow character through the buffered write lane
- * and stops early when the formatter write-count lane reaches `-1`.
- */
-[[maybe_unused]] void RuntimeWriteRepeatedBufferedCharUntilError(
-  int* const pnumwritten,
-  const char character,
-  int count,
-  std::FILE* const stream
-)
-{
-  while (count > 0 && pnumwritten != nullptr && *pnumwritten != -1) {
-    --count;
-    RuntimeWriteBufferedChar(stream, static_cast<unsigned char>(character), pnumwritten);
-  }
-}
 
-/**
- * Address: 0x00A96E6E (FUN_00A96E6E)
- *
- * What it does:
- * Writes one bounded ANSI byte span into a legacy CRT stream and applies the
- * `errno=='*'` fallback lane by emitting `'?'` for failed writes.
- */
-static int* RuntimeWriteAnsiSpanWithFallback(
-  int* const pnumwritten,
-  const unsigned char* bytes,
-  std::FILE* const stream,
-  int count
-)
-{
-  if ((legacy_file(stream)._flag & 0x40) != 0 && legacy_file(stream)._base == nullptr) {
-    *pnumwritten += count;
-    return reinterpret_cast<int*>(count);
-  }
-
-  while (count > 0) {
-    const int ch = static_cast<unsigned char>(*bytes);
-    --count;
-    RuntimeWriteBufferedChar(stream, ch, pnumwritten);
-    ++bytes;
-
-    if (*pnumwritten == -1) {
-      int* const errnoValue = _errno();
-      if (*errnoValue != '*') {
-        return errnoValue;
-      }
-      RuntimeWriteBufferedChar(stream, '?', pnumwritten);
-    }
-  }
-
-  return pnumwritten;
-}
 
 /**
  * Address: 0x00AA0103 (FUN_00AA0103)
@@ -10833,65 +7288,7 @@ static int RuntimeWriteFormatChar(std::FILE* const stream, const int character, 
   return result;
 }
 
-/**
- * Address: 0x00AA0136 (FUN_00AA0136)
- *
- * What it does:
- * Emits `count` copies of one narrow format character through the formatter
- * write lane and stops early when the write-count lane reaches `-1`.
- */
-[[maybe_unused]] int RuntimeWriteRepeatedFormatCharUntilError(
-  int* const pnumwritten,
-  const char character,
-  int count,
-  std::FILE* const stream
-)
-{
-  int lastResult = 0;
-  while (count > 0 && pnumwritten != nullptr && *pnumwritten != -1) {
-    --count;
-    lastResult = RuntimeWriteFormatChar(stream, static_cast<unsigned char>(character), pnumwritten);
-  }
-  return lastResult;
-}
 
-/**
- * Address: 0x00AA015A (FUN_00AA015A)
- *
- * What it does:
- * Writes one bounded narrow-byte span through the formatter char lane and
- * retries failed writes with `'?'` when `errno` reports the CRT replacement
- * sentinel.
- */
-static int* RuntimeWriteFormatSpanWithFallback(
-  int* const pnumwritten,
-  const char* bytes,
-  std::FILE* const stream,
-  int count
-)
-{
-  if ((legacy_file(stream)._flag & 0x40) != 0 && legacy_file(stream)._base == nullptr) {
-    *pnumwritten += count;
-    return reinterpret_cast<int*>(count);
-  }
-
-  while (count > 0) {
-    const int ch = static_cast<unsigned char>(*bytes);
-    --count;
-    (void)RuntimeWriteFormatChar(stream, ch, pnumwritten);
-    ++bytes;
-
-    if (*pnumwritten == -1) {
-      int* const errnoValue = _errno();
-      if (*errnoValue != '*') {
-        return errnoValue;
-      }
-      (void)RuntimeWriteFormatChar(stream, '?', pnumwritten);
-    }
-  }
-
-  return pnumwritten;
-}
 
 /**
  * Address: 0x00A9F589 (FUN_00A9F589, write_char)
@@ -11103,24 +7500,6 @@ namespace
   );
 }
 
-/**
- * Address: 0x00AC6150 (FUN_00AC6150)
- *
- * What it does:
- * Calls `std::string::find_first_not_of` using one legacy VC8 string view as
- * the needle argument (inline-buffer when capacity < 16, heap buffer
- * otherwise).
- */
-[[maybe_unused]] int RuntimeStringFindFirstNotOfLegacyArg(
-  std::string* const target,
-  const RuntimeLegacyStdStringArgView* const patternArg,
-  const std::size_t startPosition
-)
-{
-  const char* const pattern = (patternArg->capacity < 16u) ? patternArg->inlineBuffer : patternArg->heapBuffer;
-  const std::size_t result = target->find_first_not_of(pattern, startPosition, patternArg->length);
-  return (result == std::string::npos) ? -1 : static_cast<int>(result);
-}
 
 /**
  * Address: 0x00A954E1 (FUN_00A954E1)
@@ -11139,22 +7518,6 @@ extern "C" int __cdecl RuntimeVsprintfSecureNoLocale(
   return ::_vsprintf_s_l(buffer, sizeInBytes, format, nullptr, arguments);
 }
 
-/**
- * Address: 0x00AAA764 (FUN_00AAA764, _vsnprintf)
- *
- * What it does:
- * Forwards narrow vararg formatting to `_vsnprintf_l` with null locale so the
- * active thread locale lane is used.
- */
-static int RuntimeVsnprintfCompat(
-  char* const buffer,
-  const std::size_t bufferCount,
-  const char* const format,
-  va_list argList
-)
-{
-  return ::_vsnprintf_l(buffer, bufferCount, format, nullptr, argList);
-}
 
 /**
  * Address: 0x00A9B437 (FUN_00A9B437, ___wtomb_environ)
@@ -11316,44 +7679,7 @@ extern "C" int __cdecl _wprintf_l(const wchar_t* const format, _locale_t const l
   return result;
 }
 
-/**
- * Address: 0x00A90496 (FUN_00A90496)
- *
- * What it does:
- * Legacy varargs adapter that forwards one wide-format print lane through
- * `RuntimeVwprintfDefaultLocaleAdapter`.
- */
-[[maybe_unused]] int __cdecl RuntimeVwprintfDefaultLocaleVarargsAdapter(
-  const wchar_t* const format,
-  ...
-)
-{
-  va_list arguments;
-  va_start(arguments, format);
-  const int result = RuntimeVwprintfDefaultLocaleAdapter(format, arguments);
-  va_end(arguments);
-  return result;
-}
 
-/**
- * Address: 0x00A904BD (FUN_00A904BD)
- *
- * What it does:
- * Locale-aware legacy varargs adapter that forwards one wide-format print lane
- * through `RuntimeVwprintfLocaleAdapter`.
- */
-[[maybe_unused]] int __cdecl RuntimeVwprintfLocaleVarargsAdapter(
-  const wchar_t* const format,
-  _locale_t const localeInfo,
-  ...
-)
-{
-  va_list arguments;
-  va_start(arguments, localeInfo);
-  const int result = RuntimeVwprintfLocaleAdapter(format, localeInfo, arguments);
-  va_end(arguments);
-  return result;
-}
 
 /**
  * Address: 0x00AAB19C (FUN_00AAB19C, is_wctype)
@@ -11367,53 +7693,9 @@ extern "C" int __cdecl is_wctype(const wint_t character, const wctype_t characte
   return ::iswctype(character, characterClass);
 }
 
-/**
- * Address: 0x00A8F023 (FUN_00A8F023)
- *
- * What it does:
- * Returns non-zero when one wide character is classified as alphabetic by the
- * CRT wide-ctype lane.
- */
-int RuntimeIsWideAlpha(const wchar_t character)
-{
-  return ::iswctype(static_cast<wint_t>(character), static_cast<wctype_t>(C1_ALPHA));
-}
 
-/**
- * Address: 0x00A8F089 (FUN_00A8F089)
- *
- * What it does:
- * Returns non-zero when one wide character is classified as a decimal digit by
- * the CRT wide-ctype lane.
- */
-int RuntimeIsWideDigit(const wchar_t character)
-{
-  return ::iswctype(static_cast<wint_t>(character), static_cast<wctype_t>(C1_DIGIT));
-}
 
-/**
- * Address: 0x00A8F0D1 (FUN_00A8F0D1)
- *
- * What it does:
- * Returns non-zero when one wide character is classified as whitespace by the
- * CRT wide-ctype lane.
- */
-int RuntimeIsWideSpace(const wchar_t character)
-{
-  return ::iswctype(static_cast<wint_t>(character), static_cast<wctype_t>(C1_SPACE));
-}
 
-/**
- * Address: 0x00A8F116 (FUN_00A8F116)
- *
- * What it does:
- * Returns non-zero when one wide character is classified as alphabetic or
- * decimal-digit in the CRT wide-ctype table.
- */
-int RuntimeIsWideAlphaNumeric(const wchar_t character)
-{
-  return ::iswctype(static_cast<wint_t>(character), static_cast<wctype_t>(0x107));
-}
 
 /**
  * Address: 0x00A8FB50 (FUN_00A8FB50)
@@ -11683,28 +7965,7 @@ namespace
   };
 }
 
-/**
- * Address: 0x00957C70 (FUN_00957C70)
- *
- * What it does:
- * Returns one allocator small-block size lane for class index `0..43`.
- */
-[[maybe_unused]] int RuntimeGetAllocatorSmallBlockSize(const int sizeClass) noexcept
-{
-  return kRuntimeAllocatorSmallBlockSizes[sizeClass];
-}
 
-/**
- * Address: 0x00957C80 (FUN_00957C80)
- *
- * What it does:
- * Returns one page-count lane for the class size (`32 * size`, rounded up by
- * `4096` bytes).
- */
-[[maybe_unused]] int RuntimeGetAllocatorSmallBlockPageCount(const int sizeClass) noexcept
-{
-  return (32 * kRuntimeAllocatorSmallBlockSizes[sizeClass] + 4095) / 4096;
-}
 
 namespace
 {
@@ -11725,50 +7986,8 @@ namespace
   }
 }
 
-/**
- * Address: 0x00957CB0 (FUN_00957CB0)
- *
- * What it does:
- * Enters the CRT allocator sentinel critical section and sets the guard-state
- * byte to `1`.
- */
-[[maybe_unused]] void RuntimeAllocatorSentinelEnter(std::uint8_t* const guardState) noexcept
-{
-  EnsureAllocatorSentinelInitialized();
-  ::EnterCriticalSection(&gAllocatorSentinel);
-  if (guardState != nullptr) {
-    *guardState = 1u;
-  }
-}
 
-/**
- * Address: 0x00957CD0 (FUN_00957CD0)
- *
- * What it does:
- * Leaves the CRT allocator sentinel critical section and clears the
- * guard-state byte to `0`.
- */
-[[maybe_unused]] void RuntimeAllocatorSentinelLeave(std::uint8_t* const guardState) noexcept
-{
-  EnsureAllocatorSentinelInitialized();
-  ::LeaveCriticalSection(&gAllocatorSentinel);
-  if (guardState != nullptr) {
-    *guardState = 0u;
-  }
-}
 
-/**
- * Address: 0x009AD370 (FUN_009AD370)
- *
- * What it does:
- * Returns the operating system's current logical processor count.
- */
-[[maybe_unused]] DWORD RuntimeQuerySystemProcessorCount() noexcept
-{
-  SYSTEM_INFO systemInfo{};
-  ::GetSystemInfo(&systemInfo);
-  return systemInfo.dwNumberOfProcessors;
-}
 
 /**
  * Address: 0x00A95F48 (FUN_00A95F48)
@@ -12090,174 +8309,7 @@ namespace
     return 0;
   }
 
-  /**
-   * Address: 0x00AC0730 (FUN_00AC0730, _Mtxdst)
-   *
-   * What it does:
-   * Destroys one CRT mutex critical-section lane.
-   */
-  void RuntimeMtxDestroy(CRITICAL_SECTION* const lock) noexcept
-  {
-    ::DeleteCriticalSection(lock);
-  }
 
-  /**
-   * Address: 0x00AC0CA0 (FUN_00AC0CA0)
-   *
-   * What it does:
-   * Parses one decimal mantissa/exponent lane from `cursor`, normalizes and
-   * rounds significant digits into base-10 chunk lanes, updates decimal
-   * exponent in `mantissaChunks[0]`, and optionally publishes the parse stop.
-   */
-  int RuntimeParseDecimalMantissaChunks(
-    const char* const scanBegin,
-    const char* cursor,
-    char** const outScanEnd,
-    std::uint32_t* const mantissaChunks,
-    const int precisionDigits
-  )
-  {
-    int maxDigits = 9 * precisionDigits;
-    if (maxDigits > 45) {
-      maxDigits = 45;
-    }
-    if (maxDigits < 1) {
-      maxDigits = 1;
-    }
-
-    int digitCount = 0;
-    mantissaChunks[0] = 0;
-    mantissaChunks[1] = 0;
-
-    int sawDigit = 0;
-    if (*cursor == '0') {
-      sawDigit = 1;
-      do {
-        ++cursor;
-      } while (*cursor == '0');
-    }
-
-    int trimmedDigitCount = 0;
-    std::uint8_t digits[48]{};
-    if (isdigit(static_cast<unsigned char>(*cursor))) {
-      sawDigit = 1;
-      do {
-        if (digitCount > maxDigits) {
-          ++mantissaChunks[0];
-        } else {
-          digits[digitCount++] = static_cast<std::uint8_t>(*cursor - '0');
-        }
-        ++cursor;
-      } while (isdigit(static_cast<unsigned char>(*cursor)));
-      trimmedDigitCount = digitCount;
-    }
-
-    const lconv* const localeConv = RuntimeGetlconv();
-    if (localeConv != nullptr && localeConv->decimal_point != nullptr && *cursor == *localeConv->decimal_point) {
-      ++cursor;
-    }
-
-    if (digitCount == 0 && *cursor == '0') {
-      sawDigit = 1;
-      do {
-        --mantissaChunks[0];
-        ++cursor;
-      } while (*cursor == '0');
-    }
-
-    if (isdigit(static_cast<unsigned char>(*cursor))) {
-      sawDigit = 1;
-      do {
-        if (digitCount <= maxDigits) {
-          digits[digitCount++] = static_cast<std::uint8_t>(*cursor - '0');
-          --mantissaChunks[0];
-        }
-        ++cursor;
-      } while (isdigit(static_cast<unsigned char>(*cursor)));
-      trimmedDigitCount = digitCount;
-    }
-
-    if (digitCount > maxDigits) {
-      if (digits[maxDigits] >= 5u) {
-        ++digits[maxDigits - 1];
-      }
-      ++mantissaChunks[0];
-      digitCount = maxDigits;
-      trimmedDigitCount = maxDigits;
-    }
-
-    bool isZero = digitCount == 0;
-    while (digitCount > 0) {
-      if (digits[digitCount - 1] != 0u) {
-        break;
-      }
-      ++mantissaChunks[0];
-      --digitCount;
-      trimmedDigitCount = digitCount;
-    }
-    isZero = digitCount == 0;
-    if (isZero) {
-      digitCount = 1;
-      trimmedDigitCount = 1;
-      digits[0] = 0u;
-    }
-
-    int chunkIndex = 0;
-    if (sawDigit != 0) {
-      const int leadingPadDigits = 9 - (digitCount % 9);
-      chunkIndex = (leadingPadDigits % 9) != 0 ? 1 : 0;
-
-      for (int i = 0; i < trimmedDigitCount; ++i) {
-        const std::uint32_t digit = digits[i];
-        std::uint32_t merged = 0u;
-        if (((i + leadingPadDigits) % 9) != 0) {
-          merged = digit + 10u * mantissaChunks[chunkIndex];
-        } else {
-          merged = digit;
-          ++chunkIndex;
-        }
-        mantissaChunks[chunkIndex] = merged;
-      }
-
-      if (*cursor == 'e' || *cursor == 'E') {
-        const char* const exponentStart = cursor++;
-        char sign = '+';
-        if (*cursor == '+' || *cursor == '-') {
-          sign = *cursor++;
-        }
-
-        int exponentSeen = 0;
-        int exponentValue = 0;
-        if (isdigit(static_cast<unsigned char>(*cursor))) {
-          exponentSeen = 1;
-          do {
-            if (exponentValue < 100000000) {
-              exponentValue = exponentValue * 10 + static_cast<int>(static_cast<unsigned char>(*cursor) - '0');
-            }
-            ++cursor;
-          } while (isdigit(static_cast<unsigned char>(*cursor)));
-        }
-
-        if (sign == '-') {
-          exponentValue = -exponentValue;
-        }
-        mantissaChunks[0] = static_cast<std::uint32_t>(static_cast<std::int32_t>(mantissaChunks[0]) + exponentValue);
-
-        if (exponentSeen == 0) {
-          cursor = exponentStart;
-        }
-      }
-    }
-
-    if (outScanEnd != nullptr) {
-      if (sawDigit == 0) {
-        cursor = scanBegin;
-      }
-      *outScanEnd = const_cast<char*>(cursor);
-    }
-
-    return chunkIndex;
-  }
 
   /**
    * Address: 0x00A99EAA (FUN_00A99EAA)
@@ -12289,87 +8341,6 @@ namespace
     return 0;
   }
 
-  /**
-   * Address: 0x00AC0EE9 (FUN_00AC0EE9, sub_AC0EE9)
-   *
-   * What it does:
-   * Consumes one optional sign and classifies one floating literal head as
-   * decimal (`1`), infinity (`3`), or NaN (`4`), writing the updated scan
-   * cursor to both pointer lanes.
-   */
-  int RuntimeParseSpecialFloatToken(
-    unsigned char** const cursor,
-    unsigned char** const outScanEnd
-  )
-  {
-    int flags = 0;
-    unsigned char* scan = *cursor;
-
-    while (isspace(static_cast<int>(*scan)) != 0) {
-      ++scan;
-    }
-
-    if (*scan == static_cast<unsigned char>('-')) {
-      flags = 0x8;
-      ++scan;
-    } else if (*scan == static_cast<unsigned char>('+')) {
-      ++scan;
-    }
-
-    const unsigned char first = *scan;
-    if (first == static_cast<unsigned char>('n') || first == static_cast<unsigned char>('N')) {
-      unsigned char* tail = scan + 1;
-      if ((*tail == static_cast<unsigned char>('a') || *tail == static_cast<unsigned char>('A'))
-          && (tail[1] == static_cast<unsigned char>('n') || tail[1] == static_cast<unsigned char>('N'))) {
-        scan = tail + 2;
-        flags = 0x4;
-        if (*scan == static_cast<unsigned char>('(')) {
-          unsigned char* symbol = scan + 1;
-          for (;;) {
-            while (isalnum(static_cast<int>(*symbol)) != 0) {
-              ++symbol;
-            }
-            if (*symbol != static_cast<unsigned char>('_')) {
-              break;
-            }
-            ++symbol;
-          }
-
-          if (*symbol == static_cast<unsigned char>(')')) {
-            scan = symbol + 1;
-          }
-        }
-      } else {
-        scan = *cursor;
-        flags = 0;
-      }
-    } else if (first == static_cast<unsigned char>('i') || first == static_cast<unsigned char>('I')) {
-      unsigned char* tail = scan + 1;
-      if ((tail[0] == static_cast<unsigned char>('n') || tail[0] == static_cast<unsigned char>('N'))
-          && (tail[1] == static_cast<unsigned char>('f') || tail[1] == static_cast<unsigned char>('F'))) {
-        flags |= 0x3;
-        scan = tail + 2;
-        if ((scan[0] == static_cast<unsigned char>('i') || scan[0] == static_cast<unsigned char>('I'))
-            && (scan[1] == static_cast<unsigned char>('n') || scan[1] == static_cast<unsigned char>('N'))
-            && (scan[2] == static_cast<unsigned char>('i') || scan[2] == static_cast<unsigned char>('I'))
-            && (scan[3] == static_cast<unsigned char>('t') || scan[3] == static_cast<unsigned char>('T'))
-            && (scan[4] == static_cast<unsigned char>('y') || scan[4] == static_cast<unsigned char>('Y'))) {
-          scan += 5;
-        }
-      } else {
-        scan = *cursor;
-        flags = 0;
-      }
-    } else {
-      flags |= 0x1;
-    }
-
-    if (outScanEnd != nullptr) {
-      *outScanEnd = scan;
-    }
-    *cursor = scan;
-    return flags;
-  }
 
   struct RuntimeXtimeSnapshotView
   {
@@ -12478,107 +8449,11 @@ namespace
     return result;
   }
 
-  /**
-   * Address: 0x00AC1D20 (FUN_00AC1D20)
-   *
-   * What it does:
-   * Waits on one synchronization handle until signal or absolute xtime
-   * deadline, recomputing relative timeout slices after WAIT_TIMEOUT wakeups.
-   */
-  BOOL RuntimeWaitForSingleObjectUntilAbsoluteTimeout(
-    HANDLE* const handleSlot,
-    const RuntimeAbsoluteTimeoutView* const absoluteTimeout
-  )
-  {
-    while (true) {
-      int waitMilliseconds = 0;
-      RuntimeComputeWaitMillisecondsFromAbsoluteTimeout(
-        absoluteTimeout->secLow,
-        absoluteTimeout->secHigh,
-        absoluteTimeout->nanoseconds,
-        absoluteTimeout->reserved0C,
-        &waitMilliseconds
-      );
 
-      const DWORD waitResult = ::WaitForSingleObject(*handleSlot, static_cast<DWORD>(waitMilliseconds));
-      if (waitResult != WAIT_TIMEOUT) {
-        return (waitResult == WAIT_OBJECT_0) ? TRUE : FALSE;
-      }
 
-      RuntimeXtimeSnapshotView now{};
-      RuntimeSampleCurrentXtimeUtc(&now);
 
-      const std::int64_t deadlineSeconds = RuntimeComposeSignedSeconds(absoluteTimeout->secLow, absoluteTimeout->secHigh);
-      const std::int64_t nowSeconds = RuntimeComposeSignedSeconds(now.secLow, now.secHigh);
-      if (deadlineSeconds < nowSeconds) {
-        return FALSE;
-      }
-      if (deadlineSeconds > nowSeconds) {
-        continue;
-      }
 
-      if (absoluteTimeout->nanoseconds <= now.nanoseconds) {
-        return FALSE;
-      }
-    }
-  }
 
-  /**
-   * Address: 0x00AC1EB0 (FUN_00AC1EB0, sub_AC1EB0)
-   *
-   * What it does:
-   * Returns the canonical RTTI name lane for `boost::lock_error`.
-   */
-  [[nodiscard]] const char* RuntimeBoostLockErrorTypeName() noexcept
-  {
-    return "boost::lock_error";
-  }
-
-  /**
-   * Address: 0x00AC1F10 (FUN_00AC1F10, sub_AC1F10)
-   *
-   * What it does:
-   * Returns the canonical RTTI name lane for `boost::thread_resource_error`.
-   */
-  [[nodiscard]] const char* RuntimeBoostThreadResourceErrorTypeName() noexcept
-  {
-    return "boost::thread_resource_error";
-  }
-
-  /**
-   * Address: 0x00AC1F70 (FUN_00AC1F70, sub_AC1F70)
-   *
-   * What it does:
-   * Returns the canonical RTTI name lane for
-   * `boost::unsupported_thread_option`.
-   */
-  [[nodiscard]] const char* RuntimeBoostUnsupportedThreadOptionTypeName() noexcept
-  {
-    return "boost::unsupported_thread_option";
-  }
-
-  /**
-   * Address: 0x00AC1FD0 (FUN_00AC1FD0, sub_AC1FD0)
-   *
-   * What it does:
-   * Returns the canonical RTTI name lane for
-   * `boost::invalid_thread_argument`.
-   */
-  [[nodiscard]] const char* RuntimeBoostInvalidThreadArgumentTypeName() noexcept
-  {
-    return "boost::invalid_thread_argument";
-  }
-
-  /**
-   * Address: 0x00AC2030 (FUN_00AC2030, sub_AC2030)
-   *
-   * What it does:
-   * Returns the canonical RTTI name lane for `boost::thread_permission_error`.
-   */
-  [[nodiscard]] const char* RuntimeBoostThreadPermissionErrorTypeName() noexcept
-  {
-    return "boost::thread_permission_error";
-  }
 
   [[nodiscard]] boost::thread_exception* RuntimeDestroyBoostThreadExceptionNoDelete(
     boost::thread_exception* const exceptionRuntime
@@ -12592,142 +8467,14 @@ namespace
     return exceptionRuntime;
   }
 
-  /**
-   * Address: 0x00AC1E40 (FUN_00AC1E40)
-   *
-   * What it does:
-   * Executes one non-deleting destructor lane for `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneA(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AC1EA0 (FUN_00AC1EA0)
-   *
-   * What it does:
-   * Executes one alias non-deleting destructor lane for
-   * `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneB(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AC1F00 (FUN_00AC1F00)
-   *
-   * What it does:
-   * Executes one second alias non-deleting destructor lane for
-   * `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneC(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AC1F60 (FUN_00AC1F60, sub_AC1F60)
-   *
-   * What it does:
-   * Executes one alias non-deleting destructor lane for
-   * `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneD(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AC1FC0 (FUN_00AC1FC0, sub_AC1FC0)
-   *
-   * What it does:
-   * Executes one alias non-deleting destructor lane for
-   * `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneE(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AC2020 (FUN_00AC2020, sub_AC2020)
-   *
-   * What it does:
-   * Executes one alias non-deleting destructor lane for
-   * `boost::thread_exception`.
-   */
-  [[maybe_unused]] void RuntimeDestroyBoostThreadExceptionNoDeleteLaneF(std::exception* const exceptionRuntime) noexcept
-  {
-    (void)RuntimeDestroyBoostThreadExceptionNoDelete(static_cast<boost::thread_exception*>(exceptionRuntime));
-  }
 
-  /**
-   * Address: 0x00AA27F9 (FUN_00AA27F9, std::bad_exception non-deleting dtor lane)
-   *
-   * What it does:
-   * Executes one non-deleting destructor lane for `std::bad_exception`.
-   */
-  [[nodiscard]] std::bad_exception* RuntimeDestroyBadExceptionNoDelete(
-    std::bad_exception* const exceptionRuntime
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
 
-    exceptionRuntime->~bad_exception();
-    return exceptionRuntime;
-  }
 
-  /**
-   * Address: 0x00AA2804 (FUN_00AA2804, std::bad_exception deleting dtor lane)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for `std::bad_exception`.
-   */
-  [[nodiscard]] std::bad_exception* RuntimeDestroyBadExceptionWithDeleteFlag(
-    std::bad_exception* const exceptionRuntime,
-    const std::uint8_t deleteFlags
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
-
-    exceptionRuntime->~bad_exception();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(exceptionRuntime);
-    }
-    return exceptionRuntime;
-  }
-
-  /**
-   * Address: 0x00AA389D (FUN_00AA389D, sub_AA389D)
-   *
-   * What it does:
-   * Copy-constructs one `std::bad_exception` payload from a source
-   * `std::exception` lane and restores the concrete `std::bad_exception`
-   * vtable.
-   */
-  std::exception* RuntimeConstructBadExceptionFromStdException(
-    std::exception* const destination,
-    const std::exception* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    new (destination) std::exception(*source);
-
-    const std::bad_exception prototype{};
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(destination);
-    const auto* const prototypeView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&prototype);
-    destinationView->vtable = prototypeView->vtable;
-    return destination;
-  }
 
   struct RuntimeEhCatchableTypeRecord
   {
@@ -12749,100 +8496,9 @@ namespace
   };
   static_assert(sizeof(RuntimeEhCatchableTypeArray) == 0x08, "RuntimeEhCatchableTypeArray size must be 0x08");
 
-  /**
-   * Address: 0x00AA2E48 (FUN_00AA2E48, sub_AA2E48)
-   *
-   * What it does:
-   * Scans one EH catchable-type array and returns true when
-   * `std::bad_exception` is present.
-   */
-  [[nodiscard]] bool RuntimeHasBadExceptionCatchableType(
-    const RuntimeEhCatchableTypeArray* const catchableArray
-  ) noexcept
-  {
-    if (catchableArray == nullptr || catchableArray->count <= 0 || catchableArray->records == nullptr) {
-      return false;
-    }
 
-    const std::type_info& badExceptionType = typeid(std::bad_exception);
-    for (int index = 0; index < catchableArray->count; ++index) {
-      const RuntimeEhCatchableTypeRecord& record = catchableArray->records[index];
-      if (record.typeDescriptor != nullptr && record.typeDescriptor->operator==(badExceptionType)) {
-        return true;
-      }
-    }
 
-    return false;
-  }
 
-  /**
-   * Address: 0x00AC2040 (FUN_00AC2040, boost::unsupported_thread_option deleting dtor lane)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for
-   * `boost::unsupported_thread_option`.
-   */
-  [[nodiscard]] boost::unsupported_thread_option* RuntimeDestroyUnsupportedThreadOptionWithDeleteFlag(
-    boost::unsupported_thread_option* const exceptionRuntime,
-    const std::uint8_t deleteFlags
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
-
-    exceptionRuntime->~unsupported_thread_option();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(exceptionRuntime);
-    }
-    return exceptionRuntime;
-  }
-
-  /**
-   * Address: 0x00AC2070 (FUN_00AC2070, boost::invalid_thread_argument deleting dtor lane)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for
-   * `boost::invalid_thread_argument`.
-   */
-  [[nodiscard]] boost::invalid_thread_argument* RuntimeDestroyInvalidThreadArgumentWithDeleteFlag(
-    boost::invalid_thread_argument* const exceptionRuntime,
-    const std::uint8_t deleteFlags
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
-
-    exceptionRuntime->~invalid_thread_argument();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(exceptionRuntime);
-    }
-    return exceptionRuntime;
-  }
-
-  /**
-   * Address: 0x00AC20A0 (FUN_00AC20A0, boost::thread_permission_error deleting dtor lane)
-   *
-   * What it does:
-   * Executes one deleting-destructor thunk lane for
-   * `boost::thread_permission_error`.
-   */
-  [[nodiscard]] boost::thread_permission_error* RuntimeDestroyThreadPermissionErrorWithDeleteFlag(
-    boost::thread_permission_error* const exceptionRuntime,
-    const std::uint8_t deleteFlags
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return nullptr;
-    }
-
-    exceptionRuntime->~thread_permission_error();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(exceptionRuntime);
-    }
-    return exceptionRuntime;
-  }
 
   [[nodiscard]] CRITICAL_SECTION* RuntimeStdLockSlot(const int slot) noexcept
   {
@@ -13234,79 +8890,8 @@ namespace
     return carried;
   }
 
-  /**
-   * Address: 0x00AA1D0B (FUN_00AA1D0B)
-   *
-   * What it does:
-   * Forces one decimal-point insertion using the current thread/global locale
-   * lane (thin wrapper over the locale-aware core helper).
-   */
-  [[maybe_unused]] char RuntimeForceDecimalPointUsingCurrentLocale(
-    char* const text
-  )
-  {
-    return RuntimeForceDecimalPointLocaleAware(text, nullptr);
-  }
 
-  /**
-   * Address: 0x00AA1CEE (FUN_00AA1CEE)
-   *
-   * What it does:
-   * Shifts one C-string payload right by `shiftCount` bytes in-place (including
-   * the null terminator), preserving overlap-safe CRT move semantics.
-   */
-  [[maybe_unused]] const char* RuntimeShiftCStringRightInPlace(
-    const char* text,
-    const int shiftCount
-  )
-  {
-    char* const mutableText = const_cast<char*>(text);
-    if (shiftCount != 0) {
-      const std::size_t length = std::strlen(text);
-      return static_cast<const char*>(std::memmove(&mutableText[shiftCount], mutableText, length + 1u));
-    }
-    return text;
-  }
 
-  [[nodiscard]] char* RuntimeBuildColonDelimitedLocaleString(
-    const char* const* const firstColumns,
-    const char* const* const secondColumns,
-    const std::size_t pairCount
-  )
-  {
-    std::size_t payloadLength = 0;
-    for (std::size_t index = 0; index < pairCount; ++index) {
-      const char* const first = (firstColumns[index] != nullptr) ? firstColumns[index] : "";
-      const char* const second = (secondColumns[index] != nullptr) ? secondColumns[index] : "";
-      payloadLength += std::strlen(first) + std::strlen(second) + 2u;
-    }
-
-    char* const buffer = static_cast<char*>(std::malloc(payloadLength + 1u));
-    if (buffer == nullptr) {
-      return nullptr;
-    }
-
-    char* cursor = buffer;
-    for (std::size_t index = 0; index < pairCount; ++index) {
-      const char* const first = (firstColumns[index] != nullptr) ? firstColumns[index] : "";
-      const char* const second = (secondColumns[index] != nullptr) ? secondColumns[index] : "";
-
-      *cursor++ = ':';
-      if (strcpy_s(cursor, payloadLength + 1u - static_cast<std::size_t>(cursor - buffer), first) != 0) {
-        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-      }
-      cursor += std::strlen(cursor);
-
-      *cursor++ = ':';
-      if (strcpy_s(cursor, payloadLength + 1u - static_cast<std::size_t>(cursor - buffer), second) != 0) {
-        _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
-      }
-      cursor += std::strlen(cursor);
-    }
-
-    *cursor = '\0';
-    return buffer;
-  }
 
   [[nodiscard]] RuntimeIoInfo* ResolveIoInfoFromStream(std::FILE* const stream) noexcept
   {
@@ -13321,21 +8906,6 @@ namespace
     );
   }
 
-  [[nodiscard]] std::uint8_t RuntimeGetOsFileFlags(const int fileDescriptor) noexcept
-  {
-    if (fileDescriptor < 0 || fileDescriptor >= _nhandle) {
-      return 0u;
-    }
-
-    RuntimeIoInfo* const ioBlock = __pioinfo[fileDescriptor >> 5];
-    if (ioBlock == nullptr) {
-      return 0u;
-    }
-
-    const std::size_t blockOffset = static_cast<std::size_t>(fileDescriptor & 0x1F) * sizeof(RuntimeIoInfo);
-    const auto* const ioBytes = reinterpret_cast<const std::uint8_t*>(ioBlock) + blockOffset;
-    return ioBytes[4];
-  }
 
   [[nodiscard]] constexpr unsigned char RuntimeAsciiToLower(const unsigned char value) noexcept
   {
@@ -13345,28 +8915,6 @@ namespace
     return value;
   }
 
-  /**
-   * Address: 0x00AA5396 (FUN_00AA5396)
-   *
-   * What it does:
-   * Performs one ASCII-only case-insensitive compare and returns the raw byte
-   * delta (`lhs - rhs`) at the first mismatch or terminating NUL.
-   */
-  [[maybe_unused]] int RuntimeAsciiCaseInsensitiveDelta(
-    const unsigned char* lhsText,
-    const unsigned char* rhsText
-  ) noexcept
-  {
-    int lhsValue = 0;
-    int rhsValue = 0;
-
-    do {
-      lhsValue = static_cast<int>(RuntimeAsciiToLower(*lhsText++));
-      rhsValue = static_cast<int>(RuntimeAsciiToLower(*rhsText++));
-    } while (lhsValue != 0 && lhsValue == rhsValue);
-
-    return lhsValue - rhsValue;
-  }
 
   class RuntimeEnvironmentLockGuard
   {
@@ -13556,21 +9104,6 @@ namespace
     return eaxValue;
   }
 
-  /**
-   * Address: 0x00AA3B2C (FUN_00AA3B2C)
-   *
-   * What it does:
-   * Register-shape adapter that publishes one non-local-goto frame snapshot
-   * into the shared runtime context lanes and returns the original result lane.
-   */
-  [[maybe_unused]] std::uint32_t RuntimePublishNonLocalGotoStateAdapterLaneA(
-    const std::uint32_t eaxValue,
-    const std::uint32_t ebpValue,
-    const std::uint32_t notifyCode
-  ) noexcept
-  {
-    return RuntimePublishNonLocalGotoState(eaxValue, ebpValue, notifyCode);
-  }
 
   struct RuntimeEh3ScopeEntryView
   {
@@ -13696,34 +9229,6 @@ namespace
     "RuntimeEh3TopRegistrationProbeView::lane0C offset must be 0x0C"
   );
 
-  /**
-   * Address: 0x00AA3B09 (FUN_00AA3B09)
-   *
-   * What it does:
-   * Returns true when the top SEH registration is owned by the EH3 unwind
-   * filter lane and its frame-link consistency check passes.
-   */
-  [[maybe_unused]] BOOL RuntimeIsTopSehRegistrationEh3UnwindFilter() noexcept
-  {
-    auto* const top =
-      reinterpret_cast<RuntimeEh3TopRegistrationProbeView*>(
-        reinterpret_cast<NT_TIB*>(NtCurrentTeb())->ExceptionList);
-    if (top == nullptr) {
-      return FALSE;
-    }
-
-    if (top->frame.Handler != reinterpret_cast<PEXCEPTION_ROUTINE>(&RuntimeEh3UnwindFilter)) {
-      return FALSE;
-    }
-
-    auto* const lane0CPtr = static_cast<const std::uint8_t*>(top->lane0C);
-    if (lane0CPtr == nullptr) {
-      return FALSE;
-    }
-
-    const void* const linkedNext = *reinterpret_cast<void* const*>(lane0CPtr + 0x0C);
-    return top->lane08 == linkedNext ? TRUE : FALSE;
-  }
 
   using ThreadExitHandler = void(__cdecl*)();
   using ThreadExitHandlerList = std::list<ThreadExitHandler>;
@@ -13745,43 +9250,7 @@ namespace
     handlers->~ThreadExitHandlerList();
   }
 
-  /**
-   * Address: 0x00AC5C30 (FUN_00AC5C30)
-   *
-   * What it does:
-   * Implements the deleting-dtor wrapper for the thread-exit list lane and
-   * conditionally frees storage when bit0 of `deleteFlags` is set.
-   */
-  ThreadExitHandlerList* RuntimeThreadExitHandlerListDeleteWithFlags(
-    ThreadExitHandlerList* const handlers,
-    const std::uint8_t deleteFlags
-  )
-  {
-    RuntimeThreadExitHandlerListDestructor(handlers);
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(handlers);
-    }
-    return handlers;
-  }
 
-  /**
-   * Address: 0x00AC3760 (FUN_00AC3760)
-   *
-   * What it does:
-   * Runs one `boost::mutex` non-deleting destructor lane and conditionally
-   * frees storage when bit0 of `deleteFlags` is set.
-   */
-  [[maybe_unused]] boost::mutex* RuntimeBoostMutexDeleteWithFlags(
-    boost::mutex* const mutexObject,
-    const std::uint8_t deleteFlags
-  )
-  {
-    mutexObject->~mutex();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(mutexObject);
-    }
-    return mutexObject;
-  }
 }
 
 struct RuntimeRecursiveLockStateView
@@ -13801,127 +9270,10 @@ static_assert(
   "RuntimeRecursiveLockStateView::recursionDepth offset must be 0x8"
 );
 
-/**
- * Address: 0x00AC5220 (FUN_00AC5220, func_SharedLockAcquire)
- *
- * What it does:
- * Acquires one recursive-lock native lane (critical section or mutex) and
- * restores recursion depth from caller-owned storage.
- */
-DWORD RuntimeAcquireSharedRecursiveLockAndRestoreDepth(
-  RuntimeRecursiveLockStateView* const lockState,
-  const std::uint32_t* const depthSlot
-)
-{
-  DWORD waitResult = WAIT_OBJECT_0;
-  if (lockState->usesCriticalSection != 0u) {
-    ::EnterCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-  } else {
-    waitResult = ::WaitForSingleObject(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection), INFINITE);
-  }
 
-  lockState->recursionDepth = *depthSlot;
-  return waitResult;
-}
 
-/**
- * Address: 0x00AC5340 (FUN_00AC5340)
- *
- * What it does:
- * Acquires one recursive lock lane (critical section or kernel mutex) and
- * increments recursion depth; depth > 1 immediately releases the native lane.
- */
-void RuntimeAcquireRecursiveLockLane(RuntimeRecursiveLockStateView* const lockState)
-{
-  if (lockState->usesCriticalSection != 0u) {
-    ::EnterCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-  } else {
-    ::WaitForSingleObject(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection), INFINITE);
-  }
 
-  ++lockState->recursionDepth;
-  if (lockState->recursionDepth > 1u) {
-    if (lockState->usesCriticalSection != 0u) {
-      ::LeaveCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-    } else {
-      ::ReleaseMutex(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection));
-    }
-  }
-}
 
-/**
- * Address: 0x00AC5450 (FUN_00AC5450)
- *
- * What it does:
- * Publishes one recursive lock depth snapshot, resets depth to zero, and
- * releases the backing native lock lane according to lock mode.
- */
-void RuntimeReleaseRecursiveLockLane(
-  RuntimeRecursiveLockStateView* const lockState,
-  std::uint32_t* const outPriorDepth
-)
-{
-  *outPriorDepth = lockState->recursionDepth;
-  lockState->recursionDepth = 0;
-  if (lockState->usesCriticalSection == 0u) {
-    ::ReleaseMutex(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection));
-  } else {
-    ::LeaveCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-  }
-}
-
-/**
- * Address: 0x00AC53F0 (FUN_00AC53F0)
- *
- * What it does:
- * Decrements one recursive-lock depth lane and releases the backing native
- * lock when the depth transitions from `1` to `0`.
- */
-void RuntimeReleaseRecursiveLockDepthOnce(
-  RuntimeRecursiveLockStateView* const lockState
-)
-{
-  if (lockState == nullptr) {
-    return;
-  }
-
-  if (lockState->recursionDepth-- != 1u) {
-    return;
-  }
-
-  if (lockState->usesCriticalSection != 0u) {
-    ::LeaveCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-  } else {
-    ::ReleaseMutex(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection));
-  }
-}
-
-/**
- * Address: 0x00AC5410 (FUN_00AC5410)
- *
- * What it does:
- * Acquires one recursive lock lane (critical-section or mutex mode), then
- * restores recursion depth from caller-owned storage.
- */
-DWORD RuntimeAcquireRecursiveLockAndRestoreDepth(
-  RuntimeRecursiveLockStateView* const lockState,
-  const std::uint32_t* const depthSlot
-)
-{
-  if (lockState == nullptr || depthSlot == nullptr) {
-    return WAIT_FAILED;
-  }
-
-  DWORD waitResult = WAIT_OBJECT_0;
-  if (lockState->usesCriticalSection != 0u) {
-    ::EnterCriticalSection(static_cast<LPCRITICAL_SECTION>(lockState->nativeHandleOrCriticalSection));
-  } else {
-    waitResult = ::WaitForSingleObject(static_cast<HANDLE>(lockState->nativeHandleOrCriticalSection), INFINITE);
-  }
-
-  lockState->recursionDepth = *depthSlot;
-  return waitResult;
-}
 
 struct RuntimeRecursiveMutexStateView
 {
@@ -13934,115 +9286,11 @@ static_assert(
   "RuntimeRecursiveMutexStateView::recursionDepth offset must be 0x04"
 );
 
-/**
- * Address: 0x00AC54E0 (FUN_00AC54E0)
- *
- * What it does:
- * Waits on one mutex lane, increments recursive depth, and immediately releases
- * the mutex when depth exceeds one.
- */
-DWORD RuntimeAcquireRecursiveMutexLane(
-  RuntimeRecursiveMutexStateView* const lockState
-)
-{
-  if (lockState == nullptr) {
-    return WAIT_FAILED;
-  }
 
-  const DWORD waitResult = ::WaitForSingleObject(lockState->mutexHandle, INFINITE);
-  if (++lockState->recursionDepth > 1u) {
-    (void)::ReleaseMutex(lockState->mutexHandle);
-  }
-  return waitResult;
-}
 
-/**
- * Address: 0x00AC5510 (FUN_00AC5510)
- *
- * What it does:
- * Tries to acquire one mutex lane without blocking, increments recursive depth
- * on success, and releases immediately when depth exceeds one.
- */
-bool RuntimeTryAcquireRecursiveMutexLane(
-  RuntimeRecursiveMutexStateView* const lockState
-)
-{
-  if (lockState == nullptr) {
-    return false;
-  }
 
-  if (::WaitForSingleObject(lockState->mutexHandle, 0u) != WAIT_OBJECT_0) {
-    return false;
-  }
 
-  if (++lockState->recursionDepth > 1u) {
-    (void)::ReleaseMutex(lockState->mutexHandle);
-  }
-  return true;
-}
 
-/**
- * Address: 0x00AC54D0 (FUN_00AC54D0)
- *
- * What it does:
- * Closes one mutex handle lane stored at `*handleSlot`.
- */
-[[maybe_unused]] BOOL RuntimeCloseMutexHandleSlot(HANDLE* const handleSlot)
-{
-  return ::CloseHandle(*handleSlot);
-}
-
-/**
- * Address: 0x00AC5600 (FUN_00AC5600)
- *
- * What it does:
- * Decrements one recursive-mutex depth lane and releases the mutex when depth
- * reaches zero.
- */
-[[maybe_unused]] BOOL RuntimeReleaseRecursiveMutexDepthOnce(
-  RuntimeRecursiveMutexStateView* const lockState
-)
-{
-  if (--lockState->recursionDepth == 0u) {
-    return ::ReleaseMutex(lockState->mutexHandle);
-  }
-
-  return TRUE;
-}
-
-/**
- * Address: 0x00AC5610 (FUN_00AC5610)
- *
- * What it does:
- * Waits indefinitely on one mutex handle lane and restores recursive depth
- * from caller-owned storage.
- */
-[[maybe_unused]] DWORD RuntimeAcquireRecursiveMutexAndRestoreDepth(
-  RuntimeRecursiveMutexStateView* const lockState,
-  const std::uint32_t* const depthSlot
-)
-{
-  const DWORD waitResult = ::WaitForSingleObject(lockState->mutexHandle, INFINITE);
-  lockState->recursionDepth = *depthSlot;
-  return waitResult;
-}
-
-/**
- * Address: 0x00AC5630 (FUN_00AC5630)
- *
- * What it does:
- * Publishes one recursive-mutex depth snapshot, clears depth to zero, then
- * releases the underlying mutex lane.
- */
-[[maybe_unused]] BOOL RuntimeReleaseRecursiveMutexAndStoreDepth(
-  RuntimeRecursiveMutexStateView* const lockState,
-  std::uint32_t* const outPriorDepth
-)
-{
-  *outPriorDepth = lockState->recursionDepth;
-  lockState->recursionDepth = 0u;
-  return ::ReleaseMutex(lockState->mutexHandle);
-}
 
 struct RuntimeCriticalSectionGuardView
 {
@@ -14056,38 +9304,7 @@ static_assert(
   "RuntimeCriticalSectionGuardView::criticalSection offset must be 0x04"
 );
 
-/**
- * Address: 0x00AC56C0 (FUN_00AC56C0)
- *
- * What it does:
- * Marks one critical-section scope guard as locked, stores the guarded
- * `CRITICAL_SECTION*`, and enters the lock.
- */
-[[maybe_unused]] RuntimeCriticalSectionGuardView* RuntimeEnterCriticalSectionGuard(
-  RuntimeCriticalSectionGuardView* const guardState,
-  LPCRITICAL_SECTION const criticalSection
-)
-{
-  guardState->isLocked = 1u;
-  guardState->criticalSection = criticalSection;
-  ::EnterCriticalSection(criticalSection);
-  return guardState;
-}
 
-/**
- * Address: 0x00AC56F0 (FUN_00AC56F0)
- *
- * What it does:
- * Clears one critical-section scope guard lock flag and leaves the guarded
- * `CRITICAL_SECTION`.
- */
-[[maybe_unused]] void RuntimeLeaveCriticalSectionGuard(
-  RuntimeCriticalSectionGuardView* const guardState
-)
-{
-  guardState->isLocked = 0u;
-  ::LeaveCriticalSection(guardState->criticalSection);
-}
 
 /**
  * Address: 0x00AC5700 (FUN_00AC5700, init_threadmon_mutex)
@@ -14437,99 +9654,13 @@ namespace
   }
 }
 
-/**
- * Address: 0x00AC29E0 (FUN_00AC29E0)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneA() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AC2BF0 (FUN_00AC2BF0)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneB() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AC38A0 (FUN_00AC38A0)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneC() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AC3A60 (FUN_00AC3A60)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneD() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AC5880 (FUN_00AC5880)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneE() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AC5A00 (FUN_00AC5A00)
- *
- * What it does:
- * Returns one legacy VC8 vector-growth max-element lane for 4-byte element
- * vectors (`0x3FFFFFFF`).
- */
-[[maybe_unused]] int __cdecl RuntimeQueryLegacyVectorMaxCountLaneF() noexcept
-{
-  return RuntimeLegacyVectorMaxElementCountStride4();
-}
 
-/**
- * Address: 0x00AB8C06 (FUN_00AB8C06)
- *
- * What it does:
- * Returns the current CRT error-mode lane without mutating runtime state.
- */
-[[maybe_unused]] int __cdecl RuntimeQueryErrorModeLane() noexcept
-{
-  return gRuntimeErrorMode;
-}
 
-/**
- * Address: 0x00AB5FA6 (FUN_00AB5FA6)
- *
- * What it does:
- * Returns the current CRT application-type lane.
- */
-[[maybe_unused]] int __cdecl RuntimeQueryAppTypeLane() noexcept
-{
-  return __app_type;
-}
 
 /**
  * Address: 0x00A96878 (FUN_00A96878, __FF_MSGBANNER)
@@ -15229,72 +10360,7 @@ extern "C" std::int64_t __cdecl __ftol2(const double value)
   return static_cast<std::int64_t>(resultBits);
 }
 
-/**
- * Address: 0x00AB7F03 (FUN_00AB7F03)
- *
- * What it does:
- * Rounds one double to integral value using the active x87 rounding-control
- * mode (`frndint` semantics).
- */
-[[maybe_unused]] double RuntimeRoundToIntegralByActiveFpuMode(const double value) noexcept
-{
-  return std::rint(value);
-}
 
-/**
- * Address: 0x00A8730F (FUN_00A8730F)
- *
- * What it does:
- * Translates one CRT floating-point control-word bitfield into the x87 control
- * flags used by legacy runtime control helpers.
- */
-[[maybe_unused]] int RuntimeMapControlWordToX87Flags(const int controlWord) noexcept
-{
-  int mappedFlags = 0;
-  if ((controlWord & 0x10) != 0) {
-    mappedFlags = 0x80;
-  }
-  if ((controlWord & 0x08) != 0) {
-    mappedFlags |= 0x200;
-  }
-  if ((controlWord & 0x04) != 0) {
-    mappedFlags |= 0x400;
-  }
-  if ((controlWord & 0x02) != 0) {
-    mappedFlags |= 0x800;
-  }
-  if ((controlWord & 0x01) != 0) {
-    mappedFlags |= 0x1000;
-  }
-  if ((controlWord & 0x80000) != 0) {
-    mappedFlags |= 0x100;
-  }
-
-  switch (controlWord & 0x300) {
-  case 0x100:
-    mappedFlags |= 0x2000;
-    break;
-  case 0x200:
-    mappedFlags |= 0x4000;
-    break;
-  case 0x300:
-    mappedFlags |= 0x6000;
-    break;
-  default:
-    break;
-  }
-
-  switch (controlWord & 0x3000000) {
-  case 0x1000000:
-    return mappedFlags | 0x8040;
-  case 0x2000000:
-    return mappedFlags | 0x40;
-  case 0x3000000:
-    return mappedFlags | 0x8000;
-  default:
-    return mappedFlags;
-  }
-}
 
 /**
  * Address: 0x00A9A813 (FUN_00A9A813)
@@ -15417,53 +10483,6 @@ extern "C" int __cdecl _UTY_MulDivRound(const int value, const int multiplier, c
   return static_cast<int>(signedResult);
 }
 
-/**
- * Address: 0x00A9C56C (FUN_00A9C56C)
- *
- * What it does:
- * Walks every CRT `__pioinfo` block lane, destroys initialized per-handle
- * critical sections, frees each block, and clears the global slot pointer.
- */
-[[maybe_unused]] void RuntimeDestroyIoInfoBlocksAndCriticalSections()
-{
-  struct RuntimeIoInfoLockCleanupView
-  {
-    std::uint32_t lane00 = 0;       // +0x00
-    std::uint32_t lane04 = 0;       // +0x04
-    std::uint32_t lockInitialized = 0; // +0x08
-    std::uint8_t lockBytes[0x18]{}; // +0x0C
-    std::uint8_t tail[0x14]{};      // +0x24
-  };
-  static_assert(sizeof(RuntimeIoInfoLockCleanupView) == 0x38, "RuntimeIoInfoLockCleanupView size must be 0x38");
-  static_assert(
-    offsetof(RuntimeIoInfoLockCleanupView, lockInitialized) == 0x08,
-    "RuntimeIoInfoLockCleanupView::lockInitialized offset must be 0x08"
-  );
-  static_assert(
-    offsetof(RuntimeIoInfoLockCleanupView, lockBytes) == 0x0C,
-    "RuntimeIoInfoLockCleanupView::lockBytes offset must be 0x0C"
-  );
-
-  constexpr std::size_t kIoInfoEntriesPerBlock = 0x20u; // 0x700 / 0x38
-  constexpr std::size_t kIoInfoBlockSlotCount = 0x40u;  // __pioinfo .. debuggerhook span
-
-  for (std::size_t slotIndex = 0; slotIndex < kIoInfoBlockSlotCount; ++slotIndex) {
-    auto* const block = reinterpret_cast<RuntimeIoInfoLockCleanupView*>(__pioinfo[slotIndex]);
-    if (block == nullptr) {
-      continue;
-    }
-
-    for (std::size_t entryIndex = 0; entryIndex < kIoInfoEntriesPerBlock; ++entryIndex) {
-      RuntimeIoInfoLockCleanupView& entry = block[entryIndex];
-      if (entry.lockInitialized != 0u) {
-        ::DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(entry.lockBytes));
-      }
-    }
-
-    _free_crt(block);
-    __pioinfo[slotIndex] = nullptr;
-  }
-}
 
 /**
  * Address: 0x00A89E5A (FUN_00A89E5A, ___initstdio)
@@ -15565,76 +10584,9 @@ namespace moho::runtime
   }
 
 
-  /**
-   * Address: 0x00B57CB4 (FUN_00B57CB4)
-   *
-   * What it does:
-   * Returns destination pointer after formatting one signed integer.
-   */
-  char* LegacyToCharsSigned32(int value, char* destination, unsigned int base)
-  {
-    bool isNegative = false;
-    if (base == 10) {
-      isNegative = value < 0;
-    }
-
-    LegacyToCharsReverseUnsigned32(static_cast<unsigned int>(value), destination, base, isNegative);
-    return destination;
-  }
 
 
 
-  /**
-   * Address: 0x00B57CF1 (FUN_00B57CF1)
-   *
-   * What it does:
-   * Formats one 64-bit lane into base-N text using lowercase hex-alpha digits,
-   * optional minus prefix, and in-place reversal.
-   */
-  char LegacyToCharsUnsigned64Worker(
-    char* destination,
-    std::uint64_t value,
-    unsigned int base,
-    bool prependMinus
-  )
-  {
-    if (prependMinus) {
-      *destination = '-';
-      ++destination;
-      value = static_cast<std::uint64_t>(-static_cast<std::int64_t>(value));
-    }
-
-    char* writeCursor = destination;
-    do {
-      const std::uint64_t quotient = value / static_cast<std::uint64_t>(base);
-      const unsigned int remainder = static_cast<unsigned int>(value % static_cast<std::uint64_t>(base));
-
-      char digitChar = '\0';
-      if (remainder <= 9u) {
-        digitChar = static_cast<char>(remainder + static_cast<unsigned int>('0'));
-      } else {
-        digitChar = static_cast<char>(remainder + 87u);
-      }
-
-      *destination = digitChar;
-      ++destination;
-      value = quotient;
-    } while (value != 0u);
-
-    *destination = '\0';
-
-    char* reverseCursor = destination - 1;
-    char result = '\0';
-    do {
-      result = *reverseCursor;
-      *reverseCursor = *writeCursor;
-      --reverseCursor;
-      *writeCursor = result;
-      ++writeCursor;
-    } while (writeCursor < reverseCursor);
-
-    return result;
-  }
 
 
 
@@ -15971,28 +10923,8 @@ namespace moho::runtime
     return ::EncodePointer(nullptr);
   }
 
-  /**
-   * Address: 0x00A9A9BA (FUN_00A9A9BA)
-   *
-   * What it does:
-   * Encodes one user math-error callback pointer and publishes it into the CRT
-   * math-error handler slot, then marks the slot as active.
-   */
-  [[maybe_unused]] void* RuntimeSetEncodedMathErrorHandler(RuntimeMathErrorHandler const handler)
-  {
-    gRuntimeMathErrorActionEncoded = ::EncodePointer(reinterpret_cast<void*>(handler));
-    gRuntimeMathErrorActionEnabled = 1;
-    return gRuntimeMathErrorActionEncoded;
-  }
 
 
-  [[nodiscard]] RuntimeSignalHandler RuntimeDecodeSignalAction(void*& encodedActionSlot)
-  {
-    if (encodedActionSlot == nullptr) {
-      encodedActionSlot = RuntimeEncodedNullPointer();
-    }
-    return reinterpret_cast<RuntimeSignalHandler>(_decode_pointer(encodedActionSlot));
-  }
 
   [[noreturn]] void RuntimeTerminate();
 
@@ -16341,42 +11273,7 @@ namespace moho::runtime
     return reinterpret_cast<RuntimeTypeInfoView*>(typeInfo)->spare;
   }
 
-  [[nodiscard]] inline void* RuntimeTypeInfoBaseVtableLane() noexcept
-  {
-    static const std::type_info& kTypeInfoAnchor = typeid(void);
-    return reinterpret_cast<const RuntimeTypeInfoView*>(&kTypeInfoAnchor)->vtable;
-  }
 
-  /**
-   * Address: 0x00A962E6 (FUN_00A962E6, func_FreeTypeInfoFrame)
-   *
-   * What it does:
-   * Removes one `type_info::_m_data` frame payload from the global intrusive
-   * type-info frame list under `_TYPEINFO_LOCK`, then frees that payload.
-   */
-  void RuntimeFreeTypeInfoFrame(std::type_info* const typeInfo)
-  {
-    RuntimeLockGuard lockGuard(kRuntimeTypeInfoLock);
-
-    void*& frameStateSlot = RuntimeTypeInfoFrameStateSlot(typeInfo);
-    void* const frameState = frameStateSlot;
-    if (frameState == nullptr) {
-      return;
-    }
-
-    RuntimeTypeInfoFrameListNode* previous = &gRuntimeTypeInfoFrameRoot;
-    for (RuntimeTypeInfoFrameListNode* node = gRuntimeTypeInfoFrameRoot.next; node != nullptr; node = node->next) {
-      if (node->frameState == frameState) {
-        previous->next = node->next;
-        _free_crt(node);
-        break;
-      }
-      previous = node;
-    }
-
-    _free_crt(frameState);
-    frameStateSlot = nullptr;
-  }
 
 
 
@@ -16465,21 +11362,6 @@ namespace moho::runtime
   }
 
 
-  /**
-   * Address: 0x00ABFC0F (FUN_00ABFC0F, std::_Fiopen(char const*,int,int))
-   *
-   * What it does:
-   * Converts a narrow path to wide form and forwards to wide `_Fiopen`.
-   */
-  std::FILE* RuntimeFiopenNarrow(const char* const filePath, const int openMode, const int shareFlag)
-  {
-    wchar_t wideFilePath[0x104]{};
-    if (::mbstowcs_s(nullptr, wideFilePath, 0x104u, filePath, 0x103u) != 0) {
-      return nullptr;
-    }
-
-    return RuntimeFiopenWide(wideFilePath, openMode, shareFlag);
-  }
 
   struct RuntimeLegacyFileIoBufView
   {
@@ -16548,16 +11430,6 @@ namespace moho::runtime
     filebuf->outputCount = nullptr;
   }
 
-  void RuntimeFilebufBindFileIoLanes(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
-  {
-    auto* const ioView = reinterpret_cast<RuntimeLegacyFileIoBufView*>(file);
-    filebuf->inputBase = &ioView->base;
-    filebuf->outputBase = &ioView->base;
-    filebuf->inputPtr = &ioView->ptr;
-    filebuf->outputPtr = &ioView->ptr;
-    filebuf->inputCount = &ioView->cnt;
-    filebuf->outputCount = &ioView->cnt;
-  }
 
   std::intptr_t RuntimeFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* filebuf,
@@ -16576,52 +11448,6 @@ namespace moho::runtime
 
 
 
-  bool RuntimeFilebufEndWrite(RuntimeFilebufCharView* const filebuf)
-  {
-    if (filebuf->codecvtFacet == nullptr || filebuf->wroteSome == 0) {
-      return true;
-    }
-
-    if (filebuf->dispatch == nullptr || filebuf->dispatch->overflow == nullptr) {
-      return false;
-    }
-    if (filebuf->dispatch->overflow(filebuf, -1) == -1) {
-      return false;
-    }
-
-    std::string converted(8u, '\0');
-    while (true) {
-      std::mbstate_t shiftState{};
-      std::memcpy(&shiftState, &filebuf->stateWord, (std::min)(sizeof(shiftState), sizeof(filebuf->stateWord)));
-
-      char* const outBegin = converted.data();
-      char* const outEnd = outBegin + converted.size();
-      char* outNext = outBegin;
-      const std::codecvt_base::result result = filebuf->codecvtFacet->unshift(shiftState, outBegin, outEnd, outNext);
-
-      std::memcpy(&filebuf->stateWord, &shiftState, (std::min)(sizeof(shiftState), sizeof(filebuf->stateWord)));
-
-      if (result == std::codecvt_base::ok) {
-        filebuf->wroteSome = 0;
-      } else if (result == std::codecvt_base::noconv) {
-        return true;
-      } else if (result != std::codecvt_base::partial) {
-        return false;
-      }
-
-      const std::size_t producedBytes = static_cast<std::size_t>(outNext - outBegin);
-      if (producedBytes != 0u && std::fwrite(outBegin, 1u, producedBytes, filebuf->myFile) != producedBytes) {
-        return false;
-      }
-
-      if (filebuf->wroteSome == 0) {
-        return true;
-      }
-      if (producedBytes == 0u) {
-        converted.append(8u, '\0');
-      }
-    }
-  }
 
 
 
@@ -16710,47 +11536,9 @@ namespace moho::runtime
 
 
 
-  /**
-   * Address: 0x004C59F0 (FUN_004C59F0, sub_4C59F0)
-   *
-   * What it does:
-   * Runs base facet vtable rebinding and optionally frees storage when delete
-   * flag bit0 is set.
-   */
-  [[maybe_unused]] std::locale::facet* RuntimeLocaleFacetDestroyMaybeDelete(
-    std::locale::facet* const facet,
-    const std::uint8_t deleteFlag
-  )
-  {
-    RuntimeLocaleFacetBindBaseVtable(facet);
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(facet);
-    }
-    return facet;
-  }
 
 
 
-  /**
-   * Address: 0x00479CC0 (FUN_00479CC0, std::locale::locale)
-   *
-   * What it does:
-   * Initializes one locale object from the process-global locale implementation
-   * and increments its reference count under `_Lockit(0)`.
-   */
-  [[maybe_unused]] RuntimeStdLocaleObject* RuntimeLocaleDefaultConstruct(RuntimeStdLocaleObject* const locale)
-  {
-    locale->ptr = RuntimeLocaleInit();
-    RuntimeLocaleLocimpView* const globalLocale = RuntimeGetGlobalLocale();
-
-    RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
-    if (globalLocale != nullptr && globalLocale->refs != -1) {
-      ++globalLocale->refs;
-    }
-    RuntimeLockitDestroy(&lockit);
-    return locale;
-  }
 
   class RuntimeWstreambufBaseVtableProbe final : public std::wstreambuf
   {
@@ -16769,11 +11557,6 @@ namespace moho::runtime
     }
   };
 
-  [[nodiscard]] void* RuntimeGetWstreambufBaseVtable()
-  {
-    static void* const baseVtable = RuntimeWstreambufBaseVtableProbe::CaptureBaseVtable();
-    return baseVtable;
-  }
 
   struct RuntimeBasicWstreambufView
   {
@@ -16825,30 +11608,6 @@ namespace moho::runtime
   );
   static_assert(sizeof(RuntimeBasicWstreambufView) == 0x3C, "RuntimeBasicWstreambufView size must be 0x3C");
 
-  /**
-   * Address: 0x004F95E0 (FUN_004F95E0, std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::_Init)
-   *
-   * What it does:
-   * Rebinds the three internal pointer-lane pairs to local storage words and
-   * clears those word lanes to zero.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeBasicWstreambufInit(RuntimeBasicWstreambufView* const streambuf)
-  {
-    streambuf->lane1Begin = &streambuf->lane1Value;
-    streambuf->lane1End = &streambuf->lane1Scratch;
-    streambuf->lane0Begin = &streambuf->lane0Value;
-    streambuf->lane2Begin = &streambuf->lane2Value;
-    streambuf->lane0End = &streambuf->lane0Scratch;
-    streambuf->lane2End = &streambuf->lane2Scratch;
-
-    streambuf->lane0Scratch = 0;
-    *streambuf->lane1End = 0;
-    *streambuf->lane2End = 0;
-    *streambuf->lane0Begin = 0;
-    *streambuf->lane1Begin = 0;
-    *streambuf->lane2Begin = 0;
-    return streambuf->lane2Begin;
-  }
 
 
   struct RuntimeBasicStreambufLocaleView
@@ -16986,16 +11745,6 @@ namespace moho::runtime
 
 
 
-  /**
-   * Address: 0x00ABF9B1 (FUN_00ABF9B1, std::_Mutex::_Unlock)
-   *
-   * What it does:
-   * Leaves the mutex critical section.
-   */
-  int RuntimeMutexUnlock(RuntimeMutexHandle* const object)
-  {
-    return RuntimeMtxUnlock(object->criticalSection);
-  }
 
   struct RuntimeMutexGuardUnlockView
   {
@@ -17025,74 +11774,7 @@ namespace moho::runtime
     "RuntimeWideOstreamSentryView::ok offset must be 0x04"
   );
 
-  /**
-   * Address: 0x004F8720 (FUN_004F8720)
-   *
-   * What it does:
-   * Invokes `std::basic_ostream<wchar_t>::osfx()` on the sentry's stream when
-   * the stream's ios flags have the `0x2` (`unitbuf`) bit set; the bit drives
-   * whether the ostream forces a flush of the associated streambuf when the
-   * sentry goes out of scope. Non-unitbuf streams return immediately.
-   */
-  [[maybe_unused]] void RuntimeWideOstreamSentryOsfxIfUnitbuf(
-    std::wostream* const stream
-  )
-  {
-    if (stream == nullptr) {
-      return;
-    }
 
-    if ((stream->flags() & std::ios_base::unitbuf) != 0) {
-      stream->flush();
-    }
-  }
-
-  /**
-   * Address: 0x004F6B60 (FUN_004F6B60)
-   *
-   * IDA signature:
-   * int __usercall sub_4F6B60@<eax>(int a1@<esi>);
-   *
-   * What it does:
-   * Runs the `std::basic_ostream<wchar_t>::flush()` lane the release binary
-   * inlines through its MSVC8 CRT: when the ios_base subobject's rdstate
-   * carries neither `failbit` nor `badbit` (bits `0x2` and `0x4`), dispatches
-   * `rdbuf()->pubsync()` (vtable slot `+0x30`, offset `+0x28` in the
-   * ios_base) and, on `-1` return, stages `badbit` (`0x4`) for the state
-   * update. After the sync attempt, clears the resulting ios state via
-   * `std::ios_base::clear(state, false)`; when the secondary sentry
-   * back-pointer at ios_base offset `+4` is absent, the helper additionally
-   * pins `badbit` on the state to mirror the CRT's "no sentry implies no
-   * owner" escalation.
-   */
-  std::wostream* RuntimeWideOstreamFlushTiedStream(
-    std::wostream* const stream
-  )
-  {
-    if (stream == nullptr) {
-      return stream;
-    }
-
-    auto* const buffer = stream->rdbuf();
-    std::ios_base::iostate existingState = stream->rdstate();
-    std::ios_base::iostate deltaState = std::ios_base::goodbit;
-
-    if ((existingState & (std::ios_base::eofbit | std::ios_base::failbit)) == 0 && buffer != nullptr) {
-      if (buffer->pubsync() == -1) {
-        deltaState = std::ios_base::badbit;
-      }
-    }
-
-    if (deltaState != std::ios_base::goodbit) {
-      std::ios_base::iostate finalState = existingState | deltaState;
-      if (stream->rdbuf() == nullptr) {
-        finalState |= std::ios_base::badbit;
-      }
-      stream->clear(finalState, false);
-    }
-
-    return stream;
-  }
 
 
 
@@ -17289,13 +11971,6 @@ namespace moho::runtime
     // Intentionally empty: VC8 CRT lane is a stub.
   }
 
-  [[nodiscard]] inline int RuntimeTriStateFromUnsignedByteDifference(const int difference) noexcept
-  {
-    if (difference == 0) {
-      return 0;
-    }
-    return (difference > 0) ? 1 : -1;
-  }
 
 
   /**
@@ -17464,34 +12139,6 @@ namespace moho::runtime
     return static_cast<int>(lhsValue) - static_cast<int>(rhsValue);
   }
 
-  /**
-   * Address: 0x00AB0916 (FUN_00AB0916, _mbspbrk_l)
-   *
-   * What it does:
-   * Searches one multibyte source string for the first byte/lead-trail pair
-   * present in the accept set under the provided locale.
-   */
-  unsigned char* RuntimeMbspbrkLocale(
-    unsigned char* const text,
-    const char* const accept,
-    _locale_t const localeInfo
-  )
-  {
-    RuntimeTidDataLocaleView* threadData = nullptr;
-    bool updated = false;
-    (void)RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
-
-    unsigned char* result = nullptr;
-    if (text == nullptr || accept == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    } else {
-      result = ::_mbspbrk_l(text, reinterpret_cast<const unsigned char*>(accept), localeInfo);
-    }
-
-    RuntimeReleaseLocaleUpdate(threadData, updated);
-    return result;
-  }
 
 
   /**
@@ -17861,20 +12508,6 @@ namespace moho::runtime
     return 0x7FFFFFFF;
   }
 
-  [[nodiscard]] bool RuntimeFormatSpecifierIsIntegerLike(const unsigned int specifier) noexcept
-  {
-    switch (specifier) {
-    case 'd':
-    case 'i':
-    case 'o':
-    case 'u':
-    case 'x':
-    case 'X':
-      return true;
-    default:
-      return false;
-    }
-  }
 
   struct RuntimePositionalArgDescriptorNarrow
   {
@@ -17918,29 +12551,6 @@ namespace moho::runtime
   }
 
 
-  /**
-   * Address: 0x00ABC067 (FUN_00ABC067)
-   *
-   * What it does:
-   * Emits one UTF-16 code unit through the wide formatter write lane and marks
-   * the output count as failed when `_fputwc_nolock` returns `WEOF`.
-   */
-  static int RuntimeWriteWideFormatChar(std::FILE* const stream, int* const pnumwritten, const wchar_t wideChar)
-  {
-    int result = static_cast<int>(wideChar);
-    if ((legacy_file(stream)._flag & 0x40) == 0 || legacy_file(stream)._base != nullptr) {
-      result = static_cast<int>(::_fputwc_nolock(wideChar, stream));
-      if (result == static_cast<int>(WEOF)) {
-        *pnumwritten = -1;
-      } else {
-        ++*pnumwritten;
-      }
-      return result;
-    }
-
-    ++*pnumwritten;
-    return result;
-  }
 
 
 
@@ -18026,38 +12636,6 @@ namespace moho::runtime
 
 
 
-  [[nodiscard]] int RuntimeGrowScanBufferIfFull(
-    void** const buffer,
-    std::size_t* const capacityBytes,
-    const int usedBytes,
-    void* const inlineStorage,
-    std::uint32_t* const outDetachedInline
-  )
-  {
-    const std::size_t currentCapacity = *capacityBytes;
-    if (usedBytes == static_cast<int>(currentCapacity)) {
-      if (*buffer == inlineStorage) {
-        void* const allocated = _calloc_crt(currentCapacity, 2u);
-        *buffer = allocated;
-        if (allocated == nullptr) {
-          return 0;
-        }
-
-        *outDetachedInline = 1u;
-        std::memcpy(*buffer, inlineStorage, *capacityBytes);
-      } else {
-        void* const resized = __recalloc_crt(*buffer, currentCapacity, 2u);
-        if (resized == nullptr) {
-          return 0;
-        }
-        *buffer = resized;
-      }
-
-      *capacityBytes *= 2u;
-    }
-
-    return 1;
-  }
 
 
 
@@ -18130,45 +12708,6 @@ namespace moho::runtime
     return RuntimeWcsftimeLocaleLane(lpWideCharStr, maxSize, format, timeData, nullptr);
   }
 
-  [[nodiscard]] const wchar_t* RuntimeLookupWideErrnoMessage(const int errorCode)
-  {
-    const char* const narrowMessage = _get_sys_err_msg(errorCode);
-    if (narrowMessage == nullptr || *narrowMessage == '\0') {
-      return nullptr;
-    }
-
-    const int requiredChars = ::MultiByteToWideChar(
-      CP_ACP,
-      0,
-      narrowMessage,
-      -1,
-      nullptr,
-      0
-    );
-    if (requiredChars <= 0) {
-      return nullptr;
-    }
-
-    thread_local std::wstring wideMessageStorage{};
-    wideMessageStorage.assign(static_cast<std::size_t>(requiredChars), L'\0');
-    const int convertedChars = ::MultiByteToWideChar(
-      CP_ACP,
-      0,
-      narrowMessage,
-      -1,
-      wideMessageStorage.data(),
-      requiredChars
-    );
-    if (convertedChars <= 0) {
-      wideMessageStorage.clear();
-      return nullptr;
-    }
-
-    if (!wideMessageStorage.empty() && wideMessageStorage.back() == L'\0') {
-      wideMessageStorage.pop_back();
-    }
-    return wideMessageStorage.c_str();
-  }
 
 
   /**
@@ -18536,178 +13075,15 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return EXCEPTION_CONTINUE_SEARCH;
   }
 
-  /**
-   * Address: 0x00AAA815 (FUN_00AAA815, func_GetCompatModeSub)
-   *
-   * What it does:
-   * Probes whether one SSE2 lane can execute safely by issuing `movapd` in an
-   * SEH guard and treating AV/illegal-instruction exceptions as incompatibility.
-   */
-  int RuntimeProbeSse2ExecutionSupport()
-  {
-    int probeResult = 1;
-    __try {
-#if defined(_M_IX86)
-      __asm
-      {
-        movapd xmm0, xmm1
-      }
-#endif
-    } __except (RuntimeSseProbeExceptionFilter(GetExceptionCode())) {
-      probeResult = 0;
-    }
-    return probeResult;
-  }
 
 
-  /**
-   * Address: 0x00AAA8D2 (FUN_00AAA8D2, func_ExceptionHandler)
-   *
-   * What it does:
-   * Handles top-level C++ exception records and escalates known MSVC C++
-   * runtime EH signatures to the CRT terminate lane.
-   */
-  LONG WINAPI RuntimeExceptionHandler(_EXCEPTION_POINTERS* const exceptionInfo)
-  {
-    const EXCEPTION_RECORD* const exceptionRecord = (exceptionInfo != nullptr) ? exceptionInfo->ExceptionRecord : nullptr;
-    if (exceptionRecord != nullptr && exceptionRecord->ExceptionCode == 0xE06D7363u
-      && exceptionRecord->NumberParameters == 3u) {
-      const ULONG_PTR signature = exceptionRecord->ExceptionInformation[0];
-      if (signature == 0x19930520u || signature == 0x19930521u || signature == 0x19930522u
-        || signature == 0x01994000u) {
-        RuntimeTerminate();
-      }
-    }
-    return 0;
-  }
 
 
-  /**
-   * Address: 0x00A8EF77 (FUN_00A8EF77, func_wstrFindFirst)
-   *
-   * What it does:
-   * Scans a NUL-terminated wide string and returns the first matching
-   * character position; when searching for NUL, returns the terminator lane.
-   */
-  wchar_t* RuntimeFindFirstWideChar(wchar_t* text, const wchar_t needle)
-  {
-    wchar_t* cursor = text;
-    while (*cursor != L'\0') {
-      if (*cursor == needle) {
-        return cursor;
-      }
-      ++cursor;
-    }
-
-    return (*cursor == needle) ? cursor : nullptr;
-  }
-
-  /**
-   * Address: 0x00A8EF99 (FUN_00A8EF99, func_wstrFindLast)
-   *
-   * What it does:
-   * Scans a NUL-terminated wide string from the tail and returns the last
-   * matching character position; when searching for NUL, returns the
-   * terminator lane.
-   */
-  wchar_t* RuntimeFindLastWideChar(wchar_t* text, const wchar_t needle)
-  {
-    wchar_t* cursor = text;
-    while (*cursor++ != L'\0') {
-    }
-
-    do {
-      --cursor;
-    } while (cursor != text && *cursor != needle);
-
-    return (*cursor == needle) ? cursor : nullptr;
-  }
-
-  /**
-   * Address: 0x00A8F5FB (FUN_00A8F5FB)
-   *
-   * What it does:
-   * Scans one NUL-terminated wide string and returns the first position whose
-   * character exists in `acceptSet` (wcspbrk-style behavior).
-   */
-  wchar_t* RuntimeFindFirstWideCharFromSet(wchar_t* text, const wchar_t* acceptSet)
-  {
-    if (text == nullptr || acceptSet == nullptr) {
-      return nullptr;
-    }
-
-    for (wchar_t* cursor = text; *cursor != L'\0'; ++cursor) {
-      for (const wchar_t* probe = acceptSet; *probe != L'\0'; ++probe) {
-        if (*probe == *cursor) {
-          return cursor;
-        }
-      }
-    }
-
-    return nullptr;
-  }
 
 
-  /**
-   * Address: 0x00A8F63A (FUN_00A8F63A)
-   *
-   * What it does:
-   * Returns the leading span length of `text` containing only characters from
-   * `acceptSet` (wcsspn-style behavior).
-   */
-  std::size_t RuntimeWideSpanOfAcceptedChars(const wchar_t* text, const wchar_t* acceptSet)
-  {
-    if (text == nullptr || acceptSet == nullptr) {
-      return 0u;
-    }
 
-    const wchar_t* cursor = text;
-    while (*cursor != L'\0') {
-      const wchar_t* probe = acceptSet;
-      while (*probe != L'\0' && *probe != *cursor) {
-        ++probe;
-      }
-      if (*probe == L'\0') {
-        break;
-      }
-      ++cursor;
-    }
 
-    return static_cast<std::size_t>(cursor - text);
-  }
 
-  /**
-   * Address: 0x00A8826E (FUN_00A8826E, __imp_wcsstr)
-   *
-   * What it does:
-   * Performs a naive wide-string substring scan and returns the first
-   * occurrence of `needle` inside `haystack`.
-   */
-  wchar_t* RuntimeFindWideSubstring(wchar_t* const haystack, const wchar_t* const needle)
-  {
-    if (*needle == L'\0') {
-      return haystack;
-    }
-
-    if (*haystack == L'\0') {
-      return nullptr;
-    }
-
-    for (wchar_t* cursor = haystack; *cursor != L'\0'; ++cursor) {
-      wchar_t* haystackProbe = cursor;
-      const wchar_t* needleProbe = needle;
-      while (*needleProbe != L'\0' && *haystackProbe == *needleProbe) {
-        ++haystackProbe;
-        ++needleProbe;
-      }
-
-      if (*needleProbe == L'\0') {
-        return cursor;
-      }
-    }
-
-    return nullptr;
-  }
 
 
 
@@ -18792,25 +13168,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
 
 
-  [[nodiscard]] char* RuntimeCopyDwordAlignedRangeAndReturnEnd(
-    char* const destination,
-    const void* const sourceBegin,
-    const void* const sourceEnd
-  ) noexcept
-  {
-    const std::intptr_t sourceBeginAddress = reinterpret_cast<std::intptr_t>(sourceBegin);
-    const std::intptr_t sourceEndAddress = reinterpret_cast<std::intptr_t>(sourceEnd);
-    const std::intptr_t dwordCount = (sourceEndAddress - sourceBeginAddress) >> 2;
-    const std::intptr_t moveByteCountSigned = dwordCount * static_cast<std::intptr_t>(sizeof(std::uint32_t));
-    char* const destinationEnd = destination + moveByteCountSigned;
-
-    if (moveByteCountSigned != 0) {
-      const std::size_t moveByteCount = static_cast<std::size_t>(moveByteCountSigned);
-      (void)RuntimeMemmoveS(destination, moveByteCount, sourceBegin, moveByteCount);
-    }
-
-    return destinationEnd;
-  }
 
   [[nodiscard]] char* RuntimeCopyByteRangeWithMemmoveAndReturnEnd(
     const void* const sourceBegin,
@@ -18843,32 +13200,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     "RuntimeInlineByteBufferView::inlineStorageSlot offset must be 0x0C"
   );
 
-  [[nodiscard]] int RuntimeReallocateInlineByteBuffer(
-    RuntimeInlineByteBufferView* const buffer,
-    const unsigned int requiredSize,
-    std::uint8_t* const splitBegin,
-    const std::uint8_t* const insertBegin,
-    const std::uint8_t* const insertEnd
-  )
-  {
-    std::uint8_t* const oldBegin = buffer->begin;
-    auto* const newBegin = static_cast<std::uint8_t*>(::operator new(requiredSize));
-
-    char* cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(oldBegin, splitBegin, reinterpret_cast<char*>(newBegin));
-    cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(insertBegin, insertEnd, cursor);
-    cursor = RuntimeCopyByteRangeWithMemmoveAndReturnEnd(splitBegin, buffer->current, cursor);
-
-    if (oldBegin == reinterpret_cast<std::uint8_t*>(buffer->inlineStorageSlot)) {
-      buffer->inlineStorageSlot[0] = buffer->end;
-    } else {
-      ::operator delete[](oldBegin);
-    }
-
-    buffer->begin = newBegin;
-    buffer->current = reinterpret_cast<std::uint8_t*>(cursor);
-    buffer->end = newBegin + requiredSize;
-    return static_cast<int>(requiredSize);
-  }
 
 
 
@@ -19567,82 +13898,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return driveType != DRIVE_UNKNOWN && driveType != DRIVE_NO_ROOT_DIR;
   }
 
-  /**
-   * Address: 0x00A82B51 (FUN_00A82B51, _getdcwd_nolock)
-   *
-   * What it does:
-   * Resolves one drive working-directory path without taking outer CRT cwd
-   * locks, supporting caller-provided buffers or internal allocation when
-   * buffer is null.
-   */
-  char* RuntimeGetdcwdNoLock(int drive, char* buffer, int bufferLength)
-  {
-    if (drive != 0) {
-      if (!RuntimeValidDrive(drive)) {
-        *RuntimeDosErrno() = ERROR_INVALID_DRIVE;
-        *_errno() = EACCES;
-        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        return nullptr;
-      }
-    } else {
-      drive = _getdrive();
-    }
-
-    if (buffer != nullptr) {
-      if (bufferLength <= 0) {
-        *_errno() = EINVAL;
-        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        return nullptr;
-      }
-      buffer[0] = '\0';
-    } else {
-      bufferLength = 0;
-    }
-
-    char drivePathProbe[5]{};
-    if (drive != 0) {
-      drivePathProbe[0] = static_cast<char>(drive + '@');
-      std::strcpy(&drivePathProbe[1], ":.");
-    } else {
-      std::strcpy(drivePathProbe, ".");
-    }
-
-    char* filePart = nullptr;
-    DWORD fullPathLength = ::GetFullPathNameA(drivePathProbe, bufferLength, buffer, &filePart);
-    if (fullPathLength == 0) {
-      _dosmaperr(::GetLastError());
-      return nullptr;
-    }
-
-    if (buffer == nullptr) {
-      if (fullPathLength > static_cast<DWORD>(bufferLength)) {
-        bufferLength = static_cast<int>(fullPathLength);
-      }
-
-      buffer = static_cast<char*>(std::calloc(static_cast<std::size_t>(bufferLength), 1u));
-      if (buffer == nullptr) {
-        *_errno() = ENOMEM;
-        *RuntimeDosErrno() = ERROR_NOT_ENOUGH_MEMORY;
-        return nullptr;
-      }
-
-      fullPathLength = ::GetFullPathNameA(drivePathProbe, bufferLength, buffer, &filePart);
-      if (fullPathLength != 0 && fullPathLength < static_cast<DWORD>(bufferLength)) {
-        return buffer;
-      }
-
-      _dosmaperr(::GetLastError());
-      return nullptr;
-    }
-
-  if (fullPathLength < static_cast<DWORD>(bufferLength)) {
-      return buffer;
-    }
-
-    *_errno() = ERANGE;
-    buffer[0] = '\0';
-    return nullptr;
-  }
 
   struct RuntimePePageValidationEntry
   {
@@ -19652,65 +13907,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   };
   static_assert(sizeof(RuntimePePageValidationEntry) == 0x0C, "RuntimePePageValidationEntry size must be 0x0C");
 
-  [[nodiscard]] wchar_t* RuntimeResolveFullPathWideCore(
-    wchar_t* destination,
-    const wchar_t* const fileName,
-    DWORD bufferLength
-  )
-  {
-    const wchar_t* const sourcePath = (fileName != nullptr && fileName[0] != L'\0') ? fileName : L".";
-    const bool callerProvidedBuffer = destination != nullptr;
-    if (callerProvidedBuffer && bufferLength == 0u) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return nullptr;
-    }
-
-    if (!callerProvidedBuffer) {
-      const DWORD requiredLength = ::GetFullPathNameW(sourcePath, 0u, nullptr, nullptr);
-      if (requiredLength == 0u) {
-        _dosmaperr(::GetLastError());
-        return nullptr;
-      }
-
-      if (bufferLength <= requiredLength) {
-        bufferLength = requiredLength;
-      }
-
-      if (bufferLength > 0x7FFFFFFFu) {
-        *_errno() = EINVAL;
-        return nullptr;
-      }
-
-      destination = static_cast<wchar_t*>(std::calloc(static_cast<std::size_t>(bufferLength), sizeof(wchar_t)));
-      if (destination == nullptr) {
-        *_errno() = ENOMEM;
-        return nullptr;
-      }
-    }
-
-    LPWSTR filePart = nullptr;
-    const DWORD copiedLength = ::GetFullPathNameW(sourcePath, bufferLength, destination, &filePart);
-    if (copiedLength == 0u) {
-      if (!callerProvidedBuffer) {
-        _free_crt(destination);
-      }
-      _dosmaperr(::GetLastError());
-      return nullptr;
-    }
-
-    if (copiedLength >= bufferLength) {
-      if (!callerProvidedBuffer) {
-        _free_crt(destination);
-      } else {
-        destination[0] = L'\0';
-      }
-      *_errno() = ERANGE;
-      return nullptr;
-    }
-
-    return destination;
-  }
 
 
 
@@ -19724,41 +13920,6 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     return value == L'\\' || value == L'/';
   }
 
-  template<typename CharType, typename SizeType>
-  [[nodiscard]] bool RuntimeIsUncShareRootPathCommon(const CharType* const path, const SizeType length) noexcept
-  {
-    if (path == nullptr || length < static_cast<SizeType>(5)) {
-      return false;
-    }
-
-    if (!RuntimeIsPathSeparator(path[0]) || !RuntimeIsPathSeparator(path[1])) {
-      return false;
-    }
-
-    if (path[2] == static_cast<CharType>('\0') || RuntimeIsPathSeparator(path[2])) {
-      return false;
-    }
-
-    const CharType* serverEnd = path + 3;
-    while (*serverEnd != static_cast<CharType>('\0') && !RuntimeIsPathSeparator(*serverEnd)) {
-      ++serverEnd;
-    }
-    if (*serverEnd == static_cast<CharType>('\0')) {
-      return false;
-    }
-
-    const CharType* shareStart = serverEnd + 1;
-    if (*shareStart == static_cast<CharType>('\0')) {
-      return false;
-    }
-
-    const CharType* shareEnd = shareStart;
-    while (*shareEnd != static_cast<CharType>('\0') && !RuntimeIsPathSeparator(*shareEnd)) {
-      ++shareEnd;
-    }
-
-    return (*shareEnd == static_cast<CharType>('\0')) || (shareEnd[1] == static_cast<CharType>('\0'));
-  }
 
 
 
@@ -20616,49 +14777,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x00A9566E (FUN_00A9566E, _strcpy_s)
-   *
-   * What it does:
-   * Copies one C-string into caller buffer with CRT invalid-parameter/error
-   * semantics (`EINVAL` and `ERANGE` lanes).
-   */
-  errno_t RuntimeStrcpyS(char* const destination, const std::size_t sizeInBytes, const char* const source)
-  {
-    if (destination == nullptr || sizeInBytes == 0u) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EINVAL;
-    }
-
-    if (source == nullptr) {
-      destination[0] = '\0';
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return EINVAL;
-    }
-
-    std::size_t remainingBytes = sizeInBytes;
-    char* destinationCursor = destination;
-    const char* sourceCursor = source;
-    while (remainingBytes != 0u) {
-      const char value = *sourceCursor;
-      *destinationCursor = value;
-      ++destinationCursor;
-      ++sourceCursor;
-
-      if (value == '\0') {
-        return 0;
-      }
-
-      --remainingBytes;
-    }
-
-    destination[0] = '\0';
-    *_errno() = ERANGE;
-    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-    return ERANGE;
-  }
 
   /**
    * Address: 0x00AAC747 (FUN_00AAC747, wstrcpy)
@@ -20816,67 +14934,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     va_end(sourceList);
   }
 
-  /**
-   * Address: 0x00A8220F (FUN_00A8220F, func_ExceptionCtr)
-   *
-   * What it does:
-   * Initializes one `std::exception` payload from an indirection lane and
-   * leaves message-ownership disabled.
-   */
-  std::exception* RuntimeConstructStdExceptionFromMessageRef(
-    std::exception* const destination,
-    const char* const* const messageRef,
-    int /*unusedOwnershipFlag*/
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    new (destination) std::exception();
-    auto* const destinationView = reinterpret_cast<RuntimeStdExceptionLayout*>(destination);
-    destinationView->what = messageRef != nullptr ? *messageRef : nullptr;
-    destinationView->doFree = 0;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00A82334 (FUN_00A82334, func_BadTypeidExc)
-   *
-   * What it does:
-   * Constructs one `std::bad_typeid` object and patches its message lane to
-   * the incoming text pointer without taking ownership.
-   */
-  void* RuntimeConstructBadTypeidException(void* const storage, const char* const message)
-  {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
-    new (storage) std::bad_typeid();
-    auto* const view = reinterpret_cast<RuntimeStdExceptionLayout*>(storage);
-    view->what = message != nullptr ? message : "bad typeid";
-    view->doFree = 0;
-    return storage;
-  }
-
-
-
-
-  [[maybe_unused]] void RuntimeDestroyBadTypeidNoDeleteImpl(
-    std::exception* const exceptionRuntime
-  ) noexcept
-  {
-    if (exceptionRuntime == nullptr) {
-      return;
-    }
-
-    const std::bad_typeid prototype{};
-    auto* const exceptionView = reinterpret_cast<RuntimeStdExceptionLayout*>(exceptionRuntime);
-    const auto* const prototypeView = reinterpret_cast<const RuntimeStdExceptionLayout*>(&prototype);
-    exceptionView->vtable = prototypeView->vtable;
-    exceptionRuntime->~exception();
-  }
 
 
 
@@ -20885,30 +14942,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00A82737 (FUN_00A82737, func_UsePMD)
-   *
-   * What it does:
-   * Applies one RTTI PMD lane to an object base and returns the computed
-   * subobject displacement used by CRT dynamic-cast helpers.
-   */
-  int RuntimeUsePmd(const RuntimePmd* const pmd, const int objectBase)
-  {
-    int pdispAdjustment = 0;
-    const int pdisp = pmd->pdisp;
-    if (pdisp >= 0) {
-      const auto objectAddress = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectBase));
-      const auto vbtableAddress = static_cast<std::uintptr_t>(
-        *reinterpret_cast<const std::uint32_t*>(objectAddress + static_cast<std::uintptr_t>(pdisp))
-      );
-      const int vdispAdjustment = static_cast<int>(
-        *reinterpret_cast<const std::uint32_t*>(vbtableAddress + static_cast<std::uintptr_t>(pmd->vdisp))
-      );
-      pdispAdjustment = pdisp + vdispAdjustment;
-    }
 
-    return pmd->mdisp + pdispAdjustment;
-  }
+
+
+
+
 
 
 
@@ -21010,35 +15048,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimeMapSetLengthErrorNodeAllocator = RuntimeMapSetLengthErrorNode* (*)();
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneA()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneB()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneC()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneD()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneE()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeAllocateMapSetLengthErrorNodeLaneF()
-  {
-    return new RuntimeMapSetLengthErrorNode();
-  }
 
   [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocCommon(const unsigned int count, const unsigned int elementSize)
   {
@@ -21049,17 +15063,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return ::operator new(static_cast<std::size_t>(elementSize) * count);
   }
 
-  /**
-   * Address: 0x004E50A0 (FUN_004E50A0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane001(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
   /**
    * Address: 0x004E5160 (FUN_004E5160)
@@ -21109,36 +15112,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimePackedDwordByteLane, byte) == 0x04, "RuntimePackedDwordByteLane::byte offset must be 0x04");
   static_assert(sizeof(RuntimePackedDwordByteLane) == 0x08, "RuntimePackedDwordByteLane size must be 0x08");
 
-  [[nodiscard]] inline std::uintptr_t* RuntimeStoreDwordLane(
-    std::uintptr_t* const outValue,
-    const std::uintptr_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  [[nodiscard]] inline std::uintptr_t* RuntimePopForwardLinkNodeLane(
-    std::uintptr_t* const outValue,
-    RuntimeForwardLinkNodeLane** const headSlot
-  ) noexcept
-  {
-    RuntimeForwardLinkNodeLane* const current = *headSlot;
-    *outValue = reinterpret_cast<std::uintptr_t>(current);
-    *headSlot = current->next;
-    return outValue;
-  }
-
-  [[nodiscard]] inline RuntimePackedDwordByteLane* RuntimeCopyPackedDwordByteLane(
-    RuntimePackedDwordByteLane* const destination,
-    const std::uint32_t* const sourceDword,
-    const std::uint8_t* const sourceByte
-  ) noexcept
-  {
-    destination->dword = *sourceDword;
-    destination->byte = *sourceByte;
-    return destination;
-  }
 
 
 
@@ -21156,29 +15129,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x004E8170 (FUN_004E8170)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane004(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
-  /**
-   * Address: 0x004E9B70 (FUN_004E9B70)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane005(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
+
+
 
 
 
@@ -21207,56 +15160,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x0054E0C0 (FUN_0054E0C0)
-   *
-   * What it does:
-   * Allocates one `88`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane012(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 88u);
-  }
-
-  /**
-   * Address: 0x0054E1B0 (FUN_0054E1B0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane013(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
 
 
-  /**
-   * Address: 0x005579D0 (FUN_005579D0)
-   *
-   * What it does:
-   * Allocates one `96`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane014(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 96u);
-  }
 
 
-  /**
-   * Address: 0x00571780 (FUN_00571780)
-   *
-   * What it does:
-   * Allocates one `68`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane015(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 68u);
-  }
+
 
   struct RuntimeRbHeadNode68Color64
   {
@@ -21274,33 +15183,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeRbHeadNode68Color64, isNil) == 0x41, "RuntimeRbHeadNode68Color64::isNil offset must be 0x41");
 
 
-  /**
-   * Address: 0x00571800 (FUN_00571800)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane016(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x00582460 (FUN_00582460)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane019(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
 
   /**
@@ -21361,85 +15248,19 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x005CA280 (FUN_005CA280)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane023(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
 
 
 
-  /**
-   * Address: 0x00688D70 (FUN_00688D70)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane026(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
-
-
-  /**
-   * Address: 0x00688E80 (FUN_00688E80)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane027(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
-
-
-  /**
-   * Address: 0x00688F00 (FUN_00688F00)
-   *
-   * What it does:
-   * Allocates one `3280`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane028(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 3280u);
-  }
 
 
 
-  /**
-   * Address: 0x006EBC60 (FUN_006EBC60)
-   *
-   * What it does:
-   * Allocates one `60`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane030(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 60u);
-  }
 
 
-  /**
-   * Address: 0x00712A70 (FUN_00712A70)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane031(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
+
+
+
+
 
 
   struct RuntimeTreeNode20DwordKey
@@ -21456,17 +15277,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(sizeof(RuntimeTreeNode20DwordKey) == 0x14, "RuntimeTreeNode20DwordKey size must be 0x14");
 
 
-  /**
-   * Address: 0x0071D740 (FUN_0071D740)
-   *
-   * What it does:
-   * Allocates one `64`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane032(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 64u);
-  }
 
   struct RuntimeRbHeadNode64Color60
   {
@@ -21490,84 +15300,18 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00768DB0 (FUN_00768DB0)
-   *
-   * What it does:
-   * Allocates one `36`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane039(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 36u);
-  }
 
 
 
-  /**
-   * Address: 0x0077DB80 (FUN_0077DB80)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane040(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
-
-
-  /**
-   * Address: 0x0077DC40 (FUN_0077DC40)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane041(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
-
-
-  /**
-   * Address: 0x0077DD10 (FUN_0077DD10)
-   *
-   * What it does:
-   * Allocates one `152`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane041A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 152u);
-  }
-
-
-  /**
-   * Address: 0x00798B60 (FUN_00798B60)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane042(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
 
-  /**
-   * Address: 0x007B1420 (FUN_007B1420)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane044(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
+
+
+
+
+
+
 
   struct RuntimeAllocatedRecordLane044
   {
@@ -21583,17 +15327,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007B4E50 (FUN_007B4E50)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane045(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
 
@@ -21625,17 +15358,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007BF120 (FUN_007BF120)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane049(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
 
   struct RuntimeTypeInfoCloneRecord40
@@ -21647,37 +15369,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord40) == 0x28, "RuntimeTypeInfoCloneRecord40 size must be 0x28");
 
-  /**
-   * Address: 0x007BF180 (FUN_007BF180, runtime type-info clone lane)
-   *
-   * What it does:
-   * Copy-constructs one 40-byte runtime type-info payload (`3 dwords + std::string`)
-   * into caller-provided destination storage.
-   */
-  [[nodiscard]] RuntimeTypeInfoCloneRecord40* RuntimeCopyTypeInfoCloneRecord40(
-    RuntimeTypeInfoCloneRecord40* const destination,
-    const RuntimeTypeInfoCloneRecord40* const source
-  )
-  {
-    if (destination == nullptr) {
-      return destination;
-    }
-
-    if (source == nullptr) {
-      destination->headerWord0 = 0u;
-      destination->headerWord1 = 0u;
-      destination->headerWord2 = 0u;
-      ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
-      return destination;
-    }
-
-    destination->headerWord0 = source->headerWord0;
-    destination->headerWord1 = source->headerWord1;
-    destination->headerWord2 = source->headerWord2;
-    ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
-    destination->typeName.assign(source->typeName, 0u, msvc8::string::npos);
-    return destination;
-  }
 
 
   struct RuntimeDwordAndFastVectorUIntN2Record32
@@ -21710,43 +15401,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x007D97A0 (FUN_007D97A0)
-   *
-   * What it does:
-   * Allocates one `28`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane052(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 28u);
-  }
 
 
-  /**
-   * Address: 0x007E56B0 (FUN_007E56B0)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane053(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
 
-  /**
-   * Address: 0x007EBFD0 (FUN_007EBFD0)
-   *
-   * What it does:
-   * Allocates one `784`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane054(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 784u);
-  }
 
 
   std::uint8_t gRuntimeByte54741F = 0;
@@ -21754,45 +15412,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007F3670 (FUN_007F3670)
-   *
-   * What it does:
-   * Allocates one `192`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane056(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 192u);
-  }
 
 
 
 
-  /**
-   * Address: 0x008317B0 (FUN_008317B0)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane059(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
-  /**
-   * Address: 0x00831AB0 (FUN_00831AB0)
-   *
-   * What it does:
-   * Allocates one `136`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane060(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 136u);
-  }
 
 
   /**
@@ -21808,43 +15433,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x00831D10 (FUN_00831D10)
-   *
-   * What it does:
-   * Allocates one `40`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane062(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 40u);
-  }
 
 
-  /**
-   * Address: 0x0083C6E0 (FUN_0083C6E0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane063(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
 
-  /**
-   * Address: 0x0084A5F0 (FUN_0084A5F0)
-   *
-   * What it does:
-   * Allocates one `60`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane064(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 60u);
-  }
 
 
 
@@ -21861,67 +15453,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x00858730 (FUN_00858730)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane067(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
-  /**
-   * Address: 0x008620F0 (FUN_008620F0)
-   *
-   * What it does:
-   * Allocates one `3152`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane068(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 3152u);
-  }
 
 
-  /**
-   * Address: 0x0087D510 (FUN_0087D510)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane069(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
-  /**
-   * Address: 0x0087D570 (FUN_0087D570)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane070(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
-  /**
-   * Address: 0x0087D5F0 (FUN_0087D5F0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane071(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
 
 
@@ -21959,66 +15496,15 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   static_assert(offsetof(RuntimeTaggedPairRecord24, flag14) == 0x14, "RuntimeTaggedPairRecord24::flag14 offset must be 0x14");
   static_assert(offsetof(RuntimeTaggedPairRecord24, flag15) == 0x15, "RuntimeTaggedPairRecord24::flag15 offset must be 0x15");
 
-  [[nodiscard]] RuntimeTaggedPairRecord24* RuntimeInitTaggedPairRecord24(
-    RuntimeTaggedPairRecord24* const record,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08,
-    const std::uint32_t* const pairLanes
-  )
-  {
-    if (record == nullptr) {
-      return nullptr;
-    }
-
-    record->lane00 = lane00;
-    record->lane04 = lane04;
-    record->lane08 = lane08;
-    record->lane0C = pairLanes != nullptr ? pairLanes[0] : 0u;
-    record->lane10 = pairLanes != nullptr ? pairLanes[1] : 0u;
-    record->flag14 = 0u;
-    record->flag15 = 0u;
-    record->pad16[0] = 0u;
-    record->pad16[1] = 0u;
-    return record;
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x00884260 (FUN_00884260)
-   *
-   * What it does:
-   * Resets each legacy string lane in one half-open range `[begin,end)` to
-   * empty-inline form and releases heap storage when needed.
-   */
-  [[maybe_unused]] void RuntimeResetLegacyStringRangeToEmpty(
-    msvc8::string* begin,
-    msvc8::string* const end
-  ) noexcept
-  {
-    while (begin != end) {
-      begin->tidy(true, 0U);
-      ++begin;
-    }
-  }
 
 
 
-  /**
-   * Address: 0x0088FFC0 (FUN_0088FFC0)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane073(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
 
 
@@ -22041,33 +15527,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeTypeInfoCloneRecord32) == 0x20, "RuntimeTypeInfoCloneRecord32 size must be 0x20");
 
-  /**
-   * Address: 0x00890010 (FUN_00890010, runtime type-info clone lane)
-   *
-   * What it does:
-   * Copy-constructs one 32-byte runtime type-info payload (`1 dword + std::string`)
-   * into caller-provided destination storage.
-   */
-  [[nodiscard]] RuntimeTypeInfoCloneRecord32* RuntimeCopyTypeInfoCloneRecord32(
-    RuntimeTypeInfoCloneRecord32* const destination,
-    const RuntimeTypeInfoCloneRecord32* const source
-  )
-  {
-    if (destination == nullptr) {
-      return destination;
-    }
-
-    if (source == nullptr) {
-      destination->headerWord0 = 0u;
-      ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
-      return destination;
-    }
-
-    destination->headerWord0 = source->headerWord0;
-    ::new (static_cast<void*>(&destination->typeName)) msvc8::string();
-    destination->typeName.assign(source->typeName, 0u, msvc8::string::npos);
-    return destination;
-  }
 
 
   struct RuntimeTypeInfoCloneRecord32SplitSourceWords
@@ -22122,103 +15581,19 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
   static_assert(sizeof(RuntimeTypeInfoCloneRecord48) == 0x30, "RuntimeTypeInfoCloneRecord48 size must be 0x30");
 
-  /**
-   * Address: 0x008900D0 (FUN_008900D0)
-   *
-   * What it does:
-   * Copies one 48-byte clone record: duplicates leading header word, deep-copies
-   * the embedded text lane, mirrors shared-array/payload pointers, and acquires
-   * one strong reference on the copied control block lane.
-   */
-  [[maybe_unused]] [[nodiscard]] RuntimeTypeInfoCloneRecord48* RuntimeCopyTypeInfoCloneRecord48(
-    RuntimeTypeInfoCloneRecord48* const destination,
-    const RuntimeTypeInfoCloneRecord48* const source
-  )
-  {
-    if (destination == nullptr) {
-      return destination;
-    }
-
-    destination->headerWord0 = source->headerWord0;
-    ::new (static_cast<void*>(&destination->payload.typeName)) msvc8::string();
-    destination->payload.typeName.assign(source->payload.typeName, 0u, msvc8::string::npos);
-    destination->payload.sharedArrayPtr = source->payload.sharedArrayPtr;
-    destination->payload.controlBlock = source->payload.controlBlock;
-    if (destination->payload.controlBlock != nullptr) {
-      (void)::InterlockedExchangeAdd(&destination->payload.controlBlock->strongRefCount, 1);
-    }
-    destination->payload.payloadBegin = source->payload.payloadBegin;
-    destination->payload.payloadEnd = source->payload.payloadEnd;
-    return destination;
-  }
 
 
 
-  /**
-   * Address: 0x0089B1A0 (FUN_0089B1A0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane075(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
 
 
-  /**
-   * Address: 0x008A9C60 (FUN_008A9C60)
-   *
-   * What it does:
-   * Allocates one `80`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane076(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 80u);
-  }
 
 
 
-  /**
-   * Address: 0x008AFE90 (FUN_008AFE90)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane077(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
-  /**
-   * Address: 0x008B55D0 (FUN_008B55D0)
-   *
-   * What it does:
-   * Allocates one `80`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane077A(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 80u);
-  }
 
 
-  /**
-   * Address: 0x008B6AC0 (FUN_008B6AC0)
-   *
-   * What it does:
-   * Allocates one `24`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane078(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 24u);
-  }
 
 
   struct RuntimeLinkedSlotNode16
@@ -22681,27 +16056,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeIntrusiveDoubleLinkNode) == 0x08, "RuntimeIntrusiveDoubleLinkNode size must be 0x08");
 
-  [[nodiscard]] const void* RuntimeReadLegacyStringLikeData(const RuntimeLegacyStringLikeStorage24* const textStorage) noexcept
-  {
-    return (textStorage->capacity < 16u)
-      ? static_cast<const void*>(textStorage->storage.inlineBuffer)
-      : static_cast<const void*>(textStorage->storage.heapBuffer);
-  }
-
-  /**
-   * Address: 0x007BD9F0 (FUN_007BD9F0)
-   *
-   * What it does:
-   * Swaps one dword lane between two caller-provided pointers and returns the
-   * left-hand pointer.
-   */
-  [[maybe_unused]] int* RuntimeSwapDwordLanes(int* const lhs, int* const rhs) noexcept
-  {
-    const int previousRhs = *rhs;
-    *rhs = *lhs;
-    *lhs = previousRhs;
-    return lhs;
-  }
 
 
 
@@ -22718,94 +16072,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007C8560 (FUN_007C8560)
-   *
-   * What it does:
-   * Writes one null pointer lane to caller-provided output storage.
-   */
-  [[maybe_unused]] void** RuntimeWriteNullPointerLane(void** const outPointer) noexcept
-  {
-    *outPointer = nullptr;
-    return outPointer;
-  }
-
-
-
-  /**
-   * Address: 0x007C8770 (FUN_007C8770)
-   *
-   * What it does:
-   * Returns element count in one 16-byte-element vector state.
-   */
-  [[maybe_unused]] int RuntimeVector16Size(const RuntimeVector16StorageState* const state) noexcept
-  {
-    if (state->begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(state->end - state->begin);
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x007C88B0 (FUN_007C88B0)
-   *
-   * What it does:
-   * Writes one pointer lane to caller-provided output storage.
-   */
-  [[maybe_unused]] void** RuntimeStorePointerLane(
-    void** const outPointer,
-    void* const value
-  ) noexcept
-  {
-    *outPointer = value;
-    return outPointer;
-  }
-
-  /**
-   * Address: 0x007C88D0 (FUN_007C88D0)
-   *
-   * What it does:
-   * Assigns one releasable pointer lane and releases the previous pointer when
-   * it is non-null.
-   */
-  [[maybe_unused]] std::intptr_t RuntimeAssignReleasablePointerAndReleasePrevious(
-    RuntimeReleasableObject** const slot,
-    RuntimeReleasableObject* const value
-  ) noexcept
-  {
-    RuntimeReleasableObject* const previous = *slot;
-    *slot = value;
-    if (previous != nullptr) {
-      return previous->vtable->release(previous, 1);
-    }
-    return reinterpret_cast<std::intptr_t>(slot);
-  }
 
 
 
-  /**
-   * Address: 0x004E6A00 (FUN_004E6A00)
-   * Address: 0x007C89C0 (FUN_007C89C0)
-   *
-   * What it does:
-   * Unlinks one intrusive double-link node from its neighbors, then self-links
-   * the node.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeUnlinkAndSelfLinkNode(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-    node->prev = node;
-    node->next = node;
-    return node;
-  }
+
+
+
+
+
 
   struct RuntimeVectorDwordWindowState
   {
@@ -22864,83 +16144,19 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(offsetof(RuntimeDwordAndByteRecord, lane04) == 0x04, "RuntimeDwordAndByteRecord::lane04 offset must be 0x04");
 
-  /**
-   * Address: 0x007E2920 (FUN_007E2920)
-   *
-   * What it does:
-   * Returns `-1` when pointed lane is null, otherwise returns `0`.
-   */
-  [[maybe_unused]] int RuntimeReturnMinusOneWhenDwordLaneNull(const std::uint32_t* const lane) noexcept
-  {
-    return (*lane != 0u) ? 0 : -1;
-  }
-
-  /**
-   * Address: 0x007E2930 (FUN_007E2930)
-   *
-   * What it does:
-   * Returns whether one dword lane is zero.
-   */
-  [[maybe_unused]] BOOL RuntimeIsDwordLaneZero(const std::uint32_t* const lane) noexcept
-  {
-    return static_cast<BOOL>(*lane == 0u);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x007E2BB0 (FUN_007E2BB0)
-   *
-   * What it does:
-   * Self-links one intrusive double-link node.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeSelfLinkIntrusiveNode(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    node->prev = node;
-    node->next = node;
-    return node;
-  }
 
 
 
 
-  /**
-   * Address: 0x007E2D60 (FUN_007E2D60)
-   *
-   * What it does:
-   * Loads one node pointer through owner slot at offset `+0x04`.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode** RuntimeLoadNodePointerFromOwnerOffset04(
-    RuntimeIntrusiveDoubleLinkNode** const outNode,
-    const RuntimeOwnerPointerSlotOffset04* const owner
-  ) noexcept
-  {
-    *outNode = *owner->pointerSlot;
-    return outNode;
-  }
 
 
 
-  /**
-   * Address: 0x007E3050 (FUN_007E3050)
-   *
-   * What it does:
-   * Swaps two dword-pair records.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeSwapPointerPairRecord(
-    RuntimePointerPairRecord* const lhs,
-    RuntimePointerPairRecord* const rhs
-  ) noexcept
-  {
-    const RuntimePointerPairRecord previousRhs = *rhs;
-    *rhs = *lhs;
-    *lhs = previousRhs;
-    return lhs;
-  }
+
 
 
 
@@ -23042,14 +16258,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeStride24BaseOwner) == 0x04, "RuntimeStride24BaseOwner size must be 0x04");
 
-  [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneLocal(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outLane = value;
-    return outLane;
-  }
 
   [[nodiscard]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowFromSelfOffset(
     RuntimeInlineWindowCapacityState* const state,
@@ -23083,72 +16291,17 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007FC480 (FUN_007FC480)
-   *
-   * What it does:
-   * Returns one byte flag lane stored at record offset `+0x10`.
-   */
-  [[maybe_unused]] std::uint8_t RuntimeLoadByteFlagAtOffset16(
-    const RuntimeByteFlagAtOffset16Record* const record
-  ) noexcept
-  {
-    return record->flag10;
-  }
-
-
-
-
-  /**
-   * Address: 0x007FF400 (FUN_007FF400)
-   *
-   * What it does:
-   * Clears both dword lanes in one dword-pair record.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeZeroPointerPairRecord(
-    RuntimePointerPairRecord* const record
-  ) noexcept
-  {
-    record->lane00 = 0u;
-    record->lane04 = 0u;
-    return record;
-  }
-
-  /**
-   * Address: 0x007FF480 (FUN_007FF480)
-   *
-   * What it does:
-   * Moves one dword lane from `source` to `destination` and clears source.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeMoveDwordLaneAndZeroSource(
-    std::uint32_t* const destination,
-    std::uint32_t* const source
-  ) noexcept
-  {
-    const std::uint32_t moved = *source;
-    *source = 0u;
-    *destination = moved;
-    return destination;
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x0080A1F0 (FUN_0080A1F0)
-   *
-   * What it does:
-   * Returns one byte address for a stride-24 element at `index`.
-   */
-  [[maybe_unused]] std::byte* RuntimeStride24ElementAtAliasA(
-    const int index,
-    const RuntimeStride24BaseOwner* const owner
-  ) noexcept
-  {
-    return owner->base + (24 * index);
-  }
+
+
+
+
+
 
 
 
@@ -23238,40 +16391,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeDwordPairAndBlob28::blob08_23 offset must be 0x08"
   );
 
-  [[nodiscard]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset04(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset04Owner* const owner
-  ) noexcept
-  {
-    *outLane = *owner->pointer04;
-    return outLane;
-  }
 
-  [[nodiscard]] std::uint32_t* RuntimeLoadDwordFromPointerFieldOffset08(
-    std::uint32_t* const outLane,
-    const RuntimeDwordPointerAtOffset08Owner* const owner
-  ) noexcept
-  {
-    *outLane = *owner->pointer08;
-    return outLane;
-  }
 
-  [[nodiscard]] std::uint32_t* RuntimeLoadDwordFieldOffset04(
-    std::uint32_t* const outLane,
-    const RuntimeDwordAtOffset04Record* const owner
-  ) noexcept
-  {
-    *outLane = owner->lane04;
-    return outLane;
-  }
 
-  [[nodiscard]] RuntimePointerSlotLane* RuntimeCollapsePointerSlot(
-    RuntimePointerSlotLane* const slot
-  ) noexcept
-  {
-    slot->pointer = reinterpret_cast<std::uint32_t*>(*slot->pointer);
-    return slot;
-  }
 
 
 
@@ -23330,26 +16452,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeForwardLinkNode) == 0x04, "RuntimeForwardLinkNode size must be 0x04");
 
-  [[nodiscard]] std::uint32_t* RuntimeStoreDwordOffsetFromBaseLane(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    *outLane = *baseLane + static_cast<std::uint32_t>(4 * index);
-    return outLane;
-  }
 
-  [[nodiscard]] RuntimeForwardLinkNode** RuntimePopForwardLinkNode(
-    RuntimeForwardLinkNode** const outNode,
-    RuntimeForwardLinkNode** const headSlot
-  ) noexcept
-  {
-    RuntimeForwardLinkNode* const node = *headSlot;
-    *outNode = node;
-    *headSlot = node->next;
-    return outNode;
-  }
 
 
 
@@ -23409,44 +16512,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeDwordTripleLaneRecord) == 0x0C, "RuntimeDwordTripleLaneRecord size must be 0x0C");
 
-  [[nodiscard]] std::uint32_t* RuntimeStoreDwordStride12OffsetFromBaseLane(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    *outLane = *baseLane + static_cast<std::uint32_t>(12 * index);
-    return outLane;
-  }
-
-  [[nodiscard]] RuntimeDwordTripleLaneRecord* RuntimeSwapDwordTripleLaneRecord(
-    RuntimeDwordTripleLaneRecord* const lhs,
-    RuntimeDwordTripleLaneRecord* const rhs
-  ) noexcept
-  {
-    const RuntimeDwordTripleLaneRecord priorRhs = *rhs;
-    *rhs = *lhs;
-    *lhs = priorRhs;
-    return lhs;
-  }
-
-
-
-
-
-  /**
-   * Address: 0x008486D0 (FUN_008486D0)
-   *
-   * What it does:
-   * Initializes one inline pointer-window state from self-relative lanes
-   * `{+0x10,+0x10,+0x18,+0x10}`.
-   */
-  [[maybe_unused]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowCapacity24FromSelf(
-    RuntimeInlineWindowCapacityState* const state
-  ) noexcept
-  {
-    return RuntimeInitializeInlineWindowFromSelfOffset(state, 0x10, 0x18);
-  }
 
 
 
@@ -23467,22 +16532,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x0084B9C0 (FUN_0084B9C0)
-   *
-   * What it does:
-   * Initializes one dword-pair record from two source dword lanes.
-   */
-  [[maybe_unused]] RuntimePointerPairRecord* RuntimeInitPointerPairFromTwoDwordSources(
-    RuntimePointerPairRecord* const outRecord,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    outRecord->lane00 = *firstSource;
-    outRecord->lane04 = *secondSource;
-    return outRecord;
-  }
+
+
+
+
+
+
 
 
 
@@ -23535,51 +16590,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeDwordLanesOffset04And08Record) == 0x0C, "RuntimeDwordLanesOffset04And08Record size must be 0x0C");
 
-  [[nodiscard]] RuntimeInlineWindowCapacityState* RuntimeInitializeInlineWindowFromBaseAddress(
-    RuntimeInlineWindowCapacityState* const state,
-    const std::uint32_t baseAddress,
-    const std::ptrdiff_t capacityOffsetBytes
-  ) noexcept
-  {
-    auto* const base = reinterpret_cast<std::byte*>(static_cast<std::uintptr_t>(baseAddress));
-    return RuntimeInitializeInlineWindowFromExternalBase(state, base, capacityOffsetBytes);
-  }
 
-  [[nodiscard]] RuntimeDwordQuadRecord* RuntimeSwapDwordQuadTailLanes(
-    RuntimeDwordQuadRecord* const lhs,
-    RuntimeDwordQuadRecord* const rhs
-  ) noexcept
-  {
-    const std::uint32_t rhs04 = rhs->lane04;
-    rhs->lane04 = lhs->lane04;
-    lhs->lane04 = rhs04;
 
-    const std::uint32_t rhs08 = rhs->lane08;
-    rhs->lane08 = lhs->lane08;
-    lhs->lane08 = rhs08;
-
-    const std::uint32_t rhs0C = rhs->lane0C;
-    rhs->lane0C = lhs->lane0C;
-    lhs->lane0C = rhs0C;
-
-    return lhs;
-  }
-
-  [[nodiscard]] RuntimeDwordLanesOffset04And08Record* RuntimeSwapDwordLanesOffset04And08(
-    RuntimeDwordLanesOffset04And08Record* const lhs,
-    RuntimeDwordLanesOffset04And08Record* const rhs
-  ) noexcept
-  {
-    const std::uint32_t rhs04 = rhs->lane04;
-    rhs->lane04 = lhs->lane04;
-    lhs->lane04 = rhs04;
-
-    const std::uint32_t rhs08 = rhs->lane08;
-    rhs->lane08 = lhs->lane08;
-    lhs->lane08 = rhs08;
-
-    return lhs;
-  }
 
 
 
@@ -23662,15 +16674,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(RuntimeFloatQuadLaneRecord) == 0x10, "RuntimeFloatQuadLaneRecord size must be 0x10");
 
-  [[nodiscard]] std::uint32_t* RuntimeStoreDwordStride20OffsetFromBaseLane(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseLane,
-    const int index
-  ) noexcept
-  {
-    *outLane = *baseLane + static_cast<std::uint32_t>(20 * index);
-    return outLane;
-  }
 
 
 
@@ -23800,19 +16803,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00873860 (FUN_00873860)
-   *
-   * What it does:
-   * Returns pointer lane minus 4 when non-null, otherwise returns zero.
-   */
-  [[maybe_unused]] std::uintptr_t RuntimePointerMinus4WhenNonNullAliasA(
-    const std::uintptr_t* const pointerLane
-  ) noexcept
-  {
-    const std::uintptr_t pointerValue = *pointerLane;
-    return (pointerValue != 0u) ? (pointerValue - 4u) : 0u;
-  }
 
 
 
@@ -24088,17 +17078,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x007B4410 (FUN_007B4410)
-   *
-   * What it does:
-   * Allocates one 32-byte red-black tree head lane and zeros the tree links
-   * before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode32Color28* RuntimeAllocateRbHeadNode32LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode32Color28>(RuntimeAllocateArrayWithBadAllocLane046);
-  }
 
   /**
    * Address: 0x007B4D10 (FUN_007B4D10)
@@ -24117,17 +17096,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007CAB70 (FUN_007CAB70)
-   *
-   * What it does:
-   * Allocates one 20-byte red-black tree head lane and zeros the tree links
-   * before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode20Color16* RuntimeAllocateRbHeadNode20LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode20Color16>(RuntimeAllocateArrayWithBadAllocLane051);
-  }
 
   /**
    * Address: 0x007CB080 (FUN_007CB080)
@@ -24141,70 +17109,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDestroyRbTreePostorderCommon(root);
   }
 
-  /**
-   * Address: 0x007CC520 (FUN_007CC520)
-   *
-   * What it does:
-   * Allocates one 16-byte compact red-black tree head lane and zeros tree
-   * links before setting marker bytes `{color=1, isNil=0}`.
-   */
-  [[nodiscard]] RuntimeRbHeadNode16Color13* RuntimeAllocateCompactRbHeadNode16LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode16Color13>(gpg::core::legacy::AllocateChecked16ByteLane);
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x0082FB10 (FUN_0082FB10)
-   *
-   * What it does:
-   * Allocates one 16-byte record lane, stores two caller dwords, and copies a
-   * two-dword payload pair from source lane memory.
-   */
-  [[nodiscard]] RuntimeRecord16WithPair* RuntimeBuildRecord16WithPairLaneA(
-    const RuntimeDwordPairRecord* const sourcePair,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1
-  )
-  {
-    auto* const record = static_cast<RuntimeRecord16WithPair*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
-    if (record == nullptr) {
-      return nullptr;
-    }
 
-    record->lane0 = lane0;
-    record->lane1 = lane1;
-    record->pair = *sourcePair;
-    return record;
-  }
-
-  /**
-   * Address: 0x00830700 (FUN_00830700)
-   *
-   * What it does:
-   * Allocates one 44-byte record lane, stores two caller dwords, and copies
-   * one fixed 36-byte payload block from caller memory.
-   */
-  [[nodiscard]] RuntimeRecord44WithPayload* RuntimeBuildRecord44WithPayloadLaneA(
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const void* const payloadSource
-  )
-  {
-    auto* const record = static_cast<RuntimeRecord44WithPayload*>(RuntimeAllocateArrayWithBadAllocLane061(1u));
-    if (record == nullptr) {
-      return nullptr;
-    }
-
-    record->lane0 = lane0;
-    record->lane1 = lane1;
-    std::memcpy(record->payload, payloadSource, sizeof(record->payload));
-    return record;
-  }
 
 
 
@@ -24256,19 +17167,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimePrefixedLegacyStringOwnerOffset10::text offset must be 0x10"
   );
 
-  /**
-   * Address: 0x007BF0F0 (FUN_007BF0F0)
-   * Address: 0x007BF230 (FUN_007BF230)
-   *
-   * What it does:
-   * Resets one prefixed legacy string payload at owner offset `+0x10` and
-   * returns zero.
-   */
-  int RuntimeResetPrefixedLegacyStringLaneB(RuntimePrefixedLegacyStringOwnerOffset10* const owner)
-  {
-    RuntimeResetLegacyStringStorage(&owner->text);
-    return 0;
-  }
 
 
   /**
@@ -24382,23 +17280,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     head->right = head;
   }
 
-  template <typename TOwnerState, typename THeadNode>
-  [[nodiscard]] TOwnerState* RuntimeInitializeRbOwnerHeadLinks(
-    TOwnerState* const owner,
-    THeadNode* const head
-  ) noexcept
-  {
-    owner->head = head;
-    head->isNil = 1u;
-    RuntimeResetRbHeadNodeLinks(head);
-    owner->size = 0u;
-    return owner;
-  }
 
-  [[nodiscard]] RuntimeRbHeadNode28Color24* RuntimeAllocateRbHeadNode28LaneA()
-  {
-    return RuntimeAllocateRbHeadNodeCommon<RuntimeRbHeadNode28Color24>(RuntimeAllocateArrayWithBadAllocLane047);
-  }
 
 
 
@@ -24516,24 +17398,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x008A9F10 (FUN_008A9F10)
-   * Address: 0x008A9B50 (FUN_008A9B50)
-   *
-   * What it does:
-   * Clears both legacy string lanes in each 56-byte record over `[begin,end)`
-   * and restores inline-empty state for each string.
-   */
-  void RuntimeResetDualLegacyStringRange56LaneA(
-    RuntimeDualLegacyStringRecord56* begin,
-    RuntimeDualLegacyStringRecord56* const end
-  )
-  {
-    while (begin != end) {
-      RuntimeResetDualLegacyStringRecord56LaneA(begin);
-      ++begin;
-    }
-  }
 
   struct RuntimeSevenPrefixedLegacyStringBlock
   {
@@ -24580,71 +17444,16 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x008D6FC0 (FUN_008D6FC0)
-   *
-   * What it does:
-   * Allocates one `32`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane079(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 32u);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x008E4100 (FUN_008E4100)
-   *
-   * What it does:
-   * Allocates one `48`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane079C(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 48u);
-  }
-
-  /**
-   * Address: 0x008E8790 (FUN_008E8790)
-   *
-   * What it does:
-   * Allocates one `112`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane080(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 112u);
-  }
 
 
 
-  /**
-   * Address: 0x0092C080 (FUN_0092C080)
-   *
-   * What it does:
-   * Allocates one `12`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane082(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 12u);
-  }
 
-  /**
-   * Address: 0x0092C0E0 (FUN_0092C0E0)
-   *
-   * What it does:
-   * Allocates one `12`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane083(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 12u);
-  }
+
 
 
   /**
@@ -24659,66 +17468,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return RuntimeAllocateArrayWithBadAllocCommon(count, 4u);
   }
 
-  /**
-   * Address: 0x0094F1B0 (FUN_0094F1B0)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane085(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
-
-  /**
-   * Address: 0x0094F210 (FUN_0094F210)
-   *
-   * What it does:
-   * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane086(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
-  }
 
 
-  /**
-   * Address: 0x00A72080 (FUN_00A72080)
-   *
-   * What it does:
-   * Allocates one `8`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane087(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 8u);
-  }
 
-  /**
-   * Address: 0x00A720E0 (FUN_00A720E0)
-   *
-   * What it does:
-   * Allocates one `16`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane088(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 16u);
-  }
 
-  /**
-   * Address: 0x00AC38F0 (FUN_00AC38F0)
-   *
-   * What it does:
-   * Allocates one `4`-byte element array lane and throws `std::bad_alloc`
-   * when the 32-bit count multiplication overflows.
-   */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane089(const unsigned int count)
-  {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 4u);
-  }
+
 
   /**
    * Address: 0x00AC3BE0 (FUN_00AC3BE0)
@@ -24749,34 +17503,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  [[nodiscard]] RuntimeMapSetLengthErrorNode* RuntimeBuildMapSetLengthErrorNodeCommon(
-    RuntimeMapSetLengthErrorNode* const left,
-    RuntimeMapSetLengthErrorNode* const parent,
-    RuntimeMapSetLengthErrorNode* const right,
-    const RuntimeMapSetLengthErrorKeyRecord* const keyRecord,
-    const RuntimeMapSetLengthErrorNodeAllocator allocateNode
-  )
-  {
-    RuntimeMapSetLengthErrorNode* const node = allocateNode();
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    try {
-      node->left = left;
-      node->parent = parent;
-      node->right = right;
-      node->keyText.assign(keyRecord->keyText, 0u, std::string::npos);
-      node->keyMetadata = keyRecord->keyMetadata;
-      node->color = 0;
-      node->isNil = 0;
-    } catch (...) {
-      delete node;
-      throw;
-    }
-
-    return node;
-  }
 
 
 
@@ -24827,75 +17553,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x004E3310 (FUN_004E3310)
-   *
-   * What it does:
-   * Increments one legacy list size lane by one and throws the VC8
-   * `list<T> too long` length-error diagnostic when the max size would
-   * overflow.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeIncrementListSizeCheckedLaneA(
-    RuntimeListPointerContainer* const listRuntime
-  )
-  {
-    const std::uint32_t currentSize = listRuntime->size;
-    if (0x3FFFFFFFu - currentSize < 1u) {
-      RuntimeThrowContainerTooLong("list<T> too long");
-    }
-
-    const std::uint32_t nextSize = currentSize + 1u;
-    listRuntime->size = nextSize;
-    return nextSize;
-  }
 
 
-  /**
-   * What it does:
-   * Secondary lane of 12-byte list-node construction that preserves the
-   * original compiler-emitted staged writes.
-   * Inlined block from FUN_004E3450.
-   */
-  [[maybe_unused]] RuntimeListPointerNode* RuntimeBuildPointerListNodeLaneB(
-    RuntimeListPointerNode* const next,
-    RuntimeListPointerNode* const prev,
-    void* const* const valueSlot
-  )
-  {
-    auto* const node = static_cast<RuntimeListPointerNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
-    if (node != nullptr) {
-      node->next = next;
-    }
-    if (node != reinterpret_cast<RuntimeListPointerNode*>(static_cast<std::uintptr_t>(0xFFFFFFFCu))) {
-      node->prev = prev;
-    }
-    if (node != reinterpret_cast<RuntimeListPointerNode*>(static_cast<std::uintptr_t>(0xFFFFFFF8u))) {
-      node->value = *valueSlot;
-    }
-    return node;
-  }
 
-  /**
-   * Address: 0x004E3490 (FUN_004E3490)
-   *
-   * What it does:
-   * Increments one legacy list size lane by one and throws the VC8
-   * `list<T> too long` length-error diagnostic when the max size would
-   * overflow.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeIncrementListSizeCheckedLaneB(
-    RuntimeListPointerContainer* const listRuntime
-  )
-  {
-    const std::uint32_t currentSize = listRuntime->size;
-    if (0x3FFFFFFFu - currentSize < 1u) {
-      RuntimeThrowContainerTooLong("list<T> too long");
-    }
-
-    const std::uint32_t nextSize = currentSize + 1u;
-    listRuntime->size = nextSize;
-    return nextSize;
-  }
 
 
 
@@ -24998,16 +17658,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x007683F0 (FUN_007683F0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCD()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
@@ -25043,28 +17693,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x0082DD60 (FUN_0082DD60)
-   *
-   * What it does:
-   * Increments one intrusive-list size lane by `increment` and raises the
-   * legacy VC8 list overflow diagnostic when the 0x1FFFFFFF limit would be
-   * exceeded.
-   */
-  [[maybe_unused]] std::uint32_t __fastcall RuntimeIncrementRecord16ListSizeCheckedLaneP(
-    const std::uint32_t increment,
-    RuntimeRecord16ListState* const listState
-  )
-  {
-    const std::uint32_t currentSize = listState->size;
-    if (0x1FFFFFFFU - currentSize < increment) {
-      RuntimeThrowContainerTooLong("list<T> too long");
-    }
-
-    const std::uint32_t nextSize = currentSize + increment;
-    listState->size = nextSize;
-    return nextSize;
-  }
 
 
 
@@ -25085,16 +17713,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("list<T> too long");
   }
 
-  /**
-   * Address: 0x0082FC70 (FUN_0082FC70)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongCV()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
@@ -25105,16 +17723,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00856100 (FUN_00856100)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
@@ -25165,54 +17773,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
 
 
-  template <std::size_t kStrideBytes>
-  int __stdcall RuntimeInvokeDestroyCallbackRangeStrided(void* begin, void* const end)
-  {
-    using DestroyCallback = int(__thiscall*)(void*, int);
-
-    int result = 0;
-    auto* beginBytes = static_cast<std::uint8_t*>(begin);
-    auto* const endBytes = static_cast<std::uint8_t*>(end);
-    while (beginBytes != endBytes) {
-      auto* const vtable = *reinterpret_cast<DestroyCallback**>(beginBytes);
-      result = vtable[0](beginBytes, 0);
-      beginBytes += kStrideBytes;
-    }
-    return result;
-  }
 
 
 
-  /**
-   * Address: 0x0053A9A0 (FUN_0053A9A0)
-   *
-   * What it does:
-   * Releases one intrusive shared-control lane referenced from owner offset
-   * `+0x04` and preserves the original release return-value lane.
-   */
-  [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlFromOwner(
-    const std::intptr_t ownerRuntime
-  ) noexcept
-  {
-    auto* const ownerBytes = reinterpret_cast<std::uint8_t*>(ownerRuntime);
-    volatile long* const control = ownerBytes != nullptr ? *reinterpret_cast<volatile long**>(ownerBytes + 4) : nullptr;
-    if (control == nullptr) {
-      return ownerRuntime;
-    }
-
-    std::intptr_t result = ownerRuntime;
-    if (::InterlockedExchangeAdd(control + 1, -1) == 0) {
-      using ReleaseFn = std::intptr_t(__thiscall*)(volatile long*);
-      auto* const vtable = reinterpret_cast<ReleaseFn*>(*reinterpret_cast<void**>(const_cast<long*>(control)));
-      (void)vtable[1](control);
-      result = reinterpret_cast<std::intptr_t>(control + 2);
-      if (::InterlockedExchangeAdd(control + 2, -1) == 0) {
-        return vtable[2](control);
-      }
-    }
-
-    return result;
-  }
 
   [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlArrayRange(
     const std::intptr_t begin,
@@ -25244,20 +17807,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x007FBBA0 (FUN_007FBBA0)
-   *
-   * What it does:
-   * Releases one shared-control lane at offset `+0x10` for each 20-byte entry
-   * in `[begin,end)`.
-   */
-  [[nodiscard]] std::intptr_t RuntimeReleaseSharedControlRangeStride20(
-    const std::intptr_t begin,
-    const std::intptr_t end
-  ) noexcept
-  {
-    return RuntimeReleaseSharedControlArrayRange(begin, end, 20, 16);
-  }
 
   /**
    * Address: 0x00A48A40 (FUN_00A48A40)
@@ -25290,73 +17839,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  [[nodiscard]] std::size_t RuntimeReadAndSwapFixedWidthRows(
-    std::FILE* const stream,
-    const std::size_t elementWidthBytes,
-    const std::size_t rowCount,
-    void* const destination
-  )
-  {
-    (void)std::fread(destination, elementWidthBytes, rowCount, stream);
-    RuntimeReverseBytesPerElementRows(
-      static_cast<std::int32_t>(elementWidthBytes),
-      static_cast<std::int32_t>(rowCount),
-      destination
-    );
-    return elementWidthBytes * rowCount;
-  }
-
-  [[nodiscard]] int RuntimeCopyAndSwapFixedWidthRows(
-    void* const destination,
-    const void* const source,
-    const int rowCount,
-    const std::uint32_t elementWidthBytes
-  )
-  {
-    const std::uint32_t byteCount32 = static_cast<std::uint32_t>(rowCount) * elementWidthBytes;
-    const std::size_t byteCount = static_cast<std::size_t>(byteCount32);
-    (void)memcpy_s(destination, byteCount, source, byteCount);
-    RuntimeReverseBytesPerElementRows(static_cast<std::int32_t>(elementWidthBytes), rowCount, destination);
-    return static_cast<int>(byteCount32);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /**
-   * Address: 0x0085A1F0 (FUN_0085A1F0)
-   *
-   * What it does:
-   * Releases each shared-control pair entry from the static array lane and
-   * frees the backing array storage.
-   */
-  void RuntimeReleaseSharedControlPairArray()
-  {
-    RuntimeSharedControlPairEntry* cursor = gRuntimeSharedControlPairBegin;
-    if (cursor != nullptr) {
-      RuntimeSharedControlPairEntry* const end = gRuntimeSharedControlPairEnd;
-      while (cursor != end) {
-        RuntimeReleaseSharedControlLane(cursor->secondControl);
-        RuntimeReleaseSharedControlLane(cursor->firstControl);
-        ++cursor;
-      }
-
-      ::operator delete(static_cast<void*>(gRuntimeSharedControlPairBegin));
-    }
-
-    gRuntimeSharedControlPairBegin = nullptr;
-    gRuntimeSharedControlPairEnd = nullptr;
-    gRuntimeSharedControlPairCapacity = nullptr;
-  }
 
 
 
@@ -25386,63 +17868,27 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x008EA9D0 (FUN_008EA9D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDS()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
 
-  /**
-   * Address: 0x0092EFF0 (FUN_0092EFF0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDW()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0092F060 (FUN_0092F060)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDX()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0092F0D0 (FUN_0092F0D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongDY()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x0092F1A0 (FUN_0092F1A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongW()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   struct RuntimeListLinkNode12
   {
@@ -25466,27 +17912,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x009332E0 (FUN_009332E0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongX()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
-  /**
-   * Address: 0x009333D0 (FUN_009333D0)
-   *
-   * What it does:
-   * Throws the legacy VC8 list growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowListTooLongY()
-  {
-    RuntimeThrowContainerTooLong("list<T> too long");
-  }
 
 
 
@@ -25501,53 +17927,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeThrowContainerTooLong("vector<T> too long");
   }
 
-  /**
-   * Address: 0x00933530 (FUN_00933530)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEB()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00936DB0 (FUN_00936DB0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEC()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
 
 
-  /**
-   * Address: 0x009514A0 (FUN_009514A0)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongED()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
-  /**
-   * Address: 0x00951530 (FUN_00951530)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEE()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
+
 
   struct RuntimeLegacyProxyVectorLane final
   {
@@ -25561,32 +17947,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   using RuntimeLegacyProxyVectorThrowFn = void (*)();
   using RuntimeLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
 
-  bool RuntimeInitializeLegacyProxyVectorLane(
-    RuntimeLegacyProxyVectorLane* const lane,
-    const unsigned int elementCount,
-    const unsigned int maxElementCount,
-    const unsigned int elementStrideBytes,
-    RuntimeLegacyProxyVectorThrowFn throwTooLong,
-    RuntimeLegacyProxyVectorAllocateFn allocateStorage
-  )
-  {
-    lane->first = nullptr;
-    lane->last = nullptr;
-    lane->end = nullptr;
-    if (elementCount == 0U) {
-      return false;
-    }
-
-    if (elementCount > maxElementCount) {
-      throwTooLong();
-    }
-
-    auto* const storage = static_cast<std::uint8_t*>(allocateStorage(elementCount));
-    lane->first = storage;
-    lane->last = storage;
-    lane->end = storage + (static_cast<std::size_t>(elementStrideBytes) * static_cast<std::size_t>(elementCount));
-    return true;
-  }
 
 
 
@@ -25691,30 +18051,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return newInsertPosition;
   }
 
-  /**
-   * Address: 0x00933640 (FUN_00933640)
-   *
-   * What it does:
-   * Inserts `repeatCount` copies of one dword lane at `insertPosition` inside
-   * one VC8 proxy-vector storage owner, growing capacity with VC8 `vector<T>`
-   * rules when required.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeInsertRepeatedDwordIntoLegacyProxyVector(
-    RuntimeLegacyProxyVectorLane* const vector,
-    std::uint32_t* insertPosition,
-    const unsigned int repeatCount,
-    const std::uint32_t* const valueSlot
-  )
-  {
-    return RuntimeInsertRepeatedDwordIntoLegacyProxyVectorCommon(
-      vector,
-      insertPosition,
-      repeatCount,
-      valueSlot,
-      RuntimeThrowVectorTooLongEA,
-      RuntimeAllocateArrayWithBadAllocLane084
-    );
-  }
 
 
 
@@ -25784,23 +18120,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
 
 
-  /**
-   * Address: 0x00A6BC00 (FUN_00A6BC00)
-   *
-   * What it does:
-   * Executes the convex-hull float destruction tail by releasing the heap
-   * plane-storage array lane at `this+0x14`.
-   */
-  void DestroyConvexHullFloatPlaneStorageRuntime(ConvexHullFloatRuntimeView* const hull) noexcept
-  {
-    if (hull == nullptr) {
-      return;
-    }
-
-    void* const planeStorage = hull->planeStorage;
-    hull->planeStorage = nullptr;
-    ::operator delete[](planeStorage);
-  }
 
   struct ConvexHullDoubleRuntimeView
   {
@@ -25849,24 +18168,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
 
 
-  /**
-   * Address: 0x00A6BCD0 (FUN_00A6BCD0)
-   *
-   * What it does:
-   * Restores the convex-hull double vtable lane and releases the heap-owned
-   * plane-storage array at `+0x18`.
-   */
-  void DestroyConvexHullDoublePlaneStorageRuntime(ConvexHullDoubleRuntimeView* const hull) noexcept
-  {
-    if (hull == nullptr) {
-      return;
-    }
-
-    static std::uint8_t sConvexHullDoubleDestroyRuntimeVTableTag = 0;
-    void* const planeStorage = hull->planeStorage;
-    hull->vtable = &sConvexHullDoubleDestroyRuntimeVTableTag;
-    ::operator delete[](planeStorage);
-  }
 
   struct ConvexHull1FloatRuntimeView
   {
@@ -26103,35 +18404,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return writeLane;
   }
 
-  /**
-   * Address: 0x00A65C80 (FUN_00A65C80)
-   *
-   * What it does:
-   * Appends one 4-byte element into the deque block-map lane, allocating block
-   * storage on demand and growing the map through `RuntimeGrowDequeMapSlotsF`.
-   */
-  std::uint32_t* RuntimeDequePushBackDwordWithGrowF(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const std::uint32_t* const value
-  )
-  {
-    return RuntimeDequePushBackDwordCommon(dequeMap, value, &RuntimeGrowDequeMapSlotsF);
-  }
 
-  /**
-   * Address: 0x00A65F00 (FUN_00A65F00)
-   *
-   * What it does:
-   * Appends one 4-byte element into the deque block-map lane, allocating block
-   * storage on demand and growing the map through `RuntimeGrowDequeMapSlotsG`.
-   */
-  std::uint32_t* RuntimeDequePushBackDwordWithGrowG(
-    RuntimeDequeMapGrowthView& dequeMap,
-    const std::uint32_t* const value
-  )
-  {
-    return RuntimeDequePushBackDwordCommon(dequeMap, value, &RuntimeGrowDequeMapSlotsG);
-  }
 
 
 
@@ -26161,46 +18434,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeTreeNode20ContainerState::size offset must be 0x08"
   );
 
-  [[nodiscard]] int RuntimeReleaseNil11TreeContainerHead(RuntimeRbTree20OwnerState* const treeState) noexcept
-  {
-    if (treeState == nullptr) {
-      return 0;
-    }
 
-    RuntimeRbHeadNode20Color16* const head = treeState->head;
-    if (head != nullptr) {
-      RuntimeDestroyRbTreeLaneA(head->parent);
-      RuntimeResetRbHeadNodeLinks(head);
-      ::operator delete(static_cast<void*>(head));
-      treeState->head = nullptr;
-    }
-
-    treeState->size = 0u;
-    return 0;
-  }
-
-  [[nodiscard]] int RuntimeReleaseNode20TreeContainerHead(
-    RuntimeTreeNode20ContainerState* const treeState,
-    void (*const destroyTree)(RuntimeTreeNode20* const)
-  ) noexcept
-  {
-    if (treeState == nullptr) {
-      return 0;
-    }
-
-    RuntimeTreeNode20* const head = treeState->head;
-    if (head != nullptr) {
-      destroyTree(head->parent);
-      head->left = head;
-      head->parent = head;
-      head->right = head;
-      ::operator delete(static_cast<void*>(head));
-      treeState->head = nullptr;
-    }
-
-    treeState->size = 0u;
-    return 0;
-  }
 
 
 
@@ -26295,30 +18529,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "RuntimeOffset04ScalarPointerRowsOwnerView::rows offset must be 0x04"
   );
 
-  /**
-   * Address: 0x00A705E0 (FUN_00A705E0)
-   *
-   * What it does:
-   * Allocates one linear 8-byte buffer with `rowCount` elements and fills each
-   * destination lane from `rowPointers[row][columnIndex]`.
-   */
-  [[maybe_unused]] RuntimeLinearBufferView* RuntimeExtractDoubleColumnToLinearBuffer(
-    RuntimeOffset10ScalarPointerRowsView* const sourceRows,
-    RuntimeLinearBufferView* const destination,
-    const int columnIndex
-  )
-  {
-    RuntimeAllocateZeroedLinearBuffer8Byte(destination, sourceRows->rowCount);
-    if (sourceRows->rowCount > 0) {
-      auto* const destinationValues = static_cast<double*>(destination->elementStorage);
-      auto* const rowPointers = reinterpret_cast<const double* const*>(sourceRows->rowPointers);
-      for (int rowIndex = 0; rowIndex < sourceRows->rowCount; ++rowIndex) {
-        destinationValues[rowIndex] = rowPointers[rowIndex][columnIndex];
-      }
-    }
-
-    return destination;
-  }
 
 
 
@@ -26365,35 +18575,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return rowIndex;
   }
 
-  /**
-   * Address: 0x00A6D190 (FUN_00A6D190)
-   *
-   * What it does:
-   * Allocates one pointer-grid lane with 4-byte elements and fills row pointer
-   * lanes to each row-start offset.
-   */
-  [[nodiscard]] int RuntimeAllocatePointerGrid4Byte(
-    RuntimePointerGridView& grid,
-    const std::uint8_t zeroInitialize
-  )
-  {
-    return RuntimeAllocatePointerGrid(grid, zeroInitialize != 0u, 4u);
-  }
 
-  /**
-   * Address: 0x00A6D230 (FUN_00A6D230)
-   *
-   * What it does:
-   * Allocates one pointer-grid lane with 8-byte elements and fills row pointer
-   * lanes to each row-start offset.
-   */
-  [[nodiscard]] int RuntimeAllocatePointerGrid8Byte(
-    RuntimePointerGridView& grid,
-    const std::uint8_t zeroInitialize
-  )
-  {
-    return RuntimeAllocatePointerGrid(grid, zeroInitialize != 0u, 8u);
-  }
 
 
 
@@ -26434,35 +18616,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using RuntimePointerGridAllocator = int (*)(RuntimePointerGridView&, std::uint8_t);
 
-  [[nodiscard]] RuntimeFixedPointerGridAggregateView* RuntimeInitializeFixedPointerGridAggregate(
-    RuntimeFixedPointerGridAggregateView& aggregate,
-    const void* const sourceElements,
-    const std::int32_t rowCount,
-    const std::int32_t columnCount,
-    const std::size_t elementStride,
-    const RuntimePointerGridAllocator allocateGrid
-  )
-  {
-    aggregate.grid.elementStorage = nullptr;
-    aggregate.grid.rowPointers = nullptr;
-    ::operator delete[](nullptr);
-    ::operator delete[](aggregate.grid.rowPointers);
-
-    aggregate.grid.rowCount = rowCount;
-    aggregate.grid.columnCount = columnCount;
-    aggregate.grid.elementCount = rowCount * columnCount;
-    (void)allocateGrid(aggregate.grid, 0u);
-
-    const std::size_t gridBytes = static_cast<std::size_t>(aggregate.grid.elementCount) * elementStride;
-    std::memcpy(aggregate.grid.elementStorage, sourceElements, gridBytes);
-
-    aggregate.laneCount = rowCount;
-    const std::size_t linearBytes = static_cast<std::size_t>(aggregate.laneCount) * elementStride;
-    aggregate.linearStorageA = ::operator new(linearBytes);
-    aggregate.linearStorageB = ::operator new(linearBytes);
-    aggregate.readyFlag = 0u;
-    return &aggregate;
-  }
 
 
 
@@ -26471,16 +18624,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00A74050 (FUN_00A74050)
-   *
-   * What it does:
-   * Throws the legacy VC8 vector growth overflow length-error diagnostic.
-   */
-  [[noreturn]] void RuntimeThrowVectorTooLongEG()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
 
 
 
@@ -26561,29 +18704,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x00ABF1A0 (FUN_00ABF1A0, std::ios_base::_Ios_base_dtor)
-   * Mangled: ?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z
-   *
-   * What it does:
-   * Runs one `ios_base` teardown lane: decrements std-stream open-count for
-   * registered standard slots, calls `_Tidy` when this is the last opener (or
-   * when no std slot is attached), then destroys/deletes the owned locale
-   * object when present.
-   */
-  void RuntimeIosBaseDtor(void* const iosBaseStorage)
-  {
-    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
-
-    const int stdStreamSlot = iosBase->stdStreamSlot;
-    if (stdStreamSlot == 0 || --gRuntimeIosStdOpenCounts[stdStreamSlot] <= 0) {
-      RuntimeIosBaseTidy(iosBaseStorage);
-      if (std::locale* const locale = iosBase->localePtr; locale != nullptr) {
-        locale->~locale();
-        ::operator delete(locale);
-      }
-    }
-  }
 
 
 
@@ -26809,147 +18929,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   }
 
 
-  /**
-   * Address: 0x00AA679B (FUN_00AA679B, LangCountryEnumProc)
-   *
-   * What it does:
-   * Enumerates locale IDs while matching both language and country lanes, and
-   * updates `setlocData` state bits/LCIDs for exact, primary-prefix, and
-   * default-country/default-language fallback cases.
-   */
-  BOOL __stdcall RuntimeLangCountryEnumProc(LPSTR localeText)
-  {
-    auto* const setlocData = &__getptd()->setlocData;
-    const LCID localeId = static_cast<LCID>(RuntimeLcidFromHexString(localeText));
-    char localeName[120]{};
 
-    const LCTYPE countryField =
-      (setlocData->bAbbrevCountry != 0) ? LOCALE_SABBREVCTRYNAME : LOCALE_SENGCOUNTRY;
-    if (!::GetLocaleInfoA(localeId, countryField, localeName, 120)) {
-      setlocData->iLcidState = 0;
-      return TRUE;
-    }
-
-    if (_stricmp(setlocData->pchCountry, localeName) == 0) {
-      const LCTYPE languageField =
-        (setlocData->bAbbrevLanguage != 0) ? LOCALE_SABBREVLANGNAME : LOCALE_SENGLANGUAGE;
-      if (!::GetLocaleInfoA(localeId, languageField, localeName, 120)) {
-        setlocData->iLcidState = 0;
-        return TRUE;
-      }
-
-      if (_stricmp(setlocData->pchLanguage, localeName) == 0) {
-        setlocData->iLcidState |= 0x304;
-        setlocData->lcidLanguage = localeId;
-        setlocData->lcidCountry = localeId;
-      } else if ((setlocData->iLcidState & 2) == 0) {
-        const int primaryLength = setlocData->iPrimaryLen;
-        if (primaryLength != 0 && RuntimeMemicmp(setlocData->pchLanguage, localeName, primaryLength) == 0) {
-          setlocData->iLcidState |= 2;
-          setlocData->lcidCountry = localeId;
-          if (std::strlen(setlocData->pchLanguage) == static_cast<std::size_t>(primaryLength)) {
-            setlocData->lcidLanguage = localeId;
-          }
-        } else if ((setlocData->iLcidState & 1) == 0
-                   && RuntimeTestDefaultCountry(static_cast<std::uint16_t>(localeId)) != 0) {
-          setlocData->iLcidState |= 1;
-          setlocData->lcidCountry = localeId;
-        }
-      }
-    }
-
-    if ((setlocData->iLcidState & 0x300) != 0x300) {
-      const LCTYPE languageField =
-        (setlocData->bAbbrevLanguage != 0) ? LOCALE_SABBREVLANGNAME : LOCALE_SENGLANGUAGE;
-      if (!::GetLocaleInfoA(localeId, languageField, localeName, 120)) {
-        setlocData->iLcidState = 0;
-        return TRUE;
-      }
-
-      if (_stricmp(setlocData->pchLanguage, localeName) == 0) {
-        setlocData->iLcidState |= 0x200;
-
-        bool acceptLanguageLcid = false;
-        if (setlocData->bAbbrevLanguage != 0) {
-          acceptLanguageLcid = true;
-        } else if (setlocData->iPrimaryLen == 0
-                   || std::strlen(setlocData->pchLanguage) != static_cast<std::size_t>(setlocData->iPrimaryLen)) {
-          acceptLanguageLcid = true;
-        } else {
-          acceptLanguageLcid = RuntimeTestDefaultLanguage(setlocData, localeId, 1) != FALSE;
-        }
-
-        if (acceptLanguageLcid) {
-          setlocData->iLcidState |= 0x100;
-          if (setlocData->lcidLanguage == 0) {
-            setlocData->lcidLanguage = localeId;
-          }
-        }
-      } else if (setlocData->bAbbrevLanguage == 0
-                 && setlocData->iPrimaryLen != 0
-                 && _stricmp(setlocData->pchLanguage, localeName) == 0
-                 && RuntimeTestDefaultLanguage(setlocData, localeId, 0) != FALSE) {
-        setlocData->iLcidState |= 0x100;
-        if (setlocData->lcidLanguage == 0) {
-          setlocData->lcidLanguage = localeId;
-        }
-      }
-    }
-
-    return (setlocData->iLcidState & 4) == 0;
-  }
-
-  /**
-   * Address: 0x00AA696B (FUN_00AA696B, LanguageEnumProc)
-   *
-   * What it does:
-   * Enumerates locale language names and latches the first matching language
-   * LCID into the thread's locale-selection lane.
-   */
-  BOOL __stdcall RuntimeLanguageEnumProc(LPSTR localeText)
-  {
-    auto* const setlocData = &__getptd()->setlocData;
-    const LCID localeId = static_cast<LCID>(RuntimeLcidFromHexString(localeText));
-    char localeName[120]{};
-
-    if (!::GetLocaleInfoA(
-          localeId,
-          setlocData->bAbbrevLanguage != 0 ? LOCALE_SABBREVLANGNAME : LOCALE_SENGLANGUAGE,
-          localeName,
-          120)) {
-      setlocData->iLcidState = 0;
-      return TRUE;
-    }
-
-    if (_stricmp(setlocData->pchLanguage, localeName) == 0) {
-      if (setlocData->bAbbrevLanguage != 0) {
-        setlocData->iLcidState |= 4;
-        setlocData->lcidLanguage = localeId;
-        setlocData->lcidCountry = localeId;
-        return (setlocData->iLcidState & 4) == 0;
-      }
-
-      if (RuntimeTestDefaultLanguage(setlocData, localeId, 1) != 0) {
-        setlocData->iLcidState |= 4;
-        setlocData->lcidLanguage = localeId;
-        setlocData->lcidCountry = localeId;
-      }
-      return (setlocData->iLcidState & 4) == 0;
-    }
-
-    if (setlocData->bAbbrevLanguage != 0 || setlocData->iPrimaryLen == 0 ||
-        _stricmp(setlocData->pchLanguage, localeName) != 0) {
-      return (setlocData->iLcidState & 4) == 0;
-    }
-
-    if (RuntimeTestDefaultLanguage(setlocData, localeId, 0) != 0) {
-      setlocData->iLcidState |= 4;
-      setlocData->lcidLanguage = localeId;
-      setlocData->lcidCountry = localeId;
-    }
-
-    return (setlocData->iLcidState & 4) == 0;
-  }
 
 
 
@@ -27004,27 +18984,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return nullptr;
   }
 
-  /**
-   * Address: 0x00ABF440 (FUN_00ABF440, __Fac_tidy)
-   *
-   * What it does:
-   * Under `_Lockit(0)`, drains the global facet registration list, releases
-   * each facet lane, and deletes each list node.
-   */
-  void RuntimeFacetTidy()
-  {
-    RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
-
-    while (gRuntimeFacetHead != nullptr) {
-      RuntimeFacetNode* const node = gRuntimeFacetHead;
-      gRuntimeFacetHead = node->next;
-      RuntimeReleaseSecondFacetInPair(node);
-      ::operator delete(node);
-    }
-
-    RuntimeLockitDestroy(&lockit);
-  }
 
 
   /**
@@ -27132,19 +19091,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeLockitDestroy(&lockit);
   }
 
-  /**
-   * Address: 0x00ABF528 (FUN_00ABF528)
-   *
-   * What it does:
-   * Runs non-deleting `_Locimp` destruction by releasing facet vector lanes and
-   * destroying the embedded locale-name string.
-   */
-  RuntimeLocaleLocimpView* RuntimeDestroyLocimp(RuntimeLocaleLocimpView* const localeImpl)
-  {
-    RuntimeReleaseLocimpFacetVector(localeImpl);
-    localeImpl->name.~basic_string();
-    return localeImpl;
-  }
 
 
   /**
@@ -27292,26 +19238,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  /**
-   * Address: 0x00ABFD9F (FUN_00ABFD9F, _ReleaseCPLocHash)
-   *
-   * What it does:
-   * Atomically drains all codepage-locale hash buckets and frees each cached
-   * locale bundle and node.
-   */
-  void RuntimeReleaseCodePageLocaleHash()
-  {
-    for (std::size_t bucketIndex = 0; bucketIndex < kRuntimeCodePageLocaleHashBucketCount; ++bucketIndex) {
-      auto* const bucket = reinterpret_cast<PVOID volatile*>(&gRuntimeCodePageLocaleHash[bucketIndex]);
-      auto* entry = static_cast<RuntimeCodePageLocaleHashEntry*>(::InterlockedExchangePointer(bucket, nullptr));
-      while (entry != nullptr) {
-        RuntimeCodePageLocaleHashEntry* const nextEntry = entry->next;
-        RuntimeFreeLocale(entry->locale);
-        _free_crt(entry);
-        entry = nextEntry;
-      }
-    }
-  }
 
 
   /**
@@ -27382,25 +19308,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   );
 
 
-  /**
-   * Address: 0x004F31E0 (FUN_004F31E0)
-   *
-   * What it does:
-   * Attempts one locale-aware wide-char to multibyte conversion and returns
-   * the converted byte when exactly one output byte is produced; otherwise
-   * returns the caller-provided fallback byte.
-   */
-  [[maybe_unused]] char RuntimeConvertWideCharWithFallback(
-    const RuntimeWideCharLocaleView* const localeOwner,
-    const wchar_t sourceCharacter,
-    const char fallbackByte
-  )
-  {
-    char convertedBytes[8]{};
-    const RuntimeCvtVec* const localeVector = localeOwner != nullptr ? &localeOwner->cvtVector : nullptr;
-    const int convertedCount = RuntimeWideCharToMultiByteLocale(convertedBytes, sourceCharacter, 0, localeVector);
-    return convertedCount == 1 ? convertedBytes[0] : fallbackByte;
-  }
 
 
   struct RuntimeWideRangeDispatchVTable
@@ -27584,49 +19491,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00ABF7C1 (FUN_00ABF7C1, _Getctype)
-   *
-   * What it does:
-   * Builds one `_Ctypevec` lane from thread locale handle/codepage and either
-   * clones the current CRT `_pctype` table or aliases it on allocation failure.
-   */
-  RuntimeCtypeVec* RuntimeGetctype(RuntimeCtypeVec* const ctypeVector)
-  {
-    constexpr std::size_t kRuntimeCtypeIndexGetctype = 1u;
 
-    ctypeVector->handle = __lc_handle_func()[kRuntimeCtypeIndexGetctype];
-    ctypeVector->codePage = __lc_codepage_func();
-
-    auto* const tableCopy = static_cast<std::uint16_t*>(_calloc_crt(0x100u, sizeof(std::uint16_t)));
-    ctypeVector->table = tableCopy;
-    if (tableCopy != nullptr) {
-      std::memcpy(tableCopy, __pctype_func(), 0x200u);
-      ctypeVector->ownsCopiedTable = 1;
-    } else {
-      ctypeVector->ownsCopiedTable = 0;
-      ctypeVector->table = __pctype_func();
-    }
-
-    return ctypeVector;
-  }
-
-  /**
-   * Address: 0x00ABFA82 (FUN_00ABFA82, _Getcvt)
-   *
-   * What it does:
-   * Returns one `_Cvtvec` pair containing thread locale conversion handle lane
-   * and current locale codepage lane.
-   */
-  RuntimeCvtVec RuntimeGetcvt()
-  {
-    constexpr std::size_t kRuntimeCtypeIndexGetcvt = 2u;
-
-    RuntimeCvtVec cvtVector{};
-    cvtVector.handle = __lc_handle_func()[kRuntimeCtypeIndexGetcvt];
-    cvtVector.codePage = __lc_codepage_func();
-    return cvtVector;
-  }
 
   struct RuntimeLocaleVectorsOwnerView
   {
@@ -27662,60 +19527,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
 
 
-  /**
-   * Address: 0x00A8679D (FUN_00A8679D)
-   *
-   * What it does:
-   * Performs `ungetc` pushback core validation and buffer mutation: enforces
-   * textmode lane constraints, reserves one byte in the stream buffer, and
-   * updates `_cnt/_flag` on successful pushback.
-   */
-  int RuntimeUngetcCore(const int character, std::FILE* const stream)
-  {
-    LegacyFileView& fileView = legacy_file(stream);
-    if ((fileView._flag & 0x40) == 0) {
-      const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
-      if (((ioInfo->textmodeUnicode & 0x7F) != 0) || (ioInfo->textmodeUnicode < 0)) {
-        *_errno() = EINVAL;
-        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        return EOF;
-      }
-    }
-
-    if (character == EOF) {
-      return EOF;
-    }
-
-    if ((fileView._flag & 0x1) == 0 && (((fileView._flag & 0x80) == 0) || (fileView._flag & 0x2) != 0)) {
-      return EOF;
-    }
-
-    if (fileView._base == nullptr) {
-      _getbuf(stream);
-    }
-
-    if (fileView._ptr == fileView._base) {
-      if (fileView._cnt != 0) {
-        return EOF;
-      }
-      ++fileView._ptr;
-    }
-
-    char* const pushedSlot = --fileView._ptr;
-    const unsigned char pushedByte = static_cast<unsigned char>(character);
-    if ((fileView._flag & 0x40) != 0) {
-      if (static_cast<unsigned char>(*pushedSlot) != pushedByte) {
-        ++fileView._ptr;
-        return EOF;
-      }
-    } else {
-      *pushedSlot = static_cast<char>(pushedByte);
-    }
-
-    ++fileView._cnt;
-    fileView._flag = (fileView._flag & ~0x10) | 0x1;
-    return static_cast<int>(pushedByte);
-  }
 
 
 
@@ -27993,48 +19804,6 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return status;
   }
 
-  /**
-   * Address: 0x00A882CC (FUN_00A882CC)
-   *
-   * What it does:
-   * Validates one stream/format pair, applies CRT unicode-textmode guard lanes
-   * for narrow output, and dispatches one output callback under stream lock.
-   */
-  int RuntimeDispatchLockedOutputCallback(
-    const RuntimeOutputFn outputCallback,
-    std::FILE* const stream,
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    if (stream == nullptr || format == nullptr || outputCallback == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
-
-    int result = 0;
-    _lock_file(stream);
-
-    if ((legacy_file(stream)._flag & 0x40) == 0) {
-      const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
-      if (((ioInfo->textmodeUnicode & 0x7F) != 0) || (ioInfo->textmodeUnicode < 0)) {
-        *_errno() = EINVAL;
-        _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        result = -1;
-      }
-    }
-
-    if (result == 0) {
-      const int stbufState = RuntimeStbuf(stream);
-      result = outputCallback(stream, format, localeInfo, arguments);
-      (void)RuntimeFinalizeStreamBuffering(stbufState, stream);
-    }
-
-    _unlock_file(stream);
-    return result;
-  }
 
 
 
@@ -28322,54 +20091,11 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     extern "C" RuntimeTssSlotVector* __cdecl get_slots(bool alloc);
     extern "C" void __cdecl cleanup_slots(RuntimeTssSlotVector* slots);
 
-    void RuntimeInitializeTryEnterCriticalSectionSlot(RuntimeTryEnterCriticalSectionFn& slot)
-    {
-      OSVERSIONINFOA versionInfo{};
-      versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
-      (void)std::memset(&versionInfo.dwMajorVersion, 0, sizeof(versionInfo) - sizeof(versionInfo.dwOSVersionInfoSize));
-      (void)::GetVersionExA(&versionInfo);
-      if (versionInfo.dwPlatformId == VER_PLATFORM_WIN32_NT && versionInfo.dwMajorVersion >= 4u) {
-        if (HMODULE moduleHandle = ::GetModuleHandleA("KERNEL32.DLL"); moduleHandle != nullptr) {
-          slot = reinterpret_cast<RuntimeTryEnterCriticalSectionFn>(
-            ::GetProcAddress(moduleHandle, "TryEnterCriticalSection")
-          );
-        }
-      }
-    }
   } // namespace
 
 
 
 
-  /**
-   * Address: 0x00ABE0D5 (FUN_00ABE0D5)
-   *
-   * What it does:
-   * Validates one stdout-format lane, locks `stdout`, runs one caller-selected
-   * output formatter callback through CRT line-buffer setup/teardown lanes, and
-   * unlocks the stream before returning callback status.
-   */
-  [[maybe_unused]] int RuntimeDispatchStdoutFormatterWithValidation(
-    const RuntimeOutputFn outputFormatter,
-    const char* const format,
-    _locale_t const localeInfo,
-    va_list arguments
-  )
-  {
-    std::FILE* const stdoutStream = __iob_func() + 1;
-    if (format == nullptr) {
-      *_errno() = EINVAL;
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-      return -1;
-    }
-
-    _lock_file(stdoutStream);
-    const int stbufState = RuntimeStbuf(stdoutStream);
-    const int formatResult = outputFormatter(stdoutStream, format, localeInfo, arguments);
-    (void)RuntimeFinalizeStreamBuffering(stbufState, stdoutStream);
-    _unlock_file(stdoutStream);
-    return formatResult;
-  }
 
 
 
@@ -28651,17 +20377,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return 0;
   }
 
-  /**
-   * Address: 0x00A86A7F (FUN_00A86A7F, _ftime64)
-   *
-   * What it does:
-   * Thunks `_ftime64` into the secure `_ftime64_s` lane; the stub's error
-   * return is ignored by the CRT contract.
-   */
-  void RuntimeFtime64(__timeb64* const outTime)
-  {
-    (void)RuntimeFtime64S(outTime);
-  }
 
 
 
@@ -28747,18 +20462,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeMutexView) == 0x8, "RuntimeMutexView size must be 0x8");
 
-  void RuntimeUnlockMutex(RuntimeMutexView* const mutex)
-  {
-    if (mutex == nullptr || mutex->nativeHandleOrCriticalSection == nullptr) {
-      return;
-    }
-
-    if ((mutex->lockMode & 0x1u) != 0u) {
-      ::LeaveCriticalSection(static_cast<CRITICAL_SECTION*>(mutex->nativeHandleOrCriticalSection));
-    } else {
-      ::ReleaseMutex(static_cast<HANDLE>(mutex->nativeHandleOrCriticalSection));
-    }
-  }
 
   struct RuntimeOwnedHandleCell
   {
@@ -28810,17 +20513,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   );
   static_assert(sizeof(RuntimeCriticalSectionLeaveGuard) == 0x8, "RuntimeCriticalSectionLeaveGuard size must be 0x8");
 
-  void DestroySharedWxStringRuntimePayload(RuntimeWxStringView* const value)
-  {
-    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
-    const std::int32_t refCount = header[0];
-    if (refCount != -1) {
-      header[0] = refCount - 1;
-      if (refCount == 1) {
-        ::operator delete(static_cast<void*>(header));
-      }
-    }
-  }
 
 
 
@@ -29176,31 +20868,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-  template <typename TWord, std::size_t kWordStride>
-  [[nodiscard]] TWord* RuntimeCopyWordRangeStridedLegacyNullDestination(
-    TWord* const destination,
-    const TWord* const sourceEnd,
-    const TWord* sourceBegin
-  ) noexcept
-  {
-    constexpr std::size_t kStrideBytes = sizeof(TWord) * kWordStride;
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<TWord*>(destinationCursor);
-        for (std::size_t wordIndex = 0; wordIndex < kWordStride; ++wordIndex) {
-          output[wordIndex] = sourceBegin[wordIndex];
-        }
-
-        sourceBegin += kWordStride;
-      }
-
-      destinationCursor += kStrideBytes;
-    }
-
-    return reinterpret_cast<TWord*>(destinationCursor);
-  }
 
   template <typename TWord, std::size_t kWordStride>
   [[nodiscard]] TWord* RuntimeCopyWordCountFromFixedSource(
@@ -29416,59 +21083,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return vector->capacity;
   }
 
-  /**
-   * Address: 0x007AF0B0 (FUN_007AF0B0)
-   *
-   * What it does:
-   * Inserts one backlink-pair range into vector storage at `insertPosition`,
-   * using in-place tail moves when capacity allows or reallocating storage
-   * otherwise.
-   */
-  [[maybe_unused]] RuntimeBacklinkedPairCopyLane* RuntimeInsertBacklinkedPairVectorRangeLaneA(
-    RuntimeBacklinkedPairVectorStorageView* const vector,
-    RuntimeBacklinkedPairCopyLane* const insertPosition,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  )
-  {
-    const std::ptrdiff_t insertCount = sourceEnd - sourceBegin;
-    if (insertCount <= 0) {
-      return insertPosition;
-    }
-
-    RuntimeBacklinkedPairCopyLane* const begin = vector->begin;
-    RuntimeBacklinkedPairCopyLane* const end = vector->end;
-    RuntimeBacklinkedPairCopyLane* const capacity = vector->capacity;
-
-    const std::ptrdiff_t size = end - begin;
-    const std::ptrdiff_t capacityCount = capacity - begin;
-    const std::ptrdiff_t requiredCount = size + insertCount;
-    if (requiredCount > capacityCount) {
-      const std::ptrdiff_t grownCount = capacityCount * 2;
-      const std::ptrdiff_t newCapacityCount = (requiredCount < grownCount) ? grownCount : requiredCount;
-      return RuntimeReallocateBacklinkedPairVectorForInsertRangeLaneA(
-        vector,
-        static_cast<std::uint32_t>(newCapacityCount),
-        insertPosition,
-        sourceBegin,
-        sourceEnd
-      );
-    }
-
-    RuntimeBacklinkedPairCopyLane* const insertEnd = insertPosition + insertCount;
-    if (insertEnd <= end) {
-      vector->end = RuntimeCopyBacklinkedPairRangeCommon(end, end - insertCount, end);
-      (void)RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(end, end - insertCount, insertPosition);
-      return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(insertEnd, sourceEnd, sourceBegin);
-    }
-
-    const std::ptrdiff_t tailCount = end - insertPosition;
-    const RuntimeBacklinkedPairCopyLane* const splitSource = sourceBegin + tailCount;
-    RuntimeBacklinkedPairCopyLane* newEnd = RuntimeCopyBacklinkedPairRangeCommon(end, splitSource, sourceEnd);
-    newEnd = RuntimeCopyBacklinkedPairRangeCommon(newEnd, insertPosition, end);
-    vector->end = newEnd;
-    return RuntimeCopyAssignBacklinkedPairRangeBackwardCommon(end, splitSource, sourceBegin);
-  }
 
 
   /**
@@ -29499,56 +21113,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-  [[nodiscard]] RuntimeBacklinkedPairFloatTripleRecord* RuntimeAssignBacklinkedPairFloatTripleRecordCommon(
-    RuntimeBacklinkedPairFloatTripleRecord* const destination,
-    const RuntimeBacklinkedPairFloatTripleRecord* const source
-  ) noexcept
-  {
-    destination->word0 = source->word0;
 
-    auto* const destinationPair = reinterpret_cast<RuntimeBacklinkedPairCopyLane*>(&destination->ownerSlot);
-    const auto* const sourcePair = reinterpret_cast<const RuntimeBacklinkedPairCopyLane*>(&source->ownerSlot);
-    if (sourcePair->ownerSlot != destinationPair->ownerSlot) {
-      RuntimeDetachBacklinkedPairLane(*destinationPair);
-      RuntimeAttachBacklinkedPairLane(*destinationPair, *sourcePair);
-    }
-
-    destination->laneC = source->laneC;
-    destination->laneD = source->laneD;
-    destination->laneE = source->laneE;
-    return destination;
-  }
-
-  [[nodiscard]] RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordRangeCommon(
-    RuntimeBacklinkedFiveWordCopyLane* const destination,
-    const RuntimeBacklinkedFiveWordCopyLane* sourceBegin,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeBacklinkedFiveWordCopyLane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->word1 = sourceBegin->word1;
-        std::uintptr_t* const ownerSlot = sourceBegin->ownerSlot;
-        output->ownerSlot = ownerSlot;
-        if (ownerSlot == nullptr) {
-          output->previousOwner = 0u;
-        } else {
-          output->previousOwner = *ownerSlot;
-          *ownerSlot = destinationCursor + offsetof(RuntimeBacklinkedFiveWordCopyLane, ownerSlot);
-        }
-        output->word4 = sourceBegin->word4;
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeBacklinkedFiveWordCopyLane);
-    }
-
-    return reinterpret_cast<RuntimeBacklinkedFiveWordCopyLane*>(destinationCursor);
-  }
 
   [[nodiscard]] RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordCountFromSingleLane(
     RuntimeBacklinkedFiveWordCopyLane* const destination,
@@ -29646,29 +21211,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     }
   }
 
-  [[nodiscard]] RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleCountFromSingleLane(
-    RuntimeRefcountTailTripleCopyLane* const destination,
-    std::uint32_t repeatCount,
-    const RuntimeRefcountTailTripleCopyLane* const sourceLane
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (repeatCount != 0u) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRefcountTailTripleCopyLane*>(destinationCursor);
-        output->word0 = sourceLane->word0;
-        output->word1 = sourceLane->word1;
-        output->owner = sourceLane->owner;
-        RuntimeRetainRefcountOwner(output->owner);
-      }
-
-      destinationCursor += sizeof(RuntimeRefcountTailTripleCopyLane);
-      --repeatCount;
-    }
-
-    return reinterpret_cast<RuntimeRefcountTailTripleCopyLane*>(destinationCursor);
-  }
 
   [[nodiscard]] RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleRangeCommon(
     RuntimeRefcountTailTripleCopyLane* const destination,
@@ -29797,87 +21339,9 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     "RuntimeRefcountPairVectorStorageView::capacity offset must be 0x0C"
   );
 
-  [[maybe_unused]] void RuntimeReleaseRefcountPairRange(
-    RuntimeRefcountPairCopyLane* begin,
-    RuntimeRefcountPairCopyLane* const end
-  ) noexcept
-  {
-    while (begin != end) {
-      if (begin->owner != nullptr) {
-        RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(begin->owner));
-      }
-      ++begin;
-    }
-  }
 
-  [[maybe_unused]] [[nodiscard]] RuntimeRefcountPairCopyLane* RuntimeUninitializedFillRefcountPairRangeRetain(
-    RuntimeRefcountPairCopyLane* destination,
-    std::uint32_t count,
-    const RuntimeRefcountPairCopyLane& value
-  ) noexcept
-  {
-    while (count != 0u) {
-      if (destination != nullptr) {
-        destination->word0 = value.word0;
-        destination->owner = value.owner;
-        RuntimeRetainRefcountOwner(destination->owner);
-      }
-      ++destination;
-      --count;
-    }
 
-    return destination;
-  }
 
-  [[maybe_unused]] [[nodiscard]] RuntimeRefcountPairCopyLane* RuntimeFillAssignRefcountPairRangeRetain(
-    RuntimeRefcountPairCopyLane* destinationBegin,
-    RuntimeRefcountPairCopyLane* const destinationEnd,
-    const RuntimeRefcountPairCopyLane& value
-  ) noexcept
-  {
-    RuntimeRefcountPairCopyLane* destination = destinationBegin;
-    while (destination != destinationEnd) {
-      destination->word0 = value.word0;
-
-      RuntimeRefcountOwnerView* const incomingOwner = value.owner;
-      if (incomingOwner != destination->owner) {
-        RuntimeRetainRefcountOwner(incomingOwner);
-        if (destination->owner != nullptr) {
-          RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destination->owner));
-        }
-        destination->owner = incomingOwner;
-      }
-
-      ++destination;
-    }
-
-    return destination;
-  }
-
-  [[maybe_unused]] [[nodiscard]] RuntimeRefcountPairCopyLane* RuntimeCopyAssignRefcountPairRangeBackwardRetain(
-    RuntimeRefcountPairCopyLane* destinationEnd,
-    const RuntimeRefcountPairCopyLane* const sourceBegin,
-    const RuntimeRefcountPairCopyLane* sourceEnd
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-
-      destinationEnd->word0 = sourceEnd->word0;
-
-      RuntimeRefcountOwnerView* const incomingOwner = sourceEnd->owner;
-      if (incomingOwner != destinationEnd->owner) {
-        RuntimeRetainRefcountOwner(incomingOwner);
-        if (destinationEnd->owner != nullptr) {
-          RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destinationEnd->owner));
-        }
-        destinationEnd->owner = incomingOwner;
-      }
-    }
-
-    return destinationEnd;
-  }
 
 
   [[nodiscard]] RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeCommon(
@@ -29934,219 +21398,36 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return destination;
   }
 
-  /**
-   * Address: 0x005CDAB0 (FUN_005CDAB0)
-   * Address: 0x005CDAE0 (FUN_005CDAE0)
-   * Address: 0x005CE020 (FUN_005CE020)
-   * Address: 0x005CBF00 (FUN_005CBF00)
-   *
-   * What it does:
-   * Copies one half-open range of 52-byte records while retaining the three
-   * refcounted owner lanes at `+0x10`, `+0x18`, and `+0x20`.
-   */
-  RuntimeRetainedOwnerTripleRecord52Lane* RuntimeCopyRetainedOwnerTripleRecord52RangeAllowNull(
-    RuntimeRetainedOwnerTripleRecord52Lane* const destination,
-    const RuntimeRetainedOwnerTripleRecord52Lane* sourceBegin,
-    const RuntimeRetainedOwnerTripleRecord52Lane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeRetainedOwnerTripleRecord52Lane*>(destinationCursor);
-        (void)RuntimeCopyRetainedOwnerTripleRecord52Lane(output, sourceBegin);
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeRetainedOwnerTripleRecord52Lane);
-    }
-
-    return reinterpret_cast<RuntimeRetainedOwnerTripleRecord52Lane*>(destinationCursor);
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x005CDEF0 (FUN_005CDEF0)
-   *
-   * What it does:
-   * Copies one half-open range of tagged 28-byte records while retaining the
-   * refcounted owner lane at `+0x14`.
-   */
-  RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28RangeAllowNull(
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination,
-    const RuntimeCopyRefcountTaggedRecord28Lane* sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationCursor != 0u) {
-        auto* const output = reinterpret_cast<RuntimeCopyRefcountTaggedRecord28Lane*>(destinationCursor);
-        output->word0 = sourceBegin->word0;
-        output->word1 = sourceBegin->word1;
-        output->word2 = sourceBegin->word2;
-        output->lane0C = sourceBegin->lane0C;
-        output->lane10 = sourceBegin->lane10;
-        output->owner = sourceBegin->owner;
-        RuntimeRetainRefcountOwner(output->owner);
-        output->lane18 = sourceBegin->lane18;
-      }
-
-      ++sourceBegin;
-      destinationCursor += sizeof(RuntimeCopyRefcountTaggedRecord28Lane);
-    }
-
-    return reinterpret_cast<RuntimeCopyRefcountTaggedRecord28Lane*>(destinationCursor);
-  }
-
-
-
-
-  /**
-   * Address: 0x005493B0 (FUN_005493B0)
-   *
-   * What it does:
-   * Writes `repeatCount` 5-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordQuintCountLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceFiveWords,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 5>(destination, sourceFiveWords, repeatCount);
-  }
-
-
-  /**
-   * Address: 0x00583180 (FUN_00583180)
-   *
-   * What it does:
-   * Writes `repeatCount` 6-float lanes from one fixed source lane.
-   */
-  float* RuntimeCopyFloatHexadCountLaneA(
-    const std::uint32_t repeatCount,
-    float* const destination,
-    const float* const sourceSixFloats
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<float, 6>(destination, sourceSixFloats, repeatCount);
-  }
-
-
-  /**
-   * Address: 0x00584100 (FUN_00584100)
-   *
-   * What it does:
-   * Copies one float6 lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatHexadRangeLaneA(
-    float* const destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 6>(destination, sourceBegin, sourceEnd);
-  }
-
-
-  /**
-   * Address: 0x00572B60 (FUN_00572B60)
-   *
-   * What it does:
-   * Copies one mixed dword+float7 lane range from `[sourceBegin, sourceEnd)`
-   * without null-destination guarding.
-   */
-  RuntimeCopyMixedDwordFloatSeptupleLane* RuntimeCopyDwordOctupleRangeLaneA(
-    RuntimeCopyMixedDwordFloatSeptupleLane* const destination,
-    const RuntimeCopyMixedDwordFloatSeptupleLane* const sourceBegin,
-    const RuntimeCopyMixedDwordFloatSeptupleLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedNoNullGuard<RuntimeCopyMixedDwordFloatSeptupleLane, 1>(
-      destination,
-      sourceBegin,
-      sourceEnd
-    );
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x00594A20 (FUN_00594A20)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
-
-
-  /**
-   * Address: 0x00595F10 (FUN_00595F10)
-   * Address: 0x005CE090 (FUN_005CE090)
-   *
-   * What it does:
-   * Copies one half-open 3-dword lane range `[sourceBegin, sourceEnd)` while
-   * preserving the legacy null-destination advance semantics.
-   */
-  [[nodiscard]] std::uint32_t* RuntimeCopyDwordTripleRangeAllowNull(
-    std::uint32_t* destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* sourceBegin
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-
-    while (sourceBegin != sourceEnd) {
-      if (destinationAddress != 0u) {
-        auto* const out = reinterpret_cast<std::uint32_t*>(destinationAddress);
-        out[0] = sourceBegin[0];
-        out[1] = sourceBegin[1];
-        out[2] = sourceBegin[2];
-      }
-
-      sourceBegin += 3;
-      destinationAddress += sizeof(std::uint32_t) * 3u;
-    }
-
-    return reinterpret_cast<std::uint32_t*>(destinationAddress);
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x005CBC70 (FUN_005CBC70)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -30181,86 +21462,10 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x005CBAC0 (FUN_005CBAC0)
-   *
-   * What it does:
-   * Writes `repeatCount` tagged 28-byte lanes from one fixed source lane and
-   * retains each copied owner lane at `+0x14`.
-   */
-  RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyRefcountTaggedRecord28CountLaneA(
-    RuntimeCopyRefcountTaggedRecord28Lane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeCopyRefcountTaggedRecord28Lane* const sourceLane
-  ) noexcept
-  {
-    RuntimeCopyRefcountTaggedRecord28Lane* destinationCursor = destination;
-    std::uint32_t remaining = repeatCount;
-    while (remaining != 0u) {
-      if (destinationCursor != nullptr) {
-        destinationCursor->word0 = sourceLane->word0;
-        destinationCursor->word1 = sourceLane->word1;
-        destinationCursor->word2 = sourceLane->word2;
-        destinationCursor->lane0C = sourceLane->lane0C;
-        destinationCursor->lane10 = sourceLane->lane10;
-        destinationCursor->owner = sourceLane->owner;
-        RuntimeRetainRefcountOwner(destinationCursor->owner);
-        destinationCursor->lane18 = sourceLane->lane18;
-      }
-
-      ++destinationCursor;
-      --remaining;
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x00628AE0 (FUN_00628AE0)
-   *
-   * What it does:
-   * Writes `repeatCount` 12-byte backlink lanes from one fixed source lane and
-   * patches each destination lane to own that source owner slot.
-   */
-  RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordCountLaneA(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordCountFromSingleLane(destination, repeatCount, sourceLane);
-  }
-
-  /**
-   * Address: 0x0064F9A0 (FUN_0064F9A0)
-   *
-   * What it does:
-   * Writes `repeatCount` 13-float lanes from one fixed source lane.
-   */
-  float* RuntimeCopyFloat13CountLaneA(
-    const std::uint32_t repeatCount,
-    float* const destination,
-    const float* const sourceThirteenFloats
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<float, 13>(destination, sourceThirteenFloats, repeatCount);
-  }
 
 
-  /**
-   * Address: 0x00680940 (FUN_00680940)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneC(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
+
+
 
 
 
@@ -30271,91 +21476,15 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeFloat13LaneView) == 0x34, "RuntimeFloat13LaneView size must be 0x34");
 
-  /**
-   * Address: 0x006501F0 (FUN_006501F0)
-   *
-   * What it does:
-   * Copies 13-float records from `[sourceBegin, sourceEnd)` into `destination`
-   * and returns the advanced destination cursor.
-   *
-   * Note:
-   * The binary advances the destination register even when destination is
-   * null; we preserve that raw-lane behavior with integer cursor arithmetic.
-   */
-  [[maybe_unused]] RuntimeFloat13LaneView* RuntimeCopyFloat13RangeAndAdvanceLaneA(
-    RuntimeFloat13LaneView* destination,
-    const RuntimeFloat13LaneView* sourceBegin,
-    const RuntimeFloat13LaneView* sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destination);
-    for (const RuntimeFloat13LaneView* sourceCursor = sourceBegin;
-      sourceCursor != sourceEnd;
-      ++sourceCursor) {
-      if (destination != nullptr) {
-        *destination = *sourceCursor;
-      }
-
-      destinationCursor += sizeof(RuntimeFloat13LaneView);
-      destination = reinterpret_cast<RuntimeFloat13LaneView*>(destinationCursor);
-    }
-
-    return destination;
-  }
-
-
-
-  /**
-   * Address: 0x00689310 (FUN_00689310)
-   *
-   * What it does:
-   * Writes `repeatCount` 20-byte backlink lanes from one fixed source lane and
-   * patches each destination lane to own that source owner slot.
-   */
-  RuntimeBacklinkedFiveWordCopyLane* RuntimeCopyBacklinkedFiveWordCountLaneA(
-    RuntimeBacklinkedFiveWordCopyLane* const destination,
-    const std::uint32_t repeatCount,
-    const RuntimeBacklinkedFiveWordCopyLane* const sourceLane
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedFiveWordCountFromSingleLane(destination, repeatCount, sourceLane);
-  }
-
-
-  /**
-   * Address: 0x006A0080 (FUN_006A0080)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneD(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
 
 
 
 
-  /**
-   * Address: 0x0071E8E0 (FUN_0071E8E0)
-   * Address: 0x0071A1F0 (FUN_0071A1F0)
-   * Address: 0x007E98D0 (FUN_007E98D0)
-   *
-   * What it does:
-   * Writes `repeatCount` float4 lanes from one fixed source lane.
-   */
-  float* RuntimeCopyFloatQuadCountLaneA(
-    float* const destination,
-    const float* const sourceQuad,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<float, 4>(destination, sourceQuad, repeatCount);
-  }
+
+
+
+
+
 
 
   struct RuntimeRefcountedPointerLane
@@ -30367,200 +21496,35 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x00693200 (FUN_00693200)
-   *
-   * What it does:
-   * Writes `repeatCount` float7 lanes from one fixed source lane.
-   */
-  float* RuntimeCopyFloatSeptupleCountLaneA(
-    float* const destination,
-    const float* const sourceSeptuple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<float, 7>(destination, sourceSeptuple, repeatCount);
-  }
-
-
-  /**
-   * Address: 0x00753A90 (FUN_00753A90)
-   *
-   * What it does:
-   * Writes `repeatCount` 10-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordDecupleCountLaneA(
-    const std::uint32_t repeatCount,
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTenWords
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 10>(destination, sourceTenWords, repeatCount);
-  }
-
-
-  /**
-   * Address: 0x00755D30 (FUN_00755D30)
-   *
-   * What it does:
-   * Copies one 10-dword lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordDecupleRangeLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 10>(destination, sourceBegin, sourceEnd);
-  }
-
-
-  /**
-   * Address: 0x00756920 (FUN_00756920)
-   *
-   * What it does:
-   * Copies one 10-dword lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordDecupleRangeLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 10>(destination, sourceBegin, sourceEnd);
-  }
-
-
-
-
-  /**
-   * Address: 0x00756880 (FUN_00756880)
-   *
-   * What it does:
-   * Copies one 12-byte refcounted lane range from `[sourceBegin, sourceEnd)`
-   * and retains the owner lane at `+0x08`.
-   */
-  RuntimeRefcountTailTripleCopyLane* RuntimeCopyRefcountTailTripleRangeLaneB(
-    RuntimeRefcountTailTripleCopyLane* const destination,
-    const RuntimeRefcountTailTripleCopyLane* sourceBegin,
-    const RuntimeRefcountTailTripleCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailTripleRangeCommon(destination, sourceBegin, sourceEnd);
-  }
-
-
-
-  /**
-   * Address: 0x007625F0 (FUN_007625F0)
-   * Address: 0x00762AD0 (FUN_00762AD0)
-   *
-   * What it does:
-   * Copies one float7 lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatSeptupleRangeLaneA(
-    float* const destination,
-    const float* const sourceEnd,
-    const float* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 7>(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B5D10 (FUN_005B5D10)
-   *
-   * What it does:
-   * Copies one float7 lane range from `[sourceBegin, sourceEnd)` without
-   * null-destination guarding.
-   */
-  float* RuntimeCopyFloatSeptupleRangeNoNullGuardLaneA(
-    float* const destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStridedNoNullGuard<float, 7>(destination, sourceBegin, sourceEnd);
-  }
-
-
-  /**
-   * Address: 0x007567A0 (FUN_007567A0)
-   *
-   * What it does:
-   * Copies one float7 lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatSeptupleRangeLaneB(
-    float* const destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 7>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
 
 
-  /**
-   * Address: 0x0076B0E0 (FUN_0076B0E0)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneE(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
-
-
-
-  /**
-   * Address: 0x00629F00 (FUN_00629F00)
-   * Address: 0x006E0160 (FUN_006E0160)
-   *
-   * What it does:
-   * Copies one 12-byte backlink lane range and patches each destination lane
-   * to own the referenced owner slot.
-   */
-  RuntimeBacklinkedTripleWordCopyLane* RuntimeCopyBacklinkedTripleWordRangeLaneA(
-    RuntimeBacklinkedTripleWordCopyLane* const destination,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceBegin,
-    const RuntimeBacklinkedTripleWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedTripleWordRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x006EC5B0 (FUN_006EC5B0)
-   * Address: 0x007A5FE0 (FUN_007A5FE0)
-   *
-   * What it does:
-   * Writes `repeatCount` 8-byte backlink lanes from one fixed owner-slot source
-   * and patches each destination lane to own that slot.
-   */
-  RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairCountLaneA(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const std::int32_t repeatCount,
-    std::uintptr_t** const sourceOwnerSlotLane
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot(
-      destination,
-      static_cast<std::uint32_t>(repeatCount),
-      sourceOwnerSlotLane
-    );
-  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   /**
@@ -30578,43 +21542,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00733A80 (FUN_00733A80)
-   *
-   * What it does:
-   * Copies one dword-pair lane range `[sourceBegin, sourceEnd)` into
-   * destination storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordPairRangeTailAdapterLaneC(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordPairRangeLaneC(sourceEnd, sourceEnd, sourceBegin);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x008DA380 (FUN_008DA380)
-   *
-   * What it does:
-   * Writes `repeatCount` dword-pair lanes from one fixed source pair.
-   */
-  std::uint32_t* RuntimeCopyDwordPairCountLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourcePair,
-    const std::int32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 2>(
-      destination,
-      sourcePair,
-      static_cast<std::uint32_t>(repeatCount)
-    );
-  }
 
 
 
@@ -30624,85 +21556,13 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeRaw28ByteRecord) == 0x1C, "RuntimeRaw28ByteRecord size must be 0x1C");
 
-  /**
-   * Address: 0x008F6470 (FUN_008F6470)
-   *
-   * What it does:
-   * Copies one 28-byte lane range from `[sourceBegin, sourceEnd)` and returns
-   * one-past-end destination.
-   */
-  RuntimeRaw28ByteRecord* RuntimeCopyRaw28ByteRangeLaneA(
-    const RuntimeRaw28ByteRecord* const sourceBegin,
-    const RuntimeRaw28ByteRecord* const sourceEnd,
-    RuntimeRaw28ByteRecord* const destination
-  ) noexcept
-  {
-    std::uint32_t* const destinationWords = reinterpret_cast<std::uint32_t*>(destination);
-    const std::uint32_t* const sourceBeginWords = reinterpret_cast<const std::uint32_t*>(sourceBegin);
-    const std::uint32_t* const sourceEndWords = reinterpret_cast<const std::uint32_t*>(sourceEnd);
-
-    return reinterpret_cast<RuntimeRaw28ByteRecord*>(
-      RuntimeCopyWordRangeStrided<std::uint32_t, 7>(destinationWords, sourceBeginWords, sourceEndWords)
-    );
-  }
 
 
 
-  /**
-   * Address: 0x008F65B0 (FUN_008F65B0)
-   *
-   * What it does:
-   * Writes `repeatCount` 28-byte lanes from one fixed source lane.
-   */
-  RuntimeRaw28ByteRecord* RuntimeCopyRaw28ByteCountLaneA(
-    RuntimeRaw28ByteRecord* const destination,
-    const std::int32_t repeatCount,
-    const RuntimeRaw28ByteRecord* const sourceLane
-  ) noexcept
-  {
-    return reinterpret_cast<RuntimeRaw28ByteRecord*>(
-      RuntimeCopyWordCountFromFixedSource<std::uint32_t, 7>(
-        reinterpret_cast<std::uint32_t*>(destination),
-        reinterpret_cast<const std::uint32_t*>(sourceLane),
-        static_cast<std::uint32_t>(repeatCount)
-      )
-    );
-  }
 
 
 
-  /**
-   * Address: 0x00760000 (FUN_00760000)
-   * Address: 0x007603C0 (FUN_007603C0)
-   * Address: 0x00760670 (FUN_00760670)
-   * Address: 0x00760810 (FUN_00760810)
-   *
-   * What it does:
-   * Copies one dword-pair lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordPairRangeLaneD(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x00756840 (FUN_00756840)
-   *
-   * What it does:
-   * Copies one dword-pair lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordPairRangeLaneF(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -30714,29 +21574,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeDwordPairLane) == 0x08, "RuntimeDwordPairLane size must be 0x08");
 
-  /**
-   * Address: 0x00950670 (FUN_00950670)
-   *
-   * What it does:
-   * Backward-copies one dword-pair range `[sourceBegin, sourceEnd)` into the
-   * destination tail ending at `destinationEnd`, then returns the resulting
-   * destination start lane.
-   */
-  [[maybe_unused]] RuntimeDwordPairLane* RuntimeCopyDwordPairRangeBackwardLaneA(
-    const RuntimeDwordPairLane* const sourceBegin,
-    const RuntimeDwordPairLane* sourceEnd,
-    RuntimeDwordPairLane* destinationEnd
-  ) noexcept
-  {
-    RuntimeDwordPairLane* destinationCursor = destinationEnd;
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceEnd->lane00;
-      destinationCursor->lane04 = sourceEnd->lane04;
-    }
-    return destinationCursor;
-  }
 
 
 
@@ -30809,43 +21646,11 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return cycleCount;
   }
 
-  /**
-   * Address: 0x007344F0 (FUN_007344F0)
-   * Address: 0x007607F0 (FUN_007607F0)
-   * Address: 0x007608E0 (FUN_007608E0)
-   *
-   * What it does:
-   * Rotates one 8-byte lane range `[first,last)` so that `middle` becomes the
-   * new beginning using the legacy juggle-cycle algorithm.
-   */
-  std::int32_t RuntimeRotatePairWordRangeByMiddle(
-    std::uint32_t* const first,
-    std::uint32_t* const middle,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 2>(first, middle, last);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x0087EAA0 (FUN_0087EAA0)
-   *
-   * What it does:
-   * Rotates one dword lane range `[first,last)` so that `middle` becomes the
-   * new beginning using the legacy juggle-cycle algorithm.
-   */
-  std::int32_t RuntimeRotateDwordRangeByMiddle(
-    std::uint32_t* const first,
-    std::uint32_t* const middle,
-    std::uint32_t* const last
-  ) noexcept
-  {
-    return RuntimeRotateRangeByMiddleJuggle<std::uint32_t, 1>(first, middle, last);
-  }
 
 
 
@@ -30868,20 +21673,6 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x00768E10 (FUN_00768E10)
-   *
-   * What it does:
-   * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
-   * storage starting at `sourceEnd`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeTailAdapterLaneA(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneA(sourceEnd, sourceEnd, sourceBegin);
-  }
 
 
 
@@ -30891,90 +21682,18 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
 
 
-  /**
-   * Address: 0x0092DF90 (FUN_0092DF90)
-   *
-   * What it does:
-   * Writes `repeatCount` dwords from one fixed source word into a contiguous
-   * destination lane and returns the remaining count (always zero on exit).
-   */
-  std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneB(
-    std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
-  }
 
 
 
-  /**
-   * Address: 0x00932A50 (FUN_00932A50)
-   *
-   * What it does:
-   * Writes `repeatCount` dwords from one fixed source word into a contiguous
-   * destination lane and returns the remaining count (always zero on exit).
-   */
-  std::int32_t RuntimeCopyDwordCountFromFixedSourceLaneC(
-    std::int32_t repeatCount,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordCountFromFixedSourceLaneA(repeatCount, sourceWord, destination);
-  }
 
 
 
-  /**
-   * Address: 0x008EA090 (FUN_008EA090)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
-  std::uint32_t* const destination,
-  const std::uint32_t* const sourceTriple,
-  const std::uint32_t repeatCount
-) noexcept
-{
-  return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-}
 
 
 
-  /**
-   * Address: 0x0092DF10 (FUN_0092DF10)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneG(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
 
 
 
-  /**
-   * Address: 0x0092E010 (FUN_0092E010)
-   *
-   * What it does:
-   * Writes `repeatCount` 3-dword lanes from one fixed source lane.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleCountLaneH(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceTriple,
-    const std::uint32_t repeatCount
-  ) noexcept
-  {
-    return RuntimeCopyWordCountFromFixedSource<std::uint32_t, 3>(destination, sourceTriple, repeatCount);
-  }
 
 
 
@@ -30993,188 +21712,33 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x0076AA80 (FUN_0076AA80)
-   *
-   * What it does:
-   * Thiscall/source-first adapter lane that forwards one dword-triple tail
-   * range copy dispatch into `FUN_0076B6B0` while discarding one zero scratch
-   * lane.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordTripleRangeTailAdapterLaneA(
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyDwordTripleRangeLaneA(sourceEnd, sourceEnd, sourceBegin);
-  }
 
 
 
 
-  /**
-   * Address: 0x00756800 (FUN_00756800)
-   *
-   * What it does:
-   * Copies one dword-triple lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleRangeLaneE(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x007A61F0 (FUN_007A61F0)
-   *
-   * What it does:
-   * Copies one 8-byte backlink lane range and patches each destination lane to
-   * own the referenced owner slot.
-   */
-  RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneA(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x007CED40 (FUN_007CED40)
-   * Address: 0x00570590 (FUN_00570590)
-   *
-   * What it does:
-   * Copies one dword-quad lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordQuadRangeLaneA(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 4>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x007E99D0 (FUN_007E99D0)
-   *
-   * What it does:
-   * Copies one float4 lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatQuadRangeLaneB(
-    float* const destination,
-    const float* const sourceEnd,
-    const float* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 4>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x007F3EF0 (FUN_007F3EF0)
-   *
-   * What it does:
-   * Copies one dword-quad lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordQuadRangeLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 4>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
-  /**
-   * Address: 0x007FC2F0 (FUN_007FC2F0)
-   *
-   * What it does:
-   * Copies one 20-byte lane range and retains the tail refcounted-owner lane at
-   * `+0x10` by incrementing owner refcount at `+0x04`.
-   */
-  RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyRefcountTailFiveWordRangeLaneA(
-    RuntimeRefcountTailFiveWordCopyLane* const destination,
-    const RuntimeRefcountTailFiveWordCopyLane* sourceBegin,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountTailFiveWordRangeCommon(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x007FBB10 (FUN_007FBB10)
-   *
-   * What it does:
-   * Copy-assigns one 20-byte range, retaining each incoming owner lane at
-   * `+0x10` and releasing previously bound owners when they differ.
-   */
-  RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeLaneA(
-    RuntimeRefcountTailFiveWordCopyLane* const destination,
-    const RuntimeRefcountTailFiveWordCopyLane* sourceBegin,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignRefcountTailFiveWordRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
-  /**
-   * Address: 0x007FBFE0 (FUN_007FBFE0)
-   *
-   * What it does:
-   * Copy-assigns one 20-byte range backward from `(sourceBegin, sourceEnd]`
-   * into destination tail storage, retaining incoming owner lanes and releasing
-   * replaced owners when needed.
-   */
-  RuntimeRefcountTailFiveWordCopyLane* RuntimeCopyAssignRefcountTailFiveWordRangeBackwardLaneA(
-    const RuntimeRefcountTailFiveWordCopyLane* sourceEnd,
-    const RuntimeRefcountTailFiveWordCopyLane* const sourceBegin,
-    RuntimeRefcountTailFiveWordCopyLane* destinationEnd
-  ) noexcept
-  {
-    const RuntimeRefcountTailFiveWordCopyLane* sourceCursor = sourceEnd;
-    RuntimeRefcountTailFiveWordCopyLane* destinationCursor = destinationEnd;
 
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-
-      destinationCursor->word0 = sourceCursor->word0;
-      destinationCursor->word1 = sourceCursor->word1;
-      destinationCursor->word2 = sourceCursor->word2;
-      destinationCursor->word3 = sourceCursor->word3;
-
-      RuntimeRefcountOwnerView* const incomingOwner = sourceCursor->owner;
-      if (incomingOwner != destinationCursor->owner) {
-        RuntimeRetainRefcountOwner(incomingOwner);
-        if (destinationCursor->owner != nullptr) {
-          RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destinationCursor->owner));
-        }
-        destinationCursor->owner = incomingOwner;
-      }
-    }
-
-    return destinationCursor;
-  }
 
 
 
@@ -31194,21 +21758,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x00814480 (FUN_00814480)
-   * Address: 0x0084EC30 (FUN_0084EC30)
-   *
-   * What it does:
-   * Copies one 8-byte lane range and retains the owner lane at `+0x04`.
-   */
-  RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeLaneA(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* sourceBegin,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
   /**
@@ -31265,55 +21814,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  [[nodiscard]] void* RuntimeCopyDwordBlockWithMemmove(
-    void* const destination,
-    const void* const source,
-    const int dwordCount
-  ) noexcept
-  {
-    const std::size_t byteCount = static_cast<std::size_t>(dwordCount) * sizeof(std::uint32_t);
-    (void)memmove_s(destination, byteCount, source, byteCount);
-    return destination;
-  }
-
-
-
-
-
-
-  /**
-   * Address: 0x00553B50 (FUN_00553B50)
-   * Address: 0x00553C70 (FUN_00553C70)
-   * Address: 0x00559270 (FUN_00559270)
-   * Address: 0x005625D0 (FUN_005625D0)
-   * Address: 0x005625F0 (FUN_005625F0)
-   * Address: 0x00562FB0 (FUN_00562FB0)
-   * Address: 0x00584180 (FUN_00584180)
-   * Address: 0x005843F0 (FUN_005843F0)
-   * Address: 0x005CDB20 (FUN_005CDB20)
-   * Address: 0x005E1DC0 (FUN_005E1DC0)
-   * Address: 0x005E1E20 (FUN_005E1E20)
-   * Address: 0x006823E0 (FUN_006823E0)
-   * Address: 0x006E3EA0 (FUN_006E3EA0)
-   * Address: 0x007060B0 (FUN_007060B0)
-   * Address: 0x007B1B70 (FUN_007B1B70)
-   * Address: 0x007B1C60 (FUN_007B1C60)
-   * Address: 0x007E67F0 (FUN_007E67F0)
-   * Address: 0x008328A0 (FUN_008328A0)
-   * Address: 0x0084B880 (FUN_0084B880)
-   * Address: 0x00850300 (FUN_00850300)
-   *
-   * What it does:
-   * Copies one dword lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordRangeLaneH(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -31333,37 +21833,13 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0084C250 (FUN_0084C250)
-   * Address: 0x0084AFC0 (FUN_0084AFC0)
-   * Address: 0x0084BE20 (FUN_0084BE20)
-   *
-   * What it does:
-   * Copies one dword-triple lane range from `[sourceBegin, sourceEnd)`.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleRangeLaneB(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceEnd,
-    const std::uint32_t* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
-  }
 
-  /**
-   * Address: 0x008528E0 (FUN_008528E0)
-   *
-   * What it does:
-   * Copies one float-triple lane range from `[sourceBegin, sourceEnd)`.
-   */
-  float* RuntimeCopyFloatTripleRangeLaneA(
-    float* const destination,
-    const float* const sourceEnd,
-    const float* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<float, 3>(destination, sourceBegin, sourceEnd);
-  }
+
+
+
+
+
+
 
   struct RuntimeStride20VectorView
   {
@@ -31394,48 +21870,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimePrefixCompareCaptureLane) == 0x10, "RuntimePrefixCompareCaptureLane size must be 0x10");
 
-  /**
-   * Address: 0x007CFFC0 (FUN_007CFFC0)
-   *
-   * What it does:
-   * Scans two byte lanes while they match and stores the stop cursors plus
-   * caller-provided lane bounds.
-   */
-  RuntimePrefixCompareCaptureLane* RuntimeScanSharedPrefixAndCapture(
-    RuntimePrefixCompareCaptureLane* const outLane,
-    const std::uintptr_t lhsRangeBegin,
-    const std::uint8_t* lhsCursor,
-    const std::uintptr_t /*unusedLane*/,
-    const std::uint8_t* const lhsRangeEnd,
-    const std::uintptr_t rhsRangeEnd,
-    const std::uint8_t* rhsCursor
-  ) noexcept
-  {
-    const std::uint8_t* lhs = lhsCursor;
-    const std::uint8_t* rhs = rhsCursor;
-    while (lhs != lhsRangeEnd && *lhs == *rhs) {
-      ++lhs;
-      ++rhs;
-    }
-
-    outLane->lhsRangeBegin = lhsRangeBegin;
-    outLane->lhsCursor = lhs;
-    outLane->rhsRangeEnd = rhsRangeEnd;
-    outLane->rhsCursor = rhs;
-    return outLane;
-  }
-
-
-  [[nodiscard]] std::uint8_t RuntimeLerpColorComponent(
-    const std::uint8_t source,
-    const std::uint8_t target,
-    const float t
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>(
-      static_cast<int>((static_cast<float>(target) - static_cast<float>(source)) * t + static_cast<float>(source))
-    );
-  }
 
 
 
@@ -31444,29 +21878,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x007E9890 (FUN_007E9890)
-   *
-   * What it does:
-   * Backward-copies one 16-byte float4 lane range from `(sourceBegin,sourceEnd]`.
-   */
-  std::uint8_t* RuntimeCopyFloatQuadLane16Backward(
-    std::uint8_t* destinationEnd,
-    const std::uint8_t* sourceEnd,
-    const std::uint8_t* const sourceBegin
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      sourceEnd -= 16;
-      destinationEnd -= 16;
-      *reinterpret_cast<float*>(destinationEnd + 0) = *reinterpret_cast<const float*>(sourceEnd + 0);
-      *reinterpret_cast<float*>(destinationEnd + 4) = *reinterpret_cast<const float*>(sourceEnd + 4);
-      *reinterpret_cast<float*>(destinationEnd + 8) = *reinterpret_cast<const float*>(sourceEnd + 8);
-      *reinterpret_cast<float*>(destinationEnd + 12) = *reinterpret_cast<const float*>(sourceEnd + 12);
-    }
 
-    return destinationEnd;
-  }
+
 
 
 
@@ -31482,36 +21895,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(sizeof(RuntimeAabb6Lane) == 0x18, "RuntimeAabb6Lane size must be 0x18");
 
 
-  /**
-   * Address: 0x00857A90 (FUN_00857A90)
-   *
-   * What it does:
-   * Copies one 8-byte lane range and retains the owner lane at `+0x04`.
-   */
-  RuntimeRefcountPairCopyLane* RuntimeCopyRefcountPairRangeLaneB(
-    RuntimeRefcountPairCopyLane* const destination,
-    const RuntimeRefcountPairCopyLane* sourceBegin,
-    const RuntimeRefcountPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountPairRangeCommon(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x0085AB80 (FUN_0085AB80)
-   *
-   * What it does:
-   * Copies one 16-byte lane range and retains owner lanes at `+0x04` and
-   * `+0x0C`.
-   */
-  RuntimeRefcountQuadOddCopyLane* RuntimeCopyRefcountQuadOddRangeLaneA(
-    RuntimeRefcountQuadOddCopyLane* const destination,
-    const RuntimeRefcountQuadOddCopyLane* sourceBegin,
-    const RuntimeRefcountQuadOddCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyRefcountQuadOddRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -31530,16 +21913,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0087FCF0 (FUN_0087FCF0)
-   *
-   * What it does:
-   * Returns TRUE when both fixed 16-byte blocks compare equal.
-   */
-  BOOL RuntimeAreFixed16ByteBlocksEqual(const void* const lhs, const void* const rhs) noexcept
-  {
-    return (std::memcmp(lhs, rhs, 16u) == 0) ? TRUE : FALSE;
-  }
+
 
 
 
@@ -31566,45 +21940,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x005E1840 (FUN_005E1840)
-   * Address: 0x0056D390 (FUN_0056D390)
-   * Address: 0x0061CA20 (FUN_0061CA20)
-   * Address: 0x007AFC90 (FUN_007AFC90)
-   * Address: 0x008B3D30 (FUN_008B3D30)
-   * Address: 0x008B3B30 (FUN_008B3B30)
-   * Address: 0x008B7DA0 (FUN_008B7DA0)
-   *
-   * What it does:
-   * Copies one 8-byte backlink lane range and patches each destination lane to
-   * own the referenced owner slot.
-   */
-  RuntimeBacklinkedPairCopyLane* RuntimeCopyBacklinkedPairRangeLaneB(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin
-  ) noexcept
-  {
-    return RuntimeCopyBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
 
-  /**
-   * Address: 0x008B8140 (FUN_008B8140)
-   *
-   * What it does:
-   * Copy-assigns one backlink range `[sourceBegin, sourceEnd)` into existing
-   * destination lanes, unlinking/relinking owner slots when bindings differ.
-   */
-  RuntimeBacklinkedPairCopyLane* RuntimeCopyAssignBacklinkedPairRangeLaneA(
-    RuntimeBacklinkedPairCopyLane* const destination,
-    const RuntimeBacklinkedPairCopyLane* const sourceBegin,
-    const RuntimeBacklinkedPairCopyLane* const sourceEnd
-  ) noexcept
-  {
-    return RuntimeCopyAssignBacklinkedPairRangeCommon(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -31624,60 +21962,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   }
 
 
-  /**
-   * Address: 0x008D7270 (FUN_008D7270)
-   *
-   * What it does:
-   * Source-first register-order adapter that forwards one dword range copy into
-   * `FUN_008D80A0`.
-   */
-  [[maybe_unused]] std::uint32_t* RuntimeCopyDwordRangeRegisterAdapterLaneE(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyDwordRangeLaneE(destination, sourceEnd, sourceBegin);
-  }
-
-
-
-  /**
-   * Address: 0x008D9FA0 (FUN_008D9FA0)
-   *
-   * What it does:
-   * Copies one dword-pair lane range from `[sourceBegin, sourceEnd)` into
-   * destination-first output storage.
-   */
-  std::uint32_t* RuntimeCopyDwordPairRangeLaneE(
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 2>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
 
 
-  /**
-   * Address: 0x0092D7D0 (FUN_0092D7D0)
-   * Address: 0x0092ED60 (FUN_0092ED60)
-   *
-   * What it does:
-   * Copies one dword-triple lane range from `[sourceBegin, sourceEnd)` into
-   * destination-first output storage.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleRangeLaneC(
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
-  }
+
+
+
 
   /**
    * Address: 0x0092D810 (FUN_0092D810)
@@ -31696,22 +21988,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x0092D840 (FUN_0092D840)
-   * Address: 0x0092EEB0 (FUN_0092EEB0)
-   *
-   * What it does:
-   * Copies one dword-triple lane range from `[sourceBegin, sourceEnd)` into
-   * destination-first output storage.
-   */
-  std::uint32_t* RuntimeCopyDwordTripleRangeLaneD(
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 3>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -31722,22 +21998,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x00932610 (FUN_00932610)
-   * Address: 0x00933220 (FUN_00933220)
-   *
-   * What it does:
-   * Copies one dword lane range from `[sourceBegin, sourceEnd)` into
-   * destination-first output storage.
-   */
-  std::uint32_t* RuntimeCopyDwordRangeLaneG(
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return RuntimeCopyWordRangeStrided<std::uint32_t, 1>(destination, sourceBegin, sourceEnd);
-  }
 
 
 
@@ -31790,19 +22050,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return result;
   }
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeRightmostIteratorNodeFromRightChildFlag21Core(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeDescendRightSpineFromRightChild(node, 0x15u);
-  }
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeLeftmostIteratorNodeFromLeftChildFlag21Core(
-    RuntimeTreeIteratorNodeLaneView* const node
-  ) noexcept
-  {
-    return RuntimeDescendLeftSpineFromLeftChild(node, 0x15u);
-  }
 
 
 
@@ -31988,47 +22236,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x00530DD0 (FUN_00530DD0)
-   * Address: 0x00711F50 (FUN_00711F50)
-   * Address: 0x0077C740 (FUN_0077C740)
-   * Address: 0x0077CD80 (FUN_0077CD80)
-   * Address: 0x007B3FC0 (FUN_007B3FC0)
-   * Address: 0x0087CA10 (FUN_0087CA10)
-   * Address: 0x008AFB30 (FUN_008AFB30)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x11`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag17(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x11u);
-  }
-
-
-
-
-  /**
-   * Address: 0x00687C40 (FUN_00687C40)
-   * Address: 0x006E28D0 (FUN_006E28D0)
-   * Address: 0x0089AAE0 (FUN_0089AAE0)
-   * Address: 0x008B6950 (FUN_008B6950)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-A lane
-   * ordering with sentinel flag byte at `+0x15`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantAFlag21(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantA(cursorSlot, 0x15u);
-  }
 
 
 
@@ -32038,22 +22245,10 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0052ED00 (FUN_0052ED00)
-   * Address: 0x0052ED70 (FUN_0052ED70)
-   * Address: 0x0052EDE0 (FUN_0052EDE0)
-   *
-   * What it does:
-   * Advances one swizzled legacy RB-tree iterator slot using variant-B lane
-   * ordering with sentinel flag byte at `+0x2D`.
-   */
-  [[maybe_unused]] RuntimeTreeIteratorNodeLaneView* RuntimeAdvanceTreeIteratorVariantBFlag45(
-    const std::uint32_t,
-    RuntimeTreeIteratorNodeLaneView** const cursorSlot
-  ) noexcept
-  {
-    return RuntimeAdvanceTreeIteratorVariantB(cursorSlot, 0x2Du);
-  }
+
+
+
+
 
   /**
    * Address: 0x0052EE50 (FUN_0052EE50)
@@ -32120,14 +22315,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeTreeNode20DwordKeyColorLaneView::isNil offset must be 0x11"
   );
 
-  [[nodiscard]] std::uint32_t* RuntimeStoreDwordLaneCore(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outLane = value;
-    return outLane;
-  }
 
 
 
@@ -32221,14 +22408,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  [[nodiscard]] RuntimeTreeIteratorNodeLaneView* RuntimeRotateTreeNodeRightVariantViaOwner(
-    RuntimeTreeRotateOwnerLaneView* const owner,
-    RuntimeTreeIteratorNodeLaneView* const pivot,
-    const std::size_t sentinelOffset
-  ) noexcept
-  {
-    return RuntimeRotateTreeNodeRightVariant(pivot, owner, sentinelOffset);
-  }
 
 
 
@@ -32286,55 +22465,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeStateValueTreeOwnerView::head offset must be 0x04"
   );
 
-  /**
-   * Address: 0x00948990 (FUN_00948990)
-   *
-   * What it does:
-   * Initializes one state-value tree node lane from link/key/value/color
-   * sources and clears the `isNil` marker.
-   */
-  [[maybe_unused]] RuntimeStateValueTreeNode* RuntimeInitializeStateValueTreeNodeLaneA(
-    RuntimeStateValueTreeNode* const node,
-    RuntimeStateValueTreeNode* const left,
-    RuntimeStateValueTreeNode* const parent,
-    RuntimeStateValueTreeNode* const right,
-    const RuntimeDwordPairLaneView* const keyValuePair,
-    const std::uint8_t color
-  ) noexcept
-  {
-    node->left = left;
-    node->right = right;
-    node->parent = parent;
-    node->key = keyValuePair->lane00;
-    node->value = keyValuePair->lane04;
-    node->color = color;
-    node->isNil = 0u;
-    return node;
-  }
-
-
-
-
-
-
-
-  [[nodiscard]] RuntimeStateValueTreeNode* RuntimeLowerBoundStateValueTreeNodeByKeyDirectCore(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    const std::uint32_t keyValue
-  ) noexcept
-  {
-    RuntimeStateValueTreeNode* candidate = treeOwner->head;
-    RuntimeStateValueTreeNode* cursor = candidate->parent;
-    while (cursor != nullptr && cursor->isNil == 0u) {
-      if (cursor->key >= keyValue) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-    return candidate;
-  }
 
 
 
@@ -32348,30 +22478,13 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  [[nodiscard]] RuntimeStateValueTreeNode** RuntimeLowerBoundStateValueTreeNodeByKeyCore(
-    RuntimeStateValueTreeOwnerView* const treeOwner,
-    RuntimeStateValueTreeNode** const outNode,
-    const std::uint32_t* const key
-  ) noexcept
-  {
-    RuntimeStateValueTreeNode* candidate = treeOwner->head;
-    RuntimeStateValueTreeNode* cursor = candidate->parent;
-    while (cursor != nullptr && cursor->isNil == 0u) {
-      if (cursor->key >= *key) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
 
-    if (candidate == treeOwner->head || *key < candidate->key) {
-      *outNode = treeOwner->head;
-    } else {
-      *outNode = candidate;
-    }
-    return outNode;
-  }
+
+
+
+
+
+
 
 
 
@@ -32441,39 +22554,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   }
 
 
-  /**
-   * Address: 0x007CFC00 (FUN_007CFC00)
-   *
-   * What it does:
-   * Locates the lower-bound node for one `char` key in a `set<char>`-style RB
-   * tree and stores the resulting node lane in `outNode`.
-   */
-  RuntimeSetCharTreeNode16** RuntimeLowerBoundSetCharTreeNode(
-    const std::uint8_t* const keyLane,
-    RuntimeSetCharTreeOwnerView* const treeOwner,
-    RuntimeSetCharTreeNode16** const outNode
-  ) noexcept
-  {
-    RuntimeSetCharTreeNode16* candidate = treeOwner->head;
-    RuntimeSetCharTreeNode16* cursor = candidate->parent;
-
-    while (cursor != nullptr && cursor->isNil == 0u) {
-      if (cursor->value >= static_cast<char>(*keyLane)) {
-        candidate = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-
-    if (candidate == treeOwner->head || static_cast<char>(*keyLane) < candidate->value) {
-      *outNode = treeOwner->head;
-      return outNode;
-    }
-
-    *outNode = candidate;
-    return outNode;
-  }
 
 
   /**
@@ -32743,45 +22823,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     );
   }
 
-  /**
-   * Address: 0x007CA730 (FUN_007CA730)
-   *
-   * What it does:
-   * Erases one half-open `set<char>` iterator range `[first,last)`, with a
-   * full-clear fast path when the range covers the full tree.
-   */
-  [[maybe_unused]] RuntimeSetCharTreeNode16** RuntimeEraseSetCharTreeRangeByIterator(
-    RuntimeSetCharTreeState* const treeState,
-    RuntimeSetCharTreeNode16** const outNext,
-    RuntimeSetCharTreeNode16* first,
-    RuntimeSetCharTreeNode16* const last
-  )
-  {
-    RuntimeSetCharTreeNode16* const head = treeState->head;
-    if (first == head->left && last == head) {
-      RuntimeDestroyCompactRbTreeLaneA(reinterpret_cast<RuntimeRbHeadNode16Color13*>(head->parent));
-      head->parent = head;
-      treeState->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNext = head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      RuntimeSetCharTreeNode16* const current = first;
-      if (current->isNil == 0u) {
-        auto** const runtimeCursor = reinterpret_cast<RuntimeTreeIteratorNodeLaneView**>(&first);
-        (void)RuntimeAdvanceTreeIteratorVariantB(runtimeCursor, 0x0Eu);
-      }
-
-      RuntimeSetCharTreeNode16* ignored = nullptr;
-      (void)RuntimeEraseSetCharTreeNodeByIterator(current, treeState, &ignored, current);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
 
   /**
    * Address: 0x007CC470 (FUN_007CC470)
@@ -32814,47 +22855,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return result;
   }
 
-  /**
-   * Address: 0x007CC3B0 (FUN_007CC3B0)
-   *
-   * What it does:
-   * Clones one `set<char>` tree state from source into destination and refreshes
-   * root/min/max sentinel links.
-   */
-  [[nodiscard]] RuntimeSetCharTreeNode16* RuntimeCloneSetCharTreeStateFromSource(
-    RuntimeSetCharTreeState* const destination,
-    const RuntimeSetCharTreeState* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr || destination->head == nullptr || source->head == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeSetCharTreeNode16* const destinationHead = destination->head;
-    destinationHead->parent = RuntimeCloneSetCharTreeSubtree(destination, source->head->parent, destinationHead);
-    destination->size = source->size;
-
-    RuntimeSetCharTreeNode16* const root = destinationHead->parent;
-    if (root == nullptr || root->isNil != 0u) {
-      destinationHead->left = destinationHead;
-      destinationHead->right = destinationHead;
-      return root;
-    }
-
-    RuntimeSetCharTreeNode16* leftmost = root;
-    while (leftmost->left != nullptr && leftmost->left->isNil == 0u) {
-      leftmost = leftmost->left;
-    }
-    destinationHead->left = leftmost;
-
-    RuntimeSetCharTreeNode16* rightmost = root;
-    while (rightmost->right != nullptr && rightmost->right->isNil == 0u) {
-      rightmost = rightmost->right;
-    }
-    destinationHead->right = rightmost;
-
-    return root;
-  }
 
 
 
@@ -32959,12 +22959,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimePrefixedRbTreeStateNil17At04::tree offset must be 0x04"
   );
 
-  [[nodiscard]] std::int32_t RuntimeReleasePrefixedRbTree20StorageByRangeEraseCore(
-    RuntimePrefixedRbTreeStateNil17At04* const owner
-  ) noexcept
-  {
-    return RuntimeReleaseRbTree20StorageByRangeEraseCore(&owner->tree);
-  }
 
   [[nodiscard]] RuntimeRbTreeStateNil17DwordPayload* RuntimeAssignRbTreeStateNil17FromSourceCore(
     RuntimeRbTreeStateNil17DwordPayload* const destination,
@@ -32991,47 +22985,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destination;
   }
 
-  /**
-   * Address: 0x00536DA0 (FUN_00536DA0)
-   *
-   * What it does:
-   * Copies one 16-byte prefixed nil-`0x11` tree-owner range forward from
-   * `[sourceBegin, sourceEnd)` into destination storage.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeCopyPrefixedRbTreeStateNil17RangeForward(
-    const RuntimePrefixedRbTreeStateNil17At04* sourceBegin,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceEnd,
-    RuntimePrefixedRbTreeStateNil17At04* destinationBegin
-  )
-  {
-    auto* destinationCursor = destinationBegin;
-    const auto* sourceCursor = sourceBegin;
-    while (sourceCursor != sourceEnd) {
-      (void)RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00Core(destinationCursor, sourceCursor);
-      ++sourceCursor;
-      ++destinationCursor;
-    }
-    return destinationCursor;
-  }
 
 
-  /**
-   * Address: 0x00536DF0 (FUN_00536DF0)
-   *
-   * What it does:
-   * Destroys one half-open prefixed nil-`0x11` tree-owner range by releasing
-   * each embedded tree-head lane and clearing `{head,size}`.
-   */
-  [[maybe_unused]] void RuntimeDestroyPrefixedRbTreeStateNil17Range(
-    RuntimePrefixedRbTreeStateNil17At04* begin,
-    RuntimePrefixedRbTreeStateNil17At04* const end
-  )
-  {
-    while (begin != end) {
-      (void)RuntimeReleaseRbTree20StorageByRangeEraseCore(&begin->tree);
-      ++begin;
-    }
-  }
 
 
   struct RuntimePrefixedRbTreeStateNil17VectorOwner
@@ -33055,26 +23010,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   );
 
 
-  /**
-   * Address: 0x00536F10 (FUN_00536F10)
-   *
-   * What it does:
-   * Assign-fills one destination range `[destinationBegin, destinationEnd)`
-   * from one source record carrying a prefixed nil-`0x11` tree-owner lane.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeAssignPrefixedRbTreeStateNil17RangeFromValue(
-    RuntimePrefixedRbTreeStateNil17At04* destinationBegin,
-    RuntimePrefixedRbTreeStateNil17At04* const destinationEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceValue
-  )
-  {
-    auto* destinationCursor = destinationBegin;
-    while (destinationCursor != destinationEnd) {
-      (void)RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00Core(destinationCursor, sourceValue);
-      ++destinationCursor;
-    }
-    return destinationBegin;
-  }
 
 
 
@@ -33096,28 +23031,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x00537420 (FUN_00537420)
-   *
-   * What it does:
-   * Copies one 16-byte prefixed nil-`0x11` tree-owner range backward from
-   * `(sourceBegin, sourceEnd]` into destination tail storage.
-   */
-  [[maybe_unused]] RuntimePrefixedRbTreeStateNil17At04* RuntimeCopyPrefixedRbTreeStateNil17RangeBackward(
-    RuntimePrefixedRbTreeStateNil17At04* destinationEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* sourceEnd,
-    const RuntimePrefixedRbTreeStateNil17At04* const sourceBegin
-  )
-  {
-    auto* destinationCursor = destinationEnd;
-    const auto* sourceCursor = sourceEnd;
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      (void)RuntimeAssignPrefixedRbTreeStateNil17AndCopyLane00Core(destinationCursor, sourceCursor);
-    }
-    return destinationCursor;
-  }
 
 
 
@@ -33340,31 +23253,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     std::uint32_t lane20;
   };
 
-  /**
-   * Address: 0x007CDCC0 (FUN_007CDCC0)
-   *
-   * What it does:
-   * Copies one 36-byte record range backward from `(sourceBegin, sourceEnd]`.
-   */
-  RuntimeCopyRecord36LaneB* RuntimeCopyRecord36LaneBBackward(
-    RuntimeCopyRecord36LaneB* destinationEnd,
-    const RuntimeCopyRecord36LaneB* sourceEnd,
-    const RuntimeCopyRecord36LaneB* const sourceBegin
-  )
-  {
-    const auto* sourceCursor = sourceEnd;
-    auto* destinationCursor = destinationEnd;
-
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->text.assign(sourceCursor->text, 0u, msvc8::string::npos);
-      destinationCursor->lane20 = sourceCursor->lane20;
-    }
-
-    return destinationCursor;
-  }
 
 
   struct RuntimeLuaRecord24
@@ -33376,31 +23264,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeLuaRecord24, object) == 0x04, "RuntimeLuaRecord24::object offset must be 0x04");
 
 
-  /**
-   * Address: 0x007CDD70 (FUN_007CDD70)
-   *
-   * What it does:
-   * Copies one 24-byte record range backward from `(sourceBegin, sourceEnd]`
-   * and assignment-copies each embedded `LuaObject` lane.
-   */
-  RuntimeLuaRecord24* RuntimeCopyLuaRecord24Backward(
-    RuntimeLuaRecord24* destinationEnd,
-    const RuntimeLuaRecord24* sourceEnd,
-    const RuntimeLuaRecord24* const sourceBegin
-  )
-  {
-    const auto* sourceCursor = sourceEnd;
-    auto* destinationCursor = destinationEnd;
-
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->object = sourceCursor->object;
-    }
-
-    return destinationCursor;
-  }
 
 
   struct RuntimeCallableCloneDispatch
@@ -33421,40 +23284,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeCallableState68, stateFlag44) == 0x44, "RuntimeCallableState68::stateFlag44 offset");
 
 
-  /**
-   * Address: 0x007CEE80 (FUN_007CEE80)
-   *
-   * What it does:
-   * Backward-copies one `RuntimeLuaRecord24` range and stores the resulting
-   * destination-begin cursor in `outStart`.
-   */
-  RuntimeLuaRecord24** RuntimeCopyLuaRecord24BackwardWithOutStart(
-    RuntimeLuaRecord24** const outStart,
-    const RuntimeLuaRecord24* const sourceBegin,
-    const RuntimeLuaRecord24* sourceEnd,
-    RuntimeLuaRecord24* destinationEnd
-  )
-  {
-    if (outStart == nullptr) {
-      return nullptr;
-    }
-
-    if (sourceBegin == sourceEnd) {
-      *outStart = destinationEnd;
-      return outStart;
-    }
-
-    auto* destinationCursor = destinationEnd;
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationCursor;
-      destinationCursor->lane00 = sourceEnd->lane00;
-      destinationCursor->object = sourceEnd->object;
-    }
-
-    *outStart = destinationCursor;
-    return outStart;
-  }
 
 
   struct RuntimeCopyRecord44LaneA
@@ -33470,31 +23299,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x00877170 (FUN_00877170)
-   *
-   * What it does:
-   * Copies one 36-byte record range forward from `[sourceBegin, sourceEnd)`.
-   */
-  RuntimeCopyRecord36LaneB* RuntimeCopyRecord36LaneBForward(
-    RuntimeCopyRecord36LaneB* destinationBegin,
-    const RuntimeCopyRecord36LaneB* sourceBegin,
-    const RuntimeCopyRecord36LaneB* const sourceEnd
-  )
-  {
-    auto* destinationCursor = destinationBegin;
-    const auto* sourceCursor = sourceBegin;
-
-    while (sourceCursor != sourceEnd) {
-      destinationCursor->lane00 = sourceCursor->lane00;
-      destinationCursor->text.assign(sourceCursor->text, 0u, msvc8::string::npos);
-      destinationCursor->lane20 = sourceCursor->lane20;
-      ++sourceCursor;
-      ++destinationCursor;
-    }
-
-    return destinationCursor;
-  }
 
 
   struct RuntimePointerBufferStateLaneA
@@ -33509,26 +23313,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0084FF50 (FUN_0084FF50)
-   *
-   * What it does:
-   * Releases one pointer buffer allocation and zeros begin/end/capacity lanes.
-   */
-  void RuntimeResetPointerBufferStateLaneA(RuntimePointerBufferStateLaneA* const state) noexcept
-  {
-    if (state == nullptr) {
-      return;
-    }
-
-    if (state->begin != nullptr) {
-      ::operator delete(state->begin);
-    }
-
-    state->begin = nullptr;
-    state->end = nullptr;
-    state->capacity = nullptr;
-  }
 
 
 
@@ -33542,27 +23326,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeIntPairHashKey) == 0x08, "RuntimeIntPairHashKey size must be 0x08");
 
-  /**
-   * Address: 0x0082D960 (FUN_0082D960)
-   *
-   * What it does:
-   * Computes the legacy Park-Miller hash step from one packed integer-pair key.
-   */
-  int RuntimeHashIntPairKeyLane(const RuntimeIntPairHashKey* const key) noexcept
-  {
-    if (key == nullptr) {
-      return 0;
-    }
-
-    const int mixed = (3863 * key->lhs) + (7919 * key->rhs) + (53849 * (key->lhs ^ key->rhs));
-    const ldiv_t split = std::ldiv(mixed, 127773);
-
-    int value = (16807 * static_cast<int>(split.rem)) - (2836 * static_cast<int>(split.quot));
-    if (value < 0) {
-      value += 0x7FFFFFFF;
-    }
-    return value;
-  }
 
   struct RuntimePairHashListNode
   {
@@ -33661,40 +23424,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(sizeof(RuntimeDualLinkRightNodeLane) == 0x10, "RuntimeDualLinkRightNodeLane size must be 0x10");
   static_assert(offsetof(RuntimeDualLinkRightNodeLane, owner) == 0x08, "RuntimeDualLinkRightNodeLane::owner offset must be 0x08");
 
-  [[nodiscard]] RuntimeDualLinkLeftNodeLane* RuntimeBindDualLinkOwnerLanes(
-    RuntimeDualLinkOwnerLane* const owner,
-    RuntimeDualLinkLeftNodeLane* const leftNode,
-    RuntimeDualLinkRightNodeLane* const rightNode
-  ) noexcept
-  {
-    leftNode->owner = owner;
-    rightNode->owner = owner;
-    owner->leftNode = leftNode;
-    owner->rightNode = rightNode;
-    return leftNode;
-  }
 
 
 
-  [[nodiscard]] RuntimeIntrusiveListNode* RuntimeEraseIntrusiveListNodeAndReturnNext(
-    RuntimeIntrusiveListState* const listState,
-    RuntimeIntrusiveListNode* const node
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeIntrusiveListNode* const next = node->next;
-    if (listState != nullptr && node != listState->head) {
-      node->prev->next = next;
-      next->prev = node->prev;
-      ::operator delete(node);
-      --listState->size;
-    }
-
-    return next;
-  }
 
 
 
@@ -33732,28 +23464,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return head;
   }
 
-  /**
-   * Address: 0x0082C840 (FUN_0082C840)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_82C840@<eax>(int a1@<esi>);
-   *
-   * What it does:
-   * Alternate ClearNodesKeepHead lane used by the RuntimeIntrusiveList*
-   * helper-set that groups head/size lanes at +0x04/+0x08 with no
-   * comparator-cookie prefix; resets head sentinel self-links, zeros the
-   * size counter, and deletes every non-head node. Binary-equivalent to
-   * `RuntimeClearIntrusiveListNodesKeepHeadLaneA` at 0x008491C0; kept as a
-   * separate named lane so the caller set at 0x00824B80/0x00826000/
-   * 0x0082B550/0x0082C400/0x0082F540 can refer to it by intent rather than
-   * address.
-   */
-  RuntimeIntrusiveListNode* RuntimeClearIntrusiveListNodesKeepHeadLaneB(
-    RuntimeIntrusiveListState* const listState
-  ) noexcept
-  {
-    return RuntimeClearIntrusiveListNodesKeepHeadLaneA(listState);
-  }
 
 
   struct RuntimeMapTreePayloadTriplet
@@ -34084,35 +23794,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return destinationTree;
   }
 
-  /**
-   * Address: 0x0070E320 (FUN_0070E320)
-   *
-   * What it does:
-   * Allocates one nil-`+0x15` map-tree head, rewires it as an empty sentinel,
-   * then clones source tree lanes into destination with unwind cleanup.
-   */
-  [[maybe_unused]] RuntimeMapTreeState24* RuntimeInitializeMapTreeState24AndCopy(
-    RuntimeMapTreeState24* const destinationTree,
-    const RuntimeMapTreeState24* const sourceTree
-  )
-  {
-    auto* const head = reinterpret_cast<RuntimeMapTreeNode24*>(RuntimeAllocateAndPrimeRbHeadNode24Lane020());
-    destinationTree->head = head;
-    head->isNil = 1u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    destinationTree->size = 0u;
-
-    try {
-      (void)RuntimeCloneMapTreeState24HeaderAndExtrema(destinationTree, sourceTree);
-    } catch (...) {
-      (void)RuntimeDestroyMapTreeState24AndHead(destinationTree);
-      throw;
-    }
-
-    return destinationTree;
-  }
 
 
 
@@ -34204,67 +23885,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return result;
   }
 
-  /**
-   * Address: 0x008565A0 (FUN_008565A0)
-   *
-   * What it does:
-   * Clones one red-black tree state from `source` into `destination`, then
-   * refreshes root/min/max sentinel links.
-   */
-  [[nodiscard]] RuntimeMapTreeNode28* RuntimeCloneMapTreeStateFromSource(
-    RuntimeMapTreeState* const destination,
-    const RuntimeMapTreeState* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr || destination->head == nullptr || source->head == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeMapTreeNode28* const destinationHead = destination->head;
-    RuntimeMapTreeNode28* const sourceRoot = source->head->parent;
-
-    destinationHead->parent = RuntimeCloneMapTreeSubtree(destination, sourceRoot, destinationHead);
-    destination->size = source->size;
-
-    RuntimeMapTreeNode28* result = destinationHead->parent;
-    if (result->isNil != 0u) {
-      destinationHead->left = destinationHead;
-      destinationHead->right = destinationHead;
-      return result;
-    }
-
-    RuntimeMapTreeNode28* leftmost = result;
-    while (leftmost->left->isNil == 0u) {
-      leftmost = leftmost->left;
-    }
-    destinationHead->left = leftmost;
-
-    RuntimeMapTreeNode28* rightmost = result;
-    while (rightmost->right->isNil == 0u) {
-      rightmost = rightmost->right;
-    }
-    destinationHead->right = rightmost;
-
-    return result;
-  }
 
 
-  [[nodiscard]] RuntimeMapTreeNode28* RuntimeClearMapTreeStorageKeepHead(
-    RuntimeMapTreeState* const treeState
-  ) noexcept
-  {
-    if (treeState == nullptr || treeState->head == nullptr) {
-      return nullptr;
-    }
-
-    RuntimeMapTreeNode28* const head = treeState->head;
-    RuntimeDestroyRefcountedTreeLaneA(reinterpret_cast<RuntimeControlTreeNode28*>(head->parent));
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    treeState->size = 0u;
-    return head;
-  }
 
 
 
@@ -34361,37 +23983,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeDualBacklinkedPairRecord24::laneB offset must be 0x10"
   );
 
-  /**
-   * Address: 0x005816C0 (FUN_005816C0)
-   *
-   * What it does:
-   * Copy-assigns one 24-byte record with two backlinked pair lanes while
-   * preserving intrusive owner-slot links for both embedded pairs.
-   */
-  [[maybe_unused]] RuntimeDualBacklinkedPairRecord24* RuntimeCopyAssignDualBacklinkedPairRecordLaneA(
-    RuntimeDualBacklinkedPairRecord24* const destination,
-    const RuntimeDualBacklinkedPairRecord24* const source
-  ) noexcept
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    destination->word0 = source->word0;
-    destination->word1 = source->word1;
-
-    if (source->laneA.ownerSlot != destination->laneA.ownerSlot) {
-      RuntimeDetachBacklinkedPairLane(destination->laneA);
-      RuntimeAttachBacklinkedPairLane(destination->laneA, source->laneA);
-    }
-
-    if (source->laneB.ownerSlot != destination->laneB.ownerSlot) {
-      RuntimeDetachBacklinkedPairLane(destination->laneB);
-      RuntimeAttachBacklinkedPairLane(destination->laneB, source->laneB);
-    }
-
-    return destination;
-  }
 
   struct RuntimeTripleWordDualBacklinkedRecord40
   {
@@ -34420,66 +24011,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0073AEF0 (FUN_0073AEF0)
-   *
-   * What it does:
-   * Returns true when all 16 float lanes in `lhs` and `rhs` compare exactly
-   * equal in order.
-   */
-  [[maybe_unused]] bool RuntimeAreFloat16LanesExactlyEqual(
-    const float* const lhs,
-    const float* const rhs
-  ) noexcept
-  {
-    for (std::size_t index = 0; index < 16u; ++index) {
-      if (rhs[index] != lhs[index]) {
-        return false;
-      }
-    }
-
-    return true;
-  }
 
 
 
-  /**
-   * Address: 0x005CD100 (FUN_005CD100)
-   *
-   * What it does:
-   * Copy-assigns one 28-byte refcount-tagged record range in backward order,
-   * retaining incoming owners and releasing replaced owners at lane `+0x14`.
-   */
-  [[maybe_unused]] RuntimeCopyRefcountTaggedRecord28Lane* RuntimeCopyAssignRefcountTaggedRecord28RangeBackwardLaneA(
-    RuntimeCopyRefcountTaggedRecord28Lane* destinationEnd,
-    const RuntimeCopyRefcountTaggedRecord28Lane* sourceBegin,
-    const RuntimeCopyRefcountTaggedRecord28Lane* sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      --sourceEnd;
-      --destinationEnd;
-
-      destinationEnd->word0 = sourceEnd->word0;
-      destinationEnd->word1 = sourceEnd->word1;
-      destinationEnd->word2 = sourceEnd->word2;
-      destinationEnd->lane0C = sourceEnd->lane0C;
-      destinationEnd->lane10 = sourceEnd->lane10;
-
-      RuntimeRefcountOwnerView* const incomingOwner = sourceEnd->owner;
-      if (incomingOwner != destinationEnd->owner) {
-        RuntimeRetainRefcountOwner(incomingOwner);
-        if (destinationEnd->owner != nullptr) {
-          RuntimeReleaseSharedControlLane(reinterpret_cast<volatile long*>(destinationEnd->owner));
-        }
-        destinationEnd->owner = incomingOwner;
-      }
-
-      destinationEnd->lane18 = sourceEnd->lane18;
-    }
-
-    return destinationEnd;
-  }
 
 
 
@@ -34490,43 +24024,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(sizeof(RuntimeIntrusiveRefcountedObjectView) == 0x08, "RuntimeIntrusiveRefcountedObjectView size must be 0x08");
 
-  /**
-   * Address: 0x00658800 (FUN_00658800)
-   *
-   * What it does:
-   * Copy-assigns one contiguous intrusive-refcount pointer range, retaining
-   * incoming owners and deleting replaced owners when their refcount drops to
-   * zero.
-   */
-  [[maybe_unused]] RuntimeIntrusiveRefcountedObjectView** RuntimeCopyAssignIntrusiveRefcountPointerRangeLaneA(
-    RuntimeIntrusiveRefcountedObjectView** destination,
-    RuntimeIntrusiveRefcountedObjectView* const* sourceBegin,
-    RuntimeIntrusiveRefcountedObjectView* const* const sourceEnd
-  ) noexcept
-  {
-    using ReleaseFn = void (__thiscall*)(RuntimeIntrusiveRefcountedObjectView*, int);
-
-    while (sourceBegin != sourceEnd) {
-      RuntimeIntrusiveRefcountedObjectView* const incomingOwner = *sourceBegin;
-      RuntimeIntrusiveRefcountedObjectView* const currentOwner = *destination;
-      if (currentOwner != incomingOwner) {
-        if (currentOwner != nullptr && ::InterlockedDecrement(&currentOwner->refCount) == 0) {
-          auto* const release = reinterpret_cast<ReleaseFn>(currentOwner->vtable[0]);
-          release(currentOwner, 1);
-        }
-
-        *destination = incomingOwner;
-        if (incomingOwner != nullptr) {
-          (void)::InterlockedExchangeAdd(&incomingOwner->refCount, 1);
-        }
-      }
-
-      ++sourceBegin;
-      ++destination;
-    }
-
-    return destination;
-  }
 
 
   struct RuntimeLookupPayloadLane
@@ -34561,53 +24058,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   };
   static_assert(offsetof(RuntimeLookupOwnerLane, first) == 0x10, "RuntimeLookupOwnerLane::first offset must be 0x10");
 
-  /**
-   * Address: 0x00A33ED0 (FUN_00A33ED0)
-   *
-   * What it does:
-   * Scans one forward-linked lookup chain and returns the first payload whose
-   * lane `+0x08` equals `lane08Key`, or null when absent.
-   */
-  [[maybe_unused]] RuntimeLookupPayloadLane* RuntimeFindLookupPayloadByLane08(
-    RuntimeLookupOwnerLane* const owner,
-    const std::uint32_t lane08Key
-  ) noexcept
-  {
-    RuntimeLookupListNodeLane* node = owner->first;
-    while (node != nullptr) {
-      RuntimeLookupPayloadLane* const payload = node->payload;
-      if (payload->lane08 == lane08Key) {
-        return payload;
-      }
-      node = node->next;
-    }
-    return nullptr;
-  }
 
 
-  /**
-   * Address: 0x00A33F30 (FUN_00A33F30)
-   *
-   * What it does:
-   * Scans one forward-linked lookup chain and returns the first payload whose
-   * `(pairLhs,pairRhs)` lanes equal the input key pair, or null when absent.
-   */
-  [[maybe_unused]] RuntimeLookupPayloadLane* RuntimeFindLookupPayloadByPairKey(
-    RuntimeLookupOwnerLane* const owner,
-    const RuntimeIntPairHashKey* const keyPair
-  ) noexcept
-  {
-    RuntimeLookupListNodeLane* node = owner->first;
-    while (node != nullptr) {
-      RuntimeLookupPayloadLane* const payload = node->payload;
-      if (payload->pairLhs == static_cast<std::uint32_t>(keyPair->lhs) &&
-          payload->pairRhs == static_cast<std::uint32_t>(keyPair->rhs)) {
-        return payload;
-      }
-      node = node->next;
-    }
-    return nullptr;
-  }
 
 
   struct RuntimeSingleWordLane
@@ -34774,77 +24226,9 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
 
-  [[nodiscard]] std::uint32_t RuntimeWrapRingIndexLane(
-    const std::uint32_t absoluteIndex,
-    const std::uint32_t ringBaseIndex
-  ) noexcept
-  {
-    if (absoluteIndex >= ringBaseIndex) {
-      return absoluteIndex - ringBaseIndex;
-    }
-    return absoluteIndex;
-  }
 
-  [[nodiscard]] RuntimeSingleWordLane* RuntimeComputeStridedWordAddressLane(
-    RuntimeSingleWordLane* const destination,
-    const RuntimeSingleWordLane* const sourceBase,
-    const std::int32_t index,
-    const std::uint32_t strideBytes
-  ) noexcept
-  {
-    destination->value = sourceBase->value + static_cast<std::uint32_t>(index) * strideBytes;
-    return destination;
-  }
 
-  [[nodiscard]] int RuntimeDestroyVirtualRangeStrided(
-    void* rangeBegin,
-    void* const rangeEnd,
-    const std::size_t elementStride
-  ) noexcept
-  {
-    auto* cursor = static_cast<std::uint8_t*>(rangeBegin);
-    auto* const end = static_cast<std::uint8_t*>(rangeEnd);
-    int lastResult = 0;
-    while (cursor != end) {
-      auto** const vtable = *reinterpret_cast<void***>(cursor);
-      auto* const destroy = reinterpret_cast<RuntimeVirtualDestroyWithFlagFn>(vtable[0]);
-      lastResult = destroy(cursor, 0);
-      cursor += elementStride;
-    }
-    return lastResult;
-  }
 
-  /**
-   * Address: 0x008B3540 (FUN_008B3540)
-   * Address: 0x008B6620 (FUN_008B6620)
-   * Address: 0x008B9840 (FUN_008B9840)
-   * Address: 0x008E9120 (FUN_008E9120)
-   * Address: 0x008F5EE0 (FUN_008F5EE0)
-   * Address: 0x008F5F10 (FUN_008F5F10)
-   * Address: 0x008F6330 (FUN_008F6330)
-   * Address: 0x008F6360 (FUN_008F6360)
-   * Address: 0x008F8C60 (FUN_008F8C60)
-   * Address: 0x008F8C80 (FUN_008F8C80)
-   * Address: 0x008F8C90 (FUN_008F8C90)
-   * Address: 0x0093F540 (FUN_0093F540)
-   * Address: 0x00946530 (FUN_00946530)
-   * Address: 0x00946540 (FUN_00946540)
-   * Address: 0x00946550 (FUN_00946550)
-   * Address: 0x00946C40 (FUN_00946C40)
-   * Address: 0x00946C50 (FUN_00946C50)
-   * Address: 0x00946C60 (FUN_00946C60)
-   *
-   * What it does:
-   * Copies one 32-bit lane into destination.
-   */
-  [[maybe_unused]] RuntimeSingleWordLane* RuntimeAssignSingleWordLane(
-    RuntimeSingleWordLane* const destination,
-    const std::uint32_t value
-  ) noexcept
-  {
-    destination->value = value;
-    return destination;
-  }
 
   struct RuntimeStride116VectorLaneView
   {
@@ -34862,24 +24246,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x008B3560 (FUN_008B3560)
-   * Address: 0x008B6230 (FUN_008B6230)
-   * Address: 0x008B6870 (FUN_008B6870)
-   *
-   * What it does:
-   * Stores one two-lane pair from split scalar source pointers.
-   */
-  [[maybe_unused]] RuntimeWordPairLane* RuntimeAssignWordPairFromSplitSourcesLane(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t* const firstSource,
-    const std::uint32_t* const secondSource
-  ) noexcept
-  {
-    destination->first = *firstSource;
-    destination->second = *secondSource;
-    return destination;
-  }
 
 
 
@@ -34950,65 +24316,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeBufferedCursorProbeView, current) == 0x09, "RuntimeBufferedCursorProbeView::current offset");
 
 
-  /**
-   * Address: 0x00939970 (FUN_00939970)
-   *
-   * What it does:
-   * Primes one buffered cursor byte lane from stream-buffer cursor lanes when
-   * available, otherwise falls back to virtual slot `+0x10`; on EOF, caches
-   * prior byte lane and detaches reader state.
-   */
-  [[maybe_unused]] char RuntimePrimeBufferedCursorByte(
-    RuntimeBufferedCursorProbeView* const cursorProbe
-  ) noexcept
-  {
-    int currentByte = -1;
-    RuntimeBufferedReaderStateView* const reader = cursorProbe->reader;
-    if (reader != nullptr) {
-      const bool hasDirectCursor = reader->cursorPtr != nullptr && *reader->cursorPtr != nullptr;
-      const bool hasRemainingCount = reader->remainingCount != nullptr && *reader->remainingCount > 0;
-      if (hasDirectCursor && hasRemainingCount) {
-        currentByte = static_cast<int>(**reader->cursorPtr);
-      } else {
-        currentByte = reader->vtable->readByteFallback(reader);
-      }
-    }
-
-    if (currentByte == -1) {
-      currentByte = static_cast<int>(cursorProbe->current);
-      cursorProbe->reader = nullptr;
-      cursorProbe->hasCurrent = 1u;
-      return static_cast<char>(currentByte);
-    }
-
-    cursorProbe->current = static_cast<unsigned char>(currentByte);
-    cursorProbe->hasCurrent = 1u;
-    return static_cast<char>(currentByte);
-  }
-
-
-
-
-
-
-
-
-  /**
-   * Address: 0x008B6650 (FUN_008B6650)
-   *
-   * What it does:
-   * Stores one 32-bit lane and one byte lane from split sources.
-   */
-  [[maybe_unused]] RuntimeWordAndByteLane* RuntimeAssignWordAndByteLane(
-    RuntimeWordAndByteLane* const destination,
-    const RuntimeSingleWordLane* const wordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    destination->word = wordSource->value;
-    destination->flag = *byteSource;
-    return destination;
-  }
 
 
 
@@ -35019,20 +24326,14 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
 
 
 
-  /**
-   * Address: 0x0094EA40 (FUN_0094EA40)
-   *
-   * What it does:
-   * Initializes one intrusive double-link node to a singleton self-linked ring.
-   */
-  [[maybe_unused]] RuntimeIntrusiveDoubleLinkNode* RuntimeInitializeIntrusiveSelfLinkLaneA(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
+
+
+
+
+
+
+
+
 
 
 
@@ -35047,33 +24348,8 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     "RuntimeNodePointerOwnerOffset04::node offset must be 0x04"
   );
 
-  [[nodiscard]] RuntimeEmbeddedIntrusiveNodeOwnerOffset04* RuntimeOwnerFromEmbeddedNodeOffset04(
-    RuntimeIntrusiveDoubleLinkNode* const node
-  ) noexcept
-  {
-    return reinterpret_cast<RuntimeEmbeddedIntrusiveNodeOwnerOffset04*>(
-      reinterpret_cast<std::uint8_t*>(node) - offsetof(RuntimeEmbeddedIntrusiveNodeOwnerOffset04, node)
-    );
-  }
 
-  [[nodiscard]] RuntimeWordPairLane* RuntimeAssignWordPairLaneOrdered(
-    RuntimeWordPairLane* const destination,
-    const std::uint32_t first,
-    const std::uint32_t second
-  ) noexcept
-  {
-    destination->first = first;
-    destination->second = second;
-    return destination;
-  }
 
-  [[nodiscard]] std::uint32_t RuntimeComputePackedTriangularOffsetBase(
-    const std::uint32_t value
-  ) noexcept
-  {
-    const std::uint32_t product = value * (value - 1u);
-    return (product >> 1u) + value * 2u;
-  }
 
 
 
@@ -35133,24 +24409,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(offsetof(RuntimeInitRecord36Lane, lane1C) == 0x1C, "RuntimeInitRecord36Lane::lane1C offset must be 0x1C");
   static_assert(offsetof(RuntimeInitRecord36Lane, lane20) == 0x20, "RuntimeInitRecord36Lane::lane20 offset must be 0x20");
 
-  [[nodiscard]] RuntimeInitRecord36Lane* RuntimeInitializeRecord36WithInvalidIndexAndClearFlagCommon(
-    RuntimeInitRecord36Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04,
-    const std::uint32_t lane08
-  ) noexcept
-  {
-    owner->lane00 = lane00;
-    owner->lane08 = lane08;
-    owner->lane04 = lane04;
-    owner->lane0C = 0u;
-    owner->lane10 = 0u;
-    owner->lane14 = 0u;
-    owner->lane18 = 0u;
-    owner->lane1C = -1;
-    owner->lane20 = 0u;
-    return owner;
-  }
 
 
 
@@ -35166,20 +24424,6 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
   static_assert(sizeof(RuntimeInitRecord24Lane) == 0x18, "RuntimeInitRecord24Lane size must be 0x18");
   static_assert(offsetof(RuntimeInitRecord24Lane, lane14) == 0x14, "RuntimeInitRecord24Lane::lane14 offset must be 0x14");
 
-  [[nodiscard]] RuntimeInitRecord24Lane* RuntimeInitializeRecord24WithInvalidIndexCommon(
-    RuntimeInitRecord24Lane* const owner,
-    const std::uint32_t lane00,
-    const std::uint32_t lane04
-  ) noexcept
-  {
-    owner->lane00 = lane00;
-    owner->lane04 = lane04;
-    owner->lane08 = 0u;
-    owner->lane0C = 0u;
-    owner->lane10 = 0u;
-    owner->lane14 = -1;
-    return owner;
-  }
 
 
 
@@ -35217,35 +24461,7 @@ std::uint32_t* RuntimeCopyDwordTripleCountLaneF(
     return RuntimeScatterCopyWordFromSourceLaneCommon(count, sourceWord, destinationWord);
   }
 
-  /**
-   * Address: 0x008326F0 (FUN_008326F0)
-   *
-   * What it does:
-   * Alias lane of `RuntimeScatterCopyWordFromSourceLaneA`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceLaneB(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneCommon(count, sourceWord, destinationWord);
-  }
 
-  /**
-   * Address: 0x00832710 (FUN_00832710)
-   *
-   * What it does:
-   * Alias lane of `RuntimeScatterCopyWordFromSourceLaneA`.
-   */
-  [[maybe_unused]] std::uint32_t RuntimeScatterCopyWordFromSourceLaneC(
-    const std::uint32_t count,
-    const std::uint32_t* const sourceWord,
-    std::uint32_t* const destinationWord
-  ) noexcept
-  {
-    return RuntimeScatterCopyWordFromSourceLaneCommon(count, sourceWord, destinationWord);
-  }
 
 
 
