@@ -190,18 +190,28 @@ namespace moho
    * Layout evidence:
    * - `cfunc_UnitGetGuardsL` copies from `unit+0x500` into a local
    *   fastvector runtime view after seeding a preceding 8-byte intrusive node.
+   * - Both `Unit` constructors (0x006A5050 `Unit(Sim*)` at 0x006A5130-0x006A5165,
+   *   and 0x006A53F0 `Unit(const SUnitConstructionParams&)`) seed `mSlots`'
+   *   begin/end/metadata to `unit+0x510` and capacityEnd to `unit+0x520`, i.e.
+   *   the fastvector small-buffer is the 4-slot window at `unit+0x510..0x520`.
+   *   That window was previously mismodeled as a phantom `OccupyGroundToken`
+   *   (zero real uses) + padding; it is `mSlots`' inline storage.
    */
   struct SGuardedByRuntimeList
   {
     TDatListItem<void, void> mOwnerNode;                  // +0x00
     gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> mSlots; // +0x08
+    SGuardedByWeakOwnerSlot mInlineSlots[4];              // +0x18 (small-buffer storage backing mSlots)
   };
-  static_assert(sizeof(SGuardedByRuntimeList) == 0x18, "SGuardedByRuntimeList size must be 0x18");
+  static_assert(sizeof(SGuardedByRuntimeList) == 0x28, "SGuardedByRuntimeList size must be 0x28");
   static_assert(
     offsetof(SGuardedByRuntimeList, mOwnerNode) == 0x00, "SGuardedByRuntimeList::mOwnerNode offset must be 0x00"
   );
   static_assert(
     offsetof(SGuardedByRuntimeList, mSlots) == 0x08, "SGuardedByRuntimeList::mSlots offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SGuardedByRuntimeList, mInlineSlots) == 0x18, "SGuardedByRuntimeList::mInlineSlots offset must be 0x18"
   );
 
   /**
@@ -1905,9 +1915,7 @@ namespace moho
     SWeakRefSlot GuardedUnitRef;                         // 0x04E0
     Wm3::Vector3f GuardedPos;                            // 0x04E8
     char pad_04F4[4];                                    // 0x04F4
-    SGuardedByRuntimeList GuardedByList;                 // 0x04F8
-    void* OccupyGroundToken;                             // 0x0510
-    char pad_0514[12];                                   // 0x0514
+    SGuardedByRuntimeList GuardedByList;                 // 0x04F8 (spans 0x04F8..0x0520; mInlineSlots own 0x0510..0x0520)
     IFormationInstance* GuardFormation;                  // 0x0520
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
     char pad_0525[0x03];               // 0x0525
