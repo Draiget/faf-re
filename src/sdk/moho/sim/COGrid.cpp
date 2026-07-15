@@ -1003,6 +1003,52 @@ namespace moho
   }
 
   /**
+   * Address: 0x00721C00 (FUN_00721C00, Moho::func_GatherUnmarkedUnitsInBox)
+   *
+   * IDA signature:
+   * void __stdcall func_GatherUnmarkedUnitsInBox(Moho::COGrid *a1,
+   *     Wm3::AxisAlignedBox3f *box, gpg::fastvector_CollisionResult *into);
+   *
+   * What it does:
+   * Coarse AABB spatial query: gathers unmarked unit entities whose cached
+   * collision AABB overlaps `box` and appends one CollisionResult
+   * (sourceEntity = entity) per hit. Mirrors COGrid::CollectEntitiesInBox minus
+   * the precise CollideBox step. Matching the binary, the gathered candidate is
+   * NOT null-checked before the bounds test.
+   */
+  void GatherUnmarkedUnitsInBox(
+    COGrid& grid,
+    const Wm3::AxisAlignedBox3f& box,
+    CollisionResultFastVectorN10& into
+  )
+  {
+    const EntityCollisionBoundsView boundsView{
+      box.Min.x,
+      box.Min.y,
+      box.Min.z,
+      box.Max.x,
+      box.Max.y,
+      box.Max.z
+    };
+
+    EntityGatherVector gatheredEntities{};
+    const int gatheredCount = GatherUnmarkedEntitiesInBounds(boundsView, grid, ENTITYTYPE_Unit, gatheredEntities);
+
+    into.ResetStorageToInline();
+
+    for (int index = 0; index < gatheredCount; ++index) {
+      Entity* const candidate = gatheredEntities.start_[index];
+      if (!AxisAlignedBoundsOverlapEntityBounds(box, *candidate)) {
+        continue;
+      }
+
+      CollisionResult result{};
+      result.sourceEntity = candidate;
+      into.PushBack(result);
+    }
+  }
+
+  /**
    * Address: 0x00721FB0 (FUN_00721FB0, Moho::COGrid::ForAllEntitiesIterator)
    *
    * What it does:

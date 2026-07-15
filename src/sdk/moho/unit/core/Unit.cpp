@@ -93,7 +93,137 @@ namespace moho
    * Validates whether `moveUnit` can occupy/move through `*pos` while filtering
    * nearby collision occupants against movement/attachment/formation rules.
    */
-  bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit);
+  bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit)
+  {
+    if (moveUnit == nullptr) {
+      return false;
+    }
+
+    // Movement-rule category sets, resolved once up front (order preserved).
+    RRuleGameRules* const rules = moveUnit->SimulationRef->mRules;
+    const CategoryWordRangeView* const catFerryBeacon = rules->GetEntityCategory("FERRYBEACON");
+    const CategoryWordRangeView* const catPodStagingPlatform = rules->GetEntityCategory("PODSTAGINGPLATFORM");
+
+    const SFootprint& footprint = moveUnit->GetFootprint();
+    const ELayer moveLayer = moveUnit->mCurrentLayer;
+    const bool moveUnitHasStorage = moveUnit->AiTransport != nullptr;
+
+    // Footprint-sized query box: horizontal side = max(sizeX, sizeZ); Y spans
+    // [-1000, 1000] (effectively unbounded vertical), anchored at the cell.
+    const int maxFootprintSide = std::max<int>(footprint.mSizeX, footprint.mSizeZ);
+    Wm3::AxisAlignedBox3f box{};
+    box.Min.x = static_cast<float>(pos->x);
+    box.Max.x = static_cast<float>(pos->x + maxFootprintSide);
+    box.Min.y = -1000.0f;
+    box.Max.y = 1000.0f;
+    box.Min.z = static_cast<float>(pos->z);
+    box.Max.z = static_cast<float>(pos->z + maxFootprintSide);
+
+    CollisionResultFastVectorN10 into{};
+    GatherUnmarkedUnitsInBox(*grid, box, into);
+
+    for (const CollisionResult& hit : into) {
+      Entity* const source = hit.sourceEntity;
+      Unit* const curUnit = (source != nullptr) ? source->IsUnit() : nullptr;
+
+      // Ignore the requested unit and any non-unit occupant.
+      if (curUnit == ignoreUnit || curUnit == nullptr) {
+        continue;
+      }
+
+      // Dead / under-construction / self never block.
+      if (curUnit->IsDead()) {
+        continue;
+      }
+      if (curUnit->IsBeingBuilt()) {
+        continue;
+      }
+      if (curUnit == moveUnit) {
+        continue;
+      }
+
+      // Layer filter: air occupants never block ground movement, and a sub mover
+      // is only blocked by occupants sharing its exact layer.
+      const ELayer curLayer = curUnit->mCurrentLayer;
+      if (curLayer == LAYER_Air || (moveLayer != curLayer && moveLayer == LAYER_Sub)) {
+        continue;
+      }
+
+      // A ferry-beacon we ourselves created does not block us.
+      if (EntityCategory::HasBlueprint(curUnit->GetBlueprint(), catFerryBeacon)) {
+        if (curUnit->GetCreator() == moveUnit) {
+          continue;
+        }
+      }
+
+      // Transport-style blocker: has an AiTransport and is not a pod-staging
+      // platform (the loop `break` path in the decompiler). Otherwise fall
+      // through to the general velocity/attachment logic.
+      bool blockedByTransport = false;
+      if (curUnit->AiTransport != nullptr) {
+        if (!EntityCategory::HasBlueprint(curUnit->GetBlueprint(), catPodStagingPlatform)) {
+          blockedByTransport = true;
+        }
+      }
+
+      // Both the transport-blocker path and the velocity path converge on the
+      // same formation/attached decision. `blockOccupant` requests the
+      // "this occupant blocks -> return false" outcome (unless it is attached).
+      bool blockOccupant = false;
+
+      if (blockedByTransport) {
+        if (curUnit->mCurrentLayer == LAYER_Air) {
+          continue;
+        }
+        if (disallowAttached) {
+          blockOccupant = true;
+        } else if (!moveUnit->IsSameFormationLayerWith(curUnit)) {
+          blockOccupant = true;
+        }
+        // else same formation layer -> does not block.
+      } else {
+        // Velocity path: velocity/compare evaluated before the layer test, as in
+        // the binary. The binary compares velocity to a static zero vector via a
+        // raw 12-byte memcmp (FUN_004F0A50, an ICF fold of Wm3::Vector3::Compare
+        // and EntityTransformPositionDiffers) — reproduce the exact byte compare.
+        const Wm3::Vec3f curVel = curUnit->GetVelocity();
+        const Wm3::Vec3f kZeroVelocity{0.0f, 0.0f, 0.0f};
+        const bool isMoving = std::memcmp(&curVel, &kZeroVelocity, sizeof(Wm3::Vec3f)) != 0;
+
+        if (curUnit->mCurrentLayer == LAYER_Air) {
+          continue;
+        }
+
+        if (moveUnitHasStorage) {
+          // We are a transport: a moving occupant, or one we are not currently
+          // trying to load, does not block us here.
+          if (isMoving) {
+            continue;
+          }
+          if (moveUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+            continue;
+          }
+        }
+
+        if (disallowAttached) {
+          blockOccupant = true;
+        } else if (isMoving) {
+          continue;
+        } else if (!moveUnit->IsSameFormationLayerWith(curUnit)) {
+          blockOccupant = true;
+        }
+        // else stationary same-formation occupant -> does not block.
+      }
+
+      // Shared attachment gate: a blocking occupant still does NOT block if it is
+      // itself attached (riding something rather than occupying the cell).
+      if (blockOccupant && !curUnit->IsUnitState(UNITSTATE_Attached)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   /**
    * Address: 0x0062AA90 (FUN_0062AA90, func_UnitWontFitAt)

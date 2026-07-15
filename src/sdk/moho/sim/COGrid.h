@@ -10,6 +10,7 @@
 #include "moho/sim/SFootprint.h"
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
+#include "Wm3AxisAlignedBox3.h"
 
 namespace moho
 {
@@ -284,6 +285,17 @@ namespace moho
     EEntityType type,
     const Wm3::Vector3f& center
   );
+
+  /**
+   * Address: 0x00721C00 (FUN_00721C00, Moho::func_GatherUnmarkedUnitsInBox)
+   *
+   * What it does:
+   * Coarse AABB spatial query: gathers unmarked unit entities whose cached
+   * collision AABB overlaps `box` and appends one CollisionResult
+   * (sourceEntity = entity) per hit into `into`. Unlike COGrid::CollectEntitiesInBox
+   * there is no precise CollideBox test — cached-bounds overlap is the only filter.
+   */
+  void GatherUnmarkedUnitsInBox(COGrid& grid, const Wm3::AxisAlignedBox3f& box, CollisionResultFastVectorN10& into);
 
   /**
    * VFTABLE: 0x00E3192C
