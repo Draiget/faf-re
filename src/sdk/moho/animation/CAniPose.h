@@ -47,6 +47,17 @@ namespace moho
     CAniPoseBone(const CAniPoseBone& copy);
 
     /**
+     * Address: 0x0054EC50 (FUN_0054EC50, Moho::CAniPoseBone::operator=)
+     *
+     * What it does:
+     * Copy-assigns one pose-bone lane field-by-field (composite/local transforms,
+     * parent/pose links, index, and visibility/interpolation flags), emitting the
+     * FST/FLD per-field copy the release binary uses. Drives the per-element copy
+     * in CAniPoseBoneTypeInfo's range copy-assign.
+     */
+    CAniPoseBone& operator=(const CAniPoseBone& copy) noexcept;
+
+    /**
      * Address: 0x0054BE30 (FUN_0054BE30, Moho::CAniPoseBone::SetVisibleRecur)
      *
      * What it does:

@@ -92,10 +92,9 @@ namespace
    * (`0x4C`) per iteration. Returns the advanced destination cursor so
    * callers (see `AssignFastVectorCAniPoseBoneEnd` below) can restore
    * the owning `fastvector`'s `end` lane when the source and destination
-   * ranges diverge. The inner copy uses the per-element copy-assign
-   * lane recovered as `RuntimeCopyPackedFloatRecord74LaneA` in
-   * CrtRuntimeHelpers, which emits exactly the FST/FLD pattern the
-   * release binary uses for `CAniPoseBone::operator=`.
+   * ranges diverge. The inner `*dst = *src` invokes
+   * `CAniPoseBone::operator=` (FUN_0054EC50), which emits exactly the
+   * FST/FLD per-field pattern the release binary uses.
    */
   moho::CAniPoseBone* CopyAssignCAniPoseBoneRangeForward(
     const moho::CAniPoseBone* const sourceBegin,
