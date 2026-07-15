@@ -60,7 +60,12 @@ void CRenFrame::Render(int, int) {}
 // body drives UpdateTargets / UpdateBasis / InterpolateBasis / UpdateCoords /
 // CacheCameraFrustumUnits by name — all five sibling helpers are now
 // recovered, so the placeholder stub here is no longer needed.
-void CollisionBeamEntity::CheckCollision() {}
+// CollisionBeamEntity::CheckCollision is recovered 1:1 in
+// src/sdk/moho/entity/CollisionBeamEntity.cpp (matches FUN_006732D0) — the beam
+// collision pass that resolves the launcher weapon's impact, broadcasts the
+// hit/miss/irrelevant event, updates beam length/effect, and fires OnImpact.
+// The empty duplicate definition here shadowed that body (a multiple-definition
+// link error); removed.
 // SMassInfo::MemberDeserialize / MemberSerialize recovered in
 // src/sdk/moho/sim/SMassInfo.cpp (matches FUN_00593030 / FUN_00593080).
 void SkyDome::CreateTextures() {}
