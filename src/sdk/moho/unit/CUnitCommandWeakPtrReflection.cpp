@@ -492,8 +492,7 @@ namespace moho
    * What it does:
    * Fill-constructs `count` weak lanes from one source node, relinking each
    * filled lane at the source owner-chain head. Typed twin of the ICF-folded
-   * generic single-owner-slot fill lane recovered as
-   * `RuntimeCopyBacklinkedPairCountFromSingleOwnerSlot`.
+   * generic single-owner-slot fill lane at FUN_006EC5B0 / FUN_007A5FE0.
    */
   [[nodiscard]] WeakPtr<CUnitCommand>* FillConstructWeakPtrCUnitCommandLanes(
     WeakPtr<CUnitCommand>* destination,

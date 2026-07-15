@@ -295,9 +295,9 @@ namespace
    *
    * What it does:
    * Destroys the trailing `[eraseFirst, eraseLast)` range of a
-   * `msvc8::vector<RMeshBlueprintLOD>` in-place (invoking
-   * `RuntimeResetSevenPrefixedLegacyStringLanes` / `FUN_00519800` per element
-   * to release each LOD's seven legacy string lanes), rewinds the vector's
+   * `msvc8::vector<RMeshBlueprintLOD>` in-place (invoking `~RMeshBlueprintLOD()`
+   * / FUN_00519800 per element to release each LOD's seven legacy string
+   * lanes), rewinds the vector's
    * logical end pointer to `eraseFirst`, and stores `eraseFirst` into `*out`.
    * This is the emitted specialization of
    * `std::vector<RMeshBlueprintLOD>::erase(iter, iter)` that the binary uses
