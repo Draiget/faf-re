@@ -17438,20 +17438,25 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   };
   static_assert(sizeof(RuntimeMapTreeState) == 0x0C, "RuntimeMapTreeState size must be 0x0C");
 
+  // std::_Tree node for the per-army unit-stat registry:
+  // std::map<RUnitBlueprint* (stored as a 4-byte id), float count>.
+  // Owner: army statistics (FUN_00711B00 / FUN_00710990). See the container-map
+  // reconstruction note. mapKey = the blueprint-id key; mapValue = the mapped
+  // float count (bit-pattern copied as a dword by the emitted _Buynode/_Copy).
   struct RuntimeMapTreeNode24
   {
     RuntimeMapTreeNode24* left;   // +0x00
     RuntimeMapTreeNode24* parent; // +0x04
     RuntimeMapTreeNode24* right;  // +0x08
-    std::uint32_t keyLhs;         // +0x0C
-    std::uint32_t keyRhs;         // +0x10
+    std::uint32_t mapKey;         // +0x0C  std::map key (blueprint id)
+    std::uint32_t mapValue;       // +0x10  std::map mapped value (float count bits)
     std::uint8_t color;           // +0x14
     std::uint8_t isNil;           // +0x15
     std::uint8_t pad16[0x02];     // +0x16
   };
   static_assert(sizeof(RuntimeMapTreeNode24) == 0x18, "RuntimeMapTreeNode24 size must be 0x18");
-  static_assert(offsetof(RuntimeMapTreeNode24, keyLhs) == 0x0C, "RuntimeMapTreeNode24::keyLhs offset must be 0x0C");
-  static_assert(offsetof(RuntimeMapTreeNode24, keyRhs) == 0x10, "RuntimeMapTreeNode24::keyRhs offset must be 0x10");
+  static_assert(offsetof(RuntimeMapTreeNode24, mapKey) == 0x0C, "RuntimeMapTreeNode24::mapKey offset must be 0x0C");
+  static_assert(offsetof(RuntimeMapTreeNode24, mapValue) == 0x10, "RuntimeMapTreeNode24::mapValue offset must be 0x10");
   static_assert(offsetof(RuntimeMapTreeNode24, color) == 0x14, "RuntimeMapTreeNode24::color offset must be 0x14");
   static_assert(offsetof(RuntimeMapTreeNode24, isNil) == 0x15, "RuntimeMapTreeNode24::isNil offset must be 0x15");
 
@@ -17466,8 +17471,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
   struct RuntimeMapTreeNode24Payload
   {
-    std::uint32_t keyLhs;
-    std::uint32_t keyRhs;
+    std::uint32_t mapKey;   // blueprint-id key
+    std::uint32_t mapValue; // mapped float-count bits
   };
   static_assert(sizeof(RuntimeMapTreeNode24Payload) == 0x08, "RuntimeMapTreeNode24Payload size must be 0x08");
 
@@ -17514,8 +17519,8 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
       node->left = left;
       node->parent = parent;
       node->right = right;
-      node->keyLhs = payloadSource->keyLhs;
-      node->keyRhs = payloadSource->keyRhs;
+      node->mapKey = payloadSource->mapKey;
+      node->mapValue = payloadSource->mapValue;
       node->color = color;
       node->isNil = 0u;
     }
@@ -17539,7 +17544,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     if (sourceNode->isNil == 0u) {
       const RuntimeMapTreeNode24Payload* const payloadSource =
-        reinterpret_cast<const RuntimeMapTreeNode24Payload*>(&sourceNode->keyLhs);
+        reinterpret_cast<const RuntimeMapTreeNode24Payload*>(&sourceNode->mapKey);
       RuntimeMapTreeNode24* const clonedNode = RuntimeAllocateMapTreeNode24FromSourceKeyLanes(
         payloadSource,
         result,
