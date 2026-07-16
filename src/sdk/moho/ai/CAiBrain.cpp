@@ -45,6 +45,7 @@
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/CSquad.h"
 #include "moho/sim/ReconBlip.h"
@@ -353,6 +354,16 @@ namespace
   constexpr const char* kLuaExpectedArgRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kAiBrainSetUpAttackVectorsToArmyName = "SetUpAttackVectorsToArmy";
   constexpr const char* kAiBrainSetUpAttackVectorsToArmyHelpText = "CAiBrain:SetUpAttackVectorsToArmy()";
+  constexpr const char* kAiBrainPickBestAttackVectorName = "PickBestAttackVector";
+  constexpr const char* kAiBrainPickBestAttackVectorHelpText = "CAiBrain:PickBestAttackVector()";
+  // Binary string literals (bin/2025.7.1/ForgedAlliance.exe): the arg-count Warnf and the
+  // two user-callback error strings emitted by CAiBrain::PickBestAttackVector.
+  constexpr const char* kAiBrainPickBestAttackVectorArgCountWarning =
+    "Error in CAiBrain::PickBestAttackVector: Expected 6 or 8 arguments, got 7 instead.";
+  constexpr const char* kAiBrainPickBestAttackVectorLoadCallbackError =
+    "Error loading user-supplied callback in CAiBrain::PickBestAttackVector: %s";
+  constexpr const char* kAiBrainPickBestAttackVectorRunCallbackError =
+    "Error running user-supplied callback in CAiBrain::PickBestAttackVector: %s";
   constexpr const char* kAiBrainFindClosestArmyWithBaseName = "FindClosestArmyWithBase";
   constexpr const char* kAiBrainFindClosestArmyWithBaseHelpText =
     "CAiBrain:FindClosestArmyWithBase(allianceState) - returns the brain of the closest "
@@ -1963,6 +1974,375 @@ namespace moho
     }
 
     return matchCount;
+  }
+
+  namespace
+  {
+    /**
+     * Footprint-size multiplier (`ds:dword_DFF31C == 10.0`) that scales a
+     * candidate's footprint extent into the LeastDefended threat-scan radius.
+     */
+    constexpr float kLeastDefendedFootprintRadiusScale = 10.0f;
+
+    /**
+     * Nearby-unit scan radius (`ds:flt_E4F92C == 32.0`) used by the
+     * HighestValue / count comparison lanes of `PickBestAttackVector`.
+     */
+    constexpr float kLeastDefendedScanRadius = 32.0f;
+
+    /**
+     * Initial "no candidate scored yet" sentinel (`ds:flt_E4F6E8 == -1.0`) for
+     * the running best score in both candidate-ranking functions.
+     */
+    constexpr float kNoBestScoreSentinel = -1.0f;
+
+    /**
+     * Sum of a unit's build-cost mass and energy (blueprint `Economy`
+     * `BuildCostMass + BuildCostEnergy`). Mirrors the binary's `[bp+0x4EC] +
+     * [bp+0x4E8]` value read used to rank candidates by economic worth.
+     */
+    [[nodiscard]] float UnitBuildValue(const RUnitBlueprint* const blueprint) noexcept
+    {
+      if (blueprint == nullptr) {
+        return 0.0f;
+      }
+      return blueprint->Economy.BuildCostMass + blueprint->Economy.BuildCostEnergy;
+    }
+
+    /**
+     * Squared XYZ distance between two positions.
+     */
+    [[nodiscard]] float DistanceSquared(const Wm3::Vector3f& a, const Wm3::Vector3f& b) noexcept
+    {
+      const float dx = a.x - b.x;
+      const float dy = a.y - b.y;
+      const float dz = a.z - b.z;
+      return (dx * dx) + (dy * dy) + (dz * dz);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0057B620 (FUN_0057B620, sub_57B620)
+   *
+   * IDA signature:
+   * Value* __stdcall sub_57B620(CAiBrain* brain, ECompareType compareType,
+   *     EAlliance alliance, EntityCategory* category, Wm3::Vector3f* refPos);
+   *
+   * What it does:
+   * Gathers candidate entities and returns the single best-scored one relative
+   * to `referencePosition`, ranked by `compareType`. When `alliance ==
+   * ALLIANCE_Ally` the ally set is filled from `mArmy->GetUnits(category)`; that
+   * ally set is the one actually scored. A recon-blip set is also built (each
+   * live blip creator), matching the binary — the shipped code populates it but
+   * never scores it, so it is preserved as a faithful, if inert, side effect.
+   *
+   * Each scored candidate must be allied per `IArmy::GetAllianceWith` and must
+   * NOT be a member of `category` (the binary's category test is an exclusion
+   * filter, the inverse of `HasBlueprint`). Scoring:
+   *   COMPARE_Closest / COMPARE_Furthest : nearest / farthest to referencePosition.
+   *   COMPARE_HighestValue               : highest build-cost value.
+   *   COMPARE_LeastDefended              : lowest summed build value of armed
+   *                                        units within footprint*10 of it.
+   * Returns the best candidate `Entity*`, or nullptr when none qualify.
+   */
+  Entity* CollectAttackCandidateEntities(
+    CAiBrain* const brain,
+    const ECompareType compareType,
+    const EAlliance alliance,
+    const EntityCategorySet* const category,
+    const Wm3::Vector3f& referencePosition)
+  {
+    // Recon-blip candidate set (populated for parity with the binary; the
+    // shipped function never scores it — see the ally set below).
+    SEntitySetTemplateUnit reconCandidates{};
+    // Ally candidate set — this is the set actually iterated for scoring.
+    SEntitySetTemplateUnit allyCandidates{};
+
+    if (alliance == ALLIANCE_Ally) {
+      SEntitySetTemplateUnit armyUnits{};
+      brain->mArmy->GetUnits(&armyUnits, const_cast<EntityCategorySet*>(category));
+      allyCandidates.mVec.AddAll(&armyUnits.mVec);
+    }
+
+    CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
+    for (ReconBlip* const blip : reconDb->ReconGetBlips()) {
+      Unit* const creator = blip ? blip->GetCreator() : nullptr;
+      if (creator != nullptr && !creator->IsDead()) {
+        (void)reconCandidates.AddUnit(creator);
+      }
+    }
+
+    Entity* bestCandidate = nullptr;
+    float bestScore = kNoBestScoreSentinel;
+
+    for (Entity* const candidate : allyCandidates.mVec) {
+      if (candidate == nullptr) {
+        continue;
+      }
+
+      const IArmy* const candidateArmy =
+        (candidate->ArmyRef != nullptr) ? static_cast<const IArmy*>(candidate->ArmyRef) : nullptr;
+      if (brain->mArmy->GetAllianceWith(candidateArmy) != alliance) {
+        continue;
+      }
+
+      Unit* const candidateUnit = candidate->IsUnit();
+      const RUnitBlueprint* const candidateBlueprint =
+        (candidateUnit != nullptr) ? candidateUnit->GetBlueprint() : nullptr;
+
+      // Exclusion filter: the binary keeps candidates that are NOT in `category`
+      // (or whose category bit falls outside the set's word range).
+      if (EntityCategory::HasBlueprint(candidate->BluePrint, category)) {
+        continue;
+      }
+
+      switch (compareType) {
+        case COMPARE_Closest: {
+          const float score = DistanceSquared(candidate->GetPositionWm3(), referencePosition);
+          if (score < bestScore || bestScore < 0.0f) {
+            bestCandidate = candidate;
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_Furthest: {
+          const float score = DistanceSquared(candidate->GetPositionWm3(), referencePosition);
+          if (score > bestScore || bestScore < 0.0f) {
+            bestCandidate = candidate;
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_HighestValue: {
+          const float score = UnitBuildValue(candidateBlueprint);
+          if (score > bestScore || bestScore < 0.0f) {
+            bestCandidate = candidate;
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_LeastDefended: {
+          float nearbyDefenseValue = 0.0f;
+
+          const SFootprint& footprint = candidate->GetFootprint();
+          const std::uint8_t footprintExtent = std::max(footprint.mSizeX, footprint.mSizeZ);
+          const float scanRadius = static_cast<float>(footprintExtent) * kLeastDefendedFootprintRadiusScale;
+          const Wm3::Vector3f& candidatePos = candidate->GetPositionWm3();
+
+          // The binary re-derives the scoring brain from the candidate's own
+          // army (`[candidate+0x154]` -> army vtable slot GetArmyBrain), so the
+          // surrounding-defense scan is run from that army's perspective.
+          CAiBrain* const candidateBrain =
+            (candidate->ArmyRef != nullptr) ? candidate->ArmyRef->GetArmyBrain() : nullptr;
+
+          SEntitySetTemplateUnit nearbyDefenders{};
+          CollectUnitsAroundPointFiltered(
+            candidateBrain, &nearbyDefenders, category, candidatePos, scanRadius, ALLIANCE_Ally
+          );
+
+          for (Entity* const defenderEntity : nearbyDefenders.mVec) {
+            Unit* const defenderUnit = defenderEntity ? defenderEntity->IsUnit() : nullptr;
+            const RUnitBlueprint* const defenderBlueprint =
+              (defenderUnit != nullptr) ? defenderUnit->GetBlueprint() : nullptr;
+            if (defenderBlueprint != nullptr && !defenderBlueprint->Weapons.WeaponBlueprints.empty()) {
+              nearbyDefenseValue += UnitBuildValue(defenderBlueprint);
+            }
+          }
+
+          if (bestScore > nearbyDefenseValue || bestScore < 0.0f) {
+            bestCandidate = candidate;
+            bestScore = nearbyDefenseValue;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    return bestCandidate;
+  }
+
+  /**
+   * Address: 0x0057C290 (FUN_0057C290, Moho::CAiBrain::PickBestAttackVector)
+   *
+   * What it does:
+   * See the header declaration. Scores this brain's debug attack vectors and
+   * writes the winning vector's origin/direction into `outResult`.
+   */
+  SPointVector* CAiBrain::PickBestAttackVector(
+    SPointVector* const outResult,
+    CPlatoon* const platoon,
+    const ESquadClass squadClass,
+    const EAlliance alliance,
+    const ECompareType compareType,
+    const EntityCategorySet* const category,
+    const char* const scoreScript,
+    const char* const scoreFunc)
+  {
+    // Winning attack vector kept as an SPointVector (point=origin, vector=direction).
+    const Wm3::Vector3f zeroVector = Wm3::Vector3f::Zero();
+    SPointVector bestVector{zeroVector, zeroVector};
+    float bestScore = kNoBestScoreSentinel;
+
+    // Locate the squad of the requested class by linear scan over the platoon's
+    // squad list (the binary inlines this rather than calling GetSquad).
+    CSquad* matchingSquad = nullptr;
+    for (CSquad* const squad : platoon->mSquadList) {
+      if (squad != nullptr && squad->mSquadClass == squadClass) {
+        matchingSquad = squad;
+        break;
+      }
+    }
+
+    // Early-out guards -> zero result: no current enemy, no matching squad, or
+    // an empty squad unit set.
+    if (mCurrentEnemy == nullptr || matchingSquad == nullptr ||
+        matchingSquad->mUnits.mVec.begin() == matchingSquad->mUnits.mVec.end()) {
+      outResult->point = bestVector.point;
+      outResult->vector = bestVector.vector;
+      return outResult;
+    }
+
+    // Optional user-supplied Lua scorer.
+    LuaPlus::LuaObject scorerFunctionObject;
+    if (scoreFunc != nullptr) {
+      LuaPlus::LuaState* const luaState = mSim->GetLuaState();
+      LuaPlus::LuaObject scoreModule = SCR_Import(luaState, scoreScript);
+      scorerFunctionObject = scoreModule[scoreFunc];
+    }
+
+    Wm3::Vector3f squadCenter{};
+    (void)matchingSquad->GetCenter(&squadCenter);
+
+    // Iterate this brain's attack vectors (origin + direction).
+    for (const SAiAttackVectorDebug& attackVector : mAttackVectors) {
+      const Wm3::Vector3f candidatePoint{
+        attackVector.mOrigin.x + attackVector.mDirection.x,
+        attackVector.mOrigin.y + attackVector.mDirection.y,
+        attackVector.mOrigin.z + attackVector.mDirection.z
+      };
+
+      if (!matchingSquad->FitsAt(candidatePoint)) {
+        continue;
+      }
+
+      // When a scorer is supplied, gate on scorer(centerX, centerZ, candidateX, candidateZ).
+      if (scoreFunc != nullptr) {
+        LuaPlus::LuaFunction scorer(scorerFunctionObject);
+        const bool approved = scorer.Call_Num4_bool(
+          squadCenter.x, squadCenter.z, candidatePoint.x, candidatePoint.z
+        );
+        if (!approved) {
+          continue;
+        }
+      }
+
+      switch (compareType) {
+        case COMPARE_Closest: {
+          float score;
+          if (category->Empty()) {
+            score = DistanceSquared(squadCenter, candidatePoint);
+          } else {
+            Entity* const bestEntity =
+              CollectAttackCandidateEntities(this, COMPARE_Closest, alliance, category, squadCenter);
+            score = (bestEntity != nullptr)
+                      ? DistanceSquared(candidatePoint, bestEntity->GetPositionWm3())
+                      : std::numeric_limits<float>::infinity();
+          }
+          if (bestScore > score || bestScore < 0.0f) {
+            (void)CopySPointVectorAndReturnDestination(
+              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
+            );
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_Furthest: {
+          float score;
+          if (category->Empty()) {
+            score = DistanceSquared(squadCenter, candidatePoint);
+          } else {
+            Entity* const bestEntity =
+              CollectAttackCandidateEntities(this, COMPARE_Furthest, alliance, category, squadCenter);
+            score = (bestEntity != nullptr)
+                      ? DistanceSquared(candidatePoint, bestEntity->GetPositionWm3())
+                      : std::numeric_limits<float>::infinity();
+          }
+          if (score > bestScore || bestScore < 0.0f) {
+            (void)CopySPointVectorAndReturnDestination(
+              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
+            );
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_HighestValue: {
+          SEntitySetTemplateUnit nearbyUnits{};
+          CollectUnitsAroundPointFiltered(this, &nearbyUnits, category, squadCenter, 0.0f, alliance);
+
+          float score = 0.0f;
+          for (Entity* const nearbyEntity : nearbyUnits.mVec) {
+            Unit* const nearbyUnit = nearbyEntity ? nearbyEntity->IsUnit() : nullptr;
+            score += UnitBuildValue(nearbyUnit != nullptr ? nearbyUnit->GetBlueprint() : nullptr);
+          }
+
+          bool keep = false;
+          if (score > bestScore) {
+            keep = true;
+          } else if (bestScore < 0.0f) {
+            keep = true;
+          } else if (score == bestScore) {
+            // Tie-break (asm 0x57C776): on equal value, prefer the vector whose
+            // candidate point is closer to the squad center than the kept
+            // vector's origin is.
+            const float keptOriginDist = DistanceSquared(bestVector.point, squadCenter);
+            const float candidateDist = DistanceSquared(candidatePoint, squadCenter);
+            keep = keptOriginDist > candidateDist;
+          }
+          if (keep) {
+            (void)CopySPointVectorAndReturnDestination(
+              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
+            );
+            bestScore = score;
+          }
+          break;
+        }
+        case COMPARE_LeastDefended: {
+          SEntitySetTemplateUnit nearbyUnits{};
+          CollectUnitsAroundPointFiltered(this, &nearbyUnits, category, squadCenter, kLeastDefendedScanRadius, alliance);
+
+          const float score =
+            static_cast<float>((nearbyUnits.mVec.end() - nearbyUnits.mVec.begin()));
+
+          if (score > bestScore || bestScore < 0.0f) {
+            (void)CopySPointVectorAndReturnDestination(
+              &bestVector, reinterpret_cast<const SPointVector*>(&attackVector)
+            );
+            bestScore = score;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    // When value/count scoring found nothing near any vector, retry once in
+    // COMPARE_Closest with the same squad/alliance/category/scorer.
+    if ((compareType == COMPARE_HighestValue || compareType == COMPARE_LeastDefended) && bestScore == 0.0f) {
+      SPointVector retryResult{zeroVector, zeroVector};
+      (void)PickBestAttackVector(
+        &retryResult, platoon, squadClass, alliance, COMPARE_Closest, category, scoreScript, scoreFunc
+      );
+      outResult->point = retryResult.point;
+      outResult->vector = retryResult.vector;
+      return outResult;
+    }
+
+    outResult->point = bestVector.point;
+    outResult->vector = bestVector.vector;
+    return outResult;
   }
 } // namespace moho
 
@@ -5493,6 +5873,137 @@ int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state
   }
 
   threatsTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0058EF60 (FUN_0058EF60, cfunc_CAiBrainPickBestAttackVector)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainPickBestAttackVectorL`.
+ */
+int moho::cfunc_CAiBrainPickBestAttackVector(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainPickBestAttackVectorL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058EF80 (FUN_0058EF80, func_CAiBrainPickBestAttackVector_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:PickBestAttackVector(...)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainPickBestAttackVector_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainPickBestAttackVectorName,
+    &moho::cfunc_CAiBrainPickBestAttackVector,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainPickBestAttackVectorHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058EFE0 (FUN_0058EFE0, cfunc_CAiBrainPickBestAttackVectorL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CAiBrainPickBestAttackVectorL@<eax>(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * Reads `(brain, platoon, squadClass, alliance, compareType, category
+ * [, scoreScript, scoreFunc])` from the Lua stack, invokes
+ * `CAiBrain::PickBestAttackVector`, and returns the result as an `SPointVector`
+ * Lua object — or `nil` when the returned point equals the zero vector.
+ *
+ * The argument count must be 6 or 8; a count of 7 emits a Warnf and proceeds
+ * with null score-script/function pointers.
+ */
+int moho::cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 6 || argumentCount > 8) {
+    LuaPlus::LuaState::Error(
+      state,
+      kLuaExpectedArgRangeWarning,
+      kAiBrainPickBestAttackVectorHelpText,
+      6,
+      8,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 2));
+  CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+  ESquadClass squadClass{};
+  gpg::RRef squadClassRef{};
+  (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+  LuaPlus::LuaStackObject squadClassArg(state, 3);
+  const char* const squadClassName = lua_tostring(rawState, 3);
+  if (squadClassName == nullptr) {
+    squadClassArg.TypeError("string");
+  }
+  SCR_GetEnum(state, squadClassName, squadClassRef);
+
+  EAlliance alliance{};
+  gpg::RRef allianceRef{};
+  (void)gpg::RRef_EAlliance(&allianceRef, &alliance);
+  LuaPlus::LuaStackObject allianceArg(state, 4);
+  const char* const allianceName = lua_tostring(rawState, 4);
+  if (allianceName == nullptr) {
+    allianceArg.TypeError("string");
+  }
+  SCR_GetEnum(state, allianceName, allianceRef);
+
+  ECompareType compareType{};
+  gpg::RRef compareTypeRef{};
+  (void)gpg::RRef_ECompareType(&compareTypeRef, &compareType);
+  LuaPlus::LuaStackObject compareTypeArg(state, 5);
+  const char* const compareTypeName = lua_tostring(rawState, 5);
+  if (compareTypeName == nullptr) {
+    compareTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, compareTypeName, compareTypeRef);
+
+  const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 6));
+  EntityCategorySet* const category = func_GetCObj_EntityCategory(categoryObject);
+
+  SPointVector result{};
+  if (lua_gettop(rawState) == 8) {
+    LuaPlus::LuaStackObject scoreScriptArg(state, 7);
+    const char* const scoreScript = lua_tostring(rawState, 7);
+    if (scoreScript == nullptr) {
+      scoreScriptArg.TypeError("string");
+    }
+    LuaPlus::LuaStackObject scoreFuncArg(state, 8);
+    const char* const scoreFunc = lua_tostring(rawState, 8);
+    if (scoreFunc == nullptr) {
+      scoreFuncArg.TypeError("string");
+    }
+    brain->PickBestAttackVector(&result, platoon, squadClass, alliance, compareType, category, scoreScript, scoreFunc);
+  } else {
+    if (lua_gettop(rawState) == 7) {
+      gpg::Warnf(kAiBrainPickBestAttackVectorArgCountWarning);
+    }
+    brain->PickBestAttackVector(&result, platoon, squadClass, alliance, compareType, category, nullptr, nullptr);
+  }
+
+  const Wm3::Vector3f zeroVector = Wm3::Vector3f::Zero();
+  if (Wm3::Vector3f::Compare(&result.point, &zeroVector)) {
+    LuaPlus::LuaObject resultObject = SCR_ToLua<SPointVector>(state, result);
+    resultObject.PushStack(state);
+  } else {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+  }
   return 1;
 }
 

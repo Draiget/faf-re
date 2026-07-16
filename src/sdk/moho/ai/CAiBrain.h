@@ -6,9 +6,12 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/ai/ECompareType.h"
+#include "moho/ai/SPointVector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/ESquadClass.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
@@ -23,8 +26,10 @@ namespace moho
 {
   class CArmyImpl;
   class CAiPersonality;
+  class CPlatoon;
   class CScrLuaInitForm;
   class CTaskStage;
+  class Entity;
   struct SEntitySetTemplateUnit;
   class Sim;
   class Unit;
@@ -215,6 +220,39 @@ namespace moho
       SEntitySetTemplateUnit* outSet,
       const Wm3::Vector3f* referencePosition,
       float maxDistance
+    );
+
+    /**
+     * Address: 0x0057C290 (FUN_0057C290, Moho::CAiBrain::PickBestAttackVector)
+     *
+     * IDA signature:
+     * SPointVector* __thiscall CAiBrain::PickBestAttackVector(
+     *     CAiBrain* this, SPointVector* outResult, CPlatoon* platoon,
+     *     ESquadClass squadClass, EAlliance alliance, ECompareType compareType,
+     *     EntityCategory* category, const char* scoreScript, const char* scoreFunc);
+     *
+     * What it does:
+     * Finds the squad of class `squadClass` in `platoon`, then scores every one
+     * of this brain's debug attack vectors by projecting the vector's
+     * `origin + direction` candidate point, keeping the vectors the squad can
+     * fit at (`CSquad::FitsAt`) and, when a `scoreScript`/`scoreFunc` Lua
+     * callback is supplied, only those the callback approves. The comparison
+     * mode selects the winning vector (Closest/Furthest to the best
+     * category-excluded entity, HighestValue of nearby units, or count of
+     * nearby units). When value/count scoring finds nothing it retries once in
+     * `COMPARE_Closest`. The winning attack vector's `origin`/`direction` is
+     * written into `outResult` (as `SPointVector::point`/`vector`); a
+     * degenerate squad/brain state yields a zero result. Returns `outResult`.
+     */
+    SPointVector* PickBestAttackVector(
+      SPointVector* outResult,
+      CPlatoon* platoon,
+      ESquadClass squadClass,
+      EAlliance alliance,
+      ECompareType compareType,
+      const EntityCategorySet* category,
+      const char* scoreScript,
+      const char* scoreFunc
     );
 
   public:
@@ -1866,6 +1904,34 @@ namespace moho
    * `MOBILE - STRUCTURE`) and rebuilds attack vectors.
    */
   int cfunc_CAiBrainSetUpAttackVectorsToArmyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058EF60 (FUN_0058EF60, cfunc_CAiBrainPickBestAttackVector)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainPickBestAttackVectorL`.
+   */
+  int cfunc_CAiBrainPickBestAttackVector(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058EF80 (FUN_0058EF80, func_CAiBrainPickBestAttackVector_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:PickBestAttackVector(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainPickBestAttackVector_LuaFuncDef();
+
+  /**
+   * Address: 0x0058EFE0 (FUN_0058EFE0, cfunc_CAiBrainPickBestAttackVectorL)
+   *
+   * What it does:
+   * Reads `(brain, platoon, squadClass, alliance, compareType, category
+   * [, scoreScript, scoreFunc])` from the Lua stack, calls
+   * `CAiBrain::PickBestAttackVector`, and returns the resulting attack point as
+   * an `SPointVector` Lua object (or `nil` when the result is the zero vector).
+   */
+  int cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0058E830 (FUN_0058E830, cfunc_CAiBrainFindClosestArmyWithBase)
