@@ -106,6 +106,32 @@ namespace
   gpg::RType* gCAniPoseType = nullptr;
 
   /**
+   * Typed overlay onto an entity's intel-attributes block, which lives at the
+   * `Entity` subobject +0x128 (the `pad_0128[0x20]` lane, size-matched to
+   * `EntityAttributes` == `SSTIIntelAttributes`, 0x20 bytes).
+   * `ReconBlip::SyncInterface` (FUN_005BEFB0) reads the creator unit's Vision
+   * range from this block (`lea eax, [creator+130h]` after the -4 weak decode
+   * lands on the creator's Entity subobject +0x128) and writes the blip's own
+   * Vision radius into it (`lea eax, [this+128h]` at 0x005BF01F).
+   */
+  [[nodiscard]] moho::EntityAttributes& EntityIntelAttributes(moho::Entity& entity) noexcept
+  {
+    return *reinterpret_cast<moho::EntityAttributes*>(reinterpret_cast<std::uint8_t*>(&entity) + 0x128);
+  }
+
+  /**
+   * Typed overlay onto a `ReconBlip`'s unit variable-data payload. The blip
+   * stores it as the opaque `SReconBlipUnitVarData` (+0x298), but the binary
+   * passes it to `SSTIUnitVariableData::Assign` (FUN_005BEFB0 @0x005BF08D) — the
+   * two are byte-identical (0x228). This overlay hands the queue helper a typed
+   * `SSTIUnitVariableData` without re-embedding the type in the blip layout.
+   */
+  [[nodiscard]] moho::SSTIUnitVariableData& ReconBlipUnitVariableData(moho::ReconBlip& blip) noexcept
+  {
+    return *reinterpret_cast<moho::SSTIUnitVariableData*>(&blip.mUnitVarDat);
+  }
+
+  /**
    * Address: 0x005C5580 (FUN_005C5580)
    *
    * What it does:
@@ -1823,6 +1849,68 @@ void ReconBlip::CreateInterface(SSyncData* const syncData)
   createParams.mConstDat.mFake = mUnitConstDat.mFake;
   (void)QueueCreateUnitParams(syncData, createParams);
   mInterfaceCreated = 1u;
+}
+
+/**
+ * Address: 0x005BEFB0 (FUN_005BEFB0, ?SyncInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z)
+ *
+ * IDA signature:
+ * void __thiscall Moho::ReconBlip::SyncInterface(Moho::ReconBlip* this, Moho::SSyncData* syncData);
+ *
+ * What it does:
+ * Publishes this recon blip's variable state into the sync packet:
+ *   1. When the creator unit is alive, copies its Vision range into this blip's
+ *      intel attributes (Entity subobject +0x128).
+ *   2. Queues a `{ id_, mUnitVarDat }` record onto `SSyncData::mUnitUpdates`
+ *      (+0x158), then overrides the record's shared-pose lanes (and stun-ticks,
+ *      when the creator is alive) from the focused-army recon snapshot, and sets
+ *      the record's recon-flag word from that snapshot.
+ *   3. Chains into `Entity::SyncInterface`, which queues the entity-update
+ *      record.
+ *   4. Overrides that entity-update record's mesh / scm-resource / health lanes
+ *      from the same recon snapshot.
+ */
+void ReconBlip::SyncInterface(SSyncData* const syncData)
+{
+  const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
+  SPerArmyReconInfo& reconInfo = mReconDat[static_cast<std::size_t>(focusArmy)];
+
+  Unit* const creator = mCreator.GetObjectPtr();
+  if (creator != nullptr) {
+    const std::uint32_t creatorVisionRange =
+      EntityIntelAttributes(*static_cast<Entity*>(creator)).GetRange(ENTATTR_Vision);
+    EntityIntelAttributes(*this).SetIntelRadius(ENTATTR_Vision, static_cast<int>(creatorVisionRange));
+  }
+
+  SSTIUnitVariableData& varData = ReconBlipUnitVariableData(*this);
+  SUnitVariableUpdateEntry* const entry = QueueUnitVariableUpdate(syncData, id_, varData);
+
+  const bool creatorAlive = creator != nullptr;
+  const std::int32_t creatorStunTicks =
+    creatorAlive ? static_cast<std::int32_t>(creator->StunnedState != 0) : 0;
+  PatchUnitUpdateReconPose(
+    entry,
+    reconInfo.mPriorPose.px,
+    reconInfo.mPriorPose.pi,
+    reconInfo.mPose.px,
+    reconInfo.mPose.pi,
+    creatorAlive,
+    creatorStunTicks
+  );
+  SetUnitUpdateReconFlags(entry, static_cast<std::int32_t>(reconInfo.mReconFlags));
+
+  Entity::SyncInterface(syncData);
+
+  PatchEntityUpdateReconMesh(
+    syncData,
+    reconInfo.mStiMesh,
+    reconInfo.mMesh.px,
+    reconInfo.mMesh.pi,
+    reconInfo.mHealth,
+    reconInfo.mMaxHealth,
+    reconInfo.mFractionComplete,
+    reconInfo.mMaybeDead
+  );
 }
 
 /**

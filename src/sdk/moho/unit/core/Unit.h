@@ -19,6 +19,7 @@
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
+#include "moho/command/CmdDefs.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -614,8 +615,15 @@ namespace moho
     boost::shared_ptr<CAniPose> mPriorSharedPose; // +0x084
     boost::shared_ptr<CAniPose> mSharedPose;      // +0x08C
     std::uint8_t mPad094_097[0x04];               // +0x094
-    gpg::fastvector_n<WeakPtr<CUnitCommand>, 4> mCommands;   // +0x098
-    gpg::fastvector_n<WeakPtr<CUnitCommand>, 4> mBuildQueue; // +0x0C8
+    // Per-sim CmdId snapshot lanes (NOT weak-command handles): the binary
+    // treats these as 4-byte `CmdId` elements — `Unit::SyncInterface`
+    // (FUN_006AC3A0) refreshes them by clearing to inline storage and appending
+    // each live command's `mConstDat.cmd` via `add [end], 4` (sub_6AB960), and
+    // `SSTIUnitVariableData::Assign` (FUN_005BF1E0) copies them as raw dword
+    // ranges (sub_561C80, `>> 2`). Inline count 8 keeps the lane 0x30 bytes
+    // (0x10 header + 8 * 4).
+    gpg::fastvector_n<CmdId, 8> mCommands;   // +0x098
+    gpg::fastvector_n<CmdId, 8> mBuildQueue; // +0x0C8
     SSTIUnitWeaponInfoVector mWeaponInfo; // +0x0F8
     UnitAttributes mAttributes;           // +0x1A0
     std::uint32_t mScriptbits;            // +0x210
@@ -1084,6 +1092,20 @@ namespace moho
      * this entity interface as created.
      */
     void CreateInterface(SSyncData* syncData) override;
+
+    /**
+     * Address: 0x006AC3A0 (FUN_006AC3A0, ?SyncInterface@Unit@Moho@@MAEXPAUSSyncData@2@@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::Unit::SyncInterface(Moho::Unit* this, Moho::SSyncData* syncData);
+     *
+     * What it does:
+     * Refreshes the per-sim command / build-queue CmdId snapshots when their
+     * source queues are dirty, then queues a `{ id_, mUnitVarDat }` record onto
+     * `SSyncData::mUnitUpdates` (+0x158) with the recon-flag word set to 28,
+     * and finally chains into `Entity::SyncInterface`.
+     */
+    void SyncInterface(SSyncData* syncData) override;
 
     /**
      * Address: 0x006A4AF0
