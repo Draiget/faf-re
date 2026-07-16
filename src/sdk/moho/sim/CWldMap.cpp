@@ -3394,9 +3394,7 @@ namespace moho
    */
   void IWldTerrainRes::UpdateWaveSystem(const GeomCamera3& camera, const float elapsedSeconds, const std::int32_t tick)
   {
-    (void)camera;
-    (void)elapsedSeconds;
-    (void)tick;
+    AsTerrainRuntimeView(this)->mWaveSystem.Update(camera, elapsedSeconds, tick);
   }
 
   /**

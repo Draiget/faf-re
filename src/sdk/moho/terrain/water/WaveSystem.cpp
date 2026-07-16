@@ -12,7 +12,12 @@
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/time/Timer.h"
 #include "moho/math/MathReflection.h"
+#include "moho/particles/CParticleTextureCountedPtr.h"
+#include "moho/particles/CWorldParticles.h"
+#include "moho/particles/SWorldParticle.h"
 #include "moho/resource/CParticleTexture.h"
+#include "moho/sim/COGrid.h"
+#include "moho/sim/CRandomStream.h"
 
 namespace
 {
@@ -660,5 +665,97 @@ namespace moho
 
     delete generator;
     return generator;
+  }
+
+  /**
+   * Address: 0x00888560 (FUN_00888560, ?Update@WaveGenerator@Moho@@QAEXN@Z)
+   *
+   * IDA signature:
+   * void __userpurge Moho::WaveGenerator::Update(WaveGenerator *this, double time);
+   *
+   * What it does:
+   * When the randomized update interval has elapsed, emits one world particle:
+   * seeds a `SWorldParticle` from the generator's texture handles and scalar
+   * lanes, draws lifetime/framerate/texture-selection samples from the global
+   * random stream (texture selection under `math_GlobalRandomMutex`), appends the
+   * particle to `sWorldParticles`, then reschedules the next emission time.
+   */
+  void WaveGenerator::Update(double time)
+  {
+    if (time - mCurrentTime <= mUpdateInterval) {
+      return;
+    }
+
+    SWorldParticle particle;
+    particle.mTypeTag = "TRampAnimateFlat";
+    (void)AssignCountedParticleTexturePtr(&particle.mTexture, mPrimaryTexture);
+    (void)AssignCountedParticleTexturePtr(&particle.mRampTexture, mRampTexture);
+
+    particle.mPos = mPosition;
+    particle.mBlendMode = SWorldParticle::BlendMode::Mode0;
+    particle.mLifetime = static_cast<float>(MathGlobalRandomRange(mMinLifetime, mMaxLifetime));
+    particle.mBeginSize = mBeginSize;
+    particle.mEndSize = mEndSize;
+    particle.mAngle = mAngle;
+    particle.mDir = mDirection;
+    particle.mFramerate = static_cast<float>(MathGlobalRandomRange(mMinFramerate, mMaxFramerate));
+    particle.mValue1 = static_cast<float>(1.0 / mRampValueScale);
+    particle.mValue3 = static_cast<float>(1.0 / mTextureSelectionRange);
+
+    // Random texture selection: scale the raw MT sample by the (integer-truncated)
+    // texture-selection range in fixed point (high 32 bits of the 64-bit product),
+    // then normalize by mValue3 (== 1 / mTextureSelectionRange). Only the raw draw
+    // is taken under the global random mutex, matching the binary.
+    const std::uint32_t textureSelectionScale =
+      static_cast<std::uint32_t>(static_cast<std::int64_t>(mTextureSelectionRange));
+    std::uint32_t randomSample = 0u;
+    {
+      boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+      randomSample = math_GlobalRandomStream.twister.NextUInt32();
+    }
+    const std::uint32_t scaledSelection = static_cast<std::uint32_t>(
+      (static_cast<std::uint64_t>(textureSelectionScale) * static_cast<std::uint64_t>(randomSample)) >> 32);
+    particle.mTextureSelection =
+      static_cast<float>(static_cast<double>(scaledSelection) * static_cast<double>(particle.mValue3));
+    particle.mRampSelection = 0.0f;
+
+    sWorldParticles.AddWorldParticle(particle, nullptr);
+
+    mUpdateInterval = MathGlobalRandomRange(mMinUpdateInterval, mMaxUpdateInterval);
+    mCurrentTime = time;
+  }
+
+  /**
+   * Address: 0x00889900 (FUN_00889900, ?Update@WaveSystem@Moho@@QAEXABVGeomCamera3@2@MH@Z)
+   *
+   * IDA signature:
+   * void __userpurge Moho::WaveSystem::Update(WaveSystem *this, const GeomCamera3 *cam,
+   *   float elapsedSeconds, int tick);
+   *
+   * What it does:
+   * Per-frame wave update: no-ops when there are no registered generators or the
+   * frame-delta guard fails; every 5th tick rebuilds the in-view generator cache
+   * from the spatial DB; then advances each cached generator's emission at the
+   * current system time.
+   */
+  void WaveSystem::Update(const GeomCamera3& camera, const float elapsedSeconds, const std::int32_t tick)
+  {
+    if (mWaveGenerators.empty() || elapsedSeconds > 200.0f) {
+      return;
+    }
+
+    const double now = gpg::time::GetSystemTimer().ElapsedSeconds();
+
+    if (tick % 5 == 0) {
+      mGeneratorCache.clear();
+      mSpatialMeshInstance.CollectInView(
+        const_cast<GeomCamera3*>(&camera),
+        reinterpret_cast<gpg::fastvector<UserEntity*>&>(mGeneratorCache),
+        static_cast<EEntityType>(ENTITYTYPE_Entity));
+    }
+
+    for (WaveGenerator** it = mGeneratorCache.begin(); it != mGeneratorCache.end(); ++it) {
+      (*it)->Update(now);
+    }
   }
 } // namespace moho
