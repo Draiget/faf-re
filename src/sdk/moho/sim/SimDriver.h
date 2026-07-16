@@ -45,6 +45,21 @@ namespace moho
   struct REntityBlueprint;
   class StatItem;
 
+  /**
+   * One replicated unit-variable update record queued by the `Unit` /
+   * `ReconBlip` overrides of `SyncInterface` (FUN_006AC3A0 / FUN_005BEFB0) onto
+   * `SSyncData::mUnitUpdates` (+0x158).
+   *
+   * The record embeds a full `SSTIUnitVariableData` payload, so its complete
+   * definition (and that of `QueueUnitVariableUpdate`) lives in SimDriver.cpp,
+   * where `moho/unit/core/Unit.h` is includable. Here it is only forward-declared
+   * and stored behind the pointer-only `msvc8::vector<T>` lane, which does not
+   * require a complete `T` because `SSyncData`'s ctor/dtor are out-of-line.
+   */
+  struct SUnitVariableUpdateEntry;
+  struct SSTIUnitVariableData;
+  struct RMeshBlueprint;
+
   struct SSyncPublishedCommandPacket
   {
     CmdId commandId = 0;                       // +0x00
@@ -133,7 +148,9 @@ namespace moho
     msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
     std::uint8_t pad_0144_0148[0x04]{};                     // +0x144 (mNewEntities tail lane)
     msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
-    std::uint8_t pad_0154_0168[0x14]{};                     // +0x154 (mUnitUpdates lane)
+    std::uint8_t pad_0154_0158[0x04]{};                     // +0x154 (mUnitUpdates head pad)
+    msvc8::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
+    std::uint8_t pad_0164_0168[0x04]{};                     // +0x164 (mUnitUpdates tail pad)
     msvc8::vector<EntId> mDeleteIds;                        // +0x168
     msvc8::vector<EntId> mEraseIds;                         // +0x178
     msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
@@ -179,6 +196,10 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mEntityUpdates) == 0x148,
     "SSyncData::mEntityUpdates offset must be 0x148"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mUnitUpdates) == 0x158,
+    "SSyncData::mUnitUpdates offset must be 0x158"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mDeleteIds) == 0x168,
@@ -281,6 +302,74 @@ namespace moho
    */
   SEntityVariableUpdateEntry* QueueEntityVariableUpdate(
     SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
+
+  /**
+   * Address: 0x005C39A0 (FUN_005C39A0, mUnitUpdates push-default lane) + the
+   *          inlined id/`Assign` tail of the SyncInterface overrides
+   *          (FUN_006AC3A0 0x006AC4DC..0x006AC500 / FUN_005BEFB0 0x005BF071..).
+   *
+   * What it does:
+   * Appends one default `SUnitVariableUpdateEntry` to `syncData->mUnitUpdates`
+   * (header word 0xF0000000 in `mEntityId` + default-constructed
+   * `SSTIUnitVariableData`), then overwrites the entry's entity id and
+   * assignment-copies the supplied variable payload into it, returning a pointer
+   * to the stored element. The per-entry pose / stun / recon-flag fields are set
+   * by the caller afterward, exactly as the binary does. Mirrors
+   * `QueueEntityVariableUpdate`.
+   */
+  SUnitVariableUpdateEntry* QueueUnitVariableUpdate(
+    SSyncData* syncData, EntId entityId, const SSTIUnitVariableData& variableData);
+
+  /**
+   * Sets the trailing recon-flag word (`SUnitVariableUpdateEntry::mReconFlags`,
+   * +0x230) on a queued unit-update record. Kept out-of-line so the entry type
+   * (which embeds the full `SSTIUnitVariableData`) stays defined only in
+   * SimDriver.cpp; callers treat the entry as an opaque handle.
+   *
+   * Binary: `mov dword ptr [edi+230h], 1Ch` (Unit, FUN_006AC3A0 @0x006AC500) /
+   * `mov [esi+230h], edx` (ReconBlip, FUN_005BEFB0 @0x005BF129).
+   */
+  void SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* entry, std::int32_t reconFlags) noexcept;
+
+  /**
+   * Overwrites the prior/current shared-pose lanes and the stun-ticks lane of a
+   * queued unit-update record's embedded `SSTIUnitVariableData` from a recon
+   * snapshot, replicating `ReconBlip::SyncInterface` (FUN_005BEFB0
+   * 0x005BF092..0x005BF15A). Each pose slot performs the binary's
+   * add_ref_copy(new) / weak_release(old) swap in place; `px` is written first,
+   * then `pi` is conditionally swapped. `applyStunTicks` gates the stun write
+   * (only performed when the creator unit is alive in the binary).
+   *
+   * The pose control-block pointers are passed as raw `boost::detail::sp_counted_base*`
+   * so this helper stays free of the recon/pose engine types; the entry type
+   * (which embeds the full `SSTIUnitVariableData`) is defined in SimDriver.cpp.
+   */
+  void PatchUnitUpdateReconPose(
+    SUnitVariableUpdateEntry* entry,
+    void* priorPosePx,
+    boost::detail::sp_counted_base* priorPosePi,
+    void* posePx,
+    boost::detail::sp_counted_base* posePi,
+    bool applyStunTicks,
+    std::int32_t stunTicks) noexcept;
+
+  /**
+   * Overwrites the mesh / scm-resource / health lanes of the most recently
+   * queued entity-update record (`SSyncData::mEntityUpdates.back()`) from a
+   * recon snapshot, replicating the post-base-call tail of
+   * `ReconBlip::SyncInterface` (FUN_005BEFB0 0x005BF168..0x005BF1C4). The
+   * scm-resource control block is swapped with the binary's add_ref_copy(new) /
+   * weak_release(old) sequence.
+   */
+  void PatchEntityUpdateReconMesh(
+    SSyncData* syncData,
+    const RMeshBlueprint* meshBlueprint,
+    void* scmResourcePx,
+    boost::detail::sp_counted_base* scmResourcePi,
+    float health,
+    float maxHealth,
+    float fractionComplete,
+    std::uint8_t isDead) noexcept;
 
   /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).

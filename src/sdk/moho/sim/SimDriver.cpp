@@ -8,6 +8,7 @@
 
 #include "boost/function.hpp"
 #include <boost/ptr_container/exception.hpp>
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/app/WxAppRuntime.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/entity/EntityId.h"
@@ -730,7 +731,9 @@ SSyncData::SSyncData()
   , mNewUnits()
   , pad_0144_0148{}
   , mEntityUpdates()
-  , pad_0154_0168{}
+  , pad_0154_0158{}
+  , mUnitUpdates()
+  , pad_0164_0168{}
   , mDeleteIds()
   , mEraseIds()
   , mPublishedCommandDescriptors()
@@ -859,6 +862,174 @@ SEntityVariableUpdateEntry* moho::QueueEntityVariableUpdate(
   stored.mEntityId = entityId;
   stored.mVariableData = variableData;
   return &stored;
+}
+
+namespace moho
+{
+  /**
+   * One replicated unit-variable update record queued onto
+   * `SSyncData::mUnitUpdates` by the `Unit` / `ReconBlip` overrides of
+   * `SyncInterface`.
+   *
+   * Layout evidence (FUN_006AC3A0 / FUN_005BEFB0):
+   * - `sub edi, 238h` / `sub esi, 238h` anchor the record stride at 0x238; the
+   *   back element is `mUnitUpdates._Mylast - 142` (142 * 4 == 0x238).
+   * - `mov [edi], eax` (eax = `Entity::id_`) stores the entity id at record +0x00.
+   * - `lea edx, [edi+8]` hands `SSTIUnitVariableData::Assign` the payload lane at
+   *   record +0x08 (a 4-byte header word precedes it).
+   * - `mov dword ptr [edi+230h], 1Ch` (Unit) / `mov [esi+230h], edx`
+   *   (ReconBlip, from `SPerArmyReconInfo::mReconFlags`) writes the trailing
+   *   recon-flag word at record +0x230.
+   * The 0x08 offset and 0x238 total both hold because `SSTIUnitVariableData` is
+   * 0x228 bytes (0x08 header + 0x228 payload = 0x230, then the recon-flag word +
+   * a 4-byte tail = 0x238).
+   *
+   * This mirrors the `.cpp`-anonymous `LegacySyncUnitVariableEntry` used by the
+   * `SSyncData` teardown lane; it is the public, named-field owner of that layout
+   * (the trailing word is `mReconFlags`, not opaque tail bytes).
+   */
+  struct SUnitVariableUpdateEntry
+  {
+    EntId mEntityId = 0;                    // +0x000
+    std::uint32_t mReserved04 = 0;          // +0x004
+    SSTIUnitVariableData mVariableData{};   // +0x008
+    std::int32_t mReconFlags = 0;           // +0x230
+    std::uint32_t mReserved234 = 0;         // +0x234
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SUnitVariableUpdateEntry, mVariableData) == 0x08,
+    "SUnitVariableUpdateEntry::mVariableData offset must be 0x08"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SUnitVariableUpdateEntry, mReconFlags) == 0x230,
+    "SUnitVariableUpdateEntry::mReconFlags offset must be 0x230"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(SUnitVariableUpdateEntry) == 0x238, "SUnitVariableUpdateEntry size must be 0x238"
+  );
+} // namespace moho
+
+/**
+ * Address: 0x005C39A0 (FUN_005C39A0) + the inlined id/`Assign` tail of the
+ *          SyncInterface overrides (FUN_006AC3A0 / FUN_005BEFB0).
+ *
+ * What it does:
+ * Appends one default `SUnitVariableUpdateEntry` to `syncData->mUnitUpdates`
+ * (header word 0xF0000000 in `mEntityId` + default-constructed
+ * `SSTIUnitVariableData`), then writes the entity id and assignment-copies the
+ * supplied variable payload into the stored record, returning the inserted
+ * element pointer. Matches the binary's push-default (`sub_5C39A0` with the
+ * 0xF0000000 header) then write-id (`mov [edi], eax`) + `SSTIUnitVariableData::Assign`
+ * (`lea edx, [edi+8]`) sequence.
+ */
+moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
+  SSyncData* const syncData,
+  const EntId entityId,
+  const SSTIUnitVariableData& variableData)
+{
+  if (!syncData) {
+    return nullptr;
+  }
+
+  SUnitVariableUpdateEntry defaultEntry{};
+  defaultEntry.mEntityId = ToRaw(EEntityIdSentinel::Invalid);
+  syncData->mUnitUpdates.push_back(defaultEntry);
+  if (syncData->mUnitUpdates.empty()) {
+    return nullptr;
+  }
+
+  SUnitVariableUpdateEntry& stored = syncData->mUnitUpdates.back();
+  stored.mEntityId = entityId;
+  stored.mVariableData = variableData;
+  return &stored;
+}
+
+void moho::SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* const entry, const std::int32_t reconFlags) noexcept
+{
+  if (entry != nullptr) {
+    entry->mReconFlags = reconFlags;
+  }
+}
+
+namespace
+{
+  /**
+   * Replicates the binary's per-slot shared-pointer swap used by
+   * `ReconBlip::SyncInterface`: writes the new pointee first, then, when the
+   * control block changes, add_ref_copy()s the new block and weak_release()s the
+   * old one before storing it. Mirrors the `lock xadd [pi+4], 1` /
+   * `sp_counted_base::weak_release` sequence at 0x005BF0A4.. and 0x005BF186..
+   * operating on a raw `{px, pi}` pair.
+   */
+  void SwapSharedPointerSlotWithReconRefcount(
+    boost::SharedPtrRaw<void>& slot,
+    void* const newPx,
+    boost::detail::sp_counted_base* const newPi) noexcept
+  {
+    slot.px = newPx;
+    if (newPi == slot.pi) {
+      return;
+    }
+    if (newPi != nullptr) {
+      newPi->add_ref_copy();
+    }
+    if (slot.pi != nullptr) {
+      slot.pi->weak_release();
+    }
+    slot.pi = newPi;
+  }
+} // namespace
+
+void moho::PatchUnitUpdateReconPose(
+  SUnitVariableUpdateEntry* const entry,
+  void* const priorPosePx,
+  boost::detail::sp_counted_base* const priorPosePi,
+  void* const posePx,
+  boost::detail::sp_counted_base* const posePi,
+  const bool applyStunTicks,
+  const std::int32_t stunTicks) noexcept
+{
+  if (entry == nullptr) {
+    return;
+  }
+
+  // The binary writes the current-pose slot (varData +0x8C / entry +0x94) before
+  // the prior-pose slot (varData +0x84 / entry +0x8C); preserve that order.
+  auto& sharedPose = reinterpret_cast<boost::SharedPtrRaw<void>&>(entry->mVariableData.mSharedPose);
+  SwapSharedPointerSlotWithReconRefcount(sharedPose, posePx, posePi);
+
+  auto& priorSharedPose = reinterpret_cast<boost::SharedPtrRaw<void>&>(entry->mVariableData.mPriorSharedPose);
+  SwapSharedPointerSlotWithReconRefcount(priorSharedPose, priorPosePx, priorPosePi);
+
+  if (applyStunTicks) {
+    entry->mVariableData.mStunTicks = stunTicks;
+  }
+}
+
+void moho::PatchEntityUpdateReconMesh(
+  SSyncData* const syncData,
+  const RMeshBlueprint* const meshBlueprint,
+  void* const scmResourcePx,
+  boost::detail::sp_counted_base* const scmResourcePi,
+  const float health,
+  const float maxHealth,
+  const float fractionComplete,
+  const std::uint8_t isDead) noexcept
+{
+  if (syncData == nullptr || syncData->mEntityUpdates.empty()) {
+    return;
+  }
+
+  SSTIEntityVariableData& mDat = syncData->mEntityUpdates.back().mVariableData;
+  mDat.mMeshBlueprint = meshBlueprint;
+
+  auto& scmResource = reinterpret_cast<boost::SharedPtrRaw<void>&>(mDat.mScmResource);
+  SwapSharedPointerSlotWithReconRefcount(scmResource, scmResourcePx, scmResourcePi);
+
+  mDat.mHealth = health;
+  mDat.mMaxHealth = maxHealth;
+  mDat.mFractionComplete = fractionComplete;
+  mDat.mIsDead = isDead;
 }
 
 /**

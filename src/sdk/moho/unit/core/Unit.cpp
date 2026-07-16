@@ -11416,17 +11416,49 @@ namespace
    * Address: 0x00561C80 (FUN_00561C80, sub_561C80)
    *
    * What it does:
-   * Copy-assigns one `fastvector_n<WeakPtr<CUnitCommand>,4>` lane, preserving
-   * element order while reusing existing storage when capacity allows.
+   * Copy-assigns one `fastvector_n<CmdId, 8>` command-id snapshot lane,
+   * preserving element order while reusing existing storage when capacity
+   * allows. The binary copies these as raw dword ranges (`>> 2` element count,
+   * `*dst = *src` word copies), so this is a plain trivially-copyable lane copy.
    */
-  void CopyUnitCommandWeakVector(
-    gpg::fastvector_n<moho::WeakPtr<moho::CUnitCommand>, 4>& destination,
-    const gpg::fastvector_n<moho::WeakPtr<moho::CUnitCommand>, 4>& source
+  void CopyUnitCommandSnapshotVector(
+    gpg::fastvector_n<moho::CmdId, 8>& destination,
+    const gpg::fastvector_n<moho::CmdId, 8>& source
   )
   {
-    auto& destinationView = gpg::AsFastVectorRuntimeView<moho::WeakPtr<moho::CUnitCommand>>(&destination);
-    const auto& sourceView = gpg::AsFastVectorRuntimeView<moho::WeakPtr<moho::CUnitCommand>>(&source);
+    auto& destinationView = gpg::AsFastVectorRuntimeView<moho::CmdId>(&destination);
+    const auto& sourceView = gpg::AsFastVectorRuntimeView<moho::CmdId>(&source);
     gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
+  }
+
+  /**
+   * Address: 0x006AB960 (FUN_006AB960, sub_6AB960)
+   *
+   * IDA signature:
+   * unsigned int __usercall sub_6AB960@<eax>(
+   *   gpg::fastvector_int* snapshot@<eax>,
+   *   std::vector<WeakPtr<CUnitCommand>>* source@<ebx>);
+   *
+   * What it does:
+   * Appends the `CmdId` of every live command in `source` (a weak-command
+   * vector) onto the `snapshot` lane, in order. Each source slot is resolved
+   * through its intrusive weak pointer; dead / cleared slots are skipped. The
+   * caller has already reset `snapshot` to its inline storage, so this is the
+   * pure append pass that rebuilds the per-sim command-id snapshot from the
+   * owning queue's live commands (`command->mConstDat.cmd`).
+   */
+  void AppendLiveCommandIdsToSnapshot(
+    gpg::fastvector_n<moho::CmdId, 8>& snapshot,
+    const msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>& source
+  )
+  {
+    for (const moho::WeakPtr<moho::CUnitCommand>& commandWeakPtr : source) {
+      const moho::CUnitCommand* const command = commandWeakPtr.GetObjectPtr();
+      if (command == nullptr) {
+        continue;
+      }
+      snapshot.push_back(command->mConstDat.cmd);
+    }
   }
 
   template <class T, std::size_t N>
@@ -12672,8 +12704,8 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   mPriorSharedPose = other.mPriorSharedPose;
   mSharedPose = other.mSharedPose;
   std::memcpy(mPad094_097, other.mPad094_097, sizeof(mPad094_097));
-  CopyUnitCommandWeakVector(mCommands, other.mCommands);
-  CopyUnitCommandWeakVector(mBuildQueue, other.mBuildQueue);
+  CopyUnitCommandSnapshotVector(mCommands, other.mCommands);
+  CopyUnitCommandSnapshotVector(mBuildQueue, other.mBuildQueue);
   CopyFastVectorN(mWeaponInfo, other.mWeaponInfo);
   (void)CopyUnitAttributesSnapshot(&mAttributes, &other.mAttributes);
   mScriptbits = other.mScriptbits;
@@ -16297,6 +16329,53 @@ void Unit::CreateInterface(SSyncData* const syncData)
   }
 
   mInterfaceCreated = 1u;
+}
+
+/**
+ * Address: 0x006AC3A0 (FUN_006AC3A0, ?SyncInterface@Unit@Moho@@MAEXPAUSSyncData@2@@Z)
+ *
+ * IDA signature:
+ * void __thiscall Moho::Unit::SyncInterface(Moho::Unit* this, Moho::SSyncData* syncData);
+ *
+ * What it does:
+ * Rebuilds the per-sim command / build-queue CmdId snapshots when their source
+ * queues are marked dirty, then queues a `{ id_, mUnitVarDat }` record onto
+ * `SSyncData::mUnitUpdates` (+0x158) with the recon-flag word set to 28, and
+ * finally chains into the base `Entity::SyncInterface`.
+ *   1. `mUnitVarDat.mDidRefresh` is cleared up front.
+ *   2. If the command queue is present and dirty, the `mCommands` snapshot is
+ *      reset to inline storage and rebuilt from the queue's live commands, the
+ *      queue's dirty flag is cleared, and `mDidRefresh` is set.
+ *   3. If the AI builder is present and its factory queue is dirty, the
+ *      `mBuildQueue` snapshot is likewise rebuilt from the builder's factory
+ *      command queue, the builder's dirty flag is cleared, and `mDidRefresh` is
+ *      set.
+ *   4. A default unit-update record is pushed, `id_` + `mUnitVarDat` are copied
+ *      into it, and its recon-flag word (+0x230) is set to 28.
+ */
+void Unit::SyncInterface(SSyncData* const syncData)
+{
+  SSTIUnitVariableData& varData = VarDat();
+  varData.mDidRefresh = false;
+
+  if (CommandQueue != nullptr && CommandQueue->mNeedsRefresh) {
+    varData.mCommands.ResetStorageToInline();
+    AppendLiveCommandIdsToSnapshot(varData.mCommands, CommandQueue->mCommandVec);
+    CommandQueue->mNeedsRefresh = false;
+    varData.mDidRefresh = true;
+  }
+
+  if (AiBuilder != nullptr && AiBuilder->BuilderIsFactoryQueueDirty()) {
+    varData.mBuildQueue.ResetStorageToInline();
+    AppendLiveCommandIdsToSnapshot(varData.mBuildQueue, AiBuilder->BuilderGetFactoryCommandQueue());
+    AiBuilder->BuilderSetFactoryQueueDirty(false);
+    varData.mDidRefresh = true;
+  }
+
+  SUnitVariableUpdateEntry* const entry = QueueUnitVariableUpdate(syncData, id_, varData);
+  SetUnitUpdateReconFlags(entry, 28);
+
+  Entity::SyncInterface(syncData);
 }
 
 /**

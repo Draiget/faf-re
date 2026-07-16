@@ -263,6 +263,22 @@ namespace moho
     void CreateInterface(SSyncData* syncData) override;
 
     /**
+     * Address: 0x005BEFB0 (FUN_005BEFB0, ?SyncInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::ReconBlip::SyncInterface(Moho::ReconBlip* this, Moho::SSyncData* syncData);
+     *
+     * What it does:
+     * Copies the creator unit's Vision range into this blip's intel attributes
+     * (when the creator is alive), queues a `{ id_, mUnitVarDat }` record onto
+     * `SSyncData::mUnitUpdates` while overriding its shared-pose and stun lanes
+     * from the focused-army recon snapshot, chains into `Entity::SyncInterface`,
+     * and finally overrides the queued entity-update record's mesh/health lanes
+     * from that same recon snapshot.
+     */
+    void SyncInterface(SSyncData* syncData) override;
+
+    /**
      * Address: 0x005BEE40 (FUN_005BEE40, Moho::ReconBlip::UpdateVisibility)
      *
      * What it does:
