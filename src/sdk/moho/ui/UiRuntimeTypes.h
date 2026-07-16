@@ -2521,6 +2521,23 @@ namespace moho
     void Dump() override;
 
     /**
+     * Address: 0x007A3040 (FUN_007A3040, Moho::CMauiText::Draw)
+     *
+     * IDA signature:
+     * Wm3::Vector3f* __thiscall Moho::CMauiText::Draw(
+     *   CMauiText* this, CD3DPrimBatcher* primBatcher, int drawMask);
+     *
+     * What it does:
+     * Renders this control's text along screen axes: computes the horizontal
+     * origin (optionally centered and back-shifted by half the measured advance)
+     * and the baseline Y (optionally vertically centered), draws an optional
+     * (+1,+1) drop shadow, then the main run with an alpha byte derived from
+     * mAlpha. Occupies the CMauiControl::DoRender vtable slot; drawMask is
+     * unused. No-op when no font is bound.
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
      * Address: 0x007A2D60 (FUN_007A2D60, Moho::CMauiText::~CMauiText)
      * Deleting dtor: 0x007A2D40 (FUN_007A2D40, Moho::CMauiText::dtr)
      *

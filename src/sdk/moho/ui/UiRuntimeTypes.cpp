@@ -16605,6 +16605,85 @@ void moho::CMauiText::Dump()
 }
 
 /**
+ * Address: 0x007A3040 (FUN_007A3040, Moho::CMauiText::Draw)
+ *
+ * IDA signature:
+ * Wm3::Vector3f* __thiscall Moho::CMauiText::Draw(
+ *   CMauiText* this, CD3DPrimBatcher* primBatcher, int drawMask);
+ *
+ * What it does:
+ * Renders this text control's string. Horizontal origin is centered (and
+ * back-shifted by half the measured advance) when mCenteredHorizontally is set,
+ * otherwise the left edge. Baseline Y is vertically centered when
+ * mCenteredVertically is set, otherwise ascent below the top edge. An optional
+ * (+1,+1) drop shadow is drawn first, then the main run whose alpha byte is
+ * derived from mAlpha. maxAdvance clips to the control width when mClipToWidth
+ * is set, otherwise a quiet-NaN "no clip" sentinel is passed. Occupies the
+ * CMauiControl::DoRender vtable slot; drawMask is unused.
+ */
+void moho::CMauiText::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+{
+  (void)drawMask;
+
+  const CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
+  CD3DFont* const font = textView->mFont;
+  if (font == nullptr) {
+    return;
+  }
+
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+  const char* const text = textView->mText.c_str();
+
+  // Horizontal origin.
+  float originX;
+  if (textView->mCenteredHorizontally) {
+    const float advance = font->GetAdvance(text, 0);
+    const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+    originX = CScriptLazyVar_float::GetValue(&controlView->mWidthLV) * 0.5f + left - 0.5f * advance;
+  } else {
+    originX = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  }
+
+  // Baseline Y.
+  float baselineY;
+  if (textView->mCenteredVertically) {
+    const float centeredAscent = font->mAscent - font->mInternalLeading;
+    const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+    baselineY = CScriptLazyVar_float::GetValue(&controlView->mHeightLV) * 0.5f + 0.5f * centeredAscent + top;
+  } else {
+    const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+    baselineY = font->mAscent + top;
+  }
+
+  const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
+  const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
+
+  // Optional drop shadow, offset by (+1, +1).
+  if (textView->mDropShadow) {
+    const std::uint32_t shadowColor = this->AdjustARGBAlpha(textView->mColor & 0xFF000000u);
+    const float shadowMaxAdvance = textView->mClipToWidth
+                                     ? CScriptLazyVar_float::GetValue(&controlView->mWidthLV)
+                                     : std::numeric_limits<float>::quiet_NaN();
+    const Wm3::Vector3f shadowOrigin{originX + 1.0f, baselineY + 1.0f, 0.0f};
+    (void)font->Render(text, primBatcher, shadowOrigin, xAxis, yAxis, shadowColor, 1.0f, shadowMaxAdvance);
+  }
+
+  // Main text run.
+  const float maxAdvance = textView->mClipToWidth
+                             ? CScriptLazyVar_float::GetValue(&controlView->mWidthLV)
+                             : std::numeric_limits<float>::quiet_NaN();
+
+  // Alpha byte derived from mAlpha exactly as the binary does: negate-scale,
+  // truncate toward zero, then subtract the shifted magnitude.
+  const float alphaScaled = CMauiControlExtendedRuntimeView::FromControl(this)->mAlpha * -255.0f;
+  const std::uint32_t alphaMagnitude = static_cast<std::uint32_t>(static_cast<std::int64_t>(alphaScaled));
+  const std::uint32_t color = (textView->mColor & 0x00FFFFFFu) - (alphaMagnitude << 24);
+
+  const Wm3::Vector3f origin{originX, baselineY, 0.0f};
+  (void)font->Render(text, primBatcher, origin, xAxis, yAxis, color, 1.0f, maxAdvance);
+}
+
+/**
  * Address: 0x007A34F0 (FUN_007A34F0, cfunc_CMauiTextSetNewFont)
  *
  * What it does:
