@@ -281,19 +281,22 @@ namespace moho
       boost::weak_ptr<gpg::gal::TextureD3D9> backgroundTexture
     );
 
-  protected:
+  public:
     /**
      * Address: 0x00494930 (FUN_00494930, Moho::CWorldParticles::AddWorldParticle)
      *
      * What it does:
      * Resolves/creates the world-particle bucket for one particle payload and
-     * appends that payload into the bucket pending vector.
+     * appends that payload into the bucket pending vector. Called externally by
+     * particle emitters (e.g. `WaveGenerator::Update`, asm direct call at
+     * 0x0088873E), so this is a public entry, not a protected helper.
      */
     void AddWorldParticle(
       const SWorldParticle& particle,
       ParticleRenderBucketRuntime** bucketCacheSlot
     );
 
+  protected:
     /**
      * Address: 0x00494C20 (FUN_00494C20, Moho::CWorldParticles::AddTrail)
      *

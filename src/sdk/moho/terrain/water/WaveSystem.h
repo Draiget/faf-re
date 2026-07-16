@@ -77,6 +77,17 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x00888560 (FUN_00888560, ?Update@WaveGenerator@Moho@@QAEXN@Z)
+     *
+     * What it does:
+     * Emits one world particle when the generator's randomized update interval
+     * has elapsed: seeds a `SWorldParticle` from the generator's texture/scalar
+     * lanes, picks a random texture selection under the global random mutex,
+     * appends it to `sWorldParticles`, then reschedules the next emission.
+     */
+    void Update(double time);
+
   private:
     friend struct WaveGeneratorLayoutVerifier;
 
@@ -213,6 +224,18 @@ namespace moho
      * storage and runs one deleting-destructor lane for that generator.
      */
     WaveGenerator* RemoveAndDeleteGenerator(WaveGenerator* generator);
+
+    /**
+     * Address: 0x00889900 (FUN_00889900, ?Update@WaveSystem@Moho@@QAEXABVGeomCamera3@2@MH@Z)
+     *
+     * What it does:
+     * Advances the wave simulation for one frame. No-ops when no generators are
+     * registered or the frame-delta guard (`elapsedSeconds <= 200`) fails. Every
+     * 5th tick it refreshes the in-view generator cache from the spatial DB, then
+     * emits from each cached generator via `WaveGenerator::Update` at the current
+     * system time.
+     */
+    void Update(const GeomCamera3& camera, float elapsedSeconds, std::int32_t tick);
 
   public:
     std::uint32_t mReserved04;                            // +0x04
