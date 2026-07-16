@@ -3,55 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/unit/Broadcaster.h"
-
-namespace
-{
-  struct PauseListenerRuntimeView final
-  {
-    void* mPauseEventListenerVftable;
-    moho::Broadcaster mSessionListenerLink;
-  };
-
-  static_assert(
-    offsetof(PauseListenerRuntimeView, mSessionListenerLink) == 0x04,
-    "PauseListenerRuntimeView::mSessionListenerLink offset must be 0x04"
-  );
-  static_assert(sizeof(PauseListenerRuntimeView) == 0x0C, "PauseListenerRuntimeView size must be 0x0C");
-
-  PauseListenerRuntimeView gPauseListenerStartupAnchor{};
-  void* gPauseEventListenerVftable = nullptr;
-
-  [[nodiscard]] moho::Broadcaster& PauseListenerLink(moho::PauseListener& listener) noexcept
-  {
-    auto* const base = reinterpret_cast<std::uint8_t*>(&listener);
-    auto* const view = reinterpret_cast<PauseListenerRuntimeView*>(base + 0x04);
-    return view->mSessionListenerLink;
-  }
-
-  /**
-   * Address: 0x008697C0 (FUN_008697C0, pause-listener startup anchor cleanup)
-   *
-   * What it does:
-   * Restores the pause-event listener-vtable lane on the startup anchor,
-   * unlinks its session-listener link from the current ring, and rewires that
-   * link back to a self-linked singleton node.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::Broadcaster* cleanup_PauseListenerStartupAnchor()
-  {
-    gPauseListenerStartupAnchor.mPauseEventListenerVftable = gPauseEventListenerVftable;
-
-    moho::Broadcaster& pauseLink = gPauseListenerStartupAnchor.mSessionListenerLink;
-    pauseLink.mPrev->mNext = pauseLink.mNext;
-    pauseLink.mNext->mPrev = pauseLink.mPrev;
-    pauseLink.mPrev = &pauseLink;
-    pauseLink.mNext = &pauseLink;
-    return &pauseLink;
-  }
-} // namespace
 
 namespace moho
 {
+  static_assert(sizeof(PauseListener) == 0x10, "PauseListener complete-object size must be 0x10");
+
   /**
    * Address: 0x00869700 (FUN_00869700)
    *
@@ -61,10 +21,9 @@ namespace moho
    */
   void PauseListener::AttachToSessionListenerLane(void* const laneContext)
   {
-    auto& listenerLink = PauseListenerLink(*this);
     auto* const laneOwnerBytes = static_cast<std::uint8_t*>(laneContext);
     auto* const laneAnchor = reinterpret_cast<Broadcaster*>(laneOwnerBytes + 0x08);
-    listenerLink.ListLinkBefore(laneAnchor);
+    this->mListenerLink.ListLinkBefore(laneAnchor);
   }
 
   /**
@@ -77,6 +36,77 @@ namespace moho
   void PauseListener::DetachFromSessionListenerLane(void* const laneContext)
   {
     (void)laneContext;
-    PauseListenerLink(*this).ListUnlink();
+    this->mListenerLink.ListUnlink();
   }
+
+  /**
+   * Address: 0x00869630 (FUN_00869630, Moho::PauseListener::Receive)
+   * Slot: 0 (Listener<SPauseEvent> secondary vtable)
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject *__stdcall Moho::PauseListener::Receive(bool a1);
+   *
+   * What it does:
+   * Imports `/lua/ui/game/gamemain.lua` from the active world session's Lua
+   * state, resolves its `OnUserPause` function, and calls it with the pause
+   * flag carried by `event`. Mirrors the `SCR_Import` + `operator[]` +
+   * `LuaFunction::Call_Bool` forwarder idiom; the module/key LuaObjects are
+   * released before the call, matching the original destructor ordering.
+   */
+  void PauseListener::OnEvent(const SPauseEvent event)
+  {
+    LuaPlus::LuaState* const luaState = WLD_GetSession()->mState;
+
+    LuaPlus::LuaFunction onUserPauseFn(
+      SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]
+    );
+    onUserPauseFn.Call_Bool(event.mPaused);
+  }
+
+  namespace
+  {
+    /**
+     * Address: 0x00F5B548 (.data, process-global PauseListener instance).
+     *
+     * Layout evidence:
+     * - Static-init constructor FUN_00BE6320 registers `&off_F5B548` with the
+     *   world-session teardown callback vector (via FUN_00869950 =
+     *   `WLD_AddOnTeardownCallback`), self-links the listener broadcaster lane
+     *   at `off_F5B550/off_F5B554`, installs the PauseListener primary vtable at
+     *   `off_F5B548` and the secondary `Listener<SPauseEvent>` vtable at
+     *   `off_F5B54C`, then queues `atexit(FUN_00C07610)`.
+     * - Atexit handler FUN_00C07610 restores the base `Listener<SPauseEvent>`
+     *   vtable, unlinks the broadcaster lane, and resets it to a self-linked
+     *   singleton for orderly teardown.
+     *
+     * The engine constructs exactly one PauseListener for the process lifetime;
+     * registering it with the world-session loader keeps the instance reachable
+     * from the binary's startup graph, and its `OnEvent` slot is dispatched from
+     * the session pause broadcaster whenever the pause state toggles.
+     */
+    [[nodiscard]] PauseListener& GlobalPauseListener() noexcept
+    {
+      static PauseListener sListener;
+      return sListener;
+    }
+
+    /**
+     * Address: 0x00BE6320 (FUN_00BE6320, PauseListener static-init thunk).
+     *
+     * What it does:
+     * Constructs the process-global PauseListener and registers it with the
+     * world-session loader's teardown callback vector during CRT `__xc_a`
+     * static initialization, keeping the instance reachable from the startup
+     * graph.
+     *
+     * The cast to `IWldTeardownCallback*` is layout-compatible: the registration
+     * vector stores the raw listener pointer in an untyped pointer lane, exactly
+     * as the original binary stored `&off_F5B548`.
+     */
+    [[maybe_unused]] const bool kPauseListenerStaticInit = []() noexcept {
+      PauseListener& listener = GlobalPauseListener();
+      (void)WLD_AddOnTeardownCallback(reinterpret_cast<IWldTeardownCallback*>(&listener));
+      return true;
+    }();
+  } // namespace
 } // namespace moho
