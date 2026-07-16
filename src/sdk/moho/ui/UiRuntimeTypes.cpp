@@ -14069,6 +14069,136 @@ void moho::CMauiItemList::SetFont(CD3DFont* const font)
 }
 
 /**
+ * Address: 0x00799A50 (FUN_00799A50, Moho::CMauiItemList::Draw)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CMauiItemList::Draw(
+ *     CMauiItemList* this, CD3DPrimBatcher* primBatcher, int drawMask);
+ *
+ * What it does:
+ * Draws the item-list background quad, optional hover/selection highlight row
+ * quads, then renders each visible item's text with the resolved foreground
+ * color. All work is skipped when no font is bound.
+ */
+void moho::CMauiItemList::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t /*drawMask*/)
+{
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  const CD3DFont* const font = itemListView->mFont;
+  if (font == nullptr) {
+    return;
+  }
+
+  const CMauiControlExtendedRuntimeView* const extendedView =
+    CMauiControlExtendedRuntimeView::FromControl(this);
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+
+  const std::int32_t visibleLineCount = LinesVisible();
+
+  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+
+  const std::uint32_t vertexColor = extendedView->mVertexAlpha;
+
+  // Background quad spanning the full control rectangle.
+  {
+    const boost::shared_ptr<CD3DBatchTexture> backgroundTexture =
+      CD3DBatchTexture::FromSolidColor(itemListView->mBackgroundColor);
+    primBatcher->SetTexture(backgroundTexture);
+
+    const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
+    const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, top, vertexColor, 1.0f, 0.0f);
+    const CD3DPrimBatcher::Vertex bottomRight = MakeBorderVertex(right, bottom, vertexColor, 1.0f, 1.0f);
+    const CD3DPrimBatcher::Vertex bottomLeft = MakeBorderVertex(left, bottom, vertexColor, 0.0f, 1.0f);
+    primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+  }
+
+  const float rowHeight = font->mHeight + font->mExternalLeading;
+
+  // Mouse-over highlight row quad.
+  if (itemListView->mShowMouseoverItem) {
+    const std::int32_t hoverItem = itemListView->mHoverItem;
+    const std::int32_t scrollPosition = itemListView->mScrollPosition;
+    if (hoverItem >= scrollPosition && hoverItem < scrollPosition + visibleLineCount) {
+      const std::int32_t visibleRow = hoverItem - scrollPosition;
+      const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
+      const float rowBottom = font->mHeight + rowTop;
+
+      const boost::shared_ptr<CD3DBatchTexture> highlightTexture =
+        CD3DBatchTexture::FromSolidColor(itemListView->mHighlightBackgroundColor);
+      primBatcher->SetTexture(highlightTexture);
+
+      const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, rowTop, vertexColor, 0.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, rowTop, vertexColor, 1.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex bottomRight = MakeBorderVertex(right, rowBottom, vertexColor, 1.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex bottomLeft = MakeBorderVertex(left, rowBottom, vertexColor, 0.0f, 1.0f);
+      primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+    }
+  }
+
+  // Selection highlight row quad.
+  if (itemListView->mShowSelection) {
+    const std::int32_t curSelection = itemListView->mCurSelection;
+    const std::int32_t scrollPosition = itemListView->mScrollPosition;
+    if (curSelection >= scrollPosition && curSelection < scrollPosition + visibleLineCount) {
+      const std::int32_t visibleRow = curSelection - scrollPosition;
+      const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
+      const float rowBottom = font->mHeight + rowTop;
+
+      const boost::shared_ptr<CD3DBatchTexture> selectedTexture =
+        CD3DBatchTexture::FromSolidColor(itemListView->mSelectedBackgroundColor);
+      primBatcher->SetTexture(selectedTexture);
+
+      const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, rowTop, vertexColor, 0.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, rowTop, vertexColor, 1.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex bottomRight = MakeBorderVertex(right, rowBottom, vertexColor, 1.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex bottomLeft = MakeBorderVertex(left, rowBottom, vertexColor, 0.0f, 1.0f);
+      primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+    }
+  }
+
+  // Per-row item text.
+  if (visibleLineCount <= 0) {
+    return;
+  }
+
+  for (std::int32_t visibleRow = 0; visibleRow < visibleLineCount; ++visibleRow) {
+    const msvc8::string* const itemStorage = itemListView->mItems.data();
+    const std::int32_t itemIndex = visibleRow + itemListView->mScrollPosition;
+    if (itemStorage == nullptr || static_cast<std::uint32_t>(itemIndex) >= itemListView->mItems.size()) {
+      break;
+    }
+
+    std::uint32_t textColor = itemListView->mForegroundColor;
+    if (itemIndex == itemListView->mHoverItem && itemListView->mShowMouseoverItem) {
+      textColor = itemListView->mHighlightForegroundColor;
+    } else if (itemIndex == itemListView->mCurSelection && itemListView->mShowSelection) {
+      textColor = itemListView->mSelectedForegroundColor;
+    }
+
+    const float maxAdvance = CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
+    const float baselineY =
+      rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + font->mAscent + top;
+
+    const msvc8::string& itemText = itemStorage[itemIndex];
+    const Wm3::Vector3f origin{left, baselineY, 0.0f};
+    const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
+    const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
+    (void)itemListView->mFont->Render(
+      itemText.c_str(),
+      primBatcher,
+      origin,
+      xAxis,
+      yAxis,
+      textColor,
+      1.0f,
+      maxAdvance
+    );
+  }
+}
+
+/**
  * Address: 0x00799780 (FUN_00799780, Moho::CMauiItemList::ModifyItem)
  *
  * What it does:

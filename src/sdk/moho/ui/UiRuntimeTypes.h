@@ -2045,6 +2045,20 @@ namespace moho
     void SetFont(CD3DFont* font);
 
     /**
+     * Address: 0x00799A50 (FUN_00799A50, Moho::CMauiItemList::Draw)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CMauiItemList::Draw(
+     *     CMauiItemList* this, CD3DPrimBatcher* primBatcher, int drawMask);
+     *
+     * What it does:
+     * Draws the list background quad, then optional mouse-over and selection
+     * highlight row quads, then renders each visible item string with the
+     * resolved (normal / highlight / selected) foreground color.
+     */
+    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+
+    /**
      * Address: 0x0079A730 (FUN_0079A730, Moho::CMauiItemList::LinesVisible)
      *
      * What it does:
