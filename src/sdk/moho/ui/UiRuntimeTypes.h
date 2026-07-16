@@ -1867,6 +1867,21 @@ namespace moho
     [[nodiscard]] bool HitTest(float x, float y) override;
 
     /**
+     * Address: 0x00780850 (FUN_00780850, Moho::CMauiBitmap::Draw)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CMauiBitmap::Draw(
+     *     CMauiBitmap* this, CD3DPrimBatcher* primBatcher);
+     *
+     * What it does:
+     * Renders the current animation frame's texture batch over the control
+     * bounds, as a tiled quad when tiling is enabled or a UV-clipped quad
+     * otherwise. No-op when no frames/textures are bound. Occupies the
+     * CMauiControl::DoRender vtable slot (drawMask is unused).
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
      * Address: 0x0077FCF0 (FUN_0077FCF0, Moho::CMauiBitmap::ShareTextures)
      *
      * What it does:
