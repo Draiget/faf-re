@@ -53,6 +53,7 @@
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
+#include "moho/sim/BuildQueueCommandDecrement.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
@@ -21167,6 +21168,84 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
     // DecreaseCommandCount result, not the input command id).
     const CmdId resultCookie = activeDriver->DecreaseCommandCount(commandIssue->commandId, 1);
     QueueCommandIssueDecreaseCountEvent(*commandIssue, resultCookie, 1);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x00836980 (FUN_00836980, cfunc_DecreaseBuildCountInQueueL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_DecreaseBuildCountInQueueL@<eax>(LuaPlus::LuaState *a1@<eax>);
+ *
+ * What it does:
+ * Lua worker for `DecreaseBuildCountInQueue(queueIndex, count)`. Reads the
+ * 1-based factory build-queue item index and a decrement count, then walks that
+ * item's queued command ids from the most recently queued command backward. For
+ * each command still tracked by a live command-issue helper it marshals a
+ * `DecreaseCommandCount` through the active sim driver (clamped to the helper's
+ * remaining effective build count) and records the matching local decrease-count
+ * update event, stopping once the requested count has been fully consumed.
+ */
+int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
+{
+  constexpr const char* kDecreaseBuildCountInQueueHelpText = "DecreaseBuildCountInQueue(queueIndex, count)";
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDecreaseBuildCountInQueueHelpText, 2, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, "No active session!");
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject queueIndexArg(state, 1);
+  if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&queueIndexArg, "integer");
+  }
+  const int oneBasedQueueIndex = static_cast<int>(static_cast<std::int64_t>(lua_tonumber(state->m_state, 1)));
+
+  LuaPlus::LuaStackObject countArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&countArg, "integer");
+  }
+  std::int32_t remaining = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
+
+  const CmdId* commandBegin = nullptr;
+  const CmdId* commandEnd = nullptr;
+  CurrentBuildQueueItemCommands(oneBasedQueueIndex, &commandBegin, &commandEnd);
+
+  // Walk the item's queued command ids from the last-queued command backward.
+  for (const CmdId* cursor = commandEnd; cursor != commandBegin; --cursor) {
+    const CmdId commandId = *(cursor - 1);
+
+    CommandIssueHelperRuntimeView* const helper = FindCommandIssueHelper(session, commandId);
+    if (helper == nullptr) {
+      continue;
+    }
+
+    const std::int32_t available = QueuedBuildCommandCount(reinterpret_cast<const UserCommandIssueHelper&>(*helper));
+    std::int32_t take = remaining;
+    if (remaining <= available) {
+      remaining = 0;
+    } else {
+      take = available;
+      remaining -= available;
+    }
+
+    // The driver marshals the decrement and returns the resulting command cookie;
+    // the local event is queued with that cookie (not the input command id).
+    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    const CmdId resultCookie = activeDriver->DecreaseCommandCount(helper->commandId, take);
+    QueueCommandIssueDecreaseCountEvent(*helper, resultCookie, take);
+
+    if (remaining <= 0) {
+      break;
+    }
   }
 
   return 0;

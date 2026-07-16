@@ -16,6 +16,7 @@
 #include "legacy/containers/String.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/command/CommandIssueHelper.h"
+#include "moho/sim/BuildQueueCommandDecrement.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
@@ -3840,6 +3841,21 @@ namespace
   }
 
 } // namespace
+
+namespace moho
+{
+  /**
+   * Bridge exposing the file-local ResolveHelperBuildCount (FUN_008B4220) to the
+   * recovered `cfunc_DecreaseBuildCountInQueueL` worker in Sim.cpp. The worker
+   * holds command-issue helpers as the canonical `UserCommandIssueHelper`; this
+   * reinterprets that same object as the UserUnit-local event-ring view the
+   * count resolver was recovered against (identical binary layout).
+   */
+  std::int32_t QueuedBuildCommandCount(const UserCommandIssueHelper& helper) noexcept
+  {
+    return ResolveHelperBuildCount(reinterpret_cast<const UserCommandIssueHelperRuntimeView&>(helper));
+  }
+}
 
 namespace moho
 {

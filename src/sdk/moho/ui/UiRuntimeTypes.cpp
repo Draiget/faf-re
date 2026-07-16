@@ -1,5 +1,7 @@
 #include "moho/ui/UiRuntimeTypes.h"
 
+#include "moho/sim/BuildQueueCommandDecrement.h"
+
 #include <Windows.h>
 
 #include <algorithm>
@@ -23900,6 +23902,33 @@ namespace
 
 void moho::UI_FactoryCommandQueueHandlerBeat()
 {
+}
+
+void moho::CurrentBuildQueueItemCommands(
+  const int oneBasedQueueIndex,
+  const moho::CmdId** const outBegin,
+  const moho::CmdId** const outEnd) noexcept
+{
+  *outBegin = nullptr;
+  *outEnd = nullptr;
+
+  if (sCurrentBuildQueue.start == nullptr) {
+    return;
+  }
+
+  const std::ptrdiff_t itemCount = sCurrentBuildQueue.end - sCurrentBuildQueue.start;
+  const std::ptrdiff_t itemIndex = static_cast<std::ptrdiff_t>(oneBasedQueueIndex) - 1;
+  if (itemIndex < 0 || itemIndex >= itemCount) {
+    return;
+  }
+
+  // Each build-queue item owns a legacy vector of queued command ids
+  // (`commandData`, +0x20). The vector element is a 4-byte pointer slot that the
+  // binary stores command ids into, so reinterpret the contiguous range as ids.
+  const auto& commands = sCurrentBuildQueue.start[itemIndex].commandData;
+  const moho::CmdId* const begin = reinterpret_cast<const moho::CmdId*>(commands.begin());
+  *outBegin = begin;
+  *outEnd = begin + commands.size();
 }
 
 /**
