@@ -10,6 +10,8 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Set.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiFormationDBImpl.h"
@@ -2474,6 +2476,147 @@ namespace moho
   int cfunc_DecreaseBuildCountInQueue(lua_State* const luaContext)
   {
     return cfunc_DecreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00840130 (FUN_00840130, cfunc_GetUnitCommandDataL)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_GetUnitCommandDataL(LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Given a Lua table of user units, computes the intersection (across the
+   * selection) of the buildable-unit category set and the union of command /
+   * toggle capability masks, and returns `(commandCaps, toggleCaps, category)`.
+   * For each unit the buildable set is `(blueprintEconomyCategory & armyFilter)
+   * - restrictionCategory`, plus the same for every pending Upgrade command's
+   * target blueprint (with the target's own blueprint-id category removed).
+   */
+  int cfunc_GetUnitCommandDataL(LuaPlus::LuaState* const state)
+  {
+    const int argc = lua_gettop(state->m_state);
+    if (argc != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitCommandDataHelpText, 1, argc);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      gpg::Warnf("Attempt to call GetUnitCommands before world sessions exists.");
+      return 0;
+    }
+
+    const LuaPlus::LuaObject unitTable(LuaPlus::LuaStackObject(state, 1));
+    const int unitCount = unitTable.GetCount();
+
+    std::uint32_t accCommandCaps = 0u;
+    std::uint32_t accToggleCaps = 0u;
+    bool haveAcc = false;
+
+    EntityCategorySet accCategory{};
+    accCategory.ResetToEmpty(reinterpret_cast<std::uint32_t>(session->mRules));
+
+    for (int i = 1; i <= unitCount; ++i) {
+      EntityCategorySet perUnit{};
+      perUnit.ResetToEmpty(reinterpret_cast<std::uint32_t>(session->mRules));
+
+      const LuaPlus::LuaObject unitObject = unitTable[i];
+      UserUnit* const unit = GetUserUnitOptional(unitObject, state);
+      if (unit != nullptr) {
+        IUnit* const iunit = GetIUnitBridge(unit);
+        UnitAttributes& attrs = iunit->GetAttributes();
+        if (attrs.blueprint != nullptr) {
+          const RUnitBlueprint* const bp = iunit->GetBlueprint();
+
+          const auto* const economyCat = reinterpret_cast<const EntityCategorySet*>(&bp->Economy.CategoryCache);
+          const UserArmy* const army = reinterpret_cast<const UserEntity*>(unit)->mArmy;
+          const auto* const armyCat =
+            reinterpret_cast<const EntityCategorySet*>(&army->mVarDat.mCategoryFilterSet);
+          const EntityCategorySet* const restrictionCat = &attrs.restrictionCategory;
+
+          accCommandCaps |= attrs.commandCapsMask;
+          accToggleCaps |= attrs.toggleCapsMask;
+
+          EntityCategorySet intersect{};
+          (void)EntityCategory::Mul(&intersect, economyCat, armyCat);
+
+          EntityCategorySet buildable{};
+          (void)EntityCategory::Sub(&buildable, &intersect, restrictionCat);
+
+          (void)EntityCategory::Add(&perUnit, &buildable);
+
+          msvc8::set<const RUnitBlueprint*> upgradeTargets;
+          CollectUpgradeCommandTargetBlueprints(unit, upgradeTargets);
+          for (const RUnitBlueprint* const targetBp : upgradeTargets) {
+            const auto* const targetEconomyCat =
+              reinterpret_cast<const EntityCategorySet*>(&targetBp->Economy.CategoryCache);
+
+            EntityCategorySet targetIntersect{};
+            (void)EntityCategory::Mul(&targetIntersect, targetEconomyCat, armyCat);
+
+            EntityCategorySet targetBuildable{};
+            (void)EntityCategory::Sub(&targetBuildable, &targetIntersect, restrictionCat);
+
+            // The binary reuses the per-unit accumulator as its scratch: it
+            // OVERWRITES `perUnit` with this target's buildable set (v53 = v25),
+            // then removes the target's own blueprint-id category from the rules
+            // cache. Because the loop overwrites `perUnit` every iteration, the
+            // accumulated per-unit set becomes the LAST upgrade target's
+            // buildable set; the `Add(&perUnit, &buildable)` result above is only
+            // retained when the unit has no pending Upgrade commands.
+            perUnit = targetBuildable;
+
+            const char* const bpId = targetBp->mBlueprintId.c_str();
+            if (bpId != nullptr) {
+              const CategoryWordRangeView* const rulesCat = session->mRules->GetEntityCategory(bpId);
+              const_cast<CategoryWordRangeView*>(rulesCat)->mBits.RemoveAllFrom(&perUnit.mBits);
+            }
+          }
+        }
+      }
+
+      if (haveAcc) {
+        accCategory.mBits.IntersectWith(&perUnit.mBits);
+      } else {
+        accCategory = perUnit;
+        haveAcc = true;
+      }
+    }
+
+    LuaPlus::LuaObject commandCapsTable;
+    commandCapsTable.AssignNewTable(state, 23, 0);
+    int commandRow = 1;
+    for (int b = 0; b < 23; ++b) {
+      if (((1u << b) & accCommandCaps) != 0u) {
+        moho::ERuleBPUnitCommandCaps cap = static_cast<moho::ERuleBPUnitCommandCaps>(1u << b);
+        gpg::RRef capRef{};
+        (void)gpg::RRef_ERuleBPUnitCommandCaps(&capRef, &cap);
+        const msvc8::string lexical = capRef.GetLexical();
+        commandCapsTable.SetString(commandRow, lexical.c_str());
+        ++commandRow;
+      }
+    }
+    commandCapsTable.PushStack(state);
+
+    LuaPlus::LuaObject toggleCapsTable;
+    toggleCapsTable.AssignNewTable(state, 9, 0);
+    int toggleRow = 1;
+    for (int b = 0; b < 9; ++b) {
+      if (((1u << b) & accToggleCaps) != 0u) {
+        moho::ERuleBPUnitToggleCaps cap = static_cast<moho::ERuleBPUnitToggleCaps>(1u << b);
+        gpg::RRef capRef{};
+        (void)gpg::RRef_ERuleBPUnitToggleCaps(&capRef, &cap);
+        const msvc8::string lexical = capRef.GetLexical();
+        toggleCapsTable.SetString(toggleRow, lexical.c_str());
+        ++toggleRow;
+      }
+    }
+    toggleCapsTable.PushStack(state);
+
+    LuaPlus::LuaObject categoryObject;
+    (void)func_NewEntityCategory(state, &categoryObject, &accCategory);
+    categoryObject.PushStack(state);
+
+    return 3;
   }
 
   /**
