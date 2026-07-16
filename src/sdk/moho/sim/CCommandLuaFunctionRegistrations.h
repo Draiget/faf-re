@@ -74,6 +74,14 @@ namespace moho
    * Publishes global Lua binder `DecreaseBuildCountInQueue(queueIndex, count)`.
    */
   CScrLuaInitForm* func_DecreaseBuildCountInQueue_LuaFuncDef();
+  /**
+   * Address: 0x008366E0 (FUN_008366E0, func_IncreaseBuildCountInQueue_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder `IncreaseBuildCountInQueue` (help text mirrors the
+   * Decrease string, matching the binary).
+   */
+  CScrLuaInitForm* func_IncreaseBuildCountInQueue_LuaFuncDef();
 
   /**
    * Address: 0x008400D0 (FUN_008400D0, func_GetUnitCommandData_LuaFuncDef)
@@ -526,6 +534,15 @@ namespace moho
    * `cfunc_DecreaseBuildCountInQueueL`.
    */
   int cfunc_DecreaseBuildCountInQueue(lua_State* luaContext);
+
+  /**
+   * Address: 0x008366C0 (FUN_008366C0, cfunc_IncreaseBuildCountInQueue)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_IncreaseBuildCountInQueueL`.
+   */
+  int cfunc_IncreaseBuildCountInQueue(lua_State* luaContext);
 
   /**
    * Address: 0x008400B0 (FUN_008400B0, cfunc_GetUnitCommandData)

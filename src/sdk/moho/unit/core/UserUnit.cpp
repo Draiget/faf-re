@@ -4162,6 +4162,13 @@ namespace moho
     return ResolveHelperCommandType(reinterpret_cast<const UserCommandIssueHelperRuntimeView&>(helper));
   }
 
+  SSelectionSetUserEntity* ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept
+  {
+    UserCommandIssueWeakSetRuntimeView* const cursorSet =
+      GetEntitiesUnderCursor(reinterpret_cast<UserCommandIssueCursorEntityCacheRuntimeView*>(&helper));
+    return reinterpret_cast<SSelectionSetUserEntity*>(cursorSet);
+  }
+
   /**
    * Address: 0x008B73E0 (FUN_008B73E0)
    *

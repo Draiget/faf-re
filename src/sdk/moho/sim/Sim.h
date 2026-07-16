@@ -5207,6 +5207,16 @@ namespace moho
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00836740 (FUN_00836740, cfunc_IncreaseBuildCountInQueueL)
+   *
+   * What it does:
+   * Lua worker for `IncreaseBuildCountInQueue(queueIndex, count)`. Walks one
+   * factory build-queue item's queued command ids backward and re-issues the first
+   * live factory-build command found via `ISSUE_IncreaseCommandCount(helper, count)`.
+   */
+  int cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x008440A0 (FUN_008440A0, cfunc_GetSpecialFiles)
    *
    * lua_State *
