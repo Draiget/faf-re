@@ -3594,6 +3594,31 @@ namespace moho
   CScrLuaInitForm* func_GetSelectedUnits_LuaFuncDef();
 
   /**
+   * Address: 0x008BD5C0 (FUN_008BD5C0, cfunc_GetValidAttackingUnits)
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_GetValidAttackingUnitsL`.
+   */
+  int cfunc_GetValidAttackingUnits(lua_State* luaContext);
+
+  /**
+   * Address: 0x008BD410 (FUN_008BD410, cfunc_GetValidAttackingUnitsL)
+   *
+   * What it does:
+   * Returns a Lua array of currently-selected units that can attack the hovered
+   * target, each as its script object.
+   */
+  int cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008BD3B0 (FUN_008BD3B0, func_GetValidAttackingUnits_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the user-lane global Lua binder definition for `GetValidAttackingUnits`.
+   */
+  CScrLuaInitForm* func_GetValidAttackingUnits_LuaFuncDef();
+
+  /**
    * Address: 0x008BD870 (FUN_008BD870, cfunc_SelectUnits)
    *
    * lua_State *

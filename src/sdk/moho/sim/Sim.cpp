@@ -968,6 +968,8 @@ namespace
     "}\n"
     "If bool is specified and true, sends the current selection with the command\n";
   constexpr const char* kGetSelectedUnitsHelpText = "table GetSelectedUnits() - return a table of the currently selected units";
+  constexpr const char* kGetValidAttackingUnitsHelpText =
+    "table GetValidAttackingUnits() - return a table of the currently selected units";
   constexpr const char* kSelectUnitsHelpText = "Select the specified units";
   constexpr const char* kAddSelectUnitsHelpText = "Add these units to the currently Selected lists";
   constexpr const char* kGetUnitCommandFromCommandCapErrorHelpText = "string GetUnitCommandFromCommandCap(string)";
@@ -18693,6 +18695,87 @@ moho::CScrLuaInitForm* moho::func_GetSelectedUnits_LuaFuncDef()
     nullptr,
     "<global>",
     kGetSelectedUnitsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BD410 (FUN_008BD410, cfunc_GetValidAttackingUnitsL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState *state);
+ *
+ * What it does:
+ * Builds and returns a Lua array of the currently-selected units that can attack
+ * the hovered target (via `CWldSession::GetValidAttackingUnits`), each as its
+ * script object. Returns nil when the set is empty.
+ */
+int moho::cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState* const state)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetValidAttackingUnitsHelpText, 0, argumentCount);
+  }
+
+  msvc8::vector<UserUnit*> validUnits{};
+  session->GetValidAttackingUnits(validUnits);
+  if (validUnits.empty()) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(validUnits.size()), 0u);
+
+  std::int32_t resultIndex = 1;
+  for (UserUnit* const validUnit : validUnits) {
+    IUnit* const iunitBridge = ResolveIUnitBridge(validUnit);
+    if (!iunitBridge) {
+      continue;
+    }
+
+    LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
+    resultTable.SetObject(resultIndex, unitObject);
+    ++resultIndex;
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BD5C0 (FUN_008BD5C0, cfunc_GetValidAttackingUnits)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetValidAttackingUnitsL`.
+ */
+int moho::cfunc_GetValidAttackingUnits(lua_State* const luaContext)
+{
+  return cfunc_GetValidAttackingUnitsL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BD3B0 (FUN_008BD3B0, func_GetValidAttackingUnits_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane global Lua binder form for `GetValidAttackingUnits`.
+ */
+moho::CScrLuaInitForm* moho::func_GetValidAttackingUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetValidAttackingUnits",
+    &moho::cfunc_GetValidAttackingUnits,
+    nullptr,
+    "<global>",
+    kGetValidAttackingUnitsHelpText
   );
   return &binder;
 }
