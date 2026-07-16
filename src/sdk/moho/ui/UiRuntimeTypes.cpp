@@ -17652,6 +17652,59 @@ void moho::CUIMapPreview::ClearTexture()
 }
 
 /**
+ * Address: 0x00850B10 (FUN_00850B10, Moho::CUIMapPreview::Draw)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CUIMapPreview::Draw(
+ *   CUIMapPreview* this, CD3DPrimBatcher* primBatcher, int drawMask);
+ *
+ * What it does:
+ * Renders the bound preview texture as an aspect-fit (letterbox/pillarbox)
+ * white-tinted textured quad centered inside the control bounds. No-op when no
+ * texture is bound. Occupies the CMauiControl::DoRender vtable slot; drawMask
+ * is unused.
+ */
+void moho::CUIMapPreview::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+{
+  (void)drawMask;
+
+  CUIMapPreviewRuntimeView* const view = CUIMapPreviewRuntimeView::FromMapPreview(this);
+  if (!view->mTexture) {
+    return;
+  }
+
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+  float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
+  float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+
+  Wm3::Vector3f dimensions{};
+  (void)view->mTexture->GetDimensions(&dimensions);
+
+  const float scaleX = (right - left) / dimensions.x;
+  const float scaleY = (bottom - top) / dimensions.y;
+  if (scaleY <= scaleX) {
+    const float pad = ((right - left) - (dimensions.x * scaleY)) * 0.5f;
+    left = left + pad;
+    right = right - pad;
+  } else {
+    const float pad = ((bottom - top) - (dimensions.y * scaleX)) * 0.5f;
+    top = top + pad;
+    bottom = bottom - pad;
+  }
+
+  primBatcher->SetTexture(view->mTexture);
+
+  constexpr std::uint32_t vertexColor = 0xFFFFFFFFu;
+  const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
+  const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, top, vertexColor, 1.0f, 0.0f);
+  const CD3DPrimBatcher::Vertex bottomRight = MakeBorderVertex(right, bottom, vertexColor, 1.0f, 1.0f);
+  const CD3DPrimBatcher::Vertex bottomLeft = MakeBorderVertex(left, bottom, vertexColor, 0.0f, 1.0f);
+  primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+}
+
+/**
  * Address: 0x00850ED0 (FUN_00850ED0, cfunc_CUIMapPreviewSetTexture)
  *
  * What it does:
