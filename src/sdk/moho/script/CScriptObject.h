@@ -298,6 +298,15 @@ namespace moho
     void RunScriptStringNum3(const char* scriptName, const char* text, float a, float b, float c);
 
     /**
+     * Address: 0x005EBD60 (FUN_005EBD60, Moho::CScriptObject::RunScript_StrUnit)
+     *
+     * What it does:
+     * Invokes one script callback with `(self, text, unit)` when present.
+     * Used by `Sim::TransferUnit` to fire `OnTransportAttach(bone, storedUnit)`.
+     */
+    void RunScriptStringUnit(const char* scriptName, const char* text, Unit* unit);
+
+    /**
      * Address: 0x0067F180 (FUN_0067F180, Moho::CScriptObject::RunScript_Ent)
      *
      * What it does:
