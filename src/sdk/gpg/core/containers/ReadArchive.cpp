@@ -5,9 +5,13 @@
 #include <cstdio>
 #include <cstring>
 #include <istream>
+#include <limits>
 #include <new>
+#include <sstream>
 #include <string>
 #include <string_view>
+
+#include "gpg/core/containers/String.h"
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -1811,6 +1815,133 @@ namespace
     void ReadBool(bool* const value) override
     {
       (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093B760 (FUN_0093B760, TextReadArchive::ReadBytes)
+     *
+     * What it does:
+     * Reads `byteCount` raw bytes from the text stream, one whitespace-separated
+     * hexadecimal token per byte.
+     */
+    void ReadBytes(char* const bytes, const size_t byteCount) override
+    {
+      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::string token;
+      for (size_t index = 0; index < byteCount; ++index) {
+        stream >> token;
+        bytes[index] = static_cast<char>(gpg::STR_Xtoi(token.c_str()));
+      }
+    }
+
+    /**
+     * Address: 0x0093ECE0 (FUN_0093ECE0, TextReadArchive::ReadFloat)
+     *
+     * What it does:
+     * Reads one float token; the sentinel text "1.#INF" decodes to +infinity,
+     * otherwise the token is parsed as a floating-point value.
+     */
+    void ReadFloat(float* const value) override
+    {
+      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::string token;
+      stream >> token;
+      if (token != "1.#INF") {
+        std::istringstream parser(token);
+        parser >> *value;
+      } else {
+        *value = std::numeric_limits<float>::infinity();
+      }
+    }
+
+    /**
+     * Address: 0x0093E780 (FUN_0093E780, TextReadArchive::ReadString)
+     *
+     * What it does:
+     * Parses one double-quoted string primitive, decoding backslash escapes
+     * (`\n`, `\t`, `\"`, `\\`, and up to 3-digit octal `\NNN`) into `out`.
+     * Throws SerializationError on a malformed or truncated primitive.
+     */
+    void ReadString(msvc8::string* const out) override
+    {
+      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      stream >> std::ws;
+      if (stream.get() != '"') {
+        ThrowSerializationError("Error detected in archive: malformed string primitive.");
+      }
+
+      std::string decoded;
+      int ch = stream.get();
+      if (ch == std::char_traits<char>::eof()) {
+        ThrowSerializationError("Error detected in archive: malformed string primitive.");
+      }
+
+      while (ch != '"') {
+        if (ch == '\\') {
+          const int escape = stream.get();
+          switch (escape) {
+            case 'n': decoded.push_back('\n'); break;
+            case 't': decoded.push_back('\t'); break;
+            case '"': decoded.push_back('"'); break;
+            case '\\': decoded.push_back('\\'); break;
+            default: {
+              if (escape < '0' || escape > '7') {
+                ThrowSerializationError("Error detected in archive: malformed string primitive.");
+              }
+              int octalValue = escape - '0';
+              int extraDigits = 0;
+              while (true) {
+                const int next = stream.get();
+                if (next < '0' || next > '7') {
+                  stream.putback(static_cast<char>(next));
+                  decoded.push_back(static_cast<char>(octalValue));
+                  break;
+                }
+                octalValue = octalValue * 8 + (next - '0');
+                if (++extraDigits >= 2) {
+                  decoded.push_back(static_cast<char>(octalValue));
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        } else {
+          decoded.push_back(static_cast<char>(ch));
+        }
+
+        ch = stream.get();
+        if (ch == std::char_traits<char>::eof()) {
+          ThrowSerializationError("Error detected in archive: malformed string primitive.");
+        }
+      }
+
+      out->assign_owned(std::string_view(decoded.data(), decoded.size()));
+    }
+
+    /**
+     * Address: 0x0093B810 (FUN_0093B810, TextReadArchive::NextMarker)
+     *
+     * What it does:
+     * Reads one section-marker token from the text stream and maps it to the
+     * archive marker code (`N`=1, `0`=2, `*`=3, `{`=4, `}`=0); throws on any
+     * other character.
+     */
+    int NextMarker() override
+    {
+      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      char marker = 0;
+      stream >> marker;
+      switch (marker) {
+        case 'N': return 1;
+        case '0': return 2;
+        case '*': return 3;
+        case '{': return 4;
+        case '}': return 0;
+        default:
+          ThrowSerializationError(
+            gpg::STR_Printf("Error detected in archive: invalid marker token 0x%02x", marker).c_str());
+      }
     }
   };
 
