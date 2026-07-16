@@ -12,7 +12,6 @@
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/String.h"
-#include "lua/LuaObject.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/console/CConAlias.h"
 #include "moho/entity/Entity.h"
@@ -4676,36 +4675,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x00718A40 (FUN_00718A40)
+   * Address: 0x007171D0 (FUN_007171D0, ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QBE?AV?$vector@USPositionThreat@Moho@@V?$allocator@USPositionThreat@Moho@@@std@@@std@@ABV?$Vector3@M@Wm3@@HH_NW4EThreatType@2@H@Z)
+   *
+   * IDA signature (corrected — the mis-recovered mangled form claimed a
+   * `LuaObject*` return, but the binary fills a `vector<SPositionThreat>`):
+   * vector<SPositionThreat>* __thiscall GetThreatsAroundPosition(
+   *   CInfluenceMap *this, vector<SPositionThreat> *out, const Vector3f *pos,
+   *   int ring, bool restrictToPlayable, EThreatType threatType, int army);
    *
    * What it does:
-   * Builds one Lua threat-sample row and appends it at the next array index in
-   * the caller-owned result table.
+   * Iterates the grid cells within `ring` of the cell containing `pos`,
+   * optionally clamped to the sim playable rect. For every cell with strictly
+   * positive per-type threat it appends one `{worldX, 0.0f, worldZ, threat}`
+   * record to `out` and folds `threat` (4 bytes) then `{worldX, 0, worldZ}`
+   * (12 bytes) into the sim MD5 checksum context, matching the binary's two
+   * `MD5Context::Update` calls at 0x71735F / 0x717377. Logs the final digest.
    */
-  void AppendThreatSampleRow(
-    LuaPlus::LuaObject* const outObj,
-    std::int32_t& luaIndex,
-    LuaPlus::LuaState* const state,
-    const float worldX,
-    const float worldZ,
-    const float threat
-  )
-  {
-    LuaPlus::LuaObject point;
-    point.AssignNewTable(state, 0, 4);
-    point.SetNumber("x", worldX);
-    point.SetNumber("y", 0.0f);
-    point.SetNumber("z", worldZ);
-    point.SetNumber("threat", threat);
-    outObj->SetObject(luaIndex, point);
-    ++luaIndex;
-  }
-
-  /**
-   * Address: 0x007171D0 (FUN_007171D0, ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QAE?AVLuaObject@LuaPlus@@AAV42@ABV?$Vector3@M@Wm3@@HHW4EThreatType@2@H@Z)
-   */
-  LuaPlus::LuaObject* CInfluenceMap::GetThreatsAroundPosition(
-    LuaPlus::LuaObject* const outObj,
+  msvc8::vector<SPositionThreat>* CInfluenceMap::GetThreatsAroundPosition(
+    msvc8::vector<SPositionThreat>& out,
     const Wm3::Vec3f& pos,
     const int ring,
     const bool restrictToPlayable,
@@ -4713,17 +4700,6 @@ namespace moho
     const int armyIndex
   ) const
   {
-    if (!outObj) {
-      return nullptr;
-    }
-
-    LuaPlus::LuaState* const state = outObj->m_state;
-    if (!state) {
-      return outObj;
-    }
-
-    outObj->AssignNewTable(state, 0, 0);
-
     const std::int32_t centerIndex = VectorToCoords(pos);
     const int centerX = centerIndex % mWidth;
     const int centerZ = centerIndex / mWidth;
@@ -4741,7 +4717,6 @@ namespace moho
       mapZ1 = sim->mMapData->mPlayableRect.z1 / mGridSize;
     }
 
-    std::int32_t luaIndex = 1;
     for (int z = centerZ - ring; z <= centerZ + ring; ++z) {
       if (z < 0 || z >= mHeight) {
         continue;
@@ -4766,12 +4741,15 @@ namespace moho
 
         const float worldX = static_cast<float>((mGridSize / 2) + (x * mGridSize));
         const float worldZ = static_cast<float>((mGridSize / 2) + (z * mGridSize));
-        AppendThreatSampleRow(outObj, luaIndex, state, worldX, worldZ, threat);
+
+        const SPositionThreat sample{worldX, 0.0f, worldZ, threat};
+        out.push_back(sample);
 
         if (sim) {
-          const float coords[3] = {worldX, 0.0f, worldZ};
-          sim->mContext.Update(&threat, sizeof(threat));
-          sim->mContext.Update(coords, sizeof(coords));
+          // Binary reuses the just-pushed stack record: Update(&threat, 4)
+          // then Update(&{x,y,z}, 12) at 0x71735F / 0x717377.
+          sim->mContext.Update(&sample.threat, sizeof(float));
+          sim->mContext.Update(&sample.x, 3 * sizeof(float));
         }
       }
     }
@@ -4782,7 +4760,7 @@ namespace moho
       sim->Logf("after GetThreatsAroundPosition checksum=%s\n", checksum.c_str());
     }
 
-    return outObj;
+    return &out;
   }
 
   /**

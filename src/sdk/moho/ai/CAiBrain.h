@@ -1498,6 +1498,34 @@ namespace moho
   CScrLuaInitForm* func_CAiBrainGetThreatBetweenPositions_LuaFuncDef();
 
   /**
+   * Address: 0x00590C00 (FUN_00590C00, cfunc_CAiBrainGetThreatsAroundPosition)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetThreatsAroundPositionL`.
+   */
+  int cfunc_CAiBrainGetThreatsAroundPosition(lua_State* luaContext);
+
+  /**
+   * Address: 0x00590C80 (FUN_00590C80, cfunc_CAiBrainGetThreatsAroundPositionL)
+   *
+   * What it does:
+   * Reads `(brain, position, ring, restriction[, threatType, armyIndex])` from
+   * the Lua stack, fills a `msvc8::vector<SPositionThreat>` via
+   * `CInfluenceMap::GetThreatsAroundPosition`, and returns it as a Lua array of
+   * `{ x, z, threat }` rows.
+   */
+  int cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00590C20 (FUN_00590C20, func_CAiBrainGetThreatsAroundPosition_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetThreatsAroundPosition(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetThreatsAroundPosition_LuaFuncDef();
+
+  /**
    * Address: 0x0058FFA0 (FUN_0058FFA0, cfunc_CAiBrainAssignThreatAtPosition)
    */
   int cfunc_CAiBrainAssignThreatAtPosition(lua_State* luaContext);

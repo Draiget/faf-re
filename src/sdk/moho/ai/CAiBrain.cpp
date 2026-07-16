@@ -298,6 +298,10 @@ namespace
     "CAiBrain:GetThreatBetweenPositions(positionA, positionB, useRingMode, restrictToOnMap[, threatTypeName[, armyIndex]]) - "
     "samples threat along a grid-aligned path between two world positions and returns the aggregated value";
   constexpr const char* kAiBrainGetThreatBetweenPositionsInvalidArmyError = "Invalid army index passed in to GetThreatBetweenPositions";
+  constexpr const char* kAiBrainGetThreatsAroundPositionName = "GetThreatsAroundPosition";
+  constexpr const char* kAiBrainGetThreatsAroundPositionHelpText =
+    "CAiBrain:GetThreatsAroundPosition( position, ring, restriction, [threatType], [armyIndex] )";
+  constexpr const char* kAiBrainGetThreatsAroundPositionInvalidArmyError = "Invalid army index passed in to GetThreatsAroundPosition";
   constexpr const char* kAiBrainAssignThreatAtPositionName = "AssignThreatAtPosition";
   constexpr const char* kAiBrainAssignThreatAtPositionHelpText =
     "CAiBrain:AssignThreatAtPosition(position, threatValue[, decayRate[, threatTypeName]]) - "
@@ -5366,6 +5370,130 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatBetweenPositions_LuaFuncDef()
     kAiBrainGetThreatBetweenPositionsHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x00590C00 (FUN_00590C00, cfunc_CAiBrainGetThreatsAroundPosition)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainGetThreatsAroundPositionL`.
+ */
+int moho::cfunc_CAiBrainGetThreatsAroundPosition(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainGetThreatsAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00590C20 (FUN_00590C20, func_CAiBrainGetThreatsAroundPosition_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:GetThreatsAroundPosition(...)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainGetThreatsAroundPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainGetThreatsAroundPositionName,
+    &moho::cfunc_CAiBrainGetThreatsAroundPosition,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainGetThreatsAroundPositionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00590C80 (FUN_00590C80, cfunc_CAiBrainGetThreatsAroundPositionL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CAiBrainGetThreatsAroundPositionL@<eax>(LuaPlus::LuaState *ebx0@<ebx>);
+ *
+ * What it does:
+ * Reads `(brain, position, ring, restriction[, threatTypeName, armyIndex])`
+ * from the Lua stack, gathers every positive-threat cell around `position`
+ * into a `msvc8::vector<SPositionThreat>` via
+ * `CInfluenceMap::GetThreatsAroundPosition`, then builds and pushes a Lua array
+ * whose rows are `{ [1]=x, [2]=z, [3]=threat }`.
+ *
+ * Argument count is validated to be 4..6. The optional fifth arg is a
+ * threat-type enum name resolved via `SCR_GetEnum`; the optional sixth arg is
+ * a 1-based army index validated against `mSim->mArmiesList`.
+ */
+int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 4 || argumentCount > 6) {
+    LuaPlus::LuaState::Error(
+      state,
+      kLuaExpectedArgRangeWarning,
+      kAiBrainGetThreatsAroundPositionHelpText,
+      4,
+      6,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 2));
+  const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
+
+  LuaPlus::LuaStackObject ringStackObject(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    ringStackObject.TypeError("integer");
+  }
+  const int ring = static_cast<int>(lua_tonumber(rawState, 3));
+
+  LuaPlus::LuaStackObject restrictionStackObject(state, 4);
+  const bool restrictToPlayable = restrictionStackObject.GetBoolean();
+
+  EThreatType threatType = THREATTYPE_Overall;
+  int armyIndex = -1;
+
+  if (argumentCount > 4) {
+    gpg::RRef threatRef{};
+    gpg::RRef_EThreatType(&threatRef, &threatType);
+    LuaPlus::LuaStackObject threatNameStackObject(state, 5);
+    const char* const threatName = lua_tostring(rawState, 5);
+    if (threatName == nullptr) {
+      threatNameStackObject.TypeError("string");
+    }
+    SCR_GetEnum(state, threatName, threatRef);
+  }
+
+  if (argumentCount > 5) {
+    LuaPlus::LuaStackObject armyStackObject(state, 6);
+    if (lua_type(rawState, 6) != LUA_TNUMBER) {
+      armyStackObject.TypeError("integer");
+    }
+    const int oneBasedArmyIndex = static_cast<int>(lua_tonumber(rawState, 6));
+    armyIndex = oneBasedArmyIndex - 1;
+    const int armyCount = static_cast<int>(brain->mSim->mArmiesList.size());
+    if (armyIndex < 0 || armyIndex >= armyCount) {
+      LuaPlus::LuaState::Error(state, kAiBrainGetThreatsAroundPositionInvalidArmyError);
+    }
+  }
+
+  msvc8::vector<SPositionThreat> threats;
+  CInfluenceMap* const influenceGrid = brain->mArmy->GetIGrid();
+  influenceGrid->GetThreatsAroundPosition(threats, position, ring, restrictToPlayable, threatType, armyIndex);
+
+  LuaPlus::LuaObject threatsTable;
+  threatsTable.AssignNewTable(state, static_cast<std::int32_t>(threats.size()), 0);
+  for (const SPositionThreat& sample : threats) {
+    LuaPlus::LuaObject row;
+    row.AssignNewTable(state, 3, 0);
+    row.SetNumber(1, sample.x);
+    row.SetNumber(2, sample.z);
+    row.SetNumber(3, sample.threat);
+    threatsTable.Insert(row);
+  }
+
+  threatsTable.PushStack(state);
+  return 1;
 }
 
 /**
