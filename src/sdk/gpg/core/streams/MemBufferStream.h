@@ -10,6 +10,8 @@
 
 namespace gpg
 {
+    class RType;
+
     /**
      * Lightweight shared view over a contiguous memory range [mBegin, mEnd).
      * Ownership is kept via boost::shared_ptr<T> (typically allocated as an array).
@@ -24,6 +26,14 @@ namespace gpg
         boost::shared_ptr<type> mData{};
         type* mBegin{ nullptr };
         type* mEnd{ nullptr };
+
+        /**
+         * Per-instantiation reflected-type cache (`gpg::MemBuffer<T>::sType`).
+         * Populated lazily via `gpg::LookupRType(typeid(MemBuffer<T>))` the first
+         * time a resource/prefetch factory resolves this buffer type. Not part of
+         * the object layout (static), so the size asserts below are unaffected.
+         */
+        inline static gpg::RType* sType = nullptr;
 
         /**
          * Address: 0x00442A70 (FUN_00442A70)

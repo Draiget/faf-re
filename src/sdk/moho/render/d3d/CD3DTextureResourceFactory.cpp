@@ -203,12 +203,32 @@ namespace moho
   }
 
   /**
-   * Address: 0x004434E0 (FUN_004434E0)
+   * Address: 0x004434E0 (FUN_004434E0, ResourceFactoryPreload_RD3DTextureResource::Init)
    *
    * What it does:
-   * Preserves base init lane for preload-capable texture resource factory.
+   * Resolves and caches the reflected type of the produced resource
+   * (`RD3DTextureResource`) and of the prefetch payload
+   * (`gpg::MemBuffer<const char>`), then stores both into the factory's
+   * resource/prefetch type lanes. Unlike the templated `ResourceFactory<T>::Init`
+   * the two lanes carry distinct types, which is why this override is hand-written.
    */
-  void CD3DTextureResourceFactory::Init() {}
+  void CD3DTextureResourceFactory::Init()
+  {
+    gpg::RType* prefetchType = PrefetchData::sType;
+    if (prefetchType == nullptr) {
+      prefetchType = gpg::LookupRType(typeid(PrefetchData));
+      PrefetchData::sType = prefetchType;
+    }
+
+    gpg::RType* resourceType = RD3DTextureResource::sType;
+    if (resourceType == nullptr) {
+      resourceType = gpg::LookupRType(typeid(RD3DTextureResource));
+      RD3DTextureResource::sType = resourceType;
+    }
+
+    mResourceType = resourceType;
+    mPrefetchType = prefetchType;
+  }
 
   /**
    * Address: 0x00443530 (FUN_00443530)
