@@ -17,6 +17,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandVariableData.h"
+#include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/net/Common.h"
 #include "platform/Platform.h"
@@ -95,6 +96,32 @@ namespace moho
   );
 
   /**
+   * One replicated entity-variable update record queued by
+   * `Entity::SyncInterface` (FUN_0067A290) onto `SSyncData::mEntityUpdates`.
+   *
+   * Layout evidence (from FUN_0067A290 / SSyncData teardown lane at +0x148):
+   * - `sub ecx, 0D8h` at 0x0067A3A7 anchors the record stride to 0xD8.
+   * - `mov [ecx], edx` at 0x0067A3B3 stores the entity id at record +0x00.
+   * - `lea ebx, [ecx+8]` at 0x0067A3B0 hands `SSTIEntityVariableData::operator=`
+   *   the payload lane at record +0x08 (a 4-byte header word precedes it).
+   * The 0x08 offset and 0xD8 total both hold because `SSTIEntityVariableData`
+   * is 0xD0 bytes (0x08 header + 0xD0 payload).
+   */
+  struct SEntityVariableUpdateEntry
+  {
+    EntId mEntityId = 0;                       // +0x00
+    std::uint32_t mReserved04 = 0;             // +0x04
+    SSTIEntityVariableData mVariableData{};    // +0x08
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SEntityVariableUpdateEntry, mVariableData) == 0x08,
+    "SEntityVariableUpdateEntry::mVariableData offset must be 0x08"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(SEntityVariableUpdateEntry) == 0xD8, "SEntityVariableUpdateEntry size must be 0xD8"
+  );
+
+  /**
    * Sync publication payload exchanged from sim thread to driver consumers.
    *
    * Recovered size/layout from FA `SSyncData` usage in publish/remove paths.
@@ -104,7 +131,9 @@ namespace moho
     int32_t mCurBeat = 0;                                  // +0x000
     std::uint8_t pad_0004_0138[0x134]{};                    // +0x004
     msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
-    std::uint8_t pad_0144_0168[0x24]{};                     // +0x144
+    std::uint8_t pad_0144_0148[0x04]{};                     // +0x144 (mNewEntities tail lane)
+    msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
+    std::uint8_t pad_0154_0168[0x14]{};                     // +0x154 (mUnitUpdates lane)
     msvc8::vector<EntId> mDeleteIds;                        // +0x168
     msvc8::vector<EntId> mEraseIds;                         // +0x178
     msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
@@ -146,6 +175,10 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mNewUnits) == 0x138,
     "SSyncData::mNewUnits offset must be 0x138"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mEntityUpdates) == 0x148,
+    "SSyncData::mEntityUpdates offset must be 0x148"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mDeleteIds) == 0x168,
@@ -235,6 +268,19 @@ namespace moho
    * a pointer to the stored element.
    */
   SCreateUnitParams* QueueCreateUnitParams(SSyncData* syncData, const SCreateUnitParams& params);
+
+  /**
+   * Address: 0x0067A290 tail (inlined push lane of Moho::Entity::SyncInterface)
+   *
+   * What it does:
+   * Appends one default `SEntityVariableUpdateEntry` to
+   * `syncData->mEntityUpdates`, then overwrites the record's entity id and
+   * assignment-copies the supplied variable payload into it, returning a pointer
+   * to the stored element. Mirrors the binary's push-default / write-id /
+   * `SSTIEntityVariableData::operator=` sequence at 0x0067A35B..0x0067A3B5.
+   */
+  SEntityVariableUpdateEntry* QueueEntityVariableUpdate(
+    SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
 
   /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
