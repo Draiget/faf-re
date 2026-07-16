@@ -5147,6 +5147,16 @@ namespace moho
   int cfunc_DeleteCommandL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00836980 (FUN_00836980, cfunc_DecreaseBuildCountInQueueL)
+   *
+   * What it does:
+   * Walks the queued command ids of one factory build-queue item and marshals
+   * clamped `DecreaseCommandCount` requests through the active sim driver until
+   * the requested decrement count is consumed.
+   */
+  int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x008440A0 (FUN_008440A0, cfunc_GetSpecialFiles)
    *
    * lua_State *
