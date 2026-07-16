@@ -1200,6 +1200,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BDBEE0 (FUN_00BDBEE0, register_FlattenMapRect_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_FlattenMapRect_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_FlattenMapRect_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_FlattenMapRect_LuaFuncDef>();
+  }
+
+  /**
    * Address: 0x00BDBF90 (FUN_00BDBF90, register_EntityCategoryContains_LuaFuncDef)
    *
    * What it does:

@@ -1224,6 +1224,22 @@ namespace moho
      */
     [[nodiscard]] static Sim* Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
 
+    /**
+     * Address: 0x0074B120 (FUN_0074B120, ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z)
+     * Mangled: ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::Sim::FlattenMapRect(Moho::Sim *this, const gpg::Rect2i &rect, float elevation);
+     *
+     * What it does:
+     * Clamps `rect` to the heightfield bounds, writes `elevation` into every
+     * covered cell, records the flattened rect into the cached/loaded map-rect
+     * lists, then re-seats every land/seabed unit whose collision box overlaps
+     * the flattened area (marking its motion controller for surface re-snap, or
+     * warping it directly when it has no motion controller).
+     */
+    void FlattenMapRect(const gpg::Rect2i& rect, float elevation);
+
     msvc8::string mLogFilePrefix;
     std::FILE* mLog;
     msvc8::string mDesyncLogLine;
@@ -1277,8 +1293,13 @@ namespace moho
     msvc8::vector<void*> mSyncSerializeGroup1;
     msvc8::vector<void*> mSyncSerializeGroup3;
     msvc8::vector<void*> mSyncSerializeGroup4;
-    gpg::Rect2i mPlayableRect1;
-    gpg::Rect2i mPlayableRect2;
+    // 0x09F8 / 0x0A08: accumulated map-rect lists (each an msvc8::vector<gpg::Rect2i>,
+    // 0x10 bytes: proxy/first/last/end). FlattenMapRect (FUN_0074B120) push_back's the
+    // clamped flatten rect into both; the Sim map-data serializer (FUN_00745120) streams
+    // them element-wise (see SimSerMapDataRuntimeView). Same 0x10 size as a bare Rect2i,
+    // so downstream offsets are unaffected.
+    msvc8::vector<gpg::Rect2i> mCachedMapRects; // 0x09F8
+    msvc8::vector<gpg::Rect2i> mLoadedMapRects; // 0x0A08
     msvc8::vector<msvc8::string> mPrintField;
     msvc8::vector<void*> mSyncSerializeGroup2;
     SPhysConstants* mPhysConstants;
@@ -2135,6 +2156,35 @@ namespace moho
    * Executes one console command string argument via `CON_Execute`.
    */
   int cfunc_SimConExecuteL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00759190 (FUN_00759190, cfunc_FlattenMapRect)
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback state and forwards to `cfunc_FlattenMapRectL`.
+   */
+  int cfunc_FlattenMapRect(lua_State* luaContext);
+
+  /**
+   * Address: 0x007591B0 (FUN_007591B0, func_FlattenMapRect_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the sim-lane global Lua binder for `FlattenMapRect`.
+   */
+  CScrLuaInitForm* func_FlattenMapRect_LuaFuncDef();
+
+  /**
+   * Address: 0x00759210 (FUN_00759210, cfunc_FlattenMapRectL)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Reads `(x, z, sizex, sizez, elevation)`, builds the world rect, and calls
+   * `Sim::FlattenMapRect` on the global sim.
+   */
+  int cfunc_FlattenMapRectL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00759810 (FUN_00759810, cfunc_ParseEntityCategorySim)
