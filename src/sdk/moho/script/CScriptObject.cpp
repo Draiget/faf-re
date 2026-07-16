@@ -1734,6 +1734,39 @@ void CScriptObject::RunScriptStringNum3(
 }
 
 /**
+ * Address: 0x005EBD60 (FUN_005EBD60, Moho::CScriptObject::RunScript_StrUnit)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CScriptObject::RunScript_StrUnit(
+ *   Moho::CScriptObject *this, char *method, char **a3, Moho::Unit **a4);
+ *
+ * What it does:
+ * Under the callback weak guard, resolves the named script and, when present,
+ * calls it as `fn(self, text, unit)`. The binary passes the text and unit by
+ * pointer at the call site (a bone name slot and a stored-unit slot); the
+ * recovered API dereferences those at the caller.
+ */
+void CScriptObject::RunScriptStringUnit(const char* const scriptName, const char* const text, Unit* const unit)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, scriptName);
+  if (!script) {
+    return;
+  }
+
+  try {
+    LuaPlus::LuaFunction<void> fn{script};
+    fn(mLuaObj, text ? text : "", unit);
+  } catch (const std::exception& ex) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+  } catch (...) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+  }
+}
+
+/**
  * Address: 0x0067F180 (FUN_0067F180, Moho::CScriptObject::RunScript_Ent)
  */
 void CScriptObject::RunScriptEntity(const char* const scriptName, Entity* const entityArg)

@@ -1005,30 +1005,6 @@ namespace
   }
 
   /**
-   * Address: 0x005EBD60 (sub_5EBD60)
-   * Address: 0x005ED7D0 (func_LuaCallObjOObj_0 helper chain)
-   *
-   * What it does:
-   * Invokes a transport script callback (`OnTransportAttach` / `OnTransportDetach`)
-   * with bone-name string and optional payload unit Lua object.
-   */
-  void InvokeTransportBoneScriptCallback(
-    Unit* const transportUnit,
-    const char* const callbackName,
-    const SAniSkelBone* const bone,
-    Unit* const payloadUnit
-  )
-  {
-    if (!transportUnit || !callbackName || !bone || !bone->mBoneName) {
-      return;
-    }
-
-    const char* const boneName = bone->mBoneName;
-    LuaPlus::LuaObject* const payloadObj = payloadUnit ? &payloadUnit->mLuaObj : nullptr;
-    transportUnit->LuaPCall(callbackName, &boneName, payloadObj);
-  }
-
-  /**
    * Address: 0x005E3ED0 (FUN_005E3ED0, sub_5E3ED0)
    *
    * What it does:
@@ -2062,7 +2038,9 @@ void CAiTransportImpl::AttachUnitToBone(
   }
 
   const SAniSkelBone* const transportBone = ResolveUnitBoneByIndex(mUnit, transportBoneIndex);
-  InvokeTransportBoneScriptCallback(mUnit, "OnTransportAttach", transportBone, unit);
+  if (transportBone) {
+    mUnit->RunScriptStringUnit("OnTransportAttach", transportBone->mBoneName, unit);
+  }
   BroadcastTransportEvent(*this, AITRANSPORTEVENT_Load);
 }
 
@@ -2144,7 +2122,9 @@ bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
   if (detachedBoneIndex >= 0) {
     detachedBone = ResolveUnitBoneByIndex(mUnit, static_cast<unsigned int>(detachedBoneIndex));
   }
-  InvokeTransportBoneScriptCallback(mUnit, "OnTransportDetach", detachedBone, unit);
+  if (detachedBone) {
+    mUnit->RunScriptStringUnit("OnTransportDetach", detachedBone->mBoneName, unit);
+  }
   BroadcastTransportEvent(*this, AITRANSPORTEVENT_Unload);
 
   if (unit->AiNavigator) {
