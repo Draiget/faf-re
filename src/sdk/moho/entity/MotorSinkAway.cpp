@@ -7,6 +7,8 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/entity/Entity.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -484,10 +486,19 @@ namespace moho
   }
 
   /**
-   * Address: 0x00696940 (FUN_00696940, update lane)
+   * Address: 0x00696940 (FUN_00696940, Moho::MotorSinkAway::Update)
+   *
+   * What it does:
+   * Sinks the entity by nudging its current transform down `mSinkDeltaY * 0.1`
+   * along Y each tick, preserving orientation and X/Z, then submits it as the
+   * pending transform (used for destroyed units settling under the surface).
    */
-  void MotorSinkAway::Update(Entity* const)
-  {}
+  void MotorSinkAway::Update(Entity* const entity)
+  {
+    VTransform tran = entity->GetTransformWm3();
+    tran.pos_.y = (mSinkDeltaY * 0.1f) + tran.pos_.y;
+    entity->SetPendingTransform(tran, 1.0f);
+  }
 
   /**
    * Address: 0x00696600 (FUN_00696600, Moho::MotorSinkAwayTypeInfo::MotorSinkAwayTypeInfo)
