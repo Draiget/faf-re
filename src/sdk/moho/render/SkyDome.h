@@ -132,6 +132,18 @@ namespace moho
     void SetCirrusContext(float speed, const Wm3::Vector3f& direction, const msvc8::string& texturePath);
 
     /**
+     * Address: 0x00815230 (FUN_00815230, ?SetupHorizonAndCirrus@SkyDome@Moho@@...)
+     *
+     * What it does:
+     * Reconfigures the dome shape (origin/elevation/radius) and default
+     * tessellation, restores the horizon colour/size and sky colour, restores
+     * the fixed cirrus colour/texture context, and copies the static cirrus
+     * runtime table into the dome's cirrus-data lane. Invoked by
+     * CWldTerrainRes::Load/Reset after the terrain map bounds are known.
+     */
+    void SetupHorizonAndCirrus(const Wm3::Vector3f& domeOrigin, float waterElevation, float domeRadius);
+
+    /**
      * Address: 0x008177B0 (FUN_008177B0, ?CreateRenderAbility@SkyDome@Moho@@AAEXXZ)
      *
      * What it does:

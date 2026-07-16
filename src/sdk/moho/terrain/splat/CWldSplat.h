@@ -190,6 +190,26 @@ namespace moho
      */
     ~CDecalManager() override;
 
+    /**
+     * Address: 0x00878D90 (FUN_00878D90, Moho::CDecalManager::operator new)
+     * Mangled: ??2CDecalManager@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::CDecalManager *__cdecl Moho::CDecalManager::operator new(Moho::CWldTerrainRes *a1);
+     *
+     * What it does:
+     * Class-static allocating factory: reserves 0x114 bytes via the global
+     * throwing operator new, and on a non-null block constructs one
+     * CDecalManager owned by `terrainRes`. Returns the constructed manager, or
+     * nullptr when the raw allocation yielded null.
+     *
+     * (The binary mangling is the class allocating `operator new`; recovered as
+     * an intent-named static factory per the symbol-naming contract. The
+     * parameter is spelled IWldTerrainRes* — every caller passes a
+     * CWldTerrainRes* which upcasts to its IWldTerrainRes primary base.)
+     */
+    static CDecalManager* Create(IWldTerrainRes* terrainRes);
+
   public:
     /**
      * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)

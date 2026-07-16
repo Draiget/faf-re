@@ -35,6 +35,7 @@ namespace moho
   class CWaterShaderProperties;
   class CD3DDynamicTextureSheet;
   class CDecalManager;
+  struct CStratumMaterial;
   class CWldMap;
   class CWldTerrainRes;
   struct GeomCamera3;
@@ -308,7 +309,27 @@ namespace moho
      * terrain state for the active world map.
      */
     [[nodiscard]]
-    virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl) = 0;
+    virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl);
+
+    /**
+     * Address: 0x008A4040 (FUN_008A4040, ?LoadTexturing@CWldTerrainRes@Moho@@QAEXAAVBinaryReader@gpg@@I@Z)
+     *
+     * What it does:
+     * Loads the terrain strata/texturing state from the map stream. For map
+     * versions >= 54 it delegates to LoadLayer for each stratum layer; for legacy
+     * versions it reads the historical flat layout, then forwards to the decal
+     * manager's Load.
+     */
+    void LoadTexturing(gpg::BinaryReader& reader, std::uint32_t version);
+
+    /**
+     * Address: 0x008A3FC0 (FUN_008A3FC0, ?LoadLayer@CWldTerrainRes@Moho@@QAEXAAULayer@StratumMaterial@2@AAVBinaryReader@gpg@@@Z)
+     *
+     * What it does:
+     * Deserializes one terrain stratum layer descriptor (path + size) into the
+     * provided layer from the map stream.
+     */
+    void LoadLayer(CStratumMaterial& outLayer, gpg::BinaryReader& reader);
 
     /**
      * Address: 0x0089E710 (FUN_0089E710, ?GetPlayableMapRect@IWldTerrainRes@Moho@@UBE?AV?$Rect2@H@gpg@@XZ)
@@ -814,7 +835,7 @@ namespace moho
      * Finalizes terrain runtime resources and returns whether the pass
      * completed without requiring deferred map-change handling.
      */
-    [[nodiscard]] virtual bool Finalize() = 0;
+    [[nodiscard]] virtual bool Finalize();
 
     /**
      * Address: 0x008A5890 (FUN_008A5890, ?SyncTerrain@CWldTerrainRes@Moho@@EAEXPBVCHeightField@2@@Z)
