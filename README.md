@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`15/07/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`16/07/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
@@ -10,31 +10,31 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`97.06%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,189`*
+  - *Total amount of completed tokens: `65,190`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,310` (81.78%)
+- `recovered`: `53,311` (81.78%)
 - `skip`: `6,111` (9.37%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
 - `external_dependency`: `5,768` (8.85%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `4` (0.01%)
 - `in_progress`: `30` (0.04%)
-- **`blocked`: `2,009` (2.99%)**
+- **`blocked`: `2,008` (2.99%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,013`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,013`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,012`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,012`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Caller-Wiring Health
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (53,310 functions) — wiring health
+### Recovered (53,311 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `15,377` | 28.84% |
+| **Confirmed caller** (recovered binary caller wired by name) | `15,378` | 28.85% |
 | Vtable-anchored (virtual override of a recovered class) | `5,815` | 10.91% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,498` | 10.31% |
 | Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,651` | 4.97% |
@@ -42,15 +42,15 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `215` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,013 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,012 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `317` | 15.75% |
-| Vtable-anchored (recover with the owning class) | `209` | 10.38% |
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `316` | 15.71% |
+| Vtable-anchored (recover with the owning class) | `209` | 10.39% |
 | Framework dispatch (wx/EH/Lua/reflection) | `35` | 1.74% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,015` | 50.42% |
-| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `435` | 21.61% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `1,015` | 50.45% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `435` | 21.62% |
 | Unclassified data xref (manual review) | `1` | 0.05% |
 | RTTI-only | `1` | 0.05% |
 
