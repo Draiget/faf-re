@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <new>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/streams/BinaryWriter.h"
@@ -611,6 +612,30 @@ namespace moho
 
     const CHeightField* const heightField = map->mHeightField.get();
     spatialDb->ResizeStorageForMap(heightField->width - 1, heightField->height - 1);
+  }
+
+  /**
+   * Address: 0x00878D90 (FUN_00878D90, Moho::CDecalManager::operator new)
+   * Mangled: ??2CDecalManager@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * Moho::CDecalManager *__cdecl Moho::CDecalManager::operator new(Moho::CWldTerrainRes *a1);
+   *
+   * What it does:
+   * Class-static allocating factory. Requests 0x114 bytes (== sizeof(CDecalManager))
+   * from the global throwing operator new; if the block is null returns nullptr,
+   * otherwise placement-constructs a CDecalManager owning `terrainRes` and returns
+   * it. The placement-new form re-emits the matching operator delete on ctor throw,
+   * reproducing the binary's SEH cleanup funclet.
+   */
+  CDecalManager* CDecalManager::Create(IWldTerrainRes* const terrainRes)
+  {
+    void* const storage = ::operator new(0x114u);
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    return new (storage) CDecalManager(terrainRes);
   }
 
   /**

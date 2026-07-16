@@ -40,6 +40,7 @@
 #include "moho/sim/UserArmy.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/terrain/StratumMaterial.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaveSystem.h"
 
@@ -396,8 +397,10 @@ namespace
     std::uint8_t mUnknown9E4_9E7[0x04]{};                           // +0x9E4
     moho::WaveSystem mWaveSystem;                                   // +0x9E8
     IDecalManagerRuntimeView* mDecalManager;                        // +0xC30
+    std::uint8_t mUnknownC34_C37[0x04]{};                           // +0xC34
   };
 
+  static_assert(sizeof(TerrainRuntimeView) == 0xC38, "TerrainRuntimeView size must be 0xC38");
   static_assert(offsetof(TerrainRuntimeView, mBool) == 0x008, "TerrainRuntimeView::mBool offset must be 0x008");
   static_assert(offsetof(TerrainRuntimeView, mEditMode) == 0x009, "TerrainRuntimeView::mEditMode offset must be 0x009");
   static_assert(
@@ -488,6 +491,31 @@ namespace
   [[nodiscard]] TerrainRuntimeView* AsTerrainRuntimeView(moho::IWldTerrainRes* const terrainRes) noexcept
   {
     return reinterpret_cast<TerrainRuntimeView*>(terrainRes);
+  }
+
+  /**
+   * Adopt a device-resources texture-sheet handle into the water-map slot.
+   *
+   * The binary (FUN_008A1700, water-map block) copies the returned handle's
+   * `(sheet, count.pi_)` pair straight into `mWaterMapTexture`, reinterpreting
+   * the `RD3DTextureResource*` payload as the same `CD3DDynamicTextureSheet`
+   * object (they are the one DDS sheet, only modelled under two names). This
+   * helper performs that identical refcount-preserving raw copy through the
+   * SharedPtrRaw machinery so no open `{px,pi}` arithmetic leaks into Load.
+   */
+  void AdoptWaterMapSheetFromResource(
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
+    const moho::ID3DDeviceResources::TextureResourceHandle& sheet
+  ) noexcept
+  {
+    const boost::SharedPtrRaw<moho::RD3DTextureResource> sourceBorrow =
+      boost::SharedPtrRawFromSharedBorrow(sheet);
+
+    boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> reinterpreted{};
+    reinterpreted.px = reinterpret_cast<moho::CD3DDynamicTextureSheet*>(sourceBorrow.px);
+    reinterpreted.pi = sourceBorrow.pi;
+
+    waterMap = boost::SharedPtrFromRawRetained(reinterpreted);
   }
 
   /**
@@ -1862,8 +1890,210 @@ namespace
     terrainRes.UpdateTexture(visualView->mWaterMapTexture, visualView->mEditWordBuffer.begin);
   }
 
+  /**
+   * Address: 0x008A0AD0 (FUN_008A0AD0, ??0CWldTerrainRes@Moho@@QAE@XZ)
+   * Mangled: ??0CWldTerrainRes@Moho@@QAE@XZ
+   *
+   * IDA signature:
+   * Moho::CWldTerrainRes *__thiscall Moho::CWldTerrainRes::CWldTerrainRes(Moho::CWldTerrainRes *this);
+   *
+   * What it does:
+   * Constructs one terrain-resource object into the opaque 0xC38 block via the
+   * TerrainRuntimeView overlay: default sub-object construction (Cartographic,
+   * SkyDome, CWaterShaderProperties, StratumMaterial, WaveSystem), scalar
+   * lighting/fog/hypsometric defaults, empty string/handle/container lanes, and
+   * self-linked env-lookup map + debug dirty-rect list sentinel heads.
+   *
+   * The IWldTerrainRes base vtable + mMap/mPlayableRectSource lane are installed
+   * by the base ctor at the factory before this fills the derived fields.
+   */
+  void ConstructTerrainResFields(TerrainRuntimeView& view) noexcept
+  {
+    view.mBool = 0;
+    view.mEditMode = 0;
+
+    new (&view.mCartographic) moho::Cartographic();
+    new (&view.mSkyDome) moho::SkyDome();
+
+    view.mLightingMultiplier = 1.5f;
+    view.mSunDirection.x = 0.70700002f;
+    view.mSunDirection.y = 0.70700002f;
+    view.mSunDirection.z = 0.0f;
+    view.mSunAmbience.x = 0.2f;
+    view.mSunAmbience.y = 0.2f;
+    view.mSunAmbience.z = 0.2f;
+    view.mSunColor.x = 1.0f;
+    view.mSunColor.y = 1.0f;
+    view.mSunColor.z = 1.0f;
+    view.mShadowFillColor.x = 0.69999999f;
+    view.mShadowFillColor.y = 0.69999999f;
+    view.mShadowFillColor.z = 0.75f;
+    view.mSpecularColor.x = 0.0f;
+    view.mSpecularColor.y = 0.0f;
+    view.mSpecularColor.z = 0.0f;
+    view.mSpecularColor.w = 0.0f;
+    view.mBloom = 0.079999998f;
+    view.mTopographicSamples = 20;
+    view.mImagerElevationOffset = 0.0f;
+
+    new (&view.mWaterShaderProperties) moho::CWaterShaderProperties();
+    new (&view.mStrata) moho::StratumMaterial();
+
+    view.mNormalMap.mBegin = nullptr;
+    view.mNormalMap.mEnd = nullptr;
+    view.mNormalMap.mCapacityEnd = nullptr;
+
+    new (&view.mBackgroundFile) msvc8::string();
+    new (&view.mBackgroundTexture) moho::ID3DDeviceResources::TextureResourceHandle();
+    new (&view.mSkycubeFile) msvc8::string();
+    new (&view.mSkycubeTexture) moho::ID3DDeviceResources::TextureResourceHandle();
+
+    // Env-lookup red-black map: allocate the self-linked, nil sentinel head
+    // (sub_8A9490 == node-new that self-links parent/left/right + sets
+    // mIsNil=1, exactly what the node ctor above does). The +0x00 allocator
+    // proxy lane is left untouched (MSVC8 EBO allocator), matching the binary.
+    view.mEnvLookup.mHead = new TerrainEnvironmentLookupNodeRuntimeView();
+    view.mEnvLookup.mSize = 0u;
+
+    view.mEditWordBuffer.begin = nullptr;
+    view.mEditWordBuffer.end = nullptr;
+    view.mEditWordBuffer.capacityEnd = nullptr;
+
+    new (&view.mWaterMapTexture) moho::ID3DDeviceResources::TextureResourceHandle();
+    view.mWaterFoam = nullptr;
+    view.mWaterFlatness = nullptr;
+    view.mWaterDepthBias = nullptr;
+    view.mDebugDirtyTerrain = nullptr;
+
+    // Debug dirty-rect list: allocate the self-linked sentinel head node
+    // (sub_5AB3A0 == list-node-new self-linked; empty list, size 0). The +0x00
+    // iterator-proxy lane is left untouched, matching the binary.
+    auto* const dirtyRectHead =
+      static_cast<TerrainDirtyRectNodeRuntimeView*>(::operator new(sizeof(TerrainDirtyRectNodeRuntimeView)));
+    dirtyRectHead->mNext = dirtyRectHead;
+    dirtyRectHead->mPrev = dirtyRectHead;
+    view.mDebugDirtyRects.mHead = dirtyRectHead;
+    view.mDebugDirtyRects.mSize = 0u;
+
+    new (&view.mWaveSystem) moho::WaveSystem();
+    view.mDecalManager = nullptr;
+
+    view.mHypsometricColor[0] = 0xFF0E3EFFu;
+    view.mHypsometricColor[1] = 0xFF215CFFu;
+    view.mHypsometricColor[2] = 0xFF4785FFu;
+    view.mHypsometricColor[3] = 0xFF4C9D32u;
+    view.mHypsometricColor[4] = 0xFFFFFFFFu;
+  }
+
+  /**
+   * Address: 0x008A0D60 (FUN_008A0D60, ??1CWldTerrainRes@Moho@@UAE@XZ)
+   * Mangled: ??1CWldTerrainRes@Moho@@UAE@XZ
+   *
+   * IDA signature:
+   * void __thiscall Moho::CWldTerrainRes::~CWldTerrainRes(Moho::CWldTerrainRes *this);
+   *
+   * What it does:
+   * Tears down the terrain-resource object in reverse construction order via the
+   * overlay: decal-manager virtual delete, WaveSystem, debug dirty-rect list,
+   * debug dirty-terrain bitmap, water mask buffers, water-map texture, edit-word
+   * buffer, env-lookup map, skycube/background texture+string lanes, normal-map
+   * handles, strata/water-shader/skydome/cartographic sub-objects, then the
+   * inlined base ~IWldTerrainRes tail (STIMap teardown).
+   */
+  void DestroyTerrainResFields(TerrainRuntimeView& view) noexcept
+  {
+    // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
+    if (view.mDecalManager != nullptr) {
+      delete view.mDecalManager;
+      view.mDecalManager = nullptr;
+    }
+
+    view.mWaveSystem.~WaveSystem();
+
+    // Debug dirty-rect list: destroy all value nodes then free the sentinel
+    // head (sub_5AAF60 + operator delete). gpg::Rect2i is trivial so no
+    // per-node value dtor is needed (matches the binary's plain delete walk).
+    {
+      TerrainDirtyRectNodeRuntimeView* const head = view.mDebugDirtyRects.mHead;
+      if (head != nullptr) {
+        TerrainDirtyRectNodeRuntimeView* node = head->mNext;
+        while (node != head) {
+          TerrainDirtyRectNodeRuntimeView* const next = node->mNext;
+          ::operator delete(node);
+          node = next;
+        }
+        ::operator delete(head);
+      }
+      view.mDebugDirtyRects.mHead = nullptr;
+      view.mDebugDirtyRects.mSize = 0u;
+    }
+
+    if (view.mDebugDirtyTerrain != nullptr) {
+      view.mDebugDirtyTerrain->~BitArray2D();
+      ::operator delete(view.mDebugDirtyTerrain);
+    }
+
+    ::operator delete[](view.mWaterDepthBias);
+    ::operator delete[](view.mWaterFlatness);
+    ::operator delete[](view.mWaterFoam);
+
+    view.mWaterMapTexture.~shared_ptr();
+
+    if (view.mEditWordBuffer.begin != nullptr) {
+      ::operator delete(view.mEditWordBuffer.begin);
+    }
+    view.mEditWordBuffer.begin = nullptr;
+    view.mEditWordBuffer.end = nullptr;
+    view.mEditWordBuffer.capacityEnd = nullptr;
+
+    DestroyTerrainEnvironmentLookupMapStorage(view.mEnvLookup);
+
+    view.mSkycubeTexture.~shared_ptr();
+    view.mSkycubeFile.~string();
+    view.mBackgroundTexture.~shared_ptr();
+    view.mBackgroundFile.~string();
+
+    // Normal-map handle array: destroy each shared_ptr element (sub_424DC0)
+    // then free the backing storage.
+    if (view.mNormalMap.mBegin != nullptr) {
+      for (auto* it = view.mNormalMap.mBegin; it != view.mNormalMap.mEnd; ++it) {
+        it->~shared_ptr();
+      }
+      ::operator delete(view.mNormalMap.mBegin);
+    }
+    view.mNormalMap.mBegin = nullptr;
+    view.mNormalMap.mEnd = nullptr;
+    view.mNormalMap.mCapacityEnd = nullptr;
+
+    view.mStrata.~StratumMaterial();
+    view.mWaterShaderProperties.~CWaterShaderProperties();
+    view.mSkyDome.~SkyDome();
+    view.mCartographic.~Cartographic();
+
+    // Inlined base ~IWldTerrainRes tail: destroy the owned STIMap. The binary
+    // resets the base vftable here; the base dtor (run after this teardown by
+    // DestroyTerrainRes' delete) reinstalls it, so no explicit vptr poke.
+    if (view.mMap != nullptr) {
+      view.mMap->~STIMap();
+      ::operator delete(view.mMap);
+      view.mMap = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x008A74B0 (FUN_008A74B0, ??_ECWldTerrainRes@Moho@@UAEPAXI@Z)
+   *
+   * What it does:
+   * Scalar deleting destructor (vtable slot 0): runs the terrain-resource
+   * teardown then frees the block. Realized as the DestroyTerrainRes delete
+   * path below.
+   */
   void DestroyTerrainRes(moho::IWldTerrainRes* const terrainRes) noexcept
   {
+    if (terrainRes == nullptr) {
+      return;
+    }
+    DestroyTerrainResFields(*AsTerrainRuntimeView(terrainRes));
     delete terrainRes;
   }
 
@@ -2419,6 +2649,36 @@ namespace moho
     }
 
     return map;
+  }
+
+  /**
+   * Address: 0x008A7B90 (FUN_008A7B90, ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
+   * Mangled: ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ
+   *
+   * IDA signature:
+   * Moho::CWldTerrainRes *__cdecl Moho::WLD_CreateTerrainRes();
+   *
+   * What it does:
+   * Allocates one 0xC38-byte terrain-resource block, installs the concrete
+   * IWldTerrainRes vtable via the base constructor, then constructs its full
+   * field graph (CWldTerrainRes ctor, FUN_008A0AD0), returning it through the
+   * IWldTerrainRes interface pointer. Used by world-map load/new flows.
+   */
+  IWldTerrainRes* WLD_CreateTerrainRes()
+  {
+    static_assert(sizeof(TerrainRuntimeView) == 0xC38, "CWldTerrainRes storage must be 0xC38");
+
+    auto* const rawStorage = static_cast<TerrainRuntimeView*>(::operator new(sizeof(TerrainRuntimeView)));
+    if (rawStorage == nullptr) {
+      return nullptr;
+    }
+
+    // Base ctor installs the (now concrete) IWldTerrainRes vtable at +0x00 and
+    // zeroes the mMap/mPlayableRectSource lane at +0x04. The derived field graph
+    // is then filled over the same storage via the runtime overlay.
+    IWldTerrainRes* const terrainRes = new (rawStorage) IWldTerrainRes();
+    ConstructTerrainResFields(*rawStorage);
+    return terrainRes;
   }
 
   /**
@@ -4289,6 +4549,586 @@ namespace moho
     SaveStratumLayer(writer, strata.mStratum7NormalTexture);
 
     AsTerrainVisualResourceRuntimeView(this)->mDecalManager->Save(writer);
+  }
+
+  /**
+   * Address: 0x008A3FC0 (FUN_008A3FC0)
+   * Mangled: ?LoadLayer@CWldTerrainRes@Moho@@QAEXAAULayer@StratumMaterial@2@AAVBinaryReader@gpg@@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CWldTerrainRes::LoadLayer(
+   *     StratumMaterial::Layer& outLayer, gpg::BinaryReader& reader);
+   *
+   * What it does:
+   * Deserializes one terrain stratum layer descriptor: reads a NUL-terminated
+   * string from the stream into a temporary, assigns it into the layer's path
+   * (outLayer.mPath), then reads a 4-byte value straight into the layer's
+   * float size (outLayer.mSize @ +0x34).
+   */
+  void IWldTerrainRes::LoadLayer(CStratumMaterial& outLayer, gpg::BinaryReader& reader)
+  {
+    // Binary reads the string into a temporary, then assign()s the full range
+    // into outLayer.mPath; the temporary is destroyed inline. RAII on `scratch`
+    // reproduces that exactly.
+    msvc8::string scratch;
+    reader.ReadString(&scratch);
+    outLayer.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+
+    // asm stores the 4 raw stream bytes via `movss [ebx+0x34], xmm0` into the
+    // float mSize; ReadExact reads the same 4 bytes directly into the float.
+    reader.ReadExact(outLayer.mSize);
+  }
+
+  /**
+   * Address: 0x008A4040 (FUN_008A4040)
+   * Mangled: ?LoadTexturing@CWldTerrainRes@Moho@@QAEXAAVBinaryReader@gpg@@I@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CWldTerrainRes::LoadTexturing(
+   *     gpg::BinaryReader& reader, unsigned int vers);
+   *
+   * What it does:
+   * Loads the terrain strata/texturing state from the map stream. For map
+   * versions >= 54 it delegates to LoadLayer for each of the twenty stratum
+   * layers (albedo-first / normal-second). For legacy versions (< 54) it reads
+   * the historical flat layout, then forwards to the decal manager's Load.
+   */
+  void IWldTerrainRes::LoadTexturing(gpg::BinaryReader& reader, const std::uint32_t version)
+  {
+    TerrainRuntimeView* const view = AsTerrainRuntimeView(this);
+    StratumMaterial& strata = view->mStrata;
+
+    if (version < 54) {
+      // Legacy flat texturing layout.
+      msvc8::string scratch;
+
+      // Discarded shader-name string and a discarded 4-byte lane.
+      reader.ReadString(&scratch);
+      {
+        std::uint32_t discardedLane = 0;
+        reader.ReadExact(discardedLane);
+      }
+
+      // Lower + Lower-normal paths, then their sizes.
+      reader.ReadString(&scratch);
+      strata.mLowerAlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      strata.mLowerNormalTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadExact(strata.mLowerAlbedoTexture.mSize);
+      reader.ReadExact(strata.mLowerNormalTexture.mSize);
+
+      // Stratum 0 albedo/normal paths, then sizes.
+      reader.ReadString(&scratch);
+      strata.mStratum0AlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      strata.mStratum0NormalTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadExact(strata.mStratum0AlbedoTexture.mSize);
+      reader.ReadExact(strata.mStratum0NormalTexture.mSize);
+
+      // Stratum 1 albedo/normal paths, then sizes.
+      reader.ReadString(&scratch);
+      strata.mStratum1AlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      strata.mStratum1NormalTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadExact(strata.mStratum1AlbedoTexture.mSize);
+      reader.ReadExact(strata.mStratum1NormalTexture.mSize);
+
+      // Stratum 2 albedo/normal paths, then sizes.
+      reader.ReadString(&scratch);
+      strata.mStratum2AlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      strata.mStratum2NormalTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadExact(strata.mStratum2AlbedoTexture.mSize);
+      reader.ReadExact(strata.mStratum2NormalTexture.mSize);
+
+      // Stratum 3 albedo/normal paths, then sizes.
+      reader.ReadString(&scratch);
+      strata.mStratum3AlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      strata.mStratum3NormalTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadExact(strata.mStratum3AlbedoTexture.mSize);
+      reader.ReadExact(strata.mStratum3NormalTexture.mSize);
+
+      // Upper albedo path, discarded upper-normal path string, upper size,
+      // and a discarded trailing 4-byte lane.
+      reader.ReadString(&scratch);
+      strata.mUpperAlbedoTexture.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
+      reader.ReadString(&scratch);
+      reader.ReadExact(strata.mUpperAlbedoTexture.mSize);
+      {
+        std::uint32_t discardedLane = 0;
+        reader.ReadExact(discardedLane);
+      }
+    } else {
+      // Version >= 54: per-layer LoadLayer, albedo layers first then normals.
+      LoadLayer(strata.mLowerAlbedoTexture, reader);
+      LoadLayer(strata.mStratum0AlbedoTexture, reader);
+      LoadLayer(strata.mStratum1AlbedoTexture, reader);
+      LoadLayer(strata.mStratum2AlbedoTexture, reader);
+      LoadLayer(strata.mStratum3AlbedoTexture, reader);
+      LoadLayer(strata.mStratum4AlbedoTexture, reader);
+      LoadLayer(strata.mStratum5AlbedoTexture, reader);
+      LoadLayer(strata.mStratum6AlbedoTexture, reader);
+      LoadLayer(strata.mStratum7AlbedoTexture, reader);
+      LoadLayer(strata.mUpperAlbedoTexture, reader);
+      LoadLayer(strata.mLowerNormalTexture, reader);
+      LoadLayer(strata.mStratum0NormalTexture, reader);
+      LoadLayer(strata.mStratum1NormalTexture, reader);
+      LoadLayer(strata.mStratum2NormalTexture, reader);
+      LoadLayer(strata.mStratum3NormalTexture, reader);
+      LoadLayer(strata.mStratum4NormalTexture, reader);
+      LoadLayer(strata.mStratum5NormalTexture, reader);
+      LoadLayer(strata.mStratum6NormalTexture, reader);
+      LoadLayer(strata.mStratum7NormalTexture, reader);
+    }
+
+    view->mDecalManager->Load(reader, version);
+  }
+
+  /**
+   * Address: 0x008A1700 (FUN_008A1700)
+   * Mangled: ?Load@CWldTerrainRes@Moho@@UAE_NAAVBinaryReader@gpg@@PAVLuaState@LuaPlus@@AAVCBackgroundTaskControl@2@@Z
+   *
+   * IDA signature:
+   * char __thiscall Moho::CWldTerrainRes::Load(
+   *     gpg::BinaryReader* reader, LuaPlus::LuaState* state,
+   *     Moho::CBackgroundTaskControl* loadControl);
+   *
+   * What it does:
+   * The terrain-resource load keystone. Reads the versioned map payload: header
+   * (version/width/height/heightScale), builds the STIMap + heightfield samples,
+   * a fresh decal manager, optional rescale, terrain types, bounds/error;
+   * version-gated stratum shader/background/skycube/env-lookup; 24 streamed
+   * lighting/fog floats; water enable + elevations + water-shader + wave system;
+   * topographic/hypsometric + imager offset; texturing (LoadTexturing); a legacy
+   * skip-list; the utility mask sheets and water-map + water masks; terrain-type
+   * grid; legacy album/normal strings; skydome (loaded or derived); and
+   * cartographic decals. Returns true on success.
+   */
+  bool IWldTerrainRes::Load(
+    gpg::BinaryReader& reader,
+    LuaPlus::LuaState* const state,
+    CBackgroundTaskControl& loadControl
+  )
+  {
+    TerrainRuntimeView* const view = AsTerrainRuntimeView(this);
+    TerrainVisualResourceRuntimeView* const visualView = AsTerrainVisualResourceRuntimeView(this);
+
+    // The stratum-mask utility sheets are resolved through the device-resources
+    // object captured at entry (mirrors the SetBackground/SetSkycube idiom), not
+    // the water-map block's D3D_GetDevice() static singleton (asm 0x8A222A reads
+    // the entry-bound resources lane, distinct from the 0x8A282C static guard).
+    CD3DDevice* const entryDevice = D3D_GetDevice();
+    ID3DDeviceResources* const maskResources =
+      entryDevice != nullptr ? entryDevice->GetResources() : nullptr;
+
+    // Header: version gate, then width/height/heightScale.
+    std::uint32_t version = 0;
+    reader.ReadExact(version);
+    if (version < 0x33u) {
+      return false;
+    }
+
+    std::uint32_t mapWidth = 0;
+    std::uint32_t mapHeight = 0;
+    float heightScale = 0.0f;
+    reader.ReadExact(mapWidth);
+    reader.ReadExact(mapHeight);
+    reader.ReadExact(heightScale);
+    TickLoadingProgress(loadControl);
+
+    // Build a fresh STIMap and adopt it, destroying any previous map.
+    {
+      STIMap* const oldMap = view->mMap;
+      view->mMap = new STIMap(mapWidth, mapHeight);
+      if (oldMap != nullptr) {
+        oldMap->~STIMap();
+        ::operator delete(oldMap);
+      }
+    }
+
+    // Heightfield samples: width*height uint16 values read straight into data.
+    CHeightField* const field = view->mMap->mHeightField.get();
+    reader.Read(
+      reinterpret_cast<char*>(field->data),
+      static_cast<std::size_t>(2 * field->width * field->height)
+    );
+
+    // Fresh decal manager (destroy the previous through its virtual dtor).
+    {
+      IDecalManagerRuntimeView* const oldDecalManager = view->mDecalManager;
+      view->mDecalManager = reinterpret_cast<IDecalManagerRuntimeView*>(CDecalManager::Create(this));
+      if (oldDecalManager != nullptr) {
+        delete oldDecalManager;
+      }
+    }
+
+    // Optional rescale when the stored scale differs from the 1/128 default.
+    if (heightScale != 0.0078125f) {
+      field->Rescale(heightScale * 128.0f);
+    }
+
+    view->mMap->LoadTerrainTypes(state);
+    TickLoadingProgress(loadControl);
+
+    // Full-rect bounds + error refresh (asm passes 0..0x7FFFFFFF, which the
+    // error pass clamps to the valid heightfield extent).
+    gpg::Rect2i fullRect{};
+    fullRect.x0 = 0;
+    fullRect.z0 = 0;
+    fullRect.x1 = 0x7FFFFFFF;
+    fullRect.z1 = 0x7FFFFFFF;
+    view->mMap->mHeightField.get()->UpdateBounds(fullRect);
+    TickLoadingProgress(loadControl);
+    view->mMap->mHeightField.get()->UpdateError(loadControl, fullRect);
+    TickLoadingProgress(loadControl);
+
+    // Debug dirty-terrain bitmap sized to half resolution.
+    {
+      gpg::BitArray2D* const oldDirty = visualView->mDebugDirtyTerrain;
+      visualView->mDebugDirtyTerrain = new gpg::BitArray2D(
+        static_cast<std::int32_t>(mapWidth) / 2,
+        static_cast<std::int32_t>(mapHeight) / 2
+      );
+      if (oldDirty != nullptr) {
+        oldDirty->~BitArray2D();
+        ::operator delete(oldDirty);
+      }
+    }
+
+    // Fog defaults installed before the streamed floats overwrite most lanes.
+    view->mFogStartDistance = 1.0f;
+    view->mFogCutoffDistance = 1.0f;
+    view->mFogMinClamp = 1.0f;
+    view->mFogMaxClamp = 0.0f;
+    view->mFogCurveExponent = 1000.0f;
+
+    // Stratum shader byte1 (version-gated), shader name, background, skycube.
+    view->mStrata.byte1 = version < 0x36u ? std::uint8_t{0} : reader.ReadChar();
+    {
+      msvc8::string shaderName;
+      reader.ReadString(&shaderName);
+      view->mStrata.mShaderName.assign(shaderName, 0u, 0xFFFFFFFFu);
+    }
+    view->mStrata.byte0 = 0;
+    {
+      msvc8::string backgroundPath;
+      reader.ReadString(&backgroundPath);
+      SetBackground(backgroundPath);
+    }
+    {
+      msvc8::string skycubePath;
+      reader.ReadString(&skycubePath);
+      SetSkycube(skycubePath);
+    }
+
+    // Environment lookups: single <default> pair before 0x37, else counted loop.
+    if (version < 0x37u) {
+      const msvc8::string defaultKey("<default>");
+      msvc8::string environmentName;
+      reader.ReadString(&environmentName);
+      AddEnvLookup(defaultKey, environmentName);
+    } else {
+      std::int32_t envCount = 0;
+      reader.ReadExact(envCount);
+      for (; envCount > 0; --envCount) {
+        msvc8::string environmentKey;
+        msvc8::string environmentName;
+        reader.ReadString(&environmentKey);
+        reader.ReadString(&environmentName);
+        AddEnvLookup(environmentKey, environmentName);
+      }
+    }
+
+    // 24 streamed lighting/sun/ambience/color/shadow/specular/bloom/fog floats.
+    reader.ReadExact(view->mLightingMultiplier);
+    reader.ReadExact(view->mSunDirection.x);
+    reader.ReadExact(view->mSunDirection.y);
+    reader.ReadExact(view->mSunDirection.z);
+    reader.ReadExact(view->mSunAmbience.x);
+    reader.ReadExact(view->mSunAmbience.y);
+    reader.ReadExact(view->mSunAmbience.z);
+    reader.ReadExact(view->mSunColor.x);
+    reader.ReadExact(view->mSunColor.y);
+    reader.ReadExact(view->mSunColor.z);
+    reader.ReadExact(view->mShadowFillColor.x);
+    reader.ReadExact(view->mShadowFillColor.y);
+    reader.ReadExact(view->mShadowFillColor.z);
+    reader.ReadExact(view->mSpecularColor.x);
+    reader.ReadExact(view->mSpecularColor.y);
+    reader.ReadExact(view->mSpecularColor.z);
+    reader.ReadExact(view->mSpecularColor.w);
+    reader.ReadExact(view->mBloom);
+    reader.ReadExact(view->mFogStartDistance);
+    reader.ReadExact(view->mFogCutoffDistance);
+    reader.ReadExact(view->mFogMinClamp);
+    reader.ReadExact(view->mFogMaxClamp);
+    reader.ReadExact(view->mFogCurveExponent);
+
+    // Water enable byte + three water elevations (stored on the map).
+    view->mMap->mWaterEnabled = reader.ReadChar() != 0;
+    reader.ReadExact(view->mMap->mWaterElevation);
+    reader.ReadExact(view->mMap->mWaterElevationDeep);
+    reader.ReadExact(view->mMap->mWaterElevationAbyss);
+
+    view->mWaterShaderProperties.Load(version, reader);
+    view->mWaveSystem.Load(
+      static_cast<std::int32_t>(version),
+      static_cast<std::int32_t>(mapHeight),
+      static_cast<std::int32_t>(mapWidth),
+      reader
+    );
+    TickLoadingProgress(loadControl);
+
+    // Topographic samples + hypsometric palette + imager offset.
+    if (version < 0x38u) {
+      view->mTopographicSamples = 20;
+      view->mHypsometricColor[0] = 0xFF0E3EFFu;
+      view->mHypsometricColor[1] = 0xFF215CFFu;
+      view->mHypsometricColor[2] = 0xFF4785FFu;
+      view->mHypsometricColor[3] = 0xFF4C9D32u;
+      view->mHypsometricColor[4] = 0xFFFFFFFFu;
+    } else {
+      reader.ReadExact(view->mTopographicSamples);
+      reader.ReadExact(view->mHypsometricColor[0]);
+      reader.ReadExact(view->mHypsometricColor[1]);
+      reader.ReadExact(view->mHypsometricColor[2]);
+      reader.ReadExact(view->mHypsometricColor[3]);
+      reader.ReadExact(view->mHypsometricColor[4]);
+    }
+    if (version >= 0x39u) {
+      reader.ReadExact(view->mImagerElevationOffset);
+    }
+
+    LoadTexturing(reader, version);
+    TickLoadingProgress(loadControl);
+
+    // Legacy skip-list: two discarded dwords + a finite skip countdown, each
+    // seeking one record forward (asm 0x8A2164 `sub;jnz` proves finite).
+    {
+      std::uint32_t discardedA = 0;
+      std::uint32_t discardedB = 0;
+      std::int32_t skipCount = 0;
+      reader.ReadExact(discardedA);
+      reader.ReadExact(discardedB);
+      reader.ReadExact(skipCount);
+      for (; skipCount > 0; --skipCount) {
+        std::int32_t recordSize = 0;
+        reader.ReadExact(recordSize);
+        reader.stream()->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, recordSize);
+      }
+    }
+    TickLoadingProgress(loadControl);
+
+    // Stratum mask sheets. Since 0x36 the two utility masks are named sheets;
+    // legacy maps carry a per-index mask loop (only index 0 is adopted).
+    if (version >= 0x36u) {
+      {
+        std::uint32_t payloadSize = 0;
+        reader.ReadExact(payloadSize);
+        std::vector<char> payload(payloadSize);
+        if (payloadSize != 0u) {
+          reader.Read(payload.data(), payload.size());
+        }
+        ID3DDeviceResources::TextureResourceHandle sheet{};
+        if (maskResources != nullptr) {
+          maskResources->GetTextureSheet(sheet, "_utilitya_mask.dds", payload.data(), payload.size());
+        }
+        view->mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+      }
+      TickLoadingProgress(loadControl);
+      {
+        std::uint32_t payloadSize = 0;
+        reader.ReadExact(payloadSize);
+        std::vector<char> payload(payloadSize);
+        if (payloadSize != 0u) {
+          reader.Read(payload.data(), payload.size());
+        }
+        ID3DDeviceResources::TextureResourceHandle sheet{};
+        if (maskResources != nullptr) {
+          maskResources->GetTextureSheet(sheet, "_utilityb_mask.dds", payload.data(), payload.size());
+        }
+        view->mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+      }
+      TickLoadingProgress(loadControl);
+    } else {
+      std::int32_t maskCount = 0;
+      reader.ReadExact(maskCount);
+      for (std::int32_t maskIndex = 0; maskIndex < maskCount; ++maskIndex) {
+        std::uint32_t payloadSize = 0;
+        reader.ReadExact(payloadSize);
+        std::vector<char> payload(payloadSize);
+        if (payloadSize != 0u) {
+          reader.Read(payload.data(), payload.size());
+        }
+        if (maskIndex == 0) {
+          ID3DDeviceResources::TextureResourceHandle sheetA{};
+          ID3DDeviceResources::TextureResourceHandle sheetB{};
+          if (maskResources != nullptr) {
+            maskResources->GetTextureSheet(sheetA, "_utilitya_mask.dds", payload.data(), payload.size());
+            maskResources->GetTextureSheet(sheetB, "_utilityb_mask.dds", payload.data(), payload.size());
+          }
+          view->mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetA));
+          view->mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetB));
+        }
+        TickLoadingProgress(loadControl);
+      }
+    }
+
+    // Water-map utility sheets, indexed `_utilityc%d.dds`. Index 0 becomes the
+    // live water-map texture (resolved through the D3D_GetDevice() singleton).
+    {
+      std::int32_t waterMapCount = 0;
+      reader.ReadExact(waterMapCount);
+      for (std::int32_t waterMapIndex = 0; waterMapIndex < waterMapCount; ++waterMapIndex) {
+        std::uint32_t payloadSize = 0;
+        reader.ReadExact(payloadSize);
+        std::vector<char> payload(payloadSize);
+        if (payloadSize != 0u) {
+          reader.Read(payload.data(), payload.size());
+        }
+
+        const msvc8::string sheetLocation = gpg::STR_Printf("_utilityc%d.dds", waterMapIndex);
+        if (waterMapIndex == 0) {
+          CD3DDevice* const device = D3D_GetDevice();
+          ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
+          ID3DDeviceResources::TextureResourceHandle sheet{};
+          if (resources != nullptr) {
+            resources->GetTextureSheet(sheet, sheetLocation.c_str(), payload.data(), payload.size());
+          }
+          AdoptWaterMapSheetFromResource(visualView->mWaterMapTexture, sheet);
+        }
+        TickLoadingProgress(loadControl);
+      }
+    }
+
+    // Water masks (foam / flatness / depth-bias) sized to half resolution, read
+    // as raw grids straight into their freshly allocated lanes.
+    const std::int32_t maskTileX = (view->mMap->mHeightField.get()->width - 1) >> 1;
+    const std::int32_t maskTileY = (view->mMap->mHeightField.get()->height - 1) >> 1;
+    const std::size_t maskBytes = static_cast<std::size_t>(maskTileX * maskTileY);
+    CreateWaterMasks(maskTileX, maskTileY);
+    reader.Read(reinterpret_cast<char*>(visualView->mWaterFoam), maskBytes);
+    reader.Read(reinterpret_cast<char*>(visualView->mWaterFlatness), maskBytes);
+    reader.Read(reinterpret_cast<char*>(visualView->mWaterDepthBias), maskBytes);
+    TickLoadingProgress(loadControl);
+
+    // Terrain-type grid: raw read into the map terrain-type storage.
+    {
+      STIMap* const map = view->mMap;
+      const std::size_t terrainTypeBytes =
+        static_cast<std::size_t>(map->mTerrainType.width * map->mTerrainType.height);
+      reader.Read(reinterpret_cast<char*>(map->mTerrainType.data), terrainTypeBytes);
+    }
+
+    // Legacy album/normal strings discarded on pre-0x35 maps.
+    if (version < 0x35u) {
+      msvc8::string discardedAlbum;
+      msvc8::string discardedNormal;
+      reader.ReadString(&discardedAlbum);
+      reader.ReadString(&discardedNormal);
+    }
+
+    // Skydome: loaded directly from 0x3A onward, else derived from world bounds.
+    if (version >= 0x3Au) {
+      view->mSkyDome.Load(version, reader);
+    } else {
+      const Wm3::AxisAlignedBox3f bounds = GetWorldBounds();
+      const float centerX = (bounds.Max.x + bounds.Min.x) * 0.5f;
+      const float centerY = (bounds.Min.y + bounds.Max.y) * 0.5f;
+      const float centerZ = (bounds.Max.z + bounds.Min.z) * 0.5f;
+      const float halfX = bounds.Max.x - centerX;
+      const float halfY = bounds.Min.y - centerY;
+      const float domeRadius =
+        static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / std::cos(1.25663697719574));
+      const float sunElevation = view->mMap->mWaterEnabled ? view->mMap->mWaterElevation : bounds.Min.y;
+
+      const Wm3::Vector3f domeOrigin{centerX, centerY, centerZ};
+      view->mSkyDome.SetupHorizonAndCirrus(domeOrigin, sunElevation, domeRadius);
+    }
+
+    // Cartographic decals from 0x3B onward.
+    if (version >= 0x3Bu) {
+      view->mCartographic.ReadDecals(version, reader);
+    }
+
+    return true;
+  }
+
+  /**
+   * Address: 0x008A2DD0 (FUN_008A2DD0)
+   * Mangled: ?Finalize@CWldTerrainRes@Moho@@UAE_NXZ
+   *
+   * IDA signature:
+   * bool __thiscall Moho::CWldTerrainRes::Finalize(Moho::CWldTerrainRes *this@<ecx>);
+   *
+   * What it does:
+   * Second IWldTerrainRes virtual. Marks the resource not-ready, derives the
+   * half-resolution stratum-mask tile size from the heightfield, allocates the
+   * two dynamic stratum-mask sheets and the water-map sheet, copies the previous
+   * surfaces into the fresh sheets, then rebuilds the normal map and cycles
+   * edit-mode once so all runtime textures are primed. Returns the ready flag
+   * (mBool) it sets to 1 on success; each null-sheet allocation throws
+   * gpg::gal::Error (matching sub_940560 + _CxxThrowException).
+   */
+  bool IWldTerrainRes::Finalize()
+  {
+    auto* const runtimeView = AsTerrainRuntimeView(this);
+    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+
+    runtimeView->mBool = 0;
+
+    CBackgroundTaskControl loadControl{};
+
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+
+    const CHeightField* const field = runtimeView->mMap->mHeightField.get();
+    const std::int32_t maskTileX = (field->width - 1) >> 1;
+    const std::int32_t maskTileY = (field->height - 1) >> 1;
+
+    runtimeView->mStrata.v1 = static_cast<std::uint32_t>(maskTileX);
+    runtimeView->mStrata.v2 = static_cast<std::uint32_t>(maskTileY);
+
+    // Stratum mask 0: create a half-res dynamic sheet, blit the current mask
+    // surface into it, then adopt it as the live mask.
+    boost::shared_ptr<CD3DDynamicTextureSheet> newSheet;
+    resources->NewDynamicTextureSheet(newSheet, maskTileX, maskTileY, 2);
+    if (newSheet.get() == nullptr) {
+      throw gpg::gal::Error{};
+    }
+    D3D_GetDevice()->UpdateSurface(normalView->mStratumMask0.get(), newSheet.get(), nullptr, nullptr);
+    normalView->mStratumMask0 = newSheet;
+
+    // Stratum mask 1: same pattern, reusing the temporary sheet slot.
+    boost::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
+    resources->NewDynamicTextureSheet(spareSheet, maskTileX, maskTileY, 2);
+    newSheet = spareSheet;
+    spareSheet.reset();
+    if (newSheet.get() == nullptr) {
+      throw gpg::gal::Error{};
+    }
+    D3D_GetDevice()->UpdateSurface(normalView->mStratumMask1.get(), newSheet.get(), nullptr, nullptr);
+    normalView->mStratumMask1 = newSheet;
+    newSheet.reset();
+
+    // Water map: create a full-res (format 12) dynamic sheet, blit the current
+    // water surface into it, then adopt it.
+    resources->NewDynamicTextureSheet(spareSheet, maskTileX, maskTileY, 12);
+    if (spareSheet.get() == nullptr) {
+      throw gpg::gal::Error{};
+    }
+    D3D_GetDevice()->UpdateSurface(visualView->mWaterMapTexture.get(), spareSheet.get(), nullptr, nullptr);
+    visualView->mWaterMapTexture = spareSheet;
+    spareSheet.reset();
+
+    InitNormalMap(loadControl);
+    EnterEditMode(loadControl);
+    ExitEditMode();
+
+    runtimeView->mBool = 1;
+    return runtimeView->mBool != 0;
   }
 
   /**

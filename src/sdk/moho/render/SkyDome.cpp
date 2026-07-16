@@ -59,7 +59,7 @@ namespace
    * origin/shape lanes, and restores default tessellation lanes (`16x6`) plus
    * the default start-angle lane (`1.2566371f`).
    */
-  [[maybe_unused]] void InitializeSkyDomeShapeRuntime(
+  void InitializeSkyDomeShapeRuntime(
     moho::SkyDome* const skyDome,
     const Wm3::Vector3f& domeOrigin,
     const float domeHeight,
@@ -78,6 +78,52 @@ namespace
     skyDome->mWidth = 16;
     skyDome->mHeight = 6;
   }
+
+  /**
+   * Address: 0x008154A0 (FUN_008154A0)
+   *
+   * IDA signature:
+   * int __userpurge sub_8154A0(float *skyColor@<ebx>, SkyDome *this@<esi>,
+   *     float horizonSize, float *horizonColor);
+   *
+   * What it does:
+   * Clears the retained horizon-lookup texture handle, writes the incoming
+   * horizon size lane, and stores the horizon and sky colour vectors. The
+   * horizon-lookup path string is built/destroyed around this call by
+   * SetupHorizonAndCirrus but is not consumed here (threaded through as an
+   * ignored parameter so the caller keeps the original temporary lifetime).
+   */
+  void InitializeSkyDomeHorizonRuntime(
+    moho::SkyDome* const skyDome,
+    const Wm3::Vector3f& skyColor,
+    const float horizonSize,
+    const Wm3::Vector3f& horizonColor,
+    const msvc8::string& horizonLookupPath
+  ) noexcept
+  {
+    (void)horizonLookupPath;
+
+    skyDome->mHorizonLookupTex.reset();
+    skyDome->mHorizonSize = horizonSize;
+    skyDome->mHorizonColor = horizonColor;
+    skyDome->mSkyColor = skyColor;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Static cirrus runtime table (byte_F5AE00, 0x50 bytes / 20 float lanes)
+  // copied verbatim into SkyDome::mCirrusData by SetupHorizonAndCirrus.
+  // Extracted byte-for-byte from ForgedAlliance.exe .data @0xF5AE00.
+  // ---------------------------------------------------------------------------
+  constexpr std::array<float, 20> kSkyDomeCirrusRuntimeTable = {
+    0.00428f, 0.0030100001f, 0.55000001f, 0.53288001f,
+    -0.84618998f, 0.00191f, 0.00164f, 0.090000004f,
+    0.96638f, 0.25713f, 0.00119f, 0.0060000001f,
+    0.15000001f, 0.15816f, 0.98741001f, 0.0026400001f,
+    0.0011f, 0.30000001f, -0.59482002f, -0.80386001f,
+  };
+
+  static_assert(sizeof(kSkyDomeCirrusRuntimeTable) == 0x50,
+    "SkyDome cirrus runtime table must be 0x50 bytes");
 
   /**
    * Address: 0x0081A590 (FUN_0081A590)
@@ -188,6 +234,57 @@ namespace moho
     mCirrusColor_B = direction.z;
     mCirrusTex.reset();
     mCirrusTexPath.reset_and_assign(texturePath);
+  }
+
+  /**
+   * Address: 0x00815230 (FUN_00815230)
+   *
+   * IDA signature:
+   * void __thiscall SkyDome::SetupHorizonAndCirrus(SkyDome *this@<ecx>,
+   *     const Wm3::Vector3f *domeOrigin@<edx>, float waterElevation, float domeRadius);
+   *
+   * What it does:
+   * Reconfigures the dome shape (origin/elevation/radius) and default
+   * tessellation, restores the horizon colour/size and sky colour with a
+   * transient horizon-lookup path string, restores the fixed cirrus
+   * colour/texture context, and copies the static cirrus runtime table into the
+   * dome's cirrus-data lane. Invoked by CWldTerrainRes::Load/Reset after the
+   * terrain map bounds are known.
+   */
+  void SkyDome::SetupHorizonAndCirrus(
+    const Wm3::Vector3f& domeOrigin,
+    const float waterElevation,
+    const float domeRadius
+  )
+  {
+    // sub_8153C0: dome origin / elevation / radius + default 16x6 tessellation,
+    // drops the retained dome vertex buffer.
+    InitializeSkyDomeShapeRuntime(this, domeOrigin, waterElevation, domeRadius);
+
+    // Horizon + sky colour context. The horizon-lookup path is built here (heap
+    // side effect preserved) and released after the horizon lane is written; it
+    // is not consumed by the horizon setup itself.
+    {
+      const msvc8::string horizonLookupPath("/textures/environment/horizonLookup.dds");
+      InitializeSkyDomeHorizonRuntime(
+        this,
+        Wm3::Vector3f{0.25999999f, 0.46000001f, 0.58999997f},   // sky colour
+        domeRadius * 0.15360001f,                               // horizon size
+        Wm3::Vector3f{0.81000000f, 0.74000001f, 0.63999999f},   // horizon colour
+        horizonLookupPath);
+    }
+
+    // Cirrus context: fixed colour vector + cirrus texture path.
+    {
+      const msvc8::string cirrusTexturePath("/textures/environment/cirrus001_512.dds");
+      SetCirrusContext(
+        0.0f,                                                   // speed lane (ignored)
+        Wm3::Vector3f{1.39000000f, 0.75999999f, 0.49000001f},   // cirrus colour
+        cirrusTexturePath);
+    }
+
+    // qmemcpy(this+0x140, byte_F5AE00, 0x50): install the static cirrus table.
+    std::memcpy(mCirrusData, kSkyDomeCirrusRuntimeTable.data(), sizeof(mCirrusData));
   }
 
   /**

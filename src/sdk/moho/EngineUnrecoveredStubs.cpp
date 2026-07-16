@@ -50,7 +50,9 @@ namespace moho
   // InitializeSSTIUnitWeaponInfoVector (FUN_005C3850) — the real body in
   // moho/unit/core/Unit.cpp is now wrapped in `namespace moho { ... }`
   // matching the Unit.h:485 declaration, so the no-op stub here is gone.
-  class moho::IWldTerrainRes * WLD_CreateTerrainRes(void) { return nullptr; }
+  // WLD_CreateTerrainRes recovered in src/sdk/moho/sim/CWldMap.cpp
+  // (FUN_008A7B90): real `operator new(0xC38)` + IWldTerrainRes base ctor +
+  // CWldTerrainRes field construction. Replaces the no-op null-returning stub.
   // REN_CreateGameViewport now recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
   // (FUN_007FA230). Replaces the no-op stub.
   // moho::-namespace duplicates of the gpg::Save... stubs have been
