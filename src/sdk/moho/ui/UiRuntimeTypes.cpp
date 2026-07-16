@@ -21357,6 +21357,66 @@ bool moho::CMauiBitmap::HitTest(const float x, const float y)
 }
 
 /**
+ * Address: 0x00780850 (FUN_00780850, Moho::CMauiBitmap::Draw)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CMauiBitmap::Draw(CMauiBitmap* this, CD3DPrimBatcher* primBatcher);
+ *
+ * What it does:
+ * Renders the current animation frame's texture batch over the control bounds,
+ * as a tiled quad when tiling is enabled or a UV-clipped quad otherwise. No-op
+ * when no frames/textures are bound. Occupies the CMauiControl::DoRender vtable
+ * slot; drawMask is unused.
+ */
+void moho::CMauiBitmap::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+{
+  (void)drawMask;
+
+  CMauiBitmapRuntimeView* const view = CMauiBitmapRuntimeView::FromBitmap(this);
+  if (view->mFrames.empty() || view->mTextureBatches.empty()) {
+    return;
+  }
+
+  const std::int32_t frameIndex = view->mFrames[view->mCurrentFrame];
+  if (!view->mTextureBatches[frameIndex]) {
+    return;
+  }
+
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
+  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+
+  gpg::Rect2f destRect;
+  destRect.x0 = left;
+  destRect.z0 = top;
+  destRect.x1 = right;
+  destRect.z1 = bottom;
+
+  const boost::shared_ptr<CD3DBatchTexture> texture = view->mTextureBatches[frameIndex];
+  primBatcher->SetTexture(texture);
+
+  const std::uint32_t vertexColor = CMauiControlExtendedRuntimeView::FromControl(this)->mVertexAlpha;
+
+  if (view->mIsTiled) {
+    gpg::Rect2f tileRect;
+    tileRect.x0 = 0.0f;
+    tileRect.z0 = 0.0f;
+    tileRect.x1 = (right - left) / static_cast<float>(texture->mWidth);
+    tileRect.z1 = (bottom - top) / static_cast<float>(texture->mHeight);
+    DRAW_TiledQuad(primBatcher, destRect, tileRect, destRect, vertexColor);
+  } else {
+    gpg::Rect2f uvRect;
+    uvRect.x0 = view->mU0;
+    uvRect.z0 = view->mV0;
+    uvRect.x1 = view->mU1;
+    uvRect.z1 = view->mV1;
+    DRAW_ClippedQuad(primBatcher, destRect, uvRect, destRect, vertexColor);
+  }
+}
+
+/**
  * Address: 0x0077FCF0 (FUN_0077FCF0, Moho::CMauiBitmap::ShareTextures)
  *
  * What it does:
