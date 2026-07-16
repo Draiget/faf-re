@@ -3855,6 +3855,47 @@ namespace moho
   {
     return ResolveHelperBuildCount(reinterpret_cast<const UserCommandIssueHelperRuntimeView&>(helper));
   }
+
+  /**
+   * Address: 0x008C1220 (FUN_008C1220, sub_8C1220)
+   *
+   * IDA signature:
+   * void __thiscall sub_8C1220(UserUnit *unit, std::set<RUnitBlueprint const*> *out);
+   *
+   * What it does:
+   * Walks one unit's active command queue and collects the target unit
+   * blueprints referenced by every pending `Upgrade` command into `out`.
+   * Each queued upgrade helper's build blueprint is wrapped in a reflection
+   * reference, upcast to `RUnitBlueprint`, and inserted into the output set.
+   */
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, msvc8::set<const RUnitBlueprint*>& out)
+  {
+    UserCommandQueueLinkVectorView* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
+    if (queue == nullptr) {
+      return;
+    }
+
+    for (UserCommandQueueEntryView* entry = queue->begin; entry != queue->end; ++entry) {
+      UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+      if (helper == nullptr) {
+        continue;
+      }
+
+      if (ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_Upgrade) {
+        continue;
+      }
+
+      gpg::RRef entityRef{};
+      (void)gpg::RRef_REntityBlueprint(
+        &entityRef,
+        reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
+      );
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(entityRef, RUnitBlueprint::GetPointerType());
+      if (upcast.mObj != nullptr) {
+        out.insert(static_cast<const RUnitBlueprint*>(upcast.mObj));
+      }
+    }
+  }
 }
 
 namespace moho

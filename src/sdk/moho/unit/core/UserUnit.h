@@ -821,6 +821,16 @@ namespace moho
   [[nodiscard]] IUnit* GetIUnitBridge(UserUnit* self) noexcept;
 
   /**
+   * Address: 0x008C1220 (FUN_008C1220, sub_8C1220)
+   *
+   * What it does:
+   * Collects the target unit blueprints of every pending `Upgrade` command in
+   * `unit`'s active command queue into `out` (each queued upgrade helper's
+   * build blueprint upcast to `RUnitBlueprint`).
+   */
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, msvc8::set<const RUnitBlueprint*>& out);
+
+  /**
    * Address: 0x008C2010 (FUN_008C2010, cfunc_UserUnitCanAttackTarget)
    *
    * What it does:
