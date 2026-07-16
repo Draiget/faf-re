@@ -122,6 +122,12 @@ namespace moho
      */
     virtual TextureResourceHandle&
       LoadFromImpl(TextureResourceHandle& outTexture, const char* path, PrefetchDataHandle prefetchData);
+
+  private:
+    /** Reflected type of the produced resource (`RD3DTextureResource`). */
+    gpg::RType* mResourceType = nullptr; // +0x04
+    /** Reflected type of the prefetch payload (`gpg::MemBuffer<const char>`). */
+    gpg::RType* mPrefetchType = nullptr; // +0x08
   };
 
   /**
@@ -183,5 +189,5 @@ namespace moho
    */
   void unregister_TextureResourceFactorySecondary();
 
-  static_assert(sizeof(CD3DTextureResourceFactory) == 0x04, "CD3DTextureResourceFactory size must be 0x04");
+  static_assert(sizeof(CD3DTextureResourceFactory) == 0x0C, "CD3DTextureResourceFactory size must be 0x0C");
 } // namespace moho
