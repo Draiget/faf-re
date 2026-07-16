@@ -2685,6 +2685,21 @@ namespace moho
      * Releases any currently bound map-preview texture ownership.
      */
     void ClearTexture();
+
+    /**
+     * Address: 0x00850B10 (FUN_00850B10, Moho::CUIMapPreview::Draw)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CUIMapPreview::Draw(
+     *   CUIMapPreview* this, CD3DPrimBatcher* primBatcher, int drawMask);
+     *
+     * What it does:
+     * Renders the bound preview texture as an aspect-fit (letterbox/pillarbox)
+     * white-tinted textured quad centered inside the control bounds. No-op when
+     * no texture is bound. Occupies the CMauiControl::DoRender vtable slot;
+     * drawMask is unused.
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
 
   struct CMauiControlRuntimeView
