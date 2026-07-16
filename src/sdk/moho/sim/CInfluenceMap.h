@@ -40,6 +40,26 @@ namespace moho
   };
   static_assert(sizeof(EThreatType) == 0x04, "EThreatType size must be 0x04");
 
+  /**
+   * 16-byte threat-sample record filled by
+   * `CInfluenceMap::GetThreatsAroundPosition` (FUN_007171D0) and consumed by
+   * the `cfunc_CAiBrainGetThreatsAroundPositionL` Lua worker (FUN_00590C80).
+   *
+   * The binary builds each record on the stack as `{worldX, 0.0f, worldZ,
+   * threat}` and pushes it onto a `msvc8::vector<SPositionThreat>` (16-byte
+   * stride, `push_back` = FUN_00718A40). The `y` lane is written as `0.0f` and
+   * is unused by the worker, which reads only `x` (+0x00), `z` (+0x08), and
+   * `threat` (+0x0C).
+   */
+  struct SPositionThreat
+  {
+    float x;      // +0x00
+    float y;      // +0x04 (always 0.0f)
+    float z;      // +0x08
+    float threat; // +0x0C
+  };
+  static_assert(sizeof(SPositionThreat) == 0x10, "SPositionThreat size must be 0x10");
+
   struct SThreat
   {
     static gpg::RType* sType;
@@ -242,13 +262,21 @@ namespace moho
     ) const;
 
     /**
-     * Address: 0x007171D0 (FUN_007171D0, ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QAE?AVLuaObject@LuaPlus@@AAV42@ABV?$Vector3@M@Wm3@@HHW4EThreatType@2@H@Z)
+     * Address: 0x007171D0 (FUN_007171D0, ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QBE?AV?$vector@USPositionThreat@Moho@@V?$allocator@USPositionThreat@Moho@@@std@@@std@@ABV?$Vector3@M@Wm3@@HH_NW4EThreatType@2@H@Z)
      *
      * What it does:
-     * Emits positive-threat sample points around a center into a Lua table.
+     * Fills `out` with one `SPositionThreat` record per grid cell within `ring`
+     * whose per-type threat is strictly positive, then returns `&out`.
+     *
+     * NOTE: signature corrected from the mis-recovered `LuaObject*` form. The
+     * binary fills a `msvc8::vector<SPositionThreat>` (element built as
+     * `{worldX, 0.0f, worldZ, threat}`, pushed via FUN_00718A40); it does NOT
+     * build a Lua table. The only caller,
+     * `cfunc_CAiBrainGetThreatsAroundPositionL` (FUN_00590C80), builds the Lua
+     * table from that vector.
      */
-    LuaPlus::LuaObject* GetThreatsAroundPosition(
-      LuaPlus::LuaObject* outObj,
+    msvc8::vector<SPositionThreat>* GetThreatsAroundPosition(
+      msvc8::vector<SPositionThreat>& out,
       const Wm3::Vec3f& pos,
       int ring,
       bool restrictToPlayable,
