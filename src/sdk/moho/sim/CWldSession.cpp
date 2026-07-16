@@ -54,6 +54,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
+#include "moho/command/CommandIssueHelper.h"
 
 namespace
 {
@@ -9163,6 +9164,62 @@ namespace moho
       if (userUnit->CanAttackTarget(hoveredTarget, true)) {
         AppendUnitUnique(outUnits, userUnit);
       }
+    }
+  }
+
+  /**
+   * Address: 0x008B0C80 (FUN_008B0C80)
+   * Mangled: ?ISSUE_IncreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_IncreaseCommandCount(Moho::UserCommand* helper, int count);
+   *
+   * What it does:
+   * Re-issues one factory-build command `count` extra times. Early-outs unless the
+   * helper's resolved command type is `UNITCOMMAND_BuildFactory`. Reconstructs a
+   * `SSTICommandIssueData` carrying the helper's constant command index and target
+   * blueprint, decodes the helper's cached cursor-entity weak-set into live
+   * `UserUnit*` lanes with a tombstone-pruning tree walk, then calls `ISSUE_Command`
+   * once per requested count (the command payload is passed by value each call).
+   */
+  void ISSUE_IncreaseCommandCount(UserCommandIssueHelper* const helper, const int count)
+  {
+    // Gate: only factory-build commands are re-issued this way (asm 0x008B0CA2).
+    if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      return;
+    }
+
+    // Rebuild the issue payload from the helper's constant command descriptor: seed
+    // an empty payload, then stamp BuildFactory + the command index (+0x04) and the
+    // target blueprint pointer (+0x20) straight from the constant data.
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_None);
+    commandIssueData.mCommandType = EUnitCommandType::UNITCOMMAND_BuildFactory;
+    commandIssueData.mIndex = helper->mConstantData.cmd;
+    commandIssueData.mBlueprint = reinterpret_cast<RUnitBlueprint*>(helper->mConstantData.blueprint);
+
+    // Collect the helper's cached cursor entities as raw UserUnit* lanes (the
+    // increase path pushes every decoded entity unconditionally, no IsUserUnit
+    // filter). The set is rebuilt-if-dirty by the UserUnit-side bridge.
+    gpg::fastvector<UserUnit*> selectedUnits{};
+    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
+    if (cursorEntities->mSize > 0u) {
+      selectedUnits.reserve(cursorEntities->mSize);
+    }
+
+    SSelectionNodeUserEntity* node = nullptr;
+    cursorEntities->PruneTombstonesAndFindLive(&node, cursorEntities->mHead->mLeft);
+    while (node != cursorEntities->mHead) {
+      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt)) {
+        selectedUnits.push_back(reinterpret_cast<UserUnit*>(entity));
+      }
+      node = NextTreeNode(node);
+      cursorEntities->PruneTombstonesAndFindLive(&node, node);
+    }
+
+    // Issue the reconstructed factory-build command once per requested count;
+    // clearQueue is always false here (asm push ebx==0 at 0x008B0E12).
+    for (int remaining = count; remaining > 0; --remaining) {
+      ISSUE_Command(selectedUnits, commandIssueData, false);
     }
   }
 

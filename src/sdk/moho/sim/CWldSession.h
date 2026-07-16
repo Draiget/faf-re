@@ -28,6 +28,7 @@ namespace moho
 
   class UserArmy;
   class UserUnit;
+  struct UserCommandIssueHelper;
   enum EMauiEventModifier : std::uint32_t;
   class EntityCategoryLookupResolver;
   class LaunchInfoBase;
@@ -1330,6 +1331,22 @@ namespace moho
    * manager. Defined in Sim.cpp.
    */
   void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
+
+  /**
+   * Address: 0x008B0C80 (FUN_008B0C80)
+   * Mangled: ?ISSUE_IncreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_IncreaseCommandCount(Moho::UserCommand* helper, int count);
+   *
+   * What it does:
+   * Re-issues one factory-build command `count` extra times. Early-outs unless the
+   * helper's resolved command type is `UNITCOMMAND_BuildFactory`. Reconstructs a
+   * `SSTICommandIssueData` carrying the helper's constant command index and target
+   * blueprint, decodes the helper's cached cursor entities into a live
+   * `fastvector<UserUnit*>`, then calls `ISSUE_Command` once per requested count.
+   */
+  void ISSUE_IncreaseCommandCount(UserCommandIssueHelper* helper, int count);
 
   /**
    * Address: 0x008B05E0 (FUN_008B05E0,

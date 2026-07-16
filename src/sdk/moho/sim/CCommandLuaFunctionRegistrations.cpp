@@ -107,6 +107,10 @@ namespace
   constexpr const char* kCoordinateAttacksHelpText = "CoordinateAttacks";
   constexpr const char* kDecreaseBuildCountInQueueName = "DecreaseBuildCountInQueue";
   constexpr const char* kDecreaseBuildCountInQueueHelpText = "DecreaseBuildCountInQueue(queueIndex, count)";
+  constexpr const char* kIncreaseBuildCountInQueueName = "IncreaseBuildCountInQueue";
+  // Binary quirk: the Increase binder reuses the Decrease help string verbatim
+  // (asm 0x00836703 -> "DecreaseBuildCountInQueue(queueIndex, count)").
+  constexpr const char* kIncreaseBuildCountInQueueHelpText = "DecreaseBuildCountInQueue(queueIndex, count)";
   constexpr const char* kGetUnitCommandDataName = "GetUnitCommandData";
   constexpr const char* kGetUnitCommandDataHelpText =
     "orders, buildableCategories, GetUnitCommandData(unitSet) -- given a set of units, gets the union of orders and "
@@ -1209,6 +1213,7 @@ namespace moho
    */
   int cfunc_IssueTransportUnloadSpecificL(LuaPlus::LuaState* state);
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* state);
+  int cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* state);
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState* state);
   int cfunc_IssueDockCommandL(LuaPlus::LuaState* state);
   int cfunc_IssueCommandL(LuaPlus::LuaState* state);
@@ -1711,6 +1716,26 @@ namespace moho
       nullptr,
       "<global>",
       kDecreaseBuildCountInQueueHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x008366E0 (FUN_008366E0, func_IncreaseBuildCountInQueue_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder `IncreaseBuildCountInQueue`. The published help
+   * string reuses the Decrease text verbatim, matching the binary.
+   */
+  CScrLuaInitForm* func_IncreaseBuildCountInQueue_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kIncreaseBuildCountInQueueName,
+      &moho::cfunc_IncreaseBuildCountInQueue,
+      nullptr,
+      "<global>",
+      kIncreaseBuildCountInQueueHelpText
     );
     return &binder;
   }
@@ -2476,6 +2501,18 @@ namespace moho
   int cfunc_DecreaseBuildCountInQueue(lua_State* const luaContext)
   {
     return cfunc_DecreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x008366C0 (FUN_008366C0, cfunc_IncreaseBuildCountInQueue)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IncreaseBuildCountInQueueL`.
+   */
+  int cfunc_IncreaseBuildCountInQueue(lua_State* const luaContext)
+  {
+    return cfunc_IncreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

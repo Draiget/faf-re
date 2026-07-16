@@ -694,6 +694,15 @@ namespace moho
   [[nodiscard]] EUnitCommandType
     ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept;
 
+  struct SSelectionSetUserEntity;
+
+  // Exposes the file-local func_GetEntitiesUnderCursor (FUN_008B43F0) to the
+  // recovered `ISSUE_IncreaseCommandCount` keystone in CWldSession.cpp: rebuilds
+  // (when dirty) and returns the helper's cached cursor-entity weak-set as the
+  // shared selection-set type both TUs iterate (identical head/size tree layout).
+  [[nodiscard]] SSelectionSetUserEntity*
+    ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept;
+
   /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
    *

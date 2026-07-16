@@ -21340,6 +21340,74 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x00836740 (FUN_00836740, cfunc_IncreaseBuildCountInQueueL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_IncreaseBuildCountInQueueL@<eax>(LuaPlus::LuaState *a1@<eax>);
+ *
+ * What it does:
+ * Lua worker for `IncreaseBuildCountInQueue(queueIndex, count)`. Reads the 1-based
+ * factory build-queue item index and a count, then walks that item's queued
+ * command ids from the most recently queued command backward. Re-issues the first
+ * live factory-build command found (helper present, resolved type == BuildFactory,
+ * count > 0) via `ISSUE_IncreaseCommandCount(helper, count)` and stops.
+ */
+int moho::cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
+{
+  // Binary reuses the Decrease help string verbatim here (copy-paste in the
+  // original 2007 source: luadef_IncreaseBuildCountInQueue.mHelp -> the Decrease
+  // text, proven by the string xref at FUN_008366E0).
+  constexpr const char* kIncreaseBuildCountInQueueHelpText = "DecreaseBuildCountInQueue(queueIndex, count)";
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIncreaseBuildCountInQueueHelpText, 2, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, "No active session!");
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject queueIndexArg(state, 1);
+  if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&queueIndexArg, "integer");
+  }
+  const int oneBasedQueueIndex = static_cast<int>(static_cast<std::int64_t>(lua_tonumber(state->m_state, 1)));
+
+  LuaPlus::LuaStackObject countArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&countArg, "integer");
+  }
+  const int count = static_cast<int>(lua_tonumber(state->m_state, 2));
+
+  const CmdId* commandBegin = nullptr;
+  const CmdId* commandEnd = nullptr;
+  CurrentBuildQueueItemCommands(oneBasedQueueIndex, &commandBegin, &commandEnd);
+
+  // Walk the item's queued command ids from the last-queued command backward,
+  // re-issuing the first live factory-build command found and stopping.
+  for (const CmdId* cursor = commandEnd; cursor != commandBegin; --cursor) {
+    const CmdId commandId = *(cursor - 1);
+
+    CommandIssueHelperRuntimeView* const helper = FindCommandIssueHelper(session, commandId);
+    if (helper == nullptr) {
+      continue;
+    }
+
+    if (ResolveCommandIssueHelperCommandType(reinterpret_cast<const UserCommandIssueHelper&>(*helper))
+          == EUnitCommandType::UNITCOMMAND_BuildFactory
+        && count > 0) {
+      ISSUE_IncreaseCommandCount(reinterpret_cast<UserCommandIssueHelper*>(helper), count);
+      break;
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Address: 0x008440A0 (FUN_008440A0, cfunc_GetSpecialFiles)
  *
  * What it does:
