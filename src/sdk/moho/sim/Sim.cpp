@@ -1044,6 +1044,10 @@ namespace
   constexpr const char* kSelectedUnitHelpText =
     "unit = SelectedUnit() -- Returns the currently selected unit. For use at the lua console, so you can call Lua methods on a unit.";
   constexpr const char* kSimConExecuteHelpText = "SimConExecute('command string') -- Perform a console command";
+  constexpr const char* kFlattenMapRectName = "FlattenMapRect";
+  constexpr const char* kFlattenMapRectHelpText = "FlattenRect(x, z, sizex, sizez, elevation)";
+  constexpr const char* kFlattenMapRectOutsideBoundaryWarning =
+    "Attempted to flatten terrain outside map boundary! Operation Failed!";
   constexpr const char* kParseEntityCategorySimHelpText = "parse a string to generate a new entity category";
   constexpr const char* kFlushIntelInRectHelpText = "FlushIntelInRect( minX, minZ, maxX, maxZ )";
   constexpr const char* kEntityCategoryCountAroundPositionHelpText =
@@ -15269,6 +15273,90 @@ int moho::cfunc_SimConExecuteL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x00759190 (FUN_00759190, cfunc_FlattenMapRect)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_FlattenMapRectL`.
+ */
+int moho::cfunc_FlattenMapRect(lua_State* const luaContext)
+{
+  return cfunc_FlattenMapRectL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007591B0 (FUN_007591B0, func_FlattenMapRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the sim-lane global Lua binder for `FlattenMapRect`.
+ */
+moho::CScrLuaInitForm* moho::func_FlattenMapRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kFlattenMapRectName,
+    &moho::cfunc_FlattenMapRect,
+    nullptr,
+    "<global>",
+    kFlattenMapRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759210 (FUN_00759210, cfunc_FlattenMapRectL)
+ *
+ * What it does:
+ * Reads `(x, z, sizex, sizez, elevation)` as `(x0, z0, x0+sizex, z0+sizez)`
+ * plus a float elevation, then flattens that world rect on the global sim.
+ */
+int moho::cfunc_FlattenMapRectL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 5) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kFlattenMapRectHelpText, 5, argumentCount);
+  }
+
+  gpg::Rect2i rect{};
+
+  LuaPlus::LuaStackObject arg1(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    arg1.TypeError("integer");
+  }
+  const int originX = static_cast<int>(lua_tonumber(rawState, 1));
+  rect.x0 = originX;
+
+  LuaPlus::LuaStackObject arg2(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    arg2.TypeError("integer");
+  }
+  const int originZ = static_cast<int>(lua_tonumber(rawState, 2));
+  rect.z0 = originZ;
+
+  LuaPlus::LuaStackObject arg3(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    arg3.TypeError("integer");
+  }
+  rect.x1 = originX + static_cast<int>(lua_tonumber(rawState, 3));
+
+  LuaPlus::LuaStackObject arg4(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    arg4.TypeError("integer");
+  }
+  rect.z1 = originZ + static_cast<int>(lua_tonumber(rawState, 4));
+
+  LuaPlus::LuaStackObject arg5(state, 5);
+  if (lua_type(rawState, 5) != LUA_TNUMBER) {
+    arg5.TypeError("number");
+  }
+  const float elevation = static_cast<float>(lua_tonumber(rawState, 5));
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  sim->FlattenMapRect(rect, elevation);
+  return 0;
+}
+
+/**
  * Address: 0x00759810 (FUN_00759810, cfunc_ParseEntityCategorySim)
  *
  * What it does:
@@ -25885,6 +25973,88 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
 Sim* moho::SIM_FromLuaState(LuaPlus::LuaState* const state)
 {
   return ResolveGlobalSim(state->m_state);
+}
+
+/**
+ * Address: 0x0074B120 (FUN_0074B120, ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z)
+ * Mangled: ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::Sim::FlattenMapRect(Moho::Sim *this, const gpg::Rect2i &rect, float elevation);
+ *
+ * What it does:
+ * Clamps the requested rect to the heightfield, stamps `elevation` into every
+ * covered cell, records the flattened rect into both map-rect accumulation
+ * lists, then re-seats each live land/seabed unit overlapping the flattened
+ * area onto the new terrain.
+ */
+void Sim::FlattenMapRect(const gpg::Rect2i& rect, const float elevation)
+{
+  CHeightField* const heightField = mMapData->mHeightField.get();
+
+  // Clamp the requested rect (expanded by one on the far edges) to the map's
+  // valid cell range: [x0, min(width-1, x1+1)] x [z0, min(height-1, z1+1)].
+  gpg::Rect2i clampedRect{};
+  clampedRect.x0 = rect.x0;
+  clampedRect.z0 = rect.z0;
+  clampedRect.x1 = std::min(heightField->width - 1, rect.x1 + 1);
+  clampedRect.z1 = std::min(heightField->height - 1, rect.z1 + 1);
+
+  if (rect.x0 >= clampedRect.x1 || rect.z0 >= clampedRect.z1) {
+    gpg::Warnf(kFlattenMapRectOutsideBoundaryWarning);
+    return;
+  }
+
+  heightField->SetElevationRect(clampedRect, &elevation);
+
+  // Record the flattened rect (near edges pulled back by one, far edges kept
+  // clamped) into the cached and loaded map-rect lists.
+  const int loX = std::max(0, rect.x0 - 1);
+  const int loZ = std::max(0, rect.z0 - 1);
+  const gpg::Rect2i flattenedRect{loX, loZ, clampedRect.x1, clampedRect.z1};
+  mCachedMapRects.push_back(flattenedRect);
+  mLoadedMapRects.push_back(flattenedRect);
+
+  // Build the world-space query box covering the flattened area. Center is the
+  // rect midpoint; extents span the full clamped rect (Y half-extent 100).
+  Wm3::Vector3f boxCenter{};
+  boxCenter.x = static_cast<float>(loX + clampedRect.x1) * 0.5f;
+  boxCenter.y = 0.0f;
+  boxCenter.z = static_cast<float>(loZ + clampedRect.z1) * 0.5f;
+
+  Wm3::Vector3f boxExtents{};
+  boxExtents.x = static_cast<float>(clampedRect.x1 - loX);
+  boxExtents.y = 100.0f;
+  boxExtents.z = static_cast<float>(clampedRect.z1 - loZ);
+
+  const VAxes3 boxAxes{Wm3::Quaternionf(0.0f, 0.0f, 0.0f, 0.0f)};
+  const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
+
+  CollisionResultFastVectorN10 hits{};
+  mOGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
+
+  for (const CollisionResult& hit : hits) {
+    Unit* const unit = hit.sourceEntity->IsUnit();
+    if (unit == nullptr) {
+      continue;
+    }
+    if (unit->IsDead() || unit->DestroyQueued()) {
+      continue;
+    }
+    if (unit->mCurrentLayer != LAYER_Land && unit->mCurrentLayer != LAYER_Seabed) {
+      continue;
+    }
+
+    CUnitMotion* const motion = unit->UnitMotion;
+    if (motion != nullptr) {
+      // Defer the re-seat to the motion controller's next surface-collision pass.
+      motion->mProcessSurfaceCollision = true;
+      continue;
+    }
+
+    // No motion controller: warp the unit onto the freshly-flattened terrain now.
+    unit->Warp(unit->GetTransform());
+  }
 }
 
 /**
