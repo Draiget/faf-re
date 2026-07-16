@@ -458,6 +458,65 @@ namespace
   }
 
   /**
+   * Typed overlay onto the entity's replicated variable-data block, which the
+   * engine flattened into `Entity` starting at +0x78 (the shared_ptr / mesh /
+   * health / transform lanes at Entity +0x78.. mirror `SSTIEntityVariableData`
+   * field-for-field). `Entity::SyncInterface` (FUN_0067A290) reads/writes this
+   * block: `lea eax, [edi+78h]` (0x0067A3AD) hands the payload to
+   * `SSTIEntityVariableData::operator=`, and the attachment lanes it mutates sit
+   * at +0x64 (`mAttachmentParentRef`) and +0x68 (`mAuxValueVector`).
+   */
+  [[nodiscard]] moho::SSTIEntityVariableData& EntityVariableData(moho::Entity& entity) noexcept
+  {
+    return *reinterpret_cast<moho::SSTIEntityVariableData*>(reinterpret_cast<std::uint8_t*>(&entity) + 0x78);
+  }
+
+  /**
+   * Address: 0x00558EC0 (FUN_00558EC0, sub_558EC0) + 0x00559190 grow lane
+   *
+   * What it does:
+   * Resizes `vector` to exactly `count` `std::uint32_t` slots, filling any newly
+   * created tail slots with `fillValue`. Shrinks in place by moving `mEnd`
+   * (matches the `v6 != a3->end` early-out at 0x00558EC0); grows in place when
+   * spare capacity is sufficient, otherwise reallocates a fresh block via the
+   * grow lane (`sub_559190`) and installs it. The vector is the engine's
+   * `SSTIInlineUIntVector` small-buffer container, so this is typed field access
+   * on its named `mBegin`/`mEnd`/`mCapacityEnd` lanes, not raw offset math.
+   */
+  void ResizeAndFillAuxValueVector(
+    moho::SSTIInlineUIntVector& vector,
+    const std::size_t count,
+    const std::uint32_t fillValue)
+  {
+    const std::size_t current = vector.Size();
+    if (count <= current) {
+      vector.mEnd = vector.mBegin + count;
+      return;
+    }
+
+    if (count > vector.Capacity()) {
+      auto* const newStorage = new std::uint32_t[count];
+      if (vector.mBegin == vector.mInlineBegin) {
+        vector.mInlineStorage0 =
+          static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(vector.mCapacityEnd));
+      } else {
+        delete[] vector.mBegin;
+      }
+      if (current != 0u) {
+        std::memcpy(newStorage, vector.mBegin, current * sizeof(std::uint32_t));
+      }
+      vector.mBegin = newStorage;
+      vector.mCapacityEnd = newStorage + count;
+    }
+
+    std::uint32_t* const newEnd = vector.mBegin + count;
+    for (std::uint32_t* slot = vector.mBegin + current; slot != newEnd; ++slot) {
+      *slot = fillValue;
+    }
+    vector.mEnd = newEnd;
+  }
+
+  /**
    * Address: 0x00777690 (FUN_00777690, Moho::Entity::AddScroller)
    *
    * What it does:
@@ -3741,11 +3800,43 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067A290
+   * Address: 0x0067A290 (FUN_0067A290, ?SyncInterface@Entity@Moho@@MAEXPAUSSyncData@2@@Z)
+   *
+   * IDA signature:
+   * Moho::SSTIEntityVariableData* __thiscall
+   * Moho::Entity::SyncInterface(Moho::Entity* this, Moho::SSyncData* arg0);
+   *
+   * What it does:
+   * Snapshots this entity's replicated attachment state into its variable-data
+   * block, then queues a `{ id_, mVarDat }` record onto the sync packet's
+   * entity-update lane (`SSyncData::mEntityUpdates`, +0x148).
+   *   1. Resolves the weak attach parent; writes its id into
+   *      `mVarDat.mAttachmentParentRef` (+0x64), or the 0xF0000000 sentinel when
+   *      detached / tombstoned.
+   *   2. Resizes `mVarDat.mAuxValueVector` (+0x68) to `mAttachedEntities.size()`,
+   *      filling each slot with the child entity id (or 0xF0000000 for a null
+   *      child).
+   *   3. Pushes a default entity-update record and copies `id_` + `mVarDat` into
+   *      it via `QueueEntityVariableUpdate`.
+   * The IDA return of the stored `SSTIEntityVariableData*` is discarded at every
+   * call site, so the override keeps its `void` signature.
    */
-  void Entity::SyncInterface(SSyncData*)
+  void Entity::SyncInterface(SSyncData* const syncData)
   {
-    // 0x0067A290 serializes interface visibility channels into sync payload.
+    constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
+
+    SSTIEntityVariableData& varData = EntityVariableData(*this);
+
+    Entity* const parent = mAttachInfo.GetAttachTargetEntity();
+    varData.mAttachmentParentRef = parent ? parent->id_ : kInvalidEntityId;
+
+    ResizeAndFillAuxValueVector(varData.mAuxValueVector, mAttachedEntities.size(), kInvalidEntityId);
+    for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
+      Entity* const child = mAttachedEntities[i];
+      varData.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
+    }
+
+    (void)QueueEntityVariableUpdate(syncData, id_, varData);
   }
 
   /**

@@ -10,6 +10,7 @@
 #include <boost/ptr_container/exception.hpp>
 #include "moho/app/WxAppRuntime.h"
 #include "moho/audio/SAudioRequest.h"
+#include "moho/entity/EntityId.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -727,7 +728,9 @@ SSyncData::SSyncData()
   : mCurBeat(0)
   , pad_0004_0138{}
   , mNewUnits()
-  , pad_0144_0168{}
+  , pad_0144_0148{}
+  , mEntityUpdates()
+  , pad_0154_0168{}
   , mDeleteIds()
   , mEraseIds()
   , mPublishedCommandDescriptors()
@@ -823,6 +826,39 @@ SCreateUnitParams* moho::QueueCreateUnitParams(SSyncData* const syncData, const 
   }
 
   return &syncData->mNewUnits.back();
+}
+
+/**
+ * Address: 0x0067A290 tail (inlined push lane of Moho::Entity::SyncInterface)
+ *
+ * What it does:
+ * Appends one default `SEntityVariableUpdateEntry` to `syncData->mEntityUpdates`
+ * (header word 0xF0000000 + default-constructed `SSTIEntityVariableData`), then
+ * writes the entity id and assignment-copies the supplied variable payload into
+ * the stored record. Returns the inserted element pointer. This matches the
+ * binary's push-default (0x0067A384) then write-id + `operator=`
+ * (0x0067A3B3..0x0067A3B5) sequence.
+ */
+SEntityVariableUpdateEntry* moho::QueueEntityVariableUpdate(
+  SSyncData* const syncData,
+  const EntId entityId,
+  const SSTIEntityVariableData& variableData)
+{
+  if (!syncData) {
+    return nullptr;
+  }
+
+  SEntityVariableUpdateEntry defaultEntry{};
+  defaultEntry.mEntityId = ToRaw(EEntityIdSentinel::Invalid);
+  syncData->mEntityUpdates.push_back(defaultEntry);
+  if (syncData->mEntityUpdates.empty()) {
+    return nullptr;
+  }
+
+  SEntityVariableUpdateEntry& stored = syncData->mEntityUpdates.back();
+  stored.mEntityId = entityId;
+  stored.mVariableData = variableData;
+  return &stored;
 }
 
 /**
