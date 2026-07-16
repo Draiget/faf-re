@@ -3831,38 +3831,312 @@ namespace
 		return getobjname(static_cast<int>(instruction >> 24u), callerFrame, nameOut);
 	}
 
+	// ---- Lua 5.0 (LuaPlus 1081) bytecode instruction layout + opcode modes ----
+	//
+	// Field positions for the packed 32-bit Instruction word and the operand
+	// range limits used by the symbolic executor below. Values match the
+	// LuaPlus 1081 VM this build links.
+	constexpr int kLuaMaxStack = 250;                 // MAXSTACK
+	constexpr int kLuaNoReg = 255;                    // NO_REG (== MAXARG_A)
+	constexpr unsigned kLuaMaxArgB = 0x1FFu;          // MAXARG_B / MAXARG_C
+	constexpr unsigned kLuaMaxArgBx = 0x3FFFFu;       // MAXARG_Bx
+	constexpr int kLuaMaxArgSBx = 0x1FFFF;            // MAXARG_sBx bias
+	constexpr unsigned kLuaFieldsPerFlushM1 = 0x1Fu;  // LFIELDS_PER_FLUSH - 1
+	constexpr unsigned kLuaOpJmp = 0x18u;             // OP_JMP opcode (24)
+	constexpr unsigned kLuaOpReturn = 0x1Fu;          // OP_RETURN opcode (31)
+
+	// Bits of a `luaP_opmodes` entry: (T<<7)|(A<<6)|(B<<4)|(C<<2)|opmode.
+	enum LuaOpModeBits : unsigned char {
+		kLuaOpModeMask = 0x03,   // low 2 bits: iABC=0 / iABx=1 / iAsBx=2
+		kLuaOpModeBreg = 0x04,   // B is a register
+		kLuaOpModeBrk  = 0x08,   // B is register-or-constant (RK)
+		kLuaOpModeCrk  = 0x10,   // C is register-or-constant (RK)
+		kLuaOpModeSetA = 0x20,   // instruction assigns register A
+		kLuaOpModeK    = 0x40,   // Bx is a constant index
+	};
+	enum LuaOpMode : unsigned char { kLuaIABC = 0, kLuaIABx = 1, kLuaIAsBx = 2 };
+
+	// luaP_opmodes[op] for LuaPlus 1081 — byte-verified from ForgedAlliance.exe
+	// .rdata at VA 0x00D466F4. Do NOT edit; matches the shipped binary exactly.
+	constexpr unsigned char kLuaOpModes[39] = {
+		0x24, 0x61, 0x20, 0x24, 0x20, 0x61, 0x34, 0x41, 0x00, 0x18,
+		0x20, 0x34, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38,
+		0x38, 0x24, 0x24, 0x34, 0x02, 0x98, 0x98, 0x98, 0xA4, 0x00,
+		0x00, 0x00, 0x02, 0x80, 0x02, 0x01, 0x01, 0x00, 0x21,
+	};
+
 	/**
-	 * Address: 0x00912CD0 (ldebug.c::getobjname, file-local in original Lua)
+	 * Address: 0x00912940 (FUN_00912940, luaG_symbexec)
+	 *
+	 * IDA signature:
+	 * Instruction __usercall luaG_symbexec@<eax>(const Proto *pt, int lastpc, int reg);
 	 *
 	 * What it does:
-	 * Resolves a human-readable name for a stack-slot value to enrich runtime
-	 * error messages. Tries to find a local variable name from `Proto::locvars`
-	 * via `luaF_getlocalname` for the active program counter; if nothing
-	 * matches, returns nullptr (the original walks bytecode with `luaG_symbexec`
-	 * to recognize globals, fields, and self-calls — that path is not yet
-	 * recovered, so error messages drop to "value" instead of "global `foo`").
+	 * Symbolically executes proto bytecode from pc 0 up to `lastpc`, validating
+	 * every instruction's operands against the register window, constant table,
+	 * upvalue count and nested-proto lanes, and returns the last instruction that
+	 * assigned register `reg` (or 0 when `reg` is never written or the bytecode is
+	 * malformed). File-local in the original ldebug.c; used by `getobjname` (name
+	 * resolution) and `luaG_checkcode` (load-time verification).
+	 *
+	 * The exact early-return lattice and forward-jump tracking are preserved 1:1
+	 * from the binary; a fully structured rewrite would obscure that lattice.
 	 */
-	extern "C" const char* getobjname(const int stackPos, CallInfo* const callInfo, const char** const nameOut)
+	Instruction luaG_symbexec(const Proto* const pt, const int lastpc, const int reg)
+	{
+		int last = pt->sizecode - 1;
+		if (pt->maxstacksize > static_cast<unsigned char>(kLuaMaxStack)) {
+			return 0;
+		}
+		if (pt->sizelineinfo != pt->sizecode && pt->sizelineinfo != 0) {
+			return 0;
+		}
+
+		const Instruction* const code = pt->code;
+		if ((code[pt->sizecode - 1] & 0x3Fu) != kLuaOpReturn) {
+			return 0;
+		}
+		if (lastpc <= 0) {
+			return code[last];
+		}
+
+		const int maxstack = pt->maxstacksize;
+		int pc = 0;
+		for (;;) {
+			const Instruction instr = code[pc];
+			const int op = static_cast<int>(instr & 0x3Fu);
+			const int a = static_cast<int>((instr >> 24) & 0xFFu);
+			int b = 0;
+			int c = 0;
+			if (a >= maxstack) {
+				return 0;
+			}
+
+			const signed char mode = static_cast<signed char>(kLuaOpModes[op]);
+			const int opmode = mode & kLuaOpModeMask;
+			if (opmode == kLuaIABx) {
+				b = static_cast<int>((instr >> 6) & kLuaMaxArgBx);
+				if ((mode & kLuaOpModeK) != 0 && !(b < pt->sizek)) {
+					return 0;
+				}
+			} else if (opmode == kLuaIAsBx) {
+				b = static_cast<int>((instr >> 6) & kLuaMaxArgBx) - kLuaMaxArgSBx;
+			} else {  // iABC: decode + validate B/C operands
+				b = static_cast<int>((instr >> 15) & kLuaMaxArgB);
+				c = static_cast<int>((instr >> 6) & kLuaMaxArgB);
+				if ((mode & kLuaOpModeBreg) != 0) {
+					if (b >= maxstack) {
+						return 0;
+					}
+				} else if ((mode & kLuaOpModeBrk) != 0 && !checkRK(b, pt)) {
+					return 0;
+				}
+				if ((mode & kLuaOpModeCrk) != 0 && c >= maxstack) {
+					if (c < kLuaMaxStack) {
+						return 0;
+					}
+					if (!((c - kLuaMaxStack) < pt->sizek)) {
+						return 0;
+					}
+				}
+			}
+
+			if ((mode & kLuaOpModeSetA) != 0 && a == reg) {
+				last = pc;
+			}
+
+			// A test operator must be immediately followed by an OP_JMP; any
+			// other operator (mode >= 0, i.e. test bit clear) runs unconditionally.
+			if (mode >= 0 ||
+				(pc + 2 < pt->sizecode && (code[pc + 1] & 0x3Fu) == kLuaOpJmp)) {
+				switch (op) {
+				case 2:  // OP_LOADBOOL: skip-next requires a following instruction
+					if (c != 0 && pc + 2 >= pt->sizecode) {
+						return 0;
+					}
+					break;
+				case 3:  // OP_LOADNIL: clears R(a..b)
+					if (a <= reg && reg <= b) {
+						last = pc;
+					}
+					break;
+				case 4:  // OP_GETUPVAL
+				case 8:  // OP_SETUPVAL
+					if (b >= pt->nups) {
+						return 0;
+					}
+					break;
+				case 5:  // OP_GETGLOBAL
+				case 7:  // OP_SETGLOBAL: Bx must name a string constant
+					if (pt->k[b].tt != LUA_TSTRING) {
+						return 0;
+					}
+					break;
+				case 11:  // OP_SELF: writes R(a) and R(a+1)
+					if (a + 1 >= maxstack) {
+						return 0;
+					}
+					if (reg == a + 1) {
+						last = pc;
+					}
+					break;
+				case 23:  // OP_CONCAT: R(b..c)
+					if (c >= kLuaMaxStack || b >= c) {
+						return 0;
+					}
+					break;
+				case 29:  // OP_CALL
+				case 30:  // OP_TAILCALL
+					if (b != 0 && b + a - 1 >= maxstack) {
+						return 0;
+					}
+					if (--c == -1) {
+						if (!checkopenop(pt, pc)) {
+							return 0;
+						}
+					} else if (c != 0 && a + c - 1 >= maxstack) {
+						return 0;
+					}
+					if (reg >= a) {
+						last = pc;
+					}
+					break;
+				case 31:  // OP_RETURN
+					if (--b > 0 && b + a - 1 >= maxstack) {
+						return 0;
+					}
+					break;
+				case 35:  // OP_SETLIST
+					if (static_cast<int>(b & kLuaFieldsPerFlushM1) + a + 1 >= maxstack) {
+						return 0;
+					}
+					break;
+				case 38:  // OP_CLOSURE: preceding MOVE/GETUPVAL pseudo-ops per upvalue
+					if (b >= pt->sizep) {
+						return 0;
+					}
+					{
+						int upvalues = pt->p[b]->nups;
+						if (upvalues + pc >= pt->sizecode) {
+							return 0;
+						}
+						if (upvalues != 0) {
+							const Instruction* pseudo = &code[upvalues + pc];
+							for (;;) {
+								const int pseudoOp = static_cast<int>(*pseudo & 0x3Fu);
+								if (pseudoOp != 4 && pseudoOp != 0) {  // GETUPVAL / MOVE only
+									return 0;
+								}
+								--upvalues;
+								--pseudo;
+								if (upvalues <= 0) {
+									break;
+								}
+							}
+						}
+					}
+					break;
+				case 33:  // OP_TFORLOOP: writes control + loop vars, then falls to jump
+					if (a + c + 5 >= maxstack) {
+						return 0;
+					}
+					if (reg >= a) {
+						last = pc;
+					}
+					[[fallthrough]];
+				case 32:  // OP_FORLOOP: writes R(a+2), then falls to jump
+					if (a + 2 >= maxstack) {
+						return 0;
+					}
+					[[fallthrough]];
+				case 24: {  // OP_JMP: validate/optionally follow the forward jump
+					const int dest = b + pc + 1;
+					if (dest < 0 || dest >= pt->sizecode) {
+						return 0;
+					}
+					if (reg != kLuaNoReg && pc < dest && dest <= lastpc) {
+						pc += b;
+					}
+					break;
+				}
+				default:
+					break;
+				}
+			} else {
+				return 0;
+			}
+
+			if (++pc >= lastpc) {
+				return code[last];
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00912D50 (FUN_00912D50, getobjname)
+	 *
+	 * IDA signature:
+	 * const char* __usercall getobjname@<eax>(Instruction stackpos@<eax>, CallInfo *ci, const char **name);
+	 *
+	 * What it does:
+	 * Resolves a human-readable name (and its kind: "local"/"upval"/"global"/
+	 * "field"/"method") for the value in register `stackPos`, to enrich runtime
+	 * error messages. First tries an active local name via `luaF_getlocalname`
+	 * (skipping compiler-internal "(...)" names); otherwise symbolically executes
+	 * the proto bytecode (`luaG_symbexec`) up to the current pc to find the
+	 * producing opcode, following OP_MOVE chains to their source register.
+	 */
+	extern "C" const char* getobjname(int stackPos, CallInfo* const callInfo, const char** const nameOut)
 	{
 		constexpr int kCiSavedPc = 3;
 		if (callInfo->state >= kCiSavedPc) {
 			return nullptr;
 		}
 
-		const auto* const closure = static_cast<const Closure*>(callInfo->base[-1].value.p);
-		const Proto* const proto = closure->l.p;
-		const int instructionIndex = static_cast<int>(callInfo->savedpc - proto->code);
-		if (instructionIndex < 0) {
-			return nullptr;
-		}
+		for (;;) {
+			const auto* const closure = static_cast<const Closure*>(callInfo->base[-1].value.p);
+			const Proto* const proto = closure->l.p;
+			const int instructionIndex = static_cast<int>(callInfo->savedpc - proto->code);
 
-		if (const char* const localName = luaF_getlocalname(proto, stackPos + 1, instructionIndex);
-			localName != nullptr) {
+			// Prefer an active local-variable name. Compiler-internal locals begin
+			// with '(' (e.g. "(for index)") and are skipped, matching the original.
+			const char* const localName = luaF_getlocalname(proto, stackPos + 1, instructionIndex);
 			*nameOut = localName;
-			return "local";
-		}
+			if (localName != nullptr && *localName != '(') {
+				return "local";
+			}
 
-		return nullptr;
+			// Otherwise symbolically execute up to this pc to find the instruction
+			// that produced the value in register `stackPos`, and name it from that
+			// opcode (global/field/method/upvalue) or follow a MOVE chain.
+			const Instruction producer = luaG_symbexec(proto, instructionIndex, stackPos);
+			switch (producer & 0x3Fu) {
+			case 0:  // OP_MOVE: trace back to the source register, then re-resolve
+				if (static_cast<int>((producer >> 15) & 0x1FFu) >=
+					static_cast<int>((producer >> 24) & 0xFFu)) {
+					return nullptr;
+				}
+				stackPos = static_cast<int>((producer >> 15) & 0x1FFu);
+				if (callInfo->state >= kCiSavedPc) {
+					return nullptr;
+				}
+				continue;
+			case 4:  // OP_GETUPVAL
+				*nameOut = proto->upvalues[(producer >> 15) & 0x1FFu]->str;
+				return "upval";
+			case 5:  // OP_GETGLOBAL
+				*nameOut = static_cast<const TString*>(proto->k[(producer >> 6) & 0x3FFFFu].value.p)->str;
+				return "global";
+			case 6:  // OP_GETTABLE with a constant key
+				*nameOut = kname(static_cast<int>((producer >> 6) & 0x1FFu), proto);
+				return "field";
+			case 11:  // OP_SELF (method-call sugar)
+				*nameOut = kname(static_cast<int>((producer >> 6) & 0x1FFu), proto);
+				return "method";
+			default:
+				return nullptr;
+			}
+		}
 	}
 
 	/**
