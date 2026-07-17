@@ -2343,7 +2343,8 @@ namespace
     std::uint8_t mEnableResourceRendering = 0; // +0x136
     std::uint8_t mUnknown137 = 0;
     std::int32_t mInputLocks = 0; // +0x138
-    std::uint8_t mUnknown13CTo207[0xCC]{};
+    std::int32_t mWorldViewDepth = 0; // +0x13C  (render-world-view depth; AddWorldView depth arg)
+    std::uint8_t mUnknown140To207[0xC8]{};
     moho::CWldSession* mSession = nullptr; // +0x208
     std::uint8_t mUnknown20CTo273[0x68]{};
     std::uint8_t mShowConvertToPatrolCursor = 0; // +0x274
@@ -2400,6 +2401,7 @@ namespace
     "CUIWorldViewRuntimeView::mShowConvertToPatrolCursor offset must be 0x274"
   );
   static_assert(offsetof(CUIWorldViewRuntimeView, mInputLocks) == 0x138, "CUIWorldViewRuntimeView::mInputLocks offset must be 0x138");
+  static_assert(offsetof(CUIWorldViewRuntimeView, mWorldViewDepth) == 0x13C, "CUIWorldViewRuntimeView::mWorldViewDepth offset must be 0x13C");
   static_assert(offsetof(CUIWorldViewRuntimeView, mSession) == 0x208, "CUIWorldViewRuntimeView::mSession offset must be 0x208");
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mEnableResourceRendering) == 0x136,
@@ -20174,6 +20176,38 @@ void moho::UIWorldViewUpdateCursorEngineStats(
       gMinimapFocusDistanceStat,
       "Minimap_FocusDistance"
     );
+  }
+}
+
+/**
+ * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
+ *
+ * What it does:
+ * Toggles the world view's participation in viewport rendering: forwards the
+ * hidden state to the CMauiControl base, then removes (when hiding) or adds
+ * (when showing) the render-world-view into the global viewport, using the
+ * root-frame event handler and the view's render depth.
+ *
+ * Notes:
+ * Recovered as a free function while `CUIWorldView` remains forward-declared.
+ */
+void moho::UIWorldViewSetHidden(CUIWorldView* const worldView, const bool hidden)
+{
+  reinterpret_cast<CMauiControl*>(worldView)->CMauiControl::SetHidden(hidden);
+
+  CUIWorldViewRuntimeView* const view = CUIWorldViewRuntimeView::FromWorldView(worldView);
+  auto* const renderView = reinterpret_cast<IRenderWorldView*>(&view->mRenderWorldView);
+  if (hidden) {
+    ren_Viewport->RemoveWorldView(renderView);
+  } else {
+    CMauiControl* const rootFrame =
+      CMauiControlExtendedRuntimeView::FromControl(reinterpret_cast<CMauiControl*>(worldView))->mRootFrame;
+    CMauiControlExtendedRuntimeView* const rootFrameView =
+      CMauiControlExtendedRuntimeView::FromControl(rootFrame);
+    ren_Viewport->AddWorldView(
+      renderView,
+      static_cast<int>(reinterpret_cast<std::intptr_t>(rootFrameView->mEventMapper)),
+      view->mWorldViewDepth);
   }
 }
 
