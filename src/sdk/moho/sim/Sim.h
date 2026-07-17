@@ -117,6 +117,20 @@ namespace moho
     const char* functionName
   );
 
+  /**
+   * One pending allied-upgrade notification: the pre-upgrade (source) and
+   * post-upgrade (destination) unit ids. Accumulated in the Sim's allied
+   * upgrade-notify sync lane (`Sim::mAllyUpgradeNotifications`, +0x9D8) by
+   * the `NotifyUpgrade` Lua binding when the destination army is an ally.
+   */
+  struct SUpgradeNotifyPair
+  {
+    std::int32_t mSourceId; // +0x00
+    std::int32_t mDestId;   // +0x04
+  };
+
+  static_assert(sizeof(SUpgradeNotifyPair) == 0x08, "SUpgradeNotifyPair size must be 0x08");
+
   class Sim final : public ICommandSink
   {
   public:
@@ -1291,7 +1305,7 @@ namespace moho
     msvc8::vector<CSimConVarInstanceBase*> mSimVars;
     msvc8::vector<void*> mSyncSerializeGroup0;
     msvc8::vector<void*> mSyncSerializeGroup1;
-    msvc8::vector<void*> mSyncSerializeGroup3;
+    msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // 0x9D8 (was mSyncSerializeGroup3)
     msvc8::vector<void*> mSyncSerializeGroup4;
     // 0x09F8 / 0x0A08: accumulated map-rect lists (each an msvc8::vector<gpg::Rect2i>,
     // 0x10 bytes: proxy/first/last/end). FlattenMapRect (FUN_0074B120) push_back's the
