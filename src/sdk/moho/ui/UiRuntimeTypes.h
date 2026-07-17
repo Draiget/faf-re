@@ -3514,6 +3514,16 @@ namespace moho
    */
   void UI_NoteDisconnect(const IClient* client);
 
+  /**
+   * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
+   *
+   * What it does:
+   * Posts the received chat payload (decoded via func_ReceiveChat into the UI
+   * Lua ReceiveChat callback) onto the main thread, tagged with the sender's
+   * nickname. CWldUiInterface's ReceiveChat override.
+   */
+  void UI_ReceiveChat(const IClient* sender, gpg::MemBuffer<const char> data);
+
   void UI_ReportBottleneck(const SClientBottleneckInfo& info);
 
   /**
