@@ -9,6 +9,7 @@
 
 namespace gpg
 {
+  class BinaryReader;
   class BinaryWriter;
 }
 
@@ -94,6 +95,20 @@ namespace moho
      * writer in save-stream order.
      */
     void WriteToStream(gpg::BinaryWriter& writer);
+
+    /**
+     * Address: 0x00877480 (FUN_00877480, Moho::CDecalGroup::ReadFromStream)
+     *
+     * IDA signature:
+     * gpg::BinaryReader *__thiscall sub_877480(CDecalGroup *this, gpg::BinaryReader *a2, int a3);
+     *
+     * What it does:
+     * Inverse of `WriteToStream`: clears the decal-index lane, then reads the
+     * group index, name, decal count, and that many decal indices from the
+     * binary reader in the same field order the save stream wrote. The trailing
+     * `version` argument is passed through by the load stream but unused here.
+     */
+    void ReadFromStream(gpg::BinaryReader& reader, int version);
 
   public:
     std::int32_t mIndex = 0;                // +0x04

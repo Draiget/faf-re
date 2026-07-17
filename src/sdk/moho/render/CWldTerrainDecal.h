@@ -20,6 +20,7 @@ namespace moho
 
 namespace gpg
 {
+  class BinaryReader;
   class BinaryWriter;
 }
 
@@ -85,6 +86,21 @@ namespace moho
      * order (index/type/name slots/transforms/lod lanes).
      */
     void DecalSave(gpg::BinaryWriter& writer);
+
+    /**
+     * Address: 0x0089CC90 (FUN_0089CC90, ?DecalLoad@CWldTerrainDecal@Moho@@QAEXAAVBinaryReader@gpg@@I@Z)
+     * Mangled: ?DecalLoad@CWldTerrainDecal@Moho@@QAEXAAVBinaryReader@gpg@@I@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::CWldTerrainDecal::DecalLoad(CWldTerrainDecal *this, gpg::BinaryReader *reader);
+     *
+     * What it does:
+     * Inverse of DecalSave: reads index/type, a per-slot name count with each
+     * name deserialized and applied via SetName, then scale/position/orientation
+     * vectors, cutoff lanes, and the terminal runtime token, then refreshes
+     * derived transforms/bounds via Update().
+     */
+    void DecalLoad(gpg::BinaryReader& reader);
 
     /**
      * Address: 0x0089D1F0 (Moho::CWldTerrainDecal::SetName)

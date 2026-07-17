@@ -9,6 +9,7 @@
 
 namespace gpg
 {
+  class BinaryReader;
   class BinaryWriter;
 }
 
@@ -374,6 +375,42 @@ namespace moho
      */
     void Save(gpg::BinaryWriter& writer);
 
+    /**
+     * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CDecalManager::Load(CDecalManager *this, gpg::BinaryReader *reader, unsigned int version);
+     *
+     * What it does:
+     * Inverse of Save: reads decal counts, deserializes each decal (new
+     * CWldTerrainDecal + DecalLoad + LoadDecal), then each decal group (new
+     * CDecalGroup + ReadFromStream + LoadDecalGroup), reindexes the decal
+     * vector, and rebuilds the LOD decile histogram.
+     */
+    void Load(gpg::BinaryReader& reader, unsigned int version);
+
+    /**
+     * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
+     *
+     * What it does:
+     * Get-or-create decal group: when `group` is null, allocates a new
+     * CDecalGroup(mNumDecals++) and names it "Group_<index>"; appends the group
+     * to mDecalGroups and maps its index into the splat-index lookup lane.
+     */
+    CDecalGroup* LoadDecalGroup(CDecalGroup* group);
+
+    /**
+     * Address: 0x00877730 (FUN_00877730, Moho::CDecalManager::RebuildLodHistogram)
+     *
+     * What it does:
+     * Rebuilds the 10-entry decal-area decile histogram (mLodThresholds): dedups
+     * every decal's scale-area (mScale.z * mScale.x) through a set, collecting the
+     * distinct areas in first-seen order, then sets mLodThresholds[0]=0 and
+     * mLodThresholds[i] = the decile element at index floor(count * i * 0.1) for
+     * i in 1..9.
+     */
+    void RebuildLodHistogram();
+
   public:
     std::uint32_t mDecalCount; // +0x04
     std::uint32_t mNumDecals; // +0x08
@@ -385,7 +422,7 @@ namespace moho
     msvc8::vector<CWldSplat*> mSplats; // +0x48
     std::uint8_t mSpatialDbOwnerStorage[0x90]; // +0x54
     IWldTerrainRes* mWldTerrain; // +0xE4
-    float mUnknownE8_10F[0x0A]; // +0xE8
+    float mLodThresholds[10]; // +0xE8 (decal-area decile LOD histogram)
     std::uint8_t mDidSomething; // +0x110
     std::uint8_t mPad111_113[0x03];
   };
@@ -408,6 +445,10 @@ namespace moho
     "CDecalManager::mSpatialDbOwnerStorage offset must be 0x54"
   );
   static_assert(offsetof(CDecalManager, mWldTerrain) == 0xE4, "CDecalManager::mWldTerrain offset must be 0xE4");
+  static_assert(
+    offsetof(CDecalManager, mLodThresholds) == 0xE8,
+    "CDecalManager::mLodThresholds offset must be 0xE8"
+  );
   static_assert(
     offsetof(CDecalManager, mDidSomething) == 0x110,
     "CDecalManager::mDidSomething offset must be 0x110"

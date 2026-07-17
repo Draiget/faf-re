@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/animation/CAnimTexture.h"
@@ -349,6 +351,77 @@ namespace moho
     writer.Write(mCutoffLOD);
     writer.Write(mNearCutoff);
     writer.Write(mUnknown9C);
+  }
+
+  /**
+   * Address: 0x0089CC90 (FUN_0089CC90, ?DecalLoad@CWldTerrainDecal@Moho@@QAEXAAVBinaryReader@gpg@@I@Z)
+   * Mangled: ?DecalLoad@CWldTerrainDecal@Moho@@QAEXAAVBinaryReader@gpg@@I@Z
+   *
+   * What it does:
+   * Reads decal persistence payload in binary order (inverse of DecalSave):
+   * index, type, a per-slot name count with each name deserialized and applied
+   * via SetName, then scale/position/orientation vectors, cutoff lanes, and the
+   * terminal runtime token; refreshes derived state via Update().
+   */
+  void CWldTerrainDecal::DecalLoad(gpg::BinaryReader& reader)
+  {
+    mFlatOptimizationEnabled = 1;
+    mFlatnessCacheValid = 0;
+    mCachedFlatResult = 0;
+
+    std::int32_t indexValue = 0;
+    reader.Read(reinterpret_cast<char*>(&indexValue), sizeof(indexValue));
+    mIndex = indexValue;
+
+    std::int32_t typeValue = 0;
+    reader.Read(reinterpret_cast<char*>(&typeValue), sizeof(typeValue));
+    mType = static_cast<EWldTerrainDecalType>(typeValue);
+
+    mRuntimeActive = 1;
+
+    std::int32_t nameCount = 0;
+    reader.Read(reinterpret_cast<char*>(&nameCount), sizeof(nameCount));
+
+    for (std::int32_t slot = 0; slot < nameCount; ++slot) {
+      std::int32_t nameLength = 0;
+      reader.Read(reinterpret_cast<char*>(&nameLength), sizeof(nameLength));
+
+      std::vector<char> nameBytes(static_cast<std::size_t>(nameLength));
+      if (nameLength > 0) {
+        reader.Read(nameBytes.data(), static_cast<std::size_t>(nameLength));
+      }
+
+      msvc8::string name;
+      name.assign(nameBytes.data(), static_cast<std::size_t>(nameLength));
+
+      SetName(name, slot);
+    }
+
+    Wm3::Vec3f scale{};
+    reader.Read(reinterpret_cast<char*>(&scale), sizeof(scale));
+    mScale = scale;
+
+    Wm3::Vec3f position{};
+    reader.Read(reinterpret_cast<char*>(&position), sizeof(position));
+    mPosition = position;
+
+    Wm3::Vec3f orientation{};
+    reader.Read(reinterpret_cast<char*>(&orientation), sizeof(orientation));
+    mOrientation = orientation;
+
+    float cutoffLod = 0.0f;
+    reader.Read(reinterpret_cast<char*>(&cutoffLod), sizeof(cutoffLod));
+    mCutoffLOD = cutoffLod;
+
+    float nearCutoff = 0.0f;
+    reader.Read(reinterpret_cast<char*>(&nearCutoff), sizeof(nearCutoff));
+    mNearCutoff = nearCutoff;
+
+    std::int32_t runtimeToken = 0;
+    reader.Read(reinterpret_cast<char*>(&runtimeToken), sizeof(runtimeToken));
+    mUnknown9C = runtimeToken;
+
+    Update();
   }
 
   /**

@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 
 namespace moho
@@ -162,6 +163,36 @@ namespace moho
 
     for (std::int32_t* decalIt = decalView.begin; decalIt != decalView.end; ++decalIt) {
       writer.Write(*decalIt);
+    }
+  }
+
+  /**
+   * Address: 0x00877480 (FUN_00877480, Moho::CDecalGroup::ReadFromStream)
+   *
+   * What it does:
+   * Inverse of `WriteToStream`: empties the decal-index lane in place, then
+   * reads the group index, name, decal count, and that many decal indices from
+   * the binary reader in the same field order the save stream wrote.
+   */
+  void CDecalGroup::ReadFromStream(gpg::BinaryReader& reader, const int version)
+  {
+    (void)version;
+
+    mDecals.clear();
+
+    reader.Read(reinterpret_cast<char*>(&mIndex), sizeof(mIndex));
+
+    msvc8::string name;
+    reader.ReadString(&name);
+    mName = name;
+
+    std::int32_t decalCount = 0;
+    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+
+    for (std::int32_t i = 0; i < decalCount; ++i) {
+      std::int32_t decalIndex = 0;
+      reader.Read(reinterpret_cast<char*>(&decalIndex), sizeof(decalIndex));
+      mDecals.push_back(decalIndex);
     }
   }
 } // namespace moho
