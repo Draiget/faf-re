@@ -800,6 +800,9 @@ namespace
   constexpr const char* kUnitGetCargoHelpText = "GetCargo(self)";
   constexpr const char* kUnitAlterArmorName = "AlterArmor";
   constexpr const char* kUnitAlterArmorHelpText = "Unit:AlterArmor(damageTypeName, multiplier)";
+  constexpr const char* kNotifyUpgradeName = "NotifyUpgrade";
+  constexpr const char* kNotifyUpgradeGlobalClassName = "<global>";
+  constexpr const char* kNotifyUpgradeHelpText = "NotifyUpgrade(from,to)";
   constexpr const char* kUnitGetArmorMultName = "GetArmorMult";
   constexpr const char* kUnitGetArmorMultHelpText = "mult = Unit:GetArmorMult(damageTypeName)";
   constexpr std::uint8_t kArmorMapColorRed = 0u;
@@ -11821,6 +11824,165 @@ gpg::RType* preregister_SSTIUnitVariableDataTypeInfo()
   static SSTIUnitVariableDataTypeInfo typeInfo;
   gpg::PreRegisterRType(typeid(SSTIUnitVariableData), &typeInfo);
   return &typeInfo;
+}
+
+/**
+ * Address: 0x006CCE70 (FUN_006CCE70, cfunc_NotifyUpgradeL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_NotifyUpgradeL(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * Global Lua `NotifyUpgrade(from,to)` worker: transfers command queue, builder
+ * commands, platoon membership, repeat-queue state, health ratio, and
+ * guarded/guard links from the source unit to the destination unit during an
+ * upgrade, and queues an allied-upgrade sync notification.
+ */
+int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kNotifyUpgradeHelpText, 2, argumentCount);
+  }
+
+  Unit* source = nullptr;
+  {
+    const LuaPlus::LuaObject sourceObject(LuaPlus::LuaStackObject(state, 1));
+    source = GetUnitOptional(sourceObject);
+  }
+  Unit* dest = nullptr;
+  {
+    const LuaPlus::LuaObject destObject(LuaPlus::LuaStackObject(state, 2));
+    dest = GetUnitOptional(destObject);
+  }
+
+  if (source == nullptr || source->IsDead() || source->CommandQueue == nullptr) {
+    LuaPlus::LuaState::Error(state, "Passed in invalid source object to upgrade");
+  } else if (dest == nullptr || dest->IsDead() || dest->CommandQueue == nullptr) {
+    LuaPlus::LuaState::Error(state, "Passed in invalid destination object to upgrade");
+  }
+
+  // 1) Command-queue transfer: copy every source command onto the destination,
+  //    skipping the upgrade command that produced `dest`. The copied weak-ptr
+  //    vector unlinks + frees on scope exit (matches the binary's manual cleanup).
+  if (CUnitCommandQueue* const sourceQueue = source->CommandQueue) {
+    const msvc8::vector<WeakPtr<CUnitCommand>> commandsSnapshot = sourceQueue->mCommandVec;
+    const RUnitBlueprint* const destBlueprint = dest->GetBlueprint();
+    for (const WeakPtr<CUnitCommand>& weakCommand : commandsSnapshot) {
+      CUnitCommand* const command = weakCommand.GetObjectPtr();
+      const bool isUpgradeToDest =
+        command != nullptr &&
+        command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Upgrade &&
+        command->mConstDat.blueprint == reinterpret_cast<const REntityBlueprint*>(destBlueprint);
+      if (!isUpgradeToDest) {
+        dest->CommandQueue->AddCommandToQueue(command);
+      }
+    }
+  }
+
+  // 2) Builder factory-command transfer.
+  if (source->AiBuilder != nullptr && dest->AiBuilder != nullptr) {
+    dest->AiBuilder->BuilderClearFactoryCommandQueue();
+    const msvc8::vector<WeakPtr<CUnitCommand>>& builderCommands = source->AiBuilder->BuilderGetFactoryCommandQueue();
+    for (std::size_t i = 0; i < builderCommands.size(); ++i) {
+      CUnitCommand* const builderCommand = source->AiBuilder->BuilderGetFactoryCommand(static_cast<int>(i));
+      if (builderCommand != nullptr) {
+        dest->AiBuilder->BuilderAddFactoryCommand(builderCommand, -1);
+      }
+    }
+  }
+
+  // 3) Platoon membership transfer.
+  if (CArmyImpl* const army = source->ArmyRef) {
+    ESquadClass squadClass{};
+    CPlatoon* const destPlatoon = army->GetPlatoonFor(reinterpret_cast<int>(dest), &squadClass);
+    if (destPlatoon != nullptr) {
+      destPlatoon->RemoveUnit(dest);
+    }
+    CPlatoon* const sourcePlatoon = army->GetPlatoonFor(reinterpret_cast<int>(source), &squadClass);
+    if (sourcePlatoon != nullptr) {
+      sourcePlatoon->RemoveUnit(source);
+      sourcePlatoon->AppendUnitToSquad(squadClass, dest);
+    }
+  }
+
+  // 4) Repeat-queue state transfer + OnStart/OnStopRepeatQueue script dispatch.
+  const bool sourceRepeat = source->RepeatQueueEnabled;
+  if (sourceRepeat) {
+    if (!dest->RepeatQueueEnabled) {
+      dest->RunScript("OnStartRepeatQueue");
+    }
+  } else if (dest->RepeatQueueEnabled) {
+    dest->RunScript("OnStopRepeatQueue");
+  }
+  dest->RepeatQueueEnabled = sourceRepeat;
+  dest->DirtySyncState = 1;
+
+  // 5) Health ratio transfer.
+  const float scaledHealth = dest->MaxHealth * (source->Health / source->MaxHealth);
+  if (scaledHealth != dest->Health) {
+    dest->SetHealth(scaledHealth);
+  }
+
+  // 6) Guarded-unit + guard-list transfer.
+  dest->SetGuardedUnit(source->GuardedUnitRef.ResolveObjectPtr<Unit>());
+  dest->GuardedPos = source->GuardedPos;
+
+  // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
+  const gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> guardSlots = source->GuardedByList.mSlots;
+  msvc8::vector<Unit*> guards;
+  for (const SGuardedByWeakOwnerSlot* slot = guardSlots.begin; slot != guardSlots.end; ++slot) {
+    guards.push_back(reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(*slot)));
+  }
+  for (Unit* const guard : guards) {
+    if (guard != nullptr) {
+      guard->SetGuardedUnit(dest);
+    }
+  }
+
+  // 7) Allied-upgrade notification: record (from,to) ids in the Sim sync lane.
+  Sim* const globalUserdata = lua_getglobaluserdata_typed(rawState);
+  if (dest->ArmyRef->IsAlly != 0 && globalUserdata != nullptr) {
+    const SUpgradeNotifyPair pair{
+      static_cast<std::int32_t>(source->GetEntityId()),
+      static_cast<std::int32_t>(dest->GetEntityId())
+    };
+    globalUserdata->mAllyUpgradeNotifications.push_back(pair);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x006CCDF0 (FUN_006CCDF0, cfunc_NotifyUpgrade)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to `cfunc_NotifyUpgradeL`.
+ */
+int moho::cfunc_NotifyUpgrade(lua_State* const luaContext)
+{
+  return cfunc_NotifyUpgradeL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x006CCE10 (FUN_006CCE10, func_NotifyUpgrade_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `NotifyUpgrade(from,to)` Lua binder and links it into the
+ * sim script init form set.
+ */
+void moho::func_NotifyUpgrade_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kNotifyUpgradeName,
+    &moho::cfunc_NotifyUpgrade,
+    nullptr,
+    kNotifyUpgradeGlobalClassName,
+    kNotifyUpgradeHelpText
+  );
+  (void)binder;
 }
 
 } // namespace moho

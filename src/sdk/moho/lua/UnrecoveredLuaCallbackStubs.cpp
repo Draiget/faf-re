@@ -52,8 +52,3 @@ namespace moho
   CScrLuaInitForm* func_CreateUnit_LuaFuncDef() { return nullptr; }
 }
 
-namespace moho
-{
-  // ===== Unrecovered func_*_LuaFuncDef registrars (void return) =====
-  void func_NotifyUpgrade_LuaFuncDef() {}
-}
