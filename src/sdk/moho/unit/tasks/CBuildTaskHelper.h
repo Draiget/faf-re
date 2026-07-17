@@ -95,6 +95,15 @@ namespace moho
     [[nodiscard]] bool UpdateWorkProgress();
 
     /**
+     * Address: 0x005F5630 (FUN_005F5630, Moho::CBuildTaskHelper::IsGood)
+     *
+     * What it does:
+     * Reports whether the build focus still resolves to a live (non-null,
+     * non-dead) unit.
+     */
+    [[nodiscard]] bool IsGood() const;
+
+    /**
      * Address: 0x005FE540 (FUN_005FE540, Moho::CBuildTaskHelper::MemberDeserialize)
      *
      * What it does:

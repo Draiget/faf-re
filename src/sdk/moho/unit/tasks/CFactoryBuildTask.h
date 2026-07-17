@@ -16,6 +16,7 @@ namespace gpg
 namespace moho
 {
   class CUnitCommand;
+  class Entity;
   class IAiCommandDispatchImpl;
   struct RUnitBlueprint;
   class Unit;
@@ -113,6 +114,16 @@ namespace moho
      * Transfers pending build commands from factory to the newly built unit.
      */
     void InheritCommandsTo(Unit* builtUnit);
+
+    /**
+     * Address: 0x005FA340 (FUN_005FA340, Moho::CFactoryBuildTask::InheritQueuedCommandsTo)
+     *
+     * What it does:
+     * Transfers the factory's queued build commands to the newly built unit
+     * without the leading-Move suppression of InheritCommandsTo (the
+     * no-transport-guard path).
+     */
+    void InheritQueuedCommandsTo(Entity* builtUnit);
 
   public:
     IAiCommandDispatchImpl* mDispatch;   // 0x30

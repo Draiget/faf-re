@@ -104,6 +104,14 @@ namespace moho
   );
 
   /**
+   * Address: 0x0062DD40 (FUN_0062DD40, Moho::SIM_TryToBuild)
+   *
+   * Displaces the army's own stationary/air mobile blockers out of a pending
+   * build rect so a structure can be placed.
+   */
+  void SIM_TryToBuild(Sim* sim, CArmyImpl* army, gpg::Rect2i* rect, char requireIdle);
+
+  /**
    * Address: 0x006EF150 (FUN_006EF150, func_GetUnitBlueprint)
    *
    * What it does:
