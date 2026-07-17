@@ -58,6 +58,7 @@
 #include "platform/Platform.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
@@ -67,6 +68,7 @@ namespace moho
   class CUnitCommand;
 
   int cfunc_CAiBrainCreateUnitNearSpot(lua_State* luaContext);
+  int cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* state);
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* luaContext);
   int cfunc_CAiBrainFindPlaceToBuild(lua_State* luaContext);
 
@@ -4293,6 +4295,105 @@ int moho::cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* const state)
   lua_pushnumber(rawState, startPosition.y);
   (void)lua_gettop(rawState);
   return 2;
+}
+
+/**
+ * Address: 0x00589910 (FUN_00589910, cfunc_CAiBrainCreateUnitNearSpotL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * `brain:CreateUnitNearSpot(unitName, posX, posY)` worker: resolves the unit
+ * blueprint, occupies a small grid rect around the army start, tries to place
+ * the structure at (posX,posY), and — on success — constructs the unit and
+ * returns its Lua object (or nil).
+ */
+int moho::cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* const state)
+{
+  Sim* const sim = lua_getglobaluserdata_typed(state->m_state);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kAiBrainCreateUnitNearSpotHelpText, 4, argumentCount);
+  }
+  if (lua_type(state->m_state, 2) == 0 || !lua_isstring(state->m_state, 2)) {
+    LuaPlus::LuaState::Error(state, "Invalid unit name passed in");
+  }
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    LuaPlus::LuaState::Error(state, "Invalid posX passed in");
+  }
+  if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+    LuaPlus::LuaState::Error(state, "Invalid posY passed in");
+  }
+
+  CAiBrain* brain = nullptr;
+  {
+    const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+    brain = SCR_FromLua_CAiBrain(brainObject, state);
+  }
+
+  const char* const unitName = lua_tostring(state->m_state, 2);
+  if (unitName == nullptr) {
+    LuaPlus::LuaStackObject nameObject(state, 2);
+    nameObject.TypeError("string");
+  }
+
+  CArmyImpl* const army = brain->mArmy;
+
+  const float posY = static_cast<float>(lua_tonumber(state->m_state, 4));
+  const float posX = static_cast<float>(lua_tonumber(state->m_state, 3));
+  SCoordsVec2 tryPos{};
+  tryPos.x = posX;
+  tryPos.z = posY;
+
+  msvc8::string blueprintName;
+  gpg::STR_InitFilename(&blueprintName, unitName);
+  RUnitBlueprint* const blueprint = sim->mRules->GetUnitBlueprint(RResId(blueprintName));
+
+  COGrid* const grid = sim->mOGrid;
+
+  Wm3::Vector2f startPosition;
+  army->GetArmyStartPos(startPosition);
+  gpg::Rect2i occupyRect{};
+  occupyRect.x0 = static_cast<int>(startPosition.x) - 5;
+  occupyRect.x1 = static_cast<int>(startPosition.x) + 5;
+  occupyRect.z0 = static_cast<int>(startPosition.y) - 5;
+  occupyRect.z1 = static_cast<int>(startPosition.y) + 5;
+
+  const EOccupancyCaps occupancyCaps = blueprint->mFootprint.mOccupancyCaps;
+  grid->ExecuteOccupy(occupancyCaps, occupyRect);
+
+  Unit* createdUnit = nullptr;
+  if (TryBuildStructureAt(&tryPos, blueprint, sim, true, true, true, true)) {
+    SUnitConstructionParams params(0, Wm3::Vector3f(tryPos.x, 0.0f, tryPos.z), army, blueprint, nullptr, true);
+    params.mUseLayerOverride = 1;
+    createdUnit = sim->CreateUnitForScript(params, true);
+  }
+
+  grid->ReleaseOccupy(occupancyCaps, occupyRect);
+
+  if (createdUnit != nullptr) {
+    LuaPlus::LuaObject unitLuaObject = createdUnit->GetLuaObject();
+    unitLuaObject.PushStack(state);
+    return 1;
+  }
+
+  lua_pushnil(state->m_state);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x00589890 (FUN_00589890, cfunc_CAiBrainCreateUnitNearSpot)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to
+ * `cfunc_CAiBrainCreateUnitNearSpotL`.
+ */
+int moho::cfunc_CAiBrainCreateUnitNearSpot(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainCreateUnitNearSpotL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
