@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -45,6 +46,7 @@
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/IArmy.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -4394,6 +4396,173 @@ namespace moho
       kFindPrioritizedUnitHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x007259D0 (FUN_007259D0, Moho::CPlatoon::FindPrioritizedUnit)
+   *
+   * IDA signature (true form; the decompiler's 33-arg __userpurge is a
+   * stack-analysis failure — real params derived from the caller call site
+   * at 0x0072ED7B and register/stack usage in the .asm):
+   * Moho::Unit *__userpurge FindPrioritizedUnit@<eax>(
+   *   Moho::ESquadClass squadClass@<ecx>, Moho::CPlatoon *this@<edx>,
+   *   Moho::EAlliance alliance, bool canAttack,
+   *   Wm3::Vector3f const *center, float radius);
+   *
+   * What it does:
+   * Resolves the squad for `squadClass`, snapshots that squad's prioritized
+   * target-category list, gathers every unit within `radius` of `center`, and
+   * for each live, attackable candidate computes its priority rank = 1-based
+   * index of the first category set the unit's blueprint matches. Keeps the unit
+   * with the best (lowest) rank, breaking ties by smallest squared distance to
+   * `center`. Returns the best `Unit*`, or null when no candidate is admissible.
+   */
+  Unit* CPlatoon::FindPrioritizedUnit(
+    const ESquadClass squadClass,
+    const EAlliance alliance,
+    const bool canAttack,
+    const Wm3::Vector3f& center,
+    const float radius)
+  {
+    // Resolve the squad for `squadClass`; it supplies the priority list and
+    // gates candidates via CanAttackTarget.
+    CSquad* squad = nullptr;
+    for (CSquad* const candidate : mSquadList) {
+      if (candidate->mSquadClass == squadClass) {
+        squad = candidate;
+        break;
+      }
+    }
+    if (squad == nullptr) {
+      return nullptr;
+    }
+
+    // Snapshot the squad's prioritized target-category list (the binary copies
+    // squad->mCats into a local vector and frees it in the epilogue).
+    const msvc8::vector<EntityCategorySet> priorityList = squad->mCats;
+
+    // Gather every unit within `radius` of `center` ("ALLUNITS", alliance-filtered).
+    SEntitySetTemplateUnit gatheredUnits{};
+    (void)CollectUnitsAroundPointFiltered(
+      mArmy->GetArmyBrain(),
+      &gatheredUnits,
+      mSim->mRules->GetEntityCategory("ALLUNITS"),
+      center,
+      radius,
+      alliance);
+
+    // "no best yet" sentinels so the first admissible candidate always wins.
+    constexpr int kBestRankUnset = 99999;
+
+    Unit* bestUnit = nullptr;
+    int bestRank = kBestRankUnset;
+    float bestDistSq = std::numeric_limits<float>::infinity();
+
+    for (Entity* const* entrySlot = gatheredUnits.mVec.begin(); entrySlot != gatheredUnits.mVec.end(); ++entrySlot) {
+      Unit* const unit = (*entrySlot != nullptr) ? static_cast<Unit*>(*entrySlot) : nullptr;
+
+      // Attack-eligibility gate runs first in this leaf (unlike FindClosestUnitToPos).
+      if (canAttack && !squad->CanAttackTarget(unit)) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+
+      // Rank = 1-based index of the first priority category the blueprint matches;
+      // a candidate that cannot beat the current best rank is abandoned mid-scan.
+      int rank = 1;
+      bool matched = false;
+      for (const EntityCategorySet& priorityCategory : priorityList) {
+        if (EntityCategory::HasBlueprint(blueprint, &priorityCategory)) {
+          matched = true;
+          break;
+        }
+        if (++rank > bestRank) {
+          break;
+        }
+      }
+      if (!matched) {
+        continue;
+      }
+
+      const Wm3::Vector3f& unitPos = unit->GetPosition();
+      const float dx = center.x - unitPos.x;
+      const float dy = center.y - unitPos.y;
+      const float dz = center.z - unitPos.z;
+      const float distSq = dx * dx + dy * dy + dz * dz;
+
+      if (rank < bestRank || (rank == bestRank && bestDistSq > distSq)) {
+        bestUnit = unit;
+        bestRank = rank;
+        bestDistSq = distSq;
+      }
+    }
+
+    return bestUnit;
+  }
+
+  /**
+   * Address: 0x0072EBB0 (FUN_0072EBB0, cfunc_CPlatoonFindPrioritizedUnitL)
+   *
+   * IDA signature:
+   * int __usercall cfunc_CPlatoonFindPrioritizedUnitL@<eax>(LuaPlus::LuaState *state@<ebx>);
+   *
+   * What it does:
+   * Parses `(platoon, squadClassName, allianceName, canAttack, center, radius)`
+   * from Lua, calls `CPlatoon::FindPrioritizedUnit`, and pushes the found unit's
+   * Lua object (or nil).
+   */
+  int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 6) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", kFindPrioritizedUnitHelpText, 6, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef squadClassRef{};
+    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, squadClassRef);
+
+    EAlliance alliance = static_cast<EAlliance>(0);
+    gpg::RRef allianceRef{};
+    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    const char* const allianceName = lua_tostring(state->m_state, 3);
+    if (allianceName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 3);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, allianceName, allianceRef);
+
+    LuaPlus::LuaStackObject canAttackArg(state, 4);
+    const bool canAttack = canAttackArg.GetBoolean();
+
+    const LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 5));
+    const Wm3::Vector3f center = SCR_FromLuaCopy<Wm3::Vector3<float>>(centerObject);
+
+    LuaPlus::LuaStackObject radiusArg(state, 6);
+    if (lua_type(state->m_state, 6) != 3 /* LUA_TNUMBER */) {
+      LuaPlus::LuaStackObject::TypeError(&radiusArg, "number");
+    }
+    const float radius = static_cast<float>(lua_tonumber(radiusArg.m_state->m_state, radiusArg.m_stackIndex));
+
+    Unit* const foundUnit = platoon->FindPrioritizedUnit(squadClass, alliance, canAttack, center, radius);
+    if (foundUnit != nullptr) {
+      foundUnit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state->m_state);
+      (void)lua_gettop(state->m_state);
+    }
+    return 1;
   }
 
   /**
