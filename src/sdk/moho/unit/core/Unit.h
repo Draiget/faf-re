@@ -2186,6 +2186,23 @@ namespace moho
   int cfunc_UnitAlterArmorL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006CCDF0 (FUN_006CCDF0, cfunc_NotifyUpgrade)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_NotifyUpgradeL`.
+   */
+  int cfunc_NotifyUpgrade(lua_State* luaContext);
+
+  /**
+   * Address: 0x006CCE70 (FUN_006CCE70, cfunc_NotifyUpgradeL)
+   *
+   * What it does:
+   * Global `NotifyUpgrade(from,to)` worker: transfers unit state from the source
+   * unit to the destination unit during an upgrade.
+   */
+  int cfunc_NotifyUpgradeL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x006C4180 (FUN_006C4180, cfunc_UnitGetArmorMult)
    *
    * What it does:
