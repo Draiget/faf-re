@@ -23722,6 +23722,42 @@ void moho::UI_ReceiveChat(const IClient* const sender, const gpg::MemBuffer<cons
   THREAD_InvokeAsync(callback, 0u);
 }
 
+namespace
+{
+  /**
+   * Typed view over the game-UI client-manager interface (CWldUiInterface). The
+   * only field the recovered overrides read is the local player slot index,
+   * which NoteGameSpeedChanged forwards as `slotZeroBased`.
+   */
+  struct CWldUiInterfaceRuntimeView
+  {
+    std::uint8_t base[0x20];             // vtable + interface base/earlier lanes
+    std::int32_t mLocalSlotZeroBased;    // +0x20
+  };
+  static_assert(
+    offsetof(CWldUiInterfaceRuntimeView, mLocalSlotZeroBased) == 0x20,
+    "CWldUiInterfaceRuntimeView::mLocalSlotZeroBased offset must be 0x20"
+  );
+} // namespace
+
+/**
+ * Address: 0x0088B960 (FUN_0088B960, Moho::CWldUiInterface::NoteGameSpeedChanged)
+ *
+ * What it does:
+ * IClientMgrUIInterface::NoteGameSpeedChanged override for the game UI: posts
+ * the driver-gated game-speed-changed notice for this interface's local player
+ * slot onto the main thread (via THREAD_InvokeAsync -> UI_DriverNoteGameSpeedChanged,
+ * which forwards to the Lua UI when a sim driver is active).
+ */
+void moho::UI_InterfaceNoteGameSpeedChanged(const IClientMgrUIInterface* const self, const std::int32_t gameSpeed)
+{
+  const std::int32_t slotZeroBased =
+    reinterpret_cast<const CWldUiInterfaceRuntimeView*>(self)->mLocalSlotZeroBased;
+  boost::function<void(), std::allocator<void>> callback =
+    [slotZeroBased, gameSpeed]() { UI_DriverNoteGameSpeedChanged(slotZeroBased, gameSpeed); };
+  THREAD_InvokeAsync(callback, 0u);
+}
+
 /**
  * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
  *
