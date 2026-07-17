@@ -1,10 +1,14 @@
 #include "moho/terrain/splat/CWldSplat.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <new>
+#include <set>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "moho/render/CDecalGroup.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -591,7 +595,7 @@ namespace moho
     , mSplats()
     , mSpatialDbOwnerStorage{}
     , mWldTerrain(terrainRes)
-    , mUnknownE8_10F{}
+    , mLodThresholds{}
     , mDidSomething(0u)
     , mPad111_113{0u, 0u, 0u}
   {
@@ -974,6 +978,46 @@ namespace moho
   {
     if (storage.size() == storage.capacity()) {
       InsertNCopiesCWldTerrainDecalPtrVector(storage, storage.end(), 1u, value);
+    } else {
+      storage.push_back(value);
+    }
+  }
+
+  /**
+   * Address: 0x0087B1C0 (FUN_0087B1C0, msvc8::vector<Moho::CDecalGroup*>::_Insert_n)
+   *
+   * What it does:
+   * Canonical `_Insert_n` slow-path for the mDecalGroups vector; the body lives
+   * in `msvc8::vector<T>::insert` (legacy/containers/Vector.h) and this per-T
+   * free helper is the source-level by-name invocation that keeps the emitted
+   * symbol.
+   */
+  void InsertNCopiesCDecalGroupPtrVector(
+    msvc8::vector<CDecalGroup*>& storage,
+    CDecalGroup** const insertPosition,
+    const unsigned int insertCount,
+    CDecalGroup* const fillValue)
+  {
+    if (insertCount == 0u) {
+      return;
+    }
+
+    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
+    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
+  }
+
+  /**
+   * What it does:
+   * Appends one `CDecalGroup*` into the manager's `mDecalGroups` vector,
+   * mirroring the MSVC8 inlined `push_back` shape used by the binary: when the
+   * reserved capacity is exhausted the append reaches the canonical
+   * `vector<CDecalGroup*>::_Insert_n` slow-path
+   * (`InsertNCopiesCDecalGroupPtrVector`); otherwise a fast-path in-place store.
+   */
+  void AppendDecalGroup(msvc8::vector<CDecalGroup*>& storage, CDecalGroup* const value)
+  {
+    if (storage.size() == storage.capacity()) {
+      InsertNCopiesCDecalGroupPtrVector(storage, storage.end(), 1u, value);
     } else {
       storage.push_back(value);
     }
@@ -1425,6 +1469,127 @@ namespace moho
         group->WriteToStream(writer);
       }
     }
+  }
+
+  /**
+   * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
+   *
+   * What it does:
+   * Get-or-create decal group: when `group` is null, allocates a new
+   * CDecalGroup(mNumDecals++) and assigns it a default "Group_<index>" name;
+   * then appends the group to mDecalGroups and registers its index in the
+   * splat-index lookup lane. Returns the group.
+   */
+  CDecalGroup* CDecalManager::LoadDecalGroup(CDecalGroup* group)
+  {
+    if (group == nullptr) {
+      group = new CDecalGroup(static_cast<std::int32_t>(mNumDecals));
+      ++mNumDecals;
+
+      char nameBuffer[32];
+      (void)std::snprintf(nameBuffer, sizeof(nameBuffer), "Group_%d", *group->GetIndex());
+      *group->GetName() = nameBuffer;
+    }
+
+    AppendDecalGroup(mDecalGroups, group);
+
+    std::uint32_t* const valueLane =
+      ResolveLookupValueSlotForKey(mDecalGroupLookupBySplatIndex, static_cast<std::uint32_t>(*group->GetIndex()));
+    if (valueLane != nullptr) {
+      *valueLane = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(group));
+    }
+
+    return group;
+  }
+
+  /**
+   * Address: 0x00877730 (FUN_00877730, Moho::CDecalManager::RebuildLodHistogram)
+   *
+   * What it does:
+   * Rebuilds the decal-area decile LOD histogram (mLodThresholds[0..9]) from the
+   * scale-area (mScale.z * mScale.x) of every decal. Zeroes the array, then walks
+   * every decal collecting the DISTINCT areas (a set dedups; the vector keeps
+   * them in first-seen order). On a non-empty distinct set, sets [0]=0 and, for i
+   * in 1..9, nth-selects the decile element at index floor(count * i * 0.1) and
+   * stores it at [i].
+   */
+  void CDecalManager::RebuildLodHistogram()
+  {
+    for (float& threshold : mLodThresholds) {
+      threshold = 0.0f;
+    }
+
+    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
+    if (decalsView.begin == nullptr || decalsView.begin == decalsView.end) {
+      return;
+    }
+
+    // The binary keeps a std::set<float> purely for dedup and a std::vector<float>
+    // of the distinct areas in first-seen order; a decal's area is stored only the
+    // first time it is seen (insert reports "no existing equal element").
+    std::set<float> seenAreas;
+    std::vector<float> distinctAreas;
+
+    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
+      CWldTerrainDecal* const decal = *decalIt;
+      const float area = decal->mScale.z * decal->mScale.x;
+      if (seenAreas.insert(area).second) {
+        distinctAreas.push_back(area);
+      }
+    }
+
+    if (distinctAreas.empty()) {
+      return;
+    }
+
+    const std::size_t count = distinctAreas.size();
+    mLodThresholds[0] = 0.0f;
+    for (int decile = 1; decile < 10; ++decile) {
+      const std::size_t index =
+        static_cast<std::size_t>(static_cast<float>(count) * (static_cast<float>(decile) * 0.1f));
+      std::nth_element(distinctAreas.begin(), distinctAreas.begin() + index, distinctAreas.end());
+      mLodThresholds[decile] = distinctAreas[index];
+    }
+  }
+
+  /**
+   * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
+   *
+   * What it does:
+   * Inverse of Save: reads mDecalCount/mNumDecals, then a decal count with each
+   * decal deserialized (new CWldTerrainDecal + DecalLoad + LoadDecal); then a
+   * group count with each group deserialized (new CDecalGroup + ReadFromStream +
+   * LoadDecalGroup); reindexes every decal's mVecIndex, then rebuilds the LOD
+   * histogram.
+   */
+  void CDecalManager::Load(gpg::BinaryReader& reader, const unsigned int version)
+  {
+    reader.Read(reinterpret_cast<char*>(&mDecalCount), sizeof(mDecalCount));
+    reader.Read(reinterpret_cast<char*>(&mNumDecals), sizeof(mNumDecals));
+
+    std::uint32_t decalCount = 0;
+    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+    for (; decalCount != 0u; --decalCount) {
+      auto* const decal = new CWldTerrainDecal(AsDecalManagerSpatialDbRuntime(this), mWldTerrain);
+      decal->DecalLoad(reader);
+      (void)LoadDecal(decal);
+    }
+
+    std::uint32_t groupCount = 0;
+    reader.Read(reinterpret_cast<char*>(&groupCount), sizeof(groupCount));
+    for (; groupCount != 0u; --groupCount) {
+      auto* const group = new CDecalGroup(0);
+      group->ReadFromStream(reader, static_cast<int>(version));
+      (void)LoadDecalGroup(group);
+    }
+
+    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
+    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
+      CWldTerrainDecal* const decal = *decalIt;
+      decal->mVecIndex = static_cast<std::uint32_t>(decalIt - decalsView.begin);
+    }
+
+    RebuildLodHistogram();
   }
 
 } // namespace moho
