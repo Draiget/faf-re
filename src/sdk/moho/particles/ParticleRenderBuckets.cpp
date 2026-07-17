@@ -2985,9 +2985,9 @@ namespace
     const moho::TrailRuntimeView& source, moho::TrailRuntimeView& destination
   ) noexcept
   {
-    std::memcpy(destination.unknownPrefix, source.unknownPrefix, sizeof(destination.unknownPrefix));
-    destination.sortScalar = source.sortScalar;
-    std::memcpy(destination.unknown4C, source.unknown4C, sizeof(destination.unknown4C));
+    // Copy the 0x00..0x4F scalar-lane block (all float fields up to but not
+    // including the texture pointers at 0x50).
+    std::memcpy(&destination.prevPosX, &source.prevPosX, 0x50u);
     AssignTrailTextureLane(destination.texture0, source.texture0);
     AssignTrailTextureLane(destination.texture1, source.texture1);
     destination.tag = source.tag;
