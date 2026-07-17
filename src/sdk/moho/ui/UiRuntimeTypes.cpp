@@ -36,6 +36,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "lua/LuaAssertion.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -23359,6 +23360,44 @@ gpg::RRef moho::CLuaWldUIProvider::GetDerivedObjectRef()
   ref.mObj = reinterpret_cast<char*>(this) - 4;
   ref.mType = GetClass();
   return ref;
+}
+
+/**
+ * Address: 0x0086A6E0 (FUN_0086A6E0, Moho::CLuaWldUIProvider::CreateGameInterface)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CLuaWldUIProvider::CreateGameInterface(
+ *   CLuaWldUIProvider *this, bool createGameInterface);
+ *
+ * What it does:
+ * Runs the provider's `GetPrefetchTextures` script; if it returns a table of
+ * texture paths, prefetches each one through the live D3D device resources into
+ * mPrefetchData, then dispatches the `CreateGameInterface` script callback with
+ * the create flag. The empty stub skipped both prefetch and the callback.
+ */
+void moho::CLuaWldUIProvider::CreateGameInterface(bool createGameInterface)
+{
+  const LuaPlus::LuaObject prefetchTextures = RunScript("GetPrefetchTextures");
+  if (!prefetchTextures.IsNil()) {
+    if (!prefetchTextures.IsTable()) {
+      throw std::runtime_error("GetPrefetchTextures did not return a table of strings");
+    }
+
+    for (LuaPlus::LuaTableIterator iter(const_cast<LuaPlus::LuaObject*>(&prefetchTextures), 1);
+         !iter.m_isDone; iter.Next()) {
+      ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+      if (iter.m_isDone) {
+        throw LuaPlus::LuaAssertion("IsValid()");
+      }
+
+      const char* const texturePath = iter.m_valueObj.GetString();
+      boost::shared_ptr<PrefetchData> handle{};
+      resources->LoadPrefetchData(handle, texturePath);
+      mPrefetchData.push_back(handle);
+    }
+  }
+
+  RunScript("CreateGameInterface", createGameInterface);
 }
 
 /**
