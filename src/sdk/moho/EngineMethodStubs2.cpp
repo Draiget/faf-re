@@ -86,9 +86,6 @@ int CFactoryBuildTask::Execute() { return 0; }
 // ===== MapImager virtual destructor proxy =====
 void MapImager::VirtualDtor() {}
 
-// ===== CMauiMovie::LoadFile =====
-bool CMauiMovie::LoadFile(const char*) { return false; }
-
 // ===== Constructors (no-op default-init) =====
 CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
     : CMauiControl(lo, parent, msvc8::string{}) {}

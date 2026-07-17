@@ -1,9 +1,13 @@
 #include "moho/movie/CMovie.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <new>
 
+#include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/CVirtualFileSystem.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/audio/SofdecRuntime.h"
 #include "moho/render/ID3DTextureSheet.h"
@@ -65,6 +69,39 @@ void mwPlyFxCnvFrmARGB8888(
   void* outputBits
 );
 
+/**
+ * Address: 0x00AC8DF0 (FUN_00AC8DF0, _mwPlyGetHdrInf)
+ *
+ * What it does:
+ * Parses one Sofdec .sfd header block into the caller header-info view.
+ */
+std::int32_t mwPlyGetHdrInf(const char* buffer, std::int32_t size, void* outHeaderInfo);
+
+/**
+ * Address: 0x00AC7D00 (FUN_00AC7D00, _mwPlyCalcWorkCprmSfd)
+ *
+ * What it does:
+ * Computes the Sofdec work-buffer size for the given create params; returns a
+ * value <= 0 on failure.
+ */
+std::int32_t mwPlyCalcWorkCprmSfd(void* createParams);
+
+/**
+ * Address: 0x00AC80C0 (FUN_00AC80C0, _mwPlyCreateSofdec)
+ *
+ * What it does:
+ * Creates one Sofdec playback handle from the create params + work buffer.
+ */
+moho::MwsfdPlaybackStateSubobj* mwPlyCreateSofdec(void* createParams);
+
+/**
+ * Address: 0x00AC9F60 (FUN_00AC9F60, _mwPlySetFrmSync)
+ *
+ * What it does:
+ * Sets the frame-sync mode on one Sofdec playback handle.
+ */
+void mwPlySetFrmSync(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t mode);
+
 namespace moho
 {
   extern bool debug_movie;
@@ -84,6 +121,46 @@ namespace moho
     };
 
     static_assert(sizeof(MoviePlaybackInfoDebugView) == 0x14, "MoviePlaybackInfoDebugView size must be 0x14");
+
+    // CRI Sofdec SDK external struct views (not engine objects). Field offsets
+    // are taken from FUN_00874060.asm and mirror moho::SofdecHeaderInfoRuntimeView
+    // in StartupHelpers.cpp, with the video width/height/composition lanes named.
+    struct SofdecSfdHeaderInfo
+    {
+      std::int32_t headerValid = 0;        // +0x00
+      std::int32_t streamType = 0;         // +0x04 (1 or 3 == valid SFD)
+      std::int32_t videoWidth = 0;         // +0x08
+      std::int32_t videoHeight = 0;        // +0x0C
+      std::int32_t frameRateTimes1000 = 0; // +0x10
+      std::int32_t frameCount = 0;         // +0x14
+      std::int32_t compositionMode = 0;    // +0x18
+      std::uint8_t reserved1C[0x10]{};     // +0x1C
+    };
+
+    static_assert(sizeof(SofdecSfdHeaderInfo) == 0x2C, "SofdecSfdHeaderInfo size must be 0x2C");
+
+    // _mwsfcre_MallocTab create-params; the binary memsets 0x30 bytes then fills.
+    struct SofdecCreateParams
+    {
+      std::int32_t ftype = 0;             // +0x00
+      std::int32_t maxBitsPerSecond = 0;  // +0x04
+      std::int32_t maxWidth = 0;          // +0x08
+      std::int32_t maxHeight = 0;         // +0x0C
+      std::int32_t framePoolWork = 0;     // +0x10
+      std::int32_t maxStreams = 0;        // +0x14
+      void* work = nullptr;               // +0x18
+      std::int32_t workSize = 0;          // +0x1C
+      std::int32_t bufferFormat = 0;      // +0x20
+      std::int32_t outerFramePoolNum = 0; // +0x24
+      std::uint8_t reserved28[0x08]{};    // +0x28
+    };
+
+    static_assert(sizeof(SofdecCreateParams) == 0x30, "SofdecCreateParams size must be 0x30");
+
+    constexpr std::int32_t kSofdecStatFailed = 4;
+    constexpr std::int32_t kSofdecStatPreparing = 1;
+    constexpr std::int32_t kMovieMaxBitsPerSecond = 6000000;
+    constexpr std::int32_t kSofdecHeaderProbeBytes = 5000;
   }
 
   /**
@@ -93,7 +170,7 @@ namespace moho
    * Destroys one previous Sofdec playback handle when present and stores the
    * replacement handle into the same slot.
    */
-  [[maybe_unused]] void ReplaceSofdecPlaybackHandle(
+  void ReplaceSofdecPlaybackHandle(
     MwsfdPlaybackStateSubobj* const replacement,
     MwsfdPlaybackStateSubobj** const slot
   )
@@ -261,6 +338,145 @@ namespace moho
 
     Dispose();
     return false;
+  }
+
+  /**
+   * Address: 0x00874060 (FUN_00874060, Moho::CMovie::OpenMovie)
+   *
+   * What it does:
+   * Resolves and opens a Sofdec .sfd movie: reads a 5000-byte header, parses and
+   * validates the SFD header, records frame count/rate, allocates the Sofdec work
+   * buffer, creates the player, waits out the prepare status loop, builds the
+   * movie texture, allocates the subtitle buffer, and uploads the first frame.
+   */
+  bool CMovie::OpenMovie(const char* const path)
+  {
+    gpg::Debugf("OpenMovie %s: %i", path, snd_index);
+    if (path == nullptr || *path == '\0') {
+      return false;
+    }
+
+    // Resolve the movie path through the process file wait-handle set.
+    FWaitHandleSet* const waitSet = FILE_GetWaitHandleSet();
+    msvc8::string resolvedPath{};
+    waitSet->mHandle->FindFile(&resolvedPath, path, nullptr);
+    if (resolvedPath.empty()) {
+      gpg::Warnf("Movie \"%s\" doesn't exist.", path);
+      return false;
+    }
+
+    mMovieName = resolvedPath;
+
+    // Open the resolved file and read up to the 5000-byte Sofdec header. The
+    // stream is closed as soon as the header is parsed (before the create work).
+    msvc8::auto_ptr<gpg::Stream> movieStream = DISK_OpenFileRead(mMovieName.c_str());
+    gpg::Stream* const stream = movieStream.get();
+
+    char headerBuffer[5004] = {};
+    const std::size_t buffered = static_cast<std::size_t>(stream->mReadEnd - stream->mReadHead);
+    if (buffered < static_cast<std::size_t>(kSofdecHeaderProbeBytes)) {
+      (void)stream->VirtRead(headerBuffer, static_cast<std::size_t>(kSofdecHeaderProbeBytes));
+    } else {
+      std::memcpy(headerBuffer, stream->mReadHead, static_cast<std::size_t>(kSofdecHeaderProbeBytes));
+      stream->mReadHead += kSofdecHeaderProbeBytes;
+    }
+
+    SofdecSfdHeaderInfo header{};
+    std::memset(&header, 0, sizeof(header));
+    (void)::mwPlyGetHdrInf(headerBuffer, kSofdecHeaderProbeBytes, &header);
+
+    if ((header.streamType != 3 && header.streamType != 1) || header.headerValid == 0) {
+      gpg::Warnf("%s is not a valid SFD file.", path);
+      Dispose();
+      return false;
+    }
+    movieStream.reset(nullptr);
+
+    mFrameRate = static_cast<float>(header.frameRateTimes1000) * 0.001f;
+    mFrameCount = header.frameCount;
+
+    SofdecCreateParams createParams{};
+    std::memset(&createParams, 0, sizeof(createParams));
+    createParams.ftype = header.streamType;
+    createParams.bufferFormat = header.compositionMode;
+    createParams.maxBitsPerSecond = kMovieMaxBitsPerSecond;
+    createParams.maxWidth = header.videoWidth;
+    createParams.maxHeight = header.videoHeight;
+    createParams.framePoolWork = 2;
+    createParams.maxStreams = 1;
+    createParams.outerFramePoolNum = 0;
+
+    const std::int32_t workSize = ::mwPlyCalcWorkCprmSfd(&createParams);
+    createParams.workSize = workSize;
+    if (workSize <= 0) {
+      gpg::Warnf("Failed to get a valid worksize for %s", path);
+      return false;
+    }
+
+    void* const workBuffer = std::malloc(static_cast<std::size_t>(workSize));
+    mWorkbuffer = boost::SharedPtrRaw<void>::with_deleter(workBuffer, &std::free);
+    createParams.work = mWorkbuffer.px;
+    if (mWorkbuffer.px == nullptr) {
+      gpg::Warnf("Failed to get a valid workbuffer for %s", path);
+      return false;
+    }
+    std::memset(mWorkbuffer.px, 0, static_cast<std::size_t>(createParams.workSize));
+
+    // Create the Sofdec player, destroying any prior handle first.
+    MwsfdPlaybackStateSubobj* const created = ::mwPlyCreateSofdec(&createParams);
+    ReplaceSofdecPlaybackHandle(created, &mPly);
+    if (created == nullptr || ::mwPlyGetStat(created) == kSofdecStatFailed) {
+      gpg::Warnf("mwPlyCreateSofdec failed for movie %s", path);
+      Dispose();
+      return false;
+    }
+
+    ::mwPlySetFrmSync(mPly, 0);
+    (void)::mwPlyPause(mPly, 1);
+
+    ::mwPlyStartFname(mPly, mMovieName.c_str());
+    if (::mwPlyGetStat(mPly) == kSofdecStatFailed) {
+      gpg::Warnf("initial mwPlyGetStat failed for movie %s", path);
+      Dispose();
+      return false;
+    }
+
+    // Cache decoded dimensions (height halved for interlaced composition mode).
+    mWidth = createParams.maxWidth;
+    mHeight = (::mwPlyFxGetCompoMode(mPly) == kSofdecInterlacedCompoMode)
+      ? (createParams.maxHeight / 2)
+      : createParams.maxHeight;
+
+    if (!CreateTexture()) {
+      gpg::Warnf("CreateTexture failed for movie %s", path);
+      Dispose();
+      return false;
+    }
+
+    // Prepare loop: pump vsync/exec until the player leaves the preparing state.
+    gpg::Debugf("Preparing movie %s: %i", path, snd_index);
+    std::int32_t stat = ::mwPlyGetStat(mPly);
+    if (stat == kSofdecStatFailed) {
+      gpg::Warnf("mwPlyGetStat failed for movie %s", path);
+      Dispose();
+      return false;
+    }
+    while (stat == kSofdecStatPreparing) {
+      (void)::ADXM_WaitVsync();
+      (void)::ADXM_ExecMain();
+      gpg::Debugf("Preparing movie %s: %i", path, snd_index);
+      stat = ::mwPlyGetStat(mPly);
+      if (stat == kSofdecStatFailed) {
+        gpg::Warnf("mwPlyGetStat failed for movie %s", path);
+        Dispose();
+        return false;
+      }
+    }
+
+    mSubtitleBuffer = gpg::AllocMemBuffer(256);
+    UploadCurrentFrameToTexture();
+    mPlaybackEnabled = 1;
+    return true;
   }
 
   /**
