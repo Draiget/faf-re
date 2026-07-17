@@ -80,6 +80,16 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
+     * Address: 0x00655350 (FUN_00655350, Moho::CEfxBeam::OnTick)
+     *
+     * What it does:
+     * Per-frame beam tick: ages lifetime (destroying expired beams), refreshes
+     * endpoint transforms, queues the beam payload when a camera can see it, and
+     * draws debug cap segments when dbg_EfxBeams is set.
+     */
+    void OnTick() override;
+
+    /**
      * Address: 0x00655690 (FUN_00655690, Moho::CEfxBeam::CanSeeCam)
      *
      * What it does:

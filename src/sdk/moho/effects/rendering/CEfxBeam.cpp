@@ -21,6 +21,22 @@
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
 
+#include "moho/particles/BeamRenderHelpers.h"
+#include "moho/particles/SParticleBuffer.h"
+#include "moho/sim/CDebugCanvas.h"
+#include "moho/ui/SDebugLine.h"
+
+namespace moho
+{
+  // Debug console flag defined in EffectLuaStartupRegistrations.cpp
+  // (?dbg_EfxBeams@Moho@@3_NA); when set, OnTick draws the beam cap segments.
+  extern bool dbg_EfxBeams;
+
+  // Rotates `vec` by `quat` into `dest` (defined in moho/math/QuaternionMath.cpp);
+  // no shared header declares it, so forward-declare the external symbol here.
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+} // namespace moho
+
 namespace
 {
   template <typename TType>
@@ -728,5 +744,92 @@ namespace moho
   gpg::RType* CEfxBeam::StaticGetClass()
   {
     return ResolveCachedType<CEfxBeam>(sType);
+  }
+
+  /**
+   * Address: 0x00655350 (FUN_00655350, Moho::CEfxBeam::OnTick)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CEfxBeam::OnTick(Moho::CEfxBeam *this);
+   *
+   * What it does:
+   * Per-frame beam update (IEffect::OnTick vtable slot). Established beams whose
+   * lifetime runs out are destroyed; otherwise the beam endpoint transforms are
+   * refreshed (Update) and, if any sync-filter camera can see the beam, the beam
+   * payload is queued into the sim particle buffer. When dbg_EfxBeams is set,
+   * draws the start/end cap segments as debug lines.
+   */
+  void CEfxBeam::OnTick()
+  {
+    // Established (non-newly-attached) beams age one tick; when their lifetime
+    // reaches zero after the decrement, the beam is destroyed instead of ticked.
+    if (!mNewAttachment) {
+      const float lifetime = GetFloatParam(BEAM_LIFETIME);
+      if (lifetime > 0.0f) {
+        SetFloatParam(BEAM_LIFETIME, lifetime - 1.0f);
+        if (GetFloatParam(BEAM_LIFETIME) <= 0.0f) {
+          ResolveEffectManager(this)->DestroyEffect(this);
+          return;
+        }
+      }
+    }
+
+    // Refresh endpoint transforms; new beams skip the refresh gate.
+    if (mIsNew && !Update()) {
+      return;
+    }
+
+    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    for (const GeomCamera3& camera : cameras) {
+      if (CanSeeCam(&camera)) {
+        AppendBeamToVector(sim->GetParticleBuffer()->mBeams, mBeam);
+        break;
+      }
+    }
+
+    if (!dbg_EfxBeams) {
+      return;
+    }
+
+    CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+    constexpr auto kDebugColor0 = static_cast<std::int32_t>(0xFF0000FFu);
+    constexpr auto kDebugColor1 = static_cast<std::int32_t>(0xFFFF0000u);
+
+    // Start-cap segment: current vs last start-cap world points, each computed
+    // as transform.pos + rotate(mStart, transform.orient).
+    Wm3::Vector3f lastStartOffset{};
+    (void)MultQuadVec(&lastStartOffset, &mBeam.mStart, &mBeam.mLastStart.orient_);
+    Wm3::Vector3f curStartOffset{};
+    (void)MultQuadVec(&curStartOffset, &mBeam.mStart, &mBeam.mCurStart.orient_);
+    SDebugLine startLine{};
+    startLine.p0.x = mBeam.mCurStart.pos_.x + curStartOffset.x;
+    startLine.p0.y = mBeam.mCurStart.pos_.y + curStartOffset.y;
+    startLine.p0.z = mBeam.mCurStart.pos_.z + curStartOffset.z;
+    startLine.p1.x = mBeam.mLastStart.pos_.x + lastStartOffset.x;
+    startLine.p1.y = mBeam.mLastStart.pos_.y + lastStartOffset.y;
+    startLine.p1.z = mBeam.mLastStart.pos_.z + lastStartOffset.z;
+    startLine.depth0 = kDebugColor0;
+    startLine.depth1 = kDebugColor1;
+    debugCanvas->DebugDrawLine(startLine);
+
+    // End-cap segment: which transform lane feeds the end cap depends on whether
+    // the beam grows from its start or its own end transforms.
+    const VTransform& lastEndTransform = mBeam.mFromStart ? mBeam.mLastEnd : mBeam.mLastStart;
+    const VTransform& curEndTransform = mBeam.mFromStart ? mBeam.mCurEnd : mBeam.mCurStart;
+    Wm3::Vector3f lastEndOffset{};
+    (void)MultQuadVec(&lastEndOffset, &mBeam.mEnd, &lastEndTransform.orient_);
+    Wm3::Vector3f curEndOffset{};
+    (void)MultQuadVec(&curEndOffset, &mBeam.mEnd, &curEndTransform.orient_);
+    SDebugLine endLine{};
+    endLine.p0.x = curEndTransform.pos_.x + curEndOffset.x;
+    endLine.p0.y = curEndTransform.pos_.y + curEndOffset.y;
+    endLine.p0.z = curEndTransform.pos_.z + curEndOffset.z;
+    endLine.p1.x = lastEndTransform.pos_.x + lastEndOffset.x;
+    endLine.p1.y = lastEndTransform.pos_.y + lastEndOffset.y;
+    endLine.p1.z = lastEndTransform.pos_.z + lastEndOffset.z;
+    endLine.depth0 = kDebugColor0;
+    endLine.depth1 = kDebugColor1;
+    debugCanvas->DebugDrawLine(endLine);
   }
 } // namespace moho
