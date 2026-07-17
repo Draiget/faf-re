@@ -23,8 +23,51 @@
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
 
+#include <intrin.h>
+
+#include "moho/misc/Stats.h"
+#include "moho/misc/StatItem.h"
+#include "moho/math/MathReflection.h"
+#include "moho/particles/BeamRenderHelpers.h"
+#include "moho/particles/SParticleBuffer.h"
+#include "moho/resource/CParticleTexture.h"
+#include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/STIMap.h"
+#include "moho/ui/SDebugLine.h"
+
+namespace moho
+{
+  // Debug console flags defined in EffectLuaStartupRegistrations.cpp / CWorldParticles.cpp.
+  extern bool dbg_Emitter;
+  extern float efx_WaterOffset;
+  extern float efx_ParticleWaterSurface;
+} // namespace moho
+
 namespace
 {
+  // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick.
+  moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
+  /**
+   * Reproduces the binary's ceil-of-peak idiom (frndint + underflow correction):
+   * `(int)nearbyint(x) + (x > nearbyint(x) ? 1 : 0)`.
+   */
+  [[nodiscard]] int CeilByRint(const float value) noexcept
+  {
+    const float rounded = std::nearbyint(value);
+    return static_cast<int>(rounded) + (value > rounded ? 1 : 0);
+  }
+
+  /**
+   * Round-toward-negative-infinity via the binary's frndint + underflow
+   * correction: `(int)nearbyint(x) - (x < nearbyint(x) ? 1 : 0)`.
+   */
+  [[nodiscard]] int FloorByRint(const float value) noexcept
+  {
+    const float rounded = std::nearbyint(value);
+    return static_cast<int>(rounded) - (value < rounded ? 1 : 0);
+  }
+
   struct EmbeddedDwordVectorHeaderOffset10RuntimeView
   {
     std::byte pad00_0F[0x10];
@@ -792,5 +835,438 @@ namespace moho
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
     archive->Write(ResolveVector3fType(), &mPos, nullOwner);
+  }
+
+  /**
+   * Address: 0x0065C7F0 (FUN_0065C7F0, IDA-mislabeled "Moho::SEfxCurve::UpdateCurve")
+   *
+   * IDA signature:
+   * void __usercall Moho::CEfxEmitter::UpdateCurve(Moho::CEfxEmitter *this@<eax>);
+   *
+   * What it does:
+   * Rebuilds the cached `mParticle` template from the current curve lanes and
+   * scalar params: refreshes the Z-curve mask, derives the integer peak lifetime
+   * bound, samples every masked curve into the embedded particle payload scaled
+   * by EFFECT_SCALE, selects the ramp type-tag string, rebinds the two particle
+   * textures, seeds the blend mode, and marks the emitter valid.
+   */
+  void CEfxEmitter::UpdateCurve()
+  {
+    UpdateCurveMask();
+
+    SEfxCurve* const curves = mCurves.begin();
+    const float* const params = mParams.start_;
+    const float scale = params[EFFECT_SCALE];
+
+    // Peak lifetime envelope: max over lifetime-curve keys of (z*0.5 + y),
+    // seeded with -infinity.
+    float lifetimePeak = -std::numeric_limits<float>::infinity();
+    {
+      const SEfxCurve& lifetimeCurve = curves[EMITTER_LIFETIME_CURVE];
+      for (const Wm3::Vector3f* key = lifetimeCurve.mKeys.begin();
+           key != lifetimeCurve.mKeys.end(); ++key) {
+        const float sample = (key->z * 0.5f) + key->y;
+        if (sample > lifetimePeak) {
+          lifetimePeak = sample;
+        }
+      }
+    }
+    mMaxLifetime = CeilByRint(lifetimePeak);
+
+    // mEnabled (byte @+0x00) carries the blueprint resistance flag (NOT mResistance).
+    mParticle.mEnabled = (mBlueprint != nullptr) && (mBlueprint->ParticleResistance != 0);
+
+    // mResistance (@+0x04) comes from the resistance curve only when masked.
+    if ((mZCurveMask & (1u << EMITTER_RESISTANCE_CURVE)) != 0u) {
+      mParticle.mResistance = curves[EMITTER_RESISTANCE_CURVE].GetValue(0.0f);
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_X_POSITION_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_Y_POSITION_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_Z_POSITION_CURVE)) != 0u) {
+      mParticle.mPos.x = curves[EMITTER_X_POSITION_CURVE].GetValue(0.0f) * scale;
+      mParticle.mPos.y = curves[EMITTER_Y_POSITION_CURVE].GetValue(0.0f) * scale;
+      mParticle.mPos.z = curves[EMITTER_Z_POSITION_CURVE].GetValue(0.0f) * scale;
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_X_ACCEL_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_Y_ACCEL_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_Z_ACCEL_CURVE)) != 0u) {
+      mParticle.mAccel.x = curves[EMITTER_X_ACCEL_CURVE].GetValue(0.0f) * scale;
+      mParticle.mAccel.y = curves[EMITTER_Y_ACCEL_CURVE].GetValue(0.0f) * scale;
+      mParticle.mAccel.z = curves[EMITTER_Z_ACCEL_CURVE].GetValue(0.0f) * scale;
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_XDIR_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_YDIR_CURVE)) != 0u
+        && (mZCurveMask & (1u << EMITTER_ZDIR_CURVE)) != 0u) {
+      mParticle.mDir.x = curves[EMITTER_XDIR_CURVE].GetValue(0.0f) * scale;
+      mParticle.mDir.y = curves[EMITTER_YDIR_CURVE].GetValue(0.0f) * scale;
+      mParticle.mDir.z = curves[EMITTER_ZDIR_CURVE].GetValue(0.0f) * scale;
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_LIFETIME_CURVE)) != 0u) {
+      const float lifetime = curves[EMITTER_LIFETIME_CURVE].GetValue(0.0f);
+      mParticle.mLifetime = (lifetime > 0.0f) ? lifetime : 0.0f;
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_BEGINSIZE_CURVE)) != 0u) {
+      mParticle.mBeginSize = curves[EMITTER_BEGINSIZE_CURVE].GetValue(0.0f) * scale;
+    }
+    if ((mZCurveMask & (1u << EMITTER_ENDSIZE_CURVE)) != 0u) {
+      mParticle.mEndSize = curves[EMITTER_ENDSIZE_CURVE].GetValue(0.0f) * scale;
+    }
+    if ((mZCurveMask & (1u << EMITTER_RAMPSELECTION_CURVE)) != 0u) {
+      mParticle.mRampSelection = curves[EMITTER_RAMPSELECTION_CURVE].GetValue(0.0f);
+    }
+
+    // Sort-order cache + per-frame reciprocals (all unconditional).
+    mParticle.mReserved54 = params[EFFECT_SORTORDER];
+    mParticle.mValue1 = 1.0f / params[EFFECT_FRAMECOUNT];
+    mParticle.mValue3 = 1.0f / params[EFFECT_TEXTURE_STRIPCOUNT];
+
+    // Framerate is sampled unconditionally; texture-selection only when masked.
+    mParticle.mFramerate = curves[EMITTER_FRAMERATE_CURVE].GetValue(0.0f);
+    if ((mZCurveMask & (1u << EMITTER_FRAMERATE_CURVE)) != 0u) {
+      const float texSel = curves[EMITTER_TEXTURESELECTION_CURVE].GetValue(0.0f);
+      mParticle.mTextureSelection = std::floor(texSel) * mParticle.mValue3;
+    }
+
+    // Ramp type-tag selection.
+    if (params[EFFECT_FRAMECOUNT] <= 1.0f && params[EFFECT_TEXTURE_STRIPCOUNT] <= 1.0f) {
+      if (params[EFFECT_ALIGN_ROTATION] > 0.0f) {
+        mParticle.mTypeTag = "TRampAlign";
+      } else if (params[EFFECT_ALIGN_TO_BONE] <= 0.0f) {
+        mParticle.mTypeTag = (params[EFFECT_FLAT] <= 0.0f) ? "TRamp" : "TRampFlat";
+      } else {
+        mParticle.mTypeTag = (params[EFFECT_FLAT] <= 0.0f) ? "TRampAlignToBone" : "TRampFlat";
+      }
+      mParticle.mTextureSelection = 0.0f;
+    } else if (params[EFFECT_ALIGN_ROTATION] > 0.0f) {
+      mParticle.mTypeTag = "TRampAnimateAlign";
+    } else if (params[EFFECT_ALIGN_TO_BONE] <= 0.0f) {
+      mParticle.mTypeTag = (params[EFFECT_FLAT] > 0.0f) ? "TRampAnimateFlat" : "TRampAnimate";
+    } else {
+      mParticle.mTypeTag = (params[EFFECT_FLAT] > 0.0f) ? "TRampAnimateFlat" : "TRampAnimateAlignToBone";
+    }
+
+    if ((mZCurveMask & (1u << EMITTER_ROTATION_RATE_CURVE)) != 0u) {
+      mParticle.mRotationCurve =
+        curves[EMITTER_ROTATION_RATE_CURVE].GetValue(0.0f) * 0.017453292f;
+    }
+
+    AssignCountedParticleTexturePtr(&mParticle.mTexture, mParticleTextures.start_[0]);
+    AssignCountedParticleTexturePtr(&mParticle.mRampTexture, mParticleTextures.start_[1]);
+
+    mParticle.mBlendMode = static_cast<SWorldParticle::BlendMode>(
+      static_cast<int>(params[EFFECT_BLENDMODE]));
+    mValid = true;
+  }
+
+  /**
+   * Address: 0x0065CE00 (FUN_0065CE00, Moho::CEfxEmitter::Tick)
+   *
+   * IDA signature:
+   * char __userpurge Moho::CEfxEmitter::Tick@<al>(Moho::CEfxEmitter *this@<ebx>, int tick);
+   *
+   * What it does:
+   * Emits the accumulated whole+fractional particle count for one sub-tick,
+   * building one SWorldParticle per emission from the emitter curves, attachment
+   * matrix, water clamp, and random scatter, then pushing each into the sim
+   * particle buffer. Returns false if a per-emission InterpolatePosition fails.
+   */
+  bool CEfxEmitter::Tick(const std::int32_t tick)
+  {
+    float* const paramsBase = mParams.start_;
+    const float repeatTime = paramsBase[EFFECT_REPEATTIME];
+    const float tickFloat = static_cast<float>(tick);
+
+    float ratePhase = std::fmod(paramsBase[EFFECT_TICKCOUNT] - tickFloat, repeatTime);
+    if ((ratePhase < 0.0f) != (repeatTime < 0.0f)) {
+      ratePhase += repeatTime;
+    }
+
+    mTotalEmissions = mCurves.begin()[EMITTER_EMITRATE_CURVE].GetValue(ratePhase) + mTotalEmissions;
+    // Whole emission count = floor(mTotalEmissions); the same whole part is then
+    // consumed from the accumulator (the binary computes floor twice on the
+    // identical value).
+    const int newEfx = FloorByRint(mTotalEmissions);
+    mTotalEmissions = mTotalEmissions - static_cast<float>(newEfx);
+
+    float emissionCursor = 0.0f;
+    float emissionStep = 0.0f;
+    bool result = false;
+    VMatrix4 attachMatrix{};
+
+    if (paramsBase[EFFECT_INTERPOLATE_EMISSION] <= 0.0f) {
+      result = InterpolatePosition(this, &attachMatrix, tick, 0.0f);
+    } else {
+      emissionStep = 1.0f / static_cast<float>(newEfx);
+    }
+
+    const float scale = paramsBase[EFFECT_SCALE];
+    if (newEfx <= 0) {
+      return result;
+    }
+
+    for (int emitted = 0; ; ++emitted) {
+      const float* const params = mParams.start_;
+      const float repeat = params[EFFECT_REPEATTIME];
+      float phase = std::fmod(params[EFFECT_TICKCOUNT] - tickFloat + emissionCursor, repeat);
+      if ((phase < 0.0f) != (repeat < 0.0f)) {
+        phase += repeat;
+      }
+      const float curvePhase = phase;
+
+      Wm3::Vec3f localOffset{};
+      if ((mZCurveMask & 0x3800u) == 0x3800u) {
+        localOffset = mParticle.mPos;
+      } else {
+        localOffset.x = mCurves.begin()[EMITTER_X_POSITION_CURVE].GetValue(curvePhase) * scale;
+        localOffset.y = mCurves.begin()[EMITTER_Y_POSITION_CURVE].GetValue(curvePhase) * scale;
+        localOffset.z = mCurves.begin()[EMITTER_Z_POSITION_CURVE].GetValue(curvePhase) * scale;
+      }
+
+      if (params[EFFECT_INTERPOLATE_EMISSION] > 0.0f) {
+        result = InterpolatePosition(this, &attachMatrix, tick, emissionCursor);
+        if (!result) {
+          return result;
+        }
+      }
+
+      SWorldParticle particle(mParticle);
+      const float* const p = mParams.start_;
+      const float ox = p[EFFECT_POSITION_X] + localOffset.x;
+      const float oy = localOffset.y + p[EFFECT_POSITION_Y];
+      const float oz = localOffset.z + p[EFFECT_POSITION_Z];
+
+      const float worldX = (((attachMatrix.r[2].x * oz) + (attachMatrix.r[1].x * oy))
+                          + (attachMatrix.r[0].x * ox)) + attachMatrix.r[3].x;
+      const float worldY = (((attachMatrix.r[2].y * oz) + (attachMatrix.r[1].y * oy))
+                          + (attachMatrix.r[0].y * ox)) + attachMatrix.r[3].y;
+      const float worldZ = (((attachMatrix.r[2].z * oz) + (attachMatrix.r[1].z * oy))
+                          + (attachMatrix.r[0].z * ox)) + attachMatrix.r[3].z;
+
+      float emitY = worldY;
+      if (p[EFFECT_SNAPTOWATERLINE] > 0.0f) {
+        STIMap* const map = ResolveEffectManager(this)->GetSim()->mMapData;
+        const float waterElevation = map->mWaterEnabled ? map->mWaterElevation : -10000.0f;
+        if (efx_ParticleWaterSurface <= mParams.start_[EFFECT_SORTORDER]) {
+          const float above = waterElevation + efx_WaterOffset;
+          emitY = (above > worldY) ? above : worldY;
+        } else {
+          const float below = waterElevation - efx_WaterOffset;
+          emitY = (below <= worldY) ? below : worldY;
+        }
+      }
+
+      bool skipEmission = false;
+      if (mParams.start_[EFFECT_ONLYEMITONWATER] > 0.0f) {
+        STIMap* const map = ResolveEffectManager(this)->GetSim()->mMapData;
+        const float elevation = map->GetHeightField()->GetElevation(worldX, worldZ);
+        const float waterElevation = map->mWaterEnabled ? map->mWaterElevation : -10000.0f;
+        if (elevation > waterElevation) {
+          skipEmission = true;
+        } else {
+          emitY = efx_WaterOffset + waterElevation;
+        }
+      }
+
+      if (!skipEmission) {
+        const float sizeSample = mCurves.begin()[EMITTER_SIZE_CURVE].GetValue(curvePhase) * scale;
+
+        const float rand0 = static_cast<float>(MathGlobalRandomUnitSafe());
+        const float rand1 = static_cast<float>(MathGlobalRandomUnitSafe());
+        Wm3::Vec3f scatter{};
+        scatter.y = 0.0f;
+        scatter.x = rand1 - 0.5f;
+        scatter.z = rand0 - 0.5f;
+        (void)Wm3::Vector3f::Normalize(&scatter);
+        const float rand2 = static_cast<float>(MathGlobalRandomUnitSafe());
+        const float scatterMag = (rand2 - 0.5f) * sizeSample;
+
+        particle.mPos.x = (scatterMag * scatter.x) + worldX;
+        particle.mPos.y = emitY + (scatter.y * scatterMag);
+        particle.mPos.z = (scatter.z * scatterMag) + worldZ;
+
+        if ((mZCurveMask & 0x1C0u) != 0x1C0u) {
+          particle.mAccel.x = mCurves.begin()[EMITTER_X_ACCEL_CURVE].GetValue(curvePhase) * scale;
+          particle.mAccel.y = mCurves.begin()[EMITTER_Y_ACCEL_CURVE].GetValue(curvePhase) * scale;
+          particle.mAccel.z = mCurves.begin()[EMITTER_Z_ACCEL_CURVE].GetValue(curvePhase) * scale;
+        }
+
+        float accelY = particle.mAccel.y;
+        if (mParams.start_[EFFECT_USE_LOCAL_ACCELERATION] > 0.0f) {
+          accelY = ((particle.mAccel.y * attachMatrix.r[1].y)
+                  + (particle.mAccel.z * attachMatrix.r[2].y)) + (attachMatrix.r[0].y * particle.mAccel.x);
+          const float accelZ = ((particle.mAccel.y * attachMatrix.r[1].z)
+                  + (particle.mAccel.z * attachMatrix.r[2].z)) + (attachMatrix.r[0].z * particle.mAccel.x);
+          particle.mAccel.x = ((particle.mAccel.y * attachMatrix.r[1].x)
+                  + (particle.mAccel.z * attachMatrix.r[2].x)) + (particle.mAccel.x * attachMatrix.r[0].x);
+          particle.mAccel.y = accelY;
+          particle.mAccel.z = accelZ;
+        }
+        particle.mAccel.y = accelY - (mParams.start_[EFFECT_USE_GRAVITY] * 0.02f);
+
+        if ((mZCurveMask & 0x7u) != 0x7u) {
+          particle.mDir.x = mCurves.begin()[EMITTER_XDIR_CURVE].GetValue(curvePhase) * scale;
+          particle.mDir.y = mCurves.begin()[EMITTER_YDIR_CURVE].GetValue(curvePhase) * scale;
+          particle.mDir.z = mCurves.begin()[EMITTER_ZDIR_CURVE].GetValue(curvePhase) * scale;
+        }
+        if (mParams.start_[EFFECT_USE_LOCAL_VELOCITY] > 0.0f) {
+          const float dirY = ((particle.mDir.y * attachMatrix.r[1].y)
+                  + (particle.mDir.z * attachMatrix.r[2].y)) + (attachMatrix.r[0].y * particle.mDir.x);
+          const float dirZ = ((particle.mDir.y * attachMatrix.r[1].z)
+                  + (particle.mDir.z * attachMatrix.r[2].z)) + (attachMatrix.r[0].z * particle.mDir.x);
+          particle.mDir.x = ((particle.mDir.y * attachMatrix.r[1].x)
+                  + (particle.mDir.z * attachMatrix.r[2].x)) + (particle.mDir.x * attachMatrix.r[0].x);
+          particle.mDir.y = dirY;
+          particle.mDir.z = dirZ;
+        }
+        const float velocity = mCurves.begin()[EMITTER_VELOCITY_CURVE].GetValue(curvePhase);
+        particle.mDir.x *= velocity;
+        particle.mDir.y *= velocity;
+        particle.mDir.z *= velocity;
+
+        particle.mResistance = mCurves.begin()[EMITTER_RESISTANCE_CURVE].GetValue(curvePhase);
+        particle.mInterop = emissionCursor - tickFloat;
+
+        if ((mZCurveMask & 0x10u) == 0u) {
+          const float lifetime = mCurves.begin()[EMITTER_LIFETIME_CURVE].GetValue(curvePhase);
+          particle.mLifetime = (lifetime > 0.0f) ? lifetime : 0.0f;
+        }
+        if ((mZCurveMask & 0x4000u) == 0u) {
+          particle.mBeginSize = mCurves.begin()[EMITTER_BEGINSIZE_CURVE].GetValue(curvePhase) * scale;
+        }
+        if ((mZCurveMask & 0x8000u) == 0u) {
+          particle.mEndSize = mCurves.begin()[EMITTER_ENDSIZE_CURVE].GetValue(curvePhase) * scale;
+        }
+        if ((mZCurveMask & 0x100000u) == 0u) {
+          particle.mRampSelection = mCurves.begin()[EMITTER_RAMPSELECTION_CURVE].GetValue(curvePhase);
+        }
+        if ((mZCurveMask & 0x40000u) == 0u) {
+          particle.mFramerate = mCurves.begin()[EMITTER_FRAMERATE_CURVE].GetValue(curvePhase);
+        }
+        if ((mZCurveMask & 0x80000u) == 0u) {
+          const float texSel = mCurves.begin()[EMITTER_TEXTURESELECTION_CURVE].GetValue(curvePhase);
+          particle.mTextureSelection = std::floor(texSel) * particle.mValue3;
+        }
+
+        if (mParams.start_[EFFECT_ALIGN_TO_BONE] <= 0.0f) {
+          particle.mAngle = mCurves.begin()[EMITTER_ROTATION_CURVE].GetValue(curvePhase) * 0.017453292f;
+        } else {
+          Wm3::Vec3f boneAxis{ attachMatrix.r[2].x, attachMatrix.r[2].y, attachMatrix.r[2].z };
+          if (mParams.start_[EFFECT_FLAT] > 0.0f) {
+            (void)Wm3::Vector3f::Normalize(&boneAxis);
+            particle.mAngle = std::atan2(-boneAxis.x, boneAxis.z);
+          } else {
+            particle.mDir.x = attachMatrix.r[2].x;
+            particle.mDir.y = attachMatrix.r[2].y;
+            particle.mDir.z = attachMatrix.r[2].z;
+          }
+        }
+
+        if ((mZCurveMask & 0x20000u) == 0u) {
+          particle.mRotationCurve = mCurves.begin()[EMITTER_ROTATION_RATE_CURVE].GetValue(curvePhase) * 0.017453292f;
+        }
+
+        Sim* const sim = ResolveEffectManager(this)->GetSim();
+        AppendWorldParticleToVector(sim->GetParticleBuffer()->mParticles, particle);
+      }
+
+      emissionCursor += emissionStep;
+      result = ((emitted + 1) & 0xFF) != 0;
+      if (emitted + 1 >= newEfx) {
+        return result;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x0065DAC0 (FUN_0065DAC0, Moho::CEfxEmitter::OnTick)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CEfxEmitter::OnTick(Moho::CEfxEmitter *this);
+   *
+   * What it does:
+   * Per-frame emitter tick: refreshes the cached position every third tick (for
+   * emit/create-if-visible blueprints), gates on lifetime/visibility, bumps the
+   * active-emitter engine stat, rebuilds curves when invalid, then drives the
+   * per-sub-tick particle emission loop (Tick), advancing the effect clock.
+   */
+  void CEfxEmitter::OnTick()
+  {
+    const float* const start = mParams.start_;
+    if ((start[EFFECT_EMITIFVISIBLE] > 0.0f || start[EFFECT_CREATEIFVISIBLE] > 0.0f)
+        && (ResolveEffectManager(this)->GetSim()->mCurTick % 3u) == 0u) {
+      VMatrix4 attachMatrix{};
+      (void)InterpolatePosition(this, &attachMatrix, 0, 0.0f);
+      const float* const p = mParams.start_;
+      const float sx = p[EFFECT_POSITION_X];
+      const float sy = p[EFFECT_POSITION_Y];
+      const float sz = p[EFFECT_POSITION_Z];
+      const float worldY = (((attachMatrix.r[0].y * sx) + (attachMatrix.r[1].y * sy))
+                          + (attachMatrix.r[2].y * sz)) + attachMatrix.r[3].y;
+      const float worldZ = (((attachMatrix.r[0].z * sx) + (attachMatrix.r[1].z * sy))
+                          + (attachMatrix.r[2].z * sz)) + attachMatrix.r[3].z;
+      mPos.x = (((attachMatrix.r[2].x * sz) + (attachMatrix.r[1].x * sy))
+              + (attachMatrix.r[0].x * sx)) + attachMatrix.r[3].x;
+      mPos.y = worldY;
+      mPos.z = worldZ;
+    }
+
+    if (ProcessLifetime() || !IsVisible()) {
+      return;
+    }
+
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      EngineStats* const engineStats = GetEngineStats();
+      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
+    }
+    _InterlockedExchangeAdd(
+      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+
+    if (!mValid) {
+      UpdateCurve();
+    }
+
+    int life = static_cast<int>(mLife);
+    if (life >= 24) {
+      life = 24;
+    }
+    int subTicks = mMaxLifetime;
+    mLife = static_cast<std::uint32_t>(life);
+    if (life < subTicks) {
+      subTicks = life;
+    }
+
+    for (mLife = static_cast<std::uint32_t>(subTicks); subTicks > 0; --subTicks) {
+      Tick(subTicks);
+    }
+    mLife = 0u;
+    Tick(0);
+
+    mParams.start_[EFFECT_TICKCOUNT] =
+      mParams.start_[EFFECT_TICKINCREMENT] + mParams.start_[EFFECT_TICKCOUNT];
+
+    if (dbg_Emitter) {
+      Sim* const sim = ResolveEffectManager(this)->GetSim();
+      CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+      VMatrix4 startMatrix{};
+      VMatrix4 endMatrix{};
+      (void)InterpolatePosition(this, &startMatrix, 0, 0.0f);
+      (void)InterpolatePosition(this, &endMatrix, 0, 1.0f);
+      SDebugLine line{};
+      line.p0.x = startMatrix.r[3].x;
+      line.p0.y = startMatrix.r[3].y;
+      line.p0.z = startMatrix.r[3].z;
+      line.p1.x = endMatrix.r[3].x;
+      line.p1.y = endMatrix.r[3].y;
+      line.p1.z = endMatrix.r[3].z;
+      line.depth0 = static_cast<std::int32_t>(0xFF0000FFu);
+      line.depth1 = static_cast<std::int32_t>(0xFFFF0000u);
+      debugCanvas->DebugDrawLine(line);
+    }
   }
 } // namespace moho
