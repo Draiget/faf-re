@@ -83,8 +83,11 @@ int CFactoryBuildTask::Execute() { return 0; }
 // Moho::CUnitCarrierLaunch::TaskTick) — see the real state-machine body
 // there that drives the carrier-launch four-state flow.
 
-// ===== MapImager virtual destructor proxy =====
-void MapImager::VirtualDtor() {}
+// MapImager::VirtualDtor (FUN_007D9B90, vtable slot 0 scalar deleting dtor) is
+// recovered in src/sdk/moho/render/MapImager.cpp — the real body runs the
+// MapImager teardown (ClearBorder + vector-storage release) that the empty
+// stub silently skipped (leaking the border mesh instances on viewport
+// teardown).
 
 // ===== Constructors (no-op default-init) =====
 CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
