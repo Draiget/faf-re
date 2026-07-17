@@ -49,6 +49,7 @@ namespace moho
   class CScrLuaInitForm;
   class CUIManager;
   class IClient;
+  class IClientMgrUIInterface;
   class CUIWorldView;
   class CLuaWldUIProvider;
   class CUIWorldMesh;
@@ -3523,6 +3524,16 @@ namespace moho
    * nickname. CWldUiInterface's ReceiveChat override.
    */
   void UI_ReceiveChat(const IClient* sender, gpg::MemBuffer<const char> data);
+
+  /**
+   * Address: 0x0088B960 (FUN_0088B960, Moho::CWldUiInterface::NoteGameSpeedChanged)
+   *
+   * What it does:
+   * Posts the driver-gated game-speed-changed notice for this interface's local
+   * player slot onto the main thread. CWldUiInterface's NoteGameSpeedChanged
+   * override.
+   */
+  void UI_InterfaceNoteGameSpeedChanged(const IClientMgrUIInterface* self, std::int32_t gameSpeed);
 
   void UI_ReportBottleneck(const SClientBottleneckInfo& info);
 
