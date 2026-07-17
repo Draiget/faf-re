@@ -124,7 +124,39 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive);
 
+    /**
+     * Address: 0x005F7440 (FUN_005F7440, Moho::CUnitMobileBuildTask::TaskTick)
+     *
+     * VFTable SLOT: 1
+     *
+     * What it does:
+     * Mobile engineer build-task state machine (Preparing/Waiting/Starting/
+     * Processing/Complete): clears obstructing props, moves the builder into
+     * range, faces the target, spawns/adopts the seed unit, drives the build
+     * helper to completion, then issues the rebuild-upgrade or factory-rally
+     * follow-up. Returns the scheduler code (-1/0/1/10/50).
+     */
+    int Execute() override;
+
     void OnEvent(ECommandEvent) override {}
+
+  private:
+    /**
+     * Address: 0x005F6C70 (FUN_005F6C70, sub_5F6C70)
+     *
+     * Sphere-queries units on the build site for a live, being-built unit of the
+     * target blueprint coincident with the build position (the "seed").
+     */
+    [[nodiscard]] Unit* FindExistingSeedUnitOnSite() const;
+
+    /**
+     * Address: 0x005F6EA0 (FUN_005F6EA0, sub_5F6EA0)
+     *
+     * Box-queries ObstructsBuild props over the footprint; on a RebuildBonus id
+     * match binds the pending-build entity (returns null), else returns the
+     * nearest obstructing prop to reclaim.
+     */
+    [[nodiscard]] Entity* FindObstructingPropToReclaim();
 
   public:
     CBuildTaskHelper mBuildHelper;       // 0x40
