@@ -102,8 +102,10 @@ CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
 // CLuaWldUIProvider ctor (FUN_0086A530) and dtor (FUN_0086A5D0) are recovered
 // 1:1 in src/sdk/moho/ui/UiRuntimeTypes.cpp — the former empty-stub
 // false-recoveries here were removed in favor of the real bodies.
-gpg::RType* CLuaWldUIProvider::GetClass() const { return nullptr; }
-gpg::RRef CLuaWldUIProvider::GetDerivedObjectRef() { return {}; }
+// CLuaWldUIProvider::GetClass (FUN_0086A380) and GetDerivedObjectRef
+// (FUN_0086A3C0) are recovered in src/sdk/moho/ui/UiRuntimeTypes.cpp — GetClass
+// returns the cached CLuaWldUIProvider reflection type (the nullptr stub broke
+// reflection) and GetDerivedObjectRef packs the {object, type} RRef handle.
 void CLuaWldUIProvider::CreateGameInterface(bool) {}
 
 CameraImpl::CameraImpl(gpg::StrArg, const STIMap&, LuaPlus::LuaState*) {}
