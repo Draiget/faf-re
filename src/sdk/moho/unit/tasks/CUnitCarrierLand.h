@@ -24,6 +24,16 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00606610 (FUN_00606610, Moho::CUnitCarrierLand::~CUnitCarrierLand)
+     *
+     * What it does:
+     * Aborts an in-progress carrier landing (clears carrier motion/state,
+     * releases the focus-entity link, resets the flyer to climb, clears the
+     * target carrier's transport reservation) before base teardown.
+     */
+    ~CUnitCarrierLand() override;
+
+    /**
      * Address: 0x006086C0 (FUN_006086C0, Moho::CUnitCarrierLand::MemberDeserialize)
      *
      * What it does:

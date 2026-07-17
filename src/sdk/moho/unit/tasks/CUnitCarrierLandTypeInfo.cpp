@@ -9,9 +9,15 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
+#include "moho/unit/CUnitMotion.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitCarrierLand.h"
 #include "Wm3Vector3.h"
+
+#include <limits>
 
 namespace
 {
@@ -261,6 +267,47 @@ namespace moho
     archive->Write(CachedVector3fType(), &mCarrierAttachPos, ownerRef);
     archive->Write(CachedVector3fType(), &mCarrierAttachDir, ownerRef);
     archive->Write(CachedVector3fType(), &mCarrierApproachPos, ownerRef);
+  }
+
+  /**
+   * Address: 0x00606610 (FUN_00606610, Moho::CUnitCarrierLand::~CUnitCarrierLand)
+   *
+   * What it does:
+   * Aborts an in-progress carrier landing: clears the unit's carrier motion
+   * event and the carrier-landing state bit, releases the focus-entity weak
+   * link, and — unless the unit already loaded — resets the flyer to climb
+   * (height infinity, air layer) and clears the target carrier's transport
+   * reservation. Publishes the dispatch result, unlinks the target-carrier weak
+   * pointer, then runs the base command-task teardown.
+   */
+  CUnitCarrierLand::~CUnitCarrierLand()
+  {
+    Unit* const unit = mUnit;
+
+    if (CUnitMotion* const motion = unit->UnitMotion) {
+      motion->mCarrierEvent = static_cast<EUnitMotionCarrierEvent>(0);
+    }
+    unit->UnitStateMask &= ~static_cast<std::uint64_t>(0x100u);
+
+    // Release the focus-entity weak link this carrier-land task established.
+    unit->FocusEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    unit->NeedSyncGameData = true;
+
+    if (!mHasLoadedIntoCarrier) {
+      if (CUnitMotion* const motion = unit->UnitMotion) {
+        motion->mHeight = std::numeric_limits<float>::infinity();
+        motion->mLayer = LAYER_Air;
+      }
+      if (Unit* const targetCarrier = mTargetCarrier.GetObjectPtr()) {
+        if (!targetCarrier->IsDead() && targetCarrier->AiTransport != nullptr) {
+          targetCarrier->AiTransport->TransportClearReservation(unit);
+        }
+      }
+    }
+
+    *mDispatchResult = static_cast<EAiResult>(2 - static_cast<int>(mHasLoadedIntoCarrier));
+
+    mTargetCarrier.UnlinkFromOwnerChain();
   }
 
   /**
