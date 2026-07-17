@@ -24,12 +24,11 @@ namespace moho
 // linker resolves the reflection-callback slots to the real allocators /
 // destructors. Stubs removed to avoid the multiple-definition shadow.
 
-// ===== CFactoryBuildTask static factory =====
-CFactoryBuildTask* CFactoryBuildTask::Create(
-    CCommandTask*, const RUnitBlueprint*, CUnitCommand*, Unit*)
-{
-    return nullptr;
-}
+// CFactoryBuildTask::Create (FUN_005FAD00) is recovered in
+// src/sdk/moho/unit/tasks/CFactoryBuildTask.cpp — the real body allocates a
+// 0x94-byte CFactoryBuildTask and placement-constructs it via the recovered
+// dispatch-bound ctor (FUN_005F9F20). Replaces the no-op null-returning stub
+// that left IAiCommandDispatchImpl / CUnitGuardTask build dispatch inert.
 
 // ===== Unit serialization static helpers =====
 // Unit::MemberConstruct recovered in src/sdk/moho/unit/core/Unit.cpp
