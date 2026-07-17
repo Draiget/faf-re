@@ -22508,6 +22508,47 @@ void moho::CMauiEdit::HandleClickEvent(SMauiEventData* const eventData)
 }
 
 /**
+ * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
+ *
+ * What it does:
+ * IMauiDragger::DragMove override for the edit's embedded click-dragger: maps
+ * the current mouse X to the nearest character index in the clipped text, then
+ * extends the selection between the drag-start caret and that index (clearing it
+ * when they coincide) and moves the caret to the dragged-to position.
+ *
+ * Notes:
+ * Recovered as a free function taking the IMauiDragger sub-object pointer (the
+ * dragger lives at CMauiEdit + 0x11C = mClickDraggerStorage); the owning edit is
+ * recovered by unadjusting that multiple-inheritance sub-object offset.
+ */
+void moho::CMauiEditDragMove(IMauiDragger* const dragger, const SMauiEventData* const eventData)
+{
+  auto* const edit =
+    reinterpret_cast<CMauiEdit*>(reinterpret_cast<char*>(dragger) - 0x11C);
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
+
+  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&editView->mLeftLV);
+  msvc8::string clippedText = gpg::STR_Utf8SubString(editView->mText.c_str(), editView->mClipOffset, editView->mClipLength);
+  const int caretIndex = editView->mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + editView->mClipOffset;
+
+  const int dragStart = editView->mDragStart;
+  if (caretIndex == dragStart) {
+    editView->mSelectionStart = 0;
+    editView->mSelectionEnd = 0;
+    return;
+  }
+
+  if (caretIndex >= dragStart) {
+    editView->mSelectionStart = dragStart;
+    editView->mSelectionEnd = caretIndex;
+  } else {
+    editView->mSelectionStart = caretIndex;
+    editView->mSelectionEnd = dragStart;
+  }
+  edit->SetCaretPosition(caretIndex);
+}
+
+/**
  * Address: 0x00791780 (FUN_00791780, Moho::CMauiEdit::HandleKeyEvent)
  *
  * What it does:
