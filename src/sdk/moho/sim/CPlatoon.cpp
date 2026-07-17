@@ -1,5 +1,6 @@
 #include "moho/sim/CPlatoon.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -4070,6 +4071,151 @@ namespace moho
 
     lua_pushboolean(state->m_state, totalAvailable != 0 ? 1 : 0);
     (void)lua_gettop(state->m_state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x0072D8F0 (FUN_0072D8F0, cfunc_CPlatoonFormPlatoonL)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Implements `CPlatoon:FormPlatoon(platoonName, squadTemplate, ...)`. Creates a
+   * fresh platoon on the owning army, then for each squad spec gathers unassigned
+   * units matching the filter (optionally distance-filtered nearest-first to a
+   * center/radius), pulls them out of any prior platoon, and assigns them into
+   * the matching squad (created if absent). Returns the new platoon's Lua object.
+   */
+  int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < 3 || argumentCount > 5) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kFormPlatoonHelpText, 3, 5, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    const LuaPlus::LuaObject templatesObject(LuaPlus::LuaStackObject(state, 2));
+
+    const int templateCount = templatesObject.GetCount();
+    const LuaPlus::LuaObject nameObject = templatesObject[1];
+    const msvc8::string platoonName(nameObject.GetString());
+    const LuaPlus::LuaObject planObject = templatesObject[2];
+    const msvc8::string platoonPlan(planObject.GetString());
+
+    CPlatoon* const newPlatoon = platoon->mArmy->MakePlatoon(platoonName.data(), platoonPlan.data());
+
+    for (int specIndex = 1; specIndex <= templateCount; ++specIndex) {
+      const LuaPlus::LuaObject squadSpec = templatesObject[specIndex];
+      if (!squadSpec.IsTable()) {
+        continue;  // skip the leading name/plan string entries
+      }
+
+      const LuaPlus::LuaObject unitFilter = squadSpec[1];
+      const LuaPlus::LuaObject baseCountObject = squadSpec[3];
+      const int baseCount = baseCountObject.GetInteger();
+
+      const LuaPlus::LuaObject multiplierObject = squadSpec[5];
+      const float scaledSize = static_cast<float>(multiplierObject.GetNumber()) * static_cast<float>(baseCount);
+      const int requiredSize = static_cast<int>(std::floor(scaledSize));
+
+      ESquadClass squadClass = static_cast<ESquadClass>(0);
+      gpg::RRef enumRef{};
+      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      const LuaPlus::LuaObject squadClassNameObject = squadSpec[4];
+      const char* const squadClassName = squadClassNameObject.GetString();
+      SCR_GetEnum(state, squadClassName, enumRef);
+
+      SEntitySetTemplateUnit ref{};
+      if (argumentCount <= 4) {
+        if (unitFilter.IsString()) {
+          newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), requiredSize, ref);
+        } else {
+          const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
+          newPlatoon->GetUnassignedUnitsInCategory(category, requiredSize, ref);
+        }
+      } else {
+        SEntitySetTemplateUnit candidates{};
+        if (unitFilter.IsString()) {
+          newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
+        } else {
+          const EntityCategorySet* const category = func_GetCObj_EntityCategory(unitFilter);
+          newPlatoon->GetUnassignedUnitsInCategory(category, 1000, candidates);
+        }
+
+        const LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 4));
+        const Wm3::Vector3f center = SCR_FromLuaCopy<Wm3::Vector3<float>>(centerObject);
+
+        LuaPlus::LuaStackObject radiusArg(state, 5);
+        if (lua_type(state->m_state, 5) != kLuaNumberTypeTag) {
+          LuaPlus::LuaStackObject::TypeError(&radiusArg, "number");
+        }
+        const float radius = static_cast<float>(lua_tonumber(state->m_state, 5));
+        const float radiusSquared = radius * radius;
+
+        struct CandidateDistance
+        {
+          Unit* unit;
+          float distanceSquared;
+        };
+        std::vector<CandidateDistance> nearbyUnits;
+        for (Entity* const* entityIt = candidates.mVec.begin(); entityIt != candidates.mVec.end(); ++entityIt) {
+          Entity* const entity = *entityIt;
+          if (entity == nullptr) {
+            continue;
+          }
+          Unit* const unit = static_cast<Unit*>(entity);
+          if (unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+            continue;
+          }
+          const Wm3::Vec3f& unitPosition = unit->GetPosition();
+          const float deltaX = unitPosition.x - center.x;
+          const float deltaZ = unitPosition.z - center.z;
+          const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+          if (radiusSquared > distanceSquared) {
+            nearbyUnits.push_back(CandidateDistance{unit, distanceSquared});
+          }
+        }
+
+        std::sort(
+          nearbyUnits.begin(),
+          nearbyUnits.end(),
+          [](const CandidateDistance& lhs, const CandidateDistance& rhs) noexcept {
+            return lhs.distanceSquared < rhs.distanceSquared;
+          }
+        );
+
+        int added = 0;
+        for (const CandidateDistance& candidate : nearbyUnits) {
+          (void)ref.AddUnit(candidate.unit);
+          if (++added == requiredSize) {
+            break;
+          }
+        }
+      }
+
+      newPlatoon->mArmy->RemoveUnitsFromPlatoons(&ref);
+
+      CSquad* squad = nullptr;
+      for (CSquad** squadIt = newPlatoon->mSquadList.begin(); squadIt != newPlatoon->mSquadList.end(); ++squadIt) {
+        if (*squadIt != nullptr && (*squadIt)->mSquadClass == squadClass) {
+          squad = *squadIt;
+          break;
+        }
+      }
+      if (squad == nullptr) {
+        squad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, squadClassName);
+      }
+
+      squad->mUnits.AddRange(ref.mVec.begin(), ref.mVec.end());
+      newPlatoon->mHasLuaList = 0;
+    }
+
+    newPlatoon->mLuaUnitList.PushStack(state);
     return 1;
   }
 
