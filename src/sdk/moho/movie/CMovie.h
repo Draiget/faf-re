@@ -94,6 +94,21 @@ namespace moho
     bool CreateTexture();
 
     /**
+     * Address: 0x00874060 (FUN_00874060, Moho::CMovie::OpenMovie)
+     *
+     * IDA signature:
+     * char __thiscall Moho::CMovie::OpenMovie(Moho::CMovie *this, const char *path);
+     *
+     * What it does:
+     * Opens a Sofdec (.sfd) movie: resolves the path through the file wait-handle
+     * set, reads and validates the SFD header, records frame count/rate, allocates
+     * the Sofdec work buffer, creates the player, waits out the prepare status
+     * loop, builds the movie texture, allocates the subtitle buffer, and uploads
+     * the first frame. Returns true on success.
+     */
+    bool OpenMovie(const char* path);
+
+    /**
      * Address: 0x00874590 (FUN_00874590, Moho::CMovie::PlayMovie)
      *
      * What it does:
@@ -182,7 +197,8 @@ namespace moho
     boost::SharedPtrRaw<void> mWorkbuffer{}; // +0x2C (Sofdec work buffer shared owner)
     std::int32_t mWidth = 0;             // +0x34
     std::int32_t mHeight = 0;            // +0x38
-    std::uint8_t mReserved3C_43[0x08]{}; // +0x3C
+    std::int32_t mFrameCount = 0;        // +0x3C
+    float mFrameRate = 0.0f;             // +0x40
     msvc8::string mMovieName{};          // +0x44
     msvc8::string mSubtitleText{};       // +0x60
     std::uint8_t mFrameAdvanceBlocked = 0; // +0x7C
@@ -197,6 +213,8 @@ namespace moho
   static_assert(offsetof(CMovie, mWorkbuffer) == 0x2C, "CMovie::mWorkbuffer offset must be 0x2C");
   static_assert(offsetof(CMovie, mWidth) == 0x34, "CMovie::mWidth offset must be 0x34");
   static_assert(offsetof(CMovie, mHeight) == 0x38, "CMovie::mHeight offset must be 0x38");
+  static_assert(offsetof(CMovie, mFrameCount) == 0x3C, "CMovie::mFrameCount offset must be 0x3C");
+  static_assert(offsetof(CMovie, mFrameRate) == 0x40, "CMovie::mFrameRate offset must be 0x40");
   static_assert(offsetof(CMovie, mMovieName) == 0x44, "CMovie::mMovieName offset must be 0x44");
   static_assert(offsetof(CMovie, mSubtitleText) == 0x60, "CMovie::mSubtitleText offset must be 0x60");
   static_assert(offsetof(CMovie, mFrameAdvanceBlocked) == 0x7C, "CMovie::mFrameAdvanceBlocked offset must be 0x7C");

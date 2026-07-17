@@ -76,6 +76,8 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/task/ScrDiskWatcherTask.h"
 #include "moho/terrain/splat/CWldSplat.h"
+#include "moho/movie/CMovie.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
@@ -15249,6 +15251,55 @@ moho::CMauiMovie::CMauiMovie(LuaPlus::LuaObject* const luaObject, CMauiControl* 
   LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
   controlLuaObject.SetObject("MovieWidth", AsLazyVarObject(movieView->mMovieWidthLV));
   controlLuaObject.SetObject("MovieHeight", AsLazyVarObject(movieView->mMovieHeightLV));
+}
+
+/**
+ * Address: 0x0079EFE0 (FUN_0079EFE0, Moho::CMauiMovie::LoadFile)
+ *
+ * IDA signature:
+ * char __userpurge Moho::CMauiMovie::LoadFile(Moho::CMauiMovie *this, const char *filename);
+ *
+ * What it does:
+ * Creates a CMovie, swaps it into the control's movie slot (deleting any prior
+ * movie), and opens the given file through CMovie::OpenMovie. On failure warns
+ * and clears the slot; on success sets the debug name and publishes the movie
+ * width/height into the two lazy-var lanes. The `/nomovie` switch disables it.
+ */
+bool moho::CMauiMovie::LoadFile(const char* const filename)
+{
+  if (moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
+    return false;
+  }
+
+  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
+
+  // Allocate + construct a fresh CMovie (binary: CMovie::operator new).
+  moho::CMovie* newMovie = nullptr;
+  moho::CMovie::AllocateAndConstruct(&newMovie);
+
+  // Swap it into the movie slot, deleting the previous movie (if distinct)
+  // through the IMovie virtual deleting destructor. mMovie is the overlay's
+  // CMoviePlaybackInterface* view of the concrete CMovie stored by the binary.
+  moho::CMovie* const previousMovie = reinterpret_cast<moho::CMovie*>(movieView->mMovie);
+  if (newMovie != previousMovie && previousMovie != nullptr) {
+    delete previousMovie;
+  }
+  movieView->mMovie = reinterpret_cast<CMoviePlaybackInterface*>(newMovie);
+
+  if (!newMovie->OpenMovie(filename)) {
+    gpg::Warnf("Error opening movie %s", filename);
+    if (movieView->mMovie != nullptr) {
+      delete reinterpret_cast<moho::CMovie*>(movieView->mMovie);
+    }
+    movieView->mMovie = nullptr;
+    movieView->mIsPlaying = false;
+    return false;
+  }
+
+  SetDebugName(gpg::STR_Printf("Movie filename = %s", filename));
+  moho::CScriptLazyVar_float::SetValue(&movieView->mMovieWidthLV, static_cast<float>(newMovie->GetWidth()));
+  moho::CScriptLazyVar_float::SetValue(&movieView->mMovieHeightLV, static_cast<float>(newMovie->GetHeight()));
+  return true;
 }
 
 /**
