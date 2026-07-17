@@ -8141,6 +8141,17 @@ namespace moho
   void UIWorldViewSetHidden(CUIWorldView* worldView, bool hidden);
 
   /**
+   * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
+   *
+   * What it does:
+   * IMauiDragger::DragMove override for the edit's embedded click-dragger:
+   * extends the text selection between the drag-start caret and the character
+   * nearest the current mouse X. Recovered as a free function taking the
+   * IMauiDragger sub-object (at CMauiEdit + 0x11C).
+   */
+  void CMauiEditDragMove(IMauiDragger* dragger, const SMauiEventData* eventData);
+
+  /**
    * Address: 0x0086F090 (FUN_0086F090)
    *
    * What it does:
