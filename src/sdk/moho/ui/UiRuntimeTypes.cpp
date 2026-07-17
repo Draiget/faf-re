@@ -23706,6 +23706,23 @@ void moho::UI_NoteDisconnect(const IClient* const client)
 }
 
 /**
+ * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
+ *
+ * What it does:
+ * IClientMgrUIInterface::ReceiveChat override: captures the sender's nickname
+ * and the received chat payload, then posts the recovered func_ReceiveChat
+ * decoder (which forwards to /lua/ui/game/gamemain.lua:ReceiveChat) onto the
+ * main thread. The MemBuffer's shared payload is kept alive by the capture.
+ */
+void moho::UI_ReceiveChat(const IClient* const sender, const gpg::MemBuffer<const char> data)
+{
+  const msvc8::string nickname = sender->GetNickname();
+  boost::function<void(), std::allocator<void>> callback =
+    [nickname, data]() { (void)func_ReceiveChat(nickname.c_str(), data); };
+  THREAD_InvokeAsync(callback, 0u);
+}
+
+/**
  * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
  *
  * What it does:
