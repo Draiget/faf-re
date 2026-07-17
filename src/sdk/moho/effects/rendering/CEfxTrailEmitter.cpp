@@ -17,8 +17,30 @@
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
 
+#include <cstring>
+#include <intrin.h>
+
+#include "moho/misc/Stats.h"
+#include "moho/misc/StatItem.h"
+#include "moho/particles/BeamRenderHelpers.h"
+#include "moho/particles/SParticleBuffer.h"
+#include "moho/sim/CDebugCanvas.h"
+#include "moho/ui/SDebugLine.h"
+#include "moho/resource/CParticleTexture.h"
+
+namespace moho
+{
+  // Debug console flag defined in EffectLuaStartupRegistrations.cpp
+  // (?dbg_Trail@Moho@@3_NA); when set, Tick draws a debug line per segment.
+  extern bool dbg_Trail;
+} // namespace moho
+
 namespace
 {
+  // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick
+  // (mirrors the binary's sEngineStat_Render_ActiveEmitters_1 global).
+  moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* type = nullptr;
@@ -46,7 +68,7 @@ namespace
    * Computes one interpolated trail-start world position and returns whether
    * the camera depth-row projection stays within the blueprint LOD cutoff.
    */
-  [[maybe_unused]] [[nodiscard]] bool TrailEmitterPassesLodCutoffForCamera(
+  [[nodiscard]] bool TrailEmitterPassesLodCutoffForCamera(
     const moho::GeomCamera3* const camera,
     moho::CEfxTrailEmitter* const emitter
   )
@@ -311,5 +333,226 @@ namespace moho
     archive->WriteBool(mCreated);
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
+  }
+
+  /**
+   * Address: 0x00671750 (FUN_00671750, Moho::CEfxTrailEmitter::CalculateVisible)
+   *
+   * IDA signature:
+   * char __usercall Moho::CEfxTrailEmitter::CalculateVisible@<al>(
+   *     Moho::CEfxTrailEmitter *this@<eax>);
+   *
+   * What it does:
+   * Blueprints that always emit return true. Otherwise scans the sim
+   * sync-filter cameras and returns true on the first camera that can see this
+   * trail (and, for freshly-attached trails, still passes the LOD depth cutoff).
+   * If no camera qualifies, advances mTrailLength by one (catch-up accumulation)
+   * and returns false.
+   */
+  bool CEfxTrailEmitter::CalculateVisible()
+  {
+    if (!mTrailBlueprint->EmitIfVisible) {
+      return true;
+    }
+
+    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+
+    for (const GeomCamera3& camera : cameras) {
+      if (CanSeeCam(&camera)
+          && !(mNewAttachment && !TrailEmitterPassesLodCutoffForCamera(&camera, this))) {
+        return true;
+      }
+    }
+
+    ++mTrailLength;
+    return false;
+  }
+
+  /**
+   * Address: 0x00671850 (FUN_00671850, Moho::CEfxTrailEmitter::Tick)
+   *
+   * IDA signature:
+   * void __usercall Moho::CEfxTrailEmitter::Tick(
+   *     Moho::CEfxTrailEmitter *this@<ecx>, int tick@<ebx>);
+   *
+   * What it does:
+   * Builds one STrail payload for tick index `tick` and pushes it into the sim
+   * particle buffer's trail lane. Interpolates the trail-start position at the
+   * previous and current sub-frame (the latter scaled by the attached entity's
+   * pending-velocity reciprocal on the final tick), derives the normalized
+   * segment direction, updates the running trail length/position, retains the
+   * repeat and ramp textures, and (when dbg_Trail is set) draws a debug line.
+   */
+  void CEfxTrailEmitter::Tick(const std::int32_t tick)
+  {
+    // interpScale: 1.0, or 1 / (attached entity pending-velocity scale) on the
+    // final (tick == 0) sub-frame when an entity is attached.
+    float interpScale = 1.0f;
+    if (tick == 0) {
+      Entity* const attachedEntity = mEntityInfo.GetAttachTargetEntity();
+      if (attachedEntity != nullptr) {
+        interpScale = 1.0f / attachedEntity->mPendingVelocityScale;
+      }
+    }
+
+    VMatrix4 prevMatrix{}; // first interp (tick, 0.0)
+    VMatrix4 curMatrix{};  // second interp (tick, interpScale)
+    (void)CEfxEmitter::InterpolatePosition(this, &prevMatrix, tick, 0.0f);
+    (void)CEfxEmitter::InterpolatePosition(this, &curMatrix, tick, interpScale);
+
+    const float* const start = mParams.start_;
+    const float sx = start[TRAIL_POSITION_X];
+    const float sy = start[TRAIL_POSITION_Y];
+    const float sz = start[TRAIL_POSITION_Z];
+
+    // Trail-start point transformed through each interpolated matrix. Keep the
+    // exact parenthesized add ordering the binary emits.
+    const float curX = (((curMatrix.r[1].x * sy) + (curMatrix.r[2].x * sz)) + (curMatrix.r[0].x * sx)) + curMatrix.r[3].x;
+    const float prevX = (((prevMatrix.r[1].x * sy) + (prevMatrix.r[2].x * sz)) + (prevMatrix.r[0].x * sx)) + prevMatrix.r[3].x;
+    const float prevY = (((prevMatrix.r[0].y * sx) + (prevMatrix.r[2].y * sz)) + (prevMatrix.r[1].y * sy)) + prevMatrix.r[3].y;
+    const float prevZ = (((prevMatrix.r[0].z * sx) + (prevMatrix.r[1].z * sy)) + (prevMatrix.r[2].z * sz)) + prevMatrix.r[3].z;
+    const float curY = (((curMatrix.r[0].y * sx) + (curMatrix.r[1].y * sy)) + (curMatrix.r[2].y * sz)) + curMatrix.r[3].y;
+    const float curZ = (((curMatrix.r[0].z * sx) + (curMatrix.r[1].z * sy)) + (curMatrix.r[2].z * sz)) + curMatrix.r[3].z;
+
+    Wm3::Vector3f direction{};
+    direction.x = curX - prevX;
+    direction.y = curY - prevY;
+    direction.z = curZ - prevZ;
+    const float newLength = Wm3::Vector3f::Normalize(&direction) + mLength;
+
+    TrailRuntimeView trail{};
+    trail.sortScalar = mTrailBlueprint->SortOrder;
+
+    // Retain the repeat texture (mParticleTextures[0]) into texture0.
+    CParticleTexture* const repeatTexture = mParticleTextures.start_[0];
+    if (repeatTexture != nullptr) {
+      trail.texture0 = repeatTexture;
+      repeatTexture->AddReferenceAtomic();
+    }
+    // Swap the ramp texture (mParticleTextures[1]) into texture1 (release-old /
+    // retain-new; texture1 is null here so only the retain fires).
+    CParticleTexture* const rampTexture = mParticleTextures.start_[1];
+    if (trail.texture1 != rampTexture) {
+      if (trail.texture1 != nullptr) {
+        (void)trail.texture1->ReleaseReferenceAtomic();
+      }
+      trail.texture1 = rampTexture;
+      if (rampTexture != nullptr) {
+        rampTexture->AddReferenceAtomic();
+      }
+    }
+
+    // Endpoints; emit position is the fresh direction on the first tick, else
+    // the persisted trail position.
+    const bool firstTick = !mCreated;
+    const Wm3::Vector3f& emitPosition = firstTick ? direction : mSerializedTrailPosition;
+    trail.prevPosX = prevX;
+    trail.prevPosY = prevY;
+    trail.prevPosZ = prevZ;
+    trail.curPosX = curX;
+    trail.curPosY = curY;
+    trail.curPosZ = curZ;
+    trail.emitPosX = emitPosition.x;
+    trail.emitPosY = emitPosition.y;
+    trail.emitPosZ = emitPosition.z;
+    trail.dirX = direction.x;
+    trail.dirY = direction.y;
+    trail.dirZ = direction.z;
+
+    // Advance running trail state to the new segment endpoint.
+    const float previousLength = mLength;
+    mLength = newLength;
+    mSerializedTrailPosition.x = direction.x;
+    mSerializedTrailPosition.y = direction.y;
+    mSerializedTrailPosition.z = direction.z;
+    mCreated = true;
+
+    const RTrailBlueprint* const bp = mTrailBlueprint;
+    trail.textureRepeatRateX = bp->TextureRepeatRate * previousLength;
+    trail.textureRepeatRateZ = bp->TextureRepeatRate * newLength;
+    trail.endOffset = static_cast<float>(-1 - tick);
+    trail.impactOffset = trail.endOffset + interpScale;
+    trail.trailLength = bp->TrailLength;
+
+    const float life = mLife;
+    trail.lifeOffset = -life;
+    trail.size = bp->StartSize;
+    trail.tag = "TPolyTrail";
+    // 0x5C lane carries the blueprint blend mode as a raw dword.
+    std::memcpy(&trail.uvScalar, &bp->BlendMode, sizeof(trail.uvScalar));
+    mLife = life + 1.0f;
+
+    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    SParticleBuffer* const particleBuffer = sim->GetParticleBuffer();
+    AppendTrailToVector(particleBuffer->mTrails, trail);
+
+    if (dbg_Trail) {
+      CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+      SDebugLine line{};
+      line.p0.x = direction.y;
+      line.p0.y = direction.x;
+      line.p0.z = prevX;
+      line.p1.x = curY;
+      line.p1.y = prevY;
+      line.p1.z = prevZ;
+      line.depth0 = static_cast<std::int32_t>(0xFF0000FFu);
+      line.depth1 = static_cast<std::int32_t>(0xFFFF0000u);
+      debugCanvas->DebugDrawLine(line);
+    }
+  }
+
+  /**
+   * Address: 0x00671D90 (FUN_00671D90, Moho::CEfxTrailEmitter::OnTick)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CEfxTrailEmitter::OnTick(Moho::CEfxTrailEmitter *this);
+   *
+   * What it does:
+   * Per-frame trail tick: unless lifetime expired and while visible, bumps the
+   * active-emitter engine stat, folds accumulated catch-up ticks into
+   * mTotalTicks, clamps the pending trail-segment count to
+   * min(bp->TrailLength, 24), emits one STrail per pending segment
+   * (mLife reset to 0 before the loop), then emits the final segment for the
+   * current frame and advances mTotalTicks by one.
+   */
+  void CEfxTrailEmitter::OnTick()
+  {
+    if (ProcessLifetime() || !CalculateVisible()) {
+      return;
+    }
+
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      EngineStats* const engineStats = GetEngineStats();
+      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
+    }
+    _InterlockedExchangeAdd(
+      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+
+    const std::int32_t pendingTicks = mTrailLength;
+    const RTrailBlueprint* const bp = mTrailBlueprint;
+    mTotalTicks = static_cast<float>(pendingTicks) + mTotalTicks;
+
+    std::int32_t clampedMax = static_cast<std::int32_t>(bp->TrailLength);
+    if (clampedMax > 24) {
+      clampedMax = 24;
+    }
+    if (pendingTicks > clampedMax) {
+      mTrailLength = clampedMax;
+      mCreated = false;
+    }
+
+    std::int32_t remaining = mTrailLength;
+    if (remaining != 0) {
+      mLife = 0.0f;
+      for (; remaining > 0; --remaining) {
+        Tick(remaining);
+      }
+    }
+
+    mTrailLength = 0;
+    Tick(0);
+    mTotalTicks = mTotalTicks + 1.0f;
   }
 } // namespace moho

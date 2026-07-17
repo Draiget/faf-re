@@ -93,6 +93,35 @@ namespace moho
      */
     [[nodiscard]] bool CanSeeCam(const GeomCamera3* camera);
 
+    /**
+     * Address: 0x00671D90 (FUN_00671D90, Moho::CEfxTrailEmitter::OnTick)
+     *
+     * What it does:
+     * Per-frame trail tick: lifetime/visibility gate, active-emitter stat bump,
+     * catch-up segment clamp to min(bp->TrailLength, 24), and per-segment STrail
+     * emission via Tick().
+     */
+    void OnTick() override;
+
+    /**
+     * Address: 0x00671750 (FUN_00671750, Moho::CEfxTrailEmitter::CalculateVisible)
+     *
+     * What it does:
+     * Returns whether the trail should emit this frame: always true unless the
+     * blueprint is emit-if-visible, in which case it scans the sync-filter
+     * cameras (advancing mTrailLength as catch-up when none can see it).
+     */
+    [[nodiscard]] bool CalculateVisible();
+
+    /**
+     * Address: 0x00671850 (FUN_00671850, Moho::CEfxTrailEmitter::Tick)
+     *
+     * What it does:
+     * Builds and submits one STrail payload for the given tick index into the
+     * sim particle buffer's trail lane.
+     */
+    void Tick(std::int32_t tick);
+
   public:
     RTrailBlueprint* mTrailBlueprint;      // +0x190
     std::int32_t mTrailLength;             // +0x194
