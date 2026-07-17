@@ -198,6 +198,22 @@ namespace moho
       bool canAttack);
 
     /**
+     * Address: 0x007259D0 (FUN_007259D0, Moho::CPlatoon::FindPrioritizedUnit)
+     *
+     * What it does:
+     * Resolves the squad for `squadClass`, gathers units within `radius` of
+     * `center`, and returns the attackable candidate with the best (lowest)
+     * priority rank against that squad's target-category list, breaking ties by
+     * smallest squared distance to `center`.
+     */
+    [[nodiscard]] Unit* FindPrioritizedUnit(
+      ESquadClass squadClass,
+      EAlliance alliance,
+      bool canAttack,
+      const Wm3::Vector3f& center,
+      float radius);
+
+    /**
      * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
      *
      * What it does:
