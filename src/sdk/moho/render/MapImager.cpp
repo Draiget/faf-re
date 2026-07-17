@@ -86,6 +86,25 @@ MapImager::~MapImager()
 }
 
 /**
+ * Address: 0x007D9B90 (FUN_007D9B90, MapImager scalar deleting destructor)
+ *
+ * IDA signature:
+ * Moho::MapImager *__thiscall Moho::MapImager::`scalar deleting dtor'(
+ *   Moho::MapImager *this, char flags);
+ *
+ * What it does:
+ * Vtable slot 0. Runs the MapImager teardown (border-mesh clear + retained
+ * vector-storage release). The binary thunk additionally performs
+ * `operator delete(this)` when the low bit of its deleting-flag argument is
+ * set; MapImager is only ever destroyed as an embedded member (deleting flag
+ * clear), so that lane is inert in the recovered model.
+ */
+void MapImager::VirtualDtor()
+{
+  this->~MapImager();
+}
+
+/**
  * Address: 0x007D9F00 (FUN_007D9F00)
  *
  * IDA signature:
