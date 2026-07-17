@@ -383,16 +383,45 @@ namespace moho
    */
   struct TrailRuntimeView
   {
-    std::uint8_t unknownPrefix[0x48]{}; // +0x00
-    float sortScalar = 0.0f;            // +0x48
-    std::uint8_t unknown4C[0x04]{};     // +0x4C
+    // Float lanes 0x00..0x44, written by CEfxTrailEmitter::Tick (FUN_00671850)
+    // and block-copied by the trail bucket-copy helpers. Offsets are
+    // triple-verified: the Tick writer stores (frame anchor = push_back /
+    // ~STrail pointer arg), the ~STrail destructor (FUN_0049BE90), and the
+    // bucket-key reader (FUN_00492390) all agree with the 0x60 layout.
+    float prevPosX = 0.0f;              // +0x00  previous-frame trail endpoint (world)
+    float prevPosY = 0.0f;              // +0x04
+    float prevPosZ = 0.0f;              // +0x08
+    float curPosX = 0.0f;               // +0x0C  current-frame trail endpoint (world)
+    float curPosY = 0.0f;               // +0x10
+    float curPosZ = 0.0f;               // +0x14
+    float emitPosX = 0.0f;              // +0x18  emit position (mSerializedTrailPosition or fresh dir)
+    float emitPosY = 0.0f;              // +0x1C
+    float emitPosZ = 0.0f;              // +0x20
+    float dirX = 0.0f;                  // +0x24  normalized segment direction
+    float dirY = 0.0f;                  // +0x28
+    float dirZ = 0.0f;                  // +0x2C
+    float endOffset = 0.0f;             // +0x30  (float)(-1 - tick)
+    float impactOffset = 0.0f;          // +0x34  endOffset + interpolation scale
+    float trailLength = 0.0f;           // +0x38  blueprint TrailLength
+    float lifeOffset = 0.0f;            // +0x3C  -emitter life
+    float textureRepeatRateX = 0.0f;    // +0x40  blueprint TextureRepeatRate * prev length
+    float textureRepeatRateZ = 0.0f;    // +0x44  blueprint TextureRepeatRate * new length
+    float sortScalar = 0.0f;            // +0x48  blueprint SortOrder
+    float size = 0.0f;                  // +0x4C  blueprint StartSize
     CParticleTexture* texture0 = nullptr; // +0x50
     CParticleTexture* texture1 = nullptr; // +0x54
     const char* tag = nullptr;            // +0x58
-    float uvScalar = 0.0f;                // +0x5C
+    float uvScalar = 0.0f;                // +0x5C  blueprint BlendMode (raw dword, memcpy'd to key)
   };
 
+  static_assert(offsetof(TrailRuntimeView, prevPosX) == 0x00, "TrailRuntimeView::prevPosX offset must be 0x00");
+  static_assert(offsetof(TrailRuntimeView, curPosX) == 0x0C, "TrailRuntimeView::curPosX offset must be 0x0C");
+  static_assert(offsetof(TrailRuntimeView, emitPosX) == 0x18, "TrailRuntimeView::emitPosX offset must be 0x18");
+  static_assert(offsetof(TrailRuntimeView, dirX) == 0x24, "TrailRuntimeView::dirX offset must be 0x24");
+  static_assert(offsetof(TrailRuntimeView, endOffset) == 0x30, "TrailRuntimeView::endOffset offset must be 0x30");
+  static_assert(offsetof(TrailRuntimeView, textureRepeatRateX) == 0x40, "TrailRuntimeView::textureRepeatRateX offset must be 0x40");
   static_assert(offsetof(TrailRuntimeView, sortScalar) == 0x48, "TrailRuntimeView::sortScalar offset must be 0x48");
+  static_assert(offsetof(TrailRuntimeView, size) == 0x4C, "TrailRuntimeView::size offset must be 0x4C");
   static_assert(offsetof(TrailRuntimeView, texture0) == 0x50, "TrailRuntimeView::texture0 offset must be 0x50");
   static_assert(offsetof(TrailRuntimeView, texture1) == 0x54, "TrailRuntimeView::texture1 offset must be 0x54");
   static_assert(offsetof(TrailRuntimeView, tag) == 0x58, "TrailRuntimeView::tag offset must be 0x58");
