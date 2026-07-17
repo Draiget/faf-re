@@ -11,13 +11,36 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include <cmath>
+#include <limits>
+
+#include "gpg/core/containers/FastVector.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiBuilder.h"
+#include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/math/MathReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/COGrid.h"
+#include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
+#include "moho/unit/CUnitMotion.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -297,6 +320,362 @@ namespace moho
   {
     mBlueprint = blueprint;
     return this;
+  }
+
+  /**
+   * Address: 0x005F6C70 (FUN_005F6C70, sub_5F6C70)
+   *
+   * Sphere-queries units near the build site (radius = larger footprint extent
+   * of the target blueprint) and returns the first live, being-built unit that
+   * is XZ-coincident with the build position and whose blueprint id matches.
+   */
+  Unit* CUnitMobileBuildTask::FindExistingSeedUnitOnSite() const
+  {
+    const std::uint8_t sizeX = mBlueprint->mFootprint.mSizeX;
+    const std::uint8_t sizeZ = mBlueprint->mFootprint.mSizeZ;
+    const float queryRadius = static_cast<float>(sizeX > sizeZ ? sizeX : sizeZ);
+
+    const Wm3::Sphere3f querySphere{mBuildPosition, queryRadius};
+    CollisionResultFastVectorN10 collisions{};
+    mSim->mOGrid->ForAllEntitiesIterator(collisions, ENTITYTYPE_Unit, querySphere);
+
+    for (const CollisionResult& hit : collisions) {
+      Entity* const entity = hit.sourceEntity;
+      if (entity == nullptr) {
+        continue;
+      }
+      Unit* const unit = entity->IsUnit();
+      if (unit == nullptr || unit->IsDead() || !unit->IsBeingBuilt()) {
+        continue;
+      }
+
+      const Wm3::Vec3f& unitPos = unit->GetPosition();
+      const float deltaX = unitPos.x - mBuildPosition.x;
+      const float deltaZ = unitPos.z - mBuildPosition.z;
+      if (std::sqrt(deltaX * deltaX + deltaZ * deltaZ) > 0.0f) {
+        continue;
+      }
+
+      if (_stricmp(unit->GetBlueprint()->mBlueprintId.c_str(), mBlueprint->mBlueprintId.c_str()) != 0) {
+        continue;
+      }
+      return unit;
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x005F6EA0 (FUN_005F6EA0, sub_5F6EA0)
+   *
+   * Finds the nearest ObstructsBuild prop over the target footprint; on a
+   * RebuildBonus id match (coincident) records the rebuild fraction + binds the
+   * pending-build entity (returns null), else returns the nearest prop.
+   */
+  Entity* CUnitMobileBuildTask::FindObstructingPropToReclaim()
+  {
+    const EntityCategorySet* const obstructsBuild = mSim->mRules->GetEntityCategory("ObstructsBuild");
+
+    const std::uint8_t sizeX = mBlueprint->mFootprint.mSizeX;
+    const std::uint8_t sizeZ = mBlueprint->mFootprint.mSizeZ;
+    const int minX = static_cast<int>(mBuildPosition.x - static_cast<float>(sizeX) * 0.5f);
+    const int minZ = static_cast<int>(mBuildPosition.z - static_cast<float>(sizeZ) * 0.5f);
+    const int maxX = minX + static_cast<int>(sizeX);
+    const int maxZ = minZ + static_cast<int>(sizeZ);
+
+    Wm3::Vector3f boxCenter{static_cast<float>(maxX + minX) * 0.5f, mBuildPosition.y,
+                            static_cast<float>(maxZ + minZ) * 0.5f};
+    Wm3::Vector3f boxExtents{static_cast<float>(maxX - minX) * 0.5f, 1000.0f,
+                             static_cast<float>(maxZ - minZ) * 0.5f};
+    const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
+    const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
+
+    CollisionResultFastVectorN10 collisions{};
+    mSim->mOGrid->CollectEntitiesInBox(collisions, ENTITYTYPE_Prop, queryBox);
+
+    Entity* nearest = nullptr;
+    float nearestDistSq = std::numeric_limits<float>::infinity();
+    const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+    for (const CollisionResult& hit : collisions) {
+      Entity* const entity = hit.sourceEntity;
+      if (entity == nullptr || entity->IsProp() == nullptr) {
+        continue;
+      }
+      const REntityBlueprint* const propBp = entity->BluePrint;
+      if (propBp == nullptr || !EntityCategory::HasBlueprint(propBp, obstructsBuild)) {
+        continue;
+      }
+      const Wm3::Vec3f& propPos = entity->GetPositionWm3();
+      const float dx = builderPos.x - propPos.x;
+      const float dy = builderPos.y - propPos.y;
+      const float dz = builderPos.z - propPos.z;
+      const float distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearest = entity;
+      }
+    }
+
+    if (nearest == nullptr || nearest->IsProp() == nullptr) {
+      return nearest;
+    }
+
+    LuaPlus::LuaObject associatedBp{};
+    nearest->FindScript(&associatedBp, "AssociatedBP");
+    if (!associatedBp.IsString()) {
+      return nearest;
+    }
+
+    for (const msvc8::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
+      if (_stricmp(associatedBp.GetString(), rebuildId.c_str()) != 0) {
+        continue;
+      }
+      const Wm3::Vec3f& propPos = nearest->GetPositionWm3();
+      const float cdx = mBuildPosition.x - propPos.x;
+      const float cdz = mBuildPosition.z - propPos.z;
+      if ((cdx * cdx + cdz * cdz) >= 0.000001f) {
+        break;
+      }
+
+      gpg::core::FastVector<LuaPlus::LuaObject> results{};
+      const LuaPlus::LuaObject bpLua = mBlueprint->GetLuaBlueprint(mSim->mLuaState);
+      const LuaPlus::LuaObject e1{};
+      const LuaPlus::LuaObject e2{};
+      const LuaPlus::LuaObject e3{};
+      const LuaPlus::LuaObject e4{};
+      if (!nearest->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
+          (results.end() - results.begin()) != 1) {
+        gpg::Warnf("Failed to get valid rebuild bonus from the script");
+        return nullptr;
+      }
+      const float fractionComplete = nearest->FractionCompleted;
+      const float rebuildBonus = static_cast<float>(results.begin()->ToNumber());
+      mBuildHelper.mUnknown18 = rebuildBonus * fractionComplete;
+      mPendingBuildEntity.Set(nearest);
+      return nullptr;
+    }
+    return nearest;
+  }
+
+  /**
+   * Address: 0x005F7440 (FUN_005F7440, Moho::CUnitMobileBuildTask::TaskTick)
+   *
+   * VFTable SLOT: 1
+   *
+   * What it does:
+   * Mobile engineer build-task state machine; see header.
+   */
+  int CUnitMobileBuildTask::Execute()
+  {
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        if (!CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+          return -1;
+        }
+        if (Entity* const obstruction = FindObstructingPropToReclaim(); obstruction != nullptr) {
+          CAiTarget reclaimTarget{};
+          reclaimTarget.UpdateTarget(obstruction);
+          reinterpret_cast<IAiCommandDispatchImpl*>(this)->IssueReclaimTask(reclaimTarget);
+          return 1;
+        }
+        if (mUnit->IsMobile()) {
+          const Wm3::Vec3f& startPos = mUnit->GetPosition();
+          const SCoordsVec2 startCoords{startPos.x, startPos.z};
+          const bool fits =
+            mUnit->GetFootprint().FitsAt(startCoords, *mSim->mOGrid) != static_cast<EOccupancyCaps>(0u);
+
+          const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+          const float ddx = builderPos.x - mBuildPosition.x;
+          const float ddz = builderPos.z - mBuildPosition.z;
+          const SFootprint& fp = mUnit->GetFootprint();
+          const std::uint8_t maxFp = fp.mSizeX > fp.mSizeZ ? fp.mSizeX : fp.mSizeZ;
+          const float skX = mBlueprint->Physics.SkirtSizeX;
+          const float skZ = mBlueprint->Physics.SkirtSizeZ;
+          const float maxSkirt = skZ > skX ? skZ : skX;
+          const float range = (std::sqrt(ddx * ddx + ddz * ddz) - static_cast<float>(maxFp)) - maxSkirt;
+
+          const gpg::Rect2f builderSkirt = mUnit->GetSkirtRect();
+          const bool outOfRange = range > mUnit->GetBlueprint()->Economy.MaxBuildDistance;
+          const bool overlaps = mBuildSkirt.OverlapsInclusive(builderSkirt);
+          if (!fits || outOfRange || overlaps) {
+            gpg::Rect2f moveSkirt = mBuildSkirt;
+            moveSkirt.z0 = moveSkirt.z0 - 1.0f;
+            moveSkirt.x1 = moveSkirt.x1 + 1.0f;
+            Wm3::Vector3f moveTarget{mBuildPosition.x, mBuildPosition.y, mBuildPosition.z};
+            const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+            (void)mUnit->PrepareMove(1, &moveTarget, &moveSkirt, useWholeMap);
+            const SCoordsVec2 moveCoords{moveTarget.x, moveTarget.z};
+            const SFootprint& moveFp = mUnit->GetFootprint();
+            gpg::Rect2i reserveRect{};
+            COORDS_ToGridRect(&reserveRect, moveCoords, moveFp.mSizeX, moveFp.mSizeZ);
+            mUnit->ReserveOgridRect(reserveRect);
+            const SOCellPos goalCell = mUnit->GetFootprint().ToCellPos(moveTarget);
+            NewMoveTask(SNavGoal(goalCell), this, 0, nullptr, 0);
+          }
+        }
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return 1;
+      }
+
+      case TASKSTATE_Waiting: {
+        const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+        const float ddx = builderPos.x - mBuildPosition.x;
+        const float ddz = builderPos.z - mBuildPosition.z;
+        const SFootprint& fp = mUnit->GetFootprint();
+        const std::uint8_t maxFp = fp.mSizeX > fp.mSizeZ ? fp.mSizeX : fp.mSizeZ;
+        const float skX = mBlueprint->Physics.SkirtSizeX;
+        const float skZ = mBlueprint->Physics.SkirtSizeZ;
+        const float maxSkirt = skZ > skX ? skZ : skX;
+        const float range = (std::sqrt(ddx * ddx + ddz * ddz) - static_cast<float>(maxFp)) - maxSkirt;
+        if (range > mUnit->GetBlueprint()->Economy.MaxBuildDistance ||
+            !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+          return -1;
+        }
+        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
+          const float aimY = (mBlueprint->Physics.SkirtSizeX * 0.5f) + mBlueprint->Physics.SkirtSizeZ + mBuildPosition.y;
+          builder->BuilderSetAimTarget(Wm3::Vector3f{mBuildPosition.x, aimY, mBuildPosition.z});
+        }
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        mUnit->UnitStateMask |= kUnitStateBuildingMask;
+        return 0;
+      }
+
+      case TASKSTATE_Starting: {
+        if (!mUnit->GetBlueprint()->Economy.NeedToFaceTargetToBuild) {
+          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+          return 0;
+        }
+        const VTransform& transform = mUnit->GetTransform();
+        const VAxes3 axes{transform.orient_};
+        Wm3::Vector3f forward{axes.vX.x, 0.0f, axes.vX.z};
+        (void)forward.Normalize();
+        const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+        Wm3::Vector3f toTarget{mBuildPosition.x - builderPos.x, 0.0f, mBuildPosition.z - builderPos.z};
+        (void)toTarget.Normalize();
+        const float dot = forward.x * toTarget.x + forward.y * toTarget.y + forward.z * toTarget.z;
+        const Wm3::Vector3f zeroFacing{0.0f, 0.0f, 0.0f};
+        if (dot > 0.94999999f) {
+          mUnit->UnitMotion->SetFacing(zeroFacing);
+          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+          return 0;
+        }
+        mUnit->UnitMotion->SetFacing(toTarget);
+        return 1;
+      }
+
+      case TASKSTATE_Processing: {
+        if (mPlacementRetryCount > 10 || !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+          return -1;
+        }
+        if (Unit* const seed = FindExistingSeedUnitOnSite(); seed != nullptr) {
+          if (!seed->IsBeingBuilt()) {
+            return -1;
+          }
+          mBuildUnit.Set(seed);
+          mBuildHelper.SetFocus(mBuildUnit.GetObjectPtr());
+          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+          return 0;
+        }
+
+        SOccupationResult occupation{};
+        const SCoordsVec2 buildCoords{mBuildPosition.x, mBuildPosition.z};
+        if (!func_LocationIsFree(*mBlueprint, *mSim->mOGrid, buildCoords, occupation)) {
+          return -1;
+        }
+        if (!Sim::LocationIsFree(mSim, mUnit, &mBuildRect, 0)) {
+          gpg::Rect2i footprintRect = mBlueprint->GetFootprintRect(buildCoords);
+          footprintRect.z0 -= 1;
+          footprintRect.x1 += 1;
+          SIM_TryToBuild(mSim, mUnit->ArmyRef, &footprintRect, 0);
+          ++mPlacementRetryCount;
+          return 50;
+        }
+        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
+          return 1;
+        }
+        if (mUnit->IsPaused) {
+          return 10;
+        }
+
+        const RUnitBlueprint* spawnBlueprint = mBlueprint;
+        if (!mBlueprint->General.SeedUnit.name.empty()) {
+          spawnBlueprint = mSim->mRules->GetUnitBlueprint(RResId{mBlueprint->General.SeedUnit.name});
+        }
+
+        static TSimConVar<bool> sAiInstaBuild(false, "ai_InstaBuild", false);
+        CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&sAiInstaBuild);
+        void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
+        const bool instaBuild =
+          instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
+
+        const std::int32_t layer = mUnit->mCurrentLayer;
+        const VTransform spawnTransform{mBuildPosition, mBuildOrientation};
+        SUnitConstructionParams params(layer, spawnTransform, mUnit->ArmyRef, spawnBlueprint, mUnit, instaBuild);
+        Unit* const newUnit = mSim->CreateUnitForScript(params, true);
+        mBuildUnit.Set(newUnit);
+        Unit* const spawned = mBuildUnit.GetObjectPtr();
+        if (spawned == nullptr) {
+          return 10;
+        }
+        spawned->UnitStateMask |= kUnitStateNoReclaimMask;
+
+        if (Entity* const pending = mPendingBuildEntity.GetObjectPtr(); pending != nullptr) {
+          pending->Destroy();
+          mPendingBuildEntity.Set(nullptr);
+        }
+        if (!mBlueprint->General.SeedUnit.name.empty()) {
+          const char* seedName = mBlueprint->General.SeedUnit.name.c_str();
+          spawned->CallbackStr("OnSeedUnitBuilt", &seedName);
+        }
+        mBuildHelper.SetFocus(spawned);
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return 1;
+      }
+
+      case TASKSTATE_Complete: {
+        if (!mBuildHelper.IsGood()) {
+          return -1;
+        }
+        if (mUnit->IsPaused) {
+          return 10;
+        }
+        if (!mBuildHelper.UpdateWorkProgress()) {
+          return 1;
+        }
+        Unit* const builtUnit = mBuildUnit.GetObjectPtr();
+        const Wm3::Vector3f zeroDir{0.0f, 0.0f, 0.0f};
+        if (builtUnit != nullptr && !mBlueprint->General.SeedUnit.name.empty()) {
+          SEntitySetTemplateUnit dispatchSet{};
+          (void)dispatchSet.AddUnit(builtUnit);
+          SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Upgrade);
+          issueData.mBlueprint = const_cast<RUnitBlueprint*>(mBlueprint);
+          (void)IssueCommandToSelectedUnits(mSim, dispatchSet, issueData, true);
+        } else if (builtUnit != nullptr && builtUnit->AiBuilder != nullptr &&
+                   builtUnit->AiBuilder->BuilderIsFactory() &&
+                   Wm3::Vector3f::Compare(&mBuildDirection, &zeroDir)) {
+          SEntitySetTemplateUnit dispatchSet{};
+          (void)dispatchSet.AddUnit(builtUnit);
+          const Wm3::Vec3f& unitPos = builtUnit->GetPosition();
+          const Wm3::Vector3f rallyPos{unitPos.x + mBuildDirection.x, unitPos.y + mBuildDirection.y,
+                                       unitPos.z + mBuildDirection.z};
+          SSTICommandIssueData moveData(EUnitCommandType::UNITCOMMAND_Move);
+          moveData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+          moveData.mTarget.mEnt = -268435456;
+          moveData.mTarget.mPos = rallyPos;
+          (void)IssueCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
+        }
+        if (builtUnit != nullptr) {
+          builtUnit->UnitStateMask &= ~kUnitStateNoReclaimMask;
+        }
+        mBuildUnit.UnlinkFromOwnerChain();
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return -1;
+      }
+
+      default:
+        gpg::HandleAssertFailure(
+          "Reached the supposably unreachable.", 856, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitBuild.cpp");
+        return -1;
+    }
   }
 
   /**
