@@ -2782,6 +2782,8 @@ namespace moho
     std::int32_t mRenderPass = 0; // +0xF8
     CMauiControl* mRootFrame = nullptr; // +0xFC
     msvc8::string mDebugName{}; // +0x100
+    std::uint8_t mUnknown11CTo12F[0x14]{};
+    void* mEventMapper = nullptr; // +0x130  (root-frame event handler; AddWorldView head arg)
 
     [[nodiscard]] static CMauiControlExtendedRuntimeView* FromControl(CMauiControl* control) noexcept
     {
@@ -2843,6 +2845,10 @@ namespace moho
     "CMauiControlExtendedRuntimeView::mDebugName offset must be 0x100"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::string) == 0x1C, "msvc8::string size must be 0x1C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CMauiControlExtendedRuntimeView, mEventMapper) == 0x130,
+    "CMauiControlExtendedRuntimeView::mEventMapper offset must be 0x130"
+  );
 
   /**
    * Runtime view for global keyboard-focus tracking lane.
@@ -8123,6 +8129,16 @@ namespace moho
    * runtime-owned class in this translation unit.
    */
   void UIWorldViewDraw(CUIWorldView* worldView, CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+
+  /**
+   * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
+   *
+   * What it does:
+   * Adds/removes the world view's render-world-view from the global viewport
+   * when its hidden state toggles (recovered as a free function while
+   * CUIWorldView is forward-declared).
+   */
+  void UIWorldViewSetHidden(CUIWorldView* worldView, bool hidden);
 
   /**
    * Address: 0x0086F090 (FUN_0086F090)
