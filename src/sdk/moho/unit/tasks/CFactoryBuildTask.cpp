@@ -233,6 +233,33 @@ namespace moho
   }
 
   /**
+   * Address: 0x005FAD00 (FUN_005FAD00, ??2CFactoryBuildTask@Moho@@QAE@@Z_0)
+   *
+   * IDA signature:
+   * Moho::CFactoryBuildTask *__cdecl Moho::CFactoryBuildTask::operator new(
+   *   Moho::IAiCommandDispatchImpl *dispatch, Moho::REntityBlueprint *bp,
+   *   Moho::CUnitCommand *cmd, int rallyUnit);
+   *
+   * What it does:
+   * Allocates one CFactoryBuildTask (0x94 bytes) and runs the dispatch-bound
+   * constructor in place, returning the constructed task (or nullptr when the
+   * allocation fails).
+   */
+  CFactoryBuildTask* CFactoryBuildTask::Create(
+    CCommandTask* const dispatchTask,
+    const RUnitBlueprint* const blueprint,
+    CUnitCommand* const command,
+    Unit* const rallyPointUnit
+  )
+  {
+    auto* const result = static_cast<CFactoryBuildTask*>(::operator new(sizeof(CFactoryBuildTask)));
+    if (result == nullptr) {
+      return nullptr;
+    }
+    return new (result) CFactoryBuildTask(dispatchTask, blueprint, command, rallyPointUnit);
+  }
+
+  /**
    * Address: 0x005FD490 (FUN_005FD490)
    *
    * What it does:
