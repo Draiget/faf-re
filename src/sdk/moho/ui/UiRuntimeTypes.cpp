@@ -44,6 +44,10 @@
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/net/CGpgNetInterface.h"
+#include "moho/net/IClient.h"
+#include "moho/client/Localization.h"
+#include "moho/console/CConCommand.h"
+#include "moho/core/Thread.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/RScmResource.h"
@@ -23666,6 +23670,39 @@ void moho::UI_DriverNoteGameSpeedChanged(const std::int32_t slotZeroBased, const
   if (SIM_GetActiveDriver() != nullptr) {
     UI_NoteGameSpeedChanged(slotZeroBased, gameSpeed);
   }
+}
+
+namespace
+{
+  /**
+   * Address: 0x0088B9D0 (FUN_0088B9D0, Moho::func_ConPrintDisconnect)
+   *
+   * What it does:
+   * Async worker for the disconnect notice: localizes the
+   * "<LOC Engine0002>%s disconnected." message and console-prints it with the
+   * disconnected client's nickname. Posted onto the main thread by
+   * CWldUiInterface::NoteDisconnect.
+   */
+  void ConPrintClientDisconnected(const msvc8::string nickname)
+  {
+    const msvc8::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
+    moho::CON_Printf(message.c_str(), nickname.c_str());
+  }
+} // namespace
+
+/**
+ * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
+ *
+ * What it does:
+ * IClientMgrUIInterface::NoteDisconnect override: captures the disconnected
+ * client's nickname and posts the localized console disconnect notice onto the
+ * main thread (so console output happens on the UI thread).
+ */
+void moho::UI_NoteDisconnect(const IClient* const client)
+{
+  const msvc8::string nickname = client->GetNickname();
+  boost::function<void(), std::allocator<void>> callback = [nickname]() { ConPrintClientDisconnected(nickname); };
+  THREAD_InvokeAsync(callback, 0u);
 }
 
 /**
