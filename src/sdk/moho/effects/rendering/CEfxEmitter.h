@@ -150,6 +150,34 @@ namespace moho
     [[nodiscard]] bool ProcessLifetime();
 
     /**
+     * Address: 0x0065DAC0 (FUN_0065DAC0, Moho::CEfxEmitter::OnTick)
+     *
+     * What it does:
+     * Per-frame emitter update: refreshes cached position, gates on
+     * lifetime/visibility, bumps the active-emitter stat, rebuilds curves when
+     * invalid, and drives the per-sub-tick particle emission loop.
+     */
+    void OnTick() override;
+
+    /**
+     * Address: 0x0065CE00 (FUN_0065CE00, Moho::CEfxEmitter::Tick)
+     *
+     * What it does:
+     * Emits the accumulated whole+fractional particle count for one sub-tick,
+     * building and queuing one SWorldParticle per emission.
+     */
+    [[nodiscard]] bool Tick(std::int32_t tick);
+
+    /**
+     * Address: 0x0065C7F0 (FUN_0065C7F0, IDA-mislabeled Moho::SEfxCurve::UpdateCurve)
+     *
+     * What it does:
+     * Rebuilds the cached particle template from the current curve lanes and
+     * scalar params, then marks the emitter valid.
+     */
+    void UpdateCurve();
+
+    /**
      * Address: 0x00660280 (FUN_00660280, Moho::CEfxEmitter::MemberSerialize)
      *
      * What it does:
