@@ -405,6 +405,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x005F5630 (FUN_005F5630, Moho::CBuildTaskHelper::IsGood)
+   *
+   * What it does:
+   * Returns true only when the focus weak pointer resolves to a live unit
+   * (non-null, non-sentinel) whose IsDead() virtual reports false.
+   */
+  bool CBuildTaskHelper::IsGood() const
+  {
+    Unit* const focusUnit = ResolveFocusUnit(mFocus);
+    if (focusUnit == nullptr) {
+      return false;
+    }
+    return !focusUnit->IsDead();
+  }
+
+  /**
    * Address: 0x005FE540 (FUN_005FE540, Moho::CBuildTaskHelper::MemberDeserialize)
    *
    * What it does:

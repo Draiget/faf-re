@@ -114,7 +114,12 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CBackgroundTaskControl.h"
+#include "gpg/core/containers/BitArray2D.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/path/SNavGoal.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SPhysConstants.h"
@@ -28940,6 +28945,242 @@ bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const 
   }
 
   return true;
+}
+
+namespace
+{
+  // Per-cell displacement gate shared by both search phases. (cellCenterX,
+  // cellCenterZ) is the candidate footprint-center; on success writes the
+  // reserved rect and returns true. Mirrors FUN_0062DD40 asm 0x62E235-0x62E42E.
+  [[nodiscard]] bool TryDisplacementCell(
+    Sim& sim, COGrid& oGrid, Unit& blocker, const SFootprint& footprint,
+    const gpg::Rect2i& buildRect, const float cellCenterX, const float cellCenterZ,
+    gpg::Rect2i& outRect)
+  {
+    const int x0 = static_cast<int>(std::lrint(cellCenterX - static_cast<float>(footprint.mSizeX) * 0.5f));
+    const int z0 = static_cast<int>(std::lrint(cellCenterZ - static_cast<float>(footprint.mSizeZ) * 0.5f));
+    gpg::Rect2i rect{};
+    rect.x0 = static_cast<std::int16_t>(x0);
+    rect.z0 = static_cast<std::int16_t>(z0);
+    rect.x1 = static_cast<std::int16_t>(x0 + footprint.mSizeX);
+    rect.z1 = static_cast<std::int16_t>(z0 + footprint.mSizeZ);
+
+    // Only test cells that (partly) escape the build rect; a candidate fully
+    // inside the rect (and non-degenerate) is skipped.
+    const bool insideAndValid = rect.x1 >= buildRect.x0 && buildRect.x1 >= rect.x0 &&
+      rect.z1 >= buildRect.z0 && buildRect.z1 >= rect.z0 && buildRect.x0 < buildRect.x1 &&
+      buildRect.z0 < buildRect.z1 && rect.x0 < rect.x1 && rect.z0 < rect.z1;
+    if (insideAndValid) {
+      return false;
+    }
+
+    const SOCellPos cellPos{static_cast<std::int16_t>(x0), static_cast<std::int16_t>(z0)};
+    EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *sim.mMapData, cellPos);
+    if (blocker.mCurrentLayer == LAYER_Water) {
+      caps = static_cast<EOccupancyCaps>(
+        static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
+    }
+    if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(oGrid, cellPos, footprint, caps)) == 0) {
+      return false;
+    }
+    if (!blocker.CanReserveOgridRect(rect)) {
+      return false;
+    }
+    if (!Sim::LocationIsFree(&sim, &blocker, &rect, 0)) {
+      return false;
+    }
+    outRect = rect;
+    return true;
+  }
+
+  // Phase 1: integer DDA line walk from the blocker toward a point pushed 3x the
+  // rect extent along the escape direction, reconstructed from struct_Line
+  // (FUN_0040D860, step=1) + the walk (FUN_0062DD40 asm 0x62E1E0-0x62E4AB).
+  [[nodiscard]] bool TryPlaceAlongLine(
+    Sim& sim, COGrid& oGrid, Unit& blocker, const SFootprint& footprint,
+    const gpg::Rect2i& buildRect, const float blockerX, const float blockerZ,
+    const float farX, const float farZ, gpg::Rect2i& outRect)
+  {
+    const float x1 = farX + 0.5f;      // far
+    const float x2 = blockerX + 0.5f;  // blocker
+    const float z1 = blockerZ + 0.5f;  // blocker
+    const float z2 = farZ + 0.5f;      // far
+
+    const int dirMaskX = (x1 < x2) ? -1 : 0;
+    const float p0x = (dirMaskX != 0) ? -x2 : x2;  // cursorX origin (blocker)
+    const float p0z = (dirMaskX != 0) ? -x1 : x1;  // xLimit (far)
+    const int dirMaskZ = (z1 < z2) ? -1 : 0;
+    const float p0y = (dirMaskZ != 0) ? -z2 : z2;  // cursorZ origin (far)
+    const float p1x = (dirMaskZ != 0) ? -z1 : z1;  // zLimit (blocker)
+
+    const float extentX = p0z - p0x;
+    const float extentZ = p1x - p0y;
+    int cursorX = static_cast<int>(std::floor(p0x));
+    int cursorZ = static_cast<int>(std::floor(p0y));
+
+    for (;;) {
+      const int cellDX = dirMaskX ^ cursorX;
+      const int cellDZ = dirMaskZ ^ cursorZ;
+      if (TryDisplacementCell(sim, oGrid, blocker, footprint, buildRect,
+                              static_cast<float>(cellDX), static_cast<float>(cellDZ), outRect)) {
+        return true;
+      }
+
+      const int advancedX = cursorX + 1;
+      const int advancedZ = cursorZ + 1;
+      const float errX = (static_cast<float>(advancedX) - p0z) * extentZ;
+      const float errZ = (static_cast<float>(advancedZ) - p1x) * extentX;
+      if (errZ <= errX) {
+        cursorZ = advancedZ;
+      } else {
+        cursorX = advancedX;
+      }
+      if (static_cast<float>(cursorX) > p0z) {
+        return false;
+      }
+      if (static_cast<float>(cursorZ) > p1x) {
+        return false;
+      }
+    }
+  }
+
+  // Phase 2: expanding square-ring perimeter scan (900-cell cap), ring stride
+  // 4*max(sizeX,sizeZ). Mirrors FUN_0062DD40 asm 0x62E4B1-0x62E90B.
+  [[nodiscard]] bool TryPlaceInRing(
+    Sim& sim, COGrid& oGrid, Unit& blocker, const SFootprint& footprint,
+    const gpg::Rect2i& buildRect, gpg::Rect2i& outRect)
+  {
+    const int ringStep = 4 * std::max<int>(footprint.mSizeX, footprint.mSizeZ);
+    const Wm3::Vec3f& pos = blocker.GetPosition();
+
+    int cellsTested = 0;
+    for (int radius = 1; cellsTested < 900; ++radius) {
+      for (int row = -radius; row <= radius; ++row) {
+        const int colStep = (row == -radius || row == radius) ? 1 : (2 * radius);
+        for (int col = -radius; col <= radius; col += colStep) {
+          ++cellsTested;
+          const float cellX = pos.x + static_cast<float>(col * ringStep);
+          const float cellZ = pos.z + static_cast<float>(row * ringStep);
+          if (TryDisplacementCell(sim, oGrid, blocker, footprint, buildRect, cellX, cellZ, outRect)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+} // namespace
+
+/**
+ * Address: 0x0062DD40 (FUN_0062DD40, Moho::SIM_TryToBuild)
+ *
+ * IDA signature:
+ * void __cdecl Moho::SIM_TryToBuild(Moho::Sim *sim, Moho::CArmyImpl *army,
+ *   gpg::Rect2i *rect, char requireIdle);
+ *
+ * What it does:
+ * Clears a pending build rect of the army's own stationary/air mobile units by
+ * relocating each to the nearest free footprint cell (a line walk toward the
+ * rect, then an expanding ring scan), committing the new ogrid occupation and
+ * issuing a one-cell navigator goal so the unit vacates the site.
+ */
+void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const rect, const char requireIdle)
+{
+  COGrid* const oGrid = sim->mOGrid;
+
+  const float centerX = static_cast<float>(rect->x0 + rect->x1) * 0.5f;
+  const float centerZ = static_cast<float>(rect->z0 + rect->z1) * 0.5f;
+
+  Wm3::Vector3f boxCenter{centerX, 0.0f, centerZ};
+  Wm3::Vector3f boxExtents{};
+  boxExtents.x = static_cast<float>(rect->x1 - rect->x0) * 0.5f;
+  boxExtents.y = 100.0f;
+  boxExtents.z = static_cast<float>(rect->z1 - rect->z0) * 0.5f;
+
+  const float pushExtent = (boxExtents.z > boxExtents.x) ? boxExtents.z : boxExtents.x;
+
+  const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
+  const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
+
+  CollisionResultFastVectorN10 hits{};
+  oGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
+
+  // Collect our own mobile blockers that are air or currently at rest (moving
+  // ground units will clear on their own), not in the air layer, not dead, and
+  // (when requireIdle) idle.
+  std::vector<Unit*> blockers{};
+  for (const CollisionResult& hit : hits) {
+    Unit* const unit = hit.sourceEntity->IsUnit();
+    if (unit == nullptr || !unit->IsMobile()) {
+      continue;
+    }
+    const bool airOrAtRest =
+      unit->mIsAir || (Wm3::Vector3f::Compare(&unit->Position, &unit->PrevPosition) == 0);
+    if (!airOrAtRest || unit->mCurrentLayer == LAYER_Air || unit->IsDead()) {
+      continue;
+    }
+    if (unit->ArmyRef != army) {
+      continue;
+    }
+    if (requireIdle && !unit->IsIdleState()) {
+      continue;
+    }
+    blockers.push_back(unit);
+  }
+
+  for (Unit* const blocker : blockers) {
+    const SFootprint& footprint = blocker->GetFootprint();
+    gpg::Rect2i placedRect{};
+    bool placed = false;
+
+    // Phase 1: line walk toward a point pushed away from the rect center.
+    const Wm3::Vec3f& blockerPos = blocker->GetPosition();
+    float dirX = blockerPos.x - centerX;
+    float dirZ = blockerPos.z - centerZ;
+    Wm3::Vector3f delta{dirX, 0.0f, dirZ};
+    const Wm3::Vector3f zeroVec{0.0f, 0.0f, 0.0f};
+    float unitDirX;
+    float unitDirZ;
+    if (Wm3::Vector3f::Compare(&delta, &zeroVec) == 0) {
+      unitDirX = 0.0f;
+      unitDirZ = 1.0f;
+    } else {
+      const float len = std::sqrt((dirX * dirX) + (dirZ * dirZ));
+      if (len <= 0.000001f) {
+        unitDirX = 0.0f;
+        unitDirZ = 0.0f;
+      } else {
+        unitDirX = dirX / len;
+        unitDirZ = dirZ / len;
+      }
+    }
+    const float farX = blockerPos.x + (unitDirX * pushExtent) * 3.0f;
+    const float farZ = blockerPos.z + (unitDirZ * pushExtent) * 3.0f;
+    placed = TryPlaceAlongLine(*sim, *oGrid, *blocker, footprint, *rect,
+                               blockerPos.x, blockerPos.z, farX, farZ, placedRect);
+
+    // Phase 2: expanding ring scan if the line walk found no free cell.
+    if (!placed) {
+      placed = TryPlaceInRing(*sim, *oGrid, *blocker, footprint, *rect, placedRect);
+    }
+    if (!placed) {
+      continue;
+    }
+
+    blocker->FreeOgridRect();
+    blocker->ReservedOgridRectMinX = placedRect.x0;
+    blocker->ReservedOgridRectMinZ = placedRect.z0;
+    blocker->ReservedOgridRectMaxX = placedRect.x1;
+    blocker->ReservedOgridRectMaxZ = placedRect.z1;
+    blocker->SimulationRef->mOGrid->mOccupation.FillRect(
+      placedRect.x0, placedRect.z0, placedRect.x1 - placedRect.x0, placedRect.z1 - placedRect.z0, true);
+
+    if (IAiNavigator* const navigator = blocker->AiNavigator) {
+      const SOCellPos goalCell{static_cast<std::int16_t>(placedRect.x0), static_cast<std::int16_t>(placedRect.z0)};
+      const SNavGoal goal{goalCell};
+      navigator->SetGoal(goal);
+    }
+  }
 }
 } // namespace moho
 

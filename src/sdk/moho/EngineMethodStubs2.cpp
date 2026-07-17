@@ -77,7 +77,10 @@ void SkyDome::CreateTextures() {}
 SkyDome::~SkyDome() {}
 
 // ===== Virtual Execute() returning int =====
-int CFactoryBuildTask::Execute() { return 0; }
+// CFactoryBuildTask::Execute is recovered 1:1 in
+// src/sdk/moho/unit/tasks/CFactoryBuildTask.cpp (matches FUN_005FA790,
+// Moho::CFactoryBuildTask::TaskTick) — the real factory build-task state
+// machine. The empty {return 0;} stub here was a false recovery; removed.
 // CUnitCarrierLaunch::Execute is recovered in
 // src/sdk/moho/unit/tasks/CUnitCarrierLaunch.cpp (matches FUN_00607000,
 // Moho::CUnitCarrierLaunch::TaskTick) — see the real state-machine body

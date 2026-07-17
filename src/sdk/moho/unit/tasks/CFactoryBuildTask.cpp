@@ -7,9 +7,22 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTITarget.h"
+#include "moho/entity/Entity.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/Sim.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitCommandWeakPtrReflection.h"
 
 namespace
 {
@@ -257,6 +270,258 @@ namespace moho
       return nullptr;
     }
     return new (result) CFactoryBuildTask(dispatchTask, blueprint, command, rallyPointUnit);
+  }
+
+  namespace
+  {
+    // Copies the factory builder's command queue into `commands` (replaced by
+    // the rally-point unit's builder queue when present), matching the shared
+    // head of sub_5FA340 / InheritCommandsTo.
+    void SnapshotFactoryCommandQueue(
+      Unit* const factoryUnit, WeakPtr<Unit>& rallyPointUnit,
+      msvc8::vector<WeakPtr<CUnitCommand>>& commands)
+    {
+      CopyWeakPtrCUnitCommandVector(factoryUnit->AiBuilder->BuilderGetFactoryCommandQueue(), commands);
+      if (Unit* const rallyUnit = rallyPointUnit.GetObjectPtr();
+          rallyUnit != nullptr && rallyUnit->AiBuilder != nullptr) {
+        ResetWeakPtrCUnitCommandVectorStorage(commands);
+        CopyWeakPtrCUnitCommandVector(rallyUnit->AiBuilder->BuilderGetFactoryCommandQueue(), commands);
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x005FA340 (FUN_005FA340, Moho::CFactoryBuildTask::InheritQueuedCommandsTo)
+   *
+   * IDA signature:
+   * void __thiscall sub_5FA340(CFactoryBuildTask *this, Moho::Entity *builtUnit);
+   *
+   * What it does:
+   * Re-queues the factory's pending builder commands onto the newly built unit,
+   * dropping TransportLoadUnits commands when the built unit is AIR or NAVAL.
+   * No leading-Move suppression (the no-transport-guard path).
+   */
+  void CFactoryBuildTask::InheritQueuedCommandsTo(Entity* const builtUnit)
+  {
+    Unit* const factoryUnit = mUnit;
+    if (factoryUnit->AiBuilder == nullptr || factoryUnit->IsMobile()) {
+      return;
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> commands{};
+    SnapshotFactoryCommandQueue(factoryUnit, mRallyPointUnit, commands);
+
+    for (const WeakPtr<CUnitCommand>& commandLink : commands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      if (command == nullptr) {
+        continue;
+      }
+      if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits &&
+          (builtUnit->IsInCategory("AIR") || builtUnit->IsInCategory("NAVAL"))) {
+        continue;
+      }
+      static_cast<Unit*>(builtUnit)->CommandQueue->AddCommandToQueue(command);
+    }
+  }
+
+  /**
+   * Address: 0x005FA550 (FUN_005FA550, Moho::CFactoryBuildTask::InheritCommandsTo)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CFactoryBuildTask::InheritCommandsTo(
+   *   CFactoryBuildTask *this, Moho::Unit *builtUnit);
+   *
+   * What it does:
+   * As InheritQueuedCommandsTo, but suppresses the leading run of Move commands
+   * (until the first non-Move command is queued) so a transport-loaded unit does
+   * not drive off before loading.
+   */
+  void CFactoryBuildTask::InheritCommandsTo(Unit* const builtUnit)
+  {
+    Unit* const factoryUnit = mUnit;
+    if (factoryUnit->AiBuilder == nullptr || factoryUnit->IsMobile()) {
+      return;
+    }
+
+    msvc8::vector<WeakPtr<CUnitCommand>> commands{};
+    SnapshotFactoryCommandQueue(factoryUnit, mRallyPointUnit, commands);
+
+    bool suppressLeadingMove = true;
+    for (const WeakPtr<CUnitCommand>& commandLink : commands) {
+      CUnitCommand* const command = commandLink.GetObjectPtr();
+      if (command == nullptr) {
+        continue;
+      }
+      if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
+        if (builtUnit->IsInCategory("AIR") || builtUnit->IsInCategory("NAVAL")) {
+          continue;
+        }
+      }
+      if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Move && suppressLeadingMove) {
+        continue;
+      }
+      suppressLeadingMove = false;
+      builtUnit->CommandQueue->AddCommandToQueue(command);
+    }
+  }
+
+  /**
+   * Address: 0x005FA790 (FUN_005FA790, Moho::CFactoryBuildTask::Execute / TaskTick)
+   *
+   * IDA signature:
+   * int __thiscall Moho::CFactoryBuildTask::TaskTick(CFactoryBuildTask *this);
+   *
+   * VFTable SLOT: 1
+   *
+   * What it does:
+   * Factory build-task state machine: prepares/spawns the target unit (shuffling
+   * blockers via SIM_TryToBuild when the site is occupied), advances work
+   * progress, and on completion hands the unit to a TRANSPORTATION guard (issuing
+   * a load command) or inherits the queued commands directly.
+   */
+  int CFactoryBuildTask::Execute()
+  {
+    if (mHasCommand && mCommand.GetObjectPtr() == nullptr) {
+      return -1;
+    }
+
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        if (!mUnit->CanBuild(mBlueprint)) {
+          return -1;
+        }
+        if (!mUnit->CanStartBuilding(mBlueprint->Economy.BuildCostEnergy, mBlueprint->Economy.BuildCostMass)) {
+          return 1;
+        }
+        if (mUnit->IsPaused) {
+          return 10;
+        }
+
+        const Wm3::Vec3f& factoryPos = mUnit->GetPosition();
+        const SCoordsVec2 factoryCoords{factoryPos.x, factoryPos.z};
+        gpg::Rect2i footprintRect = mUnit->GetBlueprint()->GetFootprintRect(factoryCoords);
+
+        if (!Sim::LocationIsFree(mSim, mUnit, &footprintRect, 1)) {
+          SIM_TryToBuild(mSim, mUnit->ArmyRef, &footprintRect, 1);
+          return 50;
+        }
+
+        const std::int32_t layerArg = mBlueprint->Air.CanFly;
+        static TSimConVar<bool> sAiInstaBuild(false, "ai_InstaBuild", false);
+        CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&sAiInstaBuild);
+        void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
+        const bool instaBuild =
+          instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
+
+        const Wm3::Vec3f& spawnPos = mUnit->GetPosition();
+        SUnitConstructionParams params(layerArg, spawnPos, mUnit->ArmyRef, mBlueprint, mUnit, instaBuild);
+
+        Unit* const newUnit = mSim->CreateUnitForScript(params, true);
+        if (newUnit == nullptr) {
+          return 10;
+        }
+
+        newUnit->SetFireState(mUnit->FireState);
+        mBuildHelper.SetFocus(newUnit);
+        mUnit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      }
+        [[fallthrough]];
+
+      case TASKSTATE_Waiting: {
+        if (!mBuildHelper.IsGood()) {
+          mBuildHelper.OnStopBuild(false);
+          mTaskState = TASKSTATE_Preparing;
+          return 10;
+        }
+        if (!mBuildHelper.UpdateWorkProgress()) {
+          return 1;
+        }
+
+        Unit* const newUnit = mBuildHelper.mFocus.GetObjectPtr();
+        mBuildHelper.OnStopBuild(true);
+        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
+
+        // Walk the guard chain to the terminal guarded unit.
+        Unit* terminalGuarded = mUnit;
+        Unit* previousGuarded = nullptr;
+        for (;;) {
+          Unit* const next = terminalGuarded->GetGuardedUnit();
+          if (next == nullptr || next == mUnit || next == previousGuarded) {
+            break;
+          }
+          previousGuarded = terminalGuarded;
+          terminalGuarded = next;
+        }
+
+        // Select a TRANSPORTATION guard that is ferrying, preferring one that is
+        // not currently moving; stop at the first stationary transport.
+        Unit* selectedTransport = nullptr;
+        const gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> guardSlots =
+          terminalGuarded->GuardedByList.mSlots;
+        for (const SGuardedByWeakOwnerSlot* slot = guardSlots.begin; slot != guardSlots.end; ++slot) {
+          const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(slot->ownerLinkSlot);
+          if (encoded == 0) {
+            break;
+          }
+          if (encoded <= 0x8u) {
+            continue;
+          }
+          Unit* const guardUnit = reinterpret_cast<Unit*>(encoded - 0x8u);
+          if (!guardUnit->IsInCategory("TRANSPORTATION") || !guardUnit->IsUnitState(UNITSTATE_Ferrying)) {
+            continue;
+          }
+          if (selectedTransport == nullptr || !guardUnit->IsUnitState(UNITSTATE_Moving)) {
+            selectedTransport = guardUnit;
+          }
+          if (!selectedTransport->IsUnitState(UNITSTATE_Moving)) {
+            break;
+          }
+        }
+
+        if (selectedTransport != nullptr) {
+          SEntitySetTemplateUnit dispatchSet{};
+          (void)dispatchSet.AddUnit(selectedTransport);
+
+          CAiTarget aiTarget{};
+          aiTarget.UpdateTarget(selectedTransport);
+          SSTITarget encodedTarget{};
+          aiTarget.EncodeToSSTITarget(encodedTarget);
+
+          SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
+          issueData.mTarget = encodedTarget;
+
+          (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, dispatchSet, issueData, false);
+          InheritCommandsTo(newUnit);
+        } else {
+          InheritQueuedCommandsTo(newUnit);
+        }
+        return 0;
+      }
+
+      case TASKSTATE_Starting:
+        if (mLinkResult == static_cast<EAiResult>(2)) {
+          mTaskState = TASKSTATE_Preparing;
+          return 0;
+        }
+        mUnit->WorkProgress = 0.0f;
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return 1;
+
+      case TASKSTATE_Processing:
+        if (mUnit->IsUnitState(UNITSTATE_Busy)) {
+          return 10;
+        }
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return -1;
+
+      default:
+        gpg::HandleAssertFailure(
+          "Reached the supposably unreachable.",
+          1713,
+          "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitBuild.cpp");
+        return -1;
+    }
   }
 
   /**
