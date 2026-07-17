@@ -48,6 +48,7 @@ namespace moho
 {
   class CScrLuaInitForm;
   class CUIManager;
+  class IClient;
   class CUIWorldView;
   class CLuaWldUIProvider;
   class CUIWorldMesh;
@@ -3504,6 +3505,15 @@ namespace moho
    * What it does:
    * Forwards one assembled bottleneck snapshot into the GPGNet reporting lane.
    */
+  /**
+   * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
+   *
+   * What it does:
+   * Posts the localized "%s disconnected." console notice for the given client
+   * onto the main thread (CWldUiInterface's NoteDisconnect override).
+   */
+  void UI_NoteDisconnect(const IClient* client);
+
   void UI_ReportBottleneck(const SClientBottleneckInfo& info);
 
   /**
