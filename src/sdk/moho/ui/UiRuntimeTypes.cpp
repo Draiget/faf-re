@@ -23329,6 +23329,39 @@ gpg::RRef moho::CMauiBorder::GetDerivedObjectRef()
 }
 
 /**
+ * Address: 0x0086A380 (FUN_0086A380, Moho::CLuaWldUIProvider::GetClass)
+ *
+ * What it does:
+ * Returns the reflection descriptor for the `CLuaWldUIProvider` type (cached,
+ * looked up by name on first use). The empty stub returned nullptr, which
+ * broke reflection (GetDerivedObjectRef packed a null type).
+ */
+gpg::RType* moho::CLuaWldUIProvider::GetClass() const
+{
+  return CachedCLuaWldUIProviderType();
+}
+
+/**
+ * Address: 0x0086A3C0 (FUN_0086A3C0, Moho::CLuaWldUIProvider::GetDerivedObjectRef)
+ *
+ * IDA signature:
+ * gpg::RRef *__thiscall Moho::CLuaWldUIProvider::GetDerivedObjectRef(
+ *   CLuaWldUIProvider *this, gpg::RRef *out);
+ *
+ * What it does:
+ * Packs `{reflection-object (this - 4), GetClass()}` into a reflection
+ * reference handle. The `- 4` adjusts from the reflection sub-object vtable to
+ * the owning object, matching the binary's derived-object-ref layout.
+ */
+gpg::RRef moho::CLuaWldUIProvider::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = reinterpret_cast<char*>(this) - 4;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
  * Address: 0x00784D60 (FUN_00784D60, Moho::CMauiBorder::SetTextures)
  *
  * What it does:
