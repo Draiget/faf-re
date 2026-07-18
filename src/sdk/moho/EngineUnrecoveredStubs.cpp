@@ -111,10 +111,9 @@ namespace moho
   class CWldSession;
 }
 
-// Linker error references this at global scope (no namespace):
-// `?func_GetRightMouseButtonAction@@YA...` — keep here, NOT inside namespace moho.
-moho::CommandModeData* func_GetRightMouseButtonAction(
-    moho::CommandModeData* out, moho::MouseInfo*, int, moho::CWldSession*) { return out; }
+// func_GetRightMouseButtonAction (FUN_0081EC00) is recovered at global scope in
+// src/sdk/moho/sim/CWldSession.cpp — the no-op stub that returned `out` unchanged
+// is gone.
 
 // ===== Free wxRuntime helper =====
 // wxDestroyListNoDeleteRuntime recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
