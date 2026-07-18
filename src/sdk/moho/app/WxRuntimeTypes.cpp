@@ -70,6 +70,8 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DDepthStencil.h"
+#include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/sim/CDebugCanvas.h"
@@ -57208,6 +57210,19 @@ void moho::WWinManagedFrame::DestroyManagedOwners(
   DestroyManagedRuntimeCollection<WWinManagedFrame>(slots);
 }
 
+namespace moho
+{
+  // Bloom-pass engine globals consumed by CBloomRenderer::DoBloom
+  // (FUN_007F5160). They live in the shipped binary's data segments; their
+  // owning translation unit is not recovered yet, so they are forward-declared
+  // here as externs (same convention as the ren_* flags declared later in this
+  // file and ren_ShowNormals in MediumFidelityTerrain.cpp).
+  //   ren_BloomBlurCount @0x00F57E7C = 2 (byte-verified in
+  //   bin/2025.7.1/ForgedAlliance.exe: `02 00 00 00`).
+  extern int ren_BloomBlurCount;
+  extern ShaderVar shaderVarFrameGlowCopyAdd;
+} // namespace moho
+
 /**
  * Address: 0x00453AA0 (FUN_00453AA0, sub_453AA0)
  *
@@ -57423,6 +57438,215 @@ namespace
     bloomRenderer->mCompositeFrame.~CRenFrame();
     bloomRenderer->mExtractFrame.~CRenFrame();
     DestroySharedPtrArrayReverse(bloomRenderer->mRenderTargetLocks);
+  }
+
+  // ---------------------------------------------------------------------------
+  // CBloomRenderer bloom post-process pass (FUN_007F4FB0 / FUN_007F5070 /
+  // FUN_007F5160). These three private methods live on Moho::CBloomRenderer,
+  // which has no reachable header declaration in the current source model
+  // (the class is only ever touched through the CBloomRendererRuntime overlay
+  // above). They are therefore modeled here as file-scope helpers that take the
+  // overlay pointer, exactly like the sibling ConstructBloomRendererRuntime /
+  // DestroyBloomRendererRuntime helpers. Behavior and control flow are 1:1 with
+  // the binary; field access is fully typed through CBloomRendererRuntime and
+  // the recovered CRenFrame / CD3DDevice / gpg::gal types.
+  //
+  // Overlay <-> binary field map (byte offsets verified against the .asm):
+  //   mUnknown00 @0x00 = frame width   ([ebx+0]  in DoBloom / RenderToBlur)
+  //   mUnknown04 @0x04 = frame height  ([ebx+4])
+  //   mRenderTargetLocks[0] @0x08 = "glow/extract" render target (v2 in .c)
+  //   mRenderTargetLocks[1] @0x10 = "blur/composite" render target (v3 in .c)
+  //   mExtractFrame  @0x18 = CRenFrame used by RenderToBackBuffer ([ebx+0x18])
+  //   mCompositeFrame @0x60 = CRenFrame used by RenderToBlur     ([ebx+0x60])
+  //   mHeadIndex @0xA8 = device head index ([ebx+0xA8])
+  //
+  // NOTE: the Hex-Rays `.c` labels the two CRenFrame sub-objects `frame1`/
+  // `frame2`; those names are inverted relative to their real byte positions.
+  // The .asm displacements (0x18 vs 0x60) are ground truth and are used here.
+
+  /**
+   * Address: 0x007F4FB0 (FUN_007F4FB0, Moho::CBloomRenderer::RenderToBlur)
+   * Mangled: ?RenderToBlur@CBloomRenderer@Moho@@AAEXPBDV?$shared_ptr@VID3DRenderTarget@Moho@@@boost@@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CBloomRenderer::RenderToBlur(
+   *     CBloomRenderer *this, const char *techniqueName,
+   *     boost::shared_ptr<Moho::ID3DRenderTarget> texture);
+   *
+   * What it does:
+   * Names the composite frame pass, binds the supplied render target as its
+   * source texture, and issues the fullscreen blur draw at the renderer's frame
+   * dimensions.
+   */
+  void BloomRenderToBlur(
+    CBloomRendererRuntime* const bloomRenderer,
+    const char* const techniqueName,
+    boost::shared_ptr<moho::ID3DRenderTarget> texture
+  )
+  {
+    moho::CRenFrame& frame = bloomRenderer->mCompositeFrame;
+    frame.mName = techniqueName;
+
+    // The binary drops the SetTexture texture-slot argument at this call site
+    // (only the shared_ptr is pushed); the recovered CRenFrame::SetTexture
+    // ignores the slot and always assigns mFrameTexture1, so slot 0 is 1:1.
+    frame.SetTexture(0u, texture);
+    frame.Render(
+      static_cast<int>(bloomRenderer->mUnknown00),
+      static_cast<int>(bloomRenderer->mUnknown04)
+    );
+  }
+
+  /**
+   * Address: 0x007F5070 (FUN_007F5070, Moho::CBloomRenderer::RenderToBackBuffer)
+   * Mangled: ?RenderToBackBuffer@CBloomRenderer@Moho@@AAEXPBDV?$shared_ptr@VID3DRenderTarget@Moho@@@boost@@@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CBloomRenderer::RenderToBackBuffer(
+   *     CBloomRenderer *this,
+   *     boost::shared_ptr<Moho::ID3DRenderTarget> texture);
+   *
+   * What it does:
+   * Names the extract frame pass "TFrameAdd", binds the supplied render target
+   * as its source texture, then issues the fullscreen composite draw sized to
+   * the active device head's back-buffer dimensions.
+   *
+   * The mangled name carries a leading `const char*` parameter, but the body
+   * hardcodes the literal "TFrameAdd" and DoBloom never passes a name string at
+   * the call site, so it is omitted here to match the actual invocation.
+   */
+  void BloomRenderToBackBuffer(
+    CBloomRendererRuntime* const bloomRenderer,
+    boost::shared_ptr<moho::ID3DRenderTarget> texture
+  )
+  {
+    moho::CRenFrame& frame = bloomRenderer->mExtractFrame;
+    frame.mName = "TFrameAdd";
+    frame.SetTexture(0u, texture);
+
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+    const gpg::gal::Head& head = context->GetHead(bloomRenderer->mHeadIndex);
+    frame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+  }
+
+  /**
+   * Address: 0x007F5160 (FUN_007F5160, Moho::CBloomRenderer::DoBloom)
+   * Mangled: ?DoBloom@CBloomRenderer@Moho@@QAEXM@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::CBloomRenderer::DoBloom(CBloomRenderer *this, float amt);
+   *
+   * What it does:
+   * Runs the full bloom post-process for one viewport head: copies the glowing
+   * scene into the extract target, ping-pong blurs it `ren_BloomBlurCount`
+   * times between the two render targets, then additively composites the result
+   * back onto the head's back buffer. Saves and restores the device viewport
+   * around the passes.
+   *
+   * NOTE: the `amt` parameter is dead. The binary reuses the incoming float's
+   * stack slot as the temporary viewport's X field and never reads it; the
+   * effect strength fed to shaderVarFrameGlowCopyAdd is the constant 1.0f loaded
+   * from .rdata @0x00DFEC20 (byte-verified `00 00 80 3F`), which is the same slot
+   * used for the temporary viewport's MaxZ. It is preserved as a parameter for
+   * signature fidelity.
+   */
+  void DoBloom(CBloomRendererRuntime* const bloomRenderer, [[maybe_unused]] const float amt)
+  {
+    // Guard: both render targets must be present (binary tests [ebx+8] and
+    // [ebx+0x10], i.e. the two render-target shared_ptr px lanes).
+    if (bloomRenderer->mRenderTargetLocks[0].get() == nullptr
+        || bloomRenderer->mRenderTargetLocks[1].get() == nullptr) {
+      return;
+    }
+
+    gpg::gal::Device* const instance = gpg::gal::Device::GetInstance();
+    auto* const deviceInstance = static_cast<gpg::gal::DeviceD3D9*>(instance);
+
+    // Resolve the active depth-stencil target once (raw pointer, up-cast to the
+    // interface expected by SetRenderTarget1). The binary keeps only the .px of
+    // the returned shared_ptr in `edi` for the whole routine.
+    boost::shared_ptr<moho::CD3DDepthStencil> activeDepthStencil;
+    moho::ID3DDepthStencil* const depthStencil =
+      moho::D3D_GetDevice()->GetDepthStencil(activeDepthStencil).get();
+
+    // Saved viewport blob (GetViewport / SetViewport take an opaque D3DVIEWPORT9
+    // pointer; modeled as a 7-DWORD struct so d3d9.h is not required here).
+    struct RenBloomViewport
+    {
+      std::uint32_t x;
+      std::uint32_t y;
+      std::uint32_t width;
+      std::uint32_t height;
+      float minZ;
+      float maxZ;
+      std::uint32_t pad;
+    };
+    static_assert(sizeof(RenBloomViewport) == 0x1C, "D3DVIEWPORT9 blob must be 0x1C");
+
+    RenBloomViewport savedViewport{};
+
+    // Acquire this head's writer-lock render target, then StretchRect it into
+    // the composite/blur target (SetViewRect: source=writerLock, dest=blur RT,
+    // whole surfaces). This seeds the blur target with the current back buffer.
+    boost::shared_ptr<moho::ID3DRenderTarget> writerLock;
+    moho::D3D_GetDevice()->GetWriterLock1(writerLock, static_cast<int>(bloomRenderer->mHeadIndex));
+    moho::D3D_GetDevice()->SetViewRect(
+      writerLock.get(),
+      bloomRenderer->mRenderTargetLocks[1].get(),
+      nullptr,
+      nullptr
+    );
+
+    // Save the current device viewport, then install a full-frame viewport
+    // (0,0,width,height,0,1) for the post-process passes.
+    deviceInstance->GetViewport(&savedViewport);
+
+    RenBloomViewport bloomViewport{};
+    bloomViewport.x = 0u;
+    bloomViewport.y = 0u;
+    bloomViewport.width = bloomRenderer->mUnknown00;
+    bloomViewport.height = bloomRenderer->mUnknown04;
+    bloomViewport.minZ = 0.0f;
+    bloomViewport.maxZ = 1.0f;
+    deviceInstance->SetViewport(&bloomViewport);
+
+    // Effect strength for the additive glow-copy technique. Byte-verified
+    // constant 1.0f (see the DoBloom note above).
+    constexpr float kFrameGlowCopyAmount = 1.0f;
+    if (moho::shaderVarFrameGlowCopyAdd.Exists()) {
+      moho::shaderVarFrameGlowCopyAdd.SetFloat(kFrameGlowCopyAmount);
+    }
+
+    // Copy the glowing scene into the extract/glow target (mRenderTargetLocks[0]),
+    // sourced from the blur target (mRenderTargetLocks[1]).
+    moho::D3D_GetDevice()->SetRenderTarget1(
+      bloomRenderer->mRenderTargetLocks[0].get(), depthStencil, false, 0, 1.0f, 0
+    );
+    BloomRenderToBlur(bloomRenderer, "TCopyGlowingStuff", bloomRenderer->mRenderTargetLocks[1]);
+
+    // Ping-pong Gaussian blur: horizontal pass reads the glow target and writes
+    // the blur target, vertical pass reads the blur target and writes the glow
+    // target, repeated ren_BloomBlurCount times.
+    for (int pass = 0; pass < moho::ren_BloomBlurCount; ++pass) {
+      moho::D3D_GetDevice()->SetRenderTarget1(
+        bloomRenderer->mRenderTargetLocks[1].get(), depthStencil, false, 0, 1.0f, 0
+      );
+      BloomRenderToBlur(bloomRenderer, "TBlurHorizontal", bloomRenderer->mRenderTargetLocks[0]);
+
+      moho::D3D_GetDevice()->SetRenderTarget1(
+        bloomRenderer->mRenderTargetLocks[0].get(), depthStencil, false, 0, 1.0f, 0
+      );
+      BloomRenderToBlur(bloomRenderer, "TBlurVertical", bloomRenderer->mRenderTargetLocks[1]);
+    }
+
+    // Restore the saved viewport, rebind this head's back buffer as the render
+    // target, and additively composite the accumulated glow onto it.
+    deviceInstance->SetViewport(&savedViewport);
+    moho::D3D_GetDevice()->SetRenderTarget2(
+      static_cast<int>(bloomRenderer->mHeadIndex), false, 0, 1.0f, 0
+    );
+    BloomRenderToBackBuffer(bloomRenderer, bloomRenderer->mRenderTargetLocks[0]);
   }
 
   struct WRenViewportWorldViewStorageRuntime final
@@ -58154,6 +58378,9 @@ namespace moho
   extern bool ren_Water;
   extern bool ren_Reflection;
   extern bool ren_SkyDome;
+  extern bool ren_Oblivion;
+  extern bool ren_Bloom;
+  extern bool ren_ShowNormals;
   extern bool fog_DistanceFog;
   extern float fog_OffsetMultiplier;
 } // namespace moho
@@ -59264,6 +59491,19 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     FogOff();
 
     runtime->mCam = nullptr;
+  }
+
+  // Bloom post-process pass. Binary (WRenViewport::Render @0x007F90D0, the
+  // DoBloom call at 0x007F983A) gates it on `!ren_Oblivion && ren_Bloom &&
+  // !ren_ShowNormals` and invokes it on the active head's bloom renderer:
+  //   Moho::CBloomRenderer::DoBloom(&viewport->mBloomRenderers[viewport->mHead], amt)
+  // mBloomRenderers @+0x128 and mHead @+0x320 are both modeled by the
+  // WRenViewportDestroyRuntimeView overlay. The float amount is dead inside
+  // DoBloom (see its note), so the elided water-amount fetch is not modeled and
+  // 0.0f is passed.
+  if (!moho::ren_Oblivion && moho::ren_Bloom && !moho::ren_ShowNormals) {
+    auto* const bloomHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+    DoBloom(&bloomHost->mBloomRenderers[bloomHost->mHead], 0.0f);
   }
 
   // Conditionally dump the just-rendered frame to a numbered screenshot file.
