@@ -71,6 +71,7 @@
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
@@ -59029,6 +59030,151 @@ void moho::WRenViewport::RemoveWorldView(IRenderWorldView* const worldView)
   }
 }
 
+namespace
+{
+  /**
+   * Process-static frame-dump accumulation lane.
+   *
+   * The binary keeps this as a raw px/pn pair at `dword_11043E8`/`dword_11043EC`
+   * (VA 0x011043E8 / 0x011043EC), guarded by a one-time-init flag at
+   * `dword_11043F0` that also registers an `atexit` cleanup (`sub_C042A0` =
+   * FUN_00C042A0) which releases the shared count. That is exactly the
+   * lifetime of a file-static `boost::shared_ptr<CD3DDynamicTextureSheet>`
+   * whose destructor runs at process exit, so it is modeled as one here.
+   *
+   * `CD3DDevice::GetResources()->Func10(...)` (ID3DDeviceResources slot 18,
+   * vtable +0x48) accumulates the current frame into this sheet, taking the
+   * previous sheet as its `currentSheet` argument and returning the (possibly
+   * recreated) destination that is stored back into the lane.
+   */
+  boost::shared_ptr<moho::CD3DDynamicTextureSheet>& RenDumpFrameSheetLane() noexcept
+  {
+    // Function-local static: constructed empty on first use and released once
+    // at process exit, matching the binary's init-once + atexit semantics.
+    static boost::shared_ptr<moho::CD3DDynamicTextureSheet> sDumpFrameSheet{};
+    return sDumpFrameSheet;
+  }
+
+  // Frame-dump tuning/state globals owned by the render screenshot subsystem.
+  //
+  // These are the `Moho::dump_*` data globals the binary reads/writes from
+  // REN_MaybeDumpFrame. No prior source declaration exists, so they are
+  // modeled here at their proven types and byte-verified defaults:
+  //   dump_frameRate         @ 0x010A6334 (?dump_frameRate@Moho@@3HA)          int, 0
+  //   dump_outputFrameNumber @ 0x010A6418 (?dump_outputFrameNumber@Moho@@3HA)  int, 0
+  //   dump_Timestamp         @ 0x00F5A8A4 (msvc8::string)                      empty
+  //   dump_frameDumpName     @ 0x00F5A8C0 (msvc8::string)                      empty
+  // The timestamp / base-name strings are populated by the frame-dump console
+  // command elsewhere; here they are only consumed to build the output path.
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x010A6334 (?dump_frameRate@Moho@@3HA)
+   *
+   * Frame-dump countdown. Zero disables dumping; a positive value dumps one
+   * frame per render and decrements toward zero; a negative value dumps
+   * indefinitely (never decremented). Default 0 (byte-verified in .data).
+   */
+  int dump_frameRate = 0;
+
+  /**
+   * Address: 0x010A6418 (?dump_outputFrameNumber@Moho@@3HA)
+   *
+   * Monotonic index appended to each dumped frame's filename. Default 0.
+   */
+  int dump_outputFrameNumber = 0;
+
+  /**
+   * Address: 0x00F5A8A4 (?dump_Timestamp@Moho@@3V?$basic_string@...@std@@A)
+   *
+   * Timestamp token embedded in dumped frame filenames. Default empty.
+   */
+  msvc8::string dump_Timestamp{};
+
+  /**
+   * Address: 0x00F5A8C0 (?dump_frameDumpName@Moho@@3V?$basic_string@...@std@@A)
+   *
+   * Base directory / name prefix for dumped frame files. Default empty.
+   */
+  msvc8::string dump_frameDumpName{};
+
+  void REN_MaybeDumpFrame(ID3DRenderTarget* renderTarget);
+} // namespace moho
+
+/**
+ * Address: 0x007F5970 (FUN_007F5970)
+ * Mangled: ?REN_MaybeDumpFrame@Moho@@YAXPAVID3DRenderTarget@1@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::REN_MaybeDumpFrame(Moho::CD3DRenderTarget *this);
+ *   (the ecx-passed argument is the render target; the mangled symbol types it
+ *    as ID3DRenderTarget*, which is used here. IDA's CD3DRenderTarget* label is
+ *    a decompiler guess and the caller supplies a boost::shared_ptr
+ *    <ID3DRenderTarget>::get().)
+ *
+ * What it does:
+ * When frame dumping is armed (`dump_frameRate != 0`), decrements the positive
+ * countdown, copies the current screen writer-lock surface into the supplied
+ * render target, then accumulates that render target into a process-static
+ * dump texture sheet via the device resources copy lane. Finally it reads the
+ * accumulated sheet's texture back and saves it to a numbered `.bmp` file
+ * built from the frame-dump name + timestamp, warning on save failure.
+ */
+void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
+{
+  if (moho::dump_frameRate == 0) {
+    return;
+  }
+
+  // Positive countdown consumes one frame; a negative value dumps forever.
+  if (moho::dump_frameRate > 0) {
+    --moho::dump_frameRate;
+  }
+
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  gpg::gal::DeviceD3D9* const device9 = device->GetDeviceD3D9();
+
+  // Copy the current head's screen writer-lock surface into the caller's
+  // render target (whole-surface StretchRect: null source/dest rectangles).
+  boost::shared_ptr<moho::ID3DRenderTarget> screenLock{};
+  device->GetWriterLock1(screenLock, 0);
+  device->SetViewRect(screenLock.get(), renderTarget, nullptr, nullptr);
+
+  // Accumulate the render target into the persistent dump sheet. Func10 takes
+  // the previous sheet as `currentSheet` (reused/recreated as needed) and
+  // returns the destination sheet, which we store back into the static lane.
+  boost::shared_ptr<moho::CD3DDynamicTextureSheet>& dumpSheet = RenDumpFrameSheetLane();
+  moho::ID3DDeviceResources* const resources = device->GetResources();
+  resources->Func10(dumpSheet, renderTarget, dumpSheet);
+
+  // Build the numbered output path: "<name>\SCFrame_<timestamp>_<NNNNN>.bmp".
+  const int frameNumber = moho::dump_outputFrameNumber++;
+  const msvc8::string dest = gpg::STR_Printf(
+    "%s\\SCFrame_%s_%05d.bmp",
+    moho::dump_frameDumpName.c_str(),
+    moho::dump_Timestamp.c_str(),
+    frameNumber
+  );
+
+  // Save the accumulated sheet's texture to file. The binary reads the sheet's
+  // retained texture handle (ID3DTextureSheet::GetTexture) and forwards it to
+  // the GAL backend's texture-save lane (DeviceD3D9::Func5) with the default
+  // image format and no in-memory output buffer. A GAL error is caught and
+  // reported rather than propagated, matching the binary's inline EH funclet.
+  if (device9 != nullptr) {
+    boost::shared_ptr<gpg::gal::TextureD3D9> texture{};
+    dumpSheet->GetTexture(texture);
+    try {
+      gpg::gal::TextureD3D9* rawTexture = texture.get();
+      device9->Func5(&rawTexture, dest, 0, nullptr);
+    } catch (const std::exception& error) {
+      gpg::Warnf("Error saving file %s: %s", dest.c_str(), error.what());
+    }
+  }
+}
+
 /**
  * Address: 0x007F90D0 (FUN_007F90D0, Moho::WRenViewport::Render)
  *
@@ -59119,6 +59265,14 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 
     runtime->mCam = nullptr;
   }
+
+  // Conditionally dump the just-rendered frame to a numbered screenshot file.
+  // In the binary this is the tail call of WRenViewport::Render @0x007F90D0
+  // (line 375): Moho::REN_MaybeDumpFrame((ID3DRenderTarget *)viewport->mLocks1[0]),
+  // where mLocks1[0] is the primary render-target writer-lock slot at +0x2164.
+  // It is a no-op unless frame dumping has been armed via `dump_frameRate`.
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+  moho::REN_MaybeDumpFrame(passView->mPrimaryTargetLocks[0].get());
 }
 
 /**
