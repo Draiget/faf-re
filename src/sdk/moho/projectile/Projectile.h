@@ -48,9 +48,14 @@ namespace moho
 
     /**
      * Address: 0x0069AFE0 (FUN_0069AFE0, Moho::Projectile::Projectile)
+     * Mangled: ??0Projectile@Moho@@QAE@PBVRProjectileBlueprint@1@PAVSim@1@PAVSimArmy@1@PAVEntity@1@VVTransform@1@MMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVCAiTarget@1@_N@Z
      *
      * What it does:
-     * Constructs one projectile from runtime launch parameters.
+     * Constructs one live projectile from runtime launch parameters: reserves a
+     * projectile-family entity id, seeds randomized physics lanes from blueprint
+     * spread ranges, splices launcher/target weak links, computes launch velocity,
+     * writes the transforms, links into the Sim coord list, selects the initial
+     * layer, and fires the OnPreCreate / OnLayerChange / OnCreate scripts.
      */
     Projectile(
       const RProjectileBlueprint* blueprint,
