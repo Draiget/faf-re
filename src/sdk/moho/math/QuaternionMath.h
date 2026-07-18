@@ -216,4 +216,13 @@ namespace moho
     Wm3::Vector3f* outMatrix, float heading, float pitch, float roll
   ) noexcept;
 
+  /**
+   * Address: 0x00452FD0 (FUN_00452FD0, func_QuatToMatrix)
+   *
+   * Expands a unit quaternion (engine scalar-first storage: `.w` scalar,
+   * `.x/.y/.z` imaginary) into a row-major 3x3 rotation matrix, written as three
+   * consecutive `Wm3::Vector3f` rows. Returns `outMatrix`.
+   */
+  Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* quat, Wm3::Vector3f* outMatrix) noexcept;
+
 } // namespace moho

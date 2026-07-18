@@ -90,6 +90,7 @@
 #include "moho/lua/SCR_String.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
@@ -9250,9 +9251,10 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
 /**
  * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
  *
- * Shared quaternion-vector rotation helper with 67+ callsites. Binary body
- * inlines `QuatToMatrix` + matrix-vector multiply; expressed here via
- * `Wm3::MultiplyQuaternionVector` which matches the same semantics.
+ * Shared quaternion-vector rotation helper with 67+ callsites. Builds the
+ * quaternion's row-major 3x3 rotation matrix via `moho::QuatToMatrix`
+ * (FUN_00452FD0) and rotates `vec` through it, exactly as the binary does
+ * (zeroed matrix scratch, QuatToMatrix, then a row-major matrix-vector product).
  *
  * The orphan thunk at 0x0044F9B0 (FUN_0044F9B0) forwards here with its
  * argument order rotated; it has zero callers in the shipping binary and
@@ -9264,7 +9266,11 @@ Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const 
     return dest;
   }
 
-  Wm3::MultiplyQuaternionVector(dest, *vec, *quat);
+  Wm3::Vector3f rows[3]{};
+  moho::QuatToMatrix(quat, rows);
+  dest->x = vec->x * rows[0].x + vec->y * rows[0].y + vec->z * rows[0].z;
+  dest->y = vec->x * rows[1].x + vec->y * rows[1].y + vec->z * rows[1].z;
+  dest->z = vec->x * rows[2].x + vec->y * rows[2].y + vec->z * rows[2].z;
   return dest;
 }
 
