@@ -223,6 +223,22 @@ namespace moho
     );
 
     /**
+     * Address: 0x0057CBB0 (FUN_0057CBB0, Moho::CAiBrain::CanBuildStructureAt)
+     *
+     * What it does:
+     * Tests whether `structureBp` can legally be placed at `pos`: grid placement
+     * check + same-alliance rescue + nearby-enemy-unit skirt overlap + outstanding
+     * build-reservation skirt overlap (erasing dead reservations along the way).
+     */
+    [[nodiscard]] bool CanBuildStructureAt(
+      const Wm3::Vector3f& pos,
+      RUnitBlueprint* structureBp,
+      EAlliance alliance,
+      int cellX,
+      int cellZ
+    );
+
+    /**
      * Address: 0x0057C290 (FUN_0057C290, Moho::CAiBrain::PickBestAttackVector)
      *
      * IDA signature:
@@ -1562,6 +1578,31 @@ namespace moho
    * Publishes the `CAiBrain:GetThreatsAroundPosition(...)` Lua binder.
    */
   CScrLuaInitForm* func_CAiBrainGetThreatsAroundPosition_LuaFuncDef();
+
+  /**
+   * Address: 0x0058B3A0 (FUN_0058B3A0, cfunc_CAiBrainCanBuildStructureAt)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainCanBuildStructureAtL`.
+   */
+  int cfunc_CAiBrainCanBuildStructureAt(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058B3C0 (FUN_0058B3C0, func_CAiBrainCanBuildStructureAt_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:CanBuildStructureAt(blueprint, location)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainCanBuildStructureAt_LuaFuncDef();
+
+  /**
+   * Address: 0x0058B420 (FUN_0058B420, cfunc_CAiBrainCanBuildStructureAtL)
+   *
+   * What it does:
+   * Reads `(brain, blueprintName, location)` from the Lua stack, resolves the unit
+   * blueprint, and pushes the boolean result of `CAiBrain::CanBuildStructureAt`.
+   */
+  int cfunc_CAiBrainCanBuildStructureAtL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0058FFA0 (FUN_0058FFA0, cfunc_CAiBrainAssignThreatAtPosition)

@@ -1,5 +1,6 @@
 #include "moho/ai/CAiBrain.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <initializer_list>
@@ -352,6 +353,8 @@ namespace
   constexpr const char* kAiBrainSetCurrentEnemyHelpText = "Set the current enemy for this brain to attack";
   constexpr const char* kAiBrainSetCurrentEnemyName = "SetCurrentEnemy";
   constexpr const char* kAiBrainLuaClassName = "CAiBrain";
+  constexpr const char* kAiBrainCanBuildStructureAtName = "CanBuildStructureAt";
+  constexpr const char* kAiBrainCanBuildStructureAtHelpText = "brain:CanBuildStructureAt(blueprint, location)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kAiBrainSetUpAttackVectorsToArmyName = "SetUpAttackVectorsToArmy";
@@ -6006,6 +6009,261 @@ CScrLuaInitForm* moho::func_CAiBrainPickBestAttackVector_LuaFuncDef()
     kAiBrainPickBestAttackVectorHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0057CBB0 (FUN_0057CBB0, Moho::CAiBrain::CanBuildStructureAt)
+ *
+ * IDA signature:
+ * bool __thiscall CAiBrain::CanBuildStructureAt(CAiBrain* this,
+ *     const Wm3::Vector3f& pos, RUnitBlueprint* structureBp, EAlliance alliance,
+ *     int cellX, int cellZ);
+ *
+ * What it does:
+ * Full "can this structure be placed here?" test, in three stages that preserve
+ * the binary's control flow and short-circuit ordering exactly:
+ *
+ *   Stage 1 - grid placement check via `func_LocationIsFree`. When the site is
+ *     free, stage 2A is skipped and the common stages 2B/3 run.
+ *   Stage 2A (only when Stage 1 failed) - rescue path. A `ALLIANCE_None`
+ *     request or a null blueprint fails outright. Otherwise the candidate skirt
+ *     is scanned for nearby structures of the opposite-and-neutral alliance
+ *     lanes; the placement is only rescued when the relevant structure sets are
+ *     empty. On success the code FALLS THROUGH into Stage 2B (it is not an
+ *     if/else against the free path).
+ *   Stage 2B (common) - reject the site when the requested skirt overlaps any
+ *     nearby live, non-mobile enemy unit.
+ *   Stage 3 (common, only when the running result is still true) - walk this
+ *     brain's outstanding build reservations. A reservation whose builder or
+ *     command lane is dead is erased in place; a live reservation whose reserved
+ *     structure skirt overlaps the requested skirt rejects the placement.
+ */
+bool moho::CAiBrain::CanBuildStructureAt(
+  const Wm3::Vector3f& pos,
+  RUnitBlueprint* const structureBp,
+  const EAlliance alliance,
+  const int cellX,
+  const int cellZ
+)
+{
+  (void)cellX;
+  (void)cellZ;
+
+  // Stage 1: grid placement check. `func_LocationIsFree` writes its resolved
+  // occupation into a scratch result that is otherwise unused here.
+  const SCoordsVec2 worldXZ{pos.x, pos.z};
+  SOccupationResult placementResult{};
+  bool locationOk = false;
+  if (structureBp != nullptr) {
+    locationOk = func_LocationIsFree(*structureBp, *mSim->mOGrid, worldXZ, placementResult);
+  }
+
+  // Stage 2A: rescue path when the raw grid check failed.
+  if (!locationOk) {
+    if (structureBp == nullptr || alliance == ALLIANCE_None) {
+      return false;
+    }
+
+    const gpg::Rect2f candidateSkirt = structureBp->GetSkirtRect(worldXZ);
+    const float extent = std::max(candidateSkirt.x1 - candidateSkirt.x0, candidateSkirt.z1 - candidateSkirt.z0);
+
+    RRuleGameRules* const rules = mSim->mRules;
+    const EntityCategorySet* const structureCategory = rules->GetEntityCategory("STRUCTURE");
+
+    // Structures whose alliance is the mirror of the requested one
+    // (Ally request -> gather Enemy, Enemy request -> gather Ally), plus the
+    // neutral-alliance structures, both around the candidate position.
+    const EAlliance mirroredAlliance = (alliance == ALLIANCE_Enemy) ? ALLIANCE_Ally : ALLIANCE_Enemy;
+
+    SEntitySetTemplateUnit mirroredStructures{};
+    (void)CollectUnitsAroundPointFiltered(this, &mirroredStructures, structureCategory, pos, extent, mirroredAlliance);
+
+    SEntitySetTemplateUnit neutralStructures{};
+    (void)CollectUnitsAroundPointFiltered(this, &neutralStructures, structureCategory, pos, extent, ALLIANCE_Neutral);
+
+    if (alliance == ALLIANCE_Enemy) {
+      // Requesting an enemy placement: only the mirrored (ally) set must be empty.
+      locationOk = mirroredStructures.Empty();
+    } else {
+      // Requesting an ally placement: both the mirrored (enemy) and neutral
+      // structure sets must be empty.
+      locationOk = mirroredStructures.Empty() && neutralStructures.Empty();
+    }
+
+    if (!locationOk) {
+      return false;
+    }
+    // else: fall through into the common stages below.
+  }
+
+  // Stage 2B (common): reject when the requested skirt overlaps a nearby live,
+  // non-mobile enemy unit.
+  if (structureBp != nullptr) {
+    const gpg::Rect2f requestedSkirt = structureBp->GetSkirtRect(worldXZ);
+
+    Wm3::AxisAlignedBox3f queryBox{};
+    queryBox.Min.x = requestedSkirt.x0;
+    queryBox.Max.x = requestedSkirt.x1;
+    queryBox.Min.y = -1000.0f;
+    queryBox.Max.y = 1000.0f;
+    queryBox.Min.z = requestedSkirt.z0;
+    queryBox.Max.z = requestedSkirt.z1;
+
+    CollisionResultFastVectorN10 nearbyUnits{};
+    GatherUnmarkedUnitsInBox(*mSim->mOGrid, queryBox, nearbyUnits);
+
+    for (const CollisionResult& hit : nearbyUnits) {
+      Entity* const source = hit.sourceEntity;
+      Unit* const unit = (source != nullptr) ? source->IsUnit() : nullptr;
+      if (unit == nullptr) {
+        continue;
+      }
+      if (unit->IsDead()) {
+        continue;
+      }
+      if (unit->DestroyQueued()) {
+        continue;
+      }
+      if (alliance != ALLIANCE_None) {
+        const IArmy* const unitArmy =
+          (unit->ArmyRef != nullptr) ? static_cast<const IArmy*>(unit->ArmyRef) : nullptr;
+        if (mArmy->GetAllianceWith(unitArmy) == alliance) {
+          continue;
+        }
+      }
+      if (unit->IsMobile()) {
+        continue;
+      }
+      if (requestedSkirt.Overlaps(unit->GetSkirtRect())) {
+        return false;
+      }
+    }
+  }
+
+  if (!locationOk) {
+    return false;
+  }
+
+  // Stage 3 (common): scan outstanding build reservations. Erase reservations
+  // whose builder/command lane has died; reject the placement when a live
+  // reservation's reserved structure skirt overlaps the requested skirt.
+  // (The reserved structure blueprint is the command's build blueprint,
+  // mConstDat.blueprint; the binary reaches it via the command's target lane.)
+  auto& reserveMap = reinterpret_cast<BuildReserveMapStorage&>(mBuildStructureMap);
+  const gpg::Rect2f requestedSkirt = (structureBp != nullptr) ? structureBp->GetSkirtRect(worldXZ) : gpg::Rect2f{};
+
+  for (auto it = reserveMap.begin(); it != reserveMap.end();) {
+    SBuildReserveInfo& reservation = it->second;
+    Unit* const builder = reservation.mUnit.GetObjectPtr();
+    CUnitCommand* const command = reservation.mCom.GetObjectPtr();
+
+    // A reservation with no live command lane, no live builder, or a dead
+    // builder is stale and is dropped from the map.
+    if (command == nullptr || builder == nullptr || builder->IsDead()) {
+      it = reserveMap.erase(it);
+      continue;
+    }
+
+    // Reserved structure blueprint and its target position drive the reserved
+    // skirt rectangle.
+    auto* const reservedBlueprint = static_cast<RUnitBlueprint*>(command->mConstDat.blueprint);
+    if (reservedBlueprint == nullptr) {
+      ++it;
+      continue;
+    }
+
+    const Wm3::Vec3f reservedPos = command->mTarget.GetTargetPosGun(false);
+    const SCoordsVec2 reservedXZ{reservedPos.x, reservedPos.z};
+    const gpg::Rect2f reservedSkirt = reservedBlueprint->GetSkirtRect(reservedXZ);
+
+    if (structureBp != nullptr && reservedSkirt.Overlaps(requestedSkirt)) {
+      return false;
+    }
+
+    ++it;
+  }
+
+  return locationOk;
+}
+
+/**
+ * Address: 0x0058B3A0 (FUN_0058B3A0, cfunc_CAiBrainCanBuildStructureAt)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainCanBuildStructureAtL`.
+ */
+int moho::cfunc_CAiBrainCanBuildStructureAt(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainCanBuildStructureAtL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058B3C0 (FUN_0058B3C0, func_CAiBrainCanBuildStructureAt_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:CanBuildStructureAt(blueprint, location)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainCanBuildStructureAt_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainCanBuildStructureAtName,
+    &moho::cfunc_CAiBrainCanBuildStructureAt,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainCanBuildStructureAtHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058B420 (FUN_0058B420, cfunc_CAiBrainCanBuildStructureAtL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CAiBrainCanBuildStructureAtL@<eax>(LuaPlus::LuaState *ebx0@<ebx>);
+ *
+ * What it does:
+ * Reads `(brain, blueprintName, location)` from the Lua stack, resolves the unit
+ * blueprint by name, and pushes the boolean result of
+ * `CAiBrain::CanBuildStructureAt` evaluated at `location` with `ALLIANCE_None`
+ * and the truncated integer cell coordinates of the location.
+ */
+int moho::cfunc_CAiBrainCanBuildStructureAtL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiBrainCanBuildStructureAtHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  LuaPlus::LuaStackObject blueprintStackObject(state, 2);
+  const char* const blueprintName = lua_tostring(rawState, 2);
+  if (blueprintName == nullptr) {
+    blueprintStackObject.TypeError("string");
+  }
+
+  RResId lookupId{};
+  gpg::STR_InitFilename(&lookupId.name, blueprintName ? blueprintName : "");
+  RUnitBlueprint* const blueprint = brain->mSim->mRules->GetUnitBlueprint(lookupId);
+
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 3));
+  const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
+
+  const bool canBuild = brain->CanBuildStructureAt(
+    position,
+    blueprint,
+    ALLIANCE_None,
+    static_cast<int>(position.x),
+    static_cast<int>(position.z)
+  );
+
+  lua_pushboolean(rawState, canBuild ? 1 : 0);
+  lua_gettop(rawState);
+  return 1;
 }
 
 /**

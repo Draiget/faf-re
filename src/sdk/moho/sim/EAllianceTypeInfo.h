@@ -15,6 +15,9 @@ namespace moho
     ALLIANCE_Neutral = 0,
     ALLIANCE_Ally = 1,
     ALLIANCE_Enemy = 2,
+    // Sentinel "no alliance filter" value used by build-placement / target
+    // scanners (e.g. CAiBrain::CanBuildStructureAt) to disable the alliance gate.
+    ALLIANCE_None = 3,
   };
 
   static_assert(sizeof(EAlliance) == 0x04, "EAlliance size must be 0x04");
