@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`17/07/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`18/07/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
