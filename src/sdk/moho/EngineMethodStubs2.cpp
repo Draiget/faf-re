@@ -98,8 +98,10 @@ SkyDome::~SkyDome() {}
 // teardown).
 
 // ===== Constructors (no-op default-init) =====
-CMauiEdit::CMauiEdit(LuaPlus::LuaObject* lo, CMauiControl* parent)
-    : CMauiControl(lo, parent, msvc8::string{}) {}
+// CMauiEdit::CMauiEdit(LuaPlus::LuaObject*, CMauiControl*) (FUN_0078EFE0) is
+// recovered 1:1 in src/sdk/moho/ui/UiRuntimeTypes.cpp — the former empty-string
+// stub here was a false recovery ("" control kind + zero field init); removed in
+// favor of the real "edit" ctor that initializes the full edit/font/caret state.
 // CUnitPatrolTask parameterized ctor is recovered 1:1 in
 // src/sdk/moho/unit/tasks/CUnitPatrolTask.cpp (FUN_0061AE50) — the former
 // empty-stub false-recovery here was removed in favor of the real body.
