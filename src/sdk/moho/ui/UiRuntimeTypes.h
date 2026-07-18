@@ -319,6 +319,26 @@ namespace moho
    */
   extern bool ui_DisableCursorFixing;
   /**
+   * Address: 0x00F57A90 (?ui_SelectTolerance@Moho@@3MA)
+   *
+   * World-view unit pick tolerance (pixels); seeded to 4.0, overridden from
+   * `/lua/ui/controls/worldview.lua`'s WorldViewParams by CUIWorldView's ctor.
+   */
+  extern float ui_SelectTolerance;
+  /**
+   * Address: 0x00F57A94 (?ui_ExtractSnapTolerance@Moho@@3MA)
+   *
+   * World-view extractor snap tolerance (world units); seeded to 20.0,
+   * overridden from WorldViewParams by CUIWorldView's ctor.
+   */
+  extern float ui_ExtractSnapTolerance;
+  /**
+   * Address: 0x00F57A88 (?cam_DefaultMiniLOD@Moho@@3MA)
+   *
+   * Default LOD scale (1.8) applied to a minimap CUIWorldView's camera.
+   */
+  extern float cam_DefaultMiniLOD;
+  /**
    * Address: 0x010A63EE (?ui_WindowedAlwaysShowsCursor@Moho@@3_NA)
    *
    * What it does:
@@ -7519,6 +7539,30 @@ namespace moho
    * Publishes the `CUIWorldView:CameraReset()` Lua binder.
    */
   CScrLuaInitForm* func_CUIWorldViewCameraReset_LuaFuncDef();
+
+  /**
+   * Address: 0x00871710 (FUN_00871710, cfunc_CUIWorldView__initL)
+   *
+   * `CUIWorldView:__init(parent, cameraName, depth, isMiniMap, trackCamera)`
+   * Lua constructor worker: validates 4-6 args, extracts the parent control,
+   * resolves the minimap/track-camera options, allocates + constructs the
+   * world-view control, runs DoInit(), and pushes it back to Lua.
+   */
+  int cfunc_CUIWorldView__initL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00871690 (FUN_00871690, cfunc_CUIWorldView__init)
+   *
+   * Unwraps raw Lua callback context and forwards to `cfunc_CUIWorldView__initL`.
+   */
+  int cfunc_CUIWorldView__init(lua_State* luaContext);
+
+  /**
+   * Address: 0x008716B0 (FUN_008716B0, func_CUIWorldView__init_LuaFuncDef)
+   *
+   * Publishes the `CUIWorldView:__init(...)` Lua constructor binder.
+   */
+  CScrLuaInitForm* func_CUIWorldView__init_LuaFuncDef();
 
   /**
    * Address: 0x00871AA0 (FUN_00871AA0, cfunc_CUIWorldViewCameraResetL)
