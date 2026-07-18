@@ -51,6 +51,8 @@
 #include "moho/sim/CSquad.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/resource/ResourceDeposit.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/STIMap.h"
@@ -71,6 +73,7 @@ namespace moho
   int cfunc_CAiBrainCreateUnitNearSpot(lua_State* luaContext);
   int cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* state);
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* luaContext);
+  int cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* state);
   int cfunc_CAiBrainFindPlaceToBuild(lua_State* luaContext);
 
   // Recovered in CUnitCallTeleport.cpp; forward-declared here so the build-order
@@ -4416,6 +4419,155 @@ CScrLuaInitForm* moho::func_CAiBrainCreateUnitNearSpot_LuaFuncDef()
     kAiBrainCreateUnitNearSpotHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x00589E30 (FUN_00589E30, cfunc_CAiBrainCreateResourceBuildingNearestL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * `brain:CreateResourceBuildingNearest(structureName, posX, posY)` worker.
+ * Resolves the structure blueprint and the resource-deposit class it consumes
+ * (kHydrocarbon when the blueprint carries the HYDROCARBON category, otherwise
+ * kMass), gathers every deposit of that class into a nearest-first candidate
+ * list (sorted by squared distance from the requested (posX,posY)), and walks
+ * it: for the first candidate where `CanBuildStructureAt` succeeds it computes
+ * the placement elevation (terrain height, clamped up to the water surface for
+ * non-seabed structures), spawns the unit at the deposit centre, and returns
+ * its Lua object. Pushes nil when no candidate can host the structure.
+ */
+int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const state)
+{
+  Sim* const sim = lua_getglobaluserdata_typed(state->m_state);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kAiBrainCreateResourceBuildingNearestHelpText, 4, argumentCount);
+  }
+  if (lua_type(state->m_state, 2) == 0 || !lua_isstring(state->m_state, 2)) {
+    LuaPlus::LuaState::Error(state, "Invalid structure name passed in");
+  }
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    LuaPlus::LuaState::Error(state, "Invalid posX passed in");
+  }
+  if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+    LuaPlus::LuaState::Error(state, "Invalid posY passed in");
+  }
+
+  CAiBrain* brain = nullptr;
+  {
+    const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+    brain = SCR_FromLua_CAiBrain(brainObject, state);
+  }
+
+  const char* const structureName = lua_tostring(state->m_state, 2);
+  if (structureName == nullptr) {
+    LuaPlus::LuaStackObject nameObject(state, 2);
+    nameObject.TypeError("string");
+  }
+
+  CArmyImpl* const army = brain->mArmy;
+
+  // Numeric args read in the binary's order: posY (arg 4) then posX (arg 3),
+  // each re-validated right before extraction.
+  LuaPlus::LuaStackObject posYObject(state, 4);
+  if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+    posYObject.TypeError("number");
+  }
+  const float posY = static_cast<float>(lua_tonumber(state->m_state, 4));
+
+  LuaPlus::LuaStackObject posXObject(state, 3);
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    posXObject.TypeError("number");
+  }
+  const float posX = static_cast<float>(lua_tonumber(state->m_state, 3));
+
+  RUnitBlueprint* structureBlueprint = nullptr;
+  {
+    msvc8::string blueprintName;
+    gpg::STR_InitFilename(&blueprintName, structureName);
+    structureBlueprint = sim->mRules->GetUnitBlueprint(RResId(blueprintName));
+  }
+
+  // Hydrocarbon buildings sit on kHydrocarbon deposits; everything else on kMass.
+  const CategoryWordRangeView* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
+  const EDepositType wantedDeposit =
+    EntityCategory::HasBlueprint(structureBlueprint, hydrocarbonCategory) ? kHydrocarbon : kMass;
+
+  CSimResources* const resources = sim->mSimResources.px;
+  const msvc8::vector<ResourceDeposit>& deposits = resources->GetDeposits();
+
+  // A candidate is one deposit footprint centre plus its squared distance from
+  // the requested point; the list is walked nearest-first.
+  struct SDepositCandidate
+  {
+    float centerX;
+    float centerZ;
+    float distanceSq;
+  };
+  std::vector<SDepositCandidate> candidates;
+  for (const ResourceDeposit& deposit : deposits) {
+    if (deposit.depositType != wantedDeposit) {
+      continue;
+    }
+    const float centerX = static_cast<float>(deposit.footprintRect.x0 + deposit.footprintRect.x1) * 0.5f;
+    const float centerZ = static_cast<float>(deposit.footprintRect.z0 + deposit.footprintRect.z1) * 0.5f;
+    const float dx = posX - centerX;
+    const float dz = posY - centerZ;
+    candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
+  }
+
+  std::sort(candidates.begin(), candidates.end(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+    return a.distanceSq < b.distanceSq;
+  });
+
+  for (const SDepositCandidate& candidate : candidates) {
+    const Wm3::Vector3f queryPos(candidate.centerX, 0.0f, candidate.centerZ);
+    if (!brain->CanBuildStructureAt(
+          queryPos, structureBlueprint, ALLIANCE_None, static_cast<int>(candidate.centerX),
+          static_cast<int>(candidate.centerZ))) {
+      continue;
+    }
+
+    STIMap* const mapData = sim->mMapData;
+    float elevation = mapData->GetHeightField()->GetElevation(candidate.centerX, candidate.centerZ);
+    const bool occupiesSeabed = (static_cast<std::uint8_t>(structureBlueprint->mFootprint.mOccupancyCaps) &
+                                 static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)) != 0u;
+    if (!occupiesSeabed && mapData->mWaterEnabled) {
+      if (mapData->mWaterElevation > elevation) {
+        elevation = mapData->mWaterElevation;
+      }
+    }
+
+    const VTransform transform(
+      Wm3::Vector3f(candidate.centerX, elevation, candidate.centerZ), Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f));
+    SUnitConstructionParams params(1, transform, army, structureBlueprint, nullptr, true);
+
+    Unit* const createdUnit = sim->CreateUnitForScript(params, true);
+    if (createdUnit != nullptr) {
+      LuaPlus::LuaObject unitLuaObject = createdUnit->GetLuaObject();
+      unitLuaObject.PushStack(state);
+      return 1;
+    }
+  }
+
+  lua_pushnil(state->m_state);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x00589DB0 (FUN_00589DB0, cfunc_CAiBrainCreateResourceBuildingNearest)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to
+ * `cfunc_CAiBrainCreateResourceBuildingNearestL`.
+ */
+int moho::cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainCreateResourceBuildingNearestL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

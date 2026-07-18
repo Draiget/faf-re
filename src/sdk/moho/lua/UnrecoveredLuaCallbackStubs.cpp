@@ -26,7 +26,7 @@ namespace moho
 namespace moho
 {
   // ===== Unrecovered cfunc(lua_State*) callbacks =====
-  int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State*) { return 0; }
+  // cfunc_CAiBrainCreateResourceBuildingNearest recovered in CAiBrain.cpp (FUN_00589DB0).
   int cfunc_CAiBrainFindPlaceToBuild(lua_State*) { return 0; }
   int func_FlushEvents(lua_State*) { return 0; }
 }
