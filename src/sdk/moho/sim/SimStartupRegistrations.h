@@ -629,6 +629,14 @@ namespace moho
   CScrLuaInitForm* register_Warp_LuaFuncDef();
 
   /**
+   * Address: 0x00BDC040 (FUN_00BDC040, register_ChangeUnitArmy_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_ChangeUnitArmy_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ChangeUnitArmy_LuaFuncDef();
+
+  /**
    * Address: 0x00BDC070 (FUN_00BDC070, register_GetTerrainHeight_LuaFuncDef)
    *
    * What it does:

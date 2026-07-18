@@ -1022,6 +1022,23 @@ namespace moho
 
   public:
     /**
+     * Address: 0x007468E0 (FUN_007468E0, ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z)
+     * Mangled: ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z
+     *
+     * IDA signature:
+     * Moho::Unit *__thiscall Moho::Sim::TransferUnit(Moho::Sim *this, Moho::Unit *unit, Moho::CArmyImpl *newArmy);
+     *
+     * What it does:
+     * Transfers `unit` (and any transport-carried and attached units, recursively)
+     * to `newArmy` by constructing a replacement Unit under the new army, migrating
+     * pose/health/name, re-populating transport storage, and re-attaching child
+     * units; then destroys the original. Returns the replacement Unit, or nullptr
+     * when the transfer cannot proceed (dead/destroy-queued source, or the new army
+     * is over its unit cap).
+     */
+    [[nodiscard]] Unit* TransferUnit(Unit* unit, CArmyImpl* newArmy);
+
+    /**
      * Address: 0x00747180
      */
     bool CheatsEnabled();
@@ -2382,6 +2399,36 @@ namespace moho
    * Publishes the global Lua binder definition for `Warp`.
    */
   CScrLuaInitForm* func_Warp_LuaFuncDef();
+
+  /**
+   * Address: 0x0075B5D0 (FUN_0075B5D0, cfunc_ChangeUnitArmy)
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback state and forwards to `cfunc_ChangeUnitArmyL`.
+   */
+  int cfunc_ChangeUnitArmy(lua_State* luaContext);
+
+  /**
+   * Address: 0x0075B650 (FUN_0075B650, cfunc_ChangeUnitArmyL)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Reads `(unit, armyIndex)` and transfers the unit (and its transport-carried
+   * cargo) to the given army via `Sim::TransferUnit`, refusing the transfer when
+   * any attached entity is a COMMAND unit.
+   */
+  int cfunc_ChangeUnitArmyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0075B5F0 (FUN_0075B5F0, func_ChangeUnitArmy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `ChangeUnitArmy`.
+   */
+  CScrLuaInitForm* func_ChangeUnitArmy_LuaFuncDef();
 
   /**
    * Address: 0x0075E2A0 (FUN_0075E2A0, cfunc_DebugGetSelection)
