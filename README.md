@@ -8,49 +8,49 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`97.18%`**
+- Progress coverage:  **`97.19%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,274`*
+  - *Total amount of completed tokens: `65,279`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,396` (81.80%)
+- `recovered`: `53,401` (81.80%)
 - `skip`: `6,111` (9.36%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
-- `external_dependency`: `5,767` (8.84%) — third-party libs
+- `external_dependency`: `5,767` (8.83%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `4` (0.01%)
 - `in_progress`: `30` (0.04%)
-- **`blocked`: `1,925` (2.87%)**
+- **`blocked`: `1,920` (2.86%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,929`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,929`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,924`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,924`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Caller-Wiring Health
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (53,396 functions) — wiring health
+### Recovered (53,401 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `15,486` | 29.00% |
-| Vtable-anchored (virtual override of a recovered class) | `5,838` | 10.93% |
+| **Confirmed caller** (recovered binary caller wired by name) | `15,491` | 29.01% |
+| Vtable-anchored (virtual override of a recovered class) | `5,839` | 10.93% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,499` | 10.30% |
-| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,602` | 4.87% |
+| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,601` | 4.87% |
 | No callsite evidence (no recorded code/data caller in the index) | `23,752` | 44.48% |
 | Unclassified data xref (manual review) | `215` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (1,929 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (1,924 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `297` | 15.40% |
-| Vtable-anchored (recover with the owning class) | `185` | 9.59% |
-| Framework dispatch (wx/EH/Lua/reflection) | `34` | 1.76% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `977` | 50.65% |
-| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `434` | 22.50% |
+| **Recoverable now** (`OK_RECOVERED_CALLER` — recovered caller exists; recover next) | `297` | 15.44% |
+| Vtable-anchored (recover with the owning class) | `184` | 9.56% |
+| Framework dispatch (wx/EH/Lua/reflection) | `34` | 1.77% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `973` | 50.57% |
+| No callsite evidence (likely external/dead — candidates for `external_dependency`) | `434` | 22.56% |
 | Unclassified data xref (manual review) | `1` | 0.05% |
 | RTTI-only | `1` | 0.05% |
 

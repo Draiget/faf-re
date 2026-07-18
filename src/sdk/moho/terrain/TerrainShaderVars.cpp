@@ -78,6 +78,17 @@ namespace moho
     RegisterShaderVar("DecalMaskTexture", &decalMaskTexture, "terrain");
     RegisterShaderVar("BiCubicLookup", &biCubicLookup, "terrain");
     RegisterShaderVar("OverlayTexture", &overlayTexture, "terrain");
+
+    RegisterShaderVar("WaterRamp", &waterRamp, "terrain");
+    RegisterShaderVar("WaterElevation", &waterElevation, "terrain");
+    RegisterShaderVar("WaterElevationDeep", &waterElevationDeep, "terrain");
+    RegisterShaderVar("WaterElevationAbyss", &waterElevationAbyss, "terrain");
+    RegisterShaderVar("DecalMatrix", &decalMatrix, "terrain");
+    RegisterShaderVar("TangentMatrix", &tangentMatrix, "terrain");
+    RegisterShaderVar("DecalAlbedoTexture", &decalAlbedoTexture, "terrain");
+    RegisterShaderVar("DecalNormalTexture", &decalNormalTexture, "terrain");
+    RegisterShaderVar("DecalSpecTexture", &decalSpecTexture, "terrain");
+    RegisterShaderVar("DecalAlpha", &decalAlpha, "terrain");
   }
 
   TerrainShaderVarSet& GetTerrainShaderVars()

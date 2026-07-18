@@ -2,12 +2,15 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 #include "Wm3Vector3.h"
 #include "gpg/gal/Matrix.h"
 #include "moho/math/Vector4f.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/ID3DVertexStream.h"
+#include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
@@ -22,6 +25,7 @@
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
 #include "moho/terrain/TerrainShaderVars.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaterFactory.h"
 
 namespace
@@ -39,6 +43,9 @@ namespace
   constexpr std::uint16_t kOverlayVertexLoopStop = 0x2712u;
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
+  // Sentinel water-elevation value (dword_E4F6E4 = 0xC61C4000 = -10000.0f) bound
+  // when the active map has no water enabled.
+  constexpr float kWaterElevationSentinel = -10000.0f;
   constexpr int kNoiseFillTextureFormat = 2;
   constexpr const char* kNoiseFillName = "NoiseFill";
   constexpr const char* kNoiseFillShaderSource =
@@ -114,6 +121,10 @@ namespace moho
 {
   extern bool ren_Terrain;
   extern bool ren_Skirt;
+  extern bool ren_Decals;
+  extern bool ren_ShowNormals;
+  extern bool ren_DecalOverDraw;
+  extern bool ren_glowingDecals;
 
   /**
    * Address: 0x00803A10 (FUN_00803A10, ??0MediumFidelityTerrain@Moho@@QAE@@Z)
@@ -605,6 +616,373 @@ namespace moho
     (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
 
+  namespace
+  {
+    /// Binds one decal command's index/vertex sub-range and submits a single
+    /// indexed triangle-list draw over the terrain sheets. Shared by every decal
+    /// draw helper below (their D3D view construction is byte-identical).
+    void SubmitDecalCommandDraw(
+      CD3DVertexSheet* const vertexSheet,
+      CD3DIndexSheet* const indexSheet,
+      const TerrainDecalDrawCommand& command
+    )
+    {
+      std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = indexSheet;
+      indexView.startIndex = command.startIndex;
+      indexView.indexCount = command.indexCount;
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = vertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = command.baseVertex;
+      vertexView.endVertex = command.endVertex;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    }
+
+    /// Resolves one animated decal texture slot and binds it into `target`.
+    /// Mirrors the binary's `CWldTerrainDecal::GetTexture(slot, lod, frameSeed)`
+    /// call followed by `struct_ShaderVar::GetTexture`. The frame seed is the raw
+    /// mesh-renderer pointer value, exactly as the shipped code passes it.
+    void BindDecalTexture(
+      ShaderVar& target,
+      CWldTerrainDecal& decal,
+      const int slot,
+      const float lod,
+      MeshRenderer* const renderer
+    )
+    {
+      const boost::shared_ptr<ID3DTextureSheet> texture =
+        decal.GetTexture(slot, lod, static_cast<int>(reinterpret_cast<std::uintptr_t>(renderer)));
+      target.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+    }
+  } // namespace
+
+  /**
+   * Address: 0x008065E0 (FUN_008065E0, sub_8065E0)
+   *
+   * IDA signature:
+   * void __stdcall sub_8065E0(MediumFidelityTerrain *a1, MeshRenderer *a4,
+   *     float a5, int argC, const char *arg10);
+   *
+   * What it does:
+   * Draws each queued decal command whose decal type equals `decalType`. Selects
+   * the caller technique (or `TDecalOverDraw` when `ren_DecalOverDraw` is on),
+   * binds the decal texture matrix, the slot-0 albedo and slot-1 spec textures,
+   * and the decal alpha, then submits one indexed triangle-list draw per match.
+   */
+  void MediumFidelityTerrain::DrawDecalPass(
+    MeshRenderer* const renderer,
+    const float lod,
+    const std::int32_t decalType,
+    const char* const techniqueName
+  )
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    if (ren_DecalOverDraw) {
+      D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+    } else {
+      D3D_GetDevice()->SelectTechnique(techniqueName);
+    }
+
+    for (const TerrainDecalDrawCommand& command : mDecalDrawCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (static_cast<std::int32_t>(decal.mType) != decalType) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+      BindDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, renderer);
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      SubmitDecalCommandDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    }
+  }
+
+  /**
+   * Address: 0x00806860 (FUN_00806860, sub_806860)
+   *
+   * IDA signature:
+   * int __usercall sub_806860@<eax>(MediumFidelityTerrain *this@<esi>);
+   *
+   * What it does:
+   * Uploads the composited splat-vertex lane into the overlay vertex sheet, selects
+   * the `TSplats` technique, binds the shared texture-batcher composite texture into
+   * the decal albedo lane, and submits one indexed triangle-list draw covering all
+   * splat quads (`6 * (count / 4)` indices over `count` vertices). No-op when empty.
+   */
+  void MediumFidelityTerrain::DrawSplatComposite()
+  {
+    const std::size_t splatVertexCount = mSplatVertices.size();
+    if (splatVertexCount == 0) {
+      return;
+    }
+
+    // Copy the whole splat lane into the overlay vertex sheet's stream buffer.
+    void* const lockedVertices =
+      mOverlayVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
+    std::memcpy(lockedVertices, mSplatVertices.data(), sizeof(TerrainSplatVertex) * splatVertexCount);
+    mOverlayVertexSheet->GetVertStream(0U)->Unlock();
+
+    D3D_GetDevice()->SelectTechnique("TSplats");
+
+    auto& shaderVars = GetTerrainShaderVars();
+    shaderVars.decalAlbedoTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
+    );
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mOverlayIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = 6 * (static_cast<std::int32_t>(splatVertexCount) / 4);
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mOverlayVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(splatVertexCount) - 1;
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00806A50 (FUN_00806A50, sub_806A50)
+   *
+   * IDA signature:
+   * void __stdcall sub_806A50(MediumFidelityTerrain *a1, MeshRenderer *a4, float a5);
+   *
+   * What it does:
+   * Draws each glowing decal command (`mType == 6`) with the `TDecalsGlow`
+   * technique (or `TDecalOverDraw` under `ren_DecalOverDraw`): binds the decal
+   * matrix, slot-0 albedo texture, and decal alpha, then submits one indexed
+   * triangle-list draw per glowing decal. No-op unless both `ren_Decals` and
+   * `ren_glowingDecals` are enabled.
+   */
+  void MediumFidelityTerrain::DrawGlowingDecals(MeshRenderer* const renderer, const float lod)
+  {
+    if (!ren_Decals || !ren_glowingDecals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    if (ren_DecalOverDraw) {
+      D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+    } else {
+      D3D_GetDevice()->SelectTechnique("TDecalsGlow");
+    }
+
+    for (const TerrainDecalDrawCommand& command : mDecalDrawCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (decal.mType != WldTerrainDecalType_Glow) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      SubmitDecalCommandDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    }
+  }
+
+  /**
+   * Address: 0x00806C60 (FUN_00806C60, sub_806C60)
+   *
+   * IDA signature:
+   * void __stdcall sub_806C60(MediumFidelityTerrain *a1, MeshRenderer *a4, float a5);
+   *
+   * What it does:
+   * Draws the normal-mapped decal commands (`mType == WldTerrainDecalType_Normals`)
+   * with `TDecalsNormals` (or `TDecalOverDraw` under `ren_DecalOverDraw`). Iteration
+   * stops at the first `WldTerrainDecalType_NormalsAlpha` sentinel, which is then
+   * drawn once as an alpha pass with `TDecalsNormalsAlpha` (or `TDecalOverDraw`).
+   * Each drawn command binds the camera view/proj matrices, the decal + tangent
+   * matrices, the decal alpha, and the slot-0 normal texture, then submits one
+   * indexed triangle-list draw. No-op unless `ren_Decals` is enabled.
+   *
+   * Note: the shipped code carries a state flag that could re-select the opaque
+   * technique between an alpha pass and a following opaque decal, but that flag
+   * only ever becomes set on the terminal alpha sentinel (which returns), so the
+   * reselect never fires during forward iteration and is omitted here for clarity.
+   */
+  void MediumFidelityTerrain::DrawNormalMappedDecals(MeshRenderer* const renderer, const float lod)
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    if (ren_DecalOverDraw) {
+      D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+    } else {
+      D3D_GetDevice()->SelectTechnique("TDecalsNormals");
+    }
+
+    const GeomCamera3& camera = *mCamera;
+
+    // Emits every render-state bind + indexed draw for a single decal command.
+    // Shared by the normal-mapped commands and the terminal alpha sentinel.
+    const auto drawDecalCommand = [&](const TerrainDecalDrawCommand& command) {
+      CWldTerrainDecal& decal = *command.decal;
+
+      if (shaderVars.viewMatrix.Exists()) {
+        shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+      }
+      if (shaderVars.projMatrix.Exists()) {
+        shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+      }
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+      if (shaderVars.tangentMatrix.Exists()) {
+        shaderVars.tangentMatrix.SetMatrix4x4(&decal.mTangentMatrix);
+      }
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      BindDecalTexture(shaderVars.decalNormalTexture, decal, 0, lod, renderer);
+
+      SubmitDecalCommandDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    };
+
+    for (const TerrainDecalDrawCommand& command : mDecalDrawCommands) {
+      const EWldTerrainDecalType type = command.decal->mType;
+
+      if (type == WldTerrainDecalType_NormalsAlpha) {
+        // Terminal sentinel: draw one alpha pass and stop.
+        if (ren_DecalOverDraw) {
+          D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+        } else {
+          D3D_GetDevice()->SelectTechnique("TDecalsNormalsAlpha");
+        }
+        drawDecalCommand(command);
+        return;
+      }
+
+      if (type == WldTerrainDecalType_Normals) {
+        drawDecalCommand(command);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00805C20 (FUN_00805C20, Moho::MediumFidelityTerrain::DrawNormals)
+   * Primary vtable slot 8 (vftable @0x00E41A54).
+   *
+   * IDA signature:
+   * int __thiscall Moho::MediumFidelityTerrain::DrawNormals(
+   *     MediumFidelityTerrain *this, MeshRenderer *a2, float a3,
+   *     int a4, volatile signed __int32 *a5, int a6);
+   *
+   * What it does:
+   * The terrain normal/decal render pass. When terrain rendering is disabled,
+   * releases the by-value weak scratch handle and returns 0. Otherwise binds the
+   * terrain lighting for `shadowContext`, then either forwards to the debug
+   * normal-visualization path (`ren_ShowNormals`) or runs the full decal/splat
+   * pass: binds the water ramp and the three water-elevation constants, selects the
+   * active stratum-material technique, retains the scratch handle across the base
+   * shader-var load, draws the terrain triangles, the glow-mask decals, the albedo
+   * decals, the splat composite, the glowing decals, and (under `ren_DecalOverDraw`)
+   * the normal-mapped decals. Returns 1.
+   */
+  bool MediumFidelityTerrain::DrawNormals(
+    MeshRenderer* const renderer,
+    const float lod,
+    boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture,
+    TerrainShadowContext* const shadowContext
+  )
+  {
+    if (!ren_Terrain) {
+      return false;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    LoadTerrainLighting(shadowContext);
+
+    if (ren_ShowNormals) {
+      DrawTerrainNormals(renderer, lod);
+      return true;
+    }
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    // Water ramp texture from the terrain's water shader properties.
+    CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
+    shaderVars.waterRamp.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(waterProperties->GetWaterRamp())
+    );
+
+    // Select the active stratum-material technique.
+    const StratumMaterial& stratumMaterial = terrainRes->GetStratumMaterial();
+    D3D_GetDevice()->SelectTechnique(stratumMaterial.mShaderName.c_str());
+
+    // Water elevation constants (defaulting to the -10000.0 sentinel when the map
+    // has no water enabled). The runtime map object at mTerrainResource->mMap is
+    // the same object read by the binary at [terrainRes + 4].
+    const TerrainMapRuntimeView& map = *mTerrainResource->mMap;
+    const float waterElevation = map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel;
+    if (shaderVars.waterElevation.Exists()) {
+      shaderVars.waterElevation.SetFloat(waterElevation);
+    }
+
+    const float waterElevationDeep = map.mWaterEnabled ? map.mWaterElevationDeep : kWaterElevationSentinel;
+    if (shaderVars.waterElevationDeep.Exists()) {
+      shaderVars.waterElevationDeep.SetFloat(waterElevationDeep);
+    }
+
+    const float waterElevationAbyss = map.mWaterEnabled ? map.mWaterElevationAbyss : kWaterElevationSentinel;
+    if (shaderVars.waterElevationAbyss.Exists()) {
+      shaderVars.waterElevationAbyss.SetFloat(waterElevationAbyss);
+    }
+
+    // The binary reads the terrain-res edit-mode flag here and discards it.
+    (void)terrainRes->IsInEditMode();
+
+    // Load the base terrain shader vars, forwarding the caller's weak scratch
+    // handle (the terrain normal texture) exactly as the shipped code does.
+    LoadShaderVars(terrainNormalTexture);
+
+    DrawTriangles();
+
+    DrawDecalPass(renderer, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(renderer, lod, WldTerrainDecalType_Albedo, "TDecals");
+    DrawSplatComposite();
+    DrawGlowingDecals(renderer, lod);
+
+    if (ren_DecalOverDraw) {
+      DrawNormalMappedDecals(renderer, lod);
+    }
+
+    return true;
+  }
+
   /**
    * Address: 0x00803AD0 (FUN_00803AD0, ??1MediumFidelityTerrain@Moho@@QAE@@Z)
    * Mangled: ??1MediumFidelityTerrain@Moho@@QAE@@Z
@@ -619,12 +997,12 @@ namespace moho
 
     DeleteOwned(mOverlayIndexSheet);
     DeleteOwned(mOverlayVertexSheet);
-    mSecondaryPatchIndices.ResetStorageToInline();
+    mSplatVertices.ResetStorageToInline();
 
     DeleteOwned(mTerrainIndexSheet);
     DeleteOwned(mTerrainVertexSheet);
     DeleteOwned(mTesselator);
-    mPrimaryPatchIndices.ResetStorageToInline();
+    mDecalDrawCommands.ResetStorageToInline();
   }
 
   /**

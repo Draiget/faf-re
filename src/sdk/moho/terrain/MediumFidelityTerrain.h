@@ -18,8 +18,46 @@ namespace gpg::gal
 
 namespace moho
 {
-  using MediumPrimaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 3000>;
-  using MediumSecondaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 70000>;
+  class CWldTerrainDecal;
+  class MeshRenderer;
+
+  /**
+   * One queued terrain-decal draw command, recovered from the medium-fidelity
+   * decal draw helpers (0x008065E0 / 0x00806A50 / 0x00806C60). Each command
+   * carries the index/vertex-sheet sub-range for one decal quad plus the decal
+   * object that supplies its animated albedo/spec/normal textures. Element size
+   * is exactly 24 bytes; the command lane at `+0x40` holds up to 500 inline
+   * commands (`500 * 24 == 0x2EE0`, matching the inline byte window between
+   * `+0x50` and `mTesselator@+0x2F30`).
+   */
+  struct TerrainDecalDrawCommand
+  {
+    std::int32_t startIndex;   // +0x00 -> CD3DIndexSheetViewRuntime::startIndex
+    std::int32_t indexCount;   // +0x04 -> CD3DIndexSheetViewRuntime::indexCount
+    std::int32_t baseVertex;   // +0x08 -> CD3DVertexSheetViewRuntime::baseVertex
+    std::int32_t endVertex;    // +0x0C -> CD3DVertexSheetViewRuntime::endVertex
+    float alpha;               // +0x10 -> DecalAlpha shader-var value
+    CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)
+  };
+  static_assert(sizeof(TerrainDecalDrawCommand) == 0x18, "TerrainDecalDrawCommand size must be 0x18");
+
+  /**
+   * One composited terrain splat vertex, recovered from the splat draw helper
+   * (0x00806860) which memcpys the whole splat lane into the overlay vertex
+   * sheet and draws it with the `TSplats` technique. Element size is exactly
+   * 28 bytes; the splat lane at `+0x2F40` holds up to 10000 inline vertices
+   * (`10000 * 28 == 0x445C0`, matching the inline byte window between `+0x2F50`
+   * and `mOverlayVertexSheet@+0x47510`). Only the raw byte payload is copied,
+   * so the individual channels are kept as an opaque 28-byte record.
+   */
+  struct TerrainSplatVertex
+  {
+    std::uint8_t bytes[0x1C]; // +0x00 opaque 28-byte vertex record
+  };
+  static_assert(sizeof(TerrainSplatVertex) == 0x1C, "TerrainSplatVertex size must be 0x1C");
+
+  using MediumDecalCommandLane = gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>;
+  using MediumSplatVertexLane = gpg::core::FastVectorN<TerrainSplatVertex, 10000>;
 
   class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
@@ -208,6 +246,60 @@ namespace moho
     void DrawWaterLine(std::int32_t arg0, std::int32_t arg1);
 
     /**
+     * Address: 0x00805C20 (FUN_00805C20, Moho::MediumFidelityTerrain::DrawNormals)
+     * Primary vtable slot 8 (vftable @0x00E41A54; RTTI dump slot 8).
+     *
+     * IDA signature:
+     * int __thiscall Moho::MediumFidelityTerrain::DrawNormals(
+     *     MediumFidelityTerrain *this, MeshRenderer *a2, float a3,
+     *     int a4, volatile signed __int32 *a5, int a6);
+     * (`a4`+`a5` are the split halves of one by-value
+     * `boost::weak_ptr<CD3DDynamicTextureSheet>`; `a6` is the shadow context.)
+     *
+     * What it does:
+     * The terrain normal/decal render pass. Binds terrain lighting for the shadow
+     * context, then either forwards to the debug normal-visualization path
+     * (`ren_ShowNormals`) or runs the full decal/splat pass: binds the water ramp
+     * and the three water-elevation constants, selects the active stratum-material
+     * technique, retains the optional weak scratch handle across the base
+     * shader-var load, draws the terrain triangles, then the glow-mask decals, the
+     * albedo decals, the splat composite, the glowing decals, and (when
+     * `ren_DecalOverDraw`) the normal-mapped decals. Returns 1 when terrain
+     * rendering is enabled, 0 otherwise.
+     */
+    virtual bool DrawNormals(
+      MeshRenderer* renderer,
+      float lod,
+      boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture,
+      TerrainShadowContext* shadowContext
+    );
+
+    /**
+     * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormals)
+     * Primary vtable slot 9 (vftable @0x00E41A54; RTTI dump slot 9).
+     *
+     * IDA signature:
+     * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormals(
+     *     MediumFidelityTerrain *this, MeshRenderer *renderer, float lod);
+     *
+     * What it does:
+     * Debug normal-visualization pass invoked from DrawNormals under
+     * `ren_ShowNormals`. Selects the `TTerrainNormals` technique via the effect's
+     * `normals` string annotation, loads terrain lighting/shader vars, draws the
+     * terrain triangles + normal-mapped decals, then iterates the terrain normal
+     * maps binding per-tile scale/offset/extent shader vars and drawing each tile.
+     *
+     * NOTE: The body is a separate recovery pass. It depends on the
+     * `NormalMapScale` / `NormalMapOffset` / `UtilityTextureA` terrain shader vars
+     * plus three normal-basis vars whose exact HLSL registration names
+     * (decompiler-labeled `E_X` / `E_Y` / `Size_Source`) are not yet verified from
+     * the binary, and on `CD3DEffect::GetStringAnnotation` + the terrain-res
+     * normal-map iteration slots. It is declared here so the vtable slot and the
+     * DrawNormals dispatch are modeled 1:1; recover the body before linking.
+     */
+    virtual void DrawTerrainNormals(MeshRenderer* renderer, float lod);
+
+    /**
      * Address: 0x00805530 (FUN_00805530, Moho::MediumFidelityTerrain::DrawTerrainSkirt)
      *
      * What it does:
@@ -217,6 +309,70 @@ namespace moho
      */
     virtual void DrawTerrainSkirt();
 
+  private:
+    /**
+     * Address: 0x008065E0 (FUN_008065E0, sub_8065E0)
+     *
+     * IDA signature:
+     * void __stdcall sub_8065E0(MediumFidelityTerrain *a1, MeshRenderer *a4,
+     *     float a5, int argC, const char *arg10);
+     *
+     * What it does:
+     * Draws every queued decal command whose decal type matches `decalType`.
+     * Selects the caller technique (or `TDecalOverDraw` under `ren_DecalOverDraw`),
+     * then for each matching command binds the decal texture matrix, the slot-0
+     * albedo and slot-1 spec textures, the decal alpha, and submits one indexed
+     * triangle-list draw over the terrain vertex/index sheets. No-op unless
+     * `ren_Decals` is enabled.
+     */
+    void DrawDecalPass(MeshRenderer* renderer, float lod, std::int32_t decalType, const char* techniqueName);
+
+    /**
+     * Address: 0x00806860 (FUN_00806860, sub_806860)
+     *
+     * IDA signature:
+     * int __usercall sub_806860@<eax>(MediumFidelityTerrain *this@<esi>);
+     *
+     * What it does:
+     * Uploads the composited splat-vertex lane into the overlay vertex sheet,
+     * selects the `TSplats` technique, binds the shared texture-batcher composite
+     * texture into the decal albedo lane, and submits one indexed triangle-list
+     * draw covering all splat quads. No-op when the splat lane is empty.
+     */
+    void DrawSplatComposite();
+
+    /**
+     * Address: 0x00806A50 (FUN_00806A50, sub_806A50)
+     *
+     * IDA signature:
+     * void __stdcall sub_806A50(MediumFidelityTerrain *a1, MeshRenderer *a4, float a5);
+     *
+     * What it does:
+     * Draws every queued decal command of glowing type (`mType == 6`) with the
+     * `TDecalsGlow` technique (or `TDecalOverDraw` under `ren_DecalOverDraw`):
+     * binds the decal matrix, slot-0 albedo texture, and decal alpha, then submits
+     * one indexed triangle-list draw per glowing decal. No-op unless both
+     * `ren_Decals` and `ren_glowingDecals` are enabled.
+     */
+    void DrawGlowingDecals(MeshRenderer* renderer, float lod);
+
+    /**
+     * Address: 0x00806C60 (FUN_00806C60, sub_806C60)
+     *
+     * IDA signature:
+     * void __stdcall sub_806C60(MediumFidelityTerrain *a1, MeshRenderer *a4, float a5);
+     *
+     * What it does:
+     * Draws the normal-mapped decal commands (`mType == 2`, stopping at the first
+     * `mType == 7` sentinel). Selects `TDecalsNormals` / `TDecalsNormalsAlpha` /
+     * `TDecalOverDraw` depending on `ren_DecalOverDraw` and whether the sentinel was
+     * seen, binds the camera view/proj matrices, the decal + tangent matrices, the
+     * decal alpha, and the slot-0 normal texture, then submits one indexed
+     * triangle-list draw per matching decal. No-op unless `ren_Decals` is enabled.
+     */
+    void DrawNormalMappedDecals(MeshRenderer* renderer, float lod);
+
+  public:
     TerrainWaterResourceView* mTerrainResource;                        // +0x0C
     std::int32_t mViewportOriginX;                                     // +0x10
     std::int32_t mViewportOriginY;                                     // +0x14
@@ -230,12 +386,12 @@ namespace moho
     std::uint32_t mSkirtEndIndex = 0u;                                // +0x34
     std::int32_t mSkirtEndVertex = 0;                                 // +0x38
     std::int32_t mSkirtBaseVertex = 0;                                // +0x3C
-    MediumPrimaryPatchIndexLane mPrimaryPatchIndices;                  // +0x40
+    MediumDecalCommandLane mDecalDrawCommands;                         // +0x40
     CTesselator* mTesselator;                                          // +0x2F30
     CD3DVertexSheet* mTerrainVertexSheet;                              // +0x2F34
     CD3DIndexSheet* mTerrainIndexSheet;                                // +0x2F38
     std::uint32_t mPad2F3C = 0u;                                       // +0x2F3C
-    MediumSecondaryPatchIndexLane mSecondaryPatchIndices;              // +0x2F40
+    MediumSplatVertexLane mSplatVertices;                              // +0x2F40
     CD3DVertexSheet* mOverlayVertexSheet;                              // +0x47510
     CD3DIndexSheet* mOverlayIndexSheet;                                // +0x47514
     VTransform mOverlayTransform;                                      // +0x47518
@@ -243,8 +399,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(MediumPrimaryPatchIndexLane, inlineVec_) == 0x10,
-    "FastVectorN<uint32_t,3000>::inlineVec_ offset must be 0x10"
+    offsetof(MediumDecalCommandLane, inlineVec_) == 0x10,
+    "FastVectorN<TerrainDecalDrawCommand,500>::inlineVec_ offset must be 0x10"
   );
 
   static_assert(
@@ -276,8 +432,8 @@ namespace moho
     "MediumFidelityTerrain::mViewportRenderHeight offset must be 0x24"
   );
   static_assert(
-    offsetof(MediumFidelityTerrain, mPrimaryPatchIndices) == 0x40,
-    "MediumFidelityTerrain::mPrimaryPatchIndices offset must be 0x40"
+    offsetof(MediumFidelityTerrain, mDecalDrawCommands) == 0x40,
+    "MediumFidelityTerrain::mDecalDrawCommands offset must be 0x40"
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mSkirtStartIndex) == 0x2C,
@@ -296,18 +452,18 @@ namespace moho
     "MediumFidelityTerrain::mSkirtBaseVertex offset must be 0x3C"
   );
   static_assert(
-    offsetof(MediumFidelityTerrain, mPrimaryPatchIndices) +
-        offsetof(MediumPrimaryPatchIndexLane, inlineVec_) ==
+    offsetof(MediumFidelityTerrain, mDecalDrawCommands) +
+        offsetof(MediumDecalCommandLane, inlineVec_) ==
       0x50,
-    "MediumFidelityTerrain primary patch inline storage must start at 0x50"
+    "MediumFidelityTerrain decal-command inline storage must start at 0x50"
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mTesselator) == 0x2F30,
     "MediumFidelityTerrain::mTesselator offset must be 0x2F30"
   );
   static_assert(
-    offsetof(MediumFidelityTerrain, mSecondaryPatchIndices) == 0x2F40,
-    "MediumFidelityTerrain::mSecondaryPatchIndices offset must be 0x2F40"
+    offsetof(MediumFidelityTerrain, mSplatVertices) == 0x2F40,
+    "MediumFidelityTerrain::mSplatVertices offset must be 0x2F40"
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mOverlayVertexSheet) == 0x47510,

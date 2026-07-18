@@ -31,11 +31,21 @@ namespace moho
     std::uint8_t mWaterEnabled;                       // +0x1534
     std::uint8_t pad_1535_1537[3];                    // +0x1535
     float mWaterElevation;                            // +0x1538
+    float mWaterElevationDeep;                        // +0x153C
+    float mWaterElevationAbyss;                       // +0x1540
   };
   static_assert(offsetof(TerrainMapRuntimeView, mWaterEnabled) == 0x1534, "TerrainMapRuntimeView::mWaterEnabled offset must be 0x1534");
   static_assert(
     offsetof(TerrainMapRuntimeView, mWaterElevation) == 0x1538,
     "TerrainMapRuntimeView::mWaterElevation offset must be 0x1538"
+  );
+  static_assert(
+    offsetof(TerrainMapRuntimeView, mWaterElevationDeep) == 0x153C,
+    "TerrainMapRuntimeView::mWaterElevationDeep offset must be 0x153C"
+  );
+  static_assert(
+    offsetof(TerrainMapRuntimeView, mWaterElevationAbyss) == 0x1540,
+    "TerrainMapRuntimeView::mWaterElevationAbyss offset must be 0x1540"
   );
 
   /**

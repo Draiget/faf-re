@@ -85,6 +85,21 @@ namespace moho
     ShaderVar biCubicLookup;
     ShaderVar overlayTexture;
 
+    // Terrain normal/decal draw lane (bound by MediumFidelityTerrain::DrawNormals
+    // and its decal/splat draw helpers at 0x008065E0 / 0x00806860 / 0x00806A50 /
+    // 0x00806C60). HLSL names verified as exact null-terminated strings in
+    // bin/2025.7.1/ForgedAlliance.exe.
+    ShaderVar waterRamp;             // "WaterRamp"
+    ShaderVar waterElevation;        // "WaterElevation"
+    ShaderVar waterElevationDeep;    // "WaterElevationDeep"
+    ShaderVar waterElevationAbyss;   // "WaterElevationAbyss"
+    ShaderVar decalMatrix;           // "DecalMatrix"
+    ShaderVar tangentMatrix;         // "TangentMatrix"
+    ShaderVar decalAlbedoTexture;    // "DecalAlbedoTexture"
+    ShaderVar decalNormalTexture;    // "DecalNormalTexture"
+    ShaderVar decalSpecTexture;      // "DecalSpecTexture"
+    ShaderVar decalAlpha;            // "DecalAlpha"
+
     TerrainShaderVarSet();
   };
 
