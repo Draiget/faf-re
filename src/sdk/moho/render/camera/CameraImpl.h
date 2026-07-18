@@ -1460,4 +1460,12 @@ namespace moho
   int cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* state);
 
   static_assert(sizeof(CameraImpl) == sizeof(void*), "CameraImpl size must be pointer-sized");
+
+  /**
+   * Address: 0x00871640 (FUN_00871640, func_SetWorldCamera)
+   *
+   * Registers `camera` as the world camera by splicing its Broadcaster subobject
+   * (camera+0x04) into the process-global camera-tracking-listener registry.
+   */
+  void func_SetWorldCamera(CameraImpl* camera);
 } // namespace moho

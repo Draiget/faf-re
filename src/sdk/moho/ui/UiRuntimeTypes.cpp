@@ -2439,6 +2439,111 @@ namespace
     "CUIWorldViewLuaObjectRuntimeView::mLuaObject offset must be 0x20"
   );
 
+  // Cached UI command-graph weak handle (graph ptr + shared control block).
+  struct CUIWorldViewCommandGraphHandle
+  {
+    void* mGraph = nullptr;                             // +0x00
+    boost::detail::sp_counted_base* mControl = nullptr; // +0x04
+  };
+  static_assert(sizeof(CUIWorldViewCommandGraphHandle) == 0x08);
+
+  // Construction-time overlay covering every field CUIWorldView::CUIWorldView
+  // initializes (offsets .asm-verified against FUN_0086E480). Flat layout: the
+  // IRenderWorldView subobject occupies 0x11C..0x137 (vtable@0x11C, camera@0x120,
+  // cached view bounds 0x124..0x133, mCanShake@0x134, mIsMiniMap@0x135,
+  // mEnableResourceRendering@0x136); the two command-mode copies via the existing
+  // moho::CommandModeData (0x60); the build-drag subobject via
+  // CUIWorldViewBuildDragRuntimeView (= struct_WorldView_object).
+#pragma pack(push, 1)
+  struct CUIWorldViewCtorRuntimeView
+  {
+    std::uint8_t mBase000To0EA[0xEB];
+    std::uint8_t mNeedsFrameUpdate;                     // +0xEB
+    std::uint8_t mBase0ECTo11B[0x30];
+    void* mRenderVftable;                               // +0x11C
+    moho::CameraImpl* mCamera;                          // +0x120
+    float mCachedViewLeft;                              // +0x124
+    float mCachedViewTop;                               // +0x128
+    float mCachedViewRight;                             // +0x12C
+    float mCachedViewBottom;                            // +0x130
+    std::uint8_t mCanShake;                             // +0x134
+    std::uint8_t mIsMiniMap;                            // +0x135
+    std::uint8_t mEnableResourceRendering;              // +0x136
+    std::uint8_t mUnknown137;                           // +0x137
+    std::int32_t mInputLocks;                           // +0x138
+    std::int32_t mWorldViewDepth;                       // +0x13C
+    std::int32_t mState;                                // +0x140
+    std::uint8_t mUnknown144To147[0x04];                // +0x144
+    moho::CommandModeData mLeftMouseCommand;            // +0x148 (v11)
+    moho::CommandModeData mCommandData;                 // +0x1A8
+    moho::CWldSession* mWldSession;                     // +0x208
+    CUIWorldViewCommandGraphHandle mComGraph;           // +0x20C
+    moho::CUIWorldViewBuildDragRuntimeView mSubobject;  // +0x214
+    std::uint8_t mConvertToPatrolCursor;                // +0x274
+    std::uint8_t mUnknown275;                           // +0x275
+    std::uint8_t mHideResources;                        // +0x276
+    std::uint8_t mUnknown277To27F[0x09];                // +0x277
+    msvc8::string mCameraTrack;                         // +0x280
+    std::uint32_t mOverlayDrawToken;                    // +0x29C
+    std::uint32_t mUnknown2A0;                          // +0x2A0
+    std::uint8_t mHighlightEnabled;                     // +0x2A4
+    std::uint8_t mIconsVisible;                         // +0x2A5
+    std::uint8_t mGlobalCameraCommands;                 // +0x2A6
+    std::uint8_t mUnknown2A7;                           // +0x2A7
+
+    [[nodiscard]] static CUIWorldViewCtorRuntimeView* FromWorldView(moho::CUIWorldView* worldView) noexcept
+    {
+      return reinterpret_cast<CUIWorldViewCtorRuntimeView*>(worldView);
+    }
+  };
+#pragma pack(pop)
+
+  static_assert(sizeof(CUIWorldViewCtorRuntimeView) == 0x2A8, "CUIWorldViewCtorRuntimeView size must be 0x2A8");
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mNeedsFrameUpdate) == 0xEB);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mRenderVftable) == 0x11C);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCamera) == 0x120);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCachedViewLeft) == 0x124);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCanShake) == 0x134);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mEnableResourceRendering) == 0x136);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mInputLocks) == 0x138);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mWorldViewDepth) == 0x13C);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mState) == 0x140);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mLeftMouseCommand) == 0x148);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCommandData) == 0x1A8);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mWldSession) == 0x208);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mComGraph) == 0x20C);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mSubobject) == 0x214);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCameraTrack) == 0x280);
+  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mHighlightEnabled) == 0x2A4);
+
+  // Reproduces the ctor's inline field-by-field init of one CommandModeData:
+  // mode/caps/blueprint cleared, both drag snapshots zeroed with mIsDragger=-1,
+  // trailing sentinels (mIsDragged / mReserved5C) set to -1.
+  void ZeroInitCommandModeData(moho::CommandModeData& cmd) noexcept
+  {
+    cmd.mMode = moho::COMMOD_None;
+    cmd.mCommandCaps = static_cast<moho::ERuleBPUnitCommandCaps>(0);
+    cmd.mBlueprint = nullptr;
+
+    cmd.mMouseDragStart.mHitValid = 0;
+    cmd.mMouseDragStart.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
+    cmd.mMouseDragStart.mUnitHover = nullptr;
+    cmd.mMouseDragStart.mPrevious = nullptr;
+    cmd.mMouseDragStart.mIsDragger = -1;
+    cmd.mMouseDragStart.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
+
+    cmd.mMouseDragEnd.mHitValid = 0;
+    cmd.mMouseDragEnd.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
+    cmd.mMouseDragEnd.mUnitHover = nullptr;
+    cmd.mMouseDragEnd.mPrevious = nullptr;
+    cmd.mMouseDragEnd.mIsDragger = -1;
+    cmd.mMouseDragEnd.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
+
+    cmd.mModifiers = 0;
+    cmd.mIsDragged = -1;
+    cmd.mReserved5C = -1;
+  }
+
   moho::StatItem* gCameraCursorPositionStat = nullptr;
   moho::StatItem* gCameraCursorElevationStat = nullptr;
   moho::StatItem* gCameraCursorOCellStat = nullptr;
@@ -4601,6 +4706,9 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 moho::EUIState moho::sUIState = moho::UIS_none;
 bool moho::cam_Free = false;
 bool moho::ui_DisableCursorFixing = false;
+float moho::ui_SelectTolerance = 4.0f;
+float moho::ui_ExtractSnapTolerance = 20.0f;
+float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
@@ -18359,6 +18467,210 @@ int moho::cfunc_CUIWorldViewProjectL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject projectedPointObject = SCR_ToLua<Wm3::Vector2f>(state, projectedPoint);
   projectedPointObject.PushStack(state);
   return 1;
+}
+
+namespace
+{
+  constexpr const char* kCUIWorldViewInitHelpText =
+    "moho.UIWorldView:__init(parent_control, cameraName, depth, isMiniMap, trackCamera)";
+
+  /**
+   * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
+   *
+   * What it does:
+   * Constructs a world-view UI control in place at `storage`: CMauiControl base
+   * ctor, MI vtables (installed by the class machinery), ~40 field inits (incl 2
+   * command-mode copies + the build-drag subobject), camera creation, optional
+   * world-camera/minimap promotion, viewport registration, then reads
+   * WorldViewParams from /lua/ui/controls/worldview.lua.
+   */
+  moho::CUIWorldView* ConstructCUIWorldView(
+    void* const storage,
+    LuaPlus::LuaObject* const luaObj,
+    moho::CMauiControl* const parent,
+    const char* const name,
+    const int depth,
+    const bool isMiniMap,
+    const char* const cameraTrack
+  )
+  {
+    auto* const control = reinterpret_cast<moho::CMauiControl*>(storage);
+    new (control) moho::CMauiControl(luaObj, parent, msvc8::string("World View"));
+
+    auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(reinterpret_cast<moho::CUIWorldView*>(storage));
+
+    view->mCamera = nullptr;                              // +0x120
+    view->mCachedViewLeft = -1.0f;                        // +0x124
+    view->mCachedViewTop = -1.0f;                         // +0x128
+    view->mCachedViewRight = -1.0f;                       // +0x12C
+    view->mCachedViewBottom = -1.0f;                      // +0x130
+    view->mWorldViewDepth = depth;                        // +0x13C
+    view->mCanShake = 0;                                  // +0x134
+    view->mIsMiniMap = isMiniMap ? 1 : 0;                 // +0x135
+    view->mEnableResourceRendering = 1;                   // +0x136
+    view->mInputLocks = 0;                                // +0x138
+    view->mState = 0;                                     // +0x140
+
+    ZeroInitCommandModeData(view->mLeftMouseCommand);     // +0x148
+    ZeroInitCommandModeData(view->mCommandData);          // +0x1A8
+
+    view->mWldSession = moho::WLD_GetActiveSession();     // +0x208 (binary reads global sWldSession)
+    view->mComGraph.mGraph = nullptr;                     // +0x20C
+    view->mComGraph.mControl = nullptr;                   // +0x210
+
+    new (&view->mSubobject) moho::CUIWorldViewBuildDragRuntimeView(); // +0x214
+
+    view->mConvertToPatrolCursor = 0;                     // +0x274
+    view->mUnknown275 = 0;                                // +0x275
+    view->mHideResources = 0;                             // +0x276
+
+    new (&view->mCameraTrack) msvc8::string(cameraTrack, std::strlen(cameraTrack)); // +0x280
+
+    view->mOverlayDrawToken = 0;                          // +0x29C
+    view->mUnknown2A0 = 0;                                // +0x2A0
+    view->mHighlightEnabled = 1;                          // +0x2A4
+    view->mIconsVisible = 1;                              // +0x2A5
+    view->mGlobalCameraCommands = 0;                      // +0x2A6
+
+    control->SetDebugName(msvc8::string(name, std::strlen(name)));
+
+    moho::STIMap* const map =
+      reinterpret_cast<moho::STIMap*>(view->mWldSession->mWldMap->mTerrainRes->mPlayableRectSource);
+    LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
+    moho::RCamManager* const camManager = moho::CAM_GetManager();
+    moho::CameraImpl* const camera = camManager->CreateCamera(gpg::StrArg(name), *map, activeState);
+    // The camera slot was just null-initialized above, so the binary's
+    // replace-existing-camera release branch is unreachable here.
+    view->mCamera = camera;
+
+    if (_stricmp(name, "WorldCamera") == 0) {
+      moho::func_SetWorldCamera(view->mCamera);
+    }
+
+    if (isMiniMap) {
+      view->mCamera->SetLODScale(moho::cam_DefaultMiniLOD);
+      view->mCamera->CanShake(false);
+    }
+
+    auto* const renderView = reinterpret_cast<moho::IRenderWorldView*>(&view->mRenderVftable);
+    moho::CMauiControlExtendedRuntimeView* const extendedView =
+      moho::CMauiControlExtendedRuntimeView::FromControl(control);
+    moho::CMauiControl* const rootFrame = extendedView->mRootFrame;
+    moho::CMauiControlExtendedRuntimeView* const rootFrameView =
+      moho::CMauiControlExtendedRuntimeView::FromControl(rootFrame);
+    moho::ren_Viewport->AddWorldView(
+      renderView, static_cast<int>(reinterpret_cast<std::intptr_t>(rootFrameView->mEventMapper)), view->mWorldViewDepth);
+
+    view->mNeedsFrameUpdate = 1;
+
+    LuaPlus::LuaObject module = moho::SCR_Import(moho::g_UIManager->mLuaState, gpg::StrArg("/lua/ui/controls/worldview.lua"));
+    if (!module.IsNil()) {
+      LuaPlus::LuaObject params = module["WorldViewParams"];
+      if (params.IsTable()) {
+        if (!params["ui_SelectTolerance"].IsNil()) {
+          moho::ui_SelectTolerance = params["ui_SelectTolerance"].GetNumber();
+        }
+        if (!params["ui_DisableCursorFixing"].IsNil()) {
+          moho::ui_DisableCursorFixing = params["ui_DisableCursorFixing"].GetBoolean();
+        }
+        if (!params["ui_ExtractSnapTolerance"].IsNil()) {
+          moho::ui_ExtractSnapTolerance = params["ui_ExtractSnapTolerance"].GetNumber();
+        }
+      }
+    }
+
+    return reinterpret_cast<moho::CUIWorldView*>(storage);
+  }
+} // namespace
+
+/**
+ * Address: 0x00871710 (FUN_00871710, cfunc_CUIWorldView__initL)
+ *
+ * What it does:
+ * Lua constructor worker for CUIWorldView:__init. See header.
+ */
+int moho::cfunc_CUIWorldView__initL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount < 4 || argumentCount > 6) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected between %d and %d args, but got %d", kCUIWorldViewInitHelpText, 4, 6, argumentCount);
+  }
+
+  LuaPlus::LuaObject parentObject(LuaPlus::LuaStackObject(state, 2));
+  CMauiControl* const parent = SCR_FromLua_CMauiControl(parentObject, state);
+
+  msvc8::string trackCamera;
+  bool isMiniMap = false;
+
+  if (lua_gettop(state->m_state) == 5) {
+    if (LuaPlus::LuaStackObject(state, 5).GetBoolean()) {
+      LuaPlus::LuaState::Error(state, "Minimap view must have a view to track defined");
+      return 0;
+    }
+  } else if (lua_gettop(state->m_state) == 6) {
+    isMiniMap = LuaPlus::LuaStackObject(state, 5).GetBoolean();
+    LuaPlus::LuaStackObject trackArg(state, 6);
+    const char* const trackStr = lua_tostring(state->m_state, 6);
+    if (trackStr == nullptr) {
+      trackArg.TypeError("string");
+    }
+    trackCamera = msvc8::string(trackStr, std::strlen(trackStr));
+  }
+
+  void* const storage = ::operator new(0x2A8u);
+  CUIWorldView* worldView = nullptr;
+  if (storage != nullptr) {
+    LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
+
+    LuaPlus::LuaStackObject depthArg(state, 4);
+    if (lua_type(state->m_state, 4) != LUA_TNUMBER) {
+      depthArg.TypeError("number");
+    }
+    const int depth = static_cast<int>(lua_tonumber(state->m_state, 4));
+
+    LuaPlus::LuaStackObject nameArg(state, 3);
+    const char* const cameraName = lua_tostring(state->m_state, 3);
+    if (cameraName == nullptr) {
+      nameArg.TypeError("string");
+    }
+
+    worldView =
+      ConstructCUIWorldView(storage, &selfObject, parent, cameraName, depth, isMiniMap, trackCamera.c_str());
+  }
+
+  reinterpret_cast<CMauiControl*>(worldView)->DoInit();
+  CUIWorldViewLuaObjectRuntimeView::FromWorldView(worldView)->mLuaObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00871690 (FUN_00871690, cfunc_CUIWorldView__init)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CUIWorldView__initL`.
+ */
+int moho::cfunc_CUIWorldView__init(lua_State* const luaContext)
+{
+  return cfunc_CUIWorldView__initL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008716B0 (FUN_008716B0, func_CUIWorldView__init_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CUIWorldView:__init(...)` Lua constructor binder.
+ */
+moho::CScrLuaInitForm* moho::func_CUIWorldView__init_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "__init",
+    &moho::cfunc_CUIWorldView__init,
+    &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+    "CUIWorldView",
+    kCUIWorldViewInitHelpText);
+  return &binder;
 }
 
 /**
