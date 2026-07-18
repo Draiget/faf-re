@@ -435,6 +435,21 @@ namespace moho
     void FindIntersectingRaisedPlatform();
 
     /**
+     * Address: 0x006B9020 (FUN_006B9020, ?ProcessSurfaceCollisionFromLastMove@CUnitMotion@Moho@@AAEXXZ)
+     * Mangled: ?ProcessSurfaceCollisionFromLastMove@CUnitMotion@Moho@@AAEXXZ
+     *
+     * What it does:
+     * Rebuilds the raised-platform candidate list and resolves surface
+     * collisions after the owner unit's last move: clears the candidate lane,
+     * skips air/sub/dead/being-built/attached/flying/pushed units, builds an
+     * oriented box over the unit footprint, gathers nearby units (and, on a
+     * staggered every-fifth-tick beat for larger units, props too), runs
+     * `Sim::DoCollisionsFor` on the hits, and records each hit unit as a weak
+     * raised-platform candidate for `FindIntersectingRaisedPlatform`.
+     */
+    void ProcessSurfaceCollisionFromLastMove();
+
+    /**
      * Address: 0x006C3220 (FUN_006C3220, ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ)
      *
      * What it does:
