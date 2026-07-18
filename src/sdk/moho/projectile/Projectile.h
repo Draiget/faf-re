@@ -43,6 +43,35 @@ namespace moho
      */
     explicit Projectile(Sim* sim);
 
+    /**
+     * Address: 0x0069D1D0 (FUN_0069D1D0, Moho::Projectile::CheckCollision)
+     * Mangled: ?CheckCollision@Projectile@Moho@@AAEXXZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::Projectile::CheckCollision(Moho::Projectile *this);
+     *
+     * Per-tick collision pass over the segment swept from the previous to the
+     * pending position: handles water-surface crossing / layer change, tests the
+     * water plane, samples terrain surface intersection, tests the explicit
+     * homing target, sweeps entities crossing the segment, and finally tests the
+     * terrain height field. The earliest hit stamps mImpactInterpolation,
+     * mImpactPosition, the collided-entity weak link, and mImpactType.
+     */
+    void CheckCollision();
+
+    /**
+     * Address: 0x0069C8F0 (FUN_0069C8F0, Moho::Projectile::UpdateTracking)
+     * Mangled: ?UpdateTracking@Projectile@Moho@@AAEXAAVVTransform@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::Projectile::UpdateTracking(Moho::Projectile *this, Moho::VTransform *trn);
+     *
+     * Homing/tracking steering update: resolves the aim point (optionally lead-
+     * predicted), applies underwater clamps and zig-zag jitter, and steers `trn`
+     * toward the aim direction by up to the projectile turn rate.
+     */
+    void UpdateTracking(VTransform& trn);
+
   public:
     inline static gpg::RType* sType = nullptr;
 
@@ -110,6 +139,35 @@ namespace moho
      * Sets the projectile expiration tick to `mCurTick + int(seconds * 10.0f)`.
      */
     void SetLifetime(float lifetimeSeconds);
+
+    /**
+     * Address: 0x0069BDD0 (FUN_0069BDD0, Moho::Projectile::MotionTick)
+     * Mangled: ?MotionTick@Projectile@Moho@@UAE?AW4ETaskStatus@2@XZ
+     *
+     * IDA signature:
+     * int __thiscall Moho::Projectile::MotionTick(Moho::Projectile *this);
+     *
+     * Overrides Entity::MotionTick (primary vtable slot 20). Per-frame projectile
+     * update: advances mesh-scale animation, relinks into the Sim coord tail,
+     * integrates velocity (ballistic or homing via UpdateTracking), applies speed
+     * cap / upright / spin, writes the pending transform, runs CheckCollision,
+     * handles lifetime expiry, and drives the terrain-bounce impact interpolation.
+     */
+    int MotionTick() override;
+
+    /**
+     * Address: 0x0069DEC0 (FUN_0069DEC0, Moho::Projectile::Impact)
+     * Mangled: ?Impact@Projectile@Moho@@QAEXXZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::Projectile::Impact(Moho::Projectile *this);
+     *
+     * Impact/detonation handler: fires the `OnImpact` script, updates launcher
+     * army shots-hit/missed realtime stats, dispatches the target/self collision
+     * detonation callback by impact category, clears the collided-entity weak
+     * link, and resets impact state.
+     */
+    void Impact();
 
     /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
