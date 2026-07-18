@@ -51,6 +51,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/RResId.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -810,6 +811,9 @@ namespace
   constexpr const char* kCreateUnitName = "CreateUnit";
   constexpr const char* kCreateUnitGlobalClassName = "<global>";
   constexpr const char* kCreateUnitHelpText = "blueprint, army, tx, ty, tz, qx, qy, qz, qw, [layer]";
+  constexpr const char* kCreateUnitHPRName = "CreateUnitHPR";
+  constexpr const char* kCreateUnitHPRGlobalClassName = "<global>";
+  constexpr const char* kCreateUnitHPRHelpText = "blueprint, army, x, y, z, pitch, yaw, roll";
   constexpr const char* kUnitGetArmorMultName = "GetArmorMult";
   constexpr const char* kUnitGetArmorMultHelpText = "mult = Unit:GetArmorMult(damageTypeName)";
   constexpr std::uint8_t kArmorMapColorRed = 0u;
@@ -12271,6 +12275,133 @@ CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
     nullptr,
     kCreateUnitGlobalClassName,
     kCreateUnitHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x006CFB70 (FUN_006CFB70, cfunc_CreateUnitHPRL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CreateUnitHPRL@<eax>(LuaPlus::LuaState* state@<edi>);
+ *
+ * What it does:
+ * Global Lua `CreateUnitHPR(blueprint, army, x, y, z, pitch, yaw, roll)` worker.
+ * Validates exactly 8 args, resolves the blueprint (arg1) and owning army (arg2,
+ * a Lua army object). Reads the spawn position (args 3,4,5 -> x,y,z) and the
+ * heading/pitch/roll Euler angles (args 6,7,8), builds a row-major rotation matrix
+ * and converts it to an orientation quaternion, spawns the unit through the sim,
+ * and pushes its script object.
+ */
+int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 8) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCreateUnitHPRHelpText, 8, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata_typed(rawState);
+
+  // arg1: blueprint id (string) -> kept as an msvc8::string for the lookup + errors.
+  const LuaPlus::LuaStackObject blueprintArg(state, 1);
+  const char* blueprintText = lua_tostring(rawState, 1);
+  if (!blueprintText) {
+    blueprintArg.TypeError("string");
+    blueprintText = "";
+  }
+  const msvc8::string blueprintName(blueprintText, std::strlen(blueprintText));
+
+  // arg2: owning army as a Lua object (not a 1-based index).
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  // Position: args 5, 4, 3 read in that order -> x, y, z (straight, no swap).
+  const LuaPlus::LuaStackObject posZArg(state, 5);
+  if (lua_type(rawState, 5) != LUA_TNUMBER) {
+    posZArg.TypeError("number");
+  }
+  const float posZ = static_cast<float>(lua_tonumber(rawState, 5));
+  const LuaPlus::LuaStackObject posYArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    posYArg.TypeError("number");
+  }
+  const float posY = static_cast<float>(lua_tonumber(rawState, 4));
+  const LuaPlus::LuaStackObject posXArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    posXArg.TypeError("number");
+  }
+  const float posX = static_cast<float>(lua_tonumber(rawState, 3));
+
+  // Orientation Euler angles: arg6 -> pitch, arg7 -> heading/yaw, arg8 -> roll.
+  const LuaPlus::LuaStackObject pitchArg(state, 6);
+  if (lua_type(rawState, 6) != LUA_TNUMBER) {
+    pitchArg.TypeError("number");
+  }
+  const float pitch = static_cast<float>(lua_tonumber(rawState, 6));
+  const LuaPlus::LuaStackObject headingArg(state, 7);
+  if (lua_type(rawState, 7) != LUA_TNUMBER) {
+    headingArg.TypeError("number");
+  }
+  const float heading = static_cast<float>(lua_tonumber(rawState, 7));
+  const LuaPlus::LuaStackObject rollArg(state, 8);
+  if (lua_type(rawState, 8) != LUA_TNUMBER) {
+    rollArg.TypeError("number");
+  }
+  const float roll = static_cast<float>(lua_tonumber(rawState, 8));
+
+  // Blueprint lookup happens after all numeric args, matching the binary.
+  RResId blueprintId{};
+  gpg::STR_CopyFilename(&blueprintId.name, &blueprintName);
+  const RUnitBlueprint* const blueprint = sim->mRules->GetUnitBlueprint(blueprintId);
+  if (!blueprint) {
+    LuaPlus::LuaState::Error(state, "Unknown unit type: %s", blueprintName.c_str());
+  }
+
+  // Euler HPR -> row-major 3x3 rotation matrix -> orientation quaternion.
+  Wm3::Vector3f rotationRows[3];
+  BuildRotationMatrixFromEulerHPR(rotationRows, heading, pitch, roll);
+  Wm3::Quaternionf orient;
+  MatrixRowsToQuatCanonical(rotationRows, &orient);
+
+  const VTransform transform(Wm3::Vector3f(posX, posY, posZ), orient);
+  SUnitConstructionParams params(0, transform, army, blueprint, nullptr, true);
+
+  Unit* const unit = sim->CreateUnitForScript(params, true);
+  if (!unit) {
+    LuaPlus::LuaState::Error(state, "CreateUnitHPR(%s) failed", blueprintName.c_str());
+  }
+  unit->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x006CFAF0 (FUN_006CFAF0, cfunc_CreateUnitHPR)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitHPRL`.
+ */
+int moho::cfunc_CreateUnitHPR(lua_State* const luaContext)
+{
+  return cfunc_CreateUnitHPRL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x006CFB10 (FUN_006CFB10, func_CreateUnitHPR_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `CreateUnitHPR(...)` Lua binder and links it into the sim
+ * script init form set.
+ */
+CScrLuaInitForm* moho::func_CreateUnitHPR_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kCreateUnitHPRName,
+    &moho::cfunc_CreateUnitHPR,
+    nullptr,
+    kCreateUnitHPRGlobalClassName,
+    kCreateUnitHPRHelpText
   );
   return &binder;
 }
