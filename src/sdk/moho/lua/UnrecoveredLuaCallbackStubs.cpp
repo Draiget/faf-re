@@ -45,7 +45,7 @@ namespace moho
   // func_CAiBrainGetThreatsAroundPosition_LuaFuncDef recovered in CAiBrain.cpp (FUN_00590C20).
   // func_CAiBrainPickBestAttackVector_LuaFuncDef recovered in CAiBrain.cpp (FUN_0058EF80).
   // func_CreateUnit2_LuaFuncDef recovered in Unit.cpp (FUN_006D0020).
-  CScrLuaInitForm* func_CreateUnitHPR_LuaFuncDef() { return nullptr; }
+  // func_CreateUnitHPR_LuaFuncDef recovered in Unit.cpp (FUN_006CFB10).
   // func_CreateUnit_LuaFuncDef recovered in Unit.cpp (FUN_006CF500).
 }
 

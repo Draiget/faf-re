@@ -2240,6 +2240,25 @@ namespace moho
   int cfunc_CreateUnitL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006CFAF0 (FUN_006CFAF0, cfunc_CreateUnitHPR)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CreateUnitHPRL`.
+   */
+  int cfunc_CreateUnitHPR(lua_State* luaContext);
+
+  /**
+   * Address: 0x006CFB70 (FUN_006CFB70, cfunc_CreateUnitHPRL)
+   *
+   * What it does:
+   * Global `CreateUnitHPR(blueprint, army, x, y, z, pitch, yaw, roll)` worker:
+   * resolves the blueprint + owning army, converts the heading/pitch/roll Euler
+   * angles into an orientation quaternion, spawns the unit at (x, y, z), and
+   * returns its script object.
+   */
+  int cfunc_CreateUnitHPRL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x006C4180 (FUN_006C4180, cfunc_UnitGetArmorMult)
    *
    * What it does:
