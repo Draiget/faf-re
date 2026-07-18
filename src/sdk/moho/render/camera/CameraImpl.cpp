@@ -1451,6 +1451,42 @@ namespace
     static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
   }
+
+  // Seed one runtime camera frustum-weak-vector lane into its empty inline-SBO
+  // state, exactly as `CameraImpl::CameraImpl` does at 0x007A7BC3..0x007A7C4C:
+  // the live cursor pair (`mStart`/`mFinish`) and the inline origin point at
+  // slot 0, and the capacity bound points one past the 40-entry inline block
+  // (`&mInlineStorage[40]`, i.e. the base of the next lane). No inline node is
+  // written, mirroring the binary's pointer-only lane init.
+  void InitCameraFrustumStorageLane(CameraFrustumUserEntityStorage& storage) noexcept
+  {
+    moho::CameraFrustumUserEntityList& view = storage.mView;
+    moho::CameraUserEntityWeakRef* const inlineOrigin = &storage.mInlineStorage[0];
+    view.mStart = inlineOrigin;
+    view.mFinish = inlineOrigin;
+    view.mCapacity =
+      inlineOrigin + (sizeof(storage.mInlineStorage) / sizeof(storage.mInlineStorage[0]));
+    view.mInlineOrigin = inlineOrigin;
+  }
+
+  /**
+   * Address: 0x007AEFA0 (FUN_007AEFA0, target-list head allocator)
+   *
+   * What it does:
+   * Allocates one `CameraTargetEntityNode` head sentinel through the intrusive
+   * list-node allocator (`sub_7B1160(1)`) and self-links its `mNext`/`mPrev`
+   * back-links. The constructor stores the returned sentinel into
+   * `mTargetEntities.mHead` and zeroes `mSize`; the sentinel's `mWeakRef` and
+   * the list's `mAllocProxy` word are intentionally left untouched here (the
+   * binary defers those to first use).
+   */
+  [[nodiscard]] CameraTargetEntityNode* AllocateSelfLinkedCameraTargetHead()
+  {
+    auto* const head = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
+    head->mNext = head;
+    head->mPrev = head;
+    return head;
+  }
 } // namespace
 
 namespace moho
@@ -1506,6 +1542,143 @@ namespace moho
   broadcaster.mPrev = &broadcaster;
   broadcaster.mNext = &broadcaster;
   return &broadcaster;
+}
+
+/**
+ * Address: 0x007A7950 (FUN_007A7950, ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z)
+ * Mangled: ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z
+ *
+ * IDA signature:
+ * Moho::CameraImpl *__stdcall Moho::CameraImpl::CameraImpl(
+ *     Moho::CameraImpl *this, const char *name, Moho::STIMap *stiMap,
+ *     LuaPlus::LuaState *state);
+ *
+ * What it does:
+ * Builds one runtime camera in place over the 0x858-byte block that
+ * `RCamManager::CreateCamera` allocates with `operator new(0x858)`. Self-links
+ * the `RCamCamera` broadcaster base, constructs the `CScriptEvent` sub-object
+ * at +0x0C, copies the camera name into `mName`, binds the terrain `STIMap`,
+ * constructs the embedded `GeomCamera3`, and zero-seeds every camera state lane
+ * (mode flags, zoom/pivot lanes, timed-move / Hermite transition deltas, and
+ * the camera-shake parameter block with its scale seeded to 1.0). Allocates the
+ * intrusive target-entity list head sentinel, nulls both `ITimeSource` slots and
+ * installs a fresh `SystemTimeSource` (index 0) and `GameTimeSource` (index 1),
+ * primes the three inline frustum weak-vector lanes, seeds the max-zoom
+ * multiplier (1.4) and vertical-zoom metric scale (1.0), publishes the camera's
+ * Lua object through `CScriptObject::CreateLuaObject`, then applies the default
+ * unit viewport and runs one `CameraReset` to snap the initial basis.
+ *
+ * Sole caller: `RCamManager::CreateCamera` (0x007AA9C0, recovered in
+ * src/sdk/moho/render/RCamManager.cpp), which placement-constructs this object.
+ */
+moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const state)
+{
+  // Self-link the inherited `RCamCamera` broadcaster base node (+0x04/+0x08).
+  // The primary/CScriptObject-view vtable pointers are installed by the C++
+  // ctor prologue; only the intrusive broadcaster sentinel needs seeding.
+  (void)InitializeRuntimeCameraBaseLane(AsRuntimeCameraBaseView(this));
+
+  // Construct the `CScriptEvent` sub-object at +0x0C (it in turn constructs its
+  // `CScriptObject` sub-object at +0x1C, which the Lua publish below targets).
+  auto* const scriptEvent = ::new (reinterpret_cast<std::uint8_t*>(this) + 0x0C) moho::CScriptEvent();
+
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  // Copy the caller's camera name (`std::string::string(name, strlen(name))`).
+  ::new (&runtime->mName) msvc8::string(name, std::strlen(name));
+
+  // Bind terrain-map context and construct the embedded solid-frustum camera.
+  runtime->mTerrainMap = const_cast<moho::STIMap*>(&map);
+  ::new (&runtime->mCam) moho::GeomCamera3();
+
+  // Scalar state lanes seeded by the constructor.
+  runtime->mVerticalZoomMetricScale = 1.0f;
+  runtime->mIsOrtho = 0u;
+  runtime->mIsRotated = 0u;
+  runtime->mRevertRotation = 0u;
+  runtime->mTargetZoom = 0.0f;
+  runtime->mZoom = 0.0f;
+  runtime->mPivot.x = 0.0f;
+  runtime->mPivot.y = 0.0f;
+
+  // Intrusive target-entity list: install a self-linked head sentinel and an
+  // empty size; the active-node cursor starts detached.
+  runtime->mTargetEntities.mHead = AllocateSelfLinkedCameraTargetHead();
+  runtime->mTargetEntities.mSize = 0;
+  runtime->mActiveTargetEntityNode = nullptr;
+
+  // Default to the wall-clock (System) time source and null both slots before
+  // installing them (mirrors the binary's 2-element eh-vector zero-fill).
+  runtime->mTimeSource = kCameraTimeSourceSystem;
+  runtime->mTimeSources[0] = nullptr;
+  runtime->mTimeSources[1] = nullptr;
+  runtime->mLastFrameTime = 0.0f;
+
+  // Timed-move / Hermite transition delta lanes (all zero at construction).
+  runtime->mTimedMoveOffset = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  runtime->mTimedMoveZoom = 0.0f;
+  runtime->mTimedMoveDuration = 0.0f;
+  runtime->mTimedMoveTransitionParam = 0.0f;
+  runtime->mTimedMoveStartTime = 0.0f;
+  runtime->mTimedMovePitch = 0.0f;
+  runtime->mTimedMoveHeading = 0.0f;
+  runtime->mHermiteOffsetStartDelta = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  runtime->mHermiteOffsetEndDelta = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  runtime->mHermiteHeadingStartDelta = 0.0f;
+  runtime->mHermiteHeadingEndDelta = 0.0f;
+  runtime->mHermitePitchStartDelta = 0.0f;
+  runtime->mHermitePitchEndDelta = 0.0f;
+  runtime->mHermiteZoomStartDelta = 0.0f;
+  runtime->mHermiteZoomEndDelta = 0.0f;
+
+  // Camera-shake parameter block: zero every field, seed the shake scale to 1.0
+  // (+0x448, byte-verified `a7` = 1.0 in .rdata).
+  runtime->mCamShakeParams.mCenter = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  runtime->mCamShakeParams.mMaxRange = 0.0f;
+  runtime->mCamShakeParams.mMinMagnitude = 0.0f;
+  runtime->mCamShakeParams.mMaxMagnitude = 0.0f;
+  runtime->mCamShakeParams.mDuration = 0.0f;
+  runtime->mCamShakeParams.mElapsed = 0.0f;
+  runtime->mCamShakeParams.mScale = 1.0f;
+
+  runtime->mCanShake = 1u;
+  runtime->mAccType = kCameraAccTypeLinear;
+  runtime->mFrustumCacheTimer = 0.0f;
+  runtime->mFrustumCacheZoomMark = 0.0f;
+
+  // Prime the three inline frustum weak-vector lanes to empty inline-SBO state.
+  CameraImplFrustumLanesView* const lanes = AsFrustumLanesView(this);
+  InitCameraFrustumStorageLane(lanes->mFrustumLaneA);
+  InitCameraFrustumStorageLane(lanes->mFrustumLaneB);
+  InitCameraFrustumStorageLane(lanes->mArmyUnitsInFrustum);
+
+  // Max-zoom multiplier (+0x850, byte-verified `dword_E4F98C` = 1.4).
+  AsZoomLimitView(this)->mMaxZoomMult = 1.4f;
+
+  // Install the two heap-owned time sources. Each `new` allocates a vtable-only
+  // node (`operator new(4)` + vtable store in the binary); the swap-and-release
+  // of the prior slot value is inert here because both slots were just nulled.
+  runtime->mTimeSources[0] = new SystemTimeSource();
+  runtime->mTimeSources[1] = new GameTimeSource();
+
+  // Publish the camera's script-side Lua object. The binary constructs three
+  // empty Lua argument objects plus the cached `CameraImpl` metatable, then
+  // hands them to the `CScriptObject` sub-object's `CreateLuaObject`.
+  {
+    LuaPlus::LuaObject luaArg3{};
+    LuaPlus::LuaObject luaArg2{};
+    LuaPlus::LuaObject luaArg1{};
+    LuaPlus::LuaObject luaMetatable{};
+    func_CreateLuaCameraImpl(&luaMetatable, state);
+    static_cast<moho::CScriptObject*>(scriptEvent)
+      ->CreateLuaObject(luaMetatable, luaArg1, luaArg2, luaArg3);
+  }
+
+  // Default unit viewport (origin {0,0}, extent {1,1}) then snap the basis.
+  const Wm3::Vector2f viewportOrigin{0.0f, 0.0f};
+  const Wm3::Vector2f viewportSize{1.0f, 1.0f};
+  CameraSetViewport(viewportOrigin, viewportSize);
+  CameraReset();
 }
 
 /**
