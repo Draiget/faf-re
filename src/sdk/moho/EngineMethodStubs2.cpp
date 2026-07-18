@@ -122,7 +122,13 @@ SkyDome::~SkyDome() {}
 // CreateGameInterface prefetches the provider's textures and dispatches the
 // create-interface script callback (the empty stub did neither).
 
-CameraImpl::CameraImpl(gpg::StrArg, const STIMap&, LuaPlus::LuaState*) {}
+// CameraImpl::CameraImpl(gpg::StrArg, const STIMap&, LuaPlus::LuaState*)
+// (FUN_007A7950) is recovered 1:1 in src/sdk/moho/render/camera/CameraImpl.cpp
+// — the real runtime camera constructor (broadcaster/CScriptEvent sub-object
+// init, name/terrain/GeomCamera3 construction, full camera-state seed, target
+// list + time sources, three frustum lanes, Lua object publish, viewport +
+// reset). The former empty-body stub here was a false recovery (initialized
+// nothing); removed.
 
 // Projectile::Projectile(const RProjectileBlueprint*, Sim*, CArmyImpl*, Entity*,
 // const VTransform&, float, float, const msvc8::string&, const CAiTarget&, bool)
