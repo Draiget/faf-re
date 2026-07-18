@@ -22,6 +22,9 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/CD3DVertexFormat.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/resource/CResourceWatcher.h"
+#include "moho/resource/ResourceManager.h"
 
 namespace
 {
@@ -370,6 +373,74 @@ void SkyDome::Destroy()
     // Effect / EffectD3D9 inheritance is recovered.
     (void)D3D_GetDevice()->GetResources()->FindEffect("sky");
     return {};
+  }
+
+  /**
+   * Address: 0x00817850 (FUN_00817850, ?CreateTextures@SkyDome@Moho@@AAEXXZ)
+   * Mangled: ?CreateTextures@SkyDome@Moho@@AAEXXZ
+   *
+   * IDA signature:
+   * private: void __thiscall Moho::SkyDome::CreateTextures(void);
+   *
+   * What it does:
+   * Loads all seven sky-dome textures (atmosphere albedo/glow, horizon lookup,
+   * cirrus, and the three cumulus/decal ramp textures) from the active D3D
+   * device resources and stores each resolved base GAL texture into the
+   * matching texture lane. Runs only when at least one of the four "anchor"
+   * lanes (atmosphere albedo/glow, cirrus, horizon lookup) is still null, so
+   * repeated calls after a successful load are no-ops. When this watcher already
+   * tracks resources, it first flushes/re-registers them with the resource
+   * manager so the loaded textures participate in hot-reload.
+   *
+   * SkyDome derives its runtime layout from CResourceWatcher (its constructor
+   * inlines the watcher init at 0x008149E0 and the +0x04/+0x08 fields are the
+   * watcher flag / watched-resource small-vector). The binary passes `this`
+   * (viewed as CResourceWatcher*) as the resource-lookup owner argument; the
+   * recovered CD3DDeviceResources::GetTexture ignores that slot, but it is
+   * preserved here for 1:1 fidelity with the original call.
+   */
+  void SkyDome::CreateTextures()
+  {
+    // Skip if all anchor texture lanes are already resolved.
+    if (mAtmosphereTex && mAtmosphereTex2 && mCirrusTex && mHorizonLookupTex) {
+      return;
+    }
+
+    // SkyDome shares CResourceWatcher's layout (watcher init is inlined into
+    // the SkyDome constructor); use the typed watcher view for the tracked-
+    // resource flush and for the resource-lookup owner argument.
+    auto* const watcher = reinterpret_cast<CResourceWatcher*>(this);
+
+    // When this watcher already tracks resources, flush/re-register them with
+    // the resource manager (mirrors ~CResourceWatcher's watched-vector guard).
+    if (watcher->mWatchedBegin != watcher->mWatchedEnd) {
+      if (ResourceManager* const manager = RES_GetResourceManager(); manager != nullptr) {
+        manager->ManageWatchedResources(watcher);
+      }
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+
+    const int lookupOwner = reinterpret_cast<int>(watcher);
+
+    // Each texture: resolve the resource by path (with fallback), then extract
+    // its base GAL texture into the destination lane. Path -> lane mapping is
+    // taken verbatim from the store offsets in FUN_00817850.
+    const auto loadTexture =
+      [&](const msvc8::string& path, boost::shared_ptr<gpg::gal::TextureD3D9>& lane) {
+        ID3DDeviceResources::TextureResourceHandle textureResource;
+        resources->GetTexture(textureResource, path.c_str(), lookupOwner, true);
+        textureResource->GetTexture(lane);
+      };
+
+    loadTexture(mAtmosphereTexPath, mAtmosphereTex);    // 0x7C  -> 0x1CC
+    loadTexture(mHorizonLookupPath, mHorizonLookupTex); // 0x5C  -> 0x1B0
+    loadTexture(mAtmosphereTexPath2, mAtmosphereTex2);  // 0x98  -> 0x1D4
+    loadTexture(mDecalTexPath3, mDecalTex3);            // 0xF8  -> 0x1FC
+    loadTexture(mDecalTexPath1, mDecalTex1);            // 0xC0  -> 0x1EC
+    loadTexture(mDecalTexPath2, mDecalTex2);            // 0xDC  -> 0x1F4
+    loadTexture(mCirrusTexPath, mCirrusTex);            // 0x124 -> 0x214
   }
 
   /**

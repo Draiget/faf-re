@@ -73,7 +73,12 @@ void CMauiMesh::Frame(float) {}
 // link error); removed.
 // SMassInfo::MemberDeserialize / MemberSerialize recovered in
 // src/sdk/moho/sim/SMassInfo.cpp (matches FUN_00593030 / FUN_00593080).
-void SkyDome::CreateTextures() {}
+// SkyDome::CreateTextures is recovered 1:1 in
+// src/sdk/moho/render/SkyDome.cpp (matches FUN_00817850,
+// ?CreateTextures@SkyDome@Moho@@AAEXXZ) — the real dome texture-load pass that
+// resolves all seven dome/decal/cirrus textures from the D3D device resources
+// and extracts each base GAL texture into the matching texture lane. The empty
+// {} stub here was a false recovery; removed.
 
 // ===== Virtual destructors =====
 // CAiAttackerImpl::~CAiAttackerImpl is recovered in CAiAttackerImpl.cpp
