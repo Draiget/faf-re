@@ -60011,6 +60011,21 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       RenderCompositeTerrain(terrain);
     }
 
+    // Rebuild the global mesh-renderer batch map for this frame/view before the
+    // mesh draw passes below. Binary (WRenViewport::Render @0x007F90D0, the
+    // GetInstance+Batch pair at 0x007F9452..0x007F9478) invokes it as
+    //   MeshRenderer::Batch(instance, sCurGameTick, sDeltaFrame,
+    //                       *viewport->mCam, viewport->mCam->viewport.r[1]);
+    // The Vector4f fade-plane arg is the second row of the camera viewport
+    // matrix (mCam + 0x294 = viewport @0x284 + 0x10 = r[1]).
+    moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
+    meshRenderer->Batch(
+      moho::REN_GetGameTick(),
+      moho::REN_GetSimDeltaSeconds(),
+      *runtime->mCam,
+      runtime->mCam->viewport.r[1]
+    );
+
     RenderReflections();
     RenderMeshes(0x14, false);
     RenderEffects(true);
