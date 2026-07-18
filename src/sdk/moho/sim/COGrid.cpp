@@ -1049,6 +1049,101 @@ namespace moho
   }
 
   /**
+   * Address: 0x00721340 (FUN_00721340, Moho::COGrid::UnitIsBlocked)
+   *
+   * IDA signature:
+   * char __thiscall Moho::COGrid::UnitIsBlocked(
+   *   Moho::SOCellPos* this, Moho::COGrid* a2, Moho::Unit* a3, int mode);
+   *
+   * What it does:
+   * See the header declaration — footprint-AABB gather + per-candidate oriented
+   * box intersection, first confirmed blocker wins.
+   */
+  bool COGrid::UnitIsBlocked(const SOCellPos& cellPos, COGrid& grid, Unit* const unit, const int mode)
+  {
+    // Query unit footprint drives both the gather AABB span and the later
+    // oriented-box half-extents.
+    const SFootprint& queryFootprint = unit->GetFootprint();
+    const std::uint8_t sizeX = queryFootprint.mSizeX;
+    const std::uint8_t sizeZ = queryFootprint.mSizeZ;
+    const std::uint8_t maxSpan = (sizeX <= sizeZ) ? sizeZ : sizeX;
+
+    Wm3::AxisAlignedBox3f box{};
+    box.Min.x = static_cast<float>(cellPos.x);
+    box.Max.x = static_cast<float>(cellPos.x + maxSpan);
+    box.Min.y = -1000.0f;
+    box.Max.y = 1000.0f;
+    box.Min.z = static_cast<float>(cellPos.z);
+    box.Max.z = static_cast<float>(cellPos.z + maxSpan);
+
+    CollisionResultFastVectorN10 nearbyUnits{};
+    GatherUnmarkedUnitsInBox(grid, box, nearbyUnits);
+
+    for (const CollisionResult& hit : nearbyUnits) {
+      Entity* const source = hit.sourceEntity;
+      Unit* const candidate = source ? source->IsUnit() : nullptr;
+      if (candidate == nullptr) {
+        continue;
+      }
+
+      const ELayer candidateLayer = candidate->mCurrentLayer;
+      if (candidateLayer == LAYER_Land) {
+        // Land candidate: skip only when the query ignores structures but the
+        // candidate does not (asymmetric ignore); otherwise run the pair test.
+        const bool queryIgnoresStructures =
+          (static_cast<std::uint8_t>(unit->GetFootprint().mFlags) &
+           static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
+        const bool candidateIgnoresStructures =
+          (static_cast<std::uint8_t>(candidate->GetFootprint().mFlags) &
+           static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
+        if (queryIgnoresStructures && !candidateIgnoresStructures) {
+          continue;
+        }
+      } else if (candidateLayer == LAYER_Air || candidateLayer == LAYER_Sub) {
+        // Airborne / submerged candidates never block a footprint placement.
+        continue;
+      }
+
+      Unit* const other = candidate->IsUnit();
+      const bool formationDiffers =
+        unit->IsUnitState(UNITSTATE_Attacking) || other->IsUnitState(UNITSTATE_Attacking) ||
+        unit->mInfoCache.mFormationLayer == nullptr ||
+        unit->mInfoCache.mFormationLayer != other->mInfoCache.mFormationLayer;
+      if (!formationDiffers || func_IsSourceUnit(mode, *unit, other)) {
+        continue;
+      }
+
+      // Immobile / tiny-footprint candidates block outright.
+      if (!other->IsMobile()) {
+        return true;
+      }
+      if (other->GetMaxFootprintSize() <= 1) {
+        return true;
+      }
+
+      // Precise oriented-box intersection using the query unit's footprint
+      // half-extents (X, 1000, Z), centered on the query box XZ midpoint.
+      const Wm3::Vector3f boxCenter{(box.Max.x + box.Min.x) * 0.5f, 0.0f, (box.Max.z + box.Min.z) * 0.5f};
+      const Wm3::Box3f queryBox(
+        boxCenter,
+        Wm3::Vector3f{1.0f, 0.0f, 0.0f},
+        Wm3::Vector3f{0.0f, 1.0f, 0.0f},
+        Wm3::Vector3f{0.0f, 0.0f, 1.0f},
+        static_cast<float>(queryFootprint.mSizeX) * 0.5f,
+        1000.0f,
+        static_cast<float>(queryFootprint.mSizeZ) * 0.5f
+      );
+
+      CollisionPairResult pairResult{};
+      if (other->Intersects(queryBox, &pairResult)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Address: 0x00721FB0 (FUN_00721FB0, Moho::COGrid::ForAllEntitiesIterator)
    *
    * What it does:

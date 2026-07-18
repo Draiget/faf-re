@@ -15,6 +15,8 @@
 namespace moho
 {
   class Entity;
+  class Unit;
+  struct SOCellPos;
   struct EntityCollisionCellSpan;
   class Sim;
 
@@ -237,6 +239,22 @@ namespace moho
       EEntityType flags,
       const Wm3::Sphere3f& sphere
     );
+
+    /**
+     * Address: 0x00721340 (FUN_00721340, Moho::COGrid::UnitIsBlocked)
+     *
+     * IDA signature:
+     * char __thiscall Moho::COGrid::UnitIsBlocked(
+     *   Moho::SOCellPos* this, Moho::COGrid* a2, Moho::Unit* a3, int mode);
+     *
+     * What it does:
+     * Tests whether `unit`'s footprint placed at `cellPos` on this occupation
+     * grid collides with a nearby mobile unit that is not an ignorable "source"
+     * unit (per `func_IsSourceUnit(mode, ...)`). Builds a footprint-sized world
+     * AABB at the cell, gathers candidate units in it, and for each real
+     * blocker performs a precise oriented-box (`Box3f`) intersection test.
+     */
+    [[nodiscard]] static bool UnitIsBlocked(const SOCellPos& cellPos, COGrid& grid, Unit* unit, int mode);
   };
 
   static_assert(offsetof(COGrid, mEntityOccupationManager) == 0x04, "COGrid::mEntityOccupationManager offset must be 0x04");
