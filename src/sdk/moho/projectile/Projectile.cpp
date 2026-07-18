@@ -1,5 +1,6 @@
 #include "moho/projectile/Projectile.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <new>
@@ -10,13 +11,25 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/projectile/CProjectileAttributes.h"
 #include "moho/projectile/ProjectileStartupRegistrations.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CRandomStream.h"
 #include "moho/sim/EImpactTypeTypeInfo.h"
+#include "moho/sim/SPhysConstants.h"
 #include "moho/sim/Sim.h"
+#include "moho/task/CTask.h"
+#include "moho/task/CTaskThread.h"
+#include "moho/unit/core/Unit.h"
 
 namespace gpg
 {
@@ -277,6 +290,33 @@ namespace
     auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(broadcaster);
     weakLink.UnlinkFromOwnerChain();
   }
+
+  // Pops (and, when not auto-owned, destroys) the top task off the entity's own
+  // CTask-subobject owner thread. Mirrors the inline teardown the projectile ctor
+  // performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C and
+  // 0x0069BD23-0069BD47). The `[ebp+40h]` receiver is the Entity's CTask subobject
+  // `mOwnerThread` (CTask base at Entity+0x34, mOwnerThread at +0x0C -> Entity+0x40).
+  void PopOwnedTaskThreadTop(moho::Entity* const entity) noexcept
+  {
+    moho::CTaskThread* const thread = static_cast<moho::CTask*>(entity)->mOwnerThread;
+    if (thread == nullptr) {
+      return;
+    }
+
+    moho::CTask* const task = thread->mTaskTop;
+    if (task == nullptr) {
+      return;
+    }
+
+    thread->mTaskTop = task->mSubtask;
+    const bool autoOwned = task->mAutoDelete;
+    task->mSubtask = nullptr;
+    task->mOwnerThread = nullptr;
+    if (!autoOwned) {
+      // Binary calls the task's scalar-deleting destructor lane (`dtr(this, 1)`).
+      delete task;
+    }
+  }
 } // namespace
 
 namespace moho
@@ -339,6 +379,366 @@ namespace moho
     view.mImpactType = IMPACT_Air;
     view.mAttributes = CProjectileAttributes();
     view.mUnknownTailFlag = false;
+  }
+
+  namespace
+  {
+    // Randomized physics scalar: base + symmetric random in [-range, +range].
+    // The binary inlines the (-range) + ((range - (-range)) * u32 * 2^-32) form
+    // for turn-rate / max-speed / acceleration / lifetime / draw-scale /
+    // scale-velocity; keep the exact arithmetic instead of calling the blueprint
+    // GetRandom* helpers (the binary does not call them here).
+    [[nodiscard]] float RandomSymmetricAround(CRandomStream* const rng, const float base, const float range) noexcept
+    {
+      const float randomBits = static_cast<float>(rng->twister.NextUInt32());
+      return (-range) + ((range - (-range)) * randomBits * 2.3283064e-10f) + base;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0069AFE0 (FUN_0069AFE0, Moho::Projectile::Projectile)
+   * Mangled: ??0Projectile@Moho@@QAE@PBVRProjectileBlueprint@1@PAVSim@1@PAVSimArmy@1@PAVEntity@1@VVTransform@1@MMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVCAiTarget@1@_N@Z
+   *
+   * IDA signature:
+   * Moho::Projectile *__thiscall Moho::Projectile::Projectile(
+   *     Moho::Sim *sim, Moho::Projectile *this, Moho::RProjectileBlueprint *blueprint,
+   *     Moho::CArmyImpl *army, Moho::Entity *entity, struct_VecQuat posori,
+   *     float damage, int a14, std::string a15, Moho::CAiTarget *a16, int a17);
+   *
+   * What it does:
+   * Constructs one live projectile from runtime launch parameters: reserves a
+   * projectile-family entity id in the owning army's source-index lane, runs the
+   * base Entity ctor, seeds randomized physics lanes (turn / max-speed / accel /
+   * lifetime / draw-scale / scale-velocity) from blueprint spread ranges, splices
+   * the launcher and target weak links, computes launch velocity (realistic-
+   * ordinance inherits launcher velocity + optional bomb-drop prediction, else a
+   * quaternion forward vector scaled by a random initial speed), writes the
+   * current / previous / pending transforms, links into the Sim coord list,
+   * selects the initial layer (Air / below-water), fires OnPreCreate /
+   * OnLayerChange / OnCreate scripts, applies the mesh, and self-destructs when
+   * spawned below water with mDestroyOnWater set.
+   */
+  Projectile::Projectile(
+    const RProjectileBlueprint* const blueprint,
+    Sim* const sim,
+    CArmyImpl* const army,
+    Entity* const sourceEntity,
+    const VTransform& launchTransform,
+    const float damage,
+    const float damageRadius,
+    const msvc8::string& damageTypeName,
+    const CAiTarget& target,
+    const bool isChildProjectile
+  )
+    // Reserve a projectile-family id in this army's source-index lane (index 255
+    // when unowned); the base ctor installs it and the projectile collision bucket.
+    : Entity(
+        const_cast<RProjectileBlueprint*>(blueprint),
+        sim,
+        static_cast<EntId>(sim->mEntityDB->DoReserveId(
+          ((static_cast<std::uint32_t>(army == nullptr ? 255 : army->ArmyId) | 0x100u) << kEntityIdSourceShift)
+        )),
+        kProjectileCollisionBucketFlags
+      )
+  {
+    auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
+
+    // Impact-broadcaster storage (+0x270) cleared to two null dwords.
+    view.mImpactEventBroadcaster = {};
+
+    AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), 1L);
+
+    // Launcher weak link (+0x278): raw splice to the source entity's owner chain
+    // head. The binary binds unlinked + head-inserts here (fresh storage, no
+    // detach), then re-Sets to the resolved launcher further below.
+    if (sourceEntity != nullptr) {
+      view.mLauncherWeak.BindObjectUnlinked(sourceEntity);
+      (void)view.mLauncherWeak.LinkIntoOwnerChainHeadUnlinked();
+    } else {
+      view.mLauncherWeak.ClearLinkState();
+    }
+
+    CRandomStream* const rng = sim->mRngState;
+
+    view.mVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    view.mLocalAngularVelocity = blueprint->GetAngularVelocity(rng);
+
+    view.mImpactInterpolation = kProjectileUnsetValue; // flt_E4F6E8 == -1.0
+
+    view.mCollideSurface = blueprint->Physics.CollideSurface != 0;
+    view.mDoCollision = blueprint->Physics.CollideEntity != 0;
+    view.mTrackTarget = blueprint->Physics.TrackTarget != 0;
+    view.mVelocityAlign = blueprint->Physics.VelocityAlign != 0;
+    view.mStayUpright = blueprint->Physics.StayUpright != 0;
+    view.mLeadTarget = blueprint->Physics.LeadTarget != 0;
+    view.mStayUnderwater = blueprint->Physics.StayUnderwater != 0;
+    view.mDestroyOnWater = blueprint->Physics.DestroyOnWater != 0;
+
+    view.mTurnRateDegrees = RandomSymmetricAround(rng, blueprint->Physics.TurnRate, blueprint->Physics.TurnRateRange);
+    view.mMaxSpeed = RandomSymmetricAround(rng, blueprint->Physics.MaxSpeed, blueprint->Physics.MaxSpeedRange);
+    view.mAcceleration = RandomSymmetricAround(rng, blueprint->Physics.Acceleration, blueprint->Physics.AccelerationRange);
+
+    // Ballistic acceleration = UseGravity(0/1) * sim gravity vector.
+    {
+      const Wm3::Vector3f& gravity = sim->mPhysConstants->mGravity;
+      const float useGravity = static_cast<float>(blueprint->Physics.UseGravity);
+      view.mBallisticAcceleration =
+        Wm3::Vector3f{useGravity * gravity.x, useGravity * gravity.y, useGravity * gravity.z};
+    }
+
+    view.mDamage = damage;
+    view.mDamageRadius = damageRadius;
+    view.mDamageTypeName = damageTypeName;
+
+    // Inline CAiTarget copy from `target` (asm 0x0069B2EB-0069B33B): payload copy
+    // plus target-entity weak-link splice (bind source's object slot, head-insert).
+    view.mTargetPosData.targetType = target.targetType;
+    view.mTargetPosData.targetEntity.BindObjectUnlinked(target.targetEntity.GetObjectPtr());
+    (void)view.mTargetPosData.targetEntity.LinkIntoOwnerChainHeadUnlinked();
+    view.mTargetPosData.position = target.position;
+    view.mTargetPosData.targetPoint = target.targetPoint;
+    view.mTargetPosData.targetIsMobile = target.targetIsMobile;
+
+    // Runtime-lane defaults (asm zero-init block 0x0069B33E-0069B432).
+    view.mUnknownVelocityVector = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    view.mUnknownTrajectoryFlag = false;
+    view.mImpactPosition = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    view.mUnknownEntityWeak.ClearLinkState();
+    view.mBounceLimit = 0;
+    view.mGroundTick = 0;
+    view.mBelowWater = false;
+    view.mDirectAwayFromGround = false;
+    view.mGroundDirection = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    view.mBounceVelocityDamping = blueprint->Physics.BounceVelDamp;
+    view.mUnknownBounceCount = 0;
+    view.mUnknownGroundVector = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    view.mImpactType = IMPACT_Air;
+
+    view.mAttributes.mBlueprint = const_cast<RProjectileBlueprint*>(blueprint);
+    view.mAttributes.mMaxZigZag = kProjectileUnsetValue;
+    view.mAttributes.mZigZagFrequency = kProjectileUnsetValue;
+    view.mAttributes.mDetonateAboveHeight = kProjectileUnsetValue;
+    view.mAttributes.mDetonateBelowHeight = kProjectileUnsetValue;
+
+    view.mUnknownTailFlag = isChildProjectile;
+
+    // Lifetime end tick = curTick + int((Physics.Lifetime + rand(±LifetimeRange)) * 10).
+    {
+      const float lifetimeSeconds =
+        RandomSymmetricAround(rng, blueprint->Physics.Lifetime, blueprint->Physics.LifetimeRange);
+      const std::uint32_t curTick = SimulationRef->mCurTick;
+      view.mLifetimeEnd =
+        curTick + static_cast<std::uint32_t>(static_cast<std::int32_t>(lifetimeSeconds * 10.0f));
+    }
+
+    // Resolve the launcher: chase through a projectile source to its own launcher.
+    Entity* resolvedLauncher = sourceEntity;
+    if (sourceEntity != nullptr && sourceEntity->IsProjectile() != nullptr) {
+      resolvedLauncher = sourceEntity->IsProjectile()->GetLauncherEntity();
+    }
+    view.mLauncherWeak.Set(resolvedLauncher);
+
+    mQueueRelinkBlocked = 1;   // v3a (Entity+0x1B8)
+    mVisibilityState = 1;      // mVarDat.mNotVisibility (Entity+0x110)
+    this->RunScript("OnPreCreate");
+
+    // Bounce count uniform pick in [MinBounceCount, MaxBounceCount).
+    {
+      const std::int32_t minBounce = blueprint->Physics.MinBounceCount;
+      const std::int32_t maxBounce = blueprint->Physics.MaxBounceCount;
+      const std::uint32_t randomBits = rng->twister.NextUInt32();
+      const std::uint32_t scaled = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(static_cast<std::uint32_t>(maxBounce - minBounce)) *
+         static_cast<std::uint64_t>(randomBits)) >> 32
+      );
+      view.mBounceLimit = minBounce + static_cast<std::int32_t>(scaled);
+    }
+
+    // Launch velocity.
+    Entity* const launcherEntity = view.mLauncherWeak.GetObjectPtr();
+    if (blueprint->Physics.RealisticOrdinance != 0 && launcherEntity != nullptr) {
+      // Inherit the launcher's velocity (scaled to per-tick units).
+      const Wm3::Vec3f launcherVelocity = launcherEntity->GetVelocity();
+      view.mVelocity = Wm3::Vector3f{
+        launcherVelocity.x * 10.0f,
+        launcherVelocity.y * 10.0f,
+        launcherVelocity.z * 10.0f,
+      };
+
+      if (view.mTargetPosData.HasTarget() && launcherEntity->IsUnit() != nullptr) {
+        Wm3::Vec3f aimPoint = view.mTargetPosData.GetTargetPosGun(false);
+
+        Unit* const launcherUnit = launcherEntity->IsUnit();
+        if (launcherUnit->GetBlueprint()->Air.PredictAheadForBombDrop > 0.0f && target.targetIsMobile) {
+          Unit* const predictUnit = launcherEntity->IsUnit();
+          const float precision = predictUnit->GetBlueprint()->Air.PredictAheadForBombDrop;
+          Entity* const targetEntity = view.mTargetPosData.GetEntity();
+          Wm3::Vec3f predicted{};
+          (void)targetEntity->IsUnit()->PredictAheadBomb(&predicted, precision);
+          aimPoint = predicted;
+        }
+
+        // Steer the inherited horizontal velocity toward the aim point relative
+        // to the launcher, preserving the inherited speed. The Y lane is left
+        // untouched (steer vector's Y is forced to 0 before VecSetLength).
+        Wm3::Vector3f steerHorizontal{
+          aimPoint.x - launcherEntity->Position.x,
+          0.0f,
+          aimPoint.z - launcherEntity->Position.z,
+        };
+        const float inheritedSpeed = std::sqrt(
+          (view.mVelocity.x * view.mVelocity.x) +
+          (view.mVelocity.y * view.mVelocity.y) +
+          (view.mVelocity.z * view.mVelocity.z)
+        );
+        (void)moho::VecSetLength(&steerHorizontal, inheritedSpeed);
+
+        view.mVelocity.x += (steerHorizontal.x - view.mVelocity.x);
+        view.mVelocity.y += (steerHorizontal.y - view.mVelocity.y);
+        view.mVelocity.z += (steerHorizontal.z - view.mVelocity.z);
+      }
+
+      // Lateral jitter driven by the entity's collision-bounds Z extent
+      // (Entity+0x248 == mCollisionBoundsMin.z): if positive, jitter X and Z.
+      const float jitter = mCollisionBoundsMin.z;
+      if (jitter > 0.0f) {
+        view.mVelocity.x += rng->FRand(-jitter, jitter);
+        view.mVelocity.z += rng->FRand(-jitter, jitter);
+      }
+    } else {
+      // Ballistic forward direction derived from the launch quaternion, scaled by
+      // a random initial speed (asm 0x0069B85F-0069B918). The ARITHMETIC below is
+      // transcribed 1:1 from the .asm (movaps/mulss/addss/subss chain, *flt_DFEB0C
+      // == *2.0), and the result-lane store order (mVelocity.x/y/z <- result.y /
+      // result.z / var_10 each * GetRandomInitialSpeed) is confirmed.
+      //
+      /* UNRESOLVED: exact launchTransform lane -> (qx,qy,qz,qw) mapping for the
+       * ballistic branch, asm 0x0069B55C-0x0069B56E. IDA names the four input
+       * stack slots (x, y, z, qx) but they do NOT line up cleanly with the
+       * VTransform value-arg's 7 floats (posori occupies frame slots +0x00..+0x1B;
+       * the `z`/`qx` slots read here fall at +0x1C/+0x20, past posori's end), so the
+       * decompiler's `posori.orient.x` / `posori.pos.*` labels are unreliable here.
+       * The quaternion->forward algebra below assumes the standard
+       * (x,y,z,w) = orient_.(x,y,z,w) mapping; VERIFY the precise slot->field
+       * binding against a live frame trace before trusting the launch DIRECTION for
+       * non-realistic-ordinance projectiles. The realistic-ordinance path (the
+       * common weapon case) is unaffected. */
+      const float qx = launchTransform.orient_.x;
+      const float qy = launchTransform.orient_.y;
+      const float qz = launchTransform.orient_.z;
+      const float qw = launchTransform.orient_.w;
+
+      const float forwardY = ((qx * qy) + (qz * qw)) * 2.0f;
+      const float forwardZ = ((qx * qz) - (qy * qw)) * 2.0f;
+      const float forwardX = 1.0f - (((qz * qz) + (qy * qy)) * 2.0f);
+
+      const float initialSpeed = blueprint->GetRandomInitialSpeed(rng);
+      view.mVelocity = Wm3::Vector3f{forwardY * initialSpeed, forwardZ * initialSpeed, forwardX * initialSpeed};
+    }
+
+    // Draw scale = Display.UniformScale + rand(±Display.MeshScaleRange).
+    {
+      const float scale =
+        RandomSymmetricAround(rng, blueprint->Display.UniformScale, blueprint->Display.MeshScaleRange);
+      mDrawScaleX = scale;
+      mDrawScaleY = scale;
+      mDrawScaleZ = scale;
+    }
+
+    // Splice the coord node into Sim::mCoordEntities (ListLinkBefore == tail insert;
+    // it self-unlinks first, matching the binary's self-init + list-tail insert).
+    mCoordNode.ListLinkBefore(&sim->mCoordEntities);
+
+    // Scale velocity = Display.MeshScaleVelocity + rand(±Display.MeshScaleVelocityRange).
+    {
+      const float scaleVelocity = RandomSymmetricAround(
+        rng, blueprint->Display.MeshScaleVelocity, blueprint->Display.MeshScaleVelocityRange
+      );
+      view.mScaleVelocity = Wm3::Vector3f{scaleVelocity, scaleVelocity, scaleVelocity};
+    }
+
+    // Write current / previous / pending transforms verbatim from the launch
+    // transform. Orientation is copied as the raw quaternion tuple (m_afTuple order
+    // w,x,y,z) to match the binary's straight 4-float lane copy.
+    const Vector4f launchOrientation{
+      launchTransform.orient_[0],
+      launchTransform.orient_[1],
+      launchTransform.orient_[2],
+      launchTransform.orient_[3],
+    };
+    PendingOrientation = launchOrientation;
+    PendingPosition = launchTransform.pos_;
+    Orientation = launchOrientation;
+    Position = launchTransform.pos_;
+    PrevOrientation = launchOrientation;
+    PrevPosition = launchTransform.pos_;
+
+    bool skipLayerAndMesh = false;
+    if (view.mTrackTarget) {
+      if (view.mTargetPosData.HasTarget()) {
+        // v207 (mUnknownTrajectoryFlag) := 1 unless the target's current layer is
+        // Air (0x10) or Sub (0x04).
+        Entity* const trackedEntity = view.mTargetPosData.targetEntity.GetObjectPtr();
+        if (trackedEntity != nullptr) {
+          const ELayer trackedLayer = trackedEntity->mCurrentLayer;
+          if (trackedLayer != LAYER_Air && trackedLayer != LAYER_Sub) {
+            view.mUnknownTrajectoryFlag = true;
+          }
+        }
+        const Wm3::Vec3f gunPos = view.mTargetPosData.GetTargetPosGun(false);
+        view.mUnknownVelocityVector = Wm3::Vector3f{gunPos.x, gunPos.y, gunPos.z};
+      } else {
+        // Tracking with no live target: destroy immediately and skip layer/mesh.
+        this->Destroy();
+        PopOwnedTaskThreadTop(this);
+        skipLayerAndMesh = true;
+      }
+    }
+
+    if (!skipLayerAndMesh) {
+      // Initial layer selection from map water level vs launch height (pos.y).
+      const float currentHeight = launchTransform.pos_.y;
+      STIMap* const mapData = SimulationRef->mMapData;
+      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      const ELayer previousLayer = mCurrentLayer;
+
+      if (waterElevation <= currentHeight) {
+        mCurrentLayer = LAYER_Air;
+        if (previousLayer != LAYER_Air) {
+          const char* newLayerName = Entity::LayerToString(LAYER_Air);
+          const char* oldLayerName = Entity::LayerToString(previousLayer);
+          this->CallbackStr("OnLayerChange", &newLayerName, &oldLayerName);
+        }
+      } else {
+        view.mBelowWater = true;
+        mCurrentLayer = LAYER_Water;
+        if (previousLayer != LAYER_Water) {
+          const char* newLayerName = Entity::LayerToString(LAYER_Water);
+          const char* oldLayerName = Entity::LayerToString(previousLayer);
+          this->CallbackStr("OnLayerChange", &newLayerName, &oldLayerName);
+        }
+      }
+
+      this->SetMesh(blueprint->Display.MeshBlueprint, nullptr, true);
+
+      if (view.mBelowWater && view.mDestroyOnWater) {
+        this->Destroy();
+        PopOwnedTaskThreadTop(this);
+      } else {
+        this->RunScriptWithBool("OnCreate", view.mBelowWater);
+      }
+
+      /* UNRESOLVED: camera-follow sync-vector push, asm 0x0069BD56-0x0069BD8E.
+       * When Display.CameraFollowsProjectile != 0 the binary pushes a 12-byte lane
+       * {this->id_, <sim field @ +0x68>, Display.CameraFollowTimeout} into
+       * SimulationRef->mSyncSerializeGroup1 (Sim+0x9B8) via sub_69E6D0. The only
+       * recovered expression of this push is the offset-magic helper
+       * AppendProjectileLaneFromOwnerOffsetRuntime in SimRecoveryRuntime.cpp, which
+       * is outside this task's editable file set, and the lane's middle field
+       * (read as [ecx+0x68]) is not yet identified. Omitted rather than fabricating
+       * raw offset arithmetic; wire to the recovered Sim sync-push helper in a
+       * follow-up pass. */
+    }
   }
 
   /**

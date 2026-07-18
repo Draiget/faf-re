@@ -119,10 +119,13 @@ SkyDome::~SkyDome() {}
 
 CameraImpl::CameraImpl(gpg::StrArg, const STIMap&, LuaPlus::LuaState*) {}
 
-Projectile::Projectile(
-    const RProjectileBlueprint*, Sim* sim, CArmyImpl*, Entity*,
-    const VTransform&, float, float, const msvc8::string&,
-    const CAiTarget&, bool)
-    : Entity(sim, 0u) {}
+// Projectile::Projectile(const RProjectileBlueprint*, Sim*, CArmyImpl*, Entity*,
+// const VTransform&, float, float, const msvc8::string&, const CAiTarget&, bool)
+// is recovered 1:1 in src/sdk/moho/projectile/Projectile.cpp (matches
+// FUN_0069AFE0) — the real runtime launch ctor that reserves the entity id, seeds
+// randomized physics lanes, splices launcher/target weak links, computes launch
+// velocity, writes transforms, links into the Sim coord list, selects the layer,
+// and fires the create scripts. The former `: Entity(sim, 0u) {}` empty stub was a
+// false recovery (initialized nothing); removed.
 
 } // namespace moho
