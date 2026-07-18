@@ -54,7 +54,12 @@ void ICommandSink::EndGame() {}
 
 // ===== Misc instance methods =====
 void CMauiMesh::Frame(float) {}
-void CRenFrame::Render(int, int) {}
+// CRenFrame::Render is recovered 1:1 in
+// src/sdk/moho/render/CRenFrame.cpp (matches FUN_007F6030) — the real
+// frame/bloom post-process pass that selects the "frame" effect, binds the
+// four frame render targets plus blur/glow/width/height/viewport shader
+// variables, and issues the full-screen triangle-strip draw. The former empty
+// {} stub here was a false recovery; removed.
 // CameraImpl::Frame is fully recovered in
 // src/sdk/moho/render/camera/CameraImpl.cpp (matches FUN_007A9030). The real
 // body drives UpdateTargets / UpdateBasis / InterpolateBasis / UpdateCoords /
