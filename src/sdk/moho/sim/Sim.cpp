@@ -29152,6 +29152,206 @@ namespace moho
     session->DirtyCommandGraph();
   }
 
+namespace
+{
+  // Process-global `AI_DebugCollision` sim convar singleton (statically
+  // constructed at .data 0x010AD5F8). When set, `Sim::DoCollisionsFor` skips
+  // physical collision resolution so the collision overlay can be inspected.
+  // Same fixed-address accessor pattern as `moho::console::Sim*ConVar()`.
+  [[nodiscard]] CSimConVarBase* AIDebugCollisionConVar() noexcept
+  {
+    constexpr std::uintptr_t kAIDebugCollisionConVarEa = 0x010AD5F8u;
+    return reinterpret_cast<CSimConVarBase*>(kAIDebugCollisionConVarEa);
+  }
+
+  // Owner "mass" proxy = blueprint average density folded over the unit's
+  // bounding-box volume (density * sizeX * sizeY * sizeZ). Used to weight the
+  // momentum split between two colliding units.
+  [[nodiscard]] float BlueprintMassProxy(const RUnitBlueprint& blueprint) noexcept
+  {
+    return blueprint.mAverageDensity * blueprint.mSizeZ * blueprint.mSizeY * blueprint.mSizeX;
+  }
+
+  // The collision-push footprint gate: `pusher` may transfer an impulse to
+  // `other` when the pusher ignores structures (FPFLAG_None), or both units are
+  // non-structural footprints (both carry FPFLAG_IgnoreStructures). Mirrors the
+  // two symmetric `Entity::GetFootprint().mFlags` tests in the binary
+  // (asm 0x598086-0x5980B8 and 0x59813E-0x59816F).
+  [[nodiscard]] bool CollisionPushAllowed(const Unit& pusher, const Unit& other) noexcept
+  {
+    const std::uint8_t pusherFlags = static_cast<std::uint8_t>(pusher.GetFootprint().mFlags);
+    const std::uint8_t otherFlags = static_cast<std::uint8_t>(other.GetFootprint().mFlags);
+    constexpr std::uint8_t kIgnoreStructures = static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures);
+    return pusherFlags == static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_None) ||
+      ((pusherFlags & kIgnoreStructures) != 0u && (otherFlags & kIgnoreStructures) != 0u);
+  }
+} // namespace
+
+/**
+ * Address: 0x00597CD0 (FUN_00597CD0, Moho::Sim::DoCollisionsFor)
+ *
+ * IDA signature:
+ * void __cdecl Moho::Sim::DoCollisionsFor(Moho::Sim *sim, Moho::Unit *unit,
+ *   gpg::fastvector_n<CollisionResult,10> *collisions);
+ *
+ * What it does:
+ * Physical surface-collision resolution for `unit` against the pre-gathered
+ * `collisions` box query. See header. The impulse math is a mass-weighted
+ * separation along the XZ plane.
+ */
+void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFastVectorN10* const collisions)
+{
+  constexpr float kMinPenetration = 0.001f;      // dword_DFF0AC
+  constexpr float kMinSeparationSq = 0.000001f;  // flt_DFFBE8 (1e-6)
+  constexpr float kMaxSpeedFactor = 0.1f;        // dbl_E4F710+4
+  constexpr float kMinPushFactor = 0.1f;         // dbl_E4F710+4 (reused as impulse-share cutoff)
+  constexpr float kHalfExtentScale = 0.5f;       // flt_E4F724
+
+  // Debug/dead/queued/naval short-circuits (asm 0x597CE4-0x597D26).
+  if (ReadSimConVarBool(sim, AIDebugCollisionConVar(), false) || owner->mIsNaval || owner->IsDead() ||
+      owner->DestroyQueued()) {
+    return;
+  }
+
+  // Owner mass proxy + a per-owner approach-speed factor: the larger of
+  // (blueprint MaxSpeed * 0.1) and the current velocity magnitude
+  // (asm 0x597D33-0x597DDA). MaxSpeed lives at blueprint Physics.MaxSpeed.
+  const RUnitBlueprint* const ownerBlueprint = owner->GetBlueprint();
+  const float ownerMass = BlueprintMassProxy(*ownerBlueprint);
+
+  const Wm3::Vec3f ownerVelocity = owner->GetVelocity();
+  const float ownerSpeed =
+    std::sqrt((ownerVelocity.x * ownerVelocity.x) + (ownerVelocity.y * ownerVelocity.y) +
+      (ownerVelocity.z * ownerVelocity.z));
+  const float maxSpeedShare = ownerBlueprint->Physics.MaxSpeed * kMaxSpeedFactor;
+  const float approachSpeed = (maxSpeedShare > ownerSpeed) ? maxSpeedShare : ownerSpeed;
+
+  for (const CollisionResult& hit : *collisions) {
+    // Skip shallow contacts and empty records (asm 0x597E2D-0x597E4A).
+    if (hit.penetrationDepth < kMinPenetration) {
+      continue;
+    }
+    Entity* const contact = hit.sourceEntity;
+    if (contact == nullptr) {
+      continue;
+    }
+
+    // Props receive their OnCollision Lua callback (self, owner, dir, depth);
+    // the "otherObject" argument is the raw first-arg (Sim) slot the binary
+    // reinterprets as a LuaObject (asm 0x597E50-0x597E9A + FUN_00598660). This
+    // is an original-source type-pun; reproduce it exactly for 1:1 behavior.
+    if (contact->IsProp() != nullptr) {
+      contact->RunScriptOnCollision(
+        *reinterpret_cast<const LuaPlus::LuaObject*>(sim),
+        hit.direction.x,
+        hit.direction.y,
+        hit.direction.z,
+        hit.penetrationDepth
+      );
+    }
+
+    // Physical resolution only applies to unit contacts (asm 0x597EA9-0x597EB9).
+    Unit* const candidate = contact->IsUnit();
+    if (candidate == nullptr) {
+      continue;
+    }
+
+    // Ignore "source" units (self/attached/air/etc.) and airborne colliders
+    // (asm 0x597EBF-0x597ED9). mode 2 = blocker/collision-scan policy.
+    if (func_IsSourceUnit(2, *owner, candidate) || candidate->mIsAir) {
+      continue;
+    }
+
+    // Two units executing the exact same head command are cooperating (e.g.
+    // one build order): abort the whole pass to avoid fighting them apart
+    // (asm 0x597EDF-0x597F06).
+    CUnitCommandQueue* const ownerQueue = owner->CommandQueue;
+    if (ownerQueue->GetCurrentCommand() != nullptr) {
+      CUnitCommand* const candidateCommand = candidate->CommandQueue->GetCurrentCommand();
+      if (ownerQueue->GetCurrentCommand() == candidateCommand) {
+        return;
+      }
+    }
+
+    // Only mobile colliders on a different formation layer are resolved
+    // (asm 0x597F0C-0x597F28).
+    if (!candidate->IsMobile() || owner->IsSameFormationLayerWith(candidate)) {
+      continue;
+    }
+
+    // Separation direction on the XZ plane, from the candidate's current
+    // position toward the owner's previous-frame ("last move") position. The
+    // Hex-Rays export labels the owner reference as `mVarDat.mLastTransform.pos`
+    // (asm 0x597F3A/0x597F47); AdvanceCoords (FUN_00678F10, asm 0x678F20 copy)
+    // proves `mVarDat.mLastTransform` is the Entity previous-frame transform at
+    // +0xB8 whose position lane is Entity::PrevPosition (+0xC8) — accessed by
+    // name here rather than through the export's mis-sized offsets.
+    const Wm3::Vec3f& candidatePos = candidate->GetPosition();
+    Wm3::Vector3f pushDir{};
+    pushDir.x = owner->PrevPosition.x - candidatePos.x;
+    pushDir.y = 0.0f;
+    pushDir.z = owner->PrevPosition.z - candidatePos.z;
+
+    // Coincident units get a random XZ jitter so they can still separate
+    // (asm 0x597F73-0x597FD5).
+    const float separationSq = (pushDir.z * pushDir.z) + (pushDir.x * pushDir.x);
+    if (separationSq < kMinSeparationSq) {
+      CRandomStream* const rng = sim->mRngState;
+      pushDir.x = rng->FRand(-1.0f, 1.0f);
+      pushDir.y = 0.0f;
+      pushDir.z = rng->FRand(-1.0f, 1.0f);
+    }
+    Wm3::Vector3f::Normalize(&pushDir);
+
+    // Push magnitude = max(halfMaxFootprint, penetration) + approachSpeed
+    // (asm 0x597FE4-0x59802B). halfMaxFootprint = 0.5 * max(sizeX, sizeZ).
+    float maxFootprintDim = ownerBlueprint->mSizeX;
+    if (ownerBlueprint->mSizeZ > maxFootprintDim) {
+      maxFootprintDim = ownerBlueprint->mSizeZ;
+    }
+    float pushMagnitude = maxFootprintDim * kHalfExtentScale;
+    if (hit.penetrationDepth > pushMagnitude) {
+      pushMagnitude = hit.penetrationDepth;
+    }
+    pushMagnitude += approachSpeed;
+
+    // Mass-weighted momentum split (asm 0x598031-0x59807A):
+    //   candidateShare = ownerMass / (ownerMass + candidateMass)
+    //   ownerShare     = 1 - candidateShare
+    // A heavier owner claims a larger candidateShare, shoving the candidate
+    // more while itself yielding less. The two AddImpulse branches below apply
+    // these complementary shares.
+    const float candidateMass = BlueprintMassProxy(*candidate->GetBlueprint());
+    const float candidateShare = ownerMass / (candidateMass + ownerMass);
+    const float ownerShare = 1.0f - candidateShare;
+
+    // Owner impulse (asm 0x598080-0x59811F): pushes the owner away from the
+    // candidate, scaled by pushMagnitude and the owner's share.
+    if (ownerShare > kMinPushFactor && CollisionPushAllowed(*owner, *candidate) &&
+        !owner->IsUnitState(UNITSTATE_Immobile)) {
+      const Wm3::Vector3f ownerImpulse{
+        (pushDir.x * pushMagnitude) * ownerShare,
+        (pushDir.y * pushMagnitude) * ownerShare,
+        (pushDir.z * pushMagnitude) * ownerShare,
+      };
+      owner->UnitMotion->AddImpulse(ownerImpulse, false);
+    }
+
+    // Candidate impulse (asm 0x598131-0x5981E3): pushes the candidate the
+    // opposite way (negated pushDir), scaled by pushMagnitude and the
+    // candidate's share.
+    if (candidateShare > kMinPushFactor && CollisionPushAllowed(*candidate, *owner) &&
+        !candidate->IsUnitState(UNITSTATE_Immobile)) {
+      const Wm3::Vector3f candidateImpulse{
+        (-pushDir.x * pushMagnitude) * candidateShare,
+        (-pushDir.y * pushMagnitude) * candidateShare,
+        (-pushDir.z * pushMagnitude) * candidateShare,
+      };
+      candidate->UnitMotion->AddImpulse(candidateImpulse, false);
+    }
+  }
+}
+
 /**
  * Address: 0x0062DA50 (FUN_0062DA50, ?LocationIsFree@Sim@Moho@@SA_NPAV12@PAVUnit@2@PAV?$Rect2@H@gpg@@D@Z)
  *

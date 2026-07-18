@@ -25,6 +25,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
@@ -32,6 +33,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "Wm3Box3.h"
 
 namespace gpg
 {
@@ -158,6 +160,48 @@ namespace moho
     {
       auto* const base = reinterpret_cast<std::uint8_t*>(&motion);
       return *reinterpret_cast<CUnitMotionRaisedPlatformCandidatesRuntimeView*>(base + offsetof(CUnitMotion, mPad178));
+    }
+
+    // The raised-platform candidate lane (`mPad178`, 0x60 bytes) is the
+    // binary's inline small-buffer weak-pointer vector
+    // `gpg::fastvector_n<WeakPtr<Unit>, 10>` (0x10 header + 10 * 8-byte inline
+    // slots). It is manipulated through the same push_back/grow template family
+    // (FUN_0061C5E0 / FUN_0061C750) and WeakPtr ctor/dtor (FUN_005A6DB0 /
+    // FUN_005A6DE0) as `Unit::mBlipsInRange`, so expose it as the concrete
+    // FastVectorN type and drive it with the recovered container primitives.
+    using RaisedPlatformCandidateVector = gpg::core::FastVectorN<SWeakRefSlot, 10>;
+    static_assert(sizeof(RaisedPlatformCandidateVector) == 0x60, "raised-platform candidate lane must be 0x60 bytes");
+
+    [[nodiscard]] RaisedPlatformCandidateVector& AsRaisedPlatformCandidateVector(CUnitMotion& motion) noexcept
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(&motion);
+      return *reinterpret_cast<RaisedPlatformCandidateVector*>(base + offsetof(CUnitMotion, mPad178));
+    }
+
+    /**
+     * Address: 0x00672B50 (FUN_00672B50, sub_672B50)
+     *
+     * IDA signature:
+     * int __usercall sub_672B50@<eax>(Wm3::Quaternionf *transform@<ecx>, Wm3::Box3f *outBox@<esi>, Vector3f *halfExtents);
+     *
+     * What it does:
+     * Builds one oriented bounding box centred on `transform.pos_`, whose axes
+     * are the orthonormal basis expanded from `transform.orient_` and whose
+     * per-axis extents are `halfExtents`. File-static in the binary (no mangled
+     * name); recovered here in its only caller's translation unit.
+     */
+    Wm3::Box3f* BuildOrientedBoxFromTransform(
+      const VTransform& transform,
+      Wm3::Box3f* const outBox,
+      const Wm3::Vector3f& halfExtents
+    ) noexcept
+    {
+      const VAxes3 axes{transform.orient_};
+      // VAxes3 is three contiguous orthonormal Vector3f axes (vX,vY,vZ); the
+      // binary passes &axes.vX as the Box3 axis array and &halfExtents.x as the
+      // extent array, matching the `Box3(center, const Vector3* axis, const Real* extent)` ctor.
+      *outBox = Wm3::Box3f(transform.pos_, &axes.vX, &halfExtents.x);
+      return outBox;
     }
 
     /**
@@ -1256,7 +1300,10 @@ namespace moho
     const Wm3::Vector3f zeroSteering{};
     SetTarget(transform.pos_, zeroSteering, LAYER_None);
     ReCalcCurTargetElevation(transform.pos_);
-    FindIntersectingRaisedPlatform();
+    // Binary calls ProcessSurfaceCollisionFromLastMove here (FUN_006B93D0 asm
+    // 0x6B9431), immediately resolving surface collisions against the newly
+    // warped position and rebuilding the raised-platform candidate list.
+    ProcessSurfaceCollisionFromLastMove();
 
     if (mUnit->mCurrentLayer == LAYER_Land) {
       mProcessSurfaceCollision = true;
@@ -1911,6 +1958,86 @@ namespace moho
         nearestDistanceSq = distanceSq;
         mRaisedPlatformUnit.ResetFromObject(platformUnit);
       }
+    }
+  }
+
+  /**
+   * Address: 0x006B9020 (FUN_006B9020, ?ProcessSurfaceCollisionFromLastMove@CUnitMotion@Moho@@AAEXXZ)
+   * Mangled: ?ProcessSurfaceCollisionFromLastMove@CUnitMotion@Moho@@AAEXXZ
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUnitMotion::ProcessSurfaceCollisionFromLastMove(Moho::CUnitMotion *this);
+   *
+   * What it does:
+   * Rebuilds the raised-platform candidate list and resolves surface collisions
+   * after the owner unit's last move (see header).
+   */
+  void CUnitMotion::ProcessSurfaceCollisionFromLastMove()
+  {
+    // Staggered prop-inclusion cadence: larger footprints also collide against
+    // props, but only on the beat where the unit id and sim tick agree mod 5
+    // (asm 0x6B9177-0x6B91CE). Cheap footprint gate first (0.2 = dword_E4F8A8).
+    constexpr float kHalfExtentScale = 0.5f; // flt_E4F724
+    constexpr float kPropScanFootprintThreshold = 0.2f; // dword_E4F8A8
+    constexpr std::uint32_t kPropScanTickPeriod = 5u;
+
+    const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+
+    // Clear the previous raised-platform candidate lane: unlink every weak node
+    // from its owner chain, release escaped heap storage, and rebind to inline
+    // storage (asm 0x6B9055-0x6B908A; sub_61CA70 + delete[] + reset-to-inline).
+    RaisedPlatformCandidateVector& candidates = AsRaisedPlatformCandidateVector(*this);
+    UnlinkWeakPtrRangeWithoutClearing(
+      reinterpret_cast<WeakPtr<void>*>(candidates.begin()),
+      reinterpret_cast<WeakPtr<void>*>(candidates.end())
+    );
+    candidates.ResetStorageToInline();
+
+    // Only land/water surface units re-snap here: skip air, submerged, dead,
+    // being-built, attached, can-fly, and actively-pushed units
+    // (asm 0x6B908D-0x6B90F0).
+    const ELayer layer = mUnit->mCurrentLayer;
+    if (layer == LAYER_Air || layer == LAYER_Sub || mUnit->IsDead() || mUnit->IsBeingBuilt() ||
+        mUnit->IsUnitState(UNITSTATE_Attached) || blueprint->Air.CanFly != 0u || mIsBeingPushed) {
+      return;
+    }
+
+    // Oriented collision box over the unit footprint: half-extents are
+    // (sizeX/2, sizeY, sizeZ/2) — the vertical extent is the full blueprint
+    // height (asm 0x6B90F6-0x6B9147).
+    Wm3::Vector3f halfExtents{};
+    halfExtents.x = blueprint->mSizeX * kHalfExtentScale;
+    halfExtents.y = blueprint->mSizeY;
+    halfExtents.z = blueprint->mSizeZ * kHalfExtentScale;
+
+    Wm3::Box3f box{};
+    BuildOrientedBoxFromTransform(mUnit->GetTransform(), &box, halfExtents);
+
+    // Gather colliders in the box: units always, and props too on the staggered
+    // beat for larger units (asm 0x6B914C-0x6B920C).
+    Sim* const sim = mUnit->SimulationRef;
+    CollisionResultFastVectorN10 hits{};
+    const bool includeProps =
+      (blueprint->mSizeX * blueprint->mSizeZ) > kPropScanFootprintThreshold &&
+      (static_cast<std::uint32_t>(mUnit->GetEntityId()) % kPropScanTickPeriod) ==
+        (sim->mCurTick % kPropScanTickPeriod);
+    const EEntityType gatherFlags =
+      includeProps ? static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop) : ENTITYTYPE_Unit;
+    sim->mOGrid->CollectEntitiesInBox(hits, gatherFlags, box);
+
+    if (hits.begin() == hits.end()) {
+      return;
+    }
+
+    // Resolve the physical collisions, then record every hit unit as a weak
+    // raised-platform candidate (asm 0x6B9211-0x6B92B6). The push mirrors
+    // Unit::mBlipsInRange: construct WeakPtr<Unit>(entity) and push_back it
+    // through the FastVectorN weak-element grow lane (sub_5A6DB0 + sub_61C5E0).
+    Sim::DoCollisionsFor(sim, mUnit, &hits);
+
+    for (const CollisionResult& hit : hits) {
+      WeakPtr<Unit> candidateRef(reinterpret_cast<Unit*>(hit.sourceEntity));
+      candidates.push_back(reinterpret_cast<const SWeakRefSlot&>(candidateRef));
     }
   }
 

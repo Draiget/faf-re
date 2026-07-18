@@ -12,6 +12,7 @@
 #include "legacy/containers/Deque.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/render/RDebugOverlay.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/SSTICommandSource.h"
@@ -174,6 +175,25 @@ namespace moho
      * (no active head command) are treated as blockers.
      */
     [[nodiscard]] static bool LocationIsFree(Sim* sim, Unit* ignore, gpg::Rect2i* loc, char requireIdle);
+
+    /**
+     * Address: 0x00597CD0 (FUN_00597CD0, Moho::Sim::DoCollisionsFor)
+     *
+     * IDA signature:
+     * void __cdecl Moho::Sim::DoCollisionsFor(Moho::Sim *sim, Moho::Unit *unit,
+     *   gpg::fastvector_n<CollisionResult,10> *collisions);
+     *
+     * What it does:
+     * Resolves surface collisions for `unit` against a pre-gathered set of
+     * collision `collisions`. For every result deep enough to matter, props get
+     * their `OnCollision` Lua script fired, and mobile non-source unit colliders
+     * on the same formation layer are separated with a mass-weighted momentum
+     * impulse split (heavier unit shoves the lighter one more). Skipped entirely
+     * when the AI collision-debug convar is set, or the owner is naval/dead/
+     * destroy-queued. The `collisions` vector is the box query the caller
+     * (`CUnitMotion::ProcessSurfaceCollisionFromLastMove`) already filled.
+     */
+    static void DoCollisionsFor(Sim* sim, Unit* unit, CollisionResultFastVectorN10* collisions);
 
     /**
      * Address: 0x00748650
