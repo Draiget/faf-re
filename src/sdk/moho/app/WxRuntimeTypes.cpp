@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -56,6 +57,7 @@
 #include "moho/render/Clutter.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/MapImager.h"
+#include "moho/render/IEdRenderHook.h"
 #include "moho/render/IRenderWorldView.h"
 #include "moho/render/ID3DDepthStencil.h"
 #include "moho/render/ID3DRenderTarget.h"
@@ -74,6 +76,11 @@
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/TimeBar.h"
+#include "moho/net/CClientManagerImpl.h"
+#include "moho/net/Common.h"
+#include "moho/net/INetConnector.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
@@ -59402,6 +59409,541 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
   }
 }
 
+namespace moho
+{
+  // Console-tuning debug globals consumed by the render/debug HUD pass. All are
+  // defined in the unrecovered console-vars TU; extern-declared here per the
+  // established frontier pattern. Types byte-verified from the referencing .asm.
+  extern bool ren_Ui;                        // ?ren_Ui@Moho@@3_NA (1-byte bool)
+  extern bool ren_ShowFrameTimes;            // ?ren_ShowFrameTimes@Moho@@3_NA
+  extern bool ren_ShowNetworkStats;          // ?ren_ShowNetworkStats@Moho@@3_NA
+  extern bool ren_ShowBandwidthUsage;        // ?ren_ShowBandwidthUsage@Moho@@3_NA
+  extern bool UI_ShowControlUnderMouse;      // ?UI_ShowControlUnderMouse@Moho@@3_NA
+  extern bool ed_EnableHook;                 // ?ed_EnableHook@Moho@@3_NA
+  extern float ren_BandwidthDisplaySeconds;  // ?ren_BandwidthDisplaySeconds@Moho@@3MA
+  extern float ren_BandwidthDisplayKernel;   // ?ren_BandwidthDisplayKernel@Moho@@3MA
+
+  // Editor render hook enable flag (ed_EnableHook @DAT..; the ed_Hook object
+  // pointer itself is the process-global IEdRenderHook* from IEdRenderHook.h).
+  // The RenderUI pass invokes ed_Hook's second vtable slot (Hook1, +0x04) when
+  // both are set (asm 0x007F89FB..0x007F8A13).
+
+  // Forward declarations for the debug/UI render pass so each callee can be
+  // invoked by name before its definition and across the WRenViewport members.
+  void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
+  void REN_RenderViewportUI(WRenViewport* viewport, const void* worldViewInfoVector);
+} // namespace moho
+
+namespace
+{
+  // ---- func_ren_BandwidthUsage peak-scale hysteresis state ------------------
+  // Power-of-two auto-range for the bandwidth graph's Y axis. The peak scale
+  // only grows immediately; it decays by half at most once per second so the
+  // graph does not flicker. Both live in engine .data in the shipped binary
+  // (dword_F57E8C @0x00F57E8C, ren_bandwidth_time1 @0x010BF070, constructed via
+  // CRT static-init) and persist across frames.
+  int gRenBandwidthPeakScale = 0;                 // dword_F57E8C
+  gpg::time::Timer gRenBandwidthPeakScaleTimer;   // ren_bandwidth_time1
+
+  // Round-toward-zero + carry helpers matching the binary's frndint/cmov idiom.
+  // ceil form (cmova, +1 when x > trunc(x)); floor form (cmovb, -1 when
+  // x < trunc(x)). Preserves the exact integer the .asm computes.
+  [[nodiscard]] int RenCeilTowardZero(const float x) noexcept
+  {
+    const float truncated = std::trunc(x);
+    return static_cast<int>(truncated) + (x > truncated ? 1 : 0);
+  }
+  [[nodiscard]] int RenFloorTowardZero(const float x) noexcept
+  {
+    const float truncated = std::trunc(x);
+    return static_cast<int>(truncated) - (x < truncated ? 1 : 0);
+  }
+
+  /**
+   * Address: 0x007F40D0 (FUN_007F40D0, func_ren_BandwidthUsage)
+   *
+   * IDA signature:
+   * void __fastcall func_ren_BandwidthUsage(int@<ecx>, int@<edx>, CD3DPrimBatcher*,
+   *                                         int, int);
+   * (The Hex-Rays export mistypes the fourth argument as CD3DPrimBatcher*; the
+   *  real batcher is the third argument, and the fourth/fifth are integer graph
+   *  extents -- confirmed from the body's arg_4/arg_8/arg_C uses.)
+   *
+   * What it does:
+   * Renders the network bandwidth-over-time debug graph for the active head:
+   * a translucent backdrop quad, five Y-axis scale labels ("%5d") drawn with a
+   * 10pt Courier New font, a framed grid, and two outbound/inbound line-pair
+   * series (local client-manager send-stamps + connector send-stamps). The Y
+   * axis auto-ranges to a power-of-two peak that grows immediately and decays by
+   * half at most once per second.
+   *
+   * Callees invoked by name:
+   *  - moho::NET_BuildBandwidthUsageSeries (x2, sub_47CC00) builds each smoothed
+   *    byte-rate series from a send-stamp window.
+   *  - moho::REN_DrawBandwidthUsageLinePair (x2, func_ren_BandwidthUsage_Line)
+   *    strokes each series as connected outbound/inbound line strips.
+   */
+  void func_ren_BandwidthUsage(
+    const int graphHeightBase,             // ecx0 (== headHeight/3 at the call site)
+    const int graphLeftBase,               // edx0 (== headWidth - 3*headWidth/4 - 25)
+    moho::CD3DPrimBatcher* const batcher,  // a3 (target of every Draw* call; `info`)
+    const int graphRightExtent,            // a4  (== 3*headWidth/4)
+    const int graphHalfHeight              // arg8 (== (headHeight - headHeight/3)/2)
+  )
+  {
+    using moho::CD3DFont;
+    using moho::CD3DBatchTexture;
+    using moho::CD3DPrimBatcher;
+    using moho::SBandwidthUsageSeries;
+    using moho::SSendStampView;
+    using moho::CClientManagerImpl;
+    using moho::INetConnector;
+    using moho::Vector3f;
+
+    // 0x007F40F0: nothing to draw without an active sim driver.
+    moho::ISTIDriver* const simDriver = moho::SIM_GetActiveDriver();
+    if (simDriver == nullptr) {
+      return;
+    }
+
+    // 0x007F4101: client manager is the local send-stamp source.
+    CClientManagerImpl* const clientMgr = simDriver->GetClientManager();
+
+    // 0x007F4108..0x007F411B: coordinate bases.
+    //   rightEdgeX = (batcher pointer value) + graphLeftBase (v67.x seed
+    //     @0x007F4108-0x007F410F). A latent 2007 debug-HUD quirk: the batcher
+    //     pointer is reused as an X coordinate base, preserved 1:1 (mirrors
+    //     DrawNetworkStats reusing `this` as a coordinate).
+    //   graphBottomY = graphRightExtent + graphHeightBase (var_130 @0x007F411B).
+    const int rightEdgeX =
+      static_cast<int>(reinterpret_cast<std::uintptr_t>(batcher)) + graphLeftBase; // v67.x seed
+    const int graphBottomY = graphRightExtent + graphHeightBase;                   // var_130
+
+    // 0x007F411A..0x007F413C: retained 10pt Courier New font handle.
+    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(10, "Courier New");
+    CD3DFont* const font = rawFont.px;
+
+    // 0x007F414F..0x007F41B8: vertical extents from font metrics (ceil + 1).
+    const int ascentCeil = RenCeilTowardZero(font->mAscent) + 1;   // v11
+    const int descentCeil = RenCeilTowardZero(font->mDescent) + 1; // v14
+
+    // 0x007F41C4..0x007F4213: horizontal room reserved for the "10000" labels.
+    // GetAdvance's flags argument is the canonical whole-string form (-1).
+    const int labelAdvanceCeil = RenCeilTowardZero(font->GetAdvance("10000", -1)) + 2; // v17
+
+    // ---- Backdrop quad, asm 0x007F421B..0x007F4393. Color 0x80000000 --------
+    {
+      const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+      batcher->SetTexture(whiteTex);
+
+      constexpr std::uint32_t kBackdropColor = 0x80000000u; // 0x007F4297
+      // Corner extents (cvtsi2ss lanes at 0x007F4282..0x007F42E4).
+      const float xLeft = static_cast<float>(graphRightExtent); // arg_8 (a4) @0x007F42E4
+      const float xRight = static_cast<float>(ascentCeil);      // var_128.y @0x007F4282
+      const float yTop = static_cast<float>(graphHalfHeight);   // arg_C @0x007F4288
+      const float yBottom = static_cast<float>(descentCeil);    // var_12C @0x007F4291
+      const CD3DPrimBatcher::Vertex topLeft{xLeft, yTop, 0.0f, kBackdropColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex topRight{xLeft, yBottom, 0.0f, kBackdropColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex bottomRight{xRight, yBottom, 0.0f, kBackdropColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex bottomLeft{xRight, yTop, 0.0f, kBackdropColor, 0.0f, 0.0f};
+      batcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft); // 0x007F4393
+    }
+
+    // ---- Time-range parameters, asm 0x007F4398..0x007F443E. -----------------
+    const int rangeSpanMs = RenFloorTowardZero(moho::ren_BandwidthDisplaySeconds * 1000.0f);    // v23
+    const int windowUs = RenFloorTowardZero(moho::ren_BandwidthDisplayKernel * 1000000.0f);     // v27
+    const int kernelMs = RenFloorTowardZero(moho::ren_BandwidthDisplayKernel * 1000.0f);        // v28-derived
+
+    // 0x007F443E..0x007F4451: local send-stamp window (vtable GetBetween, slot 23).
+    SSendStampView localStamps = clientMgr->GetBetween(rangeSpanMs + kernelMs);
+
+    // 0x007F4453..0x007F44A1: connector send-stamp window (SnapshotSendStamps, slot 12).
+    INetConnector* const connector = clientMgr->GetConnector();
+    const int connectorSinceMs = rangeSpanMs + RenFloorTowardZero(moho::ren_BandwidthDisplayKernel * 1000.0f);
+    SSendStampView connectorStamps = connector->SnapshotSendStamps(connectorSinceMs);
+
+    // ---- Build the two smoothed byte-rate series, asm 0x007F44A3..0x007F4547.
+    const int sampleCount = rangeSpanMs;                                     // v63
+    const int64_t spanUs = 1000LL * static_cast<int64_t>(rangeSpanMs);       // v35
+
+    SBandwidthUsageSeries localSeries;      // &a2
+    SBandwidthUsageSeries connectorSeries;  // &v87
+
+    const uint64_t localEndUs = localStamps.windowEndTimeUs;
+    moho::NET_BuildBandwidthUsageSeries(
+      localSeries, localStamps, sampleCount,
+      localEndUs - static_cast<uint64_t>(spanUs), localEndUs, static_cast<uint64_t>(windowUs));
+
+    const uint64_t connEndUs = connectorStamps.windowEndTimeUs;
+    moho::NET_BuildBandwidthUsageSeries(
+      connectorSeries, connectorStamps, sampleCount,
+      connEndUs - static_cast<uint64_t>(spanUs), connEndUs, static_cast<uint64_t>(windowUs));
+
+    // ---- Peak-scale auto-range (power of two), asm 0x007F454C..0x007F462C. --
+    int peakScale = 128; // esi, seeded 0x80 (0x007F454C)
+    if (sampleCount > 0) {
+      const uint32_t columns = static_cast<uint32_t>(sampleCount);
+      const uint32_t nLocal = localSeries.SampleCount();
+      const uint32_t nConn = connectorSeries.SampleCount();
+      for (uint32_t i = 0; i < columns; ++i) {
+        // Per-column max across both series' outbound+inbound rates
+        // (0x007F4572..0x007F45CD).
+        float columnMax = 0.0f;
+        if (i < nConn) {
+          const moho::SBandwidthUsageSample& c = connectorSeries.samples[i];
+          columnMax = std::max(c.outboundBytesPerSec, c.inboundBytesPerSec);
+        }
+        if (i < nLocal) {
+          const moho::SBandwidthUsageSample& l = localSeries.samples[i];
+          columnMax = std::max(columnMax, std::max(l.outboundBytesPerSec, l.inboundBytesPerSec));
+        }
+        const int need = RenCeilTowardZero(columnMax);
+        while (peakScale < need) {
+          peakScale *= 2; // 0x007F45D5
+        }
+      }
+    }
+
+    // Hysteresis: grow immediately; decay by half at most once per second.
+    // asm 0x007F45E9..0x007F462C.
+    if (peakScale >= gRenBandwidthPeakScale) {
+      gRenBandwidthPeakScaleTimer.Reset();
+      gRenBandwidthPeakScale = peakScale;
+    } else {
+      if (gRenBandwidthPeakScaleTimer.ElapsedSeconds() >= 1.0f) {
+        gRenBandwidthPeakScale >>= 1; // sar dword_F57E8C, 1
+        gRenBandwidthPeakScaleTimer.Reset();
+      }
+      peakScale = gRenBandwidthPeakScale;
+    }
+
+    // Y-axis label/grid step: peakScale / 4 (sar esi, 2 @0x007F463B).
+    const int axisStep = peakScale >> 2;
+
+    // Text glyph axes (asm 0x007F4633 flt_E4F6E8 = -1.0, 0x007F465B a7 = 1.0).
+    const Vector3f textXAxis{1.0f, 0.0f, 0.0f};
+    // UNRESOLVED: text yAxis lane values, asm 0x007F4633..0x007F4692. Retail
+    // threads -1.0/1.0 scalars through registers into Render's axis args; the
+    // exact yAxis argument lane is not provable from this frame. Using the
+    // canonical down-screen row axis from the sibling DrawNetworkStats site.
+    const Vector3f textYAxis{0.0f, 1.0f, 0.0f};
+    // UNRESOLVED: Render glyphScale + maxAdvance scalars, asm 0x007F46EF/0x007F46F5
+    // (NaN sentinels). Using quiet-NaN "natural size / no advance limit" to match
+    // the sibling debug-HUD Render call sites.
+    const float kNoGlyphScale = std::numeric_limits<float>::quiet_NaN();
+    const float kNoMaxAdvance = std::numeric_limits<float>::quiet_NaN();
+
+    // ---- Y-axis scale labels: 5 rows of "%5d", asm 0x007F469A..0x007F4775. --
+    {
+      int labelValue = 0;            // ebp (v50), steps by axisStep
+      unsigned int rowYAccum = 0;    // esi (v49), steps by the row-height slot y_low
+      for (int row = 0; row < 5; ++row) { // var_138 == 5
+        const msvc8::string text = gpg::STR_Printf("%5d", labelValue); // 0x007F46B0
+        // Baseline Y = (peakScale-derived base) - (rowYAccum >> 2), fild + the
+        // MSVC unsigned->float fixup (0x007F46BC..0x007F46E1).
+        const int rawY = static_cast<int>(gRenBandwidthPeakScale) - static_cast<int>(rowYAccum >> 2);
+        const float labelY = static_cast<float>(static_cast<uint32_t>(rawY));
+        // UNRESOLVED: label origin X lane, asm 0x007F4649/0x007F4732. The origin
+        // X is threaded from the same register-aliased float lane as the row
+        // index; not pinnable to Render's origin.x from this frame. Anchoring at
+        // the reserved label gutter (graphLeftBase - labelAdvanceCeil).
+        const Vector3f origin{static_cast<float>(graphLeftBase - labelAdvanceCeil), labelY, 0.0f};
+        (void)font->Render(text.c_str(), batcher, origin, textXAxis, textYAxis,
+                           0xFFFFFFFFu, kNoGlyphScale, kNoMaxAdvance);
+        labelValue += axisStep;                               // 0x007F475F
+        rowYAccum += static_cast<unsigned int>(graphHalfHeight);  // 0x007F4763 (y_low/var_D4)
+      }
+    }
+
+    // ---- Grid frame + horizontal grid lines, asm 0x007F4775..0x007F4AC9. ----
+    {
+      const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+      batcher->SetTexture(whiteTex); // 0x007F4799
+
+      // UNRESOLVED: the four frame-rectangle corner scalars (v72.info,
+      // v72.count.pi_, v73, v74; consumed at 0x007F47DC/0x4845/0x48B1/0x491A)
+      // are read from a boost::shared_ptr storage slot reused as float scratch
+      // after the label texture temp is torn down; their producing stores are the
+      // heavily-aliased entry-block writes (~0x007F4410..0x007F447C) that could
+      // not be pinned. Using the plainly derived plot bounds.
+      const float rectLeftX = static_cast<float>(graphLeftBase - labelAdvanceCeil);  // v72.info
+      const float rectRightX = static_cast<float>(rightEdgeX);                       // v72.count.pi_
+      const float rectTopY = static_cast<float>(graphHeightBase - descentCeil - ascentCeil); // v73
+      const float rectBottomY = static_cast<float>(graphHalfHeight);                 // v74
+
+      constexpr std::uint32_t kLineColor = 0xFFFFFFFFu; // eax0 == -1 on every vertex
+      const auto lineVertex = [](const float x, const float y) {
+        return CD3DPrimBatcher::Vertex{x, y, 0.0f, kLineColor, 0.0f, 0.0f};
+      };
+
+      // Four frame edges (0x007F47DC..0x007F4981).
+      batcher->DrawLine(lineVertex(rectLeftX, rectBottomY), lineVertex(rectLeftX, rectTopY));
+      batcher->DrawLine(lineVertex(rectLeftX, rectTopY), lineVertex(rectRightX, rectTopY));
+      batcher->DrawLine(lineVertex(rectRightX, rectTopY), lineVertex(rectRightX, rectBottomY));
+      batcher->DrawLine(lineVertex(rectRightX, rectBottomY), lineVertex(rectLeftX, rectBottomY));
+
+      // Right-inner vertical edge at graphBottomY-1 (0x007F4986..0x007F49F8).
+      const float innerRightX = static_cast<float>(graphBottomY - 1);
+      batcher->DrawLine(lineVertex(innerRightX, rectBottomY), lineVertex(innerRightX, rectTopY));
+
+      // Five horizontal grid lines stepping down by the row-height slot
+      // (0x007F49FD..0x007F4AC9).
+      unsigned int gridYAccum = 0; // edi
+      for (int g = 0; g < 5; ++g) {
+        const int rawY = static_cast<int>(gRenBandwidthPeakScale) - static_cast<int>(gridYAccum >> 2);
+        const float gridY = static_cast<float>(static_cast<uint32_t>(rawY));
+        batcher->DrawLine(lineVertex(rectLeftX, gridY), lineVertex(innerRightX, gridY));
+        gridYAccum += static_cast<unsigned int>(graphHalfHeight); // 0x007F4ABF (y_low/var_D4)
+      }
+    }
+
+    // ---- The two bandwidth line-pair series, asm 0x007F4ACF..0x007F4B2A. ----
+    // yScale = (row-height slot y_low) / peakScale (fild var_D4 @0x007F4ACF / fidiv var_13C
+    // @0x007F4AE0). The per-sample color mapping is verified from the callee
+    // (func_ren_BandwidthUsage_Line): x0 (ebx) colors the inbound lane, x1 the
+    // outbound lane.
+    const float yScale = static_cast<float>(graphHalfHeight) / static_cast<float>(peakScale);
+
+    // xOffset (a4) = var_130 = graphRightExtent + graphHeightBase (asm 0x007F411B
+    // / 0x007F4AD6), i.e. graphBottomY. yBase (a5) = var_100.mColor (asm
+    // 0x007F4AE4).
+    const std::int32_t seriesXOffset = graphBottomY; // var_130
+
+    // UNRESOLVED: line-pair yBase (a5 = var_100.mColor, asm 0x007F42AE seeded as
+    // the quad color 0x80000000 then reinterpreted as an int screen-Y baseline;
+    // the producing store of its final value is aliased and could not be pinned).
+    // Using the plot bottom baseline (graphHalfHeight) as the best-evidence screen Y.
+    const std::int32_t seriesYBase = graphHalfHeight;
+
+    // Local series: inbound 0xFF0000FF (x0/ebx @0x007F4AE8), outbound 0xFFFF0000
+    // (x1 @0x007F4ADA).
+    moho::REN_DrawBandwidthUsageLinePair(
+      *batcher, localSeries,
+      /*xOffset=*/ seriesXOffset,
+      /*yBase=*/ seriesYBase,
+      /*yScale=*/ yScale,
+      /*inboundColor=*/ 0xFF0000FFu,
+      /*outboundColor=*/ 0xFFFF0000u);
+
+    // Connector series: inbound 0xFF8080FF (x0/ebx @0x007F4B1E), outbound
+    // 0xFFFF8080 (x1 @0x007F4B0E).
+    moho::REN_DrawBandwidthUsageLinePair(
+      *batcher, connectorSeries,
+      /*xOffset=*/ seriesXOffset,
+      /*yBase=*/ seriesYBase,
+      /*yScale=*/ yScale,
+      /*inboundColor=*/ 0xFF8080FFu,
+      /*outboundColor=*/ 0xFFFF8080u);
+
+    // ---- Teardown, asm 0x007F4B2F..0x007F4BE9. localSeries/connectorSeries and
+    // the two send-stamp views destruct here; release the retained font handle.
+    rawFont.release();
+  }
+} // namespace
+
+/**
+ * Address: 0x007FA730 (FUN_007FA730, Moho::REN_DebugStuff)
+ * Mangled: ?REN_DebugStuff@Moho@@YAXV?$shared_ptr@VCD3DPrimBatcher@Moho@@@boost@@H@Z
+ *
+ * IDA signature:
+ * void __usercall Moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher,
+ *                                      int head@<ecx>);
+ *
+ * What it does:
+ * Draws the per-frame debug overlays for one head, gated by console flags:
+ * frame-time bars (ren_ShowFrameTimes), the network-stats HUD
+ * (ren_ShowNetworkStats), the bandwidth graph (ren_ShowBandwidthUsage), and the
+ * control-under-mouse highlight (UI_ShowControlUnderMouse). Sets up a
+ * screen-space orthographic projection on the prim batcher, renders every armed
+ * overlay, then flushes. A no-op when every flag is clear.
+ */
+void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int head)
+{
+  // 0x007FA756..0x007FA778: bail (releasing the batcher) when nothing is armed.
+  if (!moho::ren_ShowFrameTimes && !moho::ren_ShowNetworkStats
+      && !moho::ren_ShowBandwidthUsage && !moho::UI_ShowControlUnderMouse) {
+    return; // batcher shared_ptr destructs here (asm 0x007FA77A..0x007FA786)
+  }
+
+  CD3DPrimBatcher* const primBatcher = batcher.get();
+
+  // 0x007FA79E..0x007FA7BF: select the primbatcher effect + alpha technique.
+  CD3DDevice* device = moho::D3D_GetDevice();
+  device->SelectFxFile("primbatcher");
+  device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
+
+  // 0x007FA7C1..0x007FA7C5: clear the batcher's composite-rebuild flag (+0x11D)
+  // so the screen-space HUD pass reuses the freshly set projection/view.
+  CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+
+  // 0x007FA7CC..0x007FA7EA: active head pixel dimensions.
+  const int headWidth = moho::D3D_GetDevice()->GetHeadWidth(head);   // v6
+  const int headHeight = moho::D3D_GetDevice()->GetHeadHeight(head); // v8
+  const float widthF = static_cast<float>(headWidth);
+  const float heightF = static_cast<float>(headHeight);
+
+  // 0x007FA7EC..0x007FA8D2: screen-space orthographic projection (row-major).
+  // Constants byte-verified from ForgedAlliance.exe: 2.0, -0.5, 0.5, 1.0.
+  VMatrix4 projection{};
+  projection.r[0] = {2.0f / widthF, 0.0f, 0.0f, 0.0f};
+  projection.r[1] = {0.0f, 2.0f / (-0.0f - heightF), 0.0f, 0.0f};
+  projection.r[2] = {0.0f, 0.0f, -0.5f, 0.0f};
+  projection.r[3] = {
+    (widthF / (-0.0f - widthF)) - (1.0f / widthF),
+    (heightF / heightF) + (1.0f / heightF),
+    0.5f,
+    1.0f
+  };
+  primBatcher->SetProjectionMatrix(projection);      // 0x007FA8D2
+  primBatcher->SetViewMatrix(VMatrix4::Identity());  // 0x007FA8DE (sIdentity)
+
+  // 0x007FA8E3..0x007FA93E: frame-time bars over the top-left quadrant.
+  if (moho::ren_ShowFrameTimes) {
+    moho::TIME_RenderTimeBars(
+      primBatcher, widthF * 0.25f, heightF * 0.25f, widthF * 0.5f, heightF * 0.5f);
+  }
+
+  // 0x007FA941..0x007FA982: network-stats HUD, right-anchored.
+  if (moho::ren_ShowNetworkStats) {
+    if (CSimDriver* const simDriver = static_cast<CSimDriver*>(moho::SIM_GetActiveDriver())) {
+      simDriver->DrawNetworkStats(primBatcher, static_cast<float>(headWidth - 25), 25.0f, 1.0f, 0.0f);
+    }
+  }
+
+  // 0x007FA984..0x007FA9C1: bandwidth-over-time graph. Argument arithmetic
+  // transcribed from 0x007FA98D..0x007FA9BC (__fastcall: ecx, edx, then stack
+  // args pushed right-to-left ebx=batcher, edi, eax):
+  //   graphHeightBase (ecx) = headHeight / 3
+  //   graphLeftBase   (edx) = headWidth - 3*headWidth/4 - 25
+  //   batcher         (a3)  = primBatcher (ebx)
+  //   graphRightExtent (a4) = 3*headWidth/4 (edi)
+  //   graphHalfHeight  (arg8) = (headHeight - headHeight/3) / 2 (eax)
+  if (moho::ren_ShowBandwidthUsage) {
+    const int threeQuarterWidth = 3 * headWidth / 4; // edi (sar 2 of esi+esi*2)
+    func_ren_BandwidthUsage(
+      /*graphHeightBase=*/  headHeight / 3,
+      /*graphLeftBase=*/    headWidth - threeQuarterWidth - 25,
+      /*batcher=*/          primBatcher,
+      /*graphRightExtent=*/ threeQuarterWidth,
+      /*graphHalfHeight=*/  (headHeight - headHeight / 3) / 2);
+  }
+
+  // 0x007FA9C4..0x007FA9EB: control-under-mouse debug highlight.
+  if (moho::UI_ShowControlUnderMouse) {
+    moho::IUIManager* const uiManager = moho::UI_GetManager();
+    if (uiManager != nullptr && uiManager->HasFrames()) {
+      uiManager->DebugMouseOverControl(primBatcher);
+    }
+  }
+
+  // 0x007FA9ED..0x007FA9F3: flush the accumulated debug geometry.
+  primBatcher->Flush();
+  // batcher shared_ptr destructs here (asm 0x007FA9FB..0x007FAA2D).
+}
+
+/**
+ * Address: 0x007F88B0 (FUN_007F88B0, Moho::WRenViewport::RenderUI)
+ * Mangled: ?RenderUI@WRenViewport@Moho@@AAEXABV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::WRenViewport::RenderUI(WRenViewport *this,
+ *     const std::vector<SWorldViewInfo>& worldViewInfoVector);
+ *
+ * What it does:
+ * Runs the UI-overlay + debug-HUD render pass for the active head: binds the
+ * head render target, dispatches each world-view info entry's UI-render callback
+ * through the shared prim batcher, resets the viewport to full-screen, draws the
+ * UI head (UI_Manager) when enabled, renders the debug overlays
+ * (REN_DebugStuff), and finally invokes the editor render hook.
+ *
+ * Note:
+ * The private WRenViewport::RenderUI member cannot be declared in the SDK header
+ * during this pass, so it is recovered as the file-scope helper
+ * moho::REN_RenderViewportUI(viewport, worldViewInfoVector) and invoked by name
+ * from WRenViewport::Render exactly where the binary calls RenderUI.
+ */
+void moho::REN_RenderViewportUI(WRenViewport* const viewport, const void* const worldViewInfoVector)
+{
+  // Typed overlay for the RenderUI-specific lanes: the prim batcher shared_ptr
+  // (+0x215C), the full-screen extent (+0x318), and the active head (+0x320).
+  struct WRenViewportUIRenderView final
+  {
+    std::uint8_t mUnknown0000_0317[0x318];
+    Wm3::Vector2i mFullScreen;                             // +0x318
+    std::int32_t mHead;                                    // +0x320
+    std::uint8_t mUnknown0324_215B[0x215C - 0x324];        // to +0x215C
+    boost::shared_ptr<moho::CD3DPrimBatcher> mPrimBatcher; // +0x215C
+  };
+  static_assert(offsetof(WRenViewportUIRenderView, mPrimBatcher) == 0x215C,
+                "WRenViewportUIRenderView::mPrimBatcher offset must be 0x215C");
+  static_assert(offsetof(WRenViewportUIRenderView, mFullScreen) == 0x318,
+                "WRenViewportUIRenderView::mFullScreen offset must be 0x318");
+  static_assert(offsetof(WRenViewportUIRenderView, mHead) == 0x320,
+                "WRenViewportUIRenderView::mHead offset must be 0x320");
+  auto* const uiRuntime = reinterpret_cast<WRenViewportUIRenderView*>(viewport);
+
+  // 0x007F88CA..0x007F88FD: bind the head render target, disable secondary
+  // color write.
+  moho::CD3DDevice* device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(uiRuntime->mHead, false, 0, 1.0f, 0);
+  device->SetColorWriteState(true, false);
+
+  moho::CD3DPrimBatcher* const primBatcher = uiRuntime->mPrimBatcher.get();
+
+  // 0x007F88FF..0x007F8927: dispatch every world-view info entry's UI-render
+  // callback with the shared prim batcher. Each entry is a 0x14-byte
+  // SWorldViewInfo record (== WRenViewportWorldViewParamRuntime); the callback
+  // object lives at record offset +0x0C and is invoked through its vtable slot
+  // +0x38 (14) with the batcher as the sole argument.
+  //
+  // The binary iterates the argument vector from its second pointer field
+  // ([base+4]) up to its third ([base+8]), stepping one SWorldViewInfo per
+  // iteration (asm 0x007F88FF `mov esi,[ebx+4]` .. 0x007F8927). Modeled through
+  // the same {mFirst,mLast,mEnd} 3-pointer vector view used elsewhere in this
+  // file; the traversal preserves the binary's exact [mLast, mEnd) bounds.
+  struct SWorldViewInfoUICallback
+  {
+    virtual void RenderUI(moho::CD3DPrimBatcher* batcher) = 0; // vtable slot +0x38 (14)
+  };
+  const auto& worldViewVector =
+    *static_cast<const WRenViewportWorldViewVectorRuntime*>(worldViewInfoVector);
+  for (const WRenViewportWorldViewParamRuntime* entry = worldViewVector.mLast;
+       entry != worldViewVector.mEnd;
+       ++entry) {
+    // Record offset +0x0C is the render-callback object; dispatched through its
+    // own vtable (aliases the `terrain` shared_ptr slot of the embedded-param
+    // layout, which for this external callback vector holds the callback object).
+    auto* const callback = reinterpret_cast<SWorldViewInfoUICallback*>(entry->terrain.get());
+    if (callback != nullptr) {
+      callback->RenderUI(primBatcher);
+    }
+  }
+
+  // 0x007F8929..0x007F898C: reset the viewport to the full-screen extent, origin
+  // (0,0). The binary invokes SetViewport on the global device singleton (the
+  // same instance D3D_GetDevice returns) with a zeroed origin Vector2i.
+  Wm3::Vector2i viewportOrigin{0, 0};
+  moho::D3D_GetDevice()->SetViewport(&viewportOrigin, &uiRuntime->mFullScreen, 0.0f, 1.0f);
+  device->SetColorWriteState(true, false); // 0x007F898E..0x007F8999
+
+  // 0x007F899B..0x007F89C1: draw the UI head when the UI is enabled.
+  if (moho::ren_Ui) {
+    if (moho::IUIManager* const uiManager = moho::UI_GetManager()) {
+      uiManager->DrawHead(uiRuntime->mHead, primBatcher);
+    }
+  }
+
+  // 0x007F89C3..0x007F89F8: debug overlays. Pass a retained copy of the prim
+  // batcher shared_ptr (matching the refcount bump the binary performs before
+  // the call), invoking REN_DebugStuff by name.
+  moho::REN_DebugStuff(uiRuntime->mPrimBatcher, uiRuntime->mHead);
+
+  // 0x007F89FB..0x007F8A13: editor render hook, slot +0x04 (IEdRenderHook::Hook1).
+  if (moho::ed_EnableHook && moho::ed_Hook != nullptr) {
+    moho::ed_Hook->Hook1();
+  }
+}
+
 /**
  * Address: 0x007F90D0 (FUN_007F90D0, Moho::WRenViewport::Render)
  *
@@ -59416,8 +59958,6 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
  */
 void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 {
-  (void)worldViewInfoVector;
-
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   if (device == nullptr) {
     return;
@@ -59505,6 +60045,14 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     auto* const bloomHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
     DoBloom(&bloomHost->mBloomRenderers[bloomHost->mHead], 0.0f);
   }
+
+  // UI-overlay + debug-HUD pass. In the binary (WRenViewport::Render @0x007F90D0,
+  // line 373: `Moho::WRenViewport::RenderUI(v13, viewport)` at 0x007F9845) this
+  // is invoked with the same world-view info vector this method received. The
+  // private RenderUI member is recovered as the file-scope helper
+  // REN_RenderViewportUI (the SDK header cannot declare the private member in
+  // this pass) and is invoked here by name exactly where the binary calls it.
+  moho::REN_RenderViewportUI(this, worldViewInfoVector);
 
   // Conditionally dump the just-rendered frame to a numbered screenshot file.
   // In the binary this is the tail call of WRenViewport::Render @0x007F90D0
