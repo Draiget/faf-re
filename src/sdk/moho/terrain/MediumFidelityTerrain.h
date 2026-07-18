@@ -3,8 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/gal/Matrix.h"
+#include "legacy/containers/String.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
 
@@ -18,11 +21,71 @@ namespace moho
   using MediumPrimaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 3000>;
   using MediumSecondaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 70000>;
 
+  class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
   class CD3DVertexSheet;
   class CTesselator;
   struct GeomCamera3;
   struct TerrainWaterResourceView;
+
+  /**
+   * Runtime shadow-render context passed into the terrain-lighting binder when
+   * the terrain effect is rendered with a cast-shadow source. The layout is
+   * recovered from sub_805600's shadow branch (0x00805975-0x00805A1A) and the
+   * shadow-texture accessor sub_7FEE70 (0x007FEE70). Only the fields the terrain
+   * lighting path touches are modeled; the object is owned by the shadow render
+   * subsystem and is never constructed here.
+   */
+  struct TerrainShadowContext
+  {
+    std::uint8_t reserved00[0x0C]; // +0x00
+
+    /// Selects between the primary/secondary retained shadow textures.
+    /// Read as a byte at +0x0C by sub_7FEE70.
+    bool useSecondaryShadowTexture; // +0x0C
+
+    std::uint8_t reserved0D[0x07]; // +0x0D
+
+    /// Terrain shadow-enabled flag, written to the effect as a 4-byte blob.
+    /// Read as a byte at +0x14 by sub_805600.
+    bool shadowsEnabled; // +0x14
+
+    std::uint8_t reserved15[0x9F]; // +0x15
+
+    /// World-to-shadow-map matrix bound into the `ShadowMatrix` shader var.
+    gpg::gal::Matrix shadowMatrix; // +0xB4
+
+    std::uint8_t reservedF4[0x1EC]; // +0xF4
+
+    /// Retained shadow texture used when `useSecondaryShadowTexture == false`.
+    boost::shared_ptr<gpg::gal::TextureD3D9> primaryShadowTexture; // +0x2E0
+
+    std::uint8_t reserved2E8[0x08]; // +0x2E8
+
+    /// Retained shadow texture used when `useSecondaryShadowTexture == true`.
+    boost::shared_ptr<gpg::gal::TextureD3D9> secondaryShadowTexture; // +0x2F0
+  };
+
+  static_assert(
+    offsetof(TerrainShadowContext, useSecondaryShadowTexture) == 0x0C,
+    "TerrainShadowContext::useSecondaryShadowTexture offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(TerrainShadowContext, shadowsEnabled) == 0x14,
+    "TerrainShadowContext::shadowsEnabled offset must be 0x14"
+  );
+  static_assert(
+    offsetof(TerrainShadowContext, shadowMatrix) == 0xB4,
+    "TerrainShadowContext::shadowMatrix offset must be 0xB4"
+  );
+  static_assert(
+    offsetof(TerrainShadowContext, primaryShadowTexture) == 0x2E0,
+    "TerrainShadowContext::primaryShadowTexture offset must be 0x2E0"
+  );
+  static_assert(
+    offsetof(TerrainShadowContext, secondaryShadowTexture) == 0x2F0,
+    "TerrainShadowContext::secondaryShadowTexture offset must be 0x2F0"
+  );
 
   /**
    * Medium-fidelity terrain renderer runtime.
@@ -98,6 +161,42 @@ namespace moho
      * weak handle into the active terrain effect.
      */
     void LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture);
+
+    /**
+     * Address: 0x00805600 (FUN_00805600, sub_805600)
+     *
+     * What it does:
+     * Selects the `terrain` effect and binds all lighting shader vars from the
+     * active camera (view/proj/half-angle/camera dir+pos) and terrain resource
+     * (lighting multiplier, sun dir/ambience/color, specular, shadow-fill), the
+     * optional cast-shadow context (shadows-enabled/shadow matrix/shadow
+     * texture), and the noise / decal-mask / bi-cubic-lookup textures.
+     */
+    void LoadTerrainLighting(TerrainShadowContext* shadowContext);
+
+    /**
+     * Address: 0x00805490 (FUN_00805490, sub_805490)
+     *
+     * What it does:
+     * Draws one terrain triangle-list pass using `mTerrainIndexSheet` and
+     * `mTerrainVertexSheet` with `(start=0, base=0)` and the clamped legacy
+     * index count when it is positive and divisible by 3.
+     */
+    void DrawTriangles();
+
+    /**
+     * Address: 0x00807660 (FUN_00807660, Moho::MediumFidelityTerrain::DrawTerrain)
+     *
+     * What it does:
+     * Runs one full opaque terrain pass: rebinds lighting shader vars (no shadow
+     * source), selects the `terrain` effect + caller technique, binds the overlay
+     * texture, loads the base terrain shader vars, and submits the terrain
+     * triangle list. Releases the retained overlay-texture handle on return.
+     */
+    virtual void DrawTerrain(
+      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+      const msvc8::string* techniqueName
+    );
 
     /**
      * Address: 0x00807410 (FUN_00807410, Moho::MediumFidelityTerrain::DrawWaterLine)

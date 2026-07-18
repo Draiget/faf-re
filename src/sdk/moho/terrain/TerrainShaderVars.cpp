@@ -59,6 +59,25 @@ namespace moho
     RegisterShaderVar("TerrainScale", &terrainScale, "terrain");
     RegisterShaderVar("ViewportScale", &viewportScale, "terrain");
     RegisterShaderVar("ViewportOffset", &viewportOffset, "terrain");
+
+    RegisterShaderVar("ViewMatrix", &viewMatrix, "terrain");
+    RegisterShaderVar("ProjMatrix", &projMatrix, "terrain");
+    RegisterShaderVar("LightingMultiplier", &lightingMultiplier, "terrain");
+    RegisterShaderVar("SunDirection", &sunDirection, "terrain");
+    RegisterShaderVar("SunAmbience", &sunAmbience, "terrain");
+    RegisterShaderVar("SunColor", &sunColor, "terrain");
+    RegisterShaderVar("HalfAngle", &halfAngle, "terrain");
+    RegisterShaderVar("CameraDirection", &cameraDirection, "terrain");
+    RegisterShaderVar("CameraPosition", &cameraPosition, "terrain");
+    RegisterShaderVar("SpecularColor", &specularColor, "terrain");
+    RegisterShaderVar("ShadowFillColor", &shadowFillColor, "terrain");
+    RegisterShaderVar("ShadowsEnabled", &shadowsEnabled, "terrain");
+    RegisterShaderVar("ShadowMatrix", &shadowMatrix, "terrain");
+    RegisterShaderVar("ShadowTexture", &shadowTexture, "terrain");
+    RegisterShaderVar("NoiseTexture", &noiseTexture, "terrain");
+    RegisterShaderVar("DecalMaskTexture", &decalMaskTexture, "terrain");
+    RegisterShaderVar("BiCubicLookup", &biCubicLookup, "terrain");
+    RegisterShaderVar("OverlayTexture", &overlayTexture, "terrain");
   }
 
   TerrainShaderVarSet& GetTerrainShaderVars()
@@ -89,6 +108,13 @@ namespace moho
   {
     if (shaderVar.Exists()) {
       shaderVar.mEffectVariable->SetMem(floatCount, values);
+    }
+  }
+
+  void SetShaderVarPtr(ShaderVar& shaderVar, const void* const data, const std::uint32_t byteCount)
+  {
+    if (shaderVar.Exists()) {
+      shaderVar.mEffectVariable->SetPtr(data, byteCount);
     }
   }
 } // namespace moho

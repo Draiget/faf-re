@@ -1,9 +1,14 @@
 #include "moho/terrain/MediumFidelityTerrain.h"
 
+#include <cmath>
 #include <cstdint>
 
+#include "Wm3Vector3.h"
+#include "gpg/gal/Matrix.h"
+#include "moho/math/Vector4f.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
@@ -82,6 +87,26 @@ namespace
     }
 
     indexSheet->Unlock();
+  }
+
+  /**
+   * Address: 0x007FEE70 (FUN_007FEE70, sub_7FEE70)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_7FEE70@<eax>(_DWORD *result@<eax>, int a2@<ecx>);
+   *
+   * What it does:
+   * Returns the active retained shadow texture for a cast-shadow terrain pass.
+   * Selects the secondary texture at +0x2F0 when the byte flag at +0x0C is set,
+   * otherwise the primary texture at +0x2E0, and returns a retained (strong-ref)
+   * copy of that `boost::shared_ptr<gpg::gal::TextureD3D9>`.
+   */
+  [[nodiscard]] boost::shared_ptr<gpg::gal::TextureD3D9> GetActiveShadowTexture(
+    const moho::TerrainShadowContext& shadowContext
+  )
+  {
+    return shadowContext.useSecondaryShadowTexture ? shadowContext.secondaryShadowTexture
+                                                   : shadowContext.primaryShadowTexture;
   }
 } // namespace
 
@@ -323,6 +348,205 @@ namespace moho
 
     SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
     SetShaderVarMem(shaderVars.viewportOffset, 2U, viewportOffset);
+  }
+
+  /**
+   * Address: 0x00805600 (FUN_00805600, sub_805600)
+   *
+   * IDA signature:
+   * struct_ShaderVar *__thiscall sub_805600(int this, int a2);
+   *
+   * What it does:
+   * Selects the `terrain` effect, then binds every terrain-lighting shader var.
+   * Matrix / camera lanes come from `mCamera` (GeomCamera3): `view`, `projection`,
+   * the half-angle between the sun direction and the camera forward axis
+   * (`inverseView.r[2]`), the camera forward direction (`-inverseView.r[2]`), and
+   * the camera world position (`inverseView.r[3]`). Lighting lanes come from the
+   * terrain resource: lighting multiplier, sun direction/ambience/color, specular
+   * color and shadow-fill color. When a shadow context is supplied its enabled
+   * flag, shadow matrix and active shadow texture are bound; otherwise the shadows
+   * lane is written disabled. Finally the noise / decal-mask / bi-cubic-lookup
+   * textures are bound.
+   */
+  void MediumFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectFxFile("terrain");
+
+    const GeomCamera3& camera = *mCamera;
+
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    const float lightingMultiplier = terrainRes->GetLightingMultiplier();
+    if (shaderVars.lightingMultiplier.Exists()) {
+      shaderVars.lightingMultiplier.SetFloat(lightingMultiplier);
+    }
+
+    const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
+    SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
+
+    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+    SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
+
+    const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
+    SetShaderVarMem(shaderVars.sunColor, 3U, &sunColor.x);
+
+    // Half-angle vector: normalize(sunDirection + inverseView.r[2]).
+    // The binary computes `sunDir - (-0.0 - invView.r[2].c)` per component,
+    // which is `sunDir.c + invView.r[2].c` (the constant is -0.0).
+    const Vector4f& cameraBasisZ = camera.inverseView.r[2];
+    float halfAngle[3] = {
+      sunDirection.x + cameraBasisZ.x,
+      sunDirection.y + cameraBasisZ.y,
+      sunDirection.z + cameraBasisZ.z
+    };
+    const float halfAngleLength =
+      std::sqrt((halfAngle[0] * halfAngle[0]) + (halfAngle[1] * halfAngle[1]) + (halfAngle[2] * halfAngle[2]));
+    if (halfAngleLength > 0.0f) {
+      const float inverseLength = 1.0f / halfAngleLength;
+      halfAngle[0] *= inverseLength;
+      halfAngle[1] *= inverseLength;
+      halfAngle[2] *= inverseLength;
+    } else {
+      halfAngle[0] = 0.0f;
+      halfAngle[1] = 0.0f;
+      halfAngle[2] = 0.0f;
+    }
+    SetShaderVarMem(shaderVars.halfAngle, 3U, halfAngle);
+
+    // Camera forward direction: -inverseView.r[2].
+    const float cameraDirection[3] = {
+      -cameraBasisZ.x,
+      -cameraBasisZ.y,
+      -cameraBasisZ.z
+    };
+    SetShaderVarMem(shaderVars.cameraDirection, 3U, cameraDirection);
+
+    // Camera world position: inverseView.r[3] (translation row).
+    const Vector4f& cameraTranslation = camera.inverseView.r[3];
+    const float cameraPosition[3] = {
+      cameraTranslation.x,
+      cameraTranslation.y,
+      cameraTranslation.z
+    };
+    SetShaderVarMem(shaderVars.cameraPosition, 3U, cameraPosition);
+
+    const Vector4f specularColor = terrainRes->GetSpecularColor();
+    SetShaderVarMem(shaderVars.specularColor, 4U, &specularColor.x);
+
+    const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
+    SetShaderVarMem(shaderVars.shadowFillColor, 3U, &shadowFillColor.x);
+
+    if (shadowContext != nullptr) {
+      // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
+      const std::uint32_t shadowsEnabledBlob =
+        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->shadowsEnabled));
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
+
+      if (shaderVars.shadowMatrix.Exists()) {
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+      }
+
+      const boost::shared_ptr<gpg::gal::TextureD3D9> shadowTexture = GetActiveShadowTexture(*shadowContext);
+      shaderVars.shadowTexture.GetTexture(boost::weak_ptr<gpg::gal::TextureD3D9>(shadowTexture));
+    } else {
+      const std::uint32_t shadowsDisabledBlob = 0U;
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);
+    }
+
+    // The binary binds these three directly through the shader-var
+    // shared_ptr<CD3DDynamicTextureSheet> lane (struct_ShaderVar::GetTexture,
+    // 0x00438140). The noise-fill and bi-cubic-lookup sheets are the shared
+    // medium-fidelity sheet globals; the decal mask is the base-class terrain
+    // decal texture, reinterpreted as a dynamic sheet through the common
+    // ID3DTextureSheet base (both derive from it at offset 0).
+    shaderVars.noiseTexture.GetTexture(sMediumFidelityNoiseFillTexture);
+    shaderVars.decalMaskTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
+    );
+    shaderVars.biCubicLookup.GetTexture(sMediumFidelityCubicBlendLookupTexture);
+  }
+
+  /**
+   * Address: 0x00805490 (FUN_00805490, sub_805490)
+   *
+   * IDA signature:
+   * void __usercall sub_805490(_DWORD *a1@<edi>);
+   *
+   * What it does:
+   * Draws one terrain triangle-list pass from `mTerrainIndexSheet` /
+   * `mTerrainVertexSheet` with `(startIndex=0, baseVertex=0)` and
+   * `endVertex=mUnknown30`, using the legacy skirt-start index count clamped to
+   * 199998. Skips the draw when that count is non-positive or not divisible by 3.
+   */
+  void MediumFidelityTerrain::DrawTriangles()
+  {
+    std::int32_t indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+    if (indexCount > kSkirtMaxIndexCount) {
+      indexCount = kSkirtMaxIndexCount;
+    } else if (indexCount <= 0) {
+      return;
+    }
+
+    if ((indexCount % 3) != 0) {
+      return;
+    }
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = indexCount;
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(mUnknown30);
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00807660 (FUN_00807660, Moho::MediumFidelityTerrain::DrawTerrain)
+   *
+   * IDA signature:
+   * int __thiscall Moho::MediumFidelityTerrain::DrawTerrain(
+   *     void *this, boost::shared_ptr_CD3DDynamicTextureSheet a2, int *a3);
+   *
+   * What it does:
+   * Runs one full opaque terrain pass. Rebinds all lighting shader vars with no
+   * shadow source, re-selects the `terrain` effect, selects the caller-provided
+   * technique, binds the overlay texture, loads the base terrain shader vars, and
+   * submits the terrain triangle list. The retained overlay-texture handle is
+   * released as the by-value shared_ptr parameter goes out of scope.
+   */
+  void MediumFidelityTerrain::DrawTerrain(
+    boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+    const msvc8::string* const techniqueName
+  )
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    LoadTerrainLighting(nullptr);
+
+    D3D_GetDevice()->SelectFxFile("terrain");
+    D3D_GetDevice()->SelectTechnique(techniqueName->c_str());
+
+    shaderVars.overlayTexture.GetTexture(overlayTexture);
+
+    LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9>());
+
+    DrawTriangles();
   }
 
   /**
