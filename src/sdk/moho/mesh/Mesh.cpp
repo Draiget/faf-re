@@ -33,6 +33,12 @@ namespace moho
   float ren_MeshDissolve = 0.0f;
   float ren_MeshDissolveCutoff = 0.0f;
 
+  // Mesh-pass inclusion flags read by MeshRenderer::Batch. Byte-verified
+  // defaults from ForgedAlliance.exe: ?ren_MeshSkinned@Moho@@3_NA = 1 and
+  // ?ren_MeshStatic@Moho@@3_NA = 1 (both `bool`, .data VA 0xF57E56/0xF57E57).
+  bool ren_MeshSkinned = true;
+  bool ren_MeshStatic = true;
+
   /**
    * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
    *
@@ -3270,6 +3276,56 @@ namespace
     vector.end = nullptr;
   }
 
+  /**
+   * Address: 0x007D9FC0 (FUN_007D9FC0, std::vector<Moho::MeshInstance*>::push_back)
+   * Grow path: 0x007DA270 (FUN_007DA270, std::vector<Moho::MeshInstance*>::_Insert_n)
+   *
+   * What it does:
+   * Appends one `MeshInstance*` to the raw pointer-triplet render bucket. When
+   * spare capacity exists (`last != end`) it writes the slot and bumps `last`;
+   * otherwise it reallocates to `max(size + size/2, size + 1)` elements
+   * (the MSVC8 1.5x growth policy), copies the existing range, then appends.
+   */
+  void MeshBatchInstanceVectorPushBack(moho::MeshBatchInstanceVector& vector, moho::MeshInstance* const value)
+  {
+    if (vector.last != nullptr && vector.last != vector.end) {
+      *vector.last = value;
+      ++vector.last;
+      return;
+    }
+
+    constexpr std::size_t kMaxElements = 0x3FFFFFFFu;
+    const std::size_t oldSize =
+      vector.first != nullptr ? static_cast<std::size_t>(vector.last - vector.first) : 0u;
+    if (oldSize == kMaxElements) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    std::size_t newCapacity = oldSize + (oldSize >> 1);
+    if (newCapacity < oldSize + 1u) {
+      newCapacity = oldSize + 1u;
+    }
+    if (newCapacity > kMaxElements) {
+      newCapacity = kMaxElements;
+    }
+
+    auto* const reallocated = static_cast<moho::MeshInstance**>(
+      ::operator new(sizeof(moho::MeshInstance*) * newCapacity)
+    );
+    if (oldSize != 0u) {
+      std::copy(vector.first, vector.last, reallocated);
+    }
+    reallocated[oldSize] = value;
+
+    if (vector.first != nullptr) {
+      ::operator delete(vector.first);
+    }
+
+    vector.first = reallocated;
+    vector.last = reallocated + oldSize + 1u;
+    vector.end = reallocated + newCapacity;
+  }
+
   void ClearMeshBatchTreeNodes(moho::MeshBatchBucketNode* const node, moho::MeshBatchBucketNode* const head) noexcept
   {
     if (!node || node == head || IsMeshBatchSentinelNode(node)) {
@@ -6092,6 +6148,131 @@ namespace moho
     // Keep this typed seam so thumbnail paths can call the proper owner API.
     (void)camera;
     (void)meshInstance->GetMesh();
+  }
+
+  /**
+   * Address: 0x007DFA00 (FUN_007DFA00, ?Batch@MeshRenderer@Moho@@QAEXHMABVGeomCamera3@2@ABVVector4f@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::MeshRenderer::Batch(
+   *   MeshRenderer* this, int gameTick, float deltaFrame,
+   *   const GeomCamera3& camera, const Vector4f& fadePlane);
+   *
+   * What it does:
+   * Rebuilds this renderer's per-key render-batch map (`meshes`) for one frame.
+   * Clears the bucket tree, snapshots the frame tick/delta, collects every mesh
+   * instance intersecting the camera frustum from the mesh spatial DB, then for
+   * each visible instance: selects a LOD by view-depth distance, applies the
+   * dissolve fade, frustum-culls the instance sphere, and appends it into the
+   * bucket keyed by `(isStaticPose, blueprint sort order)`.
+   */
+  void MeshRenderer::Batch(
+    const std::int32_t gameTick,
+    const float deltaFrameArg,
+    const GeomCamera3& camera,
+    const Vector4f& fadePlane
+  )
+  {
+    // Clear last frame's buckets and reset the renderer frame lanes.
+    ResetMeshBatchTree(meshes);
+    // Binary stores `gameTick` (param0) into +0x94 and clears the batched-count
+    // lane at +0x9C; both are reused by this pass as frame-scoped scratch.
+    instanceListSize = gameTick;
+    instanceListStateFlags = 0u;
+    deltaFrame = deltaFrameArg;
+
+    // Camera forward direction = negated third row of the inverse-view matrix.
+    // Used as the spatial-DB support/selector axis for the collect volume.
+    const Wm3::Vec3f cameraForward(
+      -camera.inverseView.r[2].x,
+      -camera.inverseView.r[2].y,
+      -camera.inverseView.r[2].z
+    );
+
+    // Collect every renderable instance whose bounds intersect the camera
+    // frustum solid. The mesh spatial DB registers `MeshInstance*` owners, so
+    // each collected `UserEntity*` slot is really a `MeshInstance*`.
+    gpg::fastvector<UserEntity*> collected;
+    meshSpatialDb.CollectAllInVolume(
+      collected, &const_cast<GeomCamera3&>(camera).solid2, cameraForward, fadePlane
+    );
+
+    for (UserEntity* const collectedEntity : collected) {
+      auto* const instance = reinterpret_cast<MeshInstance*>(collectedEntity);
+
+      // Skinned/static inclusion gates plus the hidden flag.
+      const bool isStatic = instance->isStaticPose != 0u;
+      if ((!ren_MeshSkinned && isStatic) || (!ren_MeshStatic && !isStatic) || instance->isHidden != 0u) {
+        continue;
+      }
+
+      // Per-instance tick filter (+0x24). It is 0 for every constructed mesh
+      // instance today, so the `filter == 0` short-circuit always accepts and
+      // the game tick is only compared when a future stamp is present. The
+      // binary loads this compare operand from a stale register lane that IDA
+      // splits across the arg0/deltaFrame stack slots; both are dead while the
+      // filter is 0, so we transcribe the intent (compare against the frame
+      // tick) faithfully.
+      const std::int32_t renderTickFilter = instance->unk24;
+      if (renderTickFilter != 0 && renderTickFilter != gameTick) {
+        continue;
+      }
+
+      instance->UpdateInterpolatedFields();
+
+      // View-depth distance = plane dot of the interpolated world position with
+      // the camera transform's orientation tuple treated as (a,b,c,d).
+      const Wm3::Vec3f& worldPos = instance->interpolatedPosition;
+      const float distance =
+        worldPos.z * camera.tranform.orient_[2]
+        + worldPos.y * camera.tranform.orient_[1]
+        + camera.tranform.orient_[0] * worldPos.x
+        + camera.tranform.orient_[3];
+
+      const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
+      const MeshLOD* const lod = mesh->ComputeLOD(distance);
+      if (lod == nullptr || distance > (mesh->GetMaxCutoff() + ren_MeshDissolve)) {
+        continue;
+      }
+
+      // Dissolve fade for LODs that fade out past their cutoff.
+      if (lod->useDissolve != 0u && lod->cutoff > 0.0f && distance > lod->cutoff) {
+        instance->SetDissolve(1.0f - ((distance - lod->cutoff) / ren_MeshDissolve));
+      } else {
+        instance->dissolve = 1.0f;
+      }
+
+      // Fully dissolved instances are skipped entirely.
+      if (instance->dissolve < ren_MeshDissolveCutoff) {
+        continue;
+      }
+
+      instance->UpdateInterpolatedFields();
+
+      // Second frustum cull against the camera solid using the refreshed
+      // bounding sphere. The binary reads this camera pointer from the arg0
+      // stack slot, which the demangled `int` parameter cannot address; the
+      // only live view camera in this pass is `camera`, so both the collect
+      // volume and this cull share it.
+      if (!camera.solid2.Intersects(instance->sphere)) {
+        continue;
+      }
+
+      // Append into the bucket keyed by (isStaticPose, sort order). The LOD-key
+      // lane stores the collection buffer address the binary carries here as a
+      // per-call constant discriminator (identical for every instance this
+      // frame), so batching resolves purely by static-pose flag and sort order.
+      MeshBatchKey key;
+      key.mIsStaticPose = instance->isStaticPose;
+      key.mLodIndexKey = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(collected.begin()));
+      key.mSortKey = mesh->GetSortOrder();
+
+      MeshBatchInstanceVector* const bucket = MeshBatchBucketTreeFindOrCreateInstances(key, meshes);
+      if (bucket != nullptr) {
+        MeshBatchInstanceVectorPushBack(*bucket, instance);
+        ++instanceListStateFlags;
+      }
+    }
   }
 
   /**

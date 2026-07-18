@@ -988,6 +988,24 @@ namespace moho
     void Render(std::int32_t meshFlags, const GeomCamera3& camera, Shadow* shadow);
 
     /**
+     * Address: 0x007DFA00 (FUN_007DFA00, ?Batch@MeshRenderer@Moho@@QAEXHMABVGeomCamera3@2@ABVVector4f@2@@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::MeshRenderer::Batch(
+     *   MeshRenderer* this, int gameTick, float deltaFrame,
+     *   const GeomCamera3& camera, const Vector4f& fadePlane);
+     *
+     * What it does:
+     * Rebuilds the renderer's per-key render-batch map for one frame. Clears the
+     * owned `meshes` bucket tree, collects every renderable mesh instance whose
+     * bounds intersect the camera frustum from the mesh spatial DB, then for each
+     * visible instance selects its LOD, applies dissolve fade based on the
+     * view-depth distance, frustum-culls against the camera solid, and appends the
+     * instance into the `(isStaticPose, sortOrder)` bucket.
+     */
+    void Batch(std::int32_t gameTick, float deltaFrame, const GeomCamera3& camera, const Vector4f& fadePlane);
+
+    /**
      * Address: 0x007E11C0 (FUN_007E11C0,
      * ?RenderThumbnail@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@PAVMeshInstance@2@PAVID3DRenderTarget@2@PAVID3DDepthStencil@2@@Z)
      *
