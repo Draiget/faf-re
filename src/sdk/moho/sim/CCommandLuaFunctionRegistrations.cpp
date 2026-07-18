@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 #include <limits>
 
 #include "gpg/core/containers/FastVector.h"
@@ -458,6 +459,27 @@ namespace
 
     ScopedLocalSelectionSet(const ScopedLocalSelectionSet&) = delete;
     ScopedLocalSelectionSet& operator=(const ScopedLocalSelectionSet&) = delete;
+
+    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept { return mSet; }
+    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept { return mSet; }
+
+  private:
+    moho::SSelectionSetUserEntity mSet{};
+  };
+
+  // Like ScopedLocalSelectionSet, but leaves the head storage uninitialized so a
+  // copy routine (e.g. `CopySessionSelectionSet`) allocates + populates it in one
+  // pass, matching the binary's raw-weak-set + `CopySelectionSetFromOther` idiom.
+  // The value-initialized `mHead` is null, and `DestroyLocalSelectionSet` tolerates
+  // a null head, so an empty/never-copied instance still tears down cleanly.
+  class ScopedCopiedSelectionSet final
+  {
+  public:
+    ScopedCopiedSelectionSet() = default;
+    ~ScopedCopiedSelectionSet() { DestroyLocalSelectionSet(mSet); }
+
+    ScopedCopiedSelectionSet(const ScopedCopiedSelectionSet&) = delete;
+    ScopedCopiedSelectionSet& operator=(const ScopedCopiedSelectionSet&) = delete;
 
     [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept { return mSet; }
     [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept { return mSet; }
@@ -2666,6 +2688,321 @@ namespace moho
   int cfunc_GetUnitCommandData(lua_State* const luaContext)
   {
     return cfunc_GetUnitCommandDataL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  namespace
+  {
+    // RULEUCC_Dock command capability bit tested against UnitAttributes::commandCapsMask.
+    constexpr std::uint32_t kRuleUccDock = 0x400000u;
+
+    // Current-layer values that disqualify a platform from being a dock target:
+    // an underwater platform (Sub or Seabed layer) cannot stage docked units.
+    // (the binary gates `layer != LAYER_Sub(4) && layer != LAYER_Seabed(2)`.)
+    constexpr std::uint32_t kDockRejectLayerSub = 4u;    // LAYER_Sub
+    constexpr std::uint32_t kDockRejectLayerSeabed = 2u; // LAYER_Seabed
+
+    // Radius padding (world units) added to the nearest-platform distance when the
+    // whole selection cannot dock at a single platform (binary literal 100.0f).
+    constexpr float kMultiDockRadiusPadding = 100.0f;
+
+    // One candidate air-staging platform: the ordering keys the binary computes for
+    // each viable platform. Layout matches the 12-byte record the binary pushes
+    // (platform @ +0x00, distSq @ +0x04, freeCapacity @ +0x08).
+    struct DockCandidate
+    {
+      UserUnit* platform;      // +0x00
+      float distSq;            // +0x04 (squared XZ distance to selection centroid)
+      std::int32_t freeCapacity; // +0x08 (available docking slots)
+    };
+  } // namespace
+
+  /**
+   * Address: 0x00840A70 (FUN_00840A70, cfunc_IssueDockCommandL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_IssueDockCommandL(LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Implements the global Lua `IssueDockCommand(clear)`. Snapshots the current
+   * world selection, keeps only units with the `RULEUCC_Dock` capability, and
+   * computes their XZ centroid (each unit contributes either its live position or,
+   * when `clear` is false and it has a queued command, that command's anchor
+   * position). It then scans every session entity for viable focus-army air-staging
+   * platforms (alive, not being built, in category `AIRSTAGINGPLATFORM`, not on an
+   * air/water layer, idle) with free docking capacity, recording distance-to-centroid
+   * and free-slot count for each. If the nearest platform can hold the whole
+   * dock-capable set, one `UNITCOMMAND_Dock` is issued toward it; otherwise units are
+   * distributed proportionally across the nearby platforms (within
+   * nearest-distance + 100 units) by free-capacity share. If no viable platform was
+   * found, or all had no capacity, it plays the corresponding "no staging platforms"
+   * / "busy staging platforms" voice-over on one representative selected entity.
+   */
+  int cfunc_IssueDockCommandL(LuaPlus::LuaState* const state)
+  {
+    const int argc = lua_gettop(state->m_state);
+    if (argc != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDockCommandHelpText, 1, argc);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      gpg::Warnf("Attempt to call IssueCommand before world sessions exists.");
+      return 0;
+    }
+
+    // Focus army must be valid (mFocusArmy >= 0 && mUserArmies[mFocusArmy] != null).
+    if (session->GetFocusArmy() == nullptr) {
+      return 0;
+    }
+
+    const bool clear = LuaPlus::LuaStackObject(state, 1).GetBoolean();
+
+    // Snapshot the current selection so the scan is not perturbed by later state.
+    // CopySessionSelectionSet allocates + populates the head in one pass (matching
+    // the binary's raw-weak-set + FUN_00822210 idiom), so the snapshot must NOT
+    // pre-allocate its own head.
+    ScopedCopiedSelectionSet selectionSnapshot{};
+    (void)CopySessionSelectionSet(&selectionSnapshot.get(), &session->mSelection);
+
+    // The dock-capable subset of the selection; docks are issued to this set.
+    ScopedLocalSelectionSet dockTargets{};
+
+    // XZ centroid accumulator over the dock-capable units, and their count.
+    float centroidX = 0.0f;
+    float centroidZ = 0.0f;
+    float dockCapableCount = 0.0f;
+
+    // --- Phase 1: collect dock-capable selected units + accumulate the centroid. ---
+    {
+      SSelectionSetUserEntity& snapshot = selectionSnapshot.get();
+      SSelectionNodeUserEntity* node = nullptr;
+      node = SSelectionSetUserEntity::find(&snapshot, snapshot.mHead->mLeft, &node);
+      while (node != snapshot.mHead) {
+        UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
+        UserUnit* const unit = (entity != nullptr) ? entity->IsUserUnit() : nullptr;
+        if (unit != nullptr) {
+          IUnit* const bridge = GetIUnitBridge(unit);
+          if ((bridge->GetAttributes().commandCapsMask & kRuleUccDock) != 0u) {
+            const QueuedUserCommandRecord* const anchor = GetLastQueuedUserCommandAnchor(unit);
+            if (clear || anchor == nullptr) {
+              const Wm3::Vec3f& position = bridge->GetPosition();
+              centroidX += position.x;
+              centroidZ += position.z;
+            } else {
+              const Wm3::Vector3f anchorPos = ResolveLastQueuedCommandAnchorPosition(anchor);
+              centroidX += anchorPos.x;
+              centroidZ += anchorPos.z;
+            }
+
+            SSelectionSetUserEntity::AddResult addResult{};
+            (void)SSelectionSetUserEntity::Add(&addResult, &dockTargets.get(), entity);
+            dockCapableCount += 1.0f;
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&snapshot, node, &node);
+      }
+    }
+
+    if (dockCapableCount <= 0.0f) {
+      return 0;
+    }
+
+    centroidX = (1.0f / dockCapableCount) * centroidX;
+    centroidZ = centroidZ * (1.0f / dockCapableCount);
+
+    // Voice-over gating flags: whether any focus-army staging platform was seen at
+    // all, and whether any had free docking capacity.
+    bool foundStagingPlatform = false;
+    bool foundFreeStagingPlatform = false;
+
+    // Staging-platform category snapshot (copy of the rules-cached set).
+    EntityCategorySet stagingCategory(*session->mRules->GetEntityCategory("AIRSTAGINGPLATFORM"));
+
+    // --- Phase 2: scan every session entity for viable air-staging platforms. ---
+    std::vector<DockCandidate> candidates;
+    {
+      UserArmy* const focusArmy = session->GetFocusArmy();
+      msvc8::vector<UserUnit*> sessionUnits;
+      GetSessionUserUnits(session, sessionUnits);
+      for (UserUnit* const platform : sessionUnits) {
+        if (platform == nullptr) {
+          continue;
+        }
+        if (reinterpret_cast<UserEntity*>(platform)->mArmy != focusArmy) {
+          continue;
+        }
+        if (platform->IsBeingBuilt()) {
+          continue;
+        }
+
+        IUnit* const platformBridge = GetIUnitBridge(platform);
+        if (platformBridge->IsDead()) {
+          continue;
+        }
+
+        const RUnitBlueprint* const blueprint = platformBridge->GetBlueprint();
+        if (!EntityCategory::HasBlueprint(blueprint, &stagingCategory)) {
+          continue;
+        }
+
+        foundStagingPlatform = true;
+
+        const std::uint32_t layerMask = reinterpret_cast<UserEntity*>(platform)->mVariableData.mLayerMask;
+        if (layerMask == kDockRejectLayerSub || layerMask == kDockRejectLayerSeabed) {
+          continue;
+        }
+        if (!USERUNIT_IsDockTargetIdle(platform)) {
+          continue;
+        }
+
+        const std::int32_t storageSlots = blueprint->Transport.StorageSlots;
+        std::int32_t freeCapacity = blueprint->Transport.DockingSlots;
+        if (storageSlots != 0) {
+          const std::int32_t dockedCount =
+            static_cast<std::int32_t>(reinterpret_cast<UserEntity*>(platform)->mVariableData.mAuxValueVector.Size());
+          freeCapacity = storageSlots - dockedCount;
+        }
+        if (freeCapacity <= 0) {
+          continue;
+        }
+
+        foundFreeStagingPlatform = true;
+
+        const Wm3::Vec3f& platformPos = platformBridge->GetPosition();
+        const float dx = platformPos.x - centroidX;
+        const float dz = platformPos.z - centroidZ;
+        const float distSq = (dz * dz) + (dx * dx);
+        candidates.push_back(DockCandidate{platform, distSq, freeCapacity});
+      }
+    }
+
+    // --- Phase 3: distance-sort candidates and assign dock commands. ---
+    std::sort(candidates.begin(), candidates.end(), [](const DockCandidate& a, const DockCandidate& b) {
+      return a.distSq < b.distSq;
+    });
+
+    if (!candidates.empty()) {
+      const std::int32_t dockCapableSize = dockTargets.get().size();
+      if (dockCapableSize <= candidates.front().freeCapacity) {
+        // The nearest platform can hold the entire dock-capable set: one command.
+        SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Dock);
+        command.mTarget.mEnt = reinterpret_cast<UserEntity*>(candidates.front().platform)->mParams.mEntityId;
+        command.mTarget.mType = EAiTargetType::AITARGET_Entity;
+        command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+        ISSUE_Command(dockTargets.get(), command, clear);
+      } else {
+        // Distribute the selection across nearby platforms by free-capacity share.
+        // Gather platforms within (nearestDistance + 100)^2 and total their capacity.
+        const float nearestDistance = std::sqrt(candidates.front().distSq);
+        const float radiusSq =
+          (nearestDistance + kMultiDockRadiusPadding) * (nearestDistance + kMultiDockRadiusPadding);
+
+        std::int32_t totalFreeCapacity = 0;
+        std::vector<DockCandidate> nearbyPlatforms;
+        for (const DockCandidate& candidate : candidates) {
+          if (radiusSq > candidate.distSq) {
+            nearbyPlatforms.push_back(candidate);
+            totalFreeCapacity += candidate.freeCapacity;
+          }
+        }
+
+        // Order the chosen platforms by ascending free capacity, then distance.
+        std::sort(
+          nearbyPlatforms.begin(),
+          nearbyPlatforms.end(),
+          [](const DockCandidate& a, const DockCandidate& b) {
+            if (a.freeCapacity != b.freeCapacity) {
+              return a.freeCapacity < b.freeCapacity;
+            }
+            return a.distSq < b.distSq;
+          }
+        );
+
+        // Per-platform quota scale = max(1, ceil(selectionSize / totalCapacity)).
+        const float capacityRatio =
+          static_cast<float>(dockCapableSize) / static_cast<float>(totalFreeCapacity);
+        const float quotaScale = (capacityRatio > 1.0f) ? capacityRatio : 1.0f;
+
+        // Walk the dock-capable set, filling each platform up to its scaled quota.
+        SSelectionSetUserEntity& dockSet = dockTargets.get();
+        for (const DockCandidate& platformSlot : nearbyPlatforms) {
+          // Quota = round-to-nearest(freeCapacity * scale), rounding up on any
+          // positive remainder above the rounded value (matches x87 frndint + adjust).
+          const float quotaValue = static_cast<float>(platformSlot.freeCapacity) * quotaScale;
+          const float roundedQuota = std::rint(quotaValue);
+          std::int32_t quota = static_cast<std::int32_t>(roundedQuota);
+          if (quotaValue > roundedQuota) {
+            quota += 1;
+          }
+
+          // Build a fresh weak-set of up to `quota` units drawn from the dock set.
+          ScopedLocalSelectionSet quotaUnits{};
+          SSelectionNodeUserEntity* cursor = nullptr;
+          cursor = SSelectionSetUserEntity::find(&dockSet, dockSet.mHead->mLeft, &cursor);
+          while (cursor != dockSet.mHead) {
+            if (quotaUnits.get().size() >= quota) {
+              break;
+            }
+
+            if (UserEntity* const unitEntity = DecodeSelectionEntity(cursor->mEnt); unitEntity != nullptr) {
+              SSelectionSetUserEntity::AddResult addResult{};
+              (void)SSelectionSetUserEntity::Add(&addResult, &quotaUnits.get(), unitEntity);
+            }
+
+            SSelectionSetUserEntity::Iterator_inc(&cursor);
+            cursor = SSelectionSetUserEntity::find(&dockSet, cursor, &cursor);
+          }
+
+          // If nothing could be assigned to this platform, stop distributing.
+          SSelectionNodeUserEntity* firstAssigned = nullptr;
+          firstAssigned =
+            SSelectionSetUserEntity::find(&quotaUnits.get(), quotaUnits.get().mHead->mLeft, &firstAssigned);
+          if (firstAssigned == quotaUnits.get().mHead) {
+            break;
+          }
+
+          SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Dock);
+          command.mTarget.mEnt = reinterpret_cast<UserEntity*>(platformSlot.platform)->mParams.mEntityId;
+          command.mTarget.mType = EAiTargetType::AITARGET_Entity;
+          command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+          ISSUE_Command(quotaUnits.get(), command, clear);
+        }
+      }
+    }
+
+    // --- Voice-over feedback on one representative selected entity. ---
+    UserEntity* representative = nullptr;
+    {
+      SSelectionSetUserEntity& snapshot = selectionSnapshot.get();
+      SSelectionNodeUserEntity* firstLive = nullptr;
+      firstLive = SSelectionSetUserEntity::find(&snapshot, snapshot.mHead->mLeft, &firstLive);
+      representative = DecodeSelectionEntity(firstLive->mEnt);
+    }
+
+    if (representative != nullptr) {
+      UserUnit* const representativeUnit = representative->IsUserUnit();
+      if (representativeUnit != nullptr) {
+        const char* voiceOver = nullptr;
+        if (!foundStagingPlatform) {
+          voiceOver = "PlayNoStagingPlatformsVO";
+        } else if (!foundFreeStagingPlatform) {
+          voiceOver = "PlayBusyStagingPlatformsVO";
+        }
+
+        if (voiceOver != nullptr) {
+          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+            const auto entityIdAsPtr = reinterpret_cast<void*>(
+              static_cast<std::uintptr_t>(reinterpret_cast<UserEntity*>(representativeUnit)->mParams.mEntityId)
+            );
+            driver->ProcessInfoPair(entityIdAsPtr, "play", voiceOver);
+          }
+        }
+      }
+    }
+
+    return 0;
   }
 
   /**

@@ -3857,6 +3857,41 @@ namespace moho
   }
 
   /**
+   * Bridge exposing the file-local `IsDockTargetQueueIdle` (FUN_008C0D00) to the
+   * recovered `cfunc_IssueDockCommandL` worker in CCommandLuaFunctionRegistrations.cpp.
+   * Returns whether one candidate platform unit is idle enough (not busy, no
+   * pending command queue entries) to be considered a dock target.
+   */
+  bool USERUNIT_IsDockTargetIdle(const UserUnit* const unit) noexcept
+  {
+    return IsDockTargetQueueIdle(unit);
+  }
+
+  /**
+   * Bridge exposing the file-local `GetLastQueuedUserCommandHelper` (FUN_008B7320)
+   * to the recovered `cfunc_IssueDockCommandL` worker. Resolves the unit's
+   * command-manager handle (`UserUnit::GetCommandQueue2`, slot 6) and returns the
+   * most recent queued command-issue helper as an opaque cross-TU handle. The
+   * dock worker reinterprets this handle as the command-graph anchor history the
+   * binary walks to seed its centroid (identical binary object).
+   */
+  const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(const UserUnit* const unit) noexcept
+  {
+    if (unit == nullptr) {
+      return nullptr;
+    }
+
+    UserUnitManager* const manager = reinterpret_cast<UserUnitManager*>(
+      DecodeUserCommandManagerHandle(unit->GetCommandQueue2())
+    );
+    if (manager == nullptr) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<const QueuedUserCommandRecord*>(GetLastQueuedUserCommandHelper(manager));
+  }
+
+  /**
    * Address: 0x008C1220 (FUN_008C1220, sub_8C1220)
    *
    * IDA signature:

@@ -28,6 +28,10 @@ namespace moho
   class UserEntity;
   struct UserCommandIssueHelper;
   struct UserUnitManager;
+  // Opaque cross-TU handle to the runtime user command-issue helper / command-graph
+  // anchor-history object (same binary object surfaced under two names). Used only as
+  // an incomplete pointer by the IssueDockCommand worker.
+  struct QueuedUserCommandRecord;
   struct UserCommand;
   class UserUnitWeapon;
   class IUnit;
@@ -838,6 +842,22 @@ namespace moho
    * build blueprint upcast to `RUnitBlueprint`).
    */
   void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, msvc8::set<const RUnitBlueprint*>& out);
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
+   * whether one candidate platform unit is currently idle enough (not busy, no
+   * pending command-queue entries) to be a dock target. Wraps the file-local
+   * `IsDockTargetQueueIdle` (FUN_008C0D00).
+   */
+  [[nodiscard]] bool USERUNIT_IsDockTargetIdle(const UserUnit* unit) noexcept;
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves one
+   * unit's most recent queued command-issue helper (via `GetCommandQueue2` +
+   * FUN_008B7320) as an opaque cross-TU anchor-history handle, or `nullptr` when
+   * the unit has no queued command.
+   */
+  [[nodiscard]] const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(const UserUnit* unit) noexcept;
 
   /**
    * Address: 0x008C2010 (FUN_008C2010, cfunc_UserUnitCanAttackTarget)
