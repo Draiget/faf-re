@@ -11,6 +11,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/entity/Entity.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -569,13 +570,19 @@ namespace
     const CAiPathNavigator& navigator, const SOCellPos fromCell, const SOCellPos toCell
   )
   {
-    if (!navigator.mPathFinder) {
+    CAiPathFinder* const pathFinder = navigator.mPathFinder;
+    if (!pathFinder || !pathFinder->mUnit) {
       return false;
     }
 
+    const COGrid* const grid = GetPathingGrid(navigator);
+    if (!grid) {
+      return false;
+    }
+
+    // Leader / extended-probe transitions use blocker mode 2, all others mode 1.
     const std::int32_t transitionMode = (navigator.mUseExtendedPathProbe != 0u) ? 2 : 1;
-    (void)transitionMode;
-    return CanOccupyTargetCell(navigator, fromCell, toCell);
+    return !PathTransitionBlocked(toCell, fromCell, *const_cast<COGrid*>(grid), pathFinder->mUnit, transitionMode);
   }
 
   /**
