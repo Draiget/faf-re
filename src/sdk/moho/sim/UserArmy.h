@@ -55,6 +55,14 @@ namespace moho
     [[nodiscard]] bool IsAlly(std::uint32_t armyIndex) const;
 
     /**
+     * Address: 0x005D5540 (FUN_005D5540, Moho::IArmy::IsEnemy)
+     *
+     * What it does:
+     * Tests enemy-bitset membership for `armyIndex`.
+     */
+    [[nodiscard]] bool IsEnemy(std::uint32_t armyIndex) const;
+
+    /**
      * Address: 0x008B17F0 (FUN_008B17F0, Moho::UserArmy::CanSeeCell)
      *
      * What it does:

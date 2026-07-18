@@ -57,6 +57,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x005D5540 (FUN_005D5540, Moho::IArmy::IsEnemy)
+   *
+   * What it does:
+   * Enemy mirror of IsAlly — tests membership of `armyIndex` in this army's
+   * enemy bit-set.
+   */
+  bool UserArmy::IsEnemy(const std::uint32_t armyIndex) const
+  {
+    if (armyIndex == 0xFFFFFFFFu) {
+      return false;
+    }
+
+    const Set& enemies = mVarDat.mEnemies;
+    if (!enemies.items_begin || !enemies.items_end) {
+      return false;
+    }
+
+    return enemies.Contains(armyIndex);
+  }
+
+  /**
    * Address: 0x008B17F0 (FUN_008B17F0, Moho::UserArmy::CanSeeCell)
    */
   bool UserArmy::CanSeeCell(const std::int32_t x, const std::int32_t z, const EReconGridMask gridMask) const

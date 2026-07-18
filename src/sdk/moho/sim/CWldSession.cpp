@@ -7522,6 +7522,368 @@ namespace moho
         DeleteFixup(tree, x, xParent);
       }
     }
+
+    // ===================================================================
+    // Right-mouse-button command resolution helpers (FUN_0081EC00 family)
+    // ===================================================================
+    //
+    // These file-static helpers back the global right-click dispatcher
+    // `func_GetRightMouseButtonAction` (FUN_0081EC00). They are only ever
+    // called from that dispatcher inside this translation unit, so they stay
+    // in this anonymous namespace next to the selection-iteration helpers they
+    // reuse (DecodeSelectedUserEntity / ResolveIUnitBridge / IsSentinelNode).
+
+    // Session command-manager runtime views. The session's command manager
+    // lives behind `CWldSession::mSessionRes1`; its command-issue map (keyed by
+    // CmdId) starts at manager offset +0xCB4 with the RB-tree head at +0xCB8.
+    // Same per-TU view shape used by Sim.cpp / UserUnit.cpp.
+    struct RightClickCommandIssueMapNodeView
+    {
+      RightClickCommandIssueMapNodeView* left;   // +0x00
+      RightClickCommandIssueMapNodeView* parent; // +0x04
+      RightClickCommandIssueMapNodeView* right;  // +0x08
+      std::uint32_t key;                         // +0x0C (CmdId)
+      void* value;                               // +0x10 (helper*)
+      std::uint8_t color;                        // +0x14
+      std::uint8_t isNil;                        // +0x15
+      std::uint8_t pad_16[2];
+    };
+    static_assert(offsetof(RightClickCommandIssueMapNodeView, key) == 0x0C, "cmd-issue node key offset must be 0x0C");
+    static_assert(offsetof(RightClickCommandIssueMapNodeView, value) == 0x10, "cmd-issue node value offset must be 0x10");
+    static_assert(offsetof(RightClickCommandIssueMapNodeView, isNil) == 0x15, "cmd-issue node isNil offset must be 0x15");
+
+    struct RightClickCommandIssueMapView
+    {
+      void* allocatorProxy;                    // +0x00
+      RightClickCommandIssueMapNodeView* head; // +0x04
+      std::uint32_t size;                      // +0x08
+    };
+    static_assert(offsetof(RightClickCommandIssueMapView, head) == 0x04, "cmd-issue map head offset must be 0x04");
+
+    struct RightClickCommandManagerView
+    {
+      std::uint8_t pad_0000_0CB4[0xCB4];
+      RightClickCommandIssueMapView commandIssueMap; // +0xCB4
+    };
+    static_assert(
+      offsetof(RightClickCommandManagerView, commandIssueMap) == 0xCB4, "command manager issue-map offset must be 0xCB4"
+    );
+
+    // The command-issue helper stores its baseline unit-command type at +0x58.
+    // The dispatcher only needs that field to detect Attack / FormAttack; the
+    // IDA helper `sub_8B4140` resolves the most-recent override event, which for
+    // this Attack/FormAttack test degrades to the same baseline command-type
+    // read (ResolveHelperCommandType in UserUnit.cpp, FUN_008B4140).
+    struct RightClickCommandIssueHelperView
+    {
+      std::uint8_t pad_0000_0058[0x58];
+      EUnitCommandType commandType; // +0x58
+    };
+    static_assert(
+      offsetof(RightClickCommandIssueHelperView, commandType) == 0x58,
+      "command-issue helper command-type offset must be 0x58"
+    );
+
+    /**
+     * Ordered lookup of one command-issue helper by CmdId in the session
+     * command manager's RB-tree, mirroring the `std::map<CmdId,...>::find` in
+     * FUN_0081EC00. Returns nullptr when the manager is absent or the key is
+     * not present.
+     */
+    [[nodiscard]] RightClickCommandIssueHelperView*
+      FindRightClickCommandIssueHelper(CWldSession* const session, const std::uint32_t commandId) noexcept
+    {
+      if (session == nullptr || session->mSessionRes1 == nullptr) {
+        return nullptr;
+      }
+
+      auto* const manager = reinterpret_cast<RightClickCommandManagerView*>(session->mSessionRes1);
+      RightClickCommandIssueMapView& issueMap = manager->commandIssueMap;
+      RightClickCommandIssueMapNodeView* const head = issueMap.head;
+      if (head == nullptr) {
+        return nullptr;
+      }
+
+      RightClickCommandIssueMapNodeView* result = head;
+      RightClickCommandIssueMapNodeView* node = head->parent;
+      while (node != nullptr && node != head && node->isNil == 0u) {
+        if (node->key >= commandId) {
+          result = node;
+          node = node->left;
+        } else {
+          node = node->right;
+        }
+      }
+
+      if (result == head || commandId < result->key) {
+        return nullptr;
+      }
+
+      return reinterpret_cast<RightClickCommandIssueHelperView*>(result->value);
+    }
+
+    /**
+     * Address: 0x0081D080 (FUN_0081D080, sub_81D080)
+     *
+     * IDA signature:
+     * char __cdecl sub_81D080(Moho::UserEntity *a1, Moho::CWldSession *a2);
+     *
+     * What it does:
+     * Returns true when the hovered target `hoverEntity` is a live, non-destroy-
+     * queued entity that at least one currently selected unit can attack (range-
+     * checked). Backs the enemy-hover Attack decision in the right-click
+     * dispatcher.
+     */
+    [[nodiscard]] bool AnySelectedUnitCanAttackHover(UserEntity* const hoverEntity, CWldSession* const session)
+    {
+      if (hoverEntity == nullptr) {
+        return false;
+      }
+      if (hoverEntity->mVariableData.mIsDead != 0u) {
+        return false;
+      }
+
+      if (UserUnit* const hoverUnit = hoverEntity->IsUserUnit(); hoverUnit != nullptr) {
+        IUnit* const hoverBridge = ResolveIUnitBridge(hoverUnit);
+        if (hoverBridge != nullptr && hoverBridge->DestroyQueued()) { // IUnit subobject slot +0x2C
+          return false;
+        }
+      }
+
+      SSelectionSetUserEntity& selection = session->mSelection;
+      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+      while (node != selection.mHead) {
+        if (UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt); selectedEntity != nullptr) {
+          if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit(); selectedUnit != nullptr) {
+            if (selectedUnit->CanAttackTarget(hoverEntity, true)) {
+              return true;
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      return false;
+    }
+
+    /**
+     * Address: 0x0081D280 (FUN_0081D280, func_RightClickWithTransport)
+     *
+     * IDA signature:
+     * char __cdecl func_RightClickWithTransport(Moho::WeakSet_UserEntity *a1, Moho::UserUnit *arg4);
+     *
+     * What it does:
+     * Scans the current selection for any live transporter that may pick up or
+     * interact with the hovered entity `hoverEntity`, honoring the transport-
+     * eligibility category rules (CANTRANSPORTCOMMANDER / FERRYBEACON / COMMAND
+     * / TRANSPORTATION / TELEPORTATION / AIRSTAGINGPLATFORM / CANNOTUSEAIRSTAGING).
+     * Returns true on the first eligible transporter. `arg4` is declared
+     * `UserUnit*` by the decompiler but only ever used through UserEntity
+     * members, so the recovered parameter is typed as the base `UserEntity*`.
+     */
+    [[nodiscard]] bool SelectionHasTransportForTarget(SSelectionSetUserEntity* const selection, UserEntity* const hoverEntity)
+    {
+      if (hoverEntity == nullptr) {
+        return false;
+      }
+      if (hoverEntity->mVariableData.mIsDead != 0u) {
+        return false;
+      }
+      if (hoverEntity->mVariableData.mLayerMask == static_cast<std::uint32_t>(LAYER_Seabed)) {
+        return false;
+      }
+      if (hoverEntity->IsBeingBuilt()) { // arg4 vtable slot +0x34
+        return false;
+      }
+
+      SSelectionSetUserEntity::FindResult cursor{};
+      (void)selection->First(&cursor);
+      while (cursor.mRes != selection->mHead) {
+        UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
+        UserUnit* const transporter = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
+        if (transporter != nullptr) {
+          IUnit* const transporterBridge = ResolveIUnitBridge(transporter);
+          if (transporterBridge != nullptr && !transporterBridge->IsDead() // slot +0x28
+              && !transporter->IsBeingBuilt()                              // v6 vtable slot +0x34
+              && !transporterBridge->DestroyQueued())                      // slot +0x2C
+          {
+            // Group 1: decide whether to skip this transporter.
+            // CANTRANSPORTCOMMANDER(hover) or FERRYBEACON(hover) -> not a skip;
+            // otherwise skip iff the transporter is not COMMAND.
+            bool skip;
+            if (hoverEntity->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
+              skip = false;
+            } else if (hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"))) {
+              skip = false;
+            } else {
+              skip = !reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("COMMAND"));
+            }
+
+            if (!skip) {
+              // Group 2: does the hovered entity want air transport?
+              bool wantsAir;
+              if (hoverEntity->IsInCategory(msvc8::string("TRANSPORTATION"))) {
+                wantsAir = true;
+              } else if (hoverEntity->IsInCategory(msvc8::string("TELEPORTATION"))) {
+                wantsAir = true;
+              } else {
+                wantsAir = hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+              }
+
+              if (wantsAir) {
+                // Non-flying transporter for an air-transport request -> accept.
+                // GetBlueprint() on the transporter IUnit subobject (slot +0x1C),
+                // then Air.CanFly (blueprint + 0x368).
+                if (transporterBridge->GetBlueprint()->Air.CanFly == 0u) {
+                  return true;
+                }
+              } else if (hoverEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))) {
+                // Accept if the transporter can't fly, or can fly but is
+                // CANNOTUSEAIRSTAGING (still a valid staging interaction).
+                if (transporterBridge->GetBlueprint()->Air.CanFly == 0u
+                    || reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("CANNOTUSEAIRSTAGING"))) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
+        cursor.mRes = SSelectionSetUserEntity::find(cursor.mSet, cursor.mRes, &cursor.mRes);
+      }
+
+      return false;
+    }
+
+    /**
+     * Address: 0x0081D660 (FUN_0081D660, func_RightClickTransport)
+     *
+     * IDA signature:
+     * char __usercall func_RightClickTransport@<al>(int a1, Moho::UserEntity *a2@<ecx>);
+     *
+     * What it does:
+     * Scans the current selection for any selected unit that the hovered
+     * transporter `hoverEntity` is allowed to carry, honoring the transport
+     * category rules (TELEPORTATION / EXPERIMENTAL / TRANSPORTFOCUS /
+     * CANTRANSPORTCOMMANDER / COMMAND / TRANSPORTATION / FERRYBEACON /
+     * AIRSTAGINGPLATFORM) against the hovered unit's air capability. Returns
+     * true on the first accepted selected unit.
+     */
+    [[nodiscard]] bool HoverTransportAcceptsSelection(SSelectionSetUserEntity* const selection, UserEntity* const hoverEntity)
+    {
+      if (hoverEntity == nullptr) {
+        return false;
+      }
+      if (hoverEntity->mVariableData.mIsDead != 0u || hoverEntity->IsBeingBuilt()) {
+        return false;
+      }
+
+      UserUnit* const hoverUnit = hoverEntity->IsUserUnit();
+      if (hoverUnit == nullptr) {
+        return false;
+      }
+      IUnit* const hoverBridge = ResolveIUnitBridge(hoverUnit);
+      if (hoverBridge == nullptr) {
+        return false;
+      }
+
+      SSelectionSetUserEntity::FindResult cursor{};
+      (void)selection->First(&cursor);
+      while (cursor.mRes != selection->mHead) {
+        // The binary rejects both null and the encoded sentinel (v5 == 8);
+        // DecodeSelectedUserEntity returns nullptr for both, so one guard covers it.
+        UserEntity* const candidate = DecodeSelectedUserEntity(cursor.mRes->mEnt);
+        if (candidate != nullptr) {
+          // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover).
+          bool teleOrExperimental;
+          if (candidate->IsInCategory(msvc8::string("TELEPORTATION"))) {
+            teleOrExperimental = true;
+          } else {
+            teleOrExperimental = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("EXPERIMENTAL"));
+          }
+
+          if (!teleOrExperimental
+              && candidate->mVariableData.mLayerMask != static_cast<std::uint32_t>(LAYER_Seabed)) {
+            // Group 2: TRANSPORTFOCUS(candidate).
+            if (candidate->IsInCategory(msvc8::string("TRANSPORTFOCUS"))) {
+              // Group 3: CANTRANSPORTCOMMANDER(candidate) -> not a skip;
+              // otherwise skip iff the hover unit is not COMMAND.
+              bool skip;
+              if (candidate->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
+                skip = false;
+              } else {
+                skip = !reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
+              }
+
+              if (!skip) {
+                // Group 4: TRANSPORTATION(candidate) or FERRYBEACON(candidate).
+                bool wantsAir;
+                if (candidate->IsInCategory(msvc8::string("TRANSPORTATION"))) {
+                  wantsAir = true;
+                } else {
+                  wantsAir = candidate->IsInCategory(msvc8::string("FERRYBEACON"));
+                }
+
+                if (wantsAir) {
+                  // Non-flying hover unit for an air-transport request -> accept.
+                  if (hoverBridge->GetBlueprint()->Air.CanFly == 0u) {
+                    return true;
+                  }
+                } else if (candidate->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))
+                           && hoverBridge->GetBlueprint()->Air.CanFly != 0u) {
+                  // Air-staging platform docking a flying hover unit -> accept.
+                  return true;
+                }
+              }
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
+        cursor.mRes = SSelectionSetUserEntity::find(cursor.mSet, cursor.mRes, &cursor.mRes);
+      }
+
+      return false;
+    }
+
+    /**
+     * Address: 0x0081DA20 (FUN_0081DA20, sub_81DA20)
+     *
+     * IDA signature:
+     * char __usercall sub_81DA20@<al>(int a1@<ebx>, Moho::CWldSession *a2);
+     *
+     * What it does:
+     * Returns true only when every currently selected entity is in the FACTORY
+     * category. Used by the ferry-beacon right-click path to allow a
+     * CallTransport order when the whole selection is factories. The binary
+     * snapshots the FACTORY category's bit-vector and tests each selected
+     * entity's blueprint ordinal against it; `EntityCategory::HasBlueprint`
+     * expresses that same membership test.
+     */
+    [[nodiscard]] bool AllSelectedAreFactories(SSelectionSetUserEntity* const selection, CWldSession* const session)
+    {
+      const CategoryWordRangeView* const factoryCategory =
+        static_cast<RRuleGameRules*>(session->mRules)->GetEntityCategory("FACTORY");
+
+      SSelectionNodeUserEntity* node = selection->mHead->mLeft;
+      node = SSelectionSetUserEntity::find(selection, node, &node);
+      while (node != selection->mHead) {
+        UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+        if (selectedEntity == nullptr
+            || !EntityCategory::HasBlueprint(selectedEntity->mParams.mBlueprint, factoryCategory)) {
+          return false;
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(selection, node, &node);
+      }
+
+      return true;
+    }
   } // namespace
 
   /**
@@ -10990,3 +11352,277 @@ namespace moho
     return gActiveWldSession;
   }
 } // namespace moho
+
+
+/**
+ * Address: 0x0081EC00 (FUN_0081EC00, func_GetRightMouseButtonAction)
+ * Mangled: ?func_GetRightMouseButtonAction@@... (referenced at global scope)
+ *
+ * IDA signature:
+ * Moho::SCommandModeData *__cdecl func_GetRightMouseButtonAction(
+ *     Moho::SCommandModeData *commandData, Moho::UICursorInfo *mouseInfo,
+ *     int modifiers, Moho::CWldSession *wldSession);
+ *
+ * What it does:
+ * Resolves the command a right-mouse click issues for the current selection
+ * given the cursor state (hover target, drag id, modifiers). Walks the selected
+ * set to accumulate the union of command-caps, then applies the attack /
+ * capture / reclaim / transport / repair / guard / move precedence against the
+ * hovered entity (or the pending command-manager helper when there is no hover)
+ * and writes the resolved SCommandModeData into `out`. This symbol is
+ * referenced by the linker at global scope (not inside namespace moho), so the
+ * definition stays at global scope.
+ */
+moho::CommandModeData* func_GetRightMouseButtonAction(
+  moho::CommandModeData* out, moho::MouseInfo* mouseInfo, int modifiers, moho::CWldSession* wldSession)
+{
+  using namespace moho;
+
+  // Seed defaults from the cursor snapshot + modifiers (FUN_0081CEA0).
+  CommandModeData commandModeData(*mouseInfo, modifiers);
+
+  // No valid focus army (observer) -> return the default (empty) command mode.
+  if (wldSession->FocusArmy < 0 || wldSession->userArmies[wldSession->FocusArmy] == nullptr) {
+    *out = commandModeData;
+    return out;
+  }
+
+  // An active UI command mode (e.g. a placement mode already engaged) suppresses
+  // right-click command resolution; leave `out` untouched and bail.
+  UICommandModeData commandMode{};
+  TryGetUICommandMode(wldSession->mState, commandMode);
+  if (!commandMode.mMode.empty()) {
+    return out;
+  }
+
+  // Accumulate the union of command caps over every live selected user-unit.
+  // `categoryOrdinals` collects each selected blueprint's category-bit index;
+  // the binary keeps this side effect but never reads the set for a decision
+  // (dead accumulation), so it is built and then destructed at scope end.
+  BVIntSet categoryOrdinals;
+  ERuleBPUnitCommandCaps selectionCommandCaps = RULEUCC_None;
+  {
+    SSelectionSetUserEntity& selection = wldSession->mSelection;
+    SSelectionNodeUserEntity* node = selection.mHead->mLeft;
+    node = SSelectionSetUserEntity::find(&selection, node, &node);
+    while (node != selection.mHead) {
+      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
+      if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
+        selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
+          selectionCommandCaps | ResolveIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
+        );
+      }
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+    }
+  }
+
+  UserEntity* const hoverEntity = mouseInfo->mUnitHover;
+
+  if (hoverEntity == nullptr) {
+    // No hover: consult the pending right-click command-manager helper. An
+    // attack/form-attack pending command with an attack-capable selection
+    // resolves to an Order+Attack; otherwise fall through to the move tail.
+    RightClickCommandIssueHelperView* const helper =
+      FindRightClickCommandIssueHelper(wldSession, static_cast<std::uint32_t>(mouseInfo->mIsDragger));
+    if (helper != nullptr
+        && (helper->commandType == EUnitCommandType::UNITCOMMAND_Attack
+            || helper->commandType == EUnitCommandType::UNITCOMMAND_FormAttack)
+        && (selectionCommandCaps & RULEUCC_Attack) != 0) {
+      commandModeData.mMode = COMMOD_Order;
+      commandModeData.mCommandCaps = RULEUCC_Attack;
+    } else if ((selectionCommandCaps & RULEUCC_Move) != 0) {
+      commandModeData.mMode = COMMOD_Order;
+      commandModeData.mCommandCaps = RULEUCC_Move;
+    }
+    commandModeData.mIsDragged = mouseInfo->mIsDragger;
+    *out = commandModeData;
+    return out;
+  }
+
+  // --- Hover branch --------------------------------------------------------
+  const bool isBeingBuilt = hoverEntity->IsBeingBuilt();
+  const bool isFerryBeacon = hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+  const bool isCampaignGate = hoverEntity->IsInCategory(msvc8::string("CAMPAIGNGATE"));
+
+  // Reclaim eligibility: RECLAIMABLE (or under-construction) targets are
+  // reclaim-valid; everything else is not.
+  bool reclaimTargetValid = true;
+  if (hoverEntity->mParams.mBlueprint != nullptr) {
+    const bool reclaimable =
+      hoverEntity->IsInCategory(msvc8::string("RECLAIMABLE")) || hoverEntity->IsBeingBuilt();
+    if (!reclaimable) {
+      reclaimTargetValid = false;
+    }
+  } else {
+    reclaimTargetValid = false;
+  }
+
+  bool mCapturable = false;
+  if (UserUnit* const hoverUnitForCaps = hoverEntity->IsUserUnit()) {
+    mCapturable = ResolveIUnitBridge(hoverUnitForCaps)->GetAttributes().mCapturable;
+    // UserUnit+0x1A2 (mSelectableOverride) is the modeled field at the offset the
+    // decompiler labels `mUnitVarDat.mIsBusy`; when set, this target is neither
+    // reclaimable nor capturable via right-click.
+    if (hoverEntity->IsUserUnit()->mSelectableOverride) {
+      reclaimTargetValid = false;
+      mCapturable = false;
+    }
+  }
+
+  bool isEnemy = false;
+  bool isAlly = false;
+  UserArmy* const focusArmy =
+    (wldSession->FocusArmy < 0) ? nullptr : wldSession->userArmies[wldSession->FocusArmy];
+  UserArmy* const hoverArmy = hoverEntity->mArmy;
+  if (hoverArmy != nullptr && focusArmy != nullptr) {
+    isEnemy = focusArmy->IsEnemy(hoverArmy->mArmyIndex);
+    isAlly = focusArmy->IsAlly(hoverArmy->mArmyIndex);
+  }
+
+  UserUnit* const hoverUnit = hoverEntity->IsUserUnit();
+
+  bool resolved = false;
+
+  if (!(isEnemy && (selectionCommandCaps & RULEUCC_Attack) != 0
+        && AnySelectedUnitCanAttackHover(hoverEntity, wldSession))) {
+    // Capture: a non-allied, finished, capturable target with capture-capable
+    // selection resolves to Order+Capture.
+    if (!isAlly && !isBeingBuilt && mCapturable && (selectionCommandCaps & RULEUCC_Capture) != 0) {
+      commandModeData.mMode = COMMOD_Order;
+      commandModeData.mCommandCaps = RULEUCC_Capture;
+      resolved = true;
+    }
+
+    // Reclaim: enemy / ownerless / reclaim-friendly targets that are reclaim
+    // valid with reclaim-capable selection resolve to Order+Reclaim.
+    if (!resolved) {
+      const bool reclaimEligible =
+        (isEnemy || hoverArmy == nullptr || hoverEntity->IsInCategory(msvc8::string("RECLAIMFRIENDLY")))
+        && reclaimTargetValid && (selectionCommandCaps & RULEUCC_Reclaim) != 0;
+      if (reclaimEligible) {
+        commandModeData.mMode = COMMOD_Order;
+        commandModeData.mCommandCaps = RULEUCC_Reclaim;
+        resolved = true;
+      }
+    }
+
+    // Transport chains only apply when the hover target belongs to the focus army.
+    if (!resolved && hoverArmy == focusArmy) {
+      if ((selectionCommandCaps & RULEUCC_CallTransport) != 0
+          && SelectionHasTransportForTarget(&wldSession->mSelection, hoverEntity)) {
+        commandModeData.mMode = COMMOD_Order;
+        commandModeData.mCommandCaps = RULEUCC_CallTransport;
+        resolved = true;
+      } else if (hoverUnit != nullptr
+                 && (ResolveIUnitBridge(hoverUnit)->GetAttributes().commandCapsMask & RULEUCC_CallTransport) != 0
+                 && HoverTransportAcceptsSelection(&wldSession->mSelection, hoverEntity)) {
+        commandModeData.mMode = COMMOD_Order;
+        commandModeData.mCommandCaps = RULEUCC_Transport;
+        resolved = true;
+      } else if (isFerryBeacon && AllSelectedAreFactories(&wldSession->mSelection, wldSession)) {
+        commandModeData.mMode = COMMOD_Order;
+        commandModeData.mCommandCaps = RULEUCC_CallTransport;
+        resolved = true;
+      }
+    }
+
+    const ERuleBPUnitCommandCaps selectionCommandCapsTail = selectionCommandCaps;
+
+    if (!resolved) {
+      if (isEnemy) {
+        // Attack-capable but nothing in the selection can actually attack the
+        // hover -> mark the order invalid (immediate 0x01000000 = RULEUCC_Invalid).
+        if ((selectionCommandCaps & RULEUCC_Attack) != 0
+            && !AnySelectedUnitCanAttackHover(hoverEntity, wldSession)) {
+          commandModeData.mMode = COMMOD_Order;
+          commandModeData.mCommandCaps = RULEUCC_Invalid;
+          resolved = true;
+        }
+        // else: fall through to the move tail.
+      } else {
+        const std::int32_t guardCap = selectionCommandCaps & RULEUCC_Guard;
+
+        if (!OPTIONS_GetBool("switch_right_click_behavior")) {
+          // Normal right-click behavior.
+          const std::int32_t repairCap = selectionCommandCapsTail & RULEUCC_Repair;
+
+          // Repair-if-under-construction: repair-capable selection over an
+          // under-construction target that is mobile, or neither factory nor silo.
+          bool repairUnderConstruction = false;
+          if (repairCap != 0 && hoverEntity->IsBeingBuilt()) {
+            if (UserUnit* const builtUnit = hoverEntity->IsUserUnit()) {
+              if (ResolveIUnitBridge(builtUnit)->IsMobile()
+                  || (!hoverEntity->IsInCategory(msvc8::string("FACTORY"))
+                      && !hoverEntity->IsInCategory(msvc8::string("SILO")))) {
+                repairUnderConstruction = true;
+              }
+            }
+          }
+          if (repairUnderConstruction) {
+            commandModeData.mMode = COMMOD_Order;
+            commandModeData.mCommandCaps = RULEUCC_Repair;
+            resolved = true;
+          }
+
+          // Guard: guard-capable selection over a non-campaign-gate hovered unit
+          // that is not the first selection member, while a formation is active.
+          if (!resolved && guardCap != 0 && !isCampaignGate && hoverUnit != nullptr
+              && !wldSession->UnitFirstInSelection(hoverUnit)
+              && wldSession->mCurFormation->mTimeLeft > 0.0f) {
+            commandModeData.mMode = COMMOD_Order;
+            commandModeData.mCommandCaps = RULEUCC_Guard;
+            resolved = true;
+          }
+
+          // Repair (finished target): allied damaged target, or a hovered unit
+          // that reports the upgrading unit-state.
+          if (!resolved && repairCap != 0
+              && ((isAlly && hoverEntity->mVariableData.mMaxHealth > hoverEntity->mVariableData.mHealth)
+                  || (hoverUnit != nullptr
+                      && ResolveIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
+            commandModeData.mMode = COMMOD_Order;
+            commandModeData.mCommandCaps = RULEUCC_Repair;
+            resolved = true;
+          }
+          // else: fall through to the move tail.
+        } else {
+          // Switched right-click behavior: repair is prioritised over guard.
+          if ((selectionCommandCapsTail & RULEUCC_Repair) != 0
+              && ((isAlly && hoverEntity->mVariableData.mMaxHealth > hoverEntity->mVariableData.mHealth)
+                  || (hoverUnit != nullptr
+                      && ResolveIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
+            commandModeData.mMode = COMMOD_Order;
+            commandModeData.mCommandCaps = RULEUCC_Repair;
+            resolved = true;
+          } else if (guardCap != 0) {
+            commandModeData.mMode = COMMOD_Order;
+            commandModeData.mCommandCaps = RULEUCC_Guard;
+            resolved = true;
+          }
+          // else: fall through to the move tail.
+        }
+      }
+    }
+
+    // Move tail: a move-capable selection defaults to Order+Move.
+    if (!resolved) {
+      if ((selectionCommandCapsTail & RULEUCC_Move) != 0) {
+        commandModeData.mMode = COMMOD_Order;
+        commandModeData.mCommandCaps = RULEUCC_Move;
+      }
+      resolved = true;
+    }
+  } else {
+    // Enemy target, attack-capable selection that can attack it -> Order+Attack.
+    commandModeData.mMode = COMMOD_Order;
+    commandModeData.mCommandCaps = RULEUCC_Attack;
+    resolved = true;
+  }
+
+  // Finalize: stamp the drag id and copy the resolved state out.
+  commandModeData.mIsDragged = mouseInfo->mIsDragger;
+  *out = commandModeData;
+  return out;
+}
