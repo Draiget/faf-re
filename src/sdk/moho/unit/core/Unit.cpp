@@ -807,6 +807,9 @@ namespace
   constexpr const char* kCreateUnit2Name = "CreateUnit2";
   constexpr const char* kCreateUnit2GlobalClassName = "<global>";
   constexpr const char* kCreateUnit2HelpText = "blueprint, army, layer, x, z, heading";
+  constexpr const char* kCreateUnitName = "CreateUnit";
+  constexpr const char* kCreateUnitGlobalClassName = "<global>";
+  constexpr const char* kCreateUnitHelpText = "blueprint, army, tx, ty, tz, qx, qy, qz, qw, [layer]";
   constexpr const char* kUnitGetArmorMultName = "GetArmorMult";
   constexpr const char* kUnitGetArmorMultHelpText = "mult = Unit:GetArmorMult(damageTypeName)";
   constexpr std::uint8_t kArmorMapColorRed = 0u;
@@ -12110,6 +12113,164 @@ CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
     nullptr,
     kCreateUnit2GlobalClassName,
     kCreateUnit2HelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x006CF560 (FUN_006CF560, cfunc_CreateUnitL)
+ *
+ * IDA signature:
+ * int __usercall cfunc_CreateUnitL@<eax>(LuaPlus::LuaState* a1@<edi>);
+ *
+ * What it does:
+ * Global Lua `CreateUnit(blueprint, army, tx, ty, tz, qx, qy, qz, qw, [layer])`
+ * worker. Validates 9-10 args, resolves the blueprint (arg1) and owning army
+ * (arg2, 1-based). Reads the spawn position and orientation quaternion, rejects a
+ * bit-zero quaternion (substituting identity + a warning), resolves the optional
+ * layer string, spawns the unit through the sim, and pushes its script object.
+ *
+ * NOTE: the binary reads position args in swapped order — arg5->vec.x, arg4->vec.y,
+ * arg3->vec.z — preserved here verbatim.
+ */
+int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 9 || argumentCount > 10) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected between %d and %d args, but got %d", kCreateUnitHelpText, 9, 10, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata_typed(rawState);
+  lua_settop(rawState, 10);
+
+  // arg1: blueprint id (string) -> resolve blueprint.
+  const LuaPlus::LuaStackObject blueprintArg(state, 1);
+  const char* blueprintText = lua_tostring(rawState, 1);
+  if (!blueprintText) {
+    blueprintArg.TypeError("string");
+    blueprintText = "";
+  }
+  RResId blueprintId{};
+  gpg::STR_InitFilename(&blueprintId.name, blueprintText);
+  const RUnitBlueprint* const blueprint = sim->mRules->GetUnitBlueprint(blueprintId);
+  if (!blueprint) {
+    LuaPlus::LuaState::Error(state, "Unknown unit kind: %s", blueprintText);
+  }
+
+  // arg2: owning army, 1-based index into the sim army list.
+  const LuaPlus::LuaStackObject armyArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    armyArg.TypeError("integer");
+  }
+  const int armyIndex = static_cast<int>(lua_tonumber(rawState, 2));
+  const int armyCount = static_cast<int>(sim->mArmiesList.size());
+  if (armyIndex < 1 || armyIndex > armyCount) {
+    LuaPlus::LuaState::Error(state, "Invalid army index; must be >= 1 and < %d but got %d.", armyCount, armyIndex);
+  }
+
+  // Position: the binary reads args 5, 4, 3 into vec.x, vec.y, vec.z respectively.
+  const LuaPlus::LuaStackObject vecXArg(state, 5);
+  if (lua_type(rawState, 5) != LUA_TNUMBER) {
+    vecXArg.TypeError("number");
+  }
+  const float vecX = static_cast<float>(lua_tonumber(rawState, 5));
+  const LuaPlus::LuaStackObject vecYArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    vecYArg.TypeError("number");
+  }
+  const float vecY = static_cast<float>(lua_tonumber(rawState, 4));
+  const LuaPlus::LuaStackObject vecZArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    vecZArg.TypeError("number");
+  }
+  const float vecZ = static_cast<float>(lua_tonumber(rawState, 3));
+
+  // Orientation: the binary reads args 8, 7, 6 (qz, qy, qx) then 9 (qw).
+  const LuaPlus::LuaStackObject quatZArg(state, 8);
+  if (lua_type(rawState, 8) != LUA_TNUMBER) {
+    quatZArg.TypeError("number");
+  }
+  const float quatZ = static_cast<float>(lua_tonumber(rawState, 8));
+  const LuaPlus::LuaStackObject quatYArg(state, 7);
+  if (lua_type(rawState, 7) != LUA_TNUMBER) {
+    quatYArg.TypeError("number");
+  }
+  const float quatY = static_cast<float>(lua_tonumber(rawState, 7));
+  const LuaPlus::LuaStackObject quatXArg(state, 6);
+  if (lua_type(rawState, 6) != LUA_TNUMBER) {
+    quatXArg.TypeError("number");
+  }
+  const float quatX = static_cast<float>(lua_tonumber(rawState, 6));
+  const LuaPlus::LuaStackObject quatWArg(state, 9);
+  if (lua_type(rawState, 9) != LUA_TNUMBER) {
+    quatWArg.TypeError("number");
+  }
+  const float quatW = static_cast<float>(lua_tonumber(rawState, 9));
+
+  Wm3::Quatf orient(quatW, quatX, quatY, quatZ); // (w, x, y, z)
+
+  // A bit-zero quaternion is invalid; warn and substitute identity. Wm3::Quaternion::
+  // Compare (FUN_004F0B40) is a raw 16-byte memcmp, so the rejection is bit-exact.
+  static const Wm3::Quatf kZeroQuat(0.0f, 0.0f, 0.0f, 0.0f);
+  if (std::memcmp(&orient, &kZeroQuat, sizeof(Wm3::Quatf)) == 0) {
+    gpg::Warnf("Passed in an invalid quaternion when creating unit %s", blueprintText);
+    orient = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
+  }
+
+  // Optional arg10: movement layer name (string). Absent -> layer 0.
+  std::int32_t layer = 0;
+  if (lua_type(rawState, 10) != 0 && lua_isstring(rawState, 10)) {
+    const LuaPlus::LuaStackObject layerArg(state, 10);
+    const char* layerText = lua_tostring(rawState, 10);
+    if (!layerText) {
+      layerArg.TypeError("string");
+      layerText = "";
+    }
+    layer = static_cast<std::int32_t>(COORDS_StringToLayer(layerText));
+  }
+
+  CArmyImpl* const army = sim->mArmiesList[armyIndex - 1];
+
+  const VTransform transform(Wm3::Vector3f(vecX, vecY, vecZ), orient);
+  SUnitConstructionParams params(layer, transform, army, blueprint, nullptr, true);
+
+  Unit* const unit = sim->CreateUnitForScript(params, true);
+  if (!unit) {
+    LuaPlus::LuaState::Error(state, "CreateUnit(%s) failed", blueprintText);
+  }
+  unit->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x006CF4E0 (FUN_006CF4E0, cfunc_CreateUnit)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitL`.
+ */
+int moho::cfunc_CreateUnit(lua_State* const luaContext)
+{
+  return cfunc_CreateUnitL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x006CF500 (FUN_006CF500, func_CreateUnit_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global `CreateUnit(...)` Lua binder and links it into the sim
+ * script init form set.
+ */
+CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kCreateUnitName,
+    &moho::cfunc_CreateUnit,
+    nullptr,
+    kCreateUnitGlobalClassName,
+    kCreateUnitHelpText
   );
   return &binder;
 }

@@ -2221,6 +2221,25 @@ namespace moho
   int cfunc_CreateUnit2L(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006CF4E0 (FUN_006CF4E0, cfunc_CreateUnit)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CreateUnitL`.
+   */
+  int cfunc_CreateUnit(lua_State* luaContext);
+
+  /**
+   * Address: 0x006CF560 (FUN_006CF560, cfunc_CreateUnitL)
+   *
+   * What it does:
+   * Global `CreateUnit(blueprint, army, tx, ty, tz, qx, qy, qz, qw, [layer])`
+   * worker: resolves the blueprint + owning army, spawns the unit at an explicit
+   * position and orientation quaternion (with an optional movement layer), and
+   * returns its script object.
+   */
+  int cfunc_CreateUnitL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x006C4180 (FUN_006C4180, cfunc_UnitGetArmorMult)
    *
    * What it does:
