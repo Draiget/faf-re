@@ -18,8 +18,10 @@ namespace gpg
 
 namespace moho
 {
+  class CAiTarget;
   class CUnitCommand;
   class Entity;
+  class IAiCommandDispatchImpl;
   struct RUnitBlueprint;
   struct SEntitySetTemplateUnit;
   struct SOCellPos;
@@ -57,6 +59,32 @@ namespace moho
      * resets target payload, and zeros guard-goal rectangle state.
      */
     CUnitGuardTask();
+
+    /**
+     * Address: 0x006111E0 (FUN_006111E0, Moho::CUnitGuardTask::CUnitGuardTask)
+     *
+     * IDA signature:
+     * Moho::CUnitGuardTask* __thiscall Moho::CUnitGuardTask::CUnitGuardTask(
+     *   Moho::IAiCommandDispatchImpl* dispatch, Moho::CUnitGuardTask* this,
+     *   Moho::CAiTarget* target);
+     *
+     * What it does:
+     * Constructs one dispatch-bound guard task: binds the command/listener lanes
+     * to the owner's current command, copies the guard target payload, sets the
+     * owner's Guarding state bit, refreshes the guarded-unit lanes, and
+     * classifies the owner/guarded unit (factory/shield/silo/engineer/
+     * no-formation) to seed the guard-behavior flags and initial task state.
+     */
+    CUnitGuardTask(IAiCommandDispatchImpl* dispatch, CAiTarget* target);
+
+    /**
+     * Address: 0x006147F0 (FUN_006147F0, Moho::CUnitGuardTask::operator new)
+     *
+     * What it does:
+     * Allocates one guard-task object and forwards the dispatch/target arguments
+     * into in-place construction.
+     */
+    [[nodiscard]] static CUnitGuardTask* Create(IAiCommandDispatchImpl* dispatch, CAiTarget* target);
 
     /**
      * Address: 0x00611850 (FUN_00611850, ??1CUnitGuardTask@Moho@@QAE@@Z)

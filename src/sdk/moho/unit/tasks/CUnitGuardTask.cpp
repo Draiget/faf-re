@@ -490,6 +490,198 @@ namespace moho
     mGuardGoal.mLayer = static_cast<ELayer>(0);
   }
 
+  namespace
+  {
+    struct CUnitCommandCommandEventLinkView
+    {
+      std::uint8_t pad_0000_0034[0x34];
+      moho::Broadcaster mCommandEventListenerHead;
+    };
+
+    static_assert(
+      offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
+      "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
+    );
+
+    /**
+     * Resolves the command-event broadcaster list head embedded at offset 0x34
+     * of a `CUnitCommand`, used to register a guard task's command-event
+     * listener on the command it is linked to.
+     */
+    [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
+    {
+      if (command == nullptr) {
+        return nullptr;
+      }
+
+      auto* const view = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
+      return &view->mCommandEventListenerHead;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x006111E0 (FUN_006111E0, Moho::CUnitGuardTask::CUnitGuardTask)
+   *
+   * IDA signature:
+   * Moho::CUnitGuardTask* __thiscall Moho::CUnitGuardTask::CUnitGuardTask(
+   *   Moho::IAiCommandDispatchImpl* dispatch, Moho::CUnitGuardTask* this,
+   *   Moho::CAiTarget* target);
+   *
+   * What it does:
+   * Constructs one dispatch-bound guard task. Binds the linked-command weak
+   * reference to the owner's current queue-head command and registers the
+   * embedded command-event listener on that command's broadcaster chain, copies
+   * the guard target payload, sets the owner's Guarding state bit, refreshes the
+   * guarded-unit lanes, then classifies the owner/guarded unit
+   * (factory/shield/silo/engineer/no-formation) to seed the guard-behavior flags
+   * and initial task state.
+   */
+  CUnitGuardTask::CUnitGuardTask(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
+    : CCommandTask(dispatch)
+    , mUnknown0030(0)
+    , mCommandEventListenerVftable(0)
+    , mCommandEventListenerLink{}
+    , mCommandTask(dispatch)
+    , mPrimaryCommandRef{}
+    , mCommandRef{}
+    , mTarget{}
+    , mTrackGuardedUnit(false)
+    , mRefreshGuardedUnitFromNearby(false)
+    , mDisableBestEnemySearch(false)
+    , mDisableReactionState(false)
+    , mPreferTransportRefuel(false)
+    , mAllowFerryBeaconRedirect(false)
+    , mUnknown7A(false)
+    , mPad007B(0)
+    , mSecondaryUnit{}
+    , mGuardDirection(Wm3::Vector3f::Zero())
+    , mGuardMoveAnchorPosition(Wm3::Vector3f::Zero())
+    , mGuardGoal{}
+  {
+    mCommandEventListenerLink.ListResetLinks();
+
+    // Copy the guard target payload, link-inserting the target entity into its
+    // owner chain (matches the binary's field-by-field target copy).
+    mTarget.targetType = target->targetType;
+    mTarget.targetEntity.ResetFromObject(target->targetEntity.GetObjectPtr());
+    mTarget.position = target->position;
+    mTarget.targetPoint = target->targetPoint;
+    mTarget.targetIsMobile = target->targetIsMobile;
+
+    mGuardGoal.minX = 0;
+    mGuardGoal.minZ = 0;
+    mGuardGoal.maxX = 0;
+    mGuardGoal.maxZ = 0;
+    mGuardGoal.aux0 = 0;
+    mGuardGoal.aux1 = 0;
+    mGuardGoal.aux2 = 0;
+    mGuardGoal.aux3 = 0;
+    mGuardGoal.mLayer = static_cast<ELayer>(0);
+
+    Unit* const unit = mUnit;
+    unit->UnitStateMask |= (1ull << UNITSTATE_Guarding);
+
+    // Bind the linked-command weak reference to the owner's current queue-head
+    // command, then register this task's embedded command-event listener on that
+    // command's broadcaster chain.
+    CUnitCommand* headCommand = nullptr;
+    if (CUnitCommandQueue* const commandQueue = unit->CommandQueue;
+        commandQueue != nullptr && commandQueue->mCommandVec.size() > 0u) {
+      headCommand = commandQueue->mCommandVec[0].GetObjectPtr();
+    }
+    mCommandRef.ResetFromObject(headCommand);
+    if (CUnitCommand* const linkedCommand = mCommandRef.GetObjectPtr(); linkedCommand != nullptr) {
+      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(linkedCommand);
+          commandListenerHead != nullptr) {
+        mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
+      }
+    }
+
+    RefreshGuardedUnitFromTarget();
+
+    // A being-built or upgrading guarded unit that is not itself a
+    // factory/shield/silo/mobile structure flags the "guarded unit is under
+    // construction" behavior lane.
+    if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr(); guardedUnit != nullptr) {
+      if (guardedUnit->IsBeingBuilt() || guardedUnit->IsUnitState(UNITSTATE_Upgrading)) {
+        const bool guardedIsStructureType = guardedUnit->IsInCategory("FACTORY") ||
+          guardedUnit->IsInCategory("SHIELD") || guardedUnit->IsInCategory("SILO") ||
+          guardedUnit->IsMobile();
+        if (!guardedIsStructureType) {
+          mUnknown7A = true;
+        }
+      }
+    }
+
+    // Immobile owners that must unpack before acting drop any desired attack
+    // target so the guard task takes exclusive control.
+    if (unit->IsUnitState(UNITSTATE_Immobile)) {
+      if (unit->GetBlueprint()->AI.NeedUnpack) {
+        if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
+          CAiTarget clearedTarget{};
+          clearedTarget.targetPoint = -1;
+          clearedTarget.targetIsMobile = false;
+          attacker->SetDesiredTarget(&clearedTarget);
+        }
+      }
+    }
+
+    mTaskState = TASKSTATE_Processing;
+
+    // No-formation owners and transport-refuel guards skip the structure-role
+    // classification below.
+    if (mPreferTransportRefuel || unit->IsInCategory("NOFORMATION")) {
+      return;
+    }
+
+    // Immobile factory owners refresh their guarded unit from nearby scans.
+    if (unit->IsInCategory("FACTORY") && !unit->IsMobile()) {
+      mRefreshGuardedUnitFromNearby = true;
+      return;
+    }
+
+    // Engineer owners only continue when a guarded unit is present.
+    if (!unit->IsInCategory("ENGINEER") || mSecondaryUnit.GetObjectPtr() == nullptr) {
+      return;
+    }
+
+    // An engineer guarding an engineer suppresses the reaction state.
+    if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
+        guardedUnit != nullptr && guardedUnit->IsInCategory("ENGINEER")) {
+      mDisableReactionState = true;
+      return;
+    }
+
+    // An engineer guarding a factory prepares before acting and suppresses the
+    // best-enemy search.
+    if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
+        guardedUnit != nullptr && guardedUnit->IsInCategory("FACTORY")) {
+      mTaskState = TASKSTATE_Preparing;
+      mDisableBestEnemySearch = true;
+    }
+  }
+
+  /**
+   * Address: 0x006147F0 (FUN_006147F0, Moho::CUnitGuardTask::operator new)
+   *
+   * IDA signature:
+   * Moho::CUnitGuardTask* __cdecl Moho::CUnitGuardTask::operator new(
+   *   Moho::IAiCommandDispatchImpl* dispatch, Moho::CAiTarget* target);
+   *
+   * What it does:
+   * Allocates one guard-task object (0xC0 bytes) and, on success, forwards the
+   * dispatch/target arguments into in-place construction.
+   */
+  CUnitGuardTask* CUnitGuardTask::Create(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
+  {
+    void* const storage = ::operator new(sizeof(CUnitGuardTask));
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (storage) CUnitGuardTask(dispatch, target);
+  }
+
   /**
    * Address: 0x00611850 (FUN_00611850, ??1CUnitGuardTask@Moho@@QAE@@Z)
    *
