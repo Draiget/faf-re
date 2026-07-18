@@ -45,6 +45,8 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/animation/CAniActor.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/CUserSoundManager.h"
 #include "moho/audio/CSimSoundManager.h"
@@ -1157,6 +1159,7 @@ namespace
   constexpr const char* kSetTerrainTypeRectHelpText = "SetTerrainTypeRect( rect, terrainTypeTable )";
   constexpr const char* kSetPlayableRectHelpText = "SetPlayableRect( minX, minZ, maxX, maxZ )";
   constexpr const char* kWarpHelpText = "Warp( unit, location, [orientation] )";
+  constexpr const char* kChangeUnitArmyHelpText = "ChangeUnitArmy(unit,armyIndex) Change a unit's army";
   constexpr const char* kGetUnitBlueprintByNameLuaDefHelpText = "blueprint = GetUnitBlueprintByName(bpName)";
   constexpr const char* kGetUnitBlueprintByNameHelpText = "GetUnitBlueprintByName(blueprint_name)";
   constexpr const char* kGenerateRandomOrientationHelpText = "rotation = GenerateRandomOrientation()";
@@ -11101,6 +11104,195 @@ Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool
 }
 
 /**
+ * Address: 0x007468E0 (FUN_007468E0, ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z)
+ * Mangled: ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z
+ *
+ * IDA signature:
+ * Moho::Unit *__thiscall Moho::Sim::TransferUnit(Moho::Sim *this, Moho::Unit *unit, Moho::CArmyImpl *newArmy);
+ *
+ * What it does:
+ * Recursively transfers `unit` (plus its transport-carried cargo and attached
+ * child units) to `newArmy`. Drains the transport storage, detaches child units
+ * (splicing each child's `TransportedByRef` weak link out of its chain),
+ * recursively transfers cargo and children, constructs a replacement Unit owned
+ * by `newArmy`, migrates pose / health / custom name, re-populates transport
+ * storage, re-attaches the transferred children, then destroys the original.
+ * Returns the replacement Unit, or nullptr when the source is dead/destroy-queued
+ * or the new army is over its unit cap.
+ */
+Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
+{
+  if (!unit || unit->IsDead() || unit->DestroyQueued()) {
+    return nullptr;
+  }
+
+  // Cargo transferred out of this unit's transport storage (parallel to
+  // transferredCargo below), and the children transferred after detach.
+  msvc8::vector<Unit*> transferredCargo;    // v57 (result of recursive transfer of stored units)
+  msvc8::vector<Unit*> transferredChildren; // v56 (result of recursive transfer of attached units)
+  msvc8::vector<Unit*> detachedChildren;    // v63 (mobile attached units, pre-detach)
+  msvc8::vector<int> childParentBones;      // v65 (each child's mParentBoneIndex, captured pre-detach)
+  msvc8::vector<int> childChildBones;       // v64 (each child's mChildBoneIndex, captured pre-detach)
+
+  // --- Phase A: drain transport storage and recursively transfer the cargo ---
+  if (IAiTransport* const transport = unit->AiTransport) {
+    msvc8::vector<Unit*> storedCargo; // a2a
+
+    EntitySetTemplate<Unit> storedUnits = transport->TransportGetStoredUnits();
+    for (Unit* const storedUnit : storedUnits) {
+      VTransform storedTransform{};
+      storedTransform.orient_.w = 1.0f; // scratch out-transform (identity), receives the removed pose
+      storedTransform.orient_.x = 0.0f;
+      storedTransform.orient_.y = 0.0f;
+      storedTransform.orient_.z = 0.0f;
+      storedTransform.pos_.x = 0.0f;
+      storedTransform.pos_.y = 0.0f;
+      storedTransform.pos_.z = 0.0f;
+      unit->AiTransport->TransportRemoveFromStorage(storedUnit, storedTransform);
+      storedCargo.push_back(storedUnit);
+    }
+
+    for (Unit* const storedUnit : storedCargo) {
+      Unit* const transferred = TransferUnit(storedUnit, newArmy);
+      transferredCargo.push_back(transferred);
+    }
+  }
+
+  // --- Phase B: capture mobile attached child units and their attach bones ---
+  const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
+  for (Entity* const attachedEntity : attached) {
+    if (!attachedEntity) {
+      continue;
+    }
+    Unit* const child = attachedEntity->IsUnit();
+    if (!child || !attachedEntity->IsMobile() || attachedEntity->Dead || attachedEntity->DestroyQueuedFlag) {
+      continue;
+    }
+    detachedChildren.push_back(attachedEntity->IsUnit());
+    childChildBones.push_back(attachedEntity->mAttachInfo.mChildBoneIndex);
+    childParentBones.push_back(attachedEntity->mAttachInfo.mParentBoneIndex);
+  }
+
+  // --- Phase C: detach each captured child and unlink its transport weak-ref ---
+  for (Unit* const child : detachedChildren) {
+    child->DetachFrom(unit, true);
+    child->TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+  }
+
+  // --- Phase D: recursively transfer the detached children ---
+  for (Unit* const child : detachedChildren) {
+    Unit* const transferred = TransferUnit(child, newArmy);
+    transferredChildren.push_back(transferred);
+  }
+
+  // --- Phase F: construct the replacement unit under the new army ---
+  const ELayer sourceLayer = unit->mCurrentLayer;
+  const VTransform sourceTransform = unit->GetTransform();
+  const RUnitBlueprint* const sourceBlueprint = unit->GetBlueprint();
+
+  SUnitConstructionParams params(
+    static_cast<std::int32_t>(sourceLayer),
+    sourceTransform,
+    newArmy,
+    sourceBlueprint,
+    nullptr,
+    true
+  );
+  // The transfer path forces fixed-elevation on unconditionally (the layer==0 gate
+  // that the shared ctor applies is not present in the shipped transfer code).
+  params.mFixElevation = 1;
+
+  Unit* const newUnit = CreateUnit(params, false);
+  if (!newUnit) {
+    // --- Phase H: creation failed (unit cap) — notify the army's brain script ---
+    if (!newArmy->IgnoreUnitCap()) {
+      if (CAiBrain* const brain = newArmy->GetArmyBrain()) {
+        reinterpret_cast<CScriptObject*>(brain)->RunScript("OnFailedUnitTransfer");
+      }
+    }
+    return nullptr;
+  }
+
+  // --- Phase G: migrate pose, health, and custom name onto the replacement ---
+  newUnit->SetPoses(unit->AniActor->GetPriorPoseShared(), unit->AniActor->GetPoseShared());
+
+  if (unit->Health != newUnit->Health) {
+    newUnit->SetHealth(unit->Health);
+  }
+
+  newUnit->SetCustomName(unit->GetCustomName());
+
+  // --- Phase G (transport): re-populate storage and re-attach children ---
+  if (newUnit->AiTransport) {
+    for (Unit* const cargo : transferredCargo) {
+      if (cargo) {
+        newUnit->AiTransport->TransportAddToStorage(cargo);
+      }
+    }
+
+    const std::size_t childCount = transferredChildren.size();
+    for (std::size_t i = 0; i < childCount; ++i) {
+      Unit* const child = transferredChildren[i];
+      if (!child) {
+        continue;
+      }
+
+      const int parentBoneIndex = childParentBones[i];
+      const int childBoneIndex = childChildBones[i];
+
+      // Re-attach the transferred child to the replacement unit. The attach payload
+      // reuses the captured bone indices with an identity relative transform
+      // (scalar-first quaternion: w-lane = 1, all else 0).
+      SEntAttachInfo attachInfo{};
+      attachInfo.mAttachTargetWeak.BindObjectUnlinked(newUnit);
+      (void)attachInfo.mAttachTargetWeak.LinkIntoOwnerChainHeadUnlinked();
+      attachInfo.mParentBoneIndex = parentBoneIndex;
+      attachInfo.mChildBoneIndex = childBoneIndex;
+      attachInfo.mRelativeOrientX = 1.0f;
+      attachInfo.mRelativeOrientY = 0.0f;
+      attachInfo.mRelativeOrientZ = 0.0f;
+      attachInfo.mRelativeOrientW = 0.0f;
+      attachInfo.mRelativePosX = 0.0f;
+      attachInfo.mRelativePosY = 0.0f;
+      attachInfo.mRelativePosZ = 0.0f;
+
+      child->AttachTo(attachInfo);
+      // Detach the temporary attach node from the replacement's weak chain; the
+      // durable linkage now lives in the child's own mAttachInfo.
+      attachInfo.mAttachTargetWeak.UnlinkFromOwnerChain();
+
+      newUnit->AiTransport->TransportAssignSlot(child, parentBoneIndex);
+
+      if (newUnit->AiTransport) {
+        // Resolve the attach bone's name and fire the child's OnTransportAttach
+        // script, matching the transport attach path.
+        const boost::shared_ptr<const CAniSkel> skeleton = newUnit->AniActor->GetSkeleton();
+        const CAniSkel* const skel = skeleton.get();
+        const char* boneName = nullptr;
+        if (skel) {
+          const SAniSkelBone* const bones = skel->mBones.begin();
+          const std::size_t boneCount = static_cast<std::size_t>(skel->mBones.end() - bones);
+          if (bones && static_cast<std::size_t>(parentBoneIndex) < boneCount) {
+            boneName = bones[static_cast<std::size_t>(parentBoneIndex)].mBoneName;
+          }
+        }
+        if (boneName) {
+          newUnit->RunScriptStringUnit("OnTransportAttach", boneName, child);
+        }
+      }
+    }
+  }
+
+  // --- Phase G (finalize): clear source footprint occupancy for static units ---
+  if (!newUnit->IsMobile()) {
+    unit->FootprintDown = false;
+  }
+
+  unit->Destroy();
+  return newUnit;
+}
+
+/**
  * Address: 0x00748AA0 (FUN_00748AA0)
  *
  * unsigned int, Moho::RResId const &, Moho::SCoordsVec2 const &, float
@@ -15893,6 +16085,109 @@ moho::CScrLuaInitForm* moho::func_Warp_LuaFuncDef()
     nullptr,
     "<global>",
     kWarpHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075B650 (FUN_0075B650, cfunc_ChangeUnitArmyL)
+ *
+ * IDA signature:
+ * void __thiscall cfunc_ChangeUnitArmyL(LuaPlus::LuaState *state);
+ *
+ * What it does:
+ * Cheat command `ChangeUnitArmy(unit, armyIndex)`. Resolves the target unit and
+ * army from the Lua stack, rejects transfers to the unit's own army, and — unless
+ * one of the unit's attached entities is a COMMAND unit — transfers the unit and
+ * its cargo to the new army through `Sim::TransferUnit`. Pushes the replacement
+ * unit's Lua object on success, `nil` otherwise. Always returns 1.
+ */
+int moho::cfunc_ChangeUnitArmyL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kChangeUnitArmyHelpText, 2, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+
+  const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+  Unit* const unit = SCR_FromLua_Unit(unitObject);
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  if (!army) {
+    // Faithful to FUN_0075B650: the worker independently validates the army lane.
+    // (The recovered ARMY_FromLuaState already raises the Lua error for an invalid
+    //  army, so this branch is defensive and mirrors the shipped worker.)
+    LuaPlus::LuaStackObject armyStackObject(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      armyStackObject.TypeError("integer");
+    }
+    LuaPlus::LuaState::Error(state, "Invalid army %d", static_cast<int>(lua_tonumber(rawState, 2)));
+  }
+
+  if (unit->ArmyRef == army) {
+    LuaPlus::LuaState::Error(state, "Unit already belongs to army %d", army->ArmyId);
+  }
+
+  // Disabled-validation predicate: the shipped binary computes this guard but the
+  // conditional branch that consumed it was hot-patched to six NOPs
+  // (asm 0x0075B816..0x0075B81B), so the result never gates behavior. Preserved for
+  // fidelity.
+  [[maybe_unused]] const bool sourceUnitIneligible =
+    unit->IsBeingBuilt() || unit->IsDead() || unit->DestroyQueued() || unit->IsInCategory("COMMAND");
+
+  // Refuse the transfer if any attached entity is a COMMAND unit.
+  const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
+  for (Entity* const attachedEntity : attached) {
+    Unit* const attachedUnit = attachedEntity->IsUnit();
+    if (attachedUnit && attachedUnit->IsInCategory("COMMAND")) {
+      lua_pushnil(rawState);
+      return 1;
+    }
+  }
+
+  Unit* const transferred = sim->TransferUnit(unit, army);
+  if (transferred) {
+    transferred->mLuaObj.PushStack(state);
+  } else {
+    lua_pushnil(rawState);
+  }
+  return 1;
+}
+
+/**
+ * Address: 0x0075B5D0 (FUN_0075B5D0, cfunc_ChangeUnitArmy)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_ChangeUnitArmyL`.
+ */
+int moho::cfunc_ChangeUnitArmy(lua_State* const luaContext)
+{
+  return cfunc_ChangeUnitArmyL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075B5F0 (FUN_0075B5F0, func_ChangeUnitArmy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ChangeUnitArmy`.
+ */
+moho::CScrLuaInitForm* moho::func_ChangeUnitArmy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ChangeUnitArmy",
+    &moho::cfunc_ChangeUnitArmy,
+    nullptr,
+    "<global>",
+    kChangeUnitArmyHelpText
   );
   return &binder;
 }
