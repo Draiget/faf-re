@@ -347,74 +347,8 @@ namespace
     return OBB2DIntersects(primaryObb, secondaryObb);
   }
 
-  /**
-   * Address: 0x0062EEA0 (FUN_0062EEA0, Moho::func_IsSourceUnit)
-   *
-   * IDA signature:
-   * bool __usercall func_IsSourceUnit@<al>(int mode@<ebx>, Unit* owner@<edi>, Unit* candidate@<esi>);
-   *
-   * What it does:
-   * Decides whether `candidate` should be treated as a "source" (i.e. ignored)
-   * relative to `owner` when scanning for blockers/collisions. Returns true to
-   * skip the candidate. `mode` selects the caller policy: mode 2 (blocker
-   * scans) short-circuits to "don't skip" after the shared gates; mode 1
-   * (pathing) additionally skips a candidate that has not moved since the
-   * previous sim transform, and falls through to same-air-army / transport-wait
-   * / build-priority tie-breaks.
-   */
-  [[nodiscard]] bool func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate) noexcept
-  {
-    if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
-        !candidate->IsMobile() ||
-        (mode == 1 &&
-          Wm3::Vector3f::Compare(
-            &candidate->GetPositionHistory(0).pos_, &candidate->GetPositionHistory(1).pos_))) {
-      return true;
-    }
-
-    if (candidate->IsUnitState(UNITSTATE_Attached)) {
-      return true;
-    }
-
-    if (owner.mCurrentLayer != candidate->mCurrentLayer || (owner.mIsNaval && !candidate->mIsNaval)) {
-      return true;
-    }
-
-    if (candidate->mIsAir && (candidate->mCurrentLayer == LAYER_Air || candidate->AiTransport != nullptr)) {
-      return true;
-    }
-
-    if (HasFootprintFlag(owner.GetFootprint().mFlags, EFootprintFlags::FPFLAG_IgnoreStructures) &&
-        candidate->GetFootprint().mFlags == EFootprintFlags::FPFLAG_None) {
-      return true;
-    }
-
-    if (owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
-      if (owner.FocusEntityRef.ResolveObjectPtr<Entity>() == candidate->FocusEntityRef.ResolveObjectPtr<Entity>()) {
-        return true;
-      }
-    }
-
-    if (owner.IsUnitState(UNITSTATE_Upgrading) && candidate->CreatorRef.ResolveObjectPtr<Unit>() == &owner) {
-      return true;
-    }
-
-    if (mode == 2) {
-      return false;
-    }
-
-    // mode 1 tail: keep same-army air units, drop candidates waiting for
-    // transport when the owner is not, else fall back to build-priority order.
-    if (candidate->mIsAir && owner.ArmyRef == candidate->ArmyRef) {
-      return true;
-    }
-
-    if (!owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
-      return false;
-    }
-
-    return candidate->IsHigherPriorityThan(&owner);
-  }
+  // moho::func_IsSourceUnit (FUN_0062EEA0) is defined at namespace-moho file
+  // scope below so COGrid::UnitIsBlocked can invoke it cross-TU by name.
 
   [[nodiscard]] float ComputeCollisionQueryRadius(const Unit& owner, const CAiPathSpline* path) noexcept
   {
@@ -920,6 +854,77 @@ namespace
     );
   }
 } // namespace
+
+/**
+ * Address: 0x0062EEA0 (FUN_0062EEA0, Moho::func_IsSourceUnit)
+ *
+ * IDA signature:
+ * bool __usercall func_IsSourceUnit@<al>(int mode@<ebx>, Unit* owner@<edi>, Unit* candidate@<esi>);
+ *
+ * What it does:
+ * Decides whether `candidate` should be treated as a "source" (i.e. ignored)
+ * relative to `owner` when scanning for blockers/collisions. Returns true to
+ * skip the candidate. `mode` selects the caller policy: mode 2 (blocker scans)
+ * short-circuits to "don't skip" after the shared gates; mode 1 (pathing)
+ * additionally skips a candidate that has not moved since the previous sim
+ * transform, and falls through to same-air-army / transport-wait / build-
+ * priority tie-breaks. Defined at namespace-moho scope so COGrid::UnitIsBlocked
+ * can invoke it cross-TU by name.
+ */
+bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate) noexcept
+{
+  if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
+      !candidate->IsMobile() ||
+      (mode == 1 &&
+        Wm3::Vector3f::Compare(
+          &candidate->GetPositionHistory(0).pos_, &candidate->GetPositionHistory(1).pos_))) {
+    return true;
+  }
+
+  if (candidate->IsUnitState(UNITSTATE_Attached)) {
+    return true;
+  }
+
+  if (owner.mCurrentLayer != candidate->mCurrentLayer || (owner.mIsNaval && !candidate->mIsNaval)) {
+    return true;
+  }
+
+  if (candidate->mIsAir && (candidate->mCurrentLayer == LAYER_Air || candidate->AiTransport != nullptr)) {
+    return true;
+  }
+
+  if ((static_cast<std::uint8_t>(owner.GetFootprint().mFlags) &
+       static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u &&
+      candidate->GetFootprint().mFlags == EFootprintFlags::FPFLAG_None) {
+    return true;
+  }
+
+  if (owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
+    if (owner.FocusEntityRef.ResolveObjectPtr<Entity>() == candidate->FocusEntityRef.ResolveObjectPtr<Entity>()) {
+      return true;
+    }
+  }
+
+  if (owner.IsUnitState(UNITSTATE_Upgrading) && candidate->CreatorRef.ResolveObjectPtr<Unit>() == &owner) {
+    return true;
+  }
+
+  if (mode == 2) {
+    return false;
+  }
+
+  // mode 1 tail: keep same-army air units, drop candidates waiting for
+  // transport when the owner is not, else fall back to build-priority order.
+  if (candidate->mIsAir && owner.ArmyRef == candidate->ArmyRef) {
+    return true;
+  }
+
+  if (!owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
+    return false;
+  }
+
+  return candidate->IsHigherPriorityThan(&owner);
+}
 
 gpg::RType* CAiSteeringImpl::sType = nullptr;
 

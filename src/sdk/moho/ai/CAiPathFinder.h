@@ -246,7 +246,6 @@ namespace moho
     void PushRectHistory(const gpg::Rect2i& rect);
     void UpdatePlayableRectGate();
     [[nodiscard]] bool RectHistoryIntersects(const gpg::Rect2i& rect) const;
-    [[nodiscard]] bool IsBlockedByHistory(const SOCellPos& cellPos) const;
     [[nodiscard]] static bool IsStrictRect(const gpg::Rect2i& rect);
     [[nodiscard]] static bool CellInRectInclusiveExclusive(const SOCellPos& cellPos, const gpg::Rect2i& rect);
     [[nodiscard]] static bool RectsOverlapStrict(const gpg::Rect2i& lhs, const gpg::Rect2i& rhs);

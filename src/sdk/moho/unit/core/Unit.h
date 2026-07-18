@@ -4817,4 +4817,15 @@ namespace moho
    */
   using UnitHideBone_LuaFuncDef = ::moho::CScrLuaBinder;
 
+  /**
+   * Address: 0x0062EEA0 (FUN_0062EEA0, Moho::func_IsSourceUnit)
+   *
+   * What it does:
+   * Blocker-scan "source unit" filter: returns true when `candidate` should be
+   * ignored relative to `owner`. Shared by AI steering collision scans (mode 2)
+   * and COGrid unit-occupation tests (mode passthrough). Defined in
+   * CAiSteeringImpl.cpp.
+   */
+  [[nodiscard]] bool func_IsSourceUnit(int mode, const Unit& owner, Unit* candidate) noexcept;
+
 } // namespace moho

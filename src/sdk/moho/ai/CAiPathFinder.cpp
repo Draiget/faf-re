@@ -956,23 +956,60 @@ const SFootprint* CAiPathFinder::GetFootprint() const
 }
 
 /**
- * Address: 0x005AA710 (FUN_005AA710)
+ * Address: 0x005AA710 (FUN_005AA710, Moho::CAiPathFinder::CanTraverseCell)
+ *
+ * IDA signature:
+ * bool __thiscall Moho::CAiPathFinder::CanTraverseCell(
+ *   Moho::CAiPathFinder* this, Moho::SOCellPos* cellPos);  // decompiled as "Func2"
+ *
+ * What it does:
+ * Occupation-based traversability test for one candidate cell. In goal-boundary
+ * probe mode it evaluates a structure-ignoring copy of the unit footprint so
+ * the probe can cross static structures. Otherwise it optionally checks the
+ * plain footprint fit (when an occupancy mask is present) and then, for
+ * non-idle searches, whether a mobile unit already blocks the cell
+ * (`COGrid::UnitIsBlocked`). Leader searches use blocker mode 2, all others
+ * mode 1; idle (`AIPATHSEARCH_None`) searches never consult the occupation grid.
  */
 bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
 {
-  if (!IsInBounds(cellPos)) {
-    return false;
+  const SOCellPos cell{cellPos.x, cellPos.z};
+
+  if (!mUseGoalBoundaryProbe) {
+    if (mHasOccupancyMask) {
+      const SFootprint& footprint = mUnit->GetFootprint();
+      EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *mOGrid->sim->mMapData, cell);
+      if (mUnit->mCurrentLayer == LAYER_Water) {
+        caps = static_cast<EOccupancyCaps>(
+          static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
+      }
+      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) == 0u) {
+        return false;
+      }
+    }
+
+    // Idle searches never consult the unit-occupation grid; otherwise the cell
+    // is traversable only when no mobile unit blocks it.
+    if (mSearchType == AIPATHSEARCH_None) {
+      return true;
+    }
+    const int mode = (mSearchType == AIPATHSEARCH_Leader) ? 2 : 1;
+    return !COGrid::UnitIsBlocked(cell, *mOGrid, mUnit, mode);
   }
 
-  if (mSearchType != AIPATHSEARCH_None && IsBlockedByHistory(cellPos)) {
-    return false;
-  }
+  // Goal-boundary-probe branch: evaluate a structure-ignoring copy of the
+  // unit's footprint so the probe can cross static structures.
+  SFootprint probeFootprint = mUnit->GetFootprint();
+  probeFootprint.mFlags = static_cast<EFootprintFlags>(
+    static_cast<std::uint8_t>(probeFootprint.mFlags) |
+    static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures));
 
-  if (mUseGoalBoundaryProbe != 0u && IsBlockedByHistory(cellPos)) {
-    return false;
+  EOccupancyCaps caps = OCCUPY_MobileCheck(probeFootprint, *mOGrid->sim->mMapData, cell);
+  if (mUnit->mCurrentLayer == LAYER_Water) {
+    caps = static_cast<EOccupancyCaps>(
+      static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
   }
-
-  return true;
+  return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, probeFootprint, caps)) != 0u;
 }
 
 /**
@@ -1406,21 +1443,6 @@ bool CAiPathFinder::RectHistoryIntersects(const gpg::Rect2i& rect) const
 
   for (const RectHistoryNode* it = head->next; it != head; it = it->next) {
     if (RectsOverlapStrict(rect, it->rect)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool CAiPathFinder::IsBlockedByHistory(const SOCellPos& cellPos) const
-{
-  const RectHistoryNode* const head = RectHistoryHead(mRecentSearchRects);
-  if (!head) {
-    return false;
-  }
-
-  for (const RectHistoryNode* it = head->next; it != head; it = it->next) {
-    if (CellInRectInclusiveExclusive(cellPos, it->rect)) {
       return true;
     }
   }
