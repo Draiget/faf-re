@@ -75,6 +75,7 @@ namespace moho
   int cfunc_CAiBrainCreateResourceBuildingNearest(lua_State* luaContext);
   int cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* state);
   int cfunc_CAiBrainFindPlaceToBuild(lua_State* luaContext);
+  int cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* state);
 
   // Recovered in CUnitCallTeleport.cpp; forward-declared here so the build-order
   // helper below can invoke it by name (matches the binary's cross-TU call).
@@ -4586,6 +4587,355 @@ void moho::func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef()
     kAiBrainLuaClassName,
     kAiBrainCreateResourceBuildingNearestHelpText
   );
+}
+
+/**
+ * Address: 0x0058A4C0 (FUN_0058A4C0, cfunc_CAiBrainFindPlaceToBuildL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* state);
+ *
+ * What it does:
+ * brain:FindPlaceToBuild(type, structureName, buildingTypes, relative, [builder],
+ * [optIgnoreAlliance], [optOverridePosX, optOverridePosZ], [optIgnoreThreatOver]).
+ * Finds a placement for a structure and returns it as a {x, z, 0} Lua table, or
+ * nil, via two paths:
+ *   Resource path (type is Resource / T1..T3Resource / T1HydroCarbon, and the
+ *     "/nomass" arg is unset): scans resource deposits of the structure's class
+ *     nearest-first from the army start (or override position) and returns the
+ *     first deposit centre that clears the threat gate and CanBuildStructureAt.
+ *   General path: walks the caller-supplied buildingTypes table (groups of
+ *     {typeNameList, positions...}); for every group whose type list contains
+ *     `type`, scores each candidate position by distance to the reference point
+ *     (builder position / override / army start) and keeps the closest that
+ *     passes CanBuildStructureAt, does not overlap a resource deposit, and
+ *     clears the threat gate.
+ */
+int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
+{
+  Sim* const sim = lua_getglobaluserdata_typed(state->m_state);
+  const int numArgs = lua_gettop(state->m_state);
+  if (numArgs < 6 || numArgs > 10) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected between %d and %d args, but got %d", kAiBrainFindPlaceToBuildHelpText, 6, 10, numArgs);
+  }
+
+  // Arg types: 2 = type (string), 3 = structureName (string), 4 = buildingTypes (table).
+  if (lua_type(state->m_state, 2) == 0 || !lua_isstring(state->m_state, 2)) {
+    LuaPlus::LuaState::Error(state, "Invalid Type name passed in");
+  }
+  if (lua_type(state->m_state, 3) == 0 || !lua_isstring(state->m_state, 3)) {
+    LuaPlus::LuaState::Error(state, "Invalid Structure name passed in");
+  }
+  {
+    const LuaPlus::LuaObject buildingTypesArg(LuaPlus::LuaStackObject(state, 4));
+    if (lua_type(state->m_state, 4) == 0 || !buildingTypesArg.IsTable()) {
+      LuaPlus::LuaState::Error(state, "Invalid buildingTypes passed in. Not a lua table!");
+    }
+  }
+
+  CAiBrain* aiBrain = nullptr;
+  {
+    const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+    aiBrain = SCR_FromLua_CAiBrain(brainObject, state);
+  }
+
+  LuaPlus::LuaStackObject typeArg(state, 2);
+  const char* const type = lua_tostring(state->m_state, 2);
+  if (type == nullptr) {
+    typeArg.TypeError("string");
+  }
+  LuaPlus::LuaStackObject structureNameArg(state, 3);
+  const char* const structureName = lua_tostring(state->m_state, 3);
+  if (structureName == nullptr) {
+    structureNameArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaObject buildingTypes(LuaPlus::LuaStackObject(state, 4));
+  const bool relative = LuaPlus::LuaStackObject(state, 5).GetBoolean();
+
+  // Optional builder unit (arg 6).
+  Unit* builderUnit = nullptr;
+  if (lua_type(state->m_state, 6) != 0) {
+    const LuaPlus::LuaObject builderObject(LuaPlus::LuaStackObject(state, 6));
+    builderUnit = SCR_FromLua_Unit(builderObject);
+  }
+
+  // Optional alliance filter to ignore (arg 7); default = ALLIANCE_None.
+  EAlliance optIgnoreAlliance = ALLIANCE_None;
+  if (numArgs >= 7 && lua_type(state->m_state, 7) != 0) {
+    gpg::RRef enumRef;
+    (void)gpg::RRef_EAlliance(&enumRef, &optIgnoreAlliance);
+    LuaPlus::LuaStackObject allianceArg(state, 7);
+    const char* const allianceName = lua_tostring(state->m_state, 7);
+    if (allianceName == nullptr) {
+      allianceArg.TypeError("string");
+    }
+    SCR_GetEnum(state, allianceName, enumRef);
+  }
+
+  // Optional override position (args 8 = X, 9 = Z).
+  bool hasOverridePos = false;
+  Wm3::Vector3f overridePos(0.0f, 0.0f, 0.0f);
+  if (numArgs >= 9 && lua_type(state->m_state, 8) != 0 && lua_type(state->m_state, 9) != 0) {
+    hasOverridePos = true;
+    overridePos.x = static_cast<float>(LuaPlus::LuaStackObject(state, 8).GetNumber());
+    overridePos.z = static_cast<float>(LuaPlus::LuaStackObject(state, 9).GetNumber());
+  }
+
+  // Optional threat ceiling (arg 10).
+  int optIgnoreThreatOver = 0;
+  if (numArgs >= 10 && lua_type(state->m_state, 10) != 0) {
+    optIgnoreThreatOver = LuaPlus::LuaStackObject(state, 10).GetInteger();
+  }
+
+  CArmyImpl* const mArmy = aiBrain->mArmy;
+
+  RUnitBlueprint* structureBp = nullptr;
+  {
+    msvc8::string structureFilename;
+    gpg::STR_InitFilename(&structureFilename, structureName);
+    structureBp = sim->mRules->GetUnitBlueprint(RResId(structureFilename));
+  }
+
+  CSimResources* const resources = sim->mSimResources.px;
+
+  Wm3::Vector2f armyStart;
+  mArmy->GetArmyStartPos(armyStart);
+  Wm3::Vector3f startingPos;
+  startingPos.x = armyStart.x;
+  startingPos.z = armyStart.y;
+  const float armyStartZ = armyStart.y;
+
+  // ---- Resource path -------------------------------------------------------
+  const bool isResourceType = _stricmp(type, "Resource") == 0 || _stricmp(type, "T1Resource") == 0 ||
+    _stricmp(type, "T2Resource") == 0 || _stricmp(type, "T3Resource") == 0 || _stricmp(type, "T1HydroCarbon") == 0;
+  if (!CFG_GetArgOption("/nomass", 0, nullptr) && isResourceType) {
+    if (hasOverridePos) {
+      startingPos.x = overridePos.x;
+      startingPos.z = overridePos.z;
+    }
+
+    const CategoryWordRangeView* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
+    const EDepositType wantedDeposit =
+      EntityCategory::HasBlueprint(structureBp, hydrocarbonCategory) ? kHydrocarbon : kMass;
+
+    struct SDepositCandidate
+    {
+      float centerX;
+      float centerZ;
+      float distanceSq;
+    };
+    std::vector<SDepositCandidate> candidates;
+    for (const ResourceDeposit& deposit : resources->GetDeposits()) {
+      if (deposit.depositType != wantedDeposit) {
+        continue;
+      }
+      const float centerX = static_cast<float>(deposit.footprintRect.x0 + deposit.footprintRect.x1) * 0.5f;
+      const float centerZ = static_cast<float>(deposit.footprintRect.z0 + deposit.footprintRect.z1) * 0.5f;
+      const float dx = startingPos.x - centerX;
+      const float dz = startingPos.z - centerZ;
+      candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+      return a.distanceSq < b.distanceSq;
+    });
+
+    for (const SDepositCandidate& candidate : candidates) {
+      const int cellWorldX = static_cast<int>(candidate.centerX);
+      const int cellWorldZ = static_cast<int>(candidate.centerZ);
+      if (optIgnoreThreatOver > 0) {
+        CInfluenceMap* const igrid = mArmy->GetIGrid();
+        const int mWidth = igrid->mWidth;
+        int locX = cellWorldX / igrid->mGridSize;
+        if (locX >= mWidth - 1) {
+          locX = mWidth - 1;
+        }
+        if (locX < 0) {
+          locX = 0;
+        }
+        int locY = cellWorldZ / igrid->mGridSize;
+        if (locY >= igrid->mHeight - 1) {
+          locY = igrid->mHeight - 1;
+        }
+        if (locY < 0) {
+          locY = 0;
+        }
+        const int cellIndex = locX + locY * mWidth;
+        const float threat = igrid->GetThreatRect(
+          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1);
+        if (threat >= static_cast<float>(optIgnoreThreatOver)) {
+          continue;
+        }
+      }
+
+      const Wm3::Vector3f buildPos(candidate.centerX, 0.0f, candidate.centerZ);
+      if (aiBrain->CanBuildStructureAt(buildPos, structureBp, optIgnoreAlliance, cellWorldX, cellWorldZ)) {
+        float resultX = candidate.centerX;
+        float resultZ = candidate.centerZ;
+        if (relative) {
+          resultX -= startingPos.x;
+          resultZ -= startingPos.z;
+        }
+        LuaPlus::LuaObject resultTable;
+        resultTable.AssignNewTable(state, 0, 3);
+        resultTable.SetNumber(1, resultX);
+        resultTable.SetNumber(2, resultZ);
+        resultTable.SetNumber(3, 0.0f);
+        resultTable.PushStack(state);
+        return 1;
+      }
+    }
+
+    lua_pushnil(state->m_state);
+    (void)lua_gettop(state->m_state);
+    return 1;
+  }
+
+  // ---- General building-types path ----------------------------------------
+  Wm3::Vector3f targetPos(startingPos.x, 0.0f, armyStartZ);
+  if (builderUnit != nullptr) {
+    targetPos = builderUnit->GetPosition();
+  }
+  if (hasOverridePos) {
+    targetPos.x = overridePos.x;
+    targetPos.y = 0.0f;
+    targetPos.z = overridePos.z;
+    startingPos.x = overridePos.x;
+    startingPos.z = overridePos.z;
+  }
+
+  LuaPlus::LuaObject closestPlacement;
+  float closestDist = std::numeric_limits<float>::infinity();
+
+  for (int groupIndex = 1; groupIndex <= buildingTypes.GetCount(); ++groupIndex) {
+    LuaPlus::LuaObject buildingGroup = buildingTypes[groupIndex];
+    LuaPlus::LuaObject typeNameList = buildingGroup[1];
+    if (buildingGroup.IsNil() || !buildingGroup.IsTable()) {
+      LuaPlus::LuaState::Error(state, "Error parsing building types. Missing type list lua table!");
+    } else if (typeNameList.IsNil() || !typeNameList.IsTable()) {
+      LuaPlus::LuaState::Error(state, "Error parsing building types. Missing type match lua table!");
+    }
+
+    // Does this group's type-name list contain the requested type?
+    bool typeMatches = false;
+    if (typeNameList.GetCount() >= 1) {
+      for (int typeIndex = 1; typeIndex <= typeNameList.GetCount(); ++typeIndex) {
+        LuaPlus::LuaObject typeNameObject = typeNameList[typeIndex];
+        if (_stricmp(typeNameObject.GetString(), type) == 0) {
+          typeMatches = true;
+          break;
+        }
+      }
+    }
+    if (!typeMatches) {
+      continue;
+    }
+
+    // Score each candidate position in the group (entries [2 .. GetCount()]).
+    const float dy2 = targetPos.y * targetPos.y;
+    for (int posIndex = 2; posIndex <= buildingGroup.GetCount(); ++posIndex) {
+      LuaPlus::LuaObject positionEntry = buildingGroup[posIndex];
+      LuaPlus::LuaObject entryX = positionEntry[1];
+      LuaPlus::LuaObject entryZ = positionEntry[2];
+      Wm3::Vector3f position;
+      position.x = static_cast<float>(entryX.GetNumber());
+      position.z = static_cast<float>(entryZ.GetNumber());
+
+      float worldX = position.x;
+      float worldZ = position.z;
+      if (relative) {
+        worldX = position.x + startingPos.x;
+        worldZ = startingPos.z + position.z;
+        position.x = worldX;
+        position.z = worldZ;
+      }
+
+      const float ddx = worldX - targetPos.x;
+      const float ddz = worldZ - targetPos.z;
+      const float curDist = (ddx * ddx) + (ddz * ddz) + dy2;
+      if (closestDist <= curDist) {
+        continue;
+      }
+
+      const Wm3::Vector3f buildPos(worldX, 0.0f, worldZ);
+      if (!aiBrain->CanBuildStructureAt(
+            buildPos, structureBp, optIgnoreAlliance, static_cast<int>(worldX), static_cast<int>(worldZ))) {
+        continue;
+      }
+
+      // Reject positions whose structure skirt overlaps a live resource deposit.
+      bool skirtFits = true;
+      SCoordsVec2 skirtPos{};
+      skirtPos.x = position.x;
+      skirtPos.z = position.z;
+      const gpg::Rect2f skirt = structureBp->GetSkirtRect(skirtPos);
+      for (const ResourceDeposit& deposit : resources->GetDeposits()) {
+        const float depX0 = static_cast<float>(deposit.footprintRect.x0);
+        const float depZ0 = static_cast<float>(deposit.footprintRect.z0);
+        const float depX1 = static_cast<float>(deposit.footprintRect.x1);
+        const float depZ1 = static_cast<float>(deposit.footprintRect.z1);
+        if (skirt.x1 > depX0 && depX1 > skirt.x0 && skirt.z1 > depZ0 && depZ1 > skirt.z0 && depX1 > depX0 &&
+            depZ0 < depZ1 && skirt.x1 > skirt.x0 && skirt.z0 < skirt.z1) {
+          skirtFits = false;
+          break;
+        }
+      }
+
+      // Threat gate. (Preserves the binary's double-divide clamp exactly.)
+      bool unthreatened = true;
+      if (optIgnoreThreatOver > 0) {
+        CInfluenceMap* const igrid = mArmy->GetIGrid();
+        const int mGridSize = igrid->mGridSize;
+        const int gridWidth = igrid->mWidth;
+        int xCell = static_cast<int>(worldX) / mGridSize;
+        if (xCell / mGridSize >= gridWidth - 1) {
+          xCell = gridWidth - 1;
+        }
+        if (xCell < 0) {
+          xCell = 0;
+        }
+        int zCell = static_cast<int>(worldZ) / mGridSize;
+        if (zCell / mGridSize >= igrid->mHeight - 1) {
+          zCell = igrid->mHeight - 1;
+        }
+        if (zCell < 0) {
+          zCell = 0;
+        }
+        const int cellIndex = xCell + zCell * gridWidth;
+        const float localThreat = igrid->GetThreatRect(
+          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1);
+        unthreatened = static_cast<float>(optIgnoreThreatOver) > localThreat;
+      }
+
+      if (skirtFits && unthreatened) {
+        closestPlacement = positionEntry;
+        closestDist = curDist;
+      }
+    }
+  }
+
+  if (closestDist >= std::numeric_limits<float>::infinity()) {
+    lua_pushnil(state->m_state);
+    (void)lua_gettop(state->m_state);
+    return 1;
+  }
+
+  closestPlacement.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0058A440 (FUN_0058A440, cfunc_CAiBrainFindPlaceToBuild)
+ *
+ * What it does:
+ * Unwraps the Lua callback binding state and forwards to
+ * `cfunc_CAiBrainFindPlaceToBuildL`.
+ */
+int moho::cfunc_CAiBrainFindPlaceToBuild(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainFindPlaceToBuildL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
