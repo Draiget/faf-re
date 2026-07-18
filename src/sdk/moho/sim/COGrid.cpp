@@ -16,6 +16,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/path/PathTables.h"
+#include "Wm3Box3.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 
@@ -1141,6 +1142,115 @@ namespace moho
     }
 
     return false;
+  }
+
+  // Rotates a vector by a quaternion (defined in Sim.cpp) — same free helper the
+  // sibling manipulator/formation TUs forward-declare.
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+
+  // Quaternion rotating a movement direction 90 degrees about +Y (built from a
+  // 45-degree half-angle) — quat_45deg1 (register_quat_45deg1, FUN_00BDA970).
+  // Stored (w, x, y, z): cos(pi/4)=sin(pi/4)=0.70710677.
+  constexpr Wm3::Quaternionf kSweptPathCrossRotation{0.70710677f, 0.0f, 0.70710677f, 0.0f};
+
+  /**
+   * Address: 0x007216D0 (FUN_007216D0, Moho::SweptPathBlockedByUnit)
+   *
+   * IDA signature:
+   * char __stdcall sub_7216D0(COGrid* grid, Unit* unit, Wm3::Vector3f* fromCenter,
+   *   Wm3::Vector3f* toCenter, int mode);
+   *
+   * What it does:
+   * Sweeps the moving unit's footprint from `fromCenter` to `toCenter` as an
+   * oriented box (width = blueprint size, length = segment length, cross axis =
+   * direction rotated 90 degrees about Y) and reports whether any nearby mobile
+   * unit of a different formation-layer that is not an ignorable source unit
+   * lies inside the swept volume.
+   */
+  [[nodiscard]] static bool SweptPathBlockedByUnit(
+    COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
+  {
+    if (!Wm3::Vector3f::Compare(&fromCenter, &toCenter)) {
+      // Endpoints coincide — nothing to sweep.
+      return false;
+    }
+
+    Wm3::Vector3f segment{toCenter.x - fromCenter.x, 0.0f, toCenter.z - fromCenter.z};
+    Wm3::Vector3f direction = segment;
+    (void)direction.Normalize();
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    const Wm3::Vector3f center{
+      (fromCenter.x + toCenter.x) * 0.5f,
+      (fromCenter.y + toCenter.y) * 0.5f,
+      (fromCenter.z + toCenter.z) * 0.5f};
+
+    Wm3::Vector3f crossAxis;
+    (void)MultQuadVec(&crossAxis, &direction, &kSweptPathCrossRotation);
+
+    const float dx = fromCenter.x - toCenter.x;
+    const float dz = fromCenter.z - toCenter.z;
+    const float halfLength = std::sqrt((dz * dz) + (dx * dx)) * 0.5f;
+
+    const Wm3::Box3f sweptBox(
+      center,
+      crossAxis,
+      Wm3::Vector3f{0.0f, 1.0f, 0.0f},
+      direction,
+      static_cast<float>(blueprint->mSizeX) * 0.55555558f,
+      1000.0f,
+      halfLength);
+
+    CollisionResultFastVectorN10 hits{};
+    grid.CollectEntitiesInBox(hits, ENTITYTYPE_Unit, sweptBox);
+
+    for (const CollisionResult& hit : hits) {
+      Entity* const source = hit.sourceEntity;
+      Unit* const candidate = source ? source->IsUnit() : nullptr;
+      if (candidate == nullptr) {
+        continue;
+      }
+      const ELayer candidateLayer = candidate->mCurrentLayer;
+      if (candidateLayer == LAYER_Air || candidateLayer == LAYER_Sub) {
+        continue;
+      }
+      if (!unit->IsSameFormationLayerWith(candidate) && !func_IsSourceUnit(mode, *unit, candidate)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Address: 0x00721990 (FUN_00721990, Moho::PathTransitionBlocked)
+   *
+   * IDA signature:
+   * char __userpurge sub_721990(__int16* toCell, SOCellPos* fromCell,
+   *   COGrid* grid, Unit* unit, int mode);
+   *
+   * What it does:
+   * Tests whether `unit` can occupy the transition from `fromCell` to `toCell`.
+   * For a same-cell move it defers to COGrid::UnitIsBlocked; otherwise it sweeps
+   * the footprint between the two cell centres (SweptPathBlockedByUnit).
+   */
+  bool PathTransitionBlocked(
+    const SOCellPos& toCell, const SOCellPos& fromCell, COGrid& grid, Unit* const unit, const int mode)
+  {
+    if (fromCell.x == toCell.x && fromCell.z == toCell.z) {
+      return COGrid::UnitIsBlocked(fromCell, grid, unit, mode);
+    }
+
+    const SFootprint& footprint = unit->GetFootprint();
+    const float halfSizeX = static_cast<float>(footprint.mSizeX) * 0.5f;
+    const float halfSizeZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
+
+    const Wm3::Vector3f fromCenter{
+      halfSizeX + static_cast<float>(fromCell.x), 0.0f, halfSizeZ + static_cast<float>(fromCell.z)};
+    const Wm3::Vector3f toCenter{
+      halfSizeX + static_cast<float>(toCell.x), 0.0f, halfSizeZ + static_cast<float>(toCell.z)};
+
+    return SweptPathBlockedByUnit(grid, unit, fromCenter, toCenter, mode);
   }
 
   /**

@@ -316,6 +316,18 @@ namespace moho
   void GatherUnmarkedUnitsInBox(COGrid& grid, const Wm3::AxisAlignedBox3f& box, CollisionResultFastVectorN10& into);
 
   /**
+   * Address: 0x00721990 (FUN_00721990, Moho::PathTransitionBlocked)
+   *
+   * What it does:
+   * Tests whether `unit` can occupy the cell transition `fromCell`->`toCell`:
+   * same-cell defers to COGrid::UnitIsBlocked, otherwise sweeps the footprint
+   * between the two cell centres. Used by the AI path navigator's transition
+   * gate (CAiPathNavigator).
+   */
+  [[nodiscard]] bool PathTransitionBlocked(
+    const SOCellPos& toCell, const SOCellPos& fromCell, COGrid& grid, Unit* unit, int mode);
+
+  /**
    * VFTABLE: 0x00E3192C
    * COL: 0x00E8E5B4
    */
