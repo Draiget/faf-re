@@ -65,6 +65,26 @@ namespace moho
     ShaderVar viewportScale;
     ShaderVar viewportOffset;
 
+    // Terrain lighting/shadow lane (bound by MediumFidelityTerrain::LoadTerrainLighting).
+    ShaderVar viewMatrix;
+    ShaderVar projMatrix;
+    ShaderVar lightingMultiplier;
+    ShaderVar sunDirection;
+    ShaderVar sunAmbience;
+    ShaderVar sunColor;
+    ShaderVar halfAngle;
+    ShaderVar cameraDirection;
+    ShaderVar cameraPosition;
+    ShaderVar specularColor;
+    ShaderVar shadowFillColor;
+    ShaderVar shadowsEnabled;
+    ShaderVar shadowMatrix;
+    ShaderVar shadowTexture;
+    ShaderVar noiseTexture;
+    ShaderVar decalMaskTexture;
+    ShaderVar biCubicLookup;
+    ShaderVar overlayTexture;
+
     TerrainShaderVarSet();
   };
 
@@ -73,4 +93,5 @@ namespace moho
   void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& textureSheet);
   void BindTextureShaderVar(ShaderVar& shaderVar, const boost::SharedPtrRaw<RD3DTextureResource>& textureResource);
   void SetShaderVarMem(ShaderVar& shaderVar, std::uint32_t floatCount, const float* values);
+  void SetShaderVarPtr(ShaderVar& shaderVar, const void* data, std::uint32_t byteCount);
 } // namespace moho
