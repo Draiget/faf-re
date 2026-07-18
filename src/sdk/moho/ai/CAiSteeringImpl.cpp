@@ -348,12 +348,27 @@ namespace
   }
 
   /**
-   * Address: 0x0062EEA0 (FUN_0062EEA0, func_IsSourceUnit mode=2 subset)
+   * Address: 0x0062EEA0 (FUN_0062EEA0, Moho::func_IsSourceUnit)
+   *
+   * IDA signature:
+   * bool __usercall func_IsSourceUnit@<al>(int mode@<ebx>, Unit* owner@<edi>, Unit* candidate@<esi>);
+   *
+   * What it does:
+   * Decides whether `candidate` should be treated as a "source" (i.e. ignored)
+   * relative to `owner` when scanning for blockers/collisions. Returns true to
+   * skip the candidate. `mode` selects the caller policy: mode 2 (blocker
+   * scans) short-circuits to "don't skip" after the shared gates; mode 1
+   * (pathing) additionally skips a candidate that has not moved since the
+   * previous sim transform, and falls through to same-air-army / transport-wait
+   * / build-priority tie-breaks.
    */
-  [[nodiscard]] bool IsSourceUnitMode2Filtered(const Unit& owner, Unit* candidate) noexcept
+  [[nodiscard]] bool func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate) noexcept
   {
     if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
-        !candidate->IsMobile()) {
+        !candidate->IsMobile() ||
+        (mode == 1 &&
+          Wm3::Vector3f::Compare(
+            &candidate->GetPositionHistory(0).pos_, &candidate->GetPositionHistory(1).pos_))) {
       return true;
     }
 
@@ -384,7 +399,21 @@ namespace
       return true;
     }
 
-    return false;
+    if (mode == 2) {
+      return false;
+    }
+
+    // mode 1 tail: keep same-army air units, drop candidates waiting for
+    // transport when the owner is not, else fall back to build-priority order.
+    if (candidate->mIsAir && owner.ArmyRef == candidate->ArmyRef) {
+      return true;
+    }
+
+    if (!owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
+      return false;
+    }
+
+    return candidate->IsHigherPriorityThan(&owner);
   }
 
   [[nodiscard]] float ComputeCollisionQueryRadius(const Unit& owner, const CAiPathSpline* path) noexcept
@@ -666,7 +695,7 @@ namespace
         continue;
       }
 
-      if (IsSourceUnitMode2Filtered(*owner, candidate)) {
+      if (func_IsSourceUnit(2, *owner, candidate)) {
         continue;
       }
 
