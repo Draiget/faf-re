@@ -178,6 +178,73 @@ void CClientBase::Debug()
 }
 
 /**
+ * Address: 0x0053B6B0 (FUN_0053B6B0)
+ *
+ * IDA signature:
+ * std::string* __userpurge FormatBottleneckLabel@<eax>(
+ *     std::string* out@<eax>, const SClientBottleneckInfo* info);
+ *
+ * What it does:
+ * Formats one bottleneck record into `out`:
+ *   "<type> <mVal>[ (<members>)][ <mFloat>ms]".
+ * The type token is selected by `mType`; the member set (when non-empty) is
+ * comma-joined from `mSubobj`; the trailing millisecond field is appended only
+ * when `mType != Nothing`.
+ */
+msvc8::string& moho::FormatBottleneckLabel(const SClientBottleneckInfo& info, msvc8::string& out)
+{
+  // Type token (switch on mType, 0..3) -> assignment (0x0053B703..0x0053B71F).
+  switch (info.mType) {
+    case SClientBottleneckInfo::Nothing:
+      out = "nothing";
+      break;
+    case SClientBottleneckInfo::Readiness:
+      out = "readiness";
+      break;
+    case SClientBottleneckInfo::Data:
+      out = "data";
+      break;
+    case SClientBottleneckInfo::Ack:
+      out = "ack";
+      break;
+  }
+
+  // " %u" of mVal (0x0053B724..0x0053B744). Binary passes the raw dword as
+  // unsigned; reproduce that exactly.
+  out += gpg::STR_Printf(" %u", static_cast<unsigned int>(info.mVal));
+
+  // Member set, comma-joined inside "( ... )", only when non-empty
+  // (0x0053B766..0x0053B853).
+  if (info.mSubobj.Count() != 0) {
+    out += " (";
+    // GetNext walks values strictly greater than the argument; start at
+    // 0xFFFFFFFF so the first present value is returned, and stop at Max()
+    // (== 32 * (mFirstWordIndex + wordCount)), matching the binary's
+    // manually-computed end sentinel.
+    const unsigned int end = info.mSubobj.Max();
+    unsigned int value = info.mSubobj.GetNext(std::numeric_limits<unsigned int>::max());
+    if (value != end) {
+      // First member: "%d" (0x0053B791).
+      out += gpg::STR_Printf("%d", value);
+      value = info.mSubobj.GetNext(value);
+      // Subsequent members: ",%d" (0x0053B7EB).
+      while (value != end) {
+        out += gpg::STR_Printf(",%d", value);
+        value = info.mSubobj.GetNext(value);
+      }
+    }
+    out += ")";
+  }
+
+  // " %.1fms" of mFloat, only when mType != Nothing (0x0053B85C..0x0053B88B).
+  if (info.mType != SClientBottleneckInfo::Nothing) {
+    out += gpg::STR_Printf(" %.1fms", info.mFloat);
+  }
+
+  return out;
+}
+
+/**
  * Address: 0x0053BF30 (FUN_0053BF30)
  * Address: 0x101297E0 (sub_101297E0)
  *
