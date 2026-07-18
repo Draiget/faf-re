@@ -22262,6 +22262,91 @@ void moho::CMauiBitmap::OnPatternEnd()
 }
 
 /**
+ * Address: 0x0078EFE0 (FUN_0078EFE0, Moho::CMauiEdit::CMauiEdit)
+ * Mangled: ??0CMauiEdit@Moho@@QAE@PAVLuaObject@LuaPlus@@PAV01@@Z
+ *
+ * IDA signature:
+ * Moho::CMauiEdit *__stdcall Moho::CMauiEdit::CMauiEdit(
+ *     Moho::CMauiEdit *this, LuaPlus::LuaObject *a2, Moho::CD3DFont *p_capacity);
+ *
+ * What it does:
+ * Constructs one edit control ("edit" control kind) from a Lua object plus
+ * parent lanes, then initializes the full edit/font/caret/selection default
+ * state and installs a default "Courier New" 14pt font. Field init order and
+ * values mirror the binary exactly.
+ *
+ * IMauiDragger sub-object note:
+ * The binary additionally writes the embedded IMauiDragger sub-object vtable at
+ * +0x11C to Moho::CMauiEdit::`vftable'{for `Moho::IMauiDragger'} (asm 0x0078F04A,
+ * thunk table VA 0x00E395CC) so the click-dragger DragMove slot dispatches to
+ * Moho::CMauiEditDragMove (FUN_007913A0). In this repo CMauiEdit is modeled as
+ * `class CMauiEdit : public CMauiControl` (no real IMauiDragger C++ base — the
+ * sub-object is the overlay lane `mClickDraggerStorage` at +0x11C), so the C++
+ * compiler does not emit that sub-object vtable pointer for us, and no existing
+ * recovered mechanism installs the edit-specific dragger thunk vtable (the only
+ * install helper, ResolveMauiDraggerVtableLane(), yields the generic empty-base
+ * IMauiDragger vtable, not the CMauiEdit override thunk). See the UNRESOLVED
+ * marker below.
+ */
+moho::CMauiEdit::CMauiEdit(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
+  : CMauiControl(luaObject, parent, "edit")
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+
+  // .c line 19: `this->mList = 0` — the embedded IMauiDragger sub-object's
+  // list-head lane (+0x120, modeled as CMauiEditClickDraggerRuntimeView::mListHead).
+  ResolveEditClickDraggerRuntime(editView)->mListHead = nullptr;
+
+  // UNRESOLVED: IMauiDragger vptr init (asm 0x0078F04A) — the binary installs
+  // the CMauiEdit-for-IMauiDragger thunk vtable (VA 0x00E395CC) into
+  // mClickDraggerStorage (+0x11C) so DragMove routes to Moho::CMauiEditDragMove.
+  // CMauiEdit is not modeled with a real IMauiDragger C++ base, so the compiler
+  // does not set this pointer, and no existing recovered helper installs the
+  // edit-specific override vtable (ResolveMauiDraggerVtableLane() only yields the
+  // generic empty-base vtable). Left unresolved rather than inventing a raw
+  // vtable cast.
+
+  editView->mFont = nullptr;
+  editView->mForegroundColor = 0xFFFFFFFFu;
+  editView->mBackgroundVisible = true;
+  editView->mBackgroundColor = 0xFF000000u;
+  editView->mHighlightForegroundColor = 0xFF000000u;
+  editView->mHighlightBackgroundColor = 0xFFFFFFFFu;
+  editView->mDropShadow = false;
+  editView->mIsEnabled = true;
+  // mText (+0x140) is already default-constructed (empty) by the runtime-view /
+  // base construction; the binary's inline SSO reset is the empty-string init.
+
+  editView->mCaretCycleCurrentAlpha = 255u; // .c mCaretCurColor
+  editView->mCaretCycleSeconds = 1.5f;       // .c mCaretCycleSeconds
+  editView->mCaretCycleOnAlpha = 255u;       // .c mCaretCycleOnColor
+  editView->mCaretPosition = 0;
+  editView->mCaretVisible = false;
+  editView->mCaretColor = 16711422u;         // .c mCaretColor (0xFEFEFE)
+  editView->mCaretCycleOffAlpha = 62u;       // .c mCaretCycleOffColor
+  editView->mCaretCycleTime = 0.0f;          // .c mCaretTime
+
+  editView->mClipOffset = 0;
+  editView->mClipLength = 0;
+  editView->mSelectionStart = 0;
+  editView->mSelectionEnd = 0;
+  editView->mDragStart = 0;
+  editView->mTextChangeCallbackInProgress = false; // .c mDoingCallback
+  editView->mMaxChars = 1024;
+
+  // Create the default "Courier New" 14pt font and apply it. Mirrors the
+  // sibling `cfunc_CMauiEditSetNewFontL` idiom: CD3DFont::Create ->
+  // ApplyEditFontAndRefreshClip -> release(). The .c's middle `0.0f` argument to
+  // sub_78F620 is the elided requested-clip-offset lane already handled inside
+  // ApplyEditFontAndRefreshClip (FUN_0078F620).
+  boost::SharedPtrRaw<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
+  ApplyEditFontAndRefreshClip(editView, defaultFont);
+  defaultFont.release();
+
+  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+}
+
+/**
  * Address: 0x0078F1B0 (FUN_0078F1B0, Moho::CMauiEdit::~CMauiEdit)
  * Mangled: ??1CMauiEdit@Moho@@QAE@XZ
  *
