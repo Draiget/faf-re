@@ -58,6 +58,22 @@ namespace moho
   };
 
   /**
+   * Address: 0x0053B6B0 (FUN_0053B6B0)
+   *
+   * IDA signature:
+   * std::string* __userpurge FormatBottleneckLabel@<eax>(
+   *     std::string* out@<eax>, const SClientBottleneckInfo* info);
+   *
+   * What it does:
+   * Renders one bottleneck record to a human-readable label:
+   *   "<type> <mVal>[ (<members>)][ <mFloat>ms]"
+   * where <type> is one of "nothing"/"readiness"/"data"/"ack", the member set
+   * is comma-joined from `mSubobj`, and the trailing millisecond field is only
+   * appended when `mType != Nothing`.
+   */
+  msvc8::string& FormatBottleneckLabel(const SClientBottleneckInfo& info, msvc8::string& out);
+
+  /**
    * VFTABLE: 0x00E16BD4
    * COL:     0x00E6AED8
    */
