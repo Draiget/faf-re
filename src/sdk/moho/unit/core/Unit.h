@@ -2203,6 +2203,24 @@ namespace moho
   int cfunc_NotifyUpgradeL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x006D0000 (FUN_006D0000, cfunc_CreateUnit2)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CreateUnit2L`.
+   */
+  int cfunc_CreateUnit2(lua_State* luaContext);
+
+  /**
+   * Address: 0x006D0080 (FUN_006D0080, cfunc_CreateUnit2L)
+   *
+   * What it does:
+   * Global `CreateUnit2(blueprint, army, layer, x, z, heading)` worker: resolves
+   * the blueprint + owning army, builds a construction payload at (x,0,z) with a
+   * heading yaw, spawns the unit via the sim, and returns its script object.
+   */
+  int cfunc_CreateUnit2L(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x006C4180 (FUN_006C4180, cfunc_UnitGetArmorMult)
    *
    * What it does:
