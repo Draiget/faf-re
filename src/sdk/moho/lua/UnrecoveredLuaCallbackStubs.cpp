@@ -34,7 +34,7 @@ namespace moho
 namespace moho
 {
   // ===== Unrecovered cfunc_*L(LuaPlus::LuaState*) inner callbacks =====
-  int cfunc_IssueDockCommandL(LuaPlus::LuaState*) { return 0; }
+  // cfunc_IssueDockCommandL recovered in CCommandLuaFunctionRegistrations.cpp (FUN_00840A70).
   int cfunc_OpenURLL(LuaPlus::LuaState*) { return 0; }
 }
 

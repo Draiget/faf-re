@@ -29,6 +29,9 @@ namespace moho
   class UserArmy;
   class UserUnit;
   struct UserCommandIssueHelper;
+  // Opaque cross-TU handle to the runtime command-graph anchor-history object
+  // (see UserUnit.h). Only used as an incomplete pointer by the dock worker bridge.
+  struct QueuedUserCommandRecord;
   enum EMauiEventModifier : std::uint32_t;
   class EntityCategoryLookupResolver;
   class LaunchInfoBase;
@@ -1362,6 +1365,31 @@ namespace moho
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
   );
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
+   * clones one source selection weak-set into `destination`, returning it.
+   * Wraps the CWldSession.cpp-local `CopySelectionSetFromOther` (FUN_00822210).
+   */
+  SSelectionSetUserEntity* CopySessionSelectionSet(
+    SSelectionSetUserEntity* destination,
+    const SSelectionSetUserEntity* source
+  );
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
+   * position seeded from one unit's last-queued command-graph anchor history.
+   * Wraps the CWldSession.cpp-local `ResolveCommandGraphAnchorHistoryWorldPosition`
+   * (FUN_0081CFD0).
+   */
+  [[nodiscard]] Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* record);
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker: walks the whole
+   * session entity map in id order and appends every live `UserUnit*` into
+   * `outUnits`. Wraps the CWldSession.cpp-local `CollectSessionUserUnits`.
+   */
+  void GetSessionUserUnits(CWldSession* session, msvc8::vector<UserUnit*>& outUnits);
 
   /**
    * Address: 0x00822270 (FUN_00822270, sub_822270)

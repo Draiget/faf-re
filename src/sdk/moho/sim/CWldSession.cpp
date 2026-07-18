@@ -7525,6 +7525,51 @@ namespace moho
   } // namespace
 
   /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
+   * copies one source selection weak-set into a fresh destination weak-set.
+   * Forwards to the file-local `CopySelectionSetFromOther` (FUN_00822210), which
+   * the dock worker uses to snapshot `CWldSession::mSelection` before scanning it.
+   */
+  SSelectionSetUserEntity* CopySessionSelectionSet(
+    SSelectionSetUserEntity* const destination,
+    const SSelectionSetUserEntity* const source
+  )
+  {
+    return CopySelectionSetFromOther(destination, const_cast<SSelectionSetUserEntity*>(source));
+  }
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
+   * position seeded from one unit's last-queued command-graph anchor history.
+   * Reinterprets the opaque `QueuedUserCommandRecord` handle (produced by
+   * `GetLastQueuedUserCommandAnchor`) as the command-graph anchor history and
+   * forwards to the file-local `ResolveCommandGraphAnchorHistoryWorldPosition`
+   * (FUN_0081CFD0), which resolves the sample position and unlinks the transient
+   * weak-owner lane.
+   */
+  Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* const record)
+  {
+    Wm3::Vector3f out{};
+    auto* const history = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(
+      const_cast<QueuedUserCommandRecord*>(record)
+    );
+    (void)ResolveCommandGraphAnchorHistoryWorldPosition(&out, history);
+    return out;
+  }
+
+  /**
+   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
+   * walks the whole session entity map in id order and appends every live
+   * `UserUnit*`. Wraps the CWldSession.cpp-local `CollectSessionUserUnits`,
+   * matching the binary's inline `mEntityMap` in-order scan (entity ids are
+   * unique keys, so the collection order equals the binary's iteration order).
+   */
+  void GetSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
+  {
+    CollectSessionUserUnits(session, outUnits);
+  }
+
+  /**
    * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
    *
    * What it does:
