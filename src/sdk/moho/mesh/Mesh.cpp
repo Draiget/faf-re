@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -6029,6 +6032,278 @@ namespace moho
   {
     static MeshShaderVarSet shaderVars{};
     return shaderVars;
+  }
+
+  // ---------------------------------------------------------------------------
+  // GPU mesh skinning-palette shader-vars (translation + rotation palettes).
+  //
+  // These are two process-wide `MeshShaderPaletteVar` globals the binary holds
+  // separately from the 23-entry `MeshShaderVarSet` above (distinct CRT init
+  // thunks at 0x00BE0900 / 0x00BE0920, distinct global addresses 0x010BEEF8 /
+  // 0x010BEE50). Each is a `ShaderVar` extended with an inline palette buffer
+  // reserved to 80 (`kPaletteCapacity`) 16-byte entries at registration time.
+  // ---------------------------------------------------------------------------
+
+  namespace
+  {
+    /**
+     * Address: 0x007E9280 (FUN_007E9280, sub_7E9280) — palette-relevant subset.
+     *
+     * Appends `count` value-initialized (zeroed) entries to the palette buffer,
+     * reallocating the backing storage when needed and relocating the existing
+     * entries with `RelocatePaletteEntries` (0x007E96A0). This is the typed
+     * reconstruction of the generic vector `_Insert_n` grow path as the palette
+     * reserve exercises it: at registration the buffer is empty, so this allocates
+     * `count` (== 80) zeroed entries. The full generic helper additionally handles
+     * mid-range inserts and the in-capacity shift cases (sub_7E96D0 / sub_7E9700 /
+     * sub_7E9730 / sub_7E95C0), which the palette reserve never reaches.
+     *
+     * UNRESOLVED: generic mid-range insert / in-place-shift arms of sub_7E9280
+     * (asm 0x007E943F..0x007E94BF) are out of scope for the palette cluster and
+     * are not reconstructed here; only the empty/append-at-end arm is modeled.
+     */
+    void AppendDefaultPaletteEntries(MeshShaderPaletteBuffer& buffer, const std::uint32_t count)
+    {
+      if (count == 0U) {
+        return;
+      }
+
+      const std::uint32_t oldCount = buffer.Count();
+      const std::uint32_t newCount = oldCount + count;
+
+      // Fast path: spare capacity already available — value-init in place.
+      const auto capacityEntries = buffer.mBegin != nullptr
+                                     ? static_cast<std::uint32_t>(buffer.mCapacity - buffer.mBegin)
+                                     : 0U;
+      if (newCount <= capacityEntries) {
+        for (std::uint32_t i = 0; i < count; ++i) {
+          buffer.mEnd[i] = SkinPaletteEntry{};
+        }
+        buffer.mEnd += count;
+        return;
+      }
+
+      // Reallocate. The binary grows by max(oldCount * 3/2, newCount).
+      std::uint32_t grownCapacity = oldCount + (oldCount >> 1);
+      if (grownCapacity < newCount) {
+        grownCapacity = newCount;
+      }
+
+      auto* const storage = static_cast<SkinPaletteEntry*>(
+        ::operator new(static_cast<std::size_t>(grownCapacity) * sizeof(SkinPaletteEntry))
+      );
+
+      SkinPaletteEntry* writeCursor = RelocatePaletteEntries(storage, buffer.mBegin, buffer.mEnd);
+      for (std::uint32_t i = 0; i < count; ++i) {
+        writeCursor[i] = SkinPaletteEntry{};
+      }
+
+      if (buffer.mBegin != nullptr) {
+        ::operator delete(buffer.mBegin);
+      }
+
+      buffer.mBegin = storage;
+      buffer.mEnd = storage + newCount;
+      buffer.mCapacity = storage + grownCapacity;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x007E96A0 (FUN_007E96A0, sub_7E96A0)
+   *
+   * What it does:
+   * Uninitialized-move relocation for palette entries: copies each 16-byte
+   * `SkinPaletteEntry` in `[first, last)` into `dest`, four floats at a time, and
+   * returns the one-past-end destination pointer.
+   */
+  SkinPaletteEntry* RelocatePaletteEntries(
+    SkinPaletteEntry* dest,
+    SkinPaletteEntry* first,
+    SkinPaletteEntry* const last
+  )
+  {
+    while (first != last) {
+      dest->x = first->x;
+      dest->y = first->y;
+      dest->z = first->z;
+      dest->w = first->w;
+      ++first;
+      ++dest;
+    }
+    return dest;
+  }
+
+  /**
+   * Address: 0x007E9130 (FUN_007E9130, sub_7E9130)
+   *
+   * What it does:
+   * Forces the palette to exactly `kPaletteCapacity` entries. When shorter (or
+   * empty) it appends default entries; when longer it drops the trailing surplus
+   * by moving the end pointer back to `begin + kPaletteCapacity`.
+   */
+  void MeshShaderPaletteBuffer::ReserveToPaletteCapacity()
+  {
+    if (mBegin == nullptr) {
+      AppendDefaultPaletteEntries(*this, kPaletteCapacity);
+      return;
+    }
+
+    const std::uint32_t count = static_cast<std::uint32_t>(mEnd - mBegin);
+    if (count < kPaletteCapacity) {
+      AppendDefaultPaletteEntries(*this, kPaletteCapacity - count);
+      return;
+    }
+
+    if (count > kPaletteCapacity) {
+      // Shrink to exactly kPaletteCapacity entries. The binary invokes the
+      // relocation helper with `first == last` here, so the move body never runs
+      // and the effect reduces to repositioning the end pointer (0x007E9172).
+      mEnd = mBegin + kPaletteCapacity;
+    }
+  }
+
+  /**
+   * Address: 0x007E9050 (FUN_007E9050, register_MeshShaderVar)
+   *
+   * IDA signature:
+   * struct_MeshShaderVar* __thiscall register_MeshShaderVar(
+   *     const char* name, struct_MeshShaderVar* a2);
+   *
+   * What it does:
+   * Registers one mesh skinning-palette shader-var against the `"mesh"` effect
+   * file (via `RegisterShaderVar`), clears its embedded palette buffer triplet,
+   * and reserves the palette to `kPaletteCapacity` (80) entries.
+   */
+  MeshShaderPaletteVar* register_MeshShaderVar(const char* const name, MeshShaderPaletteVar* const paletteVar)
+  {
+    RegisterShaderVar(name, paletteVar, "mesh");
+
+    paletteVar->mPalette.mBegin = nullptr;
+    paletteVar->mPalette.mEnd = nullptr;
+    paletteVar->mPalette.mCapacity = nullptr;
+
+    paletteVar->mPalette.ReserveToPaletteCapacity();
+    return paletteVar;
+  }
+
+  namespace
+  {
+    /**
+     * Storage + lazy construction for one mesh skinning-palette shader-var global.
+     * The binary keeps each palette var as a zero-initialized static object
+     * (`.data` BSS tail) that the CRT static-init thunk registers in place; the
+     * recovered model uses aligned storage constructed on first access so the
+     * embedded `ShaderVar` non-trivial members initialize correctly.
+     */
+    template <std::uintptr_t GlobalAddress>
+    struct MeshPaletteVarSlot
+    {
+      alignas(moho::MeshShaderPaletteVar) static std::byte storage[sizeof(moho::MeshShaderPaletteVar)];
+      static bool constructed;
+    };
+
+    template <std::uintptr_t GlobalAddress>
+    alignas(moho::MeshShaderPaletteVar) std::byte
+      MeshPaletteVarSlot<GlobalAddress>::storage[sizeof(moho::MeshShaderPaletteVar)]{};
+    template <std::uintptr_t GlobalAddress>
+    bool MeshPaletteVarSlot<GlobalAddress>::constructed = false;
+
+    template <std::uintptr_t GlobalAddress>
+    [[nodiscard]] moho::MeshShaderPaletteVar& AccessMeshPaletteVarSlot() noexcept
+    {
+      auto* const slot = reinterpret_cast<moho::MeshShaderPaletteVar*>(MeshPaletteVarSlot<GlobalAddress>::storage);
+      if (!MeshPaletteVarSlot<GlobalAddress>::constructed) {
+        ::new (static_cast<void*>(slot)) moho::MeshShaderPaletteVar();
+        MeshPaletteVarSlot<GlobalAddress>::constructed = true;
+      }
+      return *slot;
+    }
+
+    /**
+     * Address: 0x00C03E40 (FUN_00C03E40, sub_C03E40) — trans-palette cleanup.
+     * Address: 0x00C03E80 (FUN_00C03E80, sub_C03E80) — rot-palette cleanup.
+     *
+     * What it does:
+     * Process-exit cleanup for one palette shader-var: frees the palette buffer,
+     * clears the triplet, and runs the base `ShaderVar` destructor (which detaches
+     * the effect link and releases the effect-variable handle).
+     */
+    template <std::uintptr_t GlobalAddress>
+    void DestroyMeshPaletteVarSlot() noexcept
+    {
+      if (!MeshPaletteVarSlot<GlobalAddress>::constructed) {
+        return;
+      }
+
+      moho::MeshShaderPaletteVar& paletteVar = AccessMeshPaletteVarSlot<GlobalAddress>();
+      if (paletteVar.mPalette.mBegin != nullptr) {
+        ::operator delete(paletteVar.mPalette.mBegin);
+      }
+      paletteVar.mPalette.mBegin = nullptr;
+      paletteVar.mPalette.mEnd = nullptr;
+      paletteVar.mPalette.mCapacity = nullptr;
+
+      paletteVar.~MeshShaderPaletteVar();
+      MeshPaletteVarSlot<GlobalAddress>::constructed = false;
+    }
+
+    void CleanupMeshShaderVarTransPalette() { DestroyMeshPaletteVarSlot<0x010BEEF8u>(); }
+    void CleanupMeshShaderVarRotPalette() { DestroyMeshPaletteVarSlot<0x010BEE50u>(); }
+
+    /**
+     * CRT static-init bootstrap mirroring the two `__xc_a` entries at
+     * 0x00BE0900 / 0x00BE0920: registering both palette shader-vars at process
+     * startup. This is the source-level invocation site for the palette cluster
+     * (FRAMEWORK_DISPATCH via static init).
+     */
+    struct MeshPaletteShaderVarBootstrap
+    {
+      MeshPaletteShaderVarBootstrap()
+      {
+        moho::register_MeshShaderVarTransPalette();
+        moho::register_MeshShaderVarRotPalette();
+      }
+    };
+
+    [[maybe_unused]] MeshPaletteShaderVarBootstrap gMeshPaletteShaderVarBootstrap;
+  } // namespace
+
+  MeshShaderPaletteVar& GetMeshShaderVarTransPalette()
+  {
+    return AccessMeshPaletteVarSlot<0x010BEEF8u>();
+  }
+
+  MeshShaderPaletteVar& GetMeshShaderVarRotPalette()
+  {
+    return AccessMeshPaletteVarSlot<0x010BEE50u>();
+  }
+
+  /**
+   * Address: 0x00BE0900 (FUN_00BE0900, register_MeshShaderVarTransPalette)
+   *
+   * What it does:
+   * CRT static-init registration thunk: registers `meshShaderVarTransPalette`
+   * under the byte-verified HLSL name `"transPalette"` and installs its
+   * process-exit cleanup via `atexit`.
+   */
+  void register_MeshShaderVarTransPalette()
+  {
+    register_MeshShaderVar("transPalette", &GetMeshShaderVarTransPalette());
+    (void)std::atexit(&CleanupMeshShaderVarTransPalette);
+  }
+
+  /**
+   * Address: 0x00BE0920 (FUN_00BE0920, register_MeshShaderVarRotPalette)
+   *
+   * What it does:
+   * CRT static-init registration thunk: registers `meshShaderVarRotPalette`
+   * under the byte-verified HLSL name `"rotPalette"` and installs its
+   * process-exit cleanup via `atexit`.
+   */
+  void register_MeshShaderVarRotPalette()
+  {
+    register_MeshShaderVar("rotPalette", &GetMeshShaderVarRotPalette());
+    (void)std::atexit(&CleanupMeshShaderVarRotPalette);
   }
 
   /**

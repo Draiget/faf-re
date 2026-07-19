@@ -908,6 +908,145 @@ namespace moho
 
   [[nodiscard]] MeshShaderVarSet& GetMeshShaderVars();
 
+  /**
+   * One GPU skinning-palette entry: a 16-byte `float4` lane. The engine stores
+   * per-bone translation vectors (`transPalette`) and per-bone quaternions
+   * (`rotPalette`) as arrays of these, uploaded to the mesh skinning shader.
+   * The binary treats every entry as four independent 4-byte floats (the palette
+   * relocation loop at 0x007E96A0 copies each entry as `fld`/`fstp` x4).
+   */
+  struct SkinPaletteEntry
+  {
+    float x;
+    float y;
+    float z;
+    float w;
+  };
+
+  /**
+   * Skinning-palette storage lane embedded at `+0x48` of a `MeshShaderPaletteVar`.
+   *
+   * Layout matches the binary's `std::vector<SkinPaletteEntry>`-shaped triplet
+   * (`begin@+0x04`, `end@+0x08`, `capacity@+0x0C` relative to this struct), with
+   * one reserved header word at `+0x00` that the palette registration/reserve
+   * path never reads or writes (left zero from static-init). Registration
+   * (`register_MeshShaderVar`, 0x007E9050) reserves the palette to
+   * `kPaletteCapacity` (80) zeroed entries; the buffer is grown/relocated by the
+   * reserve helpers (0x007E9130 / 0x007E96A0).
+   */
+  struct MeshShaderPaletteBuffer
+  {
+    /// Max bone count the skinning palette is reserved to (0x50 entries).
+    static constexpr std::uint32_t kPaletteCapacity = 0x50;
+
+    std::uint32_t mReservedHeader; // +0x00 (unused by palette reserve path)
+    SkinPaletteEntry* mBegin;      // +0x04
+    SkinPaletteEntry* mEnd;        // +0x08
+    SkinPaletteEntry* mCapacity;   // +0x0C
+
+    [[nodiscard]] std::uint32_t Count() const noexcept
+    {
+      return mBegin != nullptr
+               ? static_cast<std::uint32_t>(mEnd - mBegin)
+               : 0U;
+    }
+
+    /**
+     * Address: 0x007E9130 (FUN_007E9130, sub_7E9130)
+     *
+     * IDA signature:
+     * unsigned int __userpurge sub_7E9130@<eax>(int a1@<edi>, char a2, ...);
+     *
+     * What it does:
+     * Reserve/resize dispatch that forces the palette to exactly
+     * `kPaletteCapacity` entries: when currently shorter (or empty) it appends
+     * default-constructed entries at the tail; when currently longer it drops the
+     * trailing surplus so the end pointer lands `kPaletteCapacity` entries past
+     * `begin`. Invoked at registration time from `register_MeshShaderVar`.
+     */
+    void ReserveToPaletteCapacity();
+  };
+
+  /**
+   * Extended shader-var used for the two GPU mesh-skinning palettes. The base
+   * `ShaderVar` (0x48 bytes) is registered against the `"mesh"` effect file; the
+   * embedded `MeshShaderPaletteBuffer` at `+0x48` holds the per-bone palette that
+   * is reserved to 80 entries at registration and uploaded to the shader during
+   * batch fill.
+   */
+  struct MeshShaderPaletteVar : ShaderVar
+  {
+    MeshShaderPaletteBuffer mPalette; // +0x48
+  };
+
+  /**
+   * Address: 0x007E96A0 (FUN_007E96A0, sub_7E96A0)
+   *
+   * IDA signature:
+   * float* __usercall sub_7E96A0@<eax>(float* dest@<eax>, float* first@<ecx>,
+   *                                    float* last@<esi>);
+   *
+   * What it does:
+   * Uninitialized-move relocation for palette entries: copies each 16-byte
+   * `SkinPaletteEntry` in `[first, last)` into `dest`, four floats at a time, and
+   * returns the one-past-end destination pointer. Used by the palette grow path
+   * when the backing storage is reallocated.
+   */
+  SkinPaletteEntry* RelocatePaletteEntries(
+    SkinPaletteEntry* dest,
+    SkinPaletteEntry* first,
+    SkinPaletteEntry* last
+  );
+
+  /**
+   * Address: 0x007E9050 (FUN_007E9050, register_MeshShaderVar)
+   *
+   * IDA signature:
+   * struct_MeshShaderVar* __thiscall register_MeshShaderVar(
+   *     const char* name, struct_MeshShaderVar* a2);
+   *
+   * What it does:
+   * Registers one mesh skinning-palette shader-var against the `"mesh"` effect
+   * file, clears its embedded palette buffer triplet, and reserves the palette to
+   * `MeshShaderPaletteBuffer::kPaletteCapacity` (80) entries.
+   */
+  MeshShaderPaletteVar* register_MeshShaderVar(const char* name, MeshShaderPaletteVar* paletteVar);
+
+  /**
+   * Address: 0x00BE0900 (FUN_00BE0900, register_MeshShaderVarTransPalette)
+   *
+   * What it does:
+   * CRT static-init registration thunk for the translation-palette shader-var:
+   * registers `meshShaderVarTransPalette` under the HLSL name `"transPalette"`
+   * and installs its process-exit cleanup via `atexit`.
+   */
+  void register_MeshShaderVarTransPalette();
+
+  /**
+   * Address: 0x00BE0920 (FUN_00BE0920, register_MeshShaderVarRotPalette)
+   *
+   * What it does:
+   * CRT static-init registration thunk for the rotation-palette shader-var:
+   * registers `meshShaderVarRotPalette` under the HLSL name `"rotPalette"` and
+   * installs its process-exit cleanup via `atexit`.
+   */
+  void register_MeshShaderVarRotPalette();
+
+  /// Translation skinning-palette shader-var (global @0x010BEEF8).
+  [[nodiscard]] MeshShaderPaletteVar& GetMeshShaderVarTransPalette();
+  /// Rotation skinning-palette shader-var (global @0x010BEE50).
+  [[nodiscard]] MeshShaderPaletteVar& GetMeshShaderVarRotPalette();
+
+  static_assert(sizeof(SkinPaletteEntry) == 0x10, "SkinPaletteEntry size must be 0x10");
+  static_assert(offsetof(MeshShaderPaletteBuffer, mBegin) == 0x04, "MeshShaderPaletteBuffer::mBegin offset must be 0x04");
+  static_assert(offsetof(MeshShaderPaletteBuffer, mEnd) == 0x08, "MeshShaderPaletteBuffer::mEnd offset must be 0x08");
+  static_assert(
+    offsetof(MeshShaderPaletteBuffer, mCapacity) == 0x0C, "MeshShaderPaletteBuffer::mCapacity offset must be 0x0C"
+  );
+  static_assert(sizeof(MeshShaderPaletteBuffer) == 0x10, "MeshShaderPaletteBuffer size must be 0x10");
+  static_assert(offsetof(MeshShaderPaletteVar, mPalette) == 0x48, "MeshShaderPaletteVar::mPalette offset must be 0x48");
+  static_assert(sizeof(MeshShaderPaletteVar) == 0x58, "MeshShaderPaletteVar size must be 0x58");
+
   class MeshRenderer
   {
   public:
