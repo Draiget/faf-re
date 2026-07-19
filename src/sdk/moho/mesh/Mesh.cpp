@@ -8,24 +8,47 @@
 #include <new>
 #include <stdexcept>
 
+#include "boost/shared_ptr.h"
+#include "boost/weak_ptr.h"
+#include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector4f.h"
+#include "moho/math/VMatrix4.h"
 #include "moho/mesh/MeshBatch.h"
 #include "moho/mesh/ShaderDictionary.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/Shadow.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/STIMap.h"
+#include "moho/terrain/TerrainShaderVars.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterSurface.h"
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/gal/Matrix.h"
 #include "gpg/core/utils/Logging.h"
 
 namespace moho
 {
+  class IWldTerrainRes;
+
   [[nodiscard]] float REN_GetSimDeltaSeconds();
+
+  // Active render-time terrain resource accessor (defined in WxRuntimeTypes.cpp,
+  // 0x007FA170) — returns `sWldMap->mTerrainRes` or nullptr when no map/terrain.
+  [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
 }
 
 namespace moho
@@ -38,6 +61,11 @@ namespace moho
   // ?ren_MeshStatic@Moho@@3_NA = 1 (both `bool`, .data VA 0xF57E56/0xF57E57).
   bool ren_MeshSkinned = true;
   bool ren_MeshStatic = true;
+
+  // Shadow depth bias read by MeshRenderer::ConfigureShader's shadow lane
+  // (?ren_ShadowBias@Moho@@3MA). Byte-verified default from ForgedAlliance.exe:
+  // .data VA 0x00F57DFC = 0.005f.
+  float ren_ShadowBias = 0.005f;
 
   /**
    * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
@@ -5964,6 +5992,306 @@ namespace moho
   }
 
   /**
+   * Constructs the mesh-render shader-var set, registering every variable
+   * against the `"mesh"` effect file. The HLSL names are byte-verified as the
+   * exact strings passed to the binary's per-var `RegisterShaderVar` calls
+   * (`register_ShaderVarMesh*`, 0x00BE0540..0x00BE0840) — read directly from
+   * bin/2025.7.1/ForgedAlliance.exe. Mirrors `TerrainShaderVarSet`.
+   */
+  MeshShaderVarSet::MeshShaderVarSet()
+  {
+    RegisterShaderVar("anisotropicTexture", &anisotropicTexture, "mesh"); // 0x00BE0540
+    RegisterShaderVar("insectTexture", &insectTexture, "mesh");           // 0x00BE0560
+    RegisterShaderVar("dissolveTexture", &dissolveTexture, "mesh");
+    RegisterShaderVar("time", &time, "mesh");
+    RegisterShaderVar("mirrored", &mirrored, "mesh");
+    RegisterShaderVar("lodBasis", &lodBasis, "mesh");
+    RegisterShaderVar("viewMatrix", &viewMatrix, "mesh");
+    RegisterShaderVar("projMatrix", &projMatrix, "mesh");
+    RegisterShaderVar("terrainScale", &terrainScale, "mesh");
+    RegisterShaderVar("lightMultiplier", &lightMultiplier, "mesh");
+    RegisterShaderVar("sunDirection", &sunDirection, "mesh");
+    RegisterShaderVar("sunDiffuse", &sunDiffuse, "mesh");
+    RegisterShaderVar("sunAmbient", &sunAmbient, "mesh");
+    RegisterShaderVar("shadowFill", &shadowFill, "mesh");
+    RegisterShaderVar("surfaceElevation", &surfaceElevation, "mesh");
+    RegisterShaderVar("abyssElevation", &abyssElevation, "mesh");
+    RegisterShaderVar("waterRamp", &waterRamp, "mesh");
+    RegisterShaderVar("shadowsEnabled", &shadowsEnabled, "mesh");
+    RegisterShaderVar("shadowMatrix", &shadowMatrix, "mesh");
+    RegisterShaderVar("shadowTexture", &shadowTexture, "mesh");
+    RegisterShaderVar("shadowBias", &shadowBias, "mesh");
+    RegisterShaderVar("shadowSize", &shadowSize, "mesh");
+    RegisterShaderVar("shadowBlur", &shadowBlur, "mesh"); // 0x00BE0840
+  }
+
+  MeshShaderVarSet& GetMeshShaderVars()
+  {
+    static MeshShaderVarSet shaderVars{};
+    return shaderVars;
+  }
+
+  /**
+   * Address: 0x007E1720 (FUN_007E1720, Moho::MeshRenderer::LoadGlobalTextures)
+   * Mangled: ?LoadGlobalTextures@MeshRenderer@Moho@@AAEXXZ
+   *
+   * IDA signature:
+   * private: void __thiscall Moho::MeshRenderer::LoadGlobalTextures(void);
+   *
+   * What it does:
+   * Lazily resolves the renderer's four global texture resources from the
+   * active D3D device resources and stores each retained
+   * `boost::shared_ptr<RD3DTextureResource>` into its lane. Each lane is only
+   * (re)loaded when still empty, matching the binary's `if (!lane.obj)` guards,
+   * so repeated calls after the first successful load are no-ops per lane. The
+   * mesh-environment cube map path comes from the renderer's
+   * `MeshEnvironment::mCubeMapPath`; the other three are fixed engine texture
+   * paths transcribed verbatim from the binary. `allowCreate=0, allowFallback=1`
+   * for every lookup.
+   */
+  void MeshRenderer::LoadGlobalTextures()
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+
+    if (!dissolveTex) {
+      resources->GetTexture(dissolveTex, "/textures/environment/dissolve.dds", 0, true);
+    }
+    if (!meshEnvironmentTex) {
+      resources->GetTexture(meshEnvironmentTex, meshEnvironment.mCubeMapPath.c_str(), 0, true);
+    }
+    if (!anisotropiclookupTex) {
+      resources->GetTexture(anisotropiclookupTex, "/textures/engine/anisotropiclookup.dds", 0, true);
+    }
+    if (!insectlookupTex) {
+      resources->GetTexture(insectlookupTex, "/textures/engine/insectlookup.dds", 0, true);
+    }
+  }
+
+  /**
+   * Address: 0x007E19D0 (FUN_007E19D0, Moho::MeshRenderer::ConfigureShader)
+   * Mangled: ?ConfigureShader@MeshRenderer@Moho@@AAEXABVGeomCamera3@2@PAVShadow@2@_N@Z
+   *
+   * IDA signature:
+   * private: void __thiscall Moho::MeshRenderer::ConfigureShader(
+   *     const GeomCamera3& camera, Shadow* shadow, bool mirrored);
+   *
+   * What it does:
+   * Binds the whole mesh-render shader-constant lane for one render pass. Reads
+   * the active water surface elevation (falling back to -1000/-10000 when no
+   * terrain/water is present), loads the global lookup textures, binds the
+   * anisotropic/insect/dissolve textures, uploads the frame time, mirror flag,
+   * (optionally mirror-flipped) view matrix and projection matrix, then either
+   * the active terrain's terrain-scale/sun/shadow/water lighting lanes or the
+   * renderer's fallback mesh-environment lighting lanes, and finally the
+   * optional shadow-map lane. All float constants and HLSL names are byte-
+   * verified from bin/2025.7.1/ForgedAlliance.exe.
+   */
+  void MeshRenderer::ConfigureShader(const GeomCamera3& camera, Shadow* const shadow, const bool mirrored)
+  {
+    MeshShaderVarSet& sv = GetMeshShaderVars();
+
+    // Select the active terrain resource (nullptr when there is no world map or
+    // no terrain). The binary reads the `sWldMap` global directly; the recovered
+    // `REN_GetTerrainRes` folds in both the map and terrain null checks and
+    // returns `sWldMap->mTerrainRes` (mirrors 0x007E1A0B..0x007E1A25).
+    IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
+    const auto* const terrainView =
+      reinterpret_cast<const TerrainWaterResourceView*>(terrainRes);
+
+    // Surface (water) elevation lane: current water elevation when water is
+    // enabled on the active map, else -10000; -1000 when there is no terrain.
+    float surfaceElevation;
+    if (terrainView != nullptr) {
+      const TerrainMapRuntimeView* const map = terrainView->mMap;
+      surfaceElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : -10000.0f;
+    } else {
+      surfaceElevation = -1000.0f;
+    }
+
+    // Global lookup textures + the three per-frame texture binds.
+    LoadGlobalTextures();
+    BindTextureShaderVar(sv.anisotropicTexture, boost::static_pointer_cast<ID3DTextureSheet>(anisotropiclookupTex));
+    BindTextureShaderVar(sv.insectTexture, boost::static_pointer_cast<ID3DTextureSheet>(insectlookupTex));
+
+    // Frame time: fold the frame counter into a float (with the unsigned int
+    // fixup the binary applies to negative counters), add the accumulated delta
+    // frame, then wrap into the shader time window (fmod by 36000).
+    const auto frameCounter = static_cast<std::int32_t>(instanceListSize);
+    double frameSeconds = static_cast<double>(frameCounter);
+    if (frameCounter < 0) {
+      frameSeconds += 4294967296.0; // 2^32 unsigned fixup (dbl_E4F710)
+    }
+    frameSeconds += deltaFrame;
+    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    if (sv.time.Exists()) {
+      sv.time.SetFloat(shaderTime);
+    }
+
+    if (sv.mirrored.Exists()) {
+      const int mirroredFlag = mirrored ? 1 : 0;
+      SetShaderVarPtr(sv.mirrored, &mirroredFlag, 4);
+    }
+
+    // Copy the camera view matrix; when mirrored, reflect it about the water
+    // plane (translate row along the up axis by 2*surfaceElevation and negate
+    // the up-axis row). Row layout: r[row].{x,y,z,w}.
+    VMatrix4 viewMatrixCopy;
+    std::memcpy(&viewMatrixCopy, &camera.view, sizeof(viewMatrixCopy));
+    if (mirrored) {
+      const float translate = surfaceElevation * 2.0f; // flt_DFEB0C = 2.0
+      viewMatrixCopy.r[3].x += (viewMatrixCopy.r[2].x + viewMatrixCopy.r[0].x) * 0.0f + viewMatrixCopy.r[1].x * translate;
+      viewMatrixCopy.r[3].y += (viewMatrixCopy.r[2].y + viewMatrixCopy.r[0].y) * 0.0f + viewMatrixCopy.r[1].y * translate;
+      viewMatrixCopy.r[3].z += (viewMatrixCopy.r[2].z + viewMatrixCopy.r[0].z) * 0.0f + viewMatrixCopy.r[1].z * translate;
+      viewMatrixCopy.r[3].w += (viewMatrixCopy.r[2].w + viewMatrixCopy.r[0].w) * 0.0f + viewMatrixCopy.r[1].w * translate;
+      viewMatrixCopy.r[1].x *= -1.0f; // flt_E4F6E8 = -1.0
+      viewMatrixCopy.r[1].y *= -1.0f;
+      viewMatrixCopy.r[1].z *= -1.0f;
+      viewMatrixCopy.r[1].w *= -1.0f;
+    }
+
+    // LOD basis = viewport matrix row 1 (camera.viewport.r[1], 4 floats).
+    if (sv.lodBasis.Exists()) {
+      SetShaderVarMem(sv.lodBasis, 4, &camera.viewport.r[1].x);
+    }
+    if (sv.viewMatrix.Exists()) {
+      sv.viewMatrix.SetMatrix4x4(&viewMatrixCopy);
+    }
+    if (sv.projMatrix.Exists()) {
+      sv.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    BindTextureShaderVar(sv.dissolveTexture, boost::static_pointer_cast<ID3DTextureSheet>(dissolveTex));
+
+    if (terrainRes != nullptr) {
+      const TerrainMapRuntimeView* const map = terrainView->mMap;
+      const TerrainHeightFieldRuntimeView* const heightField = map->mHeightFieldObject;
+
+      // Terrain scale = {1/(width-1), 0, 1/(height-1), 1}.
+      const float terrainScaleValues[4] = {
+        1.0f / static_cast<float>(heightField->width - 1),
+        0.0f,
+        1.0f / static_cast<float>(heightField->height - 1),
+        1.0f
+      };
+      if (sv.terrainScale.Exists()) {
+        SetShaderVarMem(sv.terrainScale, 4, terrainScaleValues);
+      }
+
+      const float lightingMultiplier = terrainRes->GetLightingMultiplier();
+      if (sv.lightMultiplier.Exists()) {
+        sv.lightMultiplier.SetFloat(lightingMultiplier);
+      }
+
+      // Sun direction: negated when mirrored (reflected across the water plane).
+      Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
+      if (mirrored) {
+        sunDirection.x = -0.0f - sunDirection.x; // dword_E4F748 = -0.0
+        sunDirection.y = -0.0f - sunDirection.y;
+        sunDirection.z = -0.0f - sunDirection.z;
+      }
+      if (sv.sunDirection.Exists()) {
+        SetShaderVarMem(sv.sunDirection, 3, &sunDirection.x);
+      }
+
+      const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
+      if (sv.sunDiffuse.Exists()) {
+        SetShaderVarMem(sv.sunDiffuse, 3, &sunColor.x);
+      }
+      const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+      if (sv.sunAmbient.Exists()) {
+        SetShaderVarMem(sv.sunAmbient, 3, &sunAmbience.x);
+      }
+      const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
+      if (sv.shadowFill.Exists()) {
+        SetShaderVarMem(sv.shadowFill, 3, &shadowFillColor.x);
+      }
+
+      CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
+      if (sv.surfaceElevation.Exists()) {
+        sv.surfaceElevation.SetFloat(surfaceElevation);
+      }
+
+      const float abyssElevation = (map->mWaterEnabled != 0) ? map->mWaterElevationAbyss : -10000.0f;
+      if (sv.abyssElevation.Exists()) {
+        sv.abyssElevation.SetFloat(abyssElevation);
+      }
+
+      BindTextureShaderVar(sv.waterRamp, waterProperties->GetWaterRamp());
+    } else {
+      // Fallback (no terrain): use the renderer's mesh-environment lighting.
+      if (sv.lightMultiplier.Exists()) {
+        sv.lightMultiplier.SetFloat(meshEnvironment.mFallbackLightMultiplier);
+      }
+      if (sv.sunDirection.Exists()) {
+        SetShaderVarMem(sv.sunDirection, 3, &meshEnvironment.mFallbackSunDirection.x);
+      }
+      if (sv.sunDiffuse.Exists()) {
+        SetShaderVarMem(sv.sunDiffuse, 3, &meshEnvironment.mFallbackSunDiffuseColor.x);
+      }
+      if (sv.sunAmbient.Exists()) {
+        SetShaderVarMem(sv.sunAmbient, 3, &meshEnvironment.mFallbackSunAmbientColor.x);
+      }
+      if (sv.shadowFill.Exists()) {
+        SetShaderVarMem(sv.shadowFill, 3, &meshEnvironment.mFallbackShadowFillColor.x);
+      }
+      if (sv.surfaceElevation.Exists()) {
+        sv.surfaceElevation.SetFloat(surfaceElevation);
+      }
+      if (sv.abyssElevation.Exists()) {
+        sv.abyssElevation.SetFloat(-1000.0f); // dword_E4F8D8
+      }
+
+      // No terrain water-ramp resource: resolve the fixed engine water ramp.
+      CD3DDevice* const device = D3D_GetDevice();
+      ID3DDeviceResources* const resources = device->GetResources();
+      ID3DDeviceResources::TextureResourceHandle waterRampResource;
+      resources->GetTexture(waterRampResource, "/textures/engine/waterramp.dds", 0, true);
+      BindTextureShaderVar(sv.waterRamp, boost::static_pointer_cast<ID3DTextureSheet>(waterRampResource));
+    }
+
+    // Shadow-map lane: only when a shadow object with fidelity > 1 is supplied.
+    if (shadow != nullptr && shadow->mShadowFidelity > 1) {
+      const int shadowsEnabledFlag = 1;
+      if (sv.shadowsEnabled.Exists()) {
+        SetShaderVarPtr(sv.shadowsEnabled, &shadowsEnabledFlag, 4);
+      }
+      if (sv.shadowMatrix.Exists()) {
+        sv.shadowMatrix.SetMatrix4x4(&shadow->mCamera.viewProjection);
+      }
+
+      // Bind the shadow map as a weak texture handle (matches the binary's
+      // weak-handle GetTexture overload for the shadow lane, sub_491280). The
+      // shadow-map weak handle lives at Shadow+0x2E0; the current Shadow layout
+      // models that word range as `mRuntimeLanes[]` (an {int,ptr} placeholder
+      // that byte-overlaps a `boost::weak_ptr` {px, pn.pi_}). Read it typed off
+      // the first named lane; the shared_ptr copy retains the control block for
+      // the duration of the bind, matching sub_7DB350 + sub_4303C0.
+      const auto& shadowTextureHandle =
+        *reinterpret_cast<const boost::weak_ptr<gpg::gal::TextureD3D9>*>(&shadow->mRuntimeLanes[0]);
+      sv.shadowTexture.GetTexture(shadowTextureHandle);
+
+      const float shadowBias = ren_ShadowBias; // 0.005
+      if (sv.shadowBias.Exists()) {
+        sv.shadowBias.SetFloat(shadowBias);
+      }
+      const int shadowSize = shadow->mShadowSize;
+      if (sv.shadowSize.Exists()) {
+        sv.shadowSize.SetFloat(static_cast<float>(shadowSize));
+      }
+      const int shadowBlurFlag = (shadow->mShadowBlurEnabled && shadow->mShadowFidelity == 3) ? 1 : 0;
+      if (sv.shadowBlur.Exists()) {
+        SetShaderVarPtr(sv.shadowBlur, &shadowBlurFlag, 4);
+      }
+    } else {
+      const int shadowsEnabledFlag = 0;
+      if (sv.shadowsEnabled.Exists()) {
+        SetShaderVarPtr(sv.shadowsEnabled, &shadowsEnabledFlag, 4);
+      }
+    }
+  }
+
+  /**
    * Address: 0x007DFF30 (FUN_007DFF30, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@...@Z)
    *
    * What it does:
@@ -6021,9 +6349,23 @@ namespace moho
     MeshBatchBucketTree& meshMap
   )
   {
-    (void)meshFlags;
-    (void)camera;
-    (void)shadow;
+    // Nothing to draw when the batch tree is empty (binary: `if (map->_Mysize)`).
+    if (meshMap.size == 0) {
+      return;
+    }
+
+    // Select the mesh effect as the device's current effect, then bind the whole
+    // mesh shader-constant lane for this pass. `mirrored` is `meshFlags == 2`.
+    // (Transcribed from FUN_007E0C30 @0x007E0C64..0x007E0CD7.)
+    CD3DDevice* const device = D3D_GetDevice();
+    CD3DEffect* const meshEffect = device->GetResources()->FindEffect("mesh");
+    device->SetCurEffect(meshEffect);
+    ConfigureShader(camera, shadow, meshFlags == 2);
+
+    // The per-key batch draw chain (material texture binds + MeshLOD skinned/
+    // static batch draw calls) remains elided pending typed CD3D batch-draw
+    // recovery; ConfigureShader above reproduces the observable shader-state
+    // side effects of the pass head.
     (void)meshMap;
   }
 
@@ -6144,9 +6486,15 @@ namespace moho
       return;
     }
 
-    // Full draw-call/material state chain is still under active recovery.
-    // Keep this typed seam so thumbnail paths can call the proper owner API.
-    (void)camera;
+    // Select the mesh effect file, then bind the mesh shader-constant lane for
+    // this thumbnail pass (no shadow, not mirrored). Transcribed from
+    // FUN_007E11C0 @0x007E122C..0x007E123B (Device->SelectFxFile("mesh") then
+    // ConfigureShader(camera, nullptr, false)). The render-target/depth setup and
+    // single-instance batch draw remain elided pending typed CD3D draw recovery.
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("mesh");
+    ConfigureShader(camera, nullptr, false);
+
     (void)meshInstance->GetMesh();
   }
 
