@@ -8,6 +8,7 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/projectile/ProjectileStartupRegistrations.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -185,7 +186,11 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    std::uint8_t mUnknown0270[0x1C];   // +0x270
+    // Single-listener impact-event notifier. Fired from Impact() by
+    // virtual-dispatching the chained listener's slot-0 OnEvent with the
+    // per-category event code (asm 0x0069E0E6-0x0069E112).
+    ManyToOneBroadcaster<EProjectileImpactEvent> mImpactEventBroadcaster; // +0x270
+    std::uint8_t mUnknown0278[0x14];   // +0x278
     Wm3::Vector3f mLocalAngularVelocity; // +0x28C
     Wm3::Vector3f mScaleVelocity;      // +0x298
     std::uint8_t mUnknown02A4[0x24];   // +0x2A4
@@ -196,6 +201,7 @@ namespace moho
     std::uint8_t mUnknown030C[0x74]; // +0x30C
   };
 
+  static_assert(offsetof(Projectile, mImpactEventBroadcaster) == 0x270, "Projectile::mImpactEventBroadcaster offset must be 0x270");
   static_assert(offsetof(Projectile, mLocalAngularVelocity) == 0x28C, "Projectile::mLocalAngularVelocity offset must be 0x28C");
   static_assert(offsetof(Projectile, mScaleVelocity) == 0x298, "Projectile::mScaleVelocity offset must be 0x298");
   static_assert(offsetof(Projectile, mDamage) == 0x2C8, "Projectile::mDamage offset must be 0x2C8");

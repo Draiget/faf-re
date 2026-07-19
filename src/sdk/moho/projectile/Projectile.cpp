@@ -63,16 +63,10 @@ namespace
   constexpr float kProjectileUnsetValue = -1.0f;
   constexpr float kProjectileBounceVelocityDampingDefault = 0.5f;
 
-  struct ProjectileImpactBroadcasterStorage
-  {
-    std::uint8_t bytes[0x08];
-  };
-  static_assert(sizeof(ProjectileImpactBroadcasterStorage) == 0x08, "Impact broadcaster storage size must be 0x08");
-
   struct ProjectileDeserializeRuntimeView
   {
     std::uint8_t mEntityStateStorage[0x270];
-    ProjectileImpactBroadcasterStorage mImpactEventBroadcaster;
+    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent> mImpactEventBroadcaster;
     moho::WeakPtr<moho::Entity> mLauncherWeak;
     Wm3::Vector3f mVelocity;
     Wm3::Vector3f mLocalAngularVelocity;
@@ -307,8 +301,11 @@ namespace
 #endif
   }
 
-  void UnlinkImpactBroadcaster(ProjectileImpactBroadcasterStorage& broadcaster) noexcept
+  void UnlinkImpactBroadcaster(moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>& broadcaster) noexcept
   {
+    // The broadcaster's {ownerLinkSlot@0, nextInOwner@4} pair is the same
+    // intrusive prev/next owner-chain shape a WeakPtr link uses; the projectile
+    // dtor detaches it from its owner chain (asm 0x0069E144-0x0069E163).
     auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(broadcaster);
     weakLink.UnlinkFromOwnerChain();
   }
@@ -1283,19 +1280,13 @@ namespace moho
       } else {
         eventCode = 1;
       }
-      /* UNRESOLVED (1 of 2 remaining): impact-event broadcaster fire, asm
-       * 0x0069E0FB-0x0069E112. The projectile notifies each listener chained on
-       * mImpactEventBroadcaster (this+0x270) by virtual-dispatching the listener
-       * node's slot-0 with `eventCode` (0=hit / 1=other / 2=self/projectile).
-       * ManyToOneBroadcaster<EProjectileImpactEvent> is registered (see
-       * ProjectileStartupRegistrations), but its listener node type
-       * (ManyToOneListener<EProjectileImpactEvent>) is opaque 8-byte storage in the
-       * runtime view with no recovered slot-0 notify signature, and the
-       * EProjectileImpactEvent enum values are not reconstructed. Wiring the fire
-       * would require a raw vtable-0 dispatch through the unmodeled listener node,
-       * which the fidelity contract forbids; the eventCode selection above is
-       * transcribed 1:1 and is ready to wire once that listener slot is recovered. */
-      (void)eventCode;
+      // Impact-event broadcaster fire (asm 0x0069E0E6-0x0069E112): notify the
+      // single chained listener via its slot-0 OnEvent with the selected code.
+      // The intrusive link->owner downcast lives in GetListener(); the empty
+      // check there mirrors the `[this+0x270] == 0` skip in the binary.
+      if (auto* const listener = view.mImpactEventBroadcaster.GetListener()) {
+        listener->OnEvent(static_cast<EProjectileImpactEvent>(eventCode));
+      }
     }
 
     // Reset impact state (asm 0x0069E114-0069E177).
