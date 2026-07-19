@@ -2,8 +2,9 @@
 
 #include <cstddef>
 
+#include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
-#include "moho/animation/CAniDefaultSkel.h"
+#include "moho/animation/CAniSkel.h"
 
 namespace gpg
 {
@@ -12,10 +13,27 @@ namespace gpg
 
 namespace moho
 {
-  class CAniResourceSkel : public CAniDefaultSkel
+  struct SScmFile;
+
+  class CAniResourceSkel : public CAniSkel
   {
   public:
     static gpg::RType* sType;
+
+    /**
+     * Address: 0x00538480 (FUN_00538480,
+     * ??0CAniResourceSkel@Moho@@QAE@VStrArg@gpg@@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z)
+     *
+     * IDA signature:
+     * Moho::CAniResourceSkel *__thiscall CAniResourceSkel(
+     *   Moho::CAniResourceSkel *this, std::string *name, boost::shared_ptr<SScmFile> *file);
+     *
+     * What it does:
+     * Constructs the `CAniSkel` base from the SCM file (parses the skeleton),
+     * installs the `CAniResourceSkel` vtable, and copies the resource name into
+     * `mName`.
+     */
+    CAniResourceSkel(const msvc8::string& name, const boost::shared_ptr<const SScmFile>& file);
 
     /**
      * Address: 0x00538500 (FUN_00538500, Moho::CAniResourceSkel::dtr thunk/body)
