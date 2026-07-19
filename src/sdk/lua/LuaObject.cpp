@@ -3518,9 +3518,46 @@ extern "C"
 
 } // extern "C"
 
+namespace LuaPlus
+{
+	// Runtime views for the Lua binary-bytecode loader (lundump). Kept in the
+	// engine `LuaPlus` namespace (external linkage) so both the sub-loader
+	// definitions here in LuaObject.cpp and `luaU_undump` in LuaParser.cpp name
+	// the same layout. Field offsets mirror the original `ZIO` / `LoadState`
+	// structs as observed in FUN_009285C0 / FUN_00928ED0 / FUN_009290F0.
+	struct LuaZioRuntimeView
+	{
+		int remainingBytes; // ZIO::n
+		const char* cursor; // ZIO::p
+	};
+	static_assert(offsetof(LuaZioRuntimeView, remainingBytes) == 0x0, "LuaZioRuntimeView::remainingBytes offset must be 0x0");
+	static_assert(offsetof(LuaZioRuntimeView, cursor) == 0x4, "LuaZioRuntimeView::cursor offset must be 0x4");
+
+	struct LuaLoadStateRuntimeView
+	{
+		lua_State* state;        // LoadState::L   (+0x0)
+		LuaZioRuntimeView* stream; // LoadState::Z (+0x4)
+		Mbuffer* scratchBuffer;  // LoadState::b   (+0x8)
+		int swapBytes;           // LoadState::swap(+0xC)
+		const char* chunkName;   // LoadState::name(+0x10)
+	};
+	static_assert(offsetof(LuaLoadStateRuntimeView, state) == 0x0, "LuaLoadStateRuntimeView::state offset must be 0x0");
+	static_assert(offsetof(LuaLoadStateRuntimeView, stream) == 0x4, "LuaLoadStateRuntimeView::stream offset must be 0x4");
+	static_assert(offsetof(LuaLoadStateRuntimeView, scratchBuffer) == 0x8, "LuaLoadStateRuntimeView::scratchBuffer offset must be 0x8");
+	static_assert(offsetof(LuaLoadStateRuntimeView, swapBytes) == 0xC, "LuaLoadStateRuntimeView::swapBytes offset must be 0xC");
+	static_assert(offsetof(LuaLoadStateRuntimeView, chunkName) == 0x10, "LuaLoadStateRuntimeView::chunkName offset must be 0x10");
+	static_assert(sizeof(LuaLoadStateRuntimeView) == 0x14, "LuaLoadStateRuntimeView size must be 0x14");
+
+	// Binary-chunk loader entry points, recovered in LuaObject.cpp alongside the
+	// file-private sub-loaders. External linkage so LuaParser.cpp's luaU_undump
+	// can invoke them by name.
+	void LuaLoadChunkHeader(LuaLoadStateRuntimeView* loadState);
+	Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
+}
+
 namespace
 {
-	struct LuaZioRuntimeView;
+	using LuaPlus::LuaZioRuntimeView;
 
 	extern "C"
 	{
@@ -4689,26 +4726,14 @@ namespace
 		void Init() override;
 	};
 
-	struct LuaZioRuntimeView
-	{
-		int remainingBytes;
-		const char* cursor;
-	};
-	static_assert(offsetof(LuaZioRuntimeView, remainingBytes) == 0x0, "LuaZioRuntimeView::remainingBytes offset must be 0x0");
-	static_assert(offsetof(LuaZioRuntimeView, cursor) == 0x4, "LuaZioRuntimeView::cursor offset must be 0x4");
-
-	struct LuaLoadStateRuntimeView
-	{
-		lua_State* state;
-		LuaZioRuntimeView* stream;
-		Mbuffer* scratchBuffer;
-		int swapBytes;
-		const char* chunkName;
-	};
-	static_assert(offsetof(LuaLoadStateRuntimeView, state) == 0x0, "LuaLoadStateRuntimeView::state offset must be 0x0");
-	static_assert(offsetof(LuaLoadStateRuntimeView, stream) == 0x4, "LuaLoadStateRuntimeView::stream offset must be 0x4");
-	static_assert(offsetof(LuaLoadStateRuntimeView, swapBytes) == 0xC, "LuaLoadStateRuntimeView::swapBytes offset must be 0xC");
-	static_assert(offsetof(LuaLoadStateRuntimeView, chunkName) == 0x10, "LuaLoadStateRuntimeView::chunkName offset must be 0x10");
+	// The binary-bytecode loader state views (`LuaZioRuntimeView` /
+	// `LuaLoadStateRuntimeView`) live in `namespace LuaPlus` so the lundump
+	// entry points (`LuaLoadChunkHeader` / `LuaLoadProtoObject`) can share the
+	// exact same type with `luaU_undump` in LuaParser.cpp without duplicating
+	// the layout. Re-expose them unqualified for the file-private sub-loaders
+	// below that already reference them by simple name.
+	using LuaPlus::LuaZioRuntimeView;
+	using LuaPlus::LuaLoadStateRuntimeView;
 
 	constexpr int kLuaRefUserdataTypeTag = LUA_TUSERDATA;
 	constexpr int kLuaIoUpvalueEnvIndex = lua_upvalueindex(1);
@@ -5946,7 +5971,7 @@ namespace
 	 * Loads one raw byte block from Lua chunk stream; when byte-swap mode is
 	 * enabled it reads byte-by-byte in reverse order, otherwise bulk-reads.
 	 */
-	[[maybe_unused]] void LuaLoadBlock(
+	void LuaLoadBlock(
 		const size_t size,
 		void* const destination,
 		LuaLoadStateRuntimeView* const loadState
@@ -5977,7 +6002,7 @@ namespace
 	 * Loads one element array from chunk stream; byte-swap mode reverses each
 	 * element lane byte order, otherwise it bulk-reads contiguous bytes.
 	 */
-	[[maybe_unused]] void LuaLoadElementArray(
+	void LuaLoadElementArray(
 		char* const destination,
 		LuaLoadStateRuntimeView* const loadState,
 		int elementCount,
@@ -6023,7 +6048,7 @@ namespace
 	 * Reads one size-prefixed Lua chunk string payload and interns it (without
 	 * trailing NUL) into the owner Lua state string table.
 	 */
-	[[maybe_unused]] [[nodiscard]] TString* LuaLoadTString(LuaLoadStateRuntimeView* const loadState)
+	[[nodiscard]] TString* LuaLoadTString(LuaLoadStateRuntimeView* const loadState)
 	{
 		std::uint32_t byteCount = 0u;
 		LuaLoadBlock(4u, &byteCount, loadState);
@@ -6046,7 +6071,7 @@ namespace
 	 * Reads proto bytecode instruction count, allocates `Proto::code`, and
 	 * loads one contiguous instruction vector from chunk stream.
 	 */
-	[[maybe_unused]] void LuaLoadProtoCode(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoCode(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -6066,7 +6091,7 @@ namespace
 	 * Reads proto line-info count, allocates `Proto::lineinfo`, and loads one
 	 * contiguous source-line map vector from chunk stream.
 	 */
-	[[maybe_unused]] void LuaLoadProtoLineInfo(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoLineInfo(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -6088,7 +6113,10 @@ namespace
 		return byteValue;
 	}
 
-	[[nodiscard]] Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
+	// The recursive nested-proto loader has external linkage (defined in the
+	// LuaPlus block below so LuaParser.cpp's luaU_undump can call it). Re-expose
+	// it here so the constant/child-proto reader can recurse by simple name.
+	using LuaPlus::LuaLoadProtoObject;
 
 	/**
 	 * Address: 0x00928870 (FUN_00928870, sub_928870)
@@ -6097,7 +6125,7 @@ namespace
 	 * Reads local-variable debug lane count and fills one `Proto::locvars`
 	 * array with `{name,startpc,endpc}` entries.
 	 */
-	[[maybe_unused]] void LuaLoadProtoLocalVariableDebugInfo(
+	void LuaLoadProtoLocalVariableDebugInfo(
 		LuaLoadStateRuntimeView* const loadState,
 		Proto* const proto
 	)
@@ -6144,7 +6172,7 @@ namespace
 	 * Reads upvalue-name count, validates it against `Proto::nups`, and fills
 	 * one `Proto::upvalues` string-pointer lane array.
 	 */
-	[[maybe_unused]] void LuaLoadProtoUpvalueNames(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoUpvalueNames(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -6179,7 +6207,7 @@ namespace
 	 * Loads one proto constant table lane (`Proto::k`) followed by nested child
 	 * proto pointers (`Proto::p`) from the chunk stream.
 	 */
-	[[maybe_unused]] void LuaLoadProtoConstantsAndNestedProtos(
+	void LuaLoadProtoConstantsAndNestedProtos(
 		LuaLoadStateRuntimeView* const loadState,
 		Proto* const proto
 	)
@@ -6235,49 +6263,6 @@ namespace
 		for (int index = 0; index < childCount; ++index) {
 			proto->p[index] = LuaLoadProtoObject(loadState, proto->source);
 		}
-	}
-
-	/**
-	 * Address: 0x00928C10 (FUN_00928C10, sub_928C10)
-	 *
-	 * What it does:
-	 * Loads one serialized Lua proto object from chunk stream and recursively
-	 * decodes all dependent proto lanes (line info, locals, upvalues, constants,
-	 * children, and bytecode).
-	 */
-	[[maybe_unused]] [[nodiscard]] Proto* LuaLoadProtoObject(
-		LuaLoadStateRuntimeView* const loadState,
-		TString* const fallbackSource
-	)
-	{
-		Proto* const proto = luaF_newproto(loadState->state);
-
-		TString* const loadedSource = LuaLoadTString(loadState);
-		proto->source = (loadedSource != nullptr) ? loadedSource : fallbackSource;
-
-		int lineDefined = 0;
-		LuaLoadBlock(4u, &lineDefined, loadState);
-		if (lineDefined < 0) {
-			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
-		}
-		proto->lineDefined = lineDefined;
-
-		proto->nups = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
-		proto->numparams = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
-		proto->is_vararg = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
-		proto->maxstacksize = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
-
-		LuaLoadProtoLineInfo(loadState, proto);
-		LuaLoadProtoLocalVariableDebugInfo(loadState, proto);
-		LuaLoadProtoUpvalueNames(loadState, proto);
-		LuaLoadProtoConstantsAndNestedProtos(loadState, proto);
-		LuaLoadProtoCode(loadState, proto);
-
-		if (luaG_checkcode(proto) == 0) {
-			luaG_runerror(loadState->state, "bad code in %s", loadState->chunkName);
-		}
-
-		return proto;
 	}
 
 	/**
@@ -9662,6 +9647,167 @@ namespace
 		}
 
 		object.AddToUsedList(state);
+	}
+}
+
+namespace LuaPlus
+{
+	/**
+	 * Address: 0x00928DD0 (FUN_00928DD0, LoadSignature)
+	 * IDA signature:
+	 * void __usercall LoadSignature(LoadState *S@<esi>);
+	 *
+	 * What it does:
+	 * Reads and validates the `"\x1BLua"` chunk signature byte-by-byte from the
+	 * load stream; raises "unexpected end of file" on EOF and "bad signature" on
+	 * the first mismatching byte.
+	 */
+	void LuaLoadSignature(LuaLoadStateRuntimeView* const loadState)
+	{
+		const char* expected = "\x1BLua";
+		for (;;) {
+			const int byteValue = LuaReadChunkByteOrThrow(loadState);
+			if (byteValue != static_cast<unsigned char>(*expected)) {
+				break;
+			}
+			if (*++expected == '\0') {
+				return;
+			}
+		}
+
+		if (*expected != '\0') {
+			luaG_runerror(loadState->state, "bad signature in %s", loadState->chunkName);
+		}
+	}
+
+	/**
+	 * Address: 0x00928E50 (FUN_00928E50, TestSize)
+	 * IDA signature:
+	 * void __usercall TestSize(int s@<edi>, LoadState *S@<esi>, const char *tname);
+	 *
+	 * What it does:
+	 * Reads one size byte from the load stream and verifies it equals the
+	 * expected `sizeof(<tname>)`; raises "virtual machine mismatch" on a size
+	 * disagreement (and "unexpected end of file" on EOF).
+	 */
+	void LuaTestTypeSize(const int expectedSize, LuaLoadStateRuntimeView* const loadState, const char* const typeName)
+	{
+		const int readSize = LuaReadChunkByteOrThrow(loadState);
+		if (static_cast<unsigned char>(readSize) != expectedSize) {
+			luaG_runerror(
+				loadState->state,
+				"virtual machine mismatch in %s: size of %s is %d but read %d",
+				loadState->chunkName,
+				typeName,
+				expectedSize,
+				static_cast<unsigned char>(readSize)
+			);
+		}
+	}
+
+	/**
+	 * Address: 0x00928ED0 (FUN_00928ED0, LoadChunk)
+	 * IDA signature:
+	 * void __usercall LoadChunk(LoadState *S@<eax>);
+	 *
+	 * What it does:
+	 * Validates the full binary chunk header: signature, combined
+	 * version/format word (must equal 0x0501), endianness/byte-swap flag, the
+	 * eight type-size bytes (int/size_t/Instruction/OP/A/B/C/number), and the
+	 * `lua_Number` self-test value (must truncate to 31415926).
+	 */
+	void LuaLoadChunkHeader(LuaLoadStateRuntimeView* const loadState)
+	{
+		LuaLoadSignature(loadState);
+
+		const int versionByte = LuaReadChunkByteOrThrow(loadState);
+		const int formatByte = LuaReadChunkByteOrThrow(loadState);
+		const int versionWord = static_cast<unsigned char>(formatByte)
+			| (static_cast<unsigned char>(versionByte) << 8);
+		if (versionWord > 0x0501) {
+			luaG_runerror(
+				loadState->state,
+				"%s too new: read version %d.%d; expected at most %d.%d",
+				loadState->chunkName,
+				versionWord / 16,
+				versionWord & 0xF,
+				80,
+				1
+			);
+		}
+		if (versionWord < 0x0501) {
+			luaG_runerror(
+				loadState->state,
+				"%s too old: read version %d.%d; expected at least %d.%d",
+				loadState->chunkName,
+				versionWord / 16,
+				versionWord % 16,
+				80,
+				1
+			);
+		}
+
+		const int endiannessByte = LuaReadChunkByteOrThrow(loadState);
+		loadState->swapBytes = (static_cast<std::uint8_t>(endiannessByte) != 1) ? 1 : 0;
+
+		LuaTestTypeSize(4, loadState, "int");
+		LuaTestTypeSize(4, loadState, "size_t");
+		LuaTestTypeSize(4, loadState, "Instruction");
+		LuaTestTypeSize(6, loadState, "OP");
+		LuaTestTypeSize(8, loadState, "A");
+		LuaTestTypeSize(9, loadState, "B");
+		LuaTestTypeSize(9, loadState, "C");
+		LuaTestTypeSize(4, loadState, "number");
+
+		float numberFormat = 0.0f;
+		LuaLoadBlock(4u, &numberFormat, loadState);
+		if (static_cast<int>(numberFormat) != 31415926) {
+			luaG_runerror(loadState->state, "unknown number format in %s", loadState->chunkName);
+		}
+	}
+
+	/**
+	 * Address: 0x00928C10 (FUN_00928C10, LoadFunction)
+	 * IDA signature:
+	 * Proto *__cdecl LoadFunction(LoadState *S, TString *parentSource);
+	 *
+	 * What it does:
+	 * Recursively reads one `Proto` from the chunk stream: source string (falling
+	 * back to the parent chunk name), line-defined, upvalue/param counts,
+	 * vararg/stack-size flags, then the line-info, local-variable, upvalue-name,
+	 * constant + nested-proto, and bytecode lanes via the sub-loaders. Validates
+	 * decoded bytecode with `luaG_checkcode`.
+	 */
+	Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* const loadState, TString* const fallbackSource)
+	{
+		Proto* const proto = luaF_newproto(loadState->state);
+
+		TString* const loadedSource = LuaLoadTString(loadState);
+		proto->source = (loadedSource != nullptr) ? loadedSource : fallbackSource;
+
+		int lineDefined = 0;
+		LuaLoadBlock(4u, &lineDefined, loadState);
+		if (lineDefined < 0) {
+			luaG_runerror(loadState->state, "bad integer in %s", loadState->chunkName);
+		}
+		proto->lineDefined = lineDefined;
+
+		proto->nups = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->numparams = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->is_vararg = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+		proto->maxstacksize = static_cast<lu_byte>(LuaReadChunkByteOrThrow(loadState));
+
+		LuaLoadProtoLineInfo(loadState, proto);
+		LuaLoadProtoLocalVariableDebugInfo(loadState, proto);
+		LuaLoadProtoUpvalueNames(loadState, proto);
+		LuaLoadProtoConstantsAndNestedProtos(loadState, proto);
+		LuaLoadProtoCode(loadState, proto);
+
+		if (luaG_checkcode(proto) == 0) {
+			luaG_runerror(loadState->state, "bad code in %s", loadState->chunkName);
+		}
+
+		return proto;
 	}
 }
 
