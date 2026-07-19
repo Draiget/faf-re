@@ -17,6 +17,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
 #include "SSTIEntityVariableData.h"
+#include "moho/resource/RResId.h"
 #include "moho/math/Vector4f.h"
 #include "REntityBlueprint.h"
 #include "SEntAttachInfo.h"
@@ -45,7 +46,7 @@ namespace moho
   class Projectile;
   class Prop;
   class RScmResource;
-  struct RResId;
+  class CTextureScroller;
   struct RMeshBlueprint;
   struct RUnitBlueprint;
   class ReconBlip;
@@ -699,6 +700,22 @@ namespace moho
      * `Entity*`.
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
+
+    /**
+     * Address: 0x00681720 (FUN_00681720, Moho::Entity::MemberSerialize)
+     * Mangled: ?MemberSerialize@Entity@Moho@@QBEXPAVWriteArchive@gpg@@@Z
+     *
+     * IDA signature:
+     * void __usercall Moho::Entity::MemberSerialize(Entity *this@<eax>, gpg::WriteArchive *archive@<esi>);
+     *
+     * What it does:
+     * Reflection SAVE serializer. Writes every persisted `Entity` lane to the
+     * archive in binary field order (const/variable payload sub-objects, base
+     * `CScriptObject`/`CTask` subobjects, transform, tracked pointers with their
+     * original OWNED/UNOWNED tracked-pointer states, visibility lanes, name, and
+     * bounds).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x006785D0 (FUN_006785D0, ??1Entity@Moho@@MAE@XZ)
@@ -1525,15 +1542,17 @@ namespace moho
     std::uint8_t mQueueRelinkBlocked;              // 0x01B8
     std::uint8_t DestroyQueuedFlag;                // 0x01B9
     std::uint8_t mOnDestroyDispatched;             // 0x01BA
-    char pad_01BB[0x1D];                           // 0x01BB
+    char pad_01BB[1];                              // 0x01BB
+    RResId mResId;                        // 0x01BC (serialized resource id; RResId, 0x1C)
     CIntel* mIntelManager;                // 0x01D8
     std::int32_t mVisibilityLayerFriendly; // 0x01DC
     std::int32_t mVisibilityLayerEnemy;    // 0x01E0
     std::int32_t mVisibilityLayerNeutral;  // 0x01E4
     std::int32_t mVisibilityLayerDefault;  // 0x01E8
     std::uint8_t mInterfaceCreated;        // 0x01EC
-    char pad_01ED[0x07];                   // 0x01ED
-    std::int32_t readinessFlags;           // 0x01F4
+    char pad_01ED[3];                      // 0x01ED
+    CTextureScroller* mScroller;           // 0x01F0 (owned texture-scroller; serialized OWNED)
+    SPhysBody* mPhysBody;                  // 0x01F4 (owned physics body; serialized OWNED)
     std::uint8_t RealtimeStatsEnabled;     // 0x01F8 (per-entity realtime-stats accounting gate; FUN_00689F50)
     char pad_01F9_01FB[0x03];              // 0x01F9
     msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
@@ -2768,8 +2787,11 @@ namespace moho
   static_assert(offsetof(Entity, mAttachedEntities) == 0x17C, "Entity::mAttachedEntities offset must be 0x17C");
   static_assert(offsetof(Entity, mAttachInfo) == 0x18C, "Entity::mAttachInfo offset must be 0x18C");
   static_assert(offsetof(Entity, DestroyQueuedFlag) == 0x1B9, "Entity::DestroyQueuedFlag offset must be 0x1B9");
+  static_assert(offsetof(Entity, mResId) == 0x1BC, "Entity::mResId offset must be 0x1BC");
   static_assert(offsetof(Entity, mIntelManager) == 0x1D8, "Entity::mIntelManager offset must be 0x1D8");
   static_assert(offsetof(Entity, mInterfaceCreated) == 0x1EC, "Entity::mInterfaceCreated offset must be 0x1EC");
+  static_assert(offsetof(Entity, mScroller) == 0x1F0, "Entity::mScroller offset must be 0x1F0");
+  static_assert(offsetof(Entity, mPhysBody) == 0x1F4, "Entity::mPhysBody offset must be 0x1F4");
   static_assert(offsetof(Entity, mUniqueName) == 0x1FC, "Entity::mUniqueName offset must be 0x1FC");
   static_assert(offsetof(Entity, mShooters) == 0x218, "Entity::mShooters offset must be 0x218");
   static_assert(offsetof(Entity, mCollisionBoundsMin) == 0x240, "Entity::mCollisionBoundsMin offset must be 0x240");

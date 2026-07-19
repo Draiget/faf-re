@@ -25,6 +25,7 @@
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityMotor.h"
+#include "moho/entity/SSTIEntityConstantData.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/MotorFallDown.h"
@@ -66,6 +67,10 @@
 
 namespace gpg
 {
+  // Defined out-of-line in ArchiveSerialization.cpp (0x00683600). Builds a
+  // reflected RRef for a texture-scroller pointer; used by Entity::MemberSerialize.
+  RRef* RRef_CTextureScroller(RRef* outRef, moho::CTextureScroller* value);
+
   class SerConstructResult
   {
   public:
@@ -2352,6 +2357,246 @@ namespace moho
 
   namespace
   {
+    // Lazy reflected-type resolvers mirroring the binary's
+    // `if (!X::sType) X::sType = LookupRType(typeid(X));` idiom. Types that
+    // expose a public `sType` static cache into it; the rest use a private
+    // function-local static, matching how sibling serializers resolve them.
+    [[nodiscard]] gpg::RType* CachedConstantDataType()
+    {
+      static gpg::RType* type = nullptr;
+      if (!type) {
+        type = gpg::LookupRType(typeid(SSTIEntityConstantData));
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedScriptObjectTypeForEntity()
+    {
+      gpg::RType* type = CScriptObject::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(CScriptObject));
+        CScriptObject::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedTaskType()
+    {
+      gpg::RType* type = CTask::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(CTask));
+        CTask::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedVariableDataType()
+    {
+      gpg::RType* type = SSTIEntityVariableData::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(SSTIEntityVariableData));
+        SSTIEntityVariableData::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedVTransformType()
+    {
+      static gpg::RType* type = nullptr;
+      if (!type) {
+        type = gpg::LookupRType(typeid(VTransform));
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedAttachedEntitiesType()
+    {
+      static gpg::RType* type = nullptr;
+      if (!type) {
+        type = gpg::LookupRType(typeid(msvc8::vector<Entity*>));
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedAttachInfoType()
+    {
+      gpg::RType* type = SEntAttachInfo::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(SEntAttachInfo));
+        SEntAttachInfo::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedResIdType()
+    {
+      gpg::RType* type = RResId::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(RResId));
+        RResId::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedVisibilityModeTypeForSerialize()
+    {
+      static gpg::RType* type = nullptr;
+      if (!type) {
+        type = gpg::LookupRType(typeid(EVisibilityMode));
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedShooterSetType()
+    {
+      gpg::RType* type = EntitySetTemplate<Entity>::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(EntitySetTemplate<Entity>));
+        EntitySetTemplate<Entity>::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedCollisionBoxType()
+    {
+      static gpg::RType* type = nullptr;
+      if (!type) {
+        type = gpg::LookupRType(typeid(Wm3::AxisAlignedBox3f));
+      }
+      return type;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00681720 (FUN_00681720, Moho::Entity::MemberSerialize)
+   * Mangled: ?MemberSerialize@Entity@Moho@@QBEXPAVWriteArchive@gpg@@@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::Entity::MemberSerialize(Entity *this@<eax>, gpg::WriteArchive *archive@<esi>);
+   *
+   * What it does:
+   * Reflection SAVE serializer. Writes every persisted `Entity` lane to the
+   * archive in exact binary field order, preserving each tracked pointer's
+   * original OWNED/UNOWNED state:
+   *   1. Constant-data sub-object (+0x68), `CScriptObject` base (+0x00),
+   *      `CTask` base (+0x34), variable-data sub-object (+0x78).
+   *   2. Owning army (UNOWNED), pending transform (+0x150), position history
+   *      (OWNED), interpolation float, last-tick int, collision primitive
+   *      (OWNED), attached-entity vector, attach info, three teardown flags.
+   *   3. Resource id (+0x1BC), intel manager (OWNED), four visibility lanes,
+   *      texture scroller (OWNED), physics body (OWNED), realtime-stats bool,
+   *      unique name string, shooter set, motor (OWNED), collision AABB.
+   */
+  void Entity::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef owner{};
+
+    // Constant-data sub-object (+0x68). The three lanes (id/blueprint/tick) are
+    // modeled flat because they are referenced across the engine; serializing
+    // the block's first-field address is the reflection void*+RType pattern.
+    archive->Write(CachedConstantDataType(), &id_, owner);
+
+    // CScriptObject base subobject (+0x00).
+    archive->Write(CachedScriptObjectTypeForEntity(), static_cast<const CScriptObject*>(this), owner);
+
+    // CTask base subobject (+0x34).
+    archive->Write(CachedTaskType(), static_cast<const CTask*>(this), owner);
+
+    // Variable-data sub-object (+0x78); modeled flat, first field is mMeshRef.
+    archive->Write(CachedVariableDataType(), &mMeshRef, owner);
+
+    // Owning army pointer (UNOWNED). CArmyImpl derives from SimArmy.
+    gpg::RRef armyRef{};
+    (void)gpg::RRef_SimArmy(&armyRef, static_cast<SimArmy*>(ArmyRef));
+    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
+
+    // Pending world transform (+0x150), logically a VTransform payload.
+    archive->Write(CachedVTransformType(), &PendingOrientation, owner);
+
+    // Position-history pointer (OWNED).
+    gpg::RRef positionHistoryRef{};
+    (void)gpg::RRef_PositionHistory(&positionHistoryRef, mPositionHistory);
+    gpg::WriteRawPointer(archive, positionHistoryRef, gpg::TrackedPointerState::Owned, owner);
+
+    archive->WriteFloat(mPendingVelocityScale);
+    archive->WriteInt(static_cast<int>(mLastTickProcessed));
+
+    // Collision-primitive pointer (OWNED). CColPrimitiveBase == EntityCollisionUpdater.
+    gpg::RRef collisionRef{};
+    (void)gpg::RRef_CColPrimitiveBase(&collisionRef, CollisionExtents);
+    gpg::WriteRawPointer(archive, collisionRef, gpg::TrackedPointerState::Owned, owner);
+
+    // Attached-entity vector (+0x17C).
+    archive->Write(CachedAttachedEntitiesType(), &mAttachedEntities, owner);
+
+    // Attach-info payload (+0x18C).
+    archive->Write(CachedAttachInfoType(), &mAttachInfo, owner);
+
+    archive->WriteBool(mQueueRelinkBlocked != 0u);
+    archive->WriteBool(DestroyQueuedFlag != 0u);
+    archive->WriteBool(mOnDestroyDispatched != 0u);
+
+    // Resource id (+0x1BC).
+    archive->Write(CachedResIdType(), &mResId, owner);
+
+    // Intel-manager pointer (OWNED).
+    gpg::RRef intelRef{};
+    (void)gpg::RRef_CIntel(&intelRef, mIntelManager);
+    gpg::WriteRawPointer(archive, intelRef, gpg::TrackedPointerState::Owned, owner);
+
+    // Four visibility-mode lanes (+0x1DC..+0x1E8).
+    gpg::RType* const visibilityType = CachedVisibilityModeTypeForSerialize();
+    archive->Write(visibilityType, &mVisibilityLayerFriendly, owner);
+    archive->Write(visibilityType, &mVisibilityLayerEnemy, owner);
+    archive->Write(visibilityType, &mVisibilityLayerNeutral, owner);
+    archive->Write(visibilityType, &mVisibilityLayerDefault, owner);
+
+    // Texture-scroller pointer (OWNED).
+    gpg::RRef scrollerRef{};
+    (void)gpg::RRef_CTextureScroller(&scrollerRef, mScroller);
+    gpg::WriteRawPointer(archive, scrollerRef, gpg::TrackedPointerState::Owned, owner);
+
+    // Physics-body pointer (OWNED).
+    gpg::RRef physBodyRef{};
+    (void)gpg::RRef_SPhysBody(&physBodyRef, mPhysBody);
+    gpg::WriteRawPointer(archive, physBodyRef, gpg::TrackedPointerState::Owned, owner);
+
+    archive->WriteBool(RealtimeStatsEnabled != 0u);
+    archive->WriteString(const_cast<msvc8::string*>(&mUniqueName));
+
+    // Shooter set (+0x218): EntitySetBase IS-A EntitySetTemplate<Entity>.
+    archive->Write(CachedShooterSetType(), &mShooters, owner);
+
+    // Motor pointer (OWNED).
+    gpg::RRef motorRef{};
+    (void)gpg::RRef_Motor(&motorRef, mMotor);
+    gpg::WriteRawPointer(archive, motorRef, gpg::TrackedPointerState::Owned, owner);
+
+    // Collision AABB (+0x240): min/max modeled split, first field is min.
+    archive->Write(CachedCollisionBoxType(), &mCollisionBoundsMin, owner);
+  }
+
+  /**
+   * Address: 0x006807A0 (FUN_006807A0)
+   *
+   * What it does:
+   * Reflection SAVE adapter (mSaveCallback) that forwards one entity save lane
+   * into `Entity::MemberSerialize`. Registered into the entity reflection type
+   * so the archive framework invokes `MemberSerialize` by name through this
+   * thunk. Two sibling thunks (0x0067F640, 0x0067B640) share this body.
+   */
+  [[maybe_unused]] void SerializeEntityThunk(
+    const Entity* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (object != nullptr) {
+      object->MemberSerialize(archive);
+    }
+  }
+
+  namespace
+  {
     /**
      * Static `RPointerType<Entity>` descriptor that the binary exposes as
      * `Moho::Entity::PointerType`. Default static-init runs the
@@ -2628,7 +2873,8 @@ namespace moho
     mVisibilityLayerNeutral = 2;
     mVisibilityLayerDefault = 2;
     mInterfaceCreated = 0u;
-    readinessFlags = 0;
+    mScroller = nullptr;
+    mPhysBody = nullptr;
     mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
     mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
@@ -2718,7 +2964,8 @@ namespace moho
     mVisibilityLayerNeutral = 4;
     mVisibilityLayerDefault = 2;
     mInterfaceCreated = 0u;
-    readinessFlags = 0;
+    mScroller = nullptr;
+    mPhysBody = nullptr;
     mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
     mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
@@ -2812,7 +3059,8 @@ namespace moho
     mVisibilityLayerNeutral = 4;
     mVisibilityLayerDefault = 2;
     mInterfaceCreated = 0u;
-    readinessFlags = 0;
+    mScroller = nullptr;
+    mPhysBody = nullptr;
     mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
     mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
@@ -2906,7 +3154,8 @@ namespace moho
     mVisibilityLayerNeutral = 4;
     mVisibilityLayerDefault = 2;
     mInterfaceCreated = 0u;
-    readinessFlags = 0;
+    mScroller = nullptr;
+    mPhysBody = nullptr;
     mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
     mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
@@ -2937,7 +3186,8 @@ namespace moho
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
-    readinessFlags = 0;
+    mScroller = nullptr;
+    mPhysBody = nullptr;
     mInterfaceCreated = 0u;
 
     mVisibilityLayerFriendly = 2;
