@@ -1,5 +1,6 @@
 #include "CAniSkel.h"
 
+#include <algorithm>
 #include <cstring>
 #include <new>
 
@@ -8,6 +9,7 @@
 #include "CAniDefaultSkel.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/SScmFile.h"
 #include "Wm3Vector3.h"
 
@@ -34,6 +36,101 @@ namespace
     "HeapBackedRangeHandleRuntimeView::rangeCapacityEnd offset must be 0x0C"
   );
   static_assert(sizeof(HeapBackedRangeHandleRuntimeView) == 0x10, "HeapBackedRangeHandleRuntimeView size must be 0x10");
+
+  /**
+   * On-disk skeleton-bone record inside the SScmFile bone chunk.
+   *
+   * The chunk begins at `SScmFile::mBoneTableOffset`; the SCM bone-name string
+   * block that precedes each record's names starts at file offset 0x40 (see
+   * `FillSScmBoneNamePointers`). Each record is 0x6C bytes and stores the local
+   * rest transform as a row-major 3x4 basis (the 4th column of each of the
+   * three rows is unused padding), followed by rest-position, hierarchy links,
+   * and local offset/scale lanes.
+   *
+   * Field offsets are byte-verified against the CAniSkel ctor (FUN_0054A0A0).
+   */
+  struct SScmBoneRecord
+  {
+    float mBasisRow0[4];        // +0x00 (row 0: x,y,z used, w padding)
+    float mBasisRow1[4];        // +0x10 (row 1)
+    float mBasisRow2[4];        // +0x20 (row 2)
+    float mRestPositionX;       // +0x30
+    float mRestPositionY;       // +0x34
+    float mRestPositionZ;       // +0x38
+    float mPad3C;               // +0x3C
+    float mChildStartIndex;     // +0x40 (copied verbatim as float bits)
+    float mChildCount;          // +0x44
+    float mFlags;               // +0x48
+    float mLocalOffsetX;        // +0x4C
+    float mLocalOffsetY;        // +0x50
+    float mLocalOffsetZ;        // +0x54
+    float mLocalScale;          // +0x58
+    std::uint8_t mUnknown5C[4]; // +0x5C
+    std::int32_t mParentBoneIndex; // +0x60
+    std::uint8_t mUnknown64[8]; // +0x64
+  };
+
+  static_assert(offsetof(SScmBoneRecord, mBasisRow0) == 0x00, "SScmBoneRecord::mBasisRow0 offset must be 0x00");
+  static_assert(offsetof(SScmBoneRecord, mBasisRow1) == 0x10, "SScmBoneRecord::mBasisRow1 offset must be 0x10");
+  static_assert(offsetof(SScmBoneRecord, mBasisRow2) == 0x20, "SScmBoneRecord::mBasisRow2 offset must be 0x20");
+  static_assert(offsetof(SScmBoneRecord, mRestPositionX) == 0x30, "SScmBoneRecord::mRestPositionX offset must be 0x30");
+  static_assert(offsetof(SScmBoneRecord, mChildStartIndex) == 0x40, "SScmBoneRecord::mChildStartIndex offset must be 0x40");
+  static_assert(offsetof(SScmBoneRecord, mChildCount) == 0x44, "SScmBoneRecord::mChildCount offset must be 0x44");
+  static_assert(offsetof(SScmBoneRecord, mFlags) == 0x48, "SScmBoneRecord::mFlags offset must be 0x48");
+  static_assert(offsetof(SScmBoneRecord, mLocalOffsetX) == 0x4C, "SScmBoneRecord::mLocalOffsetX offset must be 0x4C");
+  static_assert(offsetof(SScmBoneRecord, mLocalScale) == 0x58, "SScmBoneRecord::mLocalScale offset must be 0x58");
+  static_assert(offsetof(SScmBoneRecord, mParentBoneIndex) == 0x60, "SScmBoneRecord::mParentBoneIndex offset must be 0x60");
+  static_assert(sizeof(SScmBoneRecord) == 0x6C, "SScmBoneRecord size must be 0x6C");
+
+  /**
+   * Address: 0x005379D0 (FUN_005379D0, sub_5379D0)
+   *
+   * IDA signature:
+   * int callcnv_E3 sub_5379D0@<eax>(int file@<ebx>, int outNamePtrs);
+   *
+   * What it does:
+   * Fills one scratch `vector<const char*>` with one pointer per bone into the
+   * SScmFile bone-name string block (which begins at file offset 0x40): the
+   * names are stored back-to-back as null-terminated strings, so entry `i+1`
+   * starts one past the terminator of entry `i`. The output vector is first
+   * sized to hold `mBoneCount` entries. Shared with `Moho::MeshBatch::Func1`
+   * (FUN_007E6F60); kept file-static because that caller is not yet recovered
+   * into source.
+   */
+  void FillSScmBoneNamePointers(const moho::SScmFile& file, msvc8::vector<const char*>& outNamePointers)
+  {
+    const std::uint32_t boneCount = file.mBoneCount;
+    outNamePointers.resize(boneCount);
+
+    const char* cursor = reinterpret_cast<const char*>(&file) + 0x40;
+    for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+      outNamePointers.begin()[boneIndex] = cursor;
+      cursor += std::strlen(cursor) + 1;
+    }
+  }
+
+  /**
+   * Byte-verified from the introsort comparator emitted at FUN_0054EE30
+   * (`sub_54EE30`, `_Unguarded_partition`) and its guarded-insertion sibling.
+   * The MSVC8 `std::_Sort` internals (`sub_54E4B0` / `sub_54EE30`) are collapsed
+   * into a single native `std::sort` per the STL-native contract; this functor
+   * reproduces the exact strict-weak ordering: primary key is `strcmp` on the
+   * bone name, tie-broken by ascending signed `mBoneIndex`.
+   */
+  struct AniSkelBoneNameIndexLess
+  {
+    [[nodiscard]] bool operator()(
+      const moho::SAniSkelBoneNameIndex& lhs,
+      const moho::SAniSkelBoneNameIndex& rhs
+    ) const noexcept
+    {
+      const int nameOrder = std::strcmp(lhs.mBoneName, rhs.mBoneName);
+      if (nameOrder != 0) {
+        return nameOrder < 0;
+      }
+      return lhs.mBoneIndex < rhs.mBoneIndex;
+    }
+  };
 
   /**
    * Address: 0x0054AC80 (FUN_0054AC80, nullsub_2)
@@ -124,7 +221,7 @@ namespace
    * Sets `vector<SAniSkelBone>` length to `requestedCount` by destroying tail
    * lanes on shrink and value-initializing new lanes on growth.
    */
-  [[maybe_unused]] [[nodiscard]] std::size_t ResizeAniSkelBoneVector(
+  [[nodiscard]] std::size_t ResizeAniSkelBoneVector(
     msvc8::vector<moho::SAniSkelBone>& storage,
     const std::size_t requestedCount
   )
@@ -172,7 +269,7 @@ namespace
    * Sets `vector<SAniSkelBoneNameIndex>` length to `requestedCount` using one
    * caller-provided fill lane for growth.
    */
-  [[maybe_unused]] [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithFill(
+  [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithFill(
     msvc8::vector<moho::SAniSkelBoneNameIndex>& storage,
     const std::size_t requestedCount,
     const moho::SAniSkelBoneNameIndex& fillValue
@@ -929,6 +1026,89 @@ namespace
 namespace moho
 {
   gpg::RType* CAniSkel::sType = nullptr;
+
+  /**
+   * Address: 0x0054A0A0 (FUN_0054A0A0,
+   * ??0CAniSkel@Moho@@QAE@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z)
+   * Mangled: ??0CAniSkel@Moho@@QAE@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z
+   *
+   * IDA signature:
+   * Moho::CAniSkel *__userpurge CAniSkel(Moho::CAniSkel *this, boost::shared_ptr<const SScmFile> *file);
+   *
+   * What it does:
+   * Retains the shared SScmFile, gathers the bone-name pointer table from the
+   * file's name string block, sizes the bone + name->index vectors to the
+   * file's bone count, then populates each bone: name pointer, parent index,
+   * child link range, local offset/scale, and a rest transform whose
+   * orientation is the quaternion of the on-disk 3x4 basis and whose
+   * translation is the on-disk rest position. The name->index table is then
+   * sorted (strcmp primary key, ascending index tie-break) so `FindBoneIndex`
+   * can binary-search it, and per-bone bounds are rebuilt.
+   */
+  CAniSkel::CAniSkel(const boost::shared_ptr<const SScmFile>& file)
+    : mFile(file)
+  {
+    const SScmFile& scmFile = *file;
+    const std::uint32_t boneCount = scmFile.mBoneCount;
+
+    // Gather one name pointer per bone from the file's name string block.
+    msvc8::vector<const char*> boneNamePointers{};
+    FillSScmBoneNamePointers(scmFile, boneNamePointers);
+
+    (void)ResizeAniSkelBoneVector(mBones, boneCount);
+    (void)ResizeAniSkelBoneNameIndexVectorWithFill(
+      mBoneNameToIndex, boneCount, SAniSkelBoneNameIndex{nullptr, 0}
+    );
+
+    const auto* const boneRecords = reinterpret_cast<const SScmBoneRecord*>(
+      reinterpret_cast<const std::uint8_t*>(&scmFile) + scmFile.mBoneTableOffset
+    );
+    SAniSkelBone* const bones = mBones.begin();
+    SAniSkelBoneNameIndex* const nameToIndex = mBoneNameToIndex.begin();
+    const char* const* const namePointers = boneNamePointers.begin();
+
+    for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+      const SScmBoneRecord& record = boneRecords[boneIndex];
+      const char* const boneName = namePointers[boneIndex];
+
+      nameToIndex[boneIndex].mBoneName = boneName;
+      nameToIndex[boneIndex].mBoneIndex = static_cast<std::int32_t>(boneIndex);
+
+      SAniSkelBone& bone = bones[boneIndex];
+      bone.mBoneName = boneName;
+      bone.mParentBoneIndex = record.mParentBoneIndex;
+
+      // The child-link and offset/scale lanes are copied as raw float bits in
+      // the binary (fld/fstp), matching the on-disk record layout exactly.
+      std::memcpy(&bone.mChildStartIndex, &record.mChildStartIndex, sizeof(float));
+      std::memcpy(&bone.mChildCount, &record.mChildCount, sizeof(float));
+      std::memcpy(&bone.mFlags, &record.mFlags, sizeof(float));
+      bone.mLocalOffsetX = record.mLocalOffsetX;
+      bone.mLocalOffsetY = record.mLocalOffsetY;
+      bone.mLocalOffsetZ = record.mLocalOffsetZ;
+      bone.mLocalScale = record.mLocalScale;
+
+      // Convert the on-disk 3x4 basis to a quaternion. The binary passes the
+      // three rows (first three floats of each) as the "columns" argument of
+      // MatrixColumnsToQuatCanonical (FUN_004F0AE0), which transposes them.
+      const Wm3::Vector3f basisColumns[3] = {
+        Wm3::Vector3f{record.mBasisRow0[0], record.mBasisRow0[1], record.mBasisRow0[2]},
+        Wm3::Vector3f{record.mBasisRow1[0], record.mBasisRow1[1], record.mBasisRow1[2]},
+        Wm3::Vector3f{record.mBasisRow2[0], record.mBasisRow2[1], record.mBasisRow2[2]},
+      };
+      (void)MatrixColumnsToQuatCanonical(basisColumns, &bone.mBoneTransform.orient_);
+
+      bone.mBoneTransform.pos_.x = record.mRestPositionX;
+      bone.mBoneTransform.pos_.y = record.mRestPositionY;
+      bone.mBoneTransform.pos_.z = record.mRestPositionZ;
+    }
+
+    // Collapsed MSVC8 std::_Sort internals (sub_54E4B0 / sub_54EE30) into one
+    // native std::sort with the byte-verified strcmp-then-index comparator.
+    std::sort(mBoneNameToIndex.begin(), mBoneNameToIndex.end(), AniSkelBoneNameIndexLess{});
+
+    UpdateBoneBounds();
+  }
 
   /**
    * Address: 0x0054A370 (FUN_0054A370, scalar deleting destructor thunk)

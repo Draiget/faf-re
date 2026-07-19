@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/resource/CAniResourceSkel.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/SScmFile.h"
@@ -327,13 +328,21 @@ namespace moho
    * Address: 0x00538DB0 (FUN_00538DB0, ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    *
    * What it does:
-   * Returns one shared handle to the owned skeleton lane by aliasing this
-   * resource's shared-control block.
+   * Lazily constructs the owned skeleton on first request by parsing this
+   * resource's SCM file into a `CAniResourceSkel` (allocated with
+   * `operator new(0x48)`), then returns one shared handle that aliases this
+   * resource's own shared-control block so the skeleton stays alive for as long
+   * as the returned handle does.
    */
   boost::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
   {
     if (mSkeleton == nullptr) {
-      return boost::shared_ptr<const CAniSkel>();
+      // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
+      // from this resource's name + SCM file, storing it through the CAniSkel*
+      // base pointer lane.
+      CAniSkel* const previousSkeleton = mSkeleton;
+      mSkeleton = new CAniResourceSkel(mName, mFile);
+      delete previousSkeleton;
     }
 
     struct KeepOwnerAlive

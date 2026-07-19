@@ -75,6 +75,22 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0054A0A0 (FUN_0054A0A0,
+     * ??0CAniSkel@Moho@@QAE@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z)
+     * Mangled: ??0CAniSkel@Moho@@QAE@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z
+     *
+     * IDA signature:
+     * Moho::CAniSkel *__userpurge CAniSkel(Moho::CAniSkel *this, boost::shared_ptr<const SScmFile> *file);
+     *
+     * What it does:
+     * Parses the SScmFile skeleton chunk: fills the bone vector and the
+     * bone-name to index table, converts each on-disk 3x4 bone matrix to a
+     * quaternion transform, sorts the name table (strcmp, index tie-break),
+     * and rebuilds per-bone bounds.
+     */
+    explicit CAniSkel(const boost::shared_ptr<const SScmFile>& file);
+
+    /**
      * Address: 0x0054A370 (FUN_0054A370, scalar deleting destructor thunk)
      * Mangled: ??_GCAniSkel@Moho@@UAEPAXI@Z
      *
