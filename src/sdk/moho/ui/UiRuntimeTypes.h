@@ -63,6 +63,7 @@ namespace moho
   class CMauiBitmap;
   class CMauiControl;
   class CMauiEdit;
+  class CMauiEditClickDragger;
   class CMauiLuaDragger;
   class CMauiBorder;
   class CMauiFrame;
@@ -1475,6 +1476,10 @@ namespace moho
 
   class CMauiEdit : public CMauiControl
   {
+    // The embedded click-dragger sub-object routes its IMauiDragger::DragRelease
+    // slot to the (private) CMauiEdit::DragRelease release hit-test lane.
+    friend class CMauiEditClickDragger;
+
   public:
     /**
      * Address: 0x0078EFE0 (FUN_0078EFE0, Moho::CMauiEdit::CMauiEdit)
@@ -1731,6 +1736,63 @@ namespace moho
      */
     void TextChanged(const msvc8::string& newText, const msvc8::string& oldText);
   };
+
+  /**
+   * The edit control's embedded click-dragger sub-object.
+   *
+   * Layout: this is the concrete `IMauiDragger`-derived object that the binary
+   * embeds inside `CMauiEdit` at offset +0x11C (see
+   * `CMauiEditRuntimeView::mClickDragger`). Constructing it installs the
+   * CMauiEdit-specific IMauiDragger override vtable
+   * `??_7CMauiEdit@Moho@@6BIMauiDragger@Moho@@@` (VA 0x00E395CC), reproducing the
+   * secondary-vptr write at asm 0x0078F04A in the `CMauiEdit` constructor.
+   *
+   * Vtable slots (from the binary at VA 0x00E395CC):
+   *   slot 0 (0x00795A00) scalar-deleting dtor thunk (compiler-generated)
+   *   slot 1 (0x007913A0) DragMove   -> Moho::CMauiEditDragMove (FUN_007913A0)
+   *   slot 2 (0x007914C0) DragRelease -> Moho::CMauiEdit::DragRelease
+   *   slot 3 (0x00791590) OnCurrentDraggerReplaced -> no-op (FUN_00791590)
+   *
+   * Size is exactly 0x08 (vtable @+0x00, intrusive list head @+0x04) so it
+   * occupies the same 8 bytes the raw `mClickDraggerStorage[0x8]` overlay used;
+   * `CMauiEdit`'s total layout/size is unchanged.
+   */
+  class CMauiEditClickDragger final : public IMauiDragger
+  {
+  public:
+    CMauiEditClickDragger() = default;
+    ~CMauiEditClickDragger() override = default;
+
+    /**
+     * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
+     *
+     * Routes the click-dragger drag-move slot to the recovered
+     * `Moho::CMauiEditDragMove` free function, which unadjusts this MI
+     * sub-object pointer back to the owning `CMauiEdit`.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x007914C0 (FUN_007914C0, Moho::CMauiEdit::DragRelease)
+     *
+     * Routes the click-dragger release slot to the owning edit's
+     * `CMauiEdit::DragRelease` after unadjusting this MI sub-object pointer.
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00791590 (FUN_00791590, Moho::CMauiEdit::OnCurrentDraggerReplaced)
+     *
+     * No-op replace hook for the edit's click-dragger lane.
+     */
+    void OnCurrentDraggerReplaced() override;
+
+    // +0x04: intrusive dragger-list head (the binary's `mList` lane).
+    TDatListItem<IMauiDragger, void>* mList = nullptr; // +0x04
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditClickDragger, mList) == 0x4, "moho::CMauiEditClickDragger::mList offset must be 0x4");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiEditClickDragger) == 0x8, "moho::CMauiEditClickDragger size must be 0x8");
 
   class CMauiFrame : public CMauiControl
   {
@@ -3022,7 +3084,7 @@ namespace moho
   struct CMauiEditRuntimeView : CMauiControlRuntimeView
   {
     std::uint8_t mUnknown0D4To11B[0x48]{};
-    std::uint8_t mClickDraggerStorage[0x8]{}; // +0x11C
+    CMauiEditClickDragger mClickDragger{}; // +0x11C (embedded IMauiDragger sub-object)
     CD3DFont* mFont = nullptr;          // +0x124
     std::uint32_t mForegroundColor = 0; // +0x128
     bool mBackgroundVisible = false;    // +0x12C
@@ -3068,8 +3130,8 @@ namespace moho
     "CMauiEditRuntimeView::mFont offset must be 0x124"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mClickDraggerStorage) == 0x11C,
-    "CMauiEditRuntimeView::mClickDraggerStorage offset must be 0x11C"
+    offsetof(CMauiEditRuntimeView, mClickDragger) == 0x11C,
+    "CMauiEditRuntimeView::mClickDragger offset must be 0x11C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiEditRuntimeView, mForegroundColor) == 0x128,
