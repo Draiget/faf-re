@@ -4345,23 +4345,7 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 
   [[nodiscard]] IMauiDragger* ResolveEditClickDragger(CMauiEditRuntimeView* const editView) noexcept
   {
-    return reinterpret_cast<IMauiDragger*>(editView->mClickDraggerStorage);
-  }
-
-  struct CMauiEditClickDraggerRuntimeView
-  {
-    std::uint32_t mVftable = 0;
-    DraggerLink* mListHead = nullptr;
-  };
-
-  static_assert(
-    sizeof(CMauiEditClickDraggerRuntimeView) == 0x08,
-    "CMauiEditClickDraggerRuntimeView size must be 0x08"
-  );
-
-  [[nodiscard]] CMauiEditClickDraggerRuntimeView* ResolveEditClickDraggerRuntime(CMauiEditRuntimeView* const editView) noexcept
-  {
-    return reinterpret_cast<CMauiEditClickDraggerRuntimeView*>(editView->mClickDraggerStorage);
+    return &editView->mClickDragger;
   }
 
   /**
@@ -22279,32 +22263,24 @@ void moho::CMauiBitmap::OnPatternEnd()
  * The binary additionally writes the embedded IMauiDragger sub-object vtable at
  * +0x11C to Moho::CMauiEdit::`vftable'{for `Moho::IMauiDragger'} (asm 0x0078F04A,
  * thunk table VA 0x00E395CC) so the click-dragger DragMove slot dispatches to
- * Moho::CMauiEditDragMove (FUN_007913A0). In this repo CMauiEdit is modeled as
- * `class CMauiEdit : public CMauiControl` (no real IMauiDragger C++ base — the
- * sub-object is the overlay lane `mClickDraggerStorage` at +0x11C), so the C++
- * compiler does not emit that sub-object vtable pointer for us, and no existing
- * recovered mechanism installs the edit-specific dragger thunk vtable (the only
- * install helper, ResolveMauiDraggerVtableLane(), yields the generic empty-base
- * IMauiDragger vtable, not the CMauiEdit override thunk). See the UNRESOLVED
- * marker below.
+ * Moho::CMauiEditDragMove (FUN_007913A0). We model that sub-object as the typed
+ * `CMauiEditClickDragger` member `CMauiEditRuntimeView::mClickDragger` (+0x11C);
+ * placement-constructing it here makes the compiler emit + install the
+ * CMauiEdit-specific override vtable exactly as the binary does, and its list
+ * head (`mList`, +0x120) starts null (matches `.c` line 19 `this->mList = 0`).
  */
 moho::CMauiEdit::CMauiEdit(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
   : CMauiControl(luaObject, parent, "edit")
 {
   CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
-  // .c line 19: `this->mList = 0` — the embedded IMauiDragger sub-object's
-  // list-head lane (+0x120, modeled as CMauiEditClickDraggerRuntimeView::mListHead).
-  ResolveEditClickDraggerRuntime(editView)->mListHead = nullptr;
-
-  // UNRESOLVED: IMauiDragger vptr init (asm 0x0078F04A) — the binary installs
-  // the CMauiEdit-for-IMauiDragger thunk vtable (VA 0x00E395CC) into
-  // mClickDraggerStorage (+0x11C) so DragMove routes to Moho::CMauiEditDragMove.
-  // CMauiEdit is not modeled with a real IMauiDragger C++ base, so the compiler
-  // does not set this pointer, and no existing recovered helper installs the
-  // edit-specific override vtable (ResolveMauiDraggerVtableLane() only yields the
-  // generic empty-base vtable). Left unresolved rather than inventing a raw
-  // vtable cast.
+  // asm 0x0078F04A: install the CMauiEdit-for-IMauiDragger override vtable (VA
+  // 0x00E395CC) into the embedded click-dragger sub-object at +0x11C. Because the
+  // runtime-view overlays raw CMauiEdit bytes (its member ctors do not run for
+  // us), construct the typed sub-object in place: the CMauiEditClickDragger ctor
+  // writes its vptr (DragMove -> Moho::CMauiEditDragMove) and clears its intrusive
+  // list head (`mList`, +0x120 -> null, matching `.c` line 19 `this->mList = 0`).
+  new (&editView->mClickDragger) CMauiEditClickDragger();
 
   editView->mFont = nullptr;
   editView->mForegroundColor = 0xFFFFFFFFu;
@@ -22360,9 +22336,16 @@ moho::CMauiEdit::~CMauiEdit()
   editView->mText.tidy(true, 0U);
   ReleaseIntrusiveFont(editView->mFont);
 
-  CMauiEditClickDraggerRuntimeView* const clickDragger = ResolveEditClickDraggerRuntime(editView);
-  for (DraggerLink* node = clickDragger->mListHead; node != nullptr; node = clickDragger->mListHead) {
-    clickDragger->mListHead = node->mNext;
+  // asm 0x0078F230: destroying the embedded IMauiDragger sub-object resets its
+  // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable (the
+  // compiler-emitted secondary sub-object dtor), before the intrusive list at
+  // +0x120 is unlinked below.
+  editView->mClickDragger.~CMauiEditClickDragger();
+
+  // asm 0x0078F236-0x0078F250: detach every node from the click-dragger's
+  // intrusive list head (`mList`, +0x120), clearing each node's owner/next lanes.
+  for (DraggerLink* node = editView->mClickDragger.mList; node != nullptr; node = editView->mClickDragger.mList) {
+    editView->mClickDragger.mList = node->mNext;
     node->mPrev = nullptr;
     node->mNext = nullptr;
   }
@@ -22961,6 +22944,34 @@ void moho::CMauiEdit::HandleClickEvent(SMauiEventData* const eventData)
 }
 
 /**
+ * CMauiEditClickDragger override bodies.
+ *
+ * These are the slots of the CMauiEdit-for-IMauiDragger vtable (VA 0x00E395CC)
+ * installed into the embedded click-dragger sub-object at CMauiEdit + 0x11C.
+ * Each forwards to the recovered edit behavior; the sub-object `this` is
+ * unadjusted back to the owning CMauiEdit through the MI offset (-0x11C).
+ */
+void moho::CMauiEditClickDragger::DragMove(const SMauiEventData* const eventData)
+{
+  // slot 1 (0x007913A0): forward to the recovered free function, which unadjusts
+  // this sub-object pointer to the owning CMauiEdit and performs the selection.
+  moho::CMauiEditDragMove(this, eventData);
+}
+
+void moho::CMauiEditClickDragger::DragRelease(const SMauiEventData* const eventData)
+{
+  // slot 2 (0x007914C0): unadjust to the owning CMauiEdit and forward to the
+  // recovered CMauiEdit::DragRelease release hit-test lane.
+  auto* const edit = reinterpret_cast<CMauiEdit*>(reinterpret_cast<char*>(this) - 0x11C);
+  edit->DragRelease(eventData);
+}
+
+void moho::CMauiEditClickDragger::OnCurrentDraggerReplaced()
+{
+  // slot 3 (0x00791590): no-op replace hook (binary body is empty).
+}
+
+/**
  * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
  *
  * What it does:
@@ -22971,8 +22982,10 @@ void moho::CMauiEdit::HandleClickEvent(SMauiEventData* const eventData)
  *
  * Notes:
  * Recovered as a free function taking the IMauiDragger sub-object pointer (the
- * dragger lives at CMauiEdit + 0x11C = mClickDraggerStorage); the owning edit is
- * recovered by unadjusting that multiple-inheritance sub-object offset.
+ * dragger lives at CMauiEdit + 0x11C = CMauiEditClickDragger member); the owning
+ * edit is recovered by unadjusting that multiple-inheritance sub-object offset.
+ * Invoked by name from CMauiEditClickDragger::DragMove (the slot-1 override
+ * installed by the CMauiEdit ctor), so it is reachable through that vtable slot.
  */
 void moho::CMauiEditDragMove(IMauiDragger* const dragger, const SMauiEventData* const eventData)
 {
