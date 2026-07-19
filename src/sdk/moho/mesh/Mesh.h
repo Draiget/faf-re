@@ -12,6 +12,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/mesh/MeshBatchKey.h"
 #include "moho/mesh/MeshEnvironment.h"
+#include "moho/render/d3d/ShaderVar.h"
 #include "moho/containers/TDatList.h"
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/render/camera/VTransform.h"
@@ -32,9 +33,11 @@ namespace moho
   class MeshMaterial;
   class MeshInstance;
   class CD3DDynamicTextureSheet;
+  class RD3DTextureResource;
   class ID3DRenderTarget;
   class ID3DDepthStencil;
   class Shadow;
+  struct ShaderVar;
   enum EEntityType : std::uint32_t;
   struct Vector4f;
   struct RMeshBlueprint;
@@ -862,6 +865,49 @@ namespace moho
     std::uint32_t size;              // +0x08
   };
 
+  /**
+   * Process-wide mesh-render shader-constant lane. The binary holds each of
+   * these as a separate CRT static-init `struct_ShaderVar` object (registered
+   * against the `"mesh"` effect file); the recovered model groups them into one
+   * set exposed through `GetMeshShaderVars()`, mirroring `TerrainShaderVarSet`.
+   *
+   * HLSL variable names are byte-verified as the exact null-terminated strings
+   * passed to `RegisterShaderVar(...)` in the per-var CRT init functions
+   * (`register_ShaderVarMesh*`, 0x00BE0540..0x00BE0840) and read directly from
+   * bin/2025.7.1/ForgedAlliance.exe. All 23 register against the effect file
+   * "mesh".
+   */
+  struct MeshShaderVarSet
+  {
+    ShaderVar anisotropicTexture; // "anisotropicTexture"  @0x010BEC58
+    ShaderVar insectTexture;      // "insectTexture"       @0x010BEBC8
+    ShaderVar dissolveTexture;    // "dissolveTexture"     @0x010BECA0
+    ShaderVar time;               // "time"                @0x010BE940
+    ShaderVar mirrored;           // "mirrored"            @0x010BEB38
+    ShaderVar lodBasis;           // "lodBasis"            @0x010BE868
+    ShaderVar viewMatrix;         // "viewMatrix"          @0x010BEF50
+    ShaderVar projMatrix;         // "projMatrix"          @0x010BE748
+    ShaderVar terrainScale;       // "terrainScale"        @0x010BE700
+    ShaderVar lightMultiplier;    // "lightMultiplier"     @0x010BEEA8
+    ShaderVar sunDirection;       // "sunDirection"        @0x010BE8B0
+    ShaderVar sunDiffuse;         // "sunDiffuse"          @0x010BEF98
+    ShaderVar sunAmbient;         // "sunAmbient"          @0x010BE7D8
+    ShaderVar shadowFill;         // "shadowFill"          @0x010BEA60
+    ShaderVar surfaceElevation;   // "surfaceElevation"    @0x010BECE8
+    ShaderVar abyssElevation;     // "abyssElevation"      @0x010BE6B8
+    ShaderVar waterRamp;          // "waterRamp"           @0x010BE988
+    ShaderVar shadowsEnabled;     // "shadowsEnabled"      @0x010BEE08
+    ShaderVar shadowMatrix;       // "shadowMatrix"        @0x010BEA18
+    ShaderVar shadowTexture;      // "shadowTexture"       @0x010BED30
+    ShaderVar shadowBias;         // "shadowBias"          @0x010BEB80
+    ShaderVar shadowSize;         // "shadowSize"          @0x010BE790
+    ShaderVar shadowBlur;         // "shadowBlur"          @0x010BEAF0
+
+    MeshShaderVarSet();
+  };
+
+  [[nodiscard]] MeshShaderVarSet& GetMeshShaderVars();
+
   class MeshRenderer
   {
   public:
@@ -1021,11 +1067,29 @@ namespace moho
     );
 
     /**
-     * Address: 0x007E19D0 (FUN_007E19D0, Moho::MeshRenderer::ConfigureShader)
+     * Address: 0x007E1720 (FUN_007E1720, Moho::MeshRenderer::LoadGlobalTextures)
+     * Mangled: ?LoadGlobalTextures@MeshRenderer@Moho@@AAEXXZ
      *
      * What it does:
-     * Binds the terrain/sun/shadow shader-constant lane for one mesh render
-     * pass before batch iteration begins.
+     * Lazily loads the renderer's four global/shared texture resources
+     * (dissolve, mesh-environment cube map, anisotropic lookup, insect lookup)
+     * from the active D3D device resources, storing each resolved
+     * `boost::shared_ptr<RD3DTextureResource>` into its lane. Each lane is only
+     * loaded when still empty, so repeated calls after the first are no-ops.
+     */
+    void LoadGlobalTextures();
+
+    /**
+     * Address: 0x007E19D0 (FUN_007E19D0, Moho::MeshRenderer::ConfigureShader)
+     * Mangled: ?ConfigureShader@MeshRenderer@Moho@@AAEXABVGeomCamera3@2@PAVShadow@2@_N@Z
+     *
+     * What it does:
+     * Binds the mesh-render shader-constant lane for one render pass before
+     * batch iteration begins: global lookup textures, frame time, mirror flag,
+     * view/projection matrices, and either the active terrain's sun/shadow/water
+     * lighting lanes or the renderer's fallback mesh-environment lighting lanes,
+     * plus the optional shadow-map lane. Calls LoadGlobalTextures by name at the
+     * head of the terrain-independent setup.
      */
     void ConfigureShader(const GeomCamera3& camera, Shadow* shadow, bool mirrored);
 
@@ -1083,12 +1147,19 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<Mesh>
     FindOrCreateMesh(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
 
-    MeshEnvironment meshEnvironment;                                 // +0x04
-    MeshRendererMeshCacheTree meshCacheTree;                         // +0x60
-    boost::shared_ptr<CD3DDynamicTextureSheet> dissolveTex;          // +0x6C
-    boost::shared_ptr<CD3DDynamicTextureSheet> meshEnvironmentTex;   // +0x74
-    boost::shared_ptr<CD3DDynamicTextureSheet> anisotropiclookupTex; // +0x7C
-    boost::shared_ptr<CD3DDynamicTextureSheet> insectlookupTex;      // +0x84
+    MeshEnvironment meshEnvironment;                            // +0x04
+    MeshRendererMeshCacheTree meshCacheTree;                    // +0x60
+    // Global/shared texture lanes loaded by LoadGlobalTextures (0x007E1720).
+    // The binary stores the raw `boost::shared_ptr<RD3DTextureResource>` handle
+    // returned by `ID3DDeviceResources::GetTexture` directly into each lane
+    // (obj at +offset, count.pi_ at +offset+4); the base GAL texture is only
+    // extracted at bind time when ConfigureShader passes these resources to the
+    // mesh texture shader-vars. They are the owning resource handles, not the
+    // extracted `TextureD3D9`, so the lane type is `RD3DTextureResource`.
+    boost::shared_ptr<RD3DTextureResource> dissolveTex;          // +0x6C
+    boost::shared_ptr<RD3DTextureResource> meshEnvironmentTex;   // +0x74
+    boost::shared_ptr<RD3DTextureResource> anisotropiclookupTex; // +0x7C
+    boost::shared_ptr<RD3DTextureResource> insectlookupTex;      // +0x84
     MeshInstance::ListLink instanceListHead;                         // +0x8C
     std::int32_t instanceListSize;                                   // +0x94
     float deltaFrame;                                                // +0x98
