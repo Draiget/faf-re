@@ -2,6 +2,41 @@
 
 #include <cctype>
 
+namespace LuaPlus
+{
+  // Shared binary-bytecode loader (lundump) state views. These mirror the
+  // definitions in LuaObject.cpp, where the chunk-header validator and the
+  // recursive proto reader are recovered alongside the sub-loaders. Both TUs
+  // must name the exact same `LuaPlus::LuaLoadStateRuntimeView` type so
+  // luaU_undump here can build the load state and hand it to those entry
+  // points. Layout matches the original ZIO / LoadState structs
+  // (FUN_009285C0 / FUN_00928ED0 / FUN_009290F0).
+  struct LuaZioRuntimeView
+  {
+    int remainingBytes; // ZIO::n
+    const char* cursor; // ZIO::p
+  };
+
+  struct LuaLoadStateRuntimeView
+  {
+    lua_State* state;          // LoadState::L    (+0x0)
+    LuaZioRuntimeView* stream; // LoadState::Z    (+0x4)
+    Mbuffer* scratchBuffer;    // LoadState::b    (+0x8)
+    int swapBytes;             // LoadState::swap (+0xC)
+    const char* chunkName;     // LoadState::name (+0x10)
+  };
+  static_assert(offsetof(LuaLoadStateRuntimeView, state) == 0x0, "LuaLoadStateRuntimeView::state offset must be 0x0");
+  static_assert(offsetof(LuaLoadStateRuntimeView, stream) == 0x4, "LuaLoadStateRuntimeView::stream offset must be 0x4");
+  static_assert(offsetof(LuaLoadStateRuntimeView, scratchBuffer) == 0x8, "LuaLoadStateRuntimeView::scratchBuffer offset must be 0x8");
+  static_assert(offsetof(LuaLoadStateRuntimeView, swapBytes) == 0xC, "LuaLoadStateRuntimeView::swapBytes offset must be 0xC");
+  static_assert(offsetof(LuaLoadStateRuntimeView, chunkName) == 0x10, "LuaLoadStateRuntimeView::chunkName offset must be 0x10");
+  static_assert(sizeof(LuaLoadStateRuntimeView) == 0x14, "LuaLoadStateRuntimeView size must be 0x14");
+
+  // Recovered binary-chunk loader entry points (defined in LuaObject.cpp).
+  void LuaLoadChunkHeader(LuaLoadStateRuntimeView* loadState);
+  Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
+}
+
 namespace
 {
   struct FuncState;
@@ -129,14 +164,6 @@ namespace
     const char* name;
   };
 
-  struct LuaUndumpLoadStateRuntimeView
-  {
-    lua_State* state;
-    LuaUndumpZioRuntimeView* stream;
-    Mbuffer* buffer;
-    const char* sourceName;
-  };
-
   static_assert(offsetof(Token, token) == 0x00, "Token::token offset must be 0x00");
   static_assert(offsetof(Token, seminfo) == 0x04, "Token::seminfo offset must be 0x04");
   static_assert(sizeof(Token) == 0x08, "Token size must be 0x08");
@@ -191,7 +218,6 @@ namespace
   static_assert(offsetof(FuncStateRuntimeView, upvalues) == 0x38, "FuncStateRuntimeView::upvalues offset must be 0x38");
   static_assert(offsetof(FuncStateRuntimeView, actvar) == 0x2B8, "FuncStateRuntimeView::actvar offset must be 0x2B8");
   static_assert(offsetof(LuaUndumpZioRuntimeView, name) == 0x10, "LuaUndumpZioRuntimeView::name offset must be 0x10");
-  static_assert(sizeof(LuaUndumpLoadStateRuntimeView) == 0x10, "LuaUndumpLoadStateRuntimeView size must be 0x10");
 
   constexpr std::int32_t NO_JUMP = -1;
   constexpr std::int32_t VNIL = 0x01;
@@ -408,8 +434,6 @@ namespace
     void primaryexp(expdesc* outExpression, LexState* ls);
     std::int32_t luaZ_fill(LuaZioRuntimeView* stream);
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
-    void LuaUndumpLoadChunkHeader(LuaUndumpLoadStateRuntimeView* loadState);
-    Proto* LuaUndumpLoadTopLevelProto(LuaUndumpLoadStateRuntimeView* loadState, int parentProtoIndex);
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
     void luaK_indexed(FuncState* fs, expdesc* t, expdesc* k);
@@ -1531,43 +1555,15 @@ namespace
 extern "C"
 {
   /**
-   * Address: 0x00928ED0 (FUN_00928ED0, LoadChunk)
-   *
-   * What it does:
-   * Reads and validates the binary chunk header (signature byte, version,
-   * format word, endianness/size flags) from the load stream. The full
-   * binary-bytecode loader is not yet recovered (FUN_00928ED0 is 512 bytes
-   * of bit-twiddling); this stub raises a runtime error so callers see a
-   * clear failure if pre-compiled bytecode is ever loaded. Lua source
-   * loading goes through `luaY_parser`, not this path.
-   */
-  void LuaUndumpLoadChunkHeader(LuaUndumpLoadStateRuntimeView* const loadState)
-  {
-    luaG_runerror(loadState->state, "binary chunk loading not implemented in %s", loadState->sourceName);
-  }
-
-  /**
-   * Address: 0x00928C10 (FUN_00928C10, LoadFunction)
-   *
-   * What it does:
-   * Recursively reads one `Proto` (line numbers, locals, upvalues, code,
-   * constants, nested protos) from the binary chunk stream. Not yet recovered
-   * (FUN_00928C10 is 447 bytes); raises a runtime error if reached. Compiled
-   * Lua source goes through `luaY_parser` instead, so this path is dormant
-   * unless a `.luac` chunk is fed to `lua_load`.
-   */
-  Proto* LuaUndumpLoadTopLevelProto(LuaUndumpLoadStateRuntimeView* const loadState, int)
-  {
-    luaG_runerror(loadState->state, "binary chunk loading not implemented in %s", loadState->sourceName);
-    return nullptr;
-  }
-
-  /**
    * Address: 0x009290F0 (FUN_009290F0, luaU_undump)
+   * IDA signature:
+   * Proto *__usercall luaU_undump@<eax>(lua_State *L, ZIO *Z, Mbuffer *buff);
    *
    * What it does:
-   * Initializes binary-chunk load state, normalizes chunk source labels
-   * (`@`, `=`, binary-signature), then loads and returns top-level `Proto`.
+   * Initializes the binary-chunk load state, normalizes the chunk source label
+   * (`@`/`=` prefix strip, or `"binary string"` for a raw `\x1B` signature),
+   * validates the chunk header, and returns the top-level `Proto`. Delegates to
+   * the recovered header validator and recursive proto reader in LuaObject.cpp.
    */
   Proto* luaU_undump(lua_State* const state, LuaUndumpZioRuntimeView* const stream, Mbuffer* const buffer)
   {
@@ -1579,13 +1575,15 @@ extern "C"
       sourceName = "binary string";
     }
 
-    LuaUndumpLoadStateRuntimeView loadState{};
+    LuaPlus::LuaLoadStateRuntimeView loadState{};
     loadState.state = state;
-    loadState.stream = stream;
-    loadState.buffer = buffer;
-    loadState.sourceName = sourceName;
+    // The ZIO object is shared; only its leading {n, p} pair is touched by the
+    // loader, which is layout-identical to LuaZioRuntimeView.
+    loadState.stream = reinterpret_cast<LuaPlus::LuaZioRuntimeView*>(stream);
+    loadState.scratchBuffer = buffer;
+    loadState.chunkName = sourceName;
 
-    LuaUndumpLoadChunkHeader(&loadState);
-    return LuaUndumpLoadTopLevelProto(&loadState, 0);
+    LuaPlus::LuaLoadChunkHeader(&loadState);
+    return LuaPlus::LuaLoadProtoObject(&loadState, nullptr);
   }
 }
