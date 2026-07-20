@@ -5187,6 +5187,91 @@ namespace gpg::gal
         return (sMeshAllowFloat16 != 0U) && deviceContext->mSupportsFloat16;
     }
 
+    namespace
+    {
+        // Process-wide cache of the selected hardware vertex formatter
+        // (mirrors the binary global `sCurHardwareVertexFormatter`,
+        // 0x00F8E288). Resolved lazily on first request and reused thereafter.
+        MeshFormatter* sCurrentHardwareVertexFormatter = nullptr;
+
+        // The D3D9 device-type formatter candidates, most-capable first
+        // (mirrors the binary `HardwareVertexFormattersD3D9` table,
+        // 0x00F2E3D8): the float16 formatter is preferred; the plain
+        // hardware formatter is the fallback. The first candidate whose
+        // `AllowMeshInstancing()` gate passes for the current device wins.
+        [[nodiscard]] MeshFormatter* SelectFirstInstancingCapableFormatter(
+            MeshFormatter* const* const candidates
+        )
+        {
+            MeshFormatter* selected = candidates[0];
+            sCurrentHardwareVertexFormatter = selected;
+            if (selected == nullptr) {
+                return nullptr;
+            }
+
+            MeshFormatter* const* cursor = &candidates[1];
+            while (!selected->AllowMeshInstancing()) {
+                selected = *cursor++;
+                sCurrentHardwareVertexFormatter = selected;
+                if (selected == nullptr) {
+                    return nullptr;
+                }
+            }
+
+            return sCurrentHardwareVertexFormatter;
+        }
+    } // namespace
+
+    /**
+     * Address: 0x008E7550 (FUN_008E7550, func_GetHardwareVertexFormatter)
+     *
+     * What it does:
+     * Returns the process-wide hardware vertex formatter for the active
+     * device. Throws a GAL error for any device type other than D3D9/D3D10.
+     * On the first call it walks the device-type candidate list and caches the
+     * first formatter whose `AllowMeshInstancing()` gate passes; later calls
+     * return the cached formatter. The construction/fill/draw paths of
+     * `HardwareMeshBatch` all resolve their formatter through this accessor.
+     */
+    Float16HardwareVertexFormatterD3D9* GetHardwareVertexFormatter()
+    {
+        Device* const device = Device::GetInstance();
+        const auto* const deviceContext = static_cast<const DeviceContext*>(InvokeDeviceGetContext(device));
+        const std::int32_t deviceTypeSelector = deviceContext->mDeviceType - 1;
+
+        if (sCurrentHardwareVertexFormatter != nullptr) {
+            return static_cast<Float16HardwareVertexFormatterD3D9*>(sCurrentHardwareVertexFormatter);
+        }
+
+        // Device type 1 (D3D9) uses the D3D9 formatter list; device type 2
+        // (D3D10) uses the D3D10 list. The two D3D9 singletons below are the
+        // float16 (preferred) and plain hardware formatters.
+        static Float16HardwareVertexFormatterD3D9 sFloat16FormatterD3D9;
+        static HardwareVertexFormatterD3D9 sHardwareFormatterD3D9;
+        static MeshFormatter* const kHardwareVertexFormattersD3D9[] = {
+            &sFloat16FormatterD3D9,
+            &sHardwareFormatterD3D9,
+            nullptr,
+        };
+
+        if (deviceTypeSelector == 0) {
+            return static_cast<Float16HardwareVertexFormatterD3D9*>(
+                SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9)
+            );
+        }
+
+        if (deviceTypeSelector == 1) {
+            // The D3D10 device path selects from the D3D10 formatter table,
+            // which is owned by the D3D10 backend; the D3D9 backend build does
+            // not construct those singletons, so no candidate is available here.
+            return static_cast<Float16HardwareVertexFormatterD3D9*>(
+                SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9)
+            );
+        }
+
+        ThrowGalError("MeshVertex.cpp", 92, "unknown graphics API");
+    }
+
     /**
      * Address: 0x00945160 (FUN_00945160)
      *
