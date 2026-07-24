@@ -1545,10 +1545,10 @@ namespace moho
     char pad_01BB[1];                              // 0x01BB
     RResId mResId;                        // 0x01BC (serialized resource id; RResId, 0x1C)
     CIntel* mIntelManager;                // 0x01D8
-    std::int32_t mVisibilityLayerFriendly; // 0x01DC
-    std::int32_t mVisibilityLayerEnemy;    // 0x01E0
-    std::int32_t mVisibilityLayerNeutral;  // 0x01E4
-    std::int32_t mVisibilityLayerDefault;  // 0x01E8
+    std::int32_t mVizToFocusPlayer; // 0x01DC
+    std::int32_t mVizToAllies;    // 0x01E0
+    std::int32_t mVizToEnemies;  // 0x01E4
+    std::int32_t mVizToNeutrals;  // 0x01E8
     std::uint8_t mInterfaceCreated;        // 0x01EC
     char pad_01ED[3];                      // 0x01ED
     CTextureScroller* mScroller;           // 0x01F0 (owned texture-scroller; serialized OWNED)

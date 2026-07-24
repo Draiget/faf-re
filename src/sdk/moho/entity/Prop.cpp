@@ -602,7 +602,7 @@ namespace moho
     mReclaimMass = blueprint->Economy.ReclaimMassMax;
     mReclaimEnergy = blueprint->Economy.ReclaimEnergyMax;
 
-    mVisibilityLayerDefault = 2;
+    mVizToNeutrals = 2;
     mFootprintLayer = static_cast<int>(LAYER_Seabed);
     mVisibilityState = 1u;
 

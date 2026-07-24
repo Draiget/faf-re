@@ -59,6 +59,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -2549,10 +2550,10 @@ namespace moho
 
     // Four visibility-mode lanes (+0x1DC..+0x1E8).
     gpg::RType* const visibilityType = CachedVisibilityModeTypeForSerialize();
-    archive->Write(visibilityType, &mVisibilityLayerFriendly, owner);
-    archive->Write(visibilityType, &mVisibilityLayerEnemy, owner);
-    archive->Write(visibilityType, &mVisibilityLayerNeutral, owner);
-    archive->Write(visibilityType, &mVisibilityLayerDefault, owner);
+    archive->Write(visibilityType, &mVizToFocusPlayer, owner);
+    archive->Write(visibilityType, &mVizToAllies, owner);
+    archive->Write(visibilityType, &mVizToEnemies, owner);
+    archive->Write(visibilityType, &mVizToNeutrals, owner);
 
     // Texture-scroller pointer (OWNED).
     gpg::RRef scrollerRef{};
@@ -2871,10 +2872,10 @@ namespace moho
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
     mIntelManager = nullptr;
-    mVisibilityLayerFriendly = 2;
-    mVisibilityLayerEnemy = 2;
-    mVisibilityLayerNeutral = 2;
-    mVisibilityLayerDefault = 2;
+    mVizToFocusPlayer = 2;
+    mVizToAllies = 2;
+    mVizToEnemies = 2;
+    mVizToNeutrals = 2;
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
@@ -2962,10 +2963,10 @@ namespace moho
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
     mIntelManager = nullptr;
-    mVisibilityLayerFriendly = 2;
-    mVisibilityLayerEnemy = 2;
-    mVisibilityLayerNeutral = 4;
-    mVisibilityLayerDefault = 2;
+    mVizToFocusPlayer = 2;
+    mVizToAllies = 2;
+    mVizToEnemies = 4;
+    mVizToNeutrals = 2;
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
@@ -3057,10 +3058,10 @@ namespace moho
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
     mIntelManager = nullptr;
-    mVisibilityLayerFriendly = 2;
-    mVisibilityLayerEnemy = 2;
-    mVisibilityLayerNeutral = 4;
-    mVisibilityLayerDefault = 2;
+    mVizToFocusPlayer = 2;
+    mVizToAllies = 2;
+    mVizToEnemies = 4;
+    mVizToNeutrals = 2;
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
@@ -3152,10 +3153,10 @@ namespace moho
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
     mIntelManager = nullptr;
-    mVisibilityLayerFriendly = 2;
-    mVisibilityLayerEnemy = 2;
-    mVisibilityLayerNeutral = 4;
-    mVisibilityLayerDefault = 2;
+    mVizToFocusPlayer = 2;
+    mVizToAllies = 2;
+    mVizToEnemies = 4;
+    mVizToNeutrals = 2;
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
@@ -3193,10 +3194,10 @@ namespace moho
     mPhysBody = nullptr;
     mInterfaceCreated = 0u;
 
-    mVisibilityLayerFriendly = 2;
-    mVisibilityLayerEnemy = 2;
-    mVisibilityLayerNeutral = 4;
-    mVisibilityLayerDefault = 2;
+    mVizToFocusPlayer = 2;
+    mVizToAllies = 2;
+    mVizToEnemies = 4;
+    mVizToNeutrals = 2;
 
     RegisterEntityInDbIfMissing(sim, this);
     RefreshCollisionShapeFromBlueprint();
@@ -5049,22 +5050,68 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678A70
+   * Address: 0x00678A70 (FUN_00678A70, Moho::Entity::UpdateVisibility)
+   * Mangled: ?UpdateVisibility@Entity@Moho@@MAEXXZ
    *
    * What it does:
-   * Resolves entity visibility channel for current sync context.
+   * Resolves this entity's current visibility mode (mFootprintLayer @0x114) and
+   * its not-hidden flag (mVisibilityState @0x110) for the active sync focus army.
+   * With no owning army the entity uses its neutral channel and is flagged
+   * not-visible. Otherwise: if the focus army is this entity's own army (or
+   * there is no focus, index -1) the focus-player channel is used; else the
+   * channel is chosen from the alliance relation between this entity's army and
+   * the focus army (neutral/ally/enemy). The not-hidden flag is set for every
+   * channel except VIZMODE_Never.
    */
   void Entity::UpdateVisibility()
   {
-    int resolvedLayer = mVisibilityLayerDefault;
-    if (ArmyRef) {
-      if (SimulationRef && SimulationRef->mSyncArmy == -1) {
-        resolvedLayer = mVisibilityLayerFriendly;
+    // No owning army: resolve to the neutral channel, flagged not-visible.
+    // (0x00678A73-0x00678A91)
+    if (ArmyRef == nullptr) {
+      mFootprintLayer = mVizToNeutrals;
+      mVisibilityState = 1;
+      return;
+    }
+
+    const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
+
+    std::int32_t viz;
+    if (focusArmy == GetArmyIndex() || focusArmy == -1) {
+      // The sync focus is this entity's own army (or unfocused): use the
+      // focus-player channel directly. (0x00678AA4-0x00678AB0)
+      viz = mVizToFocusPlayer;
+    } else {
+      // Otherwise pick the channel by the alliance relation between this
+      // entity's army and the focus army. (0x00678AB5-0x00678AF2)
+      CArmyImpl* focusArmyImpl = nullptr;
+      const msvc8::vector<CArmyImpl*>& armies = SimulationRef->mArmiesList;
+      if (static_cast<std::uint32_t>(focusArmy) < armies.size()) {
+        focusArmyImpl = armies[static_cast<std::size_t>(focusArmy)];
+      }
+
+      switch (ArmyRef->GetAllianceWith(focusArmyImpl)) {
+        case ALLIANCE_Neutral:
+          mFootprintLayer = mVizToNeutrals;
+          mVisibilityState = static_cast<std::uint8_t>(mVizToNeutrals != VIZMODE_Never);
+          return;
+        case ALLIANCE_Ally:
+          mFootprintLayer = mVizToAllies;
+          mVisibilityState = static_cast<std::uint8_t>(mVizToAllies != VIZMODE_Never);
+          return;
+        case ALLIANCE_Enemy:
+          viz = mVizToEnemies;
+          break;
+        default:
+          gpg::HandleAssertFailure(
+            "Reached the supposably unreachable.", 354,
+            "c:\\work\\rts\\main\\code\\src\\sim\\Entity.cpp");
+          viz = mVizToEnemies;
+          break;
       }
     }
 
-    mFootprintLayer = resolvedLayer;
-    mVisibilityState = static_cast<std::uint8_t>(resolvedLayer != static_cast<int>(LAYER_Land));
+    mFootprintLayer = viz;
+    mVisibilityState = static_cast<std::uint8_t>(viz != VIZMODE_Never);
   }
 
   /**
@@ -5076,7 +5123,7 @@ namespace moho
    */
   void Entity::SetVizToFocusPlayer(const EVisibilityMode mode)
   {
-    mVisibilityLayerFriendly = static_cast<std::int32_t>(mode);
+    mVizToFocusPlayer = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
@@ -5092,7 +5139,7 @@ namespace moho
    */
   void Entity::SetVizToEnemies(const EVisibilityMode mode)
   {
-    mVisibilityLayerEnemy = static_cast<std::int32_t>(mode);
+    mVizToEnemies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
@@ -5108,7 +5155,7 @@ namespace moho
    */
   void Entity::SetVizToAllies(const EVisibilityMode mode)
   {
-    mVisibilityLayerDefault = static_cast<std::int32_t>(mode);
+    mVizToAllies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
@@ -5124,7 +5171,7 @@ namespace moho
    */
   void Entity::SetVizToNeutrals(const EVisibilityMode mode)
   {
-    mVisibilityLayerNeutral = static_cast<std::int32_t>(mode);
+    mVizToNeutrals = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
