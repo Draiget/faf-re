@@ -695,10 +695,16 @@ CAiAttackerImpl::~CAiAttackerImpl()
     }
   }
 
-  // WeakPtr<CTaskThread>::~WeakPtr resolves the WeakObject linkage
-  // and unlinks from the owner's intrusive weak chain. The recovered
-  // dtor handles the null case safely.
-  std::destroy_at(&view->mThread);
+  // Destroy the owned task thread if it is still alive (binary 0x005D6BE9:
+  // `if (mThread.object valid) CTaskThread::Destroy(object)`), right after the
+  // task loop and before the weapon loop. mThread is a WeakPtr whose destructor
+  // is trivial (= default), so the thread is NOT torn down automatically -- it
+  // must be destroyed explicitly here, otherwise the CTaskThread the attacker
+  // created leaks. The returned detached CTaskStage* is discarded, as in the
+  // binary.
+  if (CTaskThread* const ownedThread = view->mThread.GetObjectPtr()) {
+    ownedThread->Destroy();
+  }
 
   // Delete owned UnitWeapon* entries via their virtual dtor.
   if (!view->mWeapons.empty()) {
@@ -715,6 +721,10 @@ CAiAttackerImpl::~CAiAttackerImpl()
   // Release raw vector storage for mTasks and mWeapons. msvc8::vector
   // destructor handles the null _Myfirst case safely.
   std::destroy_at(&view->mTasks);
+  // Unlink the mThread WeakPtr from the CTaskThread's weak-ref chain (binary
+  // 0x005D6C6A, between the mTasks and mWeapons storage frees). Self-guards and
+  // is a no-op if Destroy() above already nulled the weak lane.
+  view->mThread.UnlinkFromOwnerChain();
   std::destroy_at(&view->mWeapons);
 
   // CTaskStage destructor tears down the two embedded intrusive
