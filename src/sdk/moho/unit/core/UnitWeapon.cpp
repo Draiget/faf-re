@@ -35,6 +35,13 @@
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/IEffectManager.h"
+#include "moho/entity/CollisionBeamEntity.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/sim/CDamage.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/ReconBlip.h"
@@ -1349,6 +1356,13 @@ namespace moho
       textureArg.TypeError("string");
       textureName = "";
     }
+    // Resolve the texture sheet handle up front; the binary (FUN_006D8690 0x006D88EC:
+    // D3D_GetDevice()->GetResources()->GetTexture(...allowFallback=true)) owns the
+    // handle across the DoInstaHit call. DoInstaHit hardcodes the beam texture and
+    // never dereferences the handle -- it just keeps it alive, then releases it.
+    ID3DDeviceResources::TextureResourceHandle textureSheet{};
+    D3D_GetDevice()->GetResources()->GetTexture(textureSheet, textureName, 0, true);
+
     LuaPlus::LuaStackObject lifetimeArg(state, 9);
     if (lua_type(rawState, 9) != LUA_TNUMBER) {
       lifetimeArg.TypeError("number");
@@ -1361,14 +1375,111 @@ namespace moho
       static_cast<float>(lua_tonumber(rawState, 5))
     };
     const float beamWidth = static_cast<float>(lua_tonumber(rawState, 7));
-    const float beamLifetime = static_cast<float>(lua_tonumber(rawState, 9));
 
-    (void)boneIndex;
-    (void)colorAndGlow;
-    (void)beamWidth;
-    (void)textureName;
-    (void)beamLifetime;
+    // Beam lifetime = seconds * 10 (ticks), floored at 1 tick (binary FUN_006D8690
+    // 0x006D8975 mulss *10.0, 0x006D8980 comiss vs 1.0).
+    const float scaledLifetime = static_cast<float>(lua_tonumber(rawState, 9)) * 10.0f;
+    const float beamLifetime = (scaledLifetime <= 1.0f) ? 1.0f : scaledLifetime;
+
+    weapon->DoInstaHit(colorAndGlow, boneIndex, beamWidth, beamLifetime, textureSheet);
     return 0;
+  }
+
+  /**
+   * Address: 0x006D7300 (FUN_006D7300)
+   *
+   * What it does:
+   * Applies one insta-hit's impact. If the beam struck a projectile, detonate it
+   * (Projectile::Impact); otherwise deal direct CDamage (instigator = firing unit,
+   * target = struck entity, amount = weapon damage, origin/vector from world
+   * positions) via SIM_Damage. Then, for realtime-stats-enabled units with a bound
+   * target, bump the army "RealTimeStats_<unit>_Shots_Hit"/"_Shots_Missed" int stat.
+   */
+  void ApplyInstaHitDamageAndTrackShot(CollisionBeamHelper& helper, UnitWeapon& weapon)
+  {
+    Unit* const firingUnit = weapon.mUnit;
+
+    // helper.mEntity is the entity the beam actually struck this pass; HasValue()
+    // folds the null / sentinel(==0x04) test.
+    if (helper.mEntity.HasValue()) {
+      Entity* const impactEntity = helper.mEntity.GetObjectPtr();
+      if (Projectile* const impactProjectile =
+            (impactEntity != nullptr) ? impactEntity->IsProjectile() : nullptr;
+          impactProjectile != nullptr) {
+        impactProjectile->Impact();
+      } else {
+        CDamage damage(firingUnit->SimulationRef);
+        damage.mTarget.ResetFromOwnerLinkSlot(helper.mEntity.ownerLinkSlot);
+        damage.mInstigator.Set(static_cast<Entity*>(firingUnit));
+        damage.mAmount = weapon.mAttributes.GetDamage();
+        damage.mType.assign(weapon.mAttributes.GetName(), 0, msvc8::string::npos);
+        const Wm3::Vec3f& firingPosition = firingUnit->GetPosition();
+        const Wm3::Vec3f& impactPosition = impactEntity->Position;
+        damage.mVector.x = firingPosition.x - impactPosition.x;
+        damage.mVector.y = firingPosition.y - impactPosition.y;
+        damage.mVector.z = firingPosition.z - impactPosition.z;
+        damage.mOrigin = firingPosition;
+        SIM_Damage(firingUnit->SimulationRef, damage);
+      }
+    }
+
+    if (firingUnit == nullptr || !firingUnit->RealtimeStatsEnabled) {
+      return;
+    }
+    if (!weapon.mTarget.targetEntity.HasValue()) {
+      return;
+    }
+
+    CArmyStats* const armyStats = firingUnit->ArmyRef->GetArmyStats();
+    const bool impactResolved = helper.mEntity.HasValue();
+    const msvc8::string statPath = msvc8::string("RealTimeStats_") + firingUnit->GetUniqueName()
+      + (impactResolved ? "_Shots_Hit" : "_Shots_Missed");
+    CArmyStatItem* const shotItem = armyStats->GetItem(statPath.c_str());
+    shotItem->SynchronizeAsInt();
+    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&shotItem->mPrimaryValueBits), 1);
+  }
+
+  /**
+   * Address: 0x006D75D0 (FUN_006D75D0, Moho::UnitWeapon::DoInstaHit)
+   *
+   * What it does:
+   * Fires one instant-hit beam from `bone`: resolves the collision result, applies
+   * impact damage / shot-tracking, then spawns a one-shot white beam from the bone
+   * world position to the collision point. `colorAndGlow` is the packed Lua
+   * color+glow quaternion ({w=glow, x=r, y=g, z=b}), copied into the beam spawn
+   * orientation. The texture is hardcoded to /textures/particles/beam_white_01.dds;
+   * the caller's looked-up textureSheet handle is unused beyond its owned lifetime,
+   * matching the binary keeping then releasing it.
+   */
+  void UnitWeapon::DoInstaHit(
+    const Wm3::Quaternionf& colorAndGlow,
+    std::int32_t bone,
+    float thickness,
+    float lifetime,
+    boost::shared_ptr<RD3DTextureResource> textureSheet)
+  {
+    (void)textureSheet; // Owned handle intentionally unused (see doc block).
+
+    CollisionBeamHelper helper;
+    CreateCollisionBeamHelper(&helper, bone);
+    ApplyInstaHitDamageAndTrackShot(helper, *this);
+
+    const VTransform boneTransform = mUnit->GetBoneWorldTransform(bone);
+
+    SCreateBeamParams beamParams;
+    beamParams.mStart = boneTransform.pos_;
+    beamParams.mEnd = helper.mPos;
+    beamParams.mLifetime = lifetime;
+    beamParams.mWidth = thickness;
+    beamParams.mTexture = "/textures/particles/beam_white_01.dds";
+    beamParams.mSpawnTransform.mOrientation = {
+      colorAndGlow.w,
+      colorAndGlow.x,
+      colorAndGlow.y,
+      colorAndGlow.z,
+    };
+
+    mSim->mEffectManager->CreateBeam(beamParams);
   }
 
   /**
