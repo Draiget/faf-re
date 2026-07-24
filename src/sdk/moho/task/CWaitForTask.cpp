@@ -7,6 +7,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 
@@ -275,6 +276,18 @@ namespace
   {
     (void)moho::cleanup_CWaitForTaskSerializer();
   }
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
 } // namespace
 
 /**
@@ -305,7 +318,9 @@ CWaitForTask::CWaitForTask()
   : CTask(nullptr, false)
   , mEventLinkRef{nullptr, nullptr}
   , mEventObject()
-{}
+{
+  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), 1L);
+}
 
 /**
  * Address: 0x004CA520 (FUN_004CA520, ??0CWaitForTask@Moho@@QAE@ABVLuaObject@LuaPlus@@@Z)
@@ -314,7 +329,9 @@ CWaitForTask::CWaitForTask(const LuaPlus::LuaObject& payload)
   : CTask(nullptr, false)
   , mEventLinkRef{nullptr, nullptr}
   , mEventObject(payload)
-{}
+{
+  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), 1L);
+}
 
 /**
  * Address: 0x004CA5B0 (FUN_004CA5B0, sub_4CA5B0)
@@ -333,6 +350,12 @@ CWaitForTask::~CWaitForTask()
   }
 
   mEventLinkRef.ResetFromObject(nullptr);
+
+  // Decrement the CWaitForTask instance-count stat (binary FUN_004CA5B0). Both
+  // ctors (FUN_004CA470, FUN_004CA520) increment it by 1; the recovered code had
+  // dropped the whole InstanceCounter<CWaitForTask> tracking (GetStatItem defined
+  // but never called), so the stat was never maintained.
+  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), -1L);
 }
 
 /**
