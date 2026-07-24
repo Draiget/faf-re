@@ -2794,6 +2794,12 @@ namespace moho
 
     delete mPositionHistory;
     mPositionHistory = nullptr;
+
+    // Decrement the Entity instance-count stat (binary FUN_006785D0 line 73:
+    // _InterlockedExchangeAdd(&InstanceCounter<Entity>::GetStatItem()->mCounter, -1)).
+    // Each Entity constructor increments it by 1; the recovered dtor had dropped
+    // the matching decrement, so the stat leaked upward on every entity teardown.
+    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), -1L);
   }
 
   /**
@@ -2806,6 +2812,7 @@ namespace moho
   Entity::Entity(Sim* sim, const std::uint32_t collisionBucketFlags)
     : CTask(nullptr, false)
   {
+    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2898,6 +2905,7 @@ namespace moho
   Entity::Entity(Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
     : CTask(nullptr, false)
   {
+    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2987,6 +2995,7 @@ namespace moho
   Entity::Entity(REntityBlueprint* blueprint, Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
     : CTask(nullptr, false)
   {
+    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -3088,6 +3097,7 @@ namespace moho
   Entity::Entity(const LuaPlus::LuaObject& luaObject, Sim* sim, const EntId entityId)
     : CTask(nullptr, false)
   {
+    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
