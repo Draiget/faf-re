@@ -2221,6 +2221,87 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A22FDC (FUN_00A22FDC)
+ * Mangled: png_handle_bKGD
+ *
+ * IDA signature:
+ * void __cdecl png_handle_bKGD(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a bKGD (background colour) chunk: enforces chunk ordering (IHDR; PLTE
+ * before bKGD for palette images; reject a duplicate) and the per-color-type
+ * length (1 palette, 2 gray, 6 colour), reads the value into png_ptr->background
+ * (a palette index resolved against the palette; three 16-bit samples for colour;
+ * one broadcast sample for gray), and stores it via png_set_bKGD.
+ */
+extern "C" void png_handle_bKGD(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before bKGD");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid bKGD after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if (ColorType(png_ptr) == kColorTypePalette && (Mode(png_ptr) & kPngHavePlte) == 0) {
+    png_warning(png_ptr, "Missing PLTE before bKGD");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoBkgd) != 0) {
+    png_warning(png_ptr, "Duplicate bKGD chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  const std::uint8_t color_type = ColorType(png_ptr);
+  const std::uint32_t expected =
+      (color_type == kColorTypePalette)
+          ? 1u
+          : 2u * ((color_type & kPngColorMaskColor) | 1u);
+  if (length != expected) {
+    png_warning(png_ptr, "Incorrect bKGD chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  std::uint8_t buf[6];
+  png_crc_read(png_ptr, buf, expected);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  std::uint16_t blue;
+  if (color_type == kColorTypePalette) {
+    Field<std::uint8_t>(png_ptr, kOffBackgroundIndex) = buf[0];
+    const std::uint16_t num_palette = info_ptr->num_palette;
+    if (num_palette == 0) {
+      png_set_bKGD(png_ptr, info_ptr, RawBase(png_ptr) + kOffBackground);
+      return;
+    }
+    if (buf[0] > num_palette) {
+      png_warning(png_ptr, "Incorrect bKGD chunk index value");
+      return;
+    }
+    const std::uint8_t* const pal_entry = Field<std::uint8_t*>(png_ptr, kOffPalette) + 3u * buf[0];
+    Field<std::uint16_t>(png_ptr, kOffBackgroundRed)   = pal_entry[0];
+    Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) = pal_entry[1];
+    blue = pal_entry[2];
+  } else if ((color_type & kPngColorMaskColor) != 0) {
+    Field<std::uint16_t>(png_ptr, kOffBackgroundRed)   = png_get_uint_16(buf);
+    Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) = png_get_uint_16(buf + 2);
+    blue = png_get_uint_16(buf + 4);
+  } else {
+    blue = png_get_uint_16(buf);
+    Field<std::uint16_t>(png_ptr, kOffBackgroundGray)  = blue;
+    Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) = blue;
+    Field<std::uint16_t>(png_ptr, kOffBackgroundRed)   = blue;
+  }
+  Field<std::uint16_t>(png_ptr, kOffBackgroundBlue) = blue;
+  png_set_bKGD(png_ptr, info_ptr, RawBase(png_ptr) + kOffBackground);
+}
+
+/**
  * Address: 0x00A2293C (FUN_00A2293C)
  * Mangled: png_handle_sRGB
  *
