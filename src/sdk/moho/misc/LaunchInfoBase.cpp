@@ -709,11 +709,6 @@ namespace
     archive->ReadString(&info->mScenarioInfo);
 
     gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
-    if (!vectorType) {
-      ThrowSerializationError(
-        "Error detected in archive: missing reflection type \"vector<ArmyLaunchInfo>\" required by LaunchInfoBase."
-      );
-    }
     archive->Read(vectorType, &info->mArmyLaunchInfo, NullOwnerRef());
 
     archive->ReadInt(&info->mCommandSources.v4);
@@ -741,11 +736,6 @@ namespace
     archive->WriteString(&info->mScenarioInfo);
 
     gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
-    if (!vectorType) {
-      ThrowSerializationError(
-        "Error while creating archive: missing reflection type \"vector<ArmyLaunchInfo>\" required by LaunchInfoBase."
-      );
-    }
     archive->Write(vectorType, &info->mArmyLaunchInfo, NullOwnerRef());
 
     archive->WriteInt(info->mCommandSources.v4);
