@@ -3152,6 +3152,14 @@ namespace moho
       (void)EraseTargetPrioritiesRange(
         *this, &eraseResult, mTargetPriorities.data(), mTargetPriorities.data() + mTargetPriorities.size());
     }
+
+    // Unlink each blacklist entry's mEntity WeakPtr from its owner chain before
+    // the msvc8::vector<SBlackListInfo> member destructor frees the storage
+    // (binary sub_6DBD70 at 0x006D4AA4). SBlackListInfo has no destructor and
+    // WeakPtr<Entity>::~WeakPtr is trivial, so the member vector teardown would
+    // leave every blacklisted entity's weak node dangling in its owner chain
+    // -> use-after-free when that entity later walks or tears down the chain.
+    (void)ResetBlacklistRangeToBegin(mBlacklist);
   }
 
   /**
