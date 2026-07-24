@@ -410,6 +410,22 @@ extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std:
 }
 
 /**
+ * Address: 0x009E8C75 (FUN_009E8C75)
+ * Mangled: png_set_bKGD
+ *
+ * Copies the 10-byte png_color_16 background colour into info_ptr->background
+ * (0x5A) and marks PNG_INFO_bKGD valid.
+ */
+extern "C" void png_set_bKGD(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* background)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  std::memcpy(info_ptr->background, background, sizeof(info_ptr->background));
+  info_ptr->valid |= kPngInfoBkgd;
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *

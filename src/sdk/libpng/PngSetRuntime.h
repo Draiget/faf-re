@@ -84,13 +84,16 @@ struct png_info_struct
 {
   std::uint8_t  pad_00_to_08[0x08];         // +0x00
   std::uint32_t valid;                       // +0x08
-  std::uint8_t  pad_0C_to_28[0x1C];         // +0x0C
+  std::uint8_t  pad_0C_to_14[0x08];         // +0x0C
+  std::uint16_t num_palette;                 // +0x14  PLTE entry count
+  std::uint8_t  pad_16_to_28[0x12];         // +0x16
   float         gamma;                       // +0x28
   std::uint8_t  srgb_intent;                 // +0x2C
   std::uint8_t  pad_2D_to_3C[0x0F];         // +0x2D
   std::uint8_t  mod_time[8];                 // +0x3C  tIME png_time (year u16, m/d/h/m/s bytes)
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
-  std::uint8_t  pad_49_to_64[0x1B];         // +0x49
+  std::uint8_t  pad_49_to_5A[0x11];         // +0x49
+  std::uint8_t  background[0x0A];            // +0x5A  bKGD png_color_16 (index,r,g,b,gray)
   std::int32_t  x_offset;                    // +0x64  oFFs
   std::int32_t  y_offset;                    // +0x68
   std::uint8_t  offset_unit_type;            // +0x6C
@@ -127,7 +130,9 @@ using png_infop       = png_info_struct*;
 using png_fixed_point = std::int32_t;
 
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
+static_assert(offsetof(png_info_struct, num_palette) == 0x14);
 static_assert(offsetof(png_info_struct, mod_time)    == 0x3C);
+static_assert(offsetof(png_info_struct, background)  == 0x5A);
 static_assert(offsetof(png_info_struct, sig_bit)     == 0x44);
 static_assert(offsetof(png_info_struct, x_offset)          == 0x64);
 static_assert(offsetof(png_info_struct, y_offset)          == 0x68);
@@ -162,6 +167,7 @@ static_assert(offsetof(png_info_struct, unknown_chunks_num) == 0xC0);
 constexpr std::uint32_t kPngInfoGamma = 0x0001;
 constexpr std::uint32_t kPngInfoSbit  = 0x0002;
 constexpr std::uint32_t kPngInfoChrm  = 0x0004;
+constexpr std::uint32_t kPngInfoBkgd  = 0x0020;
 constexpr std::uint32_t kPngInfoPhys  = 0x0080;
 constexpr std::uint32_t kPngInfoOffs  = 0x0100;
 constexpr std::uint32_t kPngInfoTime  = 0x0200;
@@ -374,6 +380,12 @@ extern "C" void png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
  * Takes a raw 8-byte png_time image (year u16 + m/d/h/m/s) as the binary does.
  */
 extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* mod_time);
+
+/**
+ * Address: 0x009E8C75 (FUN_009E8C75)  png_set_bKGD — background colour.
+ * Takes a raw 10-byte png_color_16 image as the binary does (void* + memcpy).
+ */
+extern "C" void png_set_bKGD(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* background);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
