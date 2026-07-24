@@ -1557,8 +1557,10 @@ void ReconBlip::Refresh()
   WriteEntityTransformPayload(PendingOrientation, PendingPosition, pending);
   mPendingVelocityScale = sourceUnit->mPendingVelocityScale;
 
+  // This block inlines Entity::SetPendingTransform's coord-list requeue, which
+  // front-inserts (ListLinkAfter, after the sentinel) when the node is singleton.
   if (SimulationRef && mCoordNode.ListIsSingleton()) {
-    mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   const EntityTransformPayload sourceTransform = ReadEntityTransformPayload(sourceUnit->GetTransform());
@@ -1566,6 +1568,12 @@ void ReconBlip::Refresh()
   Position = {sourceTransform.posX + mJamOffset.x, sourceTransform.posY + mJamOffset.y, sourceTransform.posZ + mJamOffset.z};
   mVelocityScale = sourceUnit->mVelocityScale;
   SetCurrentLayer(sourceUnit->mCurrentLayer);
+
+  // Copy the source unit's strategic-underlay icon onto the blip. The binary
+  // reads the unit's underlay (Entity::GetStrategicUnderlay) and installs it on
+  // the blip (Entity::SetStrategicUnderlay) at 0x005BF89A-0x005BF8B4; the prior
+  // recovery omitted this, so blips never picked up the unit's strategic icon.
+  SetStrategicUnderlay(sourceUnit->GetStrategicUnderlay());
 
   mUnitVarDat.mHasLinkedSource = sourceUnit->mAttachInfo.HasAttachTarget() ? 1u : 0u;
 
