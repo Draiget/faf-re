@@ -164,11 +164,10 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    if (upcast.mObj) {
-      return static_cast<TObject*>(upcast.mObj);
-    }
-
-    throw std::runtime_error("CAiSiloBuildImpl pointer type mismatch during archive load");
+    // The binary reads these owned pointers via typed readers (ReadPointerOwned_*)
+    // that assign the loaded pointer without an upcast type-check or throw -- a
+    // type mismatch simply yields a null field, it does not abort the load.
+    return static_cast<TObject*>(upcast.mObj);
   }
 
   template <typename TObject>

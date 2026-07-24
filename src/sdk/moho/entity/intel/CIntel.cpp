@@ -98,11 +98,10 @@ namespace
     source.mType = tracked.type;
 
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelPosHandleType());
-    if (upcast.mObj) {
-      return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
-    }
-
-    throw std::runtime_error("CIntel::ReadArchive expected CIntelPosHandle-compatible pointer.");
+    // The binary reads this owned pointer via ReadPointerOwned_CIntelPosHandle,
+    // which assigns the loaded pointer with no upcast type-check or throw -- a
+    // type mismatch simply yields a null field, it does not abort the load.
+    return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
   }
 
   [[nodiscard]] bool PositionChanged(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& position) noexcept
