@@ -13,6 +13,7 @@
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
@@ -1882,6 +1883,18 @@ namespace
   };
 
   [[maybe_unused]] CAiPersonalityStartupBootstrap gCAiPersonalityStartupBootstrap;
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
 } // namespace
 
 /**
@@ -1942,6 +1955,9 @@ CAiPersonality::CAiPersonality()
   , mQuittingTendency{}
   , mChatFrequency{}
 {
+  // Increment the CAiPersonality instance-count stat (binary FUN_005B6B40); the
+  // recovery had elided it. This ctor is independent of the (Sim*) ctor.
+  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), 1L);
 }
 
 /**
@@ -1984,6 +2000,10 @@ CAiPersonality::CAiPersonality(Sim* const sim)
   , mChatFrequency{}
   , mDifficulty(kDefaultDifficulty)
 {
+  // Increment the CAiPersonality instance-count stat (binary FUN_005B6DC0);
+  // independent standalone ctor, so it bumps in addition to the default ctor.
+  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), 1L);
+
   if (mSim && mSim->mLuaState) {
     LuaPlus::LuaObject arg1;
     LuaPlus::LuaObject arg2;
@@ -2000,7 +2020,13 @@ CAiPersonality::CAiPersonality(Sim* const sim)
  * Address: 0x005B6DA0 (FUN_005B6DA0, scalar deleting thunk)
  * Address: 0x005B7120 (FUN_005B7120, core dtor)
  */
-CAiPersonality::~CAiPersonality() = default;
+CAiPersonality::~CAiPersonality()
+{
+  // Decrement the CAiPersonality instance-count stat (binary FUN_005B7120). The
+  // member string/vector and base ~CScriptObject teardowns still run
+  // automatically after this body, exactly as they did with `= default`.
+  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), -1L);
+}
 
 /**
  * Address: 0x005B65A0 (FUN_005B65A0, ?GetClass@CAiPersonality@Moho@@UBEPAVRType@gpg@@XZ)
