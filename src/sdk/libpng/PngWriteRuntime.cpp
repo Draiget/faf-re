@@ -18,6 +18,7 @@ void png_write_data(png_structp png_ptr, const std::uint8_t* data, std::uint32_t
 void png_error(png_structp png_ptr, const char* message);
 std::FILE* __cdecl __iob_func(void);
 struct z_stream_s;
+int deflate(z_stream_s* strm, int flush);
 int deflateEnd(z_stream_s* strm);
 int deflateReset(z_stream_s* strm);
 }
@@ -185,6 +186,126 @@ extern "C" void png_write_compressed_data_out(png_structp png_ptr, int* compress
     png_write_chunk_data(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), zbuf_size - avail_out);
   }
   deflateReset(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream));
+}
+
+namespace {
+// Append the freshly-filled deflate window (png_ptr->zbuf) to the compression
+// state's list of accumulated output blocks, growing the block-pointer array by
+// four slots whenever it is exhausted, then rearm the deflate stream so its
+// next_out/avail_out point back at the start of zbuf. Lifted out of
+// png_text_compress because the binary emits this identical sequence twice — once
+// in the Z_NO_FLUSH pass and once in the Z_FINISH flush.
+void png_text_compress_store_block(png_structp png_ptr, PngCompressionState* comp, std::uint32_t zbuf_size)
+{
+  using namespace libpng_layout;
+
+  if (comp->num_output_ptr >= comp->max_output_ptr) {
+    std::uint8_t** const old_array = comp->output_ptr;
+    const int old_max = comp->max_output_ptr;
+    comp->max_output_ptr = comp->num_output_ptr + 4;
+    comp->output_ptr = static_cast<std::uint8_t**>(
+      png_malloc(png_ptr, 4u * static_cast<std::uint32_t>(comp->max_output_ptr)));
+    if (old_array != nullptr) {
+      std::memcpy(comp->output_ptr, old_array, 4u * static_cast<std::uint32_t>(old_max));
+      png_free(png_ptr, old_array);
+    }
+  }
+
+  comp->output_ptr[comp->num_output_ptr] =
+    static_cast<std::uint8_t*>(png_malloc(png_ptr, zbuf_size));
+  std::memcpy(comp->output_ptr[comp->num_output_ptr], Field<std::uint8_t*>(png_ptr, kOffZbuf), zbuf_size);
+  ++comp->num_output_ptr;
+
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = zbuf_size;
+  Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+}
+}  // namespace
+
+/**
+ * Address: 0x00A23EE2 (FUN_00A23EE2)
+ * Mangled: png_text_compress
+ *
+ * IDA signature:
+ * int __usercall png_text_compress@<eax>(png_struct *png_ptr@<edx>,
+ *     unsigned int text_len@<ecx>, png_bytepp comp@<esi>, png_bytep text, int compression);
+ *
+ * What it does:
+ * Deflates a text/profile payload into a compression_state (the `int*
+ * compressedState` overlay). compression == -1 defers compression: the raw input
+ * pointer + length are stashed for a later direct write and the length is
+ * returned unchanged. Otherwise the payload is run through zlib deflate() in
+ * zbuf-sized chunks (Z_NO_FLUSH until the input is drained, then Z_FINISH to
+ * flush the tail); every filled zbuf block is copied into a growing output-block
+ * array. Raises png_error on any deflate error or if the final flush does not
+ * report Z_STREAM_END. Returns the total compressed byte count. Callers:
+ * png_write_iCCP (0x00A24FB5), png_write_zTXt (0x00A2455B).
+ */
+extern "C" int png_text_compress(
+  png_structp png_ptr, char* text, int textLength, int compression, int* compressedState)
+{
+  using namespace libpng_layout;
+
+  auto* const comp = reinterpret_cast<PngCompressionState*>(compressedState);
+  comp->num_output_ptr = 0;
+  comp->max_output_ptr = 0;
+  comp->output_ptr = nullptr;
+  comp->input = nullptr;
+
+  // compression == -1: stash the input for a later verbatim write, no deflate.
+  if (compression == -1) {
+    comp->input = reinterpret_cast<std::uint8_t*>(text);
+    comp->input_len = static_cast<std::uint32_t>(textLength);
+    return textLength;
+  }
+
+  if (compression >= 3) {
+    char msg[52];
+    std::sprintf(msg, "Unknown compression type %d", compression);
+    png_warning(png_ptr, msg);
+  }
+
+  const std::uint32_t zbuf_size = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+  Field<std::uint8_t*>(png_ptr, kOffZstreamNextIn) = reinterpret_cast<std::uint8_t*>(text);
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = zbuf_size;
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = static_cast<std::uint32_t>(textLength);
+  Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+
+  auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+
+  // Compress the whole input, banking each window as it fills (Z_NO_FLUSH == 0).
+  do {
+    if (deflate(zstream, 0) != 0) {
+      const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+      png_error(png_ptr, zmsg != nullptr ? zmsg : "zlib error");
+    }
+    if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0) {
+      if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) == 0) {
+        break;
+      }
+      png_text_compress_store_block(png_ptr, comp, zbuf_size);
+    }
+  } while (Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) != 0);
+
+  // Flush the deflate tail (Z_FINISH == 4), banking any window that fills.
+  int status;
+  while ((status = deflate(zstream, 4)) == 0) {
+    if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0) {
+      png_text_compress_store_block(png_ptr, comp, zbuf_size);
+    }
+  }
+  // deflate(Z_FINISH) must report Z_STREAM_END (1); the decompiler mislabels
+  // this constant Z_PARTIAL_FLUSH, but the compare is against raw return code 1.
+  if (status != 1) {
+    const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+    png_error(png_ptr, zmsg != nullptr ? zmsg : "zlib error");
+  }
+
+  const std::uint32_t avail_out = Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut);
+  int result = static_cast<int>(zbuf_size) * comp->num_output_ptr;
+  if (avail_out < zbuf_size) {
+    result += static_cast<int>(zbuf_size - avail_out);
+  }
+  return result;
 }
 
 /**
@@ -835,8 +956,8 @@ extern "C" void png_write_sBIT(
 extern "C" void png_write_iCCP(
   png_structp const png_ptr,
   char* profileKeyword,
-  const int unknownCompressionTypeFlag,
   const int compressionType,
+  char* profile,
   const int profileDataLength
 )
 {
@@ -851,15 +972,17 @@ extern "C" void png_write_iCCP(
     return;
   }
 
-  if (unknownCompressionTypeFlag != 0) {
+  if (compressionType != 0) {
     png_warning(png_ptr, "Unknown compression type in iCCP chunk");
   }
 
-  int compressedPayloadLength = 0;
+  // Compress the profile payload only when a non-empty buffer is supplied; the
+  // binary gates on (profile != NULL) then compresses profileDataLength bytes.
+  int compressedPayloadLength = (profile != nullptr) ? profileDataLength : 0;
   int compressedState[5]{};
-  if (compressionType != 0) {
+  if (compressedPayloadLength != 0) {
     compressedPayloadLength =
-      png_text_compress(profileDataLength, png_ptr, compressionType, 0, compressedState);
+      png_text_compress(png_ptr, profile, profileDataLength, 0, compressedState);
   }
 
   const std::uint32_t chunkLength =
