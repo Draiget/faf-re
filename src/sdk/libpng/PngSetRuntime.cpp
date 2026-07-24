@@ -354,6 +354,44 @@ extern "C" void png_set_sBIT(png_structp png_ptr, png_infop info_ptr, const std:
 }
 
 /**
+ * Address: 0x009E9594 (FUN_009E9594)
+ * Mangled: png_set_pHYs
+ *
+ * Stores the physical pixel dimensions (resolution) into the info struct and
+ * marks PNG_INFO_pHYs valid.
+ */
+extern "C" void png_set_pHYs(png_structp png_ptr, png_infop info_ptr,
+                             std::uint32_t res_x, std::uint32_t res_y, int unit_type)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  info_ptr->x_pixels_per_unit = res_x;
+  info_ptr->y_pixels_per_unit = res_y;
+  info_ptr->phys_unit_type    = static_cast<std::uint8_t>(unit_type);
+  info_ptr->valid |= kPngInfoPhys;
+}
+
+/**
+ * Address: 0x009E93D7 (FUN_009E93D7)
+ * Mangled: png_set_oFFs
+ *
+ * Stores the image offset (position) into the info struct and marks
+ * PNG_INFO_oFFs valid.
+ */
+extern "C" void png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
+                             std::int32_t offset_x, std::int32_t offset_y, int unit_type)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  info_ptr->x_offset          = offset_x;
+  info_ptr->y_offset          = offset_y;
+  info_ptr->offset_unit_type  = static_cast<std::uint8_t>(unit_type);
+  info_ptr->valid |= kPngInfoOffs;
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *
