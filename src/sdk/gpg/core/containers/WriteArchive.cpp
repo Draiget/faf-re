@@ -944,18 +944,19 @@ void WriteArchive::Close()
 }
 
 /**
- * Address: import thunk used at 0x008812DC callsite
- * (`?CreateBinaryWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@U_iobuf@@@boost@@@Z`)
+ * Address: 0x00904740 (FUN_00904740,
+ * ?CreateBinaryWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@U_iobuf@@@boost@@@Z)
  *
  * What it does:
- * Creates one file-backed concrete `WriteArchive` for save/load serializers.
+ * Allocates one file-backed concrete `WriteArchive` (BinaryWriteArchive) bound
+ * to the given stdio stream for save/load serializers. The binary performs no
+ * validity check on the stream: it allocates with non-throwing new (returning
+ * null on allocation failure) and constructs unconditionally -- matching the
+ * sibling CreateTextWriteArchive.
  */
 WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
 {
-    if (!file.get()) {
-        ThrowSerializationError("Error while creating archive: invalid output stream.");
-    }
-    return new BinaryWriteArchive(file);
+    return new (std::nothrow) BinaryWriteArchive(file);
 }
 
 /**
