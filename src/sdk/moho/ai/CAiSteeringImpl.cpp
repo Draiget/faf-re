@@ -16,6 +16,7 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/math/Vector2f.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -949,6 +950,21 @@ moho::StatItem* moho::InstanceCounter<moho::CAiSteeringImpl>::GetStatItem()
   return sStatItem;
 }
 
+namespace
+{
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
+} // namespace
+
 /**
  * Address: 0x005D2670 (FUN_005D2670, reflection default-construct path)
  */
@@ -971,6 +987,11 @@ CAiSteeringImpl::CAiSteeringImpl()
   , mPausedForStateTransition(0)
   , mPadA1{0, 0, 0}
 {
+  // Increment the CAiSteeringImpl instance-count stat (binary FUN_005D2670).
+  // Placed on this root ctor only: the (Unit*,CUnitMotion*,ELayer) ctor delegates
+  // here via `: CAiSteeringImpl()`, so it inherits the +1 -- matching the binary's
+  // one increment per construction (FUN_005D2790 also increments exactly once).
+  AddStatCounter(InstanceCounter<CAiSteeringImpl>::GetStatItem(), 1L);
   ResetCollisionInfo(mCollisionInfo);
 }
 
@@ -1007,6 +1028,9 @@ CAiSteeringImpl::~CAiSteeringImpl()
     mPath = nullptr;
   }
   ResetCollisionInfo(mCollisionInfo);
+
+  // Decrement the CAiSteeringImpl instance-count stat (binary FUN_005D2920).
+  AddStatCounter(InstanceCounter<CAiSteeringImpl>::GetStatItem(), -1L);
 }
 
 /**
