@@ -2801,6 +2801,17 @@ namespace moho
     // the matching decrement, so the stat leaked upward on every entity teardown.
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), -1L);
 
+    // Unlink this entity's coordinate node from Sim::mCoordEntities (binary
+    // FUN_006785D0 lines 75-78, the intrusive splice + self-reset at offset
+    // 0x60/0x64 that follows CTask::~CTask and precedes CollisionShapeBase::Remove).
+    // The Entity constructor links mCoordNode into Sim::mCoordEntities, but
+    // TDatListItem has a trivial destructor (no auto-unlink), so the recovered
+    // dtor dropped the matching removal — leaving a dangling node threaded in the
+    // Sim coordinate-entity ring that corrupts the list the next time the Sim
+    // traverses it after this entity is freed. ListUnlink() on an already-singleton
+    // node is a safe no-op, matching the binary's unconditional unlink.
+    mCoordNode.ListUnlink();
+
     // Remove this entity's collision shape from the spatial grid (binary
     // FUN_006785D0 line 79 -> CollisionShapeBase::Remove FUN_004FD490, whose body
     // is the same grid-bucket removal loop as RemoveSpanMembership). The recovered
