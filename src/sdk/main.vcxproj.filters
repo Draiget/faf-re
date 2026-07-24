@@ -2004,6 +2004,9 @@
     <ClCompile Include="moho\mesh\MeshBatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\mesh\HardwareMeshBatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\mesh\MeshBatchKey.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -625,6 +625,7 @@
     <ClCompile Include="moho\debug\RDebugNavSteering.cpp" />
     <ClCompile Include="moho\debug\RDebugNavSteeringTypeInfo.cpp" />
     <ClCompile Include="moho\mesh\MeshBatch.cpp" />
+    <ClCompile Include="moho\mesh\HardwareMeshBatch.cpp" />
     <ClCompile Include="moho\mesh\MeshBatchKey.cpp" />
     <ClCompile Include="moho\mesh\MeshEnvironment.cpp" />
     <ClCompile Include="moho\mesh\MeshThumbnail.cpp" />

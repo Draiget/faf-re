@@ -30,6 +30,7 @@
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
@@ -42,6 +43,14 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/gal/Matrix.h"
 #include "gpg/core/utils/Logging.h"
+
+namespace gpg::gal
+{
+  // Runtime mesh-instancing capability gate (defined in the D3D9 backend TU,
+  // 0x00940820). The hardware mesh-batch factory only allocates a
+  // HardwareMeshBatch when this reports enabled. Returns Win32 BOOL (int).
+  int func_AllowMeshInstancing();
+} // namespace gpg::gal
 
 namespace moho
 {
@@ -4840,6 +4849,103 @@ namespace moho
     dynamicBatch.reset();
   }
 
+  namespace
+  {
+    /**
+     * Address: 0x007E8C70 (FUN_007E8C70, sub_7E8C70)
+     *
+     * IDA signature:
+     * Moho::HardwareMeshBatch* __usercall sub_7E8C70@<eax>(
+     *   char remap@<bl>, int lod@<edi>,
+     *   boost::shared_ptr<RScmResource> referenceResource,
+     *   boost::shared_ptr<RScmResource> currentResource);
+     *
+     * What it does:
+     * Shared lazy-init factory behind MeshLOD::GetStaticBatch/GetSkinnedBatch.
+     * Allocates and initializes one GPU-instanced HardwareMeshBatch for a LOD,
+     * but only when the LOD has a current mesh resource, the batch is either
+     * non-remapped or has a reference resource, and runtime mesh instancing is
+     * enabled for the active device. Returns the batch, or nullptr when the
+     * batch cannot be built. The `boost::shared_ptr` reference/current arguments
+     * are consumed (released) exactly once, so the caller passes retained copies.
+     */
+    MeshBatch* BuildHardwareMeshBatchForLod(
+      const bool remapToReferenceResource,
+      MeshLOD* const lod,
+      boost::shared_ptr<RScmResource> referenceResource,
+      boost::shared_ptr<RScmResource> currentResource
+    )
+    {
+      // Gate (binary: `a2 && a4.res && (!a1 || result.res)`): need a LOD, a
+      // current resource, and — for remapped batches — a reference resource.
+      if (lod == nullptr || !currentResource || (remapToReferenceResource && !referenceResource)) {
+        return nullptr;
+      }
+
+      // Instancing capability gate: with no hardware instancing the LOD keeps a
+      // null cached batch and falls back to the non-batched draw path.
+      if (gpg::gal::func_AllowMeshInstancing() == 0) {
+        return nullptr;
+      }
+
+      auto* const batch = static_cast<HardwareMeshBatch*>(::operator new(sizeof(HardwareMeshBatch)));
+      if (batch == nullptr) {
+        return nullptr;
+      }
+
+      // Placement-initialize the derived batch (base ctor + vtable install +
+      // GPU-buffer build) via the recovered HardwareMeshBatch factory, exactly
+      // as the binary calls it by name (un-orphans the HardwareMeshBatch TU).
+      return HardwareMeshBatchInit(batch, lod, remapToReferenceResource, referenceResource, currentResource);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x007DD220 (FUN_007DD220,
+   * ?GetStaticBatch@MeshLOD@Moho@@QAE?AV?$shared_ptr@VMeshBatch@Moho@@@boost@@XZ)
+   *
+   * IDA signature:
+   * boost::shared_ptr<MeshBatch>* __stdcall Moho::MeshLOD::GetStaticBatch(
+   *   MeshLOD* this, boost::shared_ptr<MeshBatch>* out);
+   *
+   * What it does:
+   * Lazily builds and caches this LOD's static (non-remapped) hardware mesh
+   * batch, then returns a retained copy in `outBatch`. The reference resource is
+   * the LOD's `previousResource`, the current resource is `res`.
+   */
+  boost::shared_ptr<MeshBatch>& MeshLOD::GetStaticBatch(boost::shared_ptr<MeshBatch>& outBatch)
+  {
+    if (!staticBatch) {
+      MeshBatch* const built = BuildHardwareMeshBatchForLod(false, this, previousResource, res);
+      staticBatch.reset(built);
+    }
+    outBatch = staticBatch;
+    return outBatch;
+  }
+
+  /**
+   * Address: 0x007DD420 (FUN_007DD420,
+   * ?GetSkinnedBatch@MeshLOD@Moho@@QAE?AV?$shared_ptr@VMeshBatch@Moho@@@boost@@XZ)
+   *
+   * IDA signature:
+   * boost::shared_ptr<MeshBatch>* __userpurge Moho::MeshLOD::GetSkinnedBatch(
+   *   MeshLOD* this, boost::shared_ptr<MeshBatch>* out);
+   *
+   * What it does:
+   * Lazily builds and caches this LOD's skinned (bone-remapped) hardware mesh
+   * batch, then returns a retained copy in `outBatch`. Identical to
+   * GetStaticBatch except the reference-resource bone remap is enabled.
+   */
+  boost::shared_ptr<MeshBatch>& MeshLOD::GetSkinnedBatch(boost::shared_ptr<MeshBatch>& outBatch)
+  {
+    if (!dynamicBatch) {
+      MeshBatch* const built = BuildHardwareMeshBatchForLod(true, this, previousResource, res);
+      dynamicBatch.reset(built);
+    }
+    outBatch = dynamicBatch;
+    return outBatch;
+  }
+
   /**
    * Address: 0x007DD5D0 (FUN_007DD5D0, ?SetCutoff@MeshLOD@Moho@@QAEXM@Z)
    *
@@ -6035,6 +6141,54 @@ namespace moho
   }
 
   // ---------------------------------------------------------------------------
+  // Per-material mesh-texture shader-vars.
+  //
+  // Distinct from the 23-entry MeshShaderVarSet above, the binary holds these
+  // six texture sampler shader-vars as standalone process-wide `ShaderVar`
+  // globals, each installed by its own CRT init thunk (byte-verified from
+  // bin/2025.7.1/ForgedAlliance.exe): register thunks at 0x00BE0520
+  // (environmentTexture, global 0x010BEDC0), 0x00BE0860 (albedoTexture, global
+  // 0x010BE670), 0x00BE0880 (normalsTexture, global 0x010BEAA8), 0x00BE08A0
+  // (specularTexture, global 0x010BEC10), 0x00BE08C0 (lookupTexture, global
+  // 0x010BE820) and 0x00BE08E0 (secondaryTexture, global 0x010BE8F8). Every
+  // thunk calls `RegisterShaderVar(<name>, &global, "mesh")` (0x00438000), so
+  // all six register against the "mesh" effect. The HLSL name strings are the
+  // exact null-terminated `.rdata` literals passed to those calls (VAs
+  // 0x00E3F580 / 0x00E3F6E0 / 0x00E3F6F0 / 0x00E3F700 / 0x00E3F710 /
+  // 0x00E3F720). MeshRenderer::Render binds all six per LOD material; the
+  // recovered model groups them into one set exposed through
+  // GetMeshTextureShaderVars(), mirroring MeshShaderVarSet.
+  // ---------------------------------------------------------------------------
+  namespace
+  {
+    struct MeshTextureShaderVarSet
+    {
+      ShaderVar environmentTexture; // "environmentTexture" &0x010BEDC0
+      ShaderVar albedoTexture;      // "albedoTexture"      &0x010BE670
+      ShaderVar specularTexture;    // "specularTexture"    &0x010BEC10
+      ShaderVar lookupTexture;      // "lookupTexture"      &0x010BE820
+      ShaderVar secondaryTexture;   // "secondaryTexture"   &0x010BE8F8
+      ShaderVar normalsTexture;     // "normalsTexture"     &0x010BEAA8
+
+      MeshTextureShaderVarSet()
+      {
+        RegisterShaderVar("environmentTexture", &environmentTexture, "mesh"); // 0x00BE0520
+        RegisterShaderVar("albedoTexture", &albedoTexture, "mesh");           // 0x00BE0860
+        RegisterShaderVar("specularTexture", &specularTexture, "mesh");       // 0x00BE08A0
+        RegisterShaderVar("lookupTexture", &lookupTexture, "mesh");           // 0x00BE08C0
+        RegisterShaderVar("secondaryTexture", &secondaryTexture, "mesh");     // 0x00BE08E0
+        RegisterShaderVar("normalsTexture", &normalsTexture, "mesh");         // 0x00BE0880
+      }
+    };
+
+    MeshTextureShaderVarSet& GetMeshTextureShaderVars()
+    {
+      static MeshTextureShaderVarSet textureVars{};
+      return textureVars;
+    }
+  } // namespace
+
+  // ---------------------------------------------------------------------------
   // GPU mesh skinning-palette shader-vars (translation + rotation palettes).
   //
   // These are two process-wide `MeshShaderPaletteVar` globals the binary holds
@@ -6566,6 +6720,93 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    /**
+     * Address: 0x007E42F0 (FUN_007E42F0, sub_7E42F0)
+     *
+     * What it does:
+     * Advances one batch-bucket RB-tree iterator to its in-order successor —
+     * the standard red-black tree increment. When the node has a real right
+     * child, the successor is the leftmost node of that right subtree; otherwise
+     * it is the nearest ancestor for which the node lies in the left subtree.
+     * The tree's sentinel/header node terminates both descents (its
+     * `isSentinel` byte is set), and returning it marks end-of-iteration.
+     */
+    [[nodiscard]] MeshBatchBucketNode* MeshBatchTreeSuccessor(MeshBatchBucketNode* node)
+    {
+      if (node->isSentinel) {
+        return node;
+      }
+
+      if (!node->right->isSentinel) {
+        // Successor is the leftmost node of the right subtree.
+        MeshBatchBucketNode* candidate = node->right;
+        while (!candidate->left->isSentinel) {
+          candidate = candidate->left;
+        }
+        return candidate;
+      }
+
+      // No right child: climb parents while `node` is a right child.
+      MeshBatchBucketNode* ancestor = node->parent;
+      while (!ancestor->isSentinel && node == ancestor->right) {
+        node = ancestor;
+        ancestor = ancestor->parent;
+      }
+      return ancestor;
+    }
+
+    /**
+     * Resolves the MeshLOD associated with one batch-bucket node.
+     *
+     * The batch key's `mLodIndexKey` lane (`MeshBatchKey` +0x08) stores the
+     * owning `MeshLOD*` directly (the binary reads `key.lod`); centralizing the
+     * typed reinterpretation here keeps the render loops free of offset casts.
+     */
+    [[nodiscard]] MeshLOD* MeshBatchEntryLod(const MeshBatchBucketNode* node) noexcept
+    {
+      return reinterpret_cast<MeshLOD*>(static_cast<std::intptr_t>(node->bucket.key.mLodIndexKey));
+    }
+
+    /**
+     * True when a batch-bucket entry holds skinned (static-pose) instances.
+     *
+     * The batch key's `mIsStaticPose` byte (`MeshBatchKey` +0x04) selects the
+     * skinned batch path when non-zero (the binary reads `*(node + 0x10)`).
+     */
+    [[nodiscard]] bool MeshBatchEntryIsSkinned(const MeshBatchBucketNode* node) noexcept
+    {
+      return node->bucket.key.mIsStaticPose != 0;
+    }
+
+    /**
+     * Typed view of one batch bucket's instance vector as the container type
+     * `MeshBatch::Render` consumes. `MeshBatchInstanceVector` and
+     * `msvc8::vector<MeshInstance*>` share the identical
+     * `{proxy, first, last, end}` 0x10-byte layout, so this is a typed
+     * reinterpretation of the same storage, not raw offset arithmetic.
+     */
+    [[nodiscard]] const msvc8::vector<MeshInstance*>& MeshBatchEntryInstances(const MeshBatchBucketNode* node) noexcept
+    {
+      return reinterpret_cast<const msvc8::vector<MeshInstance*>&>(node->bucket.instances);
+    }
+
+    /**
+     * Resolves a material's cached render-stage index, resolving it from the
+     * effect's `renderStage` integer annotation on first use and caching the
+     * result back into `mShaderIndex` (binary: the `mMat.mVal < 0` block).
+     */
+    [[nodiscard]] std::int32_t ResolveMaterialRenderStage(CD3DEffect* const effect, MeshMaterial& material)
+    {
+      if (material.mShaderIndex < 0) {
+        material.mShaderIndex =
+          effect->GetIntegerAnnotation(material.mShaderAnnotation, msvc8::string("renderStage"), 0);
+      }
+      return material.mShaderIndex;
+    }
+  } // namespace
+
   /**
    * Address: 0x007DFF30 (FUN_007DFF30, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@...@Z)
    *
@@ -6591,7 +6832,31 @@ namespace moho
    * Address: 0x007E03B0 (FUN_007E03B0, ?RenderDepth@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@AAV?$map@...@Z)
    *
    * What it does:
-   * Draws one mesh batch tree into the active depth surface.
+   * Draws one mesh batch tree into the active depth surface. Structurally this
+   * is the same RB-tree walk as Render but: the pass head binds only the
+   * time / lodBasis / view / proj mesh shader-vars (no ConfigureShader,
+   * textures or lighting); the per-node gate is the depth stage bit
+   * (`mShaderIndex & 1`); the material technique is a lazily-cached
+   * `depthTechnique` string annotation; only the albedo sampler is bound; and
+   * the batch is always drawn un-mirrored.
+   *
+   * DEFERRED (stub retained): the lazy depth-technique string field cannot be
+   * mapped 1:1 onto master's current MeshMaterial layout. From
+   * FUN_007E03B0.asm (esi = MeshLOD, mMat @0x0C, cross-checked via
+   * mAlbedoSheet at esi+0x2C = mMat+0x20 and mShaderIndex at esi+0x5C =
+   * mMat+0x50, mRuntimeFlag1 at esi+0x99 = mMat+0x8D):
+   *   - the `std::string::assign` destination is `lea ecx,[esi+0x7C]` =
+   *     mMat+0x70 (== master `mAuxTag1`),
+   *   - but the SelectTechnique read of the same technique string uses
+   *     `_Bx` at [esi+0x80] = mMat+0x74, `_Mysize` at [esi+0x90] = mMat+0x84
+   *     and `_Myres` at [esi+0x94] = mMat+0x88 — i.e. a string whose `_Bx`
+   *     begins at mMat+0x74, four bytes after `mAuxTag1@0x70`.
+   * These two views of the depth-technique string are inconsistent with a
+   * single `mAuxTag1@0x70` field, so binding it would require either a raw
+   * offset cast (forbidden) or a MeshMaterial layout change that is out of
+   * this pass's scope and would ripple into other TUs. Left as a stub pending
+   * a dedicated MeshMaterial depth-technique layout pass. Render (Part C)
+   * does not depend on this field.
    */
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
   {
@@ -6602,20 +6867,24 @@ namespace moho
   /**
    * Address: 0x007E0C30 (FUN_007E0C30, Moho::MeshRenderer::Render)
    *
-   * What it does:
-   * Draws one mesh batch tree with optional shadow state.
+   * IDA signature:
+   * void __thiscall Moho::MeshRenderer::Render(
+   *   std::map<MeshBatchKey, vector<MeshInstance*>>* map, MeshRenderer* this,
+   *   int meshFlags, Moho::GeomCamera3* camera, Moho::Shadow* shadow);
    *
-   * The recovered entry is invoked by name at
-   * `src/sdk/moho/app/WxRuntimeTypes.cpp` from the main render lane
-   * (`renderer->Render(meshFlags, *cam, shadowRenderer, instance->meshes)`),
-   * so the function symbol is retained by the linker. The elided
-   * body (CD3D mesh-batch draw chain) additionally invokes
-   * `MeshLOD::GetSkinnedBatch` (0x007DD420) — a lazy-init
-   * `boost::shared_ptr<MeshBatch>` accessor that allocates via the
-   * blocked HardwareMeshBatch factory (sub_7E8C70). With the
-   * draw-call body elided, `GetSkinnedBatch` is not yet invoked from
-   * the modern source; its role is absorbed by the elision and the
-   * recovered entry symbol is anchored by the external Render call.
+   * What it does:
+   * Draws one mesh batch tree with optional shadow state. Selects the "mesh"
+   * effect, binds the whole per-pass shader-constant lane (ConfigureShader),
+   * then walks the batch-bucket RB-tree in key order. For each bucket it
+   * resolves the material render stage, applies the pass stage filter, selects
+   * the material technique, lazily resolves the environment texture sheet,
+   * binds the six per-material texture samplers, then draws the bucket's
+   * instance vector through the LOD's lazily-built skinned/static hardware mesh
+   * batch. `mirrored` (the batch draw flag) is `meshFlags == 2`.
+   *
+   * The recovered entry is invoked by name from the main render lane at
+   * `src/sdk/moho/app/WxRuntimeTypes.cpp`
+   * (`renderer->Render(meshFlags, *cam, shadowRenderer, instance->meshes)`).
    */
   void MeshRenderer::Render(
     const std::int32_t meshFlags,
@@ -6629,19 +6898,87 @@ namespace moho
       return;
     }
 
+    // Active render-time terrain resource (nullptr when no map/terrain). Read at
+    // the head of the pass exactly like the binary's `sWldMap ? mTerrainRes : 0`.
+    IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
+
     // Select the mesh effect as the device's current effect, then bind the whole
     // mesh shader-constant lane for this pass. `mirrored` is `meshFlags == 2`.
     // (Transcribed from FUN_007E0C30 @0x007E0C64..0x007E0CD7.)
     CD3DDevice* const device = D3D_GetDevice();
     CD3DEffect* const meshEffect = device->GetResources()->FindEffect("mesh");
     device->SetCurEffect(meshEffect);
-    ConfigureShader(camera, shadow, meshFlags == 2);
+    const bool mirrored = (meshFlags == 2);
+    ConfigureShader(camera, shadow, mirrored);
 
-    // The per-key batch draw chain (material texture binds + MeshLOD skinned/
-    // static batch draw calls) remains elided pending typed CD3D batch-draw
-    // recovery; ConfigureShader above reproduces the observable shader-state
-    // side effects of the pass head.
-    (void)meshMap;
+    // Per-pass stage filter selectors (binary: v44 = a3 & 0x30, v42 = a3 & 0xC).
+    const std::int32_t stageMaskHigh = meshFlags & 0x30;
+    const std::int32_t stageMaskLow = meshFlags & 0x0C;
+
+    MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
+
+    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
+    MeshBatchBucketNode* const headNode = meshMap.head;
+    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
+      MeshLOD* const lod = MeshBatchEntryLod(node);
+      MeshMaterial& material = lod->mat;
+
+      // Resolve + cache the material render stage on first use.
+      const std::int32_t renderStage = ResolveMaterialRenderStage(meshEffect, material);
+
+      // Pass stage filter (binary: `!v13 || v13==2 ||
+      // ((val & (a3&0x30)) && (val & (a3&0xC)))`).
+      const bool passesStageFilter =
+        meshFlags == 0 || meshFlags == 2 ||
+        (((renderStage & stageMaskHigh) != 0) && ((renderStage & stageMaskLow) != 0));
+      if (!passesStageFilter) {
+        continue;
+      }
+
+      // Select this material's technique for the pass.
+      device->SelectTechnique(material.mShaderAnnotation.c_str());
+
+      // Lazily resolve the environment texture sheet the first time this
+      // material is drawn. When a terrain resource is present the sheet is the
+      // terrain's per-environment lookup (keyed by the material's "environment"
+      // string annotation); otherwise it is the renderer's shared mesh
+      // environment texture. Both source handles are ID3DTextureSheet-rooted,
+      // so the assignment into the CD3DDynamicTextureSheet-typed lane is a
+      // pointer-identity sibling downcast (offset-0 single inheritance), exactly
+      // as the binary's raw pointer store.
+      if (!material.mEnvironmentSheet) {
+        if (terrainRes != nullptr) {
+          const msvc8::string environmentKey =
+            meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("environment"), msvc8::string("<default>"));
+          const boost::shared_ptr<ID3DTextureSheet> environmentLookup = terrainRes->GetEnvLookup(environmentKey);
+          material.mEnvironmentSheet = boost::static_pointer_cast<CD3DDynamicTextureSheet>(environmentLookup);
+        } else {
+          material.mEnvironmentSheet = boost::static_pointer_cast<CD3DDynamicTextureSheet>(
+            boost::static_pointer_cast<ID3DTextureSheet>(meshEnvironmentTex));
+        }
+      }
+
+      // Bind the six per-material texture samplers, in binary bind order.
+      tv.environmentTexture.GetTexture(material.mEnvironmentSheet);
+      tv.albedoTexture.GetTexture(material.mAlbedoSheet);
+      tv.specularTexture.GetTexture(material.mSpecularSheet);
+      tv.lookupTexture.GetTexture(material.mLookupSheet);
+      tv.secondaryTexture.GetTexture(material.mSecondarySheet);
+      tv.normalsTexture.GetTexture(material.mNormalsSheet);
+
+      // Draw the bucket's instances through the LOD's lazily-built hardware mesh
+      // batch (skinned for static-pose buckets, static otherwise). The
+      // shared_ptr handle keeps the batch retained for the draw call.
+      boost::shared_ptr<MeshBatch> batchHandle;
+      if (MeshBatchEntryIsSkinned(node)) {
+        lod->GetSkinnedBatch(batchHandle);
+      } else {
+        lod->GetStaticBatch(batchHandle);
+      }
+      if (batchHandle) {
+        batchHandle->Render(MeshBatchEntryInstances(node), mirrored);
+      }
+    }
   }
 
   /**
