@@ -2101,11 +2101,11 @@ extern "C" void png_do_read_transformations(png_structp png_ptr)
         RawBase(png_ptr) + kOffBackground,
         reinterpret_cast<const std::uint16_t*>(RawBase(png_ptr) + kOffBackground1),
         Field<std::uint8_t*>(png_ptr, kOffGammaTable),
-        Field<std::uint8_t*>(png_ptr, kOffGammaArg7),
-        Field<std::uint8_t*>(png_ptr, kOffGammaArg8),
+        Field<std::uint8_t*>(png_ptr, kOffGammaFrom1),
+        Field<std::uint8_t*>(png_ptr, kOffGammaTo1),
         Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Table),
-        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Arg10),
-        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Arg11),
+        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16From1),
+        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16To1),
         static_cast<std::int16_t>(Field<std::uint16_t>(png_ptr, kOffGammaShift)));
   }
 
