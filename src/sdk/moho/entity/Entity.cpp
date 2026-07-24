@@ -1,6 +1,7 @@
 ﻿#include "Entity.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -4301,32 +4302,40 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679940
+   * Address: 0x00679940 (FUN_00679940, Moho::Entity::SetHealth)
+   * Mangled: ?SetHealth@Entity@Moho@@QAEXPAV12@M@Z
    *
    * What it does:
-   * Sets absolute health, triggers OnHealthChanged on 0.25-step bucket changes,
-   * and ensures the coord-node is queued into Sim coord list.
+   * Sets absolute health, logs the change, fires the "OnHealthChanged" script
+   * callback with the new and previous quantized (0.25-step) health fractions
+   * when the bucket changes, then re-queues this entity at the front of the Sim
+   * coord-dirty list.
    */
   void Entity::SetHealth(const float newHealth)
   {
-    if (MaxHealth <= 0.0f) {
-      Health = newHealth;
-      return;
-    }
-
+    // The binary divides by MaxHealth unconditionally -- there is no MaxHealth<=0
+    // guard in the original; callers guarantee a positive MaxHealth for a live
+    // entity. The two health fractions are quantized to 0.25 steps via floor().
     const float invMaxHealth = 1.0f / MaxHealth;
-    const float prevBucket = std::floor(invMaxHealth * Health * 4.0f) * 0.25f;
     const float nextBucket = std::floor(invMaxHealth * newHealth * 4.0f) * 0.25f;
+    const float prevBucket = std::floor(invMaxHealth * Health * 4.0f) * 0.25f;
 
     Health = newHealth;
 
+    SimulationRef->Logf(
+      "Entity[0x%08x]->SetHealth(%.1f [0x%08x])\n",
+      static_cast<std::uint32_t>(id_),
+      newHealth,
+      std::bit_cast<std::uint32_t>(newHealth));
+
     if (nextBucket != prevBucket) {
-      CallbackStr("OnHealthChanged");
+      RunScriptNum2("OnHealthChanged", nextBucket, prevBucket);
     }
 
-    if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
-    }
+    // Unlink from the current list and re-insert immediately after the Sim
+    // coord-dirty list sentinel (front). The binary does this unconditionally,
+    // regardless of whether the node was already linked.
+    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
