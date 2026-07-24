@@ -2184,6 +2184,69 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A2244A (FUN_00A2244A)
+ * Mangled: png_handle_sBIT
+ *
+ * IDA signature:
+ * void __cdecl png_handle_sBIT(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an sBIT (significant bits) chunk. Enforces chunk ordering and the
+ * per-color-type length (3 for palette, else png_ptr->channels), reads the
+ * significant-bit depths into png_ptr->sig_bit (broadcasting the single gray
+ * value across r/g/b for grayscale; taking r/g/b/a in order for colour), and
+ * stores them into the info struct via png_set_sBIT.
+ */
+extern "C" void png_handle_sBIT(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  std::uint8_t buf[4] = {0, 0, 0, 0};
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before sBIT");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid sBIT after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+    png_warning(png_ptr, "Out of place sBIT chunk");
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoSbit) != 0) {
+    png_warning(png_ptr, "Duplicate sBIT chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  const std::uint32_t channels =
+      (ColorType(png_ptr) == kColorTypePalette) ? 3u
+                                                : Field<std::uint8_t>(png_ptr, kOffChannels);
+  if (length != channels) {
+    png_warning(png_ptr, "Incorrect sBIT chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  png_crc_read(png_ptr, buf, channels);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  Field<std::uint8_t>(png_ptr, kOffSigBitRed) = buf[0];
+  std::uint8_t alpha_sig;
+  if ((ColorType(png_ptr) & kPngColorMaskColor) == 0) {  // grayscale
+    Field<std::uint8_t>(png_ptr, kOffSigBitGray)  = buf[0];
+    Field<std::uint8_t>(png_ptr, kOffSigBitGreen) = buf[0];
+    Field<std::uint8_t>(png_ptr, kOffSigBitBlue)  = buf[0];
+    alpha_sig = buf[1];
+  } else {  // colour
+    Field<std::uint8_t>(png_ptr, kOffSigBitGreen) = buf[1];
+    Field<std::uint8_t>(png_ptr, kOffSigBitBlue)  = buf[2];
+    alpha_sig = buf[3];
+  }
+  Field<std::uint8_t>(png_ptr, kOffSigBitAlpha) = alpha_sig;
+  png_set_sBIT(png_ptr, info_ptr, RawBase(png_ptr) + kOffSigBitRed);
+}
+
+/**
  * Address: 0x00A22320 (FUN_00A22320)
  * Mangled: png_handle_gAMA
  *

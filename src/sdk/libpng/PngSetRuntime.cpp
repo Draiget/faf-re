@@ -5,6 +5,8 @@
 
 #include "libpng/PngSetRuntime.h"
 
+#include <cstring>
+
 /**
  * Address: 0x009E966F (FUN_009E966F)
  *
@@ -330,6 +332,25 @@ extern "C" void png_set_packswap(png_structp png_ptr)
   if (BitDepth(png_ptr) < 8) {
     Transformations(png_ptr) |= kPngPackSwap;
   }
+}
+
+/**
+ * Address: 0x009E9647 (FUN_009E9647)
+ * Mangled: png_set_sBIT
+ *
+ * IDA signature:
+ * void __cdecl png_set_sBIT(png_structp png_ptr, png_infop info_ptr, png_color_8p sig_bit);
+ *
+ * Stores the significant-bit depths: copies the 5-byte png_color_8 (red, green,
+ * blue, gray, alpha) into info_ptr->sig_bit (0x44) and marks PNG_INFO_sBIT valid.
+ */
+extern "C" void png_set_sBIT(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* sig_bit)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  std::memcpy(info_ptr->sig_bit, sig_bit, 5);
+  info_ptr->valid |= kPngInfoSbit;
 }
 
 /**
