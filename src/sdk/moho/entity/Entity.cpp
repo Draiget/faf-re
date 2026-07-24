@@ -2883,7 +2883,7 @@ namespace moho
     mMotor = nullptr;
 
     if (sim != nullptr) {
-      mCoordNode.ListLinkBefore(&sim->mCoordEntities);
+      mCoordNode.ListLinkAfter(&sim->mCoordEntities);
     }
   }
 
@@ -3202,7 +3202,7 @@ namespace moho
     RefreshCollisionShapeFromBlueprint();
 
     if (SimulationRef) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -3965,7 +3965,7 @@ namespace moho
     mPendingVelocityScale = pendingVelocityScale;
 
     if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4438,7 +4438,8 @@ namespace moho
    *
    * What it does:
    * Marks this entity as destroy-queued once, enqueues it into `Sim::mDeletionQueue`,
-   * logs the queue event, and moves the coord node to the sim coord tail list.
+   * logs the queue event, and re-inserts the coord node at the front of the sim
+   * coord list (unlink + ListLinkAfter the sentinel, matching the binary).
    */
   void Entity::Destroy()
   {
@@ -4450,7 +4451,7 @@ namespace moho
     SimulationRef->mDeletionQueue.push_back(this);
     SimulationRef->Logf("Entity 0x%08x queued for delete.\n", static_cast<unsigned int>(id_));
 
-    mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -4929,7 +4930,7 @@ namespace moho
 
     mStrategicUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
 
-    mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -5043,7 +5044,7 @@ namespace moho
     }
 
     if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -5078,7 +5079,7 @@ namespace moho
     mVisibilityLayerFriendly = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -5094,7 +5095,7 @@ namespace moho
     mVisibilityLayerEnemy = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -5110,7 +5111,7 @@ namespace moho
     mVisibilityLayerDefault = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -5126,7 +5127,7 @@ namespace moho
     mVisibilityLayerNeutral = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
