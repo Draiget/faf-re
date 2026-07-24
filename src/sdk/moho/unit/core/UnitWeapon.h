@@ -16,6 +16,8 @@
 #include "moho/sim/EImpactTypeTypeInfo.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 #include "Wm3Vector3.h"
+#include "Wm3Quaternion.h"
+#include "boost/shared_ptr.h"
 
 struct lua_State;
 namespace LuaPlus
@@ -30,6 +32,7 @@ namespace moho
   class Entity;
   class IAiAttacker;
   class Projectile;
+  class RD3DTextureResource;
   struct RProjectileBlueprint;
   struct RUnitBlueprintWeapon;
   class Sim;
@@ -268,6 +271,22 @@ namespace moho
      * script projectile wrapper when creation succeeds.
      */
     Projectile* CreateProjectile(std::int32_t muzzleBoneIndex);
+
+    /**
+     * Address: 0x006D75D0 (FUN_006D75D0, Moho::UnitWeapon::DoInstaHit)
+     *
+     * Fires one instant-hit beam from `bone`: applies impact damage / shot-tracking
+     * and spawns a one-shot white beam effect. `colorAndGlow` is the packed Lua
+     * color+glow quaternion; `textureSheet` is the caller-owned texture handle (kept
+     * alive across the call, otherwise unused -- the beam texture is hardcoded).
+     */
+    void DoInstaHit(
+      const Wm3::Quaternionf& colorAndGlow,
+      std::int32_t bone,
+      float thickness,
+      float lifetime,
+      boost::shared_ptr<RD3DTextureResource> textureSheet
+    );
 
     /**
      * Address: 0x006D5F30 (FUN_006D5F30, Moho::UnitWeapon::SetTarget)
