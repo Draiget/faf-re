@@ -127,6 +127,7 @@ constexpr std::size_t kOffSigBitRed         = 0x17C;  // png_byte     sig_bit.re
 constexpr std::size_t kOffSigBitGreen       = 0x17D;  // png_byte     sig_bit.green
 constexpr std::size_t kOffSigBitBlue        = 0x17E;  // png_byte     sig_bit.blue
 constexpr std::size_t kOffSigBitGray        = 0x17F;  // png_byte     sig_bit.gray
+constexpr std::size_t kOffSigBitAlpha       = 0x180;  // png_byte     sig_bit.alpha
 constexpr std::size_t kOffPalette           = 0x114;  // png_colorp   palette (before num_palette@0x118; 3rd arg @0x9E7188)
 constexpr std::size_t kOffTransValues       = 0x18C;  // png_color_16 trans_values
 constexpr std::size_t kOffPaletteLookup     = 0x1EC;  // png_bytep    palette_lookup (dither)

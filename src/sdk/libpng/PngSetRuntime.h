@@ -87,7 +87,9 @@ struct png_info_struct
   std::uint8_t  pad_0C_to_28[0x1C];         // +0x0C
   float         gamma;                       // +0x28
   std::uint8_t  srgb_intent;                 // +0x2C
-  std::uint8_t  pad_2D_to_80[0x53];         // +0x2D
+  std::uint8_t  pad_2D_to_44[0x17];         // +0x2D
+  std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
+  std::uint8_t  pad_49_to_80[0x37];         // +0x49
   float         x_white;                     // +0x80
   float         y_white;                     // +0x84
   float         x_red;                       // +0x88
@@ -116,6 +118,7 @@ using png_infop       = png_info_struct*;
 using png_fixed_point = std::int32_t;
 
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
+static_assert(offsetof(png_info_struct, sig_bit)     == 0x44);
 static_assert(offsetof(png_info_struct, gamma)       == 0x28);
 static_assert(offsetof(png_info_struct, srgb_intent) == 0x2C);
 static_assert(offsetof(png_info_struct, x_white)     == 0x80);
@@ -141,6 +144,7 @@ static_assert(offsetof(png_info_struct, unknown_chunks_num) == 0xC0);
 
 // Validity bitmask flags used by png_info.valid:
 constexpr std::uint32_t kPngInfoGamma = 0x0001;
+constexpr std::uint32_t kPngInfoSbit  = 0x0002;
 constexpr std::uint32_t kPngInfoChrm  = 0x0004;
 constexpr std::uint32_t kPngInfoSrgb  = 0x0800;
 
@@ -321,6 +325,19 @@ extern "C" void png_set_packswap(png_structp png_ptr);
  * 5-byte png_color_8 sBIT structure into png_struct.shift.
  */
 extern "C" void png_set_shift(png_structp png_ptr, const std::uint8_t* true_bits);
+
+/**
+ * Address: 0x009E9647 (FUN_009E9647)
+ * Mangled: png_set_sBIT
+ *
+ * IDA signature:
+ * void __cdecl png_set_sBIT(png_structp png_ptr, png_infop info_ptr, png_color_8p sig_bit);
+ *
+ * What it does:
+ * Copies the 5-byte png_color_8 significant-bit depths into info_ptr->sig_bit
+ * and marks PNG_INFO_sBIT valid.
+ */
+extern "C" void png_set_sBIT(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* sig_bit);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
