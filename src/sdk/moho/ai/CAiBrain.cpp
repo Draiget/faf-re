@@ -31,6 +31,7 @@
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/EngineVectorHelpers.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/RResId.h"
@@ -2395,6 +2396,12 @@ CAiBrain::CAiBrain()
   , mReservedThreadStage(nullptr)
   , mTailWord(0)
 {
+  // Increment the CAiBrain instance-count stat (binary FUN_00579E40). The
+  // (CArmyImpl*) ctor delegates here via `: CAiBrain()`, so it inherits the +1 --
+  // one increment per construction, matching the binary.
+  ::InterlockedExchangeAdd(
+    reinterpret_cast<volatile long*>(&InstanceCounter<CAiBrain>::GetStatItem()->mPrimaryValueBits), 1L);
+
   mCurrentPlan.assign("", 0);
   InitializeBuildStructureMap(mBuildStructureMap);
 }
@@ -2638,6 +2645,11 @@ CAiBrain::~CAiBrain()
 
   delete mPersonality;
   mPersonality = nullptr;
+
+  // Decrement the CAiBrain instance-count stat (binary FUN_0057A1E0), balancing
+  // the constructor's increment.
+  ::InterlockedExchangeAdd(
+    reinterpret_cast<volatile long*>(&InstanceCounter<CAiBrain>::GetStatItem()->mPrimaryValueBits), -1L);
 }
 
 /**
