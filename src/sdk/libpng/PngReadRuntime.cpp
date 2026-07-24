@@ -88,7 +88,9 @@ void  png_handle_unknown(png_structp, png_infop, std::uint32_t);
 struct z_stream_s;
 int   inflate(z_stream_s* strm, int flush);
 int   inflateEnd(z_stream_s* strm);
+int   inflateReset(z_stream_s* strm);
 int   inflateInit_(z_stream_s* strm, const char* version, int stream_size);
+void  png_memset_check(png_structp png_ptr, void* s, int value, std::uint32_t length);
 
 // libpng's externally-defined pass mask tables (used by png_read_row).
 extern const std::uint8_t png_pass_mask[7];
@@ -604,6 +606,148 @@ extern "C" void png_do_read_intrapixel(int* row_info_raw, std::uint32_t row_addr
   }
 }
 
+namespace {
+// Adam7 interlace pass geometry (png_uint_32[7]), verified byte-for-byte from
+// the shipped PE .rdata: png_pass_start @0x00D62B88, png_pass_inc @0x00D62BA4,
+// png_pass_ystart @0x00D62BC0, png_pass_yinc @0x00D62BDC.
+constexpr std::uint32_t kPngPassStart[7]  = {0, 4, 0, 2, 0, 1, 0};
+constexpr std::uint32_t kPngPassInc[7]    = {8, 8, 4, 4, 2, 2, 1};
+constexpr std::uint32_t kPngPassYStart[7] = {0, 0, 4, 0, 2, 0, 1};
+constexpr std::uint32_t kPngPassYInc[7]   = {8, 8, 8, 4, 4, 2, 2};
+} // namespace
+
+/**
+ * Address: 0x00A2107F (FUN_00A2107F)
+ * Mangled: png_memset_check
+ *
+ * What it does:
+ * Fills `length` bytes at `s` with `value`. The length bound check present in
+ * some libpng builds compiled away here to a plain memset; png_ptr is unused.
+ */
+extern "C" void png_memset_check(png_structp png_ptr, void* s, int value, std::uint32_t length)
+{
+  (void)png_ptr;
+  std::memset(s, value, length);
+}
+
+/**
+ * Address: 0x00A23B54 (FUN_00A23B54)
+ * Mangled: png_read_finish_row
+ *
+ * What it does:
+ * Advances past a just-decoded scanline. Within a pass it only bumps
+ * row_number. At end-of-pass, for an interlaced image it advances the Adam7
+ * pass (recomputing iwidth/irowbytes, and num_rows unless the interlace
+ * transform handles expansion), skipping passes with no pixels. After the final
+ * pass (or immediately for a non-interlaced image) it drains the remaining
+ * IDAT/zlib data to Z_STREAM_END — pulling successive IDAT chunks as needed —
+ * warns on any trailing compressed data, then resets the inflate state and
+ * marks the datastream complete (PNG_HAVE_IEND | PNG_FLAG_ZLIB_FINISHED).
+ */
+extern "C" void png_read_finish_row(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  if (++Field<std::uint32_t>(png_ptr, kOffRowNumber) < Field<std::uint32_t>(png_ptr, kOffNumRows)) {
+    return;
+  }
+
+  if (*(RawBase(png_ptr) + kOffInterlaced) != 0) {
+    Field<std::uint32_t>(png_ptr, kOffRowNumber) = 0;
+    png_memset_check(png_ptr, Field<std::uint8_t*>(png_ptr, kOffPrevRow), 0,
+                     Field<std::uint32_t>(png_ptr, kOffRowbytes) + 1);
+
+    while (true) {
+      const std::uint8_t pass = static_cast<std::uint8_t>(++*(RawBase(png_ptr) + kOffPass));
+      if (pass >= 7) {
+        break;  // no more passes; finish the datastream below
+      }
+      const std::uint32_t iwidth =
+          (Field<std::uint32_t>(png_ptr, kOffWidth) - kPngPassStart[pass] + kPngPassInc[pass] - 1) /
+          kPngPassInc[pass];
+      Field<std::uint32_t>(png_ptr, kOffIwidth) = iwidth;
+      Field<std::uint32_t>(png_ptr, kOffIrowbytes) =
+          ((iwidth * *(RawBase(png_ptr) + kOffPixelDepth) + 7) >> 3) + 1;
+
+      if ((Field<std::uint32_t>(png_ptr, kOffTransformations) & 2) == 0) {
+        Field<std::uint32_t>(png_ptr, kOffNumRows) =
+            (Field<std::uint32_t>(png_ptr, kOffHeight) - kPngPassYStart[pass] + kPngPassYInc[pass] - 1) /
+            kPngPassYInc[pass];
+        if (iwidth == 0) {
+          continue;  // pass has no pixels; advance to the next one
+        }
+      }
+      return;  // next pass is set up
+    }
+  }
+
+  if ((Flags(png_ptr) & 0x20u) == 0) {  // PNG_FLAG_ZLIB_FINISHED not yet set
+    std::uint8_t scratch = 0;
+    Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = &scratch;
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = 1;
+
+    bool extra_seen = false;
+    while (true) {
+      if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) == 0) {
+        while (Field<std::uint32_t>(png_ptr, kOffIdatSize) == 0) {
+          png_crc_finish(png_ptr, 0);
+          std::uint8_t length_buf[4];
+          png_push_fill_buffer(png_ptr, length_buf, 4);
+          Field<std::uint32_t>(png_ptr, kOffIdatSize) = png_get_uint_32(length_buf);
+          png_reset_crc(png_ptr);
+          png_crc_read(png_ptr, RawBase(png_ptr) + kOffChunkName, 4);
+          if (png_memcmp(RawBase(png_ptr) + kOffChunkName, "IDAT", 4u) != 0) {
+            png_error(png_ptr, "Not enough image data");
+          }
+        }
+        std::uint32_t avail_in = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+        if (avail_in > Field<std::uint32_t>(png_ptr, kOffIdatSize)) {
+          avail_in = Field<std::uint32_t>(png_ptr, kOffIdatSize);
+        }
+        Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = avail_in;
+        Field<std::uint8_t*>(png_ptr, kOffZstreamNextIn) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+        png_crc_read(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), avail_in);
+        Field<std::uint32_t>(png_ptr, kOffIdatSize) -= avail_in;
+      }
+
+      const int ret = inflate(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream), 1);
+      if (ret == 1) {  // Z_STREAM_END
+        break;
+      }
+      if (ret != 0) {
+        const char* msg = Field<const char*>(png_ptr, kOffZstreamMsg);
+        if (msg == nullptr) {
+          msg = "Decompression Error";
+        }
+        png_error(png_ptr, msg);
+      }
+      if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0) {
+        png_warning(png_ptr, "Extra compressed data.");
+        extra_seen = true;
+        break;
+      }
+    }
+
+    if (!extra_seen &&
+        (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0 ||
+         Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) != 0 ||
+         Field<std::uint32_t>(png_ptr, kOffIdatSize) != 0)) {
+      png_warning(png_ptr, "Extra compressed data");
+    }
+
+    Mode(png_ptr) |= 8u;
+    Flags(png_ptr) |= 0x20u;
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = 0;
+  }
+
+  if (Field<std::uint32_t>(png_ptr, kOffIdatSize) != 0 ||
+      Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) != 0) {
+    png_warning(png_ptr, "Extra compression data");
+  }
+  inflateReset(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream));
+  Mode(png_ptr) |= 8u;
+}
+
 /**
  * Address: 0x009E0A46 (FUN_009E0A46)
  * Mangled: png_get_copyright
@@ -923,8 +1067,8 @@ extern "C" void png_read_image(png_structp png_ptr, std::uint8_t** image)
   using namespace libpng_layout;
 
   const int passes  = png_set_interlace_handling(png_ptr);
-  const std::uint32_t height = Field<std::uint32_t>(png_ptr, kOffNumRows);
-  Field<std::uint32_t>(png_ptr, 0xD0) = height;  // num_rows duplicated to row counter
+  const std::uint32_t height = Field<std::uint32_t>(png_ptr, kOffHeight);
+  Field<std::uint32_t>(png_ptr, kOffNumRows) = height;  // num_rows starts at the image height
 
   if (passes <= 0) {
     return;

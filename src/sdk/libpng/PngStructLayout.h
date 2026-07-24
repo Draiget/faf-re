@@ -46,8 +46,11 @@ constexpr std::size_t kOffZbufSize          = 0xB0;   // png_size_t  zbuf_size
 constexpr std::size_t kOffZlibMethod        = 0xB8;   // int         zlib_method
 constexpr std::size_t kOffZlibWindowBits    = 0xBC;   // int         zlib_window_bits
 constexpr std::size_t kOffZstream           = 0x74;   // z_stream    zstream
+constexpr std::size_t kOffZstreamNextIn     = 0x74;   // z_stream.next_in
+constexpr std::size_t kOffZstreamAvailIn    = 0x78;   // z_stream.avail_in
 constexpr std::size_t kOffZstreamNextOut    = 0x80;   // z_stream.next_out
 constexpr std::size_t kOffZstreamAvailOut   = 0x84;   // z_stream.avail_out
+constexpr std::size_t kOffZstreamMsg        = 0x8C;   // z_stream.msg (const char*)
 constexpr std::size_t kOffZstreamZalloc     = 0x94;   // z_stream.zalloc
 constexpr std::size_t kOffZstreamZfree      = 0x98;   // z_stream.zfree
 constexpr std::size_t kOffZstreamOpaque     = 0x9C;   // z_stream.opaque
@@ -59,10 +62,19 @@ constexpr std::size_t kOffReadUserChunkFn   = 0x21C;  // png_user_chunk_ptr read
 constexpr std::size_t kOffNumChunkList      = 0x220;  // png_uint_32 num_chunk_list
 constexpr std::size_t kOffChunkList         = 0x224;  // png_bytep   chunk_list
 
-constexpr std::size_t kOffWidth             = 0xDC;   // png_uint_32 width
-constexpr std::size_t kOffHeight            = 0xE0;   // png_uint_32 height
-constexpr std::size_t kOffNumRows           = 0xCC;   // png_uint_32 num_rows
-constexpr std::size_t kOffRowbytes          = 0xE4;   // png_uint_32 rowbytes / usr field
+// png_struct image-dimension lane, offsets confirmed from png_handle_IHDR
+// (width/height stores) and png_read_finish_row (num_rows/rowbytes/iwidth/
+// irowbytes/row_number pass-advance) .asm. The prior kOffWidth/kOffHeight/
+// kOffNumRows/kOffRowbytes values were transposed across this run of fields.
+constexpr std::size_t kOffWidth             = 0xC8;   // png_uint_32 width       (set by png_handle_IHDR)
+constexpr std::size_t kOffHeight            = 0xCC;   // png_uint_32 height      (set by png_handle_IHDR)
+constexpr std::size_t kOffNumRows           = 0xD0;   // png_uint_32 num_rows    (rows in current pass)
+constexpr std::size_t kOffRowbytes          = 0xD8;   // png_uint_32 rowbytes    (bytes in a full row)
+constexpr std::size_t kOffIrowbytes         = 0xDC;   // png_uint_32 irowbytes   (bytes in current interlaced row)
+constexpr std::size_t kOffIwidth            = 0xE0;   // png_uint_32 iwidth      (pixels in current interlaced row)
+constexpr std::size_t kOffRowNumber         = 0xE4;   // png_uint_32 row_number  (current row within the pass)
+constexpr std::size_t kOffPrevRow           = 0xE8;   // png_bytep   prev_row
+constexpr std::size_t kOffIdatSize          = 0x10C;  // png_uint_32 idat_size   (bytes left in current IDAT chunk)
 
 constexpr std::size_t kOffBitDepth          = 0x127;  // png_byte bit_depth (offset 295)
 constexpr std::size_t kOffColorType         = 0x126;  // png_byte color_type (offset 294)
