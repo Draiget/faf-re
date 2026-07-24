@@ -549,7 +549,12 @@ namespace moho
     , pad_027A{0u, 0u}
     , mPriorityInfo{0, 0}
     , mHandleIndex(-1)
-  {}
+  {
+    // Increment the Prop instance-count stat (binary FUN_006F9CD0). The recovery
+    // wired the matching -1 into ~Prop but dropped both ctors' +1, so the stat
+    // decremented without ever incrementing. Independent standalone ctor.
+    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), 1L);
+  }
 
   /**
    * Address: 0x006F9D90 (FUN_006F9D90)
@@ -575,6 +580,10 @@ namespace moho
     , mPriorityInfo{0, 0}
     , mHandleIndex(-1)
   {
+    // Increment the Prop instance-count stat (binary FUN_006F9D90), before the
+    // early-out so every construction is counted. Independent standalone ctor.
+    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), 1L);
+
     if (!blueprint) {
       return;
     }
