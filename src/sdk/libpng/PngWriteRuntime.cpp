@@ -188,6 +188,101 @@ extern "C" void png_write_compressed_data_out(png_structp png_ptr, int* compress
 }
 
 /**
+ * Address: 0x00A242E3 (FUN_00A242E3)
+ * Mangled: png_check_keyword
+ *
+ * What it does:
+ * Validates and normalizes a PNG text keyword into a freshly allocated buffer
+ * (*newKeyword): control/DEL characters become spaces (each warned), then
+ * leading and trailing spaces are stripped and runs of interior spaces are
+ * collapsed to a single space (each condition warned). Returns the resulting
+ * length; a keyword that normalizes to empty is freed and returns 0, and a
+ * keyword longer than 79 characters is truncated to 79.
+ */
+extern "C" int png_check_keyword(png_structp png_ptr, char* keyword, char** newKeyword)
+{
+  *newKeyword = nullptr;
+  if (keyword == nullptr) {
+    png_warning(png_ptr, "zero length keyword");
+    return 0;
+  }
+  std::uint32_t key_len = static_cast<std::uint32_t>(std::strlen(keyword));
+  if (key_len == 0) {
+    png_warning(png_ptr, "zero length keyword");
+    return 0;
+  }
+
+  char* const buffer = static_cast<char*>(png_malloc(png_ptr, key_len + 2));
+  *newKeyword = buffer;
+
+  // Copy, replacing control and DEL characters with a space.
+  char* dst = buffer;
+  for (const char* src = keyword; *src != '\0'; ++src, ++dst) {
+    const char ch = *src;
+    if (ch < 32 || ch == 127) {
+      char msg[40];
+      std::sprintf(msg, "invalid keyword character 0x%02X", ch);
+      png_warning(png_ptr, msg);
+      *dst = ' ';
+    } else {
+      *dst = ch;
+    }
+  }
+  *dst = '\0';
+
+  // Strip trailing spaces.
+  char* tail = &(*newKeyword)[key_len - 1];
+  if (*tail == ' ') {
+    png_warning(png_ptr, "trailing spaces removed from keyword");
+    while (*tail == ' ') { *tail-- = '\0'; --key_len; }
+  }
+
+  // Strip leading spaces.
+  char* head = *newKeyword;
+  if (**newKeyword == ' ') {
+    png_warning(png_ptr, "leading spaces removed from keyword");
+    while (*head == ' ') { ++head; --key_len; }
+  }
+
+  // Collapse runs of interior spaces, compacting toward the buffer front.
+  char* out = *newKeyword;
+  bool prev_space = false;
+  bool collapsed = false;
+  while (*head != '\0') {
+    const char ch = *head;
+    if (ch == ' ') {
+      if (prev_space) {
+        --key_len;
+        collapsed = true;
+      } else {
+        *out++ = ' ';
+        prev_space = true;
+      }
+    } else {
+      *out++ = ch;
+      prev_space = false;
+    }
+    ++head;
+  }
+  *out = '\0';
+  if (collapsed) {
+    png_warning(png_ptr, "extra interior spaces removed from keyword");
+  }
+
+  if (key_len == 0) {
+    png_free(png_ptr, *newKeyword);
+    *newKeyword = nullptr;
+    png_warning(png_ptr, "Zero length keyword");
+  }
+  if (key_len > 79) {
+    png_warning(png_ptr, "keyword length must be 1 - 79 characters");
+    (*newKeyword)[79] = '\0';
+    return 79;
+  }
+  return static_cast<int>(key_len);
+}
+
+/**
  * Address: 0x00A23E76 (FUN_00A23E76)
  *
  * What it does:
