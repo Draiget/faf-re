@@ -1496,7 +1496,7 @@ namespace
 
   void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
   {
-    entity.mCoordNode.ListLinkBefore(&entity.SimulationRef->mCoordEntities);
+    entity.mCoordNode.ListLinkAfter(&entity.SimulationRef->mCoordEntities);
   }
 
   [[nodiscard]] bool IsIntelEnabledForType(const moho::CIntel& intelManager, const moho::EIntel intelType) noexcept
@@ -8418,7 +8418,7 @@ void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
   Entity* entity = nullptr;
   (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   while (entity != nullptr) {
-    entity->mCoordNode.ListLinkBefore(&mCoordEntities);
+    entity->mCoordNode.ListLinkAfter(&mCoordEntities);
     ownerRef = gpg::RRef{};
     (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   }
