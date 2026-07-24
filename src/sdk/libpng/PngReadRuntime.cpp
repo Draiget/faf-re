@@ -43,6 +43,11 @@ unsigned long png_get_uint_32(const std::uint8_t* buf);
 void  png_crc_read(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length);
 int   png_crc_finish(png_structp png_ptr, std::uint32_t skip);
 void  png_calculate_crc(png_structp png_ptr, std::uint8_t* ptr, std::uint32_t length);
+void  png_warning(png_structp png_ptr, const char* message);
+void  png_format_buffer(png_structp png_ptr, char* buffer, const char* error_message);
+void  png_chunk_error(png_structp png_ptr, const char* error_message);
+void  png_chunk_warning(png_structp png_ptr, const char* warning_message);
+int   png_crc_error(png_structp png_ptr);
 void  png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask);
 void  png_read_filter_row(png_structp png_ptr, void* row_info,
                           std::uint8_t* row, std::uint8_t* prev_row, int filter);
@@ -143,6 +148,152 @@ extern "C" unsigned long png_get_uint_32(const std::uint8_t* buf)
          (static_cast<unsigned long>(buf[1]) << 16) |
          (static_cast<unsigned long>(buf[2]) << 8) |
          static_cast<unsigned long>(buf[3]);
+}
+
+/**
+ * Address: 0x009E75E2 (FUN_009E75E2)
+ * Mangled: png_format_buffer
+ *
+ * What it does:
+ * Renders the current 4-byte chunk name into `buffer`, hex-escaping any byte
+ * outside the printable ranges [0x29..0x5A] or [0x61..0x7A] as "[HH]"; then,
+ * when `error_message` is non-null, appends ": " followed by up to 64 bytes of
+ * the message (NUL-terminating the 64th). Produces the chunk-tagged text that
+ * png_chunk_error / png_chunk_warning hand to png_error / png_warning.
+ */
+extern "C" void png_format_buffer(png_structp png_ptr, char* buffer, const char* error_message)
+{
+  using namespace libpng_layout;
+
+  // byte_D63374 in the binary; verified "0123456789ABCDEF" byte-for-byte from
+  // the shipped PE .rdata at VA 0x00D63374.
+  static constexpr char kHexDigits[] = "0123456789ABCDEF";
+
+  int iout = 0;
+  for (int iin = 0; iin < 4; ++iin) {
+    const int c = Field<std::uint8_t>(png_ptr, kOffChunkName + static_cast<std::size_t>(iin));
+    // Binary isnonalpha (FUN_009E75E2): emit verbatim only for c in [0x29..0x5A]
+    // or [0x61..0x7A]; hex-escape everything else.
+    if (static_cast<unsigned>(c - 0x29) > 0x51u || (c > 0x5A && c < 0x61)) {
+      buffer[iout++] = '[';
+      buffer[iout++] = kHexDigits[(c >> 4) & 0x0F];
+      buffer[iout++] = kHexDigits[c & 0x0F];
+      buffer[iout++] = ']';
+    } else {
+      buffer[iout++] = static_cast<char>(c);
+    }
+  }
+
+  if (error_message == nullptr) {
+    buffer[iout] = '\0';
+  } else {
+    buffer[iout++] = ':';
+    buffer[iout++] = ' ';
+    std::memcpy(buffer + iout, error_message, 0x40);
+    buffer[iout + 0x3F] = '\0';
+  }
+}
+
+/**
+ * Address: 0x009E787D (FUN_009E787D)
+ * Mangled: png_chunk_error
+ *
+ * What it does:
+ * Formats the chunk-tagged error text and raises a fatal png_error (does not
+ * return in practice; png_error longjmps to the caller's setjmp buffer).
+ */
+extern "C" void png_chunk_error(png_structp png_ptr, const char* error_message)
+{
+  char message[0x54];  // 16 ("[HH]"*4) + 2 (": ") + 64 text + NUL fits in 84
+  png_format_buffer(png_ptr, message, error_message);
+  png_error(png_ptr, message);
+}
+
+/**
+ * Address: 0x009E78AB (FUN_009E78AB)
+ * Mangled: png_chunk_warning
+ *
+ * What it does:
+ * Formats the chunk-tagged warning text and reports it via png_warning.
+ */
+extern "C" void png_chunk_warning(png_structp png_ptr, const char* warning_message)
+{
+  char message[0x54];
+  png_format_buffer(png_ptr, message, warning_message);
+  png_warning(png_ptr, message);
+}
+
+/**
+ * Address: 0x00A211FF (FUN_00A211FF)
+ * Mangled: png_crc_error
+ *
+ * What it does:
+ * Reads the 4-byte stored chunk CRC (always consumed to keep the stream
+ * aligned) and reports whether it mismatches the running computed CRC. The
+ * check is suppressed (returns 0) for ancillary chunks with both
+ * CRC_ANCILLARY_USE|NOWARN set (flags & 0x300 == 0x300) and for critical
+ * chunks with CRC_CRITICAL_IGNORE set (flags & 0x800).
+ */
+extern "C" int png_crc_error(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  int need_crc = 1;
+  if ((Field<std::uint8_t>(png_ptr, kOffChunkName) & 0x20) != 0) {
+    if ((Flags(png_ptr) & 0x300u) == 0x300u) {
+      need_crc = 0;
+    }
+  } else {
+    if ((Flags(png_ptr) & 0x800u) != 0) {
+      need_crc = 0;
+    }
+  }
+
+  std::uint8_t crc_bytes[4];
+  png_push_fill_buffer(png_ptr, crc_bytes, 4);
+  if (need_crc == 0) {
+    return 0;
+  }
+  return png_get_uint_32(crc_bytes) != Field<std::uint32_t>(png_ptr, kOffCrc);
+}
+
+/**
+ * Address: 0x00A21FCC (FUN_00A21FCC)
+ * Mangled: png_crc_finish
+ *
+ * What it does:
+ * Consumes `skip` remaining payload bytes of the current chunk through the CRC
+ * in zbuf-sized reads, then validates the chunk CRC. On mismatch, raises a
+ * fatal png_chunk_error for critical chunks (unless CRC_CRITICAL_USE) and for
+ * ancillary chunks flagged CRC_ANCILLARY_NOWARN; otherwise emits a
+ * png_chunk_warning. Returns 1 on CRC error, 0 when the CRC matched.
+ */
+extern "C" int png_crc_finish(png_structp png_ptr, std::uint32_t skip)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t zbufSize = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+  std::uint32_t remaining = skip;
+  while (remaining > zbufSize) {
+    png_crc_read(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), zbufSize);
+    remaining -= zbufSize;
+  }
+  if (remaining != 0) {
+    png_crc_read(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), remaining);
+  }
+
+  if (png_crc_error(png_ptr) == 0) {
+    return 0;
+  }
+
+  const std::uint8_t nameByte = Field<std::uint8_t>(png_ptr, kOffChunkName);
+  const std::uint16_t flags = Field<std::uint16_t>(png_ptr, kOffFlags);
+  if (((nameByte & 0x20) == 0 || (flags & 0x200) != 0) &&
+      ((nameByte & 0x20) != 0 || (flags & 0x400) == 0)) {
+    png_chunk_error(png_ptr, "CRC error");
+  }
+  png_chunk_warning(png_ptr, "CRC error");
+  return 1;
 }
 
 /**

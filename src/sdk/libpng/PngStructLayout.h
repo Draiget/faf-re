@@ -53,6 +53,7 @@ constexpr std::size_t kOffZstreamZfree      = 0x98;   // z_stream.zfree
 constexpr std::size_t kOffZstreamOpaque     = 0x9C;   // z_stream.opaque
 
 constexpr std::size_t kOffSigBytes          = 0x110;  // png_byte    sig_bytes (also crc field per common runtime)
+constexpr std::size_t kOffCrc               = 0x110;  // png_uint_32 crc (running CRC; overlaps sig_bytes slot)
 constexpr std::size_t kOffChunkName         = 0x11C;  // png_byte    chunk_name[4]
 constexpr std::size_t kOffNumChunkList      = 0x220;  // png_uint_32 num_chunk_list
 constexpr std::size_t kOffChunkList         = 0x224;  // png_bytep   chunk_list
