@@ -4921,15 +4921,40 @@ RType* LookupRType(const std::type_info& typeInfo)
 }
 
 /**
+ * Address: 0x008DC9F0 (FUN_008DC9F0,
+ *   std::map<const std::type_info*, RType*, TypeInfoLess>::insert)
+ *
+ * IDA signature:
+ * struct_SearchRes *__thiscall sub_8DC9F0(std::map_type_info *this@<ecx>,
+ *   struct_SearchRes *ret@<eax>, std::pair_type_info_RType *entry);
+ *
+ * What it does:
+ * Out-of-line emission of the preregistered RTTI map's `insert(value_type)`.
+ * Performs the `TypeInfoLess` lower-bound red-black descent (keyed by
+ * `std::type_info::before`), inserts a fresh node when the key is absent, and
+ * returns `{iterator, inserted?}`. Sibling of `FindRTypePreregisteredNode`
+ * (the `lower_bound` "find" emission); recovered through the same typed
+ * `std::map` API so no red-black node offsets leak into behaviour code.
+ */
+static std::pair<TypeInfoMap::iterator, bool> InsertRTypePreregisteredNode(
+  TypeInfoMap& preregistered,
+  const TypeInfoMap::value_type& entry
+)
+{
+  return preregistered.insert(entry);
+}
+
+/**
  * Address: 0x008DF850 (FUN_008DF850, gpg::PreRegisterRType)
  *
  * What it does:
  * Adds `{type_info*, RType*}` to the preregistration map used by lazy
- * reflection type finalization.
+ * reflection type finalization, via the out-of-line map-insert emission
+ * `InsertRTypePreregisteredNode` (FUN_008DC9F0).
  */
 void PreRegisterRType(const std::type_info& typeInfo, RType* type)
 {
-  GetRTypePreregisteredMap().insert(TypeInfoMap::value_type(&typeInfo, type));
+  InsertRTypePreregisteredNode(GetRTypePreregisteredMap(), TypeInfoMap::value_type(&typeInfo, type));
 }
 
 /**
