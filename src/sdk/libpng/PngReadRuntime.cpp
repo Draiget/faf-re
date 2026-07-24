@@ -463,6 +463,90 @@ extern "C" void png_handle_unknown(png_structp png_ptr, png_infop info_ptr, std:
 }
 
 /**
+ * Address: 0x00A21C16 (FUN_00A21C16)
+ * Mangled: png_read_filter_row
+ *
+ * What it does:
+ * Reconstructs one decoded scanline in place by undoing its PNG row filter
+ * (None/Sub/Up/Average/Paeth) using the previous scanline. `bpp` is the filter
+ * stride in bytes ((pixel_depth+7)/8). An unrecognized filter byte is warned
+ * about and the row's first byte zeroed, matching the binary.
+ */
+extern "C" void png_read_filter_row(png_structp png_ptr, void* row_info_raw,
+                                    std::uint8_t* row, std::uint8_t* prev_row, int filter)
+{
+  if (filter == 0) {
+    return;  // PNG_FILTER_VALUE_NONE: bytes already final.
+  }
+
+  const auto* const row_info = static_cast<const png_row_info*>(row_info_raw);
+  const std::uint32_t rowbytes = row_info->rowbytes;
+  const std::uint32_t bpp = (static_cast<std::uint32_t>(row_info->pixel_depth) + 7u) >> 3;
+
+  switch (filter) {
+    case 1:  // Sub: predictor is the pixel bpp bytes to the left.
+      for (std::uint32_t i = bpp; i < rowbytes; ++i) {
+        row[i] = static_cast<std::uint8_t>(row[i] + row[i - bpp]);
+      }
+      break;
+
+    case 2:  // Up: predictor is the pixel directly above.
+      for (std::uint32_t i = 0; i < rowbytes; ++i) {
+        row[i] = static_cast<std::uint8_t>(row[i] + prev_row[i]);
+      }
+      break;
+
+    case 3:  // Average: mean of left and above (left = 0 for the first pixel).
+      for (std::uint32_t i = 0; i < bpp; ++i) {
+        row[i] = static_cast<std::uint8_t>(row[i] + (prev_row[i] >> 1));
+      }
+      for (std::uint32_t i = bpp; i < rowbytes; ++i) {
+        row[i] = static_cast<std::uint8_t>(
+            row[i] + ((static_cast<int>(prev_row[i]) + row[i - bpp]) >> 1));
+      }
+      break;
+
+    case 4:  // Paeth: nearest of left/above/upper-left by the Paeth predictor.
+      for (std::uint32_t i = 0; i < bpp; ++i) {
+        row[i] = static_cast<std::uint8_t>(row[i] + prev_row[i]);
+      }
+      for (std::uint32_t i = bpp; i < rowbytes; ++i) {
+        const int a = row[i - bpp];       // left
+        const int b = prev_row[i];        // above
+        const int c = prev_row[i - bpp];  // upper-left
+        const int pa = std::abs(b - c);
+        const int pb = std::abs(a - c);
+        const int pc = std::abs(a + b - 2 * c);
+        int pred = a;
+        if (pa > pb || pa > pc) {
+          pred = (pb > pc) ? c : b;
+        }
+        row[i] = static_cast<std::uint8_t>(row[i] + pred);
+      }
+      break;
+
+    default:
+      png_warning(png_ptr, "Ignoring bad adaptive filter type");
+      row[0] = 0;
+      break;
+  }
+}
+
+/**
+ * Address: 0x00A2106A (FUN_00A2106A)
+ * Mangled: png_memcpy_check
+ *
+ * What it does:
+ * Copies `length` bytes from `src` to `dst`. The length bound check present in
+ * some libpng builds compiled away here to a plain memcpy; png_ptr is unused.
+ */
+extern "C" void png_memcpy_check(png_structp png_ptr, void* dst, void* src, std::uint32_t length)
+{
+  (void)png_ptr;
+  std::memcpy(dst, src, length);
+}
+
+/**
  * Address: 0x009E0A46 (FUN_009E0A46)
  * Mangled: png_get_copyright
  *
