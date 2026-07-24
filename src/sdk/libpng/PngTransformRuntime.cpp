@@ -2016,3 +2016,183 @@ extern "C" void png_do_background(png_row_infop row_info, std::uint8_t* row,
     info.rowbytes    = (width * pd + 7) >> 3;
   }
 }
+
+#include "libpng/PngStructLayout.h"  // Field<>/RawBase/kOff* for the dispatcher
+#include "libpng/PngSetRuntime.h"    // full png_row_info (guarded to coexist) + png_do_invert
+
+#include <cstdio>  // std::snprintf
+
+// The libpng error reporters live in png.lib (recovered in PngReadRuntime.cpp);
+// declared here to match the binary's calls.
+extern "C" void png_error(png_structp png_ptr, const char* message);
+extern "C" void png_warning(png_structp png_ptr, const char* message);
+
+/**
+ * Address: 0x009E711B (FUN_009E711B)
+ * Mangled: png_do_read_transformations
+ *
+ * IDA signature:
+ * void __cdecl png_do_read_transformations(png_structp png_ptr);
+ *
+ * What it does:
+ * Read-path transform dispatcher: walks png_ptr->transformations and applies
+ * each enabled transform to the current scanline (row_buf + 1) in sequence,
+ * updating the row_info sub-object at png_struct+0x100 that png_read_row primed.
+ * Mirrors libpng pngrtran.c order exactly, including the interleaved
+ * colour-space/gamma sub-conditions and the trailing user-transform fixup.
+ * Field offsets are the push-order operands verified against FUN_009E711B.asm.
+ */
+extern "C" void png_do_read_transformations(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  auto* const row_info = reinterpret_cast<png_row_infop>(RawBase(png_ptr) + 0x100);
+
+  auto* const row_buf = Field<std::uint8_t*>(png_ptr, kOffRowBuf);
+  if (row_buf == nullptr) {
+    char buf[52];
+    std::snprintf(buf, sizeof(buf), "NULL row buffer for row %ld, pass %d",
+                  static_cast<long>(Field<std::uint32_t>(png_ptr, kOffRowNumber)),
+                  static_cast<int>(*(RawBase(png_ptr) + kOffPass)));
+    png_error(png_ptr, buf);
+  }
+  std::uint8_t* const row = row_buf + 1;
+
+  const std::uint8_t color_type = *(RawBase(png_ptr) + kOffColorType);
+
+  if ((Transformations(png_ptr) & 0x1000u) != 0) {  // PNG_EXPAND
+    if (*(RawBase(png_ptr) + kOffRowInfoColorType) == 3) {
+      png_do_expand_palette(row_info, row,
+                            Field<std::uint8_t*>(png_ptr, kOffPalette),
+                            Field<std::uint8_t*>(png_ptr, kOffTrans),
+                            static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumTrans)));
+    } else if (Field<std::uint16_t>(png_ptr, kOffNumTrans) != 0) {
+      png_do_expand(row_info, row,
+                    reinterpret_cast<const std::uint16_t*>(RawBase(png_ptr) + kOffTransValues));
+    } else {
+      png_do_expand(row_info, row, nullptr);
+    }
+  }
+
+  if ((Transformations(png_ptr) & 0x40000u) != 0) {  // strip filler
+    png_do_strip_filler(row_info, row, 0x80u);
+  }
+
+  if ((Transformations(png_ptr) & 0x600000u) != 0 &&
+      png_do_rgb_to_gray(png_ptr, row_info, row) != 0) {  // PNG_RGB_TO_GRAY
+    *(RawBase(png_ptr) + kOffRgbToGrayStatus) = 1;
+    if (Transformations(png_ptr) == 0x400000u) {
+      png_warning(png_ptr, "png_do_rgb_to_gray found nongray pixel");
+    }
+    if (Transformations(png_ptr) == 0x200000u) {
+      png_error(png_ptr, "png_do_rgb_to_gray found nongray pixel");
+    }
+  }
+
+  if ((Transformations(png_ptr) & 0x4000u) != 0 && (Mode(png_ptr) & 0x800u) == 0) {
+    png_do_gray_to_rgb(row_info, row);  // PNG_GRAY_TO_RGB (pre mode&0x800)
+  }
+
+  if ((Transformations(png_ptr) & 0x80u) != 0 &&
+      (Field<std::uint16_t>(png_ptr, kOffNumTrans) != 0 || (color_type & 0x04) != 0)) {
+    png_do_background(  // PNG_BACKGROUND
+        row_info, row,
+        reinterpret_cast<const std::uint16_t*>(RawBase(png_ptr) + kOffTransValues),
+        RawBase(png_ptr) + kOffBackground,
+        reinterpret_cast<const std::uint16_t*>(RawBase(png_ptr) + kOffBackground1),
+        Field<std::uint8_t*>(png_ptr, kOffGammaTable),
+        Field<std::uint8_t*>(png_ptr, kOffGammaArg7),
+        Field<std::uint8_t*>(png_ptr, kOffGammaArg8),
+        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Table),
+        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Arg10),
+        Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Arg11),
+        static_cast<std::int16_t>(Field<std::uint16_t>(png_ptr, kOffGammaShift)));
+  }
+
+  {
+    const std::uint32_t t = Transformations(png_ptr);
+    if ((t & 0x2000u) != 0 &&
+        ((t & 0x80u) == 0 ||
+         (Field<std::uint16_t>(png_ptr, kOffNumTrans) == 0 && (color_type & 0x04) == 0)) &&
+        color_type != 3) {
+      png_do_gamma(row_info, row,  // PNG_GAMMA
+                   Field<std::uint8_t*>(png_ptr, kOffGammaTable),
+                   Field<const std::uint16_t* const*>(png_ptr, kOffGamma16Table),
+                   static_cast<int>(Field<std::uint16_t>(png_ptr, kOffGammaShift)));
+    }
+  }
+
+  if ((Transformations(png_ptr) & 0x400u) != 0) {
+    png_do_chop(row_info, row);  // 16 -> 8 bit
+  }
+
+  if ((Transformations(png_ptr) & 0x40u) != 0) {  // PNG_DITHER
+    png_do_dither(row_info, row,
+                  Field<std::uint8_t*>(png_ptr, kOffPaletteLookup),
+                  Field<std::uint8_t*>(png_ptr, kOffDitherIndex));
+    if (Field<std::uint32_t>(png_ptr, kOffRowInfoRowbytes) == 0) {
+      png_error(png_ptr, "png_do_dither returned rowbytes=0");
+    }
+  }
+
+  if ((Transformations(png_ptr) & 0x20u) != 0) {
+    png_do_invert(row_info, row);  // PNG_INVERT_MONO
+  }
+
+  if ((Transformations(png_ptr) & 0x8u) != 0) {
+    png_do_unshift(row_info, row, RawBase(png_ptr) + kOffShift);  // PNG_SHIFT
+  }
+
+  if ((Transformations(png_ptr) & 0x4u) != 0) {
+    png_do_unpack(row_info, row);  // PNG_PACK
+  }
+
+  if ((Transformations(png_ptr) & 0x1u) != 0) {
+    png_do_bgr(row_info, row);  // PNG_BGR
+  }
+
+  if ((Transformations(png_ptr) & 0x10000u) != 0) {
+    png_do_packswap(row_info, row);  // PNG_PACKSWAP
+  }
+
+  if ((Transformations(png_ptr) & 0x4000u) != 0 && (Mode(png_ptr) & 0x800u) != 0) {
+    png_do_gray_to_rgb(row_info, row);  // PNG_GRAY_TO_RGB (post mode&0x800)
+  }
+
+  if ((Transformations(png_ptr) & 0x8000u) != 0) {  // PNG_FILLER
+    png_do_read_filler(row_info, row,
+                       Field<std::uint16_t>(png_ptr, kOffFiller),
+                       Flags(png_ptr));
+  }
+
+  if ((Transformations(png_ptr) & 0x80000u) != 0) {
+    png_do_read_invert_alpha(row_info, row);  // PNG_INVERT_ALPHA
+  }
+
+  if ((Transformations(png_ptr) & 0x20000u) != 0) {
+    png_do_read_swap_alpha(row_info, row);  // PNG_SWAP_ALPHA
+  }
+
+  if ((Transformations(png_ptr) & 0x10u) != 0) {
+    png_do_swap(row_info, row);  // PNG_SWAP_BYTES
+  }
+
+  if ((Transformations(png_ptr) & 0x100000u) != 0) {  // PNG_USER_TRANSFORM
+    using png_user_transform_ptr = void (*)(png_structp, png_row_infop, std::uint8_t*);
+    const auto fn = Field<png_user_transform_ptr>(png_ptr, kOffReadUserTransformFn);
+    if (fn != nullptr) {
+      fn(png_ptr, row_info, row);
+    }
+    const std::uint8_t utd = *(RawBase(png_ptr) + kOffUserTransformDepth);
+    if (utd != 0) {
+      row_info->bit_depth = utd;
+    }
+    const std::uint8_t utc = *(RawBase(png_ptr) + kOffUserTransformChannels);
+    if (utc != 0) {
+      row_info->channels = utc;
+    }
+    const std::uint8_t pd = static_cast<std::uint8_t>(row_info->bit_depth * row_info->channels);
+    row_info->pixel_depth = pd;
+    row_info->rowbytes = (row_info->width * pd + 7) >> 3;
+  }
+}
