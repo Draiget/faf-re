@@ -8180,12 +8180,13 @@ void ReadArchive::EndSection(const bool)
  * Mangled: ?CreateBinaryReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@U_iobuf@@@boost@@@Z
  *
  * What it does:
- * Creates one file-backed concrete `ReadArchive` for save/load serializers.
+ * Allocates one file-backed concrete `ReadArchive` (BinaryReadArchive) bound to
+ * the given stdio stream for save/load serializers. The binary performs no
+ * validity check on the stream: it allocates with non-throwing new (returning
+ * null on allocation failure) and constructs unconditionally -- matching the
+ * write-side CreateBinaryWriteArchive.
  */
 ReadArchive* gpg::CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file)
 {
-  if (!file.get()) {
-    ThrowSerializationError("noread");
-  }
-  return new BinaryReadArchive(file);
+  return new (std::nothrow) BinaryReadArchive(file);
 }
