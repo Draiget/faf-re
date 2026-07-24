@@ -89,7 +89,15 @@ struct png_info_struct
   std::uint8_t  srgb_intent;                 // +0x2C
   std::uint8_t  pad_2D_to_44[0x17];         // +0x2D
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
-  std::uint8_t  pad_49_to_80[0x37];         // +0x49
+  std::uint8_t  pad_49_to_64[0x1B];         // +0x49
+  std::int32_t  x_offset;                    // +0x64  oFFs
+  std::int32_t  y_offset;                    // +0x68
+  std::uint8_t  offset_unit_type;            // +0x6C
+  std::uint8_t  pad_6D_to_70[0x03];         // +0x6D
+  std::uint32_t x_pixels_per_unit;           // +0x70  pHYs
+  std::uint32_t y_pixels_per_unit;           // +0x74
+  std::uint8_t  phys_unit_type;              // +0x78
+  std::uint8_t  pad_79_to_80[0x07];         // +0x79
   float         x_white;                     // +0x80
   float         y_white;                     // +0x84
   float         x_red;                       // +0x88
@@ -119,6 +127,12 @@ using png_fixed_point = std::int32_t;
 
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
 static_assert(offsetof(png_info_struct, sig_bit)     == 0x44);
+static_assert(offsetof(png_info_struct, x_offset)          == 0x64);
+static_assert(offsetof(png_info_struct, y_offset)          == 0x68);
+static_assert(offsetof(png_info_struct, offset_unit_type)  == 0x6C);
+static_assert(offsetof(png_info_struct, x_pixels_per_unit) == 0x70);
+static_assert(offsetof(png_info_struct, y_pixels_per_unit) == 0x74);
+static_assert(offsetof(png_info_struct, phys_unit_type)    == 0x78);
 static_assert(offsetof(png_info_struct, gamma)       == 0x28);
 static_assert(offsetof(png_info_struct, srgb_intent) == 0x2C);
 static_assert(offsetof(png_info_struct, x_white)     == 0x80);
@@ -146,6 +160,8 @@ static_assert(offsetof(png_info_struct, unknown_chunks_num) == 0xC0);
 constexpr std::uint32_t kPngInfoGamma = 0x0001;
 constexpr std::uint32_t kPngInfoSbit  = 0x0002;
 constexpr std::uint32_t kPngInfoChrm  = 0x0004;
+constexpr std::uint32_t kPngInfoPhys  = 0x0080;
+constexpr std::uint32_t kPngInfoOffs  = 0x0100;
 constexpr std::uint32_t kPngInfoSrgb  = 0x0800;
 
 // Maximum gamma value (libpng 1.2.x: 21474.83).
@@ -338,6 +354,15 @@ extern "C" void png_set_shift(png_structp png_ptr, const std::uint8_t* true_bits
  * and marks PNG_INFO_sBIT valid.
  */
 extern "C" void png_set_sBIT(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* sig_bit);
+
+/**
+ * Address: 0x009E9594 (FUN_009E9594)  png_set_pHYs — physical pixel resolution.
+ * Address: 0x009E93D7 (FUN_009E93D7)  png_set_oFFs — image offset/position.
+ */
+extern "C" void png_set_pHYs(png_structp png_ptr, png_infop info_ptr,
+                             std::uint32_t res_x, std::uint32_t res_y, int unit_type);
+extern "C" void png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
+                             std::int32_t offset_x, std::int32_t offset_y, int unit_type);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)

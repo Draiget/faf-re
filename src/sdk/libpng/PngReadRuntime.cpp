@@ -162,6 +162,26 @@ extern "C" unsigned long png_get_uint_32(const std::uint8_t* buf)
 }
 
 /**
+ * Address: 0x00A211AD (FUN_00A211AD)
+ * Mangled: png_get_int_32
+ *
+ * IDA signature:
+ * png_int_32 __cdecl png_get_int_32(png_bytep buf);
+ *
+ * What it does:
+ * Reads a signed 32-bit big-endian integer from a 4-byte buffer (the signed
+ * companion to png_get_uint_32, used for oFFs/pCAL offset fields). The bit
+ * pattern is assembled in unsigned arithmetic and reinterpreted as signed.
+ */
+extern "C" int png_get_int_32(const std::uint8_t* buf)
+{
+  return static_cast<int>((static_cast<std::uint32_t>(buf[0]) << 24) |
+                          (static_cast<std::uint32_t>(buf[1]) << 16) |
+                          (static_cast<std::uint32_t>(buf[2]) << 8) |
+                          static_cast<std::uint32_t>(buf[3]));
+}
+
+/**
  * Address: 0x009E75E2 (FUN_009E75E2)
  * Mangled: png_format_buffer
  *
@@ -2181,6 +2201,123 @@ label_post_inflate:
   if (cb != nullptr) {
     cb(png_ptr, Field<std::uint32_t>(png_ptr, 0xE4), Pass(png_ptr));
   }
+}
+
+/**
+ * Address: 0x00A2326F (FUN_00A2326F)
+ * Mangled: png_handle_pHYs
+ *
+ * IDA signature:
+ * void __cdecl png_handle_pHYs(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a pHYs (physical pixel dimensions) chunk: enforces chunk ordering and
+ * the 9-byte length, reads x/y pixels-per-unit (big-endian u32) and the unit
+ * byte, and stores them into the info struct via png_set_pHYs.
+ */
+extern "C" void png_handle_pHYs(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  std::uint8_t buf[9];
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before pHYs");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid pHYs after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoPhys) != 0) {
+    png_warning(png_ptr, "Duplicate pHYs chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length != 9) {
+    png_warning(png_ptr, "Incorrect pHYs chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  png_crc_read(png_ptr, buf, 9);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  const std::uint32_t res_x = static_cast<std::uint32_t>(png_get_uint_32(buf));
+  const std::uint32_t res_y = static_cast<std::uint32_t>(png_get_uint_32(buf + 4));
+  png_set_pHYs(png_ptr, info_ptr, res_x, res_y, buf[8]);
+}
+
+/**
+ * Address: 0x00A23324 (FUN_00A23324)
+ * Mangled: png_handle_oFFs
+ *
+ * IDA signature:
+ * void __cdecl png_handle_oFFs(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an oFFs (image offset) chunk: enforces chunk ordering and the 9-byte
+ * length, reads x/y offsets (big-endian signed i32) and the unit byte, and
+ * stores them into the info struct via png_set_oFFs.
+ */
+extern "C" void png_handle_oFFs(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  std::uint8_t buf[9];
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before oFFs");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid oFFs after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoOffs) != 0) {
+    png_warning(png_ptr, "Duplicate oFFs chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length != 9) {
+    png_warning(png_ptr, "Incorrect oFFs chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  png_crc_read(png_ptr, buf, 9);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  const std::int32_t offset_x = png_get_int_32(buf);
+  const std::int32_t offset_y = png_get_int_32(buf + 4);
+  png_set_oFFs(png_ptr, info_ptr, offset_x, offset_y, buf[8]);
+}
+
+/**
+ * Address: 0x00A222DD (FUN_00A222DD)
+ * Mangled: png_handle_IEND
+ *
+ * IDA signature:
+ * void __cdecl png_handle_IEND(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Handles the terminal IEND chunk: errors if the file carried no image (IHDR and
+ * IDAT not both seen), marks the stream finished (PNG_AFTER_IDAT | PNG_HAVE_IEND),
+ * warns on any non-zero chunk length, and finishes the CRC.
+ */
+extern "C" void png_handle_IEND(png_structp png_ptr, [[maybe_unused]] png_infop info_ptr,
+                                std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0 || (Mode(png_ptr) & kPngHaveIdat) == 0) {
+    png_error(png_ptr, "No image in file");
+  }
+  Mode(png_ptr) |= (kPngAfterIdat | kPngHaveIend);
+  if (length != 0) {
+    png_warning(png_ptr, "Incorrect IEND chunk length");
+  }
+  png_crc_finish(png_ptr, length);
 }
 
 /**
