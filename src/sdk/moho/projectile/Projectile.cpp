@@ -807,9 +807,10 @@ namespace moho
       mDrawScaleZ = scale;
     }
 
-    // Splice the coord node into Sim::mCoordEntities (ListLinkBefore == tail insert;
-    // it self-unlinks first, matching the binary's self-init + list-tail insert).
-    mCoordNode.ListLinkBefore(&sim->mCoordEntities);
+    // Splice the coord node into Sim::mCoordEntities at the FRONT: the binary
+    // self-inits the node to a singleton then inserts it immediately after the
+    // list sentinel (ListLinkAfter unlinks-first, matching that exactly).
+    mCoordNode.ListLinkAfter(&sim->mCoordEntities);
 
     // Scale velocity = Display.MeshScaleVelocity + rand(±Display.MeshScaleVelocityRange).
     {
@@ -1017,9 +1018,10 @@ namespace moho
     mDrawScaleY += view.mScaleVelocity.y * kProjectileTickSeconds;
     mDrawScaleZ += view.mScaleVelocity.z * kProjectileTickSeconds;
 
-    // Relink the coord node at the Sim coord-list tail (ListLinkBefore self-
-    // unlinks first, matching the binary's unlink-then-append, asm 0x0069BF3B-0069BF5D).
-    mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+    // Relink the coord node at the FRONT of the Sim coord list: the binary
+    // unlinks then inserts immediately after the sentinel (node.prev=sentinel,
+    // node.next=sentinel.next, sentinel.next=node), asm 0x0069BF3B-0069BF5D.
+    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
 
     if (!view.mTrackTarget) {
       // --- Ballistic integration ---

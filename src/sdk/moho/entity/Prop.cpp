@@ -111,7 +111,7 @@ namespace
     QueueEntityForDestroyNoCallback(&prop);
 
     if (prop.SimulationRef) {
-      prop.mCoordNode.ListLinkBefore(&prop.SimulationRef->mCoordEntities);
+      prop.mCoordNode.ListLinkAfter(&prop.SimulationRef->mCoordEntities);
     }
   }
 
@@ -938,7 +938,7 @@ namespace moho
     }
 
     if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
+      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
 
     const float previous = FractionCompleted;
