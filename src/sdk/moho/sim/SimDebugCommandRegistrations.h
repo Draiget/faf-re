@@ -5,6 +5,15 @@ namespace moho
   class CSimConVarBase;
 
   /**
+   * Cross-TU accessor for the process-wide `NoDamage` sim convar object -- the
+   * `SimConVar_NoDamage` global the binary references directly (e.g. from
+   * Entity::AdjustHealth). Returns the registration slot installed by
+   * register_NoDamage_SimConVarDef(); non-null once sim startup registration has
+   * run. Engine code resolves its per-Sim instance via Sim::GetSimVar(...).
+   */
+  [[nodiscard]] CSimConVarBase* GetNoDamageSimConVar();
+
+  /**
    * Address: 0x00BD3890 (FUN_00BD3890, register_SallyShears_ConAliasDef)
    *
    * What it does:

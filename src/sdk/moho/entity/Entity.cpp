@@ -58,6 +58,8 @@
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
+#include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -4339,18 +4341,34 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679860
+   * Address: 0x00679860 (FUN_00679860, Moho::Entity::AdjustHealth)
+   * Mangled: ?AdjustHealth@Entity@Moho@@UAEXPAV12@M@Z
    *
    * What it does:
-   * Applies delta health with dead/heal guard and clamp to [0, MaxHealth].
+   * Logs the requested delta, then applies it clamped to [0, MaxHealth] unless
+   * the "NoDamage" sim cheat blocks a negative delta or the entity is dead and
+   * the delta would heal it. The (unused) first parameter is the instigator.
    */
   void Entity::AdjustHealth(Entity*, const float delta)
   {
-    if (std::isnan(delta) || delta == 0.0f) {
+    SimulationRef->Logf(
+      "Entity[0x%08x]->AdjustHealth(%.5f)\n",
+      static_cast<std::uint32_t>(id_),
+      delta);
+
+    // The binary does NOT special-case NaN: a NaN delta is neither == 0 nor
+    // caught by the clamps below, so it flows through to SetHealth(NaN), matching
+    // retail. Only an exact-zero delta short-circuits (0x00679893).
+    if (delta == 0.0f) {
       return;
     }
 
-    if (Dead && delta > 0.0f) {
+    // The "NoDamage" sim convar blocks all damage (negative deltas); a dead
+    // entity cannot be healed (positive delta). Combined skip guard matches the
+    // binary at 0x006798A4-0x006798DB.
+    CSimConVarInstanceBase* const noDamageVar = SimulationRef->GetSimVar(GetNoDamageSimConVar());
+    const bool noDamage = *static_cast<const std::uint8_t*>(noDamageVar->GetValueStorage()) != 0;
+    if ((noDamage && delta < 0.0f) || (Dead && delta > 0.0f)) {
       return;
     }
 
@@ -4361,7 +4379,6 @@ namespace moho
     if (next < 0.0f) {
       next = 0.0f;
     }
-
     if (next != Health) {
       SetHealth(next);
     }
