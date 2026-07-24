@@ -2060,10 +2060,6 @@ TypeHandle ReadArchive::ReadTypeHandle()
  */
 void ReadArchive::Read(const RType* const type, void* const object, const RRef& ownerRef)
 {
-  if (!type) {
-    ThrowSerializationError("Error detected in archive: null type descriptor.");
-  }
-
   if (!type->serLoadFunc_) {
     const RIndexed* pointerType = type->IsPointer();
     if (pointerType) {
