@@ -1104,6 +1104,17 @@ namespace moho
   }
 
   /**
+   * Cross-TU accessor for the `NoDamage` sim convar. The binary references the
+   * `SimConVar_NoDamage` global directly from engine code (Entity::AdjustHealth);
+   * this forwards to the startup-owned registration slot, upcasting the concrete
+   * TSimConVar<bool>* to the CSimConVarBase* that Sim::GetSimVar expects.
+   */
+  CSimConVarBase* GetNoDamageSimConVar()
+  {
+    return SimConVar_NoDamage_slot();
+  }
+
+  /**
    * Address: 0x00BF5F80 (FUN_00BF5F80, sub_BF5F80)
    *
    * What it does:
