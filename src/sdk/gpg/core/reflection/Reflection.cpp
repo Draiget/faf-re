@@ -740,60 +740,6 @@ RType* CachedRBlueprintType()
     return cached;
 }
 
-  struct LegacyRTypeMapNodeRuntime
-  {
-    LegacyRTypeMapNodeRuntime* left;
-    LegacyRTypeMapNodeRuntime* parent;
-    LegacyRTypeMapNodeRuntime* right;
-    void* payload0;
-    void* payload1;
-    std::uint8_t color;
-    std::uint8_t isNil;
-    std::uint16_t padding;
-  };
-
-  /**
-   * Address: 0x008DA1A0 (FUN_008DA1A0, func_CreateRTypeNode)
-   *
-   * What it does:
-   * Allocates and initializes one red-black tree node header used by the
-   * preregistered RTTI map bootstrap lane.
-   */
-  [[maybe_unused]] LegacyRTypeMapNodeRuntime* AllocatePreregisteredRTypeMapNode()
-  {
-    auto* const node = static_cast<LegacyRTypeMapNodeRuntime*>(::operator new(sizeof(LegacyRTypeMapNodeRuntime)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->payload0 = nullptr;
-    node->payload1 = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    node->padding = 0u;
-    return node;
-  }
-
-  /**
-   * Address: 0x008DA1F0 (FUN_008DA1F0, func_CreateRTypeNode_0)
-   *
-   * What it does:
-   * Allocates and initializes one red-black tree node header used by the
-   * named runtime type map bootstrap lane.
-   */
-  [[maybe_unused]] LegacyRTypeMapNodeRuntime* AllocateRuntimeTypeMapNode()
-  {
-    auto* const node = static_cast<LegacyRTypeMapNodeRuntime*>(::operator new(sizeof(LegacyRTypeMapNodeRuntime)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->payload0 = nullptr;
-    node->payload1 = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    node->padding = 0u;
-    return node;
-  }
-
   constexpr const char* kReflectionHeaderPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\reflection.h";
 
   template <class TPointee>
