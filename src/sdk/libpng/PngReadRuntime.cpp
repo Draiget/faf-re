@@ -14,6 +14,7 @@
 #include <csetjmp>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 
 // ----------------------------------------------------------------------------
 // Externally-linked libpng implementation symbols
@@ -49,6 +50,8 @@ void  png_chunk_error(png_structp png_ptr, const char* error_message);
 void  png_chunk_warning(png_structp png_ptr, const char* warning_message);
 int   png_crc_error(png_structp png_ptr);
 void* png_malloc_warn(png_structp png_ptr, std::uint32_t size);
+void* png_malloc(png_structp png_ptr, std::uint32_t size);
+void  png_free(png_structp png_ptr, void* ptr);
 void  png_check_chunk_name(png_structp png_ptr, const std::uint8_t* chunk_name);
 void  png_set_unknown_chunks(png_structp png_ptr, png_infop info_ptr, png_unknown_chunkp unknowns, int num_unknowns);
 int   png_handle_as_unknown(png_structp png_ptr, const std::uint8_t* chunk_name);
@@ -57,7 +60,8 @@ void  png_read_filter_row(png_structp png_ptr, void* row_info,
                           std::uint8_t* row, std::uint8_t* prev_row, int filter);
 void  png_read_finish_row(png_structp png_ptr);
 void  png_read_start_row(png_structp png_ptr);
-void  png_init_read_transformations(png_structp png_ptr);  // FUN_009E674D (recovered separately)
+void  png_init_read_transformations(png_structp png_ptr);  // FUN_009E674D (defined below)
+void  png_build_gamma_table(png_structp png_ptr);           // FUN_009E6044 (defined below)
 void  png_do_read_transformations(png_structp png_ptr);
 void  png_do_read_intrapixel(int* row_info, std::uint32_t row_addr_plus1);
 void  png_do_read_interlace(png_structp png_ptr);
@@ -747,6 +751,497 @@ extern "C" void png_read_finish_row(png_structp png_ptr)
   }
   inflateReset(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream));
   Mode(png_ptr) |= 8u;
+}
+
+// ============================================================================
+// Read-transform initialization: gamma tables + one-time transform setup.
+// png_build_gamma_table (FUN_009E6044) + png_init_read_transformations
+// (FUN_009E674D). Transcribed from the embedded wxWindows 2.4.2 libpng 1.2.x
+// source (pngrtran.c) and verified 1:1 against the binary .asm.
+// ============================================================================
+
+namespace {
+
+// pngrtran.c:3895  static int png_gamma_shift[] = {...};  (in-binary at 0x00F37DE0)
+constexpr int kPngGammaShift[8] = {0x10, 0x21, 0x42, 0x84, 0x110, 0x248, 0x550, 0xff0};
+
+// libpng PNG_MAX_GAMMA_8: pngrtran uses (16 - PNG_MAX_GAMMA_8) == 5 (asm push 5).
+constexpr int kPngMaxGamma8 = 11;
+
+// pngconf.h PNG_GAMMA_THRESHOLD.
+constexpr double kPngGammaThreshold = 0.05;
+
+// png_composite() accurate macro form: temp = fg*a + bg*(255-a) + 128;
+// composite = (temp + (temp>>8)) >> 8.  FA compiled this variant (add si,80h).
+[[nodiscard]] inline std::uint8_t PngComposite8(std::uint32_t fg,
+                                                std::uint32_t alpha,
+                                                std::uint32_t bg) noexcept
+{
+  const std::uint16_t temp = static_cast<std::uint16_t>(
+      static_cast<std::uint16_t>(fg) * static_cast<std::uint16_t>(alpha) +
+      static_cast<std::uint16_t>(bg) *
+          static_cast<std::uint16_t>(255 - static_cast<std::uint16_t>(alpha)) +
+      static_cast<std::uint16_t>(128));
+  return static_cast<std::uint8_t>((temp + (temp >> 8)) >> 8);
+}
+
+// One 256-entry 16-bit gamma sub-table: malloc 512 bytes, fill via pow(). This
+// is the identical inner body pngrtran.c emits for gamma_16_table (non-bg
+// branch), gamma_16_to_1 and gamma_16_from_1, so it is lifted once.
+[[nodiscard]] inline std::uint16_t* PngBuildGamma16SubTable(png_structp png_ptr,
+                                                            int i, int shift, double g)
+{
+  using namespace libpng_layout;
+  auto* const sub =
+      static_cast<std::uint16_t*>(png_malloc(png_ptr, 256u * sizeof(std::uint16_t)));
+  const std::uint32_t ig =
+      (static_cast<std::uint32_t>(i) *
+       static_cast<std::uint32_t>(kPngGammaShift[shift])) >> 4;
+  for (int j = 0; j < 256; ++j) {
+    sub[j] = static_cast<std::uint16_t>(
+        std::pow(static_cast<double>(ig + (static_cast<std::uint32_t>(j) << 8)) / 65535.0, g) *
+            65535.0 +
+        .5);
+  }
+  return sub;
+}
+
+void InitReadTransformGammaBackgroundPalette(png_structp png_ptr);
+void InitReadTransformGammaBackgroundNonPalette(png_structp png_ptr);
+
+}  // namespace
+
+/**
+ * Address: 0x009E6044 (FUN_009E6044)
+ * Mangled: png_build_gamma_table  (libpng 1.2.x, PRIVATE)
+ *
+ * IDA signature:
+ * void __usercall png_build_gamma_table(png_structp png_ptr);
+ * (the xmm0..xmm7 args in the raw IDA prototype are SSE-scratch noise the
+ *  decompiler attaches to the variadic-looking pow() thunk; png_ptr is the only
+ *  real argument.)
+ *
+ * What it does:
+ * Builds the 8- or 16-bit gamma lookup tables from png_ptr->gamma and
+ * screen_gamma using pow(). For bit_depth<=8 fills gamma_table, plus
+ * gamma_to_1/gamma_from_1 when BACKGROUND|RGB_TO_GRAY is set. For >8-bit builds
+ * the segmented gamma_16_table (a run-length fill when 16_TO_8|BACKGROUND is
+ * set, else a per-cell pow() fill), plus gamma_16_to_1/gamma_16_from_1 when
+ * BACKGROUND|RGB_TO_GRAY is set. Rounding is (cast)(pow(...)*scale + .5).
+ */
+extern "C" void png_build_gamma_table(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  // gamma @0x15C is a 32-bit float (asm fcomp dword ptr [esi+15Ch]).
+  if (Field<float>(png_ptr, kOffGamma) == 0.0f) {
+    return;
+  }
+
+  const double gamma_d        = static_cast<double>(Field<float>(png_ptr, kOffGamma));
+  const double screen_gamma_d = static_cast<double>(Field<float>(png_ptr, kOffScreenGamma));
+  const std::uint32_t transformations = Field<std::uint32_t>(png_ptr, kOffTransformations);
+
+  if (BitDepth(png_ptr) <= 8) {
+    double g;
+    if (screen_gamma_d > .000001) {
+      g = 1.0 / (gamma_d * screen_gamma_d);
+    } else {
+      g = 1.0;
+    }
+
+    auto* const gamma_table = static_cast<std::uint8_t*>(png_malloc(png_ptr, 256u));
+    Field<std::uint8_t*>(png_ptr, kOffGammaTable) = gamma_table;
+    for (int i = 0; i < 256; ++i) {
+      gamma_table[i] = static_cast<std::uint8_t>(
+          std::pow(static_cast<double>(i) / 255.0, g) * 255.0 + .5);
+    }
+
+    if ((transformations & (kPngBackground | kPngRgbToGray)) != 0) {
+      g = 1.0 / gamma_d;
+      auto* const gamma_to_1 = static_cast<std::uint8_t*>(png_malloc(png_ptr, 256u));
+      Field<std::uint8_t*>(png_ptr, kOffGammaTo1) = gamma_to_1;
+      for (int i = 0; i < 256; ++i) {
+        gamma_to_1[i] = static_cast<std::uint8_t>(
+            std::pow(static_cast<double>(i) / 255.0, g) * 255.0 + .5);
+      }
+
+      auto* const gamma_from_1 = static_cast<std::uint8_t*>(png_malloc(png_ptr, 256u));
+      Field<std::uint8_t*>(png_ptr, kOffGammaFrom1) = gamma_from_1;
+      if (screen_gamma_d > .000001) {
+        g = 1.0 / screen_gamma_d;
+      } else {
+        g = gamma_d;  // probably doing rgb_to_gray
+      }
+      for (int i = 0; i < 256; ++i) {
+        gamma_from_1[i] = static_cast<std::uint8_t>(
+            std::pow(static_cast<double>(i) / 255.0, g) * 255.0 + .5);
+      }
+    }
+    return;
+  }
+
+  // ---- 16-bit path ----
+  double g;
+  int sig_bit;
+  if ((ColorType(png_ptr) & kPngColorMaskColor) != 0) {
+    sig_bit = static_cast<int>(Field<std::uint8_t>(png_ptr, kOffSigBitRed));
+    if (static_cast<int>(Field<std::uint8_t>(png_ptr, kOffSigBitGreen)) > sig_bit) {
+      sig_bit = Field<std::uint8_t>(png_ptr, kOffSigBitGreen);
+    }
+    if (static_cast<int>(Field<std::uint8_t>(png_ptr, kOffSigBitBlue)) > sig_bit) {
+      sig_bit = Field<std::uint8_t>(png_ptr, kOffSigBitBlue);
+    }
+  } else {
+    sig_bit = static_cast<int>(Field<std::uint8_t>(png_ptr, kOffSigBitGray));
+  }
+
+  int shift;
+  if (sig_bit > 0) {
+    shift = 16 - sig_bit;
+  } else {
+    shift = 0;
+  }
+  if ((transformations & kPng16To8) != 0) {
+    if (shift < (16 - kPngMaxGamma8)) {
+      shift = (16 - kPngMaxGamma8);
+    }
+  }
+  if (shift > 8) shift = 8;
+  if (shift < 0) shift = 0;
+
+  Field<std::uint8_t>(png_ptr, kOffGammaShift) = static_cast<std::uint8_t>(shift);
+  const int num = (1 << (8 - shift));
+
+  if (screen_gamma_d > .000001) {
+    g = 1.0 / (gamma_d * screen_gamma_d);
+  } else {
+    g = 1.0;
+  }
+
+  auto* const gamma_16_table = static_cast<std::uint16_t**>(
+      png_malloc(png_ptr, static_cast<std::uint32_t>(num) * sizeof(std::uint16_t*)));
+  Field<std::uint16_t**>(png_ptr, kOffGamma16Table) = gamma_16_table;
+
+  if ((transformations & (kPng16To8 | kPngBackground)) != 0) {
+    for (int i = 0; i < num; ++i) {
+      gamma_16_table[i] = static_cast<std::uint16_t*>(
+          png_malloc(png_ptr, 256u * sizeof(std::uint16_t)));
+    }
+
+    g = 1.0 / g;
+    std::uint32_t last = 0;
+    const double num_shifted = static_cast<double>(static_cast<std::uint32_t>(num) << 8);
+    for (int i = 0; i < 256; ++i) {
+      const double fout = (static_cast<double>(i) + 0.5) / 256.0;
+      const double fin  = std::pow(fout, g);
+      const std::uint32_t max = static_cast<std::uint32_t>(fin * num_shifted);
+      while (last <= max) {
+        gamma_16_table[static_cast<int>(last & (0xffu >> shift))]
+                      [static_cast<int>(last >> (8 - shift))] =
+            static_cast<std::uint16_t>(static_cast<std::uint16_t>(i) |
+                                       (static_cast<std::uint16_t>(i) << 8));
+        ++last;
+      }
+    }
+    while (last < (static_cast<std::uint32_t>(num) << 8)) {
+      gamma_16_table[static_cast<int>(last & (0xffu >> shift))]
+                    [static_cast<int>(last >> (8 - shift))] =
+          static_cast<std::uint16_t>(65535L);
+      ++last;
+    }
+  } else {
+    for (int i = 0; i < num; ++i) {
+      gamma_16_table[i] = PngBuildGamma16SubTable(png_ptr, i, shift, g);
+    }
+  }
+
+  if ((transformations & (kPngBackground | kPngRgbToGray)) != 0) {
+    // gamma_16_to_1 built first (stored at 0x178).
+    g = 1.0 / gamma_d;
+    auto* const gamma_16_to_1 = static_cast<std::uint16_t**>(
+        png_malloc(png_ptr, static_cast<std::uint32_t>(num) * sizeof(std::uint16_t*)));
+    Field<std::uint16_t**>(png_ptr, kOffGamma16To1) = gamma_16_to_1;
+    for (int i = 0; i < num; ++i) {
+      gamma_16_to_1[i] = PngBuildGamma16SubTable(png_ptr, i, shift, g);
+    }
+
+    // gamma_16_from_1 (stored at 0x174).
+    if (screen_gamma_d > .000001) {
+      g = 1.0 / screen_gamma_d;
+    } else {
+      g = gamma_d;  // probably doing rgb_to_gray
+    }
+    auto* const gamma_16_from_1 = static_cast<std::uint16_t**>(
+        png_malloc(png_ptr, static_cast<std::uint32_t>(num) * sizeof(std::uint16_t*)));
+    Field<std::uint16_t**>(png_ptr, kOffGamma16From1) = gamma_16_from_1;
+    for (int i = 0; i < num; ++i) {
+      gamma_16_from_1[i] = PngBuildGamma16SubTable(png_ptr, i, shift, g);
+    }
+  }
+}
+
+namespace {
+
+// pngrtran.c:784-881 — PNG_BACKGROUND + PALETTE gamma composite.
+void InitReadTransformGammaBackgroundPalette(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  auto* const palette     = Field<std::uint8_t*>(png_ptr, kOffPalette);
+  const int   num_palette = static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumPalette));
+  const std::uint8_t bg_gamma_type = Field<std::uint8_t>(png_ptr, kOffBackgroundGammaType);
+
+  std::uint8_t back_r, back_g, back_b;
+  std::uint8_t back1_r, back1_g, back1_b;
+
+  const std::uint8_t bg_red   = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundRed));
+  const std::uint8_t bg_green = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundGreen));
+  const std::uint8_t bg_blue  = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundBlue));
+
+  if (bg_gamma_type == kPngBackgroundGammaFile) {
+    const std::uint8_t* const gamma_table = Field<std::uint8_t*>(png_ptr, kOffGammaTable);
+    const std::uint8_t* const gamma_to_1  = Field<std::uint8_t*>(png_ptr, kOffGammaTo1);
+    back_r  = gamma_table[bg_red];  back_g  = gamma_table[bg_green];  back_b  = gamma_table[bg_blue];
+    back1_r = gamma_to_1[bg_red];   back1_g = gamma_to_1[bg_green];   back1_b = gamma_to_1[bg_blue];
+  } else {
+    double g, gs;
+    const double gamma_d        = static_cast<double>(Field<float>(png_ptr, kOffGamma));
+    const double screen_gamma_d = static_cast<double>(Field<float>(png_ptr, kOffScreenGamma));
+    const double bg_gamma_d     = static_cast<double>(Field<float>(png_ptr, kOffBackgroundGamma));
+    switch (bg_gamma_type) {
+      case kPngBackgroundGammaScreen: g = screen_gamma_d;   gs = 1.0;                                 break;
+      case kPngBackgroundGammaFile:   g = 1.0 / gamma_d;    gs = 1.0 / (gamma_d * screen_gamma_d);    break;
+      case kPngBackgroundGammaUnique: g = 1.0 / bg_gamma_d; gs = 1.0 / (bg_gamma_d * screen_gamma_d); break;
+      default:                        g = 1.0;              gs = 1.0;                                 break;
+    }
+
+    if (std::fabs(gs - 1.0) < kPngGammaThreshold) {
+      back_r = bg_red;  back_g = bg_green;  back_b = bg_blue;
+    } else {
+      back_r = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_red)   / 255, gs) * 255.0 + .5);
+      back_g = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_green) / 255, gs) * 255.0 + .5);
+      back_b = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_blue)  / 255, gs) * 255.0 + .5);
+    }
+    back1_r = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_red)   / 255, g) * 255.0 + .5);
+    back1_g = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_green) / 255, g) * 255.0 + .5);
+    back1_b = static_cast<std::uint8_t>(std::pow(static_cast<double>(bg_blue)  / 255, g) * 255.0 + .5);
+  }
+
+  const int num_trans = static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumTrans));
+  const std::uint8_t* const trans        = Field<std::uint8_t*>(png_ptr, kOffTrans);
+  const std::uint8_t* const gamma_to_1   = Field<std::uint8_t*>(png_ptr, kOffGammaTo1);
+  const std::uint8_t* const gamma_from_1 = Field<std::uint8_t*>(png_ptr, kOffGammaFrom1);
+  const std::uint8_t* const gamma_table  = Field<std::uint8_t*>(png_ptr, kOffGammaTable);
+
+  for (int i = 0; i < num_palette; ++i) {
+    std::uint8_t* const e = palette + 3u * i;  // png_color is 3 bytes
+    if (i < num_trans && trans[i] != 0xff) {
+      if (trans[i] == 0) {
+        e[0] = back_r;  e[1] = back_g;  e[2] = back_b;
+      } else {
+        std::uint8_t v, w;
+        v = gamma_to_1[e[0]];  w = PngComposite8(v, trans[i], back1_r);  e[0] = gamma_from_1[w];
+        v = gamma_to_1[e[1]];  w = PngComposite8(v, trans[i], back1_g);  e[1] = gamma_from_1[w];
+        v = gamma_to_1[e[2]];  w = PngComposite8(v, trans[i], back1_b);  e[2] = gamma_from_1[w];
+      }
+    } else {
+      e[0] = gamma_table[e[0]];  e[1] = gamma_table[e[1]];  e[2] = gamma_table[e[2]];
+    }
+  }
+}
+
+// pngrtran.c:883-938 — PNG_BACKGROUND + non-PALETTE gamma composite.
+void InitReadTransformGammaBackgroundNonPalette(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  const double m = static_cast<double>(
+      static_cast<std::uint32_t>((1u << BitDepth(png_ptr)) - 1u));
+  double g  = 1.0;
+  double gs = 1.0;
+
+  const double gamma_d        = static_cast<double>(Field<float>(png_ptr, kOffGamma));
+  const double screen_gamma_d = static_cast<double>(Field<float>(png_ptr, kOffScreenGamma));
+  const double bg_gamma_d     = static_cast<double>(Field<float>(png_ptr, kOffBackgroundGamma));
+  switch (Field<std::uint8_t>(png_ptr, kOffBackgroundGammaType)) {
+    case kPngBackgroundGammaScreen: g = screen_gamma_d;   gs = 1.0;                                 break;
+    case kPngBackgroundGammaFile:   g = 1.0 / gamma_d;    gs = 1.0 / (gamma_d * screen_gamma_d);    break;
+    case kPngBackgroundGammaUnique: g = 1.0 / bg_gamma_d; gs = 1.0 / (bg_gamma_d * screen_gamma_d); break;
+    default: break;
+  }
+
+  auto bg = [&](std::size_t off) -> std::uint16_t& { return Field<std::uint16_t>(png_ptr, off); };
+
+  bg(kOffBackground1Gray) = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundGray)) / m, g)  * m + .5);
+  bg(kOffBackgroundGray)  = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundGray)) / m, gs) * m + .5);
+
+  if (bg(kOffBackgroundRed) != bg(kOffBackgroundGreen) ||
+      bg(kOffBackgroundRed) != bg(kOffBackgroundBlue) ||
+      bg(kOffBackgroundRed) != bg(kOffBackgroundGray)) {
+    bg(kOffBackground1Red)   = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundRed))   / m, g) * m + .5);
+    bg(kOffBackground1Green) = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundGreen)) / m, g) * m + .5);
+    bg(kOffBackground1Blue)  = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundBlue))  / m, g) * m + .5);
+    bg(kOffBackgroundRed)    = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundRed))   / m, gs) * m + .5);
+    bg(kOffBackgroundGreen)  = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundGreen)) / m, gs) * m + .5);
+    bg(kOffBackgroundBlue)   = static_cast<std::uint16_t>(std::pow(static_cast<double>(bg(kOffBackgroundBlue))  / m, gs) * m + .5);
+  } else {
+    bg(kOffBackground1Red) = bg(kOffBackground1Green) = bg(kOffBackground1Blue) = bg(kOffBackground1Gray);
+    bg(kOffBackgroundRed)  = bg(kOffBackgroundGreen)  = bg(kOffBackgroundBlue)  = bg(kOffBackgroundGray);
+  }
+}
+
+}  // namespace
+
+/**
+ * Address: 0x009E674D (FUN_009E674D)
+ * Mangled: png_init_read_transformations  (libpng 1.2.x, PRIVATE)
+ *
+ * What it does:
+ * One-time read-setup dispatcher, run from png_read_start_row before the first
+ * row. Expands the background chunk for gray/palette images, snapshots
+ * background_1 = background, drops PNG_GAMMA for fully opaque/transparent
+ * palettes, then (if GAMMA|RGB_TO_GRAY) builds the gamma tables and applies
+ * gamma+background compositing to the palette / background values. Finally, for
+ * palette images, applies a no-gamma background composite (if BACKGROUND) and
+ * the PNG_SHIFT right-shifts. (The PNG_INVERT_ALPHA tRNS-invert block and the
+ * PNG_USELESS_TESTS null-check present in the reference source were not compiled
+ * into this binary; the .asm has neither.)
+ */
+extern "C" void png_init_read_transformations(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  const int color_type = static_cast<int>(ColorType(png_ptr));
+
+  // ---- Background-expand for gray / palette ----
+  if ((Transformations(png_ptr) & kPngBackgroundExpand) != 0 &&
+      (Transformations(png_ptr) & kPngExpand) != 0) {
+    if ((color_type & kPngColorMaskColor) == 0) {  // GRAY or GRAY_ALPHA
+      switch (BitDepth(png_ptr)) {
+        case 1:
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGray) *= static_cast<std::uint16_t>(0xff);
+          Field<std::uint16_t>(png_ptr, kOffBackgroundRed) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundBlue) =
+              Field<std::uint16_t>(png_ptr, kOffBackgroundGray);
+          break;
+        case 2:
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGray) *= static_cast<std::uint16_t>(0x55);
+          Field<std::uint16_t>(png_ptr, kOffBackgroundRed) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundBlue) =
+              Field<std::uint16_t>(png_ptr, kOffBackgroundGray);
+          break;
+        case 4:
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGray) *= static_cast<std::uint16_t>(0x11);
+          Field<std::uint16_t>(png_ptr, kOffBackgroundRed) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundBlue) =
+              Field<std::uint16_t>(png_ptr, kOffBackgroundGray);
+          break;
+        case 8:
+        case 16:
+          Field<std::uint16_t>(png_ptr, kOffBackgroundRed) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) =
+          Field<std::uint16_t>(png_ptr, kOffBackgroundBlue) =
+              Field<std::uint16_t>(png_ptr, kOffBackgroundGray);
+          break;
+        default:
+          break;
+      }
+    } else if (color_type == kColorTypePalette) {
+      const std::uint8_t* const pal_entry =
+          Field<std::uint8_t*>(png_ptr, kOffPalette) +
+          3u * Field<std::uint8_t>(png_ptr, kOffBackgroundIndex);
+      Field<std::uint16_t>(png_ptr, kOffBackgroundRed)   = pal_entry[0];
+      Field<std::uint16_t>(png_ptr, kOffBackgroundGreen) = pal_entry[1];
+      Field<std::uint16_t>(png_ptr, kOffBackgroundBlue)  = pal_entry[2];
+    }
+  }
+
+  // background_1 = background (10-byte png_color_16 copy).
+  Field<std::uint16_t>(png_ptr, kOffBackground1Index) = Field<std::uint16_t>(png_ptr, kOffBackgroundIndex);
+  Field<std::uint16_t>(png_ptr, kOffBackground1Red)   = Field<std::uint16_t>(png_ptr, kOffBackgroundRed);
+  Field<std::uint16_t>(png_ptr, kOffBackground1Green) = Field<std::uint16_t>(png_ptr, kOffBackgroundGreen);
+  Field<std::uint16_t>(png_ptr, kOffBackground1Blue)  = Field<std::uint16_t>(png_ptr, kOffBackgroundBlue);
+  Field<std::uint16_t>(png_ptr, kOffBackground1Gray)  = Field<std::uint16_t>(png_ptr, kOffBackgroundGray);
+
+  // ---- Drop PNG_GAMMA for fully opaque/transparent palettes ----
+  if (color_type == kColorTypePalette &&
+      Field<std::uint16_t>(png_ptr, kOffNumTrans) != 0 &&
+      std::fabs(static_cast<double>(Field<float>(png_ptr, kOffScreenGamma)) *
+                    static_cast<double>(Field<float>(png_ptr, kOffGamma)) -
+                1.0) < kPngGammaThreshold) {
+    int k = 0;
+    const std::uint8_t* const trans = Field<std::uint8_t*>(png_ptr, kOffTrans);
+    const int istop = static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumTrans));
+    for (int i = 0; i < istop; ++i) {
+      if (trans[i] != 0 && trans[i] != 0xff) {
+        k = 1;  // partial transparency present
+      }
+    }
+    if (k == 0) {
+      Transformations(png_ptr) &= ~kPngGamma;
+    }
+  }
+
+  // ---- Gamma / RGB-to-gray path ----
+  if ((Transformations(png_ptr) & (kPngGamma | kPngRgbToGray)) != 0) {
+    png_build_gamma_table(png_ptr);
+
+    if ((Transformations(png_ptr) & kPngBackground) != 0) {
+      if (color_type == kColorTypePalette) {
+        InitReadTransformGammaBackgroundPalette(png_ptr);
+      } else {
+        InitReadTransformGammaBackgroundNonPalette(png_ptr);
+      }
+    } else if (color_type == kColorTypePalette) {
+      // palette[i].rgb = gamma_table[palette[i].rgb]
+      const std::uint16_t num_palette = Field<std::uint16_t>(png_ptr, kOffNumPalette);
+      auto* const palette = Field<std::uint8_t*>(png_ptr, kOffPalette);
+      const std::uint8_t* const gamma_table = Field<std::uint8_t*>(png_ptr, kOffGammaTable);
+      for (std::uint16_t i = 0; i < num_palette; ++i) {
+        std::uint8_t* const e = palette + 3u * i;
+        e[0] = gamma_table[e[0]];  e[1] = gamma_table[e[1]];  e[2] = gamma_table[e[2]];
+      }
+    }
+  } else if ((Transformations(png_ptr) & kPngBackground) != 0 &&
+             color_type == kColorTypePalette) {
+    // ---- No-gamma background composite for palette ----
+    const int istop = static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumTrans));
+    auto* const palette = Field<std::uint8_t*>(png_ptr, kOffPalette);
+    const std::uint8_t* const trans = Field<std::uint8_t*>(png_ptr, kOffTrans);
+    const std::uint8_t back_r = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundRed));
+    const std::uint8_t back_g = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundGreen));
+    const std::uint8_t back_b = static_cast<std::uint8_t>(Field<std::uint16_t>(png_ptr, kOffBackgroundBlue));
+    for (int i = 0; i < istop; ++i) {
+      std::uint8_t* const e = palette + 3u * i;
+      if (trans[i] == 0) {
+        e[0] = back_r;  e[1] = back_g;  e[2] = back_b;
+      } else if (trans[i] != 0xff) {
+        e[0] = PngComposite8(e[0], trans[i], back_r);
+        e[1] = PngComposite8(e[1], trans[i], back_g);
+        e[2] = PngComposite8(e[2], trans[i], back_b);
+      }
+    }
+  }
+
+  // ---- PNG_SHIFT for palette ----
+  if ((Transformations(png_ptr) & kPngShift) != 0 && color_type == kColorTypePalette) {
+    int sr = 8 - Field<std::uint8_t>(png_ptr, kOffSigBitRed);
+    int sg = 8 - Field<std::uint8_t>(png_ptr, kOffSigBitGreen);
+    int sb = 8 - Field<std::uint8_t>(png_ptr, kOffSigBitBlue);
+    if (sr < 0 || sr > 8) sr = 0;
+    if (sg < 0 || sg > 8) sg = 0;
+    if (sb < 0 || sb > 8) sb = 0;
+    const std::uint16_t istop = Field<std::uint16_t>(png_ptr, kOffNumPalette);
+    auto* const palette = Field<std::uint8_t*>(png_ptr, kOffPalette);
+    for (std::uint16_t i = 0; i < istop; ++i) {
+      std::uint8_t* const e = palette + 3u * i;
+      e[0] >>= sr;  e[1] >>= sg;  e[2] >>= sb;
+    }
+  }
 }
 
 /**

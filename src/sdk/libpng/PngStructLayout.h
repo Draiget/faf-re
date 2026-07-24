@@ -103,7 +103,17 @@ constexpr std::size_t kOffTrans             = 0x188;  // png_bytep    trans (tRN
 constexpr std::size_t kOffBackgroundGammaType = 0x130; // int         background_gamma_type (read as byte @0x9E68DE)
 constexpr std::size_t kOffBackgroundGamma   = 0x134;  // float        background_gamma (lea @0x9E6942)
 constexpr std::size_t kOffBackground        = 0x138;  // png_color_16 background (10 bytes)
+constexpr std::size_t kOffBackgroundIndex   = 0x138;  //   .index (png_byte)
+constexpr std::size_t kOffBackgroundRed     = 0x13A;  //   .red   (png_uint_16)
+constexpr std::size_t kOffBackgroundGreen   = 0x13C;  //   .green
+constexpr std::size_t kOffBackgroundBlue    = 0x13E;  //   .blue
+constexpr std::size_t kOffBackgroundGray    = 0x140;  //   .gray
 constexpr std::size_t kOffBackground1       = 0x142;  // png_color_16 background_1 (10 bytes)
+constexpr std::size_t kOffBackground1Index  = 0x142;  //   .index
+constexpr std::size_t kOffBackground1Red    = 0x144;  //   .red
+constexpr std::size_t kOffBackground1Green  = 0x146;  //   .green
+constexpr std::size_t kOffBackground1Blue   = 0x148;  //   .blue
+constexpr std::size_t kOffBackground1Gray   = 0x14A;  //   .gray
 constexpr std::size_t kOffGammaShift        = 0x158;  // png_byte     gamma_shift (written by png_build_gamma_table)
 constexpr std::size_t kOffGamma             = 0x15C;  // float        gamma (image-file gamma; fcomp dword @0x9E6050)
 constexpr std::size_t kOffScreenGamma       = 0x160;  // float        screen_gamma (fld dword @0x9E6072)
@@ -161,6 +171,12 @@ constexpr std::uint32_t kPngBgr            = 0x0001;
 constexpr std::uint32_t kPngInterlace      = 0x0002;
 constexpr std::uint32_t kPngPack           = 0x0004;
 constexpr std::uint32_t kPngShift          = 0x0008;
+constexpr std::uint32_t kPngBackground     = 0x0080;
+constexpr std::uint32_t kPngBackgroundExpand = 0x0100;
+constexpr std::uint32_t kPng16To8          = 0x0400;
+constexpr std::uint32_t kPngExpand         = 0x1000;
+constexpr std::uint32_t kPngGamma          = 0x2000;
+constexpr std::uint32_t kPngRgbToGray      = 0x600000;
 constexpr std::uint32_t kPngFiller         = 0x8000;
 constexpr std::uint32_t kPngPackSwap       = 0x10000;
 constexpr std::uint32_t kPngSwapAlpha      = 0x20000;
@@ -183,5 +199,11 @@ constexpr std::uint8_t kColorTypeRgb       = 2;
 constexpr std::uint8_t kColorTypePalette   = 3;
 constexpr std::uint8_t kColorTypeGrayAlpha = 4;
 constexpr std::uint8_t kColorTypeRgbAlpha  = 6;
+constexpr std::uint8_t kPngColorMaskColor  = 0x02;  // PNG_COLOR_MASK_COLOR
+
+// png_ptr->background_gamma_type enum (png.h):
+constexpr std::uint8_t kPngBackgroundGammaScreen = 1;
+constexpr std::uint8_t kPngBackgroundGammaFile   = 2;
+constexpr std::uint8_t kPngBackgroundGammaUnique = 3;
 
 } // namespace libpng_layout
