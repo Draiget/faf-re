@@ -14,6 +14,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
@@ -1368,6 +1369,18 @@ namespace
   };
 
   [[maybe_unused]] CAiNavigatorImplStartupBootstrap gCAiNavigatorImplStartupBootstrap;
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
 } // namespace
 
 /**
@@ -1399,7 +1412,12 @@ CAiNavigatorImpl::CAiNavigatorImpl()
   , mIgnoreFormation(0)
   , mPad61{0, 0, 0}
   , mStatus(AINAVSTATUS_Idle)
-{}
+{
+  // Increment the CAiNavigatorImpl instance-count stat (binary FUN_005A3550).
+  // The (Unit*) ctor delegates here via `: CAiNavigatorImpl()`, so it inherits
+  // the +1 -- one increment per construction, matching the binary.
+  AddStatCounter(InstanceCounter<CAiNavigatorImpl>::GetStatItem(), 1L);
+}
 
 /**
  * Address: 0x005A33E0 (FUN_005A33E0, unit ctor)
@@ -1430,7 +1448,14 @@ CAiNavigatorImpl::CAiNavigatorImpl(Unit* const unit)
  * Address: 0x005A37B0 (FUN_005A37B0, scalar deleting thunk)
  * Address: 0x005A37E0 (FUN_005A37E0, core dtor)
  */
-CAiNavigatorImpl::~CAiNavigatorImpl() = default;
+CAiNavigatorImpl::~CAiNavigatorImpl()
+{
+  // Decrement the CAiNavigatorImpl instance-count stat (binary FUN_005A37E0).
+  // The base ~IAiNavigator / ~CTask / ~CScriptObject subobject teardowns
+  // (including the Broadcaster<EAiNavigatorEvent> owner-chain unlink) still run
+  // automatically after this body, exactly as they did with `= default`.
+  AddStatCounter(InstanceCounter<CAiNavigatorImpl>::GetStatItem(), -1L);
+}
 
 /**
  * Address: 0x005A8C70 (FUN_005A8C70, Moho::CAiNavigatorImpl::MemberDeserialize)
