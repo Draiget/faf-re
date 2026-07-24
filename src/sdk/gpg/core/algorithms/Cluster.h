@@ -146,6 +146,22 @@ namespace gpg::HaStar
          * buckets into the trailing storage. Asserts `nodeCount < 256`.
          */
         void SetData(const Node* nodes, const Edge* edges, unsigned int nodeCount);
+
+        /**
+         * Address: 0x00954030 (FUN_00954030,
+         * ?cmp@Cluster@HaStar@gpg@@QBEHABV123@@Z)
+         *
+         * IDA signature:
+         * int __thiscall Cluster::cmp(Cluster* this, Cluster* other);
+         *
+         * What it does:
+         * Total-orders two cluster handles for the subcluster cache. Handles
+         * sharing the same payload compare equal; otherwise the two inline
+         * payload blobs (`mNodeCount` + `Node[n]` + `Edge[n*(n-1)/2]`, with `n`
+         * taken from this handle's node count) are compared byte-for-byte and
+         * the result is normalized to -1 / 0 / +1.
+         */
+        [[nodiscard]] int cmp(const Cluster& other) const;
     };
 
     struct SubclusterData
