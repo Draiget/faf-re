@@ -905,7 +905,7 @@ namespace moho
    * HLSL variable names are byte-verified as the exact null-terminated strings
    * passed to `RegisterShaderVar(...)` in the per-var CRT init functions
    * (`register_ShaderVarMesh*`, 0x00BE0540..0x00BE0840) and read directly from
-   * bin/2025.7.1/ForgedAlliance.exe. All 23 register against the effect file
+   * bin/2025.7.1/ForgedAlliance.exe. All 25 register against the effect file
    * "mesh".
    */
   struct MeshShaderVarSet
@@ -926,6 +926,8 @@ namespace moho
     ShaderVar shadowFill;         // "shadowFill"          @0x010BEA60
     ShaderVar surfaceElevation;   // "surfaceElevation"    @0x010BECE8
     ShaderVar abyssElevation;     // "abyssElevation"      @0x010BE6B8
+    ShaderVar minimumElevation;   // "minimumElevation"    @0x010BED78 (register_ShaderVarMeshMinimumElevation 0x00BE0780)
+    ShaderVar maximumElevation;   // "maximumElevation"    @0x010BE9D0 (register_ShaderVarMeshMaximumElevation 0x00BE07A0)
     ShaderVar waterRamp;          // "waterRamp"           @0x010BE988
     ShaderVar shadowsEnabled;     // "shadowsEnabled"      @0x010BEE08
     ShaderVar shadowMatrix;       // "shadowMatrix"        @0x010BEA18
@@ -1180,9 +1182,9 @@ namespace moho
      * tree.
      */
     void RenderCartographic(
-      float projectionScaleX,
-      float projectionScaleY,
-      float projectionScaleZ,
+      float surfaceElevation,
+      float minimumElevation,
+      float maximumElevation,
       const GeomCamera3& camera
     );
 
@@ -1288,9 +1290,9 @@ namespace moho
      * ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@VMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@U?$less@VMeshBatchKey@Moho@@@4@V?$allocator@U?$pair@$$CBVMeshBatchKey@Moho@@V?$vector@PAVMeshInstance@Moho@@V?$allocator@PAVMeshInstance@Moho@@@std@@@std@@@std@@@4@@std@@@Z)
      */
     void RenderCartographic(
-      float projectionScaleX,
-      float projectionScaleY,
-      float projectionScaleZ,
+      float surfaceElevation,
+      float minimumElevation,
+      float maximumElevation,
       const GeomCamera3& camera,
       MeshBatchBucketTree& meshMap
     );

@@ -6105,7 +6105,12 @@ namespace moho
    * against the `"mesh"` effect file. The HLSL names are byte-verified as the
    * exact strings passed to the binary's per-var `RegisterShaderVar` calls
    * (`register_ShaderVarMesh*`, 0x00BE0540..0x00BE0840) — read directly from
-   * bin/2025.7.1/ForgedAlliance.exe. Mirrors `TerrainShaderVarSet`.
+   * bin/2025.7.1/ForgedAlliance.exe. The two cartographic elevation vars are
+   * registered by register_ShaderVarMeshMinimumElevation (0x00BE0780, literal
+   * "minimumElevation" @VA 0xE3F66C, global 0x010BED78) and
+   * register_ShaderVarMeshMaximumElevation (0x00BE07A0, literal
+   * "maximumElevation" @VA 0xE3F680, global 0x010BE9D0). Mirrors
+   * `TerrainShaderVarSet`.
    */
   MeshShaderVarSet::MeshShaderVarSet()
   {
@@ -6125,6 +6130,8 @@ namespace moho
     RegisterShaderVar("shadowFill", &shadowFill, "mesh");
     RegisterShaderVar("surfaceElevation", &surfaceElevation, "mesh");
     RegisterShaderVar("abyssElevation", &abyssElevation, "mesh");
+    RegisterShaderVar("minimumElevation", &minimumElevation, "mesh"); // 0x00BE0780
+    RegisterShaderVar("maximumElevation", &maximumElevation, "mesh"); // 0x00BE07A0
     RegisterShaderVar("waterRamp", &waterRamp, "mesh");
     RegisterShaderVar("shadowsEnabled", &shadowsEnabled, "mesh");
     RegisterShaderVar("shadowMatrix", &shadowMatrix, "mesh");
@@ -6810,22 +6817,145 @@ namespace moho
   /**
    * Address: 0x007DFF30 (FUN_007DFF30, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@...@Z)
    *
+   * IDA signature:
+   * void __thiscall Moho::MeshRenderer::RenderCartographic(
+   *   MeshRenderer* this, std::map<MeshBatchKey, vector<MeshInstance*>>* map,
+   *   float surfaceElevation, float minimumElevation, float maximumElevation,
+   *   const GeomCamera3& camera);
+   *
    * What it does:
-   * Draws one mesh batch tree in cartographic mode.
+   * Draws one mesh batch tree in cartographic (minimap) mode. Binds the seven
+   * cartographic mesh shader-vars for this pass (time / lodBasis / the three
+   * elevation floats / view / proj), then walks the batch-bucket RB-tree in key
+   * order. Unlike Render it does NOT call ConfigureShader and does NOT select an
+   * effect — the caller has already made a cartographic effect the device's
+   * current effect, so it reads `device->GetCurEffect()` to resolve the per-
+   * material cartographic technique. There is no renderStage gate: each material
+   * lazily resolves + caches its "cartographicTechnique" string annotation
+   * (`MeshMaterial::mAuxTag0`, guarded by `mRuntimeFlag0`) and is drawn only when
+   * that technique is non-empty. Per material it binds the albedo/specular/
+   * normals samplers (this bind order), then draws the bucket's instances through
+   * the LOD's lazily-built skinned/static hardware batch, always un-mirrored
+   * (binary pushes 0 as the last Render arg, 0x007E030C).
+   *
+   * The three float params are the elevation lane: the binary binds
+   * `shaderVarMeshSurfaceElevation = a3`, `shaderVarMeshMinimumElevation = a4`,
+   * `shaderVarMeshMaximumElevation = a5` (0x007E0000..0x007E006C), which is why
+   * they are named surface/minimum/maximum here rather than the decompiler's
+   * mislabelled projection-scale trio.
    */
   void MeshRenderer::RenderCartographic(
-    const float projectionScaleX,
-    const float projectionScaleY,
-    const float projectionScaleZ,
+    const float surfaceElevation,
+    const float minimumElevation,
+    const float maximumElevation,
     const GeomCamera3& camera,
     MeshBatchBucketTree& meshMap
   )
   {
-    (void)projectionScaleX;
-    (void)projectionScaleY;
-    (void)projectionScaleZ;
-    (void)camera;
-    (void)meshMap;
+    // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
+    if (meshMap.size == 0) {
+      return;
+    }
+
+    // The current effect is whatever cartographic effect the caller selected;
+    // GetResources() is still pinged at the head of the pass exactly as the
+    // binary does (D3D_GetDevice()->GetResources(), 0x007DFF69..0x007DFF79).
+    MeshShaderVarSet& sv = GetMeshShaderVars();
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->GetResources();
+
+    // Frame time: fold the frame counter into a float (with the unsigned int
+    // fixup the binary applies to negative counters), add the accumulated delta
+    // frame, then wrap into the shader time window (fmod by 36000). Identical to
+    // RenderDepth's / ConfigureShader's shaderTime lane.
+    const auto frameCounter = static_cast<std::int32_t>(instanceListSize);
+    double frameSeconds = static_cast<double>(frameCounter);
+    if (frameCounter < 0) {
+      frameSeconds += 4294967296.0; // 2^32 unsigned fixup (dbl_E4F710)
+    }
+    frameSeconds += deltaFrame;
+    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    if (sv.time.Exists()) {
+      sv.time.SetFloat(shaderTime);
+    }
+
+    // Bind the cartographic shader-constant lane in binary order: LOD basis
+    // (viewport matrix row 1, camera.viewport.r[1], 4 floats = arg5+660), then
+    // the three elevation floats, then the view/projection matrices (arg5+92 /
+    // arg5+28). (Transcribed from FUN_007DFF30 @0x007DFFD6..0x007E00A8.)
+    if (sv.lodBasis.Exists()) {
+      SetShaderVarMem(sv.lodBasis, 4, &camera.viewport.r[1].x);
+    }
+    if (sv.minimumElevation.Exists()) {
+      sv.minimumElevation.SetFloat(minimumElevation);
+    }
+    if (sv.maximumElevation.Exists()) {
+      sv.maximumElevation.SetFloat(maximumElevation);
+    }
+    if (sv.surfaceElevation.Exists()) {
+      sv.surfaceElevation.SetFloat(surfaceElevation);
+    }
+    if (sv.viewMatrix.Exists()) {
+      sv.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (sv.projMatrix.Exists()) {
+      sv.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    // Cartographic mode does NOT select an effect: it consumes the effect the
+    // caller already made current (binary: `effect = device->GetCurEffect()`,
+    // vtbl+0x58 @0x007E00AA..0x007E00B3). This effect resolves each material's
+    // cartographic technique string annotation.
+    CD3DEffect* const effect = device->GetCurEffect();
+
+    MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
+
+    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
+    MeshBatchBucketNode* const headNode = meshMap.head;
+    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
+      MeshLOD* const lod = MeshBatchEntryLod(node);
+      MeshMaterial& material = lod->mat;
+
+      // Lazily resolve + cache this material's cartographic technique the first
+      // time the cartographic pass reaches it (binary: `if (!mMat.byte8C) {
+      // mMat.byte8C = 1; mMat.mStr2 = GetStringAnnotation(mAnnot,
+      // "cartographicTechnique", ""); }`). Unlike Render/RenderDepth there is no
+      // renderStage gate — the only per-material gate is a non-empty technique.
+      if (!material.mRuntimeFlag0) {
+        material.mRuntimeFlag0 = 1;
+        const msvc8::string cartographicTechnique =
+          effect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("cartographicTechnique"), msvc8::string(""));
+        material.mAuxTag0.assign_owned(cartographicTechnique.view());
+      }
+
+      // Only draw when a cartographic technique is defined for the material
+      // (binary: `if (mMat.mStr2._Mysize)`).
+      if (material.mAuxTag0.size() != 0) {
+        device->SelectTechnique(material.mAuxTag0.c_str());
+
+        // Cartographic pass binds three samplers, in binary bind order:
+        // albedo, specular, normals (0x007E01FD / 0x007E020B / 0x007E0219).
+        tv.albedoTexture.GetTexture(material.mAlbedoSheet);
+        tv.specularTexture.GetTexture(material.mSpecularSheet);
+        tv.normalsTexture.GetTexture(material.mNormalsSheet);
+
+        // Draw the bucket's instances through the LOD's lazily-built hardware
+        // mesh batch (skinned for static-pose buckets, static otherwise). The
+        // shared_ptr handle keeps the batch retained for the draw call; the
+        // cartographic pass always draws un-mirrored (binary pushes 0,
+        // 0x007E030C).
+        boost::shared_ptr<MeshBatch> batchHandle;
+        if (MeshBatchEntryIsSkinned(node)) {
+          lod->GetSkinnedBatch(batchHandle);
+        } else {
+          lod->GetStaticBatch(batchHandle);
+        }
+        if (batchHandle) {
+          batchHandle->Render(MeshBatchEntryInstances(node), false);
+        }
+      }
+    }
   }
 
   /**
@@ -7129,13 +7259,13 @@ namespace moho
    * renderer's persistent `meshes` tree.
    */
   void MeshRenderer::RenderCartographic(
-    const float projectionScaleX,
-    const float projectionScaleY,
-    const float projectionScaleZ,
+    const float surfaceElevation,
+    const float minimumElevation,
+    const float maximumElevation,
     const GeomCamera3& camera
   )
   {
-    RenderCartographic(projectionScaleX, projectionScaleY, projectionScaleZ, camera, meshes);
+    RenderCartographic(surfaceElevation, minimumElevation, maximumElevation, camera, meshes);
   }
 
   /**
