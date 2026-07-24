@@ -1125,8 +1125,13 @@ label_post_inflate:
   // Build the row_info struct that the unfilter / transform path consumes.
   const std::uint8_t color_type = ColorType(png_ptr);
   const std::uint8_t bit_depth  = BitDepth(png_ptr);
-  const std::uint8_t channels   = *(RawBase(png_ptr) + 0x129);
-  const std::uint8_t pixel_depth= *(RawBase(png_ptr) + 0x12A);
+  // Fixed swapped offsets: png_handle_IHDR stores pixel_depth (channels*bit_depth)
+  // at 0x129 and channels (1/2/3/4) at 0x12A; png_read_row's binary (FUN_009E1383)
+  // copies 0x12A->row_info.channels and 0x129->row_info.pixel_depth. The prior read
+  // had these transposed, so row_info.pixel_depth and the row_bytes below were
+  // computed from the channel count instead of the true pixel depth.
+  const std::uint8_t channels   = *(RawBase(png_ptr) + 0x12A);
+  const std::uint8_t pixel_depth= *(RawBase(png_ptr) + 0x129);
   *(RawBase(png_ptr) + 0x108) = color_type;     // row_info.color_type mirror
   *(RawBase(png_ptr) + 0x109) = bit_depth;
   *(RawBase(png_ptr) + 0x10A) = channels;

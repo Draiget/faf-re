@@ -66,8 +66,8 @@ constexpr std::size_t kOffRowbytes          = 0xE4;   // png_uint_32 rowbytes / 
 
 constexpr std::size_t kOffBitDepth          = 0x127;  // png_byte bit_depth (offset 295)
 constexpr std::size_t kOffColorType         = 0x126;  // png_byte color_type (offset 294)
-constexpr std::size_t kOffChannels          = 0x129;  // png_byte channels   (offset 297)
-constexpr std::size_t kOffPixelDepth        = 0x12A;  // png_byte pixel_depth(offset 298)
+constexpr std::size_t kOffPixelDepth        = 0x129;  // png_byte pixel_depth (offset 297) = channels*bit_depth, set by png_handle_IHDR
+constexpr std::size_t kOffChannels          = 0x12A;  // png_byte channels    (offset 298) = 1/2/3/4, set by png_handle_IHDR
 constexpr std::size_t kOffUsrChannels       = 0x12B;  // png_byte usr_channels (offset 299)
 constexpr std::size_t kOffUsrBitDepth       = 0x128;  // png_byte usr_bit_depth(offset 296)
 constexpr std::size_t kOffInterlaced        = 0x123;  // png_byte interlaced (offset 291)
