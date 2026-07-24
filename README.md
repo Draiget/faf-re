@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,388` (81.73%)
+- `recovered`: `53,390` (81.73%)
 - `skip`: `6,170` (9.45%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
-- `external_dependency`: `5,764` (8.82%) — third-party libs
+- `external_dependency`: `5,762` (8.82%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `29` (0.04%)
@@ -30,14 +30,14 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (53,388 functions) — wiring health
+### Recovered (53,390 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `15,543` | 29.11% |
+| **Confirmed caller** (recovered binary caller wired by name) | `15,546` | 29.12% |
 | Vtable-anchored (virtual override of a recovered class) | `5,843` | 10.94% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,499` | 10.30% |
-| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,574` | 4.82% |
+| Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,573` | 4.82% |
 | No callsite evidence (no recorded code/data caller in the index) | `23,710` | 44.41% |
 | Unclassified data xref (manual review) | `215` | 0.40% |
 | RTTI-only | `4` | 0.01% |
