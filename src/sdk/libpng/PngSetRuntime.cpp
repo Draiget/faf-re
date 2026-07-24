@@ -392,6 +392,24 @@ extern "C" void png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
 }
 
 /**
+ * Address: 0x009E99B7 (FUN_009E99B7)
+ * Mangled: png_set_tIME
+ *
+ * Stores the image modification time into info_ptr->mod_time and marks
+ * PNG_INFO_tIME valid — but only when tIME has not already been written
+ * (png_ptr->mode & PNG_WROTE_tIME).
+ */
+extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* mod_time)
+{
+  using namespace libpng_layout;
+  if (png_ptr == nullptr || info_ptr == nullptr || (Mode(png_ptr) & kPngWroteTime) != 0) {
+    return;
+  }
+  std::memcpy(info_ptr->mod_time, mod_time, sizeof(info_ptr->mod_time));
+  info_ptr->valid |= kPngInfoTime;
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *

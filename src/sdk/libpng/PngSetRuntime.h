@@ -87,7 +87,8 @@ struct png_info_struct
   std::uint8_t  pad_0C_to_28[0x1C];         // +0x0C
   float         gamma;                       // +0x28
   std::uint8_t  srgb_intent;                 // +0x2C
-  std::uint8_t  pad_2D_to_44[0x17];         // +0x2D
+  std::uint8_t  pad_2D_to_3C[0x0F];         // +0x2D
+  std::uint8_t  mod_time[8];                 // +0x3C  tIME png_time (year u16, m/d/h/m/s bytes)
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
   std::uint8_t  pad_49_to_64[0x1B];         // +0x49
   std::int32_t  x_offset;                    // +0x64  oFFs
@@ -126,6 +127,7 @@ using png_infop       = png_info_struct*;
 using png_fixed_point = std::int32_t;
 
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
+static_assert(offsetof(png_info_struct, mod_time)    == 0x3C);
 static_assert(offsetof(png_info_struct, sig_bit)     == 0x44);
 static_assert(offsetof(png_info_struct, x_offset)          == 0x64);
 static_assert(offsetof(png_info_struct, y_offset)          == 0x68);
@@ -162,6 +164,9 @@ constexpr std::uint32_t kPngInfoSbit  = 0x0002;
 constexpr std::uint32_t kPngInfoChrm  = 0x0004;
 constexpr std::uint32_t kPngInfoPhys  = 0x0080;
 constexpr std::uint32_t kPngInfoOffs  = 0x0100;
+constexpr std::uint32_t kPngInfoTime  = 0x0200;
+// png_struct.mode flag PNG_WROTE_tIME (guards png_set_tIME from overwriting):
+constexpr std::uint32_t kPngWroteTime = 0x0200;
 constexpr std::uint32_t kPngInfoSrgb  = 0x0800;
 
 // Maximum gamma value (libpng 1.2.x: 21474.83).
@@ -363,6 +368,12 @@ extern "C" void png_set_pHYs(png_structp png_ptr, png_infop info_ptr,
                              std::uint32_t res_x, std::uint32_t res_y, int unit_type);
 extern "C" void png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
                              std::int32_t offset_x, std::int32_t offset_y, int unit_type);
+
+/**
+ * Address: 0x009E99B7 (FUN_009E99B7)  png_set_tIME — image modification time.
+ * Takes a raw 8-byte png_time image (year u16 + m/d/h/m/s) as the binary does.
+ */
+extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* mod_time);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)

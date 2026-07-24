@@ -182,6 +182,23 @@ extern "C" int png_get_int_32(const std::uint8_t* buf)
 }
 
 /**
+ * Address: 0x00A211D0 (FUN_00A211D0)
+ * Mangled: png_get_uint_16
+ *
+ * IDA signature:
+ * png_uint_16 __cdecl png_get_uint_16(png_bytep buf);
+ *
+ * What it does:
+ * Reads a 16-bit big-endian integer from a 2-byte buffer (chunk fields such as
+ * tIME year, hIST entries, sPLT samples).
+ */
+extern "C" std::uint16_t png_get_uint_16(const std::uint8_t* buf)
+{
+  return static_cast<std::uint16_t>((static_cast<std::uint16_t>(buf[0]) << 8) |
+                                    static_cast<std::uint16_t>(buf[1]));
+}
+
+/**
  * Address: 0x009E75E2 (FUN_009E75E2)
  * Mangled: png_format_buffer
  *
@@ -2201,6 +2218,56 @@ label_post_inflate:
   if (cb != nullptr) {
     cb(png_ptr, Field<std::uint32_t>(png_ptr, 0xE4), Pass(png_ptr));
   }
+}
+
+/**
+ * Address: 0x00A23718 (FUN_00A23718)
+ * Mangled: png_handle_tIME
+ *
+ * IDA signature:
+ * void __cdecl png_handle_tIME(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a tIME (image modification time) chunk: requires IHDR, rejects a
+ * duplicate, notes AFTER_IDAT when it arrives past the image data, enforces the
+ * 7-byte length, reads the year (big-endian u16) + month/day/hour/minute/second
+ * bytes into a png_time, and stores it via png_set_tIME.
+ */
+extern "C" void png_handle_tIME(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Out of place tIME chunk");
+  }
+  if (info_ptr != nullptr && (info_ptr->valid & kPngInfoTime) != 0) {
+    png_warning(png_ptr, "Duplicate tIME chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    Mode(png_ptr) |= kPngAfterIdat;
+  }
+  if (length != 7) {
+    png_warning(png_ptr, "Incorrect tIME chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  std::uint8_t buf[7];
+  png_crc_read(png_ptr, buf, 7);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  png_time mod_time;
+  mod_time.year   = png_get_uint_16(buf);
+  mod_time.month  = buf[2];
+  mod_time.day    = buf[3];
+  mod_time.hour   = buf[4];
+  mod_time.minute = buf[5];
+  mod_time.second = buf[6];
+  png_set_tIME(png_ptr, info_ptr, reinterpret_cast<const std::uint8_t*>(&mod_time));
 }
 
 /**
