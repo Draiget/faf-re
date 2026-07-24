@@ -344,14 +344,14 @@ namespace
   {
     moho::CartographicListNode* const sentinel = owner.mListSentinel;
     if (sentinel == nullptr) {
-      owner.mRuntimeLane60 = 0;
+      owner.mBatchCount = 0;
       return;
     }
 
     moho::CartographicListNode* node = sentinel->mNext;
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
-    owner.mRuntimeLane60 = 0;
+    owner.mBatchCount = 0;
 
     while (node != nullptr && node != sentinel) {
       moho::CartographicListNode* const next = node->mNext;
@@ -611,25 +611,43 @@ namespace moho
     constexpr std::int32_t kOpaqueBlack = static_cast<std::int32_t>(0xFF000000u);
 
     mInitialized = false;
-    for (float& value : mProjectionParams) {
+
+    for (float& value : mGridSizeCoeff) {
       value = 0.0f;
     }
+    for (float& value : mTerrainSizeCoeff) {
+      value = 0.0f;
+    }
+    mTerrainHeightScale = 0.0f;
+    mElevMaximum = 0.0f;
+    mElevMinimum = 0.0f;
 
-    mFeatureToggle34 = false;
-    mProjectionScaleX = 0.0f;
-    mProjectionScaleY = 0.0f;
-    mProjectionScaleZ = 0.0f;
+    mHasElevationBounds = false;
+    mSurfaceElevation = 0.0f;
+    mWaterElevation = 0.0f;
+    mDefaultElevation = 0.0f;
 
-    for (std::int32_t& color : mColorLanes) {
+    for (std::int32_t& color : mHypsometricColors) {
       color = kOpaqueBlack;
     }
 
-    mListSentinel = CreateCartographicListSentinel();
-    mRuntimeLane60 = 0;
+    // mUnknownLane58 is deliberately left uninitialized to match the binary
+    // constructor, which skips this lane (0x54 -> 0x5C).
 
-    for (boost::shared_ptr<void>& handle : mRuntimeHandles) {
-      handle.reset();
-    }
+    mListSentinel = CreateCartographicListSentinel();
+    mBatchCount = 0;
+
+    // The eight GPU resource handles are zero-initialized empty shared_ptrs
+    // (px = nullptr, pn.pi_ = nullptr) exactly as the ctor writes them; the
+    // members' default constructors produce that state.
+    mTopographicTexture.reset();
+    mHypsometricTexture.reset();
+    mElevTexture.reset();
+    mTerrainVertexFormat.reset();
+    mTerrainVertexBuffer.reset();
+    mFrameVertexFormat.reset();
+    mFrameVertexBuffer.reset();
+    mQuadIndexBuffer.reset();
   }
 
   /**
@@ -664,13 +682,20 @@ namespace moho
   {
     ClearCartographicBatchList(*this);
 
-    for (boost::shared_ptr<void>& handle : mRuntimeHandles) {
-      handle.reset();
-    }
+    // Release order matches the binary exactly (FUN_007D14B0):
+    // 0x6C, 0x64, 0x74, 0x94, 0x8C, 0x84, 0x7C, 0x9C.
+    mHypsometricTexture.reset();
+    mTopographicTexture.reset();
+    mElevTexture.reset();
+    mFrameVertexBuffer.reset();
+    mFrameVertexFormat.reset();
+    mTerrainVertexBuffer.reset();
+    mTerrainVertexFormat.reset();
+    mQuadIndexBuffer.reset();
 
-    mProjectionScaleX = 0.0f;
-    mProjectionScaleY = 0.0f;
-    mProjectionScaleZ = 0.0f;
+    mSurfaceElevation = 0.0f;
+    mWaterElevation = 0.0f;
+    mDefaultElevation = 0.0f;
     mInitialized = false;
   }
 
@@ -698,14 +723,14 @@ namespace moho
     CartographicListNode* const node = CreateCartographicBatchNode(sentinel, sentinel->mPrev, sourceBatch);
 
     constexpr std::int32_t kMaxNodeCountBeforeOverflow = 0x0234F72C;
-    if (owner.mRuntimeLane60 == kMaxNodeCountBeforeOverflow) {
+    if (owner.mBatchCount == kMaxNodeCountBeforeOverflow) {
       node->mBatch.~CartographicDecalBatch();
       ::operator delete(node);
       throw std::length_error("list<T> too long");
     }
 
-    const std::int32_t newCount = owner.mRuntimeLane60 + 1;
-    owner.mRuntimeLane60 = newCount;
+    const std::int32_t newCount = owner.mBatchCount + 1;
+    owner.mBatchCount = newCount;
 
     sentinel->mPrev = node;
     node->mPrev->mNext = node;
@@ -727,7 +752,7 @@ namespace moho
       successor->mPrev = node->mPrev;
       node->mBatch.~CartographicDecalBatch();
       ::operator delete(node);
-      --owner.mRuntimeLane60;
+      --owner.mBatchCount;
     }
 
     return successor;
@@ -743,7 +768,7 @@ namespace moho
    */
   void Cartographic::WriteDecals(gpg::BinaryWriter& writer)
   {
-    writer.Write(mRuntimeLane60);
+    writer.Write(mBatchCount);
 
     CartographicListNode* const sentinel = mListSentinel;
     for (CartographicListNode* node = sentinel->mNext; node != sentinel; node = node->mNext) {

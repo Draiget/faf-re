@@ -304,26 +304,86 @@ namespace moho
     void RenderParticles(std::int32_t tick, float frameAlpha, const GeomCamera3& camera);
 
   public:
-    bool mInitialized;                            // +0x04
-    std::uint8_t mPadding05_07[0x03];            // +0x05
-    float mProjectionParams[11];                 // +0x08
-    bool mFeatureToggle34;                       // +0x34
-    std::uint8_t mPadding35_37[0x03];            // +0x35
-    float mProjectionScaleX;                     // +0x38
-    float mProjectionScaleY;                     // +0x3C
-    float mProjectionScaleZ;                     // +0x40
-    std::int32_t mColorLanes[5];                 // +0x44
-    std::int32_t mUninitializedLane58;           // +0x58
-    CartographicListNode* mListSentinel;         // +0x5C
-    std::int32_t mRuntimeLane60;                 // +0x60
-    boost::shared_ptr<void> mRuntimeHandles[8];  // +0x64
+    // Runtime-initialized flag. Cleared by the ctor and Shutdown, set by
+    // Initialize once terrain textures/buffers exist.
+    bool mInitialized;                                                          // +0x04
+    std::uint8_t mPadding05_07[0x03];                                           // +0x05
+
+    // Reciprocal grid dimensions used by the cartographic shader, bound to the
+    // "gridSizeCoeff" effect variable. InitializeTerrain writes
+    // {1/(w>>1), 1/(h>>1), 0, 1}.
+    float mGridSizeCoeff[4];                                                    // +0x08
+
+    // Reciprocal terrain dimensions bound to the "terrainSizeCoeff" effect
+    // variable. InitializeTerrain writes {(w>>1)/(width-1), (h>>1)/(height-1), 0, 1}.
+    float mTerrainSizeCoeff[4];                                                 // +0x18
+
+    // Height-to-normalized scale for elevation sampling ("terrainHeightScale"),
+    // 0.125f from InitializeTerrain.
+    float mTerrainHeightScale;                                                  // +0x28
+
+    // Elevation bounds of the tier box ("elevMaximum"/"elevMinimum"). Passed to
+    // MeshRenderer::RenderCartographic (max = 3rd arg, min = 2nd arg).
+    float mElevMaximum;                                                         // +0x2C
+    float mElevMinimum;                                                         // +0x30
+
+    // Whether the heightfield supplies explicit surface/water elevation bounds
+    // (heightfield+0x1534). Gates the elevation-ramp texture build.
+    bool mHasElevationBounds;                                                   // +0x34
+    std::uint8_t mPadding35_37[0x03];                                           // +0x35
+
+    // Surface/water/default elevations. Surface is the RenderCartographic 1st
+    // arg; Shutdown zeros all three.
+    float mSurfaceElevation;                                                    // +0x38
+    float mWaterElevation;                                                      // +0x3C
+    float mDefaultElevation;                                                    // +0x40
+
+    // Hypsometric tint palette (ARGB), initialized to opaque black (0xFF000000)
+    // by the ctor and filled from GetHypsometricColor(0..4) in InitializeTerrain.
+    std::int32_t mHypsometricColors[5];                                         // +0x44
+
+    // Not written by the ctor (constructor skips this lane); kept as a named
+    // placeholder to preserve layout.
+    std::int32_t mUnknownLane58;                                               // +0x58
+
+    // Intrusive decal-batch list sentinel + node count.
+    CartographicListNode* mListSentinel;                                        // +0x5C
+    std::int32_t mBatchCount;                                                   // +0x60
+
+    // GPU resource handles, all lazily created by InitializeTerrain /
+    // InitializeTerrainTextures and released by Shutdown / the dtor.
+    boost::shared_ptr<gpg::gal::TextureD3D9> mTopographicTexture;               // +0x64
+    boost::shared_ptr<gpg::gal::TextureD3D9> mHypsometricTexture;               // +0x6C
+    boost::shared_ptr<gpg::gal::TextureD3D9> mElevTexture;                      // +0x74
+    boost::shared_ptr<gpg::gal::VertexFormatD3D9> mTerrainVertexFormat;         // +0x7C
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mTerrainVertexBuffer;         // +0x84
+    boost::shared_ptr<gpg::gal::VertexFormatD3D9> mFrameVertexFormat;           // +0x8C
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mFrameVertexBuffer;           // +0x94
+    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mQuadIndexBuffer;              // +0x9C
   };
 
   static_assert(offsetof(Cartographic, mInitialized) == 0x04, "Cartographic::mInitialized offset must be 0x04");
-  static_assert(offsetof(Cartographic, mProjectionParams) == 0x08, "Cartographic::mProjectionParams offset must be 0x08");
-  static_assert(offsetof(Cartographic, mColorLanes) == 0x44, "Cartographic::mColorLanes offset must be 0x44");
+  static_assert(offsetof(Cartographic, mGridSizeCoeff) == 0x08, "Cartographic::mGridSizeCoeff offset must be 0x08");
+  static_assert(offsetof(Cartographic, mTerrainSizeCoeff) == 0x18, "Cartographic::mTerrainSizeCoeff offset must be 0x18");
+  static_assert(offsetof(Cartographic, mTerrainHeightScale) == 0x28, "Cartographic::mTerrainHeightScale offset must be 0x28");
+  static_assert(offsetof(Cartographic, mElevMaximum) == 0x2C, "Cartographic::mElevMaximum offset must be 0x2C");
+  static_assert(offsetof(Cartographic, mElevMinimum) == 0x30, "Cartographic::mElevMinimum offset must be 0x30");
+  static_assert(offsetof(Cartographic, mHasElevationBounds) == 0x34, "Cartographic::mHasElevationBounds offset must be 0x34");
+  static_assert(offsetof(Cartographic, mSurfaceElevation) == 0x38, "Cartographic::mSurfaceElevation offset must be 0x38");
+  static_assert(offsetof(Cartographic, mWaterElevation) == 0x3C, "Cartographic::mWaterElevation offset must be 0x3C");
+  static_assert(offsetof(Cartographic, mDefaultElevation) == 0x40, "Cartographic::mDefaultElevation offset must be 0x40");
+  static_assert(offsetof(Cartographic, mHypsometricColors) == 0x44, "Cartographic::mHypsometricColors offset must be 0x44");
+  static_assert(offsetof(Cartographic, mUnknownLane58) == 0x58, "Cartographic::mUnknownLane58 offset must be 0x58");
   static_assert(offsetof(Cartographic, mListSentinel) == 0x5C, "Cartographic::mListSentinel offset must be 0x5C");
-  static_assert(offsetof(Cartographic, mRuntimeHandles) == 0x64, "Cartographic::mRuntimeHandles offset must be 0x64");
+  static_assert(offsetof(Cartographic, mBatchCount) == 0x60, "Cartographic::mBatchCount offset must be 0x60");
+  static_assert(offsetof(Cartographic, mTopographicTexture) == 0x64, "Cartographic::mTopographicTexture offset must be 0x64");
+  static_assert(offsetof(Cartographic, mHypsometricTexture) == 0x6C, "Cartographic::mHypsometricTexture offset must be 0x6C");
+  static_assert(offsetof(Cartographic, mElevTexture) == 0x74, "Cartographic::mElevTexture offset must be 0x74");
+  static_assert(offsetof(Cartographic, mTerrainVertexFormat) == 0x7C, "Cartographic::mTerrainVertexFormat offset must be 0x7C");
+  static_assert(offsetof(Cartographic, mTerrainVertexBuffer) == 0x84, "Cartographic::mTerrainVertexBuffer offset must be 0x84");
+  static_assert(offsetof(Cartographic, mFrameVertexFormat) == 0x8C, "Cartographic::mFrameVertexFormat offset must be 0x8C");
+  static_assert(offsetof(Cartographic, mFrameVertexBuffer) == 0x94, "Cartographic::mFrameVertexBuffer offset must be 0x94");
+  static_assert(offsetof(Cartographic, mQuadIndexBuffer) == 0x9C, "Cartographic::mQuadIndexBuffer offset must be 0x9C");
   static_assert(sizeof(Cartographic) == 0xA4, "Cartographic size must be 0xA4");
 
   /**
