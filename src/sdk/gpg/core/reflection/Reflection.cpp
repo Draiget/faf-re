@@ -1940,185 +1940,50 @@ T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
   return upcast.mObj;
 }
 
-/**
- * Address: 0x00557D50 (FUN_00557D50)
- *
- * What it does:
- * Upcasts one reflected reference lane to `RBlueprint*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastRBlueprintRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::RBlueprint::GetPointerType());
-  return upcast.mObj;
-}
+  /**
+   * Reflected-reference pointer upcast: one function template the compiler
+   * emits out-of-line once per RPointerType<T>. Every real call site inlines
+   * it (so IDA reports no direct caller); collapsed here from 15 identical
+   * per-type copies. The explicit instantiations below preserve each
+   * out-of-line COMDAT the linker keeps -- one FUN_ per type:
+   *   RBlueprint 0x00557D50
+   *   IFormationInstance 0x0059E7F0
+   *   RUnitBlueprint 0x005A2420
+   *   ReconBlip 0x005CC300
+   *   UnitWeapon 0x005E1030
+   *   CAcquireTargetTask 0x005E1050
+   *   IAniManipulator 0x0063E970
+   *   IEffect 0x0066D190
+   *   Entity 0x00680F70
+   *   CEconomyEvent 0x006B4410
+   *   CUnitCommand 0x006E3EF0
+   *   CArmyStatItem 0x00713F10
+   *   SimArmy 0x007542D0
+   *   Shield 0x00754470
+   *   CDecalHandle 0x0077F600
+   */
+  template <class T>
+  [[nodiscard]] void* TryUpcastRefObjectVariantB(gpg::RRef* const sourceRef)
+  {
+    const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, T::GetPointerType());
+    return upcast.mObj;
+  }
 
-/**
- * Address: 0x0059E7F0 (FUN_0059E7F0)
- *
- * What it does:
- * Upcasts one reflected reference lane to `IFormationInstance*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastIFormationInstanceRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::IFormationInstance::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x005A2420 (FUN_005A2420)
- *
- * What it does:
- * Upcasts one reflected reference lane to `RUnitBlueprint*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastRUnitBlueprintRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::RUnitBlueprint::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x005CC300 (FUN_005CC300)
- *
- * What it does:
- * Upcasts one reflected reference lane to `ReconBlip*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastReconBlipRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::ReconBlip::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x005E1030 (FUN_005E1030)
- *
- * What it does:
- * Upcasts one reflected reference lane to `UnitWeapon*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastUnitWeaponRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::UnitWeapon::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x005E1050 (FUN_005E1050)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CAcquireTargetTask*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastCAcquireTargetTaskRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CAcquireTargetTask::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x0063E970 (FUN_0063E970)
- *
- * What it does:
- * Upcasts one reflected reference lane to `IAniManipulator*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastIAniManipulatorRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::IAniManipulator::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x0066D190 (FUN_0066D190)
- *
- * What it does:
- * Upcasts one reflected reference lane to `IEffect*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastIEffectRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::IEffect::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x00680F70 (FUN_00680F70)
- *
- * What it does:
- * Upcasts one reflected reference lane to `Entity*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastEntityRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::Entity::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x006B4410 (FUN_006B4410)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CEconomyEvent*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastCEconomyEventRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CEconomyEvent::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x006E3EF0 (FUN_006E3EF0)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CUnitCommand*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastCUnitCommandRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CUnitCommand::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x00713F10 (FUN_00713F10)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CArmyStatItem*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastCArmyStatItemRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CArmyStatItem::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x007542D0 (FUN_007542D0)
- *
- * What it does:
- * Upcasts one reflected reference lane to `SimArmy*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastSimArmyRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::SimArmy::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x00754470 (FUN_00754470)
- *
- * What it does:
- * Upcasts one reflected reference lane to `Shield*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastShieldRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::Shield::GetPointerType());
-  return upcast.mObj;
-}
-
-/**
- * Address: 0x0077F600 (FUN_0077F600)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CDecalHandle*` storage.
- */
-[[maybe_unused]] [[nodiscard]] void* TryUpcastCDecalHandleRefObjectVariantB(gpg::RRef* const sourceRef)
-{
-  const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CDecalHandle::GetPointerType());
-  return upcast.mObj;
-}
+  template void* TryUpcastRefObjectVariantB<moho::RBlueprint>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::IFormationInstance>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::RUnitBlueprint>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::ReconBlip>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::UnitWeapon>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::CAcquireTargetTask>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::IAniManipulator>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::IEffect>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::Entity>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::CEconomyEvent>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::CUnitCommand>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::CArmyStatItem>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::SimArmy>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::Shield>(gpg::RRef* const);
+  template void* TryUpcastRefObjectVariantB<moho::CDecalHandle>(gpg::RRef* const);
 
 // FUN_00750100 is the AssignPointer vtable slot of RPointerType<moho::SimArmy>,
 // recovered as a method of that specialization (one-address-one-function).
