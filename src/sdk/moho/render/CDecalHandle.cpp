@@ -365,7 +365,11 @@ namespace moho
     , mPadD1{0, 0, 0}
     , mCreatedAtTick(0)
   {
-    ++InstanceCounter<CDecalHandle>::s_count;
+    // Bump the CDecalHandle instance-count engine stat (binary FUN_007788F0) via
+    // the IncrementCDecalHandleStatCounterPassThrough helper. The recovery had
+    // incremented the write-only InstanceCounter::s_count member (nothing reads
+    // it) instead of the engine stat, leaving the stat at 0 and the helper orphaned.
+    (void)IncrementCDecalHandleStatCounterPassThrough(0);
   }
 
   /**
@@ -392,7 +396,9 @@ namespace moho
     (void)func_CreateCDecalHandleObject(&scriptFactory, state);
     CreateLuaObject(scriptFactory, arg1, arg2, arg3);
 
-    ++InstanceCounter<CDecalHandle>::s_count;
+    // Bump the CDecalHandle instance-count engine stat (binary FUN_00778980),
+    // as in the default ctor; independent ctor, so it increments too.
+    (void)IncrementCDecalHandleStatCounterPassThrough(0);
     mInfo.mObj = objectId;
   }
 
@@ -512,7 +518,11 @@ namespace moho
   CDecalHandle::~CDecalHandle()
   {
     mListNode.ListUnlink();
-    --InstanceCounter<CDecalHandle>::s_count;
+    // Decrement the CDecalHandle instance-count engine stat (binary FUN_00778C10),
+    // matching the ctor increments; the recovery decremented the write-only
+    // s_count member instead of the engine stat.
+    ::InterlockedExchangeAdd(
+      reinterpret_cast<volatile long*>(&InstanceCounter<CDecalHandle>::GetStatItem()->mPrimaryValueBits), -1L);
   }
 
   CDecalHandle* CDecalHandle::FromListNode(CDecalHandleListNode* const node) noexcept
