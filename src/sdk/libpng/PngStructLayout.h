@@ -92,6 +92,27 @@ constexpr std::size_t kOffPass              = 0x124;  // png_byte pass       (of
 constexpr std::size_t kOffFiller            = 0x12E;  // png_uint_16 filler  (offset 302)
 constexpr std::size_t kOffShift             = 0x181;  // png_color_8 shift   (offset 385, 5 bytes)
 
+// read-transform dispatcher fields (png_do_read_transformations, FUN_009E711B);
+// offsets confirmed from the leaf-call push order in FUN_009E711B.asm.
+constexpr std::size_t kOffReadUserTransformFn = 0x58;  // png_user_transform_ptr read_user_transform_fn
+constexpr std::size_t kOffRowInfoRowbytes   = 0x104;  // row_info.rowbytes mirror (dither ==0 check)
+constexpr std::size_t kOffRowInfoColorType  = 0x108;  // row_info.color_type mirror (expand check)
+constexpr std::size_t kOffTrans             = 0x114;  // png_bytep    trans (tRNS alpha array)
+constexpr std::size_t kOffBackground        = 0x138;  // png_color_16 background (10 bytes)
+constexpr std::size_t kOffBackground1       = 0x142;  // png_color_16 background_1 (10 bytes)
+constexpr std::size_t kOffGammaShift        = 0x158;  // int          gamma_shift (read as uint16)
+constexpr std::size_t kOffGammaTable        = 0x164;  // png_bytep    gamma_table
+constexpr std::size_t kOffGammaArg7         = 0x168;  // png_bytep    gamma param slot 7 (bg/gamma call)
+constexpr std::size_t kOffGammaArg8         = 0x16C;  // png_bytep    gamma param slot 8 (bg call)
+constexpr std::size_t kOffGamma16Table      = 0x170;  // png_uint_16pp gamma_16_table
+constexpr std::size_t kOffGamma16Arg10      = 0x174;  // png_uint_16pp gamma_16 param slot 10 (bg call)
+constexpr std::size_t kOffGamma16Arg11      = 0x178;  // png_uint_16pp gamma_16 param slot 11 (bg call)
+constexpr std::size_t kOffPalette           = 0x188;  // png_colorp   palette
+constexpr std::size_t kOffTransValues       = 0x18C;  // png_color_16 trans_values
+constexpr std::size_t kOffPaletteLookup     = 0x1EC;  // png_bytep    palette_lookup (dither)
+constexpr std::size_t kOffDitherIndex       = 0x1F0;  // png_bytep    dither_index (dither lookup)
+constexpr std::size_t kOffRgbToGrayStatus   = 0x228;  // png_byte     rgb_to_gray_status
+
 // ----------------------------------------------------------------------------
 // Typed accessors
 // ----------------------------------------------------------------------------
