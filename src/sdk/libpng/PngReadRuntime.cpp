@@ -48,6 +48,10 @@ void  png_format_buffer(png_structp png_ptr, char* buffer, const char* error_mes
 void  png_chunk_error(png_structp png_ptr, const char* error_message);
 void  png_chunk_warning(png_structp png_ptr, const char* warning_message);
 int   png_crc_error(png_structp png_ptr);
+void* png_malloc_warn(png_structp png_ptr, std::uint32_t size);
+void  png_check_chunk_name(png_structp png_ptr, const std::uint8_t* chunk_name);
+void  png_set_unknown_chunks(png_structp png_ptr, png_infop info_ptr, png_unknown_chunkp unknowns, int num_unknowns);
+int   png_handle_as_unknown(png_structp png_ptr, const std::uint8_t* chunk_name);
 void  png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask);
 void  png_read_filter_row(png_structp png_ptr, void* row_info,
                           std::uint8_t* row, std::uint8_t* prev_row, int filter);
@@ -294,6 +298,168 @@ extern "C" int png_crc_finish(png_structp png_ptr, std::uint32_t skip)
   }
   png_chunk_warning(png_ptr, "CRC error");
   return 1;
+}
+
+namespace {
+// libpng isnonalpha as compiled in this build (FUN_009E75E2 / FUN_00A21599):
+// a chunk-name byte is legal only when it lies in [0x29..0x5A] or [0x61..0x7A].
+[[nodiscard]] inline bool IsNonAlphaChunkByte(int c) noexcept
+{
+  return static_cast<unsigned>(c - 0x29) > 0x51u || (c > 0x5A && c < 0x61);
+}
+
+// Signature of a user-registered unknown-chunk callback (read_user_chunk_fn):
+// returns >0 if it consumed the chunk, 0 to defer, <0 on error.
+using png_user_chunk_ptr = int (*)(png_structp, png_unknown_chunkp);
+} // namespace
+
+/**
+ * Address: 0x00A21165 (FUN_00A21165)
+ * Mangled: png_malloc_warn
+ *
+ * What it does:
+ * Allocates `size` bytes with PNG_FLAG_MALLOC_NULL_MEM_OK (0x100000) set for
+ * the duration, so png_malloc returns nullptr on failure instead of raising a
+ * fatal error; the prior flags are restored before returning.
+ */
+extern "C" void* png_malloc_warn(png_structp png_ptr, std::uint32_t size)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t saved_flags = Flags(png_ptr);
+  Flags(png_ptr) = saved_flags | 0x100000u;
+  void* const result = png_malloc(png_ptr, size);
+  Flags(png_ptr) = saved_flags;
+  return result;
+}
+
+/**
+ * Address: 0x00A21599 (FUN_00A21599)
+ * Mangled: png_check_chunk_name
+ *
+ * What it does:
+ * Validates that all four chunk-name bytes are legal PNG chunk characters;
+ * raises a fatal png_chunk_error("invalid chunk type") if any is out of range.
+ */
+extern "C" void png_check_chunk_name(png_structp png_ptr, const std::uint8_t* chunk_name)
+{
+  if (IsNonAlphaChunkByte(chunk_name[0]) || IsNonAlphaChunkByte(chunk_name[1]) ||
+      IsNonAlphaChunkByte(chunk_name[2]) || IsNonAlphaChunkByte(chunk_name[3])) {
+    png_chunk_error(png_ptr, "invalid chunk type");
+  }
+}
+
+/**
+ * Address: 0x009E9B7A (FUN_009E9B7A)
+ * Mangled: png_set_unknown_chunks
+ *
+ * What it does:
+ * Appends `num_unknowns` unknown-chunk records to info_ptr's stored array:
+ * grows it via png_malloc_warn, copies the existing entries, then deep-copies
+ * each new record's name and payload (payload via png_malloc, tagging its
+ * location with the low byte of png_ptr->mode). Marks the array owned for free
+ * (free_me |= 0x200). Silently no-ops when out of memory.
+ */
+extern "C" void png_set_unknown_chunks(png_structp png_ptr, png_infop info_ptr,
+                                       png_unknown_chunkp unknowns, int num_unknowns)
+{
+  using namespace libpng_layout;
+
+  if (png_ptr == nullptr || info_ptr == nullptr || num_unknowns == 0) {
+    return;
+  }
+
+  const std::uint32_t old_num = info_ptr->unknown_chunks_num;
+  auto* const np = static_cast<png_unknown_chunkp>(
+      png_malloc_warn(png_ptr, 0x14u * (static_cast<std::uint32_t>(num_unknowns) + old_num)));
+  if (np == nullptr) {
+    png_warning(png_ptr, "Out of memory while processing unknown chunk.");
+    return;
+  }
+
+  std::memcpy(np, info_ptr->unknown_chunks, 0x14u * old_num);
+  png_free(png_ptr, info_ptr->unknown_chunks);
+  info_ptr->unknown_chunks = nullptr;
+
+  for (int i = 0; i < num_unknowns; ++i) {
+    png_unknown_chunkp dest = &np[old_num + static_cast<std::uint32_t>(i)];
+    const png_unknown_chunk& src = unknowns[i];
+    std::strcpy(reinterpret_cast<char*>(dest->name), reinterpret_cast<const char*>(src.name));
+    dest->data = static_cast<std::uint8_t*>(png_malloc(png_ptr, src.size));
+    if (dest->data != nullptr) {
+      std::memcpy(dest->data, src.data, src.size);
+      dest->size = src.size;
+      dest->location = static_cast<std::uint8_t>(Mode(png_ptr));
+    } else {
+      png_warning(png_ptr, "Out of memory while processing unknown chunk.");
+    }
+  }
+
+  info_ptr->unknown_chunks = np;
+  info_ptr->unknown_chunks_num += static_cast<std::uint32_t>(num_unknowns);
+  info_ptr->free_me |= 0x200u;
+}
+
+/**
+ * Address: 0x00A23A29 (FUN_00A23A29)
+ * Mangled: png_handle_unknown
+ *
+ * What it does:
+ * Reads a chunk that has no dedicated handler. Marks PNG_AFTER_IDAT for a
+ * non-IDAT chunk seen after IDAT, validates the chunk name, and errors on an
+ * unknown critical chunk that neither a keep-rule nor a user callback accepts.
+ * When PNG_FLAG_KEEP_UNKNOWN_CHUNKS is clear the payload is simply CRC-skipped;
+ * otherwise it is read and offered to any user chunk callback, and (unless the
+ * callback consumed it) stored into info_ptr via png_set_unknown_chunks.
+ */
+extern "C" void png_handle_unknown(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  std::uint8_t* const chunk_name = RawBase(png_ptr) + kOffChunkName;
+
+  if ((Mode(png_ptr) & 4u) != 0 && png_memcmp(chunk_name, "IDAT", 4u) != 0) {
+    Mode(png_ptr) |= 8u;  // PNG_AFTER_IDAT
+  }
+  png_check_chunk_name(png_ptr, chunk_name);
+
+  if ((chunk_name[0] & 0x20) == 0
+      && png_handle_as_unknown(png_ptr, chunk_name) != 3
+      && Field<png_user_chunk_ptr>(png_ptr, kOffReadUserChunkFn) == nullptr) {
+    png_chunk_error(png_ptr, "unknown critical chunk");
+  }
+
+  // The binary tests SLOWORD(flags) >= 0 — i.e. PNG_FLAG_KEEP_UNKNOWN_CHUNKS
+  // (0x8000, the sign bit of the low 16 flag bits) is clear: skip the chunk.
+  if (static_cast<std::int16_t>(Field<std::uint16_t>(png_ptr, kOffFlags)) >= 0) {
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  png_unknown_chunk chunk;
+  std::strcpy(reinterpret_cast<char*>(chunk.name), reinterpret_cast<const char*>(chunk_name));
+  chunk.data = static_cast<std::uint8_t*>(png_malloc(png_ptr, length));
+  chunk.size = length;
+  png_crc_read(png_ptr, chunk.data, length);
+
+  const png_user_chunk_ptr read_user_chunk_fn =
+      Field<png_user_chunk_ptr>(png_ptr, kOffReadUserChunkFn);
+  bool store = false;
+  if (read_user_chunk_fn == nullptr) {
+    store = true;
+  } else if (read_user_chunk_fn(png_ptr, &chunk) <= 0) {
+    if ((chunk_name[0] & 0x20) == 0 && png_handle_as_unknown(png_ptr, chunk_name) != 3) {
+      png_free(png_ptr, chunk.data);
+      png_chunk_error(png_ptr, "unknown critical chunk");
+    }
+    store = true;
+  }
+  if (store) {
+    png_set_unknown_chunks(png_ptr, info_ptr, &chunk, 1);
+  }
+
+  png_free(png_ptr, chunk.data);
+  png_crc_finish(png_ptr, 0);
 }
 
 /**
