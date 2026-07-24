@@ -916,6 +916,12 @@ namespace moho
   Projectile::~Projectile()
   {
     auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
+    // Unlink the collided-entity weak ref (asm this+0x328). It lives in the opaque
+    // mUnknown030C region and WeakPtr's destructor is trivial, so nothing unlinks it
+    // automatically -- without this it dangles in the collided entity's weak-ref
+    // chain and faults when that entity later traverses/destroys the chain. The
+    // binary unlinks it first (reverse-declaration order), before the CAiTarget ref.
+    view.mCollidedEntityWeak.UnlinkFromOwnerChain();
     view.mTargetPosData.targetEntity.UnlinkFromOwnerChain();
     view.mLauncherWeak.UnlinkFromOwnerChain();
 
