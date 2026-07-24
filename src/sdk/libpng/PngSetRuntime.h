@@ -62,6 +62,24 @@ using png_row_infop = png_row_info*;
 //   +0x118: int_x_blue       (int32_t)
 //   +0x11C: int_y_blue       (int32_t)
 
+// libpng unknown-chunk record. 20-byte stride, matching the storage layout
+// walked by png_set_unknown_chunks and populated by png_handle_unknown.
+struct png_unknown_chunk
+{
+  std::uint8_t  name[5];     // +0x00  4-char chunk name + NUL terminator
+  std::uint8_t  pad_05[3];   // +0x05
+  std::uint8_t* data;        // +0x08  malloc'd chunk payload
+  std::uint32_t size;        // +0x0C  payload length in bytes
+  std::uint8_t  location;    // +0x10  low byte of png_ptr->mode when the chunk was read
+  std::uint8_t  pad_11[3];   // +0x11
+};
+static_assert(sizeof(png_unknown_chunk) == 0x14, "png_unknown_chunk must be 20 bytes");
+static_assert(offsetof(png_unknown_chunk, data) == 0x08, "png_unknown_chunk::data at 0x08");
+static_assert(offsetof(png_unknown_chunk, size) == 0x0C, "png_unknown_chunk::size at 0x0C");
+static_assert(offsetof(png_unknown_chunk, location) == 0x10, "png_unknown_chunk::location at 0x10");
+
+using png_unknown_chunkp = png_unknown_chunk*;
+
 struct png_info_struct
 {
   std::uint8_t  pad_00_to_08[0x08];         // +0x00
@@ -78,7 +96,11 @@ struct png_info_struct
   float         y_green;                     // +0x94
   float         x_blue;                      // +0x98
   float         y_blue;                      // +0x9C
-  std::uint8_t  pad_A0_to_FC[0x5C];         // +0xA0
+  std::uint8_t       pad_A0_to_B8[0x18];    // +0xA0
+  std::uint32_t      free_me;               // +0xB8  bitmask of info-owned buffers to free
+  png_unknown_chunk* unknown_chunks;        // +0xBC  stored unknown-chunk array
+  std::uint32_t      unknown_chunks_num;    // +0xC0  count of stored unknown chunks
+  std::uint8_t       pad_C4_to_FC[0x38];    // +0xC4
   std::int32_t  int_gamma;                   // +0xFC
   std::int32_t  int_x_white;                 // +0x100
   std::int32_t  int_y_white;                 // +0x104
@@ -113,6 +135,9 @@ static_assert(offsetof(png_info_struct, int_x_green) == 0x110);
 static_assert(offsetof(png_info_struct, int_y_green) == 0x114);
 static_assert(offsetof(png_info_struct, int_x_blue)  == 0x118);
 static_assert(offsetof(png_info_struct, int_y_blue)  == 0x11C);
+static_assert(offsetof(png_info_struct, free_me)            == 0xB8);
+static_assert(offsetof(png_info_struct, unknown_chunks)     == 0xBC);
+static_assert(offsetof(png_info_struct, unknown_chunks_num) == 0xC0);
 
 // Validity bitmask flags used by png_info.valid:
 constexpr std::uint32_t kPngInfoGamma = 0x0001;
