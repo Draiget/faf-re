@@ -547,6 +547,64 @@ extern "C" void png_memcpy_check(png_structp png_ptr, void* dst, void* src, std:
 }
 
 /**
+ * Address: 0x009E6646 (FUN_009E6646)
+ * Mangled: png_do_read_intrapixel
+ *
+ * What it does:
+ * Reverses MNG intrapixel differencing on an RGB/RGBA scanline: restores each
+ * pixel's red and blue channels by adding back its green channel (8-bit) or the
+ * 16-bit big-endian green sample (16-bit). No-op for non-RGB color types or
+ * non-8/16 bit depths. `row_addr_plus1` is the pixel data (row buffer + 1,
+ * past the filter byte); `row_info_raw` aliases the png_row_info at +0x100.
+ */
+extern "C" void png_do_read_intrapixel(int* row_info_raw, std::uint32_t row_addr_plus1)
+{
+  const auto* const row_info = reinterpret_cast<const png_row_info*>(row_info_raw);
+  if ((row_info->color_type & 2) == 0) {
+    return;
+  }
+
+  const std::uint32_t width = row_info->width;
+  auto* const row = reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(row_addr_plus1));
+
+  if (row_info->bit_depth == 8) {
+    int bytes_per_pixel;
+    if (row_info->color_type == 2) {
+      bytes_per_pixel = 3;
+    } else if (row_info->color_type == 6) {
+      bytes_per_pixel = 4;
+    } else {
+      return;
+    }
+    for (std::uint32_t i = 0; i < width; ++i) {
+      std::uint8_t* const rp = row + static_cast<std::size_t>(i) * bytes_per_pixel;
+      const std::uint8_t green = rp[1];
+      rp[0] = static_cast<std::uint8_t>(rp[0] + green);
+      rp[2] = static_cast<std::uint8_t>(rp[2] + green);
+    }
+  } else if (row_info->bit_depth == 16) {
+    int bytes_per_pixel;
+    if (row_info->color_type == 2) {
+      bytes_per_pixel = 6;
+    } else if (row_info->color_type == 6) {
+      bytes_per_pixel = 8;
+    } else {
+      return;
+    }
+    for (std::uint32_t i = 0; i < width; ++i) {
+      std::uint8_t* const rp = row + static_cast<std::size_t>(i) * bytes_per_pixel;
+      const int green = (rp[2] << 8) | rp[3];
+      const int red = ((rp[0] << 8) | rp[1]) + green;
+      const int blue = ((rp[4] << 8) | rp[5]) + green;
+      rp[0] = static_cast<std::uint8_t>(red >> 8);
+      rp[1] = static_cast<std::uint8_t>(red);
+      rp[4] = static_cast<std::uint8_t>(blue >> 8);
+      rp[5] = static_cast<std::uint8_t>(blue);
+    }
+  }
+}
+
+/**
  * Address: 0x009E0A46 (FUN_009E0A46)
  * Mangled: png_get_copyright
  *
