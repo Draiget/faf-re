@@ -42,6 +42,7 @@ void  png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std::uint32_t
 unsigned long png_get_uint_32(const std::uint8_t* buf);
 void  png_crc_read(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length);
 int   png_crc_finish(png_structp png_ptr, std::uint32_t skip);
+void  png_calculate_crc(png_structp png_ptr, std::uint8_t* ptr, std::uint32_t length);
 void  png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask);
 void  png_read_filter_row(png_structp png_ptr, void* row_info,
                           std::uint8_t* row, std::uint8_t* prev_row, int filter);
@@ -102,6 +103,46 @@ extern "C" void png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std
   }
 
   read_data_fn(png_ptr, buf, length);
+}
+
+/**
+ * Address: 0x00A211E5 (FUN_00A211E5)
+ * Mangled: png_crc_read
+ *
+ * IDA signature:
+ * void __cdecl png_crc_read(png_structp png_ptr, png_bytep buf, png_size_t length);
+ *
+ * What it does:
+ * Reads `length` bytes into `buf` through the registered read callback, then
+ * folds those bytes into the running chunk CRC. This is the single primitive
+ * every chunk handler uses to consume chunk payload while keeping the CRC in
+ * sync (called from the read chunk-dispatch and each png_handle_* body).
+ */
+extern "C" void png_crc_read(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length)
+{
+  png_push_fill_buffer(png_ptr, buf, length);
+  png_calculate_crc(png_ptr, buf, length);
+}
+
+/**
+ * Address: 0x00A2118A (FUN_00A2118A)
+ * Mangled: png_get_uint_32
+ *
+ * IDA signature:
+ * png_uint_32 __cdecl png_get_uint_32(png_bytep buf);
+ *
+ * What it does:
+ * Reads a 32-bit big-endian (network byte order) integer from a 4-byte buffer.
+ * Used across the read path to decode chunk lengths and integer chunk fields.
+ * The binary spells this as nested shift-adds; the shift-or form below is the
+ * identical libpng expression (bytes never overlap).
+ */
+extern "C" unsigned long png_get_uint_32(const std::uint8_t* buf)
+{
+  return (static_cast<unsigned long>(buf[0]) << 24) |
+         (static_cast<unsigned long>(buf[1]) << 16) |
+         (static_cast<unsigned long>(buf[2]) << 8) |
+         static_cast<unsigned long>(buf[3]);
 }
 
 /**
@@ -213,6 +254,8 @@ extern "C" void png_read_init_2(
   const char* const  user_png_ver,
   const std::uint32_t png_struct_size)
 {
+  using namespace libpng_layout;
+
   if (png_ptr_ptr == nullptr || *png_ptr_ptr == nullptr) {
     return;
   }
