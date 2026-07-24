@@ -2800,6 +2800,18 @@ namespace moho
     // Each Entity constructor increments it by 1; the recovered dtor had dropped
     // the matching decrement, so the stat leaked upward on every entity teardown.
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), -1L);
+
+    // Remove this entity's collision shape from the spatial grid (binary
+    // FUN_006785D0 line 79 -> CollisionShapeBase::Remove FUN_004FD490, whose body
+    // is the same grid-bucket removal loop as RemoveSpanMembership). The recovered
+    // destructor freed CollisionExtents but dropped the grid-membership removal,
+    // leaving stale span nodes threaded in the collision buckets that dangle once
+    // the entity is freed. If the entity had already left the grid,
+    // mCellWidth/mCellHeight are 0 so the loop is a no-op; the null guard is
+    // defensive (the binary assumes a live grid at teardown).
+    if (mCollisionCellSpan.mSpatialGrid != nullptr) {
+      RemoveSpanMembership(mCollisionCellSpan);
+    }
   }
 
   /**
