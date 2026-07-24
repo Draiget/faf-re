@@ -7167,8 +7167,11 @@ namespace moho
    * ?RenderThumbnail@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@PAVMeshInstance@2@PAVID3DRenderTarget@2@PAVID3DDepthStencil@2@@Z)
    *
    * What it does:
-   * Renders one mesh instance with one thumbnail camera into caller-provided
-   * color/depth targets.
+   * Renders one mesh instance with one thumbnail camera into the caller-provided
+   * color/depth targets. Binds the caller's render/depth targets with a full
+   * clear, selects the mesh effect + top-LOD technique, binds the three material
+   * texture sheets (albedo/normals/specular), then draws the single instance
+   * through the LOD's static hardware batch (un-mirrored).
    */
   void MeshRenderer::RenderThumbnail(
     const GeomCamera3& camera,
@@ -7181,16 +7184,52 @@ namespace moho
       return;
     }
 
-    // Select the mesh effect file, then bind the mesh shader-constant lane for
-    // this thumbnail pass (no shadow, not mirrored). Transcribed from
-    // FUN_007E11C0 @0x007E122C..0x007E123B (Device->SelectFxFile("mesh") then
-    // ConfigureShader(camera, nullptr, false)). The render-target/depth setup and
-    // single-instance batch draw remain elided pending typed CD3D draw recovery.
     CD3DDevice* const device = D3D_GetDevice();
+
+    // Retain the instance's mesh for the whole pass and select its top LOD. The
+    // binary reads `*mesh->lods._Myfirst` (the first LOD) after taking a live
+    // shared_ptr copy via GetMesh(); the handle keeps the mesh alive across the
+    // draw. (FUN_007E11C0 @0x007E11EA..0x007E11FE.)
+    const boost::shared_ptr<Mesh> mesh = meshInstance->GetMesh();
+    MeshLOD* const lod = mesh->lods.front();
+
+    // Bind the caller's color + depth targets with a full clear (color
+    // 0xFF000000, z=1.0, stencil=0). The decompiler mislabels the two pointer
+    // args, but the frame slots resolve to renderTarget (arg_C, first SetRender-
+    // Target1 param) then depthStencil (arg_10, second) — matching the caller
+    // MeshThumbnailRenderer::RenderThumbnail which passes (mColorTarget,
+    // mDepthStencil). (FUN_007E11C0 @0x007E11FF..0x007E1220.)
+    device->SetRenderTarget1(renderTarget, depthStencil, true, 0xFF000000, 1.0f, 0);
+
+    // Select the mesh effect file, then bind the mesh shader-constant lane for
+    // this thumbnail pass (no shadow, not mirrored).
     device->SelectFxFile("mesh");
     ConfigureShader(camera, nullptr, false);
 
-    (void)meshInstance->GetMesh();
+    // Select the top LOD material's technique, then bind its three texture
+    // sheets in binary bind order: albedo, normals, specular. These are the same
+    // shared shader-var handles the batch-map render path binds
+    // (GetMeshTextureShaderVars()). (FUN_007E11C0 @0x007E124E..0x007E127D.)
+    MeshMaterial& material = lod->mat;
+    device->SelectTechnique(material.mShaderAnnotation.c_str());
+
+    MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
+    tv.albedoTexture.GetTexture(material.mAlbedoSheet);
+    tv.normalsTexture.GetTexture(material.mNormalsSheet);
+    tv.specularTexture.GetTexture(material.mSpecularSheet);
+
+    // Draw the single instance through the LOD's lazily-built static hardware
+    // batch (thumbnails are never skinned, so GetStaticBatch only). The batch is
+    // fed a one-element instance vector and drawn un-mirrored; the shared_ptr
+    // handle retains the batch for the draw and the vector releases after.
+    // (FUN_007E11C0 @0x007E1282..0x007E12DB.)
+    boost::shared_ptr<MeshBatch> batchHandle;
+    lod->GetStaticBatch(batchHandle);
+    if (batchHandle) {
+      msvc8::vector<MeshInstance*> singleInstance;
+      singleInstance.push_back(meshInstance);
+      batchHandle->Render(singleInstance, false);
+    }
   }
 
   /**

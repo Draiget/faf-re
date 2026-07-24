@@ -1226,8 +1226,10 @@ namespace moho
      * ?RenderThumbnail@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@PAVMeshInstance@2@PAVID3DRenderTarget@2@PAVID3DDepthStencil@2@@Z)
      *
      * What it does:
-     * Renders one mesh instance with one thumbnail camera into caller-provided
-     * color/depth targets.
+     * Renders one mesh instance with one thumbnail camera into the caller-
+     * provided color/depth targets: clears + binds the targets, selects the
+     * mesh effect and top-LOD technique, binds the material's albedo/normals/
+     * specular sheets, then draws the single instance via the LOD static batch.
      */
     void RenderThumbnail(
       const GeomCamera3& camera,
