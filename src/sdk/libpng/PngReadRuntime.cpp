@@ -862,6 +862,141 @@ extern "C" void png_read_start_row(png_structp png_ptr)
 }
 
 /**
+ * Address: 0x00A2186D (FUN_00A2186D)
+ * Mangled: png_do_read_interlace
+ *
+ * What it does:
+ * Expands one sparse Adam7 interlace-pass scanline in place into a full-width
+ * row: each source pixel is replicated png_pass_inc[pass] times so the pass
+ * pixels land at their final horizontal positions. Walks source and destination
+ * pointers backwards from the end of the row, honoring PNG_PACKSWAP bit order,
+ * with per-depth destination masks for 1/2/4-bit sub-byte packing and whole-byte
+ * memcpy for >=8-bit pixels, then rewrites row_info width/rowbytes to the
+ * expanded dimensions. This build reads everything from png_ptr (row_buf +0xEC,
+ * transformations +0x70, pass +0x124, row_info sub-struct +0x100).
+ */
+extern "C" void png_do_read_interlace(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  auto* const row_info = reinterpret_cast<png_row_info*>(RawBase(png_ptr) + 0x100);
+  std::uint8_t* const row = Field<std::uint8_t*>(png_ptr, kOffRowBuf) + 1;  // skip filter byte
+  const std::uint32_t transformations = Field<std::uint32_t>(png_ptr, kOffTransformations);
+
+  // Binary guard: row_buf != (void*)-1 (i.e. row != null) and png_ptr's row_info
+  // pointer non-null. In practice always true once the row buffers are allocated.
+  if (row == nullptr || row_info == nullptr) {
+    return;
+  }
+
+  const std::uint32_t width       = row_info->width;
+  const std::uint8_t  pixel_depth = row_info->pixel_depth;
+  const std::uint8_t  pass        = *(RawBase(png_ptr) + kOffPass);
+  const std::uint32_t pass_inc    = kPngPassInc[pass];
+  const std::uint32_t final_width = width * pass_inc;
+
+  constexpr std::uint32_t PNG_PACKSWAP = 0x10000;
+  const bool packswap = (transformations & PNG_PACKSWAP) != 0;
+
+  switch (pixel_depth) {
+    case 1: {
+      std::uint8_t* sp = row + ((width - 1) >> 3);
+      std::uint8_t* dp = row + ((final_width - 1) >> 3);
+      int sshift, dshift, s_start, s_end, s_inc;
+      if (packswap) {
+        sshift = static_cast<int>((width - 1) & 7);
+        dshift = static_cast<int>((final_width - 1) & 7);
+        s_start = 7; s_end = 0; s_inc = -1;
+      } else {
+        sshift = 7 - static_cast<int>((width - 1) & 7);
+        dshift = 7 - static_cast<int>((final_width - 1) & 7);
+        s_start = 0; s_end = 7; s_inc = 1;
+      }
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t v = static_cast<std::uint8_t>((*sp >> sshift) & 0x01);
+        for (std::uint32_t j = 0; j < pass_inc; ++j) {
+          *dp = static_cast<std::uint8_t>(
+              (v << dshift) | (*dp & static_cast<std::uint8_t>(0x7F7F >> (7 - dshift))));
+          if (dshift == s_end) { dshift = s_start; --dp; } else { dshift += s_inc; }
+        }
+        if (sshift == s_end) { sshift = s_start; --sp; } else { sshift += s_inc; }
+      }
+      break;
+    }
+
+    case 2: {
+      std::uint8_t* sp = row + ((width - 1) >> 2);
+      std::uint8_t* dp = row + ((final_width - 1) >> 2);
+      int sshift, dshift, s_start, s_end, s_inc;
+      if (packswap) {
+        sshift = static_cast<int>((2 * width - 1) & 6);
+        dshift = static_cast<int>((2 * final_width - 1) & 6);
+        s_start = 6; s_end = 0; s_inc = -2;
+      } else {
+        sshift = 2 * (3 - static_cast<int>((width - 1) & 3));
+        dshift = 2 * (3 - static_cast<int>((final_width - 1) & 3));
+        s_start = 0; s_end = 6; s_inc = 2;
+      }
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t v = static_cast<std::uint8_t>((*sp >> sshift) & 0x03);
+        for (std::uint32_t j = 0; j < pass_inc; ++j) {
+          *dp = static_cast<std::uint8_t>(
+              (v << dshift) | (*dp & static_cast<std::uint8_t>(0x3F3F >> (6 - dshift))));
+          if (dshift == s_end) { dshift = s_start; --dp; } else { dshift += s_inc; }
+        }
+        if (sshift == s_end) { sshift = s_start; --sp; } else { sshift += s_inc; }
+      }
+      break;
+    }
+
+    case 4: {
+      std::uint8_t* sp = row + ((width - 1) >> 1);
+      std::uint8_t* dp = row + ((final_width - 1) >> 1);
+      int sshift, dshift, s_start, s_end, s_inc;
+      if (packswap) {
+        sshift = static_cast<int>((-1 - 4 * width) & 4);
+        dshift = static_cast<int>((-1 - 4 * final_width) & 4);
+        s_start = 4; s_end = 0; s_inc = -4;
+      } else {
+        sshift = 4 - 4 * static_cast<int>((width - 1) & 1);
+        dshift = 4 - 4 * static_cast<int>((final_width - 1) & 1);
+        s_start = 0; s_end = 4; s_inc = 4;
+      }
+      for (std::uint32_t i = 0; i < width; ++i) {
+        const std::uint8_t v = static_cast<std::uint8_t>((*sp >> sshift) & 0x0F);
+        for (std::uint32_t j = 0; j < pass_inc; ++j) {
+          *dp = static_cast<std::uint8_t>(
+              (v << dshift) | (*dp & static_cast<std::uint8_t>(0x0F0F >> (4 - dshift))));
+          if (dshift == s_end) { dshift = s_start; --dp; } else { dshift += s_inc; }
+        }
+        if (sshift == s_end) { sshift = s_start; --sp; } else { sshift += s_inc; }
+      }
+      break;
+    }
+
+    default: {
+      // 8-bit and wider: replicate whole pixels (pixel_depth>>3 bytes each).
+      const std::size_t bytes_per_pixel = pixel_depth >> 3;
+      std::uint8_t* sp = row + bytes_per_pixel * (width - 1);
+      std::uint8_t* dp = row + bytes_per_pixel * (final_width - 1);
+      std::uint8_t pixel[8];  // scratch: up to a 64-bit (RGBA16) pixel
+      for (std::uint32_t i = 0; i < width; ++i) {
+        std::memcpy(pixel, sp, bytes_per_pixel);
+        for (std::uint32_t j = 0; j < pass_inc; ++j) {
+          std::memcpy(dp, pixel, bytes_per_pixel);
+          dp -= bytes_per_pixel;
+        }
+        sp -= bytes_per_pixel;
+      }
+      break;
+    }
+  }
+
+  row_info->width = final_width;
+  row_info->rowbytes = (static_cast<std::uint32_t>(pixel_depth) * final_width + 7) >> 3;
+}
+
+/**
  * Address: 0x009E0A46 (FUN_009E0A46)
  * Mangled: png_get_copyright
  *
