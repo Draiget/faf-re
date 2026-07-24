@@ -2032,6 +2032,24 @@ namespace moho
         AsBVIntSet(relation).Remove(armyId);
       }
     }
+
+    // The alliance change can flip what every unit of this army is visible to,
+    // so re-queue each owned unit into the Sim coord-dirty list to have its
+    // visibility recomputed next tick. The binary (0x006FDF6C-0x006FDFF0) walks
+    // CEntityDb::mAllUnits and relinks every unit whose ArmyRef == this at the
+    // front of Sim::mCoordEntities; the army-keyed range yields exactly those
+    // units in the same order.
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(ArmyId);
+    CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
+    const CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
+    while (node != endNode) {
+      Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
+      if (unit == nullptr) {
+        break;
+      }
+      unit->mCoordNode.ListLinkAfter(&Simulation->mCoordEntities);
+      node = CEntityDb::NextAllUnitsNode(node);
+    }
   }
 
   /**
