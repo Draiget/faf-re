@@ -2221,6 +2221,82 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A2293C (FUN_00A2293C)
+ * Mangled: png_handle_sRGB
+ *
+ * IDA signature:
+ * void __cdecl png_handle_sRGB(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an sRGB (rendering intent) chunk: enforces chunk ordering and the
+ * 1-byte length, reads the intent, rejects an unknown intent (>= 4), and — when
+ * a gAMA or cHRM chunk is already present and disagrees with the canonical sRGB
+ * values — warns (echoing the offending gamma). Applies the sRGB gamma +
+ * chromaticities via png_set_sRGB_gAMA_and_cHRM.
+ */
+extern "C" void png_handle_sRGB(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before sRGB");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid sRGB after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+    png_warning(png_ptr, "Out of place sRGB chunk");
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoSrgb) != 0) {
+    png_warning(png_ptr, "Duplicate sRGB chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length != 1) {
+    png_warning(png_ptr, "Incorrect sRGB chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  std::uint8_t intent;
+  png_crc_read(png_ptr, &intent, 1);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  if (intent >= 4) {
+    png_warning(png_ptr, "Unknown sRGB intent");
+    return;
+  }
+
+  // A present gAMA whose value disagrees with sRGB is ignored (echoing the
+  // png_ptr-side fixed-point gamma the binary prints to stderr).
+  if ((info_ptr->valid & kPngInfoGamma) != 0) {
+    const std::int32_t igamma = info_ptr->int_gamma;
+    if (igamma < 45000 || igamma > 46000) {
+      png_warning(png_ptr, "Ignoring incorrect gAMA value when sRGB is also present");
+      std::fprintf(stderr, "incorrect gamma=(%d/100000)\n",
+                   static_cast<int>(Field<std::int32_t>(png_ptr, kOffIntGamma)));
+    }
+  }
+
+  // A present cHRM whose chromaticities differ from sRGB (by > 0.01) is ignored.
+  if ((info_ptr->valid & kPngInfoChrm) != 0 &&
+      (std::abs(info_ptr->int_x_white - 31270) > 1000 ||
+       std::abs(info_ptr->int_y_white - 32900) > 1000 ||
+       std::abs(info_ptr->int_x_red   - 64000) > 1000 ||
+       std::abs(info_ptr->int_y_red   - 33000) > 1000 ||
+       std::abs(info_ptr->int_x_green - 30000) > 1000 ||
+       std::abs(info_ptr->int_y_green - 60000) > 1000 ||
+       std::abs(info_ptr->int_x_blue  - 15000) > 1000 ||
+       std::abs(info_ptr->int_y_blue  -  6000) > 1000)) {
+    png_warning(png_ptr, "Ignoring incorrect cHRM value when sRGB is also present");
+  }
+
+  png_set_sRGB_gAMA_and_cHRM(png_ptr, info_ptr, intent);
+}
+
+/**
  * Address: 0x00A23718 (FUN_00A23718)
  * Mangled: png_handle_tIME
  *
