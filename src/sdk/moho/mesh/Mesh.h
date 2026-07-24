@@ -407,6 +407,37 @@ namespace moho
     void ResetBatches();
 
     /**
+     * Address: 0x007DD220 (FUN_007DD220,
+     * ?GetStaticBatch@MeshLOD@Moho@@QAE?AV?$shared_ptr@VMeshBatch@Moho@@@boost@@XZ)
+     *
+     * IDA signature:
+     * boost::shared_ptr<MeshBatch>* __stdcall Moho::MeshLOD::GetStaticBatch(
+     *   MeshLOD* this, boost::shared_ptr<MeshBatch>* out);
+     *
+     * What it does:
+     * Lazily builds this LOD's static (non-remapped) hardware mesh batch on
+     * first use — when the batch handle is empty, a mesh resource is present and
+     * runtime instancing is enabled — then returns a retained copy of the cached
+     * handle. When instancing is unavailable the cached handle is left null.
+     */
+    boost::shared_ptr<MeshBatch>& GetStaticBatch(boost::shared_ptr<MeshBatch>& outBatch);
+
+    /**
+     * Address: 0x007DD420 (FUN_007DD420,
+     * ?GetSkinnedBatch@MeshLOD@Moho@@QAE?AV?$shared_ptr@VMeshBatch@Moho@@@boost@@XZ)
+     *
+     * IDA signature:
+     * boost::shared_ptr<MeshBatch>* __userpurge Moho::MeshLOD::GetSkinnedBatch(
+     *   MeshLOD* this, boost::shared_ptr<MeshBatch>* out);
+     *
+     * What it does:
+     * Lazily builds this LOD's skinned (bone-remapped) hardware mesh batch on
+     * first use, then returns a retained copy of the cached handle. Identical to
+     * GetStaticBatch except it enables the reference-resource bone remap.
+     */
+    boost::shared_ptr<MeshBatch>& GetSkinnedBatch(boost::shared_ptr<MeshBatch>& outBatch);
+
+    /**
      * Address: 0x007DD5D0 (FUN_007DD5D0, ?SetCutoff@MeshLOD@Moho@@QAEXM@Z)
      *
      * What it does:
