@@ -825,10 +825,6 @@ WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& 
  */
 void WriteArchive::WriteRefCounts(const RType* const type)
 {
-    if (!type) {
-        ThrowSerializationError("Error while creating archive: null type descriptor.");
-    }
-
     const std::map<const RType*, int>::iterator it = mRefCounts.find(type);
     if (it == mRefCounts.end()) {
         WriteInt(-1);
@@ -851,10 +847,6 @@ void WriteArchive::WriteRefCounts(const RType* const type)
  */
 void WriteArchive::Write(const RType* const type, const void* const object, const RRef& ownerRef)
 {
-    if (!type) {
-        ThrowSerializationError("Error while creating archive: null type descriptor.");
-    }
-
     if (!type->serSaveFunc_) {
         const RIndexed* pointerType = type->IsPointer();
         if (pointerType) {
