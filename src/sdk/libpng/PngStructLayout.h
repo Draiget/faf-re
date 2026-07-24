@@ -74,7 +74,12 @@ constexpr std::size_t kOffIrowbytes         = 0xDC;   // png_uint_32 irowbytes  
 constexpr std::size_t kOffIwidth            = 0xE0;   // png_uint_32 iwidth      (pixels in current interlaced row)
 constexpr std::size_t kOffRowNumber         = 0xE4;   // png_uint_32 row_number  (current row within the pass)
 constexpr std::size_t kOffPrevRow           = 0xE8;   // png_bytep   prev_row
+constexpr std::size_t kOffRowBuf            = 0xEC;   // png_bytep   row_buf (points 32 bytes into big_row_buf)
 constexpr std::size_t kOffIdatSize          = 0x10C;  // png_uint_32 idat_size   (bytes left in current IDAT chunk)
+constexpr std::size_t kOffUserTransformDepth    = 0x64;   // png_byte user_transform_depth
+constexpr std::size_t kOffUserTransformChannels = 0x65;   // png_byte user_transform_channels
+constexpr std::size_t kOffNumTrans          = 0x11A;  // png_uint_16 num_trans (tRNS entry count)
+constexpr std::size_t kOffBigRowBuf         = 0x250;  // png_bytep   big_row_buf (allocated row buffer base)
 
 constexpr std::size_t kOffBitDepth          = 0x127;  // png_byte bit_depth (offset 295)
 constexpr std::size_t kOffColorType         = 0x126;  // png_byte color_type (offset 294)

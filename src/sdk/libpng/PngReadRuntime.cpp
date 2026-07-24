@@ -57,6 +57,7 @@ void  png_read_filter_row(png_structp png_ptr, void* row_info,
                           std::uint8_t* row, std::uint8_t* prev_row, int filter);
 void  png_read_finish_row(png_structp png_ptr);
 void  png_read_start_row(png_structp png_ptr);
+void  png_init_read_transformations(png_structp png_ptr);  // FUN_009E674D (recovered separately)
 void  png_do_read_transformations(png_structp png_ptr);
 void  png_do_read_intrapixel(int* row_info, std::uint32_t row_addr_plus1);
 void  png_do_read_interlace(png_structp png_ptr);
@@ -746,6 +747,118 @@ extern "C" void png_read_finish_row(png_structp png_ptr)
   }
   inflateReset(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream));
   Mode(png_ptr) |= 8u;
+}
+
+/**
+ * Address: 0x00A21D8F (FUN_00A21D8F)
+ * Mangled: png_read_start_row
+ *
+ * What it does:
+ * Prepares row decoding: initializes the read transformations, sets the first
+ * pass's iwidth/irowbytes/num_rows (Adam7 geometry for interlaced images, full
+ * dimensions otherwise), then computes the maximum pixel depth any enabled
+ * transformation can produce and allocates the working row buffer (row_buf, 32
+ * bytes into big_row_buf) and the zeroed previous-row buffer accordingly.
+ * Finally sets PNG_FLAG_ROW_INIT.
+ */
+extern "C" void png_read_start_row(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+
+  Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = 0;
+  png_init_read_transformations(png_ptr);
+
+  const std::uint32_t width = Field<std::uint32_t>(png_ptr, kOffWidth);
+  const std::uint32_t transformations = Field<std::uint32_t>(png_ptr, kOffTransformations);
+
+  if (*(RawBase(png_ptr) + kOffInterlaced) != 0) {
+    std::uint32_t num_rows = Field<std::uint32_t>(png_ptr, kOffHeight);
+    if ((transformations & 2) == 0) {  // interlace not expanded by a transform
+      num_rows = (num_rows + 7) / 8;   // pass 0 covers every 8th row
+    }
+    Field<std::uint32_t>(png_ptr, kOffNumRows) = num_rows;
+
+    const std::uint8_t pass = *(RawBase(png_ptr) + kOffPass);
+    const std::uint32_t iwidth =
+        (width - kPngPassStart[pass] + kPngPassInc[pass] - 1) / kPngPassInc[pass];
+    Field<std::uint32_t>(png_ptr, kOffIwidth) = iwidth;
+    Field<std::uint32_t>(png_ptr, kOffIrowbytes) =
+        ((iwidth * *(RawBase(png_ptr) + kOffPixelDepth) + 7) >> 3) + 1;
+  } else {
+    Field<std::uint32_t>(png_ptr, kOffNumRows) = Field<std::uint32_t>(png_ptr, kOffHeight);
+    Field<std::uint32_t>(png_ptr, kOffIwidth) = width;
+    Field<std::uint32_t>(png_ptr, kOffIrowbytes) = Field<std::uint32_t>(png_ptr, kOffRowbytes) + 1;
+  }
+
+  // Largest pixel depth any enabled transformation can yield (governs row-buffer size).
+  int max_pixel_depth = *(RawBase(png_ptr) + kOffPixelDepth);
+  const std::uint8_t color_type = *(RawBase(png_ptr) + kOffColorType);
+  const std::uint8_t bit_depth  = *(RawBase(png_ptr) + kOffBitDepth);
+  const std::uint16_t num_trans = Field<std::uint16_t>(png_ptr, kOffNumTrans);
+
+  if ((transformations & 4) != 0 && bit_depth < 8) {
+    max_pixel_depth = 8;
+  }
+
+  if ((transformations & 0x1000) != 0) {  // PNG_EXPAND
+    if (color_type == 3) {
+      max_pixel_depth = 8 * (num_trans != 0) + 24;
+    } else if (color_type != 0) {
+      if (color_type == 2 && num_trans != 0) {
+        max_pixel_depth = 4 * max_pixel_depth / 3;
+      }
+    } else {
+      if (max_pixel_depth < 8) {
+        max_pixel_depth = 8;
+      }
+      if (num_trans != 0) {
+        max_pixel_depth *= 2;
+      }
+    }
+  }
+
+  if ((transformations & 0x8000) != 0) {  // PNG_FILLER
+    if (color_type == 3) {
+      max_pixel_depth = 32;
+    } else if (color_type == 0) {
+      max_pixel_depth = (max_pixel_depth > 8) ? 32 : 16;
+    } else if (color_type == 2) {
+      max_pixel_depth = (max_pixel_depth > 32) ? 64 : 32;
+    }
+  }
+
+  if ((transformations & 0x4000) != 0) {  // PNG_GRAY_TO_RGB
+    if ((num_trans != 0 && (transformations & 0x1000) != 0) ||
+        (transformations & 0x8000) != 0 || color_type == 4) {
+      max_pixel_depth = (max_pixel_depth > 16) ? 64 : 32;
+    } else if (max_pixel_depth > 8) {
+      max_pixel_depth = (color_type != 6) ? 48 : 64;
+    } else {
+      max_pixel_depth = 8 * (color_type == 6) + 24;
+    }
+  }
+
+  if ((transformations & 0x100000) != 0) {  // PNG_USER_TRANSFORM
+    const int user_depth = *(RawBase(png_ptr) + kOffUserTransformDepth) *
+                           *(RawBase(png_ptr) + kOffUserTransformChannels);
+    if (user_depth > max_pixel_depth) {
+      max_pixel_depth = user_depth;
+    }
+  }
+
+  auto* const big_row_buf = static_cast<std::uint8_t*>(png_malloc(
+      png_ptr,
+      ((static_cast<std::uint32_t>(max_pixel_depth) * ((width + 7) & ~7u) + 7) >> 3) +
+          ((max_pixel_depth + 7) >> 3) + 65));
+  Field<std::uint8_t*>(png_ptr, kOffBigRowBuf) = big_row_buf;
+  Field<std::uint8_t*>(png_ptr, kOffRowBuf) = big_row_buf + 32;
+
+  const std::uint32_t prev_row_size = Field<std::uint32_t>(png_ptr, kOffRowbytes) + 1;
+  auto* const prev_row = static_cast<std::uint8_t*>(png_malloc(png_ptr, prev_row_size));
+  Field<std::uint8_t*>(png_ptr, kOffPrevRow) = prev_row;
+  png_memset_check(png_ptr, prev_row, 0, prev_row_size);
+
+  Flags(png_ptr) |= 0x40u;  // PNG_FLAG_ROW_INIT
 }
 
 /**
