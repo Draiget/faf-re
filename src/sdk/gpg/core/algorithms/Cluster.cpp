@@ -1997,7 +1997,23 @@ namespace
      */
     [[nodiscard]] bool SubclusterKeyLess(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs)
     {
-        return std::memcmp(lhs.mBytes.data(), rhs.mBytes.data(), lhs.mBytes.size()) < 0;
+        // The key holds a raw byte copy of a SubclusterData (see the memcpy at
+        // key construction), so view it back as one and order it exactly as the
+        // binary does: by level first, then each of the 16 cluster handles by
+        // payload (Cluster::cmp). Reference-cast only -- Cluster owns a refcount,
+        // so a value copy here would run its dtor over borrowed payloads.
+        const auto& a = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(lhs.mBytes.data());
+        const auto& b = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(rhs.mBytes.data());
+        if (a.mLevel != b.mLevel) {
+            return a.mLevel < b.mLevel;
+        }
+        for (int i = 0; i < 16; ++i) {
+            const int order = a.mClusters[i].cmp(b.mClusters[i]);
+            if (order != 0) {
+                return order < 0;
+            }
+        }
+        return false;
     }
 
     /**
@@ -4782,6 +4798,30 @@ void Cluster::SetData(
     if (edges != nullptr && edgeBytes != 0u) {
         std::memcpy(nodeBase + nodeBytes, edges, edgeBytes);
     }
+}
+
+/**
+ * Address: 0x00954030 (FUN_00954030, ?cmp@Cluster@HaStar@gpg@@QBEHABV123@@Z)
+ *
+ * What it does:
+ * Total-orders two cluster handles by their shared payload. Handles that
+ * reference the same Data compare equal; otherwise the inline payload blob
+ * (mNodeCount + Node[n] + Edge[n*(n-1)/2], n = this handle's node count) is
+ * compared byte-for-byte and the sign normalized to -1 / 0 / +1.
+ */
+int Cluster::cmp(const Cluster& other) const
+{
+    const Data* const self = mData;
+    const Data* const rhs = other.mData;
+    if (self == rhs) {
+        return 0;
+    }
+
+    const unsigned int nodeCount = self->mNodeCount;
+    const std::size_t payloadBytes =
+        (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
+    const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
+    return (diff < 0) ? -1 : (diff > 0 ? 1 : 0);
 }
 
 /**
