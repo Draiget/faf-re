@@ -29,6 +29,27 @@ static constexpr double kPngChrmScale = 100000.0;
 static constexpr double kPngRoundBias = 0.5;
 
 /**
+ * Address: 0x00A23D8B (FUN_00A23D8B)
+ * Mangled: png_save_uint_32
+ *
+ * IDA signature:
+ * png_bytep __cdecl png_save_uint_32(png_bytep buf, png_uint_32 i);
+ *
+ * What it does:
+ * Stores a 32-bit value into a 4-byte buffer in big-endian (network) byte
+ * order. The write-path mirror of png_get_uint_32; used to lay down chunk
+ * lengths and integer chunk fields (cHRM, pHYs, tIME, ...). The binary returns
+ * buf, which every caller discards.
+ */
+extern "C" void png_save_uint_32(std::uint8_t* buf, std::uint32_t value)
+{
+  buf[0] = static_cast<std::uint8_t>((value >> 24) & 0xFF);
+  buf[1] = static_cast<std::uint8_t>((value >> 16) & 0xFF);
+  buf[2] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+  buf[3] = static_cast<std::uint8_t>(value & 0xFF);
+}
+
+/**
  * Address: 0x00A23E76 (FUN_00A23E76)
  *
  * What it does:
