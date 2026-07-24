@@ -3818,92 +3818,44 @@ RRef RRef_ArchiveToken(ArchiveToken* const token)
 }
 
 /**
- * Address: 0x00402400 (FUN_00402400, gpg::SerHelperBase::SerHelperBase)
+ * Address: 0x009501D0 (FUN_009501D0, gpg::SerHelperBase::SerHelperBase)
+ *
+ * IDA signature:
+ * gpg::SerHelperBase* __thiscall gpg::SerHelperBase::SerHelperBase(gpg::SerHelperBase* this);
  *
  * What it does:
- * Self-links this helper node as an empty singleton list.
+ * Self-links this helper node, lazily creates the process-global pending-helper
+ * list root (`sNewHelpers`), then splices this node into that pending intrusive
+ * list so a later `InitNewHelpers` pass can drain and dispatch it. The
+ * polymorphic helper's own vtable install (`??_7SerHelperBase@gpg@@6B@`) is
+ * emitted by the compiler; the modeled `{mNext,mPrev}` node carries only the
+ * intrusive links, matching the local-view convention `InitNewHelpers` uses.
  */
 gpg::SerHelperBase::SerHelperBase()
   : mNext(this)
   , mPrev(this)
 {
+  SerHelperBase* root = sNewHelpers;
+  if (root == nullptr) {
+    // Bare links-only sentinel head; raw operator new (no ctor) avoids recursion.
+    root = static_cast<SerHelperBase*>(::operator new(sizeof(SerHelperBase), std::nothrow));
+    if (root != nullptr) {
+      root->mNext = root;
+      root->mPrev = root;
+    }
+    sNewHelpers = root;
+  }
+
+  if (root != nullptr) {
+    // Splice this node in immediately after the pending-list root.
+    mNext = root->mNext;
+    mPrev = root;
+    root->mNext = this;
+    mNext->mPrev = this;
+  }
 }
 
 gpg::SerHelperBase* gpg::SerHelperBase::sNewHelpers = nullptr;
-
-namespace
-{
-  struct SerHelperCtorQueueNodeRuntimeView
-  {
-    SerHelperCtorQueueNodeRuntimeView* mNext = nullptr; // +0x00
-    SerHelperCtorQueueNodeRuntimeView* mPrev = nullptr; // +0x04
-  };
-  static_assert(
-    sizeof(SerHelperCtorQueueNodeRuntimeView) == 0x8,
-    "SerHelperCtorQueueNodeRuntimeView size must be 0x8"
-  );
-
-  struct SerHelperCtorRuntimeView
-  {
-    void** vtable = nullptr;                               // +0x00
-    SerHelperCtorQueueNodeRuntimeView links{};             // +0x04
-  };
-  static_assert(
-    offsetof(SerHelperCtorRuntimeView, links) == 0x4,
-    "SerHelperCtorRuntimeView::links offset must be 0x4"
-  );
-  static_assert(sizeof(SerHelperCtorRuntimeView) == 0xC, "SerHelperCtorRuntimeView size must be 0xC");
-
-  void* gSerHelperBaseCtorRuntimeVTableTag = nullptr;
-}
-
-/**
- * Address: 0x009501D0 (FUN_009501D0, gpg::SerHelperBase::SerHelperBase)
- *
- * What it does:
- * Initializes one serializer-helper runtime node (`vtable + links`), ensures
- * the process-global pending-helper list root exists, then inserts this node
- * into that pending intrusive list.
- */
-[[maybe_unused]] SerHelperCtorRuntimeView* ConstructSerHelperRuntimeAndQueueForInit(
-  SerHelperCtorRuntimeView* const runtime
-)
-{
-  if (runtime == nullptr) {
-    return nullptr;
-  }
-
-  auto* const links = &runtime->links;
-  links->mPrev = links;
-  links->mNext = links;
-  runtime->vtable = reinterpret_cast<void**>(&gSerHelperBaseCtorRuntimeVTableTag);
-
-  auto* root = reinterpret_cast<SerHelperCtorQueueNodeRuntimeView*>(gpg::SerHelperBase::sNewHelpers);
-  if (root == nullptr) {
-    root = static_cast<SerHelperCtorQueueNodeRuntimeView*>(
-      ::operator new(sizeof(SerHelperCtorQueueNodeRuntimeView), std::nothrow)
-    );
-    if (root != nullptr) {
-      root->mPrev = root;
-      root->mNext = root;
-    }
-    gpg::SerHelperBase::sNewHelpers = reinterpret_cast<gpg::SerHelperBase*>(root);
-  }
-
-  links->mNext->mPrev = links->mPrev;
-  links->mPrev->mNext = links->mNext;
-  links->mNext = links;
-  links->mPrev = links;
-
-  if (root != nullptr) {
-    links->mNext = root->mNext;
-    links->mPrev = root;
-    root->mNext = links;
-    links->mNext->mPrev = links;
-  }
-
-  return runtime;
-}
 
 /**
  * Address: 0x004027D0 (FUN_004027D0, duplicate helper body)

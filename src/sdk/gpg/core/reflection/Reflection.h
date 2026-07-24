@@ -246,11 +246,12 @@ namespace gpg
     SerHelperBase* mPrev;
 
     /**
-     * Address: 0x00402400 (FUN_00402400, gpg::SerHelperBase::SerHelperBase)
+     * Address: 0x009501D0 (FUN_009501D0, gpg::SerHelperBase::SerHelperBase)
      *
      * What it does:
-     * Unlinks this helper node from its current intrusive list links and then
-     * rewires it to a self-linked singleton.
+     * Self-links this helper node and splices it into the process-global pending
+     * list root (`sNewHelpers`, lazily created) so `InitNewHelpers` can later
+     * drain and dispatch it.
      */
     SerHelperBase();
 
