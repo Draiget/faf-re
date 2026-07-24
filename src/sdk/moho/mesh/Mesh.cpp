@@ -6840,28 +6840,111 @@ namespace moho
    * `depthTechnique` string annotation; only the albedo sampler is bound; and
    * the batch is always drawn un-mirrored.
    *
-   * DEFERRED (stub retained): the lazy depth-technique string field cannot be
-   * mapped 1:1 onto master's current MeshMaterial layout. From
-   * FUN_007E03B0.asm (esi = MeshLOD, mMat @0x0C, cross-checked via
-   * mAlbedoSheet at esi+0x2C = mMat+0x20 and mShaderIndex at esi+0x5C =
-   * mMat+0x50, mRuntimeFlag1 at esi+0x99 = mMat+0x8D):
-   *   - the `std::string::assign` destination is `lea ecx,[esi+0x7C]` =
-   *     mMat+0x70 (== master `mAuxTag1`),
-   *   - but the SelectTechnique read of the same technique string uses
-   *     `_Bx` at [esi+0x80] = mMat+0x74, `_Mysize` at [esi+0x90] = mMat+0x84
-   *     and `_Myres` at [esi+0x94] = mMat+0x88 — i.e. a string whose `_Bx`
-   *     begins at mMat+0x74, four bytes after `mAuxTag1@0x70`.
-   * These two views of the depth-technique string are inconsistent with a
-   * single `mAuxTag1@0x70` field, so binding it would require either a raw
-   * offset cast (forbidden) or a MeshMaterial layout change that is out of
-   * this pass's scope and would ripple into other TUs. Left as a stub pending
-   * a dedicated MeshMaterial depth-technique layout pass. Render (Part C)
-   * does not depend on this field.
+   * The depth-technique string is `MeshMaterial::mAuxTag1` (a msvc8::string at
+   * mMat+0x70). The binary's reads at mMat+0x74 / +0x84 / +0x88 (`_Bx`,
+   * `_Mysize`, `_Myres`) are that same string's internal members at
+   * string+0x04 / +0x14 / +0x18 — normal msvc8::string access, not a separate
+   * field. Cross-checked from FUN_007E03B0.asm via mAlbedoSheet at esi+0x2C =
+   * mMat+0x20, mShaderIndex at esi+0x5C = mMat+0x50, mRuntimeFlag1 at esi+0x99
+   * = mMat+0x8D.
    */
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
   {
-    (void)camera;
-    (void)meshMap;
+    // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
+    if (meshMap.size == 0) {
+      return;
+    }
+
+    // Bind only the depth-pass shader-constant lane: frame time, LOD basis, and
+    // the view/projection matrices. RenderDepth does NOT call ConfigureShader
+    // and never mirrors (no water-plane reflection of the view matrix).
+    // (Transcribed from FUN_007E03B0 @0x007E03D0..0x007E04B0.)
+    MeshShaderVarSet& sv = GetMeshShaderVars();
+
+    CD3DDevice* const device = D3D_GetDevice();
+
+    // Frame time: fold the frame counter into a float (with the unsigned int
+    // fixup the binary applies to negative counters), add the accumulated delta
+    // frame, then wrap into the shader time window (fmod by 36000). Identical to
+    // ConfigureShader's shaderTime lane.
+    const auto frameCounter = static_cast<std::int32_t>(instanceListSize);
+    double frameSeconds = static_cast<double>(frameCounter);
+    if (frameCounter < 0) {
+      frameSeconds += 4294967296.0; // 2^32 unsigned fixup
+    }
+    frameSeconds += deltaFrame;
+    const float shaderTime = static_cast<float>(std::fmod(frameSeconds, 36000.0)); // flt_F57F08
+    if (sv.time.Exists()) {
+      sv.time.SetFloat(shaderTime);
+    }
+
+    // LOD basis = viewport matrix row 1 (camera.viewport.r[1], 4 floats; the
+    // binary's arg0+660).
+    if (sv.lodBasis.Exists()) {
+      SetShaderVarMem(sv.lodBasis, 4, &camera.viewport.r[1].x);
+    }
+    // View / projection matrices bound directly (un-mirrored). arg0+92 / arg0+28.
+    if (sv.viewMatrix.Exists()) {
+      sv.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (sv.projMatrix.Exists()) {
+      sv.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    // Select the "mesh" effect as the device's current effect.
+    CD3DEffect* const meshEffect = device->GetResources()->FindEffect("mesh");
+    device->SetCurEffect(meshEffect);
+
+    MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
+
+    // Walk the batch-bucket RB-tree in key order: begin = head->left, end = head.
+    MeshBatchBucketNode* const headNode = meshMap.head;
+    for (MeshBatchBucketNode* node = headNode->left; node != headNode; node = MeshBatchTreeSuccessor(node)) {
+      MeshLOD* const lod = MeshBatchEntryLod(node);
+      MeshMaterial& material = lod->mat;
+
+      // Resolve + cache the material render stage on first use.
+      const std::int32_t renderStage = ResolveMaterialRenderStage(meshEffect, material);
+
+      // Depth gate: only draw materials whose render stage participates in the
+      // depth pass (binary: `if (mMat.mVal & 1)`).
+      if ((renderStage & 1) == 0) {
+        continue;
+      }
+
+      // Lazily resolve + cache this material's depth technique the first time
+      // the depth pass reaches it (binary: `if (!mMat.byte8D) { mMat.byte8D=1;
+      // mMat.mStr3 = GetStringAnnotation(mAnnot,"depthTechnique",""); }`).
+      if (!material.mRuntimeFlag1) {
+        material.mRuntimeFlag1 = 1;
+        const msvc8::string depthTechnique =
+          meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("depthTechnique"), msvc8::string(""));
+        material.mAuxTag1.assign_owned(depthTechnique.view());
+      }
+
+      // Only draw when a depth technique is defined for the material
+      // (binary: `if (mMat.mStr3._Mysize)`).
+      if (material.mAuxTag1.size() != 0) {
+        device->SelectTechnique(material.mAuxTag1.c_str());
+
+        // Depth pass binds only the albedo sampler.
+        tv.albedoTexture.GetTexture(material.mAlbedoSheet);
+
+        // Draw the bucket's instances through the LOD's lazily-built hardware
+        // mesh batch (skinned for static-pose buckets, static otherwise). The
+        // shared_ptr handle keeps the batch retained for the draw call; the
+        // depth pass always draws un-mirrored (binary passes 0).
+        boost::shared_ptr<MeshBatch> batchHandle;
+        if (MeshBatchEntryIsSkinned(node)) {
+          lod->GetSkinnedBatch(batchHandle);
+        } else {
+          lod->GetStaticBatch(batchHandle);
+        }
+        if (batchHandle) {
+          batchHandle->Render(MeshBatchEntryInstances(node), false);
+        }
+      }
+    }
   }
 
   /**
