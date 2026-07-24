@@ -13684,6 +13684,12 @@ Unit::~Unit()
   DestroyUnitExtraStorage(mExtraStorage);
 
   ClearWeakObjectChain(static_cast<WeakObject&>(static_cast<IUnit&>(*this)));
+
+  // Decrement the Unit instance-count stat (binary FUN_006A6BF0 line ~467). The
+  // constructor bumps it +1; the recovered destructor had dropped the matching
+  // decrement, so the live-Unit stat only grew. Mirror the ctor's inline form.
+  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
+  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), -1L);
 }
 
 /**
