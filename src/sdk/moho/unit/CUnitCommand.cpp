@@ -1089,6 +1089,11 @@ CUnitCommand::CUnitCommand()
   , mArgs()
   , mUnknownTailInt(0)
 {
+  // Increment the CUnitCommand instance-count stat (binary FUN_006E7FF0 via the
+  // IncrementCUnitCommandInstanceStatAndReturn helper FUN_006E95B0). The recovery
+  // had left the increment helper orphaned, dropping the ctor bump.
+  (void)IncrementCUnitCommandInstanceStatAndReturn(0);
+
   mPrev = this;
   mNext = this;
 
@@ -1149,6 +1154,12 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   , mArgs(issueData.mObject)
   , mUnknownTailInt(0)
 {
+  // Increment the CUnitCommand instance-count stat (via the
+  // IncrementCUnitCommandInstanceStatAndReturn helper FUN_006E95B0). This is the
+  // delegated-to root ctor; the (Sim*, issueData) ctor reaches it via delegation,
+  // so the bump lives here only (no double-count).
+  (void)IncrementCUnitCommandInstanceStatAndReturn(0);
+
   mPrev = this;
   mNext = this;
 
@@ -1840,6 +1851,11 @@ void CUnitCommand::DestroyInternal()
 
   // +0x0034 broadcaster/list base slice.
   runtime.broadcasterOwnerChainNode.UnlinkFromOwnerChain();
+
+  // Decrement the CUnitCommand instance-count stat (binary FUN_006E8500 line 97),
+  // balancing the +1 the constructors emit. The recovery had dropped it.
+  moho::StatItem* const statItem = moho::InstanceCounter<moho::CUnitCommand>::GetStatItem();
+  (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), -1L);
 }
 
 /**
