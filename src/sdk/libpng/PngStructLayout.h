@@ -133,6 +133,7 @@ constexpr std::size_t kOffTransValues       = 0x18C;  // png_color_16 trans_valu
 constexpr std::size_t kOffPaletteLookup     = 0x1EC;  // png_bytep    palette_lookup (dither)
 constexpr std::size_t kOffDitherIndex       = 0x1F0;  // png_bytep    dither_index (dither lookup)
 constexpr std::size_t kOffRgbToGrayStatus   = 0x228;  // png_byte     rgb_to_gray_status
+constexpr std::size_t kOffIntGamma          = 0x234;  // png_fixed_point int_gamma (fprintf src @0x9E... sRGB)
 
 // ----------------------------------------------------------------------------
 // Typed accessors
