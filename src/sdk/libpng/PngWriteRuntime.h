@@ -49,7 +49,7 @@ extern "C" void* png_malloc(png_structp png_ptr, std::uint32_t size);
 extern "C" void png_free(png_structp png_ptr, void* ptr);
 extern "C" int png_check_keyword(png_structp png_ptr, char* keyword, char** newKeyword);
 extern "C" int png_text_compress(
-  int textLength, png_structp png_ptr, int compressionType, int compressionFlags, int* compressedState
+  png_structp png_ptr, char* text, int textLength, int compression, int* compressedState
 );
 extern "C" void png_write_chunk_start(png_structp png_ptr, const char* chunkName, std::uint32_t length);
 extern "C" void png_write_chunk_data(png_structp png_ptr, const std::uint8_t* chunkData, std::uint32_t length);
@@ -290,7 +290,7 @@ extern "C" void png_write_sBIT(
 extern "C" void png_write_iCCP(
   png_structp png_ptr,
   char* profileKeyword,
-  int unknownCompressionTypeFlag,
   int compressionType,
+  char* profile,
   int profileDataLength
 );
