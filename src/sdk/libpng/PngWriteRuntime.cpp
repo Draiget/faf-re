@@ -5,6 +5,7 @@
 
 #include "libpng/PngWriteRuntime.h"
 #include "libpng/PngStructLayout.h"
+#include "libpng/PngCommonRuntime.h"  // png_reset_crc / png_calculate_crc
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,6 +15,7 @@ extern "C" {
 void png_save_uint_32(std::uint8_t* buf, std::uint32_t value);
 void png_write_chunk(png_structp png_ptr, std::uint8_t* chunk_name, std::uint8_t* data, std::uint32_t length);
 void png_write_data(png_structp png_ptr, const std::uint8_t* data, std::uint32_t length);
+void png_error(png_structp png_ptr, const char* message);
 std::FILE* __cdecl __iob_func(void);
 struct z_stream_s;
 int deflateEnd(z_stream_s* strm);
@@ -47,6 +49,88 @@ extern "C" void png_save_uint_32(std::uint8_t* buf, std::uint32_t value)
   buf[1] = static_cast<std::uint8_t>((value >> 16) & 0xFF);
   buf[2] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
   buf[3] = static_cast<std::uint8_t>(value & 0xFF);
+}
+
+/**
+ * Address: 0x009E9F07 (FUN_009E9F07)
+ * Mangled: png_write_data
+ *
+ * What it does:
+ * Writes `length` bytes through the png_struct output callback (+0x4C), or
+ * raises png_error when no write function is installed.
+ */
+extern "C" void png_write_data(png_structp png_ptr, const std::uint8_t* data, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  using png_rw_ptr = void (*)(png_structp, const std::uint8_t*, std::uint32_t);
+  const auto write_data_fn = Field<png_rw_ptr>(png_ptr, kOffWriteDataFn);
+  if (write_data_fn == nullptr) {
+    png_error(png_ptr, "Call to NULL write function");
+  }
+  write_data_fn(png_ptr, data, length);
+}
+
+/**
+ * Address: 0x00A23DE4 (FUN_00A23DE4)
+ * Mangled: png_write_chunk_start
+ *
+ * What it does:
+ * Emits a chunk header: the 4-byte big-endian length and the 4-byte chunk name,
+ * then resets the running CRC and seeds it with the chunk name.
+ */
+extern "C" void png_write_chunk_start(png_structp png_ptr, const char* chunkName, std::uint32_t length)
+{
+  std::uint8_t buf[4];
+  png_save_uint_32(buf, length);
+  png_write_data(png_ptr, buf, 4);
+  png_write_data(png_ptr, reinterpret_cast<const std::uint8_t*>(chunkName), 4);
+  png_reset_crc(png_ptr);
+  png_calculate_crc(png_ptr, reinterpret_cast<std::uint8_t*>(const_cast<char*>(chunkName)), 4);
+}
+
+/**
+ * Address: 0x00A23E26 (FUN_00A23E26)
+ * Mangled: png_write_chunk_data
+ *
+ * What it does:
+ * Folds `length` chunk-payload bytes into the running CRC and writes them out.
+ * A null pointer or zero length is a no-op.
+ */
+extern "C" void png_write_chunk_data(png_structp png_ptr, const std::uint8_t* chunkData, std::uint32_t length)
+{
+  if (chunkData != nullptr && length != 0) {
+    png_calculate_crc(png_ptr, const_cast<std::uint8_t*>(chunkData), length);
+    png_write_data(png_ptr, chunkData, length);
+  }
+}
+
+/**
+ * Address: 0x00A23E4E (FUN_00A23E4E)
+ * Mangled: png_write_chunk_end
+ *
+ * What it does:
+ * Writes the 4-byte big-endian chunk CRC (png_struct+0x110) that closes a chunk.
+ */
+extern "C" void png_write_chunk_end(png_structp png_ptr)
+{
+  using namespace libpng_layout;
+  std::uint8_t buf[4];
+  png_save_uint_32(buf, Field<std::uint32_t>(png_ptr, kOffCrc));
+  png_write_data(png_ptr, buf, 4);
+}
+
+/**
+ * Address: 0x00A24B64 (FUN_00A24B64)
+ * Mangled: png_write_chunk
+ *
+ * What it does:
+ * Writes a complete chunk (header + data + CRC) in one call.
+ */
+extern "C" void png_write_chunk(png_structp png_ptr, std::uint8_t* chunk_name, std::uint8_t* data, std::uint32_t length)
+{
+  png_write_chunk_start(png_ptr, reinterpret_cast<const char*>(chunk_name), length);
+  png_write_chunk_data(png_ptr, data, length);
+  png_write_chunk_end(png_ptr);
 }
 
 /**

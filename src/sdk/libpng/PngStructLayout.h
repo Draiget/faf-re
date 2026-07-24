@@ -95,6 +95,7 @@ constexpr std::size_t kOffShift             = 0x181;  // png_color_8 shift   (of
 // read-transform dispatcher fields (png_do_read_transformations, FUN_009E711B);
 // offsets confirmed from the leaf-call push order in FUN_009E711B.asm.
 constexpr std::size_t kOffReadUserTransformFn = 0x58;  // png_user_transform_ptr read_user_transform_fn
+constexpr std::size_t kOffWriteDataFn       = 0x4C;   // png_rw_ptr write_data_fn (output callback)
 constexpr std::size_t kOffRowInfoRowbytes   = 0x104;  // row_info.rowbytes mirror (dither ==0 check)
 constexpr std::size_t kOffRowInfoColorType  = 0x108;  // row_info.color_type mirror (expand check)
 constexpr std::size_t kOffTrans             = 0x114;  // png_bytep    trans (tRNS alpha array)
