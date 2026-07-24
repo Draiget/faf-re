@@ -997,6 +997,111 @@ extern "C" void png_do_read_interlace(png_structp png_ptr)
 }
 
 /**
+ * Address: 0x00A215FB (FUN_00A215FB)
+ * Mangled: png_combine_row
+ *
+ * What it does:
+ * Combines the just-decoded interlace-pass scanline (row_buf + 1) into a
+ * display/output row using an 8-bit interlace selector `mask`. The selector
+ * starts at 0x80 and rotates right (wrapping to 0x80); for each group of 8
+ * pixels, `mask & selector` decides whether the source pixel replaces the
+ * destination. mask == 255 is the whole-row memcpy fast path. Sub-byte depths
+ * (1/2/4) merge the selected pixel into the packed destination byte with a
+ * keep-mask honoring PNG_PACKSWAP; 8-bit-and-wider copies pixel_depth>>3 bytes.
+ */
+extern "C" void png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask)
+{
+  using namespace libpng_layout;
+
+  auto* const row_info = reinterpret_cast<png_row_info*>(RawBase(png_ptr) + 0x100);
+  const std::uint8_t pixel_depth = row_info->pixel_depth;
+
+  if (mask == 255) {
+    const std::uint32_t width = Field<std::uint32_t>(png_ptr, kOffWidth);
+    std::uint8_t* const sp = Field<std::uint8_t*>(png_ptr, kOffRowBuf) + 1;
+    std::memcpy(row, sp, (width * pixel_depth + 7) >> 3);
+    return;
+  }
+
+  std::uint8_t* const src_base = Field<std::uint8_t*>(png_ptr, kOffRowBuf);
+  std::uint8_t* dp = row;
+  const bool packswap = (Field<std::uint32_t>(png_ptr, kOffTransformations) & 0x10000u) != 0;
+  const std::uint32_t width = Field<std::uint32_t>(png_ptr, kOffWidth);
+
+  switch (pixel_depth) {
+    case 1: {
+      const std::uint8_t* sp = src_base + 1;
+      std::uint8_t m = 0x80;
+      int s_start, s_end, s_inc;
+      if (packswap) { s_start = 0; s_end = 7; s_inc = 1; }
+      else          { s_start = 7; s_end = 0; s_inc = -1; }
+      int shift = s_start;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        if (mask & m) {
+          const std::uint8_t value = static_cast<std::uint8_t>(((*sp >> shift) & 0x01) << shift);
+          *dp = static_cast<std::uint8_t>(value | (*dp & static_cast<std::uint8_t>(0x7F7F >> (7 - shift))));
+        }
+        if (shift == s_end) { shift = s_start; ++sp; ++dp; } else { shift += s_inc; }
+        m = (m == 1) ? 0x80 : static_cast<std::uint8_t>(m >> 1);
+      }
+      break;
+    }
+
+    case 2: {
+      const std::uint8_t* sp = src_base + 1;
+      std::uint8_t m = 0x80;
+      int s_start, s_end, s_inc;
+      if (packswap) { s_start = 0; s_end = 6; s_inc = 2; }
+      else          { s_start = 6; s_end = 0; s_inc = -2; }
+      int shift = s_start;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        if (mask & m) {
+          const std::uint8_t value = static_cast<std::uint8_t>(((*sp >> shift) & 0x03) << shift);
+          *dp = static_cast<std::uint8_t>(value | (*dp & static_cast<std::uint8_t>(0x3F3F >> (6 - shift))));
+        }
+        if (shift == s_end) { shift = s_start; ++sp; ++dp; } else { shift += s_inc; }
+        m = (m == 1) ? 0x80 : static_cast<std::uint8_t>(m >> 1);
+      }
+      break;
+    }
+
+    case 4: {
+      const std::uint8_t* sp = src_base + 1;
+      std::uint8_t m = 0x80;
+      int s_start, s_end, s_inc;
+      if (packswap) { s_start = 0; s_end = 4; s_inc = 4; }
+      else          { s_start = 4; s_end = 0; s_inc = -4; }
+      int shift = s_start;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        if (mask & m) {
+          const std::uint8_t value = static_cast<std::uint8_t>(((*sp >> shift) & 0x0F) << shift);
+          *dp = static_cast<std::uint8_t>(value | (*dp & static_cast<std::uint8_t>(0x0F0F >> (4 - shift))));
+        }
+        if (shift == s_end) { shift = s_start; ++sp; ++dp; } else { shift += s_inc; }
+        m = (m == 1) ? 0x80 : static_cast<std::uint8_t>(m >> 1);
+      }
+      break;
+    }
+
+    default: {
+      // 8-bit and wider: whole-pixel copy of pixel_depth>>3 bytes.
+      const std::size_t bytes_per_pixel = pixel_depth >> 3;
+      const std::uint8_t* sp = src_base + 1;
+      std::uint8_t m = 0x80;
+      for (std::uint32_t i = 0; i < width; ++i) {
+        if (mask & m) {
+          std::memcpy(dp, sp, bytes_per_pixel);
+        }
+        sp += bytes_per_pixel;
+        dp += bytes_per_pixel;
+        m = (m == 1) ? 0x80 : static_cast<std::uint8_t>(m >> 1);
+      }
+      break;
+    }
+  }
+}
+
+/**
  * Address: 0x009E0A46 (FUN_009E0A46)
  * Mangled: png_get_copyright
  *
