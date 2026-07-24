@@ -99,7 +99,7 @@ constexpr std::size_t kOffReadUserTransformFn = 0x58;  // png_user_transform_ptr
 constexpr std::size_t kOffWriteDataFn       = 0x4C;   // png_rw_ptr write_data_fn (output callback)
 constexpr std::size_t kOffRowInfoRowbytes   = 0x104;  // row_info.rowbytes mirror (dither ==0 check)
 constexpr std::size_t kOffRowInfoColorType  = 0x108;  // row_info.color_type mirror (expand check)
-constexpr std::size_t kOffTrans             = 0x114;  // png_bytep    trans (tRNS alpha array)
+constexpr std::size_t kOffTrans             = 0x188;  // png_bytep    trans (tRNS alpha array; 4th arg @0x9E717C)
 constexpr std::size_t kOffBackgroundGammaType = 0x130; // int         background_gamma_type (read as byte @0x9E68DE)
 constexpr std::size_t kOffBackgroundGamma   = 0x134;  // float        background_gamma (lea @0x9E6942)
 constexpr std::size_t kOffBackground        = 0x138;  // png_color_16 background (10 bytes)
@@ -117,7 +117,7 @@ constexpr std::size_t kOffSigBitRed         = 0x17C;  // png_byte     sig_bit.re
 constexpr std::size_t kOffSigBitGreen       = 0x17D;  // png_byte     sig_bit.green
 constexpr std::size_t kOffSigBitBlue        = 0x17E;  // png_byte     sig_bit.blue
 constexpr std::size_t kOffSigBitGray        = 0x17F;  // png_byte     sig_bit.gray
-constexpr std::size_t kOffPalette           = 0x188;  // png_colorp   palette
+constexpr std::size_t kOffPalette           = 0x114;  // png_colorp   palette (before num_palette@0x118; 3rd arg @0x9E7188)
 constexpr std::size_t kOffTransValues       = 0x18C;  // png_color_16 trans_values
 constexpr std::size_t kOffPaletteLookup     = 0x1EC;  // png_bytep    palette_lookup (dither)
 constexpr std::size_t kOffDitherIndex       = 0x1F0;  // png_bytep    dither_index (dither lookup)
