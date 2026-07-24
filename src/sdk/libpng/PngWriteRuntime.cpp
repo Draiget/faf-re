@@ -19,6 +19,7 @@ void png_error(png_structp png_ptr, const char* message);
 std::FILE* __cdecl __iob_func(void);
 struct z_stream_s;
 int deflateEnd(z_stream_s* strm);
+int deflateReset(z_stream_s* strm);
 }
 
 // Fixed-point scale constants from libpng 1.2.x:
@@ -131,6 +132,59 @@ extern "C" void png_write_chunk(png_structp png_ptr, std::uint8_t* chunk_name, s
   png_write_chunk_start(png_ptr, reinterpret_cast<const char*>(chunk_name), length);
   png_write_chunk_data(png_ptr, data, length);
   png_write_chunk_end(png_ptr);
+}
+
+namespace {
+// libpng text-compression state — the `int* compressedState` the write-text
+// helpers thread through, laid out as consecutive machine words.
+struct PngCompressionState
+{
+  std::uint8_t*  input;           // +0x00  single pre-formed input buffer (or null)
+  std::uint32_t  input_len;       // +0x04
+  int            num_output_ptr;  // +0x08  count of accumulated deflate output blocks
+  int            max_output_ptr;  // +0x0C  allocated size of output_ptr array
+  std::uint8_t** output_ptr;      // +0x10  array of deflate output blocks
+};
+}  // namespace
+
+/**
+ * Address: 0x00A24139 (FUN_00A24139)
+ * Mangled: png_write_compressed_data_out
+ *
+ * What it does:
+ * Flushes a text chunk's compressed payload. If the state carries a single
+ * pre-formed input buffer it is written directly; otherwise each accumulated
+ * deflate output block is written (as full zbuf-sized runs) and freed, the
+ * block array is released, any bytes still sitting in zbuf are written, and the
+ * deflate stream is reset for reuse.
+ */
+extern "C" void png_write_compressed_data_out(png_structp png_ptr, int* compressedState)
+{
+  using namespace libpng_layout;
+
+  auto* const comp = reinterpret_cast<PngCompressionState*>(compressedState);
+  const std::uint32_t zbuf_size = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+
+  if (comp->input != nullptr) {
+    png_write_chunk_data(png_ptr, comp->input, comp->input_len);
+    return;
+  }
+
+  for (int i = 0; i < comp->num_output_ptr; ++i) {
+    png_write_chunk_data(png_ptr, comp->output_ptr[i], zbuf_size);
+    png_free(png_ptr, comp->output_ptr[i]);
+    comp->output_ptr[i] = nullptr;
+  }
+  if (comp->max_output_ptr != 0) {
+    png_free(png_ptr, comp->output_ptr);
+  }
+  comp->output_ptr = nullptr;
+
+  const std::uint32_t avail_out = Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut);
+  if (avail_out < zbuf_size) {
+    png_write_chunk_data(png_ptr, Field<std::uint8_t*>(png_ptr, kOffZbuf), zbuf_size - avail_out);
+  }
+  deflateReset(reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream));
 }
 
 /**
