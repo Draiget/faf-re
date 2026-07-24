@@ -2184,6 +2184,70 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A22320 (FUN_00A22320)
+ * Mangled: png_handle_gAMA
+ *
+ * IDA signature:
+ * void __cdecl png_handle_gAMA(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a gAMA (image gamma) chunk. Enforces chunk ordering (IHDR seen, not
+ * after IDAT, warn-and-cope if after PLTE, reject a duplicate that is not being
+ * overridden by sRGB) and the 4-byte length, reads the fixed-point gamma, and —
+ * unless it contradicts an already-present sRGB chunk (in which case it warns
+ * and prints the ignored value) — records it into png_ptr->gamma and the info
+ * struct via png_set_gAMA / png_set_gAMA_fixed.
+ */
+extern "C" void png_handle_gAMA(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  std::uint8_t buf[4];
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before gAMA");
+  } else if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid gAMA after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  } else if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+    png_warning(png_ptr, "Out of place gAMA chunk");
+  } else if (info_ptr != nullptr && (info_ptr->valid & kPngInfoGamma) != 0 &&
+             (info_ptr->valid & kPngInfoSrgb) == 0) {
+    png_warning(png_ptr, "Duplicate gAMA chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length != 4) {
+    png_warning(png_ptr, "Incorrect gAMA chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  png_crc_read(png_ptr, buf, 4);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    return;
+  }
+
+  const std::uint32_t igamma = static_cast<std::uint32_t>(png_get_uint_32(buf));
+  if (igamma == 0) {
+    png_warning(png_ptr, "Ignoring gAMA chunk with gamma=0");
+    return;
+  }
+
+  if ((info_ptr->valid & kPngInfoSrgb) != 0 && (igamma < 45000u || igamma > 46000u)) {
+    png_warning(png_ptr, "Ignoring incorrect gAMA value when sRGB is also present");
+    std::fprintf(stderr, "gamma = (%d/100000)\n", static_cast<int>(igamma));
+    return;
+  }
+
+  const float file_gamma = static_cast<float>(static_cast<double>(igamma) / 100000.0);
+  Field<float>(png_ptr, kOffGamma) = file_gamma;
+  png_set_gAMA(png_ptr, info_ptr, file_gamma);
+  png_set_gAMA_fixed(png_ptr, info_ptr, static_cast<std::int32_t>(igamma));
+}
+
+/**
  * Address: 0x009E0E93 (FUN_009E0E93)
  * Mangled: png_read_info
  */
