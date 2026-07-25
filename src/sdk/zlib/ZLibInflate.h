@@ -109,6 +109,10 @@ static_assert(offsetof(ZStream, state)     == 0x1C);
 static_assert(offsetof(ZStream, adler)     == 0x30);
 static_assert(sizeof(ZStream) == 0x38, "zlib::ZStream must be 56 bytes");
 
+// zlib allocator callback ABI (z_stream zalloc/zfree).
+using AllocFunc = void* (*)(void* opaque, unsigned int items, unsigned int size);
+using FreeFunc  = void  (*)(void* opaque, void* address);
+
 // zlib return codes used by the recovered inflate leaves.
 constexpr int kZOk           = 0;
 constexpr int kZStreamError  = -2;
