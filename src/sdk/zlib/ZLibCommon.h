@@ -50,6 +50,7 @@ using FreeFunc  = void  (*)(void* opaque, void* address);
 constexpr int kZOk           = 0;
 constexpr int kZStreamEnd    = 1;
 constexpr int kZNeedDict     = 2;
+constexpr int kZErrno        = -1;
 constexpr int kZStreamError  = -2;
 constexpr int kZDataError    = -3;
 constexpr int kZMemError     = -4;

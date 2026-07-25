@@ -12,6 +12,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "zlib/ZLibCommon.h"  // canonical ZStream + Alloc/FreeFunc + return codes
+
 namespace zlib {
 
 // One entry of a Huffman decoding table (zlib `code`, 4 bytes).
@@ -181,48 +183,9 @@ static_assert(offsetof(InflateState, work)     == 0x2F0);
 static_assert(offsetof(InflateState, codes)    == 0x530);
 static_assert(sizeof(InflateState) == 0x2530, "zlib::InflateState must be 0x2530 bytes");
 
-// zlib z_stream_s (public stream head, 56 bytes). state is the opaque
-// internal_state* (points at an InflateState for the inflate direction).
-struct ZStream
-{
-  std::uint8_t*  next_in;    // +0x00
-  std::uint32_t  avail_in;   // +0x04
-  std::uint32_t  total_in;   // +0x08
-  std::uint8_t*  next_out;   // +0x0C
-  std::uint32_t  avail_out;  // +0x10
-  std::uint32_t  total_out;  // +0x14
-  char*          msg;        // +0x18
-  void*          state;      // +0x1C  internal_state*
-  void*          zalloc;     // +0x20  alloc_func
-  void*          zfree;      // +0x24  free_func
-  void*          opaque;     // +0x28
-  std::int32_t   data_type;  // +0x2C
-  std::uint32_t  adler;      // +0x30
-  std::uint32_t  reserved;   // +0x34
-};
-
-static_assert(offsetof(ZStream, total_in)  == 0x08);
-static_assert(offsetof(ZStream, total_out) == 0x14);
-static_assert(offsetof(ZStream, msg)       == 0x18);
-static_assert(offsetof(ZStream, state)     == 0x1C);
-static_assert(offsetof(ZStream, adler)     == 0x30);
-static_assert(sizeof(ZStream) == 0x38, "zlib::ZStream must be 56 bytes");
-
-// zlib allocator callback ABI (z_stream zalloc/zfree).
-using AllocFunc = void* (*)(void* opaque, unsigned int items, unsigned int size);
-using FreeFunc  = void  (*)(void* opaque, void* address);
-
-// zlib return codes (zlib.h). Values confirmed from the literal returns in
-// FUN_00959070.asm (e.g. mov eax,1 = Z_STREAM_END, mov eax,0FFFFFFFBh = -5).
-constexpr int kZOk           = 0;
-constexpr int kZStreamEnd    = 1;
-constexpr int kZNeedDict     = 2;
-constexpr int kZErrno        = -1;
-constexpr int kZStreamError  = -2;
-constexpr int kZDataError    = -3;
-constexpr int kZMemError     = -4;
-constexpr int kZBufError     = -5;
-constexpr int kZVersionError = -6;
+// ZStream, AllocFunc/FreeFunc and the zlib return codes are defined once in
+// ZLibCommon.h (included above) so both the inflate and deflate directions share
+// a single owning definition.
 
 // zlib flush values (zlib.h). inflate only distinguishes Z_FINISH (==4) and
 // Z_BLOCK (==5) from the rest; those two literals appear in FUN_00959070.asm
