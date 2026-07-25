@@ -165,7 +165,11 @@ struct png_info_struct
   std::uint8_t  pad_CC_to_D4[0x08];         // +0xCC
   png_sPLT_tp   splt_palettes;                // +0xD4  sPLT suggested-palette array
   std::int32_t  splt_palettes_num;            // +0xD8  sPLT record count
-  std::uint8_t  pad_DC_to_F8[0x1C];         // +0xDC
+  std::uint8_t  scal_unit;                    // +0xDC  sCAL unit
+  std::uint8_t  pad_DD_to_E0[0x03];         // +0xDD
+  double        scal_width;                   // +0xE0  sCAL width
+  double        scal_height;                  // +0xE8  sCAL height
+  std::uint8_t  pad_F0_to_F8[0x08];         // +0xF0
   std::uint8_t** row_pointers;                // +0xF8  attached image rows
   std::int32_t  int_gamma;                   // +0xFC
   std::int32_t  int_x_white;                 // +0x100
@@ -202,6 +206,9 @@ static_assert(offsetof(png_info_struct, iccp_name)     == 0xC4);
 static_assert(offsetof(png_info_struct, iccp_profile)  == 0xC8);
 static_assert(offsetof(png_info_struct, splt_palettes) == 0xD4);
 static_assert(offsetof(png_info_struct, splt_palettes_num) == 0xD8);
+static_assert(offsetof(png_info_struct, scal_unit)   == 0xDC);
+static_assert(offsetof(png_info_struct, scal_width)  == 0xE0);
+static_assert(offsetof(png_info_struct, scal_height) == 0xE8);
 static_assert(offsetof(png_info_struct, row_pointers)  == 0xF8);
 static_assert(offsetof(png_info_struct, bit_depth)   == 0x18);
 static_assert(offsetof(png_info_struct, color_type)  == 0x19);
@@ -497,6 +504,12 @@ extern "C" void png_set_hIST(png_structp png_ptr, png_infop info_ptr, const std:
  */
 extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
                               const png_text* text_ptr, int num_text);
+
+/**
+ * Address: 0x009E9560 (FUN_009E9560)  png_set_sCAL — physical scale (unit + w/h).
+ */
+extern "C" void png_set_sCAL(png_structp png_ptr, png_infop info_ptr,
+                             int unit, double width, double height);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)

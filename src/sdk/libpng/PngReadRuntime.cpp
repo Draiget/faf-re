@@ -2221,6 +2221,82 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A235C9 (FUN_00A235C9)
+ * Mangled: png_handle_sCAL
+ *
+ * IDA signature:
+ * void __cdecl png_handle_sCAL(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an sCAL (physical scale) chunk: requires IHDR, rejects after IDAT and a
+ * duplicate. The payload is a unit byte followed by two NUL-separated ASCII
+ * floating-point strings (width, height); each is parsed with strtod and must
+ * consume its whole string, and both must be positive. On success installs them
+ * via png_set_sCAL. (Matching the binary, the malformed-string paths leave the
+ * scratch buffer unfreed — a benign upstream libpng leak, preserved for fidelity.)
+ */
+extern "C" void png_handle_sCAL(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before sCAL");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid sCAL after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if (info_ptr != nullptr && (info_ptr->valid & 0x4000u) != 0) {
+    png_warning(png_ptr, "Duplicate sCAL chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  auto* const buffer = static_cast<char*>(png_malloc_warn(png_ptr, length + 1));
+  if (buffer == nullptr) {
+    png_warning(png_ptr, "Out of memory while processing sCAL chunk");
+    return;
+  }
+
+  png_crc_read(png_ptr, reinterpret_cast<std::uint8_t*>(buffer), length);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    png_free(png_ptr, buffer);
+    return;
+  }
+
+  char* const buffer_end = &buffer[length];
+  *buffer_end = '\0';
+
+  char* endptr = nullptr;
+  const double width = std::strtod(buffer + 1, &endptr);  // buffer[0] is the unit byte
+  if (*endptr != '\0') {
+    png_warning(png_ptr, "malformed width string in sCAL chunk");
+    return;  // binary leaves the buffer unfreed here (preserved 1:1)
+  }
+
+  char* h = buffer;
+  while (*h != '\0') {
+    ++h;
+  }
+  char* const height_start = h + 1;
+  const double height = std::strtod(height_start, &endptr);
+  if (*endptr != '\0') {
+    png_warning(png_ptr, "malformed height string in sCAL chunk");
+    return;  // binary leaves the buffer unfreed here too (preserved 1:1)
+  }
+
+  if (buffer_end < height_start || width <= 0.0 || height <= 0.0) {
+    png_warning(png_ptr, "Invalid sCAL data");
+    png_free(png_ptr, buffer);
+    return;
+  }
+
+  png_set_sCAL(png_ptr, info_ptr, static_cast<unsigned char>(buffer[0]), width, height);
+  png_free(png_ptr, buffer);
+}
+
+/**
  * Address: 0x00A237E1 (FUN_00A237E1)
  * Mangled: png_handle_tEXt
  *
