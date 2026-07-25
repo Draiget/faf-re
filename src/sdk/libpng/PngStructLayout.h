@@ -136,6 +136,7 @@ constexpr std::size_t kOffTransValBlue      = 0x192;  //   .blue
 constexpr std::size_t kOffTransValGray      = 0x194;  //   .gray
 constexpr std::size_t kOffPaletteLookup     = 0x1EC;  // png_bytep    palette_lookup (dither)
 constexpr std::size_t kOffDitherIndex       = 0x1F0;  // png_bytep    dither_index (dither lookup)
+constexpr std::size_t kOffHist              = 0x1F4;  // png_uint_16p hist (hIST array)
 constexpr std::size_t kOffRgbToGrayStatus   = 0x228;  // png_byte     rgb_to_gray_status
 constexpr std::size_t kOffMngFeaturesPermitted = 0x230; // png_uint_32 mng_features_permitted
 constexpr std::size_t kOffIntGamma          = 0x234;  // png_fixed_point int_gamma (fprintf src @0x9E... sRGB)
