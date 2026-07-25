@@ -1793,6 +1793,72 @@ extern "C" void png_read_init_2(
 }
 
 /**
+ * Address: 0x009E7567 (FUN_009E7567)
+ * Mangled: png_default_read_data
+ *
+ * IDA signature:
+ * void __cdecl png_default_read_data(png_structp png_ptr, png_bytep data, png_size_t length);
+ *
+ * Default libpng read callback: reads `length` bytes from the FILE* stored in
+ * png_ptr->io_ptr; a short read raises png_error("Read Error").
+ */
+extern "C" void png_default_read_data(png_structp png_ptr, std::uint8_t* data, std::uint32_t length)
+{
+  using namespace libpng_layout;
+  auto* const file = static_cast<std::FILE*>(Field<void*>(png_ptr, kOffIoPtr));
+  if (std::fread(data, 1, length, file) != length) {
+    png_error(png_ptr, "Read Error");
+  }
+}
+
+/**
+ * Address: 0x009E7596 (FUN_009E7596)
+ * Mangled: png_set_read_fn
+ *
+ * IDA signature:
+ * void __cdecl png_set_read_fn(png_structp png_ptr, png_voidp io_ptr, png_rw_ptr read_data_fn);
+ *
+ * Installs the read I/O callback: stores io_ptr, then read_data_fn (or
+ * png_default_read_data when null). A read structure must not carry a write
+ * callback, so any write_data_fn is cleared with two warnings; the write-side
+ * output_flush_fn is also cleared.
+ */
+extern "C" void png_set_read_fn(png_structp png_ptr, void* io_ptr, void* read_data_fn)
+{
+  using namespace libpng_layout;
+  Field<void*>(png_ptr, kOffIoPtr) = io_ptr;
+  Field<void*>(png_ptr, kOffReadDataFn) =
+      read_data_fn != nullptr ? read_data_fn : reinterpret_cast<void*>(&png_default_read_data);
+
+  if (Field<void*>(png_ptr, kOffWriteDataFn) != nullptr) {
+    Field<void*>(png_ptr, kOffWriteDataFn) = nullptr;
+    png_warning(png_ptr, "It's an error to set both read_data_fn and write_data_fn in the ");
+    png_warning(png_ptr, "same structure.  Resetting write_data_fn to NULL.");
+  }
+  Field<void*>(png_ptr, kOffOutputFlushFn) = nullptr;
+}
+
+/**
+ * Address: 0x009E7778 (FUN_009E7778)
+ * Mangled: png_set_error_fn
+ *
+ * IDA signature:
+ * void __cdecl png_set_error_fn(png_structp png_ptr, png_voidp error_ptr,
+ *                               png_error_ptr error_fn, png_error_ptr warning_fn);
+ *
+ * Stores the user error/warning callbacks and their opaque pointer on the
+ * png_struct.
+ */
+extern "C" void png_set_error_fn(png_structp png_ptr, void* error_ptr,
+                                 png_error_ptr error_fn, png_error_ptr warning_fn)
+{
+  using namespace libpng_layout;
+  Field<void*>(png_ptr, kOffErrorPtr) = error_ptr;
+  Field<png_error_ptr>(png_ptr, kOffErrorFn) = error_fn;
+  Field<png_error_ptr>(png_ptr, kOffWarningFn) = warning_fn;
+}
+
+/**
  * Address: 0x009E0AE9 (FUN_009E0AE9)
  * Mangled: png_create_info_struct
  */

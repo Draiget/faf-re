@@ -38,6 +38,13 @@ constexpr std::size_t kPngStructSize = 608;
 
 constexpr std::size_t kOffJmpBuf            = 0x00;   // jmp_buf (first 64 bytes used by setjmp)
 
+// Error/warning + I/O callbacks (verified from png_set_error_fn FUN_009E7778,
+// png_set_read_fn FUN_009E7596, png_default_read_data FUN_009E7567).
+constexpr std::size_t kOffErrorFn           = 0x40;   // png_error_ptr error_fn
+constexpr std::size_t kOffErrorPtr          = 0x48;   // png_voidp     error_ptr
+constexpr std::size_t kOffReadDataFn        = 0x50;   // png_rw_ptr    read_data_fn
+constexpr std::size_t kOffIoPtr             = 0x54;   // png_voidp     io_ptr
+
 constexpr std::size_t kOffMode              = 0x68;   // png_uint_32 mode
 constexpr std::size_t kOffFlags             = 0x6C;   // png_uint_32 flags
 constexpr std::size_t kOffTransformations   = 0x70;   // png_uint_32 transformations
@@ -58,6 +65,7 @@ constexpr std::size_t kOffZstreamOpaque     = 0x9C;   // z_stream.opaque
 constexpr std::size_t kOffSigBytes          = 0x110;  // png_byte    sig_bytes (also crc field per common runtime)
 constexpr std::size_t kOffCrc               = 0x110;  // png_uint_32 crc (running CRC; overlaps sig_bytes slot)
 constexpr std::size_t kOffChunkName         = 0x11C;  // png_byte    chunk_name[4]
+constexpr std::size_t kOffOutputFlushFn     = 0x14C;  // png_flush_ptr output_flush_fn (write side)
 constexpr std::size_t kOffReadUserChunkFn   = 0x21C;  // png_user_chunk_ptr read_user_chunk_fn
 constexpr std::size_t kOffNumChunkList      = 0x220;  // png_uint_32 num_chunk_list
 constexpr std::size_t kOffChunkList         = 0x224;  // png_bytep   chunk_list
