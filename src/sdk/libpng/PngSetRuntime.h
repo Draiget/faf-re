@@ -131,7 +131,7 @@ struct png_info_struct
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
   std::uint8_t  pad_49_to_4C[0x03];         // +0x49
   std::uint8_t* trans;                       // +0x4C  tRNS alpha array
-  std::uint8_t  pad_50_to_5A[0x0A];         // +0x50
+  std::uint8_t  trans_values[0x0A];          // +0x50  tRNS png_color_16 (non-palette transparency)
   std::uint8_t  background[0x0A];            // +0x5A  bKGD png_color_16 (index,r,g,b,gray)
   std::int32_t  x_offset;                    // +0x64  oFFs
   std::int32_t  y_offset;                    // +0x68
@@ -191,6 +191,7 @@ static_assert(offsetof(png_info_struct, num_trans)   == 0x16);
 static_assert(offsetof(png_info_struct, num_text)    == 0x30);
 static_assert(offsetof(png_info_struct, text)        == 0x38);
 static_assert(offsetof(png_info_struct, trans)       == 0x4C);
+static_assert(offsetof(png_info_struct, trans_values) == 0x50);
 static_assert(offsetof(png_info_struct, hist)        == 0x7C);
 static_assert(offsetof(png_info_struct, pcal_purpose)  == 0xA0);
 static_assert(offsetof(png_info_struct, pcal_units)    == 0xAC);
@@ -477,6 +478,13 @@ extern "C" void png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
  */
 extern "C" void png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
                              const std::uint8_t* palette, int num_palette);
+
+/**
+ * Address: 0x009E99EB (FUN_009E99EB)  png_set_tRNS — install transparency.
+ */
+extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
+                             const std::uint8_t* trans, int num_trans,
+                             const std::uint8_t* trans_values);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)

@@ -10,6 +10,7 @@
 extern "C" {
 void  png_free_data(png_structp png_ptr, png_infop info_ptr, std::uint32_t mask, int num);
 void* png_zalloc(png_structp png_ptr, std::uint32_t items, std::uint32_t size);
+void* png_malloc(png_structp png_ptr, std::uint32_t size);
 }
 
 /**
@@ -544,6 +545,45 @@ extern "C" void png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
   info_ptr->free_me |= 0x1000u;   // PNG_FREE_PLTE
   info_ptr->valid   |= 0x0008u;   // PNG_INFO_PLTE
   info_ptr->num_palette = static_cast<std::uint16_t>(num_palette);
+}
+
+/**
+ * Address: 0x009E99EB (FUN_009E99EB)
+ * Mangled: png_set_tRNS
+ *
+ * Installs transparency: for a palette image, frees any prior tRNS array,
+ * allocates a fresh 256-byte alpha buffer, copies the entries in, and points
+ * png_ptr->trans + info->trans at it (marking PNG_FREE_TRNS). A non-palette
+ * transparency value (png_color_16) is copied into info->trans_values. Marks
+ * PNG_INFO_tRNS valid and records the count.
+ */
+extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
+                             const std::uint8_t* trans, int num_trans,
+                             const std::uint8_t* trans_values)
+{
+  using namespace libpng_layout;
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+
+  if (trans != nullptr) {
+    png_free_data(png_ptr, info_ptr, 0x2000u, 0);  // PNG_FREE_TRNS
+    auto* const t = static_cast<std::uint8_t*>(png_malloc(png_ptr, 0x100u));
+    info_ptr->trans = t;
+    Field<std::uint8_t*>(png_ptr, kOffTrans) = t;
+    std::memcpy(info_ptr->trans, trans, static_cast<std::uint32_t>(num_trans));
+    info_ptr->free_me |= 0x2000u;  // PNG_FREE_TRNS
+  }
+
+  if (trans_values != nullptr) {
+    std::memcpy(info_ptr->trans_values, trans_values, sizeof(info_ptr->trans_values));
+    if (num_trans == 0) {
+      num_trans = 1;
+    }
+  }
+
+  info_ptr->valid |= 0x0010u;  // PNG_INFO_tRNS
+  info_ptr->num_trans = static_cast<std::uint16_t>(num_trans);
 }
 
 /**
