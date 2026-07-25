@@ -35,8 +35,11 @@ namespace moho
 // (FUN_006AD3C0) — reads the owning Sim from the archive, allocates + constructs
 // a Unit via the recovered private Unit(Sim*) ctor (FUN_006A5050), and publishes
 // it through SerConstructResult::SetUnowned. Stub removed.
-void Unit::MemberDeserialize(gpg::ReadArchive*, Unit*, int) {}
-void Unit::MemberSerialize(gpg::WriteArchive*, Unit*, int) {}
+// Unit::MemberSerialize (FUN_006B33A0) and Unit::MemberDeserialize (FUN_006B2B50)
+// are recovered 1:1 in src/sdk/moho/unit/core/Unit.cpp — the full reflection
+// save/load of every Unit member (typed sub-object RRefs via WriteRawPointer/
+// ReadPointerOwned, weak refs, primitives, econ events, blip/recon vectors), in
+// the exact binary field order. The no-op stubs here are removed.
 
 } // namespace moho
 
