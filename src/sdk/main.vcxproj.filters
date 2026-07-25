@@ -204,6 +204,9 @@
     <ClCompile Include="moho\path\RDebugNavPath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\path\NavPathTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\path\RDebugNavPathTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3424,6 +3427,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\path\RDebugNavPath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\path\NavPathTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\path\RDebugNavPathTypeInfo.h">
