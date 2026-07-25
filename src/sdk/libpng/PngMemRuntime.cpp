@@ -45,6 +45,10 @@ constexpr std::size_t kPngStructMemPtrOffset = 0x244;
     reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructMemPtrOffset);
 }
 
+// png_struct::malloc_fn — user-supplied malloc callback.
+// Offset verified from FUN_00A21094.asm (mov [eax+248h], ecx).
+constexpr std::size_t kPngStructMallocFnOffset = 0x248;
+
 // png_create_struct/destroy allocation sizes + type selectors.
 // Verified from FUN_00A20F69.asm: type 2 (PNG_STRUCT_INFO) => 0x120 bytes,
 // type 1 (PNG_STRUCT_PNG) => 0x260 bytes.
@@ -240,4 +244,24 @@ extern "C" void png_destroy_struct_2(void* struct_ptr, PngFreeFn free_fn, void* 
 extern "C" void png_destroy_struct(void* struct_ptr)
 {
   png_destroy_struct_2(struct_ptr, nullptr, nullptr);
+}
+
+/**
+ * Address: 0x00A21094 (FUN_00A21094)
+ * Mangled: png_set_mem_fn
+ *
+ * IDA signature:
+ * void __cdecl png_set_mem_fn(png_structp png_ptr, png_voidp mem_ptr,
+ *                             png_malloc_ptr malloc_fn, png_free_ptr free_fn);
+ *
+ * Installs the user memory callbacks (mem_ptr@0x244, malloc_fn@0x248,
+ * free_fn@0x24C) on the png_struct.
+ */
+extern "C" void png_set_mem_fn(png_structp png_ptr, void* mem_ptr,
+                               PngMallocFn malloc_fn, PngFreeFn free_fn)
+{
+  auto* const base = reinterpret_cast<std::uint8_t*>(png_ptr);
+  PngStructMemPtr(png_ptr) = mem_ptr;
+  *reinterpret_cast<PngMallocFn*>(base + kPngStructMallocFnOffset) = malloc_fn;
+  *reinterpret_cast<PngFreeFn*>(base + kPngStructFreeFnOffset)     = free_fn;
 }
