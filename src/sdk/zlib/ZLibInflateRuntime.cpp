@@ -55,3 +55,39 @@ extern "C" int inflateReset(zlib::ZStream* strm)
 
   return kZOk;
 }
+
+/**
+ * Address: 0x0095A670 (FUN_0095A670)
+ * Mangled: inflateEnd
+ *
+ * IDA signature:
+ * int __cdecl inflateEnd(z_streamp strm);
+ *
+ * Releases an inflate stream: frees the sliding window (if allocated) and the
+ * inflate_state itself through the stream's zfree callback, then nulls
+ * strm->state. Returns Z_STREAM_ERROR for a null stream, a null state, or a
+ * missing zfree callback; otherwise Z_OK. Verified 1:1 against FUN_0095A670.asm
+ * (all three guards precede any free; the freed pointer the IDA decompiler calls
+ * `state->w_mask` is state->window at +0x34).
+ */
+extern "C" int inflateEnd(zlib::ZStream* strm)
+{
+  using namespace zlib;
+
+  if (strm == nullptr || strm->state == nullptr || strm->zfree == nullptr)
+  {
+    return kZStreamError;
+  }
+
+  auto* const state = static_cast<InflateState*>(strm->state);
+  const auto zfree = reinterpret_cast<FreeFunc>(strm->zfree);
+
+  if (state->window != nullptr)
+  {
+    zfree(strm->opaque, state->window);
+  }
+  zfree(strm->opaque, strm->state);
+  strm->state = nullptr;
+
+  return kZOk;
+}
