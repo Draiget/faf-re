@@ -84,6 +84,18 @@ namespace moho
     );
 
     /**
+     * Address: 0x0080D2E0 (FUN_0080D2E0, Moho::CTesselator::GetHeightScale)
+     *
+     * IDA signature:
+     * double __thiscall Moho::CTesselator::Func7(CTesselator *this);
+     *
+     * What it does:
+     * Returns the fixed terrain height quantization scale (1/128) bound into the
+     * terrain effect's `HeightScale` shader var by the terrain renderers.
+     */
+    [[nodiscard]] float GetHeightScale() const;
+
+    /**
      * Address: 0x0080BA30 (FUN_0080BA30, Moho::CTesselator::GetData)
      *
      * What it does:

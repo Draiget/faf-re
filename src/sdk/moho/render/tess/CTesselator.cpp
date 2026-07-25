@@ -272,6 +272,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x0080D2E0 (FUN_0080D2E0, Moho::CTesselator::GetHeightScale)
+   *
+   * What it does:
+   * Returns the fixed 1/128 terrain height quantization scale. The shipped body
+   * loads the constant 0.0078125 and returns it in st0.
+   */
+  float CTesselator::GetHeightScale() const
+  {
+    return 0.0078125F;
+  }
+
+  /**
    * Address: 0x0080BB70 (FUN_0080BB70, ??1CTesselator@Moho@@QAE@@Z)
    * Mangled: ??1CTesselator@Moho@@QAE@@Z
    *

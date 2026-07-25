@@ -1,15 +1,28 @@
 #include "moho/terrain/LowFidelityTerrain.h"
 
 #include <cstdint>
+#include <cstring>
 
 #include <boost/detail/sp_counted_base.hpp>
 
+#include "Wm3Vector3.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/CWldTerrainDecal.h"
+#include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
+#include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/ID3DVertexStream.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/terrain/MediumFidelityTerrain.h"
+#include "moho/terrain/StratumMaterial.h"
+#include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/WaterFactory.h"
 
 namespace
@@ -63,7 +76,7 @@ namespace
    * Issues one triangle-list draw for one prebuilt low-fidelity terrain batch
    * when the batch has a non-zero index count.
    */
-  [[maybe_unused]] void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatchRuntime& batch)
+  void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatchRuntime& batch)
   {
     if (batch.indexCount == 0 || batch.vtx == nullptr || batch.idx == nullptr) {
       return;
@@ -88,12 +101,69 @@ namespace
     std::int32_t primitiveType = 4;
     (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
+
+  // ----- Decal / splat draw helpers -----
+  // The low-fidelity decal-command lane is stored inline at mPrimaryPatchData
+  // (+0x50); each element is a moho::TerrainDecalDrawCommand (24 bytes,
+  // 3000 * uint32 == 500 * 24). The splat-vertex lane at mSecondaryPatchData
+  // (+0x2F40) holds 28-byte splat vertices (7000 * uint32 == 1000 * 28).
+
+  /// One composited splat vertex (28-byte element of the splat lane).
+  struct LowFidelitySplatVertex
+  {
+    std::uint8_t bytes[0x1C];
+  };
+  static_assert(sizeof(LowFidelitySplatVertex) == 0x1C, "LowFidelitySplatVertex size must be 0x1C");
+
+  using LowFidelityDecalCommandLane = gpg::core::FastVectorN<moho::TerrainDecalDrawCommand, 500>;
+  using LowFidelitySplatVertexLane = gpg::core::FastVectorN<LowFidelitySplatVertex, 1000>;
+
+  /// Binds one command's index/vertex sub-range and submits one indexed
+  /// triangle-list draw over the terrain sheets (mirror of the medium-fidelity
+  /// SubmitDecalCommandDraw helper).
+  void SubmitLowFidelityDecalDraw(
+    moho::CD3DVertexSheet* const vertexSheet,
+    moho::CD3DIndexSheet* const indexSheet,
+    const moho::TerrainDecalDrawCommand& command)
+  {
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    moho::CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = indexSheet;
+    indexView.startIndex = command.startIndex;
+    indexView.indexCount = command.indexCount;
+
+    moho::CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = vertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = command.baseVertex;
+    vertexView.endVertex = command.endVertex;
+
+    (void)moho::D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /// Resolves one animated decal texture slot and binds it into `target`. Frame
+  /// seed is the raw mesh-renderer pointer, exactly as the shipped code passes it.
+  void BindLowFidelityDecalTexture(
+    moho::ShaderVar& target,
+    moho::CWldTerrainDecal& decal,
+    const int slot,
+    const float lod,
+    moho::MeshRenderer* const renderer)
+  {
+    const boost::shared_ptr<moho::ID3DTextureSheet> texture =
+      decal.GetTexture(slot, lod, static_cast<int>(reinterpret_cast<std::uintptr_t>(renderer)));
+    target.GetTexture(boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(texture));
+  }
 } // namespace
 
 namespace moho
 {
   extern bool ren_Terrain;
   extern bool ren_Skirt;
+  extern bool ren_Decals;
+  extern bool ren_DecalOverDraw;
+  extern bool ren_glowingDecals;
 
   boost::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
   WaterSurface* sTerrainWaterSurface = nullptr;
@@ -346,4 +416,339 @@ namespace moho
    */
   void LowFidelityTerrain::DrawDirtyTerrain(const std::int32_t /*arg0*/)
   {}
+
+  /**
+   * Address: 0x008079B0 (FUN_008079B0, Moho::LowFidelityTerrain::LoadShaderVars)
+   *
+   * What it does:
+   * Selects the `terrain` effect + `LowFidelityTerrain` technique, then binds the
+   * camera view/projection matrices, tesselator height scale, terrain scale, all
+   * stratum albedo textures + tile scale lanes, and the decal-mask texture.
+   */
+  void LowFidelityTerrain::LoadShaderVars()
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique("LowFidelityTerrain");
+
+    const GeomCamera3& camera = *mCamera;
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
+    }
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    const TerrainHeightFieldRuntimeView* const heightField = mTerrainResource->mMap->mHeightFieldObject;
+    const float terrainScale[4] = {
+      1.0F / static_cast<float>(heightField->width - 1),
+      1.0F / static_cast<float>(heightField->height - 1),
+      0.0F,
+      1.0F
+    };
+    SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
+
+    StratumMaterial& strata = terrainRes->GetStratumMaterial();
+    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+
+    BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
+    BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
+
+    BindTextureShaderVar(shaderVars.lowerAlbedoTexture, strata.mLowerAlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum0AlbedoTexture, strata.mStratum0AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum1AlbedoTexture, strata.mStratum1AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum2AlbedoTexture, strata.mStratum2AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum3AlbedoTexture, strata.mStratum3AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum4AlbedoTexture, strata.mStratum4AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum5AlbedoTexture, strata.mStratum5AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum6AlbedoTexture, strata.mStratum6AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.stratum7AlbedoTexture, strata.mStratum7AlbedoTexture.mTextureSheet);
+    BindTextureShaderVar(shaderVars.upperAlbedoTexture, strata.mUpperAlbedoTexture.mTextureSheet);
+
+    SetShaderVarMem(shaderVars.lowerAlbedoTile, 4U, &strata.mLowerAlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum0AlbedoTile, 4U, &strata.mStratum0AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum1AlbedoTile, 4U, &strata.mStratum1AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum2AlbedoTile, 4U, &strata.mStratum2AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum3AlbedoTile, 4U, &strata.mStratum3AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum4AlbedoTile, 4U, &strata.mStratum4AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum5AlbedoTile, 4U, &strata.mStratum5AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum6AlbedoTile, 4U, &strata.mStratum6AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.stratum7AlbedoTile, 4U, &strata.mStratum7AlbedoTexture.mScaleX);
+    SetShaderVarMem(shaderVars.upperAlbedoTile, 4U, &strata.mUpperAlbedoTexture.mScaleX);
+
+    shaderVars.decalMaskTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(
+        boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask)));
+  }
+
+  /**
+   * Address: 0x00807D20 (FUN_00807D20, Moho::LowFidelityTerrain::LoadTerrainLighting)
+   *
+   * What it does:
+   * Selects the `LowFidelityLighting` technique, binds lighting multiplier, sun
+   * direction/ambience/color and shadow-fill color from the terrain resource, and
+   * enables + binds the cast-shadow lane when a shadow context is present.
+   */
+  void LowFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectTechnique("LowFidelityLighting");
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    if (shaderVars.lightingMultiplier.Exists()) {
+      shaderVars.lightingMultiplier.SetFloat(terrainRes->GetLightingMultiplier());
+    }
+
+    const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
+    SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
+
+    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+    SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
+
+    const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
+    SetShaderVarMem(shaderVars.sunColor, 3U, &sunColor.x);
+
+    const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
+    SetShaderVarMem(shaderVars.shadowFillColor, 3U, &shadowFillColor.x);
+
+    if (shadowContext != nullptr) {
+      const std::uint32_t shadowsEnabledBlob = 1U;
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
+
+      if (shaderVars.shadowMatrix.Exists()) {
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+      }
+
+      const boost::shared_ptr<gpg::gal::TextureD3D9> shadowTexture =
+        shadowContext->useSecondaryShadowTexture ? shadowContext->secondaryShadowTexture
+                                                  : shadowContext->primaryShadowTexture;
+      shaderVars.shadowTexture.GetTexture(boost::weak_ptr<gpg::gal::TextureD3D9>(shadowTexture));
+    } else {
+      const std::uint32_t shadowsDisabledBlob = 0U;
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);
+    }
+  }
+
+  /**
+   * Address: 0x008094B0 (FUN_008094B0, sub_8094B0)
+   *
+   * What it does:
+   * Draws every queued decal command whose type equals `decalType`.
+   */
+  void LowFidelityTerrain::DrawDecalPass(
+    MeshRenderer* const renderer, const float lod, const std::int32_t decalType, const char* const techniqueName)
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    if (ren_DecalOverDraw) {
+      D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+    } else {
+      D3D_GetDevice()->SelectTechnique(techniqueName);
+    }
+
+    const auto& decalCommands = reinterpret_cast<const LowFidelityDecalCommandLane&>(mPrimaryPatchData);
+    for (const TerrainDecalDrawCommand& command : decalCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (static_cast<std::int32_t>(decal.mType) != decalType) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+      BindLowFidelityDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, renderer);
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      SubmitLowFidelityDecalDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    }
+  }
+
+  /**
+   * Address: 0x00809730 (FUN_00809730, sub_809730)
+   *
+   * What it does:
+   * Draws every glowing decal command (mType == WldTerrainDecalType_Glow) with the
+   * `TDecalsGlow` technique.
+   */
+  void LowFidelityTerrain::DrawGlowingDecals(MeshRenderer* const renderer, const float lod)
+  {
+    if (!ren_Decals || !ren_glowingDecals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    if (ren_DecalOverDraw) {
+      D3D_GetDevice()->SelectTechnique("TDecalOverDraw");
+    } else {
+      D3D_GetDevice()->SelectTechnique("TDecalsGlow");
+    }
+
+    const auto& decalCommands = reinterpret_cast<const LowFidelityDecalCommandLane&>(mPrimaryPatchData);
+    for (const TerrainDecalDrawCommand& command : decalCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (decal.mType != WldTerrainDecalType_Glow) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      SubmitLowFidelityDecalDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    }
+  }
+
+  /**
+   * Address: 0x00809930 (FUN_00809930, sub_809930)
+   *
+   * What it does:
+   * Uploads the composited splat-vertex lane into the dynamic vertex sheet,
+   * selects the `LowFidelitySplat` technique, binds the shared texture-batcher
+   * composite texture into the decal-albedo lane, and submits one indexed
+   * triangle-list draw over all splat quads.
+   */
+  void LowFidelityTerrain::DrawSplatComposite()
+  {
+    const auto& splatVertices = reinterpret_cast<const LowFidelitySplatVertexLane&>(mSecondaryPatchData);
+    const std::size_t splatVertexCount = splatVertices.size();
+    if (splatVertexCount == 0) {
+      return;
+    }
+
+    void* const lockedVertices =
+      mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
+    std::memcpy(lockedVertices, splatVertices.data(), sizeof(LowFidelitySplatVertex) * splatVertexCount);
+    mDynamicVertexSheet->GetVertStream(0U)->Unlock();
+
+    D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
+
+    auto& shaderVars = GetTerrainShaderVars();
+    shaderVars.decalAlbedoTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture()));
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mDynamicIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = 6 * (static_cast<std::int32_t>(splatVertexCount) / 4);
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mDynamicVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(splatVertexCount) - 1;
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00809120 (FUN_00809120, Moho::LowFidelityTerrain::DrawNormals)
+   *
+   * What it does:
+   * The low-fidelity terrain normal/decal render pass (see header).
+   */
+  bool LowFidelityTerrain::DrawNormals(
+    MeshRenderer* const renderer,
+    const float lod,
+    boost::weak_ptr<gpg::gal::TextureD3D9> /*terrainNormalTexture*/,
+    TerrainShadowContext* const shadowContext)
+  {
+    if (!ren_Terrain) {
+      return false;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+    CD3DDevice* const device = D3D_GetDevice();
+
+    LoadShaderVars();
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+    LoadTerrainLighting(shadowContext);
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
+    for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
+      const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
+
+      shaderVars.utilityTextureA.GetTexture(info.mTexture);
+
+      SetShaderVarMem(shaderVars.normalMapScale, 4U, &info.mXResolution);
+      SetShaderVarMem(shaderVars.normalMapOffset, 4U, &info.mOffsetScaleX);
+
+      const float basisEX[2] = {1.0F / info.mWidth, 0.0F};
+      SetShaderVarMem(shaderVars.normalBasisEX, 2U, basisEX);
+      const float basisEY[2] = {0.0F, 1.0F / info.mHeight};
+      SetShaderVarMem(shaderVars.normalBasisEY, 2U, basisEY);
+      SetShaderVarMem(shaderVars.normalBasisSizeSource, 2U, &info.mWidth);
+
+      const std::int32_t querySize = (static_cast<std::int32_t>(info.mWidth) < static_cast<std::int32_t>(info.mHeight))
+                                       ? static_cast<std::int32_t>(info.mHeight)
+                                       : static_cast<std::int32_t>(info.mWidth);
+
+      std::int32_t rangeStart = 0;
+      std::uint32_t rangeCount = 0;
+      std::int32_t minValue = 0;
+      std::int32_t maxValue = 0;
+      (void)mTesselator->Tesselate(
+        static_cast<std::int32_t>(info.mTileOriginX),
+        static_cast<std::int32_t>(info.mTileOriginY),
+        querySize,
+        &rangeStart,
+        &rangeCount,
+        &minValue,
+        &maxValue);
+
+      if (rangeStart + static_cast<std::int32_t>(rangeCount) < kSkirtMaxIndexCount && rangeCount != 0U) {
+        std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+        CD3DIndexSheetViewRuntime indexView{};
+        indexView.sheet = mTerrainIndexSheet;
+        indexView.startIndex = rangeStart;
+        indexView.indexCount = static_cast<std::int32_t>(rangeCount);
+
+        CD3DVertexSheetViewRuntime vertexView{};
+        vertexView.sheet = mTerrainVertexSheet;
+        vertexView.startVertex = 0;
+        vertexView.baseVertex = minValue;
+        vertexView.endVertex = maxValue;
+
+        (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+      }
+    }
+
+    DrawDecalPass(renderer, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(renderer, lod, WldTerrainDecalType_Albedo, "TDecals");
+    DrawDecalPass(renderer, lod, WldTerrainDecalType_WaterAlbedo, "TDecalsWaterAlbedo");
+    DrawGlowingDecals(renderer, lod);
+    DrawSplatComposite();
+
+    return true;
+  }
 } // namespace moho
