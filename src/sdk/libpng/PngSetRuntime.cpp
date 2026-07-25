@@ -790,6 +790,39 @@ extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
 }
 
 /**
+ * Address: 0x009E975D (FUN_009E975D)
+ * Mangled: png_set_iCCP
+ *
+ * Duplicates the ICC profile name and profile bytes into info-owned allocations,
+ * releases any previously stored iCCP data, then records the new name, profile,
+ * length and compression method and marks PNG_INFO_iCCP valid + PNG_FREE_ICCP
+ * owned. A null png_ptr / info_ptr / name / profile is a no-op.
+ */
+extern "C" void png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
+                             char* name, int compression_type,
+                             void* profile, std::uint32_t proflen)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr || name == nullptr || profile == nullptr) {
+    return;
+  }
+
+  auto* const new_name = static_cast<char*>(
+      png_malloc(png_ptr, static_cast<std::uint32_t>(std::strlen(name)) + 1));
+  std::strcpy(new_name, name);
+  void* const new_profile = png_malloc(png_ptr, proflen);
+  std::memcpy(new_profile, profile, proflen);
+
+  png_free_data(png_ptr, info_ptr, 0x10u, 0);  // PNG_FREE_ICCP
+
+  info_ptr->free_me         |= 0x10u;    // PNG_FREE_ICCP
+  info_ptr->valid           |= 0x1000u;  // PNG_INFO_iCCP
+  info_ptr->iccp_name        = new_name;
+  info_ptr->iccp_profile     = static_cast<std::uint8_t*>(new_profile);
+  info_ptr->iccp_proflen     = proflen;
+  info_ptr->iccp_compression = static_cast<std::uint8_t>(compression_type);
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *

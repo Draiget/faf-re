@@ -2722,6 +2722,105 @@ extern "C" void png_handle_zTXt(png_structp png_ptr, png_infop info_ptr, std::ui
 }
 
 /**
+ * Address: 0x00A22B14 (FUN_00A22B14)
+ * Mangled: png_handle_iCCP
+ *
+ * IDA signature:
+ * void __cdecl png_handle_iCCP(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an iCCP (embedded ICC colour profile) chunk: requires IHDR, rejects
+ * after IDAT, warns if out of place (after PLTE), and rejects a duplicate. Reads
+ * the profile name, the compression-method byte (forced to 0), inflates the
+ * compressed profile via png_decompress_chunk, validates the profile's own 32-bit
+ * big-endian size against the decompressed length, and installs it via
+ * png_set_iCCP.
+ */
+extern "C" void png_handle_iCCP(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  const std::uint32_t mode = Mode(png_ptr);
+  if ((mode & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before iCCP");
+  }
+  if ((mode & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid iCCP after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if ((mode & kPngHavePlte) != 0) {
+    png_warning(png_ptr, "Out of place iCCP chunk");
+  } else if (info_ptr != nullptr && (info_ptr->valid & 0x1000u) != 0) {
+    png_warning(png_ptr, "Duplicate iCCP chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  auto* chunkdata = static_cast<char*>(png_malloc(png_ptr, length + 1));
+  png_crc_read(png_ptr, reinterpret_cast<std::uint8_t*>(chunkdata), length);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    png_free(png_ptr, chunkdata);
+    return;
+  }
+
+  chunkdata[length] = '\0';
+
+  // Find the end of the profile name, then step onto the compression byte.
+  char* profile = chunkdata;
+  while (*profile != '\0') {
+    ++profile;
+  }
+  ++profile;
+
+  // There must be at least the compression byte after the name separator.
+  if (profile >= &chunkdata[length]) {
+    png_free(png_ptr, chunkdata);
+    png_warning(png_ptr, "Malformed iCCP chunk");
+    return;
+  }
+
+  std::uint8_t compression_type = static_cast<std::uint8_t>(*profile++);
+  if (compression_type != 0) {
+    png_warning(png_ptr, "Ignoring nonzero compression type in iCCP chunk");
+    compression_type = 0;
+  }
+
+  const std::uint32_t prefix_length = static_cast<std::uint32_t>(profile - chunkdata);
+
+  std::uint32_t data_length = 0;
+  chunkdata = png_decompress_chunk(png_ptr, compression_type, chunkdata, length, prefix_length, &data_length);
+
+  std::uint32_t profile_length = data_length - prefix_length;
+  if (prefix_length > data_length || profile_length < 4) {
+    png_free(png_ptr, chunkdata);
+    png_warning(png_ptr, "Profile size field missing from iCCP chunk");
+    return;
+  }
+
+  // Check the 32-bit big-endian profile size recorded at the start of the ICC data.
+  const auto* const pC = reinterpret_cast<const std::uint8_t*>(chunkdata + prefix_length);
+  const std::uint32_t profile_size =
+      (static_cast<std::uint32_t>(pC[0]) << 24) |
+      (static_cast<std::uint32_t>(pC[1]) << 16) |
+      (static_cast<std::uint32_t>(pC[2]) << 8) |
+      static_cast<std::uint32_t>(pC[3]);
+
+  if (profile_size < profile_length) {
+    profile_length = profile_size;
+  }
+  if (profile_size > profile_length) {
+    png_free(png_ptr, chunkdata);
+    png_warning(png_ptr, "Ignoring truncated iCCP profile.\n");
+    return;
+  }
+
+  png_set_iCCP(png_ptr, info_ptr, chunkdata, compression_type,
+               chunkdata + prefix_length, profile_length);
+  png_free(png_ptr, chunkdata);
+}
+
+/**
  * Address: 0x00A22548 (FUN_00A22548)
  * Mangled: png_handle_cHRM
  *
