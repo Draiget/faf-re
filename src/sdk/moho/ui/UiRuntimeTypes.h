@@ -2359,6 +2359,27 @@ namespace moho
     void SetOrientation(const Wm3::Quaternionf& orientation);
 
     /**
+     * Address: 0x0079DC10 (FUN_0079DC10, Moho::CMauiMesh::GetClass)
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for the CMauiMesh type, looked up
+     * by RTTI on first use (overrides the base CMauiControl accessor with the
+     * mesh-specific type cache).
+     */
+    [[nodiscard]] gpg::RType* GetClass() const;
+
+    /**
+     * Address: 0x0079DC30 (FUN_0079DC30, Moho::CMauiMesh::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Packs {this, GetClass()} into a reflection reference handle.
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+
+    /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
+    static gpg::RType* sType;
+
+    /**
      * Address: 0x0079DE70 (FUN_0079DE70, Moho::CMauiMesh::dtr)
      *
      * What it does:

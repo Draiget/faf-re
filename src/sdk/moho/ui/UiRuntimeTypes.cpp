@@ -4697,6 +4697,7 @@ bool moho::ui_WindowedAlwaysShowsCursor = false;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
+gpg::RType* moho::CMauiMesh::sType = nullptr;
 moho::CMauiCurrentFocusControlRuntimeView moho::Maui_CurrentFocusControl{};
 bool moho::Maui_ControlHasFocus = false;
 
@@ -23732,6 +23733,37 @@ gpg::RType* moho::CMauiBorder::GetClass() const
  * Packs `{this, GetClass()}` as a reflection reference handle.
  */
 gpg::RRef moho::CMauiBorder::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0079DC10 (FUN_0079DC10, Moho::CMauiMesh::GetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiMesh`, looked up by RTTI on
+ * first use. Overrides the base CMauiControl accessor with the mesh-specific type
+ * cache (the inherited stub returned the wrong/none type).
+ */
+gpg::RType* moho::CMauiMesh::GetClass() const
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiMesh));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0079DC30 (FUN_0079DC30, Moho::CMauiMesh::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` into a reflection reference handle (matching the
+ * binary's `*out = this; out[1] = this->GetClass()`).
+ */
+gpg::RRef moho::CMauiMesh::GetDerivedObjectRef()
 {
   gpg::RRef ref{};
   ref.mObj = this;
