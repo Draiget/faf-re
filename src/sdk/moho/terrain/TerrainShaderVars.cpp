@@ -79,6 +79,13 @@ namespace moho
     RegisterShaderVar("BiCubicLookup", &biCubicLookup, "terrain");
     RegisterShaderVar("OverlayTexture", &overlayTexture, "terrain");
 
+    RegisterShaderVar("HeightScale", &heightScale, "terrain");
+    RegisterShaderVar("NormalMapScale", &normalMapScale, "terrain");
+    RegisterShaderVar("NormalMapOffset", &normalMapOffset, "terrain");
+    RegisterShaderVar("E_X", &normalBasisEX, "terrain");
+    RegisterShaderVar("E_Y", &normalBasisEY, "terrain");
+    RegisterShaderVar("Size_Source", &normalBasisSizeSource, "terrain");
+
     RegisterShaderVar("WaterRamp", &waterRamp, "terrain");
     RegisterShaderVar("WaterElevation", &waterElevation, "terrain");
     RegisterShaderVar("WaterElevationDeep", &waterElevationDeep, "terrain");

@@ -85,6 +85,16 @@ namespace moho
     ShaderVar biCubicLookup;
     ShaderVar overlayTexture;
 
+    // Terrain height + normal-visualization lane (bound by
+    // LowFidelityTerrain::LoadShaderVars @0x008079B0 / ::DrawNormals @0x00809120 and
+    // by MediumFidelityTerrain::DrawTerrainNormals @0x00806F50).
+    ShaderVar heightScale;           // "HeightScale"
+    ShaderVar normalMapScale;        // "NormalMapScale"
+    ShaderVar normalMapOffset;       // "NormalMapOffset"
+    ShaderVar normalBasisEX;         // decompiler label "E_X"
+    ShaderVar normalBasisEY;         // decompiler label "E_Y"
+    ShaderVar normalBasisSizeSource; // decompiler label "Size_Source"
+
     // Terrain normal/decal draw lane (bound by MediumFidelityTerrain::DrawNormals
     // and its decal/splat draw helpers at 0x008065E0 / 0x00806860 / 0x00806A50 /
     // 0x00806C60). HLSL names verified as exact null-terminated strings in
