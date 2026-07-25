@@ -728,6 +728,68 @@ extern "C" void png_set_sCAL(png_structp png_ptr, png_infop info_ptr,
 }
 
 /**
+ * Address: 0x009E9402 (FUN_009E9402)
+ * Mangled: png_set_pCAL
+ *
+ * Stores the pCAL pixel-calibration data into the info struct: the purpose
+ * string, X0/X1 endpoints, equation type, units string, and nparams parameter
+ * strings — each duplicated into an info-owned allocation. Marks PNG_INFO_pCAL
+ * valid and PNG_FREE_PCAL owned. On any allocation failure it warns and returns
+ * with the info fields partially filled, matching the binary exactly.
+ */
+extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
+                             char* purpose, std::int32_t X0, std::int32_t X1,
+                             int type, int nparams, char* units, char** params)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+
+  std::uint32_t length = static_cast<std::uint32_t>(std::strlen(purpose)) + 1;
+  info_ptr->pcal_purpose = static_cast<char*>(png_malloc_warn(png_ptr, length));
+  if (info_ptr->pcal_purpose == nullptr) {
+    png_warning(png_ptr, "Insufficient memory for pCAL purpose.");
+    return;
+  }
+  std::memcpy(info_ptr->pcal_purpose, purpose, length);
+
+  info_ptr->pcal_X0      = X0;
+  info_ptr->pcal_X1      = X1;
+  info_ptr->pcal_type    = static_cast<std::uint8_t>(type);
+  info_ptr->pcal_nparams = static_cast<std::uint8_t>(nparams);
+
+  length = static_cast<std::uint32_t>(std::strlen(units)) + 1;
+  info_ptr->pcal_units = static_cast<char*>(png_malloc_warn(png_ptr, length));
+  if (info_ptr->pcal_units == nullptr) {
+    png_warning(png_ptr, "Insufficient memory for pCAL units.");
+    return;
+  }
+  std::memcpy(info_ptr->pcal_units, units, length);
+
+  info_ptr->pcal_params = static_cast<char**>(
+      png_malloc_warn(png_ptr, 4u * static_cast<std::uint32_t>(nparams) + 4u));
+  if (info_ptr->pcal_params == nullptr) {
+    png_warning(png_ptr, "Insufficient memory for pCAL params.");
+    return;
+  }
+
+  info_ptr->pcal_params[nparams] = nullptr;
+
+  for (int i = 0; i < nparams; ++i) {
+    length = static_cast<std::uint32_t>(std::strlen(params[i])) + 1;
+    info_ptr->pcal_params[i] = static_cast<char*>(png_malloc_warn(png_ptr, length));
+    if (info_ptr->pcal_params[i] == nullptr) {
+      png_warning(png_ptr, "Insufficient memory for pCAL parameter.");
+      return;
+    }
+    std::memcpy(info_ptr->pcal_params[i], params[i], length);
+  }
+
+  info_ptr->valid   |= 0x400u;  // PNG_INFO_pCAL
+  info_ptr->free_me |= 0x80u;   // PNG_FREE_PCAL
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *
