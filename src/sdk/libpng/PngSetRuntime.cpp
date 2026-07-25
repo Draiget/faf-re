@@ -709,6 +709,25 @@ extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
 }
 
 /**
+ * Address: 0x009E9560 (FUN_009E9560)
+ * Mangled: png_set_sCAL
+ *
+ * Stores the physical scale (unit + width + height as doubles) into the info
+ * struct and marks PNG_INFO_sCAL valid.
+ */
+extern "C" void png_set_sCAL(png_structp png_ptr, png_infop info_ptr,
+                             int unit, double width, double height)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  info_ptr->valid |= 0x4000u;  // PNG_INFO_sCAL
+  info_ptr->scal_width  = width;
+  info_ptr->scal_unit   = static_cast<std::uint8_t>(unit);
+  info_ptr->scal_height = height;
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *
