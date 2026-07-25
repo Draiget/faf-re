@@ -2221,6 +2221,116 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A22548 (FUN_00A22548)
+ * Mangled: png_handle_cHRM
+ *
+ * IDA signature:
+ * void __cdecl png_handle_cHRM(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a cHRM (chromaticity) chunk: requires IHDR, rejects after IDAT, warns
+ * if it follows PLTE, and rejects a duplicate (unless sRGB is overriding). Reads
+ * the eight 1e5-fixed-point white/red/green/blue x,y coordinates, validating
+ * each point (each coordinate <= 0.8, x+y <= 1.0); on a valid set, either — when
+ * an sRGB chunk is present and the values disagree — warns and echoes them, or
+ * installs them via png_set_cHRM (float) + png_set_cHRM_fixed (fixed-point).
+ */
+extern "C" void png_handle_cHRM(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before cHRM");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid cHRM after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+    png_warning(png_ptr, "Missing PLTE before cHRM");  // cHRM after PLTE — cope, don't fail
+  } else if (info_ptr != nullptr &&
+             (info_ptr->valid & 0x04u) != 0 && (info_ptr->valid & 0x800u) == 0) {
+    png_warning(png_ptr, "Duplicate cHRM chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length != 32) {
+    png_warning(png_ptr, "Incorrect cHRM chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  std::uint8_t buf[4];
+  auto read_fixed = [&]() -> std::uint32_t {
+    png_crc_read(png_ptr, buf, 4);
+    return static_cast<std::uint32_t>(png_get_uint_32(buf));
+  };
+
+  const std::uint32_t white_x = read_fixed();
+  const std::uint32_t white_y = read_fixed();
+  if (white_x > 0x13880u || white_y > 0x13880u || white_y + white_x > 0x186A0u) {
+    png_warning(png_ptr, "Invalid cHRM white point");
+    png_crc_finish(png_ptr, 24);
+    return;
+  }
+  const std::uint32_t red_x = read_fixed();
+  const std::uint32_t red_y = read_fixed();
+  if (red_x > 0x13880u || red_y > 0x13880u || red_y + red_x > 0x186A0u) {
+    png_warning(png_ptr, "Invalid cHRM red point");
+    png_crc_finish(png_ptr, 16);
+    return;
+  }
+  const std::uint32_t green_x = read_fixed();
+  const std::uint32_t green_y = read_fixed();
+  if (green_x > 0x13880u || green_y > 0x13880u || green_y + green_x > 0x186A0u) {
+    png_warning(png_ptr, "Invalid cHRM green point");
+    png_crc_finish(png_ptr, 8);
+    return;
+  }
+  const std::uint32_t blue_x = read_fixed();
+  const std::uint32_t blue_y = read_fixed();
+  if (blue_x > 0x13880u || blue_y > 0x13880u || blue_y + blue_x > 0x186A0u) {
+    png_warning(png_ptr, "Invalid cHRM blue point");
+    png_crc_finish(png_ptr, 0);
+    return;
+  }
+
+  const float wx = static_cast<float>(static_cast<double>(white_x) / 100000.0);
+  const float wy = static_cast<float>(static_cast<double>(white_y) / 100000.0);
+  const float rx = static_cast<float>(static_cast<double>(red_x)   / 100000.0);
+  const float ry = static_cast<float>(static_cast<double>(red_y)   / 100000.0);
+  const float gx = static_cast<float>(static_cast<double>(green_x) / 100000.0);
+  const float gy = static_cast<float>(static_cast<double>(green_y) / 100000.0);
+  const float bx = static_cast<float>(static_cast<double>(blue_x)  / 100000.0);
+  const float by = static_cast<float>(static_cast<double>(blue_y)  / 100000.0);
+
+  if ((info_ptr->valid & 0x800u) != 0) {  // sRGB present
+    if (std::abs(static_cast<int>(white_x) - 31270) > 1000 ||
+        std::abs(static_cast<int>(white_y) - 32900) > 1000 ||
+        std::abs(static_cast<int>(red_x)   - 64000) > 1000 ||
+        std::abs(static_cast<int>(red_y)   - 33000) > 1000 ||
+        std::abs(static_cast<int>(green_x) - 30000) > 1000 ||
+        std::abs(static_cast<int>(green_y) - 60000) > 1000 ||
+        std::abs(static_cast<int>(blue_x)  - 15000) > 1000 ||
+        std::abs(static_cast<int>(blue_y)  -  6000) > 1000) {
+      png_warning(png_ptr, "Ignoring incorrect cHRM value when sRGB is also present");
+      std::fprintf(stderr, "wx=%f, wy=%f, rx=%f, ry=%f\n", wx, wy, rx, ry);
+      std::fprintf(stderr, "gx=%f, gy=%f, bx=%f, by=%f\n", gx, gy, bx, by);
+    }
+  } else {
+    png_set_cHRM(png_ptr, info_ptr, wx, wy, rx, ry, gx, gy, bx, by);
+    png_set_cHRM_fixed(png_ptr, info_ptr,
+                       static_cast<std::int32_t>(white_x), static_cast<std::int32_t>(white_y),
+                       static_cast<std::int32_t>(red_x),   static_cast<std::int32_t>(red_y),
+                       static_cast<std::int32_t>(green_x), static_cast<std::int32_t>(green_y),
+                       static_cast<std::int32_t>(blue_x),  static_cast<std::int32_t>(blue_y));
+  }
+  png_crc_finish(png_ptr, 0);
+}
+
+/**
  * Address: 0x00A2316B (FUN_00A2316B)
  * Mangled: png_handle_hIST
  *
