@@ -125,7 +125,7 @@ struct png_info_struct
   std::uint8_t  srgb_intent;                 // +0x2C
   std::uint8_t  pad_2D_to_30[0x03];         // +0x2D
   std::int32_t  num_text;                    // +0x30  tEXt/zTXt record count
-  std::uint8_t  pad_34_to_38[0x04];         // +0x34
+  std::int32_t  max_text;                    // +0x34  allocated capacity of text[]
   png_textp     text;                        // +0x38  text-chunk array
   std::uint8_t  mod_time[8];                 // +0x3C  tIME png_time (year u16, m/d/h/m/s bytes)
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
@@ -189,6 +189,7 @@ static_assert(offsetof(png_info_struct, palette)     == 0x10);
 static_assert(offsetof(png_info_struct, num_palette) == 0x14);
 static_assert(offsetof(png_info_struct, num_trans)   == 0x16);
 static_assert(offsetof(png_info_struct, num_text)    == 0x30);
+static_assert(offsetof(png_info_struct, max_text)    == 0x34);
 static_assert(offsetof(png_info_struct, text)        == 0x38);
 static_assert(offsetof(png_info_struct, trans)       == 0x4C);
 static_assert(offsetof(png_info_struct, trans_values) == 0x50);
@@ -490,6 +491,12 @@ extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
  * Address: 0x009E9162 (FUN_009E9162)  png_set_hIST — install palette histogram.
  */
 extern "C" void png_set_hIST(png_structp png_ptr, png_infop info_ptr, const std::uint16_t* hist);
+
+/**
+ * Address: 0x009E97FB (FUN_009E97FB)  png_set_text_2 — append text records to info.
+ */
+extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
+                              const png_text* text_ptr, int num_text);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
