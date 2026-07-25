@@ -116,5 +116,10 @@ using FreeFunc  = void  (*)(void* opaque, void* address);
 // zlib return codes used by the recovered inflate leaves.
 constexpr int kZOk           = 0;
 constexpr int kZStreamError  = -2;
+constexpr int kZMemError     = -4;
+constexpr int kZVersionError = -6;
+
+// libpng passes DEF_WBITS (15) through inflateInit_.
+constexpr int kZDefaultWindowBits = 15;
 
 } // namespace zlib
