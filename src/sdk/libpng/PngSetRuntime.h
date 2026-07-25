@@ -112,7 +112,7 @@ struct png_info_struct
   std::uint32_t rowbytes;                    // +0x0C
   std::uint8_t* palette;                     // +0x10  PLTE colour array
   std::uint16_t num_palette;                 // +0x14  PLTE entry count
-  std::uint8_t  pad_16_to_18[0x02];         // +0x16
+  std::uint16_t num_trans;                   // +0x16  tRNS entry count
   std::uint8_t  bit_depth;                   // +0x18  IHDR
   std::uint8_t  color_type;                  // +0x19
   std::uint8_t  compression_type;            // +0x1A
@@ -187,6 +187,7 @@ static_assert(offsetof(png_info_struct, valid)       == 0x08);
 static_assert(offsetof(png_info_struct, rowbytes)    == 0x0C);
 static_assert(offsetof(png_info_struct, palette)     == 0x10);
 static_assert(offsetof(png_info_struct, num_palette) == 0x14);
+static_assert(offsetof(png_info_struct, num_trans)   == 0x16);
 static_assert(offsetof(png_info_struct, num_text)    == 0x30);
 static_assert(offsetof(png_info_struct, text)        == 0x38);
 static_assert(offsetof(png_info_struct, trans)       == 0x4C);
@@ -470,6 +471,12 @@ extern "C" void png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
                              std::uint32_t width, std::uint32_t height,
                              int bit_depth, int color_type, int interlace_type,
                              int compression_type, int filter_type);
+
+/**
+ * Address: 0x009E95BF (FUN_009E95BF)  png_set_PLTE — install the colour palette.
+ */
+extern "C" void png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
+                             const std::uint8_t* palette, int num_palette);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
