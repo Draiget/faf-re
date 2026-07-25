@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`24/07/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`25/07/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,432` (81.80%)
+- `recovered`: `53,434` (81.80%)
 - `skip`: `6,170` (9.45%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
-- `external_dependency`: `5,721` (8.76%) — third-party libs
+- `external_dependency`: `5,719` (8.75%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
 - `needs_evidence`: `3` (0.00%)
 - `in_progress`: `29` (0.04%)
@@ -30,12 +30,12 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index. A function's verdict reflects whether its binary callsite evidence is satisfied by recovered source — i.e. whether some recovered file in `src/sdk/**` actually invokes it (directly, via vtable slot, or via a framework dispatch table).
 
-### Recovered (53,432 functions) — wiring health
+### Recovered (53,434 functions) — wiring health
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Confirmed caller** (recovered binary caller wired by name) | `15,610` | 29.21% |
-| Vtable-anchored (virtual override of a recovered class) | `5,843` | 10.94% |
+| **Confirmed caller** (recovered binary caller wired by name) | `15,612` | 29.22% |
+| Vtable-anchored (virtual override of a recovered class) | `5,843` | 10.93% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,499` | 10.29% |
 | Caller still blocked (orphan-helper risk — caller awaits recovery) | `2,551` | 4.77% |
 | No callsite evidence (no recorded code/data caller in the index) | `23,710` | 44.37% |
