@@ -4,6 +4,7 @@
 #include "libpng/PngMemRuntime.h"
 #include "libpng/PngCommonRuntime.h"  // kPngFlagMallocNullMemOk + flag offset
 
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -22,7 +23,59 @@ constexpr std::size_t kPngStructFlagsOffset = 0x6C;
 // Binary evidence: FUN_009E0494 splits the zero-fill at 0x8000 bytes.
 constexpr std::uint32_t kPngMemsetChunkSize = 0x8000;
 
+// png_struct::free_fn — user-supplied free callback (PNG_USER_MEM_SUPPORTED).
+// Offset verified from FUN_00A2113B.asm (mov eax, [ecx+24Ch]).
+constexpr std::size_t kPngStructFreeFnOffset = 0x24C;
+using PngFreeFn = void (*)(png_structp, void*);
+
+[[nodiscard]] PngFreeFn PngStructFreeFn(png_structp png_ptr) noexcept
+{
+  return *reinterpret_cast<PngFreeFn*>(
+    reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructFreeFnOffset);
+}
+
+/**
+ * Address: 0x00A21051 (FUN_00A21051)
+ * Mangled: png_free_default
+ *
+ * IDA signature:
+ * void __cdecl png_free_default(png_structp png_ptr, void* ptr);
+ *
+ * libpng's default free path. In this build the 16-bit far-heap offset_table
+ * bookkeeping is compiled out, so it reduces to handing ptr back to the CRT.
+ */
+void png_free_default(png_structp png_ptr, void* ptr)
+{
+  if (png_ptr == nullptr || ptr == nullptr) {
+    return;
+  }
+  std::free(ptr);
+}
+
 } // namespace
+
+/**
+ * Address: 0x00A2113B (FUN_00A2113B)
+ * Mangled: png_free
+ *
+ * IDA signature:
+ * void __cdecl png_free(png_structp png_ptr, void* ptr);
+ *
+ * libpng free entry point. No-op on a null png_ptr or ptr. Dispatches to the
+ * user free callback (png_ptr->free_fn, +0x24C) when one is installed, otherwise
+ * falls back to png_free_default (the CRT free path).
+ */
+extern "C" void png_free(png_structp png_ptr, void* ptr)
+{
+  if (png_ptr == nullptr || ptr == nullptr) {
+    return;
+  }
+  if (const PngFreeFn free_fn = PngStructFreeFn(png_ptr)) {
+    free_fn(png_ptr, ptr);
+  } else {
+    png_free_default(png_ptr, ptr);
+  }
+}
 
 /**
  * Address: 0x009E0494 (FUN_009E0494)
