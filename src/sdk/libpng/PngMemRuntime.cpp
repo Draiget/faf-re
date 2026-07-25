@@ -34,6 +34,26 @@ using PngFreeFn = void (*)(png_structp, void*);
     reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructFreeFnOffset);
 }
 
+// png_struct::mem_ptr — user-supplied opaque handed to the mem callbacks.
+// Offset verified from FUN_00A20F69.asm / FUN_00A20FDC.asm: the mem_ptr field
+// sits at [ebp-0x20] within the 0x264-byte stack dummy => struct offset 0x244.
+constexpr std::size_t kPngStructMemPtrOffset = 0x244;
+
+[[nodiscard]] void*& PngStructMemPtr(png_structp png_ptr) noexcept
+{
+  return *reinterpret_cast<void**>(
+    reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructMemPtrOffset);
+}
+
+// png_create_struct/destroy allocation sizes + type selectors.
+// Verified from FUN_00A20F69.asm: type 2 (PNG_STRUCT_INFO) => 0x120 bytes,
+// type 1 (PNG_STRUCT_PNG) => 0x260 bytes.
+using PngMallocFn = void* (*)(png_structp, std::uint32_t);
+constexpr int          kPngStructPngType    = 1;
+constexpr int          kPngStructInfoType   = 2;
+constexpr std::uint32_t kPngSizeofPngStruct  = 0x260;
+constexpr std::uint32_t kPngSizeofInfoStruct = 0x120;
+
 /**
  * Address: 0x00A21051 (FUN_00A21051)
  * Mangled: png_free_default
@@ -125,4 +145,99 @@ extern "C" void* png_zalloc(
 extern "C" void png_zfree(png_structp png_ptr, void* ptr)
 {
   png_free(png_ptr, ptr);
+}
+
+/**
+ * Address: 0x00A20F69 (FUN_00A20F69)
+ * Mangled: png_create_struct_2
+ *
+ * IDA signature:
+ * png_voidp __cdecl png_create_struct_2(int type, png_malloc_ptr malloc_fn, png_voidp mem_ptr);
+ *
+ * Allocates and zero-fills a raw png_struct (type 1, 0x260 bytes) or
+ * png_info_struct (type 2, 0x120 bytes). When a user malloc callback is
+ * supplied it is invoked with a stack dummy png_struct carrying mem_ptr;
+ * otherwise the CRT malloc is used. An unknown type returns null. Matching the
+ * binary, only the dummy's mem_ptr field is set before the callback (the rest
+ * is left as-is) and the returned buffer is the one that gets zero-filled.
+ */
+extern "C" void* png_create_struct_2(int type, PngMallocFn malloc_fn, void* mem_ptr)
+{
+  std::uint32_t size;
+  if (type == kPngStructInfoType) {
+    size = kPngSizeofInfoStruct;
+  } else if (type == kPngStructPngType) {
+    size = kPngSizeofPngStruct;
+  } else {
+    return nullptr;
+  }
+
+  void* struct_ptr;
+  if (malloc_fn != nullptr) {
+    std::uint8_t dummy_struct[kPngSizeofPngStruct];
+    PngStructMemPtr(reinterpret_cast<png_structp>(dummy_struct)) = mem_ptr;
+    struct_ptr = malloc_fn(reinterpret_cast<png_structp>(dummy_struct), size);
+  } else {
+    struct_ptr = std::malloc(size);
+  }
+
+  if (struct_ptr != nullptr) {
+    std::memset(struct_ptr, 0, size);
+  }
+  return struct_ptr;
+}
+
+/**
+ * Address: 0x00A210C2 (FUN_00A210C2)
+ * Mangled: png_create_struct
+ *
+ * IDA signature:
+ * png_voidp __cdecl png_create_struct(int type);
+ *
+ * Thin wrapper: allocates a zero-filled png_struct/png_info of the given type
+ * via the CRT allocator (no user malloc callback).
+ */
+extern "C" void* png_create_struct(int type)
+{
+  return png_create_struct_2(type, nullptr, nullptr);
+}
+
+/**
+ * Address: 0x00A20FDC (FUN_00A20FDC)
+ * Mangled: png_destroy_struct_2
+ *
+ * IDA signature:
+ * void __cdecl png_destroy_struct_2(png_voidp struct_ptr, png_free_ptr free_fn, png_voidp mem_ptr);
+ *
+ * Frees a png_struct/png_info. When a user free callback is supplied it is
+ * invoked with a stack dummy png_struct carrying mem_ptr; otherwise the CRT
+ * free is used. A null struct_ptr is a no-op.
+ */
+extern "C" void png_destroy_struct_2(void* struct_ptr, PngFreeFn free_fn, void* mem_ptr)
+{
+  if (struct_ptr == nullptr) {
+    return;
+  }
+  if (free_fn != nullptr) {
+    std::uint8_t dummy_struct[kPngSizeofPngStruct];
+    PngStructMemPtr(reinterpret_cast<png_structp>(dummy_struct)) = mem_ptr;
+    free_fn(reinterpret_cast<png_structp>(dummy_struct), struct_ptr);
+  } else {
+    std::free(struct_ptr);
+  }
+}
+
+/**
+ * Address: 0x00A210D3 (FUN_00A210D3)
+ * Mangled: png_destroy_struct
+ *
+ * IDA signature:
+ * void __cdecl png_destroy_struct(png_voidp struct_ptr);
+ *
+ * Thin wrapper: frees a png_struct/png_info via the CRT allocator (no user free
+ * callback).
+ */
+extern "C" void png_destroy_struct(void* struct_ptr)
+{
+  png_destroy_struct_2(struct_ptr, nullptr, nullptr);
 }
