@@ -151,10 +151,11 @@ struct png_info_struct
   float         x_blue;                      // +0x98
   float         y_blue;                      // +0x9C
   char*         pcal_purpose;                // +0xA0  pCAL purpose string
-  std::uint8_t  pad_A4_to_AC[0x08];         // +0xA4
+  std::int32_t  pcal_X0;                      // +0xA4  pCAL chunk zero
+  std::int32_t  pcal_X1;                      // +0xA8  pCAL chunk one
   char*         pcal_units;                  // +0xAC  pCAL units string
   char**        pcal_params;                 // +0xB0  pCAL parameter strings
-  std::uint8_t  pad_B4_to_B5[0x01];         // +0xB4
+  std::uint8_t  pcal_type;                    // +0xB4  pCAL equation type
   std::uint8_t  pcal_nparams;                // +0xB5  pCAL parameter count
   std::uint8_t  pad_B6_to_B8[0x02];         // +0xB6
   std::uint32_t      free_me;               // +0xB8  bitmask of info-owned buffers to free
@@ -199,8 +200,11 @@ static_assert(offsetof(png_info_struct, trans)       == 0x4C);
 static_assert(offsetof(png_info_struct, trans_values) == 0x50);
 static_assert(offsetof(png_info_struct, hist)        == 0x7C);
 static_assert(offsetof(png_info_struct, pcal_purpose)  == 0xA0);
+static_assert(offsetof(png_info_struct, pcal_X0)       == 0xA4);
+static_assert(offsetof(png_info_struct, pcal_X1)       == 0xA8);
 static_assert(offsetof(png_info_struct, pcal_units)    == 0xAC);
 static_assert(offsetof(png_info_struct, pcal_params)   == 0xB0);
+static_assert(offsetof(png_info_struct, pcal_type)     == 0xB4);
 static_assert(offsetof(png_info_struct, pcal_nparams)  == 0xB5);
 static_assert(offsetof(png_info_struct, iccp_name)     == 0xC4);
 static_assert(offsetof(png_info_struct, iccp_profile)  == 0xC8);
@@ -510,6 +514,14 @@ extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
  */
 extern "C" void png_set_sCAL(png_structp png_ptr, png_infop info_ptr,
                              int unit, double width, double height);
+
+/**
+ * Address: 0x009E9402 (FUN_009E9402)  png_set_pCAL — pixel calibration (purpose,
+ * X0/X1, equation type, units, nparams parameter strings).
+ */
+extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
+                             char* purpose, std::int32_t X0, std::int32_t X1,
+                             int type, int nparams, char* units, char** params);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)

@@ -2221,6 +2221,128 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A233DB (FUN_00A233DB)
+ * Mangled: png_handle_pCAL
+ *
+ * IDA signature:
+ * void __cdecl png_handle_pCAL(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a pCAL (pixel-calibration) chunk: requires IHDR, rejects after IDAT and
+ * a duplicate. The payload is a NUL-terminated purpose string, then X0/X1 (int32
+ * each), an equation-type byte, an nparams byte, a NUL-terminated units string,
+ * and nparams NUL-terminated parameter strings. Validates the parameter count
+ * against the equation type, gathers a pointer to each parameter string, and
+ * installs the result via png_set_pCAL.
+ */
+extern "C" void png_handle_pCAL(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before pCAL");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid pCAL after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if (info_ptr != nullptr && (info_ptr->valid & 0x400u) != 0) {
+    png_warning(png_ptr, "Duplicate pCAL chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  auto* const purpose = static_cast<char*>(png_malloc_warn(png_ptr, length + 1));
+  if (purpose == nullptr) {
+    png_warning(png_ptr, "No memory for pCAL purpose.");
+    return;
+  }
+
+  png_crc_read(png_ptr, reinterpret_cast<std::uint8_t*>(purpose), length);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    png_free(png_ptr, purpose);
+    return;
+  }
+
+  purpose[length] = '\0';  // null-terminate the final string
+
+  // Find the end of the purpose string.
+  char* buf = purpose;
+  while (*buf != '\0') {
+    ++buf;
+  }
+
+  char* const endptr = purpose + length;
+
+  // We need at least 12 bytes after the purpose string for the parameter header.
+  if (endptr <= buf + 12) {
+    png_warning(png_ptr, "Invalid pCAL data");
+    png_free(png_ptr, purpose);
+    return;
+  }
+
+  const std::int32_t X0 = png_get_int_32(reinterpret_cast<const std::uint8_t*>(buf + 1));
+  const std::int32_t X1 = png_get_int_32(reinterpret_cast<const std::uint8_t*>(buf + 5));
+  const std::uint8_t type    = static_cast<std::uint8_t>(buf[9]);
+  const std::uint8_t nparams = static_cast<std::uint8_t>(buf[10]);
+  char* const units = buf + 11;
+
+  // Check the parameter count against the known equation types
+  // (0=linear/2, 1=base-e/3, 2=arbitrary/3, 3=hyperbolic/4; >=4 unrecognized).
+  if ((type == 0 && nparams != 2) ||
+      (type == 1 && nparams != 3) ||
+      (type == 2 && nparams != 3)) {
+    png_warning(png_ptr, "Invalid pCAL parameters for equation type");
+    png_free(png_ptr, purpose);
+    return;
+  }
+  if (type == 3) {
+    if (nparams != 4) {
+      png_warning(png_ptr, "Invalid pCAL parameters for equation type");
+      png_free(png_ptr, purpose);
+      return;
+    }
+  } else if (type >= 4) {
+    png_warning(png_ptr, "Unrecognized equation type for pCAL chunk");
+  }
+
+  // Move buf past the units string.
+  buf = units;
+  while (*buf != '\0') {
+    ++buf;
+  }
+
+  auto* const params = static_cast<char**>(
+      png_malloc_warn(png_ptr, 4u * static_cast<std::uint32_t>(nparams)));
+  if (params == nullptr) {
+    png_free(png_ptr, purpose);
+    png_warning(png_ptr, "No memory for pCAL params.");
+    return;
+  }
+
+  // Get pointers to the start of each parameter string.
+  for (int i = 0; i < static_cast<int>(nparams); ++i) {
+    ++buf;  // skip the NUL terminator from the previous parameter
+    params[i] = buf;
+    while (*buf != '\0' && buf <= endptr) {
+      ++buf;
+    }
+    if (buf > endptr) {
+      png_warning(png_ptr, "Invalid pCAL data");
+      png_free(png_ptr, purpose);
+      png_free(png_ptr, params);
+      return;
+    }
+  }
+
+  png_set_pCAL(png_ptr, info_ptr, purpose, X0, X1, type, nparams, units, params);
+
+  png_free(png_ptr, purpose);
+  png_free(png_ptr, params);
+}
+
+/**
  * Address: 0x00A235C9 (FUN_00A235C9)
  * Mangled: png_handle_sCAL
  *
