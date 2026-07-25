@@ -44,6 +44,7 @@ using png_structp = png_struct_def*;
 
 // Libpng helper: issue a warning message via the struct's error handler.
 extern "C" void png_warning(png_structp png_ptr, const char* message);
+extern "C" void png_error(png_structp png_ptr, const char* message);
 // Libpng memory allocator.
 extern "C" void* png_malloc(png_structp png_ptr, std::uint32_t size);
 extern "C" void png_free(png_structp png_ptr, void* ptr);

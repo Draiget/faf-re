@@ -2221,6 +2221,65 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A2205C (FUN_00A2205C)
+ * Mangled: png_handle_IHDR
+ *
+ * IDA signature:
+ * void __cdecl png_handle_IHDR(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses the IHDR chunk (must be first, exactly 13 bytes): reads width/height
+ * (big-endian u32), bit_depth, color_type, compression, filter and interlace,
+ * records them into png_ptr (deriving channels, pixel_depth and rowbytes), and
+ * validates + mirrors them into the info struct via png_set_IHDR.
+ */
+extern "C" void png_handle_IHDR(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) != 0) {
+    png_error(png_ptr, "Out of place IHDR");
+  }
+  if (length != 13) {
+    png_error(png_ptr, "Invalid IHDR chunk");
+  }
+  Mode(png_ptr) |= kPngHaveIhdr;
+
+  std::uint8_t buf[13];
+  png_crc_read(png_ptr, buf, 13);
+  png_crc_finish(png_ptr, 0);
+
+  const std::uint32_t width      = static_cast<std::uint32_t>(png_get_uint_32(buf));
+  const std::uint32_t height     = static_cast<std::uint32_t>(png_get_uint_32(buf + 4));
+  const std::uint8_t bit_depth   = buf[8];
+  const std::uint8_t color_type  = buf[9];
+  const std::uint8_t compression = buf[10];
+  const std::uint8_t filter      = buf[11];
+  const std::uint8_t interlace   = buf[12];
+
+  Field<std::uint8_t>(png_ptr, kOffInterlaced)  = interlace;
+  Field<std::uint32_t>(png_ptr, kOffWidth)      = width;
+  Field<std::uint32_t>(png_ptr, kOffHeight)     = height;
+  Field<std::uint8_t>(png_ptr, kOffBitDepth)    = bit_depth;
+  Field<std::uint8_t>(png_ptr, kOffColorType)   = color_type;
+  Field<std::uint8_t>(png_ptr, kOffFilterType)  = filter;
+
+  std::uint8_t channels;
+  switch (color_type) {
+    case 2:  channels = 3; break;  // RGB
+    case 4:  channels = 2; break;  // gray + alpha
+    case 6:  channels = 4; break;  // RGBA
+    default: channels = 1; break;  // gray (0) / palette (3)
+  }
+  Field<std::uint8_t>(png_ptr, kOffChannels) = channels;
+  const std::uint8_t pixel_depth = static_cast<std::uint8_t>(bit_depth * channels);
+  Field<std::uint8_t>(png_ptr, kOffPixelDepth) = pixel_depth;
+  Field<std::uint32_t>(png_ptr, kOffRowbytes) = (width * pixel_depth + 7u) >> 3;
+
+  png_set_IHDR(png_ptr, info_ptr, width, height, bit_depth, color_type, interlace, compression, filter);
+}
+
+/**
  * Address: 0x00A22FDC (FUN_00A22FDC)
  * Mangled: png_handle_bKGD
  *

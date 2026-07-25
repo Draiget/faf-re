@@ -426,6 +426,89 @@ extern "C" void png_set_bKGD(png_structp png_ptr, png_infop info_ptr, const std:
 }
 
 /**
+ * Address: 0x009E91F2 (FUN_009E91F2)
+ * Mangled: png_set_IHDR
+ *
+ * Validates the IHDR fields (raising png_error on any invalid combination) and
+ * records the image geometry into the info struct, computing channels,
+ * pixel_depth and rowbytes. The MNG filter-method extension (filter 64 on RGB)
+ * is permitted only when mng_features_permitted allows it; otherwise a non-zero
+ * filter method is rejected.
+ */
+extern "C" void png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
+                             std::uint32_t width, std::uint32_t height,
+                             int bit_depth, int color_type, int interlace_type,
+                             int compression_type, int filter_type)
+{
+  using namespace libpng_layout;
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+
+  if (width == 0 || height == 0) {
+    png_error(png_ptr, "Image width or height is zero in IHDR");
+  }
+  if (width > 0x7FFFFFFFu || height > 0x7FFFFFFFu) {
+    png_error(png_ptr, "Invalid image size in IHDR");
+  }
+  if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) {
+    png_error(png_ptr, "Invalid bit depth in IHDR");
+  }
+  if (color_type < 0 || color_type == 1 || color_type == 5 || color_type > 6) {
+    png_error(png_ptr, "Invalid color type in IHDR");
+  }
+  if ((color_type == 3 && bit_depth > 8) ||
+      ((color_type == 2 || color_type == 4 || color_type == 6) && bit_depth < 8)) {
+    png_error(png_ptr, "Invalid color type/bit depth combination in IHDR");
+  }
+  if (interlace_type >= 2) {
+    png_error(png_ptr, "Unknown interlace method in IHDR");
+  }
+  if (compression_type != 0) {
+    png_error(png_ptr, "Unknown compression method in IHDR");
+  }
+
+  const std::uint32_t mng = Field<std::uint32_t>(png_ptr, kOffMngFeaturesPermitted);
+  if ((Mode(png_ptr) & 0x1000u) != 0 && mng != 0) {
+    png_warning(png_ptr, "MNG features are not allowed in a PNG datastream\n");
+  }
+  if (filter_type != 0) {
+    if ((mng & 4u) == 0 || filter_type != 64 || (Mode(png_ptr) & 0x1000u) != 0 ||
+        (color_type != 2 && color_type != 6)) {
+      png_error(png_ptr, "Unknown filter method in IHDR");
+    }
+    if ((Mode(png_ptr) & 0x1000u) != 0) {
+      png_warning(png_ptr, "Invalid filter method in IHDR");
+    }
+  }
+
+  info_ptr->height           = height;
+  info_ptr->compression_type = static_cast<std::uint8_t>(compression_type);
+  info_ptr->filter_type      = static_cast<std::uint8_t>(filter_type);
+  info_ptr->width            = width;
+  info_ptr->bit_depth        = static_cast<std::uint8_t>(bit_depth);
+  info_ptr->color_type       = static_cast<std::uint8_t>(color_type);
+  info_ptr->interlace_type   = static_cast<std::uint8_t>(interlace_type);
+
+  if (color_type == 3 || (color_type & 2) == 0) {
+    info_ptr->channels = 1;
+  } else {
+    info_ptr->channels = 3;
+  }
+  if ((color_type & 4) != 0) {
+    ++info_ptr->channels;
+  }
+  info_ptr->pixel_depth = static_cast<std::uint8_t>(bit_depth * info_ptr->channels);
+
+  if (width <= 0x7FFFFFFFu / ((info_ptr->pixel_depth + 7u) >> 3) - 64u) {
+    info_ptr->rowbytes = (width * info_ptr->pixel_depth + 7u) >> 3;
+  } else {
+    png_warning(png_ptr, "Width too large to process image data; rowbytes will overflow.");
+    info_ptr->rowbytes = 0;
+  }
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *

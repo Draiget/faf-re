@@ -82,11 +82,21 @@ using png_unknown_chunkp = png_unknown_chunk*;
 
 struct png_info_struct
 {
-  std::uint8_t  pad_00_to_08[0x08];         // +0x00
+  std::uint32_t width;                       // +0x00  IHDR
+  std::uint32_t height;                      // +0x04
   std::uint32_t valid;                       // +0x08
-  std::uint8_t  pad_0C_to_14[0x08];         // +0x0C
+  std::uint32_t rowbytes;                    // +0x0C
+  std::uint8_t  pad_10_to_14[0x04];         // +0x10
   std::uint16_t num_palette;                 // +0x14  PLTE entry count
-  std::uint8_t  pad_16_to_28[0x12];         // +0x16
+  std::uint8_t  pad_16_to_18[0x02];         // +0x16
+  std::uint8_t  bit_depth;                   // +0x18  IHDR
+  std::uint8_t  color_type;                  // +0x19
+  std::uint8_t  compression_type;            // +0x1A
+  std::uint8_t  filter_type;                 // +0x1B
+  std::uint8_t  interlace_type;              // +0x1C
+  std::uint8_t  channels;                    // +0x1D
+  std::uint8_t  pixel_depth;                 // +0x1E
+  std::uint8_t  pad_1F_to_28[0x09];         // +0x1F
   float         gamma;                       // +0x28
   std::uint8_t  srgb_intent;                 // +0x2C
   std::uint8_t  pad_2D_to_3C[0x0F];         // +0x2D
@@ -129,8 +139,16 @@ struct png_info_struct
 using png_infop       = png_info_struct*;
 using png_fixed_point = std::int32_t;
 
+static_assert(offsetof(png_info_struct, width)       == 0x00);
+static_assert(offsetof(png_info_struct, height)      == 0x04);
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
+static_assert(offsetof(png_info_struct, rowbytes)    == 0x0C);
 static_assert(offsetof(png_info_struct, num_palette) == 0x14);
+static_assert(offsetof(png_info_struct, bit_depth)   == 0x18);
+static_assert(offsetof(png_info_struct, color_type)  == 0x19);
+static_assert(offsetof(png_info_struct, filter_type) == 0x1B);
+static_assert(offsetof(png_info_struct, channels)    == 0x1D);
+static_assert(offsetof(png_info_struct, pixel_depth) == 0x1E);
 static_assert(offsetof(png_info_struct, mod_time)    == 0x3C);
 static_assert(offsetof(png_info_struct, background)  == 0x5A);
 static_assert(offsetof(png_info_struct, sig_bit)     == 0x44);
@@ -386,6 +404,16 @@ extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std:
  * Takes a raw 10-byte png_color_16 image as the binary does (void* + memcpy).
  */
 extern "C" void png_set_bKGD(png_structp png_ptr, png_infop info_ptr, const std::uint8_t* background);
+
+/**
+ * Address: 0x009E91F2 (FUN_009E91F2)  png_set_IHDR — image header.
+ * Validates the IHDR fields and records width/height/bit_depth/color_type/
+ * interlace/compression/filter + computed channels/pixel_depth/rowbytes into info.
+ */
+extern "C" void png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
+                             std::uint32_t width, std::uint32_t height,
+                             int bit_depth, int color_type, int interlace_type,
+                             int compression_type, int filter_type);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
