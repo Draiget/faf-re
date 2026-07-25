@@ -2221,6 +2221,76 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A22192 (FUN_00A22192)
+ * Mangled: png_handle_PLTE
+ *
+ * IDA signature:
+ * void __cdecl png_handle_PLTE(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a PLTE (palette) chunk: requires IHDR, rejects after IDAT, errors on a
+ * duplicate; marks PNG_HAVE_PLTE; ignores PLTE for grayscale images; validates
+ * the length (multiple of 3, <= 768) — a bad length is fatal for palette images
+ * but only a warning otherwise; reads the RGB entries and installs them via
+ * png_set_PLTE. For a palette image with a tRNS chunk already read, truncates an
+ * over-long tRNS (in both png_ptr and info) to the palette size.
+ */
+extern "C" void png_handle_PLTE(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before PLTE");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid PLTE after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+    png_error(png_ptr, "Duplicate PLTE chunk");
+  }
+
+  const std::uint8_t color_type = ColorType(png_ptr);
+  Mode(png_ptr) |= kPngHavePlte;
+
+  if ((color_type & kPngColorMaskColor) == 0) {
+    png_warning(png_ptr, "Ignoring PLTE chunk in grayscale PNG");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (length > 0x300u || (length % 3u) != 0) {
+    if (color_type == kColorTypePalette) {
+      png_error(png_ptr, "Invalid palette chunk");
+    }
+    png_warning(png_ptr, "Invalid palette chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  const int num_palette = static_cast<int>(length / 3u);
+  std::uint8_t buffer[0x300];  // up to 256 RGB entries
+  for (int i = 0; i < num_palette; ++i) {
+    png_crc_read(png_ptr, buffer + 3 * i, 3);
+  }
+  png_crc_finish(png_ptr, 0);
+  png_set_PLTE(png_ptr, info_ptr, buffer, num_palette);
+
+  if (ColorType(png_ptr) == kColorTypePalette && info_ptr != nullptr &&
+      (info_ptr->valid & 0x10u) != 0) {  // PNG_INFO_tRNS present
+    if (Field<std::uint16_t>(png_ptr, kOffNumTrans) > num_palette) {
+      png_warning(png_ptr, "Truncating incorrect tRNS chunk length");
+      Field<std::uint16_t>(png_ptr, kOffNumTrans) = static_cast<std::uint16_t>(num_palette);
+    }
+    if (info_ptr->num_trans > num_palette) {
+      png_warning(png_ptr, "Truncating incorrect info tRNS chunk length");
+      info_ptr->num_trans = static_cast<std::uint16_t>(num_palette);
+    }
+  }
+}
+
+/**
  * Address: 0x00A2205C (FUN_00A2205C)
  * Mangled: png_handle_IHDR
  *

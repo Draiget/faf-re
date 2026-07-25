@@ -7,6 +7,11 @@
 
 #include <cstring>
 
+extern "C" {
+void  png_free_data(png_structp png_ptr, png_infop info_ptr, std::uint32_t mask, int num);
+void* png_zalloc(png_structp png_ptr, std::uint32_t items, std::uint32_t size);
+}
+
 /**
  * Address: 0x009E966F (FUN_009E966F)
  *
@@ -506,6 +511,39 @@ extern "C" void png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
     png_warning(png_ptr, "Width too large to process image data; rowbytes will overflow.");
     info_ptr->rowbytes = 0;
   }
+}
+
+/**
+ * Address: 0x009E95BF (FUN_009E95BF)
+ * Mangled: png_set_PLTE
+ *
+ * Installs the palette: frees any previously-owned palette, allocates a fresh
+ * 256-entry (768-byte) buffer via png_zalloc, copies the supplied entries in,
+ * points both png_ptr->palette and info_ptr->palette at it, records the count,
+ * and marks PNG_INFO_PLTE valid + PNG_FREE_PLTE owned.
+ */
+extern "C" void png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
+                             const std::uint8_t* palette, int num_palette)
+{
+  using namespace libpng_layout;
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+
+  png_free_data(png_ptr, info_ptr, 0x1000u, 0);  // PNG_FREE_PLTE
+
+  auto* const pal = static_cast<std::uint8_t*>(png_zalloc(png_ptr, 256u, 3u));
+  Field<std::uint8_t*>(png_ptr, kOffPalette) = pal;
+  if (pal == nullptr) {
+    png_error(png_ptr, "Unable to malloc palette");
+  }
+  std::memcpy(pal, palette, 3u * static_cast<std::uint32_t>(num_palette));
+
+  info_ptr->palette = pal;
+  Field<std::uint16_t>(png_ptr, kOffNumPalette) = static_cast<std::uint16_t>(num_palette);
+  info_ptr->free_me |= 0x1000u;   // PNG_FREE_PLTE
+  info_ptr->valid   |= 0x0008u;   // PNG_INFO_PLTE
+  info_ptr->num_palette = static_cast<std::uint16_t>(num_palette);
 }
 
 /**
