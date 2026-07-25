@@ -595,6 +595,7 @@
     <ClCompile Include="moho\path\SNamedFootprintTypeInfo.cpp" />
     <ClCompile Include="moho\path\SNavGoal.cpp" />
     <ClCompile Include="moho\path\RDebugNavPath.cpp" />
+    <ClCompile Include="moho\path\NavPathTypeInfo.cpp" />
     <ClCompile Include="moho\path\RDebugNavPathTypeInfo.cpp" />
     <ClCompile Include="moho\path\PathTables.cpp" />
     <ClCompile Include="moho\containers\BVIntSet.cpp" />
@@ -1869,6 +1870,7 @@
     <ClInclude Include="moho\path\IPathTraveler.h" />
     <ClInclude Include="moho\path\IPathTravelerTypeInfo.h" />
     <ClInclude Include="moho\path\RDebugNavPath.h" />
+    <ClInclude Include="moho\path\NavPathTypeInfo.h" />
     <ClInclude Include="moho\path\RDebugNavPathTypeInfo.h" />
     <ClInclude Include="moho\math\Angle.h" />
     <ClInclude Include="moho\math\GridPos.h" />
