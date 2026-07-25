@@ -2221,6 +2221,93 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A22E23 (FUN_00A22E23)
+ * Mangled: png_handle_tRNS
+ *
+ * IDA signature:
+ * void __cdecl png_handle_tRNS(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a tRNS (transparency) chunk. For a palette image reads up to
+ * num_palette alpha bytes (warning on a bad length / missing PLTE / zero length);
+ * for truecolour reads one 16-bit RGB key (length 6); for grayscale reads one
+ * 16-bit gray key (length 2); and rejects tRNS on images that already carry an
+ * alpha channel. Installs the result via png_set_tRNS.
+ */
+extern "C" void png_handle_tRNS(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before tRNS");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid tRNS after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if (info_ptr != nullptr && (info_ptr->valid & 0x10u) != 0) {
+    png_warning(png_ptr, "Duplicate tRNS chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  const std::uint8_t color_type = ColorType(png_ptr);
+  std::uint8_t alpha[256] = {};  // palette alpha buffer (unused for RGB/gray)
+
+  if (color_type == kColorTypePalette) {
+    if ((Mode(png_ptr) & kPngHavePlte) != 0) {
+      if (length > Field<std::uint16_t>(png_ptr, kOffNumPalette)) {
+        png_warning(png_ptr, "Incorrect tRNS chunk length");
+        png_crc_finish(png_ptr, length);
+        return;
+      }
+    } else {
+      png_warning(png_ptr, "Missing PLTE before tRNS");
+    }
+    if (length == 0) {
+      png_warning(png_ptr, "Zero length tRNS chunk");
+      png_crc_finish(png_ptr, 0);
+      return;
+    }
+    png_crc_read(png_ptr, alpha, length);
+    Field<std::uint16_t>(png_ptr, kOffNumTrans) = static_cast<std::uint16_t>(length);
+  } else if (color_type == kColorTypeRgb) {
+    if (length != 6) {
+      png_warning(png_ptr, "Incorrect tRNS chunk length");
+      png_crc_finish(png_ptr, length);
+      return;
+    }
+    std::uint8_t buf[6];
+    png_crc_read(png_ptr, buf, 6);
+    Field<std::uint16_t>(png_ptr, kOffNumTrans)     = 1;
+    Field<std::uint16_t>(png_ptr, kOffTransValRed)   = png_get_uint_16(buf);
+    Field<std::uint16_t>(png_ptr, kOffTransValGreen) = png_get_uint_16(buf + 2);
+    Field<std::uint16_t>(png_ptr, kOffTransValBlue)  = png_get_uint_16(buf + 4);
+  } else if (color_type == kColorTypeGray) {
+    if (length != 2) {
+      png_warning(png_ptr, "Incorrect tRNS chunk length");
+      png_crc_finish(png_ptr, length);
+      return;
+    }
+    std::uint8_t buf[2];
+    png_crc_read(png_ptr, buf, 2);
+    Field<std::uint16_t>(png_ptr, kOffNumTrans)     = 1;
+    Field<std::uint16_t>(png_ptr, kOffTransValGray)  = png_get_uint_16(buf);
+  } else {  // color types 4 / 6 already carry an alpha channel
+    png_warning(png_ptr, "tRNS chunk not allowed with alpha channel");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  if (png_crc_finish(png_ptr, 0) == 0) {
+    png_set_tRNS(png_ptr, info_ptr, alpha,
+                 static_cast<int>(Field<std::uint16_t>(png_ptr, kOffNumTrans)),
+                 RawBase(png_ptr) + kOffTransValues);
+  }
+}
+
+/**
  * Address: 0x00A22192 (FUN_00A22192)
  * Mangled: png_handle_PLTE
  *
