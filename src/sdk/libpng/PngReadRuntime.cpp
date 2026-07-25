@@ -89,6 +89,11 @@ void  png_handle_tRNS(png_structp, png_infop, std::uint32_t);
 void  png_handle_zTXt(png_structp, png_infop, std::uint32_t);
 void  png_handle_unknown(png_structp, png_infop, std::uint32_t);
 
+// Shared zTXt/iCCP inflate helper (libpng PRIVATE).
+char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
+                           std::uint32_t chunklength, std::uint32_t prefix_size,
+                           std::uint32_t* newlength);
+
 // zlib symbols.
 struct z_stream_s;
 int   inflate(z_stream_s* strm, int flush);
@@ -2481,6 +2486,238 @@ extern "C" void png_handle_tEXt(png_structp png_ptr, png_infop info_ptr, std::ui
   png_free(png_ptr, record);
   if (oom != 0) {
     png_warning(png_ptr, "Insufficient memory to process text chunk.");
+  }
+}
+
+/**
+ * Address: 0x00A2125F (FUN_00A2125F)
+ * Mangled: png_decompress_chunk
+ *
+ * IDA signature:
+ * png_charp __cdecl png_decompress_chunk(png_structp png_ptr, int comp_type,
+ *     png_charp chunkdata, png_size_t chunklength, png_size_t prefix_size,
+ *     png_size_t *newlength);
+ *
+ * What it does:
+ * Inflates the compressed tail of a zTXt/iCCP chunk. For comp_type 0
+ * (PNG_COMPRESSION_TYPE_BASE) it drives the png_struct's zlib inflate stream over
+ * chunkdata[prefix_size .. chunklength), growing a heap buffer by zbuf-sized runs
+ * (the prefix bytes copied verbatim in front). On a zlib error it warns, copies a
+ * bounded diagnostic string in after the prefix, and returns a prefix-only buffer.
+ * The original chunkdata is always freed; the freshly allocated buffer is returned
+ * and *newlength set to its logical length. A non-zero comp_type is rejected with
+ * a warning and the prefix returned unchanged.
+ */
+char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
+                           std::uint32_t chunklength, std::uint32_t prefix_size,
+                           std::uint32_t* newlength)
+{
+  using namespace libpng_layout;
+
+  static char msg[] = "Error decoding compressed text";
+  char* text = nullptr;
+  std::uint32_t text_size = 0;
+
+  if (comp_type == 0) {  // PNG_COMPRESSION_TYPE_BASE
+    auto* const zstream = reinterpret_cast<z_stream_s*>(RawBase(png_ptr) + kOffZstream);
+    int ret = 0;  // Z_OK
+
+    Field<std::uint8_t*>(png_ptr, kOffZstreamNextIn) =
+        reinterpret_cast<std::uint8_t*>(chunkdata) + prefix_size;
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = chunklength - prefix_size;
+    Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+
+    while (Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) != 0) {
+      ret = inflate(zstream, 1);  // Z_PARTIAL_FLUSH
+      if (ret != 0 && ret != 1) {  // neither Z_OK nor Z_STREAM_END
+        const char* const zmsg = Field<const char*>(png_ptr, kOffZstreamMsg);
+        png_warning(png_ptr, zmsg != nullptr ? zmsg : msg);
+        inflateReset(zstream);
+        Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = 0;
+
+        if (text == nullptr) {
+          text_size = prefix_size + sizeof(msg) + 1;
+          text = static_cast<char*>(png_malloc_warn(png_ptr, text_size));
+          if (text == nullptr) {
+            png_free(png_ptr, chunkdata);
+            png_error(png_ptr, "Not enough memory to decompress chunk");
+          }
+          std::memcpy(text, chunkdata, prefix_size);
+        }
+        text[text_size - 1] = 0x00;
+
+        // Copy what we can of the error message in after the prefix. Preserves
+        // the original's raw pointer-difference size computation exactly.
+        text_size = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(chunkdata)
+                        - reinterpret_cast<std::uintptr_t>(text))
+                    + chunklength - 1;
+        text_size = sizeof(msg) > text_size ? text_size : sizeof(msg);
+        std::memcpy(text + prefix_size, msg, text_size + 1);
+        break;
+      }
+      if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0 || ret == 1) {
+        const std::uint32_t produced = Field<std::uint32_t>(png_ptr, kOffZbufSize)
+                                       - Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut);
+        if (text == nullptr) {
+          text_size = prefix_size + produced;
+          text = static_cast<char*>(png_malloc_warn(png_ptr, text_size + 1));
+          if (text == nullptr) {
+            png_free(png_ptr, chunkdata);
+            png_error(png_ptr, "Not enough memory to decompress chunk.");
+          }
+          std::memcpy(text + prefix_size, Field<std::uint8_t*>(png_ptr, kOffZbuf),
+                      text_size - prefix_size);
+          std::memcpy(text, chunkdata, prefix_size);
+          text[text_size] = 0x00;
+        } else {
+          char* const tmp = text;
+          text = static_cast<char*>(png_malloc_warn(png_ptr, text_size + produced + 1));
+          if (text == nullptr) {
+            png_free(png_ptr, tmp);
+            png_free(png_ptr, chunkdata);
+            png_error(png_ptr, "Not enough memory to decompress chunk..");
+          }
+          std::memcpy(text, tmp, text_size);
+          png_free(png_ptr, tmp);
+          std::memcpy(text + text_size, Field<std::uint8_t*>(png_ptr, kOffZbuf), produced);
+          text_size += produced;
+          text[text_size] = 0x00;
+        }
+        if (ret == 1) {  // Z_STREAM_END
+          break;
+        }
+        Field<std::uint8_t*>(png_ptr, kOffZstreamNextOut) = Field<std::uint8_t*>(png_ptr, kOffZbuf);
+        Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) = Field<std::uint32_t>(png_ptr, kOffZbufSize);
+      }
+    }
+
+    if (ret != 1) {  // not Z_STREAM_END
+      char umsg[52];
+      const char* const chunk_name =
+          reinterpret_cast<const char*>(RawBase(png_ptr) + kOffChunkName);
+      if (ret == -5) {  // Z_BUF_ERROR
+        std::snprintf(umsg, sizeof(umsg),
+                      "Buffer error in compressed datastream in %s chunk", chunk_name);
+      } else if (ret == -3) {  // Z_DATA_ERROR
+        std::snprintf(umsg, sizeof(umsg),
+                      "Data error in compressed datastream in %s chunk", chunk_name);
+      } else {
+        std::snprintf(umsg, sizeof(umsg),
+                      "Incomplete compressed datastream in %s chunk", chunk_name);
+      }
+      png_warning(png_ptr, umsg);
+
+      text_size = prefix_size;
+      if (text == nullptr) {
+        text = static_cast<char*>(png_malloc_warn(png_ptr, text_size + 1));
+        if (text == nullptr) {
+          png_free(png_ptr, chunkdata);
+          png_error(png_ptr, "Not enough memory for text.");
+        }
+        std::memcpy(text, chunkdata, prefix_size);
+      }
+      text[text_size] = 0x00;
+    }
+
+    inflateReset(zstream);
+    Field<std::uint32_t>(png_ptr, kOffZstreamAvailIn) = 0;
+    png_free(png_ptr, chunkdata);
+    chunkdata = text;
+    *newlength = text_size;
+  } else {  // comp_type != PNG_COMPRESSION_TYPE_BASE
+    char umsg[52];
+    std::snprintf(umsg, sizeof(umsg), "Unknown zTXt compression type %d", comp_type);
+    png_warning(png_ptr, umsg);
+    chunkdata[prefix_size] = 0x00;
+    *newlength = prefix_size;
+  }
+
+  return chunkdata;
+}
+
+/**
+ * Address: 0x00A238E1 (FUN_00A238E1)
+ * Mangled: png_handle_zTXt
+ *
+ * IDA signature:
+ * void __cdecl png_handle_zTXt(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a zTXt (compressed text) chunk: requires IHDR, notes AFTER_IDAT when it
+ * follows the image data, reads the whole chunk, splits it at the keyword NUL and
+ * reads the compression-method byte, then inflates the payload via
+ * png_decompress_chunk and installs the resulting png_text record through
+ * png_set_text_2. Warns/cleans up on allocation failure and on an unrecognized
+ * compression method.
+ */
+extern "C" void png_handle_zTXt(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before zTXt");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    Mode(png_ptr) |= kPngAfterIdat;
+  }
+
+  auto* chunkdata = static_cast<char*>(png_malloc_warn(png_ptr, length + 1));
+  if (chunkdata == nullptr) {
+    png_warning(png_ptr, "Out of memory processing zTXt chunk.");
+    return;
+  }
+
+  png_crc_read(png_ptr, reinterpret_cast<std::uint8_t*>(chunkdata), length);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    png_free(png_ptr, chunkdata);
+    return;
+  }
+
+  chunkdata[length] = '\0';
+
+  // Find the end of the keyword.
+  char* text = chunkdata;
+  while (*text != '\0') {
+    ++text;
+  }
+
+  int comp_type;
+  if (text == &chunkdata[length]) {
+    comp_type = -1;  // PNG_TEXT_COMPRESSION_NONE — zTXt must have text after the keyword
+    png_warning(png_ptr, "Zero length zTXt chunk");
+  } else {
+    comp_type = static_cast<signed char>(*(++text));
+    if (comp_type != 0) {  // PNG_TEXT_COMPRESSION_zTXt
+      png_warning(png_ptr, "Unknown compression type in zTXt chunk");
+      comp_type = 0;
+    }
+    ++text;  // skip the compression-method byte
+  }
+
+  const std::uint32_t prefix_len = static_cast<std::uint32_t>(text - chunkdata);
+
+  std::uint32_t data_len = 0;
+  chunkdata = png_decompress_chunk(png_ptr, comp_type, chunkdata, length, prefix_len, &data_len);
+
+  auto* const text_ptr =
+      static_cast<png_text*>(png_malloc_warn(png_ptr, static_cast<std::uint32_t>(sizeof(png_text))));
+  if (text_ptr == nullptr) {
+    png_warning(png_ptr, "Not enough memory to process zTXt chunk.");
+    png_free(png_ptr, chunkdata);
+    return;
+  }
+
+  text_ptr->compression = comp_type;
+  text_ptr->key         = chunkdata;
+  text_ptr->text        = chunkdata + prefix_len;
+  text_ptr->text_length = data_len;
+
+  const int ret = png_set_text_2(png_ptr, info_ptr, text_ptr, 1);
+  png_free(png_ptr, text_ptr);
+  png_free(png_ptr, chunkdata);
+  if (ret != 0) {
+    png_error(png_ptr, "Insufficient memory to store zTXt chunk.");
   }
 }
 
