@@ -163,7 +163,9 @@ struct png_info_struct
   std::uint32_t      unknown_chunks_num;    // +0xC0  count of stored unknown chunks
   char*         iccp_name;                    // +0xC4  iCCP profile name
   std::uint8_t* iccp_profile;                 // +0xC8  iCCP profile data
-  std::uint8_t  pad_CC_to_D4[0x08];         // +0xCC
+  std::uint32_t iccp_proflen;                 // +0xCC  iCCP profile length
+  std::uint8_t  iccp_compression;             // +0xD0  iCCP compression method (always 0)
+  std::uint8_t  pad_D1_to_D4[0x03];          // +0xD1
   png_sPLT_tp   splt_palettes;                // +0xD4  sPLT suggested-palette array
   std::int32_t  splt_palettes_num;            // +0xD8  sPLT record count
   std::uint8_t  scal_unit;                    // +0xDC  sCAL unit
@@ -208,6 +210,8 @@ static_assert(offsetof(png_info_struct, pcal_type)     == 0xB4);
 static_assert(offsetof(png_info_struct, pcal_nparams)  == 0xB5);
 static_assert(offsetof(png_info_struct, iccp_name)     == 0xC4);
 static_assert(offsetof(png_info_struct, iccp_profile)  == 0xC8);
+static_assert(offsetof(png_info_struct, iccp_proflen)  == 0xCC);
+static_assert(offsetof(png_info_struct, iccp_compression) == 0xD0);
 static_assert(offsetof(png_info_struct, splt_palettes) == 0xD4);
 static_assert(offsetof(png_info_struct, splt_palettes_num) == 0xD8);
 static_assert(offsetof(png_info_struct, scal_unit)   == 0xDC);
@@ -522,6 +526,14 @@ extern "C" void png_set_sCAL(png_structp png_ptr, png_infop info_ptr,
 extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
                              char* purpose, std::int32_t X0, std::int32_t X1,
                              int type, int nparams, char* units, char** params);
+
+/**
+ * Address: 0x009E975D (FUN_009E975D)  png_set_iCCP — stores an ICC colour
+ * profile (name, compression method, profile bytes) into the info struct.
+ */
+extern "C" void png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
+                             char* name, int compression_type,
+                             void* profile, std::uint32_t proflen);
 
 /**
  * Address: 0x009E2208 (FUN_009E2208)
