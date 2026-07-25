@@ -791,6 +791,9 @@
     <ClCompile Include="libpng\PngTransformRuntime.cpp">
       <ExcludedFromBuild Condition="true">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="zlib\ZLibCrcRuntime.cpp">
+      <ExcludedFromBuild Condition="true">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="moho\misc\CSaveGameRequestImpl.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseSerializer.cpp" />
