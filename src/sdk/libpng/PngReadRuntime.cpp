@@ -2221,6 +2221,72 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A237E1 (FUN_00A237E1)
+ * Mangled: png_handle_tEXt
+ *
+ * IDA signature:
+ * void __cdecl png_handle_tEXt(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses a tEXt (uncompressed text) chunk: requires IHDR, notes AFTER_IDAT when
+ * it follows the image data, reads the whole chunk, splits it at the keyword's
+ * NUL separator into keyword + text, builds a single uncompressed png_text
+ * record and installs it via png_set_text_2; warns (and cleans up) on any
+ * allocation failure.
+ */
+extern "C" void png_handle_tEXt(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before tEXt");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    Mode(png_ptr) |= kPngAfterIdat;
+  }
+
+  auto* const buffer = static_cast<char*>(png_malloc_warn(png_ptr, length + 1));
+  if (buffer == nullptr) {
+    png_warning(png_ptr, "No memory to process text chunk.");
+    return;
+  }
+
+  png_crc_read(png_ptr, reinterpret_cast<std::uint8_t*>(buffer), length);
+  if (png_crc_finish(png_ptr, 0) != 0) {
+    png_free(png_ptr, buffer);
+    return;
+  }
+
+  buffer[length] = '\0';
+  char* text_start = buffer;
+  while (*text_start != '\0') {
+    ++text_start;
+  }
+  if (text_start != &buffer[length]) {
+    ++text_start;  // skip the keyword's NUL separator
+  }
+
+  auto* const record = static_cast<png_text*>(png_malloc_warn(png_ptr, 0x10u));
+  if (record == nullptr) {
+    png_warning(png_ptr, "Not enough memory to process text chunk.");
+    png_free(png_ptr, buffer);
+    return;
+  }
+
+  record->compression  = -1;  // tEXt: uncompressed
+  record->key          = buffer;
+  record->text         = text_start;
+  record->text_length  = static_cast<std::uint32_t>(std::strlen(text_start));
+
+  const int oom = png_set_text_2(png_ptr, info_ptr, record, 1);
+  png_free(png_ptr, buffer);
+  png_free(png_ptr, record);
+  if (oom != 0) {
+    png_warning(png_ptr, "Insufficient memory to process text chunk.");
+  }
+}
+
+/**
  * Address: 0x00A22548 (FUN_00A22548)
  * Mangled: png_handle_cHRM
  *

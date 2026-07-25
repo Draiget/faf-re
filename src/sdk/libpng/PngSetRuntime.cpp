@@ -625,6 +625,90 @@ extern "C" void png_set_hIST(png_structp png_ptr, png_infop info_ptr, const std:
 }
 
 /**
+ * Address: 0x009E97FB (FUN_009E97FB)
+ * Mangled: png_set_text_2
+ *
+ * Appends num_text text records to info_ptr->text, growing the array (by the
+ * needed count + 8 slack) when it can't fit. Each record's key and text are
+ * copied into a single freshly-allocated "key\0text\0" buffer. iTXt records
+ * (compression > 0) are not supported and are skipped with a warning; a record
+ * with no key is skipped. Returns 1 on an allocation failure, else 0.
+ */
+extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
+                              const png_text* text_ptr, int num_text)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr || num_text == 0) {
+    return 0;
+  }
+
+  const int needed = num_text + info_ptr->num_text;
+  if (needed > info_ptr->max_text) {
+    if (info_ptr->text != nullptr) {
+      const int old_max = info_ptr->max_text;
+      info_ptr->max_text = needed + 8;
+      auto* const grown = static_cast<png_text*>(
+          png_malloc_warn(png_ptr, 16u * static_cast<std::uint32_t>(info_ptr->max_text)));
+      png_text* const old = info_ptr->text;
+      info_ptr->text = grown;
+      if (grown == nullptr) {
+        png_free(png_ptr, old);
+        return 1;
+      }
+      std::memcpy(grown, old, 16u * static_cast<std::uint32_t>(old_max));
+      png_free(png_ptr, old);
+    } else {
+      info_ptr->num_text = 0;
+      info_ptr->max_text = num_text + 8;
+      info_ptr->text = static_cast<png_text*>(
+          png_malloc_warn(png_ptr, 16u * static_cast<std::uint32_t>(info_ptr->max_text)));
+      if (info_ptr->text == nullptr) {
+        return 1;
+      }
+      info_ptr->free_me |= 0x4000u;  // PNG_FREE_TEXT
+    }
+  }
+
+  for (int i = 0; i < num_text; ++i) {
+    const png_text& src = text_ptr[i];
+    if (src.key == nullptr) {
+      continue;
+    }
+    if (src.compression > 0) {
+      png_warning(png_ptr, "iTXt chunk not supported.");
+      continue;
+    }
+
+    png_text* const dest = &info_ptr->text[info_ptr->num_text];
+    const std::size_t key_len = std::strlen(src.key);
+    std::size_t text_len;
+    if (src.text != nullptr && src.text[0] != '\0') {
+      text_len = std::strlen(src.text);
+      dest->compression = src.compression;
+    } else {
+      text_len = 0;
+      dest->compression = -1;
+    }
+
+    auto* const buf = static_cast<char*>(
+        png_malloc_warn(png_ptr, static_cast<std::uint32_t>(text_len + key_len + 4)));
+    dest->key = buf;
+    if (buf == nullptr) {
+      return 1;
+    }
+    std::memcpy(buf, src.key, key_len);
+    buf[key_len] = '\0';
+    dest->text = buf + key_len + 1;
+    if (text_len != 0) {
+      std::memcpy(dest->text, src.text, text_len);
+    }
+    dest->text[text_len] = '\0';
+    dest->text_length = static_cast<std::uint32_t>(text_len);
+    ++info_ptr->num_text;
+  }
+  return 0;
+}
+
+/**
  * Address: 0x009E21EF (FUN_009E21EF)
  * Mangled: png_set_shift
  *
