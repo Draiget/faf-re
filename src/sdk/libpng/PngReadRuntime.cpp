@@ -2221,6 +2221,60 @@ label_post_inflate:
 }
 
 /**
+ * Address: 0x00A2316B (FUN_00A2316B)
+ * Mangled: png_handle_hIST
+ *
+ * IDA signature:
+ * void __cdecl png_handle_hIST(png_structp png_ptr, png_infop info_ptr, png_size_t length);
+ *
+ * What it does:
+ * Parses an hIST (palette histogram) chunk: requires IHDR + PLTE, rejects after
+ * IDAT and a duplicate, and — only when the entry count (length/2) matches the
+ * palette size — reads that many 16-bit frequencies and installs them via
+ * png_set_hIST; otherwise warns on an incorrect length.
+ */
+extern "C" void png_handle_hIST(png_structp png_ptr, png_infop info_ptr, std::uint32_t length)
+{
+  using namespace libpng_layout;
+
+  if ((Mode(png_ptr) & kPngHaveIhdr) == 0) {
+    png_error(png_ptr, "Missing IHDR before hIST");
+  }
+  if ((Mode(png_ptr) & kPngHaveIdat) != 0) {
+    png_warning(png_ptr, "Invalid hIST after IDAT");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if ((Mode(png_ptr) & kPngHavePlte) == 0) {
+    png_warning(png_ptr, "Missing PLTE before hIST");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+  if (info_ptr != nullptr && (info_ptr->valid & 0x40u) != 0) {
+    png_warning(png_ptr, "Duplicate hIST chunk");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  const std::uint32_t num = length / 2u;
+  if (num != Field<std::uint16_t>(png_ptr, kOffNumPalette)) {
+    png_warning(png_ptr, "Incorrect hIST chunk length");
+    png_crc_finish(png_ptr, length);
+    return;
+  }
+
+  std::uint16_t hist[256];
+  for (std::uint32_t i = 0; i < num; ++i) {
+    std::uint8_t buf[2];
+    png_crc_read(png_ptr, buf, 2);
+    hist[i] = png_get_uint_16(buf);
+  }
+  if (png_crc_finish(png_ptr, 0) == 0) {
+    png_set_hIST(png_ptr, info_ptr, hist);
+  }
+}
+
+/**
  * Address: 0x00A22E23 (FUN_00A22E23)
  * Mangled: png_handle_tRNS
  *

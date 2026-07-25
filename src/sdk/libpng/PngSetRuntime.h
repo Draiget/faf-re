@@ -487,6 +487,11 @@ extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
                              const std::uint8_t* trans_values);
 
 /**
+ * Address: 0x009E9162 (FUN_009E9162)  png_set_hIST — install palette histogram.
+ */
+extern "C" void png_set_hIST(png_structp png_ptr, png_infop info_ptr, const std::uint16_t* hist);
+
+/**
  * Address: 0x009E2208 (FUN_009E2208)
  * Mangled: png_set_interlace_handling
  *

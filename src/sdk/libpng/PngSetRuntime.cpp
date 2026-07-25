@@ -11,6 +11,7 @@ extern "C" {
 void  png_free_data(png_structp png_ptr, png_infop info_ptr, std::uint32_t mask, int num);
 void* png_zalloc(png_structp png_ptr, std::uint32_t items, std::uint32_t size);
 void* png_malloc(png_structp png_ptr, std::uint32_t size);
+void* png_malloc_warn(png_structp png_ptr, std::uint32_t size);
 }
 
 /**
@@ -584,6 +585,43 @@ extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
 
   info_ptr->valid |= 0x0010u;  // PNG_INFO_tRNS
   info_ptr->num_trans = static_cast<std::uint16_t>(num_trans);
+}
+
+/**
+ * Address: 0x009E9162 (FUN_009E9162)
+ * Mangled: png_set_hIST
+ *
+ * Installs the palette histogram: frees any prior hIST, allocates a fresh
+ * 512-byte (256-entry) buffer, copies num_palette entries in, and points
+ * png_ptr->hist + info->hist at it (marking PNG_INFO_hIST valid + PNG_FREE_HIST
+ * owned). No-ops with a warning when the palette is empty or the allocation
+ * fails.
+ */
+extern "C" void png_set_hIST(png_structp png_ptr, png_infop info_ptr, const std::uint16_t* hist)
+{
+  using namespace libpng_layout;
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+  if (info_ptr->num_palette == 0) {
+    png_warning(png_ptr, "Palette size 0, hIST allocation skipped.");
+    return;
+  }
+
+  png_free_data(png_ptr, info_ptr, 8u, 0);  // PNG_FREE_HIST
+  auto* const h = static_cast<std::uint16_t*>(png_malloc_warn(png_ptr, 0x200u));
+  Field<std::uint16_t*>(png_ptr, kOffHist) = h;
+  if (h == nullptr) {
+    png_warning(png_ptr, "Insufficient memory for hIST chunk data.");
+    return;
+  }
+
+  for (int i = 0; i < info_ptr->num_palette; ++i) {
+    h[i] = hist[i];
+  }
+  info_ptr->valid |= 0x0040u;   // PNG_INFO_hIST
+  info_ptr->free_me |= 0x0008u; // PNG_FREE_HIST
+  info_ptr->hist = h;
 }
 
 /**
