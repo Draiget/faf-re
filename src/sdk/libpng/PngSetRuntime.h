@@ -80,13 +80,37 @@ static_assert(offsetof(png_unknown_chunk, location) == 0x10, "png_unknown_chunk:
 
 using png_unknown_chunkp = png_unknown_chunk*;
 
+// libpng png_text (this build: 16-byte record — the iTXt lang fields are not
+// compiled). png_free_data only touches .key.
+struct png_text
+{
+  std::int32_t  compression;   // +0x00
+  char*         key;           // +0x04
+  char*         text;          // +0x08
+  std::uint32_t text_length;   // +0x0C
+};
+using png_textp = png_text*;
+static_assert(sizeof(png_text) == 16, "png_text must be 16 bytes");
+
+// libpng png_sPLT_t (16-byte record). png_free_data touches .name and .entries.
+struct png_sPLT_t
+{
+  char*         name;          // +0x00
+  std::uint8_t  depth;         // +0x04
+  std::uint8_t  pad_05_08[3];  // +0x05
+  void*         entries;       // +0x08
+  std::int32_t  nentries;      // +0x0C
+};
+using png_sPLT_tp = png_sPLT_t*;
+static_assert(sizeof(png_sPLT_t) == 16, "png_sPLT_t must be 16 bytes");
+
 struct png_info_struct
 {
   std::uint32_t width;                       // +0x00  IHDR
   std::uint32_t height;                      // +0x04
   std::uint32_t valid;                       // +0x08
   std::uint32_t rowbytes;                    // +0x0C
-  std::uint8_t  pad_10_to_14[0x04];         // +0x10
+  std::uint8_t* palette;                     // +0x10  PLTE colour array
   std::uint16_t num_palette;                 // +0x14  PLTE entry count
   std::uint8_t  pad_16_to_18[0x02];         // +0x16
   std::uint8_t  bit_depth;                   // +0x18  IHDR
@@ -99,10 +123,15 @@ struct png_info_struct
   std::uint8_t  pad_1F_to_28[0x09];         // +0x1F
   float         gamma;                       // +0x28
   std::uint8_t  srgb_intent;                 // +0x2C
-  std::uint8_t  pad_2D_to_3C[0x0F];         // +0x2D
+  std::uint8_t  pad_2D_to_30[0x03];         // +0x2D
+  std::int32_t  num_text;                    // +0x30  tEXt/zTXt record count
+  std::uint8_t  pad_34_to_38[0x04];         // +0x34
+  png_textp     text;                        // +0x38  text-chunk array
   std::uint8_t  mod_time[8];                 // +0x3C  tIME png_time (year u16, m/d/h/m/s bytes)
   std::uint8_t  sig_bit[5];                  // +0x44  png_color_8 (r,g,b,gray,alpha)
-  std::uint8_t  pad_49_to_5A[0x11];         // +0x49
+  std::uint8_t  pad_49_to_4C[0x03];         // +0x49
+  std::uint8_t* trans;                       // +0x4C  tRNS alpha array
+  std::uint8_t  pad_50_to_5A[0x0A];         // +0x50
   std::uint8_t  background[0x0A];            // +0x5A  bKGD png_color_16 (index,r,g,b,gray)
   std::int32_t  x_offset;                    // +0x64  oFFs
   std::int32_t  y_offset;                    // +0x68
@@ -111,7 +140,8 @@ struct png_info_struct
   std::uint32_t x_pixels_per_unit;           // +0x70  pHYs
   std::uint32_t y_pixels_per_unit;           // +0x74
   std::uint8_t  phys_unit_type;              // +0x78
-  std::uint8_t  pad_79_to_80[0x07];         // +0x79
+  std::uint8_t   pad_79_to_7C[0x03];        // +0x79
+  std::uint16_t* hist;                       // +0x7C  hIST array
   float         x_white;                     // +0x80
   float         y_white;                     // +0x84
   float         x_red;                       // +0x88
@@ -120,11 +150,23 @@ struct png_info_struct
   float         y_green;                     // +0x94
   float         x_blue;                      // +0x98
   float         y_blue;                      // +0x9C
-  std::uint8_t       pad_A0_to_B8[0x18];    // +0xA0
+  char*         pcal_purpose;                // +0xA0  pCAL purpose string
+  std::uint8_t  pad_A4_to_AC[0x08];         // +0xA4
+  char*         pcal_units;                  // +0xAC  pCAL units string
+  char**        pcal_params;                 // +0xB0  pCAL parameter strings
+  std::uint8_t  pad_B4_to_B5[0x01];         // +0xB4
+  std::uint8_t  pcal_nparams;                // +0xB5  pCAL parameter count
+  std::uint8_t  pad_B6_to_B8[0x02];         // +0xB6
   std::uint32_t      free_me;               // +0xB8  bitmask of info-owned buffers to free
   png_unknown_chunk* unknown_chunks;        // +0xBC  stored unknown-chunk array
   std::uint32_t      unknown_chunks_num;    // +0xC0  count of stored unknown chunks
-  std::uint8_t       pad_C4_to_FC[0x38];    // +0xC4
+  char*         iccp_name;                    // +0xC4  iCCP profile name
+  std::uint8_t* iccp_profile;                 // +0xC8  iCCP profile data
+  std::uint8_t  pad_CC_to_D4[0x08];         // +0xCC
+  png_sPLT_tp   splt_palettes;                // +0xD4  sPLT suggested-palette array
+  std::int32_t  splt_palettes_num;            // +0xD8  sPLT record count
+  std::uint8_t  pad_DC_to_F8[0x1C];         // +0xDC
+  std::uint8_t** row_pointers;                // +0xF8  attached image rows
   std::int32_t  int_gamma;                   // +0xFC
   std::int32_t  int_x_white;                 // +0x100
   std::int32_t  int_y_white;                 // +0x104
@@ -143,7 +185,21 @@ static_assert(offsetof(png_info_struct, width)       == 0x00);
 static_assert(offsetof(png_info_struct, height)      == 0x04);
 static_assert(offsetof(png_info_struct, valid)       == 0x08);
 static_assert(offsetof(png_info_struct, rowbytes)    == 0x0C);
+static_assert(offsetof(png_info_struct, palette)     == 0x10);
 static_assert(offsetof(png_info_struct, num_palette) == 0x14);
+static_assert(offsetof(png_info_struct, num_text)    == 0x30);
+static_assert(offsetof(png_info_struct, text)        == 0x38);
+static_assert(offsetof(png_info_struct, trans)       == 0x4C);
+static_assert(offsetof(png_info_struct, hist)        == 0x7C);
+static_assert(offsetof(png_info_struct, pcal_purpose)  == 0xA0);
+static_assert(offsetof(png_info_struct, pcal_units)    == 0xAC);
+static_assert(offsetof(png_info_struct, pcal_params)   == 0xB0);
+static_assert(offsetof(png_info_struct, pcal_nparams)  == 0xB5);
+static_assert(offsetof(png_info_struct, iccp_name)     == 0xC4);
+static_assert(offsetof(png_info_struct, iccp_profile)  == 0xC8);
+static_assert(offsetof(png_info_struct, splt_palettes) == 0xD4);
+static_assert(offsetof(png_info_struct, splt_palettes_num) == 0xD8);
+static_assert(offsetof(png_info_struct, row_pointers)  == 0xF8);
 static_assert(offsetof(png_info_struct, bit_depth)   == 0x18);
 static_assert(offsetof(png_info_struct, color_type)  == 0x19);
 static_assert(offsetof(png_info_struct, filter_type) == 0x1B);

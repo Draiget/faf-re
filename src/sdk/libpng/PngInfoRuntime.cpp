@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "libpng/PngInfoRuntime.h"
+#include "libpng/PngMemRuntime.h"   // png_free / png_zfree
 #include "libpng/PngSetRuntime.h"   // png_info_struct field layout
 #include "libpng/PngStructRuntime.h"
 
@@ -53,6 +54,166 @@ extern "C" void png_info_init_3(png_infopp ptr_ptr, png_size_t png_info_struct_s
   }
 
   std::memset(info_ptr, 0, kPngInfoStructSize);
+}
+
+/**
+ * Address: 0x009E05DF (FUN_009E05DF)
+ * Mangled: png_free_data
+ *
+ * IDA signature:
+ * void __cdecl png_free_data(png_structp png_ptr, png_infop info_ptr,
+ *                            png_uint_32 mask, int num);
+ *
+ * What it does:
+ * Frees each info-owned optional-chunk buffer selected by `mask`, gated by the
+ * matching info_ptr->free_me ownership bit. num == -1 frees a whole array
+ * (recursing per element for the multi-record types text/sPLT/unknown); num >= 0
+ * frees a single element. After a buffer is freed its pointer is zeroed and the
+ * matching info_ptr->valid bit cleared. Finally the freed bits are removed from
+ * free_me — all of `mask` for a whole-array free, otherwise `mask & ~PNG_FREE_MUL`
+ * so the still-owned sibling records of a multi-record type keep their bit.
+ * Branch order follows the compiled binary (not the canonical png.c source).
+ */
+extern "C" void png_free_data(png_structp png_ptr, png_infop info_ptr,
+                              std::uint32_t mask, int num)
+{
+  if (png_ptr == nullptr || info_ptr == nullptr) {
+    return;
+  }
+
+  const std::uint32_t owned = mask & info_ptr->free_me;
+
+  // PNG_FREE_TEXT (0x4000) — tEXt/zTXt records (free each .key, then the array).
+  if ((owned & 0x4000u) != 0) {
+    if (num != -1) {
+      if (info_ptr->text != nullptr && info_ptr->text[num].key != nullptr) {
+        png_free(png_ptr, info_ptr->text[num].key);
+        info_ptr->text[num].key = nullptr;
+      }
+    } else {
+      for (int i = 0; i < info_ptr->num_text; ++i) {
+        png_free_data(png_ptr, info_ptr, 0x4000u, i);
+      }
+      png_free(png_ptr, info_ptr->text);
+      info_ptr->text = nullptr;
+      info_ptr->num_text = 0;
+    }
+  }
+
+  // PNG_FREE_TRNS (0x2000) — tRNS alpha array.
+  if ((owned & 0x2000u) != 0) {
+    png_free(png_ptr, info_ptr->trans);
+    info_ptr->valid &= ~0x0010u;  // PNG_INFO_tRNS
+    info_ptr->trans = nullptr;
+  }
+
+  // PNG_FREE_SCAL (0x100) — floating-point build frees no string, only clears valid.
+  if ((owned & 0x0100u) != 0) {
+    info_ptr->valid &= ~0x4000u;  // PNG_INFO_sCAL
+  }
+
+  // PNG_FREE_PCAL (0x80) — pCAL purpose/units strings + params array.
+  if ((owned & 0x0080u) != 0) {
+    png_free(png_ptr, info_ptr->pcal_purpose);
+    png_free(png_ptr, info_ptr->pcal_units);
+    info_ptr->pcal_purpose = nullptr;
+    info_ptr->pcal_units = nullptr;
+    if (info_ptr->pcal_params != nullptr) {
+      for (int i = 0; i < info_ptr->pcal_nparams; ++i) {
+        png_free(png_ptr, info_ptr->pcal_params[i]);
+        info_ptr->pcal_params[i] = nullptr;
+      }
+      png_free(png_ptr, info_ptr->pcal_params);
+      info_ptr->pcal_params = nullptr;
+    }
+    info_ptr->valid &= ~0x0400u;  // PNG_INFO_pCAL
+  }
+
+  // PNG_FREE_ICCP (0x10) — iCCP name + profile.
+  if ((owned & 0x0010u) != 0) {
+    png_free(png_ptr, info_ptr->iccp_name);
+    png_free(png_ptr, info_ptr->iccp_profile);
+    info_ptr->valid &= ~0x1000u;  // PNG_INFO_iCCP
+    info_ptr->iccp_name = nullptr;
+    info_ptr->iccp_profile = nullptr;
+  }
+
+  // PNG_FREE_SPLT (0x20) — sPLT records (free each .name + .entries, then the array).
+  if ((owned & 0x0020u) != 0) {
+    if (num != -1) {
+      if (info_ptr->splt_palettes != nullptr) {
+        png_free(png_ptr, info_ptr->splt_palettes[num].name);
+        png_free(png_ptr, info_ptr->splt_palettes[num].entries);
+        info_ptr->splt_palettes[num].name = nullptr;
+        info_ptr->splt_palettes[num].entries = nullptr;
+      }
+    } else {
+      if (info_ptr->splt_palettes_num != 0) {
+        for (int i = 0; i < info_ptr->splt_palettes_num; ++i) {
+          png_free_data(png_ptr, info_ptr, 0x0020u, i);
+        }
+        png_free(png_ptr, info_ptr->splt_palettes);
+        info_ptr->splt_palettes = nullptr;
+        info_ptr->splt_palettes_num = 0;
+      }
+      info_ptr->valid &= ~0x2000u;  // PNG_INFO_sPLT
+    }
+  }
+
+  // PNG_FREE_UNKN (0x200) — unknown-chunk records (free each .data, then the array).
+  if ((owned & 0x0200u) != 0) {
+    if (num != -1) {
+      if (info_ptr->unknown_chunks != nullptr) {
+        png_free(png_ptr, info_ptr->unknown_chunks[num].data);
+        info_ptr->unknown_chunks[num].data = nullptr;
+      }
+    } else {
+      if (info_ptr->unknown_chunks_num != 0) {
+        for (int i = 0; i < static_cast<int>(info_ptr->unknown_chunks_num); ++i) {
+          png_free_data(png_ptr, info_ptr, 0x0200u, i);
+        }
+        png_free(png_ptr, info_ptr->unknown_chunks);
+        info_ptr->unknown_chunks = nullptr;
+        info_ptr->unknown_chunks_num = 0;
+      }
+    }
+  }
+
+  // PNG_FREE_HIST (0x08) — hIST array.
+  if ((owned & 0x0008u) != 0) {
+    png_free(png_ptr, info_ptr->hist);
+    info_ptr->valid &= ~0x0040u;  // PNG_INFO_hIST
+    info_ptr->hist = nullptr;
+  }
+
+  // PNG_FREE_PLTE (0x1000) — internally-allocated palette (freed via png_zfree).
+  if ((owned & 0x1000u) != 0) {
+    png_zfree(png_ptr, info_ptr->palette);
+    info_ptr->valid &= ~0x0008u;  // PNG_INFO_PLTE
+    info_ptr->palette = nullptr;
+    info_ptr->num_palette = 0;
+  }
+
+  // PNG_FREE_ROWS (0x40) — attached image rows.
+  if ((owned & 0x0040u) != 0) {
+    if (info_ptr->row_pointers != nullptr) {
+      for (int j = 0; j < static_cast<int>(info_ptr->height); ++j) {
+        png_free(png_ptr, info_ptr->row_pointers[j]);
+        info_ptr->row_pointers[j] = nullptr;
+      }
+      png_free(png_ptr, info_ptr->row_pointers);
+      info_ptr->row_pointers = nullptr;
+    }
+    info_ptr->valid &= ~0x8000u;  // PNG_INFO_IDAT
+  }
+
+  // Drop the freed ownership bits. A single-element free (num != -1) must keep
+  // the multi-record types' bit (PNG_FREE_MUL = 0x4220) since siblings remain.
+  std::uint32_t clear = mask;
+  if (num != -1) {
+    clear &= 0xFFFFBDDFu;  // ~PNG_FREE_MUL
+  }
+  info_ptr->free_me &= ~clear;
 }
 
 /**
