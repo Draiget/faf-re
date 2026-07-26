@@ -451,6 +451,8 @@
     <ClCompile Include="moho\path\PathTablesTypeInfo.cpp" />
     <ClCompile Include="moho\entity\SScrollerTypeInfo.cpp" />
     <ClCompile Include="moho\render\SDecalInfoTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\CPlatoonTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\core\UserUnitTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EAiAttackerEventTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EAiNavigatorEventTypeInfo.cpp" />
@@ -1838,6 +1840,8 @@
     <ClInclude Include="moho\path\PathTablesTypeInfo.h" />
     <ClInclude Include="moho\entity\SScrollerTypeInfo.h" />
     <ClInclude Include="moho\render\SDecalInfoTypeInfo.h" />
+    <ClInclude Include="moho\sim\CPlatoonTypeInfo.h" />
+    <ClInclude Include="moho\unit\core\UserUnitTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTargetTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTransportCommandOps.h" />
     <ClInclude Include="moho\ai\EAiAttackerEventTypeInfo.h" />

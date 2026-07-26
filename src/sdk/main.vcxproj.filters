@@ -2502,6 +2502,12 @@
     <ClCompile Include="moho\render\SDecalInfoTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\CPlatoonTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UserUnitTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5644,6 +5650,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\SDecalInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CPlatoonTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UserUnitTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiTargetTypeInfo.h">
