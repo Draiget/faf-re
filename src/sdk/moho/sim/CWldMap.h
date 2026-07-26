@@ -338,7 +338,7 @@ namespace moho
      * Copies playable map bounds from terrain-res internal storage into `outRect`
      * and returns `&outRect`.
      */
-    [[nodiscard]] const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const;
+    [[nodiscard]] virtual const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const;
 
     /**
      * Address: 0x008A6DA0 (FUN_008A6DA0, ?SetPlayableMapRect@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
