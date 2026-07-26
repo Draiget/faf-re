@@ -5,6 +5,7 @@
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
+#include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
@@ -451,10 +452,15 @@ namespace moho
     RRuleGameRulesBlueprintMap mEmitterBlueprints;    // +0x90
     RRuleGameRulesBlueprintMap mBeamBlueprints;       // +0x9C
     RRuleGameRulesBlueprintMap mTrailBlueprints;      // +0xA8
-    void* mUnknownB4;                                 // +0xB4
-    RBlueprint** mBlueprintByOrdinalBegin;            // +0xB8
-    RBlueprint** mBlueprintByOrdinalEnd;              // +0xBC
-    RBlueprint** mBlueprintByOrdinalCapacity;         // +0xC0
+    /**
+     * Blueprint registry indexed by ordinal (the order `RegisterUnitBlueprint`
+     * and friends first saw each blueprint). The binary hands `rules + 0xB4`
+     * straight to `msvc8::vector<RBlueprint*>::push_back` — see the
+     * `add ecx, 0B4h` at 0x00531FE9 in `func_CreateRUnitBlueprint` — so the
+     * `{proxy, first, last, end}` quad at +0xB4..+0xC0 is one whole legacy
+     * vector object, not four independent lanes.
+     */
+    msvc8::vector<RBlueprint*> mBlueprintsByOrdinal;  // +0xB4
     void* mEntityCategoryLookup;                      // +0xC4
     void* mPendingBlueprintReloadNext;                // +0xC8
     void* mPendingBlueprintReloadPrev;                // +0xCC
@@ -491,12 +497,11 @@ namespace moho
     offsetof(RRuleGameRulesImpl, mTrailBlueprints) == 0xA8, "RRuleGameRulesImpl::mTrailBlueprints offset must be 0xA8"
   );
   static_assert(
-    offsetof(RRuleGameRulesImpl, mBlueprintByOrdinalBegin) == 0xB8,
-    "RRuleGameRulesImpl::mBlueprintByOrdinalBegin offset must be 0xB8"
+    offsetof(RRuleGameRulesImpl, mBlueprintsByOrdinal) == 0xB4,
+    "RRuleGameRulesImpl::mBlueprintsByOrdinal offset must be 0xB4"
   );
   static_assert(
-    offsetof(RRuleGameRulesImpl, mBlueprintByOrdinalEnd) == 0xBC,
-    "RRuleGameRulesImpl::mBlueprintByOrdinalEnd offset must be 0xBC"
+    sizeof(msvc8::vector<RBlueprint*>) == 0x10, "msvc8::vector<RBlueprint*> size must be 0x10"
   );
   static_assert(
     offsetof(RRuleGameRulesImpl, mEntityCategoryLookup) == 0xC4,

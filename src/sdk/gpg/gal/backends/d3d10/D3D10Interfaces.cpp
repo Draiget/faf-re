@@ -2769,7 +2769,6 @@ namespace gpg::gal
       entry->output_ = output;
       entry->modes_.clear();
       entry->outputDesc_ = {};
-      entry->outputDescPad_ = 0U;
       if (output != nullptr) {
         static_cast<void>(output->GetDesc(&entry->outputDesc_));
       }
@@ -2805,6 +2804,8 @@ namespace gpg::gal
      */
     void AppendDisplayModeToAdapterModeEntry(AdapterModeD3D10& entry, const DXGI_MODE_DESC& mode)
     {
+      // push_back's capacity-full path is `msvc8::vector<DXGI_MODE_DESC>::insert`
+      // (FUN_008F6A50), reached through insert(end(),val) at FUN_008F6FB0.
       entry.modes_.push_back(mode);
     }
 
@@ -2831,6 +2832,8 @@ namespace gpg::gal
      */
     void AppendBackendAdapter(msvc8::vector<AdapterD3D10>& adapters, const AdapterD3D10& adapter)
     {
+      // push_back's capacity-full path is `msvc8::vector<AdapterD3D10>::insert`
+      // (FUN_00900630), reached through insert(end(),val) at FUN_00900960.
       adapters.push_back(adapter);
     }
 
@@ -4928,57 +4931,45 @@ namespace gpg::gal
    */
   int AdapterD3D10::ProbeOutputsAndModes()
   {
-    modes_.clear();
-    if (dxgiAdapter_ == nullptr) {
-      return E_POINTER;
-    }
-
     IDXGIOutput* output = nullptr;
-    HRESULT result = dxgiAdapter_->EnumOutputs(0U, &output);
+    const HRESULT result = dxgiAdapter_->EnumOutputs(0U, &output);
     if (result == DXGI_ERROR_NOT_FOUND) {
       return 0;
     }
 
-    for (unsigned int outputIndex = 0U; result >= 0; ++outputIndex) {
-      DXGI_OUTPUT_DESC outputDesc{};
-      static_cast<void>(output->GetDesc(&outputDesc));
+    if (result >= 0) {
+      // One entry per probe, built before the format loop and appended once
+      // after it (0x008F7D8C-0x008F7DA2 sets it up, 0x008F7E85 pushes it).
+      // `format_` is left at zero here — the binary never writes the probed
+      // format into the entry; the entry describes the *output*, and every
+      // format's modes accumulate into its single `modes_` lane.
+      AdapterModeD3D10 modeEntry{};
+      static_cast<void>(InitializeAdapterModeEntry(&modeEntry, 0U, output));
 
       for (const DXGI_FORMAT format : kAdapterProbeFormats) {
         UINT modeCount = 0U;
-        const HRESULT countResult = output->GetDisplayModeList(format, 0U, &modeCount, nullptr);
-        if (countResult == DXGI_ERROR_NOT_FOUND) {
+        if (output->GetDisplayModeList(format, 0U, &modeCount, nullptr) == DXGI_ERROR_NOT_FOUND) {
           break;
         }
 
-        AdapterModeD3D10 modeEntry{};
-        static_cast<void>(InitializeAdapterModeEntry(&modeEntry, static_cast<std::uint32_t>(format), output));
-        modeEntry.outputDesc_ = outputDesc;
-        modeEntry.outputDescPad_ = 0U;
-
-        if ((countResult >= 0) && (modeCount != 0U)) {
-          // Mirror the binary's scratch-buffer-then-per-element-push path:
-          // DXGI fills a caller-owned scratch array via `GetDisplayModeList`
-          // and each entry is appended through the recovered per-element
-          // push lane (`AppendDisplayModeToAdapterModeEntry`). The scratch
-          // buffer is released before the next format probe.
-          auto* const scratch =
-            static_cast<DXGI_MODE_DESC*>(::operator new(static_cast<std::size_t>(modeCount) * sizeof(DXGI_MODE_DESC)));
-          const HRESULT fillResult = output->GetDisplayModeList(format, 0U, &modeCount, scratch);
-          if (fillResult >= 0) {
-            for (UINT modeIndex = 0U; modeIndex < modeCount; ++modeIndex) {
-              AppendDisplayModeToAdapterModeEntry(modeEntry, scratch[modeIndex]);
-            }
+        // The scratch buffer is allocated unconditionally on the count
+        // result (0x008F7DFD-0x008F7E0C, including the `modeCount == 0`
+        // case) and released before the next format probe; only the second
+        // GetDisplayModeList's HRESULT gates the append loop (0x008F7E2A).
+        auto* const scratch =
+          static_cast<DXGI_MODE_DESC*>(::operator new(static_cast<std::size_t>(modeCount) * sizeof(DXGI_MODE_DESC)));
+        if (output->GetDisplayModeList(format, 0U, &modeCount, scratch) >= 0) {
+          for (UINT modeIndex = 0U; modeIndex < modeCount; ++modeIndex) {
+            AppendDisplayModeToAdapterModeEntry(modeEntry, scratch[modeIndex]);
           }
-          ::operator delete[](scratch);
         }
-
-        AppendAdapterModeEntry(modes_, modeEntry);
+        ::operator delete[](scratch);
       }
 
-      result = dxgiAdapter_->EnumOutputs(outputIndex + 1U, &output);
+      AppendAdapterModeEntry(modes_, modeEntry);
     }
 
-    return (result == DXGI_ERROR_NOT_FOUND) ? 0 : result;
+    return result;
   }
 
   /**
@@ -6722,17 +6713,29 @@ namespace gpg::gal
    *
    * What it does:
    * Copies startup device-context payload into recovered D3D10 backend context
-   * lanes and records current thread ownership.
+   * lanes, records current thread ownership, and runs the backend startup
+   * chain.
+   *
+   * The startup call is not optional decoration: `func_CreateDeviceD3D`
+   * publishes the new backend into the `sDeviceD3D` singleton
+   * (`mov sDeviceD3D, esi` at 0x008E6C78) and immediately calls
+   * `gpg::gal::DeviceD3D10::Setup(context)` at 0x008E6C7E with the requested
+   * `DeviceContext` in edi. Without it the whole D3D10 bring-up chain —
+   * `SetupDXGIDevice` -> `AdapterD3D10::ProbeOutputsAndModes` -> the adapter
+   * and display-mode append lanes — is never entered.
    */
-  void InitializeDeviceD3D10Backend(Device* const device, const DeviceContext* const context)
+  void InitializeDeviceD3D10Backend(Device* const device, DeviceContext* const context)
   {
     if ((device == nullptr) || (context == nullptr)) {
       return;
     }
 
-    auto* const backend = AsDeviceD3D10BackendObject(reinterpret_cast<DeviceD3D10*>(device));
+    auto* const deviceD3D10 = reinterpret_cast<DeviceD3D10*>(device);
+    auto* const backend = AsDeviceD3D10BackendObject(deviceD3D10);
     backend->currentThreadId_ = static_cast<int>(::GetCurrentThreadId());
     backend->deviceContext_ = *context;
+
+    deviceD3D10->Setup(context);
   }
 
   /**

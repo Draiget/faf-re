@@ -1930,6 +1930,92 @@ namespace msvc8
          * `_Tmp` by the movss block at 0x0071BEFE-0x0071BF2D. Emitted via
          * out.push_back(sample) in Moho::CInfluenceMap::GetThreatsAroundPosition
          * (CInfluenceMap.cpp:4906)).
+         * Address: 0x00535D60 (FUN_00535D60, msvc8::vector<Moho::RBlueprint*>::_Insert_n
+         * grow lane for the 4-byte pointer element (`sar 2` stride, max_size 0x3FFFFFFF
+         * = 0xFFFFFFFF/4 loaded at 0x00535D96, overflow test `max_size() - size() < 1`
+         * then the `vector<T> too long` throw lane FUN_0052EC30 at 0x00535DA2).
+         * `_Count` is folded to the constant 1 (`add ecx, 1` / `cmp edx, ecx` at
+         * 0x00535DB7) because both of its callers are single-element lanes: MSVC8's
+         * push_back at FUN_005347A0, which reaches it at 0x005347DC on the
+         * capacity-full path, and the `insert(iterator, const T&)` overload of the
+         * same instantiation — an IDA-unclassified chunk at 0x005355E0-0x00535619
+         * that computes `_Off`, calls this lane at 0x00535607, and returns
+         * `begin() + _Off`. Growth is the 1.5x lane with clamp-to-zero at
+         * 0x00535DC2-0x00535DDD, and the value arrives by pointer in eax
+         * (`mov ecx, [eax]` at 0x00535D63). Emitted via
+         * rules.mBlueprintsByOrdinal.push_back(...) in moho::AppendBlueprintOrdinal
+         * (Sim.cpp:14253), whose registry lives at `rules + 0xB4` — the operand of
+         * `add ecx, 0B4h` at 0x00531FE9 in func_CreateRUnitBlueprint)
+         * Address: 0x006D1A90 (FUN_006D1A90, msvc8::vector<moho::SUpgradeNotifyPair>::_Insert_n
+         * grow lane for the 8-byte `{mSourceId, mDestId}` element (`sar 3` stride,
+         * max_size 0x1FFFFFFF = 0xFFFFFFFF/8 at 0x006D1AE6, overflow throw through
+         * FUN_006D1D30). `_Count` is folded to the constant 1 (`cmp edi, 1` at
+         * 0x006D1AED, `mov ecx, 1` at 0x006D1BB6) — the element is copied two dwords
+         * at a time by FUN_006D2730 with no destroy pass, so the element is trivially
+         * copyable. Its live caller is MSVC8's push_back at FUN_006D1960, which skips
+         * the iterator-returning wrapper (FUN_006D1A20, itself xref-less) and tail-calls
+         * this lane directly at 0x006D19BA because push_back discards the iterator.
+         * Emitted via globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
+         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
+         * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
+         * Address: 0x006DC600 (FUN_006DC600, msvc8::vector<moho::EntityCategorySet>::_Insert_n
+         * grow-and-fill lane for the 0x28-byte non-trivial element (stride divide by
+         * the 66666667h/`sar 4` magic pair, max_size 0x6666666 = 0xFFFFFFFF/40 at
+         * 0x006DC68B, overflow throw through FUN_006DC930 which pushes the
+         * `vector<T> too long` literal at 0x006DC950). `_Count` is a live parameter
+         * with a `test esi, esi` zero early-out at 0x006DC665. Element copies route
+         * through the EntityCategorySet copy path — the inlined temp ctor at
+         * 0x006DC61B copies mUniverse (+0x00), the first-word index (+0x08) and deep-
+         * copies the fastvector_n<uint,2> word lane (+0x10..+0x28) — and the old range
+         * is torn down by FUN_006DEB80 before the buffer is freed, never a raw byte
+         * copy. Two binary lanes reach it: push_back (FUN_006DB010) through
+         * insert(end(),1,val) (FUN_006DBAE0), and the by-value
+         * resize(n, EntityCategorySet) emission FUN_006DC4E0 at 0x006DC554. Emitted via
+         * storage->resize(count, zeroFill) in
+         * gpg::RVectorType<moho::EntityCategorySet>::SetCount
+         * (EntityCategorySetVectorReflection.cpp:467), a slot of the reflection type
+         * that register_EntityCategorySetVectorType actually constructs)
+         * Address: 0x008F6A50 (FUN_008F6A50, msvc8::vector<DXGI_MODE_DESC>::_Insert_n
+         * grow lane for the 0x1C-byte POD element (stride divide by the
+         * 92492493h/`add`/`sar 4` magic triple at 0x008F6A90, max_size 0x9249249 =
+         * 0xFFFFFFFF/28 at 0x008F6ACF, overflow throw through FUN_008F6890 which
+         * pushes the `vector<T> too long` literal). `_Count` is a live parameter with
+         * a zero early-out at 0x008F6AA8, and the 28-byte value is copied into a local
+         * `_Tmp` by the `rep movsd` with ecx=7 at 0x008F6A73. Element moves are raw
+         * byte copies with no destroy pass, so the element is trivially copyable.
+         * Reached from insert(end(),val) (FUN_008F6FB0) under push_back (FUN_008F7230).
+         * Emitted via entry.modes_.push_back(mode) in
+         * gpg::gal::AppendDisplayModeToAdapterModeEntry (D3D10Interfaces.cpp:2809),
+         * whose owner lane is AdapterModeD3D10::modes_ at +0x64)
+         * Address: 0x00900630 (FUN_00900630, msvc8::vector<gpg::gal::AdapterD3D10>::_Insert_n
+         * grow lane for the 0x13C-byte polymorphic element (stride divide by the
+         * 67B23A55h/`sar 7` magic pair at 0x0090069E with explicit `imul reg, 13Ch`
+         * multiply-back at 0x009007FB, max_size 0xCF6474 = 0xFFFFFFFF/316 at
+         * 0x009006D8 — IDA misprints that literal as an `__xc_a` offset — overflow
+         * throw through FUN_008FAA50). `_Count` is a live parameter with a zero
+         * early-out at 0x009006B4. The local `_Tmp` is a real copy-construct: it
+         * stores `??_7AdapterD3D10@gal@gpg@@6B@` at 0x00900662, copies the 0x124-byte
+         * description block, copy-constructs the `modes_` member through FUN_008FF220,
+         * and is torn down by ~AdapterD3D10 at 0x00900939 — and the old range is
+         * destroyed by FUN_008FA890 before the buffer is freed. Reached from
+         * insert(end(),val) (FUN_00900960) under push_back (FUN_009009D0). Emitted via
+         * adapters.push_back(adapter) in gpg::gal::AppendBackendAdapter
+         * (D3D10Interfaces.cpp:2837), whose owner lane is
+         * DeviceD3D10BackendObject::adapters_ at +0x94)
+         * Address: 0x0093FEB0 (FUN_0093FEB0, msvc8::vector<gpg::gal::EffectMacro>::_Insert_n
+         * grow lane for the 0x3C-byte element (stride divide by the
+         * 88888889h/`add`/`sar 5` magic triple at 0x0093FEF3 with the
+         * `shl ecx,4; sub ecx,ebx; lea edx,[eax+ecx*4]` multiply-back at 0x00940059,
+         * max_size 0x4444444 = 0xFFFFFFFF/60 at 0x0093FF30, overflow throw through
+         * FUN_004331F0). `_Count` is a live parameter with a zero early-out at
+         * 0x0093FF0B. The element is polymorphic and owns two msvc8::strings
+         * (vftable +0x00, keyText_ +0x04, valueText_ +0x20), so the local `_Tmp` is
+         * copy-constructed by FUN_008FA9A0 at 0x0093FEDD and destroyed by FUN_0093F710
+         * at 0x0094019C, and the old range is destroyed by FUN_004331C0 before the
+         * buffer is freed. Reached from insert(end(),val) (FUN_009401C0) under
+         * push_back (FUN_00940230). Emitted via vec->push_back(source) in
+         * gpg::gal::PushBackEffectMacroIntoLane (ContextInterfaces.cpp:266), whose
+         * owner lane is EffectContext's macro vector at +0x54)
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`

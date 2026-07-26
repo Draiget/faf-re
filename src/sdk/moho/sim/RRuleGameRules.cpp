@@ -1853,17 +1853,14 @@ namespace moho
         return;
       }
 
-      const std::size_t ordinalCount = (rules.mBlueprintByOrdinalBegin && rules.mBlueprintByOrdinalEnd &&
-                                        rules.mBlueprintByOrdinalEnd >= rules.mBlueprintByOrdinalBegin)
-        ? static_cast<std::size_t>(rules.mBlueprintByOrdinalEnd - rules.mBlueprintByOrdinalBegin)
-        : 0u;
+      const std::size_t ordinalCount = rules.mBlueprintsByOrdinal.size();
 
       for (std::size_t ordinal = 0; ordinal < ordinalCount; ++ordinal) {
         LuaPlus::LuaObject sourceEntry = sourceBlueprints.GetByIndex(static_cast<int32_t>(ordinal));
         LuaPlus::LuaObject copiedEntry = CopyLuaObjectToState(sourceEntry, rootState);
         destinationBlueprints.SetObject(static_cast<int32_t>(ordinal), copiedEntry);
 
-        RBlueprint* const blueprint = rules.mBlueprintByOrdinalBegin[ordinal];
+        RBlueprint* const blueprint = rules.mBlueprintsByOrdinal[ordinal];
         if (blueprint) {
           const char* const blueprintId = blueprint->mBlueprintId.c_str();
           if (blueprintId && *blueprintId) {
@@ -1902,20 +1899,19 @@ namespace moho
 
     void DestroyBlueprintObjectsFromOrdinalArray(RRuleGameRulesImpl& rules) noexcept
     {
-      if (rules.mBlueprintByOrdinalBegin != nullptr && rules.mBlueprintByOrdinalEnd != nullptr &&
-          rules.mBlueprintByOrdinalEnd >= rules.mBlueprintByOrdinalBegin) {
-        for (RBlueprint** it = rules.mBlueprintByOrdinalBegin; it != rules.mBlueprintByOrdinalEnd; ++it) {
-          if (*it != nullptr) {
-            delete *it;
-            *it = nullptr;
-          }
+      for (RBlueprint*& slot : rules.mBlueprintsByOrdinal) {
+        if (slot != nullptr) {
+          delete slot;
+          slot = nullptr;
         }
       }
 
-      ::operator delete(static_cast<void*>(rules.mBlueprintByOrdinalBegin));
-      rules.mBlueprintByOrdinalBegin = nullptr;
-      rules.mBlueprintByOrdinalEnd = nullptr;
-      rules.mBlueprintByOrdinalCapacity = nullptr;
+      // The registry owns its buffer and the binary releases it right here,
+      // ahead of the remaining member teardown. Drain it through a scoped
+      // swap so the vector's own deallocation lane runs at that point,
+      // instead of a hand-rolled `operator delete` on the begin lane.
+      msvc8::vector<RBlueprint*> drained;
+      drained.swap(rules.mBlueprintsByOrdinal);
     }
 
     void DestroyBlueprintObjectsFromMap(RRuleGameRulesBlueprintMap& map) noexcept
@@ -2052,10 +2048,7 @@ namespace moho
     , mEmitterBlueprints{}
     , mBeamBlueprints{}
     , mTrailBlueprints{}
-    , mUnknownB4(nullptr)
-    , mBlueprintByOrdinalBegin(nullptr)
-    , mBlueprintByOrdinalEnd(nullptr)
-    , mBlueprintByOrdinalCapacity(nullptr)
+    , mBlueprintsByOrdinal()
     , mEntityCategoryLookup(nullptr)
     , mPendingBlueprintReloadNext(nullptr)
     , mPendingBlueprintReloadPrev(nullptr)
@@ -2425,11 +2418,7 @@ namespace moho
    */
   int RRuleGameRulesImpl::AssignNextOrdinal()
   {
-    if (!mBlueprintByOrdinalBegin) {
-      return 0;
-    }
-
-    return static_cast<int>(mBlueprintByOrdinalEnd - mBlueprintByOrdinalBegin);
+    return static_cast<int>(mBlueprintsByOrdinal.size());
   }
 
   /**
@@ -2440,16 +2429,11 @@ namespace moho
    */
   RBlueprint* RRuleGameRulesImpl::GetBlueprintFromOrdinal(const int ordinal) const
   {
-    if (ordinal < 0 || !mBlueprintByOrdinalBegin) {
+    if (ordinal < 0 || static_cast<std::size_t>(ordinal) >= mBlueprintsByOrdinal.size()) {
       return nullptr;
     }
 
-    const std::ptrdiff_t count = mBlueprintByOrdinalEnd - mBlueprintByOrdinalBegin;
-    if (ordinal >= count) {
-      return nullptr;
-    }
-
-    return mBlueprintByOrdinalBegin[ordinal];
+    return mBlueprintsByOrdinal[static_cast<std::size_t>(ordinal)];
   }
 
   /**
@@ -2719,14 +2703,11 @@ namespace moho
     // Preserve footprint-table contribution (binary hashes SRuleFootprintsBlueprint here).
     context->Update(&mFootprints, sizeof(mFootprints));
 
-    std::uint32_t blueprintCount = 0u;
-    if (mBlueprintByOrdinalBegin && mBlueprintByOrdinalEnd && mBlueprintByOrdinalEnd >= mBlueprintByOrdinalBegin) {
-      blueprintCount = static_cast<std::uint32_t>(mBlueprintByOrdinalEnd - mBlueprintByOrdinalBegin);
-    }
+    auto blueprintCount = static_cast<std::uint32_t>(mBlueprintsByOrdinal.size());
     context->Update(&blueprintCount, sizeof(blueprintCount));
 
     for (std::uint32_t ordinal = 0; ordinal < blueprintCount; ++ordinal) {
-      RBlueprint* const blueprint = mBlueprintByOrdinalBegin[ordinal];
+      RBlueprint* const blueprint = mBlueprintsByOrdinal[ordinal];
       const char* id = nullptr;
       if (blueprint) {
         id = blueprint->mBlueprintId.c_str();

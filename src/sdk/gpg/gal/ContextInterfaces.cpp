@@ -261,6 +261,8 @@ namespace gpg::gal
         )
         {
             auto* const vec = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime);
+            // push_back's capacity-full path is `msvc8::vector<EffectMacro>::insert`
+            // (FUN_0093FEB0), reached through insert(end(),val) at FUN_009401C0.
             vec->push_back(source);
         }
 

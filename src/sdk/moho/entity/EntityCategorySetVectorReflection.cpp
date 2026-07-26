@@ -462,6 +462,8 @@ void gpg::RVectorType<moho::EntityCategorySet>::SetCount(void* const obj, const 
   }
 
   const moho::EntityCategorySet zeroFill{};
+  // resize's growth path is `msvc8::vector<EntityCategorySet>::insert` (FUN_006DC600),
+  // reached through the binary's by-value resize at FUN_006DC4E0.
   storage->resize(static_cast<std::size_t>(count), zeroFill);
 }
 
