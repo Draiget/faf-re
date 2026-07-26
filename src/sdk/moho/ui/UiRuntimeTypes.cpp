@@ -2811,6 +2811,36 @@ namespace
      * Lua callback and notifies the previous keyboard-focus owner.
      */
     void OnMouseMove(wxEventRuntime& mouseEvent);
+
+    /**
+     * Address: 0x007A4FD0 (FUN_007A4FD0)
+     *
+     * wxEvent-table sink installed at `0x00F5A488` for the
+     * `CMauiWxEventMapper` event table. Routes one wx key-release event to the
+     * keyboard-focus control (or the top input-capture control) as a typed
+     * `MET_KeyUp` `SMauiEventData`.
+     */
+    void OnKeyUp(wxEventRuntime& keyEvent);
+
+    /**
+     * Address: 0x007A4EF0 (FUN_007A4EF0)
+     *
+     * wxEvent-table sink installed at `0x00F5A488` for the
+     * `CMauiWxEventMapper` event table. Routes one wx key-press event to the
+     * keyboard-focus control (or the top input-capture control) as a typed
+     * `MET_KeyDown` `SMauiEventData`.
+     */
+    void OnKeyDown(wxEventRuntime& keyEvent);
+
+    /**
+     * Address: 0x007A50B0 (FUN_007A50B0)
+     *
+     * wxEvent-table sink installed at `0x00F5A488` for the
+     * `CMauiWxEventMapper` event table. Routes one wx translated-character
+     * event to the keyboard-focus control (or the top input-capture control)
+     * as a typed `MET_Char` `SMauiEventData`.
+     */
+    void OnChar(wxEventRuntime& keyEvent);
   };
 
   using CMauiWxEventMapperRuntimeView = CMauiWxEventMapperRuntime;
@@ -10354,6 +10384,142 @@ void CMauiWxEventMapperRuntime::OnMouseMove(wxEventRuntime& mouseEventRef)
   UnlinkFocusControlSentinel(&trackingSentinel);
 }
 
+namespace
+{
+  /**
+   * Layout view over `wxKeyEvent` fields beyond the `wxEvent` base. Field
+   * offsets are confirmed by the FUN_007A4EF0 asm reads at `[esi+0x28]`
+   * (key code), `[esi+0x2C..0x2E]` (control/shift/alt flag bytes),
+   * `[esi+0x34]` (raw key code) and the `[esi+0x1C]` skip byte in the shared
+   * `wxEvent` header.
+   */
+  struct WxKeyEventDispatchRuntimeView
+  {
+    std::uint8_t mWxEventBase[0x1C]{}; // +0x00 wxEventRuntime header
+    std::uint8_t mSkipped = 0;         // +0x1C wxEvent::m_skipped
+    std::uint8_t mReserved1D[0x0B]{};  // +0x1D
+    std::int32_t mKeyCode = 0;         // +0x28
+    std::uint8_t mControlDown = 0;     // +0x2C
+    std::uint8_t mShiftDown = 0;       // +0x2D
+    std::uint8_t mAltDown = 0;         // +0x2E
+    std::uint8_t mMetaDown = 0;        // +0x2F
+    std::int32_t mScanCode = 0;        // +0x30
+    std::int32_t mRawKeyCode = 0;      // +0x34
+  };
+  static_assert(
+    offsetof(WxKeyEventDispatchRuntimeView, mSkipped) == 0x1C,
+    "WxKeyEventDispatchRuntimeView::mSkipped offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(WxKeyEventDispatchRuntimeView, mKeyCode) == 0x28,
+    "WxKeyEventDispatchRuntimeView::mKeyCode offset must be 0x28"
+  );
+  static_assert(
+    offsetof(WxKeyEventDispatchRuntimeView, mControlDown) == 0x2C,
+    "WxKeyEventDispatchRuntimeView::mControlDown offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(WxKeyEventDispatchRuntimeView, mRawKeyCode) == 0x34,
+    "WxKeyEventDispatchRuntimeView::mRawKeyCode offset must be 0x34"
+  );
+
+  /**
+   * Shared body of the three `CMauiWxEventMapper` keyboard event-table sinks
+   * (FUN_007A4EF0 / FUN_007A4FD0 / FUN_007A50B0). The retail bodies are
+   * byte-identical apart from the `EMauiEventType` constant they stamp into
+   * the payload, so the mechanics live here and each sink supplies its type.
+   *
+   * Keyboard events carry no cursor position, so the payload's mouse lane is
+   * stamped with the binary's `-1.0f` sentinel (`flt_E4F6E8`) and the wheel
+   * lanes are zeroed. Delivery order is keyboard focus first; when no focus
+   * control exists the top input-capture control receives the event instead.
+   * `wxEvent::m_skipped` is set whenever nothing consumed the event, letting
+   * wx continue its own propagation.
+   */
+  void DispatchMauiKeyEventToFocusOrCapture(
+    wxEventRuntime& keyEventRef,
+    const moho::EMauiEventType eventType
+  )
+  {
+    auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
+
+    moho::SMauiEventData eventPayload{};
+    eventPayload.mEventType = eventType;
+    eventPayload.mMousePos.x = -1.0f;
+    eventPayload.mMousePos.y = -1.0f;
+    eventPayload.mWheelRotation = 0;
+    eventPayload.mWheelData = 0;
+    eventPayload.mKeyCode = keyEvent->mKeyCode;
+    eventPayload.mRawKeyCode = keyEvent->mRawKeyCode;
+
+    std::uint32_t modifierBits = 0u;
+    if (keyEvent->mShiftDown != 0)   { modifierBits |= moho::MEM_Shift; }
+    if (keyEvent->mControlDown != 0) { modifierBits |= moho::MEM_Ctrl; }
+    if (keyEvent->mAltDown != 0)     { modifierBits |= moho::MEM_Alt; }
+    eventPayload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
+    eventPayload.mSource = nullptr;
+
+    if (moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl();
+        focused != nullptr) {
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(focused);
+      if (focused->HandleEvent(eventPayload)) {
+        return;
+      }
+
+      keyEvent->mSkipped = 1;
+      return;
+    }
+
+    moho::CMauiControl* const captureControl = ResolveTopInputCaptureControl();
+    if (captureControl == nullptr) {
+      keyEvent->mSkipped = 1;
+      return;
+    }
+
+    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(captureControl);
+    (void)captureControl->HandleEvent(eventPayload);
+  }
+} // namespace
+
+/**
+ * Address: 0x007A4FD0 (FUN_007A4FD0)
+ *
+ * What it does:
+ * `wxEventTableEntry` key-release sink at `0x00F5A488`: delivers one
+ * `MET_KeyUp` event to the keyboard-focus control, falling back to the top
+ * input-capture control.
+ */
+void CMauiWxEventMapperRuntime::OnKeyUp(wxEventRuntime& keyEvent)
+{
+  DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyUp);
+}
+
+/**
+ * Address: 0x007A4EF0 (FUN_007A4EF0)
+ *
+ * What it does:
+ * `wxEventTableEntry` key-press sink at `0x00F5A488`: delivers one
+ * `MET_KeyDown` event to the keyboard-focus control, falling back to the top
+ * input-capture control.
+ */
+void CMauiWxEventMapperRuntime::OnKeyDown(wxEventRuntime& keyEvent)
+{
+  DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyDown);
+}
+
+/**
+ * Address: 0x007A50B0 (FUN_007A50B0)
+ *
+ * What it does:
+ * `wxEventTableEntry` translated-character sink at `0x00F5A488`: delivers one
+ * `MET_Char` event to the keyboard-focus control, falling back to the top
+ * input-capture control.
+ */
+void CMauiWxEventMapperRuntime::OnChar(wxEventRuntime& keyEvent)
+{
+  DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_Char);
+}
+
 // wxEventTableEntry sink for `Moho::CMauiWxEventMapper`.
 //
 // The binary places one `wxEventTable` array starting at `0x00F5A488` whose
@@ -10375,10 +10541,16 @@ namespace
   struct CMauiWxEventMapperEventTableBindings
   {
     CMauiWxEventMapperMouseEventFnPtr onMouseMove;
+    CMauiWxEventMapperMouseEventFnPtr onKeyUp;
+    CMauiWxEventMapperMouseEventFnPtr onKeyDown;
+    CMauiWxEventMapperMouseEventFnPtr onChar;
   };
 
   const CMauiWxEventMapperEventTableBindings kCMauiWxEventMapperEventTableBindings = {
     &CMauiWxEventMapperRuntime::OnMouseMove,
+    &CMauiWxEventMapperRuntime::OnKeyUp,
+    &CMauiWxEventMapperRuntime::OnKeyDown,
+    &CMauiWxEventMapperRuntime::OnChar,
   };
 
   [[nodiscard]] const void* PublishCMauiWxEventMapperEventTableBindings() noexcept
