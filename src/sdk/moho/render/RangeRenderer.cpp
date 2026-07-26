@@ -19,6 +19,7 @@
 #include "moho/entity/UserEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
+#include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -41,16 +42,6 @@ namespace
   constexpr float kRangeAngleStepRadians = 0.13962634f; // 2*pi/45
   constexpr float kRangeMaxMapHeight = 256.0f;
   constexpr float kRangeMinMapHeight = -256.0f;
-  constexpr std::size_t kRangeRingHullSampleCount = 24u;
-
-  struct RangeRingHullSampleDirection
-  {
-    float cosTheta;
-    float sinTheta;
-  };
-
-  static_assert(sizeof(RangeRingHullSampleDirection) == 0x08, "RangeRingHullSampleDirection size must be 0x08");
-
   /**
    * Address: 0x007EC320 (FUN_007EC320, func_GetRangeEffect)
    *
@@ -63,106 +54,6 @@ namespace
     moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
     moho::CD3DEffect* const effect = resources->FindEffect("range");
     return effect->GetBaseEffect();
-  }
-
-  // Applied from FAForever/FA-Binary-Patches PR #150 ("Add range ring hull cull
-  // for dense crowd FPS recovery"), by M3RT1N99 (Apr 9-10, 2026).
-  // Why: range-ring setup/render cost scales with unit count, while dense
-  // interior rings are fully hidden by neighbors and add no visible outline.
-  // This 24-sample outer-circle coverage test keeps only boundary/isolated rings.
-  constexpr std::array<RangeRingHullSampleDirection, kRangeRingHullSampleCount> kRangeRingHullSampleDirections = {{
-    {1.00000000f, 0.00000000f},   {0.96592583f, 0.25881905f},   {0.86602540f, 0.50000000f},
-    {0.70710677f, 0.70710677f},   {0.50000000f, 0.86602540f},   {0.25881905f, 0.96592583f},
-    {0.00000000f, 1.00000000f},   {-0.25881905f, 0.96592583f},  {-0.50000000f, 0.86602540f},
-    {-0.70710677f, 0.70710677f},  {-0.86602540f, 0.50000000f},  {-0.96592583f, 0.25881905f},
-    {-1.00000000f, 0.00000000f},  {-0.96592583f, -0.25881905f}, {-0.86602540f, -0.50000000f},
-    {-0.70710677f, -0.70710677f}, {-0.50000000f, -0.86602540f}, {-0.25881905f, -0.96592583f},
-    {0.00000000f, -1.00000000f},  {0.25881905f, -0.96592583f},  {0.50000000f, -0.86602540f},
-    {0.70710677f, -0.70710677f},  {0.86602540f, -0.50000000f},  {0.96592583f, -0.25881905f},
-  }};
-
-  [[nodiscard]] bool IsRingSampleCoveredByEntry(
-    const moho::SRangeExtractionPayload& entry,
-    const float sampleX,
-    const float sampleZ
-  )
-  {
-    const float dx = entry.centerX - sampleX;
-    const float dz = entry.centerZ - sampleZ;
-    const float distanceSquared = (dx * dx) + (dz * dz);
-    const float outerRadius = entry.outerRadius;
-    if (distanceSquared > (outerRadius * outerRadius)) {
-      return false;
-    }
-
-    const float innerRadius = entry.innerRadius;
-    if (innerRadius > 0.0f && distanceSquared < (innerRadius * innerRadius)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  [[nodiscard]] bool IsFullyCoveredByKeptEntries(
-    const moho::SRangeExtractionPayload& candidate,
-    const RangeExtractionPayloadVector& entries,
-    const std::size_t keptCount
-  )
-  {
-    if (keptCount == 0u) {
-      return false;
-    }
-
-    for (const RangeRingHullSampleDirection sampleDirection : kRangeRingHullSampleDirections) {
-      const float sampleX = candidate.centerX + (candidate.outerRadius * sampleDirection.cosTheta);
-      const float sampleZ = candidate.centerZ + (candidate.outerRadius * sampleDirection.sinTheta);
-
-      bool sampleCovered = false;
-      for (std::size_t keptIndex = 0u; keptIndex < keptCount; ++keptIndex) {
-        if (IsRingSampleCoveredByEntry(entries[keptIndex], sampleX, sampleZ)) {
-          sampleCovered = true;
-          break;
-        }
-      }
-
-      if (!sampleCovered) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Applied patch behavior:
-   * FAForever/FA-Binary-Patches PR #150 (M3RT1N99), hooked at 0x007EF5E2 in
-   * `func_RenderRings` (0x007EF5A0), before the render loops consume the ring
-   * payload vector.
-   */
-  [[maybe_unused]] std::uint32_t CullRangeRingClusterHullInPlace(
-    RangeExtractionPayloadVector& ringEntries,
-    const bool enabled
-  )
-  {
-    const std::size_t originalCount = ringEntries.size();
-    if (!enabled || originalCount <= 4u) {
-      return static_cast<std::uint32_t>(originalCount);
-    }
-
-    std::size_t writeIndex = 0u;
-    for (std::size_t readIndex = 0u; readIndex < originalCount; ++readIndex) {
-      const moho::SRangeExtractionPayload candidate = ringEntries[readIndex];
-      const bool fullyCovered = IsFullyCoveredByKeptEntries(candidate, ringEntries, writeIndex);
-      if (fullyCovered) {
-        continue;
-      }
-
-      ringEntries[writeIndex] = candidate;
-      ++writeIndex;
-    }
-
-    ringEntries.resize(writeIndex);
-    return static_cast<std::uint32_t>(writeIndex);
   }
 
   /**
@@ -464,9 +355,10 @@ namespace
    * Address: 0x007EF5A0 (FUN_007EF5A0, func_RenderRings)
    *
    * What it does:
-   * Recovers the geometry-preparation lane used by range-ring rendering:
-   * - applies FAF hull-cull compaction from PR #150
-   * - computes zoom-scaled inner/outer thickness offsets
+   * Recovers the geometry-preparation head of `func_RenderRings`:
+   * - computes zoom-scaled inner/outer thickness offsets from the
+   *   `range_InnerThicknessCoeff` / `range_OuterThicknessCoeff` console
+   *   variables, which the binary reads as globals at this point
    * - expands source ring entries into fill + edge payload buffers
    *
    * Notes:
@@ -479,13 +371,14 @@ namespace
     const moho::RangeRingRadiusParams& outerRingParams,
     const float playableMapSpan,
     const float zoomScale,
-    const float innerThicknessCoeff,
-    const float outerThicknessCoeff,
     RangeExtractionPayloadVector& outFillPayloads,
     RangeExtractionPayloadVector& outEdgePayloads
   )
   {
-    const std::uint32_t ringCount = CullRangeRingClusterHullInPlace(ringEntries, true);
+    const float innerThicknessCoeff = moho::range_InnerThicknessCoeff;
+    const float outerThicknessCoeff = moho::range_OuterThicknessCoeff;
+
+    const std::uint32_t ringCount = static_cast<std::uint32_t>(ringEntries.size());
     outFillPayloads.clear();
     outEdgePayloads.clear();
     if (ringCount == 0u) {
