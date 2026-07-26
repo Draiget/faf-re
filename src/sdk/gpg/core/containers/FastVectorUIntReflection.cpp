@@ -10,6 +10,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/unit/core/Unit.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -909,6 +910,62 @@ namespace
       }
     }
     return gFastVectorUnitWeaponInfoTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x0055CD70 (FUN_0055CD70, gpg::RFastVectorType_UnitWeaponInfo::SetCount)
+   *
+   * IDA signature:
+   * void __stdcall gpg::RFastVectorType_UnitWeaponInfo::SetCount(
+   *   gpg::fastvector_n1_UnitWeaponInfo *vector, unsigned int count);
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot of the `fastvector<UnitWeaponInfo>` reflection
+   * descriptor. Default-constructs one prototype, resizes the reflected vector
+   * to `count` -- copy-constructing appended entries from that prototype and
+   * destroying trimmed ones -- then tears the prototype down. The prototype is
+   * a real object rather than a zeroed blob because `UnitWeaponInfo` owns two
+   * `EntityCategorySet` word vectors and two `msvc8::string` lanes.
+   *
+   * The retail body reaches the resize through the per-`UnitWeaponInfo`
+   * emissions of the shared fastvector resize template (FUN_0055D260 and its
+   * copy-assign / relocate lanes); recovered source calls that shared template
+   * directly, which is the canonical per-T form for these emissions.
+   */
+  void SetFastVectorUnitWeaponInfoCount(void* const vector, const int count)
+  {
+    moho::UnitWeaponInfo fill;
+    gpg::FastVectorRuntimeResizeFill<moho::UnitWeaponInfo>(
+      &fill,
+      static_cast<unsigned int>(count),
+      gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(vector)
+    );
+  }
+
+  /**
+   * Address: 0x01104D98 (`gpg::RFastVectorType<Moho::UnitWeaponInfo>` descriptor)
+   *
+   * What it does:
+   * Holds the descriptor's `RIndexed::SetCount` slot so the linker keeps the
+   * lane addressable from this translation unit. The retail descriptor is
+   * built by FUN_0055E9B0, which installs the
+   * `RFastVectorType<Moho::UnitWeaponInfo>` vtable pair (the main `RType`
+   * table plus the `{for gpg::RIndexed}` sub-object table) and preregisters it
+   * for `gpg::fastvector<Moho::UnitWeaponInfo>`; reflection reaches this body
+   * only through that `RIndexed` slot.
+   */
+  struct FastVectorUnitWeaponInfoReflectionSlots
+  {
+    void (*setCount)(void*, int);
+  };
+
+  const FastVectorUnitWeaponInfoReflectionSlots kFastVectorUnitWeaponInfoReflectionSlots = {
+    &SetFastVectorUnitWeaponInfoCount,
+  };
+
+  [[maybe_unused]] [[nodiscard]] const void* PublishFastVectorUnitWeaponInfoReflectionSlots() noexcept
+  {
+    return static_cast<const void*>(&kFastVectorUnitWeaponInfoReflectionSlots);
   }
 
   /**
