@@ -6,8 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <vector>
 #include <limits>
+#include <string>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -20,6 +21,7 @@
 #include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/WxUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
@@ -1155,7 +1157,6 @@ namespace moho
   int cfunc_SetOverlayFilterL(LuaPlus::LuaState* state);
   int cfunc_GetActiveBuildTemplateL(LuaPlus::LuaState* state);
   int cfunc_SetActiveBuildTemplateL(LuaPlus::LuaState* state);
-  int cfunc_OpenURLL(LuaPlus::LuaState* state);
   int cfunc_SetCursorL(LuaPlus::LuaState* state);
   int cfunc_IsCommandDoneL(LuaPlus::LuaState* state);
   int cfunc_IssueClearCommandsL(LuaPlus::LuaState* state);
@@ -3869,6 +3870,32 @@ namespace moho
   int cfunc_SetActiveBuildTemplate(lua_State* const luaContext)
   {
     return cfunc_SetActiveBuildTemplateL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00848050 (FUN_00848050, cfunc_OpenURLL)
+   *
+   * What it does:
+   * Validates a requested URL through wxURL, permits only configured protocol
+   * names, and opens an allowed URL through the Windows shell.
+   */
+  int cfunc_OpenURLL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kOpenURLHelpText, 1, argumentCount);
+    }
+
+    const LuaPlus::LuaStackObject urlArgument(state, 1);
+    const char* const urlText = lua_tostring(rawState, 1);
+    if (urlText == nullptr) {
+      urlArgument.TypeError("string");
+    }
+
+    const std::wstring wideUrl = gpg::STR_Utf8ToWide(urlText);
+    OpenAllowedUrlByWx(wideUrl);
+    return 0;
   }
 
   /**

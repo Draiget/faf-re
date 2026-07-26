@@ -10,16 +10,16 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`97.37%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,398`*
+  - *Total amount of completed tokens: `65,399`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,572` (81.92%)
+- `recovered`: `53,573` (81.92%)
 - `skip`: `6,146` (9.40%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,680` (8.69%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `4` (0.01%)
-- `in_progress`: `1` (0.00%)
+- `in_progress`: `0` (0.00%)
 - **`blocked`: `1,830` (2.72%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,834`*
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,572 functions) — binary caller context
+### Recovered (53,573 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `15,741` | 29.38% |
+| **Recovered caller token exists** (source edge still requires verification) | `15,744` | 29.39% |
 | Vtable-anchored (virtual override of a recovered class) | `5,847` | 10.91% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,526` | 10.32% |
-| No recovered caller token yet (orphan risk) | `2,507` | 4.68% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,730` | 44.30% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,526` | 10.31% |
+| No recovered caller token yet (orphan risk) | `2,505` | 4.68% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,730` | 44.29% |
 | Unclassified data xref (manual review) | `217` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 

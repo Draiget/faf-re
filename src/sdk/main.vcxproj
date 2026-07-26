@@ -526,6 +526,10 @@
     <ClCompile Include="moho\app\WxAppVectorHelpers.cpp" />
     <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp" />
     <ClCompile Include="moho\app\WxRuntimeTypes.cpp" />
+    <ClCompile Include="moho\app\WxUrl.cpp">
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="moho\collision\CCollisionManipulator.cpp" />
     <ClCompile Include="moho\collision\CCollisionManipulatorSerializer.cpp" />
     <ClCompile Include="moho\collision\CCollisionManipulatorTypeInfo.cpp" />
@@ -1446,6 +1450,7 @@
     <ClInclude Include="moho\app\WxAppRuntime.h" />
     <ClInclude Include="moho\app\WxAppVectorHelpers.h" />
     <ClInclude Include="moho\app\WxRuntimeTypes.h" />
+    <ClInclude Include="moho\app\WxUrl.h" />
     <ClInclude Include="moho\client\Localization.h" />
     <ClInclude Include="moho\collision\ECollisionShape.h" />
     <ClInclude Include="moho\command\CCommandDb.h" />
