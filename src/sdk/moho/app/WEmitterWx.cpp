@@ -7,6 +7,7 @@
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
@@ -45,6 +46,27 @@ extern const std::int32_t wxEVT_MIDDLE_DOWN;
  * caller's seed value untouched.
  */
 bool ParseWideDoubleStrictRuntime(const wchar_t** sourceText, double* outValue);
+
+/**
+ * Address: 0x009B1460 (FUN_009B1460, wxFileDialog::wxFileDialog)
+ *
+ * wxWidgets-2.4.2 library constructor (classified `external_dependency`). The
+ * emitter frame allocates 0x1A0 bytes and runs it with
+ * `(parent, title, defaultDir, defaultFile, wildcard, style, position)`.
+ */
+void* ConstructWxFileDialog(
+  void* storage,
+  void* parentFrame,
+  const wxStringRuntime* title,
+  const wxStringRuntime* defaultDirectory,
+  const wxStringRuntime* defaultFile,
+  const wxStringRuntime* wildcard,
+  std::int32_t style,
+  const void* position
+);
+
+/** wx's default window position sentinel, passed to every dialog here. */
+extern const void* const wxDefaultPosition;
 
 namespace
 {
@@ -96,12 +118,20 @@ namespace
 
   using SetTextControlValueFn = void(__thiscall*)(moho::WEmitterTextControl*, const wxStringRuntime*);
 
+  using SetTextControlTextFn = void(__thiscall*)(moho::WEmitterTextControl*, const wxStringRuntime*);
+
   struct WEmitterTextControlVTableLayout
   {
-    void* mLanes000To217[0x218 / sizeof(void*)]{};
+    void* mLanes000To037[0x38 / sizeof(void*)]{};
+    SetTextControlTextFn mSetText = nullptr;    // +0x38
+    void* mLanes03CTo217[(0x218 - 0x3C) / sizeof(void*)]{};
     CopyTextFn mCopyText = nullptr;             // +0x218
     SetTextControlValueFn mSetValue = nullptr;  // +0x21C
   };
+  static_assert(
+    offsetof(WEmitterTextControlVTableLayout, mSetText) == 0x38,
+    "WEmitterTextControlVTableLayout::mSetText offset must be 0x38"
+  );
   static_assert(
     offsetof(WEmitterTextControlVTableLayout, mCopyText) == 0x218,
     "WEmitterTextControlVTableLayout::mCopyText offset must be 0x218"
@@ -255,6 +285,61 @@ namespace
 
   /** Side of the square grab handle drawn per key by FUN_00662180. */
   constexpr std::int32_t kCurveKeyHandleSize = 5;
+
+  /**
+   * Menu/command ids handled by the emitter frame's command sink
+   * (FUN_00668B00). `0x29D` shares the particle-texture body by fall-through,
+   * and `0x2A0`..`0x2AC` (excluding `0x2A7`) share the parameter-toggle body.
+   */
+  constexpr std::int32_t kEmitterOpenBlueprintCommandId = 0x29C;
+  constexpr std::int32_t kEmitterBrowseTextureCommandIdAlt = 0x29D;
+  constexpr std::int32_t kEmitterBrowseTextureCommandId = 0x29E;
+  constexpr std::int32_t kEmitterBrowseRampCommandId = 0x29F;
+  constexpr std::int32_t kEmitterSaveBlueprintAsCommandId = 0x2A7;
+
+  constexpr const char* kEmitterBlueprintDirectory = "/effects/Emitters";
+  constexpr const char* kEmitterTextureDirectory = "/textures/particles";
+
+  /** `wxID_OK`, the value FUN_00668B00 compares every `ShowModal` against. */
+  constexpr std::int32_t kWxIdOk = 5100;
+
+  /** Allocation size and style FUN_00668B00 passes for each `wxFileDialog`. */
+  constexpr std::size_t kWxFileDialogSize = 0x1A0;
+  constexpr std::int32_t kWxFileDialogStyle = 1;
+
+  /**
+   * `wxFileDialog` lanes the emitter frame reads back after a modal run.
+   * Offsets are taken from the constructor at FUN_009B1460, which assigns the
+   * title to `+0x170`, the style to `+0x174`, the parent to `+0x178`, the
+   * default directory to `+0x17C`, the default file to `+0x184` and the
+   * wildcard to `+0x198`. `ShowModal` is the `+0x1C` vtable slot.
+   */
+  struct WxFileDialogRuntimeView
+  {
+    void** mVTable = nullptr;
+    std::uint8_t mReserved004To17B[0x178]{};
+    wxStringRuntime mDirectory;            // +0x17C
+    std::uint8_t mReserved180To183[0x4]{};
+    wxStringRuntime mFileName;             // +0x184
+  };
+  static_assert(
+    offsetof(WxFileDialogRuntimeView, mDirectory) == 0x17C,
+    "WxFileDialogRuntimeView::mDirectory offset must be 0x17C"
+  );
+  static_assert(
+    offsetof(WxFileDialogRuntimeView, mFileName) == 0x184,
+    "WxFileDialogRuntimeView::mFileName offset must be 0x184"
+  );
+
+  struct WxFileDialogVTable
+  {
+    void* mLanes000To01B[0x1C / sizeof(void*)]{};
+    std::int32_t(__thiscall* mShowModal)(void*); // +0x1C
+  };
+  static_assert(
+    offsetof(WxFileDialogVTable, mShowModal) == 0x1C,
+    "wxFileDialog ShowModal slot must be +0x1C"
+  );
 
   /** Drag-button codes stored at `editor+0x1A8` by FUN_00661820. */
   constexpr std::int32_t kCurveDragButtonLeft = 1;
@@ -853,6 +938,298 @@ namespace moho
    * numeric fields from its editor, then rebuilds the preview emitter so the
    * viewport reflects the edited curves.
    */
+  /**
+   * Address: 0x00667860 (FUN_00667860)
+   *
+   * IDA signature:
+   * void __thiscall sub_667860(WEmitterWx *this, wxEvent *event);
+   *
+   * What it does:
+   * The inverse of `RefreshPreviewEmitter`: repopulates the editor UI from the
+   * live preview effect. No-op when no effect is bound (the retail body tests
+   * the handle for null and for the `4` dead-weak sentinel). `mRefreshGuard` is
+   * raised across the whole pass so the control-change events fired while the
+   * fields are written do not bounce straight back into the effect.
+   *
+   * The two texture paths come back as UTF-8 through `GetStringParam`, are
+   * widened, cached in the editor's own `wxString` lanes and pushed into their
+   * controls through the `+0x38` setter; then every curve panel is handed its
+   * curve from the effect via `AssignCurve`.
+   */
+  /**
+   * Shared body of the four file-dialog cases in FUN_00668B00. The retail
+   * switch open-codes this per case; the only differences are the VFS root,
+   * the title and the wildcard, so the mechanics live here.
+   *
+   * Resolves `vfsRoot` through the VFS, seeds the dialog's starting directory
+   * from it, runs the dialog modally and -- on `wxID_OK` -- writes the chosen
+   * directory and file name back into the frame so the next browse reopens in
+   * place.
+   */
+  bool WEmitterWx::RunEmitterFileDialog(
+    const char* const vfsRoot,
+    const wchar_t* const title,
+    const wchar_t* const wildcard,
+    wxStringRuntime& startingDirectory
+  )
+  {
+    moho::SDiskFileInfo fileInfo{};
+    msvc8::string resolvedRoot;
+    (void)moho::DISK_GetVFS()->FindFile(&resolvedRoot, vfsRoot, &fileInfo);
+
+    const std::wstring wideRoot = gpg::STR_Utf8ToWide(resolvedRoot.c_str());
+    ReleaseCopiedWxString(startingDirectory);
+    (void)wxStringFormat(&startingDirectory, L"%s", wideRoot.c_str());
+
+    auto* const storage = static_cast<WxFileDialogRuntimeView*>(::operator new(kWxFileDialogSize, std::nothrow));
+    if (storage == nullptr) {
+      return false;
+    }
+
+    wxStringRuntime titleText{};
+    wxStringRuntime defaultFile{};
+    wxStringRuntime wildcardText{};
+    (void)wxStringFormat(&titleText, L"%s", title);
+    (void)wxStringFormat(&wildcardText, L"%s", wildcard);
+
+    ConstructWxFileDialog(
+      storage, this, &titleText, &startingDirectory, &defaultFile, &wildcardText,
+      kWxFileDialogStyle, &wxDefaultPosition
+    );
+
+    ReleaseCopiedWxString(titleText);
+    ReleaseCopiedWxString(defaultFile);
+    ReleaseCopiedWxString(wildcardText);
+
+    const auto* const dialogVTable = reinterpret_cast<const WxFileDialogVTable*>(storage->mVTable);
+    if (dialogVTable->mShowModal(storage) != kWxIdOk) {
+      return false;
+    }
+
+    ReleaseCopiedWxString(startingDirectory);
+    (void)wxStringFormat(&startingDirectory, L"%s", storage->mDirectory.m_pchData);
+    return true;
+  }
+
+  /**
+   * Flips one boolean effect parameter, mirroring the shared toggle body the
+   * retail switch reaches for every id in the `0x2A0`..`0x2AC` block.
+   */
+  void WEmitterWx::ToggleEffectParameterFlag(const std::int32_t parameterIndex)
+  {
+    IEffect* const effect = mPreviewEffect.GetObjectPtr();
+    if (effect == nullptr) {
+      return;
+    }
+
+    const bool wasSet = effect->GetFloatParam(parameterIndex) > 0.0f;
+    effect->SetFloatParam(parameterIndex, wasSet ? 0.0f : 1.0f);
+  }
+
+  void WEmitterWx::LoadFromEffect()
+  {
+    IEffect* const effect = mPreviewEffect.GetObjectPtr();
+    if (effect == nullptr) {
+      return;
+    }
+
+    mRefreshGuard = 1;
+
+    const auto pushPath = [](WEmitterTextControl* const control,
+                             wxStringRuntime& cachedPath,
+                             const msvc8::string* const utf8) {
+      const std::wstring wide = gpg::STR_Utf8ToWide(utf8 != nullptr ? utf8->c_str() : "");
+      ReleaseCopiedWxString(cachedPath);
+      (void)wxStringFormat(&cachedPath, L"%s", wide.c_str());
+      TextVTable(*control)->mSetText(control, &cachedPath);
+    };
+
+    pushPath(mTextureNameControl, mTexturePath, effect->GetStringParam(0));
+    pushPath(mRampNameControl, mRampTexturePath, effect->GetStringParam(1));
+
+    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
+    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    for (std::size_t i = 0; i < curveCount; ++i) {
+      WEmitterCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
+      const auto* const curve =
+        reinterpret_cast<const SEfxCurve*>(effect->GetCurveParam(static_cast<std::int32_t>(i)));
+      if (curve != nullptr) {
+        curveEditor->AssignCurve(*curve);
+      }
+    }
+
+    mRefreshGuard = 0;
+  }
+
+  /**
+   * Address: 0x00668340 (FUN_00668340)
+   *
+   * IDA signature:
+   * void __userpurge sub_668340(
+   *   std::auto_ptr<gpg::Stream> scratch, const wchar_t **path,
+   *   const wchar_t **blueprintId, int stream);
+   *
+   * What it does:
+   * Writes the emitter blueprint out as a Lua script: opens the destination
+   * through `Moho::DISK_OpenFileWrite`, formats the header, every scalar and
+   * flag parameter, both texture paths and each curve panel's block, then lets
+   * the stream close. With no live effect it warns and skips.
+   *
+   * As with `FormatCurveScript`, the retail body discards every formatted line
+   * -- `gpg::STR_Printf` writes into a reused `msvc8::string` sret slot with no
+   * reader -- while still creating and closing the file. Both the formatting
+   * and the file open/close are preserved 1:1; see the escalation note for the
+   * four-point evidence chain behind that reading.
+   */
+  void WEmitterWx::WriteBlueprintScript(const wchar_t* const filePath, const wchar_t* const blueprintId)
+  {
+    IEffect* const effect = mPreviewEffect.GetObjectPtr();
+    if (effect == nullptr) {
+      gpg::Warnf("Invalid effect. Skip saving blueprint!");
+      return;
+    }
+
+    const msvc8::string utf8Path = gpg::STR_WideToUtf8(filePath);
+    msvc8::auto_ptr<gpg::Stream> output = moho::DISK_OpenFileWrite(utf8Path.c_str());
+    if (output.get() == nullptr) {
+      return;
+    }
+
+    const auto flag = [effect](const std::int32_t parameterIndex) {
+      return effect->GetFloatParam(parameterIndex) > 0.0f ? "true" : "false";
+    };
+    const auto scalar = [effect](const std::int32_t parameterIndex) {
+      return static_cast<double>(effect->GetFloatParam(parameterIndex));
+    };
+
+    msvc8::string line = gpg::STR_Printf("EmitterBlueprint {\n");
+
+    const msvc8::string utf8BlueprintId = gpg::STR_WideToUtf8(blueprintId);
+    line = gpg::STR_Printf("\tBlueprintId = '%s',\n", utf8BlueprintId.c_str());
+
+    line = gpg::STR_Printf("\tLifetime = %.2f,\n", scalar(kParamLifetime));
+    line = gpg::STR_Printf("\tRepeattime = %.2f,\n", scalar(kParamRepeatTime));
+    line = gpg::STR_Printf("\tTextureFramecount = %.2f,\n", scalar(kParamTextureFrameCount));
+    line = gpg::STR_Printf("\tBlendmode = %.2f,\n", scalar(kParamBlendMode));
+    line = gpg::STR_Printf("\tLocalVelocity = %s,\n", flag(9));
+    line = gpg::STR_Printf("\tLocalAcceleration = %s,\n", flag(10));
+    line = gpg::STR_Printf("\tGravity = %s,\n", flag(11));
+    line = gpg::STR_Printf("\tAlignRotation = %s,\n", flag(12));
+    line = gpg::STR_Printf("\tAlignToBone = %s,\n", flag(15));
+    line = gpg::STR_Printf("\tFlat = %s,\n", flag(17));
+    line = gpg::STR_Printf("\tLODCutoff = %.2f,\n", scalar(kParamLodCutoff));
+    line = gpg::STR_Printf("\tEmitIfVisible = %s,\n", flag(20));
+    line = gpg::STR_Printf("\tCatchupEmit = %s,\n", flag(21));
+    line = gpg::STR_Printf("\tCreateIfVisible = %s,\n", flag(22));
+    line = gpg::STR_Printf("\tSnapToWaterline = %s,\n", flag(23));
+    line = gpg::STR_Printf("\tOnlyEmitOnWater = %s,\n", flag(24));
+    line = gpg::STR_Printf("\tParticleResistance = %s,\n", flag(25));
+    line = gpg::STR_Printf("\tInterpolateEmission = %s,\n", flag(13));
+    line = gpg::STR_Printf("\tTextureStripcount = %.2f,\n", scalar(kParamTextureStripCount));
+    line = gpg::STR_Printf("\tSortOrder = %.2f,\n", scalar(kParamSortOrder));
+
+    // The three fidelity lines share one bitmask taken from the fidelity choice
+    // control; the binary adds 1 to the raw selection before testing bits 0-2.
+    const std::int32_t fidelityMask = mFidelityChoice->GetSelection() + 1;
+    line = gpg::STR_Printf("\tLowFidelity = %s,\n", (fidelityMask & 1) != 0 ? "true" : "false");
+    line = gpg::STR_Printf("\tMedFidelity = %s,\n", (fidelityMask & 2) != 0 ? "true" : "false");
+    line = gpg::STR_Printf("\tHighFidelity = %s,\n", (fidelityMask & 4) != 0 ? "true" : "false");
+
+    const msvc8::string texturePath = gpg::STR_WideToUtf8(mTexturePath.m_pchData);
+    line = gpg::STR_Printf("\tTexture = [[%s]],\n", texturePath.c_str());
+    const msvc8::string rampPath = gpg::STR_WideToUtf8(mRampTexturePath.m_pchData);
+    line = gpg::STR_Printf("\tRampTexture = [[%s]],\n", rampPath.c_str());
+
+    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
+    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    for (std::size_t i = 0; i < curveCount; ++i) {
+      curvePanelView.begin[i]->mCurveEditor->FormatCurveScript();
+    }
+
+    line = gpg::STR_Printf("}\n\n");
+    (void)line;
+  }
+
+  /**
+   * Address: 0x00668B00 (FUN_00668B00)
+   *
+   * IDA signature:
+   * void __thiscall sub_668B00(WEmitterWx *this, wxCommandEvent *event);
+   *
+   * What it does:
+   * The emitter editor's menu/command sink, and the head of this cluster. It
+   * switches on the command id at `[event+0x14]`:
+   *
+   *  - `0x29C` open a blueprint: resolves `/effects/Emitters` through the VFS,
+   *    runs a `wxFileDialog` titled "Select Blueprint" filtered to `*.bp`, and
+   *    on accept reloads the editor from the chosen file. A file whose name is
+   *    not `*.bp` is refused with "You didn't open a valid blueprint".
+   *  - `0x29D` / `0x29E` browse for the particle texture, and `0x29F` for the
+   *    ramp texture -- both rooted at `/textures/particles` and filtered to
+   *    `*.dds`. `0x29D` reaches the particle body by fall-through, exactly as
+   *    the retail switch does.
+   *  - `0x2A7` save-as: "Choose a file to save as." over `/effects/Emitters`,
+   *    rejecting a name that is not `*.bp` with "Since this is a blueprint you
+   *    must save as *.bp" and an empty one with "Bad name!".
+   *  - every other id in `0x2A0`..`0x2AC` is a parameter toggle, flipping the
+   *    effect flag named by the shared binding tables.
+   *
+   * Each dialog stores its chosen directory back into the frame so the next
+   * browse reopens where the user left off, and every path finishes by pushing
+   * the editor state through `RefreshPreviewEmitter`.
+   */
+  void WEmitterWx::OnMenuCommand(wxEventRuntime& commandEventRef)
+  {
+    const auto& commandEvent =
+      reinterpret_cast<const WxCurveFieldCommandEventRuntimeView&>(commandEventRef);
+
+    switch (commandEvent.mCommandId) {
+      case kEmitterOpenBlueprintCommandId:
+        if (RunEmitterFileDialog(kEmitterBlueprintDirectory, L"Select Blueprint", L"*.bp",
+                                 mBlueprintFilePath)) {
+          LoadFromEffect();
+        }
+        break;
+
+      case kEmitterBrowseTextureCommandIdAlt:
+      case kEmitterBrowseTextureCommandId:
+        if (RunEmitterFileDialog(kEmitterTextureDirectory, L"Select Particle Texture", L"*.dds",
+                                 mBlueprintIdPath)) {
+          TextVTable(*mTextureNameControl)->mSetText(mTextureNameControl, &mTexturePath);
+        }
+        break;
+
+      case kEmitterBrowseRampCommandId:
+        if (RunEmitterFileDialog(kEmitterTextureDirectory, L"Select Ramp Texture", L"*.dds",
+                                 mBlueprintIdPath)) {
+          TextVTable(*mRampNameControl)->mSetText(mRampNameControl, &mRampTexturePath);
+        }
+        break;
+
+      case kEmitterSaveBlueprintAsCommandId:
+        if (RunEmitterFileDialog(kEmitterBlueprintDirectory, L"Choose a file to save as.", L"*.bp",
+                                 mBlueprintFilePath)) {
+          WriteBlueprintScript(mBlueprintFilePath.m_pchData, mBlueprintIdPath.m_pchData);
+        }
+        break;
+
+      default:
+        for (const EmitterFlagBinding& binding : kEmitterFlagBindings) {
+          if (binding.commandId == commandEvent.mCommandId) {
+            ToggleEffectParameterFlag(binding.parameterIndex);
+          }
+        }
+        for (const EmitterFlagBinding& binding : kVisibilityFlagBindings) {
+          if (binding.commandId == commandEvent.mCommandId) {
+            ToggleEffectParameterFlag(binding.parameterIndex);
+          }
+        }
+        break;
+    }
+
+    RefreshPreviewEmitter();
+  }
+
   void WEmitterWx::OnCurveEdited()
   {
     const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
@@ -1128,6 +1505,69 @@ namespace moho
     (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
   }
 
+  /**
+   * Address: 0x00669E40 (FUN_00669E40)
+   *
+   * IDA signature:
+   * void __usercall sub_669E40(SEfxCurve *source@<eax>, WCurveEditor *this@<ecx>);
+   *
+   * What it does:
+   * Replaces the edited curve wholesale -- bounds and keys -- then drops the
+   * selection, which would otherwise dangle into the freed key storage, raises
+   * the curve-changed notification and command, and refreshes the owning
+   * panel's numeric fields. This is how a blueprint's curve reaches the editor.
+   */
+  void WEmitterCurveEditor::AssignCurve(const SEfxCurve& source)
+  {
+    mCurve = source;
+    mSelectedKey = mCurve.mKeys.end();
+
+    (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
+    PostCurveChangedCommand();
+    mOwnerPanel->RefreshFieldsFromCurve();
+  }
+
+  /**
+   * Address: 0x00661580 (FUN_00661580)
+   *
+   * IDA signature:
+   * void __userpurge sub_661580(WCurveEditor *this@<edi>, msvc8::string *scratch);
+   *
+   * What it does:
+   * Formats this curve as a Lua table -- the script key, an `XRange` taken from
+   * the curve's own upper X bound, then one `{ x=, y=, z= }` line per key.
+   *
+   * The retail body then throws every line away: `gpg::STR_Printf` formats into
+   * a caller-supplied `msvc8::string` sret slot (confirmed from FUN_00938F10,
+   * which is a plain by-value formatter forwarding to `STR_Va`), the same slot
+   * is reused for every line, and nothing ever reads it -- the write plumbing
+   * of this exporter was removed while the formatting was left in place.
+   * Preserved 1:1 so the string-allocation side effects match the binary,
+   * following the ` DoPreload` marker convention in `moho/sim/CWldSession.cpp`.
+   */
+  void WEmitterCurveEditor::FormatCurveScript() const
+  {
+    const msvc8::string scriptName = gpg::STR_WideToUtf8(mScriptName.m_pchData);
+
+    msvc8::string line = gpg::STR_Printf(
+      "\t%s = {\n\t\tXRange = %.2f,\n\t\tKeys = {\n",
+      scriptName.c_str(),
+      static_cast<double>(mCurve.mBoundsMax.x)
+    );
+
+    for (const Wm3::Vector3f* key = mCurve.mKeys.begin(); key != mCurve.mKeys.end(); ++key) {
+      line = gpg::STR_Printf(
+        "\t\t\t{ x=%.3f,y=%.3f,z=%.3f },\n",
+        static_cast<double>(key->x),
+        static_cast<double>(key->y),
+        static_cast<double>(key->z)
+      );
+    }
+
+    line = gpg::STR_Printf("\t\t},\n\t},\n");
+    (void)line;
+  }
+
   void WEmitterCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
@@ -1197,10 +1637,12 @@ namespace moho
     struct WEmitterWxEventTableBindings
     {
       void (WEmitterWx::*onCurveEdited)();
+      void (WEmitterWx::*onMenuCommand)(wxEventRuntime&);
     };
 
     const WEmitterWxEventTableBindings kWEmitterWxEventTableBindings = {
       &WEmitterWx::OnCurveEdited,
+      &WEmitterWx::OnMenuCommand,
     };
 
     [[maybe_unused]] [[nodiscard]] const void* PublishWEmitterWxEventTableBindings() noexcept
