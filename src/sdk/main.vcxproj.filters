@@ -2481,6 +2481,27 @@
     <ClCompile Include="moho\ai\CAiTargetSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\SOffsetInfoTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\SPickUpInfoTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CSquadTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\HPathCellTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\path\PathTablesTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\SScrollerTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\SDecalInfoTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5602,6 +5623,27 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiTargetSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SOffsetInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SPickUpInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CSquadTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\HPathCellTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\path\PathTablesTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\SScrollerTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\SDecalInfoTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiTargetTypeInfo.h">
