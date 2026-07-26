@@ -11,6 +11,24 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 
+/**
+ * This build compiles wxWidgets with `WXWIN_COMPATIBILITY_EVENT_TYPES=0`, so
+ * event types are handed out by `wxNewEventType()` during static init rather
+ * than folded in as constants: FUN_00661100 loads the value from the library
+ * global at 0x00F8F5C8 (`mov eax, wxEVT_COMMAND_BUTTON_CLICKED`) instead of
+ * pushing an immediate. Reference that same global here.
+ */
+extern const std::int32_t wxEVT_COMMAND_BUTTON_CLICKED;
+
+/**
+ * Address: 0x009600E0 (FUN_009600E0, wxString::ToDouble)
+ *
+ * Recovered in `moho/sim/SimRecoveryRuntime.cpp`. The curve panel's field sink
+ * calls it on the committed `wxCommandEvent` text; a failed parse leaves the
+ * caller's seed value untouched.
+ */
+bool ParseWideDoubleStrictRuntime(const wchar_t** sourceText, double* outValue);
+
 namespace
 {
   constexpr double kMinimumRepeatTime = 0.001;
@@ -59,14 +77,21 @@ namespace
   using IsMenuItemCheckedFn = bool(__thiscall*)(const void*);
   using NotifyCurveChangedFn = int(__thiscall*)(moho::WEmitterCurveEditor*, std::int32_t, std::int32_t);
 
+  using SetTextControlValueFn = void(__thiscall*)(moho::WEmitterTextControl*, const wxStringRuntime*);
+
   struct WEmitterTextControlVTableLayout
   {
     void* mLanes000To217[0x218 / sizeof(void*)]{};
-    CopyTextFn mCopyText = nullptr; // +0x218
+    CopyTextFn mCopyText = nullptr;             // +0x218
+    SetTextControlValueFn mSetValue = nullptr;  // +0x21C
   };
   static_assert(
     offsetof(WEmitterTextControlVTableLayout, mCopyText) == 0x218,
     "WEmitterTextControlVTableLayout::mCopyText offset must be 0x218"
+  );
+  static_assert(
+    offsetof(WEmitterTextControlVTableLayout, mSetValue) == 0x21C,
+    "WEmitterTextControlVTableLayout::mSetValue offset must be 0x21C"
   );
 
   struct WEmitterPreviewPanelVTableLayout
@@ -115,6 +140,72 @@ namespace
    * against `dbl_E4F710+4` (0.1f) by FUN_006617A0 before it commits a zoom.
    */
   constexpr float kMinimumVisibleValueSpan = 0.1f;
+
+  /**
+   * wx command ids of the curve panel's five numeric fields, consecutive from
+   * 622 as dispatched by FUN_00663650 (`cmp [event+0x14], 26Eh..272h`).
+   */
+  constexpr std::int32_t kCurveKeyTimeFieldId = 0x26E;      // 622
+  constexpr std::int32_t kCurveKeyValueFieldId = 0x26F;     // 623
+  constexpr std::int32_t kCurveKeyTangentFieldId = 0x270;   // 624
+  constexpr std::int32_t kCurveViewValueMinFieldId = 0x271; // 625
+  constexpr std::int32_t kCurveViewValueMaxFieldId = 0x272; // 626
+
+  /**
+   * `wxCommandEvent` lanes the curve panel's field sink touches: the command
+   * id at `[event+0x14]`, the skip byte at `[event+0x1C]`, and the committed
+   * text at `[event+0x20]` (matching `wxCommandEventRuntime::mCommandString`).
+   */
+  struct WxCurveFieldCommandEventRuntimeView
+  {
+    std::uint8_t mWxEventBase[0x14]{};   // +0x00
+    std::int32_t mCommandId = 0;         // +0x14
+    std::uint8_t mReserved18To1B[0x4]{}; // +0x18
+    std::uint8_t mSkipped = 0;           // +0x1C
+    std::uint8_t mReserved1DTo1F[0x3]{}; // +0x1D
+    wxStringRuntime mCommandString;      // +0x20
+  };
+  static_assert(
+    offsetof(WxCurveFieldCommandEventRuntimeView, mCommandId) == 0x14,
+    "WxCurveFieldCommandEventRuntimeView::mCommandId offset must be 0x14"
+  );
+  static_assert(
+    offsetof(WxCurveFieldCommandEventRuntimeView, mSkipped) == 0x1C,
+    "WxCurveFieldCommandEventRuntimeView::mSkipped offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(WxCurveFieldCommandEventRuntimeView, mCommandString) == 0x20,
+    "WxCurveFieldCommandEventRuntimeView::mCommandString offset must be 0x20"
+  );
+
+  /**
+   * Parses one committed field's text into `outValue`, leaving `outValue`
+   * untouched when the text is not a full, well-formed number. `wxString`
+   * stores its payload pointer first, so the string object doubles as the
+   * `const wchar_t**` cursor the parser expects -- which is exactly how the
+   * binary passes it (`this` in `ecx`).
+   */
+  [[nodiscard]] bool ParseCommittedFieldValue(wxStringRuntime& text, double* const outValue)
+  {
+    return ParseWideDoubleStrictRuntime(const_cast<const wchar_t**>(&text.m_pchData), outValue);
+  }
+
+  /**
+   * Exposes `wxControl::ProcessCommand` for the curve editor. The retail body
+   * calls it as a statically-bound `wxControl` member (not through the
+   * editor's own vtable), which mirrors a plain base-class call in the 2007
+   * source; `WCurveEditor` derives from `wxControl`, so the editor storage is
+   * reinterpreted through the recovered control projection.
+   */
+  struct CurveEditorControlAccess : wxControlRuntime
+  {
+    using wxControlRuntime::ProcessCommand;
+
+    [[nodiscard]] static CurveEditorControlAccess* From(moho::WEmitterCurveEditor* const editor) noexcept
+    {
+      return reinterpret_cast<CurveEditorControlAccess*>(editor);
+    }
+  };
 
   /**
    * `wxMouseEvent` wheel lane used by the curve editor's wheel sink. The
@@ -453,6 +544,158 @@ namespace moho
     (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
   }
 
+  /**
+   * Address: 0x00661100 (FUN_00661100)
+   *
+   * IDA signature:
+   * int __usercall sub_661100@<eax>(WCurveEditor *this@<esi>);
+   *
+   * What it does:
+   * Clears the editor's dirty flag and raises a
+   * `wxEVT_COMMAND_BUTTON_CLICKED` command event carrying the editor's own
+   * window id, routed straight through `wxControl::ProcessCommand` (the
+   * binary binds that call statically rather than dispatching virtually).
+   * This is how the curve editor tells its owning panel that the curve
+   * changed.
+   */
+  void WEmitterCurveEditor::PostCurveChangedCommand()
+  {
+    const std::int32_t commandId = mWindowId;
+    mCurveDirty = 0;
+
+    wxCommandEventRuntime changedEvent(wxEVT_COMMAND_BUTTON_CLICKED, commandId);
+    CurveEditorControlAccess::From(this)->ProcessCommand(&changedEvent);
+  }
+
+  /**
+   * Address: 0x006614B0 (FUN_006614B0)
+   *
+   * IDA signature:
+   * int __userpurge sub_6614B0@<eax>(
+   *   WCurveEditor *this@<eax>, float time@<xmm1>, float value, int tangent);
+   *
+   * What it does:
+   * Moves the currently selected curve key. No-op when nothing is selected
+   * (`mSelectedKey == mCurve.mKeys.end()`). The requested time is clamped
+   * into the visible time range and then against the neighbouring keys, so
+   * dragging a key can never reorder the key vector; the value is clamped
+   * into the visible value range. The tangent lane is stored verbatim.
+   * Afterwards the curve's Y bounds are recomputed and the curve-changed
+   * command is posted, followed by the same `(1, 0)` notification
+   * `ResetCurveXRange` raises.
+   */
+  void WEmitterCurveEditor::MoveSelectedKeyTo(
+    const float time,
+    const float value,
+    const float tangent
+  )
+  {
+    Wm3::Vector3f* const selected = mSelectedKey;
+    if (selected == mCurve.mKeys.end()) {
+      return;
+    }
+
+    float clampedTime = std::min(mViewTimeMax, time);
+    clampedTime = std::max(mViewTimeMin, clampedTime);
+
+    float clampedValue = std::min(mViewValueMax, value);
+    clampedValue = std::max(mViewValueMin, clampedValue);
+
+    // Keys are kept sorted by time, so the move is additionally fenced by the
+    // immediate neighbours rather than being allowed to swap past them.
+    if (selected != mCurve.mKeys.begin()) {
+      clampedTime = std::max(selected[-1].x, clampedTime);
+    }
+    if (selected + 1 != mCurve.mKeys.end()) {
+      clampedTime = std::min(selected[1].x, clampedTime);
+    }
+
+    selected->x = clampedTime;
+    selected->y = clampedValue;
+    selected->z = tangent;
+
+    RecomputeEmitterCurveYBounds(mCurve);
+    PostCurveChangedCommand();
+    (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
+  }
+
+  /**
+   * Address: 0x00663650 (FUN_00663650)
+   *
+   * IDA signature:
+   * void __thiscall sub_663650(WCurveEditorPanel *this, wxCommandEvent *event);
+   *
+   * What it does:
+   * `wxEventTableEntry` sink shared by the panel's five numeric fields
+   * (0x00F59D80..0x00F59DD0, one entry per command id 622..626). Commits are
+   * ignored until the panel's fields are bound.
+   *
+   * It seeds the selected key's `(time, value, tangent)` -- or zeros when
+   * nothing is selected -- then, for whichever field raised the event, parses
+   * the committed text over that seed (a failed parse leaves the seed intact,
+   * so a malformed entry reverts rather than zeroing the key) and mirrors the
+   * text back into the control. The key is then re-applied through
+   * `MoveSelectedKeyTo`, which re-clamps it.
+   *
+   * Ids 625/626 edit the visible value range instead. They are applied only
+   * when the resulting span stays at or above 0.1f -- the same guard
+   * `ZoomValueAxisByWheel` uses -- and share its `(1, 0)` notification.
+   * The event is marked skipped on every path so wx continues its own
+   * propagation.
+   */
+  void WEmitterCurvePanel::OnCurveFieldCommitted(wxEventRuntime& commandEvent)
+  {
+    auto& fieldEvent = reinterpret_cast<WxCurveFieldCommandEventRuntimeView&>(commandEvent);
+    if (mFieldsLive == 0) {
+      fieldEvent.mSkipped = 1;
+      return;
+    }
+
+    WEmitterCurveEditor* const editor = mCurveEditor;
+    const Wm3::Vector3f* const keysEnd = editor->mCurve.mKeys.end();
+
+    double keyTime = (editor->mSelectedKey == keysEnd) ? 0.0 : editor->mSelectedKey->x;
+    double keyValue = (editor->mSelectedKey == keysEnd) ? 0.0 : editor->mSelectedKey->y;
+    double keyTangent = (editor->mSelectedKey == keysEnd) ? 0.0 : editor->mSelectedKey->z;
+
+    if (fieldEvent.mCommandId == kCurveKeyTimeFieldId) {
+      (void)ParseCommittedFieldValue(fieldEvent.mCommandString, &keyTime);
+      TextVTable(*mKeyTimeText)->mSetValue(mKeyTimeText, &fieldEvent.mCommandString);
+    }
+    if (fieldEvent.mCommandId == kCurveKeyValueFieldId) {
+      (void)ParseCommittedFieldValue(fieldEvent.mCommandString, &keyValue);
+      TextVTable(*mKeyValueText)->mSetValue(mKeyValueText, &fieldEvent.mCommandString);
+    }
+    if (fieldEvent.mCommandId == kCurveKeyTangentFieldId) {
+      (void)ParseCommittedFieldValue(fieldEvent.mCommandString, &keyTangent);
+      TextVTable(*mKeyTangentText)->mSetValue(mKeyTangentText, &fieldEvent.mCommandString);
+    }
+
+    editor->MoveSelectedKeyTo(
+      static_cast<float>(keyTime), static_cast<float>(keyValue), static_cast<float>(keyTangent)
+    );
+
+    double viewValueMin = editor->mViewValueMin;
+    double viewValueMax = editor->mViewValueMax;
+
+    if (fieldEvent.mCommandId == kCurveViewValueMinFieldId) {
+      (void)ParseCommittedFieldValue(fieldEvent.mCommandString, &viewValueMin);
+      TextVTable(*mViewValueMinText)->mSetValue(mViewValueMinText, &fieldEvent.mCommandString);
+    }
+    if (fieldEvent.mCommandId == kCurveViewValueMaxFieldId) {
+      (void)ParseCommittedFieldValue(fieldEvent.mCommandString, &viewValueMax);
+      TextVTable(*mViewValueMaxText)->mSetValue(mViewValueMaxText, &fieldEvent.mCommandString);
+    }
+
+    if (viewValueMax - viewValueMin >= static_cast<double>(kMinimumVisibleValueSpan)) {
+      editor->mViewValueMin = static_cast<float>(viewValueMin);
+      editor->mViewValueMax = static_cast<float>(viewValueMax);
+      (void)CurveEditorVTable(*editor)->mNotifyCurveChanged(editor, 1, 0);
+    }
+
+    fieldEvent.mSkipped = 1;
+  }
+
   void WEmitterCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
@@ -479,6 +722,32 @@ namespace moho
     const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
       &WEmitterCurveEditor::ZoomValueAxisByWheel,
     };
+
+    using CurvePanelFieldSinkFnPtr = void (WEmitterCurvePanel::*)(wxEventRuntime&);
+
+    /**
+     * Address: 0x00F59D80 (`WCurveEditorPanel` wxEventTableEntry array)
+     *
+     * What it does:
+     * Keeps the panel's field sink addressable from this TU. The binary's
+     * table holds five consecutive entries -- one per field id 622..626 --
+     * all pointing at the same handler, which is what the wx
+     * `EVT_TEXT_ENTER` macro emits when the same method is bound to a range
+     * of control ids.
+     */
+    struct WCurveEditorPanelEventTableBindings
+    {
+      CurvePanelFieldSinkFnPtr onCurveFieldCommitted;
+    };
+
+    const WCurveEditorPanelEventTableBindings kWCurveEditorPanelEventTableBindings = {
+      &WEmitterCurvePanel::OnCurveFieldCommitted,
+    };
+
+    [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorPanelEventTableBindings() noexcept
+    {
+      return static_cast<const void*>(&kWCurveEditorPanelEventTableBindings);
+    }
 
     [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorEventTableBindings() noexcept
     {
