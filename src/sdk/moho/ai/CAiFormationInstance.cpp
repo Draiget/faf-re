@@ -2902,6 +2902,62 @@ namespace
   }
 
   /**
+   * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
+   *
+   * IDA signature:
+   * int __stdcall gpg::RFastVectorType_SOffsetInfo::SetCount(void *obj, int count);
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot of the `fastvector<SOffsetInfo>` reflection
+   * descriptor. Resizes the reflected lane vector, copy-constructing any
+   * appended entries from one default-initialised prototype. The prototype is
+   * built and torn down around the resize because it owns a sentinel-backed
+   * lane map, so it cannot simply be a zeroed stack blob.
+   *
+   * Lives in this translation unit rather than beside the descriptor's other
+   * slots because the three lane-entry helpers it needs are file-local here.
+   */
+  void SetFastVectorLaneEntryCount(void* const laneVector, const int count)
+  {
+    moho::SFormationLaneEntry fill{};
+    (void)InitializeDefaultFormationLaneEntry(&fill);
+
+    ResizeLaneEntryVectorByCountWithFill(
+      static_cast<unsigned int>(count), static_cast<moho::SFormationLaneVec*>(laneVector), &fill
+    );
+
+    ResetFormationLaneEntryUnitMapStorage(fill);
+  }
+
+  using SetReflectedCountFn = void (*)(void*, int);
+
+  /**
+   * Address: 0x01104FA0 (`gpg::RFastVectorType<Moho::SOffsetInfo>` descriptor)
+   *
+   * What it does:
+   * Holds the descriptor's `RIndexed::SetCount` slot so the linker keeps the
+   * lane addressable from this translation unit. The retail descriptor is
+   * built by FUN_00571C00, which installs the
+   * `RFastVectorType<Moho::SOffsetInfo>` vtable pair (the main `RType` table
+   * plus the `{for gpg::RIndexed}` sub-object table) and preregisters it for
+   * `gpg::fastvector<Moho::SOffsetInfo>`; reflection reaches this body only
+   * through that `RIndexed` slot.
+   */
+  struct FastVectorLaneEntryReflectionSlots
+  {
+    SetReflectedCountFn setCount;
+  };
+
+  const FastVectorLaneEntryReflectionSlots kFastVectorLaneEntryReflectionSlots = {
+    &SetFastVectorLaneEntryCount,
+  };
+
+  [[maybe_unused]] [[nodiscard]] const void* PublishFastVectorLaneEntryReflectionSlots() noexcept
+  {
+    return static_cast<const void*>(&kFastVectorLaneEntryReflectionSlots);
+  }
+
+  /**
    * Address: 0x0056B590 (FUN_0056B590)
    *
    * What it does:
