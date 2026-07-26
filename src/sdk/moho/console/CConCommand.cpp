@@ -3030,18 +3030,11 @@ namespace
     &moho::snd_ExtraDoWorkCalls
   );
 
-  template <typename TCommand>
-  void CleanupStartupConCommand(TCommand& command) noexcept
-  {
-    TeardownConCommandRegistration(command);
-  }
-
-  template <typename TConVarLike>
-  void RegisterStartupConVar(TConVarLike& conVar, void (*cleanupFn)()) noexcept
-  {
-    RegisterConCommand(conVar);
-    (void)std::atexit(cleanupFn);
-  }
+  // `CleanupStartupConCommand` / `RegisterStartupConVar` now live in
+  // CConCommand.h so every subsystem's registration translation unit shares one
+  // definition instead of re-emitting a private copy. The `register_*` /
+  // `cleanup_*` bodies below sit in `namespace moho` and pick them up by
+  // ordinary unqualified lookup.
 
   void RegisterStartupConFunc(
     CConFunc& conFunc,

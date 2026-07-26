@@ -675,6 +675,7 @@
     <ClCompile Include="moho\render\CRenFrame.cpp" />
     <ClCompile Include="moho\render\RCamManager.cpp" />
     <ClCompile Include="moho\render\RangeRenderer.cpp" />
+    <ClCompile Include="moho\render\RangeRendererStartupRegistrations.cpp" />
     <ClCompile Include="moho\render\Cartographic.cpp" />
     <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
@@ -1557,6 +1558,7 @@
     <ClInclude Include="moho\render\CDecalTypes.h" />
     <ClInclude Include="moho\render\Silhouette.h" />
     <ClInclude Include="moho\render\RangeRenderer.h" />
+    <ClInclude Include="moho\render\RangeRendererStartupRegistrations.h" />
     <ClInclude Include="moho\render\SelectionBracketParams.h" />
     <ClInclude Include="moho\render\RenderGeometryBuffers.h" />
     <ClInclude Include="moho\effects\rendering\SEfxCurve.h" />
