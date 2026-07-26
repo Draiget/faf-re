@@ -93,6 +93,24 @@ namespace moho
   void RecomputeEmitterCurveYBounds(SEfxCurve& curve);
 
   /**
+   * Address: 0x00515270 (FUN_00515270)
+   *
+   * What it does:
+   * Returns the key nearest `point` by Euclidean distance over
+   * `(time, value)`, or `mKeys.end()` when the curve is empty.
+   */
+  [[nodiscard]] Wm3::Vector3f* FindNearestCurveKey(SEfxCurve& curve, const Wm3::Vector2f& point);
+
+  /**
+   * Address: 0x005158C0 (FUN_005158C0)
+   *
+   * What it does:
+   * Erases `[first, last)` from the curve's key vector, shifting the trailing
+   * keys down and pulling the end lane back.
+   */
+  Wm3::Vector3f* EraseEmitterCurveKeyRange(Wm3::Vector3f* first, Wm3::Vector3f* last, SEfxCurve& curve);
+
+  /**
    * Address: 0x005151B0 (FUN_005151B0, insert_emitter_curve_key)
    *
    * What it does:

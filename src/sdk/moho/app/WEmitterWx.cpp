@@ -30,6 +30,14 @@ extern void* const wxRED_PEN;
 extern void* const wxCYAN_PEN;
 
 /**
+ * Mouse-button event types, read from the wx library globals by FUN_00661820
+ * (`cmp edx, wxEVT_LEFT_DOWN` / `cmp eax, wxEVT_MIDDLE_DOWN`). Dynamically
+ * assigned in this build, same as `wxEVT_COMMAND_BUTTON_CLICKED` above.
+ */
+extern const std::int32_t wxEVT_LEFT_DOWN;
+extern const std::int32_t wxEVT_MIDDLE_DOWN;
+
+/**
  * Address: 0x009600E0 (FUN_009600E0, wxString::ToDouble)
  *
  * Recovered in `moho/sim/SimRecoveryRuntime.cpp`. The curve panel's field sink
@@ -247,6 +255,40 @@ namespace
 
   /** Side of the square grab handle drawn per key by FUN_00662180. */
   constexpr std::int32_t kCurveKeyHandleSize = 5;
+
+  /** Drag-button codes stored at `editor+0x1A8` by FUN_00661820. */
+  constexpr std::int32_t kCurveDragButtonLeft = 1;
+  constexpr std::int32_t kCurveDragButtonMiddle = 2;
+
+  /**
+   * `wxMouseEvent` lanes the curve editor's button sinks read: the event type
+   * at `[event+0x0C]`, the cursor at `[event+0x20]`/`[event+0x24]`, and the
+   * control-key flag at `[event+0x2B]` (FUN_00661820 / FUN_00661A90).
+   */
+  struct WxCurveEditorMouseEventRuntimeView
+  {
+    std::uint8_t mWxEventBase[0x0C]{};    // +0x00
+    std::int32_t mEventType = 0;          // +0x0C
+    std::uint8_t mReserved10To1F[0x10]{}; // +0x10
+    std::int32_t mMouseX = 0;             // +0x20
+    std::int32_t mMouseY = 0;             // +0x24
+    std::uint8_t mLeftDown = 0;           // +0x28
+    std::uint8_t mMiddleDown = 0;         // +0x29
+    std::uint8_t mRightDown = 0;          // +0x2A
+    std::uint8_t mControlDown = 0;        // +0x2B
+  };
+  static_assert(
+    offsetof(WxCurveEditorMouseEventRuntimeView, mEventType) == 0x0C,
+    "WxCurveEditorMouseEventRuntimeView::mEventType offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(WxCurveEditorMouseEventRuntimeView, mMouseX) == 0x20,
+    "WxCurveEditorMouseEventRuntimeView::mMouseX offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxCurveEditorMouseEventRuntimeView, mControlDown) == 0x2B,
+    "WxCurveEditorMouseEventRuntimeView::mControlDown offset must be 0x2B"
+  );
 
   /**
    * Parses one committed field's text into `outValue`, leaving `outValue`
@@ -1003,6 +1045,89 @@ namespace moho
     ReleaseCopiedWxString(label);
   }
 
+  /**
+   * Address: 0x00661820 (FUN_00661820)
+   *
+   * IDA signature:
+   * int __thiscall sub_661820(WCurveEditor *this, wxMouseEvent *event);
+   *
+   * What it does:
+   * `wxEventTableEntry` button-down sink. Caches the cursor position, converts
+   * it back into curve space (the inverse of `ProjectCurvePointToScreen`) and
+   * selects the nearest key. Left and middle buttons additionally record which
+   * button is driving the drag and post the curve-changed command. The mouse is
+   * captured on the first press so the drag keeps receiving events outside the
+   * widget, and the widget is then repainted.
+   */
+  void WEmitterCurveEditor::OnMouseDown(wxEventRuntime& mouseEventRef)
+  {
+    const auto& mouseEvent = reinterpret_cast<const WxCurveEditorMouseEventRuntimeView&>(mouseEventRef);
+
+    mLastMouseX = mouseEvent.mMouseX;
+    mLastMouseY = mouseEvent.mMouseY;
+
+    const Wm3::Vector2f curvePoint{
+      mViewTimeMin + static_cast<float>(mLastMouseX) / mViewTimeScale,
+      mViewValueMin + static_cast<float>(mClientHeight - mLastMouseY) / mViewValueScale
+    };
+    mSelectedKey = FindNearestCurveKey(mCurve, curvePoint);
+
+    if (mouseEvent.mEventType == wxEVT_LEFT_DOWN) {
+      mActiveDragButton = kCurveDragButtonLeft;
+      PostCurveChangedCommand();
+    }
+    if (mouseEvent.mEventType == wxEVT_MIDDLE_DOWN) {
+      mActiveDragButton = kCurveDragButtonMiddle;
+      PostCurveChangedCommand();
+    }
+
+    if (mMouseCaptured == 0) {
+      reinterpret_cast<wxWindowBase*>(this)->CaptureMouse();
+      mMouseCaptured = 1;
+    }
+
+    reinterpret_cast<wxWindowBase*>(this)->Refresh(true, nullptr);
+  }
+
+  /**
+   * Address: 0x00661A90 (FUN_00661A90)
+   *
+   * IDA signature:
+   * int __thiscall sub_661A90(WCurveEditor *this, wxMouseEvent *event);
+   *
+   * What it does:
+   * `wxEventTableEntry` sink for the key-editing click. The cursor position is
+   * converted into curve space; a plain click inserts a key there (with a zero
+   * tangent) and selects it, while a control-click deletes the nearest key --
+   * but only while more than one key remains, so the curve can never be
+   * emptied. Deleting re-derives the value bounds and falls the selection back
+   * to the first key. Either way the curve-changed command and the `(1, 0)`
+   * notification are raised.
+   */
+  void WEmitterCurveEditor::OnCurveKeyEdit(wxEventRuntime& mouseEventRef)
+  {
+    const auto& mouseEvent = reinterpret_cast<const WxCurveEditorMouseEventRuntimeView&>(mouseEventRef);
+
+    Wm3::Vector3f curvePoint{};
+    curvePoint.x = mViewTimeMin + static_cast<float>(mouseEvent.mMouseX) / mViewTimeScale;
+    curvePoint.y = mViewValueMin + static_cast<float>(mClientHeight - mouseEvent.mMouseY) / mViewValueScale;
+
+    const Wm3::Vector2f hitPoint{curvePoint.x, curvePoint.y};
+    if (mouseEvent.mControlDown == 0) {
+      curvePoint.z = 0.0f;
+      InsertEmitterCurveKey(mCurve, curvePoint);
+      mSelectedKey = FindNearestCurveKey(mCurve, hitPoint);
+    } else if (mCurve.mKeys.end() - mCurve.mKeys.begin() > 1) {
+      Wm3::Vector3f* const doomed = FindNearestCurveKey(mCurve, hitPoint);
+      (void)EraseEmitterCurveKeyRange(doomed, doomed + 1, mCurve);
+      RecomputeEmitterCurveYBounds(mCurve);
+      mSelectedKey = mCurve.mKeys.begin();
+    }
+
+    PostCurveChangedCommand();
+    (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
+  }
+
   void WEmitterCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
@@ -1025,11 +1150,15 @@ namespace moho
     {
       CurveEditorWheelSinkFnPtr onMouseWheel;
       void (WEmitterCurveEditor::*onPaint)();
+      void (WEmitterCurveEditor::*onMouseDown)(wxEventRuntime&);
+      void (WEmitterCurveEditor::*onCurveKeyEdit)(wxEventRuntime&);
     };
 
     const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
       &WEmitterCurveEditor::ZoomValueAxisByWheel,
       &WEmitterCurveEditor::OnPaint,
+      &WEmitterCurveEditor::OnMouseDown,
+      &WEmitterCurveEditor::OnCurveKeyEdit,
     };
 
     using CurvePanelFieldSinkFnPtr = void (WEmitterCurvePanel::*)(wxEventRuntime&);
