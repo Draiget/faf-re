@@ -1,6 +1,8 @@
 #include "LuaRuntimeTypes.h"
 
+#include <array>
 #include <cctype>
+#include <utility>
 
 namespace LuaPlus
 {
@@ -243,14 +245,14 @@ namespace
   constexpr std::int32_t OP_TESTSET = 0x1C;
   constexpr std::int32_t MAXSTACK = 0xFA;
   constexpr std::int32_t LUA_MAXARG_Bx = 0x3FFFF;
-  constexpr std::int32_t OPR_BAND = 0x00;
-  constexpr std::int32_t OPR_BOR = 0x01;
-  constexpr std::int32_t OPR_BSHL = 0x02;
-  constexpr std::int32_t OPR_BSHR = 0x03;
-  constexpr std::int32_t OPR_ADD = 0x04;
-  constexpr std::int32_t OPR_SUB = 0x05;
-  constexpr std::int32_t OPR_MULT = 0x06;
-  constexpr std::int32_t OPR_DIV = 0x07;
+  constexpr std::int32_t OPR_ADD = 0x00;
+  constexpr std::int32_t OPR_SUB = 0x01;
+  constexpr std::int32_t OPR_MULT = 0x02;
+  constexpr std::int32_t OPR_DIV = 0x03;
+  constexpr std::int32_t OPR_BAND = 0x04;
+  constexpr std::int32_t OPR_BOR = 0x05;
+  constexpr std::int32_t OPR_BSHL = 0x06;
+  constexpr std::int32_t OPR_BSHR = 0x07;
   constexpr std::int32_t OPR_POW = 0x08;
   constexpr std::int32_t OPR_CONCAT = 0x09;
   constexpr std::int32_t OPR_NE = 0x0A;
@@ -262,6 +264,9 @@ namespace
   constexpr std::int32_t OPR_AND = 0x10;
   constexpr std::int32_t OPR_OR = 0x11;
   constexpr std::int32_t OPR_NOBINOPR = 0x12;
+  constexpr std::int32_t OPR_MINUS = 0x00;
+  constexpr std::int32_t OPR_NOT = 0x01;
+  constexpr std::int32_t OPR_NOUNOPR = 0x02;
   constexpr std::int32_t TK_AND = 0x101;
   constexpr std::int32_t TK_FALSE = 0x108;
   constexpr std::int32_t TK_ELSE = 0x105;
@@ -270,6 +275,7 @@ namespace
   constexpr std::int32_t TK_FUNCTION = 0x10A;
   constexpr std::int32_t TK_IF = 0x10B;
   constexpr std::int32_t TK_NIL = 0x10E;
+  constexpr std::int32_t TK_NOT = 0x10F;
   constexpr std::int32_t TK_OR = 0x110;
   constexpr std::int32_t TK_THEN = 0x113;
   constexpr std::int32_t TK_TRUE = 0x114;
@@ -283,6 +289,22 @@ namespace
   constexpr std::int32_t TK_BSHL = 0x120;
   constexpr std::int32_t TK_BSHR = 0x121;
   constexpr std::int32_t TK_EOS = 0x122;
+  constexpr std::int32_t UNARY_PRIORITY = 8;
+
+  // LuaPlus's parser records the left and right binding powers as one
+  // two-byte pair per BinOpr. std::pair expresses that source-level record
+  // without introducing another recovered layout type.
+  using BinaryOperatorPriority = std::pair<std::uint8_t, std::uint8_t>;
+  constexpr std::array<BinaryOperatorPriority, OPR_NOBINOPR> kBinaryOperatorPriorities{{
+    {6, 6}, {6, 6}, {7, 7}, {7, 7},
+    {8, 8}, {8, 8}, {8, 8}, {8, 8},
+    {10, 9}, {5, 4},
+    {3, 3}, {3, 3},
+    {3, 3}, {3, 3}, {3, 3}, {3, 3},
+    {2, 2}, {1, 1}
+  }};
+  static_assert(kBinaryOperatorPriorities.size() == OPR_NOBINOPR);
+
   constexpr unsigned char kLuaOpcodeModes[] = {
     0x24, 0x61, 0x20, 0x24, 0x20, 0x61, 0x34, 0x41, 0x00, 0x18,
     0x20, 0x34, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38,
@@ -393,7 +415,16 @@ namespace
     void check(LexState* ls, std::int32_t c);
     void block(LexState* ls);
     void check_match(LexState* ls, std::int32_t what, std::int32_t who, std::int32_t where);
-    void subexpr(LexState* ls, expdesc* expression, std::int32_t limit);
+
+    /**
+     * Address: 0x0091C680 (FUN_0091C680, subexpr)
+     *
+     * What it does:
+     * Parses unary and binary expressions with Lua's precedence and
+     * associativity rules, returning the first operator left for its caller.
+     */
+    std::int32_t subexpr(LexState* ls, expdesc* expression, std::int32_t limit);
+
     void assignment(LexState* ls, LHS_assign* lhs, std::int32_t nvars);
     std::int32_t luaK_code(FuncState* fs, Instruction i, int line);
     std::int32_t luaK_jump(FuncState* fs);
@@ -437,6 +468,14 @@ namespace
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
     void luaK_indexed(FuncState* fs, expdesc* t, expdesc* k);
+    void luaK_prefix(FuncState* fs, std::int32_t op, expdesc* expression);
+    void luaK_infix(FuncState* fs, std::int32_t op, expdesc* expression);
+    void luaK_posfix(
+      FuncState* fs,
+      std::int32_t op,
+      expdesc* leftExpression,
+      expdesc* rightExpression
+    );
   }
 
   /**
@@ -1200,6 +1239,64 @@ namespace
       primaryexp(outExpression, ls);
       return;
     }
+  }
+
+  /**
+   * Address: 0x0091C680 (FUN_0091C680, subexpr)
+   *
+   * What it does:
+   * Parses unary and binary expressions with Lua's precedence and
+   * associativity rules, returning the first operator left for its caller.
+   */
+  extern "C" std::int32_t subexpr(
+    LexState* const ls,
+    expdesc* const expression,
+    const std::int32_t limit
+  )
+  {
+    if (++ls->nestlevel > 200) {
+      luaX_syntaxerror(ls, "too many syntax levels");
+    }
+
+    std::int32_t unaryOperator = OPR_NOUNOPR;
+    if (ls->t.token == '-') {
+      unaryOperator = OPR_MINUS;
+    } else if (ls->t.token == TK_NOT) {
+      unaryOperator = OPR_NOT;
+    }
+
+    if (unaryOperator != OPR_NOUNOPR) {
+      next(ls);
+      (void)subexpr(ls, expression, UNARY_PRIORITY);
+      luaK_prefix(ls->fs, unaryOperator, expression);
+    } else {
+      simpleexp(ls, expression);
+    }
+
+    std::int32_t binaryOperator = GetBinaryOperatorFromToken(ls->t.token);
+    while (
+      binaryOperator != OPR_NOBINOPR
+      && static_cast<std::int32_t>(
+        kBinaryOperatorPriorities[static_cast<std::size_t>(binaryOperator)].first
+      ) > limit
+    ) {
+      next(ls);
+      luaK_infix(ls->fs, binaryOperator, expression);
+
+      expdesc rightExpression;
+      const std::int32_t nextOperator = subexpr(
+        ls,
+        &rightExpression,
+        static_cast<std::int32_t>(
+          kBinaryOperatorPriorities[static_cast<std::size_t>(binaryOperator)].second
+        )
+      );
+      luaK_posfix(ls->fs, binaryOperator, expression, &rightExpression);
+      binaryOperator = nextOperator;
+    }
+
+    --ls->nestlevel;
+    return binaryOperator;
   }
 
   /**
