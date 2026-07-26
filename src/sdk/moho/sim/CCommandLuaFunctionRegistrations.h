@@ -677,6 +677,15 @@ namespace moho
   int cfunc_SetActiveBuildTemplate(lua_State* luaContext);
 
   /**
+   * Address: 0x00848050 (FUN_00848050, cfunc_OpenURLL)
+   *
+   * What it does:
+   * Validates a requested URL against the configured protocol allow-list and
+   * opens an allowed URL through the Windows shell.
+   */
+  int cfunc_OpenURLL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00847FD0 (FUN_00847FD0, cfunc_OpenURL)
    *
    * What it does:
