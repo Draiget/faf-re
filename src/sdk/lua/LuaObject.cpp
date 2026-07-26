@@ -5951,6 +5951,89 @@ namespace
 		return LuaWriteToFile(2, state, ToFile(state, 1));
 	}
 
+	constexpr int kLuaFileSeekModes[] = {SEEK_SET, SEEK_CUR, SEEK_END};
+
+	constexpr const char* const kLuaFileSeekModeNames[] = {
+		"set",
+		"cur",
+		"end",
+		nullptr
+	};
+
+	/**
+	 * Address: 0x00917940 (FUN_00917940, lua::f_seek)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua::f_seek(lua_State *L);
+	 *
+	 * What it does:
+	 * Lua `file:seek([whence [, offset]])`. Resolves the wrapped file userdata
+	 * (raising the closed-file error when its stream lane is null), maps the
+	 * optional whence selector (`"set"`/`"cur"`/`"end"`, defaulting to `"cur"`)
+	 * onto the CRT `SEEK_*` constants, and seeks by the optional offset
+	 * (defaulting to 0). On success it pushes the new `ftell` position and
+	 * returns 1; on failure it pushes the inline `pushresult` failure tuple
+	 * (nil, `strerror(errno)`, errno) and returns 3.
+	 */
+	int LuaFileSeek(lua_State* const state)
+	{
+		std::FILE* const stream = ToFile(state, 1);
+		const char* const whenceName = luaL_optlstring(state, 2, "cur", nullptr);
+		const int whenceIndex = luaL_findstring(whenceName, kLuaFileSeekModeNames);
+		const long offset = static_cast<long>(luaL_optnumber(state, 3, 0.0f));
+
+		if (whenceIndex == -1) {
+			luaL_argerror(state, 2, "invalid mode");
+		}
+
+		if (std::fseek(stream, offset, kLuaFileSeekModes[whenceIndex]) != 0) {
+			lua_pushnil(state);
+			const int errorCode = *_errno();
+			lua_pushfstring(state, "%s", std::strerror(errorCode));
+			lua_pushnumber(state, static_cast<lua_Number>(*_errno()));
+			return 3;
+		}
+
+		lua_pushnumber(state, static_cast<lua_Number>(static_cast<int>(std::ftell(stream))));
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00D45C80 (`flib` registration table)
+	 *
+	 * What it does:
+	 * The `liolib` file-method registration table: the methods installed onto
+	 * the wrapped-`FILE` userdata metatable. Reconstructed from the binary's
+	 * `luaL_reg` array, whose function lanes sit at 0x00D45C84 (`f_flush`),
+	 * 0x00D45C8C (`f_read`), 0x00D45C94 (`aux_lines`), 0x00D45C9C (`f_seek`),
+	 * 0x00D45CA4 (`f_write`), 0x00D45CAC (`io_close`) and 0x00D45CB4
+	 * (`io_tostring`) -- seven consecutive 8-byte entries, so this build carries
+	 * no `__gc` lane between `close` and `__tostring`.
+	 *
+	 * This table is the source-level invocation for all seven file methods:
+	 * `luaL_openlib` installs them by address from here.
+	 */
+	const luaL_reg kLuaFileMethods[] = {
+		{"flush", &LuaFileFlush},
+		{"read", &LuaFileRead},
+		{"lines", &LuaAuxLines},
+		{"seek", &LuaFileSeek},
+		{"write", &LuaFileWrite},
+		{"close", &LuaIoClose},
+		{"__tostring", &LuaIoToString},
+		{nullptr, nullptr}
+	};
+
+	/**
+	 * Publishes the recovered `flib` file-method table so the registration lane
+	 * stays addressable from this TU, mirroring how the binary's `liolib`
+	 * open path hands the array to `luaL_openlib`.
+	 */
+	[[maybe_unused]] [[nodiscard]] const luaL_reg* ResolveLuaFileMethodRegistrations() noexcept
+	{
+		return kLuaFileMethods;
+	}
+
 	int ReadZioByte(LuaZioRuntimeView* const stream)
 	{
 		const int available = stream->remainingBytes;
