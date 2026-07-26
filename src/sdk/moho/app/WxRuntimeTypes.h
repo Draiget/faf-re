@@ -1201,6 +1201,16 @@ void __stdcall wxNoOpRuntimeStdCall1E(std::int32_t reservedArg0);
 wxStringRuntime* wxFormatDdeErrorString(wxStringRuntime* outText, unsigned int ddeErrorCode);
 
 /**
+ * Address: 0x00962120 (FUN_00962120, wxString::Format)
+ *
+ * What it does:
+ * Static `wxString::Format`: seeds `outValue` to the shared empty string then
+ * formats the varargs into it. The retail signature returns `wxString` by
+ * value, so the result comes back through the hidden first parameter.
+ */
+wxStringRuntime* wxStringFormat(wxStringRuntime* outValue, const wchar_t* formatText, ...);
+
+/**
  * Address: 0x00968990 (FUN_00968990, wxYieldForCommandsOnly)
  *
  * What it does:
