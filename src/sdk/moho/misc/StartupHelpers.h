@@ -34,6 +34,22 @@ namespace moho
   class CScrLuaInitFormSet;
   enum ESpecialFileType : std::int32_t;
 
+  /**
+   * FAForever launch-patch map-height lanes.
+   *
+   * `Sim::Create_exxt` derives both from the loaded heightmap's sample range
+   * and publishes them for the range- and vision-ring renderers to consume;
+   * it then calls `RangeRenderer::Init()` and `VisionRenderer::Init()`, which
+   * read these globals when building their ring geometry.
+   *
+   * Binary globals: `patch_maxMapHeight` @ 0x0128F294, `patch_minMapHeight`
+   * @ 0x0128F290 (both in `.exxt`). Read by
+   * `Moho::RangeRenderer::Init` (0x007EE2B8 / 0x007EE336) and
+   * `Moho::VisionRenderer::Init` (0x0081C38A / 0x0081C3C1).
+   */
+  extern float patch_maxMapHeight;
+  extern float patch_minMapHeight;
+
   struct CfgAliasSet
   {
     const char* const* values = nullptr;

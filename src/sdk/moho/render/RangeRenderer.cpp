@@ -19,6 +19,7 @@
 #include "moho/entity/UserEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
@@ -40,8 +41,6 @@ namespace
   constexpr std::uint32_t kDynamicVertexStrideBytes = 16u;
 
   constexpr float kRangeAngleStepRadians = 0.13962634f; // 2*pi/45
-  constexpr float kRangeMaxMapHeight = 256.0f;
-  constexpr float kRangeMinMapHeight = -256.0f;
   /**
    * Address: 0x007EC320 (FUN_007EC320, func_GetRangeEffect)
    *
@@ -62,10 +61,13 @@ namespace
    * What it does:
    * Appends one ring extraction payload (`worldX`, `worldZ`, `innerRadius`,
    * `outerRadius`) to the active payload vector, growing storage when needed.
-   * This helper lane is part of FAF's hull-cull range-ring patch path
-   * (xref: `patch_Moho::CNetUDPConnector::Entry`), not the stock engine lane.
+   *
+   * This is stock engine code with eight direct callers, byte-verified as
+   * `E8 rel32` call sites: 0x007EDCD6, 0x007EDD12 and 0x007EDD52 (in
+   * `sub_7EDC80`), 0x007EEFB4 (`func_RenderBuildRings`), 0x007EF19E
+   * (`func_ExtractRanges`), 0x007EF26D, 0x007EF3D2 and 0x007EF551.
    */
-  [[maybe_unused, nodiscard]] moho::SRangeExtractionPayload* AppendRangeExtractionPayload(
+  [[nodiscard]] moho::SRangeExtractionPayload* AppendRangeExtractionPayload(
     RangeExtractionPayloadVector& payloads,
     const moho::SRangeExtractionPayload& payload
   )
@@ -1440,10 +1442,17 @@ namespace moho
           const float x = std::cos(angle);
           const float z = std::sin(angle);
 
-          WriteRingBandVertex(vertexData, i, x, kRangeMaxMapHeight, z, 1.0f, 0.0f);
-          WriteRingBandVertex(vertexData, i + kRangeRingSegmentCount, x, kRangeMaxMapHeight, z, 0.0f, 1.0f);
-          WriteRingBandVertex(vertexData, i + (kRangeRingSegmentCount * 2u), x, kRangeMinMapHeight, z, 1.0f, 0.0f);
-          WriteRingBandVertex(vertexData, i + (kRangeRingSegmentCount * 3u), x, kRangeMinMapHeight, z, 0.0f, 1.0f);
+          // Vertical extents come from the map's own height range, published by
+          // Sim::Create_exxt — the binary loads them here, not immediates:
+          // `movss xmm2, ds:patch_maxMapHeight` at 0x007EE2B8 for the upper band
+          // and `ds:patch_minMapHeight` at 0x007EE336 for the lower one.
+          const float upperBandHeight = moho::patch_maxMapHeight;
+          const float lowerBandHeight = moho::patch_minMapHeight;
+
+          WriteRingBandVertex(vertexData, i, x, upperBandHeight, z, 1.0f, 0.0f);
+          WriteRingBandVertex(vertexData, i + kRangeRingSegmentCount, x, upperBandHeight, z, 0.0f, 1.0f);
+          WriteRingBandVertex(vertexData, i + (kRangeRingSegmentCount * 2u), x, lowerBandHeight, z, 1.0f, 0.0f);
+          WriteRingBandVertex(vertexData, i + (kRangeRingSegmentCount * 3u), x, lowerBandHeight, z, 0.0f, 1.0f);
         }
       }
 

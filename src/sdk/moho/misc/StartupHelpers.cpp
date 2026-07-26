@@ -714,11 +714,6 @@ namespace
     RegisterProcessControlLuaFunction<lua_SetProcessPriority>(state->m_state, "SetProcessPriority");
   }
 
-  // FAForever launch-patch map-height lanes published by Sim::Create_exxt for
-  // the range/vision renderers to consume.
-  float patch_maxMapHeight = 0.0f;
-  float patch_minMapHeight = 0.0f;
-
   // Typed view over the range/vision renderer sub-objects embedded in a
   // WRenViewport (mRangeRenderer @ +0x37C, mVisionRenderer @ +0x410). The
   // full WRenViewport is not modelled with named members; the offsets match
@@ -772,8 +767,8 @@ namespace
 
     // Binary mapping: the max-height lane is derived from the smallest sample
     // (minus a 5-unit offset) and the min-height lane from the largest sample.
-    patch_maxMapHeight = (static_cast<float>(minSample) * 0.0078125f) - 5.0f;
-    patch_minMapHeight = static_cast<float>(maxSample) * 0.0078125f;
+    moho::patch_maxMapHeight = (static_cast<float>(minSample) * 0.0078125f) - 5.0f;
+    moho::patch_minMapHeight = static_cast<float>(maxSample) * 0.0078125f;
 
     // Initialize the active viewport's range/vision renderers.
     if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
@@ -6822,6 +6817,13 @@ void moho::SetupAntiAliasingSettings()
  */
 namespace moho
 {
+  // Declared in StartupHelpers.h. Derived by Sim::Create_exxt from the loaded
+  // heightmap's sample range and read by RangeRenderer::Init (0x007EE2B8 /
+  // 0x007EE336) and VisionRenderer::Init (0x0081C38A / 0x0081C3C1) when they
+  // build their ring geometry.
+  float patch_maxMapHeight = 0.0f;
+  float patch_minMapHeight = 0.0f;
+
   [[maybe_unused]] void PrintExecutableTimestampToConsole()
   {
     CON_Printf("Exe timestamp : %s", "Mon Jun 22 14:06:14 2009");

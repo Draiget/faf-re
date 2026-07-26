@@ -12,6 +12,7 @@
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 
@@ -21,8 +22,6 @@ namespace
   constexpr std::uint32_t kVisionVertexCount = (kVisionSegmentCount * 2u) + 2u; // 92
   constexpr std::uint32_t kVisionIndexCount = kVisionSegmentCount * 12u;         // 540
   constexpr float kVisionAngleStep = 0.13962634f;                                 // 2*pi/45
-  constexpr float kVisionMaxMapHeight = 256.0f;
-  constexpr float kVisionMinMapHeight = -256.0f;
 
   /**
    * Address: 0x007D0460 (FUN_007D0460, func_GetVisionEffect)
@@ -123,25 +122,32 @@ namespace moho
           const float cosValue = std::cos(angle);
           const float sinValue = std::sin(angle);
 
+          // Vertical extents come from the map's own height range, published
+          // by Sim::Create_exxt. The binary loads them here rather than using
+          // immediates: `movss xmm2, ds:patch_maxMapHeight` at 0x0081C38A and
+          // `movss xmm1, ds:patch_minMapHeight` at 0x0081C3C1.
+          const float upperCapHeight = moho::patch_maxMapHeight;
+          const float lowerCapHeight = moho::patch_minMapHeight;
+
           const std::uint32_t topBase = i * 3u;
           vertexData[topBase + 0u] = cosValue;
-          vertexData[topBase + 1u] = kVisionMaxMapHeight;
+          vertexData[topBase + 1u] = upperCapHeight;
           vertexData[topBase + 2u] = sinValue;
 
           const std::uint32_t bottomBase = (kVisionSegmentCount * 3u) + (i * 3u);
           vertexData[bottomBase + 0u] = cosValue;
-          vertexData[bottomBase + 1u] = kVisionMinMapHeight;
+          vertexData[bottomBase + 1u] = lowerCapHeight;
           vertexData[bottomBase + 2u] = sinValue;
         }
 
         const std::uint32_t topCenterBase = (kVisionSegmentCount * 2u) * 3u;
         vertexData[topCenterBase + 0u] = 0.0f;
-        vertexData[topCenterBase + 1u] = kVisionMaxMapHeight;
+        vertexData[topCenterBase + 1u] = moho::patch_maxMapHeight;
         vertexData[topCenterBase + 2u] = 0.0f;
 
         const std::uint32_t bottomCenterBase = topCenterBase + 3u;
         vertexData[bottomCenterBase + 0u] = 0.0f;
-        vertexData[bottomCenterBase + 1u] = kVisionMinMapHeight;
+        vertexData[bottomCenterBase + 1u] = moho::patch_minMapHeight;
         vertexData[bottomCenterBase + 2u] = 0.0f;
       }
 
