@@ -138,12 +138,21 @@ namespace moho
     float mViewValueMin = 0.0f;
     float mViewTimeMax = 0.0f;
     float mViewValueMax = 0.0f;
-    std::uint8_t mReserved190[0x1]{};
+    /** Set once the widget has captured the mouse for a drag (FUN_00661820). */
+    std::uint8_t mMouseCaptured = 0;
     std::uint8_t mCurveDirty = 0;
     std::uint8_t mReserved192To193[0x2]{};
 
     /** Caption painted at the widget's top-left corner. */
     wxStringRuntime mCaption;
+    std::uint8_t mReserved198To19F[0x8]{};
+
+    /** Cursor position cached on button-down (FUN_00661820). */
+    std::int32_t mLastMouseX = 0;
+    std::int32_t mLastMouseY = 0;
+
+    /** Which button is driving the current drag: 1 = left, 2 = middle. */
+    std::int32_t mActiveDragButton = 0;
 
     void ResetCurveXRange(float rangeMax) noexcept;
 
@@ -203,6 +212,24 @@ namespace moho
      * scales, and paints the envelope spans, key handles and axis labels.
      */
     void OnPaint();
+
+    /**
+     * Address: 0x00661820 (FUN_00661820)
+     *
+     * What it does:
+     * Button-down sink: caches the cursor, selects the nearest key, records the
+     * drag button, captures the mouse and repaints.
+     */
+    void OnMouseDown(wxEventRuntime& mouseEvent);
+
+    /**
+     * Address: 0x00661A90 (FUN_00661A90)
+     *
+     * What it does:
+     * Key-editing sink: a plain click inserts a key at the cursor, a
+     * control-click deletes the nearest one (never the last).
+     */
+    void OnCurveKeyEdit(wxEventRuntime& mouseEvent);
 
     /**
      * Address: 0x006612A0 (FUN_006612A0)

@@ -265,6 +265,70 @@ namespace gpg
 namespace moho
 {
   /**
+   * Address: 0x00515270 (FUN_00515270)
+   *
+   * IDA signature:
+   * float *__usercall sub_515270@<eax>(float *point@<eax>, SEfxCurve *curve@<ecx>);
+   *
+   * What it does:
+   * Returns the key nearest `point` in curve space, measuring plain Euclidean
+   * distance over `(time, value)` and ignoring the tangent lane. Returns
+   * `mKeys.end()` when the curve has no keys, so callers can use the result
+   * directly as the "no selection" sentinel.
+   */
+  Wm3::Vector3f* FindNearestCurveKey(SEfxCurve& curve, const Wm3::Vector2f& point)
+  {
+    Wm3::Vector3f* const keysEnd = curve.mKeys.end();
+    Wm3::Vector3f* nearest = keysEnd;
+    float nearestDistance = std::numeric_limits<float>::infinity();
+
+    for (Wm3::Vector3f* key = curve.mKeys.begin(); key != keysEnd; ++key) {
+      const float deltaTime = point.x - key->x;
+      const float deltaValue = point.y - key->y;
+      const float distance = std::sqrt(deltaTime * deltaTime + deltaValue * deltaValue);
+      if (nearestDistance > distance) {
+        nearestDistance = distance;
+        nearest = key;
+      }
+    }
+
+    return nearest;
+  }
+
+  /**
+   * Address: 0x005158C0 (FUN_005158C0)
+   *
+   * IDA signature:
+   * float *__usercall sub_5158C0@<eax>(
+   *   float *first@<eax>, float *last@<edx>, gpg::fastvector *keys@<ebx>);
+   *
+   * What it does:
+   * Erases `[first, last)` from the key vector by shifting the trailing keys
+   * down over the hole and pulling the end lane back. Matches
+   * `std::vector::erase(first, last)` semantics for the 12-byte key stride.
+   */
+  Wm3::Vector3f* EraseEmitterCurveKeyRange(
+    Wm3::Vector3f* const first,
+    Wm3::Vector3f* const last,
+    SEfxCurve& curve
+  )
+  {
+    if (first == last) {
+      return first;
+    }
+
+    Wm3::Vector3f* const keysEnd = curve.mKeys.end();
+    Wm3::Vector3f* destination = first;
+    for (Wm3::Vector3f* source = last; source != keysEnd; ++source, ++destination) {
+      *destination = *source;
+    }
+
+    auto& keysView = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(&curve.mKeys);
+    keysView.end = destination;
+    return first;
+  }
+
+  /**
    * Address: 0x00514FF0 (FUN_00514FF0, SEfxCurve y-bounds recompute lane)
    *
    * What it does:
