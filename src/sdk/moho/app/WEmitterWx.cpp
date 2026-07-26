@@ -21,6 +21,15 @@
 extern const std::int32_t wxEVT_COMMAND_BUTTON_CLICKED;
 
 /**
+ * wx's stock red pen, read from the library global at 0x00F8F634 by
+ * FUN_00661B90 (`mov eax, wxRED_PEN`).
+ */
+extern void* const wxRED_PEN;
+
+/** wx's stock cyan pen, used to highlight the selected curve key. */
+extern void* const wxCYAN_PEN;
+
+/**
  * Address: 0x009600E0 (FUN_009600E0, wxString::ToDouble)
  *
  * Recovered in `moho/sim/SimRecoveryRuntime.cpp`. The curve panel's field sink
@@ -177,6 +186,67 @@ namespace
     offsetof(WxCurveFieldCommandEventRuntimeView, mCommandString) == 0x20,
     "WxCurveFieldCommandEventRuntimeView::mCommandString offset must be 0x20"
   );
+
+  /**
+   * The three `wxDC` vtable slots the curve editor paints through. `wxDCRuntime`
+   * in `WxRuntimeTypes.h` is a field projection that models no vtable, so the
+   * slots are reached through this local overlay rather than by widening that
+   * shared type. Offsets are read off FUN_00661B90: `+0x38` takes a pen,
+   * `+0xF4` takes `(n, points, xoffset, yoffset, fillStyle)`, and `+0xB4`
+   * takes four coordinates.
+   */
+  struct WxCurveEditorDcVTable
+  {
+    void* mLanes000To037[0x38 / sizeof(void*)]{};
+    void(__thiscall* mSetPen)(void*, const void*);                        // +0x38
+    void* mLanes03CTo0B3[(0xB4 - 0x3C) / sizeof(void*)]{};
+    void(__thiscall* mDoDrawLine)(void*, std::int32_t, std::int32_t, std::int32_t, std::int32_t); // +0xB4
+    void* mLanes0B8To0C3[(0xC4 - 0xB8) / sizeof(void*)]{};
+    void(__thiscall* mDoDrawRectangle)(                                   // +0xC4
+      void*, std::int32_t, std::int32_t, std::int32_t, std::int32_t
+    );
+    void* mLanes0C8To0DB[(0xDC - 0xC8) / sizeof(void*)]{};
+    void(__thiscall* mDoDrawText)(void*, const wxStringRuntime*, std::int32_t, std::int32_t); // +0xDC
+    void* mLanes0E0To0F3[(0xF4 - 0xE0) / sizeof(void*)]{};
+    void(__thiscall* mDoDrawPolygon)(                                     // +0xF4
+      void*, std::int32_t, const wxPoint*, std::int32_t, std::int32_t, std::int32_t
+    );
+  };
+  static_assert(offsetof(WxCurveEditorDcVTable, mSetPen) == 0x38, "wxDC SetPen slot must be +0x38");
+  static_assert(offsetof(WxCurveEditorDcVTable, mDoDrawLine) == 0xB4, "wxDC DoDrawLine slot must be +0xB4");
+  static_assert(
+    offsetof(WxCurveEditorDcVTable, mDoDrawRectangle) == 0xC4,
+    "wxDC DoDrawRectangle slot must be +0xC4"
+  );
+  static_assert(offsetof(WxCurveEditorDcVTable, mDoDrawText) == 0xDC, "wxDC DoDrawText slot must be +0xDC");
+  static_assert(offsetof(WxCurveEditorDcVTable, mDoDrawPolygon) == 0xF4, "wxDC DoDrawPolygon slot must be +0xF4");
+
+  /**
+   * `WCurveEditor`'s own `GetTextExtent` slot, used by the paint handler to
+   * centre each axis label (FUN_006621F0 at `mov edx, [eax+0x120]`).
+   */
+  struct WxCurveEditorTextExtentVTable
+  {
+    void* mLanes000To11F[0x120 / sizeof(void*)]{};
+    void(__thiscall* mGetTextExtent)(                                     // +0x120
+      const void*, const wxStringRuntime*, std::int32_t*, std::int32_t*, void*, void*, void*
+    );
+  };
+  static_assert(
+    offsetof(WxCurveEditorTextExtentVTable, mGetTextExtent) == 0x120,
+    "WCurveEditor GetTextExtent slot must be +0x120"
+  );
+
+  [[nodiscard]] const WxCurveEditorDcVTable* CurveEditorDcVTable(void* const dc) noexcept
+  {
+    return *reinterpret_cast<const WxCurveEditorDcVTable* const*>(dc);
+  }
+
+  /** wx polygon fill style pushed by FUN_00661B90 (`push 2`). */
+  constexpr std::int32_t kCurveEnvelopeFillStyle = 2;
+
+  /** Side of the square grab handle drawn per key by FUN_00662180. */
+  constexpr std::int32_t kCurveKeyHandleSize = 5;
 
   /**
    * Parses one committed field's text into `outValue`, leaving `outValue`
@@ -752,6 +822,187 @@ namespace moho
     RefreshPreviewEmitter();
   }
 
+  /**
+   * Address: 0x00661B90 (FUN_00661B90)
+   *
+   * IDA signature:
+   * int __userpurge sub_661B90@<eax>(
+   *   wxDC *dc@<edi>, WCurveEditor *editor@<esi>, Wm3::Vector3f **keyCursor);
+   *
+   * What it does:
+   * Paints one span of the curve's tangent envelope in `wxRED_PEN`. The span
+   * runs between two "columns" -- for an interior key, the previous key and
+   * this key; at the first key the span is clamped to `mViewTimeMin`, and at
+   * the end sentinel it is clamped to `mViewTimeMax` against the last key.
+   *
+   * Each column contributes three points through `ProjectCurvePointToScreen`:
+   * the upper envelope edge (`value + tangent/2`), the curve value itself, and
+   * the lower edge (`value - tangent/2`). Wound as
+   * `upperX, upperY, midY, lowerY, lowerX, midX`, that is the six-vertex
+   * hexagon the retail body fills, after which the two mid-points are joined
+   * by a line so the curve itself is drawn over the band.
+   */
+  void WEmitterCurveEditor::DrawKeyEnvelopeSpan(void* const dc, const Wm3::Vector3f* const key) const
+  {
+    const auto* const dcVTable = CurveEditorDcVTable(dc);
+    dcVTable->mSetPen(dc, wxRED_PEN);
+
+    const Wm3::Vector3f* const keysBegin = mCurve.mKeys.begin();
+    const Wm3::Vector3f* const keysEnd = mCurve.mKeys.end();
+
+    // Resolve the span's two columns. `columnA` is drawn first in the winding.
+    CurveEnvelopeColumn columnA{};
+    CurveEnvelopeColumn columnB{};
+    if (key == keysBegin) {
+      columnA = {mViewTimeMin, key->y, key->z};
+      columnB = {key->x, key->y, key->z};
+    } else if (key == keysEnd) {
+      const Wm3::Vector3f* const lastKey = key - 1;
+      columnA = {lastKey->x, lastKey->y, lastKey->z};
+      columnB = {mViewTimeMax, lastKey->y, lastKey->z};
+    } else {
+      const Wm3::Vector3f* const previousKey = key - 1;
+      columnA = {previousKey->x, previousKey->y, previousKey->z};
+      columnB = {key->x, key->y, key->z};
+    }
+
+    const wxPoint envelope[6] = {
+      ProjectCurvePointToScreen(kCurveEnvelopeUpperEdge, columnA),
+      ProjectCurvePointToScreen(kCurveEnvelopeUpperEdge, columnB),
+      ProjectCurvePointToScreen(kCurveEnvelopeCurveValue, columnB),
+      ProjectCurvePointToScreen(kCurveEnvelopeLowerEdge, columnB),
+      ProjectCurvePointToScreen(kCurveEnvelopeLowerEdge, columnA),
+      ProjectCurvePointToScreen(kCurveEnvelopeCurveValue, columnA),
+    };
+    dcVTable->mDoDrawPolygon(dc, 6, envelope, 0, 0, kCurveEnvelopeFillStyle);
+
+    const wxPoint midB = ProjectCurvePointToScreen(kCurveEnvelopeCurveValue, columnB);
+    const wxPoint midA = ProjectCurvePointToScreen(kCurveEnvelopeCurveValue, columnA);
+    dcVTable->mDoDrawLine(dc, midA.x, midA.y, midB.x, midB.y);
+  }
+
+  /**
+   * Address: 0x006612A0 (FUN_006612A0)
+   *
+   * IDA signature:
+   * int *__userpurge sub_6612A0@<eax>(
+   *   int *out@<eax>, WCurveEditor *editor@<edx>, int edge@<ecx>,
+   *   float time, float value, float tangent);
+   *
+   * What it does:
+   * Projects one curve point into widget space. `edge` shifts the value by
+   * half the tangent to reach the upper or lower envelope edge, or leaves it
+   * alone for the curve itself. The horizontal axis maps time through
+   * `mViewTimeScale` relative to `mViewTimeMin`; the vertical axis is
+   * inverted, measuring down from the client height.
+   */
+  wxPoint WEmitterCurveEditor::ProjectCurvePointToScreen(
+    const std::int32_t edge,
+    const CurveEnvelopeColumn& column
+  ) const noexcept
+  {
+    float value = column.mValue;
+    if (edge == kCurveEnvelopeUpperEdge) {
+      value = column.mValue + column.mTangent * 0.5f;
+    } else if (edge == kCurveEnvelopeLowerEdge) {
+      value = column.mValue - column.mTangent * 0.5f;
+    }
+
+    wxPoint projected{};
+    projected.x = static_cast<std::int32_t>(mViewTimeScale * (column.mTime - mViewTimeMin));
+    projected.y = static_cast<std::int32_t>(
+      static_cast<float>(mClientHeight) - mViewValueScale * (value - mViewValueMin)
+    );
+    return projected;
+  }
+
+  /**
+   * Address: 0x00662180 (FUN_00662180)
+   *
+   * IDA signature:
+   * int __usercall sub_662180@<eax>(
+   *   WCurveEditor *editor@<ebx>, Wm3::Vector3f **keyCursor@<edi>, wxDC *dc@<esi>);
+   *
+   * What it does:
+   * Draws one key's grab handle: a 5x5 square centred on the key, cyan when
+   * that key is the current selection and red otherwise.
+   */
+  void WEmitterCurveEditor::DrawKeyHandle(void* const dc, const Wm3::Vector3f* const key) const
+  {
+    const auto* const dcVTable = CurveEditorDcVTable(dc);
+    dcVTable->mSetPen(dc, key == mSelectedKey ? wxCYAN_PEN : wxRED_PEN);
+
+    const wxPoint handle =
+      ProjectCurvePointToScreen(kCurveEnvelopeCurveValue, {key->x, key->y, key->z});
+    dcVTable->mDoDrawRectangle(dc, handle.x, handle.y, kCurveKeyHandleSize, kCurveKeyHandleSize);
+  }
+
+  /**
+   * Address: 0x006621F0 (FUN_006621F0)
+   *
+   * IDA signature:
+   * void __thiscall sub_6621F0(WCurveEditor *this, wxPaintEvent *event);
+   *
+   * What it does:
+   * `wxEventTableEntry` paint sink for the curve editor. Caches the client
+   * size, derives the two pixel-per-unit view scales from it, then paints the
+   * curve: one envelope span per key plus a closing span for the end
+   * sentinel, a grab handle per key, and the four axis labels (`%.1f`) placed
+   * against the edges using the control's own `GetTextExtent`, followed by the
+   * editor's caption.
+   */
+  void WEmitterCurveEditor::OnPaint()
+  {
+    wxPaintDCRuntime paintDc(reinterpret_cast<wxWindowBase*>(this));
+    void* const dc = &paintDc;
+
+    std::int32_t clientWidth = 0;
+    std::int32_t clientHeight = 0;
+    paintDc.DoGetSize(&clientWidth, &clientHeight);
+    mClientWidth = clientWidth;
+    mClientHeight = clientHeight;
+
+    mViewTimeScale = static_cast<float>(clientWidth) / (mViewTimeMax - mViewTimeMin);
+    mViewValueScale = static_cast<float>(clientHeight) / (mViewValueMax - mViewValueMin);
+
+    // One envelope span per key, then the closing span at the end sentinel.
+    for (const Wm3::Vector3f* key = mCurve.mKeys.begin(); key != mCurve.mKeys.end(); ++key) {
+      DrawKeyEnvelopeSpan(dc, key);
+    }
+    DrawKeyEnvelopeSpan(dc, mCurve.mKeys.end());
+
+    for (const Wm3::Vector3f* key = mCurve.mKeys.begin(); key != mCurve.mKeys.end(); ++key) {
+      DrawKeyHandle(dc, key);
+    }
+
+    const auto* const dcVTable = CurveEditorDcVTable(dc);
+    const auto* const textVTable = *reinterpret_cast<const WxCurveEditorTextExtentVTable* const*>(this);
+
+    wxStringRuntime label{};
+    const auto drawLabel = [&](const float value, const bool horizontalCentre, const bool atFarEdge) {
+      (void)wxStringFormat(&label, L"%.1f", static_cast<double>(value));
+
+      std::int32_t textWidth = 0;
+      std::int32_t textHeight = 0;
+      textVTable->mGetTextExtent(this, &label, &textWidth, &textHeight, nullptr, nullptr, nullptr);
+
+      const std::int32_t x = horizontalCentre ? (clientWidth / 2 - textWidth / 2)
+                                              : (atFarEdge ? clientWidth - textWidth : 0);
+      const std::int32_t y = horizontalCentre ? (atFarEdge ? clientHeight - textHeight : 0)
+                                              : (clientHeight / 2 - textHeight / 2);
+      dcVTable->mDoDrawText(dc, &label, x, y);
+    };
+
+    drawLabel(mViewTimeMin, false, false);  // left edge, vertically centred
+    drawLabel(mViewTimeMax, false, true);   // right edge, vertically centred
+    drawLabel(mViewValueMin, true, true);   // bottom edge, horizontally centred
+    drawLabel(mViewValueMax, true, false);  // top edge, horizontally centred
+
+    dcVTable->mDoDrawText(dc, &mCaption, 0, 0);
+
+    ReleaseCopiedWxString(label);
+  }
+
   void WEmitterCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
@@ -773,10 +1024,12 @@ namespace moho
     struct WCurveEditorEventTableBindings
     {
       CurveEditorWheelSinkFnPtr onMouseWheel;
+      void (WEmitterCurveEditor::*onPaint)();
     };
 
     const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
       &WEmitterCurveEditor::ZoomValueAxisByWheel,
+      &WEmitterCurveEditor::OnPaint,
     };
 
     using CurvePanelFieldSinkFnPtr = void (WEmitterCurvePanel::*)(wxEventRuntime&);

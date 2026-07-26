@@ -72,6 +72,22 @@ namespace moho
 
   struct WEmitterCurveEditorVTable;
 
+  /**
+   * One vertical column of the curve envelope: a time on the horizontal axis
+   * plus the value/tangent pair that gives the band its height there.
+   */
+  struct CurveEnvelopeColumn
+  {
+    float mTime = 0.0f;
+    float mValue = 0.0f;
+    float mTangent = 0.0f;
+  };
+
+  /** Envelope edge selectors taken by `ProjectCurvePointToScreen`. */
+  inline constexpr std::int32_t kCurveEnvelopeUpperEdge = 0;
+  inline constexpr std::int32_t kCurveEnvelopeCurveValue = 1;
+  inline constexpr std::int32_t kCurveEnvelopeLowerEdge = 2;
+
   struct WEmitterCurveEditor
   {
     WEmitterCurveEditorVTable* mVTable = nullptr;
@@ -90,7 +106,12 @@ namespace moho
     Wm3::Vector3f* mSelectedKey = nullptr;
     std::uint8_t mReserved134To137[0x4]{};
     SEfxCurve mCurve;
-    std::uint8_t mReserved170To173[0x4]{};
+
+    /**
+     * Time-axis pixels-per-unit, recomputed by the paint handler
+     * (FUN_006621F0) as `clientWidth / (mViewTimeMax - mViewTimeMin)`.
+     */
+    float mViewTimeScale = 0.0f;
 
     /**
      * Value-axis units-per-pixel scale. Recomputed by the resize handler
@@ -100,7 +121,10 @@ namespace moho
      * FUN_00661A90 all divide by `[this+0x174]`).
      */
     float mViewValueScale = 0.0f;
-    std::uint8_t mReserved178To17F[0x8]{};
+
+    /** Client size cached by the paint handler (FUN_006621F0). */
+    std::int32_t mClientWidth = 0;
+    std::int32_t mClientHeight = 0;
 
     /**
      * Visible view rectangle over the curve, stored interleaved as
@@ -116,6 +140,10 @@ namespace moho
     float mViewValueMax = 0.0f;
     std::uint8_t mReserved190[0x1]{};
     std::uint8_t mCurveDirty = 0;
+    std::uint8_t mReserved192To193[0x2]{};
+
+    /** Caption painted at the widget's top-left corner. */
+    wxStringRuntime mCaption;
 
     void ResetCurveXRange(float rangeMax) noexcept;
 
@@ -149,13 +177,65 @@ namespace moho
      */
     void MoveSelectedKeyTo(float time, float value, float tangent);
 
+    /**
+     * Address: 0x00661B90 (FUN_00661B90)
+     *
+     * What it does:
+     * Paints one span of the curve's tangent envelope between the given key
+     * and its neighbour (clamped to the visible time range at either end),
+     * then draws the curve line across that span.
+     */
+    void DrawKeyEnvelopeSpan(void* dc, const Wm3::Vector3f* key) const;
+
+    /**
+     * Address: 0x00662180 (FUN_00662180)
+     *
+     * What it does:
+     * Draws one key's 5x5 grab handle, cyan when selected and red otherwise.
+     */
+    void DrawKeyHandle(void* dc, const Wm3::Vector3f* key) const;
+
+    /**
+     * Address: 0x006621F0 (FUN_006621F0)
+     *
+     * What it does:
+     * `wxEventTableEntry` paint sink: caches the client size, derives the view
+     * scales, and paints the envelope spans, key handles and axis labels.
+     */
+    void OnPaint();
+
+    /**
+     * Address: 0x006612A0 (FUN_006612A0)
+     *
+     * What it does:
+     * Projects one curve point to widget space. `edge` selects the upper
+     * envelope edge (`value + tangent/2`), the curve value itself, or the
+     * lower edge (`value - tangent/2`).
+     */
+    [[nodiscard]] wxPoint ProjectCurvePointToScreen(
+      std::int32_t edge,
+      const CurveEnvelopeColumn& column
+    ) const noexcept;
+
     void MarkCurveClean() noexcept;
     [[nodiscard]] const SEfxCurve& Curve() const noexcept;
   };
   static_assert(offsetof(WEmitterCurveEditor, mCurve) == 0x138, "WEmitterCurveEditor::mCurve offset must be 0x138");
   static_assert(
+    offsetof(WEmitterCurveEditor, mViewTimeScale) == 0x170,
+    "WEmitterCurveEditor::mViewTimeScale offset must be 0x170"
+  );
+  static_assert(
     offsetof(WEmitterCurveEditor, mViewValueScale) == 0x174,
     "WEmitterCurveEditor::mViewValueScale offset must be 0x174"
+  );
+  static_assert(
+    offsetof(WEmitterCurveEditor, mClientWidth) == 0x178,
+    "WEmitterCurveEditor::mClientWidth offset must be 0x178"
+  );
+  static_assert(
+    offsetof(WEmitterCurveEditor, mClientHeight) == 0x17C,
+    "WEmitterCurveEditor::mClientHeight offset must be 0x17C"
   );
   static_assert(
     offsetof(WEmitterCurveEditor, mViewTimeMin) == 0x180,
