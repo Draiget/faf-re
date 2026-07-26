@@ -109,6 +109,27 @@ namespace
     void* mLanes000To0EF[0xF0 / sizeof(void*)]{};
     NotifyCurveChangedFn mNotifyCurveChanged = nullptr; // +0xF0
   };
+
+  /**
+   * Smallest visible value span the curve editor will zoom down to. Compared
+   * against `dbl_E4F710+4` (0.1f) by FUN_006617A0 before it commits a zoom.
+   */
+  constexpr float kMinimumVisibleValueSpan = 0.1f;
+
+  /**
+   * `wxMouseEvent` wheel lane used by the curve editor's wheel sink. The
+   * rotation field is read at `[event+0x30]` by FUN_006617A0, matching the
+   * `wxMouseEvent` layout already modelled for the Maui mapper.
+   */
+  struct WxCurveEditorWheelEventRuntimeView
+  {
+    std::uint8_t mWxEventBase[0x30]{}; // +0x00 wxEvent header + mouse position/flag lanes
+    std::int32_t mWheelRotation = 0;   // +0x30
+  };
+  static_assert(
+    offsetof(WxCurveEditorWheelEventRuntimeView, mWheelRotation) == 0x30,
+    "WxCurveEditorWheelEventRuntimeView::mWheelRotation offset must be 0x30"
+  );
   static_assert(
     offsetof(WEmitterCurveEditorVTableLayout, mNotifyCurveChanged) == 0xF0,
     "WEmitterCurveEditorVTableLayout::mNotifyCurveChanged offset must be 0xF0"
@@ -390,9 +411,45 @@ namespace moho
 
   void WEmitterCurveEditor::ResetCurveXRange(const float rangeMax) noexcept
   {
-    mCurveRangeMin = 0.0f;
-    mCurveRangeMax = rangeMax;
+    mViewTimeMin = 0.0f;
+    mViewTimeMax = rangeMax;
     RescaleEmitterCurveXRange(&mCurve, 0.0f, rangeMax);
+    (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
+  }
+
+  /**
+   * Address: 0x006617A0 (FUN_006617A0)
+   *
+   * IDA signature:
+   * int __thiscall sub_6617A0(WCurveEditor *this, wxMouseEvent *event);
+   *
+   * What it does:
+   * `WCurveEditor` mouse-wheel sink, installed at 0x00F59D44 in the curve
+   * editor's `wxEventTableEntry` array. Zooms the value (Y) axis about its
+   * centre: one wheel notch is converted into a value delta of
+   * `rotation / (mViewValueScale * 5.0f) * 0.5f`, which is added to the
+   * visible minimum and subtracted from the visible maximum. The zoom is
+   * rejected outright when it would collapse the visible value span below
+   * `0.1f`, so the range is left untouched rather than clamped. On an accepted
+   * zoom the new bounds are stored and the curve-changed notification
+   * (vtable +0xF0) is raised with `(1, 0)`, exactly as `ResetCurveXRange`
+   * does for the time axis.
+   */
+  void WEmitterCurveEditor::ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept
+  {
+    const auto& mouseEvent = reinterpret_cast<const WxCurveEditorWheelEventRuntimeView&>(wheelEvent);
+
+    const float valueDelta =
+      (static_cast<float>(mouseEvent.mWheelRotation) / (mViewValueScale * 5.0f)) * 0.5f;
+    const float zoomedMin = mViewValueMin + valueDelta;
+    const float zoomedMax = mViewValueMax - valueDelta;
+
+    if (zoomedMax - zoomedMin < kMinimumVisibleValueSpan) {
+      return;
+    }
+
+    mViewValueMin = zoomedMin;
+    mViewValueMax = zoomedMax;
     (void)CurveEditorVTable(*this)->mNotifyCurveChanged(this, 1, 0);
   }
 
@@ -400,6 +457,34 @@ namespace moho
   {
     mCurveDirty = 0;
   }
+
+  namespace
+  {
+    using CurveEditorWheelSinkFnPtr = void (WEmitterCurveEditor::*)(const wxEventRuntime&) noexcept;
+
+    /**
+     * Address: 0x00F59D44 (`WCurveEditor` wxEventTableEntry slot)
+     *
+     * What it does:
+     * Holds the curve editor's wheel sink so the linker keeps it addressable
+     * from this TU, mirroring the compiler-emitted `wxEventTable` array that
+     * `WCurveEditor::GetEventTable` (0x00662660) publishes. In the original
+     * 2007 source this entry is emitted by the wx `EVT_MOUSEWHEEL` macro.
+     */
+    struct WCurveEditorEventTableBindings
+    {
+      CurveEditorWheelSinkFnPtr onMouseWheel;
+    };
+
+    const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
+      &WEmitterCurveEditor::ZoomValueAxisByWheel,
+    };
+
+    [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorEventTableBindings() noexcept
+    {
+      return static_cast<const void*>(&kWCurveEditorEventTableBindings);
+    }
+  } // namespace
 
   const SEfxCurve& WEmitterCurveEditor::Curve() const noexcept
   {

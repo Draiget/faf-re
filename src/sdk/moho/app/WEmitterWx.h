@@ -77,25 +77,68 @@ namespace moho
     WEmitterCurveEditorVTable* mVTable = nullptr;
     std::uint8_t mReserved004To137[0x134]{};
     SEfxCurve mCurve;
-    std::uint8_t mReserved170To17F[0x10]{};
-    float mCurveRangeMin = 0.0f;
-    float mCurveRangeMid = 0.0f;
-    float mCurveRangeMax = 0.0f;
-    std::uint8_t mReserved18CTo190[0x5]{};
+    std::uint8_t mReserved170To173[0x4]{};
+
+    /**
+     * Value-axis units-per-pixel scale. Recomputed by the resize handler
+     * (FUN_006621F0 stores the value span here, then divides the time span by
+     * it) and used as the divisor that converts pixel / wheel deltas into
+     * curve-value deltas (FUN_006617A0, FUN_00661820, FUN_00661900,
+     * FUN_00661A90 all divide by `[this+0x174]`).
+     */
+    float mViewValueScale = 0.0f;
+    std::uint8_t mReserved178To17F[0x8]{};
+
+    /**
+     * Visible view rectangle over the curve, stored interleaved as
+     * (timeMin, valueMin, timeMax, valueMax). Proven by the `WCurveEditor`
+     * constructor at 0x006613FA-0x0066142F, which seeds `[0x180] = 0.0f`,
+     * `[0x188] = arg8`, `[0x184] = argC`, `[0x18C] = arg10`; and by the span
+     * arithmetic in FUN_006621F0 (`[0x188]-[0x180]` paired with
+     * `[0x18C]-[0x184]`).
+     */
+    float mViewTimeMin = 0.0f;
+    float mViewValueMin = 0.0f;
+    float mViewTimeMax = 0.0f;
+    float mViewValueMax = 0.0f;
+    std::uint8_t mReserved190[0x1]{};
     std::uint8_t mCurveDirty = 0;
 
     void ResetCurveXRange(float rangeMax) noexcept;
+
+    /**
+     * Address: 0x006617A0 (FUN_006617A0)
+     *
+     * What it does:
+     * `wxEventTableEntry` mouse-wheel sink at 0x00F59D44: zooms the value axis
+     * about its centre, rejecting zooms that would collapse the visible span
+     * below 0.1f, then raises the curve-changed notification.
+     */
+    void ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept;
+
     void MarkCurveClean() noexcept;
     [[nodiscard]] const SEfxCurve& Curve() const noexcept;
   };
   static_assert(offsetof(WEmitterCurveEditor, mCurve) == 0x138, "WEmitterCurveEditor::mCurve offset must be 0x138");
   static_assert(
-    offsetof(WEmitterCurveEditor, mCurveRangeMin) == 0x180,
-    "WEmitterCurveEditor::mCurveRangeMin offset must be 0x180"
+    offsetof(WEmitterCurveEditor, mViewValueScale) == 0x174,
+    "WEmitterCurveEditor::mViewValueScale offset must be 0x174"
   );
   static_assert(
-    offsetof(WEmitterCurveEditor, mCurveRangeMax) == 0x188,
-    "WEmitterCurveEditor::mCurveRangeMax offset must be 0x188"
+    offsetof(WEmitterCurveEditor, mViewTimeMin) == 0x180,
+    "WEmitterCurveEditor::mViewTimeMin offset must be 0x180"
+  );
+  static_assert(
+    offsetof(WEmitterCurveEditor, mViewValueMin) == 0x184,
+    "WEmitterCurveEditor::mViewValueMin offset must be 0x184"
+  );
+  static_assert(
+    offsetof(WEmitterCurveEditor, mViewTimeMax) == 0x188,
+    "WEmitterCurveEditor::mViewTimeMax offset must be 0x188"
+  );
+  static_assert(
+    offsetof(WEmitterCurveEditor, mViewValueMax) == 0x18C,
+    "WEmitterCurveEditor::mViewValueMax offset must be 0x18C"
   );
   static_assert(
     offsetof(WEmitterCurveEditor, mCurveDirty) == 0x191,
