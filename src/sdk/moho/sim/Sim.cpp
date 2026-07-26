@@ -7432,8 +7432,20 @@ namespace
     PathPreviewPublishedPathRuntimeView publishedPath{};
     publishedPath.mPreviousFootprint = finder->mFootprint;
     finder->mFootprint = nullptr;
-    publishedPath.mCells.resize(sourceCells.size());
-    for (std::size_t i = 0; i < sourceCells.size(); ++i) {
+
+    // The binary sizes the destination with the two-argument resize, filling
+    // appended slots with the `Invalid<SOCellPos>` sentinel rather than
+    // value-initialising them: 0x00764AD1 materialises 0xFFFF8000 and stores
+    // it as two 16-bit halves, then passes that 4-byte value BY VALUE to the
+    // resize lane at 0x00764AEB. The source count is computed once
+    // (0x00764AC9) and reused as both the resize count and the copy bound.
+    constexpr SOCellPos kInvalidCellPos{
+      static_cast<std::int16_t>(0x8000),
+      static_cast<std::int16_t>(0x8000)
+    };
+    const std::size_t cellCount = sourceCells.size();
+    publishedPath.mCells.resize(cellCount, kInvalidCellPos);
+    for (std::size_t i = 0; i < cellCount; ++i) {
       publishedPath.mCells[i] = sourceCells[i];
     }
 
@@ -13831,19 +13843,6 @@ namespace
   // They are not standalone binary function boundaries, so they intentionally
   // do not carry per-function `Address:` blocks. Canonical recovered entry
   // points in this lane remain explicitly address-annotated.
-  struct BlueprintOrdinalVectorView
-  {
-    void* mProxy;                  // +0x00
-    RBlueprint** mBegin;           // +0x04
-    RBlueprint** mEnd;             // +0x08
-    RBlueprint** mCapacityEnd;     // +0x0C
-  };
-  static_assert(sizeof(BlueprintOrdinalVectorView) == 0x10, "BlueprintOrdinalVectorView size must be 0x10");
-  static_assert(
-    offsetof(BlueprintOrdinalVectorView, mBegin) == 0x04,
-    "BlueprintOrdinalVectorView::mBegin offset must be 0x04"
-  );
-
   struct CategoryLookupNodeView : msvc8::Tree<CategoryLookupNodeView>
   {
     std::uint8_t color;           // +0x0C
@@ -14223,49 +14222,35 @@ namespace
     return node;
   }
 
-  [[nodiscard]] std::size_t SafeVectorCount(RBlueprint** const begin, RBlueprint** const end) noexcept
-  {
-    if (!begin || !end || end < begin) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(end - begin);
-  }
-
-  [[nodiscard]] BlueprintOrdinalVectorView& BlueprintOrdinalVector(RRuleGameRulesImpl& rules) noexcept
-  {
-    return *reinterpret_cast<BlueprintOrdinalVectorView*>(&rules.mUnknownB4);
-  }
-
+  /**
+   * Address: 0x005347A0 (FUN_005347A0, msvc8::vector<Moho::RBlueprint*>::push_back)
+   *
+   * IDA signature:
+   * unsigned int __usercall sub_5347A0@<eax>(RBlueprint **value@<eax>,
+   *                                          std::vector_RBlueprint_P *vec);
+   *
+   * What it does:
+   * Appends one blueprint pointer to the by-ordinal registry at `rules + 0xB4`
+   * (`add ecx, 0B4h` at 0x00531FE9 in `func_CreateRUnitBlueprint`). The append
+   * is the legacy container's own `push_back`; on the capacity-full path MSVC8
+   * routes it into the `vector<RBlueprint*>::insert(end(), 1, value)` lane
+   * emitted at FUN_00535D60.
+   *
+   * The parameter stays `void*` because the recovered `REntityBlueprint`
+   * models the shared blueprint header by layout duplication rather than by
+   * deriving from `RBlueprint`, so `RUnitBlueprint*` has no implicit
+   * conversion to the registry's element type yet. The binary stores the raw
+   * pointer value either way.
+   */
   void AppendBlueprintOrdinal(RRuleGameRulesImpl& rules, void* const blueprintObject)
   {
     if (blueprintObject == nullptr) {
       return;
     }
 
-    BlueprintOrdinalVectorView& ordinalVector = BlueprintOrdinalVector(rules);
-    std::size_t count = SafeVectorCount(ordinalVector.mBegin, ordinalVector.mEnd);
-    const std::size_t capacity = SafeVectorCount(ordinalVector.mBegin, ordinalVector.mCapacityEnd);
-    if (ordinalVector.mBegin == nullptr || count >= capacity) {
-      const std::size_t growth = (capacity > 0u) ? std::max<std::size_t>(capacity >> 1u, 1u) : 8u;
-      const std::size_t newCapacity = capacity + growth;
-      auto** const newStorage =
-        static_cast<RBlueprint**>(::operator new(sizeof(RBlueprint*) * newCapacity, std::nothrow));
-      if (!newStorage) {
-        return;
-      }
-
-      if (ordinalVector.mBegin != nullptr && count > 0u) {
-        std::memcpy(newStorage, ordinalVector.mBegin, sizeof(RBlueprint*) * count);
-      }
-
-      ::operator delete(ordinalVector.mBegin);
-      ordinalVector.mBegin = newStorage;
-      ordinalVector.mEnd = newStorage + count;
-      ordinalVector.mCapacityEnd = newStorage + newCapacity;
-    }
-
-    *ordinalVector.mEnd = reinterpret_cast<RBlueprint*>(blueprintObject);
-    ++ordinalVector.mEnd;
+    // push_back's capacity-full path is `msvc8::vector<RBlueprint*>::insert`
+    // (FUN_00535D60), reached through the binary's push_back at FUN_005347A0.
+    rules.mBlueprintsByOrdinal.push_back(static_cast<RBlueprint*>(blueprintObject));
   }
 
   [[nodiscard]] EntityCategoryLookupTableView* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept

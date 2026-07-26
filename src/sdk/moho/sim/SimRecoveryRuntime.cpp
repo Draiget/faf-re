@@ -4100,24 +4100,11 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
   DestroyRecursiveStringTree(node);
 }
 
-/**
- * Address: 0x005347A0 (FUN_005347A0)
- *
- * What it does:
- * Appends one 32-bit blueprint-registry word into a legacy vector lane.
- */
-[[maybe_unused]] std::uint32_t AppendBlueprintRegistryWordRuntime(
-  const std::uint32_t* const value,
-  LegacyVectorStorageRuntime<std::uint32_t>* const vector
-)
-{
-  if (value == nullptr || vector == nullptr) {
-    return 0u;
-  }
-
-  std::uint32_t* const inserted = AppendTrivialValue(vector, *value);
-  return inserted != nullptr ? *inserted : *value;
-}
+// 0x005347A0 is `msvc8::vector<Moho::RBlueprint*>::push_back`, recovered as a
+// real container call in moho::AppendBlueprintOrdinal (Sim.cpp). The
+// type-erased `LegacyVectorStorageRuntime<std::uint32_t>` stand-in that used to
+// claim this address here duplicated the container and has been removed —
+// one address, one function.
 
 /**
  * Address: 0x00545280 (FUN_00545280)

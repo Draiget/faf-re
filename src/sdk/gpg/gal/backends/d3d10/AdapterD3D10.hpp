@@ -13,17 +13,29 @@ namespace gpg::gal
     {
         std::uint32_t format_ = 0U;              // +0x00 (DXGI_FORMAT)
         void* output_ = nullptr;                 // +0x04 (IDXGIOutput*)
-        DXGI_OUTPUT_DESC outputDesc_{};          // +0x08
-        std::uint32_t outputDescPad_ = 0U;       // +0x64
-        msvc8::vector<DXGI_MODE_DESC> modes_{};  // +0x68
+        DXGI_OUTPUT_DESC outputDesc_{};          // +0x08 (0x5C bytes)
+        msvc8::vector<DXGI_MODE_DESC> modes_{};  // +0x64
     };
 
     static_assert(offsetof(AdapterModeD3D10, format_) == 0x00, "AdapterModeD3D10::format_ offset must be 0x00");
     static_assert(offsetof(AdapterModeD3D10, output_) == 0x04, "AdapterModeD3D10::output_ offset must be 0x04");
     static_assert(offsetof(AdapterModeD3D10, outputDesc_) == 0x08, "AdapterModeD3D10::outputDesc_ offset must be 0x08");
-    static_assert(offsetof(AdapterModeD3D10, outputDescPad_) == 0x64, "AdapterModeD3D10::outputDescPad_ offset must be 0x64");
-    static_assert(offsetof(AdapterModeD3D10, modes_) == 0x68, "AdapterModeD3D10::modes_ offset must be 0x68");
-    static_assert(sizeof(AdapterModeD3D10) == 0x78, "AdapterModeD3D10 size must be 0x78");
+    /**
+     * `modes_` starts at +0x64, not +0x68: the word at +0x64 is the legacy
+     * vector's own `myProxy_` lane, not a descriptor pad.
+     *
+     * Proof, both from `AppendAdapterModeEntry`'s binary body (FUN_008F7C50):
+     * the element stride is `add esi, 74h` at 0x008F7CBC, and the count divide
+     * is the `imul 8D3DCB09h` / `add edx, ecx` / `sar edx, 6` reciprocal triple
+     * at 0x008F7C66-0x008F7C6F — the signed divide-by-116 sequence. And in
+     * `AdapterD3D10::ProbeOutputsAndModes` (FUN_008F7CF0) the entry base is
+     * `esp+0x44` (0x008F7E7A) while the three zeroed vector lanes are
+     * `esp+0xAC/0xB0/0xB4` (0x008F7D94-0x008F7DA2) and the buffer freed at
+     * 0x008F7EA1 is read from `esp+0xAC` — i.e. `first_` sits at entry+0x68,
+     * so the vector object itself begins one word earlier.
+     */
+    static_assert(offsetof(AdapterModeD3D10, modes_) == 0x64, "AdapterModeD3D10::modes_ offset must be 0x64");
+    static_assert(sizeof(AdapterModeD3D10) == 0x74, "AdapterModeD3D10 size must be 0x74");
 
     /**
      * VFTABLE: 0x00D42FF8

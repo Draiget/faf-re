@@ -658,6 +658,6 @@ namespace gal {
      * Copies startup device-context payload into recovered D3D10 backend
      * context lanes and records the current thread id.
      */
-    void InitializeDeviceD3D10Backend(Device* device, const DeviceContext* context);
+    void InitializeDeviceD3D10Backend(Device* device, DeviceContext* context);
 } // namespace gal
 } // namespace gpg
