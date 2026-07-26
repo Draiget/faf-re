@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -103,6 +104,30 @@ namespace moho
    * Base unwind/teardown helper that removes command registration when name is set.
    */
   void TeardownConCommandRegistration(CConCommand& command);
+
+  /**
+   * Shared startup-registration glue for statically constructed console
+   * commands and convars.
+   *
+   * Every `register_*` / `cleanup_*` pair the binary emits for a static
+   * `CConCommand` or `TConVar<T>` object expands to the same two-instruction
+   * shape (`CON_GetMap()` insert + `_atexit(dtor)` on the way in,
+   * `CON_ReregisterCom` on the way out). These stay templates so each owning
+   * subsystem's registration translation unit reuses one definition instead of
+   * re-emitting a per-command copy.
+   */
+  template <typename TCommand>
+  void CleanupStartupConCommand(TCommand& command) noexcept
+  {
+    TeardownConCommandRegistration(command);
+  }
+
+  template <typename TCommand>
+  void RegisterStartupConVar(TCommand& conVar, void (*cleanupFn)()) noexcept
+  {
+    RegisterConCommand(conVar);
+    (void)std::atexit(cleanupFn);
+  }
 
   /**
    * Address: 0x0041BFF0 (FUN_0041BFF0, ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
