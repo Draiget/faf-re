@@ -157,6 +157,21 @@ namespace moho
     InfluenceGrid();
 
     /**
+     * Address: 0x0071C150 (FUN_0071C150, Moho::InfluenceGrid::Cpy)
+     *
+     * IDA signature:
+     * Moho::InfluenceGrid *__stdcall Moho::InfluenceGrid::Cpy(
+     *     Moho::InfluenceGrid *dst, Moho::InfluenceGrid *src);
+     *
+     * What it does:
+     * Copy-constructs one grid: builds a sentinel-only `entries` header and
+     * clones every `InfluenceMapEntry` node from `other`, copy-constructs the
+     * per-army `threats` vector, then copies the aggregate `threat`/`decay`
+     * lanes.
+     */
+    InfluenceGrid(const InfluenceGrid& other);
+
+    /**
      * Address: 0x00716350 (FUN_00716350, ??1InfluenceGrid@Moho@@QAE@@Z)
      *
      * What it does:

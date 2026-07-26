@@ -77,7 +77,15 @@ namespace gpg
     void Init() override;
   };
 
-  class RVectorType_InfluenceGrid final : public gpg::RType
+  /**
+   * VFTABLE (gpg::RIndexed subobject @ +0x64): 0x00E3181C
+   *   ??_7?$RVectorType@UInfluenceGrid@Moho@@@gpg@@6BRIndexed@gpg@@@
+   *   +0x00 SubscriptIndex   0x00718FA0
+   *   +0x04 GetCount         0x00718F40
+   *   +0x08 SetCount         0x00718F70
+   *   +0x0C AssignPointer    0x00401320 (inherited gpg::RIndexed base impl)
+   */
+  class RVectorType_InfluenceGrid final : public gpg::RType, public gpg::RIndexed
   {
   public:
     /**
@@ -93,8 +101,42 @@ namespace gpg
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
+    /**
+     * Address: 0x00718F30 (FUN_00718F30, gpg::RVectorType_InfluenceGrid::IsIndexed)
+     *
+     * What it does:
+     * Returns the `gpg::RIndexed` subobject (`this ? this + 0x64 : nullptr`).
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
     void Init() override;
+
+    /**
+     * Address: 0x00718FA0 (FUN_00718FA0, gpg::RVectorType_InfluenceGrid::SubscriptIndex)
+     *
+     * What it does:
+     * Wraps `&vec[ind]` (stride 0x8C) as one `gpg::RRef_InfluenceGrid` reference.
+     */
+    [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x00718F40 (FUN_00718F40, gpg::RVectorType_InfluenceGrid::GetCount)
+     *
+     * What it does:
+     * Returns `(last - first) / sizeof(InfluenceGrid)`, or 0 for an empty lane.
+     */
+    [[nodiscard]] std::size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x00718F70 (FUN_00718F70, gpg::RVectorType_InfluenceGrid::SetCount)
+     *
+     * What it does:
+     * Resizes the reflected `vector<InfluenceGrid>` to `count`, filling any
+     * appended cells with a default-constructed `InfluenceGrid`.
+     */
+    void SetCount(void* obj, int count) const override;
   };
+  static_assert(sizeof(RVectorType_InfluenceGrid) == 0x68, "RVectorType_InfluenceGrid size must be 0x68");
 
   class RVectorType_SThreat final : public gpg::RType
   {
@@ -153,29 +195,35 @@ namespace
   /**
    * Address: 0x0071B860 (FUN_0071B860)
    *
+   * IDA signature:
+   * void __usercall sub_71B860(unsigned int newCount@<ecx>,
+   *                            std::vector_InfluenceGrid *vec@<edx>,
+   *                            Moho::InfluenceGrid fillValue);
+   *
    * What it does:
-   * Adjusts one `vector<InfluenceGrid>` length to `requestedCount` and uses
-   * one caller-provided fill lane for growth.
+   * The MSVC8 `vector<InfluenceGrid>::resize(size_type, _Ty _Val)` emission:
+   * appends `requestedCount - size()` copies of `fillValue` through
+   * `_Insert_n(end(), n, value)` (0x0071B8D9 -> FUN_0071B970) when growing, and
+   * erases the tail range `[begin() + requestedCount, end())` (0x0071B912) when
+   * shrinking. `fillValue` arrives by value (0x8C bytes, `retn 8Ch`) and is
+   * destroyed on the way out at 0x0071B924.
    */
-  [[maybe_unused]] std::size_t ResizeInfluenceGridVectorWithFill(
+  void ResizeInfluenceGridVectorWithFill(
     InfluenceGridVector& storage,
     const std::size_t requestedCount,
     const moho::InfluenceGrid& fillValue
   )
   {
-    (void)fillValue;
-
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
-      storage.resize(requestedCount);
-      return requestedCount;
+      // Growth path instantiates `msvc8::vector<InfluenceGrid>::insert` (FUN_0071B970).
+      storage.resize(requestedCount, fillValue);
+      return;
     }
 
     if (requestedCount < currentCount) {
       storage.resize(requestedCount);
     }
-
-    return requestedCount;
   }
 
   /**
@@ -191,7 +239,7 @@ namespace
   )
   {
     moho::InfluenceGrid fillValue{};
-    (void)ResizeInfluenceGridVectorWithFill(storage, static_cast<std::size_t>(requestedCount), fillValue);
+    ResizeInfluenceGridVectorWithFill(storage, static_cast<std::size_t>(requestedCount), fillValue);
   }
 
   /**
@@ -1783,12 +1831,20 @@ namespace
    *
    * What it does:
    * Loads one reflected `vector<InfluenceGrid>` payload from archive lanes.
+   * The binary never resizes the destination in place: it reads the element
+   * count (`ReadUInt` through vtable slot +0x20 at 0x0071A378), reserves that
+   * many slots on a stack-local scratch vector (0x0071A383 -> FUN_0071B730),
+   * appends every element to the scratch through `push_back` (0x0071A3E9 ->
+   * FUN_00718810), and only then swaps the scratch's `{first,last,end}` lanes
+   * into the destination (0x0071A44E/0x0071A458/0x0071A45F). The destination's
+   * previous buffer is destroyed and freed afterwards, by the scratch vector's
+   * scope-exit teardown (0x0071A477/0x0071A47D).
    */
-  [[maybe_unused]] void LoadInfluenceGridVectorArchive(
+  void LoadInfluenceGridVectorArchive(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::RRef* const ownerRef
+    gpg::RRef*
   )
   {
     auto* const vectorObject = PointerFromArchiveInt<InfluenceGridVector>(objectPtr);
@@ -1801,24 +1857,27 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    vectorObject->clear();
-    if (count == 0u) {
-      return;
-    }
+    // Instantiates `msvc8::vector<InfluenceGrid>::reserve` (FUN_0071B730).
+    InfluenceGridVector loaded;
+    loaded.reserve(count);
 
-    vectorObject->resize(count);
-
-    gpg::RType* const valueType = CachedInfluenceGridType();
-    GPG_ASSERT(valueType != nullptr);
-    if (!valueType) {
-      vectorObject->clear();
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(valueType, &(*vectorObject)[static_cast<std::size_t>(i)], owner);
+      moho::InfluenceGrid element;
+
+      // The binary re-reads the lazily initialised `Moho::InfluenceGrid::sType`
+      // global on every iteration (0x0071A3AB), so the lookup stays in-loop.
+      gpg::RType* const valueType = CachedInfluenceGridType();
+      GPG_ASSERT(valueType != nullptr);
+
+      // 0x0071A3B2/0x0071A3B6 zero a fresh `RRef` per element — the owner
+      // reference handed to this serLoad callback is deliberately not forwarded.
+      const gpg::RRef elementOwner{};
+      archive->Read(valueType, &element, elementOwner);
+
+      loaded.push_back(element);
     }
+
+    vectorObject->swap(loaded);
   }
 
   /**
@@ -1912,6 +1971,7 @@ namespace
   {
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
+      // Growth path instantiates `msvc8::vector<SThreat>::insert` (FUN_0071AF90).
       storage.resize(requestedCount, fillValue);
       return;
     }
@@ -1995,11 +2055,17 @@ namespace
    * What it does:
    * Initializes `destination.entries` as an empty legacy ordered set and then
    * copies every `InfluenceMapEntry` node from `source.entries` into it.
-   * Used by `InfluenceGrid::Cpy` to rebuild the entries tree on a newly-
-   * allocated destination before the threat vector and aggregate lanes are
-   * populated.
+   *
+   * This is the *raw-storage* lane: it placement-news the set header, so it is
+   * only valid on memory whose `entries` member has not been constructed yet.
+   * Its single binary caller is `InfluenceGrid::Cpy` (0x0071C150, called at
+   * 0x0071C173), which C++ expresses as `InfluenceGrid`'s copy constructor —
+   * and there the `entries` member is already constructed by the member
+   * initialiser list, so the constructor uses `CopyInfluenceEntryTreeStorage`
+   * directly instead (calling this helper would leak the freshly allocated set
+   * header). No other source-level caller exists.
    */
-  moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
+  [[maybe_unused]] moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
     moho::InfluenceGrid* const destination,
     const moho::InfluenceGrid* const source
   )
@@ -2110,35 +2176,6 @@ namespace
     // Fits capacity: copy-assign the first dstSize slots, then
     // uninitialized-copy the tail `[dstSize .. srcSize)` past `end`.
     destination.assign(source.begin(), srcSize);
-    return destination;
-  }
-
-  /**
-   * Address: 0x0071C150 (FUN_0071C150, Moho::InfluenceGrid::Cpy)
-   *
-   * IDA signature:
-   * Moho::InfluenceGrid *__stdcall Moho::InfluenceGrid::Cpy(
-   *     Moho::InfluenceGrid *a1, Moho::InfluenceGrid *a2);
-   *
-   * What it does:
-   * In-place copy-constructs `destination` (`a1`) from `source` (`a2`):
-   *   1) rebuild `destination.entries` via `CopyConstructInfluenceGridEntries`
-   *   2) copy `source.threats` into `destination.threats` via
-   *      `CopyConstructSThreatVector`
-   *   3) byte-copy aggregate `threat` and `decay` SThreat lanes from source.
-   *
-   * Used by `msvc8::vector<InfluenceGrid>` growth paths when the
-   * per-cell grid needs to be duplicated, and by serializer scratch copies.
-   */
-  [[maybe_unused]] moho::InfluenceGrid* CopyConstructInfluenceGrid(
-    moho::InfluenceGrid* const destination,
-    moho::InfluenceGrid* const source
-  )
-  {
-    (void)CopyConstructInfluenceGridEntries(destination, source);
-    (void)CopyConstructSThreatVector(&destination->threats, &source->threats);
-    destination->threat = source->threat;
-    destination->decay = source->decay;
     return destination;
   }
 
@@ -2477,6 +2514,101 @@ void gpg::RVectorType_InfluenceGrid::Init()
   version_ = 1;
   serLoadFunc_ = &LoadInfluenceGridVectorArchive;
   serSaveFunc_ = &SaveInfluenceGridVectorArchive;
+}
+
+/**
+ * Address: 0x00718F30 (FUN_00718F30, gpg::RVectorType_InfluenceGrid::IsIndexed)
+ *
+ * IDA signature:
+ * gpg::RIndexed *__thiscall gpg::RVectorType_InfluenceGrid::IsIndexed(
+ *     gpg::RVectorType_InfluenceGrid *this);
+ *
+ * What it does:
+ * Returns the `gpg::RIndexed` subobject at `this + 0x64`.
+ */
+const gpg::RIndexed* gpg::RVectorType_InfluenceGrid::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x00718FA0 (FUN_00718FA0, gpg::RVectorType_InfluenceGrid::SubscriptIndex)
+ * VFTable SLOT: gpg::RIndexed +0x00 (??_7?$RVectorType@UInfluenceGrid@Moho@@@gpg@@6BRIndexed@gpg@@@ @ 0x00E3181C)
+ *
+ * IDA signature:
+ * gpg::RRef *__userpurge gpg::RVectorType_InfluenceGrid::SubscriptIndex(
+ *     gpg::RRef *result, void *obj, int ind);
+ *
+ * What it does:
+ * Forms `&vec[ind]` as `first + ind * 0x8C` (0x00718FA8/0x00718FAE) and wraps
+ * it as one `gpg::RRef_InfluenceGrid` reference, returned by value.
+ */
+gpg::RRef gpg::RVectorType_InfluenceGrid::SubscriptIndex(void* const obj, const int ind) const
+{
+  auto* const storage = static_cast<InfluenceGridVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(ind >= 0);
+  GPG_ASSERT(storage != nullptr && static_cast<std::size_t>(ind) < storage->size());
+
+  gpg::RRef out{};
+  if (!storage || ind < 0) {
+    (void)gpg::RRef_InfluenceGrid(&out, nullptr);
+    return out;
+  }
+
+  (void)gpg::RRef_InfluenceGrid(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  return out;
+}
+
+/**
+ * Address: 0x00718F40 (FUN_00718F40, gpg::RVectorType_InfluenceGrid::GetCount)
+ * VFTable SLOT: gpg::RIndexed +0x04 (0x00E31820)
+ *
+ * IDA signature:
+ * unsigned int __userpurge gpg::RVectorType_InfluenceGrid::GetCount(void *obj);
+ *
+ * What it does:
+ * Returns `(last - first) / 0x8C`, short-circuiting to 0 when the lane has no
+ * storage (0x00718F47).
+ */
+std::size_t gpg::RVectorType_InfluenceGrid::GetCount(void* const obj) const
+{
+  if (!obj) {
+    return 0u;
+  }
+
+  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const InfluenceGridVector*>(obj));
+  if (!view.begin) {
+    return 0u;
+  }
+
+  return static_cast<std::size_t>(view.end - view.begin);
+}
+
+/**
+ * Address: 0x00718F70 (FUN_00718F70, gpg::RVectorType_InfluenceGrid::SetCount)
+ * VFTable SLOT: gpg::RIndexed +0x08 (0x00E31824)
+ *
+ * IDA signature:
+ * void __userpurge gpg::RVectorType_InfluenceGrid::SetCount(void *obj, int count);
+ *
+ * What it does:
+ * Default-constructs one `Moho::InfluenceGrid` in the caller frame
+ * (0x00718F81) and resizes the reflected `vector<InfluenceGrid>` to `count`
+ * with that grid as the fill value, passing it by value to the resize lane
+ * (0x00718F94 -> FUN_0071B860).
+ */
+void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) const
+{
+  auto* const storage = static_cast<InfluenceGridVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(count >= 0);
+  if (!storage || count < 0) {
+    return;
+  }
+
+  const moho::InfluenceGrid fillValue;
+  ResizeInfluenceGridVectorWithFill(*storage, static_cast<std::size_t>(count), fillValue);
 }
 
 /**
@@ -3681,6 +3813,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x0071C150 (FUN_0071C150, Moho::InfluenceGrid::Cpy)
+   *
+   * IDA signature:
+   * Moho::InfluenceGrid *__stdcall Moho::InfluenceGrid::Cpy(
+   *     Moho::InfluenceGrid *dst, Moho::InfluenceGrid *src);
+   *
+   * What it does:
+   * Copy-constructs one grid from `other`:
+   *   1) `entries()` below builds the sentinel-only ordered-set header that the
+   *      binary creates at the head of `CopyConstructInfluenceGridEntries`
+   *      (0x0071C1F0, called at 0x0071C173), and the clone loop in the body is
+   *      that helper's second half;
+   *   2) `threats(other.threats)` is the `vector_SThreat::Cpy` call at
+   *      0x0071C187 (allocate matching storage, copy the live range);
+   *   3) the aggregate `threat` / `decay` lanes are the two 56-byte
+   *      `rep movsd` blocks at 0x0071C192 and 0x0071C19F.
+   *
+   * This is the element copy lane the `msvc8::vector<InfluenceGrid>` growth and
+   * fill paths use (`_Insert_n` at FUN_0071B970 takes its `_Tmp` copy through
+   * it at 0x0071B9A2).
+   */
+  InfluenceGrid::InfluenceGrid(const InfluenceGrid& other)
+    : entries()
+    , threats(other.threats)
+    , threat(other.threat)
+    , decay(other.decay)
+  {
+    CopyInfluenceEntryTreeStorage(entries, other.entries);
+  }
+
+  /**
    * Address: 0x00716350 (FUN_00716350, ??1InfluenceGrid@Moho@@QAE@@Z)
    * Address: 0x0071EE70 (FUN_0071EE70)
    * Address: 0x0071F7C0 (FUN_0071F7C0)
@@ -4743,6 +4906,8 @@ namespace moho
         const float worldZ = static_cast<float>((mGridSize / 2) + (z * mGridSize));
 
         const SPositionThreat sample{worldX, 0.0f, worldZ, threat};
+        // push_back's capacity-full path is `msvc8::vector<SPositionThreat>::insert`
+        // (FUN_0071BEE0), reached through the binary's push_back at FUN_00718A40.
         out.push_back(sample);
 
         if (sim) {
@@ -5011,7 +5176,10 @@ namespace moho
 
     const std::int32_t cellIndex = blipCell->cellIndex;
     if (cellIndex >= 0 && cellIndex < mTotal) {
-      mMapEntries[static_cast<std::size_t>(cellIndex)].RemoveEntry(blipId);
+      // InfluenceGrid::RemoveEntry reports whether an entry was actually erased;
+      // the binary ignores that result here and unconditionally drops the blip
+      // cell below, so the discard is deliberate.
+      (void)mMapEntries[static_cast<std::size_t>(cellIndex)].RemoveEntry(blipId);
     }
 
     RemoveBlipCell(blipId);
