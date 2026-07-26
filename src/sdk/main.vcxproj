@@ -444,6 +444,13 @@
     <ClCompile Include="moho\ai\EFormationdStatusTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiTarget.cpp" />
     <ClCompile Include="moho\ai\CAiTargetSerializer.cpp" />
+    <ClCompile Include="moho\ai\SOffsetInfoTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\SPickUpInfoTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\CSquadTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\HPathCellTypeInfo.cpp" />
+    <ClCompile Include="moho\path\PathTablesTypeInfo.cpp" />
+    <ClCompile Include="moho\entity\SScrollerTypeInfo.cpp" />
+    <ClCompile Include="moho\render\SDecalInfoTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EAiAttackerEventTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EAiNavigatorEventTypeInfo.cpp" />
@@ -1824,6 +1831,13 @@
     <ClInclude Include="moho\ai\ESearchTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\ESiloTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTargetSerializer.h" />
+    <ClInclude Include="moho\ai\SOffsetInfoTypeInfo.h" />
+    <ClInclude Include="moho\ai\SPickUpInfoTypeInfo.h" />
+    <ClInclude Include="moho\sim\CSquadTypeInfo.h" />
+    <ClInclude Include="moho\ai\HPathCellTypeInfo.h" />
+    <ClInclude Include="moho\path\PathTablesTypeInfo.h" />
+    <ClInclude Include="moho\entity\SScrollerTypeInfo.h" />
+    <ClInclude Include="moho\render\SDecalInfoTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTargetTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTransportCommandOps.h" />
     <ClInclude Include="moho\ai\EAiAttackerEventTypeInfo.h" />
