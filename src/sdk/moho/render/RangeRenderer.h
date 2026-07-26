@@ -16,7 +16,7 @@
 namespace moho
 {
   class CWldSession;
-  class Cartographic;
+  class CameraImpl;
 
   struct RangeRingColor
   {
@@ -131,8 +131,27 @@ namespace moho
 
     /**
      * Address: 0x007EEA00 (FUN_007EEA00, Moho::RangeRenderer::Render)
+     *
+     * IDA signature (compiler-invented register convention, `retn 0Ch`):
+     * void __usercall Render(CWldSession *session@<ecx>, CameraImpl *camera@<ebx>,
+     *                        RangeRenderer *renderer, unsigned headIndex, float alpha);
+     *
+     * The camera parameter is `CameraImpl`, not `Cartographic`. EBX is never
+     * written in the body (inbound register argument) and is dispatched at
+     * `+0x08` (0x007EEA87) and `+0xA4` (0x007EEA90), then forwarded as the EDX
+     * register argument of `func_RenderRings` where `+0x08`, `+0x4C` and `+0x50`
+     * are used. `??_7CameraImpl@Moho@@6B@` (0x00E3C474) holds 0x007A6A00
+     * (`CameraGetView`, slot 2), 0x007A6CA0 (`CameraGetTargetZoom`, slot 19),
+     * 0x007A7310 (`GetMaxZoom`, slot 20) and 0x007A7910
+     * (`GetArmyUnitsInFrustum`, slot 41) at exactly those offsets. Both callers
+     * load EBX from `IRenderWorldView::GetCamera()`: `Moho::Cartographic::Render`
+     * at 0x007D183F-0x007D1A2C and `Moho::WRenViewport::Render` at
+     * 0x007F940E-0x007F944B.
+     *
+     * No body is recovered yet; the render chain below it is still blocked on
+     * the `sWldMap` and `shaderVarFrameRangeColor` globals.
      */
-    void Render(CWldSession* worldSession, Cartographic* cartographic, unsigned int viewportHeadIndex, float alpha);
+    void Render(CWldSession* worldSession, CameraImpl* camera, unsigned int viewportHeadIndex, float alpha);
 
     /**
      * Address: 0x007EE950 (FUN_007EE950, Moho::RangeRenderer::MoveCategories)
