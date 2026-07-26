@@ -75,7 +75,20 @@ namespace moho
   struct WEmitterCurveEditor
   {
     WEmitterCurveEditorVTable* mVTable = nullptr;
-    std::uint8_t mReserved004To137[0x134]{};
+    std::uint8_t mReserved004To027[0x24]{};
+
+    /** wx window id, used as the command id of the curve-changed event. */
+    std::int32_t mWindowId = 0;
+    std::uint8_t mReserved02CTo12F[0x104]{};
+
+    /**
+     * Cursor into `mCurve.mKeys` naming the key the user currently has
+     * selected. Seeded to `mCurve.mKeys.begin()` by the constructor
+     * (0x00661470) and by FUN_00661A90 (0x00661B37); "no selection" is
+     * expressed as `mSelectedKey == mCurve.mKeys.end()`.
+     */
+    Wm3::Vector3f* mSelectedKey = nullptr;
+    std::uint8_t mReserved134To137[0x4]{};
     SEfxCurve mCurve;
     std::uint8_t mReserved170To173[0x4]{};
 
@@ -116,6 +129,26 @@ namespace moho
      */
     void ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept;
 
+    /**
+     * Address: 0x00661100 (FUN_00661100)
+     *
+     * What it does:
+     * Clears the dirty flag and posts a `wxEVT_COMMAND_BUTTON_CLICKED`
+     * command event carrying this editor's window id, so the owning panel
+     * learns the curve changed.
+     */
+    void PostCurveChangedCommand();
+
+    /**
+     * Address: 0x006614B0 (FUN_006614B0)
+     *
+     * What it does:
+     * Moves the selected key to `(time, value, tangent)`, clamping the time
+     * into the visible time range and against the neighbouring keys (to keep
+     * keys sorted by time) and the value into the visible value range.
+     */
+    void MoveSelectedKeyTo(float time, float value, float tangent);
+
     void MarkCurveClean() noexcept;
     [[nodiscard]] const SEfxCurve& Curve() const noexcept;
   };
@@ -148,11 +181,47 @@ namespace moho
   struct WEmitterCurvePanel : WCurveEditorPanel
   {
     std::uint8_t mReserved004To133[0x130]{};
-    WEmitterCurveEditor* mCurveEditor = nullptr;
+    WEmitterCurveEditor* mCurveEditor = nullptr;      // +0x134
+
+    /**
+     * The five numeric fields the panel keeps in sync with the editor. Their
+     * wx command ids are consecutive from 622 (0x26E), which is how
+     * FUN_00663650 selects between them.
+     */
+    WEmitterTextControl* mKeyTimeText = nullptr;      // +0x138, id 622
+    WEmitterTextControl* mKeyValueText = nullptr;     // +0x13C, id 623
+    WEmitterTextControl* mKeyTangentText = nullptr;   // +0x140, id 624
+    WEmitterTextControl* mViewValueMinText = nullptr; // +0x144, id 625
+    WEmitterTextControl* mViewValueMaxText = nullptr; // +0x148, id 626
+
+    /** Set once the panel's fields are bound; commits are ignored until then. */
+    std::uint8_t mFieldsLive = 0;                     // +0x14C
+
+    /**
+     * Address: 0x00663650 (FUN_00663650)
+     *
+     * What it does:
+     * `wxEventTableEntry` sink shared by all five numeric fields: re-reads the
+     * committed text, applies it to the selected key or the visible value
+     * range, and mirrors the parsed value back into the field.
+     */
+    void OnCurveFieldCommitted(wxEventRuntime& commandEvent);
   };
   static_assert(
     offsetof(WEmitterCurvePanel, mCurveEditor) == 0x134,
     "WEmitterCurvePanel::mCurveEditor offset must be 0x134"
+  );
+  static_assert(
+    offsetof(WEmitterCurvePanel, mKeyTimeText) == 0x138,
+    "WEmitterCurvePanel::mKeyTimeText offset must be 0x138"
+  );
+  static_assert(
+    offsetof(WEmitterCurvePanel, mViewValueMaxText) == 0x148,
+    "WEmitterCurvePanel::mViewValueMaxText offset must be 0x148"
+  );
+  static_assert(
+    offsetof(WEmitterCurvePanel, mFieldsLive) == 0x14C,
+    "WEmitterCurvePanel::mFieldsLive offset must be 0x14C"
   );
 
   struct WEmitterWx : WWinManagedFrame

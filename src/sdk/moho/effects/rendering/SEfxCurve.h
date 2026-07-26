@@ -84,6 +84,15 @@ namespace moho
   };
 
   /**
+   * Address: 0x00514FF0 (FUN_00514FF0, SEfxCurve y-bounds recompute lane)
+   *
+   * What it does:
+   * Recomputes the curve's Y min/max bounds by scanning every key lane.
+   * Called across translation units by the curve editor after a key move.
+   */
+  void RecomputeEmitterCurveYBounds(SEfxCurve& curve);
+
+  /**
    * Address: 0x005151B0 (FUN_005151B0, insert_emitter_curve_key)
    *
    * What it does:

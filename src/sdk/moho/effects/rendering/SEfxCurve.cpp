@@ -264,30 +264,31 @@ namespace gpg
 
 namespace moho
 {
-  namespace
+  /**
+   * Address: 0x00514FF0 (FUN_00514FF0, SEfxCurve y-bounds recompute lane)
+   *
+   * What it does:
+   * Recomputes Y min/max bounds from the current key vector by scanning
+   * every `(x,y,z)` key lane.
+   *
+   * Externally visible because the curve editor calls it from its own
+   * translation unit after moving a key (`WCurveEditor::MoveSelectedKeyTo`,
+   * FUN_006614B0, calls this at 0x006615A0).
+   */
+  void RecomputeEmitterCurveYBounds(SEfxCurve& curve)
   {
-    /**
-     * Address: 0x00514FF0 (FUN_00514FF0, SEfxCurve y-bounds recompute lane)
-     *
-     * What it does:
-     * Recomputes Y min/max bounds from the current key vector by scanning
-     * every `(x,y,z)` key lane.
-     */
-    void RecomputeEmitterCurveYBounds(SEfxCurve& curve)
-    {
-      curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
-      curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
+    curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
+    curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
 
-      for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {
-        if (curve.mBoundsMin.y > key->y) {
-          curve.mBoundsMin.y = key->y;
-        }
-        if (key->y > curve.mBoundsMax.y) {
-          curve.mBoundsMax.y = key->y;
-        }
+    for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {
+      if (curve.mBoundsMin.y > key->y) {
+        curve.mBoundsMin.y = key->y;
+      }
+      if (key->y > curve.mBoundsMax.y) {
+        curve.mBoundsMax.y = key->y;
       }
     }
-  } // namespace
+  }
 
   SEfxCurve::SEfxCurve(const SEfxCurve& other)
     : mBoundsMin(other.mBoundsMin)
