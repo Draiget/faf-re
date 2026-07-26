@@ -1531,6 +1531,16 @@ namespace msvc8
          * Address: 0x005DCFB0 (FUN_005DCFB0, msvc8::vector<Moho::UnitWeapon*>::reserve
          * out-of-line emission — reallocate-to-capacity for the 4-byte pointer element;
          * invoked by name from gpg::RVectorType_UnitWeapon_P::SerLoad's reserve(count) path)
+         * Address: 0x0071B730 (FUN_0071B730, msvc8::vector<moho::InfluenceGrid>::reserve
+         * out-of-line emission for the 0x8C-byte non-trivial element. Unlike the
+         * `_Insert_n` bodies it opens with a bare `count > max_size()` test
+         * (`cmp esi, 1D41D41h` at 0x0071B750 — 0xFFFFFFFF/140 — then
+         * `call FUN_0071BCA0`, the `vector<T> too long` throw lane), takes a single
+         * stack argument (`retn 4`), performs no tail shift and no fill: it moves the
+         * live range into the fresh block (0x0071B7C3), destroys and frees the old
+         * one, then rebases `{first,last,end}` (0x0071B82A-0x0071B830). Emitted by
+         * moho::LoadInfluenceGridVectorArchive's `loaded.reserve(count)`
+         * (CInfluenceMap.cpp:1860), which is the binary's own call at 0x0071A383)
          *
          * Reserve storage for at least new_cap elements
          */
@@ -1597,6 +1607,32 @@ namespace msvc8
         void clear() noexcept {
             destroy_all();
             last_ = first_;
+        }
+
+        /**
+         * Exchange contents with another vector.
+         *
+         * What it does:
+         * Swaps the three data-range lanes `{first_, last_, end_}` with `other`.
+         * The VC8 debug-iterator lane (`myProxy_`) is intentionally left in
+         * place: release builds never populate it, and the binary's swap sites
+         * touch only the three range lanes — see the tail of
+         * `moho::LoadInfluenceGridVectorArchive` (FUN_0071A330), where the
+         * scratch vector's lanes are stored into the destination at
+         * 0x0071A44E / 0x0071A458 / 0x0071A45F while the destination's previous
+         * `{first, last}` pair is kept in registers and torn down by the
+         * scratch's scope-exit teardown at 0x0071A477 / 0x0071A47D.
+         */
+        void swap(vector& other) noexcept {
+            T* const otherFirst = other.first_;
+            T* const otherLast = other.last_;
+            T* const otherEnd = other.end_;
+            other.first_ = first_;
+            other.last_ = last_;
+            other.end_ = end_;
+            first_ = otherFirst;
+            last_ = otherLast;
+            end_ = otherEnd;
         }
 
         /**
@@ -1717,7 +1753,9 @@ namespace msvc8
             if (tail) {
                 if constexpr (std::is_trivially_copyable_v<T>) {
                     if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
-                        detail::MoveWords(next, tail, pos);
+                        // MoveWords returns its destination cursor; erase only needs the
+                        // shift performed, so the result is deliberately discarded.
+                        (void)detail::MoveWords(next, tail, pos);
                     } else {
                         std::memmove(pos, next, tail * sizeof(T));
                     }
@@ -1864,6 +1902,34 @@ namespace msvc8
          * counts.push_back({blueprint,1}) by name — MSVC8's push_back (FUN_0075F1A0)
          * is insert(end(),1,value) on the capacity-full path — so this per-T 8-byte
          * symbol is emitted).
+         * Address: 0x0071AF90 (FUN_0071AF90, msvc8::vector<moho::SThreat>::_Insert_n
+         * grow-and-fill lane for the 0x38-byte element (stride divide by the
+         * 92492493h/`sar 5` magic pair, max_size 0x4924924 = 0xFFFFFFFF/56, overflow
+         * throw through FUN_0071B260, 1.5x growth with clamp-to-zero at
+         * 0x0071B051-0x0071B067). The value arrives by pointer in edx and is copied
+         * into a local `_Tmp` by the 14-dword `rep movsd` at 0x0071AFB8. Emitted via
+         * moho::ResizeSThreatVectorWithFill's storage.resize(requestedCount, fillValue)
+         * (CInfluenceMap.cpp:1972)).
+         * Address: 0x0071B970 (FUN_0071B970, msvc8::vector<moho::InfluenceGrid>::_Insert_n
+         * grow-and-fill lane for the 0x8C-byte non-trivial element (stride divide by
+         * the EA0EA0EBh/`sar 7` magic pair, max_size 0x1D41D41 = 0xFFFFFFFF/140,
+         * overflow throw through FUN_0071BCA0, 1.5x growth with clamp-to-zero at
+         * 0x0071BA35-0x0071BA46). Element copies route through
+         * Moho::InfluenceGrid::Cpy (the copy constructor, 0x0071C150 — taken for the
+         * local `_Tmp` at 0x0071B9A2) and ~InfluenceGrid, never a raw byte copy.
+         * Emitted via moho::ResizeInfluenceGridVectorWithFill's
+         * storage.resize(requestedCount, fillValue) (CInfluenceMap.cpp:219), which is
+         * the binary's own call at 0x0071B8D9).
+         * Address: 0x0071BEE0 (FUN_0071BEE0, msvc8::vector<moho::SPositionThreat>::_Insert_n
+         * grow lane for the 0x10-byte element (`sar 4` stride, max_size 0xFFFFFFF =
+         * 0xFFFFFFFF/16, overflow throw through FUN_00592830). `_Count` is folded to
+         * the constant 1 (`cmp edx, 1` at 0x0071BF57) because both binary callers are
+         * single-element append lanes: MSVC8's push_back (FUN_00718A40, tail-calling
+         * it at 0x00718A9A on the capacity-full path) and the single-value insert
+         * lane FUN_0071A1B0 (0x0071A1D9); the value's four floats are copied into a local
+         * `_Tmp` by the movss block at 0x0071BEFE-0x0071BF2D. Emitted via
+         * out.push_back(sample) in Moho::CInfluenceMap::GetThreatsAroundPosition
+         * (CInfluenceMap.cpp:4906)).
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
