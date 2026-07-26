@@ -71,6 +71,7 @@ namespace moho
   );
 
   struct WEmitterCurveEditorVTable;
+  struct WEmitterCurvePanel;
 
   /**
    * One vertical column of the curve envelope: a time on the horizontal axis
@@ -145,7 +146,12 @@ namespace moho
 
     /** Caption painted at the widget's top-left corner. */
     wxStringRuntime mCaption;
-    std::uint8_t mReserved198To19F[0x8]{};
+
+    /** Script key this curve is written out under (FUN_00661580). */
+    wxStringRuntime mScriptName;
+
+    /** Panel that owns this editor; refreshed after a curve assignment. */
+    WEmitterCurvePanel* mOwnerPanel = nullptr;
 
     /** Cursor position cached on button-down (FUN_00661820). */
     std::int32_t mLastMouseX = 0;
@@ -243,6 +249,24 @@ namespace moho
       std::int32_t edge,
       const CurveEnvelopeColumn& column
     ) const noexcept;
+
+    /**
+     * Address: 0x00669E40 (FUN_00669E40)
+     *
+     * What it does:
+     * Replaces the edited curve wholesale, drops the now-dangling selection,
+     * notifies, and refreshes the owning panel's fields.
+     */
+    void AssignCurve(const SEfxCurve& source);
+
+    /**
+     * Address: 0x00661580 (FUN_00661580)
+     *
+     * What it does:
+     * Formats this curve as a Lua table (`XRange` plus one `{x,y,z}` line per
+     * key). See the body note: the retail exporter discards the text.
+     */
+    void FormatCurveScript() const;
 
     void MarkCurveClean() noexcept;
     [[nodiscard]] const SEfxCurve& Curve() const noexcept;
@@ -359,6 +383,47 @@ namespace moho
      * numeric fields from its editor, then rebuilds the preview emitter.
      */
     void OnCurveEdited();
+
+    /**
+     * Address: 0x00667860 (FUN_00667860)
+     *
+     * What it does:
+     * Repopulates the editor UI from the live preview effect -- texture paths
+     * and every curve panel -- guarded so the writes do not echo back.
+     */
+    void LoadFromEffect();
+
+    /**
+     * Address: 0x00668B00 (FUN_00668B00)
+     *
+     * What it does:
+     * The emitter editor's menu/command sink: the file-open, texture-browse,
+     * ramp-browse and save-as dialogs plus the parameter toggles, each
+     * followed by a preview refresh.
+     */
+    void OnMenuCommand(wxEventRuntime& commandEvent);
+
+  private:
+    bool RunEmitterFileDialog(
+      const char* vfsRoot,
+      const wchar_t* title,
+      const wchar_t* wildcard,
+      wxStringRuntime& startingDirectory
+    );
+
+    void ToggleEffectParameterFlag(std::int32_t parameterIndex);
+
+  public:
+
+    /**
+     * Address: 0x00668340 (FUN_00668340)
+     *
+     * What it does:
+     * Writes the emitter blueprint out as a Lua script: opens the destination
+     * file, formats the header, every parameter, both texture paths and each
+     * curve block, then closes the stream.
+     */
+    void WriteBlueprintScript(const wchar_t* filePath, const wchar_t* blueprintId);
 
     /**
      * Address: 0x00666F40 (FUN_00666F40, Moho::WEmitterWx::~WEmitterWx)
