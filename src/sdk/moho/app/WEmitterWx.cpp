@@ -696,6 +696,62 @@ namespace moho
     fieldEvent.mSkipped = 1;
   }
 
+  /**
+   * Address: 0x00663400 (FUN_00663400)
+   *
+   * IDA signature:
+   * void __usercall sub_663400(WCurveEditorPanel *this@<esi>);
+   *
+   * What it does:
+   * The inverse of `OnCurveFieldCommitted`: pushes the editor's current values
+   * back out into the five numeric fields. Each value is formatted with
+   * `wxString::Format(L"%f", value)`, handed to the control's `+0x21C`
+   * setter, and the temporary's copy-on-write reference is then dropped. The
+   * three key fields show zero when no key is selected.
+   */
+  void WEmitterCurvePanel::RefreshFieldsFromCurve()
+  {
+    const WEmitterCurveEditor* const editor = mCurveEditor;
+
+    const auto pushField = [](WEmitterTextControl* const control, const float value) {
+      wxStringRuntime formatted{};
+      (void)wxStringFormat(&formatted, L"%f", static_cast<double>(value));
+      TextVTable(*control)->mSetValue(control, &formatted);
+      ReleaseCopiedWxString(formatted);
+    };
+
+    const Wm3::Vector3f* const keysEnd = editor->mCurve.mKeys.end();
+    const Wm3::Vector3f* const selected = editor->mSelectedKey;
+
+    pushField(mKeyTimeText, selected == keysEnd ? 0.0f : selected->x);
+    pushField(mKeyValueText, selected == keysEnd ? 0.0f : selected->y);
+    pushField(mKeyTangentText, selected == keysEnd ? 0.0f : selected->z);
+    pushField(mViewValueMinText, editor->mViewValueMin);
+    pushField(mViewValueMaxText, editor->mViewValueMax);
+  }
+
+  /**
+   * Address: 0x00668180 (FUN_00668180)
+   *
+   * IDA signature:
+   * int __thiscall sub_668180(WEmitterWx *this, wxEvent *event);
+   *
+   * What it does:
+   * `wxEventTableEntry` sink at 0x00F59DF8. Re-syncs every curve panel's
+   * numeric fields from its editor, then rebuilds the preview emitter so the
+   * viewport reflects the edited curves.
+   */
+  void WEmitterWx::OnCurveEdited()
+  {
+    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
+    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    for (std::size_t i = 0; i < curveCount; ++i) {
+      curvePanelView.begin[i]->RefreshFieldsFromCurve();
+    }
+
+    RefreshPreviewEmitter();
+  }
+
   void WEmitterCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
@@ -747,6 +803,27 @@ namespace moho
     [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorPanelEventTableBindings() noexcept
     {
       return static_cast<const void*>(&kWCurveEditorPanelEventTableBindings);
+    }
+
+    /**
+     * Address: 0x00F59DF8 (`WEmitterWx` wxEventTableEntry slot)
+     *
+     * What it does:
+     * Keeps the emitter frame's curve-edited sink addressable from this TU,
+     * mirroring the wx event-table entry the original source emitted for it.
+     */
+    struct WEmitterWxEventTableBindings
+    {
+      void (WEmitterWx::*onCurveEdited)();
+    };
+
+    const WEmitterWxEventTableBindings kWEmitterWxEventTableBindings = {
+      &WEmitterWx::OnCurveEdited,
+    };
+
+    [[maybe_unused]] [[nodiscard]] const void* PublishWEmitterWxEventTableBindings() noexcept
+    {
+      return static_cast<const void*>(&kWEmitterWxEventTableBindings);
     }
 
     [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorEventTableBindings() noexcept

@@ -8671,6 +8671,18 @@ namespace
   }
 
   /**
+   * Address: 0x00962160 forwarder used by the varargs entry point below.
+   */
+  wxStringRuntime* wxStringFormatV(
+    wxStringRuntime* const outValue,
+    const wchar_t* const formatText,
+    va_list argumentList
+  )
+  {
+    return wxStringInitializeFromEmptyAndPrintfV(outValue, formatText, argumentList);
+  }
+
+  /**
    * Address: 0x00961B40 (FUN_00961B40)
    *
    * What it does:
@@ -36115,6 +36127,27 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * What it does:
  * Formats one DDE error-code lane into a human-readable wx string payload.
  */
+/**
+ * Address: 0x00962120 (FUN_00962120, wxString::Format)
+ *
+ * IDA signature:
+ * int *wxString::Format(int *out, int format, ...);
+ *
+ * What it does:
+ * Static `wxString::Format`. Seeds the returned lane to the shared empty
+ * string and then formats the varargs through `PrintfV` (0x00962160). The
+ * result is returned through the hidden first parameter because the retail
+ * signature returns `wxString` by value.
+ */
+wxStringRuntime* wxStringFormat(wxStringRuntime* const outValue, const wchar_t* const formatText, ...)
+{
+  va_list argumentList;
+  va_start(argumentList, formatText);
+  wxStringRuntime* const result = wxStringFormatV(outValue, formatText, argumentList);
+  va_end(argumentList);
+  return result;
+}
+
 wxStringRuntime* wxFormatDdeErrorString(
   wxStringRuntime* const outText,
   const unsigned int ddeErrorCode

@@ -206,6 +206,15 @@ namespace moho
      * range, and mirrors the parsed value back into the field.
      */
     void OnCurveFieldCommitted(wxEventRuntime& commandEvent);
+
+    /**
+     * Address: 0x00663400 (FUN_00663400)
+     *
+     * What it does:
+     * Pushes the editor's current key and view-range values back out into the
+     * five numeric fields, formatted as `%f`.
+     */
+    void RefreshFieldsFromCurve();
   };
   static_assert(
     offsetof(WEmitterCurvePanel, mCurveEditor) == 0x134,
@@ -234,6 +243,15 @@ namespace moho
      * scalar, flag, curve, texture, and ramp controls into the live effect.
      */
     void RefreshPreviewEmitter();
+
+    /**
+     * Address: 0x00668180 (FUN_00668180)
+     *
+     * What it does:
+     * `wxEventTableEntry` sink at 0x00F59DF8: re-syncs every curve panel's
+     * numeric fields from its editor, then rebuilds the preview emitter.
+     */
+    void OnCurveEdited();
 
     /**
      * Address: 0x00666F40 (FUN_00666F40, Moho::WEmitterWx::~WEmitterWx)
