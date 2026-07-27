@@ -5393,6 +5393,17 @@ namespace
   }
 
   /**
+   * Address: 0x00AC0730 (_Mtxdst)
+   *
+   * What it does:
+   * Tears down one CRT mutex critical-section lane.
+   */
+  void RuntimeMtxDestroy(CRITICAL_SECTION* const lock) noexcept
+  {
+    ::DeleteCriticalSection(lock);
+  }
+
+  /**
    * Address: 0x00AC073B (FUN_00AC073B, _Mtxlock)
    *
    * What it does:
@@ -8000,6 +8011,69 @@ namespace moho::runtime
     object->criticalSection = lock;
     RuntimeMtxInit(lock);
     return object;
+  }
+
+  /**
+   * Address: 0x00ABF993 (FUN_00ABF993, std::_Mutex::~_Mutex)
+   *
+   * What it does:
+   * Destroys the critical section this mutex owns and releases its storage -
+   * the counterpart to RuntimeMutexConstruct above.
+   */
+  void RuntimeMutexDestruct(RuntimeMutexHandle* const object)
+  {
+    CRITICAL_SECTION* const lock = object->criticalSection;
+    RuntimeMtxDestroy(lock);
+    ::operator delete(static_cast<void*>(lock));
+  }
+
+  /**
+   * Address: 0x00A899D4 (FUN_00A899D4, feof)
+   *
+   * What it does:
+   * Reports the stream end-of-file flag. A null stream is a parameter error,
+   * not a crash: errno is set to EINVAL, the invalid-parameter handler runs,
+   * and zero is returned.
+   */
+  extern "C" int __cdecl RuntimeStreamAtEof(std::FILE* const stream)
+  {
+    if (stream == nullptr) {
+      errno = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0, 0);
+      return 0;
+    }
+    return legacy_file(stream)._flag & 0x10;
+  }
+
+  /**
+   * Address: 0x00A89A03 (FUN_00A89A03, ferror)
+   *
+   * What it does:
+   * Reports the stream error flag, with the same null-stream handling as
+   * RuntimeStreamAtEof. Differs from it only in the flag bit tested.
+   */
+  extern "C" int __cdecl RuntimeStreamHasError(std::FILE* const stream)
+  {
+    if (stream == nullptr) {
+      errno = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0, 0);
+      return 0;
+    }
+    return legacy_file(stream)._flag & 0x20;
+  }
+
+  /**
+   * Address: 0x00A96B96 (FUN_00A96B96, _unlock)
+   *
+   * What it does:
+   * Leaves the CRT lock-table entry for `lockId`. The paired acquire lives in
+   * the same table; entries are initialized lazily by the lock-table setup lane.
+   */
+  extern "C" void __cdecl RuntimeUnlockCrtLock(const int lockId)
+  {
+    // The table is pairs of {lock, kind}; _locktable is typed as a flat
+    // LPCRITICAL_SECTION array, so the lock lives at index 2*lockId.
+    ::LeaveCriticalSection(_locktable[2 * static_cast<std::size_t>(lockId)]);
   }
 
   /**
