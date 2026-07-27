@@ -758,6 +758,7 @@ namespace gpg::core
      * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
      * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
      * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::SFormationLinkedUnitRef, 4>::InsertAt)
+     * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
      *
      * What it does:
@@ -2007,6 +2008,13 @@ namespace gpg
   /**
    * Address: 0x004028E0 (FUN_004028E0, gpg::fastvector_uint::cpy)
    * Address: 0x00553370 (FUN_00553370, gpg::fastvector<Moho::SOCellPos>::cpy)
+   * Address: 0x00561D90 (FUN_00561D90, gpg::fastvector_n<Moho::SSTIUnitWeaponInfoSnapshot, 1>::cpy
+   * — the 0x98-byte weapon-info snapshot emission, stride confirmed by the three
+   * `/152` size divides at 0x00561DA5/0x00561DB6/0x00561DC8 and the
+   * `152 * v3` prefix offset. Reached by name from
+   * `moho::CopyFastVectorN(mWeaponInfo, other.mWeaponInfo)` in
+   * `SSTIUnitVariableData::AssignFrom` (Unit.cpp), which forwards to this
+   * template through `AsFastVectorRuntimeView`.)
    *
    * What it does:
    * Copies source contents into destination runtime view.
