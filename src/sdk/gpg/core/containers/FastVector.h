@@ -200,6 +200,33 @@ namespace gpg::core
         *cursor = static_cast<IntrusiveWeakLinkNode*>(begin->nextInOwner);
       }
     }
+
+    /**
+     * Address: 0x00562A80 (FUN_00562A80, _Copy_backward for a 152-byte element)
+     *
+     * IDA signature:
+     * int __usercall sub_562A80@<eax>(int a1@<eax>, int a2@<ecx>, int a3@<ebx>);
+     *
+     * What it does:
+     * Copy-assigns `[first, last)` backward into the range ending at
+     * `resultLast`, returning the lowest destination written. Backward order is
+     * what makes an overlapping right-shift safe.
+     *
+     * Assignment, not construction: the destination slots already hold live
+     * objects. The 0x00562A80 emission is for `T = Moho::UnitWeaponInfo` and
+     * calls its operator= (0x0055F210) per element, which is why a byte-wise
+     * move is wrong for that T - it owns two msvc8::string members.
+     */
+    template <class T>
+    T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
+    {
+      while (last != first) {
+        --last;
+        --resultLast;
+        *resultLast = *last;
+      }
+      return resultLast;
+    }
   } // namespace detail
 
   /**
@@ -1139,12 +1166,7 @@ namespace gpg::core
      */
     static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
     {
-      while (last != first) {
-        --last;
-        --resultLast;
-        *resultLast = *last;
-      }
-      return resultLast;
+      return detail::CopyBackwardAssign<T>(last, resultLast, first);
     }
 
     /**
@@ -2002,9 +2024,19 @@ namespace gpg
     // overwrite the tail copied just above.
     const std::ptrdiff_t moveCount = tailStart - insertPos;
     if (moveCount > 0) {
-      std::memmove(
-        insertPos + insertCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T)
-      );
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(
+          insertPos + insertCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T)
+        );
+      } else {
+        // The binary uses a backward element-assign loop here for non-trivial
+        // T (0x00562A80 for UnitWeaponInfo, calling its operator=). A byte-wise
+        // move would duplicate owning members - UnitWeaponInfo holds two
+        // msvc8::string lanes - and then double-free them.
+        (void)core::detail::CopyBackwardAssign<T>(
+          insertPos + moveCount, insertPos + insertCount + moveCount, insertPos
+        );
+      }
     }
 
     std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
