@@ -9,7 +9,8 @@
 #include "gpg/core/containers/String.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/CAiSiloBuildImplConstruct.h"
-#include "moho/ai/CAiSiloBuildImplSerializer.h"
+#include "moho/ai/CAiSiloBuildImplSerializer.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -437,3 +438,14 @@ namespace
 
   [[maybe_unused]] CAiSiloBuildTypeInfoBootstrap gCAiSiloBuildTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SSiloBuildInfoTypeInfo_cefa38, moho::register_SSiloBuildInfoTypeInfo)
+GPG_PREREGISTER_INIT(register_CAiSiloBuildImplTypeInfo_cefa38, moho::register_CAiSiloBuildImplTypeInfo)
+GPG_PREREGISTER_INIT(register_ESiloTypeListTypeInfo_cefa38, moho::register_ESiloTypeListTypeInfo)
+
+GPG_PREREGISTER_INIT(AcquireSSiloBuildInfoTypeInfo_cefa38, AcquireSSiloBuildInfoTypeInfo)
+GPG_PREREGISTER_INIT(AcquireCAiSiloBuildImplTypeInfo_cefa38, AcquireCAiSiloBuildImplTypeInfo)
+GPG_PREREGISTER_INIT(AcquireESiloTypeListTypeInfo_cefa38, AcquireESiloTypeListTypeInfo)

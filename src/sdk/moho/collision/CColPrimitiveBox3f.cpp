@@ -7,9 +7,8 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/Global.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -694,3 +693,9 @@ namespace
 
   [[maybe_unused]] DColPrimBoxBootstrap gDColPrimBoxBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_Box3fTypeInfo_88284f, moho::register_Box3fTypeInfo)
+GPG_PREREGISTER_INIT(register_DColPrimBoxTypeInfo_88284f, moho::register_DColPrimBoxTypeInfo)

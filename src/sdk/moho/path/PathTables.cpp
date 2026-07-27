@@ -30,7 +30,8 @@
 #include "moho/sim/STIMap.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include <windows.h>
+#include "gpg/core/reflection/StaticInitPhase.h"
 #endif
 
 template <typename T>
@@ -2184,3 +2185,8 @@ namespace moho
   // populated lazily by `gpg::RRef_PathQueue` via cached lookup.
   gpg::RType* PathQueue::sType = nullptr;
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(RegisterPathQueueTypeInfo_96e1d0, moho::RegisterPathQueueTypeInfo)
+GPG_PREREGISTER_INIT(RegisterPathQueueImplTypeInfo_96e1d0, moho::RegisterPathQueueImplTypeInfo)

@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
@@ -1468,6 +1469,103 @@ extern "C" void* __cdecl _expand(void* pblock, size_t newsize)
     }
 
     return (msize(pblock) >= newsize) ? pblock : nullptr;
+}
+
+/**
+ * Address: 0x00957AF0 (FUN_00957AF0, _free_crt)
+ *
+ * IDA signature:
+ * void __cdecl free_crt(void *ptr);
+ *
+ * What it does:
+ * CRT-lane thunk that forwards to the allocator's `free`. `operator delete`
+ * reaches the small-block allocator through this hop rather than calling
+ * `free` directly.
+ */
+extern "C" void __cdecl free_crt(void* const ptr)
+{
+    free(ptr);
+}
+
+/**
+ * Address: 0x00A825B9 (FUN_00A825B9, ??2@YAPAXI@Z)
+ * Mangled: ??2@YAPAXI@Z
+ *
+ * IDA signature:
+ * void *__cdecl operator new(size_t size);
+ *
+ * What it does:
+ * Global `operator new`. Retries `malloc` for as long as the installed
+ * new-handler keeps reporting that it freed memory, and throws `std::bad_alloc`
+ * once the handler gives up (or when none is installed).
+ *
+ * This override is what keeps C++ allocation on the engine allocator. MSVC's
+ * own debug `operator new` calls `malloc` - which this translation unit already
+ * replaces - but its debug `operator delete` calls `_free_dbg` directly, so
+ * without this pair every `new`/`delete` round-trip would allocate from the
+ * engine's small-block lanes and free into the CRT debug heap.
+ */
+void* __cdecl operator new(const std::size_t size)
+{
+    for (;;) {
+        if (void* const block = malloc(size)) {
+            return block;
+        }
+
+        if (_callnewh(size) == 0) {
+            throw std::bad_alloc{};
+        }
+    }
+}
+
+/**
+ * Address: 0x00957A60 (FUN_00957A60, ??3@YAXPAX@Z)
+ * Mangled: ??3@YAXPAX@Z
+ *
+ * IDA signature:
+ * void __cdecl operator delete(void *ptr);
+ *
+ * What it does:
+ * Global `operator delete`; a straight tail-jump to `free_crt` in the binary.
+ */
+void __cdecl operator delete(void* const ptr) noexcept
+{
+    free_crt(ptr);
+}
+
+/**
+ * Address: 0x00A82542 (FUN_00A82542, ??_V@YAXPAX@Z)
+ * Mangled: ??_V@YAXPAX@Z
+ *
+ * IDA signature:
+ * void __cdecl operator delete[](void *a1);
+ *
+ * What it does:
+ * Global array `operator delete`; a tail-jump to the scalar form.
+ */
+void __cdecl operator delete[](void* const ptr) noexcept
+{
+    ::operator delete(ptr);
+}
+
+/**
+ * Sized and array forms C++14 onward lets the compiler emit. The 2007 binary
+ * predates them, so they carry no address of their own and simply funnel into
+ * the recovered scalar lanes - the allocator ignores the size hint.
+ */
+void __cdecl operator delete(void* const ptr, std::size_t) noexcept
+{
+    ::operator delete(ptr);
+}
+
+void __cdecl operator delete[](void* const ptr, std::size_t) noexcept
+{
+    ::operator delete(ptr);
+}
+
+void* __cdecl operator new[](const std::size_t size)
+{
+    return ::operator new(size);
 }
 
 /**

@@ -6,7 +6,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CTask.h"
-#include "moho/unit/tasks/CFireWeaponTask.h"
+#include "moho/unit/tasks/CFireWeaponTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -160,3 +161,8 @@ namespace moho
     (void)std::atexit(&cleanup_CFireWeaponTaskTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CFireWeaponTaskTypeInfo_cd5fe2, moho::register_CFireWeaponTaskTypeInfo)

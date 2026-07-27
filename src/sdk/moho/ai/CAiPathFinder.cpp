@@ -24,7 +24,8 @@
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -1520,3 +1521,8 @@ HPathCell CAiPathFinder::LastPathCell(const SNavPath& path)
     static_cast<std::uint16_t>(cell.z),
   };
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_NavPath_d4632f, preregister_RBroadcasterRType_NavPath)
+GPG_PREREGISTER_INIT(preregister_RListenerRType_NavPath_d4632f, preregister_RListenerRType_NavPath)

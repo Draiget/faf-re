@@ -11,7 +11,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniPose.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -727,3 +728,9 @@ namespace
 
   [[maybe_unused]] SAniManipBindingReflectionBootstrap gSAniManipBindingReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SAniManipBindingTypeInfo_c664d9, moho::preregister_SAniManipBindingTypeInfo)
+GPG_PREREGISTER_INIT(preregister_FastVectorSAniManipBindingType_c664d9, moho::preregister_FastVectorSAniManipBindingType)
+GPG_PREREGISTER_INIT(register_FastVectorSAniManipBindingTypeAtexit_c664d9, moho::register_FastVectorSAniManipBindingTypeAtexit)

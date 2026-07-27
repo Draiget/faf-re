@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -118,3 +119,10 @@ namespace moho
   }
 } // namespace moho
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ECompareTypeTypeInfoStartup_358c70, moho::register_ECompareTypeTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(preregister_ECompareTypeTypeInfo_358c70, moho::preregister_ECompareTypeTypeInfo)

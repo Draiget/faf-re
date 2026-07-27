@@ -10,7 +10,8 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/Stats.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -370,3 +371,7 @@ namespace
 
   [[maybe_unused]] SSTIUnitConstantDataSerializerBootstrap gSSTIUnitConstantDataSerializerBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTIUnitConstantDataTypeInfo_f5d847, moho::preregister_SSTIUnitConstantDataTypeInfo)

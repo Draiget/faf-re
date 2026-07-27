@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiNavigatorAir.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -133,3 +134,8 @@ namespace
   [[maybe_unused]] CAiNavigatorAirTypeInfoBootstrap gCAiNavigatorAirTypeInfoBootstrap;
 } // namespace
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiNavigatorAirTypeInfo_6780b5, moho::register_CAiNavigatorAirTypeInfo)

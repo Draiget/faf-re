@@ -6,7 +6,8 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitPodAssist.h"
+#include "moho/unit/tasks/CUnitPodAssist.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -197,3 +198,8 @@ namespace moho
     return std::atexit(&cleanup_CUnitPodAssistTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitPodAssistTypeInfo_77e443, moho::register_CUnitPodAssistTypeInfo)

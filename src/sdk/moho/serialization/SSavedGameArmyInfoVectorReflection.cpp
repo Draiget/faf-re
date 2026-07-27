@@ -4,7 +4,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "legacy/containers/Vector.h"
+#include "legacy/containers/Vector.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -366,3 +367,7 @@ gpg::RRef* gpg::RRef_SSavedGameArmyInfo(gpg::RRef* outRef, moho::SSavedGameArmyI
   return outRef;
 }
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSavedGameArmyInfoVectorTypeStartup_7c867d, gpg::preregister_SSavedGameArmyInfoVectorTypeStartup)

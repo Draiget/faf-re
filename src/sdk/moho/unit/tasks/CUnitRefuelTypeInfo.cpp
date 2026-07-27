@@ -7,7 +7,8 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitRefuel.h"
+#include "moho/unit/tasks/CUnitRefuel.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -204,3 +205,8 @@ namespace moho
     return std::atexit(&cleanup_CUnitRefuelTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitRefuelTypeInfo_cb70ca, moho::register_CUnitRefuelTypeInfo)

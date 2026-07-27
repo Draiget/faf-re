@@ -10,7 +10,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/path/IPathTraveler.h"
+#include "moho/path/IPathTraveler.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -302,3 +303,8 @@ namespace moho
     Finish();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RDListType_IPathTraveler_4b32d3, preregister_RDListType_IPathTraveler)
+GPG_PREREGISTER_INIT(preregister_IPathTravelerTypeInfo_4b32d3, preregister_IPathTravelerTypeInfo)

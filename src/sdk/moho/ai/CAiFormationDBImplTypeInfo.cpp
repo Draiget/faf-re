@@ -12,7 +12,8 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/IAiFormationDB.h"
 #include "moho/ai/IFormationInstance.h"
-#include "moho/misc/Stats.h"
+#include "moho/misc/Stats.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -594,3 +595,12 @@ namespace
 
   [[maybe_unused]] CAiFormationDBImplTypeInfoBootstrap gCAiFormationDBImplTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiFormationDBImplTypeInfo_700dc3, moho::register_CAiFormationDBImplTypeInfo)
+
+GPG_PREREGISTER_INIT(register_FastVectorIFormationInstanceTypeAtexit_700dc3, moho::register_FastVectorIFormationInstanceTypeAtexit)
+
+GPG_PREREGISTER_INIT(preregister_FastVectorIFormationInstanceType_700dc3, preregister_FastVectorIFormationInstanceType)

@@ -12,7 +12,8 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiBuilderImpl.h"
 #include "moho/misc/Stats.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -882,3 +883,11 @@ namespace
 
   [[maybe_unused]] CAiBuilderImplTypeInfoBootstrap gCAiBuilderImplTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiBuilderImplTypeInfo_a07870, moho::register_CAiBuilderImplTypeInfo)
+GPG_PREREGISTER_INIT(register_CAiBuilderRebuildMapTypeInfo_a07870, moho::register_CAiBuilderRebuildMapTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CAiBuilderRebuildMapTypeInfo_a07870, moho::preregister_CAiBuilderRebuildMapTypeInfo)

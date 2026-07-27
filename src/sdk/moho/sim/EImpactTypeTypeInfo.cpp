@@ -6,7 +6,8 @@
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -383,3 +384,10 @@ namespace
 
   [[maybe_unused]] EImpactTypeTypeInfoBootstrap gEImpactTypeTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EImpactTypeTypeInfo_c2a1f9, moho::register_EImpactTypeTypeInfo)
+
+GPG_PREREGISTER_INIT(ConstructEImpactTypeTypeInfoInternal_c2a1f9, ConstructEImpactTypeTypeInfoInternal)

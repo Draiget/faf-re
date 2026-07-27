@@ -11,7 +11,8 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/StatItem.h"
+#include "moho/misc/StatItem.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -499,3 +500,10 @@ void CTaskTypeInfo::Init()
   gpg::RType::Init();
   Finish();
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CTaskTypeInfo_e70b77, moho::register_CTaskTypeInfo)
+
+GPG_PREREGISTER_INIT(InitializeCTaskTypeInfoStorage_e70b77, InitializeCTaskTypeInfoStorage)

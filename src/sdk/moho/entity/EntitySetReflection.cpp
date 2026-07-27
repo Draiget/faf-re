@@ -9,7 +9,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityFastVectorReflection.h"
+#include "moho/entity/EntityFastVectorReflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -1109,3 +1110,10 @@ namespace
 
   EntitySetReflectionBootstrap gEntitySetReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EntitySetBaseTypeInfo_2618e1, moho::register_EntitySetBaseTypeInfo)
+GPG_PREREGISTER_INIT(register_EntitySetTypeInfo_2618e1, moho::register_EntitySetTypeInfo)
+GPG_PREREGISTER_INIT(register_WeakEntitySetTypeInfo_2618e1, moho::register_WeakEntitySetTypeInfo)

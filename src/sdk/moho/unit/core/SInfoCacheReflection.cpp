@@ -17,8 +17,6 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using TypeInfo = moho::SInfoCacheTypeInfo;

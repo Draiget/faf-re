@@ -6,7 +6,8 @@
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/tasks/CUnitGuardTask.h"
+#include "moho/unit/tasks/CUnitGuardTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -191,3 +192,7 @@ namespace moho
     task->~CUnitGuardTask();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CUnitGuardTaskTypeInfo_15e799, moho::preregister_CUnitGuardTaskTypeInfo)

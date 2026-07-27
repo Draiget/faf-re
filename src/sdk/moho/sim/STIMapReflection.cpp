@@ -4,7 +4,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -202,3 +203,7 @@ namespace gpg
   }
 } // namespace gpg
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_STIMapTypeInfo_f195ea, moho::preregister_STIMapTypeInfo)

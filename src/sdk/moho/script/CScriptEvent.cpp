@@ -35,7 +35,8 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UserUnit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -3203,3 +3204,10 @@ void CScriptEventTypeInfo::Init()
   AddBase_CTaskEvent(this);
   Finish();
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CScriptEventTypeInfo_4715db, moho::register_CScriptEventTypeInfo)
+
+GPG_PREREGISTER_INIT(PreRegisterCScriptEventTypeInfo_4715db, PreRegisterCScriptEventTypeInfo)

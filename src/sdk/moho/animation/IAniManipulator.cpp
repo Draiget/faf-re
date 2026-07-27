@@ -22,7 +22,8 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2403,3 +2404,8 @@ namespace
 
   [[maybe_unused]] IAniManipulatorStartupBootstrap gIAniManipulatorStartupBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(AcquireIAniManipulatorTypeInfo_80a9e7, AcquireIAniManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(PreregisterIAniManipulatorPointerType_80a9e7, moho::PreregisterIAniManipulatorPointerType)

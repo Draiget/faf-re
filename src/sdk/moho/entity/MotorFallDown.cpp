@@ -21,9 +21,8 @@
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimStartupRegistrations.h"
-#include "moho/sim/STIMap.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -983,3 +982,8 @@ namespace
 
   [[maybe_unused]] MotorFallDownBootstrap gMotorFallDownBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_MotorFallDownTypeInfo_920782, moho::register_MotorFallDownTypeInfo)

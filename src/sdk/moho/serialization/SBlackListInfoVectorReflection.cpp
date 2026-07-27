@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -357,3 +358,7 @@ int moho::register_SBlackListInfoVectorType_AtExit()
   (void)register_SBlackListInfoVectorType_00();
   return std::atexit(&cleanup_SBlackListInfoVectorType);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SBlackListInfoVectorType_00_ca9d53, moho::register_SBlackListInfoVectorType_00)

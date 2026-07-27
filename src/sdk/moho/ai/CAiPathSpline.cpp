@@ -17,6 +17,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -2061,3 +2062,17 @@ namespace
 
   [[maybe_unused]] CPathPointReflectionBootstrap gCPathPointReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SCollisionInfoTypeInfo_9ee641, moho::register_SCollisionInfoTypeInfo)
+GPG_PREREGISTER_INIT(register_ECollisionTypeTypeInfo_9ee641, moho::register_ECollisionTypeTypeInfo)
+GPG_PREREGISTER_INIT(register_EPathPointStateTypeInfo_9ee641, moho::register_EPathPointStateTypeInfo)
+GPG_PREREGISTER_INIT(register_CPathPointTypeInfo_9ee641, moho::register_CPathPointTypeInfo)
+
+GPG_PREREGISTER_INIT(register_FastVectorCPathPointTypeAtexit_9ee641, moho::register_FastVectorCPathPointTypeAtexit)
+
+GPG_PREREGISTER_INIT(preregister_FastVectorCPathPointType_9ee641, preregister_FastVectorCPathPointType)
+GPG_PREREGISTER_INIT(construct_EPathPointStateTypeInfo_9ee641, construct_EPathPointStateTypeInfo)
+GPG_PREREGISTER_INIT(construct_CPathPointTypeInfo_9ee641, construct_CPathPointTypeInfo)

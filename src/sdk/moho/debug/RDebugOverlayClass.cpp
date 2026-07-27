@@ -17,7 +17,8 @@
 #include "moho/path/RDebugNavPath.h"
 #include "moho/path/RDebugNavPathTypeInfo.h"
 #include "moho/unit/core/RDebugWeapons.h"
-#include "moho/unit/core/RDebugWeaponsTypeInfo.h"
+#include "moho/unit/core/RDebugWeaponsTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -609,3 +610,24 @@ namespace
 
   [[maybe_unused]] const RDebugOverlayClassTypeInfoBootstrap gRDebugOverlayClassTypeInfoBootstrap{};
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RDebugGridTypeInfoStartup_e193c2, moho::register_RDebugGridTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugRadarTypeInfoStartup_e193c2, moho::register_RDebugRadarTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugNavPathTypeInfoStartup_e193c2, moho::register_RDebugNavPathTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugNavWaypointsTypeInfoStartup_e193c2, moho::register_RDebugNavWaypointsTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugNavSteeringTypeInfoStartup_e193c2, moho::register_RDebugNavSteeringTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugOverlayClassTypeInfoStartup_e193c2, moho::register_RDebugOverlayClassTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugOverlayTypeInfoStartup_e193c2, moho::register_RDebugOverlayTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_RDebugWeaponsTypeInfoStartup_e193c2, moho::register_RDebugWeaponsTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(register_RDebugGridTypeInfo_e193c2, moho::register_RDebugGridTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugRadarTypeInfo_e193c2, moho::register_RDebugRadarTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugNavPathTypeInfo_e193c2, moho::register_RDebugNavPathTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugNavWaypointsTypeInfo_e193c2, moho::register_RDebugNavWaypointsTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugNavSteeringTypeInfo_e193c2, moho::register_RDebugNavSteeringTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugOverlayClassTypeInfo_e193c2, moho::register_RDebugOverlayClassTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugOverlayTypeInfo_e193c2, moho::register_RDebugOverlayTypeInfo)
+GPG_PREREGISTER_INIT(register_RDebugWeaponsTypeInfo_e193c2, moho::register_RDebugWeaponsTypeInfo)

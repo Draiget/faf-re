@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiFormationDB.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -99,3 +100,8 @@ namespace
 
   [[maybe_unused]] IAiFormationDBTypeInfoBootstrap gIAiFormationDBTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiFormationDBTypeInfo_86cce9, moho::register_IAiFormationDBTypeInfo)

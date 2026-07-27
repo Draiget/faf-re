@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/script/CUnitScriptTask.h"
+#include "moho/script/CUnitScriptTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -208,3 +209,7 @@ namespace
 
   CUnitScriptTaskTypeInfoBootstrap gCUnitScriptTaskTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitScriptTaskTypeInfo_31c747, moho::register_CUnitScriptTaskTypeInfo)

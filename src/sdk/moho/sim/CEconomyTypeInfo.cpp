@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/sim/CEconomy.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -77,3 +78,8 @@ void moho::register_CEconomyTypeInfoStartup()
   (void)AcquireCEconomyTypeInfo();
   (void)std::atexit(&cleanup_CEconomyTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEconomyTypeInfoStartup_e9f26e, moho::register_CEconomyTypeInfoStartup)

@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/sim/CEconStorage.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -58,3 +59,8 @@ void moho::register_CEconStorageTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEconStorageTypeInfoStartup_e016aa, moho::register_CEconStorageTypeInfoStartup)

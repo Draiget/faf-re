@@ -9,9 +9,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/Entity.h"
-
-#pragma init_seg(lib)
+#include "moho/entity/Entity.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -878,3 +877,9 @@ namespace moho
     return std::atexit(&cleanup_FastVectorEntityPtrType);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WeakPtr_Entity_Type_00_d52ccd, moho::register_WeakPtr_Entity_Type_00)
+GPG_PREREGISTER_INIT(register_VectorEntityPtr_Type_00_d52ccd, moho::register_VectorEntityPtr_Type_00)
+GPG_PREREGISTER_INIT(register_FastVectorEntityPtrType_00_d52ccd, moho::register_FastVectorEntityPtrType_00)

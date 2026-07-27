@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -94,3 +95,8 @@ namespace
 
   [[maybe_unused]] Sphere3fTypeInfoBootstrap gSphere3fTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_Sphere3fTypeInfo_96ea18, moho::register_Sphere3fTypeInfo)

@@ -3,6 +3,7 @@
 #include <typeinfo>
 
 #include "moho/sim/CInfluenceMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -140,3 +141,9 @@ namespace
 
   CInfluenceMapTypeInfoBootstrap gCInfluenceMapTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CInfluenceMapTypeInfo_50df3b, moho::register_CInfluenceMapTypeInfo)
+GPG_PREREGISTER_INIT(register_EThreatTypeTypeInfo_50df3b, moho::register_EThreatTypeTypeInfo)

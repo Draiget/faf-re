@@ -4,8 +4,6 @@
 
 #include "moho/entity/intel/CIntelCounterHandle.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using Serializer = moho::CIntelCounterHandleSerializer;

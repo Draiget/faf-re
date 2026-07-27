@@ -12,6 +12,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -257,3 +258,7 @@ namespace moho
     return &typeInfo;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RListType_ShieldPtr_095a6f, moho::preregister_RListType_ShieldPtr)

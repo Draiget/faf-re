@@ -6,7 +6,8 @@
 #include <typeinfo>
 
 #include "moho/ai/CAimManipulator.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -185,3 +186,8 @@ namespace moho
     (void)std::atexit(&cleanup_CAimManipulatorTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAimManipulatorTypeInfo_9e43e8, moho::register_CAimManipulatorTypeInfo)

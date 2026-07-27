@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/ai/CBuilderArmManipulator.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -316,3 +317,10 @@ namespace moho
     return std::atexit(&cleanup_CBuilderArmManipulatorTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CBuilderArmManipulatorTypeInfo_9cf0c1, moho::register_CBuilderArmManipulatorTypeInfo)
+
+GPG_PREREGISTER_INIT(AcquireTypeInfo_9cf0c1, AcquireTypeInfo)

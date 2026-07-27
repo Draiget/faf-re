@@ -7,9 +7,8 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/Global.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -624,3 +623,10 @@ namespace
 } // namespace
 
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_DColPrimSphereTypeInfo_2459d0, moho::register_DColPrimSphereTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_DColPrimSphereTypeInfo_2459d0, moho::preregister_DColPrimSphereTypeInfo)

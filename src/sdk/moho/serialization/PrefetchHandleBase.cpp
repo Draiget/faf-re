@@ -14,6 +14,7 @@
 #include "moho/serialization/CPrefetchSet.h"
 #include "moho/serialization/PrefetchHandleBaseSerializer.h"
 #include "moho/serialization/PrefetchHandleBaseTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -462,3 +463,10 @@ namespace moho
     return ResetSerializerLinks(gPrefetchHandleBaseSerializer);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_PrefetchHandleBaseTypeInfo_dee002, moho::register_PrefetchHandleBaseTypeInfo)
+
+GPG_PREREGISTER_INIT(EnsurePrefetchSetTypeRegistered_dee002, EnsurePrefetchSetTypeRegistered)

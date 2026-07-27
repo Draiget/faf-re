@@ -18,24 +18,6 @@ namespace moho
   template <class TEvent>
   class ManyToOneListener;
 
-  template <>
-  class ManyToOneListener<EProjectileImpactEvent> : public WeakObject
-  {
-  public:
-    /**
-     * Address: 0x005D88F0 (FUN_005D88F0)
-     *
-     * What it does:
-     * Initializes projectile-impact listener weak-link storage to an empty
-     * owner chain.
-     */
-    ManyToOneListener();
-
-    virtual int HandleProjectileImpactListenerState(int action) = 0;
-
-  public:
-    static gpg::RType* sType;
-  };
 
   template <>
   class ManyToOneListener<ECollisionBeamEvent> : public WeakObject
@@ -117,7 +99,7 @@ namespace moho
      * Dispatches listener action handling for projectile-impact callbacks:
      * retarget probe on action==1, reset/counter-clear on action==0/2.
      */
-    int HandleProjectileImpactListenerState(int action);
+    int OnEvent(EProjectileImpactEvent event) override;
 
     /**
      * Address: 0x005D9830 (FUN_005D9830, listener callback lane)

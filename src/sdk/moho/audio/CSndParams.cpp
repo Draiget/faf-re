@@ -20,7 +20,8 @@
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/SParamKey.h"
 #include "moho/lua/CScrLuaBinder.h"
-#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1433,3 +1434,7 @@ namespace moho
     return &binder;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterCSndParamsPointerType_ce959d, moho::PreregisterCSndParamsPointerType)

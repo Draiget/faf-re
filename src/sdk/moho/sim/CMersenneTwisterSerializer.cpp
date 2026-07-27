@@ -8,8 +8,6 @@
 
 // Make CMersenneTwister registration run before default-segment bootstrap
 // objects that query RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCMersenneTwisterType()

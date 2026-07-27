@@ -9,7 +9,8 @@
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/ECommandEvent.h"
+#include "moho/unit/ECommandEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -251,3 +252,8 @@ namespace moho
     return std::atexit(&cleanup);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitAttackTargetTaskTypeInfo_83cf44, moho::register_CUnitAttackTargetTaskTypeInfo)

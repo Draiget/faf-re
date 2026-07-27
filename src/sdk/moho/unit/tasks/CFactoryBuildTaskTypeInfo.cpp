@@ -3,7 +3,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CFactoryBuildTask.h"
+#include "moho/unit/tasks/CFactoryBuildTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -119,3 +120,7 @@ namespace moho
     return gpg::RRef{task, CachedCFactoryBuildTaskType()};
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CFactoryBuildTaskTypeInfo_c07ac7, moho::preregister_CFactoryBuildTaskTypeInfo)

@@ -17,7 +17,8 @@
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -617,3 +618,7 @@ namespace moho
     Finish();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_ShieldTypeInfo_0bcbf6, moho::preregister_ShieldTypeInfo)

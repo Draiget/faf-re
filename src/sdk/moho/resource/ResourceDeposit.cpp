@@ -10,7 +10,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/resource/EResourceTypeTypeInfo.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -313,3 +314,8 @@ namespace moho
     (void)std::atexit(&cleanup_ResourceDepositTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ResourceDepositTypeInfo_91baf4, moho::register_ResourceDepositTypeInfo)

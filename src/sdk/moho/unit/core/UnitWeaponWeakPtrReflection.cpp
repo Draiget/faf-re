@@ -10,8 +10,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/unit/core/UnitWeapon.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -261,3 +260,7 @@ namespace moho
     return std::atexit(&cleanup_WeakPtr_UnitWeapon_Type);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WeakPtr_UnitWeapon_Type_00_c604f3, moho::register_WeakPtr_UnitWeapon_Type_00)

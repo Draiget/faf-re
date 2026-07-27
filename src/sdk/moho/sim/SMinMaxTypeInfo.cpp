@@ -4,8 +4,6 @@
 
 #include "moho/sim/SMinMax.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   moho::SMinMaxFloatTypeInfo gSMinMaxFloatTypeInfo;

@@ -5,8 +5,7 @@
 #include <typeinfo>
 
 #include "moho/resource/CParticleTexture.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -94,3 +93,8 @@ namespace moho
     return register_CParticleTextureTypeInfo_00BC5250_Impl();
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CParticleTextureTypeInfo_88240b, moho::register_CParticleTextureTypeInfo)

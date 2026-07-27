@@ -11,7 +11,8 @@
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/unit/core/Unit.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1983,3 +1984,12 @@ namespace
   [[maybe_unused]] FastVectorVector3fReflectionBootstrap gFastVectorVector3fReflectionBootstrap;
 } // namespace
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_FastVectorFloatType_86ef6d, gpg::preregister_FastVectorFloatType)
+GPG_PREREGISTER_INIT(register_FastVectorFloatTypeAtexit_86ef6d, gpg::register_FastVectorFloatTypeAtexit)
+GPG_PREREGISTER_INIT(preregister_FastVectorStringType_86ef6d, gpg::preregister_FastVectorStringType)
+GPG_PREREGISTER_INIT(register_FastVectorStringTypeAtexit_86ef6d, gpg::register_FastVectorStringTypeAtexit)
+GPG_PREREGISTER_INIT(preregister_FastVectorVector3fType_86ef6d, gpg::preregister_FastVectorVector3fType)
+GPG_PREREGISTER_INIT(register_FastVectorVector3fTypeAtexit_86ef6d, gpg::register_FastVectorVector3fTypeAtexit)

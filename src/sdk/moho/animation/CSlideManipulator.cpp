@@ -19,7 +19,8 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1464,3 +1465,10 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CSlideManipulatorTypeInfoStartup_aadc13, register_CSlideManipulatorTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(preregister_CSlideManipulatorTypeInfo_aadc13, preregister_CSlideManipulatorTypeInfo)

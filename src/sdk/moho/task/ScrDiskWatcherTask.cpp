@@ -13,6 +13,7 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StatItem.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -564,3 +565,10 @@ void ScrDiskWatcherTaskTypeInfo::Init()
   AddBase_CTask(this);
   Finish();
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ScrDiskWatcherTaskTypeInfo_1d07fe, moho::register_ScrDiskWatcherTaskTypeInfo)
+
+GPG_PREREGISTER_INIT(RegisterScrDiskWatcherTaskTypeInfo_1d07fe, RegisterScrDiskWatcherTaskTypeInfo)

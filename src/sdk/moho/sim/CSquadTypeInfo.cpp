@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/sim/CSquad.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // CSquad registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query CSquad RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::CSquadTypeInfo) unsigned char gCSquadTypeInfoStorage[sizeof(moho::CSquadTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] CSquadTypeInfoRegistration gCSquadTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CSquadTypeInfo_e03500, moho::register_CSquadTypeInfo)

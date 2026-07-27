@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/SAiReservedTransportBone.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -94,3 +95,10 @@ int moho::register_SAiReservedTransportBoneTypeInfo()
   (void)preregister_SAiReservedTransportBoneTypeInfoStartup();
   return std::atexit(&cleanup_SAiReservedTransportBoneTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SAiReservedTransportBoneTypeInfo_147354, moho::register_SAiReservedTransportBoneTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_SAiReservedTransportBoneTypeInfoStartup_147354, preregister_SAiReservedTransportBoneTypeInfoStartup)

@@ -5,6 +5,7 @@
 
 #include "moho/entity/Entity.h"
 #include "moho/entity/Prop.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -151,3 +152,9 @@ namespace
 
   PropTypeInfoBootstrap gPropTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SPropPriorityInfoTypeInfo_e6e11f, moho::register_SPropPriorityInfoTypeInfo)
+GPG_PREREGISTER_INIT(register_PropTypeInfo_e6e11f, moho::register_PropTypeInfo)

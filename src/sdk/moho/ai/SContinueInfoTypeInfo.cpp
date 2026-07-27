@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathSpline.h"
+#include "moho/ai/CAiPathSpline.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -100,3 +101,8 @@ namespace
 
   [[maybe_unused]] SContinueInfoTypeInfoBootstrap gSContinueInfoTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SContinueInfoTypeInfo_3ad5d7, moho::register_SContinueInfoTypeInfo)

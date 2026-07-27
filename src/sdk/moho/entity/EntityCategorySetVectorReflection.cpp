@@ -6,7 +6,8 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -590,3 +591,7 @@ void moho::PushBackEntityCategorySetVector(
   // which tail-calls `msvc8::vector<EntityCategorySet>::_Insert_n` (FUN_006DC600).
   destination.push_back(value);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EntityCategorySetVectorType_0692e8, moho::register_EntityCategorySetVectorType)

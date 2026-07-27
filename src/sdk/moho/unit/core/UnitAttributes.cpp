@@ -8,7 +8,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -284,3 +285,7 @@ namespace
 
   [[maybe_unused]] UnitAttributesTypeInfoBootstrap gUnitAttributesTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_UnitAttributesTypeInfo_ff51a9, moho::preregister_UnitAttributesTypeInfo)

@@ -5,8 +5,7 @@
 #include <typeinfo>
 
 #include "moho/net/CLobby.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -153,3 +152,8 @@ namespace moho
     Finish();
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CLobbyTypeInfo_2c77e3, register_CLobbyTypeInfo)

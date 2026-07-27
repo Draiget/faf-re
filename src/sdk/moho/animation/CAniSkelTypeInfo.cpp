@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/animation/CAniSkel.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -93,3 +94,7 @@ namespace moho
     return std::atexit(&cleanup_CAniSkelTypeInfo);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CAniSkelTypeInfo_9b39e1, moho::preregister_CAniSkelTypeInfo)

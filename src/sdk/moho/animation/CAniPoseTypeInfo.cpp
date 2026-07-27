@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
-#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniPose.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -303,3 +304,8 @@ void moho::register_CAniPoseTypeInfoStartup()
   (void)AcquireCAniPoseTypeInfo();
   (void)std::atexit(&cleanup_CAniPoseTypeInfoStartup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAniPoseTypeInfoStartup_e9036b, moho::register_CAniPoseTypeInfoStartup)

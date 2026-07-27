@@ -4,12 +4,11 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiNavigator.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // NavPath registration is emitted into the earliest C++ initializer segment
 // (binary __xc_a) so the descriptor is preregistered before default-segment
 // bootstrap objects query NavPath RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace moho
 {
   /**
@@ -96,3 +95,8 @@ namespace moho
     (void)std::atexit(&cleanup_NavPathTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_NavPathTypeInfo_10f919, moho::register_NavPathTypeInfo)

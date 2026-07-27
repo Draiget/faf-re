@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiSteering.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -100,3 +101,10 @@ int moho::register_IAiSteeringTypeInfo()
   IAiSteering::sType = typeInfo;
   return std::atexit(&cleanup_IAiSteeringTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiSteeringTypeInfo_5a1c4a, moho::register_IAiSteeringTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_IAiSteeringTypeInfoStartup_5a1c4a, preregister_IAiSteeringTypeInfoStartup)

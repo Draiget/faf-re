@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/effects/rendering/CEfxEmitter.h"
+#include "moho/effects/rendering/CEfxEmitter.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -217,3 +218,7 @@ namespace moho
     return std::atexit(&cleanup_CEfxEmitterTypeInfo);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEfxEmitterTypeInfo_00_e6e4eb, moho::register_CEfxEmitterTypeInfo_00)

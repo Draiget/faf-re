@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/command/CCommandDb.h"
+#include "moho/command/CCommandDb.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -133,3 +134,8 @@ namespace
 
   CCommandDBTypeInfoBootstrap gCCommandDBTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CCommandDBTypeInfo_4c172b, moho::register_CCommandDBTypeInfo)

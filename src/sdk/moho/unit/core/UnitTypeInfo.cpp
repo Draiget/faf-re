@@ -7,6 +7,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -172,3 +173,8 @@ namespace moho
     (void)std::atexit(&cleanup_UnitTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_UnitTypeInfo_fd4ea3, moho::register_UnitTypeInfo)

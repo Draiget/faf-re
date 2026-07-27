@@ -18,7 +18,8 @@
 #include "moho/path/PathTables.h"
 #include "Wm3Box3.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1596,3 +1597,8 @@ namespace
 
   [[maybe_unused]] COGridTypeInfoBootstrap gCOGridTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_COGridTypeInfo_dc0e5e, moho::register_COGridTypeInfo)

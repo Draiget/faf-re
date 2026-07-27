@@ -20,7 +20,8 @@
 #include "moho/math/Vector3f.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1330,3 +1331,10 @@ gpg::RRef* gpg::RRef_CRotateManipulator(gpg::RRef* const outRef, moho::CRotateMa
   outRef->mType = typed.mType;
   return outRef;
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CRotateManipulatorTypeInfoStartup_072343, register_CRotateManipulatorTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(preregister_CRotateManipulatorTypeInfo_072343, preregister_CRotateManipulatorTypeInfo)

@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathSpline.h"
+#include "moho/ai/CAiPathSpline.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -228,3 +229,10 @@ namespace
 
   [[maybe_unused]] CAiPathSplineTypeInfoBootstrap gCAiPathSplineTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiPathSplineTypeInfo_62956f, moho::register_CAiPathSplineTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CAiPathSplineTypeInfo_62956f, preregister_CAiPathSplineTypeInfo)

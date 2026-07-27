@@ -16,7 +16,8 @@
 #include "moho/ai/CAiNavigatorAir.h"
 #include "moho/ai/CAiNavigatorImpl.h"
 #include "moho/ai/CAiNavigatorLand.h"
-#include "moho/misc/Listener.h"
+#include "moho/misc/Listener.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -1756,3 +1757,8 @@ namespace
 
   [[maybe_unused]] IAiNavigatorReflectionBootstrap gIAiNavigatorReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(RegisterBroadcasterEAiNavigatorEventType_2f6ef0, RegisterBroadcasterEAiNavigatorEventType)
+GPG_PREREGISTER_INIT(RegisterListenerEAiNavigatorEventType_2f6ef0, RegisterListenerEAiNavigatorEventType)

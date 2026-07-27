@@ -10,7 +10,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "legacy/containers/Vector.h"
+#include "legacy/containers/Vector.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1079,3 +1080,7 @@ namespace moho
     archive->WriteInt(static_cast<int>(mFidelity));
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RListType_SDecalInfo_874f42, preregister_RListType_SDecalInfo)

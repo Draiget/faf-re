@@ -9,7 +9,8 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/EngineVectorHelpers.h"
+#include "moho/misc/EngineVectorHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1099,3 +1100,8 @@ namespace
 
   [[maybe_unused]] SSTIArmyVariableDataSerializerBootstrap gSSTIArmyVariableDataSerializerBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SSTIArmyVariableDataTypeInfo_275369, moho::register_SSTIArmyVariableDataTypeInfo)

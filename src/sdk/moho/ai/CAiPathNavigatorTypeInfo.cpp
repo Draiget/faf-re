@@ -6,6 +6,7 @@
 
 #include "moho/ai/CAiPathNavigator.h"
 #include "moho/misc/Listener.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -231,3 +232,8 @@ namespace
 
   [[maybe_unused]] CAiPathNavigatorTypeInfoBootstrap gCAiPathNavigatorTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiPathNavigatorTypeInfo_7e1f6e, moho::register_CAiPathNavigatorTypeInfo)

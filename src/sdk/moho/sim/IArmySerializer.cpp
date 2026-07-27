@@ -10,7 +10,8 @@
 #include "moho/sim/IArmyTypeInfo.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SSTIArmyConstantData.h"
-#include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/sim/SSTIArmyVariableData.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -435,3 +436,7 @@ namespace
 
   [[maybe_unused]] IArmySerializerBootstrap gIArmySerializerBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTIArmyConstantDataTypeInfo_ce637e, moho::preregister_SSTIArmyConstantDataTypeInfo)

@@ -9,8 +9,6 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/particles/SWorldBeam.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using BeamSerializer = moho::SWorldBeamSerializer;

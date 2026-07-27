@@ -23,7 +23,8 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/STIMap.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -5376,3 +5377,8 @@ namespace
 
   CInfluenceMapDebugBootstrap gCInfluenceMapDebugBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RMapType_uint_int_9e247f, preregister_RMapType_uint_int)
+GPG_PREREGISTER_INIT(preregister_RMapType_uint_InfluenceMapEntry_9e247f, preregister_RMapType_uint_InfluenceMapEntry)

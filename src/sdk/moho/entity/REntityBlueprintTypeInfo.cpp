@@ -15,7 +15,8 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
-#include "moho/sim/SFootprint.h"
+#include "moho/sim/SFootprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -976,3 +977,13 @@ gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntity
   outRef->mType = temp.mType;
   return outRef;
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EFootprintFlagsTypeInfo_4663ab, moho::register_EFootprintFlagsTypeInfo)
+GPG_PREREGISTER_INIT(register_RStringVectorTypeInfo_4663ab, moho::register_RStringVectorTypeInfo)
+GPG_PREREGISTER_INIT(register_REntityBlueprintTypeInfo_4663ab, moho::register_REntityBlueprintTypeInfo)
+
+GPG_PREREGISTER_INIT(AcquireEFootprintFlagsTypeInfo_4663ab, AcquireEFootprintFlagsTypeInfo)
+GPG_PREREGISTER_INIT(AcquireRStringVectorTypeInfo_4663ab, AcquireRStringVectorTypeInfo)

@@ -29,9 +29,8 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/ui/CUIManager.h"
-#include "platform/Platform.h"
-
-#pragma init_seg(lib)
+#include "platform/Platform.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2719,3 +2718,10 @@ namespace
 
   StatItemSerializerBootstrap gStatItemSerializerBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_PrimitiveSerHelper_EPulseModeTypeInfo_448311, moho::register_PrimitiveSerHelper_EPulseModeTypeInfo)
+
+GPG_PREREGISTER_INIT(register_PrimitiveSerHelper_EStatType_448311, moho::register_PrimitiveSerHelper_EStatType)

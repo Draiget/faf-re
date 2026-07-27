@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using TypeInfo = gpg::RTypeTypeInfo;
 
@@ -54,3 +55,8 @@ void gpg::register_RTypeTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RTypeTypeInfoStartup_668427, gpg::register_RTypeTypeInfoStartup)

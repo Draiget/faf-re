@@ -9,8 +9,6 @@
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/SPhysConstantsTypeInfo.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using Serializer = moho::SPhysConstantsSerializer;

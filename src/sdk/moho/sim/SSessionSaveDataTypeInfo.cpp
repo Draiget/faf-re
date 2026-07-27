@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/CWldSession.h"
+#include "moho/sim/CWldSession.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -151,3 +152,8 @@ void moho::register_SSessionSaveDataTypeInfoStartup()
   (void)AcquireSSessionSaveDataTypeInfo();
   (void)std::atexit(&cleanup_SSessionSaveDataTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SSessionSaveDataTypeInfoStartup_c53156, moho::register_SSessionSaveDataTypeInfoStartup)

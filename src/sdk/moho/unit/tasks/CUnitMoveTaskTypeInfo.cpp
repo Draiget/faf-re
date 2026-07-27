@@ -9,6 +9,7 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -206,3 +207,7 @@ namespace moho
     return gpg::RRef{task, CachedCUnitMoveTaskType()};
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CUnitMoveTaskTypeInfo_86327d, moho::preregister_CUnitMoveTaskTypeInfo)

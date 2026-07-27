@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CUnitGetBuiltTask.h"
+#include "moho/unit/tasks/CUnitGetBuiltTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -182,3 +183,8 @@ namespace moho
     return std::atexit(&cleanup);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitGetBuiltTaskTypeInfo_9f28d3, moho::register_CUnitGetBuiltTaskTypeInfo)

@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPersonality.h"
+#include "moho/ai/CAiPersonality.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -490,3 +491,10 @@ namespace
 
   [[maybe_unused]] CAiPersonalitySerializerBootstrap gCAiPersonalitySerializerBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SValuePairTypeInfo_95b24f, moho::register_SValuePairTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_SValuePairTypeInfo_95b24f, preregister_SValuePairTypeInfo)

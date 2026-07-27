@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/sim/SMassInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -97,3 +98,8 @@ void moho::register_SMassInfoTypeInfoStartup()
   (void)AcquireSMassInfoTypeInfo();
   (void)std::atexit(&cleanup_SMassInfoTypeInfoStartup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SMassInfoTypeInfoStartup_53a161, moho::register_SMassInfoTypeInfoStartup)

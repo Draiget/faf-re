@@ -6,6 +6,7 @@
 
 #include "moho/audio/AudioReflectionHelpers.h"
 #include "moho/audio/HSound.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -103,3 +104,8 @@ namespace
 
   [[maybe_unused]] HSoundTypeInfoBootstrap gHSoundTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_HSoundTypeInfo_6cd9a3, moho::register_HSoundTypeInfo)

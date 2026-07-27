@@ -6,8 +6,6 @@
 
 #include "moho/unit/core/UnitWeapon.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using TypeInfo = moho::UnitWeaponTypeInfo;

@@ -86,7 +86,8 @@
 #include "moho/unit/core/UnitLuaFunctionThunks.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
-#include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UserUnit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -17656,3 +17657,8 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
 }
 
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_UnitWeaponInfoTypeInfo_d3b904, moho::preregister_UnitWeaponInfoTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SSTIUnitVariableDataTypeInfo_d3b904, moho::preregister_SSTIUnitVariableDataTypeInfo)

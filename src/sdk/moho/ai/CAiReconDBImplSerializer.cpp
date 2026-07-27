@@ -15,7 +15,8 @@
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -805,3 +806,10 @@ void moho::register_CAiReconDBImplSerializer()
   serializer->mSerSaveFunc = &CAiReconDBImplSerializer::Serialize;
   (void)std::atexit(&cleanup_CAiReconDBImplSerializer);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SReconKeyTypeInfo_e639f8, moho::register_SReconKeyTypeInfo)
+
+GPG_PREREGISTER_INIT(PreregisterSReconKeyTypeInfo_e639f8, PreregisterSReconKeyTypeInfo)

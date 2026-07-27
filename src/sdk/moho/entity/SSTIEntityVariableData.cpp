@@ -17,7 +17,8 @@
 #include "moho/audio/CSndParams.h"
 #include "moho/entity/EntityId.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
-#include "moho/resource/RScmResource.h"
+#include "moho/resource/RScmResource.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1094,3 +1095,9 @@ namespace moho
   // Cached reflected `SSTIEntityAttachInfo` lane.
   gpg::RType* SSTIEntityAttachInfo::sType = nullptr;
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTIEntityAttachInfoTypeInfo_a1a5ff, moho::preregister_SSTIEntityAttachInfoTypeInfo)
+GPG_PREREGISTER_INIT(preregister_EntityAttributesTypeInfo_a1a5ff, moho::preregister_EntityAttributesTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SSTIEntityVariableDataTypeInfo_a1a5ff, moho::preregister_SSTIEntityVariableDataTypeInfo)

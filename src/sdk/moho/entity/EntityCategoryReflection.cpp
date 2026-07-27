@@ -16,7 +16,8 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RBlueprint.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -947,3 +948,8 @@ namespace
     (void)std::atexit(&cleanup_EntityCategoryHelperSerializerAtexit);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EntityCategoryHelperTypeInfoStartup_887a87, moho::register_EntityCategoryHelperTypeInfoStartup)

@@ -4,6 +4,7 @@
 
 #include "moho/entity/intel/CIntelCounterHandle.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -59,3 +60,7 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CIntelCounterHandleTypeInfo_03281c, moho::preregister_CIntelCounterHandleTypeInfo)

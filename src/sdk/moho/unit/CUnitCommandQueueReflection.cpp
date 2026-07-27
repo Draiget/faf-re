@@ -4,7 +4,8 @@
 #include <typeinfo>
 
 #include "moho/unit/Broadcaster.h"
-#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitCommandQueue.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -403,3 +404,8 @@ namespace
 
   CUnitCommandQueueReflectionBootstrap gCUnitCommandQueueReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitCommandQueueTypeInfo_856820, moho::register_CUnitCommandQueueTypeInfo)

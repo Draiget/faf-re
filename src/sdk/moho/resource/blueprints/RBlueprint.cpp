@@ -14,7 +14,8 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/RResId.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -511,3 +512,10 @@ namespace
 
   RBlueprintTypeInfoBootstrap gRBlueprintTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RBlueprintTypeInfo_c294bc, moho::register_RBlueprintTypeInfo)
+
+GPG_PREREGISTER_INIT(PreregisterRBlueprintPointerType_c294bc, moho::PreregisterRBlueprintPointerType)

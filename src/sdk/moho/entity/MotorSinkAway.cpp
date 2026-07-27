@@ -11,9 +11,8 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/StatItem.h"
-#include "moho/misc/Stats.h"
-
-#pragma init_seg(lib)
+#include "moho/misc/Stats.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -804,3 +803,8 @@ namespace
 
   [[maybe_unused]] MotorSinkAwayBootstrap gMotorSinkAwayBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_MotorSinkAwayTypeInfo_905beb, moho::register_MotorSinkAwayTypeInfo)

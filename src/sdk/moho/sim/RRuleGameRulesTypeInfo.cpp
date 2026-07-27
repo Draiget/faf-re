@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -110,3 +111,8 @@ namespace moho
     return std::atexit(&cleanup_RRuleGameRulesTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RRuleGameRulesTypeInfoStartup_ea72de, moho::register_RRuleGameRulesTypeInfoStartup)

@@ -6,7 +6,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
+#include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -166,3 +167,8 @@ namespace moho
   }
 } // namespace moho
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitCallAirStagingPlatformTypeInfo_3049ed, moho::register_CUnitCallAirStagingPlatformTypeInfo)

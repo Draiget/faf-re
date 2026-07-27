@@ -11,8 +11,6 @@
 #include "moho/entity/Entity.h"
 #include "moho/serialization/SBlackListInfo.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using Serializer = moho::SBlackListInfoSerializer;

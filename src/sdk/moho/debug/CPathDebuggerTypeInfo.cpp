@@ -4,6 +4,7 @@
 
 #include "moho/debug/CPathDebugger.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -55,3 +56,7 @@ namespace moho
     debug_reflection::AddBaseCScriptObject(typeInfo);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CPathDebuggerTypeInfo_7700d8, moho::preregister_CPathDebuggerTypeInfo)

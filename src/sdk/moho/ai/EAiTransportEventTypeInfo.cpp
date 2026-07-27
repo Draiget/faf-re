@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/IAiTransport.h"
+#include "moho/ai/IAiTransport.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -326,3 +327,8 @@ int moho::register_EAiTransportEventPrimitiveSerializer()
   (void)InitializeEAiTransportEventPrimitiveSerializerSaveLoadLane();
   return std::atexit(&cleanup_EAiTransportEventPrimitiveSerializer);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EAiTransportEventTypeInfo_b34ccd, moho::register_EAiTransportEventTypeInfo)

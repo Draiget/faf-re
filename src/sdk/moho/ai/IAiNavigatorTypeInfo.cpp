@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiNavigator.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -100,3 +101,8 @@ namespace
   [[maybe_unused]] IAiNavigatorTypeInfoBootstrap gIAiNavigatorTypeInfoBootstrap;
 } // namespace
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiNavigatorTypeInfo_2d060b, moho::register_IAiNavigatorTypeInfo)

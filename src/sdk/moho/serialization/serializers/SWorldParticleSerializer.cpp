@@ -9,8 +9,6 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/particles/SWorldParticle.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using ParticleSerializer = moho::SWorldParticleSerializer;

@@ -7,6 +7,7 @@
 
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -127,3 +128,8 @@ namespace
 
   [[maybe_unused]] RD3DTextureResourceTypeInfoBootstrap gRD3DTextureResourceTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RD3DTextureResourceTypeInfo_5d5a4d, moho::register_RD3DTextureResourceTypeInfo)

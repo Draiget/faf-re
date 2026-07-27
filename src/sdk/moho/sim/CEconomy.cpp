@@ -12,7 +12,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -765,3 +766,8 @@ namespace
 
   [[maybe_unused]] CEconomyConstructHelperBootstrap gCEconomyConstructHelperBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SEconValueTypeInfo_e739f5, moho::preregister_SEconValueTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SEconTotalsTypeInfo_e739f5, moho::preregister_SEconTotalsTypeInfo)

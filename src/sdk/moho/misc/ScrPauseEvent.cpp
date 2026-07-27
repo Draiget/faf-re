@@ -1,6 +1,7 @@
 #include "moho/misc/ScrPauseEvent.h"
 
-#include <new>
+#include <new>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 /**
  * Address: 0x00978FD0
@@ -155,3 +156,7 @@ namespace
 
   ScrPauseEventTypeBootstrap gScrPauseEventTypeBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ScrPauseEventType_f8b90b, moho::register_ScrPauseEventType)

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -164,3 +165,9 @@ namespace
 
   SWorldBeamTypeInfoBootstrap gSWorldBeamTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SWorldBeam_BlendModeTypeInfo_3b975d, moho::register_SWorldBeam_BlendModeTypeInfo)
+GPG_PREREGISTER_INIT(register_SWorldBeamTypeInfo_3b975d, moho::register_SWorldBeamTypeInfo)

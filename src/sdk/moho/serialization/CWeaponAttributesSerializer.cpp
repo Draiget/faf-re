@@ -14,8 +14,6 @@
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using Serializer = moho::CWeaponAttributesSerializer;

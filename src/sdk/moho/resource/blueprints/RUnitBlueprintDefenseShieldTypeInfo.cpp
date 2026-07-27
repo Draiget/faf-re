@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -114,3 +115,8 @@ namespace moho
   }
 } // namespace moho
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RUnitBlueprintDefenseShieldTypeInfo_bf2b10, moho::register_RUnitBlueprintDefenseShieldTypeInfo)

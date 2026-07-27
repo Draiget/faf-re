@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/misc/CEconomyEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -77,3 +78,8 @@ void moho::register_CEconRequestTypeInfoStartup()
   (void)AcquireCEconRequestTypeInfo();
   (void)std::atexit(&cleanup_CEconRequestTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEconRequestTypeInfoStartup_c49737, moho::register_CEconRequestTypeInfoStartup)

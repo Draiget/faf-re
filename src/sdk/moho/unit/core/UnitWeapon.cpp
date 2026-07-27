@@ -52,6 +52,7 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CFireWeaponTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -4556,3 +4557,7 @@ namespace moho
     archive.WriteInt(mShotsAtTarget);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterUnitWeaponPointerType_2b5e7d, moho::PreregisterUnitWeaponPointerType)

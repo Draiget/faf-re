@@ -8,7 +8,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -229,3 +230,8 @@ namespace
 
   [[maybe_unused]] SSTITargetTypeInfoBootstrap gSSTITargetTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EntIdTypeInfo_dd3051, moho::preregister_EntIdTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SSTITargetTypeInfo_dd3051, moho::preregister_SSTITargetTypeInfo)

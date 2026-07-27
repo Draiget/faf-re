@@ -5,7 +5,8 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -519,3 +520,7 @@ namespace
 
   [[maybe_unused]] SSTICommandConstantDataSerializerBootstrap gSSTICommandConstantDataSerializerBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTICommandConstantDataTypeInfo_0f3565, moho::preregister_SSTICommandConstantDataTypeInfo)

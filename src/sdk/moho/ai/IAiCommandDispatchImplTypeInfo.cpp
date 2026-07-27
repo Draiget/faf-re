@@ -9,6 +9,7 @@
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/EUnitCommandQueueStatus.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -157,3 +158,10 @@ namespace
 
   [[maybe_unused]] IAiCommandDispatchImplTypeInfoBootstrap gIAiCommandDispatchImplTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiCommandDispatchImplTypeInfo_aaf8a9, moho::register_IAiCommandDispatchImplTypeInfo)
+
+GPG_PREREGISTER_INIT(construct_IAiCommandDispatchImplTypeInfo_aaf8a9, construct_IAiCommandDispatchImplTypeInfo)

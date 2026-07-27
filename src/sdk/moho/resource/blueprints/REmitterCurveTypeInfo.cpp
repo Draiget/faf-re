@@ -9,7 +9,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1439,3 +1440,12 @@ namespace moho
     return std::atexit(&cleanup_VectorREmitterCurveKeyType);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_REmitterBlueprintCurveTypeInfo_399a30, moho::register_REmitterBlueprintCurveTypeInfo)
+GPG_PREREGISTER_INIT(register_REmitterCurveKeyTypeInfo_399a30, moho::register_REmitterCurveKeyTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_VectorREmitterCurveKeyType_399a30, moho::preregister_VectorREmitterCurveKeyType)
+GPG_PREREGISTER_INIT(register_VectorREmitterCurveKeyTypeAtexit_399a30, moho::register_VectorREmitterCurveKeyTypeAtexit)

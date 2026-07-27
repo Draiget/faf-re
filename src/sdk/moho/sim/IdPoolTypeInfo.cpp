@@ -6,8 +6,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/IdPool.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -166,3 +165,8 @@ namespace moho
     DestroyIdPoolMembers(*object);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IdPoolTypeInfo_7d0278, moho::register_IdPoolTypeInfo)

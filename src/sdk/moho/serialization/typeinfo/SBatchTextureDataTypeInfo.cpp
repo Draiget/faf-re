@@ -3,6 +3,7 @@
 #include <typeinfo>
 
 #include "moho/render/textures/SBatchTextureData.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -81,3 +82,8 @@ namespace
 
   SBatchTextureDataTypeInfoBootstrap gSBatchTextureDataTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SBatchTextureDataTypeInfo_a65318, moho::register_SBatchTextureDataTypeInfo)

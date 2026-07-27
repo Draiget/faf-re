@@ -12,7 +12,8 @@
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1130,3 +1131,8 @@ namespace
 
   [[maybe_unused]] CAniActorStartupBootstrap gCAniActorStartupBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAniActorTypeInfo_22c0a4, moho::register_CAniActorTypeInfo)

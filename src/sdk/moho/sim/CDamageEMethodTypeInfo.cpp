@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -112,3 +113,10 @@ namespace
 
   [[maybe_unused]] CDamageEMethodTypeInfoBootstrap gCDamageEMethodTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CDamageEMethodTypeInfo_ca3e35, moho::register_CDamageEMethodTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CDamageEMethodTypeInfo_ca3e35, moho::preregister_CDamageEMethodTypeInfo)

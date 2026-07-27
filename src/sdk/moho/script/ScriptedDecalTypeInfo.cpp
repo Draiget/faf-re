@@ -3,6 +3,7 @@
 #include <typeinfo>
 
 #include "moho/script/ScriptedDecal.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -67,3 +68,7 @@ void ScriptedDecalTypeInfo::Init()
   gpg::PreRegisterRType(typeid(ScriptedDecal), &typeInfo);
   return &typeInfo;
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_ScriptedDecalTypeInfo_3ff0a1, preregister_ScriptedDecalTypeInfo)

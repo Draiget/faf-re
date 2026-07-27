@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiReconDB.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -103,3 +104,8 @@ void moho::register_IAiReconDBTypeInfo()
   (void)AcquireIAiReconDBTypeInfo();
   (void)std::atexit(&cleanup_IAiReconDBTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiReconDBTypeInfo_254042, moho::register_IAiReconDBTypeInfo)

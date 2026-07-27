@@ -19,7 +19,8 @@
 #include "moho/containers/BitStorage32.h"
 #include "legacy/containers/Vector.h"
 #include "moho/lua/CScrLuaInitForm.h"
-#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1076,3 +1077,7 @@ namespace
 
   [[maybe_unused]] ManipulatorStartupRegistrationsBootstrap gManipulatorStartupRegistrationsBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RVectorType_bool_324744, preregister_RVectorType_bool)

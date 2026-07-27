@@ -6,9 +6,8 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/Global.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -287,3 +286,8 @@ namespace
 
   [[maybe_unused]] SCoordsVec2Bootstrap gSCoordsVec2Bootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SCoordsVec2TypeInfo_ae87f1, moho::register_SCoordsVec2TypeInfo)

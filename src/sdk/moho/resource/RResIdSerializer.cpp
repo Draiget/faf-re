@@ -7,8 +7,6 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/RResId.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   moho::RResIdSerializer gRResIdSerializer{};

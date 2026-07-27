@@ -8,8 +8,6 @@
 
 // Keep IdPool serializer registration in the lib init segment so runtime
 // bootstrap sees the callbacks before first IdPool RTTI lookup.
-#pragma init_seg(lib)
-
 namespace moho
 {
   void register_IdPoolSerializer();

@@ -12,7 +12,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/Listener.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/EUnitCommandQueueStatus.h"
+#include "moho/unit/EUnitCommandQueueStatus.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -888,3 +889,10 @@ namespace moho
       &cleanup_Listener_EUnitCommandQueueStatus_RType>();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_Broadcaster_ECommandEvent_RType_566e21, moho::register_Broadcaster_ECommandEvent_RType)
+GPG_PREREGISTER_INIT(register_Listener_ECommandEvent_RType_566e21, moho::register_Listener_ECommandEvent_RType)
+GPG_PREREGISTER_INIT(register_Broadcaster_EUnitCommandQueueStatus_RType_566e21, moho::register_Broadcaster_EUnitCommandQueueStatus_RType)
+GPG_PREREGISTER_INIT(register_Listener_EUnitCommandQueueStatus_RType_566e21, moho::register_Listener_EUnitCommandQueueStatus_RType)

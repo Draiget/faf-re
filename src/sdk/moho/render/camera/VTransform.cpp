@@ -12,7 +12,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/math/VMatrix4.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -569,3 +570,10 @@ namespace
 
   [[maybe_unused]] VTransformBootstrap gVTransformBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_VTransformTypeInfo_2fd396, moho::register_VTransformTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_VTransformTypeInfo_2fd396, moho::preregister_VTransformTypeInfo)

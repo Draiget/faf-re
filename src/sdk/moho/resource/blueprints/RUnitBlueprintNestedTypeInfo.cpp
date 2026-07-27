@@ -13,7 +13,8 @@
 #include "legacy/containers/Vector.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/RResId.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2394,3 +2395,19 @@ namespace moho
     return std::atexit(&cleanup_RUnitBlueprintWeaponTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RUnitBlueprintGeneralTypeInfo_db3407, moho::register_RUnitBlueprintGeneralTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintDisplayTypeInfo_db3407, moho::register_RUnitBlueprintDisplayTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintPhysicsTypeInfo_db3407, moho::register_RUnitBlueprintPhysicsTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintAirTypeInfo_db3407, moho::register_RUnitBlueprintAirTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintTransportTypeInfo_db3407, moho::register_RUnitBlueprintTransportTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintAITypeInfo_db3407, moho::register_RUnitBlueprintAITypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintDefenseTypeInfo_db3407, moho::register_RUnitBlueprintDefenseTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintIntelTypeInfo_db3407, moho::register_RUnitBlueprintIntelTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintEconomyTypeInfo_db3407, moho::register_RUnitBlueprintEconomyTypeInfo)
+GPG_PREREGISTER_INIT(register_RUnitBlueprintWeaponTypeInfo_db3407, moho::register_RUnitBlueprintWeaponTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_VectorFloatReflectionType_db3407, preregister_VectorFloatReflectionType)

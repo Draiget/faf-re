@@ -13,7 +13,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StatItem.h"
-#include "moho/script/CScriptEvent.h"
+#include "moho/script/CScriptEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 extern "C" {
 int lua_traceback(lua_State* L, const char* message, int level);
@@ -1180,3 +1181,10 @@ void CLuaTaskTypeInfo::Init()
   AddCTaskBaseToTypeInfo(this);
   Finish();
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CLuaTaskTypeInfo_2cbdf6, moho::register_CLuaTaskTypeInfo)
+
+GPG_PREREGISTER_INIT(PreRegisterCLuaTaskTypeInfo_2cbdf6, PreRegisterCLuaTaskTypeInfo)

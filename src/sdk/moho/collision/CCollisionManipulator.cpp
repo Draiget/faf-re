@@ -21,7 +21,8 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
-#include "Wm3Quaternion.h"
+#include "Wm3Quaternion.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -1194,3 +1195,7 @@ namespace
 
   [[maybe_unused]] CCollisionManipulatorTypeInfoBootstrap gCCollisionManipulatorTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CCollisionManipulatorTypeInfo_fb0e04, moho::preregister_CCollisionManipulatorTypeInfo)

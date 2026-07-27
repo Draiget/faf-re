@@ -10,7 +10,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/String.h"
 #include "moho/ai/CAiPathFinder.h"
-#include "moho/misc/Stats.h"
+#include "moho/misc/Stats.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -523,3 +524,12 @@ namespace
 
   [[maybe_unused]] CAiPathFinderTypeInfoBootstrap gCAiPathFinderTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiPathFinderTypeInfo_ef9477, moho::register_CAiPathFinderTypeInfo)
+GPG_PREREGISTER_INIT(register_Rect2iListTypeInfo_ef9477, moho::register_Rect2iListTypeInfo)
+
+GPG_PREREGISTER_INIT(AcquireCAiPathFinderTypeInfo_ef9477, AcquireCAiPathFinderTypeInfo)
+GPG_PREREGISTER_INIT(AcquireRect2iListTypeInfo_ef9477, AcquireRect2iListTypeInfo)

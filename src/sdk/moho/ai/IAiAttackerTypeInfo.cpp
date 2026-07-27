@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiAttacker.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -106,3 +107,10 @@ int moho::register_IAiAttackerTypeInfo()
   IAiAttacker::sType = type;
   return std::atexit(&cleanup_IAiAttackerTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_IAiAttackerTypeInfo_d7aa45, moho::register_IAiAttackerTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_IAiAttackerTypeInfoStartup_d7aa45, preregister_IAiAttackerTypeInfoStartup)

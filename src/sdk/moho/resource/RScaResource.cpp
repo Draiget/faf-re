@@ -10,7 +10,8 @@
 #include <cstddef>
 #include <cstring>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -545,3 +546,7 @@ gpg::RRef* GetScaResource(gpg::RRef* const outRef, const char* const path)
 }
 
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RScaResourceTypeInfo_ed4da3, moho::preregister_RScaResourceTypeInfo)

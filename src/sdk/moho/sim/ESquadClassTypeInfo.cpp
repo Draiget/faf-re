@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -213,3 +214,7 @@ namespace moho
     AddEnum(StripPrefix("SQUADCLASS_Scout"), static_cast<std::int32_t>(ESquadClass::Scout));
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(ConstructESquadClassTypeInfo_542e07, ConstructESquadClassTypeInfo)

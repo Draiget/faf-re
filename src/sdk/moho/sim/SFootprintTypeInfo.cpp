@@ -8,9 +8,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/SFootprint.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/SFootprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -356,3 +355,8 @@ namespace
 
   [[maybe_unused]] SFootprintBootstrap gSFootprintBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SFootprintTypeInfo_d68759, moho::register_SFootprintTypeInfo)

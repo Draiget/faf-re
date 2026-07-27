@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/ai/SPickUpInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // SPickUpInfo registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query SPickUpInfo RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::SPickUpInfoTypeInfo) unsigned char gSPickUpInfoTypeInfoStorage[sizeof(moho::SPickUpInfoTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] SPickUpInfoTypeInfoRegistration gSPickUpInfoTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SPickUpInfoTypeInfo_eafc01, moho::register_SPickUpInfoTypeInfo)

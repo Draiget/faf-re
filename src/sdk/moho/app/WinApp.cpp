@@ -42,7 +42,8 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/resource/ResourceManager.h"
-#include "moho/core/Thread.h"
+#include "moho/core/Thread.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -4260,3 +4261,7 @@ void moho::WINX_ExitSplash()
 }
 
 #pragma warning(pop)
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WinAppEventType_8090fb, moho::register_WinAppEventType)

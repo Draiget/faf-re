@@ -67,7 +67,8 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -9208,3 +9209,7 @@ namespace moho
   }
 } // namespace moho
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterEntityPointerType_26ac7a, moho::PreregisterEntityPointerType)

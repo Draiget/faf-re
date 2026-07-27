@@ -13,7 +13,8 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
 #include "moho/unit/Broadcaster.h"
-#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommand.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -983,3 +984,8 @@ namespace
 
   CUnitCommandWeakPtrReflectionBootstrap gCUnitCommandWeakPtrReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WeakPtr_CUnitCommand_Type_00_c8c64f, moho::register_WeakPtr_CUnitCommand_Type_00)
+GPG_PREREGISTER_INIT(register_WeakPtr_CUnitCommand_VectorType_00_c8c64f, moho::register_WeakPtr_CUnitCommand_VectorType_00)

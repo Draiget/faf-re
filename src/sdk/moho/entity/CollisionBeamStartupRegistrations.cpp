@@ -8,8 +8,7 @@
 #include "gpg/core/containers/String.h"
 #include "moho/console/CConCommand.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -386,3 +385,14 @@ namespace
 
   [[maybe_unused]] CollisionBeamStartupRegistrationsBootstrap gCollisionBeamStartupRegistrationsBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ECollisionBeamEventTypeInfo_f04c7b, moho::register_ECollisionBeamEventTypeInfo)
+GPG_PREREGISTER_INIT(register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo_f04c7b, moho::register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo)
+GPG_PREREGISTER_INIT(register_ManyToOneListener_ECollisionBeamEvent_TypeInfo_f04c7b, moho::register_ManyToOneListener_ECollisionBeamEvent_TypeInfo)
+
+GPG_PREREGISTER_INIT(ConstructECollisionBeamEventTypeInfo_f04c7b, ConstructECollisionBeamEventTypeInfo)
+GPG_PREREGISTER_INIT(ConstructManyToOneBroadcasterCollisionBeamEventTypeInfo_f04c7b, ConstructManyToOneBroadcasterCollisionBeamEventTypeInfo)
+GPG_PREREGISTER_INIT(ConstructManyToOneListenerCollisionBeamEventTypeInfo_f04c7b, ConstructManyToOneListenerCollisionBeamEventTypeInfo)

@@ -6,7 +6,8 @@
 #include "moho/ai/EAiResult.h"
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -265,3 +266,10 @@ namespace
 
   EAiResultTypeInfoBootstrap gEAiResultTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EAiResultTypeInfo_003fd7, moho::register_EAiResultTypeInfo)
+
+GPG_PREREGISTER_INIT(construct_EAiResultTypeInfo_003fd7, construct_EAiResultTypeInfo)

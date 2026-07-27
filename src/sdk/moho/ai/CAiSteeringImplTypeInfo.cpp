@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiSteeringImpl.h"
+#include "moho/ai/CAiSteeringImpl.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -248,3 +249,8 @@ int moho::register_CAiSteeringImplTypeInfo()
   CAiSteeringImpl::sType = typeInfo;
   return std::atexit(&cleanup_CAiSteeringImplTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiSteeringImplTypeInfo_8b6b3f, moho::register_CAiSteeringImplTypeInfo)
