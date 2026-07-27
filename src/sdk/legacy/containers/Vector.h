@@ -3151,6 +3151,42 @@ namespace msvc8
             return iterator(next);
         }
 
+        /**
+         * Transfers the node range `[first, last)` out of `other` and relinks it
+         * immediately before `where`, without allocating or destroying nodes.
+         *
+         * This is the MSVC8 `std::list::splice` primitive. `msvc8::hash_map::_Grow`
+         * uses the same-list form to migrate one node to the list tail while the
+         * bucket index is being split, which is why the size bookkeeping is skipped
+         * when `&other == this` (the binary's grow lane at 0x007693F4 branches over
+         * its size-transfer helper for exactly that reason).
+         */
+        void splice(const_iterator where, list& other, const_iterator first, const_iterator last)
+        {
+            _Nodeptr whereNode = where._Ptr;
+            _Nodeptr firstNode = first._Ptr;
+            _Nodeptr lastNode = last._Ptr;
+
+            if (firstNode == lastNode || whereNode == firstNode) {
+                return;
+            }
+
+            if (&other != this) {
+                const size_type moved = static_cast<size_type>(std::distance(first, last));
+                other._Mysize -= moved;
+                _Mysize += moved;
+            }
+
+            firstNode->_Prev->_Next = lastNode;
+            lastNode->_Prev->_Next = whereNode;
+            whereNode->_Prev->_Next = firstNode;
+
+            _Nodeptr const previousTail = whereNode->_Prev;
+            whereNode->_Prev = lastNode->_Prev;
+            lastNode->_Prev = firstNode->_Prev;
+            firstNode->_Prev = previousTail;
+        }
+
     private:
         void _Init()
         {

@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/HashMap.h"
 
 namespace moho
 {
@@ -25,6 +26,33 @@ namespace moho
    * Returns whether two cell-position lanes carry identical `(x, z)` values.
    */
   [[nodiscard]] bool operator==(const SOCellPos& lhs, const SOCellPos& rhs) noexcept;
+
+  /**
+   * Reinterprets one cell coordinate as the single 32-bit word the engine's
+   * hashed containers key on.
+   *
+   * The pathfinder's node table hashes and orders cells by this packed value
+   * rather than field-by-field - every call site reads the whole dword
+   * (`mov edx, [ebp+8]` at 0x00769386 feeding `ldiv`, and the unsigned `cmp`
+   * that orders a bucket window), so the packing is observable and must match.
+   */
+  [[nodiscard]] inline std::uint32_t PackCellKey(const SOCellPos& cell) noexcept
+  {
+    return static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.x))
+         | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.z)) << 16);
+  }
+
+  /**
+   * Address: 0x00769560 / 0x0076AC60 / 0x007692F0 (inlined `stdext::hash_value`)
+   *
+   * What it does:
+   * Hashes one cell for `msvc8::hash_map`. Found by argument-dependent lookup,
+   * which is how the container picks this up in place of the integral default.
+   */
+  [[nodiscard]] inline std::size_t hash_value(const SOCellPos& cell) noexcept
+  {
+    return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(PackCellKey(cell))));
+  }
 
   /**
    * Owns reflected metadata for `SOCellPos`.

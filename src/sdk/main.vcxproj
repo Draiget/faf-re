@@ -1262,6 +1262,7 @@
     <ClInclude Include="boost\thread.h" />
     <ClInclude Include="boost\weak_ptr.h" />
     <ClInclude Include="boost\xtime.h" />
+    <ClInclude Include="gpg\core\algorithms\AStarSearch.h" />
     <ClInclude Include="gpg\core\algorithms\Cluster.h" />
     <ClInclude Include="gpg\core\algorithms\MD5.h" />
     <ClInclude Include="gpg\core\containers\Array2D.h" />
@@ -1391,8 +1392,11 @@
     <ClInclude Include="gpg\gal\VertexFormat.hpp" />
     <ClInclude Include="legacy\containers\AutoPtr.h" />
     <ClInclude Include="legacy\containers\Deque.h" />
+    <ClInclude Include="legacy\containers\HashMap.h" />
+    <ClInclude Include="legacy\containers\List.h" />
     <ClInclude Include="legacy\containers\Map.h" />
     <ClInclude Include="legacy\containers\Queue.h" />
+    <ClInclude Include="legacy\containers\RbTree.h" />
     <ClInclude Include="legacy\containers\Set.h" />
     <ClInclude Include="legacy\containers\String.h" />
     <ClInclude Include="legacy\containers\Tree.h" />
