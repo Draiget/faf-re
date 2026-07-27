@@ -959,6 +959,46 @@ namespace
     return destinationCursor;
   }
 
+  // Defined below, next to the other per-type ArmyLaunchInfo range lanes.
+  moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
+    moho::ArmyLaunchInfo* begin,
+    moho::ArmyLaunchInfo* end
+  );
+
+  /**
+   * Address: 0x00543A50 (FUN_00543A50)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_543A50@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
+   *
+   * What it does:
+   * `msvc8::vector<ArmyLaunchInfo>::erase(first, last)`: assigns the surviving
+   * tail down over the erased window, releases the elements left stranded past
+   * the new end, and rewinds `_Mylast`. An empty window is a no-op.
+   *
+   * Written against the two per-type lanes the binary calls (0x00544C20 and
+   * 0x00544E20) rather than the generic vector::erase: the generic path assigns
+   * elements through BVIntSet::operator=, which also writes the reserved
+   * meta-word and self-guards, while the binary lane touches only the universe
+   * and word-list fields.
+   */
+  moho::ArmyLaunchInfo* EraseArmyLaunchInfoRange(
+    ArmyLaunchInfoVector& storage,
+    moho::ArmyLaunchInfo* const first,
+    moho::ArmyLaunchInfo* const last
+  )
+  {
+    if (first == last) {
+      return first;
+    }
+
+    moho::ArmyLaunchInfo* const oldEnd = storage.end();
+    moho::ArmyLaunchInfo* const newEnd = CopyAssignArmyLaunchInfoRange(last, oldEnd, first);
+    (void)ResetArmyLaunchInfoUnitSourcesRange(newEnd, oldEnd);
+    storage.resize(static_cast<std::size_t>(newEnd - storage.begin()));
+    return first;
+  }
+
   /**
    * Address: 0x00542CD0 (FUN_00542CD0)
    *
@@ -977,7 +1017,7 @@ namespace
     const std::size_t sourceSize = source.size();
     if (sourceSize == 0u) {
       // 0x00542CF3: an empty source clears the destination outright.
-      destination.erase(destination.begin(), destination.end());
+      (void)EraseArmyLaunchInfoRange(destination, destination.begin(), destination.end());
       return destination;
     }
 
@@ -985,7 +1025,7 @@ namespace
       // 0x00542D25: assign onto the live elements, then drop the surplus tail.
       moho::ArmyLaunchInfo* const assignedEnd =
         CopyAssignArmyLaunchInfoRange(source.begin(), source.end(), destination.begin());
-      destination.erase(assignedEnd, destination.end());
+      (void)EraseArmyLaunchInfoRange(destination, assignedEnd, destination.end());
       return destination;
     }
 
@@ -1112,7 +1152,7 @@ namespace
    * Rewinds one half-open ArmyLaunchInfo range by releasing heap-backed
    * `BVIntSet::mWords` storage and restoring inline fastvector lanes.
    */
-  [[maybe_unused]] moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
+  moho::ArmyLaunchInfo* ResetArmyLaunchInfoUnitSourcesRange(
     moho::ArmyLaunchInfo* const begin,
     moho::ArmyLaunchInfo* const end
   )
