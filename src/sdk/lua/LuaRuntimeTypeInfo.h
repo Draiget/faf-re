@@ -170,3 +170,60 @@ public:
   void Init() override;
 };
 static_assert(sizeof(UdataTypeInfo) == sizeof(gpg::RType), "UdataTypeInfo size must match gpg::RType");
+
+/**
+ * Address: 0x00BEA1A0 (register_TStringTypeInfo)
+ *
+ * Constructs the process-lifetime `TStringTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_TStringTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA2B0 (register_TableTypeInfo)
+ *
+ * Constructs the process-lifetime `TableTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_TableTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA3C0 (register_LClosureTypeInfo)
+ *
+ * Constructs the process-lifetime `LClosureTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_LClosureTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA4D0 (register_UpValTypeInfo)
+ *
+ * Constructs the process-lifetime `UpValTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_UpValTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA5E0 (register_ProtoTypeInfo)
+ *
+ * Constructs the process-lifetime `ProtoTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_ProtoTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA6F0 (register_lua_StateTypeInfo)
+ *
+ * Constructs the process-lifetime `lua_StateTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_lua_StateTypeInfoStartup();
+
+/**
+ * Address: 0x00BEA800 (register_UdataTypeInfo)
+ *
+ * Constructs the process-lifetime `UdataTypeInfo` singleton so its
+ * constructor can pre-register its typeid, then arms teardown.
+ */
+void register_UdataTypeInfoStartup();
+
