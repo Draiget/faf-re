@@ -6381,6 +6381,64 @@ extern "C" void __cdecl __lock_file2(const int streamIndex, std::FILE* const str
 }
 
 /**
+ * Address: 0x00A89F2B (FUN_00A89F2B, _lock_file)
+ *
+ * IDA signature:
+ * void __cdecl _lock_file(FILE *Stream);
+ *
+ * What it does:
+ * Same two-way lock acquisition as `__lock_file2`, but decides by pointer
+ * range rather than by index: a stream outside the static `_iob` table owns
+ * its critical section inline at `FILE+0x20`, while a table entry uses the
+ * global CRT lock slot at `(entry index) + 16` and is marked `_IOLOCKED`.
+ */
+extern "C" void __cdecl _lock_file(std::FILE* const stream)
+{
+  std::FILE* const table = __iob_func();
+  // 0x00A89F39 compares against `_iob_IOB_ENTRIES`, which is the address of
+  // the LAST table entry (_iob + 19), not one past the end - the test is
+  // `ja`, so index 19 is still in range.
+  constexpr std::ptrdiff_t kIobLastEntry = 19;
+
+  if (stream < table || stream > (table + kIobLastEntry)) {
+    struct RuntimeFileLockOwnerView
+    {
+      std::uint8_t reserved00[0x20];
+      CRITICAL_SECTION lock;
+    };
+    static_assert(
+      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
+      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+    );
+
+    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    ::EnterCriticalSection(&lockOwner->lock);
+    return;
+  }
+
+  _lock(static_cast<int>(stream - table) + 16);
+  legacy_file(stream)._flag |= 0x8000;
+}
+
+/**
+ * Address: 0x00ABFA82 (FUN_00ABFA82, _Getcvt)
+ *
+ * IDA signature:
+ * LCID Getcvt();
+ *
+ * What it does:
+ * Returns the LC_NUMERIC locale handle. The codepage query is issued for its
+ * side effect of refreshing thread locale state; its result is discarded, and
+ * the handle is read before it so the pre-refresh value is what comes back.
+ */
+extern "C" LCID __cdecl RuntimeGetConversionLocale()
+{
+  const LCID numericHandle = __lc_handle_func()[2];
+  (void)__lc_codepage_func();
+  return numericHandle;
+}
+
+/**
  * Address: 0x00A89FCB (FUN_00A89FCB, __unlock_file2)
  *
  * What it does:
