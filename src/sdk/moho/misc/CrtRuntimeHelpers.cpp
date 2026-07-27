@@ -5511,6 +5511,7 @@ namespace
     gAtexitFuncs[static_cast<std::size_t>(gAtexitRemaining)] = handler;
   }
 
+
   /**
    * Address: 0x00AC073B (FUN_00AC073B, _Mtxlock)
    *
@@ -5534,6 +5535,37 @@ namespace
     ::LeaveCriticalSection(lock);
     return 0;
   }
+
+  /**
+   * Address: 0x00ABF8DB (std::_Lockit::_Lockit(int))
+   *          0x00ABF8FC (std::_Lockit::~_Lockit())
+   *
+   * What it does:
+   * RAII guard over one of the four iostreams locks. The selector is masked
+   * with 3 rather than bounds-checked, which independently confirms the table
+   * size derived from the xlock::mtx address range, and means an out-of-range
+   * request silently aliases onto an existing lock instead of faulting.
+   */
+  class RuntimeLockitGuard
+  {
+  public:
+    explicit RuntimeLockitGuard(const int selector) noexcept
+      : mSlot(selector & 3)
+    {
+      (void)RuntimeMtxLock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
+    }
+
+    ~RuntimeLockitGuard()
+    {
+      (void)RuntimeMtxUnlock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
+    }
+
+    RuntimeLockitGuard(const RuntimeLockitGuard&) = delete;
+    RuntimeLockitGuard& operator=(const RuntimeLockitGuard&) = delete;
+
+  private:
+    int mSlot;
+  };
 
   /**
    * Address: 0x00A99EAA (FUN_00A99EAA)
