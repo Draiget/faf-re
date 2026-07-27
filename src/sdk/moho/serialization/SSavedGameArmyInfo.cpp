@@ -2,7 +2,7 @@
 
 #include <typeinfo>
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -110,16 +110,24 @@ namespace
 
   void EnsureSavedGameArmyInfoRegistered()
   {
-    static const bool kRegistered = []() {
-      (void)preregister_SSavedGameArmyInfoTypeInfo();
-      InitializeSavedGameArmyInfoSerializerLinks();
-      gSavedGameArmyInfoSerializer.mSerLoadFunc = &LoadSavedGameArmyInfo;
-      gSavedGameArmyInfoSerializer.mSerSaveFunc = &SaveSavedGameArmyInfo;
-      gSavedGameArmyInfoSerializer.RegisterSerializeFunctions();
-      return true;
-    }();
+    // Zero-initialised flag, not a magic static: this registration re-enters
+    // itself. RegisterSerializeFunctions() resolves the type through
+    // SSavedGameArmyInfo::StaticGetClass(), which calls back in here. A
+    // function-local static with a dynamic initialiser would make that second
+    // entry wait in _Init_thread_header for an initialisation this very thread
+    // is still running, deadlocking startup. Setting the guard before the body
+    // runs makes the re-entrant call a no-op instead.
+    static bool sRegistered = false;
+    if (sRegistered) {
+      return;
+    }
+    sRegistered = true;
 
-    (void)kRegistered;
+    (void)preregister_SSavedGameArmyInfoTypeInfo();
+    InitializeSavedGameArmyInfoSerializerLinks();
+    gSavedGameArmyInfoSerializer.mSerLoadFunc = &LoadSavedGameArmyInfo;
+    gSavedGameArmyInfoSerializer.mSerSaveFunc = &SaveSavedGameArmyInfo;
+    gSavedGameArmyInfoSerializer.RegisterSerializeFunctions();
   }
 } // namespace
 
