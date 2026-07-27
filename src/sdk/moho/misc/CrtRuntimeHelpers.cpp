@@ -6690,6 +6690,37 @@ extern "C" int __cdecl fflush(std::FILE* const stream)
   return result;
 }
 
+/**
+ * Address: 0x00ABF7C1 (FUN_00ABF7C1, _Getctype)
+ *
+ * IDA signature:
+ * struct _Ctypevec *__cdecl Getctype(struct _Ctypevec *a1);
+ *
+ * What it does:
+ * Snapshots the current locale ctype classification table. It tries to take a
+ * private 512-byte copy so the caller is immune to a later setlocale, and only
+ * if that allocation fails does it alias the shared table instead - which is
+ * what `ownsTable` records, so teardown knows whether the buffer is his to
+ * free.
+ */
+extern "C" RuntimeCtypeVec* __cdecl RuntimeGetCtypeVec(RuntimeCtypeVec* const out)
+{
+  out->handle = __lc_handle_func()[1];
+  out->codePage = __lc_codepage_func();
+
+  auto* const copy = static_cast<std::uint16_t*>(_calloc_crt(0x100u, sizeof(std::uint16_t)));
+  out->table = copy;
+
+  if (copy != nullptr) {
+    std::memcpy(copy, __pctype_func(), 0x200u);
+    out->ownsCopiedTable = 1;
+  } else {
+    out->ownsCopiedTable = 0;
+    out->table = __pctype_func();
+  }
+  return out;
+}
+
 extern "C" int global_mode_sse2;
 extern "C" double __cdecl __CIpow_pentium4(double exponent, double base);
 
