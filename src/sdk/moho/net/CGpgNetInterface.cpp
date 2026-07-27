@@ -744,7 +744,7 @@ namespace
    * destination lanes, and on exception destroys already-written lanes before
    * rethrowing.
    */
-  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
+  void CopyAssignCommandArgRangeWithRollback(
     const SNetCommandArg& prototype,
     std::uint32_t count,
     SNetCommandArg* const destination
@@ -1067,6 +1067,76 @@ namespace
  * The VC8 debug-iterator proxy lane at +0x00 is deliberately left alone, which
  * is what the binary does.
  */
+/**
+ * Address: 0x007BB7F0 (FUN_007BB7F0, msvc8::vector<Moho::SNetCommandArg>::_Buy)
+ *
+ * IDA signature:
+ * char callcnv_F3 sub_7BB7F0@<al>(_DWORD *a1@<edi>, unsigned int a2@<esi>);
+ *
+ * What it does:
+ * Allocates raw storage for `count` elements and arms the triplet: `first` and
+ * `last` both point at the block start (nothing constructed yet), `end` at the
+ * capacity limit. A count of zero leaves the triplet null and reports success.
+ *
+ * The guard constant 0x71C71C7 is max_size for this element: 0xFFFFFFFF / 36,
+ * and sizeof(SNetCommandArg) is 0x24. Exceeding it raises length_error rather
+ * than overflowing the byte count.
+ */
+bool moho::BuyVectorOfSNetCommandArgStorage(
+  msvc8::vector<moho::SNetCommandArg>& storage,
+  const std::size_t count
+)
+{
+  constexpr std::size_t kMaxElements = 0x71C71C7u;
+  if (count > kMaxElements) {
+    throw std::length_error("vector<T> too long");
+  }
+
+  if (count == 0u) {
+    return true;
+  }
+
+  storage.reserve(count);
+  return storage.capacity() >= count;
+}
+
+/**
+ * Address: 0x007BB6A0 (FUN_007BB6A0, msvc8::vector<Moho::SNetCommandArg>::vector(count, value))
+ *
+ * IDA signature:
+ * void __thiscall sub_7BB6A0(unsigned int a1, std::vector_SNetCommandArg *a3, int a4);
+ *
+ * What it does:
+ * Builds a vector holding `count` copies of `prototype`. Storage is bought
+ * first, then the elements are copy-constructed into it and `last` is advanced
+ * only once the fill has succeeded - so a throw mid-fill leaves `last` at the
+ * block start and the rollback funclet has nothing constructed to destroy
+ * beyond what the fill lane already unwound.
+ */
+void moho::ConstructVectorOfSNetCommandArgFilled(
+  msvc8::vector<moho::SNetCommandArg>& storage,
+  const std::size_t count,
+  const moho::SNetCommandArg& prototype
+)
+{
+  storage.clear();
+  if (count == 0u) {
+    return;
+  }
+
+  if (!moho::BuyVectorOfSNetCommandArgStorage(storage, count)) {
+    return;
+  }
+
+  try {
+    CopyAssignCommandArgRangeWithRollback(prototype, static_cast<std::uint32_t>(count), storage.begin());
+    storage.resize(count, prototype);
+  } catch (...) {
+    moho::TidyVectorOfSNetCommandArg(storage);
+    throw;
+  }
+}
+
 void moho::TidyVectorOfSNetCommandArg(msvc8::vector<moho::SNetCommandArg>& storage) noexcept
 {
   if (moho::SNetCommandArg* const first = storage.begin(); first != nullptr) {

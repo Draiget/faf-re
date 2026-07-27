@@ -202,4 +202,17 @@ namespace moho
    * file-private range-destroy emission, as the binary does.
    */
   void TidyVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& storage) noexcept;
+
+  /** Address: 0x007BB7F0 (msvc8::vector<Moho::SNetCommandArg>::_Buy) */
+  [[nodiscard]] bool BuyVectorOfSNetCommandArgStorage(
+    msvc8::vector<SNetCommandArg>& storage,
+    std::size_t count
+  );
+
+  /** Address: 0x007BB6A0 (msvc8::vector<Moho::SNetCommandArg>::vector(count, value)) */
+  void ConstructVectorOfSNetCommandArgFilled(
+    msvc8::vector<SNetCommandArg>& storage,
+    std::size_t count,
+    const SNetCommandArg& prototype
+  );
 } // namespace moho
