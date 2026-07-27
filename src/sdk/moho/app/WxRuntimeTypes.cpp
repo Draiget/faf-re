@@ -38330,28 +38330,36 @@ void wxRemoveFileExtensionInPlace(
 }
 
 /**
- * Address: 0x009DE3D0 (FUN_009DE3D0)
+ * Address: 0x009F64F0 (FUN_009F64F0, wxFileName::CreateTempFileName)
+ *
+ * IDA signature:
+ * wxString *__cdecl sub_9F64F0(wxString *arg0, wxString *a1, wxFile *a3);
  *
  * What it does:
- * Resolves one temporary-file name from the provided prefix lane and stores it
- * in `outFileName`; returns `true` when the output is non-empty.
+ * Splits `prefix` into a directory and a name, resolves an empty directory to
+ * the Win32 temp path (falling back to `.`) and normalises `/` to `\` in a
+ * supplied one, then names a unique file with `GetTempFileNameW`. When
+ * `fileTemp` is supplied and still closed, the new file is opened for writing
+ * with mode 0600. Either failure logs the localized diagnostic and clears
+ * `outPath`.
  */
-bool wxCreateTempFileNameFromPrefix(
-  const wxStringRuntime* const prefixText,
-  wxStringRuntime* const outFileName
+wxStringRuntime* wxFileName::CreateTempFileName(
+  wxStringRuntime* const outPath,
+  const wxStringRuntime& prefix,
+  wxFile* const fileTemp
 )
 {
-  if (outFileName == nullptr) {
-    return false;
+  if (outPath == nullptr) {
+    return nullptr;
   }
 
-  wxStringRuntime tempDirectory = AllocateOwnedWxString(std::wstring());
-  wxStringRuntime tempPrefix = AllocateOwnedWxString(std::wstring());
-  const wxStringRuntime prefixSource = prefixText != nullptr ? *prefixText : wxStringRuntime::Borrow(L"");
-  wxFileName::SplitPath_0(prefixSource, &tempDirectory, &tempPrefix, nullptr, nullptr);
+  wxStringRuntime directoryText = AllocateOwnedWxString(std::wstring());
+  wxStringRuntime nameText = AllocateOwnedWxString(std::wstring());
+  wxFileName::SplitPath_0(prefix, &directoryText, &nameText, nullptr, nullptr);
 
-  std::wstring directory = tempDirectory.c_str() != nullptr ? std::wstring(tempDirectory.c_str()) : std::wstring();
+  std::wstring directory = directoryText.c_str() != nullptr ? std::wstring(directoryText.c_str()) : std::wstring();
   if (!directory.empty()) {
+    // GetTempFileNameW is the one Win32 path API that rejects forward slashes.
     std::replace(directory.begin(), directory.end(), L'/', L'\\');
   } else {
     std::array<wchar_t, 0x105> tempPathBuffer{};
@@ -38364,25 +38372,62 @@ bool wxCreateTempFileNameFromPrefix(
     }
   }
 
-  const std::wstring prefix = tempPrefix.c_str() != nullptr ? std::wstring(tempPrefix.c_str()) : std::wstring();
+  const std::wstring namePrefix = nameText.c_str() != nullptr ? std::wstring(nameText.c_str()) : std::wstring();
   std::array<wchar_t, 0x105> fileNameBuffer{};
-  const bool didCreate = ::GetTempFileNameW(
-                           directory.c_str(),
-                           prefix.c_str(),
-                           0u,
-                           fileNameBuffer.data()
-                         )
-    != 0u;
+  const bool didCreate =
+    ::GetTempFileNameW(directory.c_str(), namePrefix.c_str(), 0u, fileNameBuffer.data()) != 0u;
 
-  if (didCreate) {
-    AssignOwnedWxString(outFileName, std::wstring(fileNameBuffer.data()));
-  } else {
+  if (!didCreate) {
+    // 0x009F660D / 0x009F6624
     WxLogSysErrorLocalized(L"Failed to create a temporary file name");
-    AssignOwnedWxString(outFileName, std::wstring());
+    AssignOwnedWxString(outPath, std::wstring());
+    ReleaseOwnedWxString(nameText);
+    ReleaseOwnedWxString(directoryText);
+    return outPath;
   }
 
-  ReleaseOwnedWxString(tempPrefix);
-  ReleaseOwnedWxString(tempDirectory);
+  AssignOwnedWxString(outPath, std::wstring(fileNameBuffer.data()));
+
+  // 0x009F6634-0x009F667D: only open when the caller supplied a wxFile that is
+  // still closed; an already-open handle is left alone.
+  if (fileTemp != nullptr && fileTemp->m_fd == -1) {
+    if (!fileTemp->Open(fileNameBuffer.data(), wxFile::OpenWrite, 0600)) {
+      wxLogError(WxResolveLocalizedMessage(L"Failed to open temporary file."));
+      AssignOwnedWxString(outPath, std::wstring());
+    }
+  }
+
+  ReleaseOwnedWxString(nameText);
+  ReleaseOwnedWxString(directoryText);
+  return outPath;
+}
+
+/**
+ * Address: 0x009DE3D0 (FUN_009DE3D0)
+ *
+ * What it does:
+ * Names a temporary file with no open request, reporting whether a path came
+ * back. A thin forward to `wxFileName::CreateTempFileName` - the binary body is
+ * 30 instructions and does nothing else. An earlier reconstruction inlined the
+ * whole of that callee into here and, in doing so, dropped its `wxFile*` open
+ * lane and the "Failed to open temporary file." diagnostic entirely.
+ */
+bool wxCreateTempFileNameFromPrefix(
+  const wxStringRuntime* const prefixText,
+  wxStringRuntime* const outFileName
+)
+{
+  if (outFileName == nullptr) {
+    return false;
+  }
+
+  wxStringRuntime named = AllocateOwnedWxString(std::wstring());
+  const wxStringRuntime prefixSource =
+    prefixText != nullptr ? *prefixText : wxStringRuntime::Borrow(L"");
+  (void)wxFileName::CreateTempFileName(&named, prefixSource, nullptr);
+
+  AssignOwnedWxString(outFileName, named.c_str() != nullptr ? std::wstring(named.c_str()) : std::wstring());
+  ReleaseOwnedWxString(named);
 
   const wchar_t* const outputText = outFileName->c_str();
   return outputText != nullptr && *outputText != L'\0';
