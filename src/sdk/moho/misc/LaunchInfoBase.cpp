@@ -881,7 +881,7 @@ namespace
    * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
    * `destination`, preserving the destination reserved meta-word lane.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesLane(
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesLane(
     const moho::ArmyLaunchInfo* const source,
     moho::ArmyLaunchInfo* const destination
   )
@@ -930,6 +930,36 @@ namespace
   }
 
   /**
+   * Address: 0x00544C20 (FUN_00544C20)
+   *
+   * IDA signature:
+   * int __usercall sub_544C20@<eax>(int result@<eax>, int a2@<ecx>, int a3);
+   *
+   * What it does:
+   * Copy-assigns the half-open range `[sourceBegin, sourceEnd)` onto the
+   * already-constructed destination elements starting at `destinationBegin`,
+   * one `mUnitSources` lane per step, returning the destination cursor one past
+   * the last element written.
+   *
+   * This is the `T = moho::ArmyLaunchInfo` emission of the MSVC8 `std::copy`
+   * element loop. Assignment, not construction: the destination `mWords` lanes
+   * stay bound to the storage they already own.
+   */
+  [[nodiscard]] moho::ArmyLaunchInfo* CopyAssignArmyLaunchInfoRange(
+    const moho::ArmyLaunchInfo* const sourceBegin,
+    const moho::ArmyLaunchInfo* const sourceEnd,
+    moho::ArmyLaunchInfo* const destinationBegin
+  )
+  {
+    moho::ArmyLaunchInfo* destinationCursor = destinationBegin;
+    for (const moho::ArmyLaunchInfo* sourceCursor = sourceBegin; sourceCursor != sourceEnd; ++sourceCursor) {
+      (void)CopyArmyLaunchInfoUnitSourcesLane(sourceCursor, destinationCursor);
+      ++destinationCursor;
+    }
+    return destinationCursor;
+  }
+
+  /**
    * Address: 0x00542CD0 (FUN_00542CD0)
    *
    * What it does:
@@ -940,9 +970,29 @@ namespace
     ArmyLaunchInfoVector& destination, const ArmyLaunchInfoVector& source
   )
   {
-    if (&destination != &source) {
-      destination = source;
+    if (&destination == &source) {
+      return destination;
     }
+
+    const std::size_t sourceSize = source.size();
+    if (sourceSize == 0u) {
+      // 0x00542CF3: an empty source clears the destination outright.
+      destination.erase(destination.begin(), destination.end());
+      return destination;
+    }
+
+    if (sourceSize <= destination.size()) {
+      // 0x00542D25: assign onto the live elements, then drop the surplus tail.
+      moho::ArmyLaunchInfo* const assignedEnd =
+        CopyAssignArmyLaunchInfoRange(source.begin(), source.end(), destination.begin());
+      destination.erase(assignedEnd, destination.end());
+      return destination;
+    }
+
+    // 0x00542D75 / 0x00542DC9: both grow lanes finish through the per-type
+    // uninitialized-copy emission (FUN_005444B0), which is not recovered yet;
+    // msvc8::vector copy-assign reaches the same final state.
+    destination = source;
     return destination;
   }
 

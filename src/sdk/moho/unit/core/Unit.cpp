@@ -12862,6 +12862,54 @@ UnitWeaponInfo::UnitWeaponInfo(const UnitWeaponInfo& other)
 }
 
 /**
+ * Address: 0x0055F210 (FUN_0055F210, sub_55F210)
+ *
+ * IDA signature:
+ * int __usercall sub_55F210@<eax>(int a1@<eax>, int a2@<esi>);
+ *
+ * What it does:
+ * Copy-assigns one already-constructed `UnitWeaponInfo` over another. Each
+ * category lane is updated header-first (`mUniverse`, then
+ * `mBits.mFirstWordIndex`) and its word list copy-assigned through the
+ * `gpg::fastvector_uint::cpy` lane; layer/radius values are plain stores; both
+ * UI range visual-id strings are re-assigned from the source.
+ *
+ * Unlike the copy constructor this does NOT rebind the word lists to inline
+ * storage first - the destination already owns whatever buffer it has, which is
+ * why the binary calls the copy lane directly at 0x0055F225 / 0x0055F23D.
+ */
+UnitWeaponInfo& UnitWeaponInfo::operator=(const UnitWeaponInfo& other)
+{
+  // No self-assignment guard: the binary has none. Aliasing is absorbed by the
+  // fastvector copy lane and by msvc8::string::assign.
+  mCat1.mUniverse = other.mCat1.mUniverse;
+  mCat1.mBits.mFirstWordIndex = other.mCat1.mBits.mFirstWordIndex;
+  {
+    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&mCat1.mBits.mWords);
+    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&other.mCat1.mBits.mWords);
+    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+  }
+
+  mCat2.mUniverse = other.mCat2.mUniverse;
+  mCat2.mBits.mFirstWordIndex = other.mCat2.mBits.mFirstWordIndex;
+  {
+    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&mCat2.mBits.mWords);
+    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&other.mCat2.mBits.mWords);
+    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+  }
+
+  mLayer = other.mLayer;
+  mMinRadius = other.mMinRadius;
+  mMaxRadius = other.mMaxRadius;
+  mEffectiveRadius = other.mEffectiveRadius;
+
+  mUIMinRangeVisualId.assign(other.mUIMinRangeVisualId, 0U, ~0U);
+  mUIMaxRangeVisualId.assign(other.mUIMaxRangeVisualId, 0U, ~0U);
+
+  return *this;
+}
+
+/**
  * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
  *
  * What it does:

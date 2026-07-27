@@ -108,7 +108,7 @@ namespace moho
      * What it does:
      * Worker loop that polls replay stream readiness and signals manager event.
      */
-    static void ReplayThreadMain(CReplayClient* self);
+    void ReplayThread();
 
     gpg::Stream* mReplayStream{nullptr};     // 0x0D8
     CMessage mReplayMessage;                 // 0x0E0
