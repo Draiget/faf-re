@@ -6662,6 +6662,39 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
 // Defined below alongside the other CRT lock-table lanes.
 extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
 
+extern "C" int global_mode_sse2;
+extern "C" double __cdecl __CIpow_pentium4(double exponent, double base);
+
+/**
+ * Address: 0x00A8E0E0 (FUN_00A8E0E0, _CIpow)
+ *
+ * IDA signature:
+ * double callcnv_F3 _CIpow@<st0>(double x@<st0>, double y@<st1>);
+ *
+ * What it does:
+ * Dispatches pow between the SSE2 and x87 implementations. The SSE2 path is
+ * taken only when the build has it enabled AND both control words are in their
+ * default state: every MXCSR exception masked (0x1F80) and the x87 control
+ * word low seven bits at 0x7F. If either has been reprogrammed - which the
+ * engine does around some render and sim paths - it falls back to x87 so the
+ * caller keeps the rounding and exception behaviour it set up.
+ */
+extern "C" double __cdecl RuntimePowDispatch(const double base, const double exponent)
+{
+  if (global_mode_sse2 != 0) {
+    const bool mxcsrIsDefault = (_mm_getcsr() & 0x1F80u) == 0x1F80u;
+    if (mxcsrIsDefault) {
+      std::uint16_t x87ControlWord = 0;
+      __asm { fnstcw x87ControlWord }
+      if ((x87ControlWord & 0x7Fu) == 0x7Fu) {
+        return __CIpow_pentium4(exponent, base);
+      }
+    }
+  }
+
+  return std::pow(base, exponent);
+}
+
 /**
  * Address: 0x00A824E7 (FUN_00A824E7, memmove_s)
  *
