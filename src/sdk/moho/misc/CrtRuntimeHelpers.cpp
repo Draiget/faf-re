@@ -8238,6 +8238,42 @@ namespace moho::runtime
     filebuf->outputCount = nullptr;
   }
 
+  /**
+   * Address: 0x004C5430 (FUN_004C5430, std::basic_filebuf<char>::_Init)
+   *
+   * IDA signature:
+   * void __thiscall std::basic_filebuf::_Init(std::filebuf *this, int a2);
+   *
+   * What it does:
+   * Binds one filebuf to a `FILE`. The streambuf lanes are not given their own
+   * buffer - they are pointed straight at the FILE's internal cursor fields, so
+   * the two stay in sync with no copying: `_ptr` at +0x00 feeds both I/O
+   * pointers, `_cnt` at +0x04 both counts, and `_base` at +0x08 both bases.
+   *
+   * A null FILE leaves the lanes as `_Init` on the streambuf base left them
+   * (all null) and only the scalar state is written.
+   */
+  void RuntimeFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
+  {
+    filebuf->closeOnClose = 0;
+    filebuf->wroteSome = 0;
+    RuntimeFilebufResetIoLanes(filebuf);
+
+    if (file != nullptr) {
+      LegacyFileView& legacy = legacy_file(file);
+      filebuf->inputBase = &legacy._base;
+      filebuf->outputBase = &legacy._base;
+      filebuf->inputPtr = &legacy._ptr;
+      filebuf->outputPtr = &legacy._ptr;
+      filebuf->inputCount = &legacy._cnt;
+      filebuf->outputCount = &legacy._cnt;
+    }
+
+    filebuf->myFile = file;
+    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
+    filebuf->codecvtFacet = nullptr;
+  }
+
   std::intptr_t RuntimeFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* filebuf,
     const RuntimeCodecvtCharFacet* codecvtFacet
