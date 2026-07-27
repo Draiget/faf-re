@@ -100,118 +100,22 @@ namespace
     triplet.capacity = nullptr;
   }
 
-  struct PathQueueNodeOwner
+
+  /**
+   * Address: 0x00701A80 (FUN_00701A80)
+   *
+   * What it does:
+   * Installs a new path queue on the army, tearing down whatever it replaces.
+   *
+   * The teardown lives with the queue (`PathQueue::Move`, 0x00701AD0). This
+   * file used to carry its own byte-level copy of `PathQueue::Impl` and
+   * `ImplBase` to open-code the same release; that duplicate modelled the
+   * pre-c63b909 layout, in which the traveller node had `mNext`/`mPrev`
+   * transposed and the last two fields were mistaken for padding.
+   */
+  void ReplacePathFinderOwnedPointer(void*& field, moho::PathQueue* const value)
   {
-    std::uint32_t unknown00;
-    IntrusiveListNode* sentinel;
-    std::uint32_t count;
-  };
-
-  static_assert(sizeof(PathQueueNodeOwner) == 0x0C, "PathQueueNodeOwner size must be 0x0C");
-
-  struct PathQueueImplBaseView
-  {
-    PathQueueNodeOwner ownedNodes; // +0x00
-    std::uint8_t pad_0C[0x08];
-    PointerTriplet clusters; // +0x14
-    std::uint8_t pad_20[0x0C];
-    PointerTriplet bucketA; // +0x2C
-    std::uint8_t pad_38[0x04];
-    PointerTriplet bucketB; // +0x3C
-    std::uint8_t pad_48[0x04];
-    IntrusiveListNode traveler; // +0x4C
-    std::uint8_t pad_54[0x14];
-    PointerTriplet pending; // +0x68
-  };
-
-  static_assert(
-    offsetof(PathQueueImplBaseView, ownedNodes) == 0x00, "PathQueueImplBaseView::ownedNodes offset must be 0x00"
-  );
-  static_assert(
-    offsetof(PathQueueImplBaseView, clusters) == 0x14, "PathQueueImplBaseView::clusters offset must be 0x14"
-  );
-  static_assert(offsetof(PathQueueImplBaseView, bucketA) == 0x2C, "PathQueueImplBaseView::bucketA offset must be 0x2C");
-  static_assert(offsetof(PathQueueImplBaseView, bucketB) == 0x3C, "PathQueueImplBaseView::bucketB offset must be 0x3C");
-  static_assert(
-    offsetof(PathQueueImplBaseView, traveler) == 0x4C, "PathQueueImplBaseView::traveler offset must be 0x4C"
-  );
-  static_assert(offsetof(PathQueueImplBaseView, pending) == 0x68, "PathQueueImplBaseView::pending offset must be 0x68");
-
-  struct PathQueueRuntimeView
-  {
-    void* unknown00;
-    IntrusiveListNode registrationNode;
-    PathQueueImplBaseView implBase;
-  };
-
-  static_assert(
-    offsetof(PathQueueRuntimeView, registrationNode) == 0x04,
-    "PathQueueRuntimeView::registrationNode offset must be 0x04"
-  );
-  static_assert(offsetof(PathQueueRuntimeView, implBase) == 0x0C, "PathQueueRuntimeView::implBase offset must be 0x0C");
-
-  struct PathFinderOwnerView
-  {
-    PathQueueRuntimeView* runtime;
-  };
-
-  static_assert(sizeof(PathFinderOwnerView) == 0x04, "PathFinderOwnerView size must be 0x04");
-
-  void ClearOwnedPathQueueNodes(PathQueueNodeOwner& owner)
-  {
-    IntrusiveListNode* const sentinel = owner.sentinel;
-    if (sentinel == nullptr) {
-      owner.count = 0;
-      return;
-    }
-
-    IntrusiveListNode* node = sentinel->mNext;
-    sentinel->ListResetLinks();
-    owner.count = 0;
-
-    while (node != sentinel) {
-      IntrusiveListNode* const next = node->mNext;
-      operator delete(node);
-      node = next;
-    }
-  }
-
-  void DestroyPathQueueImplBase(PathQueueImplBaseView& implBase)
-  {
-    // Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
-    ResetPointerTripletStorage(implBase.bucketB);
-    ResetPointerTripletStorage(implBase.bucketA);
-    ResetPointerTripletStorage(implBase.clusters);
-    ClearOwnedPathQueueNodes(implBase.ownedNodes);
-    operator delete(implBase.ownedNodes.sentinel);
-    implBase.ownedNodes.sentinel = nullptr;
-  }
-
-  void DestroyPathQueueImpl(PathQueueImplBaseView& implBase)
-  {
-    // Address: 0x00765BE0 (FUN_00765BE0), PathQueue implementation teardown prefix.
-    ResetPointerTripletStorage(implBase.pending);
-    UnlinkIntrusiveNode(implBase.traveler);
-    DestroyPathQueueImplBase(implBase);
-  }
-
-  void DestroyPathFinder(void*& pathFinder)
-  {
-    // Address: 0x00701A80 (FUN_00701A80), field helper used by CArmyImpl teardown.
-    auto* const owner = static_cast<PathFinderOwnerView*>(pathFinder);
-    if (owner == nullptr) {
-      return;
-    }
-
-    PathQueueRuntimeView* const runtime = owner->runtime;
-    if (runtime != nullptr) {
-      DestroyPathQueueImpl(runtime->implBase);
-      UnlinkIntrusiveNode(runtime->registrationNode);
-      operator delete(runtime);
-    }
-
-    operator delete(owner);
-    pathFinder = nullptr;
+    moho::PathQueue::Move(reinterpret_cast<moho::PathQueue**>(&field), value);
   }
 
   struct CEconStorageView
@@ -637,17 +541,6 @@ namespace
 
     field = value;
     DestroyArmyEconomyInfo(prior);
-  }
-
-  void ReplacePathFinderOwnedPointer(void*& field, void* const value)
-  {
-    void* prior = field;
-    if (prior == value) {
-      return;
-    }
-
-    field = value;
-    DestroyPathFinder(prior);
   }
 
   [[nodiscard]] UnitCategorySetVectorView& UnitCategorySetVector(moho::CArmyImpl& army)
@@ -1701,7 +1594,7 @@ namespace moho
     DestroyArmyCategorySets(*this);
     DestroyPlatoonPool(PlatoonPool);
     UnknownShared220.release();
-    DestroyPathFinder(PathFinder);
+    ReplacePathFinderOwnedPointer(PathFinder, nullptr);
 
     delete InfluenceMap;
     InfluenceMap = nullptr;
@@ -1879,7 +1772,7 @@ namespace moho
       // is typed PathQueue and the upcast/ownership transition must match.
       moho::PathQueue* loadedPathQueue = nullptr;
       (void)archive->ReadPointerOwned_PathQueue(&loadedPathQueue, &owner);
-      ReplacePathFinderOwnedPointer(PathFinder, static_cast<void*>(loadedPathQueue));
+      ReplacePathFinderOwnedPointer(PathFinder, loadedPathQueue);
     }
 
     gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
