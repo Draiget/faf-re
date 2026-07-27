@@ -8,7 +8,9 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/backends/d3d9/AdapterModeD3D9.hpp"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 
 namespace gpg {
 namespace gal {
@@ -93,7 +95,7 @@ namespace gal {
        * Slot: 5
        * Demangled: gpg::gal::DeviceD3D9::GetModesForAdapter
        */
-      virtual void GetModesForAdapter();
+      virtual void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex);
       /**
        * Address: 0x008EABF0 (FUN_008EABF0)
        * Slot: 6

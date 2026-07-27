@@ -5845,8 +5845,22 @@ namespace gpg::gal
      * What it does:
      * Preserves the currently unresolved adapter-mode projection slot.
      */
-    void DeviceD3D9::GetModesForAdapter()
+    void DeviceD3D9::GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, const int adapterIndex)
     {
+      // The binary rewinds the output rather than releasing it, so the caller
+      // keeps whatever capacity it already paid for across repeated queries.
+      outModes.clear();
+
+      const DeviceD3D9RuntimeView& runtime = AsDeviceD3D9Runtime(*this);
+      if (adapterIndex >= static_cast<int>(runtime.adapters.size())) {
+        return;
+      }
+
+      // Copied field-by-field rather than element-wise: the source modes carry a
+      // vptr this output does not reproduce, and only the three scalars matter.
+      for (const AdapterModeD3D9& mode : runtime.adapters[static_cast<std::size_t>(adapterIndex)].modes) {
+        PushBackAdapterModeD3D9(outModes, AdapterModeD3D9(mode.width_, mode.height_, mode.refreshRate_));
+      }
     }
 
     /**
