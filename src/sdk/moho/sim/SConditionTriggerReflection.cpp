@@ -17,7 +17,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/CArmyStats.h"
+#include "moho/sim/CArmyStats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -1207,10 +1207,10 @@ namespace
       if ((gMapStringArmyStatItemPtrTypeNameInitGuard & 1u) == 0u) {
         gMapStringArmyStatItemPtrTypeNameInitGuard |= 1u;
 
-        gpg::RType* keyType = gpg::LookupRType(typeid(std::string));
-        if (keyType == nullptr) {
-          keyType = gpg::LookupRType(typeid(msvc8::string));
-        }
+        // See RMapStringFloatTypeInfo.cpp: the descriptor is registered under
+        // the engine ABI string type, and LookupRType throws on a miss, so the
+        // std::string probe threw and its fallback never ran.
+        gpg::RType* keyType = gpg::LookupRType(typeid(msvc8::string));
 
         gpg::RType* valueType = gpg::LookupRType(typeid(moho::CArmyStatItem*));
         const char* const keyName = keyType != nullptr ? keyType->GetName() : "std::string";

@@ -71,10 +71,12 @@ namespace gpg
     if ((gMapStringFloatTypeNameInitGuard & 1u) == 0u) {
       gMapStringFloatTypeNameInitGuard |= 1u;
 
-      gpg::RType* keyType = gpg::LookupRType(typeid(std::string));
-      if (keyType == nullptr) {
-        keyType = gpg::LookupRType(typeid(msvc8::string));
-      }
+      // The descriptor is registered under the engine ABI string type by
+      // RStringType.cpp. typeid(std::string) is a different type here (the
+      // 2007 build had only one), and LookupRType throws on a miss rather
+      // than returning null, so asking for it first threw and the fallback
+      // below was unreachable.
+      gpg::RType* keyType = gpg::LookupRType(typeid(msvc8::string));
 
       gpg::RType* valueType = gpg::LookupRType(typeid(float));
       const char* const keyName = keyType != nullptr ? keyType->GetName() : "std::string";
