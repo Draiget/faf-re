@@ -7,6 +7,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
+#include <new>
+
 /**
  * Address: 0x00A83523 (FUN_00A83523, atof)
  *
@@ -100,4 +102,47 @@ void floatTypeInfo::Init()
 {
   size_ = static_cast<int>(sizeof(float));
   Finish();
+}
+
+namespace
+{
+  alignas(floatTypeInfo) unsigned char gStorage[sizeof(floatTypeInfo)];
+  bool gConstructed = false;
+
+  [[nodiscard]] floatTypeInfo& Acquire()
+  {
+    if (!gConstructed) {
+      new (gStorage) floatTypeInfo();
+      gConstructed = true;
+    }
+    return *reinterpret_cast<floatTypeInfo*>(gStorage);
+  }
+
+  void cleanup()
+  {
+    if (!gConstructed) {
+      return;
+    }
+    auto& ti = *reinterpret_cast<floatTypeInfo*>(gStorage);
+    ti.fields_ = msvc8::vector<gpg::RField>{};
+    ti.bases_ = msvc8::vector<gpg::RField>{};
+  }
+
+  struct Bootstrap { Bootstrap() { register_floatTypeInfoStartup(); } };
+  Bootstrap gBootstrap;
+}
+
+/**
+ * Address: 0x00BE9940 (register_floatTypeInfo)
+ *
+ * What it does:
+ * Brings the `floatTypeInfo` singleton into existence so its constructor can
+ * pre-register `typeid(float)`, then arms teardown. Without this the descriptor
+ * is never constructed and every reflected `float` field resolves to a null
+ * `RType`.
+ */
+void register_floatTypeInfoStartup()
+{
+  (void)Acquire();
+  (void)std::atexit(&cleanup);
 }

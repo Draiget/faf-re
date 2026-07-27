@@ -80,3 +80,13 @@ public:
    */
   void Init() override;
 };
+
+/**
+ * Address: 0x00BE9940 (register_floatTypeInfo)
+ *
+ * What it does:
+ * Constructs the process-lifetime `floatTypeInfo` singleton, which registers
+ * `typeid(float)` in the reflection pre-registration map, and installs its
+ * teardown hook. The binary runs this from its CRT initializer table.
+ */
+void register_floatTypeInfoStartup();
