@@ -3100,6 +3100,23 @@ public:
     const wchar_t* formatHint
   );
 
+  /**
+   * Address: 0x009F64F0 (FUN_009F64F0, wxFileName::CreateTempFileName)
+   *
+   * IDA signature:
+   * wxString *__cdecl sub_9F64F0(wxString *arg0, wxString *a1, wxFile *a3);
+   *
+   * What it does:
+   * Names a unique temporary file from `prefix` and returns the path through
+   * `outPath`. When `fileTemp` is supplied and still closed, the newly named
+   * file is also opened for writing; either failure logs and clears `outPath`.
+   */
+  static wxStringRuntime* CreateTempFileName(
+    wxStringRuntime* outPath,
+    const wxStringRuntime& prefix,
+    wxFile* fileTemp
+  );
+
 public:
   wxStringRuntime mPrimaryText{};      // +0x00
   wxArrayString mComponents{};         // +0x04
