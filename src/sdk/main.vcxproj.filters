@@ -2967,6 +2967,15 @@
     <ClInclude Include="legacy\containers\Vector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="legacy\containers\HashMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legacy\containers\List.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legacy\containers\RbTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="legacy\containers\String.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3658,6 +3667,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\reflection\SerializationError.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\algorithms\AStarSearch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\algorithms\Cluster.h">

@@ -9,13 +9,17 @@
 #include <typeinfo>
 #include <utility>
 
+#include "gpg/core/algorithms/AStarSearch.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/containers/TDatList.h"
 #include "moho/path/ClusterMap.h"
+#include "moho/path/IPathTraveler.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 #include "moho/sim/STIMap.h"
 
@@ -67,99 +71,158 @@ namespace
     "SerSaveLoadHelperInitRuntimeView size must be 0x14"
   );
 
-  struct PathQueueIntrusiveNode
+  /**
+   * The traveler ring node. `moho::TDatListItem` is `{mPrev, mNext}` in that order,
+   * which is what the binary uses: `PathQueue::Work` tests emptiness with
+   * `cmp [ecx+4], ecx` (0x00765EE5) and reaches the current traveler through
+   * `[edi+50h]` (0x00766141), i.e. through the *second* word of the node at
+   * +0x4C. An earlier reconstruction had these two fields the other way round.
+   */
+  using PathQueueIntrusiveNode = moho::TDatListItem<void, void>;
+
+  /**
+   * Orders cell keys by their packed 32-bit representation, which is how the
+   * binary compares them (`cmp` on the whole dword at node+8, unsigned).
+   */
+  struct PathQueueCellLess
   {
-    PathQueueIntrusiveNode* mNext;
-    PathQueueIntrusiveNode* mPrev;
+    [[nodiscard]] bool operator()(const moho::SOCellPos& lhs, const moho::SOCellPos& rhs) const noexcept
+    {
+      return PackCellKey(lhs) < PackCellKey(rhs);
+    }
   };
 
-  struct PathQueueOwnedNodeLane
-  {
-    std::uint32_t mFlags;
-    PathQueueIntrusiveNode* mSentinel;
-    std::uint32_t mCount;
-  };
+  using PathQueueCellTraits = msvc8::hash_compare<moho::SOCellPos, PathQueueCellLess>;
 
-  struct PathQueuePointerTriplet
-  {
-    void* mFirst;
-    void* mLast;
-    void* mCapacity;
-  };
-
+  /**
+   * `Moho::PathQueue::ImplBase` - one in-flight path query.
+   *
+   * The first 0x4C bytes are the generic A* search state (node table + open
+   * heap); everything from +0x4C onward is this class's own per-query state.
+   * The derivation is what makes the binary pass the same pointer as both the
+   * search and the traits argument (`push edi; push edi` at 0x00765F36).
+   *
+   * Layout:
+   *   +0x00 : gpg::AStarSearch base   (node hash_map 0x28 + open heap 0x24)
+   *   +0x4C : mTraveler       traveler ring head (at most one entry is live)
+   *   +0x54 : mClosestCell    best cell seen so far, by heuristic
+   *   +0x58 : mClosestDistance
+   *   +0x5C : mClusterMap     cluster map selected for this traveler's footprint
+   *   +0x60 : mBudget         remaining CPU budget, decremented per expansion
+   *   +0x64 : mResultCells    the path handed back to the traveler
+   *   +0x74 : mExpandCount    expansions performed for this traveler
+   *   +0x78 : mPathCap        traveler-supplied expansion cap
+   */
   struct PathQueueImplBaseRuntime
+    : gpg::AStarSearch<moho::SOCellPos, PathQueueImplBaseRuntime, PathQueueCellTraits>
   {
-    PathQueueOwnedNodeLane mOwnedNodes;           // +0x00
-    std::uint32_t mOwnedNodeCountMirror;          // +0x0C
-    void* mClusterVectorProxy;                    // +0x10
-    PathQueuePointerTriplet mClusters;            // +0x14
-    std::uint32_t mClusterBucketMask;             // +0x20
-    std::uint32_t mClusterBucketMaxIndex;         // +0x24
-    std::uint8_t mPad28[0x04];                    // +0x28
-    PathQueuePointerTriplet mBucketA;             // +0x2C
-    std::uint8_t mPad38[0x04];                    // +0x38
-    PathQueuePointerTriplet mBucketB;             // +0x3C
-    std::int32_t mBucketBDefaultCost;             // +0x48
-    PathQueueIntrusiveNode mTraveler;             // +0x4C
-    std::uint32_t mTravelerCount;                 // +0x54
-    std::uint8_t mPad58[0x10];                    // +0x58
-    PathQueuePointerTriplet mPending;             // +0x68
+    PathQueueIntrusiveNode mTraveler;         // +0x4C
+    moho::SOCellPos mClosestCell;                   // +0x54
+    float mClosestDistance;                   // +0x58
+    gpg::HaStar::ClusterMap* mClusterMap;     // +0x5C
+    std::int32_t mBudget;                     // +0x60
+    msvc8::vector<moho::SOCellPos> mResultCells;    // +0x64
+    std::int32_t mExpandCount;                // +0x74
+    std::int32_t mPathCap;                    // +0x78
+
+    PathQueueImplBaseRuntime()
+      : mClosestCell()
+      , mClosestDistance(0.0f)
+      , mClusterMap(nullptr)
+      , mBudget(0)
+      , mExpandCount(0)
+      , mPathCap(0)
+    {
+    }
+
+    /** The traveler currently being served, or null when the ring is empty. */
+    [[nodiscard]] moho::IPathTraveler* CurrentTraveler() const noexcept;
+
+    /** A* traits hook: distance estimate from `cell` to this traveler's goal. */
+    [[nodiscard]] float GetHeuristicCost(const moho::SOCellPos& cell) const;
+
+    /** A* traits hook: tracks the closest cell reached, for fallback paths. */
+    void NoteCandidateCell(const moho::SOCellPos& cell, float estimate) noexcept;
   };
 
   static_assert(sizeof(PathQueueIntrusiveNode) == 0x08, "PathQueueIntrusiveNode size must be 0x08");
-  static_assert(sizeof(PathQueueOwnedNodeLane) == 0x0C, "PathQueueOwnedNodeLane size must be 0x0C");
-  static_assert(sizeof(PathQueuePointerTriplet) == 0x0C, "PathQueuePointerTriplet size must be 0x0C");
-  static_assert(sizeof(PathQueueImplBaseRuntime) == 0x74, "PathQueueImplBaseRuntime size must be 0x74");
-  static_assert(offsetof(PathQueueImplBaseRuntime, mClusters) == 0x14, "PathQueueImplBaseRuntime::mClusters offset must be 0x14");
-  static_assert(offsetof(PathQueueImplBaseRuntime, mBucketA) == 0x2C, "PathQueueImplBaseRuntime::mBucketA offset must be 0x2C");
-  static_assert(offsetof(PathQueueImplBaseRuntime, mBucketB) == 0x3C, "PathQueueImplBaseRuntime::mBucketB offset must be 0x3C");
+  static_assert(sizeof(PathQueueImplBaseRuntime) == 0x7C, "PathQueueImplBaseRuntime size must be 0x7C");
   static_assert(offsetof(PathQueueImplBaseRuntime, mTraveler) == 0x4C, "PathQueueImplBaseRuntime::mTraveler offset must be 0x4C");
-  static_assert(offsetof(PathQueueImplBaseRuntime, mPending) == 0x68, "PathQueueImplBaseRuntime::mPending offset must be 0x68");
-
-  [[nodiscard]] PathQueueIntrusiveNode* AllocatePathQueueSentinel()
-  {
-    auto* const sentinel = static_cast<PathQueueIntrusiveNode*>(::operator new(sizeof(PathQueueIntrusiveNode), std::nothrow));
-    if (sentinel == nullptr) {
-      return nullptr;
-    }
-
-    sentinel->mNext = sentinel;
-    sentinel->mPrev = sentinel;
-    return sentinel;
-  }
+  static_assert(offsetof(PathQueueImplBaseRuntime, mClosestCell) == 0x54, "PathQueueImplBaseRuntime::mClosestCell offset must be 0x54");
+  static_assert(offsetof(PathQueueImplBaseRuntime, mClusterMap) == 0x5C, "PathQueueImplBaseRuntime::mClusterMap offset must be 0x5C");
+  static_assert(offsetof(PathQueueImplBaseRuntime, mBudget) == 0x60, "PathQueueImplBaseRuntime::mBudget offset must be 0x60");
+  static_assert(offsetof(PathQueueImplBaseRuntime, mResultCells) == 0x64, "PathQueueImplBaseRuntime::mResultCells offset must be 0x64");
+  static_assert(offsetof(PathQueueImplBaseRuntime, mExpandCount) == 0x74, "PathQueueImplBaseRuntime::mExpandCount offset must be 0x74");
+  static_assert(offsetof(PathQueueImplBaseRuntime, mPathCap) == 0x78, "PathQueueImplBaseRuntime::mPathCap offset must be 0x78");
 
   /**
-   * Absorbs binary helper:
-   * Address: 0x00767E10 (FUN_00767E10, PathQueue::ImplBase
-   *   cluster-bucket vector-fill helper for 9-slot, 4-byte stride)
+   * Address: 0x00765B90 (FUN_00765B90, ??0ImplBase@PathQueue@Moho@@QAE@@Z)
+   *          0x00766CE0 (FUN_00766CE0) - open-heap freelist arming
+   *          0x00767600 (FUN_00767600) - node-table arming
    *
-   * The binary's PathQueue::ImplBase copy-ctor (FUN_00767600) called
-   * FUN_00767E10 to pre-size the cluster-bucket triplet
-   * `{begin, end_cur, end_cap}` window at offset `+0x04..0x10` with
-   * 9 slots filled from a prototype (a sentinel/empty bucket-head
-   * pointer). The modern recovered InitializePathQueueImplBase
-   * zero-fills the entire ImplBase via `std::memset` and assigns
-   * `mClusterBucketMask = 1u` / `mClusterBucketMaxIndex = 1u`
-   * directly (the recovered layout uses a different bucket-count
-   * shape than the binary's 9-slot vector), so the per-T vector-fill
-   * helper is never invoked and its role is absorbed by the
-   * memset + scalar assignment.
+   * What it does:
+   * Brings one `ImplBase` up to its empty-but-usable state: the traveler ring
+   * is self-linked and the search structures are armed by their own
+   * constructors.
    */
   void InitializePathQueueImplBase(PathQueueImplBaseRuntime& implBase)
   {
-    std::memset(&implBase, 0, sizeof(PathQueueImplBaseRuntime));
-
-    // Address: 0x00767600 (FUN_00767600, sub_767600)
-    implBase.mOwnedNodes.mSentinel = AllocatePathQueueSentinel();
-    implBase.mClusterBucketMask = 1u;
-    implBase.mClusterBucketMaxIndex = 1u;
-
-    // Address: 0x00766CE0 (FUN_00766CE0, sub_766CE0)
-    implBase.mBucketBDefaultCost = -1;
-
-    // Address: 0x00765B90 (FUN_00765B90, ??0ImplBase@PathQueue@Moho@@QAE@@Z)
     implBase.mTraveler.mNext = &implBase.mTraveler;
     implBase.mTraveler.mPrev = &implBase.mTraveler;
+    implBase.mClosestCell = moho::SOCellPos();
+    implBase.mResultCells.clear();
+  }
+
+  /**
+   * Address: 0x00766141 / 0x007684E3 / 0x0076614B (the recurring
+   *          `mov eax, [reg+50h]` + `lea .., [eax-4]` pair)
+   *
+   * What it does:
+   * Recovers the traveler from its ring node. `moho::IPathTraveler::mPathQueueNode`
+   * sits at +0x04, which is the `-4` the binary applies; a null head means the
+   * ring is empty.
+   */
+  moho::IPathTraveler* PathQueueImplBaseRuntime::CurrentTraveler() const noexcept
+  {
+    PathQueueIntrusiveNode* const head = mTraveler.mNext;
+    if (head == nullptr || head == &mTraveler) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::IPathTraveler*>(
+      reinterpret_cast<std::uint8_t*>(head) - offsetof(moho::IPathTraveler, mPathQueueNode)
+    );
+  }
+
+  /**
+   * Address: 0x007684ED (vtable slot 3, `moho::IPathTraveler::GetHeuristicCost`)
+   *
+   * What it does:
+   * A* traits hook - defers the distance estimate to the traveler being served.
+   */
+  float PathQueueImplBaseRuntime::GetHeuristicCost(const moho::SOCellPos& cell) const
+  {
+    const moho::IPathTraveler* const traveler = CurrentTraveler();
+    if (traveler == nullptr) {
+      return 0.0f;
+    }
+    return traveler->GetHeuristicCost(cell);
+  }
+
+  /**
+   * Address: 0x007684F9 (FUN_007684C0) and 0x00768502 (FUN_007685A0)
+   *
+   * What it does:
+   * A* traits hook - remembers the cell with the smallest heuristic seen during
+   * this query, so a search that runs out of budget can still hand back the
+   * closest approach instead of failing outright.
+   */
+  void PathQueueImplBaseRuntime::NoteCandidateCell(const moho::SOCellPos& cell, float estimate) noexcept
+  {
+    if (mClosestDistance > estimate) {
+      mClosestCell = cell;
+      mClosestDistance = estimate;
+    }
   }
 
   void ResetPathQueueNodeLinks(PathQueueIntrusiveNode& node)
@@ -217,223 +280,43 @@ namespace
     return first;
   }
 
-  void ResetPathQueuePointerTriplet(PathQueuePointerTriplet& triplet)
+  /**
+   * Address: 0x007676A0 (FUN_007676A0) + 0x00767C70 (FUN_00767C70)
+   *          0x007672E0 (FUN_007672E0)
+   *
+   * What it does:
+   * Releases every search record and open-heap entry accumulated by the
+   * previous query, leaving both structures armed for the next traveler.
+   */
+  void ResetPathQueueSearchState(PathQueueImplBaseRuntime& implBase)
   {
-    if (triplet.mFirst != nullptr) {
-      ::operator delete(triplet.mFirst);
-    }
-
-    triplet.mFirst = nullptr;
-    triplet.mLast = nullptr;
-    triplet.mCapacity = nullptr;
+    implBase.ResetSearch();
   }
 
   /**
-   * Address: 0x007676A0 (FUN_007676A0, Moho::PathQueue::ImplBase::~ImplBase helper)
+   * Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
    *
    * What it does:
-   * Clears all owned intrusive nodes under the owner sentinel, resets sentinel
-   * self-links, and zeroes the tracked node-count lane.
+   * Tears down the search structures owned by one `ImplBase`.
    */
-  void ClearOwnedPathQueueNodes(PathQueueOwnedNodeLane& owner)
-  {
-    PathQueueIntrusiveNode* const sentinel = owner.mSentinel;
-    if (sentinel == nullptr) {
-      owner.mCount = 0;
-      return;
-    }
-
-    PathQueueIntrusiveNode* node = sentinel->mNext;
-    ResetPathQueueNodeLinks(*sentinel);
-    owner.mCount = 0;
-
-    while (node != sentinel) {
-      PathQueueIntrusiveNode* const next = node->mNext;
-      ::operator delete(node);
-      node = next;
-    }
-  }
-
   void DestroyPathQueueImplBase(PathQueueImplBaseRuntime& implBase)
   {
-    // Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
-    ResetPathQueuePointerTriplet(implBase.mBucketB);
-    ResetPathQueuePointerTriplet(implBase.mBucketA);
-    ResetPathQueuePointerTriplet(implBase.mClusters);
-    ClearOwnedPathQueueNodes(implBase.mOwnedNodes);
-    ::operator delete(implBase.mOwnedNodes.mSentinel);
-    implBase.mOwnedNodes.mSentinel = nullptr;
+    implBase.mResultCells.clear();
+    implBase.ResetSearch();
   }
 
+  /**
+   * Address: 0x00765BE0 (FUN_00765BE0)
+   *
+   * What it does:
+   * Detaches the traveler ring before releasing the search structures.
+   */
   void DestroyPathQueueImpl(PathQueueImplBaseRuntime& implBase)
   {
-    // Address: 0x00765BE0 (FUN_00765BE0), PathQueue implementation teardown prefix.
-    ResetPathQueuePointerTriplet(implBase.mPending);
     UnlinkAndResetPathQueueNode(implBase.mTraveler);
     DestroyPathQueueImplBase(implBase);
   }
 
-  struct PathQueueWorkHeapEntry
-  {
-    float totalCost;            // +0x00
-    std::uint32_t lane04;       // +0x04
-    std::uint32_t handleIndex;  // +0x08
-  };
-  static_assert(sizeof(PathQueueWorkHeapEntry) == 0x0C, "PathQueueWorkHeapEntry size must be 0x0C");
-  static_assert(offsetof(PathQueueWorkHeapEntry, handleIndex) == 0x08, "PathQueueWorkHeapEntry::handleIndex offset must be 0x08");
-
-  struct PathQueueWorkHeapRuntimeView
-  {
-    std::uint32_t lane00;                 // +0x00
-    PathQueueWorkHeapEntry* entries;      // +0x04
-    std::uint8_t pad08[0x0C];             // +0x08
-    std::uint32_t* indexByHandle;         // +0x14
-  };
-  static_assert(sizeof(PathQueueWorkHeapRuntimeView) == 0x18, "PathQueueWorkHeapRuntimeView size must be 0x18");
-  static_assert(offsetof(PathQueueWorkHeapRuntimeView, entries) == 0x04, "PathQueueWorkHeapRuntimeView::entries offset must be 0x04");
-  static_assert(
-    offsetof(PathQueueWorkHeapRuntimeView, indexByHandle) == 0x14,
-    "PathQueueWorkHeapRuntimeView::indexByHandle offset must be 0x14"
-  );
-
-  /**
-   * Address: 0x00769600 (FUN_00769600)
-   *
-   * What it does:
-   * Sifts one open-heap entry upward by `totalCost` in the `PathQueue::Work`
-   * lane and keeps the external `handle -> heapIndex` map synchronized.
-   */
-  [[maybe_unused]] std::uintptr_t PathQueueSiftWorkHeapEntryUpByCost(
-    std::uint32_t heapIndex,
-    PathQueueWorkHeapRuntimeView* const heap
-  ) noexcept
-  {
-    std::uintptr_t result = heapIndex;
-    if (heapIndex == 0u || heap == nullptr || heap->entries == nullptr) {
-      return result;
-    }
-
-    while (true) {
-      PathQueueWorkHeapEntry* const entries = heap->entries;
-      result = reinterpret_cast<std::uintptr_t>(entries);
-
-      const std::uint32_t parentIndex = (heapIndex - 1u) >> 1u;
-      if (entries[heapIndex].totalCost > entries[parentIndex].totalCost) {
-        break;
-      }
-
-      PathQueueWorkHeapEntry savedParent = entries[parentIndex];
-      entries[parentIndex] = entries[heapIndex];
-      entries[heapIndex] = savedParent;
-
-      if (heap->indexByHandle != nullptr) {
-        heap->indexByHandle[entries[parentIndex].handleIndex] = parentIndex;
-        heap->indexByHandle[entries[heapIndex].handleIndex] = heapIndex;
-        result = reinterpret_cast<std::uintptr_t>(heap->indexByHandle);
-      }
-
-      heapIndex = parentIndex;
-      if (heapIndex == 0u) {
-        break;
-      }
-    }
-
-    return result;
-  }
-
-  struct LegacyVectorStorageRuntime12
-  {
-    std::uint32_t lane00;                 // +0x00
-    PathQueueWorkHeapEntry* begin;        // +0x04
-    PathQueueWorkHeapEntry* end;          // +0x08
-    PathQueueWorkHeapEntry* capacityEnd;  // +0x0C
-  };
-  static_assert(sizeof(LegacyVectorStorageRuntime12) == 0x10, "LegacyVectorStorageRuntime12 size must be 0x10");
-
-  /**
-   * Address: 0x00769860 (FUN_00769860)
-   * Address: 0x0076C400 (FUN_0076C400)
-   *
-   * What it does:
-   * Returns the logical element count for one 12-byte legacy vector lane.
-   */
-  [[maybe_unused]] std::int32_t CountLegacyVector12ElementsRuntime(
-    const LegacyVectorStorageRuntime12* const vector
-  ) noexcept
-  {
-    if (vector == nullptr || vector->begin == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(vector->end - vector->begin);
-  }
-
-  /**
-   * Address: 0x00769C30 (FUN_00769C30)
-   *
-   * What it does:
-   * Swaps two work-heap entries and refreshes the handle-index lookup lane.
-   */
-  [[maybe_unused]] std::uint32_t* SwapPathQueueWorkHeapEntriesAndSyncIndicesRuntime(
-    const std::uint32_t firstIndex,
-    PathQueueWorkHeapRuntimeView* const heap,
-    const std::uint32_t secondIndex
-  ) noexcept
-  {
-    if (heap == nullptr || heap->entries == nullptr || heap->indexByHandle == nullptr) {
-      return heap != nullptr ? heap->indexByHandle : nullptr;
-    }
-
-    PathQueueWorkHeapEntry& first = heap->entries[firstIndex];
-    PathQueueWorkHeapEntry& second = heap->entries[secondIndex];
-    std::swap(first, second);
-
-    heap->indexByHandle[first.handleIndex] = firstIndex;
-    heap->indexByHandle[second.handleIndex] = secondIndex;
-    return heap->indexByHandle;
-  }
-
-  /**
-   * Address: 0x0076AAB0 (FUN_0076AAB0)
-   *
-   * What it does:
-   * Writes one repeated 12-byte work-heap entry into `[begin,end)`.
-   */
-  [[maybe_unused]] PathQueueWorkHeapEntry* FillPathQueueWorkHeapEntryRangeRuntime(
-    PathQueueWorkHeapEntry* begin,
-    PathQueueWorkHeapEntry* const end,
-    const PathQueueWorkHeapEntry* const value
-  ) noexcept
-  {
-    if (value == nullptr) {
-      return begin;
-    }
-
-    for (; begin != end; ++begin) {
-      *begin = *value;
-    }
-    return begin;
-  }
-
-  /**
-   * Address: 0x0076AAD0 (FUN_0076AAD0)
-   *
-   * What it does:
-   * Copies one 12-byte work-heap range backward into destination tail lanes.
-   */
-  [[maybe_unused]] PathQueueWorkHeapEntry* CopyPathQueueWorkHeapEntryRangeBackwardRuntime(
-    PathQueueWorkHeapEntry* destinationEnd,
-    const PathQueueWorkHeapEntry* sourceEnd,
-    const PathQueueWorkHeapEntry* const sourceBegin
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      --destinationEnd;
-      --sourceEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
-  }
 } // namespace
 
 namespace moho
@@ -451,10 +334,16 @@ namespace moho
      */
     Impl();
 
+    // +0x00 is the owning `PathTables`: `PathQueue::Work` hands it to the query
+    // setup lane at 0x00765F04, which dereferences it twice
+    // (`[[owner] + 0x1C][footprintIndex]`) to pick this traveler's cluster map.
+    // It is still typed as a word here because nothing in this translation unit
+    // dereferences it yet; the Work chain retypes it.
     std::int32_t mSize;                     // +0x00
     PathQueueIntrusiveNode mHeightSentinel; // +0x04
+    // mBase now spans +0x0C..+0x88: the previous reconstruction stopped it at
+    // +0x80 and padded the remainder, which hid `mExpandCount` / `mPathCap`.
     PathQueueImplBaseRuntime mBase;         // +0x0C
-    std::uint8_t mPad80[0x08];              // +0x80
   };
 
   static_assert(sizeof(PathQueue::Impl) == 0x88, "PathQueue::Impl size must be 0x88");
