@@ -11962,7 +11962,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
       static_cast<std::int32_t>(dest->GetEntityId())
     };
     // push_back's capacity-full path is `msvc8::vector<SUpgradeNotifyPair>::insert`
-    // (FUN_006D1A90), reached through the binary's push_back at FUN_006D1960.
+    // (FUN_006D1A90), reached through the binary's push_back (FUN_006D1960).
     globalUserdata->mAllyUpgradeNotifications.push_back(pair);
   }
 

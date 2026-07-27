@@ -2267,22 +2267,6 @@ namespace
 }
 
 /**
- * Address: 0x00626E10 (FUN_00626E10)
- *
- * What it does:
- * Appends one 12-byte pickup-info lane into a legacy growth vector,
- * expanding storage when the current capacity is exhausted.
- */
-[[maybe_unused]] Element12Runtime* AppendPickupInfoLaneRuntime(
-  const Element12Runtime* const value,
-  LegacyVectorStorageRuntime<Element12Runtime>* const vector
-)
-{
-  const Element12Runtime copy = value != nullptr ? *value : Element12Runtime{};
-  return AppendTrivialValue(vector, copy);
-}
-
-/**
  * Address: 0x00642180 (FUN_00642180)
  *
  * What it does:
@@ -3235,35 +3219,6 @@ namespace
 }
 
 /**
- * Address: 0x006DBAE0 (FUN_006DBAE0)
- *
- * What it does:
- * Inserts one 40-byte lane into an element40 vector and writes the rebased
- * cursor lane to `outCursor`.
- */
-[[maybe_unused]] std::uint32_t* InsertElement40LaneAndRebaseCursorRuntime(
-  LegacyVectorStorageRuntime<Element40Runtime>* const vector,
-  std::uint32_t* const outCursor,
-  Element40Runtime* const insertPosition,
-  const Element40Runtime* const value
-)
-{
-  if (outCursor == nullptr || vector == nullptr) {
-    return outCursor;
-  }
-
-  std::size_t index = 0u;
-  if (vector->begin != nullptr && vector->end != nullptr && vector->end > vector->begin && insertPosition != nullptr) {
-    index = static_cast<std::size_t>(insertPosition - vector->begin);
-  }
-
-  const Element40Runtime copy = value != nullptr ? *value : Element40Runtime{};
-  (void)InsertTrivialValueAtPosition(vector, insertPosition, copy);
-  *outCursor = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(vector->begin + index));
-  return outCursor;
-}
-
-/**
  * Address: 0x006DBE70 (FUN_006DBE70)
  *
  * What it does:
@@ -3466,23 +3421,6 @@ namespace
   const std::uint32_t value = fillValue != nullptr ? *fillValue : 0u;
   (void)ResizeTrivialVectorWithFill(vector, desiredCount, value);
   return static_cast<std::uint32_t>(VectorSize(*vector));
-}
-
-/**
- * Address: 0x006D1960 (FUN_006D1960)
- * Address: 0x006C38E0 (FUN_006C38E0)
- *
- * What it does:
- * Appends one 8-byte pair lane into a legacy vector used by upgrade-notify
- * pipelines.
- */
-[[maybe_unused]] Element8Runtime* AppendUpgradePairLaneRuntime(
-  const Element8Runtime* const value,
-  LegacyVectorStorageRuntime<Element8Runtime>* const vector
-)
-{
-  const Element8Runtime copy = value != nullptr ? *value : Element8Runtime{};
-  return AppendTrivialValue(vector, copy);
 }
 
 /**
@@ -3967,28 +3905,6 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
 {
   const Element12Runtime copy = value != nullptr ? *value : Element12Runtime{};
   return AppendTrivialValue(vector, copy);
-}
-
-/**
- * Address: 0x00762120 (FUN_00762120)
- *
- * What it does:
- * Resizes one vector of packed seven-float payload lanes (`0x1C` each),
- * filling new lanes from the caller-provided sample value.
- */
-[[maybe_unused]] std::uint32_t ResizeFloat7VectorWithFillRuntime(
-  const std::uint32_t desiredCount,
-  LegacyVectorStorageRuntime<Float7Runtime>* const vector,
-  const Float7Runtime* const fillValue
-)
-{
-  if (vector == nullptr) {
-    return 0u;
-  }
-
-  const Float7Runtime value = fillValue != nullptr ? *fillValue : Float7Runtime{};
-  (void)ResizeTrivialVectorWithFill(vector, desiredCount, value);
-  return static_cast<std::uint32_t>(VectorSize(*vector));
 }
 
 /**
@@ -4651,26 +4567,6 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
   storage->head = AllocateSelfLinkedPairNodeRuntime();
   storage->size = 0u;
   return storage;
-}
-
-/**
- * Address: 0x007407F0 (FUN_007407F0)
- *
- * What it does:
- * Forwards one owner range `[begin, begin + size)` into the supplied range
- * erase callback.
- */
-[[maybe_unused]] std::int32_t EraseOwnerRangeRuntime(
-  RangeOwnerByteRuntime* const owner,
-  const RangeEraseRuntimeFn eraseFn
-)
-{
-  if (owner == nullptr || eraseFn == nullptr) {
-    return 0;
-  }
-
-  std::byte* const begin = owner->rangeBegin;
-  return eraseFn(owner, begin, owner, begin + owner->rangeByteSize);
 }
 
 /**
@@ -6985,35 +6881,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 /**
- * Address: 0x008F6FB0 (FUN_008F6FB0)
- *
- * What it does:
- * Inserts one 28-byte lane at `insertPosition` and writes the rebased cursor
- * lane into `outCursor`.
- */
-[[maybe_unused]] Element28Runtime** InsertElement28LaneAndStoreRebasedCursorRuntime(
-  LegacyVectorStorageRuntime<Element28Runtime>* const vector,
-  Element28Runtime** const outCursor,
-  Element28Runtime* const insertPosition,
-  const Element28Runtime* const valueLane
-)
-{
-  if (vector == nullptr || outCursor == nullptr) {
-    return outCursor;
-  }
-
-  std::size_t index = 0u;
-  if (vector->begin != nullptr && vector->end != nullptr && vector->end > vector->begin && insertPosition != nullptr) {
-    index = static_cast<std::size_t>(insertPosition - vector->begin);
-  }
-
-  const Element28Runtime copy = valueLane != nullptr ? *valueLane : Element28Runtime{};
-  (void)InsertTrivialValueAtPosition(vector, insertPosition, copy);
-  *outCursor = vector->begin + index;
-  return outCursor;
-}
-
-/**
  * Address: 0x008FA5C0 (FUN_008FA5C0)
  *
  * What it does:
@@ -7027,35 +6894,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 )
 {
   return CopyDwordRangeBackwardByBoundsRuntime(sourceEnd, destinationEnd, sourceBegin);
-}
-
-/**
- * Address: 0x00900960 (FUN_00900960)
- *
- * What it does:
- * Inserts one 0x13C-byte lane at `insertPosition` and writes the rebased
- * cursor lane into `outCursor`.
- */
-[[maybe_unused]] Element316Runtime** InsertElement316LaneAndStoreRebasedCursorRuntime(
-  LegacyVectorStorageRuntime<Element316Runtime>* const vector,
-  Element316Runtime** const outCursor,
-  Element316Runtime* const insertPosition,
-  const Element316Runtime* const valueLane
-)
-{
-  if (vector == nullptr || outCursor == nullptr) {
-    return outCursor;
-  }
-
-  std::size_t index = 0u;
-  if (vector->begin != nullptr && vector->end != nullptr && vector->end > vector->begin && insertPosition != nullptr) {
-    index = static_cast<std::size_t>(insertPosition - vector->begin);
-  }
-
-  const Element316Runtime copy = valueLane != nullptr ? *valueLane : Element316Runtime{};
-  (void)InsertTrivialValueAtPosition(vector, insertPosition, copy);
-  *outCursor = vector->begin + index;
-  return outCursor;
 }
 
 /**
@@ -7480,35 +7318,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 )
 {
   return CopyDwordRangeBackwardByBoundsRuntime(sourceEnd, destinationEnd, sourceBegin);
-}
-
-/**
- * Address: 0x009401C0 (FUN_009401C0)
- *
- * What it does:
- * Inserts one 60-byte lane at `insertPosition` and writes the rebased cursor
- * lane into `outCursor`.
- */
-[[maybe_unused]] Element60Runtime** InsertElement60LaneAndStoreRebasedCursorRuntime(
-  LegacyVectorStorageRuntime<Element60Runtime>* const vector,
-  Element60Runtime** const outCursor,
-  Element60Runtime* const insertPosition,
-  const Element60Runtime* const valueLane
-)
-{
-  if (vector == nullptr || outCursor == nullptr) {
-    return outCursor;
-  }
-
-  std::size_t index = 0u;
-  if (vector->begin != nullptr && vector->end != nullptr && vector->end > vector->begin && insertPosition != nullptr) {
-    index = static_cast<std::size_t>(insertPosition - vector->begin);
-  }
-
-  const Element60Runtime copy = valueLane != nullptr ? *valueLane : Element60Runtime{};
-  (void)InsertTrivialValueAtPosition(vector, insertPosition, copy);
-  *outCursor = vector->begin + index;
-  return outCursor;
 }
 
 /**
@@ -7952,64 +7761,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 )
 {
   return AdvanceRbIteratorRuntime<MapNodeNil17Runtime, 0x11u>(iteratorLane);
-}
-
-/**
- * Address: 0x008B3870 (FUN_008B3870)
- *
- * What it does:
- * Rebinds a contiguous lane of intrusive owner-slot nodes so each destination
- * node is linked at the head of the source owner slot.
- */
-[[maybe_unused]] std::uint32_t* RebindIntrusiveOwnerSlotRangeRuntime(
-  std::uint32_t* destination,
-  const std::uint32_t* sourceBegin,
-  const std::uint32_t* const sourceEnd
-)
-{
-  while (sourceBegin != sourceEnd) {
-    auto* const destinationNode = reinterpret_cast<IntrusiveOwnerSlotRuntime*>(destination);
-    const auto* const sourceNode = reinterpret_cast<const IntrusiveOwnerSlotRuntime*>(sourceBegin);
-    if (destinationNode->ownerSlot != sourceNode->ownerSlot) {
-      if (destinationNode->ownerSlot != nullptr) {
-        IntrusiveOwnerSlotRuntime** cursor = destinationNode->ownerSlot;
-        while (*cursor != destinationNode) {
-          cursor = &(*cursor)->next;
-        }
-        *cursor = destinationNode->next;
-      }
-
-      destinationNode->ownerSlot = sourceNode->ownerSlot;
-      if (sourceNode->ownerSlot == nullptr) {
-        destinationNode->next = nullptr;
-      } else {
-        destinationNode->next = *sourceNode->ownerSlot;
-        *sourceNode->ownerSlot = destinationNode;
-      }
-    }
-
-    destination += 2;
-    sourceBegin += 2;
-  }
-
-  return destination;
-}
-
-/**
- * Address: 0x008B35F0 (FUN_008B35F0)
- * Address: 0x008B7F80 (FUN_008B7F80)
- *
- * What it does:
- * Register-order adapter that forwards intrusive owner-slot range rebinding
- * into `RebindIntrusiveOwnerSlotRangeRuntime`.
- */
-[[maybe_unused]] std::uint32_t* RebindIntrusiveOwnerSlotRangeSourceFirstAdapter(
-  const std::uint32_t* const sourceBegin,
-  const std::uint32_t* const sourceEnd,
-  std::uint32_t* const destination
-)
-{
-  return RebindIntrusiveOwnerSlotRangeRuntime(destination, sourceBegin, sourceEnd);
 }
 
 /**
@@ -8844,29 +8595,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 /**
- * Address: 0x00A2F550 (FUN_00A2F550)
- *
- * What it does:
- * Runs wx-protocol base initialization with lane `0` and installs the
- * protocol vtable token.
- */
-[[maybe_unused]] VtableOnlyRuntime* InitializeWxProtocolRuntime(
-  VtableOnlyRuntime* const protocol,
-  void* const wxProtocolVtable,
-  const WxProtocolInitializeFn initializeFn
-)
-{
-  if (initializeFn != nullptr) {
-    initializeFn(0);
-  }
-
-  if (protocol != nullptr) {
-    protocol->vtable = wxProtocolVtable;
-  }
-  return protocol;
-}
-
-/**
  * Address: 0x00A2F9C0 (FUN_00A2F9C0)
  *
  * What it does:
@@ -9300,38 +9028,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 /**
- * Address: 0x007D4380 (FUN_007D4380)
- *
- * What it does:
- * Clears one intrusive cartographic-decal list lane and destroys each dynamic
- * node after rebinding its vtable token.
- */
-[[maybe_unused]] CartographicDecalNodeRuntime* ClearCartographicDecalListRuntime(
-  CartographicDecalListRuntime* const list,
-  void* const cartographicDecalVtable
-)
-{
-  if (list == nullptr || list->sentinel == nullptr) {
-    return nullptr;
-  }
-
-  CartographicDecalNodeRuntime* const sentinel = list->sentinel;
-  CartographicDecalNodeRuntime* node = sentinel->next;
-  sentinel->next = sentinel;
-  sentinel->prev = sentinel;
-  list->size = 0u;
-
-  while (node != nullptr && node != sentinel) {
-    CartographicDecalNodeRuntime* const next = node->next;
-    node->vtable = cartographicDecalVtable;
-    ::operator delete(node);
-    node = next;
-  }
-
-  return node;
-}
-
-/**
  * Address: 0x00886FB0 (FUN_00886FB0)
  *
  * What it does:
@@ -9549,57 +9245,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
   ::GetTextMetricsW(deviceContext, outMetrics);
   ::ReleaseDC(owner->windowHandle, deviceContext);
   return outMetrics;
-}
-
-/**
- * Address: 0x0097C070 (FUN_0097C070)
- *
- * What it does:
- * Writes region bounding-box coordinates (`left`, `top`, `width`, `height`)
- * when region data is present, otherwise zeroes all outputs.
- */
-[[maybe_unused]] LONG* GetRegionBoundsRuntime(
-  const RegionOwnerRuntime* const owner,
-  LONG* const outLeft,
-  LONG* const outTop,
-  LONG* const outWidth,
-  LONG* const outHeight
-)
-{
-  if (owner == nullptr || owner->node == nullptr || owner->node->regionHandle == nullptr) {
-    if (outHeight != nullptr) {
-      *outHeight = 0;
-    }
-    if (outWidth != nullptr) {
-      *outWidth = 0;
-    }
-    if (outTop != nullptr) {
-      *outTop = 0;
-    }
-    if (outLeft != nullptr) {
-      *outLeft = 0;
-    }
-    return outTop;
-  }
-
-  RECT box{};
-  ::GetRgnBox(owner->node->regionHandle, &box);
-  const LONG left = box.left;
-  const LONG top = box.top;
-
-  if (outLeft != nullptr) {
-    *outLeft = left;
-  }
-  if (outTop != nullptr) {
-    *outTop = top;
-  }
-  if (outWidth != nullptr) {
-    *outWidth = box.right - left;
-  }
-  if (outHeight != nullptr) {
-    *outHeight = box.bottom - top;
-  }
-  return outHeight;
 }
 
 /**
@@ -10309,24 +9954,6 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 /**
- * Address: 0x004F8240 (FUN_004F8240)
- *
- * What it does:
- * Forwards one runtime-failure lane to the core dispatcher and never returns.
- */
-[[maybe_unused]] [[noreturn]] void DispatchRuntimeFailureAndTerminateRuntime(
-  const int arg0,
-  const int arg1,
-  const RuntimeFailureDispatchFn dispatchFn
-)
-{
-  if (dispatchFn != nullptr) {
-    dispatchFn(arg0, arg1);
-  }
-  std::terminate();
-}
-
-/**
  * Address: 0x00837750 (FUN_00837750)
  *
  * What it does:
@@ -10982,90 +10609,6 @@ namespace
   destination->object = object;
   destination->counter = temporary.counter;
   ReleaseSharedCounterRuntime(previousCounter);
-}
-
-/**
- * Address: 0x007E5B20 (FUN_007E5B20)
- *
- * What it does:
- * Finds-or-inserts one 2-word key in a pair-key RB-tree lane whose nil flag
- * lives at `+0x25`, returning `(node, inserted)`.
- */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertPairKeyNodeRuntime(
-  const PairKeyRuntime* const key,
-  LegacyMapStorageRuntime<PairKeyNodeNil37Runtime>* const map,
-  MapInsertStatusRuntime* const outResult
-)
-{
-  if (outResult == nullptr) {
-    return nullptr;
-  }
-
-  outResult->node = nullptr;
-  outResult->inserted = 0u;
-  outResult->reserved[0] = 0u;
-  outResult->reserved[1] = 0u;
-  outResult->reserved[2] = 0u;
-  if (map == nullptr || key == nullptr) {
-    return outResult;
-  }
-
-  PairKeyNodeNil37Runtime* const head = EnsurePairMapHeadRuntime(map);
-  if (head == nullptr) {
-    return outResult;
-  }
-
-  PairKeyNodeNil37Runtime* parent = head;
-  PairKeyNodeNil37Runtime* cursor = head->parent;
-  bool goLeft = true;
-  while (cursor != nullptr && cursor != head && cursor->isNil == 0u) {
-    parent = cursor;
-    const PairKeyRuntime cursorKey{cursor->keyHigh, cursor->keyLow};
-    if (PairKeyLessRuntime(*key, cursorKey)) {
-      goLeft = true;
-      cursor = cursor->left;
-    } else if (PairKeyLessRuntime(cursorKey, *key)) {
-      goLeft = false;
-      cursor = cursor->right;
-    } else {
-      outResult->node = cursor;
-      return outResult;
-    }
-  }
-
-  auto* const inserted = static_cast<PairKeyNodeNil37Runtime*>(::operator new(sizeof(PairKeyNodeNil37Runtime), std::nothrow));
-  if (inserted == nullptr) {
-    return outResult;
-  }
-
-  std::memset(inserted, 0, sizeof(PairKeyNodeNil37Runtime));
-  inserted->left = head;
-  inserted->right = head;
-  inserted->parent = (parent != nullptr) ? parent : head;
-  inserted->keyHigh = key->high;
-  inserted->keyLow = key->low;
-  inserted->isNil = 0u;
-
-  if (parent == nullptr || parent == head || parent->isNil != 0u) {
-    head->parent = inserted;
-    head->left = inserted;
-    head->right = inserted;
-  } else if (goLeft) {
-    parent->left = inserted;
-    if (head->left == parent || head->left == head) {
-      head->left = inserted;
-    }
-  } else {
-    parent->right = inserted;
-    if (head->right == parent || head->right == head) {
-      head->right = inserted;
-    }
-  }
-
-  ++map->size;
-  outResult->node = inserted;
-  outResult->inserted = 1u;
-  return outResult;
 }
 
 /**
@@ -13957,37 +13500,6 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
 ) noexcept
 {
   return CopyByteRangeAndAdvanceRuntimeA(first, last, output);
-}
-
-/**
- * Address: 0x0095F0C0 (FUN_0095F0C0)
- *
- * What it does:
- * Flushes staged bits to the output byte stream when at least one full byte
- * is pending in the bit accumulator lane.
- */
-[[maybe_unused]] ByteFlushStateRuntime* FlushStagedBitsToOutputRuntime(
-  ByteFlushStateRuntime* const owner
-) noexcept
-{
-  if (owner == nullptr) {
-    return nullptr;
-  }
-
-  if (owner->stagedBitCount == 16u) {
-    owner->outputBuffer[owner->outputSize++] = static_cast<std::uint8_t>(owner->stagedWord & 0xFFu);
-    owner->outputBuffer[owner->outputSize++] = owner->stagedHighByte;
-    owner->stagedBitCount = 0u;
-    owner->stagedWord = 0u;
-    owner->stagedHighByte = 0u;
-  } else if (owner->stagedBitCount >= 8u) {
-    owner->outputBuffer[owner->outputSize++] = static_cast<std::uint8_t>(owner->stagedWord & 0xFFu);
-    owner->stagedBitCount -= 8u;
-    owner->stagedWord = owner->stagedHighByte;
-    owner->stagedHighByte = 0u;
-  }
-
-  return owner;
 }
 
 /**
