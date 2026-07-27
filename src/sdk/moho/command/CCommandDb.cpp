@@ -751,14 +751,11 @@ namespace moho
     runtime->pool.mSubRes2.Reset();
     runtime->pool.mReleasedLows.mWords.ResetStorageToInline();
 
-    if (runtime->map.head != nullptr) {
-      CommandDbMapNodeRuntime* iterator = runtime->map.head;
-      (void)EraseCommandMapRange(runtime->map, iterator, runtime->map.head->left, runtime->map.head);
-      ::operator delete(runtime->map.head);
-      runtime->map.head = nullptr;
-    }
-
-    runtime->map.size = 0u;
+    // The command map owns its nodes and its sentinel: `commands.clear()` runs
+    // the same whole-tree erase the binary inlines here, and `~msvc8::map` then
+    // releases the header. Freeing the sentinel from this overlay as well would
+    // double-free it.
+    commands.clear();
   }
 
   /**

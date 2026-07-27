@@ -1,29 +1,44 @@
 #pragma once
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 #include <functional>
-#include <iterator>
-#include <type_traits>
-#include <cassert>
+#include <utility>
+
+#include "legacy/containers/RbTree.h"
+
+#pragma pack(push, 4)
 
 namespace msvc8
 {
     /**
-     * \brief Minimal, debug-checked, read-only facade of MSVC8 std::map layout.
+     * \brief Owning MSVC8-layout `std::map`.
      *
-     * This is a layout-compatible RB-tree view for reverse-engineering:
-     * - header sentinel node at _Myhead, used as end() iterator
-     * - _Myhead->_Parent = root (or _Myhead if empty)
-     * - _Myhead->_Left   = leftmost (min) (or _Myhead if empty)
-     * - _Myhead->_Right  = rightmost (max) (or _Myhead if empty)
+     * All red-black mechanics live in `detail::rb_tree` (RbTree.h), which this
+     * container shares with `msvc8::set`; the only difference between the two is
+     * the traits' key extractor - `set` extracts the value itself, `map` extracts
+     * `value_type::first`.
      *
-     * The container never allocates or mutates memory. It only traverses what's already built.
-     * Use adopt(...) to wrap an in-memory tree from the game.
+     * Layout is the shipped 12-byte `{proxy, _Myhead, _Mysize}` triplet with the
+     * comparator empty-base-optimised away. That footprint is confirmed by
+     * `Moho::CCommandDB`, whose command map occupies +0x04..+0x0F with the id
+     * pool starting at +0x10 (`CommandDbMapRuntime` in CCommandDb.cpp).
+     *
+     * Iterator stepping is documented (and address-annotated) on
+     * `detail::rb_increment` / `detail::rb_decrement`.
+     *
+     * Note: this container used to be a non-owning inspection facade with an
+     * `adopt(header, size)` factory. Adopting foreign tree memory is unsound now
+     * that the container frees what it holds, so `adopt` and the raw-header
+     * constructor are gone; nothing in `src/sdk/**` referenced them.
      */
     template<class Key, class T, class Less = std::less<Key>>
     class map
     {
+        using traits = detail::rb_map_traits<Key, T, Less>;
+        using tree_type = detail::rb_tree<traits>;
+        using node_type = typename tree_type::node_type;
+
     public:
         using key_type = Key;
         using mapped_type = T;
@@ -31,486 +46,198 @@ namespace msvc8
         using key_compare = Less;
         using size_type = std::size_t;
         using difference_type = std::ptrdiff_t;
+        using reference = value_type&;
+        using const_reference = const value_type&;
 
-    private:
-#pragma pack(push, 4)
-        /** Node layout as in VC8: left/parent/right pointers, color byte, then value. */
-        struct _Node {
-            _Node* _Left;    // left child or _Myhead
-            _Node* _Parent;  // parent or _Myhead
-            _Node* _Right;   // right child or _Myhead
-            char        _Color;   // 0 = Red, 1 = Black (header is Black)
-            char        _Pad[3];  // keep 4-byte alignment before value
-            value_type  _Value;   // pair<const Key, T>
-        };
-#pragma pack(pop)
+        using iterator = detail::rb_iterator<traits, false>;
+        using const_iterator = detail::rb_iterator<traits, true>;
 
-        /** Owner cookie/allocator slot (debug-era field; not used in this facade). */
-        void* _Alval = nullptr;
+        // ---- ctor / dtor ------------------------------------------------------
 
-        /** Header sentinel node pointer (points to a node in target address space). */
-        _Node* _Myhead = nullptr;
+        map() noexcept {}
+        explicit map(const key_compare& comp) : tree_(comp) {}
 
-        /** Number of elements in the tree (debug stores it in container, not header). */
-        size_type  _Mysize = 0;
-
-        /** Key comparator. */
-        key_compare _Keycomp{};
-
-        /** Debug assertion helper. */
-        static void _DbgAssert(bool cond, const char* msg) {
-#if !defined(NDEBUG)
-            assert((cond) && msg);
-#else
-            (void)cond; (void)msg;
-#endif
-        }
-
-        /** Helper: treat header as end() marker. */
-        [[nodiscard]] bool _Is_header(const _Node* p) const noexcept {
-            return p == _Myhead;
-        }
-
-        /** Helper: is the tree empty? */
-        [[nodiscard]] bool _Is_empty() const noexcept {
-            return !_Myhead || _Myhead->_Parent == _Myhead;
-        }
-
-        /** Helper: root pointer (or header if empty). */
-        [[nodiscard]] _Node* _Root() const noexcept {
-            return _Myhead ? _Myhead->_Parent : nullptr;
-        }
-
-        /** Helper: leftmost (min) node (or header if empty). */
-        [[nodiscard]] _Node* _Leftmost() const noexcept {
-            return _Myhead ? _Myhead->_Left : nullptr;
-        }
-
-        /** Helper: rightmost (max) node (or header if empty). */
-        [[nodiscard]] _Node* _Rightmost() const noexcept {
-            return _Myhead ? _Myhead->_Right : nullptr;
-        }
-
-        /** In-order successor of node x (header-aware). */
-        static _Node* _Inc(_Node* x, _Node* header) noexcept {
-            // If right child exists (not header), go to right then all the way left.
-            if (x->_Right != header) {
-                x = x->_Right;
-                while (x->_Left != header) x = x->_Left;
-                return x;
-            }
-            // Else climb up until we come from a left child.
-            _Node* p = x->_Parent;
-            while (x == p->_Right) {
-                x = p;
-                p = p->_Parent;
-            }
-            // If we hit header from rightmost, p is header (== end()).
-            return p;
-        }
-
-        /** In-order predecessor of node x (header-aware). */
-        static _Node* _Dec(_Node* x, _Node* header) noexcept {
-            // If at header (end), predecessor is rightmost.
-            if (x == header) return header->_Right;
-
-            // If left child exists (not header), go left then all the way right.
-            if (x->_Left != header) {
-                x = x->_Left;
-                while (x->_Right != header) x = x->_Right;
-                return x;
-            }
-            // Else climb up until we come from a right child.
-            _Node* p = x->_Parent;
-            while (x == p->_Left) {
-                x = p;
-                p = p->_Parent;
-            }
-            return p;
-        }
-
-    public:
-        /**
-         * \brief Bidirectional iterator with VC8-like owner pointer.
-         * Stores container owner for debug-checked iterators (similar to _Mycont).
-         */
-        class iterator
+        map(const map&) = delete;
+        map& operator=(const map&) = delete;
+        map(map&& o) noexcept : tree_(std::move(o.tree_)) {}
+        map& operator=(map&& o) noexcept
         {
-            friend class map;
-        public:
-            using iterator_category = std::bidirectional_iterator_tag;
-            using value_type = map::value_type;
-            using difference_type = map::difference_type;
-            using pointer = value_type*;
-            using reference = value_type&;
+            tree_ = std::move(o.tree_);
+            return *this;
+        }
 
-            /** Default ctor: null iterator (invalid until assigned). */
-            iterator() noexcept = default;
+        // ---- observers --------------------------------------------------------
 
-            /** Dereference to value. */
-            reference operator*() const noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::iterator: null dereference");
-                return _Ptr->_Value;
-            }
-            pointer operator->() const noexcept { return std::addressof(**this); }
+        [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
 
-            /**
-             * Address: 0x0094F030 (FUN_0094F030, std::map_RType_int::iterator::operator++)
-             * Address: 0x009488D0 (FUN_009488D0)
-             * Address: 0x00948930 (FUN_00948930)
-             *
-             * What it does:
-             * Advances this iterator by one tree step using header-aware
-             * in-order traversal; when starting on the sentinel lane, the
-             * iterator moves to the sentinel's `_Right` link.
-             */
-            iterator& operator++() noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::iterator: ++ on null");
-                if (_Ptr == _Owner->_Myhead) {
-                    _Ptr = _Owner->_Myhead->_Right;
-                    return *this;
-                }
-                _Ptr = map::_Inc(_Ptr, _Owner->_Myhead);
-                return *this;
-            }
-            /** Post-increment. */
-            iterator operator++(int) noexcept { auto c = *this; ++*this; return c; }
+        [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
+        [[nodiscard]] bool empty() const noexcept { return tree_.empty(); }
 
-            /**
-             * Address: 0x0094F090 (FUN_0094F090, std::map_RType_int::iterator::operator--)
-             *
-             * What it does:
-             * Steps this iterator to the previous in-order node using the
-             * cached header-aware RB-tree links.
-             */
-            iterator& operator--() noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::iterator: -- on null");
-                _Ptr = map::_Dec(_Ptr, _Owner->_Myhead);
-                return *this;
-            }
-            /** Post-decrement. */
-            iterator operator--(int) noexcept { auto c = *this; --*this; return c; }
+        /** Header sentinel pointer (for low-level diagnostics). */
+        [[nodiscard]] const void* header_ptr() const noexcept { return tree_.header(); }
 
-            friend bool operator==(const iterator& a, const iterator& b) noexcept {
-                return a._Ptr == b._Ptr;
-            }
-            friend bool operator!=(const iterator& a, const iterator& b) noexcept {
-                return !(a == b);
-            }
-
-        private:
-            iterator(map* owner, _Node* p) noexcept : _Owner(owner), _Ptr(p) {}
-
-            map* _Owner = nullptr;
-            _Node* _Ptr = nullptr;
-        };
-
-        /** Const-iterator (same layout, const view). */
-        class const_iterator
+        /** Checks the header self-link invariants (non-exhaustive). */
+        [[nodiscard]] bool basic_sanity() const noexcept
         {
-            friend class map;
-        public:
-            using iterator_category = std::bidirectional_iterator_tag;
-            using value_type = map::value_type;
-            using difference_type = map::difference_type;
-            using pointer = const value_type*;
-            using reference = const value_type&;
-
-            const_iterator() noexcept = default;
-            const_iterator(const iterator& it) noexcept : _Owner(it._Owner), _Ptr(it._Ptr) {}
-
-            reference operator*() const noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::const_iterator: null dereference");
-                return _Ptr->_Value;
+            const node_type* const head = tree_.header();
+            if (head == nullptr || head->isNil == 0) {
+                return false;
             }
-            pointer operator->() const noexcept { return std::addressof(**this); }
-
-            const_iterator& operator++() noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::const_iterator: ++ on null");
-                _Ptr = map::_Inc(_Ptr, _Owner->_Myhead);
-                return *this;
-            }
-            const_iterator operator++(int) noexcept { auto c = *this; ++*this; return c; }
-
-            const_iterator& operator--() noexcept {
-                _DbgAssert(_Owner && _Ptr, "msvc8::map::const_iterator: -- on null");
-                _Ptr = map::_Dec(_Ptr, _Owner->_Myhead);
-                return *this;
-            }
-            const_iterator operator--(int) noexcept { auto c = *this; --*this; return c; }
-
-            friend bool operator==(const const_iterator& a, const const_iterator& b) noexcept {
-                return a._Ptr == b._Ptr;
-            }
-            friend bool operator!=(const const_iterator& a, const const_iterator& b) noexcept {
-                return !(a == b);
-            }
-
-        private:
-            const_iterator(const map* owner, _Node* p) noexcept : _Owner(owner), _Ptr(p) {}
-
-            const map* _Owner = nullptr;
-            _Node* _Ptr = nullptr;
-        };
-
-        // ---- Ctors / adoption -------------------------------------------------
-
-        /**
-         * \brief Default-construct an empty view (no header).
-         */
-        map() noexcept = default;
-
-        /**
-         * \brief Adopt an existing VC8 map tree from memory.
-         * \param myhead Pointer to header sentinel node in the foreign tree.
-         * \param size   Number of elements (debug-era stored in container).
-         * \param comp   Comparator (must match original ordering).
-         * \param alval  Optional allocator/debug cookie for symmetry with VC8 layout.
-         */
-        map(_Node* myhead, size_type size, key_compare comp = {}, void* alval = nullptr) noexcept
-            : _Alval(alval), _Myhead(myhead), _Mysize(size), _Keycomp(comp)
-        {
-            _DbgAssert(_Myhead != nullptr, "msvc8::map: _Myhead must not be null");
-            // Basic sanity: header should reference itself on empty trees.
-            if (_Myhead) {
-                if (_Myhead->_Parent == nullptr) {
-                    // Some builds may zero header in raw images; we still allow it.
-                }
-            }
+            const bool emptyTree = head->parent == head && head->left == head && head->right == head;
+            return emptyTree ? tree_.size() == 0 : tree_.size() != 0;
         }
 
-        // ---- Observers --------------------------------------------------------
+        // ---- iteration --------------------------------------------------------
 
-        /** Returns comparator. */
-        [[nodiscard]] key_compare key_comp() const noexcept { return _Keycomp; }
-
-        /** Number of elements (as reported by debug-era container). */
-        [[nodiscard]] size_type size() const noexcept { return _Mysize; }
-
-        /** True if size() == 0. */
-        [[nodiscard]] bool empty() const noexcept { return size() == 0; }
-
-        /** Header pointer (for low-level diagnostics). */
-        [[nodiscard]] const void* header_ptr() const noexcept { return _Myhead; }
-
-        // ---- Iteration --------------------------------------------------------
-
-        /**
-         * \brief begin(): in-order first element (leftmost node).
-         */
-        [[nodiscard]] iterator begin() noexcept {
-            return iterator(this, _Is_empty() ? _Myhead : _Leftmost());
-        }
-        [[nodiscard]] const_iterator begin() const noexcept {
-            return const_iterator(this, _Is_empty() ? _Myhead : _Leftmost());
-        }
+        [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
+        [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
 
-        /**
-         * \brief end(): header sentinel (one past the last).
-         */
-        [[nodiscard]] iterator end() noexcept { return iterator(this, _Myhead); }
-        [[nodiscard]] const_iterator end() const noexcept { return const_iterator(this, _Myhead); }
+        [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
+        [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
         [[nodiscard]] const_iterator cend() const noexcept { return end(); }
 
-        // ---- Lookup -----------------------------------------------------------
+        // ---- lookup -----------------------------------------------------------
+
+        [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
+        [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
+
+        [[nodiscard]] size_type count(const key_type& k) const { return find(k) != end() ? 1u : 0u; }
+
+        [[nodiscard]] iterator lower_bound(const key_type& k) { return iterator(tree_.lower_bound_node(k)); }
+        [[nodiscard]] const_iterator lower_bound(const key_type& k) const
+        {
+            return const_iterator(tree_.lower_bound_node(k));
+        }
+
+        [[nodiscard]] iterator upper_bound(const key_type& k) { return iterator(tree_.upper_bound_node(k)); }
+        [[nodiscard]] const_iterator upper_bound(const key_type& k) const
+        {
+            return const_iterator(tree_.upper_bound_node(k));
+        }
+
+        [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k)
+        {
+            return {lower_bound(k), upper_bound(k)};
+        }
+        [[nodiscard]] std::pair<const_iterator, const_iterator> equal_range(const key_type& k) const
+        {
+            return {lower_bound(k), upper_bound(k)};
+        }
+
+        /** Reference to the mapped value; asserts when the key is missing. */
+        [[nodiscard]] mapped_type& at(const key_type& k)
+        {
+            node_type* const n = tree_.find_node(k);
+            assert(!detail::rb_is_nil(n) && "msvc8::map::at: key not found");
+            return n->value.second;
+        }
+        [[nodiscard]] const mapped_type& at(const key_type& k) const
+        {
+            const node_type* const n = tree_.find_node(k);
+            assert(!detail::rb_is_nil(n) && "msvc8::map::at: key not found");
+            return n->value.second;
+        }
+
+        /** Mapped value pointer, or nullptr when the key is absent. */
+        [[nodiscard]] mapped_type* try_get(const key_type& k) noexcept
+        {
+            node_type* const n = tree_.find_node(k);
+            return detail::rb_is_nil(n) ? nullptr : std::addressof(n->value.second);
+        }
+        [[nodiscard]] const mapped_type* try_get(const key_type& k) const noexcept
+        {
+            const node_type* const n = tree_.find_node(k);
+            return detail::rb_is_nil(n) ? nullptr : std::addressof(n->value.second);
+        }
+
+        // ---- modifiers --------------------------------------------------------
+
+        /** Destroys every node and restores the empty header links. */
+        void clear() noexcept { tree_.clear(); }
 
         /**
-         * \brief Find node with given key; returns end() if not found.
+         * Address: 0x007E3CF0 (FUN_007E3CF0, std::map<Moho::MeshBatchKey, std::vector<Moho::MeshInstance*>>::insert)
+         *
+         * IDA signature:
+         * _Pairib *__userpurge insert@<eax>(_Tree *this@<ebx>, const value_type *val@<esi>, _Pairib *result);
+         *
+         * What it does:
+         * Links a copy of `v` into the tree when its key is absent and reports
+         * `true`; otherwise returns a cursor on the colliding node and `false`.
          */
-        iterator find(const key_type& k) noexcept {
-            return iterator(this, _Find_node(k));
+        std::pair<iterator, bool> insert(const value_type& v)
+        {
+            const std::pair<node_type*, bool> result = tree_.insert_unique(v);
+            return {iterator(result.first), result.second};
         }
-        const_iterator find(const key_type& k) const noexcept {
-            return const_iterator(this, _Find_node(k));
+
+        /** Hinted unique insert; a useless hint costs one extra comparison. */
+        iterator insert(const_iterator hint, const value_type& v) { return iterator(tree_.insert_hint(hint, v)); }
+
+        template<class... Args>
+        std::pair<iterator, bool> emplace(Args&&... args)
+        {
+            const std::pair<node_type*, bool> result = tree_.emplace_unique(std::forward<Args>(args)...);
+            return {iterator(result.first), result.second};
         }
 
         /**
-         * \brief Returns 1 if key exists, 0 otherwise.
+         * Address: 0x007E2C60 (FUN_007E2C60, std::map<MeshBatchKey, vector<MeshInstance*>>::operator[])
+         * Address: 0x005A0040 (FUN_005A0040, std::map<uint, Moho::RUnitBlueprint*>::operator[])
+         * Address: 0x00718360 (FUN_00718360, std::map<uint32, cellIndex>::operator[])
+         *
+         * IDA signature:
+         * mapped_type *__thiscall operator[](const key_type *key, _Tree *this);
+         *
+         * What it does:
+         * Locates the lower bound for `k`; when that cursor is `end()` or holds a
+         * greater key, inserts `value_type(k, mapped_type())` at the located gap.
+         * Returns a reference to the mapped value either way.
          */
-        size_type count(const key_type& k) const noexcept {
-            return _Find_node(k) == _Myhead ? 0u : 1u;
-        }
-
-        /**
-         * \brief lower_bound: first element whose key is not less than k.
-         */
-        iterator lower_bound(const key_type& k) noexcept {
-            return iterator(this, _Lower_bound_node(k));
-        }
-        const_iterator lower_bound(const key_type& k) const noexcept {
-            return const_iterator(this, _Lower_bound_node(k));
-        }
-
-        /**
-         * \brief upper_bound: first element whose key is greater than k.
-         */
-        iterator upper_bound(const key_type& k) noexcept {
-            return iterator(this, _Upper_bound_node(k));
-        }
-        const_iterator upper_bound(const key_type& k) const noexcept {
-            return const_iterator(this, _Upper_bound_node(k));
-        }
-
-        /**
-         * \brief equal_range: [lower_bound(k), upper_bound(k)).
-         */
-        std::pair<iterator, iterator> equal_range(const key_type& k) noexcept {
-            return { lower_bound(k), upper_bound(k) };
-        }
-        std::pair<const_iterator, const_iterator> equal_range(const key_type& k) const noexcept {
-            return { lower_bound(k), upper_bound(k) };
-        }
-
-        /**
-         * \brief at(): read-only reference to mapped value; asserts if key is missing.
-         */
-        const mapped_type& at(const key_type& k) const {
-            _Node* n = _Find_node(k);
-            _DbgAssert(n != _Myhead, "msvc8::map::at: key not found");
-            return n->_Value.second;
-        }
-
-        /**
-         * \brief Try-get mapped value pointer; returns nullptr if not found.
-         */
-        const mapped_type* try_get(const key_type& k) const noexcept {
-            _Node* n = _Find_node(k);
-            return (n == _Myhead) ? nullptr : std::addressof(n->_Value.second);
-        }
-
-        // ---- Non-modifying diagnostics ---------------------------------------
-
-        /**
-         * \brief Check minimal header invariants (non-exhaustive).
-         */
-        [[nodiscard]] bool basic_sanity() const noexcept {
-            if (!_Myhead) return false;
-            // Header is its own parent when empty (common VC8 pattern), but not guaranteed in all dumps.
-            // Accept both: empty (Parent==Left==Right==_Myhead) or non-empty with Parent!=_Myhead.
-            const bool emptyTree =
-                _Myhead->_Parent == _Myhead &&
-                _Myhead->_Left == _Myhead &&
-                _Myhead->_Right == _Myhead;
-            const bool nonEmpty = _Myhead->_Parent != _Myhead;
-            return emptyTree || nonEmpty;
-        }
-
-        /**
-         * Clear view (debug-friendly).
-         * By default, does NOT mutate foreign memory; it detaches to a local empty header.
-         * Define MSVC8_MAP_MUTATE_ON_CLEAR=1 to patch header links in-place.
-         */
-        void clear() noexcept {
-            // Always reset logical size first.
-            _Mysize = 0;
-
-            if (!_Myhead) {
-                // Nothing to mutate; switch to local empty header.
-                _Myhead = _Empty_header();
-                return;
+        mapped_type& operator[](const key_type& k)
+        {
+            iterator where = lower_bound(k);
+            if (where == end() || tree_.key_comp()(k, where->first)) {
+                where = insert(const_iterator(where), value_type(k, mapped_type()));
             }
-
-#if MSVC8_MAP_MUTATE_ON_CLEAR
-            // In-place header rewire: header points to itself => empty tree.
-            _Myhead->_Parent = _Myhead;
-            _Myhead->_Left = _Myhead;
-            _Myhead->_Right = _Myhead;
-            _Myhead->_Color = 1; // Black (matches VC8 header convention)
-            // Keep _Myhead as-is (foreign header).
-#else
-            // Non-mutating: detach this facade from foreign tree and use local empty header.
-            _Myhead = _Empty_header();
-#endif
+            return where->second;
         }
+
+        /**
+         * Unlinks the node under `pos`, frees it and returns a cursor on the
+         * following element.
+         */
+        iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
+
+        size_type erase(const key_type& k)
+        {
+            node_type* const n = tree_.find_node(k);
+            if (detail::rb_is_nil(n)) {
+                return 0;
+            }
+            (void)tree_.erase_node(n);
+            return 1;
+        }
+
+        iterator erase(const_iterator first, const_iterator last)
+        {
+            iterator it(first.node());
+            while (it != last) {
+                it = erase(const_iterator(it));
+            }
+            return it;
+        }
+
+        void swap(map& other) noexcept { tree_.swap(other.tree_); }
+
     private:
-        /** Raw root (or header if empty). */
-        [[nodiscard]] _Node* _Root_nonnull_header() const noexcept {
-            return _Myhead ? _Myhead->_Parent : nullptr;
-        }
-
-        /** Tree search; returns _Myhead if not found. */
-        _Node* _Find_node(const key_type& k) const noexcept {
-            _DbgAssert(_Myhead != nullptr, "msvc8::map::_Find_node: header is null");
-            _Node* cur = _Root_nonnull_header();
-            while (cur && cur != _Myhead) {
-                const key_type& ck = cur->_Value.first;
-                if (_Keycomp(k, ck)) {
-                    cur = cur->_Left;
-                } else if (_Keycomp(ck, k)) {
-                    cur = cur->_Right;
-                } else {
-                    return cur; // equal
-                }
-            }
-            return _Myhead;
-        }
-
-        /** lower_bound search. */
-        _Node* _Lower_bound_node(const key_type& k) const noexcept {
-            _DbgAssert(_Myhead != nullptr, "msvc8::map::_Lower_bound_node: header is null");
-            _Node* cur = _Root_nonnull_header();
-            _Node* res = _Myhead; // default to end()
-            while (cur && cur != _Myhead) {
-                const key_type& ck = cur->_Value.first;
-                if (!_Keycomp(ck, k)) { // !(ck < k)  => ck >= k  => candidate
-                    res = cur;
-                    cur = cur->_Left;
-                } else {
-                    cur = cur->_Right;
-                }
-            }
-            return res;
-        }
-
-        /** upper_bound search. */
-        _Node* _Upper_bound_node(const key_type& k) const noexcept {
-            _DbgAssert(_Myhead != nullptr, "msvc8::map::_Upper_bound_node: header is null");
-            _Node* cur = _Root_nonnull_header();
-            _Node* res = _Myhead; // default to end()
-            while (cur && cur != _Myhead) {
-                const key_type& ck = cur->_Value.first;
-                if (_Keycomp(k, ck)) { // k < ck  => candidate
-                    res = cur;
-                    cur = cur->_Left;
-                } else {
-                    cur = cur->_Right;
-                }
-            }
-            return res;
-        }
-
-        /** Obtain an in-process empty header sentinel without constructing value_type. */
-        static _Node* _Empty_header() noexcept {
-            // Raw storage with proper alignment; value payload remains unconstructed.
-            static typename std::aligned_storage<sizeof(_Node), alignof(_Node)>::type s_storage;
-            _Node* h = reinterpret_cast<_Node*>(&s_storage);
-            h->_Left = h;
-            h->_Right = h;
-            h->_Parent = h;
-            h->_Color = 1; // Black
-            return h;
-        }
-    public:
-        // ---- Factory: adopt from raw pieces ----------------------------------
-
-        /**
-         * \brief Factory to adopt a tree using raw header pointer and size.
-         *
-         * Usage:
-         *   auto v = msvc8::map<K,V>::adopt(headerPtr, sz);
-         *
-         * The header node must follow VC8 invariant:
-         *   - header->_Parent == root (or header if empty)
-         *   - header->_Left   == leftmost (or header if empty)
-         *   - header->_Right  == rightmost (or header if empty)
-         */
-        static map adopt(void* header, size_type sz, key_compare comp = {}, void* alval = nullptr) noexcept {
-            return map(reinterpret_cast<_Node*>(header), sz, comp, alval);
-        }
+        tree_type tree_;
     };
 
     // --------- Convenience: ensure 32-bit pointer size assumed ----------
-    static_assert(sizeof(map<void*, void*>) == 0x10, "msvc8::map size should be 0x10");
+    static_assert(sizeof(map<void*, void*>) == 0x0C, "msvc8::map size should be 0x0C");
 
 } // namespace msvc8
+
+#pragma pack(pop)

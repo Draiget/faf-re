@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "legacy/containers/Map.h"
+#include "legacy/containers/Vector.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/sim/IdPool.h"
 #include "moho/unit/CUnitCommand.h"
@@ -42,11 +43,19 @@ namespace moho
      */
     ~CCommandDb();
 
-    Sim* sim;
-    msvc8::map<CmdId, CUnitCommand> commands;
-    // Legacy map node/proxy bookkeeping occupies +0x14..+0x1F in the binary layout.
-    std::uint8_t pad_0014[0x0C];
-    IdPool pool;
+    Sim* sim;                                     // +0x0000
+    /**
+     * Command id -> owned command lookup.
+     *
+     * The binary's node is `{left,parent,right, key@0x0C, CUnitCommand*@0x10,
+     * color@0x14, isnil@0x15}` (0x18 bytes) - see `CommandDbMapNodeRuntime` in
+     * CCommandDb.cpp - so the mapped type is a `CUnitCommand` pointer, and the
+     * container itself is the shipped 12-byte `{proxy,_Myhead,_Mysize}` triplet
+     * ending at +0x0F with the id pool starting at +0x10.
+     */
+    msvc8::map<CmdId, CUnitCommand*> commands;    // +0x0004
+    IdPool pool;                                  // +0x0010
+    msvc8::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
 
     /**
      * Address: 0x006E1430 (FUN_006E1430, Moho::CCommandDB::MemberDeserialize)
@@ -86,5 +95,12 @@ namespace moho
     void PublishSyncData(SSyncData* syncData, bool forceRefresh);
   };
 
+  static_assert(offsetof(CCommandDb, sim) == 0x0000, "CCommandDb::sim offset must be 0x0000");
+  static_assert(offsetof(CCommandDb, commands) == 0x0004, "CCommandDb::commands offset must be 0x0004");
+  static_assert(offsetof(CCommandDb, pool) == 0x0010, "CCommandDb::pool offset must be 0x0010");
+  static_assert(
+    offsetof(CCommandDb, pendingReleasedCmdIds) == 0x0CC0,
+    "CCommandDb::pendingReleasedCmdIds offset must be 0x0CC0"
+  );
   static_assert(sizeof(CCommandDb) == 0xCD0, "CCommandDb size must be 0xCD0");
 } // namespace moho
