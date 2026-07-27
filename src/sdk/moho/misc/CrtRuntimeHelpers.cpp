@@ -8541,6 +8541,37 @@ namespace moho::runtime
   }
 
   /**
+   * Address: 0x00ABF9A8 (FUN_00ABF9A8, std::_Mutex::_Lock)
+   *
+   * IDA signature:
+   * int __thiscall sub_ABF9A8(LPCRITICAL_SECTION *this);
+   *
+   * What it does:
+   * Enters the critical section this mutex owns. The handle holds a pointer,
+   * so the section is reached through one indirection rather than being
+   * embedded.
+   */
+  int RuntimeMutexLock(RuntimeMutexHandle* const object) noexcept
+  {
+    return RuntimeMtxLock(object->criticalSection);
+  }
+
+  /**
+   * Address: 0x00ABF9B1 (FUN_00ABF9B1, std::_Mutex::_Unlock)
+   *
+   * IDA signature:
+   * int __thiscall func_LeaveCritical05(LPCRITICAL_SECTION *this);
+   *
+   * What it does:
+   * Leaves the critical section this mutex owns; the counterpart to
+   * RuntimeMutexLock.
+   */
+  int RuntimeMutexUnlock(RuntimeMutexHandle* const object) noexcept
+  {
+    return RuntimeMtxUnlock(object->criticalSection);
+  }
+
+  /**
    * Address: 0x00A899D4 (FUN_00A899D4, feof)
    *
    * What it does:
