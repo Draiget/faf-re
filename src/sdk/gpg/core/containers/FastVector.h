@@ -1996,9 +1996,15 @@ namespace gpg
     T* const tailStart = oldFinish - static_cast<std::ptrdiff_t>(insertCount);
     view.end = FastVectorRuntimeCopyRange(oldFinish, tailStart, oldFinish);
 
+    // Shift the middle block right by exactly `insertCount` to open the gap.
+    // `view.end` has already been advanced to `oldFinish + insertCount`, so
+    // `view.end - moveCount` lands at `insertPos + 2 * insertCount` and would
+    // overwrite the tail copied just above.
     const std::ptrdiff_t moveCount = tailStart - insertPos;
     if (moveCount > 0) {
-      std::memmove(view.end - moveCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T));
+      std::memmove(
+        insertPos + insertCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T)
+      );
     }
 
     std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
