@@ -6663,6 +6663,39 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
 extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
 
 /**
+ * Address: 0x00A9003B (FUN_00A9003B, _wcsdup)
+ *
+ * IDA signature:
+ * wchar_t *__cdecl wcsdup(const wchar_t *String);
+ *
+ * What it does:
+ * Allocates a copy of one wide string, terminator included. A null input and a
+ * failed allocation both return null rather than raising; only a copy that
+ * reports failure into a buffer sized from the same string is treated as
+ * impossible and routed to the Watson handler.
+ *
+ * The allocation is calloc, not malloc, so the buffer is already zeroed if the
+ * copy writes short.
+ */
+extern "C" wchar_t* __cdecl RuntimeWideStringDuplicate(const wchar_t* const text)
+{
+  if (text == nullptr) {
+    return nullptr;
+  }
+
+  const std::size_t length = std::wcslen(text) + 1u;
+  auto* const copy = static_cast<wchar_t*>(std::calloc(length, sizeof(wchar_t)));
+  if (copy == nullptr) {
+    return nullptr;
+  }
+
+  if (::wcscpy_s(copy, length, text) != 0) {
+    _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+  }
+  return copy;
+}
+
+/**
  * Address: 0x00A89F95 (FUN_00A89F95, _unlock_file)
  *
  * IDA signature:
