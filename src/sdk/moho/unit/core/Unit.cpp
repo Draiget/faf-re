@@ -258,13 +258,12 @@ namespace moho
       return true;
     }
 
-    SOCellPos cellPos{};
-    cellPos.x = static_cast<std::int16_t>(
-      static_cast<int>(worldPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f)
-    );
-    cellPos.z = static_cast<std::int16_t>(
-      static_cast<int>(worldPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
-    );
+    // The binary converts these with fld/fistp (0x0062AB0D-0x0062AB11 and
+    // 0x0062AB32-0x0062AB36), i.e. round-to-nearest under the default FPU
+    // control word - not truncation. `SFootprint::ToCellPos` (FUN_00579300) is
+    // the same computation and already rounds correctly, so defer to it rather
+    // than open-code a second copy.
+    const SOCellPos cellPos = footprint.ToCellPos(worldPosition);
 
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, mapData, cellPos);
     if (unit->mCurrentLayer == LAYER_Water) {
