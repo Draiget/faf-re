@@ -7016,6 +7016,65 @@ extern "C" std::int64_t __cdecl __ftol2(const double value)
 }
 
 /**
+ * Address: 0x00A8EF99 (FUN_00A8EF99, func_wstrFindLast)
+ *
+ * IDA signature:
+ * _WORD *__cdecl func_wstrFindLast(_WORD *a1, __int16 a2);
+ *
+ * What it does:
+ * `wcsrchr`: walks to the terminator, then scans back for `needle` and returns
+ * that position, or null when absent. Searching the terminator itself finds it,
+ * because the backward scan starts there.
+ */
+extern "C" wchar_t* __cdecl RuntimeWideStringFindLast(wchar_t* const text, const wchar_t needle)
+{
+  wchar_t* cursor = text;
+  while (*cursor++ != L'\0') {
+  }
+
+  do {
+    --cursor;
+  } while (cursor != text && *cursor != needle);
+
+  return (*cursor == needle) ? cursor : nullptr;
+}
+
+/**
+ * Address: 0x00B57ED0 (FUN_00B57ED0, func_SofdecToInt)
+ *
+ * IDA signature:
+ * __int64 __usercall func_SofdecToInt@<edx:eax>(double a1@<st0>);
+ *
+ * What it does:
+ * Truncating double to signed 64-bit conversion, the plain form used by the
+ * Sofdec lanes. Distinct from `__ftol2` above, which carries the extra
+ * rounding-correction shuffle.
+ */
+extern "C" std::int64_t __cdecl RuntimeDoubleToInt64(const double value)
+{
+  return static_cast<std::int64_t>(value);
+}
+
+/**
+ * Address: 0x00B57F00 (FUN_00B57F00, shl)
+ *
+ * IDA signature:
+ * int __usercall shl@<eax>(__int64 a1@<edx:eax>, unsigned __int8 a2@<cl>);
+ *
+ * What it does:
+ * The CRT `__allshl` helper: 64-bit left shift by a byte count. A count of 64
+ * or more yields zero rather than being taken modulo the width, which is what
+ * a bare x86 shift would do.
+ */
+extern "C" std::int64_t __cdecl RuntimeShiftLeft64(const std::int64_t value, const unsigned char count)
+{
+  if (count >= 64u) {
+    return 0;
+  }
+  return static_cast<std::int64_t>(static_cast<std::uint64_t>(value) << (count & 0x3Fu));
+}
+
+/**
  * Address: 0x00A9A813 (FUN_00A9A813)
  *
  * What it does:
