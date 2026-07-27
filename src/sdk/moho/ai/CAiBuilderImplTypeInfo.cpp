@@ -12,7 +12,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiBuilderImpl.h"
 #include "moho/misc/Stats.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -311,12 +311,15 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedRUnitBlueprintPointerType()
   {
+    // The descriptor is pre-registered under `typeid(RUnitBlueprint*)` by
+    // PreregisterRUnitBlueprintPointerType. `typeid(const RUnitBlueprint*)` is
+    // a distinct type and is never registered, and LookupRType *throws* on a
+    // miss rather than returning null - so asking for the const form first
+    // threw out of REF_RegisterAllTypes, and the fallback below it was
+    // unreachable.
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = gpg::LookupRType(typeid(const RUnitBlueprint*));
-      if (!type) {
-        type = gpg::LookupRType(typeid(RUnitBlueprint*));
-      }
+      type = gpg::LookupRType(typeid(RUnitBlueprint*));
     }
     return type;
   }
