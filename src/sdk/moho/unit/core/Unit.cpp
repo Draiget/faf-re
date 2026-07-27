@@ -242,6 +242,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x0062ABA0 (FUN_0062ABA0, sub_62ABA0)
+   *
+   * IDA signature:
+   * char __usercall sub_62ABA0@<al>(Wm3::Vector3f *a1@<edi>, Moho::Unit *a2@<esi>, int a3);
+   *
+   * What it does:
+   * Converts `worldPosition` to the unit footprint's origin cell and asks the
+   * occupancy grid whether the unit is blocked there under `mode`.
+   *
+   * The conversion is the same one `SFootprint::ToCellPos` performs, and it
+   * rounds: the binary uses two bare fistp stores with no __ftol call.
+   */
+  bool UnitIsBlockedAt(const Wm3::Vec3f& worldPosition, Unit* const unit, const int mode)
+  {
+    const SFootprint& footprint = unit->GetFootprint();
+    const SOCellPos cellPos = footprint.ToCellPos(worldPosition);
+    return COGrid::UnitIsBlocked(cellPos, *unit->SimulationRef->mOGrid, unit, mode);
+  }
+
+  /**
    * Address: 0x0062AA90 (FUN_0062AA90, func_UnitWontFitAt)
    *
    * What it does:
