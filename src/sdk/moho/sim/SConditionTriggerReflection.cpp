@@ -1084,10 +1084,11 @@ namespace
       if ((gMapUnitBlueprintFloatTypeNameInitGuard & 1u) == 0u) {
         gMapUnitBlueprintFloatTypeNameInitGuard |= 1u;
 
-        gpg::RType* keyType = gpg::LookupRType(typeid(const moho::RUnitBlueprint*));
-        if (keyType == nullptr) {
-          keyType = gpg::LookupRType(typeid(moho::RUnitBlueprint*));
-        }
+        // PreregisterRUnitBlueprintPointerType registers the descriptor under
+        // typeid(RUnitBlueprint*). The const-qualified pointer is a distinct
+        // type and is never registered, and LookupRType throws on a miss, so
+        // probing for it threw and the fallback below never ran.
+        gpg::RType* keyType = gpg::LookupRType(typeid(moho::RUnitBlueprint*));
 
         gpg::RType* valueType = gpg::LookupRType(typeid(float));
         const char* const keyName = keyType != nullptr ? keyType->GetName() : "Moho::RUnitBlueprint const *";

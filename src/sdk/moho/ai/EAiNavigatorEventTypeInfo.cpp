@@ -119,6 +119,28 @@ namespace
 /**
  * Address: 0x005A30B0 (FUN_005A30B0, scalar deleting thunk)
  */
+/**
+ * Address: 0x005A3020 (FUN_005A3020,
+ *   Moho::EAiNavigatorEventTypeInfo::EAiNavigatorEventTypeInfo)
+ *
+ * IDA signature:
+ * gpg::REnumType *Moho::EAiNavigatorEventTypeInfo::EAiNavigatorEventTypeInfo();
+ *
+ * What it does:
+ * Runs the REnumType base constructor, installs the most-derived vftable lane,
+ * and pre-registers the descriptor under `typeid(EAiNavigatorEvent)`.
+ *
+ * The recovery previously declared no constructor at all, so the implicit one
+ * ran the base chain but never pre-registered - leaving
+ * LookupRType(typeid(EAiNavigatorEvent)) to throw during REF_RegisterAllTypes
+ * even though the registrar and its bootstrap were both present.
+ */
+EAiNavigatorEventTypeInfo::EAiNavigatorEventTypeInfo()
+  : gpg::REnumType()
+{
+  gpg::PreRegisterRType(typeid(EAiNavigatorEvent), this);
+}
+
 EAiNavigatorEventTypeInfo::~EAiNavigatorEventTypeInfo() = default;
 
 /**

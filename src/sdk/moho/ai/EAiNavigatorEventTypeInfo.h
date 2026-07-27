@@ -16,6 +16,15 @@ namespace moho
     /**
      * Address: 0x005A30B0 (FUN_005A30B0, scalar deleting thunk)
      */
+    /**
+     * Address: 0x005A3020 (FUN_005A3020,
+     *   Moho::EAiNavigatorEventTypeInfo::EAiNavigatorEventTypeInfo)
+     *
+     * What it does:
+     * Pre-registers the enum type descriptor for EAiNavigatorEvent.
+     */
+    EAiNavigatorEventTypeInfo();
+
     ~EAiNavigatorEventTypeInfo() override;
 
     /**
