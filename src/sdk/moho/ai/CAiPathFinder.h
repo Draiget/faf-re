@@ -147,7 +147,7 @@ namespace moho
      * VFTable SLOT: 2
      */
     [[nodiscard]]
-    bool IsInBounds(const SOCellPos& cellPos) const override;
+    bool IsInBounds(const SOCellPos& fromCell, const SOCellPos& toCell, float* edgeCost) const override;
 
     /**
      * Address: 0x005AA590 (FUN_005AA590)

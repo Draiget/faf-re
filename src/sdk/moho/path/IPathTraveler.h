@@ -42,9 +42,20 @@ namespace moho
 
     /**
      * Address: 0x00A82547 (_purecall in FA binary)
+     *
+     * Edge-admission hook, called once per candidate step during expansion.
+     * `edgeCost` arrives holding the geometric cost of the step and may be
+     * adjusted; returning false drops the edge.
+     *
+     * The three-parameter shape is pinned by the two dispatch sites in the
+     * neighbour enumerator (0x00766350): both pass the cell being expanded,
+     * the candidate cell, and a pointer to the running cost. An earlier
+     * reconstruction declared this slot as `IsInBounds(const SOCellPos&)`,
+     * which silently bound the *source* cell to the parameter the only
+     * override actually tests.
      */
     [[nodiscard]]
-    virtual bool IsInBounds(const SOCellPos& cellPos) const = 0;
+    virtual bool IsInBounds(const SOCellPos& fromCell, const SOCellPos& toCell, float* edgeCost) const = 0;
 
     /**
      * Address: 0x00A82547 (_purecall in FA binary)

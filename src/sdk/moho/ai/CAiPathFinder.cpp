@@ -893,7 +893,8 @@ void CAiPathFinder::SetGoal(const SAiNavigatorGoal& goal)
         static_cast<std::int16_t>(x),
         static_cast<std::int16_t>(z),
       };
-      if (!IsInBounds(cell)) {
+      float boundaryEdgeCost = 0.0f;
+      if (!IsInBounds(cell, cell, &boundaryEdgeCost)) {
         mIsGoalBoundaryBlocked = 1;
         return;
       }
@@ -1015,23 +1016,34 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
 /**
  * Address: 0x005AA680 (FUN_005AA680)
  */
-bool CAiPathFinder::IsInBounds(const SOCellPos& cellPos) const
+bool CAiPathFinder::IsInBounds(const SOCellPos& fromCell, const SOCellPos& toCell, float* const edgeCost) const
 {
-  if (mUseWholeMap == 0u && mInsidePlayableRect != 0u) {
-    if (!mSim || !mSim->mMapData) {
-      return false;
-    }
+  // This override admits an edge purely on where it lands: neither the source
+  // cell nor the running cost is consulted.
+  (void)fromCell;
+  (void)edgeCost;
 
-    const gpg::Rect2i& bounds = mSim->mMapData->mPlayableRect;
-    const float margin = static_cast<float>(mMaxFootprintSpan);
-    const float x = static_cast<float>(cellPos.x);
-    const float z = static_cast<float>(cellPos.z);
-    if ((x - margin) < static_cast<float>(bounds.x0) || (z - margin) < static_cast<float>(bounds.z0) ||
-        static_cast<float>(bounds.x1) < (x + margin) || static_cast<float>(bounds.z1) < (z + margin)) {
-      return false;
-    }
+  if (mUseWholeMap != 0u) {
+    return true;
   }
-  return true;
+  if (mInsidePlayableRect == 0u) {
+    return true;
+  }
+
+  // Coordinates are widened through their unsigned 16-bit representation, so a
+  // cell that has wrapped past 0x7FFF reads as a large positive and fails the
+  // upper-bound test rather than passing the lower one.
+  const float margin = static_cast<float>(static_cast<std::int32_t>(mMaxFootprintSpan));
+  const float x = static_cast<float>(static_cast<std::uint16_t>(toCell.x));
+  const float z = static_cast<float>(static_cast<std::uint16_t>(toCell.z));
+
+  const gpg::Rect2i& bounds = mSim->mMapData->mPlayableRect;
+  if (static_cast<float>(bounds.x0) > (x - margin)) {
+    return false;
+  }
+  return static_cast<float>(bounds.z0) <= (z - margin)
+      && (x + margin) <= static_cast<float>(bounds.x1)
+      && (z + margin) <= static_cast<float>(bounds.z1);
 }
 
 /**

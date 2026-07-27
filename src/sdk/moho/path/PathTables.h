@@ -8,9 +8,15 @@ namespace gpg
   class RType;
 } // namespace gpg
 
+namespace gpg::HaStar
+{
+  class ClusterMap;
+} // namespace gpg::HaStar
+
 namespace moho
 {
   class COGrid;
+  class PathTables;
   struct SRuleFootprintsBlueprint;
   struct PathTablesImpl;
 
@@ -34,7 +40,19 @@ namespace moho
      * Allocates one `PathQueue::Impl` payload and stores the caller-supplied
      * queue-size lane in the impl header.
      */
-    explicit PathQueue(int size);
+    explicit PathQueue(PathTables* owner);
+
+    /**
+     * Address: 0x00765ED0 (FUN_00765ED0, Moho::PathQueue::Work)
+     *
+     * IDA signature:
+     * void __usercall Moho::PathQueue::Work(Moho::PathQueue *this@<ebx>, int *budget@<esi>);
+     *
+     * What it does:
+     * Serves queued path travellers until `budget` is spent, decrementing it by
+     * the work actually performed.
+     */
+    void Work(int& budget);
 
     /**
      * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
@@ -97,6 +115,16 @@ namespace moho
      * Marks all registered path cluster maps dirty for the supplied rect.
      */
     void DirtyClusters(const gpg::Rect2i& dirtyRect);
+
+    /**
+     * Address: 0x00766047 (inlined into the query-setup lane at 0x00765FE0)
+     *
+     * What it does:
+     * Returns the cluster map built for one footprint index. Each distinct
+     * footprint gets its own hierarchy, because what counts as passable
+     * terrain depends on the unit's size and movement class.
+     */
+    [[nodiscard]] gpg::HaStar::ClusterMap* ClusterMapForFootprint(std::int32_t footprintIndex) const;
 
   private:
     // Runtime path-table implementation payload (PathTables::Impl).

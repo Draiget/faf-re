@@ -7182,7 +7182,12 @@ namespace
    * What it does:
    * Uses an always-in-bounds policy for preview traversal.
    */
-  [[maybe_unused]] bool PathPreviewIsInBounds(const PathPreviewFinderRuntimeView*, const SOCellPos&)
+  [[maybe_unused]] bool PathPreviewIsInBounds(
+    const PathPreviewFinderRuntimeView*,
+    const SOCellPos& /*fromCell*/,
+    const SOCellPos& /*toCell*/,
+    float* /*edgeCost*/
+  )
   {
     return true;
   }
