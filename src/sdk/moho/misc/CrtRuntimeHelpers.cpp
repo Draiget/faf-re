@@ -5568,6 +5568,105 @@ namespace
   };
 
   /**
+   * `std::locale::facet` header. The vftable sits at +0x00 and the reference
+   * count at +0x04 (0x00479C50 reads [edi+4]); slot 0 of the vftable is the
+   * scalar deleting destructor.
+   */
+  struct RuntimeLocaleFacetView
+  {
+    void** vftable;
+    std::size_t refs;
+  };
+  static_assert(offsetof(RuntimeLocaleFacetView, refs) == 0x04, "facet::_Refs offset must be 0x04");
+
+  /**
+   * Address: 0x00479C40 (std::locale::facet::_Decref)
+   *
+   * What it does:
+   * Drops one reference under the locale lock and returns the facet only when
+   * the count reached zero, i.e. only when the caller now owns it.
+   *
+   * A count of 0xFFFFFFFF is the never-delete sentinel used by statically
+   * allocated facets: 0x00479C57 skips the decrement for it, so such a facet
+   * never reports itself as collectable.
+   */
+  RuntimeLocaleFacetView* RuntimeFacetDecref(RuntimeLocaleFacetView* const facet) noexcept
+  {
+    const RuntimeLockitGuard guard(0);
+
+    const std::size_t refs = facet->refs;
+    if (refs != 0u && refs != static_cast<std::size_t>(-1)) {
+      facet->refs = refs - 1u;
+    }
+    return (facet->refs == 0u) ? facet : nullptr;
+  }
+
+  /**
+   * Address: 0x00ABF314 (FUN_00ABF314)
+   *
+   * What it does:
+   * Releases the facet a list node points at, invoking its scalar deleting
+   * destructor (vftable slot 0, flag 1) only if the reference drop made this
+   * the last owner.
+   */
+  void RuntimeReleaseFacetNode(RuntimeFacetNode* const node) noexcept
+  {
+    RuntimeLocaleFacetView* const owned =
+      RuntimeFacetDecref(reinterpret_cast<RuntimeLocaleFacetView*>(node->facet));
+    if (owned == nullptr) {
+      return;
+    }
+
+    using RuntimeFacetDeletingDtorFn = void*(__thiscall*)(RuntimeLocaleFacetView*, int);
+    auto* const deletingDtor = reinterpret_cast<RuntimeFacetDeletingDtorFn>(owned->vftable[0]);
+    (void)deletingDtor(owned, 1);
+  }
+
+  /**
+   * Address: 0x00ABF440 (FUN_00ABF440, _Fac_tidy)
+   *
+   * What it does:
+   * Shutdown hook: drains the registered-facet list under the locale lock,
+   * releasing each facet and freeing its node.
+   */
+  void RuntimeFacetTidy()
+  {
+    const RuntimeLockitGuard guard(0);
+
+    while (gRuntimeFacetHead != nullptr) {
+      RuntimeFacetNode* const node = gRuntimeFacetHead;
+      gRuntimeFacetHead = node->next;
+      RuntimeReleaseFacetNode(node);
+      ::operator delete(static_cast<void*>(node));
+    }
+  }
+
+  /**
+   * Address: 0x00ABF483 (FUN_00ABF483, std::locale::facet::_Register)
+   *
+   * What it does:
+   * Adds one facet to the list that `RuntimeFacetTidy` drains at shutdown,
+   * arming that hook on first registration.
+   *
+   * Note the allocation-failure path: the binary stores the null straight into
+   * the head (0x00ABF4B4/0x00ABF4B6), discarding every previously registered
+   * node rather than leaving the list intact. Reproduced as-is.
+   */
+  void RuntimeRegisterFacet(std::locale::facet* const facet)
+  {
+    if (gRuntimeFacetHead == nullptr) {
+      RuntimeAtexit(&RuntimeFacetTidy);
+    }
+
+    auto* const node = static_cast<RuntimeFacetNode*>(::operator new(sizeof(RuntimeFacetNode), std::nothrow));
+    if (node != nullptr) {
+      node->next = gRuntimeFacetHead;
+      node->facet = facet;
+    }
+    gRuntimeFacetHead = node;
+  }
+
+  /**
    * Address: 0x00A99EAA (FUN_00A99EAA)
    *
    * What it does:
