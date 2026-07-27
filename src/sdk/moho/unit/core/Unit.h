@@ -80,6 +80,18 @@ namespace moho
   [[nodiscard]] bool UnitWontFitAt(const Wm3::Vec3f& worldPosition, const Unit* unit);
 
   /**
+   * Address: 0x0062ABA0 (FUN_0062ABA0, sub_62ABA0)
+   *
+   * IDA signature:
+   * char __usercall sub_62ABA0@<al>(Wm3::Vector3f *a1@<edi>, Moho::Unit *a2@<esi>, int a3);
+   *
+   * What it does:
+   * Returns true when the grid reports `unit` blocked at the footprint-origin
+   * cell for `worldPosition`, under the supplied occupancy mode.
+   */
+  [[nodiscard]] bool UnitIsBlockedAt(const Wm3::Vec3f& worldPosition, Unit* unit, int mode);
+
+  /**
    * Address: 0x0067F080 (FUN_0067F080, func_GetUnitFactory)
    *
    * What it does:

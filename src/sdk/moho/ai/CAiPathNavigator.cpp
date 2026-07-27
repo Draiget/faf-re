@@ -1449,6 +1449,23 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
       return;
     }
 
+    // 0x005AEBF5-0x005AEC67. Standing on the last cell of the path and still
+    // being asked to repath means the destination itself is occupied, so back
+    // off for a while instead of burning a request per tick. A unit waiting for
+    // a transport is exempt - it is expected to be sitting still on its goal.
+    if (PackCell(mCurrentPos) == PackCell(mPath.finish[-1])
+        && !unit->IsUnitState(UNITSTATE_WaitingForTransport)) {
+      const Wm3::Vector3f goalWorldPos{
+        static_cast<float>(static_cast<std::uint16_t>(mCurrentPos.x)),
+        0.0f,
+        static_cast<float>(static_cast<std::uint16_t>(mCurrentPos.z)),
+      };
+      if (UnitIsBlockedAt(goalWorldPos, unit, 1)) {
+        mPathRetryDelayFrames = 10;
+        return;
+      }
+    }
+
     RequestContinuationPath(2);
   }
 }
