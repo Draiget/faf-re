@@ -49,4 +49,11 @@ namespace moho
   };
 
   static_assert(sizeof(EFormationdStatusTypeInfo) == 0x78, "EFormationdStatusTypeInfo size must be 0x78");
+  /**
+   * Address: 0x00BCAA80 (FUN_00BCAA80, sub_BCAA80)
+   *
+   * What it does:
+   * Constructs and pre-registers the EFormationdStatus enum descriptor.
+   */
+  void register_EFormationdStatusTypeInfo();
 } // namespace moho
