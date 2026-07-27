@@ -18,7 +18,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/CRandomStream.h"
+#include "moho/sim/CRandomStream.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -1226,16 +1226,19 @@ namespace moho
   {
     size_ = sizeof(VEulers3);
     gpg::RType::Init();
-    gpg::RField* const roll = AddFieldFloat("r", offsetof(VEulers3, r));
-    gpg::RField* const pitch = AddFieldFloat("p", offsetof(VEulers3, p));
-    gpg::RField* const yaw = AddFieldFloat("y", offsetof(VEulers3, y));
-    if (roll != nullptr) {
+    // Rename each field immediately, as the binary does:
+    //   gpg::RType::AddField_float(this, "r", 0)->mName = "Roll";
+    // The returned RField* points into `fields_`, so it only stays valid until
+    // the next AddField* grows that vector. Holding all three and renaming
+    // afterwards writes through two dangling pointers - and because an RField
+    // begins with mName, that write lands on the freed block's free-list link.
+    if (gpg::RField* const roll = AddFieldFloat("r", offsetof(VEulers3, r))) {
       roll->mName = "Roll";
     }
-    if (pitch != nullptr) {
+    if (gpg::RField* const pitch = AddFieldFloat("p", offsetof(VEulers3, p))) {
       pitch->mName = "Pitch";
     }
-    if (yaw != nullptr) {
+    if (gpg::RField* const yaw = AddFieldFloat("y", offsetof(VEulers3, y))) {
       yaw->mName = "Yaw";
     }
     Finish();
