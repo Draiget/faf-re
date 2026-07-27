@@ -5477,6 +5477,41 @@ namespace
   }
 
   /**
+   * Address: 0x00F3F894 (atcount_cdecl) / 0x00FB8BD0 (atfuns_cdecl)
+   *
+   * The iostreams-side atexit table. `atcount_cdecl` holds 10 in the image, so
+   * there are ten slots and the table fills downward from index 9 - handlers
+   * therefore run in registration order when walked from the bottom up.
+   * `atfuns_cdecl` is zero-initialised BSS.
+   */
+  constexpr std::size_t kAtexitSlotCount = 10;
+  using RuntimeAtexitFn = void(__cdecl*)();
+  RuntimeAtexitFn gAtexitFuncs[kAtexitSlotCount]{};
+  int gAtexitRemaining = static_cast<int>(kAtexitSlotCount);
+
+  /**
+   * Address: 0x00AC06A9 (FUN_00AC06A9, _Atexit)
+   *
+   * IDA signature:
+   * void __cdecl _Atexit(void (__cdecl *a1)());
+   *
+   * What it does:
+   * Records one shutdown handler in the fixed ten-slot table, filling from the
+   * top down. There is no growth path: exhausting the table calls `abort`
+   * rather than failing softly, which is why the count is checked before the
+   * decrement.
+   */
+  void RuntimeAtexit(const RuntimeAtexitFn handler)
+  {
+    if (gAtexitRemaining == 0) {
+      std::abort();
+    }
+
+    --gAtexitRemaining;
+    gAtexitFuncs[static_cast<std::size_t>(gAtexitRemaining)] = handler;
+  }
+
+  /**
    * Address: 0x00AC073B (FUN_00AC073B, _Mtxlock)
    *
    * What it does:
