@@ -77,10 +77,10 @@ namespace
    */
   [[nodiscard]] SOCellPos TargetWorldToCell(const Wm3::Vector3f& worldPos, const SFootprint& footprint) noexcept
   {
-    SOCellPos cell{};
-    cell.x = static_cast<std::int16_t>(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
-    cell.z = static_cast<std::int16_t>(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
-    return cell;
+    // FUN_0051E380 converts both coordinates with bare fistp and never calls
+    // __ftol, so this rounds to nearest rather than truncating. This is the
+    // same computation as SFootprint::ToCellPos (FUN_00579300).
+    return footprint.ToCellPos(Wm3::Vec3f{worldPos.x, worldPos.y, worldPos.z});
   }
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
