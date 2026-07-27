@@ -1,12 +1,48 @@
 #include "moho/render/CDecalHandleTypeInfo.h"
 
+#include <cstdlib>
 #include <new>
+
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 #include "moho/render/CDecalHandle.h"
 #include "moho/script/CScriptObject.h"
 
 namespace
 {
+  // Storage for the descriptor singleton. Placement-new'd on first use and
+  // torn down through atexit, matching the other recovered TypeInfo lanes.
+  alignas(moho::CDecalHandleTypeInfo) unsigned char gCDecalHandleTypeInfoStorage
+    [sizeof(moho::CDecalHandleTypeInfo)];
+  bool gCDecalHandleTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CDecalHandleTypeInfo& AcquireCDecalHandleTypeInfo()
+  {
+    if (!gCDecalHandleTypeInfoConstructed) {
+      new (gCDecalHandleTypeInfoStorage) moho::CDecalHandleTypeInfo();
+      gCDecalHandleTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::CDecalHandleTypeInfo*>(gCDecalHandleTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00C028E0 (sub_C028E0, atexit thunk for the descriptor)
+   *
+   * What it does:
+   * Releases the descriptor's field/base tables at shutdown.
+   */
+  void cleanup_CDecalHandleTypeInfo()
+  {
+    if (!gCDecalHandleTypeInfoConstructed) {
+      return;
+    }
+
+    auto& typeInfo = *reinterpret_cast<moho::CDecalHandleTypeInfo*>(gCDecalHandleTypeInfoStorage);
+    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
+    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+  }
+
   /**
    * Address: 0x0077C7F0 (FUN_0077C7F0, Moho::CDecalHandle::operator new)
    */
@@ -89,6 +125,28 @@ namespace moho
   CDecalHandleTypeInfo::~CDecalHandleTypeInfo() = default;
 
   /**
+   * Address: 0x00BDD8C0 (FUN_00BDD8C0, register_CDecalHandleTypeInfo)
+   *
+   * IDA signature:
+   * void __cdecl register_CDecalHandleTypeInfo();
+   *
+   * What it does:
+   * Constructs the process-wide `CDecalHandleTypeInfo` singleton - whose
+   * constructor pre-registers `typeid(CDecalHandle)` - and installs the
+   * matching `atexit` teardown. This is CRT dynamic initializer #3557 in the
+   * shipped binary.
+   *
+   * Without it nothing ever constructs the descriptor, so
+   * `RPointerType<CDecalHandle>::GetPointeeType` throws "Attempting to lookup
+   * the RType for ... before it is registered" during REF_RegisterAllTypes.
+   */
+  void register_CDecalHandleTypeInfo()
+  {
+    (void)AcquireCDecalHandleTypeInfo();
+    (void)std::atexit(&cleanup_CDecalHandleTypeInfo);
+  }
+
+  /**
    * Address: 0x00779EE0 (FUN_00779EE0, Moho::CDecalHandleTypeInfo::GetName)
    */
   const char* CDecalHandleTypeInfo::GetName() const
@@ -123,3 +181,7 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CDecalHandleTypeInfo, moho::register_CDecalHandleTypeInfo)
