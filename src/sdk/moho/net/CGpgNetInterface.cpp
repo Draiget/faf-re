@@ -987,7 +987,7 @@ namespace
    * Destroys one half-open `SNetCommandArg` range by releasing each string
    * payload lane in turn.
    */
-  [[maybe_unused]] void DestroyCommandArgRange(
+  void DestroyCommandArgRange(
     SNetCommandArg* first,
     SNetCommandArg* last
   ) noexcept
@@ -1054,6 +1054,28 @@ namespace
     return CopyConstructSNetCommandIfPresent(destination, source);
   }
 } // namespace
+
+/**
+ * Address: 0x007BB840 (FUN_007BB840, msvc8::vector<Moho::SNetCommandArg>::_Tidy)
+ *
+ * IDA signature:
+ * void __usercall sub_7BB840(int a1@<esi>);
+ *
+ * What it does:
+ * Destroys the live element range through the per-`T` range-destroy emission,
+ * releases the storage block, and clears the `{first_, last_, end_}` triplet.
+ * The VC8 debug-iterator proxy lane at +0x00 is deliberately left alone, which
+ * is what the binary does.
+ */
+void moho::TidyVectorOfSNetCommandArg(msvc8::vector<moho::SNetCommandArg>& storage) noexcept
+{
+  if (moho::SNetCommandArg* const first = storage.begin(); first != nullptr) {
+    DestroyCommandArgRange(first, storage.end());
+    ::operator delete(static_cast<void*>(first));
+  }
+
+  storage.reset_range_lanes_preserve_proxy();
+}
 
 /**
  * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)

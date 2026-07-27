@@ -126,6 +126,14 @@ namespace moho
   void CopyConstructVectorOfSNetCommandArg(msvc8::vector<SNetCommandArg>& destination,
                                            const msvc8::vector<SNetCommandArg>& source)
   {
-    destination = source;
+    // MSVC8 `vector(const vector&)` runs the element-copy lane under an EH
+    // scope; on throw the partially-built destination is tidied and the
+    // exception rethrown (0x007BB080-0x007BB08C).
+    try {
+      destination = source;
+    } catch (...) {
+      TidyVectorOfSNetCommandArg(destination);
+      throw;
+    }
   }
 } // namespace moho

@@ -275,6 +275,38 @@ namespace
   }
 
   /**
+   * Address: 0x007D4620 (FUN_007D4620, sub_7D4620)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_7D4620@<eax>(_DWORD *a1@<edi>, int a2@<esi>, _DWORD **a3)
+   *
+   * What it does:
+   * Legacy VC8 `std::list<CartographicDecal>::erase(iterator)` lane: unlinks one
+   * non-sentinel decal node, destroys the embedded decal, frees the node and
+   * decrements the count, returning the successor. Erasing the sentinel is a
+   * no-op that still returns its successor, matching the binary's guard.
+   *
+   * Structural twin of the batch-list lane `EraseCartographicDecalBatchNode`
+   * (FUN_007D1740); the binary emits one copy per element type.
+   */
+  moho::CartographicDecalNode* EraseCartographicDecalNode(
+    moho::CartographicDecalList& list,
+    moho::CartographicDecalNode* const node
+  ) noexcept
+  {
+    moho::CartographicDecalNode* const successor = node->mNext;
+    if (node != list.mDecalSentinel) {
+      node->mPrev->mNext = successor;
+      successor->mPrev = node->mPrev;
+      node->mDecal.~CartographicDecal();
+      ::operator delete(node);
+      --list.mDecalCount;
+    }
+
+    return successor;
+  }
+
+  /**
    * Address: 0x007D4550 (FUN_007D4550, sub_7D4550)
    *
    * What it does:
@@ -293,10 +325,24 @@ namespace
     const moho::CartographicDecalNode* const sourceFirst,
     const moho::CartographicDecalNode* const sourceSentinel)
   {
-    for (const moho::CartographicDecalNode* sourceNode = sourceFirst;
-         sourceNode != sourceSentinel;
-         sourceNode = sourceNode->mNext) {
-      AppendCartographicDecalListNodeBeforeSentinel(destination, sourceNode->mDecal);
+    // The binary brackets this loop in a C++ EH scope (SEH_7D4550): on throw the
+    // funclet at 0x007D45AC erases exactly as many nodes off the destination
+    // tail as source elements were consumed, then rethrows. `_Where` there is
+    // the destination sentinel, because the destination is freshly self-linked
+    // and empty when FUN_007D4230 evaluates it.
+    std::size_t appended = 0;
+    try {
+      for (const moho::CartographicDecalNode* sourceNode = sourceFirst;
+           sourceNode != sourceSentinel;
+           sourceNode = sourceNode->mNext) {
+        AppendCartographicDecalListNodeBeforeSentinel(destination, sourceNode->mDecal);
+        ++appended;
+      }
+    } catch (...) {
+      while (appended-- > 0) {
+        (void)EraseCartographicDecalNode(destination, destination.mDecalSentinel->mPrev);
+      }
+      throw;
     }
   }
 

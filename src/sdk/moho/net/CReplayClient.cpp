@@ -1,5 +1,7 @@
 #include "CReplayClient.h"
 
+#include <boost/bind.hpp>
+
 #include <cstdint>
 #include <mutex>
 #include <new>
@@ -42,65 +44,33 @@ namespace
     }
   }
 
-  struct ReplayThreadTask
-  {
-    using ThreadProc = void (*)(CReplayClient*);
-
-    ThreadProc mProc{nullptr};
-    CReplayClient* mSelf{nullptr};
-
-    void operator()() const
-    {
-      if (mProc != nullptr) {
-        mProc(mSelf);
-      }
-    }
-  };
-
   /**
-   * Address: 0x00540D70 (FUN_00540D70)
+   * Address: 0x00540A90 (FUN_00540A90) - callback construction
+   *          0x00540AA0 (FUN_00540AA0) - boost::function0<void> converting ctor
+   *          0x00540D60 (FUN_00540D60) - bind_t construction from the bound arg
+   *          0x00540D70 (FUN_00540D70) - member-pointer capture
+   *          0x00540DB0 (FUN_00540DB0) - boost::function0<void>::assign_to
    *
    * What it does:
-   * Builds a replay-thread task with the static entry point only.
-   */
-  ReplayThreadTask::ThreadProc* StoreReplayThreadEntryProc(
-    ReplayThreadTask::ThreadProc* const outProc
-  )
-  {
-    *outProc = &CReplayClient::ReplayThreadMain;
-    return outProc;
-  }
-
-  /**
-   * Address: 0x00540D60 (FUN_00540D60)
+   * Builds the callable handed to the replay worker thread.
    *
-   * What it does:
-   * Builds one replay-thread task from one entry-proc lane and one
-   * dereferenced self-pointer lane.
-   */
-  ReplayThreadTask BindReplayThreadTaskFromSlot(
-    CReplayClient* const* const selfSlot,
-    const ReplayThreadTask::ThreadProc proc
-  )
-  {
-    ReplayThreadTask task{};
-    task.mProc = proc;
-    task.mSelf = *selfSlot;
-    return task;
-  }
-
-  /**
-   * Address: 0x00540A90 (FUN_00540A90)
+   * The stored functor's exact type is not inferred: the functor manager at
+   * 0x005412A0 publishes `stru_F65DC8` as its `type_info`, and the name bytes
+   * at 0x00F65DC8 read
+   *   ".?AV?$bind_t@XV?$mf0@XVCReplayClient@Moho@@@_mfi@boost@@
+   *     V?$list1@V?$value@PAVCReplayClient@Moho@@@_bi@boost@@@_bi@3@@_bi@boost@@"
+   * i.e. `boost::_bi::bind_t<void, boost::_mfi::mf0<void, Moho::CReplayClient>,
+   * boost::_bi::list1<boost::_bi::value<Moho::CReplayClient*>>>` - a bound
+   * *member* pointer, 8 bytes of payload `{ &CReplayClient::ReplayThread, this }`.
+   * The invoker at 0x00541290 loads +0x04 into ECX and tail-jumps +0x00, which is
+   * why the worker entry is a nullary __thiscall member and not a free function.
    *
-   * What it does:
-   * Builds a replay-thread task bound to a specific client instance.
+   * An earlier reconstruction modelled this as a `void (*)(CReplayClient*)` /
+   * self-pointer pair, which has the same size but the wrong call shape.
    */
-  ReplayThreadTask MakeReplayThreadTask(CReplayClient* self)
+  [[nodiscard]] boost::function0<void> MakeReplayThreadCallback(CReplayClient* const self)
   {
-    ReplayThreadTask::ThreadProc proc = nullptr;
-    (void)StoreReplayThreadEntryProc(&proc);
-    CReplayClient* selfSlot = self;
-    return BindReplayThreadTaskFromSlot(&selfSlot, proc);
+    return boost::function0<void>(boost::bind(&CReplayClient::ReplayThread, self));
   }
 } // namespace
 
@@ -287,8 +257,7 @@ void CReplayClient::Start()
   }
 
   if (mReplayThread == nullptr) {
-    const auto replayTask = MakeReplayThreadTask(this);
-    auto* const worker = new (std::nothrow) boost::thread(replayTask);
+    auto* const worker = new (std::nothrow) boost::thread(MakeReplayThreadCallback(this));
     ReplaceReplayThread(mReplayThread, worker);
   }
 
@@ -299,20 +268,20 @@ void CReplayClient::Start()
 /**
  * Address: 0x0053D7A0 (FUN_0053D7A0, func_ReplayThread)
  */
-void CReplayClient::ReplayThreadMain(CReplayClient* const self)
+void CReplayClient::ReplayThread()
 {
-  if (self == nullptr || self->mManager == nullptr) {
+  if (mManager == nullptr) {
     return;
   }
 
-  boost::recursive_mutex::scoped_lock lock(self->mManager->mLock);
+  boost::recursive_mutex::scoped_lock lock(mManager->mLock);
 
-  while (!self->mReplayThreadStopRequested) {
-    if (self->mReplayPollRequested) {
-      gpg::Stream* const stream = self->mReplayStream;
+  while (!mReplayThreadStopRequested) {
+    if (mReplayPollRequested) {
+      gpg::Stream* const stream = mReplayStream;
       if (stream == nullptr) {
-        self->mReplayPollRequested = false;
-        SignalCurrentEventIfManagerIdle(self->mManager);
+        mReplayPollRequested = false;
+        SignalCurrentEventIfManagerIdle(mManager);
         continue;
       }
 
@@ -333,8 +302,8 @@ void CReplayClient::ReplayThreadMain(CReplayClient* const self)
       }
 
       if (hasReplayData) {
-        self->mReplayPollRequested = false;
-        SignalCurrentEventIfManagerIdle(self->mManager);
+        mReplayPollRequested = false;
+        SignalCurrentEventIfManagerIdle(mManager);
       } else {
         lock.unlock();
         ::SleepEx(100u, TRUE);
@@ -343,7 +312,7 @@ void CReplayClient::ReplayThreadMain(CReplayClient* const self)
       continue;
     }
 
-    self->mReplayWorkerCondition.wait(lock);
+    mReplayWorkerCondition.wait(lock);
   }
 }
 

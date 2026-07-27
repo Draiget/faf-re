@@ -449,6 +449,20 @@ namespace moho
     UnitWeaponInfo(const UnitWeaponInfo& other);
 
     /**
+     * Address: 0x0055F210 (FUN_0055F210, sub_55F210)
+     *
+     * IDA signature:
+     * int __usercall sub_55F210@<eax>(int a1@<eax>, int a2@<esi>);
+     *
+     * What it does:
+     * Copy-assigns one already-constructed `UnitWeaponInfo`: both category
+     * lanes are updated header-first and their word lists copy-assigned in
+     * place, scalars are plain stores, and both UI range visual-id strings are
+     * re-assigned from the source.
+     */
+    UnitWeaponInfo& operator=(const UnitWeaponInfo& other);
+
+    /**
      * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
      *
      * What it does:
