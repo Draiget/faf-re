@@ -1347,9 +1347,13 @@ namespace
     }
   }
 
-  [[nodiscard]] int PathQueueOwnerLane(const moho::Sim* const sim) noexcept
+  /**
+   * The queue's owner is the sim's `PathTables`; the queue reads its
+   * per-footprint cluster maps back out of it during query setup.
+   */
+  [[nodiscard]] moho::PathTables* PathQueueOwnerLane(const moho::Sim* const sim) noexcept
   {
-    return static_cast<int>(reinterpret_cast<std::intptr_t>(sim != nullptr ? sim->mPathTables : nullptr));
+    return (sim != nullptr) ? sim->mPathTables : nullptr;
   }
 
   struct CSquadRuntimeUnitsView
@@ -1519,17 +1523,21 @@ namespace
     delete platoon;
   }
 
-  void ProcessArmyPathQueueBudget(void* const pathQueueProxy, int budget)
+  /**
+   * Address: 0x006FFEBF..0x006FFECD (inlined into Moho::CArmyImpl::OnTick)
+   *
+   * What it does:
+   * Spends this tick's pathfinding allowance on the army's traveller queue.
+   * `CArmyImpl::PathFinder` (+0x21C) holds the `PathQueue`, which the binary
+   * loads into `ebx` immediately before the call.
+   */
+  void ProcessArmyPathQueueBudget(void* const pathQueue, int budget)
   {
-    if (pathQueueProxy == nullptr) {
+    if (pathQueue == nullptr) {
       return;
     }
 
-    // The full PathQueue::Work closure (FUN_00765ED0 family) is still pending
-    // dedicated PathQueue owner recovery. The runtime proxy is layout-compatible
-    // with PathTables and preserves the same queue pointer lane.
-    auto* const pathTables = static_cast<moho::PathTables*>(pathQueueProxy);
-    pathTables->UpdateBackground(&budget);
+    static_cast<moho::PathQueue*>(pathQueue)->Work(budget);
   }
 
 } // namespace

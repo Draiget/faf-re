@@ -1,7 +1,9 @@
 #include "PathTables.h"
 
 #include <array>
+#include <cassert>
 #include <climits>
+#include <limits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -17,7 +19,11 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/containers/TDatList.h"
 #include "moho/path/ClusterMap.h"
+#include "gpg/core/containers/FastVector.h"
+#include "moho/ai/CAiPathFinder.h"
+#include "moho/ai/IAiNavigator.h"
 #include "moho/path/IPathTraveler.h"
+#include "moho/path/SNamedFootprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
@@ -310,6 +316,322 @@ namespace
     DestroyPathQueueImplBase(implBase);
   }
 
+  // ---------------------------------------------------------------------
+  // PathQueue::Work closure
+  // ---------------------------------------------------------------------
+
+  /** One candidate step produced by expansion: where to, and at what cost. */
+  struct PathQueueNeighbour
+  {
+    moho::SOCellPos mCell;  // +0x00
+    float mCost;            // +0x04
+  };
+  static_assert(sizeof(PathQueueNeighbour) == 0x08, "PathQueueNeighbour size must be 0x08");
+
+  /**
+   * `WorkOnce` holds candidates in a stack buffer spanning `[esp+660h]` to
+   * `[esp+CA0h]` (0x640 bytes) with a 0x10-byte header at `[esp+650h]`, i.e.
+   * 200 inline entries before the vector spills to the heap.
+   */
+  using PathQueueNeighbourBuffer = gpg::core::FastVectorN<PathQueueNeighbour, 200>;
+
+  /**
+   * Address: 0x00E35E84 / 0x00E35E8C / 0x00E35E94 / 0x00E35E9C
+   *
+   * The 8-way step table, read out of the binary. Cardinals come first so the
+   * diagonals can gate on them: `kStepGate[i]` is a mask of the cardinal
+   * indices that must already have succeeded before diagonal `i` is allowed,
+   * which is what stops a unit cutting the corner between two blocked cells.
+   */
+  constexpr std::int8_t kStepOffsetX[8] = { 0, -1, 0, 1, -1, -1, 1, 1 };
+  constexpr std::int8_t kStepOffsetZ[8] = { -1, 0, 1, 0, -1, 1, 1, -1 };
+  constexpr std::uint8_t kStepGate[8] = { 0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u };
+  constexpr float kStepCost[8] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f };
+
+  /**
+   * Address: 0x00766350 (FUN_00766350, level-0 arm)
+   *
+   * What it does:
+   * Emits the walkable subset of the eight cells adjacent to `cell`.
+   *
+   * Each candidate must clear three gates in order: the traveler must want to
+   * search the cluster the candidate falls in, the candidate cell must be
+   * traversable, and the traveler must accept the edge (which may also revise
+   * its cost). Only a candidate that clears all three sets its bit in
+   * `acceptedMask`, so a diagonal is offered only once both of its adjacent
+   * cardinals have been accepted.
+   */
+  [[nodiscard]] bool EnumerateAdjacentCells(
+    PathQueueImplBaseRuntime& implBase,
+    const moho::SOCellPos& cell,
+    PathQueueNeighbourBuffer& outNeighbours
+  )
+  {
+    moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
+    if (traveler == nullptr) {
+      return true;
+    }
+
+    std::uint32_t acceptedMask = 0u;
+    for (std::size_t step = 0; step < 8; ++step) {
+      if ((acceptedMask & kStepGate[step]) != kStepGate[step]) {
+        continue;
+      }
+
+      const int candidateX = static_cast<std::uint16_t>(cell.x) + kStepOffsetX[step];
+      const int candidateZ = static_cast<std::uint16_t>(cell.z) + kStepOffsetZ[step];
+
+      if (!traveler->ShouldSearchRect(implBase.mClusterMap->ClusterRect(candidateX, candidateZ, 1u))) {
+        continue;
+      }
+
+      moho::SOCellPos candidate{};
+      candidate.x = static_cast<std::int16_t>(candidateX);
+      candidate.z = static_cast<std::int16_t>(candidateZ);
+
+      if (!traveler->CanTraverseCell(candidate)) {
+        continue;
+      }
+
+      float cost = kStepCost[step];
+      if (!traveler->IsInBounds(cell, candidate, &cost)) {
+        continue;
+      }
+
+      PathQueueNeighbour neighbour{};
+      neighbour.mCell = candidate;
+      neighbour.mCost = cost;
+      outNeighbours.push_back(neighbour);
+
+      acceptedMask |= 1u << step;
+    }
+    return true;
+  }
+
+  /**
+   * Address: 0x00766350 (FUN_00766350, level>0 arm)
+   *
+   * What it does:
+   * Emits the cluster-graph edges leaving `cell` at `level`.
+   *
+   * At a coarse level the map is precomputed into clusters, each holding a
+   * handful of boundary nodes and a triangular matrix of costs between them.
+   * If `cell` is one of those nodes, every other node in the same cluster that
+   * has a recorded edge becomes a candidate - which is how the search covers
+   * open ground in a few steps instead of one cell at a time.
+   *
+   * Returns false only when the cluster build ran out of budget, which aborts
+   * the whole query rather than yielding a partial neighbour set.
+   */
+  [[nodiscard]] bool EnumerateClusterEdges(
+    PathQueueImplBaseRuntime& implBase,
+    const moho::SOCellPos& cell,
+    const int level,
+    PathQueueNeighbourBuffer& outNeighbours
+  )
+  {
+    moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
+    if (traveler == nullptr) {
+      return true;
+    }
+
+    gpg::HaStar::ClusterMap& clusterMap = *implBase.mClusterMap;
+    const std::uint32_t topLevel = clusterMap.mNumLevels;
+    const int originShift = gpg::HaStar::sClusterSizeLog2[level];
+    const int cellX = static_cast<std::uint16_t>(cell.x);
+    const int cellZ = static_cast<std::uint16_t>(cell.z);
+
+    const gpg::Rect2i clusterBounds =
+      clusterMap.ClusterIndexRect(cellX, cellZ, static_cast<std::uint8_t>(level));
+
+    for (int clusterX = clusterBounds.x0; clusterX < clusterBounds.x1; ++clusterX) {
+      const int originX = clusterX << originShift;
+
+      for (int clusterZ = clusterBounds.z0; clusterZ < clusterBounds.z1; ++clusterZ) {
+        const int originZ = clusterZ << originShift;
+
+        if (!clusterMap.WorkOnCluster(clusterX, clusterZ, level, implBase.mBudget)) {
+          return false;
+        }
+
+        const gpg::HaStar::Subcluster& subcluster = clusterMap.mLevels[level];
+
+        // Hold the payload across the walk by taking a counted handle:
+        // WorkOnCluster on a neighbouring cluster can otherwise evict it.
+        const gpg::HaStar::Cluster clusterHandle =
+          subcluster.mArray[clusterX + clusterZ * subcluster.mWidth];
+        gpg::HaStar::Cluster::Data* const data = clusterHandle.mData;
+
+        const std::uint32_t nodeCount = (data != nullptr) ? data->mNodeCount : 0u;
+        const gpg::HaStar::Cluster::Node* const nodes = (data != nullptr) ? data->mNodes : nullptr;
+        const auto* const edges = (data != nullptr)
+          ? reinterpret_cast<const std::int8_t*>(nodes + nodeCount)
+          : nullptr;
+
+        std::uint32_t fromIndex = 0u;
+        for (; fromIndex < nodeCount; ++fromIndex) {
+          if (nodes[fromIndex].x == static_cast<std::uint8_t>(cellX - originX)
+              && nodes[fromIndex].z == static_cast<std::uint8_t>(cellZ - originZ)) {
+            break;
+          }
+        }
+
+        if (fromIndex < nodeCount) {
+          for (std::uint32_t toIndex = 0u; toIndex < nodeCount; ++toIndex) {
+            if (toIndex == fromIndex) {
+              continue;
+            }
+
+            const std::uint32_t edgeIndex = (fromIndex >= toIndex)
+              ? toIndex + ((fromIndex * (fromIndex - 1u)) >> 1)
+              : fromIndex + ((toIndex * (toIndex - 1u)) >> 1);
+
+            // A negative bucket means the pair is unreachable inside the cluster.
+            if (edges[edgeIndex] < 0) {
+              continue;
+            }
+
+            moho::SOCellPos candidate{};
+            candidate.x = static_cast<std::int16_t>(originX + nodes[toIndex].x);
+            candidate.z = static_cast<std::int16_t>(originZ + nodes[toIndex].z);
+
+            // At the coarsest level there is no parent cluster left to consult.
+            if (static_cast<std::uint32_t>(level) != topLevel) {
+              const gpg::Rect2i parentRect =
+                clusterMap.ClusterRect(candidate.x, candidate.z, static_cast<std::uint8_t>(level + 1));
+              if (!traveler->ShouldSearchRect(parentRect)) {
+                continue;
+              }
+            }
+
+            float cost = gpg::HaStar::Cluster::DequantizeEdgeCost(
+              edges[edgeIndex],
+              gpg::HaStar::Cluster::NodeOctileDistance(*data, fromIndex, toIndex)
+            );
+
+            if (!traveler->IsInBounds(cell, candidate, &cost)) {
+              continue;
+            }
+
+            PathQueueNeighbour neighbour{};
+            neighbour.mCell = candidate;
+            neighbour.mCost = cost;
+            outNeighbours.push_back(neighbour);
+          }
+        }
+
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Address: 0x00766280 (FUN_00766280)
+   *
+   * IDA signature:
+   * bool __userpurge sub_766280@<al>(Moho::PathQueue::ImplBase *a1@<ebx>, Moho::SOCellPos *a2@<esi>, int a3);
+   *
+   * What it does:
+   * Produces the candidate steps out of `cell`, coarse levels first.
+   *
+   * The traveler decides how coarse to start: if it still wants to search the
+   * immediate neighbourhood the walk begins at level 0, otherwise it begins at
+   * the top of the hierarchy. Descending stops early once the traveler loses
+   * interest in the cluster around `cell`. A level only contributes when `cell`
+   * sits on that level's cluster grid, since only grid-aligned cells carry
+   * cluster nodes.
+   */
+  [[nodiscard]] bool ExpandCellNeighbours(
+    PathQueueImplBaseRuntime& implBase,
+    const moho::SOCellPos& cell,
+    PathQueueNeighbourBuffer& outNeighbours
+  )
+  {
+    moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
+    if (traveler == nullptr) {
+      return true;
+    }
+
+    gpg::HaStar::ClusterMap& clusterMap = *implBase.mClusterMap;
+    const int cellX = static_cast<std::uint16_t>(cell.x);
+    const int cellZ = static_cast<std::uint16_t>(cell.z);
+
+    int level = traveler->ShouldSearchRect(clusterMap.ClusterRect(cellX, cellZ, 0u))
+      ? 0
+      : static_cast<int>(clusterMap.mNumLevels);
+
+    for (; level >= 0; --level) {
+      const int clusterMask = gpg::HaStar::sClusterSize[level] - 1;
+      if ((cellX & clusterMask) != 0 && (cellZ & clusterMask) != 0) {
+        continue;
+      }
+
+      const bool completed = (level == 0)
+        ? EnumerateAdjacentCells(implBase, cell, outNeighbours)
+        : EnumerateClusterEdges(implBase, cell, level, outNeighbours);
+      if (!completed) {
+        return false;
+      }
+
+      if (level > 0
+          && !traveler->ShouldSearchRect(
+               clusterMap.ClusterRect(cellX, cellZ, static_cast<std::uint8_t>(level)))) {
+        return true;
+      }
+    }
+    return true;
+  }
+
+  /** Outcome of one expansion step, in the encoding `WorkOnce` returns. */
+  enum class PathQueueStep : int
+  {
+    Continue = 0,
+    GoalReached = 1,
+    BudgetExhausted = 2,
+    PathCapExceeded = 3,
+  };
+
+  /**
+   * Address: 0x007661C0 (FUN_007661C0)
+   *
+   * IDA signature:
+   * int __userpurge sub_7661C0@<eax>(Moho::SOCellPos *a1@<eax>, Moho::PathQueue::ImplBase *a2@<ecx>, int a3);
+   *
+   * What it does:
+   * Charges one expansion against the query's budgets and decides whether the
+   * search should continue, stop at the goal, or give up.
+   *
+   * Note the budget is spent before the goal test, so reaching the goal on the
+   * final unit of budget still costs it.
+   */
+  [[nodiscard]] PathQueueStep StepExpansion(
+    PathQueueImplBaseRuntime& implBase,
+    const moho::SOCellPos& cell,
+    PathQueueNeighbourBuffer& outNeighbours
+  )
+  {
+    --implBase.mBudget;
+    ++implBase.mExpandCount;
+
+    if (implBase.mBudget <= 0) {
+      return PathQueueStep::BudgetExhausted;
+    }
+
+    moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
+    if (traveler != nullptr && traveler->IsGoalCandidateCell(cell)) {
+      implBase.mClosestCell = cell;
+      return PathQueueStep::GoalReached;
+    }
+
+    if (implBase.mExpandCount > implBase.mPathCap) {
+      return PathQueueStep::PathCapExceeded;
+    }
+
+    return ExpandCellNeighbours(implBase, cell, outNeighbours)
+      ? PathQueueStep::Continue
+      : PathQueueStep::BudgetExhausted;
+  }
+
 } // namespace
 
 namespace moho
@@ -332,7 +654,7 @@ namespace moho
     // (`[[owner] + 0x1C][footprintIndex]`) to pick this traveler's cluster map.
     // It is still typed as a word here because nothing in this translation unit
     // dereferences it yet; the Work chain retypes it.
-    std::int32_t mSize;                     // +0x00
+    PathTables* mOwner;                     // +0x00
     PathQueueIntrusiveNode mHeightSentinel; // +0x04
     // mBase now spans +0x0C..+0x88: the previous reconstruction stopped it at
     // +0x80 and padded the remainder, which hid `mExpandCount` / `mPathCap`.
@@ -340,7 +662,7 @@ namespace moho
   };
 
   static_assert(sizeof(PathQueue::Impl) == 0x88, "PathQueue::Impl size must be 0x88");
-  static_assert(offsetof(PathQueue::Impl, mSize) == 0x00, "PathQueue::Impl::mSize offset must be 0x00");
+  static_assert(offsetof(PathQueue::Impl, mOwner) == 0x00, "PathQueue::Impl::mOwner offset must be 0x00");
   static_assert(offsetof(PathQueue::Impl, mBase) == 0x0C, "PathQueue::Impl::mBase offset must be 0x0C");
 
   namespace
@@ -662,10 +984,7 @@ namespace moho
       gpg::RRef ownerRef{};
       ownerRef.mObj = nullptr;
       ownerRef.mType = nullptr;
-      archive->ReadPointer_PathTables(
-        reinterpret_cast<PathTables**>(&impl->mSize),
-        &ownerRef
-      );
+      archive->ReadPointer_PathTables(&impl->mOwner, &ownerRef);
 
       static gpg::RType* dlistType = nullptr;
       if (dlistType == nullptr) {
@@ -691,10 +1010,7 @@ namespace moho
 
     void SavePathQueueImplRefCallback(PathQueue::Impl* const impl, gpg::WriteArchive& archive)
     {
-      // The impl header lane at +0x00 holds the owning `PathTables*` in the
-      // serialize context (IDA reads `[edi]` and hands it to RRef_PathTables).
-      auto* const pathTables =
-        reinterpret_cast<PathTables*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(impl->mSize)));
+      PathTables* const pathTables = impl->mOwner;
 
       gpg::RRef pathTablesRef{};
       (void)gpg::RRef_PathTables(&pathTablesRef, pathTables);
@@ -1290,7 +1606,7 @@ namespace moho
    * runtime owner lanes.
    */
   PathQueue::Impl::Impl()
-    : mSize(0)
+    : mOwner(nullptr)
   {
     mHeightSentinel.mNext = &mHeightSentinel;
     mHeightSentinel.mPrev = &mHeightSentinel;
@@ -1304,7 +1620,7 @@ namespace moho
    * Allocates one `PathQueue::Impl`, runs the impl initialization chain, and
    * records the requested queue-size lane.
    */
-  PathQueue::PathQueue(const int size)
+  PathQueue::PathQueue(PathTables* const owner)
     : mImpl(nullptr)
   {
     // Allocation size and constructor chain from:
@@ -1318,8 +1634,232 @@ namespace moho
     }
 
     ::new (impl) PathQueue::Impl();
-    impl->mSize = size;
+    impl->mOwner = owner;
     mImpl = impl;
+  }
+
+  /**
+   * Address: 0x007685A0 (FUN_007685A0, Moho::PathQueue::WorkOnce)
+   *
+   * IDA signature:
+   * int __stdcall sub_7685A0(Moho::PathQueue::ImplBase *a3, Moho::PathQueue::ImplBase *a2);
+   *
+   * What it does:
+   * Runs the A* main loop for the traveler currently being served, until the
+   * search finishes or one of the budgets runs out.
+   *
+   * Each pass takes the cheapest open node, asks `StepExpansion` for its
+   * neighbours, closes it, and relaxes each candidate. The two arguments are
+   * the same object twice - the search state and the traits - which is why the
+   * binary pushes `edi` twice at the call site.
+   *
+   * Returns `Continue` only when the open set is exhausted without reaching the
+   * goal, i.e. no path exists within the searched region.
+   */
+  [[nodiscard]] PathQueueStep PathQueueWorkOnce(PathQueueImplBaseRuntime& implBase)
+  {
+    PathQueueNeighbourBuffer neighbours;
+
+    while (!implBase.OpenSet().empty()) {
+      gpg::AStarNode<SOCellPos>* const current = implBase.OpenSet().top();
+
+      neighbours.clear();
+      const PathQueueStep step = StepExpansion(implBase, current->mCell, neighbours);
+      if (step != PathQueueStep::Continue) {
+        return step;
+      }
+
+      current->mState = gpg::AStarNodeState::Closed;
+      (void)implBase.OpenSet().Pop();
+
+      moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
+
+      for (const PathQueueNeighbour& neighbour : neighbours) {
+        gpg::AStarNode<SOCellPos>& node = implBase.FindOrCreateNode(neighbour.mCell);
+        const float reachedCost = current->mCost + neighbour.mCost;
+
+        switch (node.mState) {
+          case gpg::AStarNodeState::Unvisited: {
+            node.mState = gpg::AStarNodeState::Open;
+
+            const float estimate =
+              (traveler != nullptr) ? traveler->GetHeuristicCost(neighbour.mCell) : 0.0f;
+            implBase.NoteCandidateCell(neighbour.mCell, estimate);
+
+            node.mEstimate = estimate;
+            node.mParent = current;
+            node.mCell = neighbour.mCell;
+            node.mCost = reachedCost;
+            node.mHandle = implBase.OpenSet().Push(reachedCost + estimate, &node);
+            break;
+          }
+
+          case gpg::AStarNodeState::Open: {
+            // Only re-parent when this route is genuinely cheaper; the estimate
+            // is unchanged, so the new priority is a pure decrease-key.
+            if (node.mCost > reachedCost) {
+              node.mParent = current;
+              node.mCell = neighbour.mCell;
+              node.mCost = reachedCost;
+              implBase.OpenSet().UpdatePriority(node.mHandle, node.mEstimate + reachedCost);
+            }
+            break;
+          }
+
+          case gpg::AStarNodeState::Closed:
+          default:
+            // "neib->mState == CLOSED", AStarSearch.h:253
+            assert(node.mState == gpg::AStarNodeState::Closed);
+            break;
+        }
+      }
+    }
+
+    return PathQueueStep::Continue;
+  }
+
+  /**
+   * Address: 0x00765FE0 (FUN_00765FE0)
+   *
+   * IDA signature:
+   * void __userpurge sub_765FE0(Moho::PathQueue::ImplBase *a1@<eax>, Moho::CAiPathFinder *a2@<edi>, int a3);
+   *
+   * What it does:
+   * Starts a query for `traveler`: clears the previous search, picks the
+   * cluster map matching the traveler's footprint, moves the traveler out of
+   * the pending ring into the active slot, and seeds the search at its anchor
+   * cell.
+   */
+  void BeginPathQueueQuery(
+    PathQueueImplBaseRuntime& implBase,
+    IPathTraveler& traveler,
+    PathTables& owner
+  )
+  {
+    // "mTraveler.empty()", PathQueue.cpp:148
+    assert(implBase.mTraveler.mNext == &implBase.mTraveler);
+
+    const SFootprint* const footprint = traveler.GetFootprint();
+
+    implBase.mExpandCount = 0;
+    implBase.mPathCap = traveler.GetPathcap();
+
+    HPathCell anchorCell{};
+    traveler.GetAnchorCell(&anchorCell);
+    implBase.mClosestCell = *reinterpret_cast<const SOCellPos*>(&anchorCell);
+    implBase.mClosestDistance = std::numeric_limits<float>::max();
+
+    // The traveller hands back its named footprint; the binary reads the index
+    // at +0x2C, which only exists on SNamedFootprint. The declared return type
+    // is the base, so the concrete type has to be recovered here.
+    const auto* const namedFootprint = static_cast<const SNamedFootprint*>(footprint);
+    implBase.mClusterMap = owner.ClusterMapForFootprint(namedFootprint->mIndex);
+
+    implBase.ResetSearch();
+    implBase.mResultCells.clear();
+
+    // Move the traveler from the pending ring to the active slot.
+    UnlinkAndResetPathQueueNode(traveler.mPathQueueNode);
+    PathQueueIntrusiveNode& node = traveler.mPathQueueNode;
+    node.mPrev = implBase.mTraveler.mPrev;
+    node.mNext = &implBase.mTraveler;
+    implBase.mTraveler.mPrev = &node;
+    node.mPrev->mNext = &node;
+
+    implBase.AddStartNode(implBase.mClosestCell, implBase);
+  }
+
+  /**
+   * Address: 0x00766140 (FUN_00766140)
+   *
+   * IDA signature:
+   * int __userpurge sub_766140@<eax>(Moho::PathQueue::ImplBase *a1@<edi>, char a2);
+   *
+   * What it does:
+   * Ends the current query: materialises the path to the best cell reached,
+   * detaches the traveler, and notifies it of the outcome.
+   *
+   * The path is built even on failure - the traveler still gets the closest
+   * approach through `OnPathRejected` and can decide what to do with it.
+   */
+  void FinishPathQueueQuery(PathQueueImplBaseRuntime& implBase, const bool reachedGoal)
+  {
+    IPathTraveler* const traveler = implBase.CurrentTraveler();
+
+    implBase.mResultCells.clear();
+    (void)implBase.BuildPath(implBase.mClosestCell, implBase.mResultCells);
+
+    UnlinkAndResetPathQueueNode(implBase.mTraveler);
+
+    if (traveler == nullptr) {
+      return;
+    }
+
+    const SNavPath& path = *reinterpret_cast<const SNavPath*>(&implBase.mResultCells);
+    if (reachedGoal) {
+      traveler->OnPathAccepted(path);
+    } else {
+      traveler->OnPathRejected(path);
+    }
+  }
+
+  /**
+   * Address: 0x00766047 (inlined into the query-setup lane at 0x00765FE0)
+   */
+  gpg::HaStar::ClusterMap* PathTables::ClusterMapForFootprint(const std::int32_t footprintIndex) const
+  {
+    return mImpl->mMaps.mFirst[footprintIndex];
+  }
+
+  /**
+   * Address: 0x00765ED0 (FUN_00765ED0, Moho::PathQueue::Work)
+   *
+   * IDA signature:
+   * void __usercall Moho::PathQueue::Work(Moho::PathQueue *this@<ebx>, int *budget@<esi>);
+   *
+   * What it does:
+   * Drains the traveller queue while budget remains.
+   *
+   * Each turn of the loop either continues the query already in flight or, if
+   * none is, promotes the next traveller off the pending ring. `WorkOnce` then
+   * runs until it either finishes the query or reports the budget spent - the
+   * one outcome that leaves the query in flight, to be resumed on a later tick.
+   * That is what makes pathfinding here incremental across frames rather than a
+   * single blocking search.
+   */
+  void PathQueue::Work(int& budget)
+  {
+    while (budget > 0) {
+      Impl& impl = *mImpl;
+
+      const bool queryInFlight = impl.mBase.mTraveler.mNext != &impl.mBase.mTraveler;
+      if (!queryInFlight) {
+        if (impl.mHeightSentinel.mNext == &impl.mHeightSentinel) {
+          // Nothing queued; the remaining budget goes unspent.
+          return;
+        }
+
+        auto* const pendingNode = impl.mHeightSentinel.mNext;
+        auto* const pending = reinterpret_cast<IPathTraveler*>(
+          reinterpret_cast<std::uint8_t*>(pendingNode) - offsetof(IPathTraveler, mPathQueueNode)
+        );
+        BeginPathQueueQuery(impl.mBase, *pending, *impl.mOwner);
+      }
+
+      // "!mTraveler.empty()", PathQueue.cpp:169
+      assert(impl.mBase.mTraveler.mNext != &impl.mBase.mTraveler);
+
+      impl.mBase.mBudget = budget;
+      const PathQueueStep step = PathQueueWorkOnce(impl.mBase);
+      budget = impl.mBase.mBudget;
+
+      if (step == PathQueueStep::BudgetExhausted) {
+        // "cpuBudget <= 0", PathQueue.cpp:179
+        assert(budget <= 0);
+      } else {
+        FinishPathQueueQuery(impl.mBase, step == PathQueueStep::GoalReached);
+      }
+    }
   }
 
   /**

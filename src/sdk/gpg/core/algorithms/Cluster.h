@@ -129,6 +129,27 @@ namespace gpg::HaStar
         [[nodiscard]] static float QuantizeEdgeCost(float a, float b);
 
         /**
+         * Address: 0x0092D8E0 (?DequantizeEdgeCost@Cluster@HaStar@gpg@@SAMHM@Z)
+         *
+         * What it does:
+         * Inverts `QuantizeEdgeCost`: scales `distance` by `exp(bucket / 6)`,
+         * read from a 32-entry table rather than recomputed. The table lives at
+         * 0x00E35DA0 and was verified entry-by-entry against `exp(q / 6)`.
+         */
+        [[nodiscard]] static float DequantizeEdgeCost(int bucket, float distance);
+
+        /**
+         * Address: 0x007658D0 (FUN_007658D0)
+         *
+         * What it does:
+         * Octile distance between two of a cluster's boundary nodes:
+         * `max + min * (sqrt(2) - 1)`. Pairs with the stored edge bucket, which
+         * only records how much worse the real path is than this straight-line
+         * lower bound.
+         */
+        [[nodiscard]] static float NodeOctileDistance(const Data& data, std::uint32_t lhs, std::uint32_t rhs);
+
+        /**
          * Address: 0x00954110 (FUN_00954110,
          * ?SetData@Cluster@HaStar@gpg@@QAEXPBUNode@123@PBUEdge@123@I@Z)
          *
@@ -304,6 +325,21 @@ namespace gpg::HaStar
      * Computes one cluster-aligned world rectangle for `(x,z)` and clamps it
      * against per-axis cluster bounds.
      */
+    /**
+     * Address: 0x00D49380 (?sClusterSize@HaStar@gpg@@3QBEB)
+     *
+     * Cell extent of one cluster at each hierarchy level.
+     */
+    inline constexpr std::uint8_t sClusterSize[4] = { 1u, 8u, 32u, 128u };
+
+    /**
+     * Address: 0x00D49384 (?sClusterSize_Log2@HaStar@gpg@@3QBEB)
+     *
+     * `log2(sClusterSize[level])`, used to turn a cluster index into the world
+     * coordinate of the cluster's origin with a shift.
+     */
+    inline constexpr std::uint8_t sClusterSizeLog2[4] = { 0u, 3u, 5u, 7u };
+
     [[nodiscard]] gpg::Rect2i ClusterRect(
         int worldX,
         int worldZ,
@@ -374,6 +410,16 @@ namespace gpg::HaStar
          * the requested level and clamps to map dimensions.
          */
         [[nodiscard]] gpg::Rect2i ClusterRect(const gpg::Rect2i& worldRect, std::uint8_t level) const;
+
+        /**
+         * Address: 0x008E33B0 (FUN_008E33B0)
+         *
+         * What it does:
+         * Cluster-aligned world rectangle containing the single cell `(x, z)`
+         * at `level`, clamped to this map's extent. A thin forward to the free
+         * `gpg::HaStar::ClusterRect` supplying `mWidth` / `mHeight`.
+         */
+        [[nodiscard]] gpg::Rect2i ClusterRect(int worldX, int worldZ, std::uint8_t level) const;
 
         /**
          * Address: 0x008E35A0 (FUN_008E35A0,
