@@ -586,5 +586,7 @@ void moho::PushBackEntityCategorySetVector(
   msvc8::vector<moho::EntityCategorySet>& destination,
   const moho::EntityCategorySet& value)
 {
+  // push_back's capacity-full path is the single-value insert lane (FUN_006DBAE0),
+  // which tail-calls `msvc8::vector<EntityCategorySet>::_Insert_n` (FUN_006DC600).
   destination.push_back(value);
 }

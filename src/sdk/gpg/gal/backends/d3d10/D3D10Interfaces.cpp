@@ -2805,7 +2805,7 @@ namespace gpg::gal
     void AppendDisplayModeToAdapterModeEntry(AdapterModeD3D10& entry, const DXGI_MODE_DESC& mode)
     {
       // push_back's capacity-full path is `msvc8::vector<DXGI_MODE_DESC>::insert`
-      // (FUN_008F6A50), reached through insert(end(),val) at FUN_008F6FB0.
+      // (FUN_008F6A50), reached through the single-value insert lane (FUN_008F6FB0).
       entry.modes_.push_back(mode);
     }
 
@@ -2833,7 +2833,7 @@ namespace gpg::gal
     void AppendBackendAdapter(msvc8::vector<AdapterD3D10>& adapters, const AdapterD3D10& adapter)
     {
       // push_back's capacity-full path is `msvc8::vector<AdapterD3D10>::insert`
-      // (FUN_00900630), reached through insert(end(),val) at FUN_00900960.
+      // (FUN_00900630), reached through the single-value insert lane (FUN_00900960).
       adapters.push_back(adapter);
     }
 

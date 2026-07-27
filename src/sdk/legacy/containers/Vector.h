@@ -1649,6 +1649,17 @@ namespace msvc8
          * Sim::DumpUnits invokes counts.push_back({blueprint,1}) by name — on the
          * capacity-full path this routes to insert(end(),1,value) → _Insert_n
          * (FUN_0075F810), on the fast path it appends in place)
+         * Address: 0x006D1960 (FUN_006D1960, msvc8::vector<moho::SUpgradeNotifyPair>::push_back
+         * for the 8-byte `{mSourceId, mDestId}` element — `sar 3` stride at 0x006D1974
+         * and 0x006D1980. The fast path copies the two dwords through FUN_006D2730
+         * (0x006D19A0); the capacity-full path tail-calls the `_Insert_n` grow lane
+         * FUN_006D1A90 at 0x006D19BA, skipping the iterator-returning wrapper because
+         * push_back discards the iterator. A 16-byte linker-emitted bridge (FUN_006C38E0)
+         * whose whole body is `call sub_6D1960` at 0x006C38E9 folds onto this same
+         * symbol, so both addresses resolve here. Emitted via
+         * globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
+         * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
+         * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -2016,6 +2027,37 @@ namespace msvc8
          * push_back (FUN_00940230). Emitted via vec->push_back(source) in
          * gpg::gal::PushBackEffectMacroIntoLane (ContextInterfaces.cpp:266), whose
          * owner lane is EffectContext's macro vector at +0x54)
+         * Address: 0x006DBAE0 (FUN_006DBAE0, msvc8::vector<moho::EntityCategorySet>::insert
+         * single-value lane — `insert(end(), 1, val)` for the 0x28-byte element. Computes
+         * the insert offset twice with the 66666667h/`sar 4` magic pair (0x006DBAF8 and
+         * 0x006DBB13 — 0xFFFFFFFF/40) and tail-calls the `_Insert_n` grow lane
+         * FUN_006DC600 at 0x006DBB2D. Its only code xref is 0x006DB08B inside
+         * msvc8::vector<EntityCategorySet>::push_back (FUN_006DB010), so the lane is
+         * reached only through push_back. Emitted via destination.push_back(value) in
+         * moho::PushBackEntityCategorySetVector
+         * (EntityCategorySetVectorReflection.cpp:591), whose own callers are
+         * UnitWeapon::cfunc_UnitWeaponSetTargetingPrioritiesL and
+         * CPlatoon::cfunc_CPlatoonSetPrioritizedTargetListL)
+         * Address: 0x008F6FB0 (FUN_008F6FB0, msvc8::vector<DXGI_MODE_DESC>::insert
+         * single-value lane for the 0x1C-byte POD element (92492493h/`sar 4` magic pair
+         * at 0x008F6FC5 and 0x008F6FE2 — 0xFFFFFFFF/28), tail-calling the `_Insert_n`
+         * grow lane FUN_008F6A50 at 0x008F6FFF. Emitted via entry.modes_.push_back(mode)
+         * in gpg::gal::AppendDisplayModeToAdapterModeEntry (D3D10Interfaces.cpp:2809),
+         * whose owner lane is AdapterModeD3D10::modes_ at +0x64)
+         * Address: 0x00900960 (FUN_00900960, msvc8::vector<gpg::gal::AdapterD3D10>::insert
+         * single-value lane for the 0x13C-byte polymorphic element (67B23A55h/`sar 7`
+         * magic pair at 0x00900975 and 0x00900990 — 0xFFFFFFFF/316), tail-calling the
+         * `_Insert_n` grow lane FUN_00900630 at 0x009009AB. Emitted via
+         * adapters.push_back(adapter) in gpg::gal::AppendBackendAdapter
+         * (D3D10Interfaces.cpp:2837), whose owner lane is
+         * DeviceD3D10BackendObject::adapters_ at +0x94)
+         * Address: 0x009401C0 (FUN_009401C0, msvc8::vector<gpg::gal::EffectMacro>::insert
+         * single-value lane for the 0x3C-byte element owning two msvc8::strings
+         * (88888889h/`sar 5` magic pair at 0x009401D5 and 0x009401F2 — 0xFFFFFFFF/60),
+         * tail-calling the `_Insert_n` grow lane FUN_0093FEB0 at 0x0094020F. Emitted via
+         * vec->push_back(source) in gpg::gal::PushBackEffectMacroIntoLane
+         * (ContextInterfaces.cpp:266), whose owner lane is EffectContext's macro
+         * vector at +0x54)
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
