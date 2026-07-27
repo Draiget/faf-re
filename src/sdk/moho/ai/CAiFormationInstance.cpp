@@ -3326,13 +3326,9 @@ namespace
   )
   {
     const moho::SFootprint& footprint = unit->GetFootprint();
-    moho::SOCellPos cell{};
-    cell.x = static_cast<short>(
-      static_cast<int>(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f))
-    );
-    cell.z = static_cast<short>(
-      static_cast<int>(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))
-    );
+    // FUN_007212B0 converts both coordinates with bare fistp and never calls
+    // __ftol, so this rounds to nearest rather than truncating.
+    moho::SOCellPos cell = footprint.ToCellPos(Wm3::Vec3f{position.x, 0.0f, position.z});
     return moho::COORDS_CanMoveAt(&cell, grid, unit, false, nullptr);
   }
 } // namespace

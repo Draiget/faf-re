@@ -167,12 +167,10 @@ namespace moho
     commandData.mOri[3] = sinHalf * 0.0f;
 
     // Single-cell cell-list at the footprint origin.
-    const SOCellPos cell{
-      static_cast<std::int16_t>(
-        static_cast<int>(cellPos.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f)),
-      static_cast<std::int16_t>(
-        static_cast<int>(cellPos.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f)),
-    };
+    // FUN_0057A790 converts both coordinates with bare fistp and never calls
+    // __ftol, so this rounds to nearest rather than truncating.
+    const SOCellPos cell =
+      blueprint->mFootprint.ToCellPos(Wm3::Vec3f{cellPos.x, 0.0f, cellPos.z});
     commandData.mCells.PushBack(cell);
 
     commandData.mBlueprint = blueprint;
