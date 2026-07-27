@@ -4996,7 +4996,11 @@ namespace
       return nullptr;
     }
 
-    return &it->second;
+    // The map's mapped type is a CUnitCommand pointer, not a value: the binary's
+    // node is {left,parent,right,key@0x0C,CUnitCommand*@0x10,color@0x14,isNil@0x15}
+    // (see CommandDbMapNodeRuntime in CCommandDb.cpp), so the stored slot is
+    // already the command pointer.
+    return it->second;
   }
 
   struct EntityDbEntityMapView
@@ -8962,7 +8966,9 @@ void Sim::RefreshBlips()
   }
 
   for (auto it = mCommandDB->commands.begin(); it != mCommandDB->commands.end(); ++it) {
-    it->second.RefreshBlipState();
+    if (CUnitCommand* const command = it->second) {
+      command->RefreshBlipState();
+    }
   }
 }
 
