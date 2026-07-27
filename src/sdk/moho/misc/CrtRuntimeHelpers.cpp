@@ -6663,6 +6663,49 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
 extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
 
 /**
+ * Address: 0x00A824E7 (FUN_00A824E7, memmove_s)
+ *
+ * IDA signature:
+ * errno_t __usercall memmove_s@<eax>(void *const Destination, const rsize_t DestinationSize,
+ *                                    const void *const Source, const rsize_t SourceSize);
+ *
+ * What it does:
+ * Bounds-checked memmove. A zero-byte request succeeds without touching or
+ * even validating the pointers; otherwise a null pointer reports EINVAL and an
+ * undersized destination reports ERANGE, both after setting errno and running
+ * the invalid-parameter handler.
+ *
+ * Note it does NOT scrub the destination on failure, unlike the later UCRT
+ * behaviour - the buffer is left exactly as the caller had it.
+ */
+extern "C" errno_t __cdecl RuntimeMemMoveChecked(
+  void* const destination,
+  const std::size_t destinationSize,
+  const void* const source,
+  const std::size_t sourceSize
+)
+{
+  if (sourceSize == 0u) {
+    return 0;
+  }
+
+  if (destination == nullptr || source == nullptr) {
+    errno = EINVAL;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0, 0);
+    return EINVAL;
+  }
+
+  if (destinationSize < sourceSize) {
+    errno = ERANGE;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0, 0);
+    return ERANGE;
+  }
+
+  (void)std::memmove(destination, source, sourceSize);
+  return 0;
+}
+
+/**
  * Address: 0x00A9003B (FUN_00A9003B, _wcsdup)
  *
  * IDA signature:
