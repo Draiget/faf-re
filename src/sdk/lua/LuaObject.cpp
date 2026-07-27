@@ -505,6 +505,34 @@ ProtoSerializer::ProtoSerializer()
 
 void ProtoSerializer::RegisterSerializeFunctions() {}
 
+namespace
+{
+	/**
+	 * Address: 0x00BEA380 (register_TableSerializer)
+	 * Address: 0x00BEA6B0 (register_ProtoSerializer)
+	 *
+	 * What it does:
+	 * Brings both serializer helpers into existence. Each self-links into its own
+	 * intrusive helper ring and binds its load/save callbacks - TableSerializer
+	 * through its Initialize lane, ProtoSerializer through its constructor - so
+	 * neither takes effect until something creates one. The binary drives both
+	 * from its CRT initializer table.
+	 */
+	alignas(TableSerializer) unsigned char gTableSerializerStorage[sizeof(TableSerializer)];
+
+	struct LuaValueSerializerBootstrap
+	{
+		LuaValueSerializerBootstrap()
+		{
+			(void)TableSerializer::Initialize(
+				reinterpret_cast<TableSerializer*>(gTableSerializerStorage));
+		}
+	};
+
+	LuaValueSerializerBootstrap gLuaValueSerializerBootstrap;
+	ProtoSerializer gProtoSerializer;
+}
+
 /**
  * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
  *
