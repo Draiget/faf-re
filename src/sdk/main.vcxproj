@@ -1390,7 +1390,7 @@
     <ClInclude Include="gpg\gal\VertexBuffer.hpp" />
     <ClInclude Include="gpg\gal\VertexBufferContext.hpp" />
     <ClInclude Include="gpg\gal\VertexFormat.hpp" />
-    <ClInclude Include="legacylgorithms\Sort.h" />
+    <ClInclude Include="legacy\algorithms\Sort.h" />
     <ClInclude Include="legacy\containers\AutoPtr.h" />
     <ClInclude Include="legacy\containers\Deque.h" />
     <ClInclude Include="legacy\containers\HashMap.h" />
