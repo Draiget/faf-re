@@ -6662,6 +6662,34 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
 // Defined below alongside the other CRT lock-table lanes.
 extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
 
+// Defined below with the other stream lanes.
+extern "C" int __cdecl RuntimeFlushAllStreams(int mode);
+
+/**
+ * Address: 0x00A86537 (FUN_00A86537, fflush)
+ *
+ * IDA signature:
+ * int __cdecl fflush(FILE *a1);
+ *
+ * What it does:
+ * Flushes one stream under its own lock, or every stream when given null.
+ *
+ * The null case deliberately does NOT take a per-stream lock - the flush-all
+ * lane walks the stream table under the table lock instead, which is why the
+ * two paths cannot be collapsed.
+ */
+extern "C" int __cdecl fflush(std::FILE* const stream)
+{
+  if (stream == nullptr) {
+    return RuntimeFlushAllStreams(0);
+  }
+
+  _lock_file(stream);
+  const int result = _fflush_nolock(stream);
+  _unlock_file(stream);
+  return result;
+}
+
 extern "C" int global_mode_sse2;
 extern "C" double __cdecl __CIpow_pentium4(double exponent, double base);
 
