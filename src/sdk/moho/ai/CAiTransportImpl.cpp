@@ -104,7 +104,7 @@ void STransportPickUpInfo::MemberDeserialize(gpg::ReadArchive* const archive)
   static gpg::RType* const coordsType = gpg::LookupRType(typeid(SCoordsVec2));
   static gpg::RType* const quatType = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
   static gpg::RType* const vecType = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-  static gpg::RType* const unitsType = gpg::LookupRType(typeid(SEntitySetTemplateUnit));
+  static gpg::RType* const unitsType = gpg::LookupRType(typeid(EntitySetTemplate<Unit>));
 
   const gpg::RRef ownerRef{};
   archive->Read(coordsType, &mFallbackPos, ownerRef);
@@ -134,7 +134,7 @@ void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) con
   static gpg::RType* const coordsType = gpg::LookupRType(typeid(SCoordsVec2));
   static gpg::RType* const quatType = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
   static gpg::RType* const vecType = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-  static gpg::RType* const unitsType = gpg::LookupRType(typeid(SEntitySetTemplateUnit));
+  static gpg::RType* const unitsType = gpg::LookupRType(typeid(EntitySetTemplate<Unit>));
 
   const gpg::RRef ownerRef{};
   archive->Write(coordsType, &mFallbackPos, ownerRef);
@@ -194,7 +194,7 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
   {
-    return CachedType<SEntitySetTemplateUnit>(gEntitySetTemplateUnitType);
+    return CachedType<EntitySetTemplate<Unit>>(gEntitySetTemplateUnitType);
   }
 
   [[nodiscard]] gpg::RType* ResolveReservedBoneVectorType()
