@@ -4183,6 +4183,43 @@ extern "C" __time64_t __cdecl __time64_t_from_ft(FILETIME* const fileTime)
   return static_cast<__time64_t>(-1);
 }
 
+/**
+ * Address: 0x00A855B2 (FUN_00A855B2, _time64)
+ *
+ * IDA signature:
+ * __time64_t __usercall time64@<edx:eax>(__time64_t *Time);
+ *
+ * What it does:
+ * Current UTC time in seconds since the Unix epoch. Reads the system clock as
+ * a FILETIME (100ns ticks since 1601-01-01), shifts it onto the 1970 epoch and
+ * converts to seconds. Writes the result through `outTime` when supplied and
+ * also returns it.
+ *
+ * Unlike `__time64_t_from_ft` above this stays in UTC - no local-time
+ * conversion is involved.
+ */
+extern "C" __time64_t __cdecl RuntimeCurrentTime64(__time64_t* const outTime)
+{
+  // 116444736000000000 = 100ns ticks between 1601-01-01 and 1970-01-01.
+  constexpr std::int64_t kFileTimeToUnixEpochTicks = 0x19DB1DED53E8000LL;
+  constexpr std::int64_t kTicksPerSecond = 10000000LL;
+
+  FILETIME systemTimeAsFileTime{};
+  ::GetSystemTimeAsFileTime(&systemTimeAsFileTime);
+
+  const std::int64_t ticks =
+    (static_cast<std::int64_t>(systemTimeAsFileTime.dwHighDateTime) << 32)
+    | static_cast<std::int64_t>(systemTimeAsFileTime.dwLowDateTime);
+
+  const __time64_t seconds =
+    static_cast<__time64_t>((ticks - kFileTimeToUnixEpochTicks) / kTicksPerSecond);
+
+  if (outTime != nullptr) {
+    *outTime = seconds;
+  }
+  return seconds;
+}
+
 namespace
 {
   /**
