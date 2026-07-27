@@ -5383,6 +5383,57 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00BEA0A0 (register_WrapFileTypeInfo)
+	 * Address: 0x00BEA100 (register_TObjectTypeInfo)
+	 *
+	 * What it does:
+	 * Constructs the two descriptors so their constructors can pre-register
+	 * `typeid(WrapFile)` and `typeid(TObject)`. Both register from their ctor,
+	 * so without an instance neither typeid ever reaches the reflection map.
+	 * The binary drives both from its CRT initializer table.
+	 */
+	alignas(WrapFileTypeInfo) unsigned char gWrapFileTypeInfoStorage[sizeof(WrapFileTypeInfo)];
+	alignas(TObjectTypeInfo) unsigned char gTObjectTypeInfoStorage[sizeof(TObjectTypeInfo)];
+	bool gWrapFileTypeInfoConstructed = false;
+	bool gTObjectTypeInfoConstructed = false;
+
+	void CleanupWrapFileTypeInfo()
+	{
+		if (!gWrapFileTypeInfoConstructed) {
+			return;
+		}
+		auto& ti = *reinterpret_cast<WrapFileTypeInfo*>(gWrapFileTypeInfoStorage);
+		ti.fields_ = msvc8::vector<gpg::RField>{};
+		ti.bases_ = msvc8::vector<gpg::RField>{};
+	}
+
+	void CleanupTObjectTypeInfo()
+	{
+		if (!gTObjectTypeInfoConstructed) {
+			return;
+		}
+		auto& ti = *reinterpret_cast<TObjectTypeInfo*>(gTObjectTypeInfoStorage);
+		ti.fields_ = msvc8::vector<gpg::RField>{};
+		ti.bases_ = msvc8::vector<gpg::RField>{};
+	}
+
+	struct LuaObjectTypeInfoBootstrap
+	{
+		LuaObjectTypeInfoBootstrap()
+		{
+			new (gWrapFileTypeInfoStorage) WrapFileTypeInfo();
+			gWrapFileTypeInfoConstructed = true;
+			(void)std::atexit(&CleanupWrapFileTypeInfo);
+
+			new (gTObjectTypeInfoStorage) TObjectTypeInfo();
+			gTObjectTypeInfoConstructed = true;
+			(void)std::atexit(&CleanupTObjectTypeInfo);
+		}
+	};
+
+	LuaObjectTypeInfoBootstrap gLuaObjectTypeInfoBootstrap;
+
+	/**
 	 * Address: 0x00917CE0 (FUN_00917CE0, sub_917CE0)
 	 *
 	 * What it does:
