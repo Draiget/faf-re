@@ -5441,6 +5441,42 @@ namespace
   }
 
   /**
+   * Address: 0x00FB8A50 (xlock::mtx) / 0x00F3F848 (xlock::init)
+   *
+   * The iostreams lock table and its one-time guard. The guard starts at -1
+   * (read from the image at 0x00F3F848) so the first InterlockedIncrement
+   * returns 0 and exactly one caller performs the initialization. The table
+   * spans 0x00FB8A50..0x00FB8AB0 = 0x60 bytes at 0x18 per CRITICAL_SECTION,
+   * i.e. four locks, and lives in zero-initialised BSS.
+   */
+  constexpr std::size_t kIostreamsLockCount = 4;
+  CRITICAL_SECTION gIostreamsLocks[kIostreamsLockCount]{};
+  volatile LONG gIostreamsLockInit = -1;
+
+  /**
+   * Address: 0x00ABF81C (FUN_00ABF81C, _Init_locks::_Init_locks)
+   *
+   * IDA signature:
+   * void __thiscall _Init_locks::_Init_locks(void *this);
+   *
+   * What it does:
+   * Initializes the iostreams lock table exactly once. The interlocked
+   * increment is the arbiter: only the caller that observes 0 (the guard was
+   * -1) runs the loop, so concurrent constructions are safe and later ones are
+   * no-ops.
+   */
+  void RuntimeInitIostreamsLocks() noexcept
+  {
+    if (::InterlockedIncrement(&gIostreamsLockInit) != 0) {
+      return;
+    }
+
+    for (CRITICAL_SECTION& lock : gIostreamsLocks) {
+      RuntimeMtxInit(&lock);
+    }
+  }
+
+  /**
    * Address: 0x00AC073B (FUN_00AC073B, _Mtxlock)
    *
    * What it does:
