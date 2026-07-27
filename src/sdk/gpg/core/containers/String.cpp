@@ -1106,7 +1106,19 @@ msvc8::string gpg::STR_Va(
   const va_list va
 )
 {
-  msvc8::string builder{};
+  // Build through msvc8::string's concatenation path, not append().
+  //
+  // msvc8::string is the legacy non-owning wrapper: it holds an inline buffer
+  // of 15 chars and never reallocates, so append() returns false and copies
+  // nothing once mySize + n exceeds myRes. Formatted diagnostics are almost
+  // always longer than 15 characters, so appending into a default-constructed
+  // string silently produced an empty result - every Logf/Die/exception
+  // message the engine formatted came out blank.
+  //
+  // Concatenation is the wrapper's supported route for longer strings: it
+  // stages them in the thread-local arena behind get_concat_buffer and adopts
+  // that storage, which is the same lifetime contract every operator+ already
+  // relies on.
   char stackBuffer[256]{};
   int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, va);
   if (formattedLength == -1) {
@@ -1118,10 +1130,9 @@ msvc8::string gpg::STR_Va(
       formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, va);
     } while (formattedLength == -1);
 
-    builder.append(dynamicBuffer.data(), formattedLength);
-    return builder;
+    return msvc8::string{} +
+           std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
   }
 
-  builder.append(stackBuffer, formattedLength);
-  return builder;
+  return msvc8::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));
 }
