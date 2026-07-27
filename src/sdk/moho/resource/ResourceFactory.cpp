@@ -9,8 +9,6 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/SScmFile.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   void DeleteScmFileBuffer(const moho::SScmFile* const scmFile) noexcept

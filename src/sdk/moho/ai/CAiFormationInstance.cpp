@@ -31,7 +31,8 @@
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -4936,3 +4937,12 @@ namespace moho
     return true;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SUnitOffsetInfoTypeInfo_12dfcf, moho::preregister_SUnitOffsetInfoTypeInfo)
+GPG_PREREGISTER_INIT(preregister_IFormationInstanceTypeInfo_12dfcf, moho::preregister_IFormationInstanceTypeInfo)
+GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SUnitOffsetInfo_12dfcf, moho::preregister_RMapType_EntId_SUnitOffsetInfo)
+GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EFormationdStatus_12dfcf, moho::preregister_RBroadcasterRType_EFormationdStatus)
+GPG_PREREGISTER_INIT(preregister_RListenerRType_EFormationdStatus_12dfcf, moho::preregister_RListenerRType_EFormationdStatus)
+GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SCoordsVec2_12dfcf, moho::preregister_RMapType_EntId_SCoordsVec2)

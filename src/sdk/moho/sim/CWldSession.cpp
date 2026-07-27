@@ -54,7 +54,8 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
-#include "moho/command/CommandIssueHelper.h"
+#include "moho/command/CommandIssueHelper.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -11626,3 +11627,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   *out = commandModeData;
   return out;
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RMultiMapType_EntId_string_933d97, preregister_RMultiMapType_EntId_string)

@@ -6,12 +6,11 @@
 
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/CPlatoon.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // CPlatoon registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query CPlatoon RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::CPlatoonTypeInfo) unsigned char gCPlatoonTypeInfoStorage[sizeof(moho::CPlatoonTypeInfo)];
@@ -135,3 +134,8 @@ namespace
 
   [[maybe_unused]] CPlatoonTypeInfoRegistration gCPlatoonTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CPlatoonTypeInfo_007b24, moho::register_CPlatoonTypeInfo)

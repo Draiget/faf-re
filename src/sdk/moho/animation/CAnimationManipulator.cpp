@@ -21,7 +21,8 @@
 #include "moho/resource/RScaResource.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1969,3 +1970,10 @@ namespace
 
   [[maybe_unused]] CAnimationManipulatorStartupBootstrap gCAnimationManipulatorStartupBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAnimationManipulatorTypeInfo_344280, moho::register_CAnimationManipulatorTypeInfo)
+
+GPG_PREREGISTER_INIT(GetCAnimationManipulatorTypeInfo_344280, GetCAnimationManipulatorTypeInfo)

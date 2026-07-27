@@ -7,12 +7,11 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // UserUnit registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query UserUnit RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   // Reflected base sub-object offsets inside the retail `UserUnit` complete
@@ -162,3 +161,8 @@ namespace
 
   [[maybe_unused]] UserUnitTypeInfoRegistration gUserUnitTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_UserUnitTypeInfo_497a76, moho::register_UserUnitTypeInfo)

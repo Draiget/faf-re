@@ -2,7 +2,8 @@
 
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 /**
  * Address: 0x00923280 (FUN_00923280, TStringTypeInfo deleting-dtor thunk)
@@ -557,3 +558,14 @@ void register_UdataTypeInfoStartup()
   }
 }
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_TStringTypeInfoStartup_8f60e9, register_TStringTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_TableTypeInfoStartup_8f60e9, register_TableTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_LClosureTypeInfoStartup_8f60e9, register_LClosureTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_UpValTypeInfoStartup_8f60e9, register_UpValTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_ProtoTypeInfoStartup_8f60e9, register_ProtoTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_lua_StateTypeInfoStartup_8f60e9, register_lua_StateTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_UdataTypeInfoStartup_8f60e9, register_UdataTypeInfoStartup)

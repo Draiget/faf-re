@@ -6,6 +6,7 @@
 
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -131,3 +132,7 @@ namespace
 
   [[maybe_unused]] CEffectManagerImplTypeInfoBootstrap gCEffectManagerImplTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEffectManagerImplTypeInfo_00_3343ce, moho::register_CEffectManagerImplTypeInfo_00)

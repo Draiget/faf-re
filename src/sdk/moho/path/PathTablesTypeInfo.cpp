@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/path/PathTables.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // PathTables registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query PathTables RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::PathTablesTypeInfo) unsigned char gPathTablesTypeInfoStorage[sizeof(moho::PathTablesTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] PathTablesTypeInfoRegistration gPathTablesTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_PathTablesTypeInfo_7db8da, moho::register_PathTablesTypeInfo)

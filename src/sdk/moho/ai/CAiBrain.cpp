@@ -65,7 +65,8 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -8968,3 +8969,7 @@ int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
   resultArray.PushStack(state);
   return 1;
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_BuildReserveMapTypeInfo_f3fc29, preregister_BuildReserveMapTypeInfo)

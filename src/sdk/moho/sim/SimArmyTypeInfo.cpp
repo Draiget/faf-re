@@ -2,7 +2,8 @@
 
 #include <typeinfo>
 
-#include "moho/sim/SimArmy.h"
+#include "moho/sim/SimArmy.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -102,3 +103,8 @@ namespace
 
   SimArmyTypeInfoBootstrap gSimArmyTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SimArmyTypeInfo_411663, moho::register_SimArmyTypeInfo)

@@ -9,7 +9,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/render/EmitterType.h"
+#include "moho/render/EmitterType.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -302,3 +303,7 @@ namespace
 
   [[maybe_unused]] EmitterTypeTypeInfoBootstrap gEmitterTypeTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EmitterTypeTypeInfo_00_78818e, moho::register_EmitterTypeTypeInfo_00)

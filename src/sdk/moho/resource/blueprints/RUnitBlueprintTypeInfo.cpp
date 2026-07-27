@@ -8,6 +8,7 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintWeaponVectorReflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -449,3 +450,8 @@ namespace moho
     (void)std::atexit(&cleanup_RUnitBlueprintTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RUnitBlueprintTypeInfo_79d1ea, moho::register_RUnitBlueprintTypeInfo)

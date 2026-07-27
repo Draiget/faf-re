@@ -17,7 +17,8 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/CArmyStats.h"
+#include "moho/sim/CArmyStats.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1565,3 +1566,10 @@ namespace
 
   SConditionTriggerBootstrap gSConditionTriggerBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ETriggerOperatorTypeInfo_61eef0, moho::register_ETriggerOperatorTypeInfo)
+GPG_PREREGISTER_INIT(register_SConditionTypeInfo_61eef0, moho::register_SConditionTypeInfo)
+GPG_PREREGISTER_INIT(register_STriggerTypeInfo_61eef0, moho::register_STriggerTypeInfo)

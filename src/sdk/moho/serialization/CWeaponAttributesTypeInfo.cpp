@@ -7,8 +7,6 @@
 #include "moho/serialization/CWeaponAttributesSerializer.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using TypeInfo = moho::CWeaponAttributesTypeInfo;

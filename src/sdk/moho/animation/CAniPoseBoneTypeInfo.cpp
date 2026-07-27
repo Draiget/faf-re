@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -579,3 +580,9 @@ namespace gpg
     ResizeFastVectorCAniPoseBoneToCount(static_cast<unsigned int>(count), view, fill);
   }
 } // namespace gpg
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CAniPoseBoneTypeInfo_af44d4, moho::preregister_CAniPoseBoneTypeInfo)
+GPG_PREREGISTER_INIT(preregister_FastVectorCAniPoseBoneType_af44d4, moho::preregister_FastVectorCAniPoseBoneType)
+GPG_PREREGISTER_INIT(register_FastVectorCAniPoseBoneTypeAtexit_af44d4, moho::register_FastVectorCAniPoseBoneTypeAtexit)

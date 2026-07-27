@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ui/UiRuntimeTypes.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -77,3 +78,8 @@ void moho::register_CMauiFrameTypeInfoStartup()
   (void)AcquireCMauiFrameTypeInfo();
   (void)std::atexit(&cleanup_CMauiFrameTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CMauiFrameTypeInfoStartup_050fa0, moho::register_CMauiFrameTypeInfoStartup)

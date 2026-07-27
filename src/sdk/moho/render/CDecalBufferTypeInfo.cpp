@@ -3,7 +3,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/render/CDecalBuffer.h"
+#include "moho/render/CDecalBuffer.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -132,3 +133,7 @@ namespace moho
     return &typeInfo;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CDecalBufferTypeInfo_5f3209, moho::preregister_CDecalBufferTypeInfo)

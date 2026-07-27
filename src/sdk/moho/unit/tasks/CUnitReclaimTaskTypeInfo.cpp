@@ -5,6 +5,7 @@
 
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitReclaimTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -238,3 +239,7 @@ namespace moho
     object->~CUnitReclaimTaskReflectionView();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(AcquireCUnitReclaimTaskTypeInfo_13dd41, AcquireCUnitReclaimTaskTypeInfo)

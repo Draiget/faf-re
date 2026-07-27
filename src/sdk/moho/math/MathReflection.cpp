@@ -18,9 +18,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/CRandomStream.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/CRandomStream.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2402,3 +2401,17 @@ extern "C" double __cdecl ceil(double value)
 
   return CeilScalarCore(value);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_AxisAlignedBox3fTypeInfo_e3917f, moho::register_AxisAlignedBox3fTypeInfo)
+GPG_PREREGISTER_INIT(register_Vector2iTypeInfo_e3917f, moho::register_Vector2iTypeInfo)
+GPG_PREREGISTER_INIT(register_Vector3iTypeInfo_e3917f, moho::register_Vector3iTypeInfo)
+GPG_PREREGISTER_INIT(register_Vector2fTypeInfo_e3917f, moho::register_Vector2fTypeInfo)
+GPG_PREREGISTER_INIT(register_Vector3fTypeInfo_e3917f, moho::register_Vector3fTypeInfo)
+GPG_PREREGISTER_INIT(register_Vector4fTypeInfo_e3917f, moho::register_Vector4fTypeInfo)
+GPG_PREREGISTER_INIT(register_QuaternionfTypeInfo_e3917f, moho::register_QuaternionfTypeInfo)
+GPG_PREREGISTER_INIT(register_VEulers3TypeInfo_e3917f, moho::register_VEulers3TypeInfo)
+GPG_PREREGISTER_INIT(register_VAxes3TypeInfo_e3917f, moho::register_VAxes3TypeInfo)
+GPG_PREREGISTER_INIT(register_VMatrix4TypeInfo_e3917f, moho::register_VMatrix4TypeInfo)

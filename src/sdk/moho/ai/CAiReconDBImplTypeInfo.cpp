@@ -10,7 +10,8 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/ai/IAiReconDBTypeInfo.h"
-#include "moho/sim/ReconBlip.h"
+#include "moho/sim/ReconBlip.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -1092,3 +1093,11 @@ int moho::register_RMultiMapType_SReconKey_ReconBlipPtr()
   (void)preregister_RMultiMapType_SReconKey_ReconBlipPtr();
   return std::atexit(&cleanup_RMultiMapType_SReconKey_ReconBlipPtr_Impl);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiReconDBImplTypeInfo_049ac2, moho::register_CAiReconDBImplTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_RVectorType_ReconBlipPtr_049ac2, moho::preregister_RVectorType_ReconBlipPtr)
+GPG_PREREGISTER_INIT(preregister_RMultiMapType_SReconKey_ReconBlipPtr_049ac2, moho::preregister_RMultiMapType_SReconKey_ReconBlipPtr)

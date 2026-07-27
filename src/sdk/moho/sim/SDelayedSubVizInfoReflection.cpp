@@ -11,9 +11,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2047,3 +2046,10 @@ void gpg::RVectorType<moho::SDelayedSubVizInfo>::SetCount(void* const obj, const
   const moho::SDelayedSubVizInfo zeroFill{};
   (void)ResizeDelayedSubVizVectorWithFill(*storage, static_cast<std::size_t>(count), zeroFill);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SDelayedSubVizInfoTypeInfo_b03a7d, moho::preregister_SDelayedSubVizInfoTypeInfo)
+GPG_PREREGISTER_INIT(register_SDelayedSubVizInfoVectorType_b03a7d, moho::register_SDelayedSubVizInfoVectorType)
+
+GPG_PREREGISTER_INIT(ConstructAndRegisterDelayedSubVizVectorType_b03a7d, ConstructAndRegisterDelayedSubVizVectorType)

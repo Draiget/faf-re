@@ -8,7 +8,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -647,3 +648,11 @@ namespace moho
     return std::atexit(&cleanup_VectorRMeshBlueprintLODTypeStorage);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RMeshBlueprintLODTypeInfo_8ee506, moho::register_RMeshBlueprintLODTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_VectorRMeshBlueprintLODType_8ee506, moho::preregister_VectorRMeshBlueprintLODType)
+GPG_PREREGISTER_INIT(register_VectorRMeshBlueprintLODTypeAtexit_8ee506, moho::register_VectorRMeshBlueprintLODTypeAtexit)

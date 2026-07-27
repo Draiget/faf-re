@@ -13,7 +13,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/CParticleTexture.h"
 #include "moho/resource/CParticleTextureReflection.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -764,3 +765,10 @@ namespace
 
   [[maybe_unused]] CParticleTextureCountedPtrReflectionBootstrap gCParticleTextureCountedPtrReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CountedPtrCParticleTextureType_d01659, moho::preregister_CountedPtrCParticleTextureType)
+GPG_PREREGISTER_INIT(register_CountedPtrCParticleTextureTypeAtexit_d01659, moho::register_CountedPtrCParticleTextureTypeAtexit)
+GPG_PREREGISTER_INIT(preregister_FastVectorCountedPtrCParticleTextureType_d01659, moho::preregister_FastVectorCountedPtrCParticleTextureType)
+GPG_PREREGISTER_INIT(register_FastVectorCountedPtrCParticleTextureTypeAtexit_d01659, moho::register_FastVectorCountedPtrCParticleTextureTypeAtexit)

@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/render/CDecalTypes.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // SDecalInfo registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query SDecalInfo RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::SDecalInfoTypeInfo) unsigned char gSDecalInfoTypeInfoStorage[sizeof(moho::SDecalInfoTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] SDecalInfoTypeInfoRegistration gSDecalInfoTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SDecalInfoTypeInfo_e40ec1, moho::register_SDecalInfoTypeInfo)

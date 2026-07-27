@@ -17,7 +17,8 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -855,3 +856,10 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CSlaveManipulatorTypeInfoStartup_28b2e3, register_CSlaveManipulatorTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(preregister_CSlaveManipulatorTypeInfo_28b2e3, preregister_CSlaveManipulatorTypeInfo)

@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/entity/Entity.h"
+#include "moho/entity/Entity.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -144,3 +145,8 @@ namespace
 
   WeakUnitSetTypeInfoBootstrap gWeakUnitSetTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WeakUnitSetTypeInfo_72e330, moho::register_WeakUnitSetTypeInfo)

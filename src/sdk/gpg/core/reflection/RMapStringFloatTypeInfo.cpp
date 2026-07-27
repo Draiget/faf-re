@@ -8,6 +8,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -200,3 +201,7 @@ namespace gpg
     return std::atexit(&CleanupMapStringFloatTypeInfoAtExit);
   }
 } // namespace gpg
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_MapStringFloat_Type_00_7b60b7, gpg::register_MapStringFloat_Type_00)

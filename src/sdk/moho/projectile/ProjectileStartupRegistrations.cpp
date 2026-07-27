@@ -22,9 +22,8 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SPhysConstants.h"
-#include "moho/sim/Sim.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -3309,3 +3308,11 @@ namespace moho
     return std::atexit(&cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EProjectileImpactEventTypeInfo_6d193a, moho::register_EProjectileImpactEventTypeInfo)
+GPG_PREREGISTER_INIT(register_CProjectileAttributesTypeInfo_6d193a, moho::register_CProjectileAttributesTypeInfo)
+GPG_PREREGISTER_INIT(register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
+GPG_PREREGISTER_INIT(register_ManyToOneListener_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneListener_EProjectileImpactEvent_TypeInfo)

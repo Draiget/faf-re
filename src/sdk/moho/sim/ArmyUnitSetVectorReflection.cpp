@@ -6,7 +6,8 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -203,3 +204,7 @@ int moho::register_EntitySetTemplateUnitVectorType_AtExit()
   (void)register_EntitySetTemplateUnitVectorType();
   return std::atexit(&cleanup_EntitySetTemplateUnitVectorType);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EntitySetTemplateUnitVectorType_50022b, moho::register_EntitySetTemplateUnitVectorType)

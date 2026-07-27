@@ -1192,7 +1192,7 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
     return;
   }
 
-  CUnitCommand* const coordinatingCommand = &it->second;
+  CUnitCommand* const coordinatingCommand = it->second;
   if (!coordinatingCommand) {
     return;
   }

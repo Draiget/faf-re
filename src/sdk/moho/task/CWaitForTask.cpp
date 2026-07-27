@@ -9,7 +9,8 @@
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
-#include "moho/script/CScriptEvent.h"
+#include "moho/script/CScriptEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -516,3 +517,10 @@ void CWaitForTaskTypeInfo::Init()
   AddCTaskBaseToTypeInfo(this);
   Finish();
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CWaitForTaskTypeInfo_30426d, moho::register_CWaitForTaskTypeInfo)
+
+GPG_PREREGISTER_INIT(PreRegisterCWaitForTaskTypeInfo_30426d, PreRegisterCWaitForTaskTypeInfo)

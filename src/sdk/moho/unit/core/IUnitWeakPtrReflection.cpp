@@ -10,7 +10,8 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -596,3 +597,9 @@ gpg::RType* gpg::preregister_FastVectorWeakPtrIUnitTypeStartup()
   gpg::PreRegisterRType(typeid(gpg::fastvector<moho::WeakPtr<moho::IUnit>>), typeInfo);
   return typeInfo;
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_IUnitTypeInfoStartup_b5549d, moho::preregister_IUnitTypeInfoStartup)
+GPG_PREREGISTER_INIT(preregister_WeakPtrIUnitTypeStartup_b5549d, moho::preregister_WeakPtrIUnitTypeStartup)
+GPG_PREREGISTER_INIT(preregister_FastVectorWeakPtrIUnitTypeStartup_b5549d, gpg::preregister_FastVectorWeakPtrIUnitTypeStartup)

@@ -170,6 +170,7 @@
 #include "lua/LuaRuntimeTypes.h"
 #include "lua/LuaObject.h"
 #include "Wm3Vector3.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 using namespace gpg;
 
 
@@ -13734,3 +13735,15 @@ gpg::RRef* PackRRef_Entity(RRef* const out, moho::Entity* const value)
 }
 
 } // namespace gpg
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_Rect2iTypeInfo_65cf11, register_Rect2iTypeInfo)
+GPG_PREREGISTER_INIT(register_Rect2fTypeInfo_65cf11, register_Rect2fTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CAcquireTargetTaskPointerTypeStartup_65cf11, gpg::preregister_CAcquireTargetTaskPointerTypeStartup)
+GPG_PREREGISTER_INIT(preregister_SimArmyPointerTypeStartup_65cf11, gpg::preregister_SimArmyPointerTypeStartup)
+GPG_PREREGISTER_INIT(preregister_ShieldPointerTypeStartup_65cf11, gpg::preregister_ShieldPointerTypeStartup)
+GPG_PREREGISTER_INIT(preregister_CDecalHandlePointerTypeStartup_65cf11, gpg::preregister_CDecalHandlePointerTypeStartup)
+GPG_PREREGISTER_INIT(preregister_SimArmyVectorTypeStartup_65cf11, gpg::preregister_SimArmyVectorTypeStartup)

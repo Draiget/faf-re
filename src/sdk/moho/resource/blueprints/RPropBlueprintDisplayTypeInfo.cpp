@@ -6,6 +6,7 @@
 
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -128,3 +129,8 @@ namespace moho
     return std::atexit(&cleanup_RPropBlueprintDisplayTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RPropBlueprintDisplayTypeInfo_882cea, moho::register_RPropBlueprintDisplayTypeInfo)

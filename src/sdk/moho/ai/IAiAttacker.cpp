@@ -18,7 +18,8 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/Listener.h"
-#include "moho/unit/core/UnitWeapon.h"
+#include "moho/unit/core/UnitWeapon.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -992,3 +993,9 @@ namespace
 
   [[maybe_unused]] IAiAttackerReflectionBootstrap gIAiAttackerReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EAiAttackerEvent_1874e7, moho::preregister_RBroadcasterRType_EAiAttackerEvent)
+GPG_PREREGISTER_INIT(preregister_RVectorType_UnitWeaponPtr_1874e7, moho::preregister_RVectorType_UnitWeaponPtr)
+GPG_PREREGISTER_INIT(preregister_RVectorType_CAcquireTargetTaskPtr_1874e7, moho::preregister_RVectorType_CAcquireTargetTaskPtr)

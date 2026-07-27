@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -278,3 +279,10 @@ namespace
 
   [[maybe_unused]] EAllianceTypeInfoBootstrap gEAllianceTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EAllianceTypeInfo_90bbef, moho::register_EAllianceTypeInfo)
+
+GPG_PREREGISTER_INIT(ConstructEAllianceTypeInfoInternal_90bbef, ConstructEAllianceTypeInfoInternal)

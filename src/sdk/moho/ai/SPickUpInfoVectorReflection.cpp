@@ -9,6 +9,7 @@
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/SPickUpInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -338,3 +339,8 @@ int moho::register_VectorSPickUpInfoTypeAtexit()
   (void)preregister_VectorSPickUpInfoType();
   return std::atexit(&cleanup_VectorSPickUpInfoTypeStorage);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_VectorSPickUpInfoType_37b846, moho::preregister_VectorSPickUpInfoType)
+GPG_PREREGISTER_INIT(register_VectorSPickUpInfoTypeAtexit_37b846, moho::register_VectorSPickUpInfoTypeAtexit)

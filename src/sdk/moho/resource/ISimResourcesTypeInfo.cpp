@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/resource/ISimResources.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -124,3 +125,8 @@ namespace moho
     (void)std::atexit(&cleanup_ISimResourcesTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ISimResourcesTypeInfo_415ee2, moho::register_ISimResourcesTypeInfo)

@@ -7,7 +7,8 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -741,3 +742,10 @@ namespace
   [[maybe_unused]] SPointVectorTypeInfoBootstrap gSPointVectorTypeInfoBootstrap;
   [[maybe_unused]] SPointVectorVectorTypeBootstrap gSPointVectorVectorTypeBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SPointVectorTypeInfo_169786, moho::register_SPointVectorTypeInfo)
+
+GPG_PREREGISTER_INIT(register_SPointVectorVectorType_169786, moho::register_SPointVectorVectorType)

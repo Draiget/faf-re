@@ -12,7 +12,8 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/EFormationdStatusTypeInfo.h"
-#include "moho/unit/Broadcaster.h"
+#include "moho/unit/Broadcaster.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -615,3 +616,7 @@ namespace
 
   IFormationInstanceCountedPtrReflectionBootstrap gIFormationInstanceCountedPtrReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterIFormationInstancePointerType_096ddf, moho::PreregisterIFormationInstancePointerType)

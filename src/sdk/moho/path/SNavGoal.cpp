@@ -8,9 +8,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/sim/SOCellPos.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/SOCellPos.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -372,3 +371,8 @@ namespace
 
   [[maybe_unused]] SNavGoalBootstrap gSNavGoalBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SNavGoalTypeInfo_cc117b, moho::register_SNavGoalTypeInfo)

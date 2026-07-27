@@ -12,7 +12,8 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2354,3 +2355,13 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_LaunchInfoNewTypeInfo_05cb74, moho::register_LaunchInfoNewTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_ArmyLaunchInfoVectorTypeStartup_05cb74, moho::preregister_ArmyLaunchInfoVectorTypeStartup)
+
+GPG_PREREGISTER_INIT(RegisterArmyLaunchInfoTypeInfoStartup_05cb74, RegisterArmyLaunchInfoTypeInfoStartup)
+GPG_PREREGISTER_INIT(EnsureLaunchInfoBaseTypeRegistered_05cb74, EnsureLaunchInfoBaseTypeRegistered)

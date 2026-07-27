@@ -6,6 +6,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "moho/animation/CAniPose.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -153,3 +154,7 @@ namespace gpg
     return typeInfo;
   }
 } // namespace gpg
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SharedPtrCAniPoseTypeStartup_4971d6, gpg::preregister_SharedPtrCAniPoseTypeStartup)

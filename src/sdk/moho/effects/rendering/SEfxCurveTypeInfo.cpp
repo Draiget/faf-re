@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/effects/rendering/SEfxCurve.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -90,3 +91,8 @@ namespace moho
     return std::atexit(&cleanup_SEfxCurveTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SEfxCurveTypeInfo_49049d, moho::register_SEfxCurveTypeInfo)

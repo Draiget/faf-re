@@ -6,6 +6,7 @@
 
 #include "moho/animation/CAniDefaultSkel.h"
 #include "moho/animation/CAniSkel.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -110,3 +111,7 @@ namespace moho
     return std::atexit(&cleanup_CAniDefaultSkelTypeInfo);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CAniDefaultSkelTypeInfo_08e177, moho::preregister_CAniDefaultSkelTypeInfo)

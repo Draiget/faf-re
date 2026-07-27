@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -276,3 +277,10 @@ namespace
   [[maybe_unused]] EUnitCommandTypeTypeInfoBootstrap gEUnitCommandTypeTypeInfoBootstrap;
 } // namespace
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EUnitCommandTypeTypeInfo_14a04b, moho::register_EUnitCommandTypeTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_EUnitCommandTypeTypeInfo_14a04b, moho::preregister_EUnitCommandTypeTypeInfo)

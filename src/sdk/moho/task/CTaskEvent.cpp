@@ -9,7 +9,8 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -923,3 +924,9 @@ namespace
 
   [[maybe_unused]] CTaskEventReflectionBootstrap gCTaskEventReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_STaskEventLinkageTypeInfo_7aa7c0, moho::register_STaskEventLinkageTypeInfo)
+GPG_PREREGISTER_INIT(register_CTaskEventTypeInfo_7aa7c0, moho::register_CTaskEventTypeInfo)

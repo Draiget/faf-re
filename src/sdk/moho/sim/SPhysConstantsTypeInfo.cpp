@@ -4,9 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/SPhysConstants.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/SPhysConstants.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -312,3 +311,8 @@ namespace
 
   [[maybe_unused]] SPhysConstantsTypeInfoBootstrap gSPhysConstantsTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SPhysConstantsTypeInfo_4a719c, moho::register_SPhysConstantsTypeInfo)

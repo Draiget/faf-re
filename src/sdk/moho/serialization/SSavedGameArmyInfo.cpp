@@ -2,7 +2,8 @@
 
 #include <typeinfo>
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -168,3 +169,7 @@ namespace moho
     type->serSaveFunc_ = mSerSaveFunc;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSavedGameArmyInfoTypeInfo_ed43fe, preregister_SSavedGameArmyInfoTypeInfo)

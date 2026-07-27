@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -116,3 +117,8 @@ void register_stringTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_stringTypeInfoStartup_3f2685, register_stringTypeInfoStartup)

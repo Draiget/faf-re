@@ -4,8 +4,6 @@
 
 #include "moho/entity/intel/CIntelPosHandle.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   using Serializer = moho::CIntelPosHandleSerializer;

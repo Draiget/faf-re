@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiTransportImpl.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -87,3 +88,10 @@ int moho::register_SAttachPointTypeInfo()
   (void)preregister_SAttachPointTypeInfoStartup();
   return std::atexit(&cleanup_SAttachPointTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SAttachPointTypeInfo_1ad790, moho::register_SAttachPointTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_SAttachPointTypeInfoStartup_1ad790, preregister_SAttachPointTypeInfoStartup)

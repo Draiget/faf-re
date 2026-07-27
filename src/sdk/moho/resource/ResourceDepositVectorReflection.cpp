@@ -8,7 +8,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/ResourceDeposit.h"
+#include "moho/resource/ResourceDeposit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -510,3 +511,8 @@ int moho::register_VectorResourceDepositTypeAtexit()
   return std::atexit(&cleanup_VectorResourceDepositTypeStorage);
 }
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_VectorResourceDepositType_c50930, moho::preregister_VectorResourceDepositType)
+GPG_PREREGISTER_INIT(register_VectorResourceDepositTypeAtexit_c50930, moho::register_VectorResourceDepositTypeAtexit)

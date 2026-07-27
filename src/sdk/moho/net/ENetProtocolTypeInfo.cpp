@@ -6,6 +6,7 @@
 #include <typeinfo>
 
 #include "moho/net/NetTransportEnums.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -108,3 +109,8 @@ namespace
   ENetProtocolTypeInfoBootstrap gENetProtocolTypeInfoBootstrap;
 } // namespace
 
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ENetProtocolTypeInfo_691d12, moho::register_ENetProtocolTypeInfo)

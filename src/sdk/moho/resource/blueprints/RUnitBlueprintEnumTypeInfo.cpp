@@ -7,7 +7,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1130,3 +1131,14 @@ namespace
 
   RUnitBlueprintEnumTypeInfoBootstrap gRUnitBlueprintEnumTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ERuleBPUnitBuildRestrictionTypeInfo_8d2279, moho::register_ERuleBPUnitBuildRestrictionTypeInfo)
+GPG_PREREGISTER_INIT(register_ERuleBPUnitWeaponBallisticArcTypeInfo_8d2279, moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo)
+GPG_PREREGISTER_INIT(register_ERuleBPUnitWeaponTargetTypeTypeInfo_8d2279, moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo)
+GPG_PREREGISTER_INIT(register_ERuleBPUnitMovementTypeTypeInfo_8d2279, moho::register_ERuleBPUnitMovementTypeTypeInfo)
+GPG_PREREGISTER_INIT(register_ERuleBPUnitCommandCapsTypeInfo_8d2279, moho::register_ERuleBPUnitCommandCapsTypeInfo)
+GPG_PREREGISTER_INIT(register_ERuleBPUnitToggleCapsTypeInfo_8d2279, moho::register_ERuleBPUnitToggleCapsTypeInfo)
+GPG_PREREGISTER_INIT(register_UnitWeaponRangeCategoryTypeInfo_8d2279, moho::register_UnitWeaponRangeCategoryTypeInfo)

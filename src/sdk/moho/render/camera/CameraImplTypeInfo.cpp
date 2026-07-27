@@ -6,6 +6,7 @@
 
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/script/CScriptEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -112,3 +113,8 @@ void moho::register_CameraImplTypeInfoStartup()
   (void)AcquireCameraImplTypeInfo();
   (void)std::atexit(&cleanup_CameraImplTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CameraImplTypeInfoStartup_035071, moho::register_CameraImplTypeInfoStartup)

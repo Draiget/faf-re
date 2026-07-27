@@ -34,6 +34,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/ui/SDebugLine.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -1189,3 +1190,10 @@ namespace
 
   [[maybe_unused]] CDamageTypeInfoBootstrap gCDamageTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CDamageTypeInfo_13c59b, moho::register_CDamageTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CDamageTypeInfo_13c59b, moho::preregister_CDamageTypeInfo)

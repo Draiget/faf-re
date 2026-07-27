@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/ai/LAiAttackerImpl.h"
-#include "moho/task/CTask.h"
+#include "moho/task/CTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -184,3 +185,8 @@ void moho::register_LAiAttackerImplTypeInfo()
   (void)AcquireLAiAttackerImplTypeInfo();
   (void)std::atexit(&cleanup_LAiAttackerImplTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_LAiAttackerImplTypeInfo_f0cee0, moho::register_LAiAttackerImplTypeInfo)

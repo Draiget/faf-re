@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/net/CDiscoveryService.h"
-#include "moho/script/CScriptObject.h"
+#include "moho/script/CScriptObject.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -139,3 +140,8 @@ void moho::register_CDiscoveryServiceTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CDiscoveryServiceTypeInfoStartup_4bf64c, moho::register_CDiscoveryServiceTypeInfoStartup)

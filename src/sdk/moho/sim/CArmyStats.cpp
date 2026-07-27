@@ -23,7 +23,8 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SConditionTriggerTypes.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -2061,3 +2062,7 @@ namespace moho
     out.reset(raw);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterCArmyStatItemPointerType_5a41c5, moho::PreregisterCArmyStatItemPointerType)

@@ -10,6 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -278,3 +279,7 @@ namespace moho
     return std::atexit(&cleanup_WeakPtr_Unit_Type);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_WeakPtr_Unit_Type_00_6d7fb4, moho::register_WeakPtr_Unit_Type_00)

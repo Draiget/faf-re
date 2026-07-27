@@ -6,6 +6,7 @@
 
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 #include "moho/ui/CUIWorldMesh.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -60,3 +61,8 @@ void moho::register_CUIWorldMeshTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUIWorldMeshTypeInfoStartup_9897a7, moho::register_CUIWorldMeshTypeInfoStartup)

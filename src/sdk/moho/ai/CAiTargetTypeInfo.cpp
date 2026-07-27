@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiTarget.h"
+#include "moho/ai/CAiTarget.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -86,3 +87,8 @@ int moho::register_CAiTargetTypeInfo()
   (void)AcquireCAiTargetTypeInfo();
   return std::atexit(&cleanup_CAiTargetTypeInfo);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiTargetTypeInfo_7df6d1, moho::register_CAiTargetTypeInfo)

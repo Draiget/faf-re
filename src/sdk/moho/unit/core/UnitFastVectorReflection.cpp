@@ -11,6 +11,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/ReconBlip.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -639,3 +640,8 @@ namespace moho
     return std::atexit(&cleanup_FastVectorReconBlipPtrType);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_FastVectorWeakPtrEntityType_00_2ebb12, moho::register_FastVectorWeakPtrEntityType_00)
+GPG_PREREGISTER_INIT(register_FastVectorReconBlipPtrType_00_2ebb12, moho::register_FastVectorReconBlipPtrType_00)

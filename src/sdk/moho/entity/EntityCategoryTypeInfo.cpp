@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
-#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -267,3 +268,8 @@ void moho::register_EntityCategoryTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EntityCategoryTypeInfoStartup_e127e8, moho::register_EntityCategoryTypeInfoStartup)

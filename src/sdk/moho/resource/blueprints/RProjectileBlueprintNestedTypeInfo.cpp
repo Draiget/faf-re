@@ -6,6 +6,7 @@
 
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -445,3 +446,12 @@ namespace moho
     return std::atexit(&cleanup_RProjectileBlueprintPhysicsTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RProjectileBlueprintDisplayTypeInfo_131585, moho::register_RProjectileBlueprintDisplayTypeInfo)
+GPG_PREREGISTER_INIT(register_RProjectileBlueprintEconomyTypeInfo_131585, moho::register_RProjectileBlueprintEconomyTypeInfo)
+GPG_PREREGISTER_INIT(register_RProjectileBlueprintPhysicsTypeInfo_131585, moho::register_RProjectileBlueprintPhysicsTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_RProjectileBlueprintPhysicsTypeInfo_131585, moho::preregister_RProjectileBlueprintPhysicsTypeInfo)

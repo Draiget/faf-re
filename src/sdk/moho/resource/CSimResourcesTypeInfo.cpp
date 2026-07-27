@@ -8,7 +8,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/resource/CSimResources.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -314,3 +315,8 @@ namespace moho
     (void)std::atexit(&cleanup_CSimResourcesTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CSimResourcesTypeInfo_f091f7, moho::register_CSimResourcesTypeInfo)

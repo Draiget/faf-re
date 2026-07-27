@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiFormationInstance.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // SOffsetInfo registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query SOffsetInfo RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::SOffsetInfoTypeInfo) unsigned char gSOffsetInfoTypeInfoStorage[sizeof(moho::SOffsetInfoTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] SOffsetInfoTypeInfoRegistration gSOffsetInfoTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SOffsetInfoTypeInfo_99627c, moho::register_SOffsetInfoTypeInfo)

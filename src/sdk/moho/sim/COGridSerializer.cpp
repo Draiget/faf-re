@@ -9,8 +9,6 @@
 
 // Keep startup serializer registration in the library init segment so RTTI
 // callback lanes are ready before first COGrid archive traffic.
-#pragma init_seg(lib)
-
 namespace
 {
   moho::COGridSerializer gCOGridSerializer{};

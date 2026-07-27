@@ -143,7 +143,8 @@
 #include "moho/unit/core/UserUnit.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
-#include "moho/unit/CUnitMotion.h"
+#include "moho/unit/CUnitMotion.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 using EntId = std::int32_t;
@@ -29681,3 +29682,7 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
 }
 } // namespace moho
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SimTypeInfo_e0dc23, preregister_SimTypeInfo)

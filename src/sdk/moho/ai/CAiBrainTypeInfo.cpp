@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiBrain.h"
-#include "moho/script/CScriptObject.h"
+#include "moho/script/CScriptObject.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -151,3 +152,8 @@ void moho::register_CAiBrainTypeInfoStartup()
   (void)AcquireCAiBrainTypeInfo();
   (void)std::atexit(&cleanup_CAiBrainTypeInfoStartup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAiBrainTypeInfoStartup_776a4f, moho::register_CAiBrainTypeInfoStartup)

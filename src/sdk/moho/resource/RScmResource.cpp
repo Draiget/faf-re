@@ -17,8 +17,6 @@
 #include "moho/resource/SScmFile.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
-#pragma init_seg(lib)
-
 namespace gpg
 {
   class SerConstructResult

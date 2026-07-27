@@ -11,9 +11,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/STIMap.h"
-#include "moho/sim/STIMapReflection.h"
-
-#pragma init_seg(lib)
+#include "moho/sim/STIMapReflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -1072,3 +1071,8 @@ namespace
 
   [[maybe_unused]] CIntelGridReflectionBootstrap gCIntelGridReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CIntelGridTypeInfo_d0037a, moho::register_CIntelGridTypeInfo)

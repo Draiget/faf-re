@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiPathFinder.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // HPathCell registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query HPathCell RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::HPathCellTypeInfo) unsigned char gHPathCellTypeInfoStorage[sizeof(moho::HPathCellTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] HPathCellTypeInfoRegistration gHPathCellTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_HPathCellTypeInfo_05227f, moho::register_HPathCellTypeInfo)

@@ -12,6 +12,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -422,3 +423,8 @@ namespace moho
     return std::atexit(&cleanup_FastVectorSAudioRequestType);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_FastVectorSAudioRequestType_9ff453, moho::preregister_FastVectorSAudioRequestType)
+GPG_PREREGISTER_INIT(register_FastVectorSAudioRequestTypeAtexit_9ff453, moho::register_FastVectorSAudioRequestTypeAtexit)

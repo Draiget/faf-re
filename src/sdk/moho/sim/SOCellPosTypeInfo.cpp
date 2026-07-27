@@ -5,9 +5,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -369,3 +368,8 @@ namespace
 
   [[maybe_unused]] SOCellPosBootstrap gSOCellPosBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SOCellPosTypeInfo_9a89ee, moho::register_SOCellPosTypeInfo)

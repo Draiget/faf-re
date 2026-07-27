@@ -31,7 +31,8 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/STIMap.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -1936,3 +1937,7 @@ void ReconBlip::UpdateVisibility()
     focusArmy != -1 && mReconDat[static_cast<std::size_t>(focusArmy)].mNeedsFlush != 0u
   );
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterReconBlipPointerType_a752bd, PreregisterReconBlipPointerType)

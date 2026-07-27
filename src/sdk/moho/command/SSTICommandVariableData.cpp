@@ -7,7 +7,8 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -807,3 +808,7 @@ namespace
 
   [[maybe_unused]] SSTICommandVariableDataSerializerBootstrap gSSTICommandVariableDataSerializerBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTICommandVariableDataTypeInfo_2a172c, moho::preregister_SSTICommandVariableDataTypeInfo)

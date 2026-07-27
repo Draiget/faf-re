@@ -7,12 +7,11 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/CRandomStream.h"
-#include "moho/sim/CRandomStreamTypeInfo.h"
+#include "moho/sim/CRandomStreamTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // Make CRandomStream registration run before default-segment bootstrap objects
 // that query RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCRandomStreamType()
@@ -184,3 +183,8 @@ namespace moho
     type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CRandomStreamTypeInfo_f08a86, moho::register_CRandomStreamTypeInfo)

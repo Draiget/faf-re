@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -366,3 +367,11 @@ void moho::CTaskThreadConstruct::Deconstruct(void* const object)
   thread->~CTaskThread();
   ::operator delete(thread);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CTaskThreadTypeInfo_6a4218, moho::register_CTaskThreadTypeInfo)
+GPG_PREREGISTER_INIT(register_CTaskStageTypeInfo_6a4218, moho::register_CTaskStageTypeInfo)
+
+GPG_PREREGISTER_INIT(InitializeCTaskThreadTypeInfoStorage_6a4218, InitializeCTaskThreadTypeInfoStorage)

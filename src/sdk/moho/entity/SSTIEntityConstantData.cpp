@@ -10,7 +10,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -225,3 +226,7 @@ namespace
 
   [[maybe_unused]] SSTIEntityConstantDataTypeInfoBootstrap gSSTIEntityConstantDataTypeInfoBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTIEntityConstantDataTypeInfo_f23d45, moho::preregister_SSTIEntityConstantDataTypeInfo)

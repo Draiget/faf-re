@@ -6,8 +6,7 @@
 
 #include "moho/resource/CAniResourceSkel.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -95,3 +94,8 @@ namespace moho
     (void)std::atexit(&cleanup_CAniResourceSkelTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CAniResourceSkelTypeInfo_66d271, moho::register_CAniResourceSkelTypeInfo)

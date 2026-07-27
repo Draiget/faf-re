@@ -768,26 +768,26 @@ namespace moho
   /**
    * Address: 0x005D97F0 (FUN_005D97F0, listener callback lane)
    */
-  int CAcquireTargetTask::HandleProjectileImpactListenerState(const int action)
+  int CAcquireTargetTask::OnEvent(const EProjectileImpactEvent event)
   {
     if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
-      return action;
+      return event;
     }
     if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
-      return action;
+      return event;
     }
 
-    if (action == 1) {
+    if (event == ProjectileImpactEvent_Other) {
       HandleRetargetProbeOnListenerTick();
-      return action;
+      return event;
     }
 
-    if (action == 0 || action == 2) {
+    if (event == ProjectileImpactEvent_HitTarget || event == ProjectileImpactEvent_SelfOrProjectile) {
       mTargetCooldown = 0;
       mWeapon->mUnknown170 = 0;
     }
 
-    return action;
+    return event;
   }
 
   /**

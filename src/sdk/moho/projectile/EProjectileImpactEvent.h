@@ -1,5 +1,8 @@
 #pragma once
 
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/misc/WeakObject.h"
+
 namespace moho
 {
   /**
@@ -22,6 +25,35 @@ namespace moho
     ProjectileImpactEvent_None = ProjectileImpactEvent_HitTarget,
     ProjectileImpactEvent_Other = 1,
     ProjectileImpactEvent_SelfOrProjectile = 2
+  };
+
+  /**
+   * Address: 0x005D88F0 (FUN_005D88F0, ManyToOneListener_EProjectileImpactEvent ctor)
+   *
+   * Single-listener sink for projectile impact events.
+   *
+   * Canonical definition. This specialization was previously defined twice -
+   * in ProjectileStartupRegistrations.h without the WeakObject base, and in
+   * CAcquireTargetTask.h with it - an ODR violation that broke the build
+   * outright (C2766). The two models were layout-identical: WeakObject is
+   * 4 bytes with no vtable, so adding a virtual here puts the vptr at +0x00
+   * and the owner link at +0x04 either way.
+   *
+   * Slot 0 takes the event: Projectile::Impact dispatches it with
+   * `mov edx,[ecx]; mov eax,[edx]; call eax` at 0x0069E10E.
+   */
+  template <class TEvent>
+  class ManyToOneListener;
+
+  template <>
+  class ManyToOneListener<EProjectileImpactEvent> : public WeakObject
+  {
+  public:
+    static gpg::RType* sType;
+
+    ManyToOneListener();
+
+    virtual int OnEvent(EProjectileImpactEvent event) = 0;
   };
 } // namespace moho
 

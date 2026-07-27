@@ -7,8 +7,6 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/CollisionBeamEntity.h"
 
-#pragma init_seg(lib)
-
 namespace
 {
   moho::CollisionBeamEntitySerializer gCollisionBeamEntitySerializer{};

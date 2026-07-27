@@ -6,7 +6,8 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitFerryTask.h"
+#include "moho/unit/tasks/CUnitFerryTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -254,3 +255,8 @@ namespace moho
     return std::atexit(&cleanup);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitFerryTaskTypeInfo_71ac00, moho::register_CUnitFerryTaskTypeInfo)

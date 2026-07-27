@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "moho/effects/rendering/CEffectImpl.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -114,3 +115,7 @@ namespace moho
     return std::atexit(&cleanup_CEffectImplTypeInfo);
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CEffectImplTypeInfo_00_261522, moho::register_CEffectImplTypeInfo_00)

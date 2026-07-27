@@ -11,7 +11,8 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -407,3 +408,7 @@ moho::StatItem* moho::InstanceCounter<moho::IEffect>::GetStatItem()
   sEngineStat_InstanceCounts_IEffect = engineStats->GetItem(statPath.c_str(), true);
   return sEngineStat_InstanceCounts_IEffect;
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(PreregisterIEffectPointerType_32e2fd, moho::PreregisterIEffectPointerType)

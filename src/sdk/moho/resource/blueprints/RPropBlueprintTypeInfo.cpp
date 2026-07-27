@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/entity/REntityBlueprint.h"
-#include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/resource/blueprints/RPropBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -287,3 +288,11 @@ namespace moho
     (void)std::atexit(&cleanup_RPropBlueprintTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RPropBlueprintTypeInfo_460a53, moho::register_RPropBlueprintTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_RPropBlueprintDefenseTypeInfo_460a53, moho::preregister_RPropBlueprintDefenseTypeInfo)
+GPG_PREREGISTER_INIT(preregister_RPropBlueprintEconomyTypeInfo_460a53, moho::preregister_RPropBlueprintEconomyTypeInfo)

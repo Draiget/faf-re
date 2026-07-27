@@ -7,7 +7,8 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
-#include "moho/unit/ECommandEvent.h"
+#include "moho/unit/ECommandEvent.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -275,3 +276,10 @@ namespace
 
   CUnitCommandTypeInfoBootstrap gCUnitCommandTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CUnitCommandTypeInfo_67e437, moho::register_CUnitCommandTypeInfo)
+
+GPG_PREREGISTER_INIT(PreregisterCUnitCommandPointerType_67e437, moho::PreregisterCUnitCommandPointerType)

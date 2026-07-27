@@ -4,6 +4,7 @@
 
 #include "moho/misc/Stats.h"
 #include "moho/sim/CArmyStats.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -95,3 +96,8 @@ namespace
 
   CArmyStatsTypeInfoBootstrap gCArmyStatsTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CArmyStatsTypeInfo_a19502, moho::register_CArmyStatsTypeInfo)

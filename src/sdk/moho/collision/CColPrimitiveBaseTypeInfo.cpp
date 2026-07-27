@@ -7,6 +7,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/collision/ECollisionShape.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -186,3 +187,12 @@ namespace
 
   [[maybe_unused]] CColPrimitiveBaseTypeInfoBootstrap gCColPrimitiveBaseTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CColPrimitiveBaseTypeInfo_58cbdc, moho::register_CColPrimitiveBaseTypeInfo)
+GPG_PREREGISTER_INIT(register_ECollisionShapeTypeInfo_58cbdc, moho::register_ECollisionShapeTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_CColPrimitiveBaseTypeInfo_58cbdc, moho::preregister_CColPrimitiveBaseTypeInfo)
+GPG_PREREGISTER_INIT(preregister_ECollisionShapeTypeInfo_58cbdc, moho::preregister_ECollisionShapeTypeInfo)

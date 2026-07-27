@@ -3,7 +3,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -123,3 +124,8 @@ void moho::register_ESTITargetTypeTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ESTITargetTypeTypeInfoStartup_11d329, moho::register_ESTITargetTypeTypeInfoStartup)

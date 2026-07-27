@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -285,3 +286,10 @@ namespace
 
   [[maybe_unused]] EIntelTypeInfoBootstrap gEIntelTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EIntelTypeInfo_4aa76a, moho::register_EIntelTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_EIntelTypeInfo_4aa76a, preregister_EIntelTypeInfo)

@@ -24,9 +24,6 @@ namespace moho
   class CScrLuaInitForm;
 
   template <class TEvent>
-  class ManyToOneListener;
-
-  template <class TEvent>
   class ManyToOneBroadcaster
   {
   public:
@@ -43,21 +40,6 @@ namespace moho
    * see `ManyToOneBroadcaster<...>::BroadcastEvent` (FUN_005DC230) which sets
    * `broadcaster.v0 = &listener->v1`.
    */
-  template <>
-  class ManyToOneListener<EProjectileImpactEvent>
-  {
-  public:
-    static gpg::RType* sType;
-
-    /**
-     * Slot 0: impact-event notify. Dispatched from `Projectile::Impact`
-     * (FUN_0069DEC0, asm 0x0069E10E-0x0069E112: `mov edx,[ecx];
-     * mov eax,[edx]; call eax`).
-     */
-    virtual void OnEvent(EProjectileImpactEvent event) = 0;
-
-    void* ownerLink; // +0x04
-  };
 
   template <>
   class ManyToOneBroadcaster<EProjectileImpactEvent>
@@ -95,7 +77,7 @@ namespace moho
       }
       auto* const listener = reinterpret_cast<ManyToOneListener<EProjectileImpactEvent>*>(
         reinterpret_cast<std::uint8_t*>(ownerLinkSlot) -
-        offsetof(ManyToOneListener<EProjectileImpactEvent>, ownerLink)
+        offsetof(ManyToOneListener<EProjectileImpactEvent>, weakLinkHead_)
       );
       if (listener == nullptr) {
         return nullptr;
@@ -119,8 +101,8 @@ namespace moho
     "ManyToOneListener<EProjectileImpactEvent> size must be 0x08"
   );
   static_assert(
-    offsetof(ManyToOneListener_EProjectileImpactEvent, ownerLink) == 0x04,
-    "ManyToOneListener<EProjectileImpactEvent>::ownerLink offset must be 0x04"
+    offsetof(ManyToOneListener_EProjectileImpactEvent, weakLinkHead_) == 0x04,
+    "ManyToOneListener<EProjectileImpactEvent> weak-link slot offset must be 0x04"
   );
   static_assert(
     sizeof(ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08,

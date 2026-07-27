@@ -6,7 +6,8 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/serialization/SSavedGameArmyInfoVectorReflection.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/LaunchInfoBase.h"
+#include "moho/misc/LaunchInfoBase.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -253,3 +254,7 @@ namespace moho
   }
 } // namespace moho
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSavedGameHeaderTypeInfo_84f4eb, preregister_SSavedGameHeaderTypeInfo)

@@ -5,8 +5,7 @@
 #include <typeinfo>
 
 #include "moho/resource/RScmResource.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -93,3 +92,8 @@ namespace moho
     (void)std::atexit(&cleanup_RScmResourceTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RScmResourceTypeInfo_2222b3, moho::register_RScmResourceTypeInfo)

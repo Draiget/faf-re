@@ -3,7 +3,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CUnitCarrierLaunch.h"
+#include "moho/unit/tasks/CUnitCarrierLaunch.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -119,3 +120,7 @@ namespace moho
     return gpg::RRef{task, CachedCUnitCarrierLaunchType()};
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CUnitCarrierLaunchTypeInfo_413aa3, moho::preregister_CUnitCarrierLaunchTypeInfo)

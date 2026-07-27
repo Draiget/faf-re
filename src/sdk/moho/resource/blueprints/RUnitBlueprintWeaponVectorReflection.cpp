@@ -6,7 +6,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -564,3 +565,8 @@ int moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
   return std::atexit(&cleanup_VectorRUnitBlueprintWeaponTypeStorage);
 }
 
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_VectorRUnitBlueprintWeaponType_8f3a7d, moho::preregister_VectorRUnitBlueprintWeaponType)
+GPG_PREREGISTER_INIT(register_VectorRUnitBlueprintWeaponTypeAtexit_8f3a7d, moho::register_VectorRUnitBlueprintWeaponTypeAtexit)

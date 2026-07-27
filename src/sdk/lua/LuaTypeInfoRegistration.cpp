@@ -6,8 +6,7 @@
 #include <typeinfo>
 
 #include "lua/LuaObject.h"
-
-#pragma init_seg(lib)
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -114,3 +113,9 @@ namespace
 
   [[maybe_unused]] LuaTypeInfoRegistration gLuaTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_LuaObjectTypeInfo_da2f14, register_LuaObjectTypeInfo)
+GPG_PREREGISTER_INIT(register_LuaStateTypeInfo_da2f14, register_LuaStateTypeInfo)

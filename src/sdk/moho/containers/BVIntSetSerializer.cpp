@@ -6,12 +6,11 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/containers/TDatList.h"
-#include "moho/containers/BVIntSetTypeInfo.h"
+#include "moho/containers/BVIntSetTypeInfo.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // Make BVIntSet registration run before default-segment bootstrap objects that
 // query BVIntSet RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace moho
 {
   void register_BVIntSetTypeInfo();
@@ -264,3 +263,8 @@ namespace moho
     type->serSaveFunc_ = mSaveCallback;
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_BVIntSetTypeInfo_180679, moho::register_BVIntSetTypeInfo)

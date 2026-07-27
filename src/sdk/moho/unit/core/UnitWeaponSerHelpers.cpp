@@ -13,8 +13,6 @@ namespace gpg
   };
 } // namespace gpg
 
-#pragma init_seg(lib)
-
 namespace
 {
   moho::UnitWeaponConstruct gUnitWeaponConstruct{};

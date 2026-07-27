@@ -5,12 +5,11 @@
 #include <typeinfo>
 
 #include "moho/entity/CTextureScroller.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 // SScroller registration runs from the earliest C++ initializer segment (binary
 // __xc_a) so the descriptor is preregistered before default-segment bootstrap
 // objects query SScroller RTTI during static initialization.
-#pragma init_seg(lib)
-
 namespace
 {
   alignas(moho::SScrollerTypeInfo) unsigned char gSScrollerTypeInfoStorage[sizeof(moho::SScrollerTypeInfo)];
@@ -112,3 +111,8 @@ namespace
 
   [[maybe_unused]] SScrollerTypeInfoRegistration gSScrollerTypeInfoRegistration;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SScrollerTypeInfo_cf675b, moho::register_SScrollerTypeInfo)

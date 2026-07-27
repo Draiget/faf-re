@@ -12,7 +12,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/MathReflection.h"
-#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
 {
@@ -666,3 +667,8 @@ namespace
 
   [[maybe_unused]] SEfxCurveFastVectorReflectionBootstrap gSEfxCurveFastVectorReflectionBootstrap;
 } // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_FastVectorSEfxCurveType_a4fe50, moho::preregister_FastVectorSEfxCurveType)
+GPG_PREREGISTER_INIT(register_FastVectorSEfxCurveTypeAtexit_a4fe50, moho::register_FastVectorSEfxCurveTypeAtexit)

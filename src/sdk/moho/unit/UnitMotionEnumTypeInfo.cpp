@@ -11,6 +11,7 @@
 #include "moho/ai/EAirCombatState.h"
 #include "moho/ai/EAirCombatStateTypeInfo.h"
 #include "moho/unit/CUnitMotion.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -889,3 +890,13 @@ namespace
 
   UnitMotionEnumTypeInfoBootstrap gUnitMotionEnumTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EUnitMotionStateTypeInfo_ddfe48, moho::register_EUnitMotionStateTypeInfo)
+GPG_PREREGISTER_INIT(register_EUnitMotionCarrierEventTypeInfo_ddfe48, moho::register_EUnitMotionCarrierEventTypeInfo)
+GPG_PREREGISTER_INIT(register_EUnitMotionHorzEventTypeInfo_ddfe48, moho::register_EUnitMotionHorzEventTypeInfo)
+GPG_PREREGISTER_INIT(register_EUnitMotionVertEventTypeInfo_ddfe48, moho::register_EUnitMotionVertEventTypeInfo)
+GPG_PREREGISTER_INIT(register_EUnitMotionTurnEventTypeInfo_ddfe48, moho::register_EUnitMotionTurnEventTypeInfo)
+GPG_PREREGISTER_INIT(register_EAirCombatStateTypeInfo_ddfe48, moho::register_EAirCombatStateTypeInfo)

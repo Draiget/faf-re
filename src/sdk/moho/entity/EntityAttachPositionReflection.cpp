@@ -13,7 +13,8 @@
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/script/CScriptObject.h"
-#include "moho/task/CTask.h"
+#include "moho/task/CTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -1528,3 +1529,10 @@ namespace
 
   [[maybe_unused]] EntityAttachPositionReflectionBootstrap gEntityAttachPositionReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SEntAttachInfoTypeInfo_b8ac72, moho::register_SEntAttachInfoTypeInfo)
+GPG_PREREGISTER_INIT(register_PositionHistoryTypeInfo_b8ac72, moho::register_PositionHistoryTypeInfo)
+GPG_PREREGISTER_INIT(register_EntityTypeInfo_b8ac72, moho::register_EntityTypeInfo)

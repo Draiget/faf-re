@@ -7,7 +7,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
-#include <new>
+#include <new>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 /**
  * Address: 0x00A83523 (FUN_00A83523, atof)
@@ -146,3 +147,8 @@ void register_floatTypeInfoStartup()
   (void)Acquire();
   (void)std::atexit(&cleanup);
 }
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_floatTypeInfoStartup_f1479a, register_floatTypeInfoStartup)

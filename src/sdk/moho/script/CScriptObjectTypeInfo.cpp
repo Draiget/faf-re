@@ -3,6 +3,7 @@
 #include <typeinfo>
 
 #include "moho/script/CScriptObject.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -94,3 +95,8 @@ namespace moho
     (void)ScriptObjectTypeInfoSingleton();
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CScriptObjectTypeInfo_f1a664, moho::register_CScriptObjectTypeInfo)

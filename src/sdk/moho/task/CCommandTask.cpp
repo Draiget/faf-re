@@ -13,7 +13,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/StatItem.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
@@ -780,3 +781,10 @@ namespace
 
   CCommandTaskReflectionBootstrap gCCommandTaskReflectionBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CCommandTaskTypeInfo_7e4818, moho::register_CCommandTaskTypeInfo)
+
+GPG_PREREGISTER_INIT(AcquireCCommandTaskTypeInfo_7e4818, AcquireCCommandTaskTypeInfo)

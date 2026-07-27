@@ -7,6 +7,7 @@
 #include "gpg/core/containers/String.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/ReconBlip.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -355,3 +356,12 @@ namespace moho
     return std::atexit(&cleanup_RVectorType_SPerArmyReconInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_ReconBlipTypeInfo_3acb48, moho::register_ReconBlipTypeInfo)
+GPG_PREREGISTER_INIT(register_SPerArmyReconInfoTypeInfo_3acb48, moho::register_SPerArmyReconInfoTypeInfo)
+
+GPG_PREREGISTER_INIT(preregister_SPerArmyReconInfoTypeInfo_3acb48, moho::preregister_SPerArmyReconInfoTypeInfo)
+GPG_PREREGISTER_INIT(preregister_RVectorType_SPerArmyReconInfo_3acb48, moho::preregister_RVectorType_SPerArmyReconInfo)

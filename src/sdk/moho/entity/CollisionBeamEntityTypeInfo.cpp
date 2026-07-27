@@ -2,7 +2,8 @@
 
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -106,3 +107,8 @@ namespace
 
   [[maybe_unused]] CollisionBeamEntityTypeInfoBootstrap gCollisionBeamEntityTypeInfoBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_CollisionBeamEntityTypeInfo_1d0c25, moho::register_CollisionBeamEntityTypeInfo)

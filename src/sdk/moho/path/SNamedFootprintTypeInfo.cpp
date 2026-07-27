@@ -9,7 +9,8 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -887,3 +888,12 @@ namespace moho
     return std::atexit(&cleanup_SNamedFootprintListTypeInfo);
   }
 } // namespace moho
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SNamedFootprintTypeInfoStartup_dd003b, moho::register_SNamedFootprintTypeInfoStartup)
+GPG_PREREGISTER_INIT(register_SNamedFootprintListTypeInfoStartup_dd003b, moho::register_SNamedFootprintListTypeInfoStartup)
+
+GPG_PREREGISTER_INIT(preregister_SNamedFootprintTypeInfo_dd003b, moho::preregister_SNamedFootprintTypeInfo)
+GPG_PREREGISTER_INIT(preregister_SNamedFootprintListTypeInfo_dd003b, moho::preregister_SNamedFootprintListTypeInfo)

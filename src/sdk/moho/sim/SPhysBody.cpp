@@ -10,9 +10,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/render/camera/VTransform.h"
-
-#pragma init_seg(lib)
+#include "moho/render/camera/VTransform.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
@@ -928,3 +927,8 @@ namespace
 
   [[maybe_unused]] SPhysBodyBootstrap gSPhysBodyBootstrap;
 } // namespace
+
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_SPhysBodyTypeInfo_dc3862, moho::register_SPhysBodyTypeInfo)

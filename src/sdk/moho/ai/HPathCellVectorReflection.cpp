@@ -9,6 +9,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -343,3 +344,7 @@ int moho::register_HPathCellVectorType_AtExit()
   (void)register_HPathCellVectorType_00();
   return std::atexit(&cleanup_HPathCellVectorType);
 }
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_HPathCellVectorType_00_63aed0, moho::register_HPathCellVectorType_00)

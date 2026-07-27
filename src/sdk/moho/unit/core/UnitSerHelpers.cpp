@@ -15,8 +15,6 @@ namespace gpg
   };
 } // namespace gpg
 
-#pragma init_seg(lib)
-
 namespace
 {
   gpg::RType* gUnitType = nullptr;

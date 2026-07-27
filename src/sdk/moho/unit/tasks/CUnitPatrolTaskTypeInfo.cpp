@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "moho/unit/tasks/CUnitPatrolTask.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -49,3 +50,7 @@ namespace moho
     Finish();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CUnitPatrolTaskTypeInfo_fdce9d, moho::preregister_CUnitPatrolTaskTypeInfo)
