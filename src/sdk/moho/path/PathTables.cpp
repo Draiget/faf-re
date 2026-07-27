@@ -1863,6 +1863,41 @@ namespace moho
   }
 
   /**
+   * Address: 0x00765DD0 (FUN_00765DD0)
+   *
+   * IDA signature:
+   * void __userpurge sub_765DD0(int *pBudget@<esi>, Moho::PathQueue *arg0, Moho::CAiPathFinder *a2);
+   *
+   * What it does:
+   * Answers one path query synchronously instead of queueing it.
+   *
+   * The search state is a local `ImplBase` rather than the queue's own, so a
+   * caller that needs an answer this instant cannot corrupt whatever query the
+   * queue already has in flight. Only a single `WorkOnce` pass runs: whatever
+   * the budget buys is what the traveller gets, and it is notified either way.
+   */
+  void PathQueue::WorkImmediate(int& budget, IPathTraveler& traveller)
+  {
+    PathQueueImplBaseRuntime scratch;
+    InitializePathQueueImplBase(scratch);
+
+    BeginPathQueueQuery(scratch, traveller, *mImpl->mOwner);
+
+    // "!mTraveler.empty()", PathQueue.cpp:169
+    assert(scratch.mTraveler.mNext != &scratch.mTraveler);
+
+    scratch.mBudget = budget;
+    const PathQueueStep step = PathQueueWorkOnce(scratch);
+    budget = scratch.mBudget;
+
+    FinishPathQueueQuery(scratch, step == PathQueueStep::GoalReached);
+
+    scratch.mResultCells.clear();
+    UnlinkAndResetPathQueueNode(scratch.mTraveler);
+    DestroyPathQueueImplBase(scratch);
+  }
+
+  /**
    * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
    *
    * What it does:
