@@ -2970,6 +2970,9 @@
     <ClInclude Include="legacy\containers\Vector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="legacylgorithms\Sort.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="legacy\containers\HashMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
