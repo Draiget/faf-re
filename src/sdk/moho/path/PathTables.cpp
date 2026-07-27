@@ -281,23 +281,16 @@ namespace
   }
 
   /**
-   * Address: 0x007676A0 (FUN_007676A0) + 0x00767C70 (FUN_00767C70)
-   *          0x007672E0 (FUN_007672E0)
-   *
-   * What it does:
-   * Releases every search record and open-heap entry accumulated by the
-   * previous query, leaving both structures armed for the next traveler.
-   */
-  void ResetPathQueueSearchState(PathQueueImplBaseRuntime& implBase)
-  {
-    implBase.ResetSearch();
-  }
-
-  /**
    * Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
    *
+   * Reaches, through `AStarSearch::ResetSearch`:
+   *   0x007672E0 (FUN_007672E0) - open-heap reset
+   *   0x007676A0 (FUN_007676A0) - node-table element release
+   *   0x00767C70 (FUN_00767C70) - bucket-window re-arm
+   *
    * What it does:
-   * Tears down the search structures owned by one `ImplBase`.
+   * Releases every search record and open-heap entry owned by one `ImplBase`,
+   * leaving both structures armed for the next traveler.
    */
   void DestroyPathQueueImplBase(PathQueueImplBaseRuntime& implBase)
   {
