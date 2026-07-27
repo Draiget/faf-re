@@ -6,8 +6,9 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/entity/Entity.h"
 
 namespace
 {
@@ -36,24 +37,13 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
   {
-    gpg::RType* type = gpg::LookupRType(typeid(moho::SEntitySetTemplateUnit));
-    if (type != nullptr) {
-      return type;
-    }
-
-    constexpr const char* kTypeNameCandidates[] = {
-      "Moho::EntitySetTemplate<Moho::Unit>",
-      "EntitySetTemplate<Unit>",
-      "SEntitySetTemplateUnit"
-    };
-    for (const char* const name : kTypeNameCandidates) {
-      type = gpg::REF_FindTypeNamed(name);
-      if (type != nullptr) {
-        return type;
-      }
-    }
-
-    return nullptr;
+    // UnitSetTypeInfo pre-registers this descriptor under
+    // typeid(EntitySetTemplate<Unit>), and the binary resolves it the same way
+    // (FUN_005EBA40 looks up `Moho::EntitySetTemplate<Moho::Unit>`).
+    // SEntitySetTemplateUnit is this recovery's own name for that type, so
+    // nothing ever registers it - and since LookupRType throws on a miss, the
+    // name-based candidate search that used to follow was unreachable.
+    return gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
   }
 
   /**
