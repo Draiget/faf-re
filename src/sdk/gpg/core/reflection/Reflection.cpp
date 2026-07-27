@@ -12915,27 +12915,35 @@ void RType::AddBase(const RField& field)
     return;
   }
 
-  // MSVC8 vector layout may expose raw pointers;
-  // keep null-safe checks like in the original.
-  const RField* it = baseType->fields_.begin();
-  const RField* end = baseType->fields_.end();
-  if (!it)
-    return; // consistent with original early-exit when start==nullptr
+  // Index by counter and re-read the base's field range every iteration, as
+  // the binary does. Caching begin()/end() across the push_back below is only
+  // safe while `baseType->fields_` and `fields_` are distinct buffers; the
+  // original never assumes that, and a stale pointer here reads freed memory.
+  for (std::size_t index = 0;; ++index) {
+    const RField* const start = baseType->fields_.begin();
+    if (!start) {
+      // consistent with original early-exit when start==nullptr
+      return;
+    }
+    if (index >= static_cast<std::size_t>(baseType->fields_.end() - start)) {
+      return;
+    }
 
-  for (; it < end; ++it) {
+    const RField& source = start[index];
+
     // Copy-by-value semantics;
     // strings/descriptions are pointer aliases in the original.
     RField out{
       // same literal pointer as in base
-      it->mName,
+      source.mName,
       // same field type
-      it->mType,
+      source.mType,
       // adjust offset by base field offset
-      field.mOffset + it->mOffset
+      field.mOffset + source.mOffset
     };
 
-    out.v4 = it->v4;
-    out.mDesc = it->mDesc;
+    out.v4 = source.v4;
+    out.mDesc = source.mDesc;
 
     fields_.push_back(out);
   }
