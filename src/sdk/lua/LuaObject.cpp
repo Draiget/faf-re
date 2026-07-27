@@ -433,6 +433,35 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00BEA7C0 (register_lua_StateSerializer)
+	 *
+	 * IDA signature:
+	 * void __cdecl register_lua_StateSerializer();
+	 *
+	 * What it does:
+	 * Initializes one serializer-helper lane for Lua thread load/save callbacks.
+	 * The binary runs SerHelperBase::SerHelperBase to self-link the ring, binds
+	 * both callbacks, stores the vftable and registers the destructor with
+	 * atexit; the ring self-link plus callback binding is the observable part.
+	 */
+	SerializerHelperRuntimeView* InitializeLuaStateSerializerHelper(
+		SerializerHelperRuntimeView* const helper
+	) noexcept
+	{
+		if (helper == nullptr) {
+			return nullptr;
+		}
+
+		helper->vftable = nullptr;
+		gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&helper->mNext);
+		helper->mNext = self;
+		helper->mPrev = self;
+		helper->mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&lua_StateSerializer::Deserialize);
+		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&lua_StateSerializer::Serialize);
+		return helper;
+	}
+
+	/**
 	 * Address: 0x00BEA160 (register_TObjectSerializer)
 	 * Address: 0x00BEA490 (register_LClosureSerializer)
 	 * Address: 0x00BEA8D0 (register_UdataSerializer)
@@ -446,6 +475,7 @@ namespace
 	SerializerHelperRuntimeView gTObjectSerializerHelper{};
 	SerializerHelperRuntimeView gLClosureSerializerHelper{};
 	SerializerHelperRuntimeView gUdataSerializerHelper{};
+	SerializerHelperRuntimeView gLuaStateSerializerHelper{};
 
 	struct LuaSerializerHelperBootstrap
 	{
@@ -454,6 +484,7 @@ namespace
 			(void)InitializeTObjectSerializerHelper(&gTObjectSerializerHelper);
 			(void)InitializeLClosureSerializerHelper(&gLClosureSerializerHelper);
 			(void)InitializeUdataSerializerHelper(&gUdataSerializerHelper);
+			(void)InitializeLuaStateSerializerHelper(&gLuaStateSerializerHelper);
 		}
 	};
 
