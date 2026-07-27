@@ -58,4 +58,11 @@ namespace moho
   };
 
   static_assert(sizeof(CDecalHandleTypeInfo) == 0x64, "CDecalHandleTypeInfo size must be 0x64");
+  /**
+   * Address: 0x00BDD8C0 (FUN_00BDD8C0, register_CDecalHandleTypeInfo)
+   *
+   * What it does:
+   * Constructs and pre-registers the CDecalHandle type descriptor.
+   */
+  void register_CDecalHandleTypeInfo();
 } // namespace moho
