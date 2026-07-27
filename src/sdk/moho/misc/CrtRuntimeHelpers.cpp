@@ -6659,6 +6659,49 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
   legacy_file(stream)._flag |= 0x8000;
 }
 
+// Defined below alongside the other CRT lock-table lanes.
+extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
+
+/**
+ * Address: 0x00A89F95 (FUN_00A89F95, _unlock_file)
+ *
+ * IDA signature:
+ * void callcnv_33 _unlock_file(FILE *Stream);
+ *
+ * What it does:
+ * Releases what `_lock_file` took, choosing the same way: a stream outside the
+ * static `_iob` table leaves its own inline critical section, a table entry
+ * clears `_IOLOCKED` and releases the global slot at (index + 16).
+ *
+ * The order is the mirror of the acquire: the flag is cleared *before* the
+ * lock is dropped (0x00A89FA9 precedes the _unlock call), so no other thread
+ * can observe the stream unlocked but still flagged.
+ */
+extern "C" void __cdecl _unlock_file(std::FILE* const stream)
+{
+  std::FILE* const table = __iob_func();
+  constexpr std::ptrdiff_t kIobLastEntry = 19;
+
+  if (stream < table || stream > (table + kIobLastEntry)) {
+    struct RuntimeFileLockOwnerView
+    {
+      std::uint8_t reserved00[0x20];
+      CRITICAL_SECTION lock;
+    };
+    static_assert(
+      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
+      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+    );
+
+    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    ::LeaveCriticalSection(&lockOwner->lock);
+    return;
+  }
+
+  legacy_file(stream)._flag &= ~0x8000;
+  RuntimeUnlockCrtLock(static_cast<int>(stream - table) + 16);
+}
+
 /**
  * Address: 0x00ABFA82 (FUN_00ABFA82, _Getcvt)
  *
