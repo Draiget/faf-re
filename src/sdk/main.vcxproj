@@ -2133,6 +2133,7 @@
     <ClInclude Include="moho\sim\SSelectionEvent.h" />
     <ClInclude Include="moho\sim\SessionVisibilityQuery.h" />
     <ClInclude Include="moho\sim\Sim.h" />
+    <ClInclude Include="moho\sim\SimConVarAccess.h" />
     <ClInclude Include="moho\sim\CEconomy.h" />
     <ClInclude Include="moho\sim\SimArmy.h" />
     <ClInclude Include="moho\sim\SimArmySerializer.h" />

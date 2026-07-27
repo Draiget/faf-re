@@ -16,6 +16,7 @@ namespace gpg::HaStar
 namespace moho
 {
   class COGrid;
+  class IPathTraveler;
   class PathTables;
   struct SRuleFootprintsBlueprint;
   struct PathTablesImpl;
@@ -53,6 +54,18 @@ namespace moho
      * the work actually performed.
      */
     void Work(int& budget);
+
+    /**
+     * Address: 0x00765DD0 (FUN_00765DD0)
+     *
+     * IDA signature:
+     * void __userpurge sub_765DD0(int *pBudget@<esi>, Moho::PathQueue *arg0, Moho::CAiPathFinder *a2);
+     *
+     * What it does:
+     * Runs one path query for `traveller` to completion right now, on scratch
+     * search state, without disturbing the queue's own in-flight work.
+     */
+    void WorkImmediate(int& budget, IPathTraveler& traveller);
 
     /**
      * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)

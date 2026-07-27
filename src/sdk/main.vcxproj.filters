@@ -2700,6 +2700,9 @@
     <ClInclude Include="moho\sim\Sim.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\SimConVarAccess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\command\ICommandSink.h">
       <Filter>Header Files</Filter>
     </ClInclude>

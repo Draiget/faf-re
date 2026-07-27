@@ -33,6 +33,7 @@
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/SimConVarAccess.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
@@ -861,42 +862,6 @@ namespace
   constexpr const char* kConVarRenderDebugPlayableRect = "AI_RenderDebugPlayableRect";
   constexpr const char* kArmyPoolName = "ArmyPool";
   constexpr const char* kOnDestroyScriptName = "OnDestroy";
-
-  [[nodiscard]] moho::CSimConVarBase* FindSimConVarByName(const char* const name)
-  {
-    if (name == nullptr || *name == '\0') {
-      return nullptr;
-    }
-
-    moho::CSimConCommand* const command = moho::FindRegisteredSimConCommand(name);
-    return dynamic_cast<moho::CSimConVarBase*>(command);
-  }
-
-  template <typename TValue>
-  [[nodiscard]] bool ReadSimConVarValue(moho::Sim* const sim, const char* const name, TValue& outValue)
-  {
-    if (sim == nullptr) {
-      return false;
-    }
-
-    moho::CSimConVarBase* const conVar = FindSimConVarByName(name);
-    if (conVar == nullptr) {
-      return false;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(conVar);
-    if (instance == nullptr) {
-      return false;
-    }
-
-    const void* const valueStorage = instance->GetValueStorage();
-    if (valueStorage == nullptr) {
-      return false;
-    }
-
-    outValue = *static_cast<const TValue*>(valueStorage);
-    return true;
-  }
 
   void SetArmyFloatStatValue(moho::CArmyStats* const stats, const char* const statPath, const float value)
   {
@@ -1983,7 +1948,7 @@ namespace moho
     }
 
     bool renderPlayableRect = false;
-    if (!ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugPlayableRect, renderPlayableRect) || !renderPlayableRect) {
+    if (!moho::ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugPlayableRect, renderPlayableRect) || !renderPlayableRect) {
       return;
     }
 
@@ -2111,7 +2076,7 @@ namespace moho
 
     int pathBudget = 2500;
     if (Simulation != nullptr) {
-      (void)ReadSimConVarValue<int>(Simulation, kConVarPathArmyBudget, pathBudget);
+      (void)moho::ReadSimConVarValue<int>(Simulation, kConVarPathArmyBudget, pathBudget);
     }
     ProcessArmyPathQueueBudget(PathFinder, pathBudget);
 
@@ -2119,7 +2084,7 @@ namespace moho
 
     bool renderAttackVectors = false;
     if (Simulation != nullptr) {
-      (void)ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugAttackVectors, renderAttackVectors);
+      (void)moho::ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugAttackVectors, renderAttackVectors);
     }
 
     if (!renderAttackVectors || AiBrain == nullptr) {
@@ -2128,7 +2093,7 @@ namespace moho
 
     int debugArmyIndex = -1;
     if (Simulation != nullptr) {
-      (void)ReadSimConVarValue<int>(Simulation, kConVarDebugArmyIndex, debugArmyIndex);
+      (void)moho::ReadSimConVarValue<int>(Simulation, kConVarDebugArmyIndex, debugArmyIndex);
     }
 
     if (debugArmyIndex >= 0 && Simulation != nullptr) {

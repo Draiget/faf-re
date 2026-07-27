@@ -1,5 +1,8 @@
 #include "moho/ai/CAiPathFinder.h"
 
+#include "moho/path/PathTables.h"
+#include "moho/sim/SimConVarAccess.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -79,6 +82,8 @@ namespace moho
 
 namespace
 {
+  constexpr const char* kConVarPathMaxInstantWorkUnits = "path_MaxInstantWorkUnits";
+
   using PathCellVector = msvc8::vector<moho::HPathCell>;
 
   /**
@@ -914,12 +919,22 @@ bool CAiPathFinder::RunDirectProbe()
   mHasPathResult = 0;
   mResultCell = {};
 
+  // The probe is allowed to spend a bounded amount of work right now; the
+  // ceiling is a sim con-var so it can be tuned without a rebuild.
+  int budget = 0;
+  (void)ReadSimConVarValue<int>(mSim, kConVarPathMaxInstantWorkUnits, budget);
+
   if (mUnit && mUnit->ArmyRef) {
     mUseWholeMap = mUnit->ArmyRef->UseWholeMap() ? 1u : 0u;
   }
   UpdatePlayableRectGate();
 
-  QueueSearch();
+  // 0x005AA2F0: run the query synchronously against scratch search state rather
+  // than queueing it, so the answer is available before this call returns.
+  if (auto* const queue = static_cast<PathQueue*>(mPathQueueProxy); queue != nullptr) {
+    queue->WorkImmediate(budget, *this);
+  }
+
   return mHasPathResult != 0u;
 }
 
