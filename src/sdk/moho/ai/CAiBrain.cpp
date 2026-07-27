@@ -1,5 +1,7 @@
 #include "moho/ai/CAiBrain.h"
 
+#include "legacy/algorithms/Sort.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -4530,7 +4532,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
     candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
   }
 
-  std::sort(candidates.begin(), candidates.end(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+  msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
     return a.distanceSq < b.distanceSq;
   });
 
@@ -4748,7 +4750,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+    msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
       return a.distanceSq < b.distanceSq;
     });
 
