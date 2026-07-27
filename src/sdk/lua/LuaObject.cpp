@@ -369,7 +369,7 @@ namespace
 	 * What it does:
 	 * Initializes one serializer-helper lane for `TObject` load/save callbacks.
 	 */
-	[[maybe_unused]] SerializerHelperRuntimeView* InitializeTObjectSerializerHelper(
+	SerializerHelperRuntimeView* InitializeTObjectSerializerHelper(
 		SerializerHelperRuntimeView* const helper
 	) noexcept
 	{
@@ -392,7 +392,7 @@ namespace
 	 * What it does:
 	 * Initializes one serializer-helper lane for `LClosure` load/save callbacks.
 	 */
-	[[maybe_unused]] SerializerHelperRuntimeView* InitializeLClosureSerializerHelper(
+	SerializerHelperRuntimeView* InitializeLClosureSerializerHelper(
 		SerializerHelperRuntimeView* const helper
 	) noexcept
 	{
@@ -415,7 +415,7 @@ namespace
 	 * What it does:
 	 * Initializes one serializer-helper lane for userdata load/save callbacks.
 	 */
-	[[maybe_unused]] SerializerHelperRuntimeView* InitializeUdataSerializerHelper(
+	SerializerHelperRuntimeView* InitializeUdataSerializerHelper(
 		SerializerHelperRuntimeView* const helper
 	) noexcept
 	{
@@ -431,6 +431,33 @@ namespace
 		helper->mSerialize = reinterpret_cast<gpg::RType::save_func_t>(&UdataSerializer::Serialize);
 		return helper;
 	}
+
+	/**
+	 * Address: 0x00BEA160 (register_TObjectSerializer)
+	 * Address: 0x00BEA490 (register_LClosureSerializer)
+	 * Address: 0x00BEA8D0 (register_UdataSerializer)
+	 *
+	 * What it does:
+	 * Brings the Lua serializer helper lanes into existence. Each helper links
+	 * itself into its own intrusive ring and binds its load/save callbacks; the
+	 * binary drives all three from its CRT initializer table. Without this the
+	 * Initialize* lanes above are never called and no Lua value has a serializer.
+	 */
+	SerializerHelperRuntimeView gTObjectSerializerHelper{};
+	SerializerHelperRuntimeView gLClosureSerializerHelper{};
+	SerializerHelperRuntimeView gUdataSerializerHelper{};
+
+	struct LuaSerializerHelperBootstrap
+	{
+		LuaSerializerHelperBootstrap()
+		{
+			(void)InitializeTObjectSerializerHelper(&gTObjectSerializerHelper);
+			(void)InitializeLClosureSerializerHelper(&gLClosureSerializerHelper);
+			(void)InitializeUdataSerializerHelper(&gUdataSerializerHelper);
+		}
+	};
+
+	LuaSerializerHelperBootstrap gLuaSerializerHelperBootstrap;
 }
 
 /**
