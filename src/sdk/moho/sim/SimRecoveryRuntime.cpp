@@ -2694,14 +2694,26 @@ namespace
 }
 
 /**
- * Address: 0x00760290 (FUN_00760290)
  * Address: 0x007605E0 (FUN_007605E0)
  * Address: 0x00734210 (FUN_00734210)
- * Address: 0x00733F50 (FUN_00733F50)
  *
  * What it does:
- * Repeatedly pops the root lane to the range tail and restores heap order over
- * the shrinking prefix until one lane remains.
+ * `std::sort_heap` tail pass: repeatedly pops the root lane to the range tail
+ * and restores heap order over the shrinking prefix until one lane remains.
+ *
+ * Two caveats this block previously misstated.
+ *
+ * First, 0x00760290 and 0x00733F50 were co-claimed as carrying this body. They
+ * do not: each is a 5-byte linker bridge — `E9 4B 03 00 00  jmp sub_7605E0` and
+ * `E9 BB 02 00 00  jmp sub_734210` respectively. The body exists only at the two
+ * addresses named above.
+ *
+ * Second, 0x007605E0 and 0x00734210 are two *different* functions folded into
+ * one C++ body here: they dispatch to different sift helpers (sub_760720 versus
+ * sub_734350). The 0x00734210 lane operates on `PlatoonPriorityEntry`
+ * (`sizeof == 0x8`), whose sift helper is recovered in CPlatoon.cpp; the
+ * 0x007605E0 lane's element type is not yet proven. Splitting them needs the
+ * second element type identified first.
  */
 [[maybe_unused]] std::int32_t HeapSortElement8RangeTailPassRuntime(
   Element8Runtime* const heapBegin,
@@ -3147,8 +3159,15 @@ namespace
  * Address: 0x00693150 (FUN_00693150)
  *
  * What it does:
- * Copies one contiguous float7 lane range backwards and returns the rebased
- * destination begin lane.
+ * Argument-shuffling forwarder into the 28-byte backward-copy body: 14
+ * instructions that reload the two range arguments, clear a stack flag, push
+ * four words and `call sub_693390`, then return.
+ *
+ * The backward-copy loop itself is NOT at this address — there is no decrement,
+ * no dereference and no stride arithmetic here. The loop lives at 0x00693390,
+ * already recovered as `CopyBackward28ByteLane` in FastVectorInsertLanes.cpp.
+ * The prior description of this body as the copy loop was not supported by the
+ * assembly.
  */
 [[maybe_unused]] Float7Runtime* CopyFloat7RangeBackwardRuntime(
   Float7Runtime* destinationEnd,
@@ -3755,11 +3774,15 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
 
 /**
  * Address: 0x00740380 (FUN_00740380)
- * Address: 0x00607F00 (FUN_00607F00)
  *
  * What it does:
- * Tail-forwards one `SSyncData` army-variable vector teardown thunk into the
- * canonical vector-destroy helper body.
+ * Linker-emitted bridge: a single `jmp sub_740B40` (5 bytes) tail-forwarding
+ * into the canonical army-variable vector-destroy body.
+ *
+ * The address 0x00607F00 was previously co-claimed here. That is wrong:
+ * 0x00607F00 is `E9 BB 07 00 00  jmp Moho::CUnitCarrierLand::MemberDeserialize`
+ * — an unrelated deserializer with no connection to SSTIArmyVariableData or to
+ * any vector teardown. The claim was fabricated ownership and has been removed.
  */
 [[maybe_unused]] void DestroyArmyVariableDataVectorThunk(
   LegacyVectorStorageRuntime<moho::SSTIArmyVariableData>* const vector
@@ -5583,11 +5606,14 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
 
 /**
  * Address: 0x0085FDB0 (FUN_0085FDB0)
- * Address: 0x0085F910 (FUN_0085F910)
  *
  * What it does:
  * Fills `count` contiguous `0x34`-byte lanes by copying one
  * `RefCountedPayload49Runtime` source payload into each lane.
+ *
+ * 0x0085F910 was previously co-claimed here. It does not carry this loop: it is
+ * 11 instructions of argument shuffling ending in `call sub_85FDB0`, i.e. a
+ * distinct register-shape adapter for this body, not a second copy of it.
  */
 [[maybe_unused]] RefCountedPayload49Runtime* FillStride52RefCountedPayload49LaneRuntime(
   std::uint32_t count,
@@ -5804,11 +5830,14 @@ namespace
 
 /**
  * Address: 0x007CCEF0 (FUN_007CCEF0)
- * Address: 0x007CBF00 (FUN_007CBF00)
  *
  * What it does:
  * Initializes `count` contiguous 0x18-byte lanes by copying one source
  * dword lane and copy-constructing one `LuaObject` lane from the same source.
+ *
+ * 0x007CBF00 was previously co-claimed here. It does not carry this loop: it is
+ * 11 instructions ending in `call sub_7CCEF0`, with no `add esi, 18h` stride and
+ * no LuaObject placement-new — a register-shape adapter, not a second copy.
  */
 [[maybe_unused]] LuaPlus::LuaObject* FillStride24WordLuaObjectLaneRuntime(
   std::uint32_t count,
