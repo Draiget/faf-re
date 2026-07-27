@@ -5937,10 +5937,16 @@ std::filesystem::path moho::DISK_GetLaunchDir()
     executablePathBuffer[0] = '.';
   }
 
-  msvc8::string launchPath{};
-  (void)func_StringSetFilename2(&launchPath, executablePathBuffer.data());
-  const msvc8::string launchDirText = FILE_DirPrefix(launchPath.c_str());
-  return std::filesystem::path(launchDirText.c_str());
+  // Take the directory straight off the resolved path.
+  //
+  // Routing it through msvc8::string first does not survive: that wrapper has
+  // a 15-character inline buffer and never reallocates, so a real executable
+  // path is silently truncated - "G:\projects\faf-main\output\..." came back
+  // as "gZ\projects\faf", exactly 15 characters and no longer absolute. The
+  // caller then resolved it against the working directory and looked for
+  // SupComDataPath.lua in a path that cannot exist, so
+  // DISK_SetupDataAndSearchPaths failed and startup died in gpg::Die.
+  return std::filesystem::path(executablePathBuffer.data()).parent_path();
 }
 
 /**
