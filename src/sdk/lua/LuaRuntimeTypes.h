@@ -45,18 +45,19 @@ struct Node
 
 struct Table
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	int32_t reservedAfterHeader;
-	int8_t flags;           // Cached "missing TM" bitset.
-	lu_byte lsizenode;      // log2(node array size).
-	Table* metatable;
-	LuaPlus::TObject* array; // Dense integer-key part.
-	Node* node;              // Hash node array.
-	Node* firstfree;         // First free hash node.
-	GCObject* gclist;        // GC gray list link.
-	int sizearray;           // Dense array slot count.
+	GCObject* next;          // +0x00
+	lu_byte tt;              // +0x04
+	lu_byte marked;          // +0x05
+	lu_byte reservedAfterHeader[2]; // +0x06 CommonHeader tail padding in this fork.
+	int8_t flags;            // +0x08 Cached "missing TM" bitset.
+	lu_byte lsizenode;       // +0x09 log2(node array size).
+	// +0x0A..0x0B implicit padding before the pointer lanes.
+	Table* metatable;        // +0x0C
+	LuaPlus::TObject* array; // +0x10 Dense integer-key part.
+	Node* node;              // +0x14 Hash node array.
+	Node* firstfree;         // +0x18 First free hash node.
+	GCObject* gclist;        // +0x1C GC gray list link.
+	int sizearray;           // +0x20 Dense array slot count.
 
 	/**
 	 * Address: 0x00920530 (FUN_00920530, Table::MemberSerialize)
@@ -76,6 +77,22 @@ struct Table
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, Table* object, int version, const gpg::RRef& ownerRef);
 };
+
+// Layout confirmed from the binary, not inferred: luaH_new (FUN_00927320)
+// stores metatable/array/node/sizearray/lsizenode at these displacements and
+// allocates the object with luaM_realloc(L, 0, 0, 0x24), and luaH_getnum
+// (FUN_00927450) reads [esi+20h] for sizearray, [esi+10h] for array,
+// [esi+14h] for node and [esi+9] for lsizenode. flags is the
+// "mov byte ptr [esi+8], 0FFh" (t->flags = -1) at 0x00927350.
+static_assert(offsetof(Table, flags) == 0x08, "Table::flags must be at +0x08");
+static_assert(offsetof(Table, lsizenode) == 0x09, "Table::lsizenode must be at +0x09");
+static_assert(offsetof(Table, metatable) == 0x0C, "Table::metatable must be at +0x0C");
+static_assert(offsetof(Table, array) == 0x10, "Table::array must be at +0x10");
+static_assert(offsetof(Table, node) == 0x14, "Table::node must be at +0x14");
+static_assert(offsetof(Table, firstfree) == 0x18, "Table::firstfree must be at +0x18");
+static_assert(offsetof(Table, gclist) == 0x1C, "Table::gclist must be at +0x1C");
+static_assert(offsetof(Table, sizearray) == 0x20, "Table::sizearray must be at +0x20");
+static_assert(sizeof(Table) == 0x24, "Table size must be 0x24 (luaH_new allocates 0x24)");
 
 struct Udata
 {
