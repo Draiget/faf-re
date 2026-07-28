@@ -2597,6 +2597,30 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x00928420 (FUN_00928420, luaT_gettm)
+	 *
+	 * IDA signature:
+	 * const TObject *__cdecl luaT_gettm(Table *events, char event, TString *ename);
+	 *
+	 * What it does:
+	 * Fetches one tag method from a metatable by name. On a miss it records the
+	 * absence in the metatable's `flags` cache - setting bit `event` so later
+	 * lookups for the same event can skip the table entirely - and returns null
+	 * rather than the shared nil object, which is what lets callers distinguish
+	 * "no such tag method" from "a tag method whose value is nil".
+	 */
+	const TObject* luaT_gettm(Table* const events, const int event, TString* const ename)
+	{
+		const TObject* const tagMethod = luaH_getstr(events, ename);
+		if (tagMethod->tt == LUA_TNIL) {
+			events->flags |= static_cast<int8_t>(1 << event);
+			return nullptr;
+		}
+
+		return tagMethod;
+	}
+
+	/**
 	 * Address: 0x00927510 (FUN_00927510, luaH_get)
 	 *
 	 * What it does:
