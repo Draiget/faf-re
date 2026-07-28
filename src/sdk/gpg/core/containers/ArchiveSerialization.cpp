@@ -586,7 +586,7 @@ namespace gpg
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Stats_StatItem>());
   }
 
-  gpg::RRef* RRef_Sim(gpg::RRef* const outRef, moho::Sim* const value)
+  gpg::RRef* RRef_Sim(gpg::RRef* outRef, moho::Sim* value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Sim>());
   }
@@ -639,7 +639,7 @@ namespace gpg
    * Builds one reflected reference for `moho::CEconStorage`, preserving derived
    * runtime type and base-adjusted object lane when needed.
    */
-  gpg::RRef* RRef_CEconStorage(gpg::RRef* const outRef, moho::CEconStorage* const value)
+  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CEconStorage>());
   }
@@ -667,7 +667,7 @@ namespace gpg
    * Builds one reflected reference for `moho::CTextureScroller`, preserving
    * derived runtime type and base-adjusted object lane when needed.
    */
-  gpg::RRef* RRef_CTextureScroller(gpg::RRef* const outRef, moho::CTextureScroller* const value)
+  gpg::RRef* RRef_CTextureScroller(gpg::RRef* outRef, moho::CTextureScroller* value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTextureScroller>());
   }
