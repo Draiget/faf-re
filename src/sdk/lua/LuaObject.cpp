@@ -824,10 +824,10 @@ namespace
 	);
 
 #if INTPTR_MAX == INT32_MAX
-	static_assert(offsetof(Table, lsizenode) == 0x0D, "Table::lsizenode offset must be 0x0D (x86)");
-	static_assert(offsetof(Table, array) == 0x14, "Table::array offset must be 0x14 (x86)");
-	static_assert(offsetof(Table, node) == 0x18, "Table::node offset must be 0x18 (x86)");
-	static_assert(offsetof(Table, sizearray) == 0x24, "Table::sizearray offset must be 0x24 (x86)");
+	// Table's own offsets are asserted at its definition in LuaRuntimeTypes.h,
+	// where each one cites the instruction it was read from. They used to be
+	// asserted here as 0x0D/0x14/0x18/0x24, which matched the struct as written
+	// rather than the binary.
 	static_assert(sizeof(Node) == 0x14, "Node size must be 0x14 (x86)");
 #endif
 
