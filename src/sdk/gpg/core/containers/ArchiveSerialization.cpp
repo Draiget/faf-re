@@ -751,6 +751,20 @@ namespace gpg
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CSquad>());
   }
 
+  /**
+   * Address: 0x00676000 (FUN_00676000)
+   * Mangled: ?RRef_ManyToOneListener_ECollisionBeamEvent@gpg@@YAPAVRRef@1@PAV21@PAV?$ManyToOneListener@W4ECollisionBeamEvent@Moho@@@Moho@@@Z
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_ManyToOneListener_ECollisionBeamEvent(
+   *     gpg::RRef *outRef, Moho::ManyToOneListener_ECollisionBeamEvent *value);
+   *
+   * What it does:
+   * Builds one reflected reference for
+   * `moho::ManyToOneListener<moho::ECollisionBeamEvent>`, resolving the dynamic
+   * runtime RType via RTTI and adjusting the object lane by the base offset when
+   * the concrete type derives from the static listener type.
+   */
   gpg::RRef* RRef_ManyToOneListener_ECollisionBeamEvent(
     gpg::RRef* const outRef,
     moho::ManyToOneListener_ECollisionBeamEvent* const value
