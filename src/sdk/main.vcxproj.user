@@ -1,18 +1,49 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
+  <!--
+    F5 = build, stage main.exe into $(FafRunDir), and launch it there.
+
+    The engine resolves its data path from its own module path, not from the
+    working directory: DISK_GetLaunchDir() takes _fullpath(argv[0]) and strips
+    the filename, and DISK_SetupDataAndSearchPaths() then looks for
+    SupComDataPath.lua beside it. Debugging $(TargetPath) straight out of
+    output\ therefore dies in gpg::Die("Failed to setup initial search path.")
+    - so the post-build event in main.vcxproj copies the exe next to the game's
+    SupComDataPath.lua, and we debug that copy.
+
+    The PDB is not copied: its absolute path is embedded in the exe, so the
+    debugger resolves symbols back to output\ on its own.
+
+    To run against a different install, override FafRunDir - here, or on the
+    command line:
+        msbuild src\sdk\main.vcxproj /p:FafRunDir=D:\SomeGameDir\bin\
+  -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(FafRunDir)$(TargetFileName)</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>$(FafRunDir)</LocalDebuggerWorkingDirectory>
+    <!-- The game is normally launched with an explicit init script, e.g.
+         /init init_faf.lua. Left empty so SupComDataPath.lua drives the
+         bootstrap; fill this in to reproduce a specific launcher invocation. -->
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(FafRunDir)$(TargetFileName)</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>$(FafRunDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>
