@@ -1150,6 +1150,60 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090C340 (FUN_0090C340, negindex)
+	 *
+	 * IDA signature:
+	 * TObject *__usercall negindex@<eax>(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Resolves a non-positive stack index to its slot. Ordinary negative
+	 * indices count back from the top; below those sit the pseudo-indices -
+	 * this fork adds a registry-by-integer range beneath the usual
+	 * globals/registry pair, and anything lower still is an upvalue of the
+	 * running C closure (null when the closure has no such upvalue).
+	 *
+	 * The thresholds are the literals in the disassembly, not the decompiler's
+	 * symbol substitution:
+	 *   0x0090C344  cmp edx, 0FFFFD8F0h   -10000  LUA_REGISTRYINDEX
+	 *   0x0090C357  cmp edx, 0FFFF63C0h   -40000  kRegistryIntegerIndexBase
+	 *   0x0090C37D  cmp edx, 0FFFFD8EFh   -10001  LUA_GLOBALSINDEX
+	 */
+	TObject* negindex(lua_State* const L, const int idx)
+	{
+		// Registry slots addressed by integer, a LuaPlus extension below the
+		// stock pseudo-index pair.
+		constexpr int kRegistryIntegerIndexBase = -40000;
+
+		if (idx > LUA_REGISTRYINDEX) {
+			return &L->top[idx];
+		}
+
+		if (idx < kRegistryIntegerIndexBase) {
+			auto* const registry = static_cast<Table*>(L->l_G->_registry.value.p);
+			return const_cast<TObject*>(luaH_getnum(registry, kRegistryIntegerIndexBase - idx));
+		}
+
+		if (idx == LUA_GLOBALSINDEX) {
+			return &L->_gt;
+		}
+
+		if (idx == LUA_REGISTRYINDEX) {
+			return &L->l_G->_registry;
+		}
+
+		// Upvalue of the running C closure, counted down from the globals
+		// pseudo-index. `upvalue_m1` is the one-before-first lane the binary
+		// indexes, so the subscript is used directly.
+		GCObject* const closure = static_cast<GCObject*>(L->base[-1].value.p);
+		const int upvalueIndex = LUA_GLOBALSINDEX - idx;
+		if (upvalueIndex > closure->cl.c.nupvalues) {
+			return nullptr;
+		}
+
+		return &closure->cl.c.upvalue_m1[upvalueIndex];
+	}
+
+	/**
 	 * Address: 0x0090C420 (FUN_0090C420, luaA_pushobject)
 	 *
 	 * What it does:
