@@ -4049,13 +4049,26 @@ namespace LuaPlus
 	// definitions here in LuaObject.cpp and `luaU_undump` in LuaParser.cpp name
 	// the same layout. Field offsets mirror the original `ZIO` / `LoadState`
 	// structs as observed in FUN_009285C0 / FUN_00928ED0 / FUN_009290F0.
+	// The reader hands back a whole block at a time; `remainingBytes`/`cursor`
+	// walk it, and the tail three fields are what luaZ_init (FUN_0092BA10)
+	// writes: "mov [eax+8], ecx" (reader), "mov [eax+0Ch], edx" (data),
+	// "mov [eax+10h], ecx" (name), then zeroes +0x00 and +0x04.
+	// End-of-stream sentinel the reader lane returns (stock Lua's EOZ).
+	constexpr int kLuaEndOfStream = -1;
+
 	struct LuaZioRuntimeView
 	{
-		int remainingBytes; // ZIO::n
-		const char* cursor; // ZIO::p
+		int remainingBytes;    // ZIO::n     +0x00
+		const char* cursor;    // ZIO::p     +0x04
+		lua_Chunkreader reader; // ZIO::reader +0x08
+		void* readerData;      // ZIO::data  +0x0C
+		const char* chunkName; // ZIO::name  +0x10
 	};
 	static_assert(offsetof(LuaZioRuntimeView, remainingBytes) == 0x0, "LuaZioRuntimeView::remainingBytes offset must be 0x0");
 	static_assert(offsetof(LuaZioRuntimeView, cursor) == 0x4, "LuaZioRuntimeView::cursor offset must be 0x4");
+	static_assert(offsetof(LuaZioRuntimeView, reader) == 0x8, "LuaZioRuntimeView::reader offset must be 0x8");
+	static_assert(offsetof(LuaZioRuntimeView, readerData) == 0xC, "LuaZioRuntimeView::readerData offset must be 0xC");
+	static_assert(offsetof(LuaZioRuntimeView, chunkName) == 0x10, "LuaZioRuntimeView::chunkName offset must be 0x10");
 
 	struct LuaLoadStateRuntimeView
 	{
@@ -4103,7 +4116,7 @@ namespace
 		const char* getobjname(int stackPos, CallInfo* callInfo, const char** nameOut);
 		void luaG_runerror(lua_State* L, const char* format, ...);
 		int luaZ_fill(LuaZioRuntimeView* stream);
-		int luaZ_read(LuaZioRuntimeView* stream, void* buffer, size_t size);
+		size_t luaZ_read(LuaZioRuntimeView* stream, void* buffer, size_t size);
 		char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
 		std::FILE* __cdecl __iob_func(void);
 		void luaO_chunkid(char* out, const char* source, int bufflen);
@@ -11202,6 +11215,143 @@ extern "C"
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
+
+	/**
+	 * Address: 0x0092BA10 (FUN_0092BA10, luaZ_init)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaZ_init(ZIO *z, lua_Chunkreader reader, void *data, const char *name);
+	 *
+	 * What it does:
+	 * Binds a stream to its reader. The buffer starts empty, so the first read
+	 * pulls a block.
+	 */
+	void luaZ_init(LuaZioRuntimeView* const stream, const lua_Chunkreader reader, void* const data, const char* const name)
+	{
+		stream->reader = reader;
+		stream->readerData = data;
+		stream->chunkName = name;
+		stream->remainingBytes = 0;
+		stream->cursor = nullptr;
+	}
+
+	/**
+	 * Address: 0x0092B970 (FUN_0092B970, luaZ_fill)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaZ_fill(ZIO *z);
+	 *
+	 * What it does:
+	 * Pulls the next block from the reader and returns its first byte, already
+	 * consumed. An empty or absent block is end of stream.
+	 */
+	int luaZ_fill(LuaZioRuntimeView* const stream)
+	{
+		size_t available = 0;
+		const char* const block = reinterpret_cast<const char*>(
+			stream->reader(nullptr, stream->readerData, &available)
+		);
+
+		if (block == nullptr || available == 0u) {
+			return kLuaEndOfStream;
+		}
+
+		stream->remainingBytes = static_cast<int>(available - 1u);
+		stream->cursor = block + 1;
+		return static_cast<unsigned char>(*block);
+	}
+
+	/**
+	 * Address: 0x0092B9B0 (FUN_0092B9B0, luaZ_lookahead)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaZ_lookahead(ZIO *z);
+	 *
+	 * What it does:
+	 * Peeks the next byte without consuming it. Refilling consumes one, so it
+	 * is pushed back - the binary inlines luaZ_fill here and open-codes that
+	 * same adjustment.
+	 */
+	int luaZ_lookahead(LuaZioRuntimeView* const stream)
+	{
+		if (stream->remainingBytes == 0) {
+			if (luaZ_fill(stream) == kLuaEndOfStream) {
+				return kLuaEndOfStream;
+			}
+
+			++stream->remainingBytes;
+			--stream->cursor;
+		}
+
+		return static_cast<unsigned char>(*stream->cursor);
+	}
+
+	/**
+	 * Address: 0x0092BA40 (FUN_0092BA40, luaZ_read)
+	 *
+	 * IDA signature:
+	 * size_t __cdecl luaZ_read(ZIO *z, void *b, size_t n);
+	 *
+	 * What it does:
+	 * Copies `n` bytes out of the stream, pulling blocks as needed. Returns 0
+	 * on success, or how many bytes were still wanted when the stream ended -
+	 * so a non-zero result is a short read, not a count.
+	 */
+	size_t luaZ_read(LuaZioRuntimeView* const stream, void* buffer, size_t n)
+	{
+		while (n != 0u) {
+			if (stream->remainingBytes == 0) {
+				if (luaZ_fill(stream) == kLuaEndOfStream) {
+					return n;
+				}
+
+				++stream->remainingBytes;
+				--stream->cursor;
+			}
+
+			const size_t chunk =
+				(n <= static_cast<size_t>(stream->remainingBytes)) ? n : static_cast<size_t>(stream->remainingBytes);
+			std::memcpy(buffer, stream->cursor, chunk);
+
+			stream->remainingBytes -= static_cast<int>(chunk);
+			stream->cursor += chunk;
+			buffer = static_cast<char*>(buffer) + chunk;
+			n -= chunk;
+		}
+
+		return 0u;
+	}
+
+	/**
+	 * Address: 0x0090DD10 (FUN_0090DD10, luaL_checkstack)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_checkstack(lua_State *L, int space, const char *mes);
+	 *
+	 * What it does:
+	 * Reserves stack room or raises "stack overflow", naming what wanted it.
+	 */
+	void luaL_checkstack(lua_State* const state, const int space, const char* const message)
+	{
+		if (lua_checkstack(state, space) == 0) {
+			luaL_error(state, "stack overflow (%s)", message);
+		}
+	}
+
+	/**
+	 * Address: 0x0090DCF0 (FUN_0090DCF0, luaL_getmetatable)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_getmetatable(lua_State *L, const char *tname);
+	 *
+	 * What it does:
+	 * Pushes the registry entry a named metatable was registered under.
+	 */
+	void luaL_getmetatable(lua_State* const state, const char* const tname)
+	{
+		lua_pushstring(state, tname);
+		lua_rawget(state, LUA_REGISTRYINDEX);
+	}
 
 	/**
 	 * Address: 0x00914EF0 (FUN_00914EF0, luaF_newLclosure)
