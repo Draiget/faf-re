@@ -412,8 +412,24 @@ namespace moho
    * Address: 0x00BC59E0 (FUN_00BC59E0, sub_BC59E0)
    *
    * What it does:
-   * Saves current `core` Lua-init form chain head and relinks it to the
-   * recovered CPrefetchSet startup anchor lane.
+   * Prepends this translation unit's class-binder form to the `core` init set.
+   *
+   * The binary does this by hand because its form is a *statically
+   * initialised* object in .data - the compiler emitted its vtable pointer and
+   * strings at link time, so no constructor ever runs and nothing links it
+   * into the set. Dumping 0x00F593F0 out of the image shows exactly that: a
+   * vtable at +0x00, "moho.CPrefetchSet" at +0x04, "CPrefetchSet" at +0x08 and
+   * the mNextInSet lane at +0x10 that this function patches.
+   *
+   * That does not carry over. Our equivalent form is a real C++ object whose
+   * constructor already calls CScrLuaInitFormSet::AddInit, so the prepend has
+   * happened by the time anything calls this. Re-doing it here is what broke
+   * startup: the previous recovery assigned `mForms` the *address of a
+   * CScrLuaInitForm* variable*, so the set's head was a pointer-sized lane
+   * whose first word - read as a vtable pointer - was null, and
+   * RunLuaInitFormSetIfPresent access-violated on the first virtual call. It
+   * also dropped every form registered before it, because the old head was
+   * saved into a "Prev" variable that nothing ever relinked.
    */
   CScrLuaInitForm* register_core_CoreInits_mForms_CPrefetchSetAnchor()
   {
@@ -424,7 +440,6 @@ namespace moho
 
     CScrLuaInitForm* const result = coreSet->mForms;
     gRecoveredCoreLuaInitFormPrev_CPrefetchSetStartup = result;
-    coreSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gRecoveredCoreLuaInitFormAnchor_CPrefetchSetStartup);
     return result;
   }
 } // namespace moho

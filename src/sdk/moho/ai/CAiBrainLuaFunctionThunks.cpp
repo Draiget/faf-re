@@ -878,7 +878,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup);
+    // Prepend suppressed: the binary's anchor is a statically initialised form
+    // object in .data with no constructor, so it patches the list by hand. Our
+    // equivalent is a real C++ object whose constructor already calls AddInit,
+    // and re-doing it here published the address of a CScrLuaInitForm* variable
+    // as the list head - a null vtable pointer that crashed
+    // RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup);
     return result;
   }
 

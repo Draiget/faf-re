@@ -786,7 +786,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane21 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane21);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane21);
     return result;
   }
 
@@ -807,7 +813,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane22 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane22);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane22);
     return result;
   }
 
@@ -828,7 +840,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane23 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane23);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane23);
     return result;
   }
 
@@ -849,7 +867,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane24 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane24);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane24);
     return result;
   }
 
@@ -870,7 +894,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane25 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane25);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane25);
     return result;
   }
 
@@ -891,7 +921,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane26 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane26);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane26);
     return result;
   }
 
@@ -912,7 +948,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane27 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane27);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane27);
     return result;
   }
 
@@ -933,7 +975,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane28 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane28);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane28);
     return result;
   }
 
@@ -976,7 +1024,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevMohoWeaponMethodsFactory = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorMohoWeaponMethodsFactory);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorMohoWeaponMethodsFactory);
     return result;
   }
 
@@ -997,7 +1051,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevStartupLane30 = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane30);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane30);
     return result;
   }
 
@@ -1652,7 +1712,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitFormPrevReconBlipAnchorA = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorReconBlipAnchorA);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorReconBlipAnchorA);
     return result;
   }
 
@@ -1673,7 +1739,13 @@ namespace moho
 
     CScrLuaInitForm* const result = simSet->mForms;
     gSimLuaInitReconBlipAnchorB.mPrevDef = result;
-    simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitReconBlipAnchorB);
+    // Prepend suppressed: the binary's anchor is a statically initialised
+    // form object in .data with no constructor, so it patches the list by
+    // hand. Our equivalent is a real C++ object whose constructor already
+    // calls AddInit, and re-doing it here published the address of a
+    // CScrLuaInitForm* variable as the list head - a null vtable pointer
+    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
+    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitReconBlipAnchorB);
     return result;
   }
 
