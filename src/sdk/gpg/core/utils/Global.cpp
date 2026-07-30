@@ -1413,8 +1413,16 @@ extern "C" size_t __cdecl _msize(void* memblock)
  * What it does:
  * Reallocates allocator-managed blocks with grow/shrink thresholds matching
  * recovered binary behavior.
+ *
+ * Named `realloc_0` for the same reason `malloc_0` carries its suffix: the
+ * project links the DLL CRT, so `<cstdlib>` declares `realloc` as
+ * `__declspec(dllimport)` and every translation unit that includes it binds
+ * to `__imp__realloc` instead of this definition. A caller that then released
+ * the block through `free_crt` - which does reach the engine allocator -
+ * would be freeing a CRT block against the engine's page map. Callers that
+ * want the engine allocator must name it explicitly.
  */
-extern "C" void* __cdecl realloc(void* pblock, size_t newsize)
+extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
 {
     if (pblock == nullptr) {
         return malloc_0(static_cast<std::uint32_t>(newsize));

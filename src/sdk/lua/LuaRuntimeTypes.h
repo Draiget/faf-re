@@ -299,8 +299,8 @@ struct global_State
 	lu_mem GCthreshold;          // +0x24 Next GC trigger threshold.
 	int32_t gcTraversalLockDepth; // +0x28 GC traversal lock counter used by debug helpers.
 	lu_mem nblocks;              // +0x2C Bytes currently allocated.
-	LuaPlus::TObject _defaultmeta; // +0x30 Default table/userdata metatable.
-	LuaPlus::TObject _registry;  // +0x38 Registry table.
+	LuaPlus::TObject _registry;  // +0x30 Registry table.
+	LuaPlus::TObject _defaultmeta; // +0x38 Default table/userdata metatable.
 	lua_State* mainthread;       // +0x40 Main thread.
 	lua_State* lstate;           // +0x44 Currently active thread.
 	Node dummynode[1];           // +0x48 Shared empty-table node.
@@ -409,8 +409,13 @@ static_assert(sizeof(CallInfo) == 0x28, "CallInfo must be 0x28 bytes (x86)");
 //   GCthreshold       lua_getgcthreshold (FUN_0090D650) "mov eax,[ecx+24h]; shr eax,0Ah"
 //   gcTraversalLock   FUN_009136F0 "add dword ptr [edi+28h],1" / "...,0FFFFFFFFh"
 //   nblocks           lua_getgccount (FUN_0090D660) "mov eax,[ecx+2Ch]; shr eax,0Ah"
-//   _defaultmeta      markroot    (FUN_00915BF0) "cmp [eax+30h],edi" / "mov eax,[eax+34h]"
-//   _registry         markroot    "cmp [eax+38h],edi" / "mov eax,[eax+3Ch]"
+//   _registry         negindex    (FUN_0090C340) LUA_REGISTRYINDEX returns
+//                     "mov eax,[eax+10h]; add eax,30h", and the
+//                     registry-by-integer lane reads the table out of
+//                     "mov eax,[edx+34h]" - so tt is 0x30, value 0x34
+//   _defaultmeta      lua_setmetatable (FUN_0090D340) falls back to
+//                     "mov ecx,[esi+10h]; add ecx,38h" when the pushed value
+//                     is nil, which is stock Lua's defaultmeta(L)
 //   mainthread        markroot    "mov edi,[ecx+40h]" -> traversestack
 //   lstate            f_luaopen   "mov [ebp+44h],esi" (the second thread slot)
 //   dummynode         f_luaopen   zeroes +0x48/+0x50/+0x58 = i_key.tt / i_val.tt / next
@@ -430,8 +435,8 @@ static_assert(
 	"global_State::gcTraversalLockDepth must be at +0x28 (x86)"
 );
 static_assert(offsetof(global_State, nblocks) == 0x2C, "global_State::nblocks must be at +0x2C (x86)");
-static_assert(offsetof(global_State, _defaultmeta) == 0x30, "global_State::_defaultmeta must be at +0x30 (x86)");
-static_assert(offsetof(global_State, _registry) == 0x38, "global_State::_registry must be at +0x38 (x86)");
+static_assert(offsetof(global_State, _registry) == 0x30, "global_State::_registry must be at +0x30 (x86)");
+static_assert(offsetof(global_State, _defaultmeta) == 0x38, "global_State::_defaultmeta must be at +0x38 (x86)");
 static_assert(offsetof(global_State, mainthread) == 0x40, "global_State::mainthread must be at +0x40 (x86)");
 static_assert(offsetof(global_State, lstate) == 0x44, "global_State::lstate must be at +0x44 (x86)");
 static_assert(offsetof(global_State, dummynode) == 0x48, "global_State::dummynode must be at +0x48 (x86)");

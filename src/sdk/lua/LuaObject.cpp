@@ -21,6 +21,7 @@
 #include <stdexcept>
 
 #include "LuaAssertion.h"
+#include "LuaError.h"
 #include "LuaTableIterator.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
@@ -931,6 +932,19 @@ extern "C"
 		"upval",     // LUA_TUPVALUE       11
 	};
 
+	// Sizes of the three interned-name tables the bootstrap walks, each taken
+	// from the loop bound in the function that fills it.
+	constexpr int kLuaTypeTagCount = 12;      // luaC_init:  0xA4 -> 0xD4 step 4
+	constexpr int kLuaTagMethodCount = 18;    // luaT_init:  0x5C -> 0xA4 step 4
+	constexpr int kLuaReservedWordCount = 22; // luaX_init:  "cmp ebx, 16h"
+
+	// GC mark bit that pins a string against collection; every interned name
+	// laid down during bootstrap gets it ("or byte ptr [eax+5], 10h").
+	constexpr lu_byte kLuaFixedStringMark = 0x10;
+
+	// Bucket count the string table opens with ("push 20h" -> luaS_resize).
+	constexpr int kLuaInitialStringTableSize = 32;
+
 	/**
 	 * `luaC_checkGC` was a macro in the 2007 sources, so the binary emits it
 	 * inline at every allocating API entry point rather than as a call. Kept
@@ -963,7 +977,7 @@ extern "C"
 	 * Allocates one fresh Lua thread stack and call-info array, initializes the
 	 * first call frame, and seeds default stack/base/top lanes for execution.
 	 */
-	[[maybe_unused]] static void lua_stack_init(lua_State* const allocatorState, lua_State* const threadState)
+	static void lua_stack_init(lua_State* const allocatorState, lua_State* const threadState)
 	{
 		constexpr int kInitialStackSlots = 45;
 		constexpr int kStackGuardTailSlots = 6;
@@ -1014,7 +1028,7 @@ extern "C"
 	 * releases callinfo+stack arrays, then frees global and thread state using
 	 * allocator callbacks captured from `global_State`.
 	 */
-	[[maybe_unused]] static void close_state(lua_State* const state)
+	static void close_state(lua_State* const state)
 	{
 		luaF_close(state, state->stack);
 
@@ -7339,7 +7353,7 @@ namespace
 	 * Sweeps every string-table bucket and decrements `nuse` by each bucket's
 	 * reclaimed string count.
 	 */
-	[[maybe_unused]] void sweepstrings(lua_State* const state, const int all)
+	void sweepstrings(lua_State* const state, const int all)
 	{
 		global_State* const globalState = state->l_G;
 		for (int index = 0; index < globalState->strt.size; ++index) {
@@ -7395,10 +7409,10 @@ namespace
 		global_State* const globalState = state->l_G;
 		global_State* const gcGlobals = st->g;
 
-		if (globalState->_registry.tt >= LUA_TSTRING) {
-			auto* const registryObject = static_cast<GCObject*>(globalState->_registry.value.p);
-			if ((registryObject->gch.marked & 0x11u) == 0u) {
-				reallymarkobject(st, registryObject);
+		if (globalState->_defaultmeta.tt >= LUA_TSTRING) {
+			auto* const defaultMetaObject = static_cast<GCObject*>(globalState->_defaultmeta.value.p);
+			if ((defaultMetaObject->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, defaultMetaObject);
 			}
 		}
 
@@ -7411,10 +7425,10 @@ namespace
 			}
 		}
 
-		if (globalState->_defaultmeta.tt >= LUA_TSTRING) {
-			auto* const defaultMetaObject = static_cast<GCObject*>(globalState->_defaultmeta.value.p);
-			if ((defaultMetaObject->gch.marked & 0x11u) == 0u) {
-				reallymarkobject(st, defaultMetaObject);
+		if (globalState->_registry.tt >= LUA_TSTRING) {
+			auto* const registryObject = static_cast<GCObject*>(globalState->_registry.value.p);
+			if ((registryObject->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, registryObject);
 			}
 		}
 
@@ -10506,6 +10520,701 @@ extern "C" void luaV_settable(
 
 	luaG_runerror(state, "loop in settable");
 }
+
+// ---------------------------------------------------------------------------
+// Lua state construction.
+//
+// This block is the bootstrap the prebuilt LuaPlus lib used to own. Because
+// lua_open and f_luaopen were never recovered, the lib allocated and
+// initialised the whole lua_State + global_State pair at *its* field offsets,
+// and every recovered function above then read that object at ours - which is
+// why L->_gt came back as 0xCD debug fill no matter how much of the API was
+// correct. Everything here is defined with C linkage at namespace scope so it
+// displaces the lib's copies at link time.
+// ---------------------------------------------------------------------------
+
+// luaM_realloc, f_luaopen and lua_open all raise lua_MemError on allocation
+// failure, exactly as the binary does through _CxxThrowException. The project
+// compiles with /EHc, under which the compiler assumes an extern "C" function
+// never throws and warns (C4297) when one does. The assumption is wrong for
+// these three; switching the project to /EHs would express that globally, so
+// the suppression is scoped to this block rather than papered over per-call.
+#pragma warning(push)
+#pragma warning(disable : 4297)
+extern "C"
+{
+	// Both hooks reach the engine's small-block allocator, which is what the
+	// binary does: FUN_00923F20 tail-calls realloc at FUN_00957B00 and
+	// FUN_00923F40 tail-calls _free_crt at FUN_00957AF0, and both of those are
+	// engine code, not CRT. Naming matters here - the project links the DLL
+	// CRT, so writing `realloc` would bind to `__imp__realloc` and allocate on
+	// the CRT heap while `free_crt` released it against the engine's page map.
+	void* __cdecl realloc_0(void* pblock, std::size_t newsize);
+	void __cdecl free_crt(void* ptr);
+
+	/**
+	 * Address: 0x00923F20 (FUN_00923F20, luaHelper_ReallocFunction)
+	 *
+	 * IDA signature:
+	 * void *__cdecl luaHelper_ReallocFunction(void *ptr, int oldsize, int size,
+	 *     void *data, const char *allocName, unsigned int flags);
+	 *
+	 * What it does:
+	 * Resizes one Lua block on the CRT heap. Only `ptr` and `size` reach the
+	 * call - the bookkeeping arguments exist for allocator instrumentation
+	 * this build never installs.
+	 */
+	void* __cdecl luaHelper_ReallocFunction(
+		void* const ptr,
+		[[maybe_unused]] const int oldsize,
+		const int size,
+		[[maybe_unused]] void* const data,
+		[[maybe_unused]] const char* const allocName,
+		[[maybe_unused]] const unsigned int flags
+	)
+	{
+		return realloc_0(ptr, static_cast<std::size_t>(size));
+	}
+
+	/**
+	 * Address: 0x00923F40 (FUN_00923F40, luaHelper_FreeFunction)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaHelper_FreeFunction(void *ptr, int oldsize, void *data);
+	 *
+	 * What it does:
+	 * Releases one Lua block back to the CRT heap.
+	 */
+	void __cdecl luaHelper_FreeFunction(
+		void* const ptr,
+		[[maybe_unused]] const int oldsize,
+		[[maybe_unused]] void* const data
+	)
+	{
+		free_crt(ptr);
+	}
+
+	// Allocator hooks and tuning knobs, read out of .data in the shipped image:
+	//   luaHelper_Realloc     0x00F32120 -> 0x00923F20
+	//   luaHelper_Free        0x00F32124 -> 0x00923F40
+	//   luaHelper_memData     0x00F8EB9C -> zero-initialised
+	//   lua_minimumnumstrings 0x00F32128 -> 0x1F
+	//   lua_minimumauxspace   0x00F8EBA0 -> zero-initialised
+	ReallocFunction luaHelper_Realloc = &luaHelper_ReallocFunction;
+	FreeFunction luaHelper_Free = &luaHelper_FreeFunction;
+	void* luaHelper_memData = nullptr;
+	int lua_minimumnumstrings = 0x1F;
+	int lua_minimumauxspace = 0;
+
+	/**
+	 * Address: 0x0091A240 (FUN_0091A240, luaM_realloc)
+	 *
+	 * IDA signature:
+	 * void *__cdecl luaM_realloc(lua_State *L, void *block, lu_mem oldsize, lu_mem size);
+	 *
+	 * What it does:
+	 * The VM's single allocation choke point. A zero `size` frees, anything
+	 * else resizes through the global_State's realloc hook, and either way the
+	 * allocated-byte counter is adjusted by the same delta. Note the counter
+	 * update runs even on the error paths - that is the binary's behaviour,
+	 * not an oversight here.
+	 */
+	// noexcept(false) is load-bearing: /EHc makes the compiler assume an
+	// extern "C" function cannot throw, and this one does - the binary raises
+	// lua_MemError through _CxxThrowException on allocation failure.
+	void* luaM_realloc(lua_State* const state, void* const block, const lu_mem oldsize, const lu_mem size)
+	{
+		// The largest block the allocator will attempt; anything at or above
+		// this is reported rather than passed on ("cmp ebx, 0FFFFFFFDh").
+		constexpr lu_mem kMaxBlockSize = 0xFFFFFFFDu;
+
+		void* result = nullptr;
+
+		if (size == 0) {
+			if (block == nullptr) {
+				return nullptr;
+			}
+
+			global_State* const globalState = state->l_G;
+			globalState->freeFunc(block, static_cast<int>(oldsize), globalState->memData);
+		} else if (size >= kMaxBlockSize) {
+			luaG_runerror(state, "memory allocation error: block too big");
+			result = block;
+		} else {
+			global_State* const globalState = state->l_G;
+			result = globalState->reallocFunc(
+				block,
+				static_cast<int>(oldsize),
+				static_cast<int>(size),
+				globalState->memData,
+				nullptr,
+				state->allocFlags
+			);
+
+			if (result == nullptr) {
+				throw lua_MemError(lua::lua_Error(state, LUA_ERRMEM, "out of memory"));
+			}
+		}
+
+		if (state != nullptr) {
+			state->l_G->nblocks -= oldsize;
+			state->l_G->nblocks += size;
+		}
+
+		return result;
+	}
+
+	/**
+	 * Address: 0x0090D050 (FUN_0090D050, lua_rawget)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_rawget(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Replaces the key on top of the stack with `t[key]`, without consulting
+	 * any metatable.
+	 */
+	void lua_rawget(lua_State* const state, const int idx)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		TObject* const key = state->top - 1;
+		*key = *luaH_get(static_cast<Table*>(table->value.p), key);
+	}
+
+	/**
+	 * Address: 0x0090D2A0 (FUN_0090D2A0, lua_rawset)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_rawset(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Stores `t[key] = value` from the top two stack slots and pops both,
+	 * bypassing metatables.
+	 */
+	void lua_rawset(lua_State* const state, const int idx)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		TObject* const key = state->top - 2;
+		*luaH_set(state, static_cast<Table*>(table->value.p), key) = *(state->top - 1);
+		state->top -= 2;
+	}
+
+	/**
+	 * Address: 0x0090D2F0 (FUN_0090D2F0, lua_rawseti)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_rawseti(lua_State *L, int idx, int n);
+	 *
+	 * What it does:
+	 * Stores `t[n] = value` from the top stack slot and pops it, bypassing
+	 * metatables.
+	 */
+	void lua_rawseti(lua_State* const state, const int idx, const int n)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		*luaH_setnum(state, static_cast<Table*>(table->value.p), n) = *(state->top - 1);
+		--state->top;
+	}
+
+	/**
+	 * Address: 0x0090D340 (FUN_0090D340, lua_setmetatable)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_setmetatable(lua_State *L, int objindex);
+	 *
+	 * What it does:
+	 * Pops a metatable off the stack and installs it on the value at
+	 * `objindex`. A nil on top means "no metatable of its own", which this
+	 * fork expresses by installing the shared default metatable rather than a
+	 * null pointer - so a table's metatable lane is never empty. Returns 1
+	 * when the target can carry one, 0 for tags that cannot.
+	 */
+	int lua_setmetatable(lua_State* const state, const int objindex)
+	{
+		const TObject* const object = luaA_index(state, objindex);
+
+		const TObject* metatable = state->top - 1;
+		if (metatable->tt == LUA_TNIL) {
+			metatable = &state->l_G->_defaultmeta;
+		}
+
+		int applied = 1;
+		switch (object->tt) {
+			case LUA_TTABLE:
+				static_cast<Table*>(object->value.p)->metatable = static_cast<Table*>(metatable->value.p);
+				break;
+			case LUA_TUSERDATA:
+				static_cast<Udata*>(object->value.p)->metatable = static_cast<Table*>(metatable->value.p);
+				break;
+			default:
+				applied = 0;
+				break;
+		}
+
+		--state->top;
+		return applied;
+	}
+
+	/**
+	 * Address: 0x00915DF0 (FUN_00915DF0, luaC_link)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaC_link(lua_State *L, GCObject *o, lu_byte tt);
+	 *
+	 * What it does:
+	 * Pushes one fresh collectable onto the head of the main GC root list and
+	 * stamps its tag, clearing the mark bits so the next sweep sees it white.
+	 */
+	void luaC_link(lua_State* const state, GCObject* const object, const int typeTag)
+	{
+		global_State* const globalState = state->l_G;
+		object->gch.next = globalState->rootgc;
+		globalState->rootgc = object;
+		object->gch.marked = 0;
+		object->gch.tt = static_cast<lu_byte>(typeTag);
+	}
+
+	/**
+	 * Address: 0x00914E90 (FUN_00914E90, luaF_newCclosure)
+	 *
+	 * IDA signature:
+	 * Closure *__cdecl luaF_newCclosure(lua_State *L, int nelems);
+	 *
+	 * What it does:
+	 * Allocates a C closure sized for `nelems` upvalues, links it for
+	 * collection, and records the upvalue count. The function pointer itself
+	 * is filled in by the caller.
+	 */
+	Closure* luaF_newCclosure(lua_State* const state, const int nelems)
+	{
+		auto* const closure = static_cast<Closure*>(luaM_realloc(
+			state,
+			nullptr,
+			0u,
+			static_cast<lu_mem>(offsetof(CClosure, upvalue) + sizeof(LuaPlus::TObject) * nelems)
+		));
+
+		luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_CFUNCTION);
+
+		// The binary clears 0x18 through 0x40 - the tail of the reserved span
+		// whose fields are not named yet, plus the one-before-first upvalue
+		// lane - and deliberately leaves the dword at 0x14 as the allocator
+		// returned it.
+		constexpr std::size_t kUnclearedReservedPrefix = 4;
+		std::memset(
+			&closure->c.reservedTail[kUnclearedReservedPrefix],
+			0,
+			sizeof(closure->c.reservedTail) - kUnclearedReservedPrefix
+		);
+		closure->c.upvalue_m1[0].tt = LUA_TNIL;
+		closure->c.upvalue_m1[0].value.p = nullptr;
+
+		closure->c.nupvalues = static_cast<lu_byte>(nelems);
+		return closure;
+	}
+
+	/**
+	 * Address: 0x0092BAD0 (FUN_0092BAD0, luaZ_openspace)
+	 *
+	 * IDA signature:
+	 * char *__cdecl luaZ_openspace(lua_State *L, Mbuffer *buff, size_t n);
+	 *
+	 * What it does:
+	 * Grows the shared scratch buffer to at least `n` bytes, never below the
+	 * 32-byte floor. The allocator flag lane is forced to 1 across the resize
+	 * and restored afterwards, which is how this build tags scratch growth
+	 * apart from ordinary VM allocation.
+	 */
+	char* luaZ_openspace(lua_State* const state, Mbuffer* const buff, const size_t n)
+	{
+		constexpr size_t kMinBuffer = 32u;
+
+		if (n > buff->buffsize) {
+			const size_t newSize = n < kMinBuffer ? kMinBuffer : n;
+
+			const unsigned int savedAllocFlags = state->allocFlags;
+			state->allocFlags = 1u;
+			buff->buffer = static_cast<char*>(
+				luaM_realloc(state, buff->buffer, static_cast<lu_mem>(buff->buffsize), static_cast<lu_mem>(newSize))
+			);
+			state->allocFlags = savedAllocFlags;
+
+			buff->buffsize = newSize;
+		}
+
+		return buff->buffer;
+	}
+
+	/**
+	 * Address: 0x00D47508 (luaT_eventname)
+	 *
+	 * What it does:
+	 * Source text for the tag-method names `luaT_init` interns into
+	 * `global_State::tmname`. Eighteen entries, read out of the shipped image;
+	 * the array ends where unrelated data begins, and the count matches
+	 * luaT_init's own loop bound (esi = 0x5C stepping 4 while below 0xA4).
+	 */
+	const char* luaT_eventname[]{
+		"__index",    // 0
+		"__newindex", // 1
+		"__mode",     // 2
+		"__eq",       // 3
+		"__add",      // 4
+		"__sub",      // 5
+		"__mul",      // 6
+		"__div",      // 7
+		"__band",     // 8
+		"__bor",      // 9
+		"__bshl",     // 10
+		"__bshr",     // 11
+		"__pow",      // 12
+		"__unm",      // 13
+		"__lt",       // 14
+		"__le",       // 15
+		"__concat",   // 16
+		"__call",     // 17
+	};
+
+	/**
+	 * Address: 0x00D46010 (token2string)
+	 *
+	 * What it does:
+	 * The reserved words, in token order. `luaX_init` interns these and stamps
+	 * each one's `reserved` lane with its index + 1, which is how the lexer
+	 * recognises a keyword by pointer identity instead of strcmp. Entry 22 in
+	 * the image starts the non-reserved token names, so the reserved run is
+	 * exactly the 22 below - matching luaX_init's "cmp ebx, 16h".
+	 */
+	const char* token2string[]{
+		"and",   "break", "continue", "do",   "else", "elseif",
+		"end",   "false", "for",      "function", "if", "in",
+		"local", "nil",   "not",      "or",   "repeat", "return",
+		"then",  "true",  "until",    "while",
+	};
+
+	/**
+	 * Address: 0x009241A0 (FUN_009241A0, luaC_init)
+	 *
+	 * IDA signature:
+	 * void __usercall luaC_init(lua_State *L@<edi>);
+	 *
+	 * What it does:
+	 * Despite the luaC_ prefix this is not GC setup - it interns the twelve
+	 * type names into `global_State::typenames` and pins each against
+	 * collection. The loop walks g+0xA4 through g+0xD4 in four-byte steps,
+	 * which is where that array lives.
+	 */
+	void luaC_init(lua_State* const state)
+	{
+		for (int typeTag = 0; typeTag < kLuaTypeTagCount; ++typeTag) {
+			const char* const name = luaT_typenames[typeTag];
+			TString* const interned = luaS_newlstr(state, name, std::strlen(name));
+			state->l_G->typenames[typeTag] = interned;
+			state->l_G->typenames[typeTag]->marked |= kLuaFixedStringMark;
+		}
+	}
+
+	/**
+	 * Address: 0x009283C0 (FUN_009283C0, luaT_init)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaT_init(lua_State *L);
+	 *
+	 * What it does:
+	 * Interns the tag-method names into `global_State::tmname` and pins each
+	 * against collection, so `luaT_gettm` can look a metamethod up by
+	 * pre-interned key.
+	 */
+	void luaT_init(lua_State* const state)
+	{
+		for (int event = 0; event < kLuaTagMethodCount; ++event) {
+			const char* const name = luaT_eventname[event];
+			TString* const interned = luaS_newlstr(state, name, std::strlen(name));
+			state->l_G->tmname[event] = interned;
+			state->l_G->tmname[event]->marked |= kLuaFixedStringMark;
+		}
+	}
+
+	/**
+	 * Address: 0x009180D0 (FUN_009180D0, luaX_init)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaX_init(lua_State *L);
+	 *
+	 * What it does:
+	 * Interns the reserved words, pins them, and stamps each with its token
+	 * index + 1. The binary writes only the low byte of the `reserved` lane
+	 * ("mov [eax+8], cl"); the indices are all under 256, so storing the whole
+	 * field is equivalent for a freshly interned string.
+	 */
+	void luaX_init(lua_State* const state)
+	{
+		for (int token = 0; token < kLuaReservedWordCount; ++token) {
+			const char* const word = token2string[token];
+			TString* const interned = luaS_newlstr(state, word, std::strlen(word));
+			interned->marked |= kLuaFixedStringMark;
+			interned->reserved = token + 1;
+		}
+	}
+
+	/**
+	 * Address: 0x009247A0 (FUN_009247A0, luaS_freeall)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaS_freeall(lua_State *L);
+	 *
+	 * What it does:
+	 * Releases the string table's bucket array. The strings themselves are
+	 * already gone by this point - close_state sweeps before calling here.
+	 */
+	void luaS_freeall(lua_State* const state)
+	{
+		global_State* const globalState = state->l_G;
+		(void)luaM_realloc(
+			state,
+			globalState->strt.hash,
+			static_cast<lu_mem>(sizeof(GCObject*) * globalState->strt.size),
+			0u
+		);
+	}
+
+	/**
+	 * Address: 0x00915BA0 (FUN_00915BA0, luaC_sweep)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaC_sweep(lua_State *L, int all);
+	 *
+	 * What it does:
+	 * Sweeps the four collectable lanes in the order userdata, strings,
+	 * secondary root list, main root list. `all` selects the mark limit: 0
+	 * keeps anything reachable, 0x100 is above every real mark bit and so
+	 * collects everything, which is what close_state passes.
+	 */
+	int luaC_sweep(lua_State* const state, const int all)
+	{
+		constexpr int kSweepEverythingLimit = 0x100;
+
+		const int limit = all != 0 ? kSweepEverythingLimit : 0;
+
+		(void)sweeplist(&state->l_G->rootudata, nullptr, state, limit);
+		sweepstrings(state, limit);
+		(void)sweeplist(&state->l_G->rootgc1, nullptr, state, limit);
+		return sweeplist(&state->l_G->rootgc, nullptr, state, limit);
+	}
+
+	/**
+	 * Address: 0x00914FC0 (FUN_00914FC0, luaF_close)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaF_close(lua_State *L, StkId level);
+	 *
+	 * What it does:
+	 * Closes every open upvalue at or above `level`: the referenced stack slot
+	 * is copied into the upvalue's own storage, the pointer is retargeted at
+	 * that copy, and the object moves off the thread's open list onto the GC
+	 * list. Open upvalues are ordered by descending stack slot, so the walk
+	 * stops at the first one below `level`.
+	 */
+	void luaF_close(lua_State* const state, const StkId level)
+	{
+		for (GCObject* upvalObject = state->openupval; upvalObject != nullptr;
+			 upvalObject = state->openupval) {
+			UpVal* const upval = &upvalObject->uv;
+			if (upval->v < level) {
+				return;
+			}
+
+			upval->value = *upval->v;
+			upval->v = &upval->value;
+			state->openupval = upvalObject->gch.next;
+			luaC_link(state, upvalObject, LUA_TUPVALUE);
+		}
+	}
+
+	/**
+	 * Address: 0x00924470 (FUN_00924470, f_luaopen)
+	 *
+	 * IDA signature:
+	 * void __usercall f_luaopen(lua_State *L@<eax>);
+	 *
+	 * What it does:
+	 * Builds the shared global_State for a brand-new thread. The chicken-and-
+	 * egg problem - the allocator lives in the global_State being allocated -
+	 * is solved with a throwaway lua_State/global_State pair on the stack
+	 * carrying just the allocator hooks, which is what the real object is
+	 * allocated through. After that it seeds the string table, the registry
+	 * (whose metatable is itself), a default metatable per type tag, the
+	 * thread's globals table, the interned name tables, and the scratch
+	 * buffer.
+	 */
+	void f_luaopen(lua_State* const state)
+	{
+		// The binary leaves this bootstrap pair uninitialised apart from the
+		// five fields below, so luaM_realloc reads whatever the stack held for
+		// allocFlags. Value-initialising is the one deliberate deviation here:
+		// reading indeterminate storage is undefined behaviour in C++, and
+		// zero is the flag value every other caller uses (luaZ_openspace saves
+		// and restores it precisely because 1 is the exception).
+		lua_State bootstrapState{};
+		global_State bootstrapGlobals{};
+		bootstrapState.l_G = &bootstrapGlobals;
+		bootstrapGlobals.reallocFunc = luaHelper_Realloc;
+		bootstrapGlobals.freeFunc = luaHelper_Free;
+		bootstrapGlobals.memData = luaHelper_memData;
+		bootstrapGlobals.nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+
+		auto* const globalState = static_cast<global_State*>(
+			luaM_realloc(&bootstrapState, nullptr, 0u, static_cast<lu_mem>(sizeof(global_State)))
+		);
+		if (globalState == nullptr) {
+			throw lua_MemError(lua::lua_Error(state, LUA_ERRMEM, "out of memory"));
+		}
+
+		state->l_G = globalState;
+
+		globalState->strt.hash = nullptr;
+		globalState->strt.nuse = 0;
+		globalState->strt.size = 0;
+		globalState->rootgc = nullptr;
+		globalState->rootgc1 = nullptr;
+		globalState->rootudata = nullptr;
+		globalState->tmudata = nullptr;
+		globalState->buff.buffer = nullptr;
+		globalState->buff.buffsize = 0u;
+		globalState->GCthreshold = 0u;
+		globalState->gcTraversalLockDepth = 0;
+		globalState->nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+		globalState->_defaultmeta.tt = LUA_TNIL;
+		globalState->_registry.tt = LUA_TNIL;
+		globalState->mainthread = state;
+		globalState->lstate = state;
+		globalState->dummynode[0].i_key.tt = LUA_TNIL;
+		globalState->dummynode[0].i_val.tt = LUA_TNIL;
+		globalState->dummynode[0].next = nullptr;
+		globalState->fatalErrorFunc = &defaultFatalErrorFunc;
+		globalState->memData = luaHelper_memData;
+		globalState->reallocFunc = luaHelper_Realloc;
+		globalState->freeFunc = luaHelper_Free;
+		globalState->globalUserData = nullptr;
+		globalState->userGCFunction = nullptr;
+		globalState->allocationTrackingEnabled = 0;
+		globalState->hookmask = 0;
+		globalState->allowhook = 1;
+		globalState->basehookcount = 0;
+		globalState->hookcount = 0;
+		globalState->hook = nullptr;
+
+		lua_stack_init(state, state);
+
+		for (TObject& slot : globalState->_defaultmetatypes) {
+			slot.value.p = nullptr;
+		}
+
+		// The slot starts life as the number 0 before being replaced by its
+		// table - the binary really does write LUA_TNUMBER here first.
+		globalState->_defaultmeta.tt = LUA_TNUMBER;
+		globalState->_defaultmeta.value.p = nullptr;
+
+		// The shared default metatable is its own metatable, which is what
+		// terminates metatable chains for values that have none of their own.
+		Table* const defaultMeta = luaH_new(state, 0, 0);
+		globalState->_defaultmeta.tt = static_cast<int>(defaultMeta->tt);
+		globalState->_defaultmeta.value.p = defaultMeta;
+		static_cast<Table*>(globalState->_defaultmeta.value.p)->metatable =
+			static_cast<Table*>(globalState->_defaultmeta.value.p);
+
+		for (TObject& slot : globalState->_defaultmetatypes) {
+			Table* const typeMeta = luaH_new(state, 0, 0);
+			slot.tt = static_cast<int>(typeMeta->tt);
+			slot.value.p = typeMeta;
+			static_cast<Table*>(slot.value.p)->metatable =
+				static_cast<Table*>(globalState->_defaultmeta.value.p);
+		}
+
+		Table* const globals = luaH_new(state, 0, 4);
+		state->_gt.tt = static_cast<int>(globals->tt);
+		state->_gt.value.p = globals;
+
+		Table* const registry = luaH_new(state, 4, 4);
+		globalState->_registry.value.p = registry;
+		globalState->_registry.tt = static_cast<int>(registry->tt);
+		globalState->minimumstrings = lua_minimumnumstrings;
+
+		luaS_resize(state, kLuaInitialStringTableSize);
+		luaC_init(state);
+		luaT_init(state);
+		luaX_init(state);
+
+		TString* const outOfMemory = luaS_newlstr(state, "not enough memory", 17u);
+		outOfMemory->marked |= kLuaFixedStringMark;
+
+		globalState->GCthreshold = 4u * globalState->nblocks;
+		(void)luaZ_openspace(state, &globalState->buff, static_cast<size_t>(lua_minimumauxspace));
+	}
+
+	/**
+	 * Address: 0x009246D0 (FUN_009246D0, lua_open)
+	 * Mangled: ?lua_open@@YAPAUlua_State@@XZ
+	 *
+	 * IDA signature:
+	 * lua_State *__cdecl lua_open(void);
+	 *
+	 * What it does:
+	 * Allocates the main thread through the same throwaway allocator state
+	 * f_luaopen uses, blanks it, and hands it to f_luaopen to acquire the
+	 * shared global_State. If that throws part-way the half-built state is
+	 * closed before the exception continues out - the binary expresses this
+	 * with an SEH frame around the f_luaopen call.
+	 */
+	lua_State* lua_open(void)
+	{
+		lua_State bootstrapState{};
+		global_State bootstrapGlobals{};
+		bootstrapState.l_G = &bootstrapGlobals;
+		bootstrapGlobals.reallocFunc = luaHelper_Realloc;
+		bootstrapGlobals.freeFunc = luaHelper_Free;
+		bootstrapGlobals.memData = luaHelper_memData;
+		bootstrapGlobals.nblocks = static_cast<lu_mem>(sizeof(lua_State) + sizeof(global_State));
+
+		auto* const state = static_cast<lua_State*>(
+			luaM_realloc(&bootstrapState, nullptr, 0u, static_cast<lu_mem>(sizeof(lua_State)))
+		);
+		if (state == nullptr) {
+			return nullptr;
+		}
+
+		state->next = nullptr;
+		state->tt = LUA_TTHREAD;
+		state->marked = 0;
+		state->l_G = nullptr;
+		state->ci = nullptr;
+		state->stack = nullptr;
+		state->stacksize = 0;
+		state->base_ci = nullptr;
+		state->size_ci = 0;
+		state->nCcalls = 0;
+		state->_gt.tt = LUA_TNIL;
+		state->openupval = nullptr;
+		state->gclist = nullptr;
+		state->stateUserData = nullptr;
+		// Not written by the binary, which leaves the freshly allocated bytes
+		// in place and lets luaM_realloc read them. Zeroed here for the same
+		// reason as the bootstrap pair above: the allocator hook ignores the
+		// flag lane, so the observable behaviour is identical without the
+		// indeterminate read.
+		state->allocFlags = 0u;
+
+		try {
+			f_luaopen(state);
+		} catch (...) {
+			close_state(state);
+			throw;
+		}
+
+		return state;
+	}
+}
+#pragma warning(pop)
 
 extern "C"
 {
