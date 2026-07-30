@@ -11204,6 +11204,39 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x009131B0 (FUN_009131B0, luaG_errormsg)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaG_errormsg(lua_State *L);
+	 *
+	 * What it does:
+	 * Delivers a pending error. If the globals table defines `_TRACEBACK`, it
+	 * is called with the message and whatever it returns replaces it - that is
+	 * how a stack trace gets attached. Either way the result is thrown as a
+	 * lua_RuntimeError carrying the top-of-stack string.
+	 */
+	void luaG_errormsg(lua_State* const state)
+	{
+		TString* const key = luaS_newlstr(state, "_TRACEBACK", 10u);
+		state->top->tt = static_cast<int>(key->tt);
+		state->top->value.p = key;
+		api_incr_top(state);
+
+		const TObject* const handler = luaV_gettable(state, &state->_gt, state->top - 1, 0);
+		if (IsCallableTag(handler->tt)) {
+			// Stack holds [message, "_TRACEBACK"]; turn it into
+			// [handler, message] and call it.
+			state->top[-1] = state->top[-2];
+			state->top[-2] = *handler;
+			(void)luaD_call(state, state->top - 2, 1);
+		} else {
+			--state->top;
+		}
+
+		throw lua_RuntimeError(lua::lua_Error(state, LUA_ERRRUN));
+	}
+
+	/**
 	 * Address: 0x009291A0 (FUN_009291A0, luaV_tostring)
 	 *
 	 * IDA signature:
@@ -11313,9 +11346,6 @@ extern "C"
 	 * than something the caller has to free. Only %%, %c, %d, %f and %s are
 	 * understood - anything else is dropped, as in the binary.
 	 */
-	// Still the lib's: recovering it needs a two-argument lua_Error ctor
-	// (FUN_009131B0 calls ??0lua_Error@lua@@Z with just L and a code) that
-	// this tree does not model yet.
 	void luaG_errormsg(lua_State* L);
 
 	const char* luaO_pushvfstring(lua_State* const state, const char* fmt, va_list argp)

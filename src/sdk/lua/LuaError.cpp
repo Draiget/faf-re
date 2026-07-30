@@ -15,6 +15,20 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const c
 }
 
 /**
+ * Address: 0x0090DA40 (FUN_0090DA40)
+ * Mangled: ??0lua_Error@lua@@Z
+ *
+ * What it does:
+ * Takes the message from the value on top of the Lua stack. This is the form
+ * luaG_errormsg uses: by the time it throws, the message - possibly rewritten
+ * by a _TRACEBACK handler - is already sitting there.
+ */
+lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
+  : std::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
+{
+}
+
+/**
  * Address: 0x009137B0 (FUN_009137B0, lua_Error::lua_Error)
  * Mangled: ??0lua_Error@@QAE@@Z
  *

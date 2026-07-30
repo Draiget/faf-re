@@ -31,6 +31,19 @@ namespace lua
     lua_Error(lua_State* lua_state, int errcode, const char* err);
 
     /**
+     * Address: 0x0090DA40 (FUN_0090DA40)
+     * Mangled: ??0lua_Error@lua@@Z
+     *
+     * lua_State*, int
+     *
+     * What it does:
+     * Constructs a `lua_Error` whose message is whatever string sits on top of
+     * the Lua stack - the form the error machinery uses once a handler has
+     * already produced the text.
+     */
+    lua_Error(lua_State* lua_state, int errcode);
+
+    /**
      * Address: 0x009137B0 (FUN_009137B0, lua_Error::lua_Error)
      * Mangled: ??0lua_Error@@QAE@@Z
      *
