@@ -283,50 +283,44 @@ struct GCState
 	lua_State* L;
 };
 
+// Every offset below is pinned by a concrete instruction in the shipped
+// binary; see the static_assert block after lua_State for the citations. The
+// struct previously modelled the head region four bytes short (no `tmudata`
+// lane), which pushed `buff` through `_defaultmetatypes` onto the wrong slots
+// and made `_registry`/`_defaultmeta` alias each other's halves.
 struct global_State
 {
-	stringtable strt;            // Interned string table.
-	GCObject* rootgc;            // Main GC root list.
-	GCObject* rootgc1;           // Secondary GC root list lane (debug traversal).
-	GCObject* rootudata;         // Userdata root list.
-	Mbuffer buff;                // Scratch concat buffer.
-	lu_mem GCthreshold;          // Next GC trigger threshold.
-	CFunction panic;             // Panic callback.
-	int32_t gcTraversalLockDepth; // GC traversal lock counter used by debug helpers.
-	LuaPlus::TObject _registry;  // Registry table.
-	LuaPlus::TObject _defaultmeta; // Default table/userdata metatable.
-	lua_State* mainthread;       // Main thread.
-	lua_State* lstate;           // Currently active thread.
-	Node dummynode[1];           // Shared empty-table node.
-	TString* tmname[15];         // Interned TM names.
-	LuaPlus::TObject _defaultmetatypes[11]; // Default metatable per type tag.
-	void* lockDataOrReserved;    // Matches LuaPlus MT support slot (if enabled).
-	void* lockFuncOrReserved;    // Matches LuaPlus MT support slot (if enabled).
-	void* unlockFuncOrReserved;  // Matches LuaPlus MT support slot (if enabled).
-	int32_t unknownFC;
-	int32_t unknown100;
-	int32_t unknown104;
-	int32_t unknown108;
-	int32_t unknown10C;
-	int32_t unknown110;
-	int32_t unknown114;
-	int32_t unknown118;
-	int8_t unknown11C[24];
-	void (*fatalErrorFunc)(void);   // Fatal VM error sink.
-	void* memData;                  // Allocator user context.
-	ReallocFunction reallocFunc;    // Custom realloc callback.
-	FreeFunction freeFunc;          // Custom free callback.
-	int minimumstrings;             // String table floor.
-	int32_t unknown144;             // Preserves x86 hook-function slot alignment block.
-	moho::Sim* globalUserData;      // Engine-owned Lua global userdata.
-	void(__cdecl* userGCFunction)(GCState*); // Engine GC callback hook.
-	int8_t unknown150;
-	lu_byte hookmask;               // Hook event mask (CALL/RET/LINE/COUNT).
-	lu_byte allowhook;              // Hook enable gate.
-	int8_t unknown153;
-	int32_t basehookcount;          // Hook countdown reset value.
-	int32_t hookcount;              // Current hook countdown.
-	Hook hook;                      // Active debug hook callback.
+	stringtable strt;            // +0x00 Interned string table.
+	GCObject* rootgc;            // +0x0C Main GC root list.
+	GCObject* rootgc1;           // +0x10 Secondary GC root list lane (debug traversal).
+	GCObject* rootudata;         // +0x14 Userdata root list.
+	GCObject* tmudata;           // +0x18 Userdata queued for finalization.
+	Mbuffer buff;                // +0x1C Scratch concat buffer.
+	lu_mem GCthreshold;          // +0x24 Next GC trigger threshold.
+	int32_t gcTraversalLockDepth; // +0x28 GC traversal lock counter used by debug helpers.
+	lu_mem nblocks;              // +0x2C Bytes currently allocated.
+	LuaPlus::TObject _defaultmeta; // +0x30 Default table/userdata metatable.
+	LuaPlus::TObject _registry;  // +0x38 Registry table.
+	lua_State* mainthread;       // +0x40 Main thread.
+	lua_State* lstate;           // +0x44 Currently active thread.
+	Node dummynode[1];           // +0x48 Shared empty-table node.
+	TString* tmname[18];         // +0x5C Interned tag-method names.
+	TString* typenames[12];      // +0xA4 Interned type-name strings, indexed by tag.
+	LuaPlus::TObject _defaultmetatypes[12]; // +0xD4 Default metatable per type tag.
+	void (*fatalErrorFunc)(void);   // +0x134 Fatal VM error sink.
+	void* memData;                  // +0x138 Allocator user context.
+	ReallocFunction reallocFunc;    // +0x13C Custom realloc callback.
+	FreeFunction freeFunc;          // +0x140 Custom free callback.
+	int minimumstrings;             // +0x144 String table floor.
+	moho::Sim* globalUserData;      // +0x148 Engine-owned Lua global userdata.
+	void(__cdecl* userGCFunction)(GCState*); // +0x14C Engine GC callback hook.
+	lu_byte allocationTrackingEnabled; // +0x150 Debug allocation-tracking gate.
+	lu_byte hookmask;               // +0x151 Hook event mask (CALL/RET/LINE/COUNT).
+	lu_byte allowhook;              // +0x152 Hook enable gate.
+	lu_byte reservedAfterAllowHook; // +0x153 Padding to the hook-count block.
+	int32_t basehookcount;          // +0x154 Hook countdown reset value.
+	int32_t hookcount;              // +0x158 Current hook countdown.
+	Hook hook;                      // +0x15C Active debug hook callback.
 };
 
 struct __declspec(align(8)) lua_State
@@ -379,15 +373,12 @@ struct __declspec(align(8)) lua_State
 		gpg::RRef* ownerRef
 	);
 
-	// Stock LuaPlus_1081 ends at +0x44. Remaining slots are kept for the
-	// engine-linked build variant until each one is proven in gpgcore/moho.
-	int32_t unknown48;
-	int32_t unknown4C;
-	type_lua_longjmp* errorJmp;   // Inferred from legacy Lua 5.0; not re-proven in game binary yet.
-	type_ptrdiff_t errfunc;       // Inferred protected-call error handler index.
-	const char* allocName;        // Inferred debug allocation tag.
-	int32_t unknown5C;
-	int32_t unknown60;
+	// The object ends at +0x48: lua_open (FUN_009246D0) allocates it with
+	// "push 48h" -> luaM_realloc, and f_luaopen stores
+	// sizeof(lua_State) + sizeof(global_State) into nblocks as 0x1A8, which
+	// leaves exactly 0x1A8 - 0x160 = 0x48 for this struct. It used to carry
+	// 0x20 bytes of unproven trailing slots (errorJmp/errfunc/allocName and
+	// filler), so any write through them landed past the real allocation.
 };
 
 union GCObject
@@ -406,25 +397,70 @@ union GCObject
 static_assert(offsetof(lua_State, l_G) == 0x10, "lua_State::l_G must be at +0x10 (x86)");
 static_assert(offsetof(lua_State, _gt) == 0x30, "lua_State::_gt must be at +0x30 (x86)");
 static_assert(offsetof(lua_State, stateUserData) == 0x44, "lua_State::stateUserData must be at +0x44 (x86)");
+static_assert(sizeof(lua_State) == 0x48, "lua_State must be 0x48 bytes (lua_open allocates 0x48)");
 static_assert(sizeof(CallInfo) == 0x28, "CallInfo must be 0x28 bytes (x86)");
 
+// global_State head region. Each offset below is taken from a single named
+// instruction rather than inferred from neighbouring fields.
+//   strt.nuse/.size   checkSizes  (FUN_00915AA0) "mov eax,[ecx+8]" / "cmp [ecx+4],eax"
+//   rootgc/rootgc1/rootudata/tmudata
+//                     f_luaopen   (FUN_00924470) zeroes +0x0C/+0x10/+0x14/+0x18
+//   buff              checkSizes  "mov edx,[eax+1Ch]" (buffer) / "cmp [ecx+20h],40h" (buffsize)
+//   GCthreshold       lua_getgcthreshold (FUN_0090D650) "mov eax,[ecx+24h]; shr eax,0Ah"
+//   gcTraversalLock   FUN_009136F0 "add dword ptr [edi+28h],1" / "...,0FFFFFFFFh"
+//   nblocks           lua_getgccount (FUN_0090D660) "mov eax,[ecx+2Ch]; shr eax,0Ah"
+//   _defaultmeta      markroot    (FUN_00915BF0) "cmp [eax+30h],edi" / "mov eax,[eax+34h]"
+//   _registry         markroot    "cmp [eax+38h],edi" / "mov eax,[eax+3Ch]"
+//   mainthread        markroot    "mov edi,[ecx+40h]" -> traversestack
+//   lstate            f_luaopen   "mov [ebp+44h],esi" (the second thread slot)
+//   dummynode         f_luaopen   zeroes +0x48/+0x50/+0x58 = i_key.tt / i_val.tt / next
+//   tmname[18]        luaT_init   (FUN_009283C0) esi = 0x5C, step 4, "cmp esi,0A4h; jl"
+//   typenames[12]     luaB_type   (FUN_0090F270) "mov ecx,[edx+ecx*4+0A4h]"
+//   _defaultmetatypes[12]
+//                     luaT_gettmbyobj (FUN_00928450) "lea eax,[ecx+eax*8+0D4h]";
+//                     markroot loops esi = 0xD8..0x138 step 8 over the value halves
 static_assert(offsetof(global_State, rootgc) == 0x0C, "global_State::rootgc must be at +0x0C (x86)");
 static_assert(offsetof(global_State, rootgc1) == 0x10, "global_State::rootgc1 must be at +0x10 (x86)");
 static_assert(offsetof(global_State, rootudata) == 0x14, "global_State::rootudata must be at +0x14 (x86)");
+static_assert(offsetof(global_State, tmudata) == 0x18, "global_State::tmudata must be at +0x18 (x86)");
+static_assert(offsetof(global_State, buff) == 0x1C, "global_State::buff must be at +0x1C (x86)");
+static_assert(offsetof(global_State, GCthreshold) == 0x24, "global_State::GCthreshold must be at +0x24 (x86)");
 static_assert(
 	offsetof(global_State, gcTraversalLockDepth) == 0x28,
 	"global_State::gcTraversalLockDepth must be at +0x28 (x86)"
 );
-static_assert(offsetof(global_State, lstate) == 0x40, "global_State::lstate must be at +0x40 (x86)");
+static_assert(offsetof(global_State, nblocks) == 0x2C, "global_State::nblocks must be at +0x2C (x86)");
+static_assert(offsetof(global_State, _defaultmeta) == 0x30, "global_State::_defaultmeta must be at +0x30 (x86)");
+static_assert(offsetof(global_State, _registry) == 0x38, "global_State::_registry must be at +0x38 (x86)");
+static_assert(offsetof(global_State, mainthread) == 0x40, "global_State::mainthread must be at +0x40 (x86)");
+static_assert(offsetof(global_State, lstate) == 0x44, "global_State::lstate must be at +0x44 (x86)");
+static_assert(offsetof(global_State, dummynode) == 0x48, "global_State::dummynode must be at +0x48 (x86)");
+static_assert(offsetof(global_State, tmname) == 0x5C, "global_State::tmname must be at +0x5C (x86)");
+static_assert(offsetof(global_State, typenames) == 0xA4, "global_State::typenames must be at +0xA4 (x86)");
+static_assert(
+	offsetof(global_State, _defaultmetatypes) == 0xD4,
+	"global_State::_defaultmetatypes must be at +0xD4 (x86)"
+);
+static_assert(offsetof(global_State, fatalErrorFunc) == 0x134, "global_State::fatalErrorFunc must be at +0x134 (x86)");
+static_assert(offsetof(global_State, memData) == 0x138, "global_State::memData must be at +0x138 (x86)");
+static_assert(offsetof(global_State, reallocFunc) == 0x13C, "global_State::reallocFunc must be at +0x13C (x86)");
+static_assert(offsetof(global_State, freeFunc) == 0x140, "global_State::freeFunc must be at +0x140 (x86)");
+static_assert(offsetof(global_State, minimumstrings) == 0x144, "global_State::minimumstrings must be at +0x144 (x86)");
+static_assert(offsetof(global_State, globalUserData) == 0x148, "global_State::globalUserData must be at +0x148 (x86)");
 static_assert(offsetof(global_State, userGCFunction) == 0x14C, "global_State::userGCFunction must be at +0x14C (x86)");
+static_assert(
+	offsetof(global_State, allocationTrackingEnabled) == 0x150,
+	"global_State::allocationTrackingEnabled must be at +0x150 (x86)"
+);
 static_assert(offsetof(global_State, hookmask) == 0x151, "global_State::hookmask must be at +0x151 (x86)");
+static_assert(offsetof(global_State, allowhook) == 0x152, "global_State::allowhook must be at +0x152 (x86)");
 static_assert(offsetof(global_State, basehookcount) == 0x154, "global_State::basehookcount must be at +0x154 (x86)");
 static_assert(offsetof(global_State, hookcount) == 0x158, "global_State::hookcount must be at +0x158 (x86)");
 static_assert(offsetof(global_State, hook) == 0x15C, "global_State::hook must be at +0x15C (x86)");
 // f_luaopen (FUN_00924470) allocates the object with
 // luaM_realloc(&thread, 0, 0, 0x160u), and its last field write is
-// "mov [ebp+15Ch], ebx" (hook). The struct therefore ends at 0x160 - it used
-// to carry 88 bytes of trailing filler past that, so every global_State access
-// beyond +0x160 ran off the end of the real allocation.
+// "mov [ebp+15Ch], ebx" (hook). The struct therefore ends at 0x160. The same
+// function then stores sizeof(lua_State) + sizeof(global_State) into nblocks
+// as the literal 0x1A8, which cross-checks 0x160 against lua_State's 0x48.
 static_assert(sizeof(global_State) == 0x160, "global_State must be 0x160 bytes (f_luaopen allocates 0x160)");
 #endif
