@@ -4038,7 +4038,7 @@ namespace
 		const char* luaF_getlocalname(const Proto* func, int local_number, int pc);
 		Table* luaT_getmetatable(lua_State* L, const TObject* o);
 		int luaO_log2(unsigned int x);
-		const TObject* luaV_gettable(lua_State* L, const TObject* t, const TObject* key, StkId val);
+		const TObject* luaV_gettable(lua_State* L, const TObject* t, const TObject* key, int loop);
 		void luaV_settable(lua_State* L, const TObject* t, TObject* key, StkId val);
 		int luaV_tonumber(const TObject* obj, TObject* outNumber);
 		int luaV_tostring(lua_State* L, TObject* obj);
@@ -4909,7 +4909,7 @@ namespace
 	 * Pushes one metamethod function + two operands, executes one Lua call with
 	 * a single expected result, then pops that result slot from the Lua stack.
 	 */
-	[[maybe_unused]] int callTMres(
+	int callTMres(
 		const TObject* const metamethodFunction,
 		const TObject* const leftOperand,
 		const TObject* const rightOperand,
@@ -10664,6 +10664,167 @@ extern "C"
 		return result;
 	}
 
+	// luaV_gettable and the two paths below are mutually recursive: a metatable
+	// whose __index is itself a table sends the lookup back around.
+	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
+	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
+
+	/**
+	 * Address: 0x009284A0 (FUN_009284A0, luaT_getmetatable)
+	 *
+	 * IDA signature:
+	 * Table *__cdecl luaT_getmetatable(lua_State *L, const TObject *o);
+	 *
+	 * What it does:
+	 * Returns the metatable governing one value: tables and userdata carry
+	 * their own, everything else shares the per-type default.
+	 */
+	Table* luaT_getmetatable(lua_State* const state, const TObject* const object)
+	{
+		switch (object->tt) {
+			case LUA_TTABLE:
+				return static_cast<Table*>(object->value.p)->metatable;
+			case LUA_TUSERDATA:
+				return static_cast<Udata*>(object->value.p)->metatable;
+			default:
+				return static_cast<Table*>(state->l_G->_defaultmetatypes[object->tt].value.p);
+		}
+	}
+
+	/**
+	 * Address: 0x009293E0 (FUN_009293E0, luaV_gettable)
+	 *
+	 * IDA signature:
+	 * const TObject *__cdecl luaV_gettable(lua_State *L, const TObject *t, const TObject *key, int loop);
+	 *
+	 * What it does:
+	 * Reads `t[key]` with full `__index` semantics. A raw hit on a real table
+	 * returns immediately; a miss, or a non-table subject, continues down the
+	 * metatable chain. `loop` counts the hops taken so far and trips the
+	 * "loop in gettable" error past 100.
+	 */
+	const TObject* luaV_gettable(
+		lua_State* const state,
+		const TObject* const t,
+		const TObject* const key,
+		const int loop
+	)
+	{
+		constexpr int kMaxTagMethodChain = 100;
+
+		if (loop > kMaxTagMethodChain) {
+			luaG_runerror(state, "loop in gettable");
+		}
+
+		if (t->tt != LUA_TTABLE) {
+			return luaV_getnotable(state, t, key, loop + 1);
+		}
+
+		const TObject* const value = luaH_get(static_cast<Table*>(t->value.p), key);
+		if (value->tt != LUA_TNIL) {
+			return value;
+		}
+
+		return luaV_index(state, t, key, loop + 1);
+	}
+
+	/**
+	 * Address: 0x00929BF0 (FUN_00929BF0, luaV_index)
+	 *
+	 * IDA signature:
+	 * const TObject *__cdecl luaV_index(lua_State *L, const TObject *t, const TObject *key, int loop);
+	 *
+	 * What it does:
+	 * Handles a raw miss on a real table. The metatable's cached "no __index
+	 * here" flag short-circuits to nil without touching the table at all;
+	 * otherwise a callable handler is invoked and anything else is re-indexed.
+	 */
+	const TObject* luaV_index(
+		lua_State* const state,
+		const TObject* const t,
+		const TObject* const key,
+		const int loop
+	)
+	{
+		constexpr int kTagMethodIndex = 0;
+		constexpr int kNoIndexTagMethodFlag = 1 << kTagMethodIndex;
+
+		Table* const metatable = static_cast<Table*>(t->value.p)->metatable;
+		if ((metatable->flags & kNoIndexTagMethodFlag) != 0) {
+			return &luaO_nilobject;
+		}
+
+		const TObject* const handler =
+			luaT_gettm(metatable, kTagMethodIndex, state->l_G->tmname[kTagMethodIndex]);
+		if (handler == nullptr) {
+			return &luaO_nilobject;
+		}
+
+		if (IsCallableTag(handler->tt)) {
+			(void)callTMres(handler, t, key, state);
+			return state->top;
+		}
+
+		return luaV_gettable(state, handler, key, loop);
+	}
+
+	/**
+	 * Address: 0x00929370 (FUN_00929370, luaV_getnotable)
+	 *
+	 * IDA signature:
+	 * const TObject *__usercall luaV_getnotable(lua_State *L@<eax>, const TObject *t@<edi>,
+	 *     const TObject *key@<ebx>, int loop);
+	 *
+	 * What it does:
+	 * Handles indexing a value that is not a table. The per-type `__index` tag
+	 * method wins if there is one; failing that the value's whole metatable
+	 * stands in as the handler, so `("x").upper` resolves through the string
+	 * metatable.
+	 */
+	const TObject* luaV_getnotable(
+		lua_State* const state,
+		const TObject* const t,
+		const TObject* const key,
+		const int loop
+	)
+	{
+		constexpr int kTagMethodIndex = 0;
+
+		const TObject* handler = luaT_gettmbyobj(state, t, kTagMethodIndex);
+
+		TObject metatableAsHandler{};
+		if (handler->tt == LUA_TNIL) {
+			Table* const metatable = luaT_getmetatable(state, t);
+			metatableAsHandler.tt = static_cast<int>(metatable->tt);
+			metatableAsHandler.value.p = metatable;
+			handler = &metatableAsHandler;
+		}
+
+		if (IsCallableTag(handler->tt)) {
+			(void)callTMres(handler, t, key, state);
+			return state->top;
+		}
+
+		return luaV_gettable(state, handler, key, loop);
+	}
+
+	/**
+	 * Address: 0x0090D000 (FUN_0090D000, lua_gettable)
+	 * Mangled: ?lua_gettable@@YAXPAUlua_State@@H@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_gettable(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Replaces the key on top of the stack with `t[key]`, honouring metatables.
+	 */
+	void lua_gettable(lua_State* const state, const int idx)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		TObject* const key = state->top - 1;
+		*key = *luaV_gettable(state, table, key, 0);
+	}
+
 	/**
 	 * Address: 0x0090D050 (FUN_0090D050, lua_rawget)
 	 *
@@ -14786,7 +14947,7 @@ LuaObject LuaObject::GetByObject(const LuaObject& key) const
 	lua_State* const lstate = GetActiveCState();
 	Ensure(lstate != nullptr, "active lua state");
 
-	const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key.m_object, nullptr);
+	const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key.m_object, 0);
 	LuaObject out;
 	out.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
 	return out;
@@ -14805,7 +14966,7 @@ LuaObject LuaObject::GetByObject(const LuaStackObject& obj) const
 
 	lua_State* const lstate = GetActiveCState();
 	TObject* const keyObject = luaA_index(lstate, obj.m_stackIndex);
-	const TObject* const rawValue = luaV_gettable(lstate, &m_object, keyObject, nullptr);
+	const TObject* const rawValue = luaV_gettable(lstate, &m_object, keyObject, 0);
 	return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
