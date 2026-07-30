@@ -4106,7 +4106,7 @@ namespace
 		int luaZ_read(LuaZioRuntimeView* stream, void* buffer, size_t size);
 		char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
 		std::FILE* __cdecl __iob_func(void);
-		void luaO_chunkid(char* out, const char* source, size_t bufflen);
+		void luaO_chunkid(char* out, const char* source, int bufflen);
 		void luaA_pushobject(lua_State* L, const TObject* o);
 		int luaopen_serialize(lua_State* L);
 		void reallymarkobject(GCState* gcState, GCObject* object);
@@ -4714,7 +4714,7 @@ namespace
 			const auto* const closure = static_cast<const Closure*>(ci->base[-1].value.p);
 			const Proto* const proto = closure->l.p;
 			const int line = currentline(ci);
-			luaO_chunkid(buff, proto->source->str, sizeof(buff));
+			luaO_chunkid(buff, proto->source->str, static_cast<int>(sizeof(buff)));
 			return luaO_pushfstring(state, "%s(%d): %s", buff, line, msg);
 		}
 
@@ -11202,6 +11202,98 @@ extern "C"
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
+
+	/**
+	 * Address: 0x0091A8F0 (FUN_0091A8F0, luaO_chunkid)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaO_chunkid(char *out, const char *source, int bufflen);
+	 *
+	 * What it does:
+	 * Renders a chunk name for an error message, in the three forms Lua's
+	 * loader tags sources with. `=name` is used verbatim, `@file` is a file
+	 * path shown from the tail with a leading ellipsis when it does not fit,
+	 * and anything else is source text quoted as `[string "..."]`, truncated
+	 * at the first newline or at the buffer limit.
+	 */
+	void luaO_chunkid(char* const out, const char* const source, const int bufflen)
+	{
+		if (*source == '=') {
+			std::strncpy(out, source + 1, static_cast<size_t>(bufflen));
+			out[bufflen - 1] = '\0';
+			return;
+		}
+
+		if (*source == '@') {
+			// File name: keep the tail, which is the part that identifies it.
+			constexpr int kEllipsisReserve = 8;
+
+			const char* path = source + 1;
+			const int length = static_cast<int>(std::strlen(path));
+			*out = '\0';
+
+			if (length > bufflen - kEllipsisReserve) {
+				path += length - (bufflen - kEllipsisReserve);
+				std::strcat(out, "...");
+			}
+
+			std::strcat(out, path);
+			return;
+		}
+
+		// Source text: show the first line, quoted.
+		constexpr int kQuotingReserve = 17;
+
+		int length = static_cast<int>(std::strcspn(source, "\n"));
+		if (length > bufflen - kQuotingReserve) {
+			length = bufflen - kQuotingReserve;
+		}
+
+		std::strcpy(out, "[string \"");
+		if (source[length] != '\0') {
+			std::strncat(out, source, static_cast<size_t>(length));
+			std::strcat(out, "...");
+		} else {
+			std::strcat(out, source);
+		}
+
+		std::strcat(out, "\"]");
+	}
+
+	/**
+	 * Address: 0x00912F30 (FUN_00912F30, addinfo)
+	 *
+	 * IDA signature:
+	 * const char *__usercall addinfo(lua_State *L@<edi>, const char *msg);
+	 *
+	 * What it does:
+	 * Prefixes an error message with the chunk name and line it came from,
+	 * turning "attempt to call a nil value" into
+	 * "script.lua(42): attempt to call a nil value". Only frames still running
+	 * Lua bytecode carry that position, so a C frame is left unannotated.
+	 */
+	static void addinfo(lua_State* const state, const char* const msg)
+	{
+		constexpr int kChunkIdBufferSize = 60;
+		constexpr int kCallInfoStateRunningLua = 3;
+
+		CallInfo* const ci = state->ci;
+		if (ci->state >= kCallInfoStateRunningLua) {
+			return;
+		}
+
+		const Proto* const proto = static_cast<GCObject*>(ci->base[-1].value.p)->cl.l.p;
+		const ptrdiff_t pc = ci->savedpc - proto->code;
+
+		int line = -1;
+		if (pc >= 0) {
+			line = (proto->lineinfo != nullptr) ? proto->lineinfo[pc] : 0;
+		}
+
+		char chunkId[kChunkIdBufferSize];
+		luaO_chunkid(chunkId, proto->source->str, kChunkIdBufferSize);
+		(void)luaO_pushfstring(state, "%s(%d): %s", chunkId, line, msg);
+	}
 
 	/**
 	 * Address: 0x0090D430 (FUN_0090D430, lua_call)
