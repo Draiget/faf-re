@@ -11204,6 +11204,243 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x00915090 (FUN_00915090, luaF_freeproto)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaF_freeproto(lua_State *L, Proto *f);
+	 *
+	 * What it does:
+	 * Releases a prototype and every array hanging off it, the prototype
+	 * itself last.
+	 */
+	void luaF_freeproto(lua_State* const state, Proto* const proto)
+	{
+		(void)luaM_realloc(state, proto->code, sizeof(Instruction) * proto->sizecode, 0u);
+		(void)luaM_realloc(state, proto->p, sizeof(Proto*) * proto->sizep, 0u);
+		(void)luaM_realloc(state, proto->k, sizeof(TObject) * proto->sizek, 0u);
+		(void)luaM_realloc(state, proto->lineinfo, sizeof(int) * proto->sizelineinfo, 0u);
+		(void)luaM_realloc(state, proto->locvars, sizeof(LocVar) * proto->sizelocvars, 0u);
+		(void)luaM_realloc(state, proto->upvalues, sizeof(TString*) * proto->sizeupvalues, 0u);
+		(void)luaM_realloc(state, proto, static_cast<lu_mem>(sizeof(Proto)), 0u);
+	}
+
+	/**
+	 * Address: 0x00929680 (FUN_00929680, luaV_strcmp)
+	 *
+	 * IDA signature:
+	 * int __usercall luaV_strcmp(const TString *ls@<ecx>, const TString *rs@<eax>);
+	 *
+	 * What it does:
+	 * Orders two Lua strings by locale. They may contain embedded NULs, so a
+	 * single strcoll is not enough: when the compared runs tie, whichever
+	 * string ends at that NUL sorts first, and if neither does the comparison
+	 * resumes past it.
+	 */
+	static int luaV_strcmp(const TString* const ls, const TString* const rs)
+	{
+		const char* left = ls->str;
+		const char* right = rs->str;
+		size_t leftRemaining = ls->len;
+		size_t rightRemaining = rs->len;
+
+		for (;;) {
+			const int ordering = std::strcoll(left, right);
+			if (ordering != 0) {
+				return ordering;
+			}
+
+			// Equal up to a NUL: whoever ran out is the smaller string.
+			const size_t run = std::strlen(left);
+			if (run == rightRemaining) {
+				return (run == leftRemaining) ? 0 : 1;
+			}
+
+			if (run == leftRemaining) {
+				return -1;
+			}
+
+			const size_t consumed = run + 1u;
+			left += consumed;
+			right += consumed;
+			leftRemaining -= consumed;
+			rightRemaining -= consumed;
+		}
+	}
+
+	/**
+	 * Address: 0x00913460 (FUN_00913460, luaG_ordererror)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaG_ordererror(lua_State *L, const TObject *p1, const TObject *p2);
+	 *
+	 * What it does:
+	 * Reports two values that cannot be ordered. The binary distinguishes
+	 * "two %s values" from "%s with %s" by comparing the third character of
+	 * the two type names, which is enough to separate every pair in
+	 * luaT_typenames.
+	 */
+	void luaG_ordererror(lua_State* const state, const TObject* const left, const TObject* const right)
+	{
+		const char* const leftName = luaT_typenames[left->tt];
+		const char* const rightName = luaT_typenames[right->tt];
+
+		if (leftName[2] == rightName[2]) {
+			luaG_runerror(state, "attempt to compare two %s values", leftName);
+		}
+
+		luaG_runerror(state, "attempt to compare %s with %s", leftName, rightName);
+	}
+
+	/**
+	 * Address: 0x009296F0 (FUN_009296F0, luaV_lessthan)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaV_lessthan(lua_State *L, const TObject *l, const TObject *r);
+	 *
+	 * What it does:
+	 * Evaluates `l < r`. Values of different tags order by tag alone; numbers
+	 * and strings compare directly; anything else goes to `__lt`.
+	 */
+	int luaV_lessthan(lua_State* const state, const TObject* const left, const TObject* const right)
+	{
+		constexpr int kTagMethodLess = 14;
+
+		if (left->tt != right->tt) {
+			return left->tt < right->tt;
+		}
+
+		if (left->tt == LUA_TNUMBER) {
+			return right->value.n > left->value.n;
+		}
+
+		if (left->tt == LUA_TSTRING) {
+			return luaV_strcmp(
+				static_cast<const TString*>(left->value.p),
+				static_cast<const TString*>(right->value.p)
+			) < 0;
+		}
+
+		const int viaTagMethod = call_orderTM(state, left, right, kTagMethodLess);
+		if (viaTagMethod == -1) {
+			luaG_ordererror(state, left, right);
+		}
+
+		return viaTagMethod;
+	}
+
+	/**
+	 * Address: 0x00929770 (FUN_00929770, luaV_lessequal)
+	 *
+	 * IDA signature:
+	 * int __usercall luaV_lessequal(const TObject *l@<edi>, const TObject *r@<esi>, lua_State *L);
+	 *
+	 * What it does:
+	 * Evaluates `l <= r`. With no `__le` it falls back to `not (r < l)`, which
+	 * is what makes a type that only defines `__lt` still usable with `<=`.
+	 */
+	int luaV_lessequal(lua_State* const state, const TObject* const left, const TObject* const right)
+	{
+		constexpr int kTagMethodLess = 14;
+		constexpr int kTagMethodLessEqual = 15;
+
+		if (left->tt != right->tt) {
+			return left->tt < right->tt;
+		}
+
+		if (left->tt == LUA_TNUMBER) {
+			return right->value.n >= left->value.n;
+		}
+
+		if (left->tt == LUA_TSTRING) {
+			return luaV_strcmp(
+				static_cast<const TString*>(left->value.p),
+				static_cast<const TString*>(right->value.p)
+			) <= 0;
+		}
+
+		const int viaLessEqual = call_orderTM(state, left, right, kTagMethodLessEqual);
+		if (viaLessEqual != -1) {
+			return viaLessEqual;
+		}
+
+		const int viaLess = call_orderTM(state, right, left, kTagMethodLess);
+		if (viaLess == -1) {
+			luaG_ordererror(state, left, right);
+		}
+
+		return viaLess == 0;
+	}
+
+	/**
+	 * Address: 0x00929810 (FUN_00929810, luaV_equalval)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaV_equalval(lua_State *L, const TObject *l, const TObject *r);
+	 *
+	 * What it does:
+	 * Compares two values already known to share a tag. Primitives compare by
+	 * payload; tables and userdata are equal when they are the same object, and
+	 * otherwise consult `__eq` - which only applies when both sides carry the
+	 * same handler.
+	 */
+	int luaV_equalval(lua_State* const state, const TObject* const left, const TObject* const right)
+	{
+		constexpr int kTagMethodEqual = 3;
+
+		Table* leftMetatable = nullptr;
+		Table* rightMetatable = nullptr;
+
+		switch (left->tt) {
+			case LUA_TNIL:
+				return 1;
+			case LUA_TBOOLEAN:
+				return left->value.b == right->value.b;
+			case LUA_TNUMBER:
+				return left->value.n == right->value.n;
+			case LUA_TTABLE: {
+				auto* const leftTable = static_cast<Table*>(left->value.p);
+				auto* const rightTable = static_cast<Table*>(right->value.p);
+				if (leftTable == rightTable) {
+					return 1;
+				}
+				leftMetatable = leftTable->metatable;
+				rightMetatable = rightTable->metatable;
+				break;
+			}
+			case LUA_TUSERDATA: {
+				auto* const leftUdata = static_cast<Udata*>(left->value.p);
+				auto* const rightUdata = static_cast<Udata*>(right->value.p);
+				if (leftUdata == rightUdata) {
+					return 1;
+				}
+				leftMetatable = leftUdata->metatable;
+				rightMetatable = rightUdata->metatable;
+				break;
+			}
+			default:
+				return left->value.b == right->value.b;
+		}
+
+		const TObject* const handler = get_compTM(leftMetatable, kTagMethodEqual, state, rightMetatable);
+		if (handler == nullptr) {
+			return 0;
+		}
+
+		(void)callTMres(handler, left, right, state);
+
+		const TObject* const result = state->top;
+		if (result->tt == LUA_TNIL) {
+			return 0;
+		}
+
+		if (result->tt != LUA_TBOOLEAN) {
+			return 1;
+		}
+
+		return result->value.b != 0;
+	}
+
+	/**
 	 * Address: 0x00915010 (FUN_00915010, luaF_newproto)
 	 *
 	 * IDA signature:
