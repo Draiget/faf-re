@@ -695,27 +695,6 @@ void UdataSerializer::Serialize(
 
 namespace
 {
-	struct LuaGlobalStateGcRuntimeView
-	{
-		std::uint8_t reserved00[0x24];
-		std::uint32_t gcThreshold;
-		void* panicFunction;
-		std::uint32_t allocatedBytes;
-	};
-
-	static_assert(
-		offsetof(LuaGlobalStateGcRuntimeView, gcThreshold) == 0x24,
-		"LuaGlobalStateGcRuntimeView::gcThreshold offset must be 0x24"
-	);
-	static_assert(
-		offsetof(LuaGlobalStateGcRuntimeView, panicFunction) == 0x28,
-		"LuaGlobalStateGcRuntimeView::panicFunction offset must be 0x28"
-	);
-	static_assert(
-		offsetof(LuaGlobalStateGcRuntimeView, allocatedBytes) == 0x2C,
-		"LuaGlobalStateGcRuntimeView::allocatedBytes offset must be 0x2C"
-	);
-
 	struct LuaGlobalStateUserdataRuntimeView
 	{
 		std::uint8_t reserved00[0x14];
@@ -924,6 +903,59 @@ extern "C"
 	TObject* luaH_set(lua_State* L, Table* t, const TObject* key);
 	TObject* luaH_setnum(lua_State* L, Table* t, int key);
 	TObject* negindex(lua_State* L, int idx);
+	Table* luaH_new(lua_State* L, int narray, int lnhash);
+
+	/**
+	 * Address: 0x00D474D8 (luaT_typenames)
+	 *
+	 * What it does:
+	 * Names each type tag for `lua_typename` and the `luaG_*error` messages.
+	 * Read straight out of the shipped image: twelve entries, ending where
+	 * luaT_eventname begins at 0x00D47508. The fork's split of "cfunction"
+	 * from "function" and its trailing proto/upval lanes are why this cannot
+	 * be left to resolve into the prebuilt LuaPlus lib, whose stock array is
+	 * both shorter and differently ordered.
+	 */
+	extern const char* luaT_typenames[]{
+		"nil",       // LUA_TNIL            0
+		"boolean",   // LUA_TBOOLEAN        1
+		"userdata",  // LUA_TLIGHTUSERDATA  2
+		"number",    // LUA_TNUMBER         3
+		"string",    // LUA_TSTRING         4
+		"table",     // LUA_TTABLE          5
+		"cfunction", // LUA_CFUNCTION       6
+		"function",  // LUA_TFUNCTION       7
+		"userdata",  // LUA_TUSERDATA       8
+		"thread",    // LUA_TTHREAD         9
+		"proto",     // LUA_TPROTO         10
+		"upval",     // LUA_TUPVALUE       11
+	};
+
+	/**
+	 * `luaC_checkGC` was a macro in the 2007 sources, so the binary emits it
+	 * inline at every allocating API entry point rather than as a call. Kept
+	 * as one internal-linkage helper here so the gate is written once.
+	 */
+	static void luaC_checkGC(lua_State* const state)
+	{
+		global_State* const globalState = state->l_G;
+		if (globalState->nblocks >= globalState->GCthreshold && globalState->gcTraversalLockDepth == 0) {
+			luaC_collectgarbage(state);
+		}
+	}
+
+	/**
+	 * `api_incr_top`, likewise a macro: publish one freshly written stack slot,
+	 * growing the stack first when this frame has run out of room.
+	 */
+	static void api_incr_top(lua_State* const state)
+	{
+		if (state->top >= state->ci->top && state->stack_last - state->top <= 1) {
+			luaD_growstack(state, 1);
+		}
+
+		++state->top;
+	}
 	/**
 	 * Address: 0x009240C0 (FUN_009240C0, lua_stack_init)
 	 *
@@ -1078,11 +1110,7 @@ extern "C"
 	 */
 	lua_State* lua_newthread(lua_State* const state)
 	{
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateGcRuntimeView*>(state->l_G);
-		if (globalStateRuntime->allocatedBytes >= globalStateRuntime->gcThreshold
-			&& globalStateRuntime->panicFunction == nullptr) {
-			luaC_collectgarbage(state);
-		}
+		luaC_checkGC(state);
 
 		lua_State* const newThread = luaE_newthread(state);
 		auto* const threadObject = reinterpret_cast<GCObject*>(newThread);
@@ -1221,6 +1249,245 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090C740 (FUN_0090C740, lua_type)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_type(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Returns the type tag at `idx`, or LUA_TNONE for an index that addresses
+	 * nothing: past the live top for a positive index, or a pseudo-index with
+	 * no slot (an upvalue the running closure does not have).
+	 */
+	int lua_type(lua_State* const state, const int idx)
+	{
+		const TObject* slot = nullptr;
+		if (idx > 0) {
+			slot = &state->base[idx - 1];
+			if (slot >= state->top) {
+				return LUA_TNONE;
+			}
+		} else {
+			slot = negindex(state, idx);
+			if (slot == nullptr) {
+				return LUA_TNONE;
+			}
+		}
+
+		return slot->tt;
+	}
+
+	/**
+	 * Address: 0x0090C780 (FUN_0090C780, lua_typename)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl lua_typename(lua_State *L, int t);
+	 *
+	 * What it does:
+	 * Names one type tag. The state argument is unused - the table is global.
+	 */
+	const char* lua_typename([[maybe_unused]] lua_State* const state, const int t)
+	{
+		if (t == LUA_TNONE) {
+			return "no value";
+		}
+
+		return luaT_typenames[t];
+	}
+
+	/**
+	 * Address: 0x0090C6E0 (FUN_0090C6E0, lua_pushvalue)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushvalue(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Copies the value at `idx` onto the top of the stack.
+	 */
+	void lua_pushvalue(lua_State* const state, const int idx)
+	{
+		*state->top = *luaA_index(state, idx);
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090C5F0 (FUN_0090C5F0, lua_remove)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_remove(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Deletes the value at `idx`, shifting everything above it down one slot.
+	 */
+	void lua_remove(lua_State* const state, const int idx)
+	{
+		TObject* slot = luaA_index(state, idx);
+		for (++slot; slot < state->top; ++slot) {
+			slot[-1] = *slot;
+		}
+
+		--state->top;
+	}
+
+	/**
+	 * Address: 0x0090C640 (FUN_0090C640, lua_insert)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_insert(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Moves the top value down to `idx`, shifting everything from `idx` up one
+	 * slot to make room. The stack height is unchanged.
+	 */
+	void lua_insert(lua_State* const state, const int idx)
+	{
+		TObject* const destination = luaA_index(state, idx);
+		for (TObject* slot = state->top; slot > destination; --slot) {
+			*slot = slot[-1];
+		}
+
+		*destination = *state->top;
+	}
+
+	/**
+	 * Address: 0x0090C690 (FUN_0090C690, lua_replace)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_replace(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Pops the top value and stores it into `idx`.
+	 */
+	void lua_replace(lua_State* const state, const int idx)
+	{
+		const TObject* const source = state->top - 1;
+		*luaA_index(state, idx) = *source;
+		--state->top;
+	}
+
+	/**
+	 * Address: 0x0090CD80 (FUN_0090CD80, lua_pushlstring)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushlstring(lua_State *L, const char *s, size_t len);
+	 *
+	 * What it does:
+	 * Interns `len` bytes as a Lua string and pushes it, running the GC gate
+	 * first because the intern may allocate.
+	 */
+	void lua_pushlstring(lua_State* const state, const char* const s, const size_t len)
+	{
+		luaC_checkGC(state);
+
+		TString* const interned = luaS_newlstr(state, s, len);
+		TObject* const top = state->top;
+		top->tt = static_cast<int>(interned->tt);
+		top->value.p = interned;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090D110 (FUN_0090D110, lua_newtable)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_newtable(lua_State *L);
+	 *
+	 * What it does:
+	 * Creates one empty table and pushes it, running the GC gate first because
+	 * the table allocates.
+	 */
+	void lua_newtable(lua_State* const state)
+	{
+		luaC_checkGC(state);
+
+		Table* const table = luaH_new(state, 0, 0);
+		TObject* const top = state->top;
+		top->tt = static_cast<int>(table->tt);
+		top->value.p = table;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090C590 (FUN_0090C590, lua_gettop)
+	 * Mangled: ?lua_gettop@@YAHPAUlua_State@@@Z
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_gettop(lua_State *L);
+	 *
+	 * What it does:
+	 * Returns the number of values on the current frame's stack.
+	 */
+	int lua_gettop(lua_State* const state)
+	{
+		return static_cast<int>(state->top - state->base);
+	}
+
+	/**
+	 * Address: 0x0090C5A0 (FUN_0090C5A0, lua_settop)
+	 * Mangled: ?lua_settop@@YAXPAUlua_State@@H@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_settop(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Sets the stack height. A non-negative `idx` is an absolute height, and
+	 * any slots opened up by growing are niled - only the tag is written, the
+	 * value half is left as it was. A negative `idx` is relative to the
+	 * current top, so -1 leaves the stack unchanged.
+	 */
+	void lua_settop(lua_State* const state, const int idx)
+	{
+		if (idx >= 0) {
+			TObject* const target = state->base + idx;
+			for (; state->top < target; ++state->top) {
+				state->top->tt = LUA_TNIL;
+			}
+
+			state->top = target;
+		} else {
+			state->top += idx + 1;
+		}
+	}
+
+	/**
+	 * Address: 0x0090CD00 (FUN_0090CD00, lua_pushnil)
+	 * Mangled: ?lua_pushnil@@YAXPAUlua_State@@@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushnil(lua_State *L);
+	 *
+	 * What it does:
+	 * Pushes nil. Only the tag is written - the value half keeps whatever the
+	 * slot held before.
+	 */
+	void lua_pushnil(lua_State* const state)
+	{
+		state->top->tt = LUA_TNIL;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090CDF0 (FUN_0090CDF0, lua_pushstring)
+	 * Mangled: ?lua_pushstring@@YAXPAUlua_State@@PBD@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushstring(lua_State *L, const char *s);
+	 *
+	 * What it does:
+	 * Pushes a NUL-terminated string, or nil when `s` is null.
+	 */
+	void lua_pushstring(lua_State* const state, const char* const s)
+	{
+		if (s == nullptr) {
+			state->top->tt = LUA_TNIL;
+			api_incr_top(state);
+			return;
+		}
+
+		lua_pushlstring(state, s, std::strlen(s));
+	}
+
+	/**
 	 * Address: 0x0090CED0 (FUN_0090CED0, lua_pushcclosure)
 	 *
 	 * What it does:
@@ -1229,11 +1496,7 @@ extern "C"
 	 */
 	void lua_pushcclosure(lua_State* const state, lua_CFunction fn, int n)
 	{
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateGcRuntimeView*>(state->l_G);
-		if (globalStateRuntime->allocatedBytes >= globalStateRuntime->gcThreshold
-			&& globalStateRuntime->panicFunction == nullptr) {
-			luaC_collectgarbage(state);
-		}
+		luaC_checkGC(state);
 
 		Closure* const closure = luaF_newCclosure(state, n);
 		closure->c.f = fn;
@@ -1304,17 +1567,14 @@ extern "C"
 	 */
 	void lua_setgcthreshold(lua_State* const state, const int newThreshold)
 	{
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateGcRuntimeView*>(state->l_G);
+		global_State* const globalState = state->l_G;
 		if (static_cast<std::uint32_t>(newThreshold) <= 0x3FFFFFu) {
-			globalStateRuntime->gcThreshold = static_cast<std::uint32_t>(newThreshold) << 10;
+			globalState->GCthreshold = static_cast<std::uint32_t>(newThreshold) << 10;
 		} else {
-			globalStateRuntime->gcThreshold = 0xFFFFFFFFu;
+			globalState->GCthreshold = 0xFFFFFFFFu;
 		}
 
-		if (globalStateRuntime->allocatedBytes >= globalStateRuntime->gcThreshold
-			&& globalStateRuntime->panicFunction == nullptr) {
-			luaC_collectgarbage(state);
-		}
+		luaC_checkGC(state);
 	}
 
 	/**
@@ -1326,11 +1586,7 @@ extern "C"
 	 */
 	void lua_concat(lua_State* const state, const int n)
 	{
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateGcRuntimeView*>(state->l_G);
-		if (globalStateRuntime->allocatedBytes >= globalStateRuntime->gcThreshold
-			&& globalStateRuntime->panicFunction == nullptr) {
-			luaC_collectgarbage(state);
-		}
+		luaC_checkGC(state);
 
 		if (n >= 2) {
 			const int last = static_cast<int>(state->top - state->base) - 1;
@@ -3791,7 +4047,6 @@ namespace
 		StkId luaV_execute(lua_State* L);
 		void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 		void correctstack(lua_State* L, TObject* oldstack);
-		extern const char* luaT_typenames[];
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
@@ -6686,7 +6941,13 @@ namespace
 	 */
 	extern "C" void traversetable(GCState* const st, Table* const h)
 	{
-		constexpr int kLuaTagMethodMode = 3;
+		// __mode is slot 2, not 3: luaT_init (FUN_009283C0) interns
+		// luaT_eventname (0x00D47508) in the order __index, __newindex,
+		// __mode, __eq, ..., and traversetable's own call site is
+		// "mov edx,[ecx+64h]" / "push 2" - byte offset 0x64 into tmname at
+		// 0x5C. The old value read the same byte offset only because tmname
+		// was mismodelled as starting at 0x58.
+		constexpr int kLuaTagMethodMode = 2;
 
 		auto markCollectable = [st](TObject& slot) {
 			if (slot.tt >= LUA_TSTRING) {
