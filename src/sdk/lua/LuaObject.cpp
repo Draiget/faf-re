@@ -11217,6 +11217,122 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x0090E400 (FUN_0090E400, luaL_buffinit)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_buffinit(lua_State *L, luaL_Buffer *B);
+	 *
+	 * What it does:
+	 * Starts an empty string buffer. `lvl` counts the partial strings parked
+	 * on the Lua stack, which is how the buffer grows past its fixed array.
+	 */
+	void luaL_buffinit(lua_State* const state, luaL_Buffer* const buffer)
+	{
+		buffer->L = state;
+		buffer->p = buffer->buffer;
+		buffer->lvl = 0;
+	}
+
+	/**
+	 * Address: 0x0090E260 (FUN_0090E260, luaL_prepbuffer)
+	 *
+	 * IDA signature:
+	 * char *__usercall luaL_prepbuffer(luaL_Buffer *B);
+	 *
+	 * What it does:
+	 * Flushes whatever the array holds onto the Lua stack and hands it back
+	 * empty. An already-empty buffer is left alone, so no zero-length string
+	 * is pushed.
+	 */
+	char* luaL_prepbuffer(luaL_Buffer* const buffer)
+	{
+		if (buffer->p != buffer->buffer) {
+			lua_pushlstring(buffer->L, buffer->buffer, static_cast<size_t>(buffer->p - buffer->buffer));
+			++buffer->lvl;
+			buffer->p = buffer->buffer;
+			adjuststack(buffer);
+		}
+
+		return buffer->buffer;
+	}
+
+	/**
+	 * Address: 0x0090E2A0 (FUN_0090E2A0, luaL_addlstring)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_addlstring(luaL_Buffer *B, const char *s, size_t l);
+	 *
+	 * What it does:
+	 * Appends `l` bytes, flushing whenever the array fills. The binary tests
+	 * and copies one byte at a time rather than in runs, which matters for a
+	 * source string that overlaps the buffer.
+	 */
+	void luaL_addlstring(luaL_Buffer* const buffer, const char* s, size_t l)
+	{
+		for (; l != 0u; --l, ++s) {
+			if (buffer->p >= reinterpret_cast<char*>(buffer + 1) && buffer->p != buffer->buffer) {
+				lua_pushlstring(buffer->L, buffer->buffer, static_cast<size_t>(buffer->p - buffer->buffer));
+				++buffer->lvl;
+				buffer->p = buffer->buffer;
+				adjuststack(buffer);
+			}
+
+			*buffer->p++ = *s;
+		}
+	}
+
+	/**
+	 * Address: 0x0090E300 (FUN_0090E300, luaL_addstring)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_addstring(luaL_Buffer *B, const char *s);
+	 *
+	 * What it does:
+	 * Appends a NUL-terminated string.
+	 */
+	void luaL_addstring(luaL_Buffer* const buffer, const char* const s)
+	{
+		luaL_addlstring(buffer, s, std::strlen(s));
+	}
+
+	/**
+	 * Address: 0x0090E370 (FUN_0090E370, luaL_addvalue)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_addvalue(luaL_Buffer *B);
+	 *
+	 * What it does:
+	 * Appends the value on top of the Lua stack. One that fits is copied into
+	 * the array; one that does not is left on the stack as its own level, with
+	 * any pending array contents pushed underneath it first so the pieces stay
+	 * in order.
+	 */
+	void luaL_addvalue(luaL_Buffer* const buffer)
+	{
+		lua_State* const state = buffer->L;
+		const size_t valueLength = lua_strlen(state, -1);
+		const size_t freeSpace = sizeof(buffer->buffer) - static_cast<size_t>(buffer->p - buffer->buffer);
+
+		if (valueLength > freeSpace) {
+			if (buffer->p != buffer->buffer) {
+				lua_pushlstring(buffer->L, buffer->buffer, static_cast<size_t>(buffer->p - buffer->buffer));
+				++buffer->lvl;
+				buffer->p = buffer->buffer;
+				// Slide the flushed piece below the value being added.
+				lua_insert(state, -2);
+			}
+
+			++buffer->lvl;
+			adjuststack(buffer);
+			return;
+		}
+
+		std::memcpy(buffer->p, lua_tostring(state, -1), valueLength);
+		buffer->p += valueLength;
+		lua_settop(state, -2);
+	}
+
+	/**
 	 * Address: 0x0090DC20 (FUN_0090DC20, luaL_findstring)
 	 *
 	 * IDA signature:
