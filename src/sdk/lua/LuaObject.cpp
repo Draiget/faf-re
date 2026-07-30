@@ -10664,6 +10664,158 @@ extern "C"
 		return result;
 	}
 
+	/**
+	 * Address: 0x0090EC20 (FUN_0090EC20, luaB_print)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_print(lua_State *L);
+	 *
+	 * What it does:
+	 * Writes each argument to stdout, tab-separated, newline-terminated. Each
+	 * value is rendered by calling the *global* `tostring` - looked up once up
+	 * front - so a script that replaces it changes what print produces.
+	 */
+	int luaB_print(lua_State* const state)
+	{
+		const int argumentCount = lua_gettop(state);
+
+		lua_pushstring(state, "tostring");
+		lua_gettable(state, LUA_GLOBALSINDEX);
+
+		for (int argument = 1; argument <= argumentCount; ++argument) {
+			lua_pushvalue(state, -1);
+			lua_pushvalue(state, argument);
+			lua_call(state, 1, 1);
+
+			const char* const text = lua_tostring(state, -1);
+			if (text == nullptr) {
+				return luaL_error(state, "`tostring' must return a string to `print'");
+			}
+
+			if (argument > 1) {
+				std::fputs("\t", stdout);
+			}
+
+			std::fputs(text, stdout);
+			lua_settop(state, -2);
+		}
+
+		std::fputs("\n", stdout);
+		return 0;
+	}
+
+	/**
+	 * Address: 0x0090FC30 (FUN_0090FC30, luaB_costatus)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_costatus(lua_State *L);
+	 *
+	 * What it does:
+	 * Reports a coroutine as "running" when it is the calling thread,
+	 * "suspended" while it still has a frame or stack to resume into, and
+	 * "dead" once it has neither.
+	 */
+	int luaB_costatus(lua_State* const state)
+	{
+		lua_State* const coroutine = lua_tothread(state, 1);
+		if (coroutine == nullptr) {
+			luaL_argerror(state, 1, "coroutine expected");
+		}
+
+		if (state == coroutine) {
+			lua_pushlstring(state, "running", 7u);
+			return 1;
+		}
+
+		lua_Debug frame{};
+		if (lua_getstack(coroutine, 0, &frame) != 0 || lua_gettop(coroutine) != 0) {
+			lua_pushlstring(state, "suspended", 9u);
+			return 1;
+		}
+
+		lua_pushlstring(state, "dead", 4u);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090ECF0 (FUN_0090ECF0, luaB_tonumber)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_tonumber(lua_State *L);
+	 *
+	 * What it does:
+	 * Converts argument 1 to a number. Base 10 accepts anything Lua already
+	 * considers numeric; any other base parses a string with `strtoul` and
+	 * requires the whole remainder to be blank. Returns nil on failure.
+	 */
+	int luaB_tonumber(lua_State* const state)
+	{
+		constexpr int kDecimalBase = 10;
+		constexpr int kMinBase = 2;
+		constexpr int kMaxBase = 36;
+
+		const int base = static_cast<int>(luaL_optnumber(state, 2, static_cast<lua_Number>(kDecimalBase)));
+
+		if (base == kDecimalBase) {
+			luaL_checkany(state, 1);
+			if (lua_isnumber(state, 1) != 0) {
+				lua_pushnumber(state, lua_tonumber(state, 1));
+				return 1;
+			}
+		} else {
+			const char* const text = luaL_checklstring(state, 1, nullptr);
+			if (base < kMinBase || base > kMaxBase) {
+				luaL_argerror(state, 2, "base out of range");
+			}
+
+			char* end = nullptr;
+			const unsigned long value = std::strtoul(text, &end, base);
+			if (text != end) {
+				while (std::isspace(static_cast<unsigned char>(*end)) != 0) {
+					++end;
+				}
+
+				if (*end == '\0') {
+					lua_pushnumber(state, static_cast<lua_Number>(value));
+					return 1;
+				}
+			}
+		}
+
+		lua_pushnil(state);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090F6D0 (FUN_0090F6D0, lua::getpath)
+	 *
+	 * IDA signature:
+	 * const char *__usercall lua::getpath(lua_State *L@<esi>);
+	 *
+	 * What it does:
+	 * Resolves the package search path: the global `LUA_PATH` wins, then the
+	 * environment variable of the same name, and failing both a built-in
+	 * "current directory" pattern.
+	 */
+	static const char* getpath(lua_State* const state)
+	{
+		lua_pushstring(state, "LUA_PATH");
+		lua_gettable(state, LUA_GLOBALSINDEX);
+		const char* const scriptPath = lua_tostring(state, -1);
+		lua_settop(state, -2);
+
+		if (scriptPath != nullptr) {
+			return scriptPath;
+		}
+
+		const char* const environmentPath = std::getenv("LUA_PATH");
+		if (environmentPath == nullptr) {
+			return "?;?.lua";
+		}
+
+		return environmentPath;
+	}
+
 	// luaV_gettable and the two paths below are mutually recursive: a metatable
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
