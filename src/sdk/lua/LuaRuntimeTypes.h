@@ -208,18 +208,23 @@ struct UpVal
 	LuaPlus::TObject value; // Closed value storage.
 };
 
+// Shares its header with CClosure: tt/marked are single bytes like every other
+// collectable, and nupvalues/isC sit at +0x08/+0x09. The previous model made
+// tt and marked int32, which pushed p to +0x20 and the upvalue array to +0x24 -
+// every `cl.l.p` read was landing on the wrong field.
 struct LClosure
 {
-	GCObject* next;
-	int32_t tt;
-	int32_t marked;
-	lu_byte nupvalues;
-	int8_t reservedHeader;
-	int32_t isC;
-	GCObject* gclist;
-	LuaPlus::TObject g; // Closure environment/global table.
-	Proto* p;
-	UpVal* upvals[3];
+	GCObject* next;                  // +0x00
+	lu_byte tt;                      // +0x04
+	lu_byte marked;                  // +0x05
+	lu_byte reservedAfterHeader[2];  // +0x06 CommonHeader tail padding.
+	lu_byte nupvalues;               // +0x08
+	lu_byte isC;                     // +0x09
+	lu_byte reservedAfterCounts[2];  // +0x0A
+	GCObject* gclist;                // +0x0C
+	LuaPlus::TObject g;              // +0x10 Closure environment/global table.
+	Proto* p;                        // +0x18
+	UpVal* upvals[1];                // +0x1C Flexible tail, one pointer each.
 
 	/**
 	 * Address: 0x00920DA0 (FUN_00920DA0, LClosure::MemberSerialize)
@@ -399,6 +404,18 @@ static_assert(offsetof(lua_State, _gt) == 0x30, "lua_State::_gt must be at +0x30
 static_assert(offsetof(lua_State, stateUserData) == 0x44, "lua_State::stateUserData must be at +0x44 (x86)");
 static_assert(sizeof(lua_State) == 0x48, "lua_State must be 0x48 bytes (lua_open allocates 0x48)");
 static_assert(sizeof(CallInfo) == 0x28, "CallInfo must be 0x28 bytes (x86)");
+
+// LClosure. luaF_newLclosure (FUN_00914EF0) allocates "lea eax, ds:1Ch[ebx*4]"
+// - 0x1C plus four bytes per upvalue - so the upvalue array starts at 0x1C. It
+// then writes nupvalues with "mov [esi+8], bl" and the environment TObject with
+// "mov [esi+10h], ecx" / "mov [esi+14h], edx". p at 0x18 is confirmed twice
+// over: luaD_precall reads "mov edx,[ebp+4]" / "mov edi,[edx+18h]", and
+// luaF_getlocalname reads "mov ebx,[ecx+18h]".
+static_assert(offsetof(LClosure, nupvalues) == 0x08, "LClosure::nupvalues must be at +0x08 (x86)");
+static_assert(offsetof(LClosure, gclist) == 0x0C, "LClosure::gclist must be at +0x0C (x86)");
+static_assert(offsetof(LClosure, g) == 0x10, "LClosure::g must be at +0x10 (x86)");
+static_assert(offsetof(LClosure, p) == 0x18, "LClosure::p must be at +0x18 (x86)");
+static_assert(offsetof(LClosure, upvals) == 0x1C, "LClosure::upvals must be at +0x1C (x86)");
 
 // global_State head region. Each offset below is taken from a single named
 // instruction rather than inferred from neighbouring fields.
