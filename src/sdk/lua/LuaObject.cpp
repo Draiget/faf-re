@@ -4111,9 +4111,9 @@ namespace
 		int luaopen_serialize(lua_State* L);
 		void reallymarkobject(GCState* gcState, GCObject* object);
 		int luaD_call(lua_State* L, StkId func, int nResults);
-		int luaD_precall(lua_State* L, StkId func);
+		LuaPlus::StkId luaD_precall(lua_State* L, StkId func);
 		void luaD_callhook(lua_State* L, int event, int line);
-		int luaD_poscall(lua_State* L, int wanted, StkId firstResult);
+		void luaD_poscall(lua_State* L, int wanted, StkId firstResult);
 		void luaD_reallocCI(lua_State* L, int newsize);
 		void luaD_growstack(lua_State* L, int n);
 		StkId luaV_execute(lua_State* L);
@@ -11202,6 +11202,240 @@ extern "C"
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
+
+	/**
+	 * Address: 0x00913C30 (FUN_00913C30, tryFuncTM)
+	 *
+	 * IDA signature:
+	 * StkId __usercall tryFuncTM(TObject *func@<eax>, lua_State *L@<esi>);
+	 *
+	 * What it does:
+	 * Handles a call on something that is not a function. The value's `__call`
+	 * tag method becomes the callee and the original value is shifted up to
+	 * become its first argument, so `t(x)` turns into `mt.__call(t, x)`.
+	 */
+	static StkId tryFuncTM(StkId func, lua_State* const state)
+	{
+		constexpr int kTagMethodCall = 17;
+
+		const TObject* const handler = luaT_gettmbyobj(state, func, kTagMethodCall);
+		const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+
+		if (!IsCallableTag(handler->tt)) {
+			luaG_typeerror(state, func, "call");
+		}
+
+		// Open a slot at `func` by sliding everything above it up one.
+		for (StkId slot = state->top; slot > func; --slot) {
+			slot[0] = slot[-1];
+		}
+
+		if (state->stack_last - state->top <= 1) {
+			luaD_growstack(state, 1);
+		}
+
+		++state->top;
+
+		StkId const target = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+		target->tt = handler->tt;
+		target->value.p = handler->value.p;
+		return target;
+	}
+
+	/**
+	 * Address: 0x00913D40 (FUN_00913D40, luaD_poscall)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaD_poscall(lua_State *L, int wanted, StkId firstResult);
+	 *
+	 * What it does:
+	 * Tears the finished frame down: pops the CallInfo, restores `base`, then
+	 * slides the results down over the callee and its arguments, padding with
+	 * nil when fewer were produced than the caller asked for.
+	 */
+	void luaD_poscall(lua_State* const state, int wanted, StkId firstResult)
+	{
+		constexpr lu_byte kHookMaskReturn = 1 << 1;
+
+		if ((state->l_G->hookmask & kHookMaskReturn) != 0) {
+			firstResult = callrethooks(firstResult, state);
+		}
+
+		--state->ci;
+		StkId result = state->base - 1;
+		state->base = state->ci->base;
+
+		for (; wanted != 0 && firstResult < state->top; --wanted) {
+			*result++ = *firstResult++;
+		}
+
+		for (; wanted > 0; --wanted) {
+			(result++)->tt = LUA_TNIL;
+		}
+
+		state->top = result;
+	}
+
+	/**
+	 * Address: 0x009142A0 (FUN_009142A0, luaD_precall)
+	 *
+	 * IDA signature:
+	 * StkId __cdecl luaD_precall(lua_State *L, StkId func);
+	 *
+	 * What it does:
+	 * Opens a call frame. A Lua closure gets its stack reserved and returns
+	 * null, telling the caller to run the interpreter; a C closure is invoked
+	 * here and its first result returned. Anything else is routed through
+	 * `__call` first.
+	 */
+	StkId luaD_precall(lua_State* const state, StkId func)
+	{
+		constexpr int kMinCStackSlots = 20;
+		constexpr lu_byte kHookMaskCall = 1 << 0;
+		constexpr int kCallInfoSavedPc = 1 << 0;
+
+		const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+
+		if (!IsCallableTag(func->tt)) {
+			func = tryFuncTM(func, state);
+		}
+
+		if (&state->ci[1] == state->end_ci) {
+			luaD_growCI(state);
+		}
+
+		if (func->tt == LUA_TFUNCTION) {
+			// Lua closure: reserve its registers and hand back to the caller,
+			// which runs luaV_execute over the frame we just opened.
+			Proto* const proto = static_cast<GCObject*>(func->value.p)->cl.l.p;
+
+			if (proto->is_vararg != 0) {
+				adjust_varargs(state, proto->numparams, func + 1);
+			}
+
+			if (state->stack_last - state->top <= proto->maxstacksize) {
+				luaD_growstack(state, proto->maxstacksize);
+			}
+
+			CallInfo* const ci = ++state->ci;
+			ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+			state->base = ci->base;
+			ci->top = state->base + proto->maxstacksize;
+			ci->savedpc = proto->code;
+			ci->tailcalls = 0;
+			ci->state = 0;
+			ci->pc = nullptr;
+			ci->reserved0 = 0;
+			ci->reserved1 = 0;
+			ci->reserved2 = 0;
+
+			for (; state->top < ci->top; ++state->top) {
+				state->top->tt = LUA_TNIL;
+			}
+
+			state->top = ci->top;
+			// Per-proto invocation counter at Proto+0x68 (reserved8). The binary
+			// bumps only the low dword - "add dword ptr [edi+68h], 1" with no
+			// carry - so this is a 32-bit increment, not a 64-bit one.
+			reinterpret_cast<std::uint32_t&>(proto->reserved8) += 1u;
+			return nullptr;
+		}
+
+		if (state->stack_last - state->top <= kMinCStackSlots) {
+			luaD_growstack(state, kMinCStackSlots);
+		}
+
+		CallInfo* const ci = ++state->ci;
+		ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+		state->base = ci->base;
+		ci->top = state->top + kMinCStackSlots;
+		ci->state = kCallInfoSavedPc;
+		ci->savedpc = nullptr;
+		ci->tailcalls = 0;
+		ci->pc = nullptr;
+		ci->reserved0 = 0;
+		ci->reserved1 = 0;
+		ci->reserved2 = 0;
+
+		if ((state->l_G->hookmask & kHookMaskCall) != 0) {
+			luaD_callhook(state, LUA_HOOKCALL, -1);
+		}
+
+		Closure* const closure = static_cast<Closure*>(state->base[-1].value.p);
+
+		// The two words at upvalue_m1[0] are one 64-bit invocation counter this
+		// fork keeps per C closure - the binary increments the low half and
+		// carries into the high half.
+		std::uint32_t& invocationsLow = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].tt);
+		std::uint32_t& invocationsHigh = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].value.b);
+		const std::uint32_t previousLow = invocationsLow++;
+		if (invocationsLow < previousLow) {
+			++invocationsHigh;
+		}
+
+		const int produced = closure->c.f(state);
+		return state->top - produced;
+	}
+
+	/**
+	 * Address: 0x00914430 (FUN_00914430, luaD_call)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaD_call(lua_State *L, StkId func, int nResults);
+	 *
+	 * What it does:
+	 * Calls `func` and leaves `nResults` values behind it. Guards the C stack
+	 * against runaway recursion, and on any error unwinds this frame back to
+	 * the depth it started at - closing upvalues, planting the message where
+	 * the caller expects it, and restoring the hook gate - before letting the
+	 * error continue outward.
+	 */
+	int luaD_call(lua_State* const state, StkId func, const int nResults)
+	{
+		constexpr unsigned int kMaxCCalls = 200;
+		constexpr unsigned int kMaxCCallsHandling = kMaxCCalls + (kMaxCCalls >> 3);
+
+		const ptrdiff_t frameOffset =
+			reinterpret_cast<char*>(state->ci) - reinterpret_cast<char*>(state->base_ci);
+		const std::uint16_t savedNestedCalls = state->nCcalls;
+		const lu_byte savedAllowHook = state->l_G->allowhook;
+		const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+
+		if (++state->nCcalls >= kMaxCCalls) {
+			if (state->nCcalls == kMaxCCalls) {
+				luaG_runerror(state, "C stack overflow");
+			} else if (state->nCcalls >= kMaxCCallsHandling) {
+				throw lua_ErrorError(lua::lua_Error(state, LUA_ERRERR, "error in Lua error handling"));
+			}
+		}
+
+		try {
+			StkId firstResult = luaD_precall(state, func);
+			if (firstResult == nullptr) {
+				firstResult = luaV_execute(state);
+			}
+
+			luaD_poscall(state, nResults, firstResult);
+		} catch (const std::exception& error) {
+			StkId const errorSlot =
+				reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+			luaF_close(state, errorSlot);
+			(void)PushLuaStringAtStackSlot(state, errorSlot, error.what());
+
+			state->ci = reinterpret_cast<CallInfo*>(
+				reinterpret_cast<char*>(state->base_ci) + frameOffset
+			);
+			state->base = state->ci->base;
+			state->nCcalls = savedNestedCalls;
+			state->l_G->allowhook = savedAllowHook;
+			(void)luaD_refreshstacklimit(state);
+			throw;
+		}
+
+		--state->nCcalls;
+		luaC_checkGC(state);
+		return 0;
+	}
 
 	/**
 	 * Address: 0x00915290 (FUN_00915290, luaC_separateudata)
