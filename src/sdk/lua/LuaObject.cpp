@@ -7426,7 +7426,7 @@ namespace
 	 * Shrinks oversized string/hash scratch storage and recomputes the next GC
 	 * threshold after the current mark/sweep dead-memory estimate.
 	 */
-	[[maybe_unused]] void checkSizes(lua_State* const state, const size_t deadmem)
+	void checkSizes(lua_State* const state, const size_t deadmem)
 	{
 		global_State* const globalState = state->l_G;
 		if (globalState->strt.nuse < globalState->strt.size / 4) {
@@ -7462,7 +7462,7 @@ namespace
 	 * Marks Lua GC roots for default metatable lanes, registry, and thread
 	 * roots, then dispatches the optional engine GC callback hook.
 	 */
-	[[maybe_unused]] void markroot(GCState* const st, lua_State* const state)
+	void markroot(GCState* const st, lua_State* const state)
 	{
 		global_State* const globalState = state->l_G;
 		global_State* const gcGlobals = st->g;
@@ -11202,6 +11202,168 @@ extern "C"
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
+
+	/**
+	 * Address: 0x00915290 (FUN_00915290, luaC_separateudata)
+	 *
+	 * IDA signature:
+	 * size_t __usercall luaC_separateudata(lua_State *L);
+	 *
+	 * What it does:
+	 * Moves every unreachable userdata that still wants finalising off the
+	 * live list and onto `tmudata`, returning the total bytes they occupy so
+	 * the collector can charge them against the allocation counter before the
+	 * finalisers have actually run.
+	 */
+	static size_t luaC_separateudata(lua_State* const state)
+	{
+		constexpr lu_byte kReachableMask = 0x11;
+		constexpr lu_byte kWantsFinaliserMask = 0x02;
+
+		global_State* const globalState = state->l_G;
+		GCObject** survivor = &globalState->rootudata;
+		GCObject* collected = nullptr;
+		GCObject** lastCollected = &collected;
+		size_t deadmem = 0;
+
+		for (GCObject* current = *survivor; current != nullptr; current = *survivor) {
+			const lu_byte marked = current->gch.marked;
+			if ((marked & kReachableMask) != 0 || (marked & kWantsFinaliserMask) == 0) {
+				survivor = &current->gch.next;
+				continue;
+			}
+
+			deadmem += static_cast<size_t>(reinterpret_cast<gpg::RType*>(current->u.len)->size_);
+			*survivor = current->gch.next;
+			current->gch.next = nullptr;
+			*lastCollected = current;
+			lastCollected = &current->gch.next;
+		}
+
+		*lastCollected = state->l_G->tmudata;
+		state->l_G->tmudata = collected;
+		return deadmem;
+	}
+
+	/**
+	 * Address: 0x00915B20 (FUN_00915B20, luaC_callGCTM)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaC_callGCTM(lua_State *L);
+	 *
+	 * What it does:
+	 * Runs the finaliser for every userdata `luaC_separateudata` set aside,
+	 * returning each one to the live list first so a finaliser that resurrects
+	 * its object finds it intact. Hooks stay disabled for the duration. Unlike
+	 * stock Lua this does not look up a `__gc` metamethod - the fork calls the
+	 * reflected destructor recorded on the userdata's RType instead, which is
+	 * why the payload pointer rather than a Lua value is what gets passed.
+	 */
+	static void luaC_callGCTM(lua_State* const state)
+	{
+		constexpr lu_byte kClearFinaliserBits = 0xFC;
+
+		global_State* const globalState = state->l_G;
+		const lu_byte savedAllowHook = globalState->allowhook;
+		globalState->allowhook = 0;
+
+		// One reserved slot holds the userdata across the finaliser call.
+		++state->top;
+
+		while (state->l_G->tmudata != nullptr) {
+			GCObject* const udata = state->l_G->tmudata;
+
+			state->l_G->tmudata = udata->gch.next;
+			udata->gch.next = state->l_G->rootudata;
+			state->l_G->rootudata = udata;
+
+			TObject* const slot = state->top - 1;
+			slot->value.p = udata;
+			slot->tt = static_cast<int>(udata->gch.tt);
+
+			udata->gch.marked &= kClearFinaliserBits;
+
+			auto* const type = reinterpret_cast<gpg::RType*>(udata->u.len);
+			type->dtrFunc_(static_cast<void*>(&udata->u + 1));
+		}
+
+		--state->top;
+		state->l_G->allowhook = savedAllowHook;
+	}
+
+	/**
+	 * Address: 0x00915CC0 (FUN_00915CC0, mark)
+	 *
+	 * IDA signature:
+	 * size_t __usercall mark(lua_State *L@<eax>);
+	 *
+	 * What it does:
+	 * The mark half of one collection cycle. Roots are marked and propagated,
+	 * then weak-valued tables are cleared before userdata pending finalisation
+	 * are separated out and re-marked - they and anything they reach have to
+	 * survive long enough for their finalisers to run. A second propagation
+	 * covers that resurrection, after which the weak tables are cleared for
+	 * real. Returns the bytes owed by the separated userdata.
+	 */
+	static size_t mark(lua_State* const state)
+	{
+		constexpr lu_byte kMarkedBit = 0x01;
+
+		GCState st{};
+		st.g = state->l_G;
+		st.L = state;
+
+		markroot(&st, state);
+		propagatemarks(&st);
+
+		cleartablevalues(st.wkv);
+		cleartablevalues(st.wv);
+
+		GCObject* const weakKeyValueTables = st.wkv;
+		st.wkv = nullptr;
+		st.wv = nullptr;
+
+		const size_t deadmem = luaC_separateudata(state);
+
+		for (GCObject* udata = st.g->tmudata; udata != nullptr; udata = udata->gch.next) {
+			udata->gch.marked &= static_cast<lu_byte>(~kMarkedBit);
+			reallymarkobject(&st, udata);
+		}
+
+		propagatemarks(&st);
+
+		cleartablekeys(weakKeyValueTables);
+		cleartablekeys(st.wk);
+		cleartablevalues(st.wv);
+		cleartablekeys(st.wkv);
+		cleartablevalues(st.wkv);
+
+		return deadmem;
+	}
+
+	/**
+	 * Address: 0x00915D90 (FUN_00915D90, luaC_collectgarbage)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaC_collectgarbage(lua_State *L);
+	 *
+	 * What it does:
+	 * One full stop-the-world cycle: mark, sweep the four collectable lanes,
+	 * resize the string table and recompute the threshold, then run the
+	 * finalisers that the mark phase deferred.
+	 */
+	void luaC_collectgarbage(lua_State* const state)
+	{
+		const size_t deadmem = mark(state);
+
+		(void)sweeplist(&state->l_G->rootudata, nullptr, state, 0);
+		sweepstrings(state, 0);
+		(void)sweeplist(&state->l_G->rootgc1, nullptr, state, 0);
+		(void)sweeplist(&state->l_G->rootgc, nullptr, state, 0);
+
+		checkSizes(state, deadmem);
+		luaC_callGCTM(state);
+	}
 
 	/**
 	 * Address: 0x009284A0 (FUN_009284A0, luaT_getmetatable)
