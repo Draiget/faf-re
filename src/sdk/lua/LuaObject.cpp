@@ -11204,6 +11204,196 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x009291A0 (FUN_009291A0, luaV_tostring)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaV_tostring(lua_State *L, TObject *obj);
+	 *
+	 * What it does:
+	 * Converts a number in place to its string form, leaving anything else
+	 * alone. Returns whether the slot now holds a string.
+	 */
+	int luaV_tostring(lua_State* const state, TObject* const object)
+	{
+		if (object->tt != LUA_TNUMBER) {
+			return 0;
+		}
+
+		char rendered[32];
+		std::sprintf(rendered, "%.14g", static_cast<double>(object->value.n));
+
+		TString* const interned = luaS_newlstr(state, rendered, std::strlen(rendered));
+		object->value.p = interned;
+		object->tt = static_cast<int>(interned->tt);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00929910 (FUN_00929910, luaV_concat)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaV_concat(lua_State *L, int total, int last);
+	 *
+	 * What it does:
+	 * Folds `total` stack values ending at `last` into one string. Each pass
+	 * takes the longest run of strings and numbers it can reach and joins them
+	 * through the shared scratch buffer in a single allocation, so `a..b..c`
+	 * does not build an intermediate. A pair that is not concatenable falls
+	 * back to `__concat`, which handles one pair at a time - hence the outer
+	 * loop.
+	 */
+	void luaV_concat(lua_State* const state, int total, int last)
+	{
+		constexpr int kTagMethodConcat = 16;
+		constexpr size_t kMaxStringSize = 0xFFFFFFFDu;
+
+		do {
+			StkId const top = state->base + last + 1;
+			int handled = 2;
+
+			const bool leftIsText = (top[-2].tt == LUA_TSTRING) || luaV_tostring(state, top - 2) != 0;
+			if (!leftIsText || luaV_tostring(state, top - 1) == 0) {
+				const TObject* handler = luaT_gettmbyobj(state, top - 2, kTagMethodConcat);
+				if (handler->tt == LUA_TNIL) {
+					handler = luaT_gettmbyobj(state, top - 1, kTagMethodConcat);
+				}
+
+				if (!IsCallableTag(handler->tt)) {
+					luaV_concat_raise_typeerror(state, top - 2, top - 1);
+				}
+
+				const ptrdiff_t resultOffset =
+					reinterpret_cast<char*>(top - 2) - reinterpret_cast<char*>(state->stack);
+				(void)callTMres(handler, top - 2, top - 1, state);
+				*reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + resultOffset) = *state->top;
+			} else if (static_cast<TString*>(top[-1].value.p)->len > 0u) {
+				// Two strings at least. Reach back over as many more as are
+				// convertible so the whole run costs one allocation.
+				size_t joinedLength = static_cast<TString*>(top[-1].value.p)->len
+					+ static_cast<TString*>(top[-2].value.p)->len;
+
+				while (handled < total && luaV_tostring(state, top - handled - 1) != 0) {
+					joinedLength += static_cast<TString*>(top[-handled - 1].value.p)->len;
+					++handled;
+				}
+
+				if (joinedLength > kMaxStringSize) {
+					luaG_runerror(state, "string size overflow");
+				}
+
+				char* const buffer = luaZ_openspace(state, &state->l_G->buff, joinedLength);
+
+				size_t written = 0;
+				for (int index = handled; index > 0; --index) {
+					const TString* const piece = static_cast<TString*>(top[-index].value.p);
+					std::memcpy(buffer + written, piece->str, piece->len);
+					written += piece->len;
+				}
+
+				TString* const joined = luaS_newlstr(state, buffer, written);
+				top[-handled].tt = static_cast<int>(joined->tt);
+				top[-handled].value.p = joined;
+			}
+
+			total -= handled - 1;
+			last -= handled - 1;
+		} while (total > 1);
+	}
+
+	/**
+	 * Address: 0x0091A690 (FUN_0091A690, luaO_pushvfstring)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl luaO_pushvfstring(lua_State *L, const char *fmt, va_list argp);
+	 *
+	 * What it does:
+	 * Formats a message onto the Lua stack. Each literal run and each
+	 * conversion is pushed as its own value and the lot is concatenated at the
+	 * end, which is how the result becomes a collectable Lua string rather
+	 * than something the caller has to free. Only %%, %c, %d, %f and %s are
+	 * understood - anything else is dropped, as in the binary.
+	 */
+	// Still the lib's: recovering it needs a two-argument lua_Error ctor
+	// (FUN_009131B0 calls ??0lua_Error@lua@@Z with just L and a code) that
+	// this tree does not model yet.
+	void luaG_errormsg(lua_State* L);
+
+	const char* luaO_pushvfstring(lua_State* const state, const char* fmt, va_list argp)
+	{
+		int pushed = 1;
+		pushstr(state, "");
+
+		const char* conversion = std::strchr(fmt, '%');
+		while (conversion != nullptr) {
+			TString* const literal = luaS_newlstr(state, fmt, static_cast<size_t>(conversion - fmt));
+			TObject* top = state->top;
+			top->tt = static_cast<int>(literal->tt);
+			top->value.p = literal;
+			api_incr_top(state);
+
+			top = state->top;
+			switch (conversion[1]) {
+				case '%':
+					pushstr(state, "%");
+					break;
+				case 'c': {
+					char one[2];
+					one[0] = static_cast<char>(va_arg(argp, int));
+					one[1] = '\0';
+					pushstr(state, one);
+					break;
+				}
+				case 'd':
+					top->value.n = static_cast<float>(va_arg(argp, int));
+					top->tt = LUA_TNUMBER;
+					api_incr_top(state);
+					break;
+				case 'f':
+					top->value.n = static_cast<float>(va_arg(argp, double));
+					top->tt = LUA_TNUMBER;
+					api_incr_top(state);
+					break;
+				case 's':
+					pushstr(state, va_arg(argp, const char*));
+					break;
+				default:
+					break;
+			}
+
+			pushed += 2;
+			fmt = conversion + 2;
+			conversion = std::strchr(fmt, '%');
+		}
+
+		pushstr(state, fmt);
+		luaV_concat(state, pushed + 1, static_cast<int>(state->top - state->base) - 1);
+		state->top -= pushed;
+		return static_cast<TString*>(state->top[-1].value.p)->str;
+	}
+
+	/**
+	 * Address: 0x00913270 (FUN_00913270, luaG_runerror)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaG_runerror(lua_State *L, const char *fmt, ...);
+	 *
+	 * What it does:
+	 * Raises a runtime error: formats the message onto the stack, tags it with
+	 * the chunk and line it came from, and hands it to the error machinery.
+	 * Never returns.
+	 */
+	void luaG_runerror(lua_State* const state, const char* const format, ...)
+	{
+		va_list arguments;
+		va_start(arguments, format);
+		const char* const message = luaO_pushvfstring(state, format, arguments);
+		va_end(arguments);
+
+		addinfo(state, message);
+		luaG_errormsg(state);
+	}
+
+	/**
 	 * Address: 0x0091A8F0 (FUN_0091A8F0, luaO_chunkid)
 	 *
 	 * IDA signature:
