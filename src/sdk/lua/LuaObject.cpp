@@ -11204,6 +11204,158 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x00915010 (FUN_00915010, luaF_newproto)
+	 *
+	 * IDA signature:
+	 * Proto *__cdecl luaF_newproto(lua_State *L);
+	 *
+	 * What it does:
+	 * Allocates an empty function prototype and links it for collection. Every
+	 * lane is cleared except gclist, which luaC_link has just written.
+	 */
+	Proto* luaF_newproto(lua_State* const state)
+	{
+		auto* const proto = static_cast<Proto*>(
+			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(Proto)))
+		);
+		luaC_link(state, reinterpret_cast<GCObject*>(proto), LUA_TPROTO);
+
+		proto->k = nullptr;
+		proto->code = nullptr;
+		proto->p = nullptr;
+		proto->lineinfo = nullptr;
+		proto->locvars = nullptr;
+		proto->upvalues = nullptr;
+		proto->source = nullptr;
+		proto->sizeupvalues = 0;
+		proto->sizek = 0;
+		proto->sizecode = 0;
+		proto->sizelineinfo = 0;
+		proto->sizep = 0;
+		proto->sizelocvars = 0;
+		proto->lineDefined = 0;
+		proto->nups = 0;
+		proto->numparams = 0;
+		proto->is_vararg = 0;
+		proto->maxstacksize = 0;
+		proto->reserved0 = 0;
+		proto->reserved1 = 0;
+		proto->reserved2 = 0;
+		proto->reserved3 = 0;
+		proto->reserved4 = 0;
+		proto->reserved5 = 0;
+		proto->reserved6 = 0;
+		proto->reserved7 = 0;
+		proto->reserved8 = 0;
+		return proto;
+	}
+
+	/**
+	 * Address: 0x00915160 (FUN_00915160, luaF_freeclosure)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaF_freeclosure(lua_State *L, Closure *c);
+	 *
+	 * What it does:
+	 * Releases a closure. The size is computed from the upvalue count with the
+	 * Lua-closure formula, which is what the binary does for either kind.
+	 */
+	void luaF_freeclosure(lua_State* const state, Closure* const closure)
+	{
+		constexpr size_t kClosureHeaderSize = 28u;
+
+		(void)luaM_realloc(
+			state,
+			closure,
+			static_cast<lu_mem>(kClosureHeaderSize + 4u * closure->c.nupvalues),
+			0u
+		);
+	}
+
+	/**
+	 * Address: 0x00914F70 (FUN_00914F70, luaF_findupval)
+	 *
+	 * IDA signature:
+	 * UpVal *__usercall luaF_findupval(lua_State *L, StkId level);
+	 *
+	 * What it does:
+	 * Returns the upvalue already pointing at `level`, or makes one and splices
+	 * it into the thread's open list. The list runs from higher stack slots
+	 * down, so the walk stops as soon as it passes the target.
+	 */
+	UpVal* luaF_findupval(lua_State* const state, StkId const level)
+	{
+		GCObject** link = &state->openupval;
+
+		for (GCObject* candidate = state->openupval; candidate != nullptr; candidate = candidate->gch.next) {
+			TObject* const referenced = candidate->uv.v;
+			if (referenced < level) {
+				break;
+			}
+
+			if (referenced == level) {
+				return &candidate->uv;
+			}
+
+			link = &candidate->gch.next;
+		}
+
+		auto* const upvalue = static_cast<UpVal*>(
+			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(UpVal)))
+		);
+		upvalue->tt = LUA_TUPVALUE;
+		upvalue->marked = 1;
+		upvalue->v = level;
+		upvalue->next = *link;
+		*link = reinterpret_cast<GCObject*>(upvalue);
+		return upvalue;
+	}
+
+	/**
+	 * Address: 0x009139F0 (FUN_009139F0, luaD_callhook)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaD_callhook(lua_State *L, int event, int line);
+	 *
+	 * What it does:
+	 * Invokes the installed debug hook for one event. Stack positions are
+	 * saved as offsets rather than pointers because the hook may grow the
+	 * stack and move it, and the hook is disabled for its own duration so it
+	 * cannot re-enter. A tail return has no frame of its own, so it reports
+	 * i_ci 0.
+	 */
+	void luaD_callhook(lua_State* const state, const int event, const int line)
+	{
+		constexpr int kMinCStackSlots = 20;
+
+		global_State* const globalState = state->l_G;
+		const Hook hook = globalState->hook;
+		if (hook == nullptr || globalState->allowhook == 0) {
+			return;
+		}
+
+		const ptrdiff_t savedTop = state->top - state->stack;
+		const ptrdiff_t savedFrameTop = state->ci->top - state->stack;
+
+		lua_Debug ar{};
+		ar.event = event;
+		ar.currentline = line;
+		ar.i_ci = (event == LUA_HOOKTAILRET) ? 0 : static_cast<int>(state->ci - state->base_ci);
+
+		if (state->stack_last - state->top <= kMinCStackSlots) {
+			luaD_growstack(state, kMinCStackSlots);
+		}
+
+		state->ci->top = state->top + kMinCStackSlots;
+		state->l_G->allowhook = 0;
+		hook(state, &ar);
+		state->l_G->allowhook = 1;
+
+		state->ci->top = state->stack + savedFrameTop;
+		state->top = state->stack + savedTop;
+	}
+
+	/**
 	 * Address: 0x009131B0 (FUN_009131B0, luaG_errormsg)
 	 *
 	 * IDA signature:
