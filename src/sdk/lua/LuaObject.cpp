@@ -1257,15 +1257,18 @@ extern "C"
 	/**
 	 * Address: 0x0090AD00 (FUN_0090AD00, lua_setdefaultmetatable)
 	 *
+	 * IDA signature:
+	 * void __cdecl lua_setdefaultmetatable(lua_State *L, int type);
+	 *
 	 * What it does:
 	 * Pops one value from stack top and, when that value is a table, writes it
-	 * into the default-metatable slot for `type + 7`.
+	 * into the default-metatable slot for `type`.
 	 */
 	void lua_setdefaultmetatable(lua_State* const state, const int type)
 	{
 		TObject* const topValue = state->top - 1;
 		if (topValue->tt == LUA_TTABLE) {
-			state->l_G->_defaultmetatypes[type + 7] = *topValue;
+			state->l_G->_defaultmetatypes[type] = *topValue;
 		}
 		--state->top;
 	}
@@ -1289,7 +1292,7 @@ extern "C"
 	 */
 	int lua_getgccount(lua_State* const state)
 	{
-		return static_cast<int>(static_cast<std::uint32_t>(state->l_G->unknown10C) >> 10);
+		return static_cast<int>(static_cast<std::uint32_t>(state->l_G->nblocks) >> 10);
 	}
 
 	/**
@@ -2621,6 +2624,35 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x00928450 (FUN_00928450, luaT_gettmbyobj)
+	 *
+	 * IDA signature:
+	 * const TObject *__cdecl luaT_gettmbyobj(lua_State *L, const TObject *o, int event);
+	 *
+	 * What it does:
+	 * Resolves one tag method for an arbitrary value. Tables and userdata each
+	 * carry their own metatable, so the event name is looked up there. Every
+	 * other tag shares the per-type default metatable this fork keeps in
+	 * `global_State::_defaultmetatypes` - unlike stock Lua 5.0, which returns
+	 * the nil sentinel for those tags - so the slot is handed back directly and
+	 * the caller sees nil only when no default has been installed for the type.
+	 */
+	const TObject* luaT_gettmbyobj(lua_State* const state, const TObject* const object, const int event)
+	{
+		global_State* const globalState = state->l_G;
+		TString* const eventName = globalState->tmname[event];
+
+		switch (object->tt) {
+			case LUA_TTABLE:
+				return luaH_getstr(static_cast<Table*>(object->value.p)->metatable, eventName);
+			case LUA_TUSERDATA:
+				return luaH_getstr(static_cast<Udata*>(object->value.p)->metatable, eventName);
+			default:
+				return &globalState->_defaultmetatypes[object->tt];
+		}
+	}
+
+	/**
 	 * Address: 0x00927510 (FUN_00927510, luaH_get)
 	 *
 	 * What it does:
@@ -3286,7 +3318,7 @@ extern "C"
 	{
 		global_State* const globalState = state->l_G;
 		++globalState->gcTraversalLockDepth;
-		globalState->unknown150 = 0;
+		globalState->allocationTrackingEnabled = 0;
 
 		TObject* const top = state->top;
 		top->tt = static_cast<int>(table->tt);
@@ -3302,7 +3334,7 @@ extern "C"
 		*destination = *(state->top - 1);
 		state->top -= 2;
 
-		globalState->unknown150 = 1;
+		globalState->allocationTrackingEnabled = 1;
 		--globalState->gcTraversalLockDepth;
 	}
 
@@ -4539,7 +4571,7 @@ namespace
 	 * Pushes one metamethod + three operands, performs a no-result Lua call,
 	 * and preserves stack-growth behavior.
 	 */
-	[[maybe_unused]] void callTM(
+	void callTM(
 		const TObject* const firstOperand,
 		const TObject* const secondOperand,
 		const TObject* const thirdOperand,
@@ -7079,7 +7111,7 @@ namespace
 			globalState->buff.buffsize = newBufferSize;
 		}
 
-		const int nblocks = globalState->unknown10C;
+		const int nblocks = static_cast<int>(globalState->nblocks);
 		int thresholdBase = nblocks + nblocks;
 		if (nblocks >= 0x40000000) {
 			thresholdBase = nblocks + 0x10000000;
@@ -7102,10 +7134,10 @@ namespace
 		global_State* const globalState = state->l_G;
 		global_State* const gcGlobals = st->g;
 
-		if (globalState->_defaultmeta.tt >= LUA_TSTRING) {
-			auto* const defaultMetaObject = static_cast<GCObject*>(globalState->_defaultmeta.value.p);
-			if ((defaultMetaObject->gch.marked & 0x11u) == 0u) {
-				reallymarkobject(st, defaultMetaObject);
+		if (globalState->_registry.tt >= LUA_TSTRING) {
+			auto* const registryObject = static_cast<GCObject*>(globalState->_registry.value.p);
+			if ((registryObject->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, registryObject);
 			}
 		}
 
@@ -7118,10 +7150,10 @@ namespace
 			}
 		}
 
-		if (globalState->_registry.tt >= LUA_TSTRING) {
-			auto* const registryObject = static_cast<GCObject*>(globalState->_registry.value.p);
-			if ((registryObject->gch.marked & 0x11u) == 0u) {
-				reallymarkobject(st, registryObject);
+		if (globalState->_defaultmeta.tt >= LUA_TSTRING) {
+			auto* const defaultMetaObject = static_cast<GCObject*>(globalState->_defaultmeta.value.p);
+			if ((defaultMetaObject->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, defaultMetaObject);
 			}
 		}
 
@@ -7879,7 +7911,7 @@ namespace
 			luaL_argerror(state, 1, "boolean expected");
 		}
 
-		state->l_G->unknown150 = static_cast<std::int8_t>(lua_toboolean(state, 1));
+		state->l_G->allocationTrackingEnabled = static_cast<lu_byte>(lua_toboolean(state, 1));
 		return 0;
 	}
 
@@ -9099,7 +9131,7 @@ namespace
 	 *
 	 * What it does:
 	 * Replaces arg-1 with the interned type-name string lane from
-	 * `global_State::_defaultmetatypes` and returns it.
+	 * `global_State::typenames` and returns it.
 	 */
 	[[maybe_unused]] int luaB_type(lua_State* const state)
 	{
@@ -9107,7 +9139,7 @@ namespace
 
 		TObject* const top = state->top;
 		const int valueTypeTag = (top - 1)->tt;
-		TString* const typeName = static_cast<TString*>(state->l_G->_defaultmetatypes[valueTypeTag].value.p);
+		TString* const typeName = state->l_G->typenames[valueTypeTag];
 		(top - 1)->tt = static_cast<int>(typeName->tt);
 		(top - 1)->value.p = typeName;
 		return 1;
@@ -10130,6 +10162,88 @@ extern "C"
 		luaV_settable(state, object, state->top - 2, state->top - 1);
 		state->top -= 2;
 	}
+}
+
+namespace
+{
+	// LUA_CFUNCTION (6) and LUA_TFUNCTION (7) are adjacent tags differing only
+	// in the low bit, which is how the binary tests "is this callable" in one
+	// instruction pair: `or eax, 1` / `cmp eax, 7`.
+	[[nodiscard]] constexpr bool IsCallableTag(const int tag) noexcept
+	{
+		return (tag | 1) == LUA_TFUNCTION;
+	}
+}
+
+/**
+ * Address: 0x00929450 (FUN_00929450, luaV_settable)
+ *
+ * IDA signature:
+ * void __cdecl luaV_settable(lua_State *L, const TObject *t, TObject *key, StkId val);
+ *
+ * What it does:
+ * Performs one `t[key] = val` with full `__newindex` semantics. The raw table
+ * store wins in three cases: the slot already holds a non-nil value, the
+ * metatable carries the cached "no __newindex here" flag, or the metatable
+ * genuinely has no `__newindex`. Otherwise the handler is invoked when it is
+ * callable, and re-indexed into when it is another container - bounded to 100
+ * hops before raising "loop in settable".
+ *
+ * Defined with C linkage at namespace scope on purpose: the prebuilt
+ * LuaPlus lib carries its own `_luaV_settable` built against a different
+ * TObject/Table layout, and letting that one win is what corrupted every
+ * table written through `luaL_openlib` during startup.
+ */
+extern "C" void luaV_settable(
+	lua_State* const state,
+	const TObject* target,
+	TObject* const key,
+	TObject* const val
+)
+{
+	constexpr int kTagMethodNewIndex = 1;
+	constexpr int kNoNewIndexTagMethodFlag = 1 << kTagMethodNewIndex;
+	constexpr int kMaxTagMethodChain = 100;
+
+	for (int hop = 0; hop <= kMaxTagMethodChain; ++hop) {
+		const TObject* handler = nullptr;
+
+		if (target->tt == LUA_TTABLE) {
+			auto* const table = static_cast<Table*>(target->value.p);
+			TObject* const slot = luaH_set(state, table, key);
+
+			if (slot->tt != LUA_TNIL) {
+				*slot = *val;
+				return;
+			}
+
+			Table* const metatable = table->metatable;
+			if ((metatable->flags & kNoNewIndexTagMethodFlag) != 0) {
+				*slot = *val;
+				return;
+			}
+
+			handler = luaT_gettm(metatable, kTagMethodNewIndex, state->l_G->tmname[kTagMethodNewIndex]);
+			if (handler == nullptr) {
+				*slot = *val;
+				return;
+			}
+		} else {
+			handler = luaT_gettmbyobj(state, target, kTagMethodNewIndex);
+			if (handler->tt == LUA_TNIL) {
+				luaG_typeerror(state, target, "index");
+			}
+		}
+
+		if (IsCallableTag(handler->tt)) {
+			callTM(target, key, val, state, handler);
+			return;
+		}
+
+		target = handler;
+	}
+
+	luaG_runerror(state, "loop in settable");
 }
 
 extern "C"
@@ -13312,13 +13426,6 @@ void LuaObject::SetObject(const int32_t index, LuaObject* value)
 
 namespace
 {
-	struct LuaDefaultMetatypeSlotRuntime
-	{
-		int tt;
-		LuaPlus::Value value;
-	};
-	static_assert(sizeof(LuaDefaultMetatypeSlotRuntime) == sizeof(LuaPlus::TObject), "LuaDefaultMetatypeSlotRuntime size mismatch");
-
 	/**
 	 * Address: 0x00915E20 (FUN_00915E20)
 	 *
@@ -13384,47 +13491,35 @@ namespace
 	/**
 	 * Address: 0x009284D0 (FUN_009284D0)
 	 *
+	 * IDA signature:
+	 * void __cdecl sub_9284D0(lua_State *L, TObject *o, GCObject *mt);
+	 *
 	 * What it does:
 	 * Assigns one metatable object to a tagged Lua value:
 	 * table/userdata instances store direct metatable pointers while all other
-	 * tag lanes update `global_State::_defaultmetatypes[tt]`.
+	 * tag lanes update `global_State::_defaultmetatypes[tt]`. The binary
+	 * dispatches on the tag alone - it validates neither the pointers nor the
+	 * tag range, so neither does this.
 	 */
-	[[maybe_unused]] LuaDefaultMetatypeSlotRuntime* AssignMetatableByTaggedValueType(
+	void AssignMetatableByTaggedValueType(
 		lua_State* const state,
 		LuaPlus::TObject* const object,
 		GCObject* const metatableObject
 	)
 	{
-		if (state == nullptr || state->l_G == nullptr || object == nullptr) {
-			return nullptr;
-		}
-
 		if (object->tt == LUA_TTABLE) {
-			if (object->value.p != nullptr) {
-				auto* const table = static_cast<Table*>(object->value.p);
-				table->metatable = reinterpret_cast<Table*>(metatableObject);
-				return reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(table->metatable);
-			}
-			return nullptr;
+			static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+			return;
 		}
 
 		if (object->tt == LUA_TUSERDATA) {
-			if (object->value.p != nullptr) {
-				auto* const userData = static_cast<Udata*>(object->value.p);
-				userData->metatable = reinterpret_cast<Table*>(metatableObject);
-				return reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(userData->metatable);
-			}
-			return nullptr;
+			static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+			return;
 		}
 
-		if (object->tt < 0 || object->tt >= 11) {
-			return nullptr;
-		}
-
-		auto* const slot = reinterpret_cast<LuaDefaultMetatypeSlotRuntime*>(&state->l_G->_defaultmetatypes[object->tt]);
-		slot->tt = metatableObject != nullptr ? static_cast<int>(metatableObject->gch.tt) : LUA_TNIL;
-		slot->value.p = metatableObject;
-		return slot;
+		TObject& slot = state->l_G->_defaultmetatypes[object->tt];
+		slot.tt = static_cast<int>(metatableObject->gch.tt);
+		slot.value.p = metatableObject;
 	}
 }
 
@@ -13439,11 +13534,8 @@ void LuaObject::SetMetaTable(const LuaObject& valueObj)
 {
 	Ensure(m_state && m_state == valueObj.m_state, "m_state && m_state == valueObj.m_state");
 
-	lua_State* const lstate = m_state->GetCState();
-	Ensure(lstate != nullptr, "m_state->GetCState() != nullptr");
-
-	(void)AssignMetatableByTaggedValueType(
-		lstate,
+	AssignMetatableByTaggedValueType(
+		m_state->GetCState(),
 		&m_object,
 		static_cast<GCObject*>(valueObj.m_object.value.p)
 	);
