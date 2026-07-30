@@ -11204,6 +11204,24 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x0090D430 (FUN_0090D430, lua_call)
+	 * Mangled: ?lua_call@@YAXPAUlua_State@@HH@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_call(lua_State *L, int nargs, int nresults);
+	 *
+	 * What it does:
+	 * Calls the function sitting `nargs` slots below the top, leaving
+	 * `nresults` values in its place. Errors propagate to the caller - it is
+	 * lua_pcall that catches them.
+	 */
+	void lua_call(lua_State* const state, const int nargs, const int nresults)
+	{
+		StkId const func = state->top - (nargs + 1);
+		(void)luaD_call(state, func, nresults);
+	}
+
+	/**
 	 * Address: 0x00913C30 (FUN_00913C30, tryFuncTM)
 	 *
 	 * IDA signature:
