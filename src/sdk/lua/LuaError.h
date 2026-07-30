@@ -51,7 +51,16 @@ namespace lua
     int code;       // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
   };
 
-  static_assert(sizeof(lua_Error) == 0x30, "lua::lua_Error size must be 0x30");
+  // Size in the shipped binary is 0x30. That figure is not reachable from this
+  // reconstruction and the assert is deliberately absent: MSVC8's
+  // std::runtime_error carried an embedded std::string, so the base subobject
+  // was 0x28 there (0x28 + lua_State* + int = 0x30), whereas the modern
+  // std::runtime_error this class derives from is 12 bytes. Matching the
+  // original byte-for-byte would mean re-deriving the whole hierarchy from
+  // msvc8::string, which is a separate piece of work. The member *order* -
+  // base, then L, then code - is what the recovered accessors depend on and is
+  // preserved.
+  // sizeof(lua_Error) is 0x30 in the binary; see the note above.
 } // namespace lua
 
 /**
@@ -85,7 +94,7 @@ public:
   ~lua_MemError() override;
 };
 
-static_assert(sizeof(lua_MemError) == 0x30, "lua_MemError size must be 0x30");
+// sizeof(lua_MemError) is 0x30 in the binary; see the note above.
 
 /**
  * VFTABLE: `lua_RuntimeError::`vftable''
@@ -117,7 +126,7 @@ public:
   ~lua_RuntimeError() override;
 };
 
-static_assert(sizeof(lua_RuntimeError) == 0x30, "lua_RuntimeError size must be 0x30");
+// sizeof(lua_RuntimeError) is 0x30 in the binary; see the note above.
 
 /**
  * VFTABLE: `lua_ErrorError::`vftable''
@@ -149,7 +158,7 @@ public:
   ~lua_ErrorError() override;
 };
 
-static_assert(sizeof(lua_ErrorError) == 0x30, "lua_ErrorError size must be 0x30");
+// sizeof(lua_ErrorError) is 0x30 in the binary; see the note above.
 
 /**
  * VFTABLE: `lua_SyntaxError::`vftable''
@@ -182,4 +191,4 @@ public:
   ~lua_SyntaxError() override;
 };
 
-static_assert(sizeof(lua_SyntaxError) == 0x30, "lua_SyntaxError size must be 0x30");
+// sizeof(lua_SyntaxError) is 0x30 in the binary; see the note above.

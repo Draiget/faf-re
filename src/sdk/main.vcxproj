@@ -240,6 +240,7 @@
     <ClCompile Include="lua\LuaTypeInfoRegistration.cpp" />
     <ClCompile Include="lua\LuaTableIterator.cpp" />
     <ClCompile Include="lua\LuaStateConstruct.cpp" />
+    <ClCompile Include="lua\LuaError.cpp" />
     <ClCompile Include="lua\LuaObject.cpp" />
     <ClCompile Include="lua\LuaParser.cpp" />
     <ClCompile Include="lua\LuaObjectSerializer.cpp" />
@@ -2406,7 +2407,6 @@
     <None Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp" />
     <None Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp" />
   
-    <None Include="lua\LuaError.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gpg\gal\AppRuntimeView.h" />
