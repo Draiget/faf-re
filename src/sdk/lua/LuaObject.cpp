@@ -11217,6 +11217,290 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x0090DC20 (FUN_0090DC20, luaL_findstring)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_findstring(const char *name, const char *const *list);
+	 *
+	 * What it does:
+	 * Returns the index of `name` in a NULL-terminated list, or -1.
+	 */
+	int luaL_findstring(const char* const name, const char* const* const list)
+	{
+		for (int index = 0; list[index] != nullptr; ++index) {
+			if (std::strcmp(list[index], name) == 0) {
+				return index;
+			}
+		}
+
+		return -1;
+	}
+
+	/**
+	 * Address: 0x0090DC70 (FUN_0090DC70, luaL_newmetatable)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_newmetatable(lua_State *L, const char *tname);
+	 *
+	 * What it does:
+	 * Creates a metatable registered under `tname` and leaves it on the stack,
+	 * or returns 0 with the existing one if the name is taken. The registry
+	 * gets both directions - name to table and table to name - so a userdata's
+	 * type can be recovered from its metatable.
+	 */
+	int luaL_newmetatable(lua_State* const state, const char* const tname)
+	{
+		lua_pushstring(state, tname);
+		lua_rawget(state, LUA_REGISTRYINDEX);
+		if (lua_type(state, -1) != LUA_TNIL) {
+			return 0;
+		}
+
+		lua_settop(state, -2);
+		lua_newtable(state);
+
+		lua_pushstring(state, tname);
+		lua_pushvalue(state, -2);
+		lua_rawset(state, LUA_REGISTRYINDEX);
+
+		lua_pushvalue(state, -1);
+		lua_pushstring(state, tname);
+		lua_rawset(state, LUA_REGISTRYINDEX);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090DDA0 (FUN_0090DDA0, luaL_callmeta)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_callmeta(lua_State *L, int obj, const char *event);
+	 *
+	 * What it does:
+	 * Calls a metamethod with the object as its only argument, leaving the one
+	 * result. Returns 0 untouched when there is no such metamethod.
+	 */
+	int luaL_callmeta(lua_State* const state, int obj, const char* const event)
+	{
+		if (static_cast<unsigned int>(obj) >= 0xFFFFD8F1u || obj == 0) {
+			obj += lua_gettop(state) + 1;
+		}
+
+		const int found = luaL_getmetafield(state, obj, event);
+		if (found == 0) {
+			return found;
+		}
+
+		lua_pushvalue(state, obj);
+		lua_call(state, 1, 1);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090E900 (FUN_0090E900, luaL_argerror)
+	 *
+	 * IDA signature:
+	 * int __usercall luaL_argerror(lua_State *L, int narg, const char *extramsg);
+	 *
+	 * What it does:
+	 * Raises a bad-argument error naming the offending position and function.
+	 * A method call shifts the numbering, because `self` is argument one - so
+	 * a complaint about it is reported as bad self rather than argument 0.
+	 */
+	int luaL_argerror(lua_State* const state, int narg, const char* const extramsg)
+	{
+		lua_Debug ar{};
+		(void)lua_getstack(state, 0, &ar);
+		(void)lua_getinfo(state, "n", &ar);
+
+		if (std::strcmp(ar.namewhat, "method") == 0 && --narg == 0) {
+			luaL_error(state, "calling `%s' on bad self (%s)", ar.name, extramsg);
+		}
+
+		if (ar.name == nullptr) {
+			ar.name = "?";
+		}
+
+		return luaL_error(state, "bad argument #%d to `%s' (%s)", narg, ar.name, extramsg);
+	}
+
+	/**
+	 * Address: 0x0090E9A0 (FUN_0090E9A0, luaL_typerror)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_typerror(lua_State *L, int narg, const char *tname);
+	 *
+	 * What it does:
+	 * Raises "expected X, got Y" for an argument of the wrong type.
+	 */
+	int luaL_typerror(lua_State* const state, const int narg, const char* const tname)
+	{
+		const char* const actual = lua_typename(state, lua_type(state, narg));
+		const char* const message = lua_pushfstring(state, "%s expected, got %s", tname, actual);
+		return luaL_argerror(state, narg, message);
+	}
+
+	/**
+	 * Address: 0x0090E420 (FUN_0090E420, luaL_ref)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_ref(lua_State *L, int t);
+	 *
+	 * What it does:
+	 * Stores the value on top of the stack in table `t` and returns an integer
+	 * key for it. Slot 1 heads a free list threaded through the table itself,
+	 * so released references are reused before the table grows. A nil value
+	 * consumes nothing and returns -1.
+	 */
+	int luaL_ref(lua_State* const state, int t)
+	{
+		constexpr int kFreeListSlot = 1;
+		constexpr int kFirstReference = 3;
+		constexpr int kRefNil = -1;
+
+		if (static_cast<unsigned int>(t) >= 0xFFFFD8F1u || t == 0) {
+			t += lua_gettop(state) + 1;
+		}
+
+		if (lua_type(state, -1) == LUA_TNIL) {
+			lua_settop(state, -2);
+			return kRefNil;
+		}
+
+		lua_rawgeti(state, t, kFreeListSlot);
+		const int recycled = static_cast<int>(lua_tonumber(state, -1));
+		lua_settop(state, -2);
+
+		if (recycled != 0) {
+			// Pop the head of the free list and re-point slot 1 at its successor.
+			lua_rawgeti(state, t, recycled);
+			lua_rawseti(state, t, kFreeListSlot);
+			lua_rawseti(state, t, recycled);
+			return recycled;
+		}
+
+		int next = luaL_getn(state, t);
+		if (next < kFirstReference) {
+			next = kFirstReference;
+		}
+
+		++next;
+		luaL_setn(state, t, next);
+		lua_rawseti(state, t, next);
+		return next;
+	}
+
+	/**
+	 * Address: 0x0090E4F0 (FUN_0090E4F0, luaL_unref)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_unref(lua_State *L, int t, int ref);
+	 *
+	 * What it does:
+	 * Releases a reference by pushing its slot onto the free list headed at
+	 * slot 1. Negative references - LUA_REFNIL and LUA_NOREF - are ignored.
+	 */
+	void luaL_unref(lua_State* const state, int t, const int ref)
+	{
+		constexpr int kFreeListSlot = 1;
+
+		if (ref < 0) {
+			return;
+		}
+
+		if (static_cast<unsigned int>(t) >= 0xFFFFD8F1u || t == 0) {
+			t += lua_gettop(state) + 1;
+		}
+
+		lua_rawgeti(state, t, kFreeListSlot);
+		lua_rawseti(state, t, ref);
+		lua_pushnumber(state, static_cast<lua_Number>(ref));
+		lua_rawseti(state, t, kFreeListSlot);
+	}
+
+	/**
+	 * Address: 0x00915190 (FUN_00915190, luaF_getlocalname)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl luaF_getlocalname(const Proto *f, int local_number, int pc);
+	 *
+	 * What it does:
+	 * Names the `local_number`-th local that is live at `pc`. Locals are stored
+	 * in the order they come into scope, so the walk stops as soon as one
+	 * starts after `pc`.
+	 */
+	const char* luaF_getlocalname(const Proto* const proto, int local_number, const int pc)
+	{
+		for (int index = 0; index < proto->sizelocvars; ++index) {
+			const LocVar& local = proto->locvars[index];
+			if (local.startpc > pc) {
+				break;
+			}
+
+			if (pc < local.endpc && --local_number == 0) {
+				return local.varname->str;
+			}
+		}
+
+		return nullptr;
+	}
+
+	/**
+	 * Address: 0x00924300 (FUN_00924300, luaE_newthread)
+	 *
+	 * IDA signature:
+	 * lua_State *__usercall luaE_newthread(lua_State *L);
+	 *
+	 * What it does:
+	 * Creates a coroutine sharing the parent's global state and globals table,
+	 * with its own stack. It goes on the secondary GC root list, not the main
+	 * one.
+	 */
+	lua_State* luaE_newthread(lua_State* const state)
+	{
+		auto* const thread = static_cast<lua_State*>(
+			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(lua_State)))
+		);
+
+		thread->next = state->l_G->rootgc1;
+		state->l_G->rootgc1 = reinterpret_cast<GCObject*>(thread);
+
+		thread->marked = 0;
+		thread->stack = nullptr;
+		thread->stacksize = 0;
+		thread->openupval = nullptr;
+		thread->size_ci = 0;
+		thread->nCcalls = 0;
+		thread->ci = nullptr;
+		thread->base_ci = nullptr;
+		thread->stateUserData = nullptr;
+		thread->_gt.tt = LUA_TNIL;
+		thread->tt = LUA_TTHREAD;
+		thread->l_G = state->l_G;
+
+		lua_stack_init(state, thread);
+		thread->_gt = state->_gt;
+		return thread;
+	}
+
+	/**
+	 * Address: 0x00924370 (FUN_00924370, luaE_freethread)
+	 *
+	 * IDA signature:
+	 * void __usercall luaE_freethread(lua_State *L, lua_State *L1);
+	 *
+	 * What it does:
+	 * Destroys a coroutine: closes its upvalues, then releases its call-info
+	 * array, its stack, and the thread object, all charged to the parent.
+	 */
+	void luaE_freethread(lua_State* const state, lua_State* const thread)
+	{
+		luaF_close(thread, thread->stack);
+		(void)luaM_realloc(state, thread->base_ci, sizeof(CallInfo) * thread->size_ci, 0u);
+		(void)luaM_realloc(state, thread->stack, sizeof(TObject) * thread->stacksize, 0u);
+		(void)luaM_realloc(state, thread, static_cast<lu_mem>(sizeof(lua_State)), 0u);
+	}
+
+	/**
 	 * Address: 0x0092BA10 (FUN_0092BA10, luaZ_init)
 	 *
 	 * IDA signature:
