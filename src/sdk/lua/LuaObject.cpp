@@ -11204,6 +11204,217 @@ extern "C"
 	const TObject* luaV_index(lua_State* state, const TObject* t, const TObject* key, int loop);
 
 	/**
+	 * Address: 0x00914EF0 (FUN_00914EF0, luaF_newLclosure)
+	 *
+	 * IDA signature:
+	 * Closure *__usercall luaF_newLclosure(lua_State *L, int nelems, TObject *e);
+	 *
+	 * What it does:
+	 * Allocates a Lua closure sized for `nelems` upvalues, links it for
+	 * collection, and captures the environment it was created in. The
+	 * prototype and the upvalue array are filled in by the caller.
+	 */
+	Closure* luaF_newLclosure(lua_State* const state, const int nelems, const TObject* const environment)
+	{
+		auto* const closure = static_cast<Closure*>(luaM_realloc(
+			state,
+			nullptr,
+			0u,
+			static_cast<lu_mem>(offsetof(LClosure, upvals) + sizeof(UpVal*) * nelems)
+		));
+
+		luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_TFUNCTION);
+
+		closure->l.g = *environment;
+		closure->l.nupvalues = static_cast<lu_byte>(nelems);
+		return closure;
+	}
+
+	/**
+	 * Address: 0x009138D0 (FUN_009138D0, luaD_reallocstack)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaD_reallocstack(lua_State *L, int newsize);
+	 *
+	 * What it does:
+	 * Resizes the value stack and re-points everything that held a slot into
+	 * the old block. `stack_last` is kept six slots short of the end, which is
+	 * the headroom the API relies on for pushes that do not check first.
+	 */
+	void luaD_reallocstack(lua_State* const state, const int newsize)
+	{
+		constexpr int kStackHeadroom = 6;
+
+		StkId const oldStack = state->stack;
+		auto* const newStack = static_cast<StkId>(luaM_realloc(
+			state,
+			oldStack,
+			static_cast<lu_mem>(sizeof(TObject) * state->stacksize),
+			static_cast<lu_mem>(sizeof(TObject) * newsize)
+		));
+
+		state->stack_last = &newStack[newsize - kStackHeadroom];
+		state->stack = newStack;
+		state->stacksize = newsize;
+		correctstack(state, oldStack);
+	}
+
+	/**
+	 * Address: 0x00913920 (FUN_00913920, luaD_reallocCI)
+	 *
+	 * IDA signature:
+	 * CallInfo *__cdecl luaD_reallocCI(lua_State *L, int newsize);
+	 *
+	 * What it does:
+	 * Resizes the call-info array, rebasing the current frame pointer onto the
+	 * new block. Note the frame count is truncated to 16 bits when end_ci is
+	 * computed, matching size_ci's width.
+	 */
+	void luaD_reallocCI(lua_State* const state, const int newsize)
+	{
+		CallInfo* const oldBase = state->base_ci;
+		const ptrdiff_t activeFrame = state->ci - oldBase;
+
+		auto* const newBase = static_cast<CallInfo*>(luaM_realloc(
+			state,
+			oldBase,
+			static_cast<lu_mem>(sizeof(CallInfo) * state->size_ci),
+			static_cast<lu_mem>(sizeof(CallInfo) * newsize)
+		));
+
+		state->ci = &newBase[activeFrame];
+		state->size_ci = static_cast<std::uint16_t>(newsize);
+		state->base_ci = newBase;
+		state->end_ci = &newBase[static_cast<std::uint16_t>(newsize)];
+	}
+
+	/**
+	 * Address: 0x0090DF30 (FUN_0090DF30, getsizes)
+	 *
+	 * IDA signature:
+	 * void __usercall getsizes(lua_State *L@<esi>);
+	 *
+	 * What it does:
+	 * Pushes the registry's weak-keyed table of array sizes, creating it on
+	 * first use. Weak keys mean a table recorded here does not keep itself
+	 * alive just by having had its length cached.
+	 */
+	static void getsizes(lua_State* const state)
+	{
+		constexpr int kRegistrySizesKey = 2;
+
+		lua_rawgeti(state, LUA_REGISTRYINDEX, kRegistrySizesKey);
+		if (lua_type(state, -1) != LUA_TNIL) {
+			return;
+		}
+
+		lua_settop(state, -2);
+		lua_newtable(state);
+		lua_pushvalue(state, -1);
+		(void)lua_setmetatable(state, -2);
+		lua_pushlstring(state, "__mode", 6u);
+		lua_pushlstring(state, "k", 1u);
+		lua_rawset(state, -3);
+		lua_pushvalue(state, -1);
+		lua_rawseti(state, LUA_REGISTRYINDEX, kRegistrySizesKey);
+	}
+
+	/**
+	 * Address: 0x0090DFB0 (FUN_0090DFB0, luaL_setn)
+	 *
+	 * IDA signature:
+	 * void __cdecl luaL_setn(lua_State *L, int t, int n);
+	 *
+	 * What it does:
+	 * Records a table's length. A table that already carries an `n` field keeps
+	 * using it; otherwise the size goes in the weak side table, so the table
+	 * itself is left unmodified.
+	 */
+	void luaL_setn(lua_State* const state, int t, const int n)
+	{
+		if (static_cast<unsigned int>(t) >= 0xFFFFD8F1u || t == 0) {
+			t += lua_gettop(state) + 1;
+		}
+
+		lua_pushlstring(state, "n", 1u);
+		lua_rawget(state, t);
+
+		int recorded = static_cast<int>(lua_tonumber(state, -1));
+		if (recorded == 0 && lua_isnumber(state, -1) == 0) {
+			recorded = -1;
+		}
+
+		lua_settop(state, -2);
+
+		if (recorded < 0) {
+			getsizes(state);
+			lua_pushvalue(state, t);
+			lua_pushnumber(state, static_cast<lua_Number>(n));
+			lua_rawset(state, -3);
+			lua_settop(state, -2);
+			return;
+		}
+
+		lua_pushlstring(state, "n", 1u);
+		lua_pushnumber(state, static_cast<lua_Number>(n));
+		lua_rawset(state, t);
+	}
+
+	/**
+	 * Address: 0x0090E090 (FUN_0090E090, luaL_getn)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_getn(lua_State *L, int t);
+	 *
+	 * What it does:
+	 * Reports a table's length, in the order the `n` field, then the weak side
+	 * table, then an actual count from index 1 up to the first nil.
+	 */
+	int luaL_getn(lua_State* const state, int t)
+	{
+		if (static_cast<unsigned int>(t) >= 0xFFFFD8F1u || t == 0) {
+			t += lua_gettop(state) + 1;
+		}
+
+		lua_pushlstring(state, "n", 1u);
+		lua_rawget(state, t);
+
+		int recorded = static_cast<int>(lua_tonumber(state, -1));
+		if (recorded == 0 && lua_isnumber(state, -1) == 0) {
+			recorded = -1;
+		}
+
+		lua_settop(state, -2);
+		if (recorded >= 0) {
+			return recorded;
+		}
+
+		getsizes(state);
+		lua_pushvalue(state, t);
+		lua_rawget(state, -2);
+
+		recorded = static_cast<int>(lua_tonumber(state, -1));
+		if (recorded == 0 && lua_isnumber(state, -1) == 0) {
+			recorded = -1;
+		}
+
+		lua_settop(state, -3);
+		if (recorded >= 0) {
+			return recorded;
+		}
+
+		int index = 1;
+		lua_rawgeti(state, t, index);
+		while (lua_type(state, -1) != LUA_TNIL) {
+			lua_settop(state, -2);
+			lua_rawgeti(state, t, ++index);
+		}
+
+		lua_settop(state, -2);
+		return index - 1;
+	}
+
+	/**
 	 * Address: 0x00915090 (FUN_00915090, luaF_freeproto)
 	 *
 	 * IDA signature:
