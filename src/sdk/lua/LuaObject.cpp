@@ -1481,6 +1481,64 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090CD40 (FUN_0090CD40, lua_pushnumber)
+	 * Mangled: ?lua_pushnumber@@YAXPAUlua_State@@M@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushnumber(lua_State *L, float n);
+	 *
+	 * What it does:
+	 * Pushes a number. The binary takes a 4-byte float ("movss xmm0,[esp+n]")
+	 * because this fork's Value::n is float - that is what makes TObject 8
+	 * bytes instead of 12. The parameter stays lua_Number here because
+	 * src/sdk/main.vcxproj never defines LUA_NUMBER, so every existing caller
+	 * passes a double; the narrowing on store is what the binary's callers do
+	 * at their own call sites. Defining LUA_NUMBER=float project-wide would
+	 * remove the conversion, and is worth doing separately.
+	 */
+	void lua_pushnumber(lua_State* const state, const lua_Number n)
+	{
+		TObject* const top = state->top;
+		top->value.n = static_cast<float>(n);
+		top->tt = LUA_TNUMBER;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090CF80 (FUN_0090CF80, lua_pushboolean)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushboolean(lua_State *L, int b);
+	 *
+	 * What it does:
+	 * Pushes a boolean, normalising any non-zero input to 1.
+	 */
+	void lua_pushboolean(lua_State* const state, const int b)
+	{
+		TObject* const top = state->top;
+		top->tt = LUA_TBOOLEAN;
+		top->value.b = (b != 0) ? 1 : 0;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090CFC0 (FUN_0090CFC0, lua_pushlightuserdata)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_pushlightuserdata(lua_State *L, void *p);
+	 *
+	 * What it does:
+	 * Pushes a raw pointer the collector does not own.
+	 */
+	void lua_pushlightuserdata(lua_State* const state, void* const p)
+	{
+		TObject* const top = state->top;
+		top->tt = LUA_TLIGHTUSERDATA;
+		top->value.p = p;
+		api_incr_top(state);
+	}
+
+	/**
 	 * Address: 0x0090CDF0 (FUN_0090CDF0, lua_pushstring)
 	 * Mangled: ?lua_pushstring@@YAXPAUlua_State@@PBD@Z
 	 *
