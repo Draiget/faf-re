@@ -327,7 +327,6 @@ struct global_State
 	int32_t basehookcount;          // Hook countdown reset value.
 	int32_t hookcount;              // Current hook countdown.
 	Hook hook;                      // Active debug hook callback.
-	int8_t unknown160[88];
 };
 
 struct __declspec(align(8)) lua_State
@@ -422,4 +421,10 @@ static_assert(offsetof(global_State, hookmask) == 0x151, "global_State::hookmask
 static_assert(offsetof(global_State, basehookcount) == 0x154, "global_State::basehookcount must be at +0x154 (x86)");
 static_assert(offsetof(global_State, hookcount) == 0x158, "global_State::hookcount must be at +0x158 (x86)");
 static_assert(offsetof(global_State, hook) == 0x15C, "global_State::hook must be at +0x15C (x86)");
+// f_luaopen (FUN_00924470) allocates the object with
+// luaM_realloc(&thread, 0, 0, 0x160u), and its last field write is
+// "mov [ebp+15Ch], ebx" (hook). The struct therefore ends at 0x160 - it used
+// to carry 88 bytes of trailing filler past that, so every global_State access
+// beyond +0x160 ran off the end of the real allocation.
+static_assert(sizeof(global_State) == 0x160, "global_State must be 0x160 bytes (f_luaopen allocates 0x160)");
 #endif
